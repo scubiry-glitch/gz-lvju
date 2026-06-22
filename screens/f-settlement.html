@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>结算付款 · 江苏银行 · 保租房金融端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1d4ed8; --gold: #b45309;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --gold-soft: color-mix(in oklab, var(--gold) 14%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .crumb { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn-gold { background: var(--gold); color: white; }
+    .btn svg { width: 14px; height: 14px; }
+
+    /* hero */
+    .hero {
+      background: linear-gradient(135deg, #0f1a4d 0%, #1d4ed8 60%, #3b82f6 100%);
+      color: white; border-radius: var(--radius-md); padding: 22px 26px; margin-bottom: 16px;
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 28px; align-items: center;
+    }
+    .hero .tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.18); font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+    .hero .l { font-size: 11px; opacity: 0.75; }
+    .hero .v { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    .hero .s { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+    .hero .big .v { font-size: 36px; }
+    .hero-cta { background: var(--gold); color: white; border-radius: var(--radius-sm); padding: 10px 18px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+
+    /* tabs */
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .tab { padding: 10px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); }
+    .tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab .badge { background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px; }
+
+    /* batch list */
+    .batch-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 10px; padding: 14px 18px; }
+    .batch-row { display: grid; grid-template-columns: 2fr 1.4fr 1fr 0.8fr 0.8fr 1fr 0.7fr; gap: 14px; align-items: center; }
+    .batch-row.head { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 18px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 8px; }
+    .op { font-weight: 600; font-size: 13px; }
+    .batch-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .amt { font-weight: 700; font-size: 15px; color: var(--accent); }
+    .amt-locked { color: var(--danger); }
+    .cnt { font-size: 12px; }
+    .cnt small { color: var(--muted); }
+    .st { font-size: 11px; padding: 3px 10px; border-radius: 3px; font-weight: 500; display: inline-block; }
+    .st.ready { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .st.lock { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .st.pending { background: var(--bg); color: var(--muted); }
+    .st.done { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+    .audit { font-size: 11px; color: var(--muted); }
+    .audit .ok { color: var(--success); }
+    .audit .warn { color: var(--warn); }
+    .audit .err { color: var(--danger); }
+    .act { color: var(--accent); font-size: 12px; }
+
+    /* operations panel */
+    .ops { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+    .ops .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .ops h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+    .timeline { font-size: 12px; }
+    .timeline .row { display: grid; grid-template-columns: 60px 1fr; gap: 12px; padding: 7px 0; }
+    .timeline .when { color: var(--muted); }
+    .timeline .what strong { color: var(--accent); }
+    .audit-list .row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 12px; }
+    .audit-list .row:last-child { border-bottom: 0; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot.ok { background: var(--success); }
+    .dot.warn { background: var(--warn); }
+    .dot.err { background: var(--danger); }
+
+    /* sticky bottom bar */
+    .sticky-cta {
+      position: sticky; bottom: 14px; background: var(--fg); color: white;
+      border-radius: var(--radius-md); padding: 14px 22px;
+      display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      box-shadow: 0 10px 30px rgba(15,26,77,0.25);
+    }
+    .sticky-cta .x { font-size: 12px; opacity: 0.7; }
+    .sticky-cta .y { font-weight: 700; font-size: 18px; }
+    .sticky-cta .grow { flex: 1; }
+
+    @media (max-width: 1100px) { .console { grid-template-columns: 1fr; } .side { display: none; } .hero { grid-template-columns: 1fr; } .batch-row { grid-template-columns: 1fr 1fr; } .batch-row.head { display: none; } .ops { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="f" data-active="settlement"></div>
+
+  <main class="main">
+    <div class="crumb">江苏银行 · 保租房通道 / 账户与结算 / 结算付款</div>
+    <div class="topbar">
+      <h1>结算付款</h1>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        下载结算清单
+      </button>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        定时策略
+      </button>
+    </div>
+
+    <!-- hero -->
+    <div class="hero">
+      <div>
+        <span class="tag">本次结算窗口：06-05 00:00 ~ 24:00（T+1 → 06-06 09:00 划付）</span>
+        <div class="big" style="margin-top: 8px;">
+          <div class="l">待划付总额</div>
+          <div class="v">¥ 4,864,560</div>
+          <div class="s">已对账 2,032 笔 · 锁付 3 笔 ¥ 8,420</div>
+        </div>
+      </div>
+      <div>
+        <div class="l">运营商批次</div>
+        <div class="v">6</div>
+        <div class="s">可放行 5 · 部分锁定 1</div>
+      </div>
+      <div>
+        <div class="l">监管账户对账</div>
+        <div class="v" style="color: #86efac;">✓ 闭环</div>
+        <div class="s">差异 ¥ 0 · 连续 92 天</div>
+      </div>
+      <div style="text-align: right;">
+        <button class="hero-cta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          双人复核 → 一键放行
+        </button>
+        <div style="font-size: 11px; opacity: 0.7; margin-top: 6px;">需 普惠金融部 + 运营管理部 双签</div>
+      </div>
+    </div>
+
+    <!-- tabs -->
+    <div class="tabs">
+      <div class="tab on">待发起 <span class="badge">6</span></div>
+      <div class="tab">复核中 <span class="badge">0</span></div>
+      <div class="tab">划付中 <span class="badge">2</span></div>
+      <div class="tab">已完成 <span class="badge">本月 28</span></div>
+      <div class="tab">锁付与异常 <span class="badge">3</span></div>
+    </div>
+
+    <!-- batch list -->
+    <div class="batch-row head">
+      <div>运营商 / 批次号</div>
+      <div>资金构成</div>
+      <div>金额</div>
+      <div>笔数</div>
+      <div>审计</div>
+      <div>状态</div>
+      <div>操作</div>
+    </div>
+
+    <div class="batch-card">
+      <div class="batch-row">
+        <div>
+          <div class="op">南京安居集团（国企持有方→白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-001 · 收款户 6217****8801 · 江苏银行新街口</div>
+        </div>
+        <div class="audit">
+          租金 ¥ 1,386,020 + 押金返还 ¥ 28,400 + 杂费 ¥ 5,940
+        </div>
+        <div class="amt">¥ 1,420,360</div>
+        <div class="cnt">582 笔 <small>租 562 / 押 18 / 杂 2</small></div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="ok">● 公安备案全通过</span><br>
+          <span class="ok">● 合同备案核验通过</span>
+        </div>
+        <div><span class="st ready">可放行</span></div>
+        <div><a class="act" href="#">详情</a></div>
+      </div>
+    </div>
+
+    <div class="batch-card">
+      <div class="batch-row">
+        <div>
+          <div class="op">江苏安居（国企持有方→白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-002 · 收款户 6217****8842 · 江苏银行河西</div>
+        </div>
+        <div class="audit">租金 ¥ 928,180 + 押金返还 ¥ 4,000</div>
+        <div class="amt">¥ 932,180</div>
+        <div class="cnt">401 笔 <small>租 397 / 押 4</small></div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="ok">● 公安备案全通过</span><br>
+          <span class="ok">● 合同备案核验通过</span>
+        </div>
+        <div><span class="st ready">可放行</span></div>
+        <div><a class="act" href="#">详情</a></div>
+      </div>
+    </div>
+
+    <div class="batch-card">
+      <div class="batch-row">
+        <div>
+          <div class="op">江北建发 · 贝壳运营（白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-003 · 收款户 6217****9012 · 江苏银行江北</div>
+        </div>
+        <div class="audit">租金 ¥ 1,098,420 + 杂费 ¥ 10,000</div>
+        <div class="amt">¥ 1,108,420</div>
+        <div class="cnt">476 笔</div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="ok">● 公安备案全通过</span><br>
+          <span class="ok">● 合同备案核验通过</span>
+        </div>
+        <div><span class="st ready">可放行</span></div>
+        <div><a class="act" href="#">详情</a></div>
+      </div>
+    </div>
+
+    <div class="batch-card">
+      <div class="batch-row">
+        <div>
+          <div class="op">自如（南京）（白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-004 · 收款户 6217****7156 · 江苏银行鼓楼</div>
+        </div>
+        <div class="audit">租金 ¥ 642,800</div>
+        <div class="amt">¥ 642,800</div>
+        <div class="cnt">258 笔</div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="ok">● 公安备案全通过</span><br>
+          <span class="warn">● 合同备案：1 件复核中（不阻断）</span>
+        </div>
+        <div><span class="st ready">可放行</span></div>
+        <div><a class="act" href="#">详情</a></div>
+      </div>
+    </div>
+
+    <div class="batch-card">
+      <div class="batch-row">
+        <div>
+          <div class="op">龙湖冠寓（南京）（白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-005 · 收款户 6217****6320 · 江苏银行雨花</div>
+        </div>
+        <div class="audit">租金 ¥ 528,160</div>
+        <div class="amt">¥ 528,160</div>
+        <div class="cnt">219 笔</div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="ok">● 公安备案全通过</span><br>
+          <span class="ok">● 合同备案核验通过</span>
+        </div>
+        <div><span class="st ready">可放行</span></div>
+        <div><a class="act" href="#">详情</a></div>
+      </div>
+    </div>
+
+    <div class="batch-card" style="border-color: color-mix(in oklab, var(--danger) 30%, transparent);">
+      <div class="batch-row">
+        <div>
+          <div class="op">栖霞建设 · 贝壳省心租（白名单运营商）</div>
+          <div class="batch-meta">BATCH-20260606-006 · 收款户 6217****5108 · 江苏银行仙林</div>
+        </div>
+        <div class="audit">租金 ¥ 230,460 + 押金返还 ¥ 2,180 · <span class="err">3 笔 ¥ 8,420 锁付</span></div>
+        <div>
+          <div class="amt">¥ 232,640</div>
+          <div class="amt-locked" style="font-size: 11px;">⊘ ¥ 8,420 锁定</div>
+        </div>
+        <div class="cnt">96 笔 <small>锁 3</small></div>
+        <div class="audit">
+          <span class="ok">● 对账闭环</span><br>
+          <span class="err">● 公安备案：3 笔未办</span><br>
+          <span class="ok">● 合同备案核验通过</span>
+        </div>
+        <div><span class="st lock">部分锁定</span></div>
+        <div><a class="act" href="f-public-security.html">查看锁付</a></div>
+      </div>
+    </div>
+
+    <!-- operations panel -->
+    <div class="ops" style="margin-top: 18px;">
+      <div class="card">
+        <h4>结算节奏</h4>
+        <div class="timeline">
+          <div class="row"><span class="when">D+0 00:00</span><span class="what">监管账户开始汇集租客缴款</span></div>
+          <div class="row"><span class="when">D+0 24:00</span><span class="what">缴款窗口截单</span></div>
+          <div class="row"><span class="when">D+1 02:00</span><span class="what"><strong>金鹰系统</strong>同步公安备案回执</span></div>
+          <div class="row"><span class="when">D+1 04:00</span><span class="what">三方对账（贝壳支付 ↔ 银行 ↔ 住建厅备案）</span></div>
+          <div class="row"><span class="when">D+1 06:00</span><span class="what">系统生成结算批次，进入双人复核队列</span></div>
+          <div class="row"><span class="when">D+1 09:00</span><span class="what"><strong>批量放行</strong>，资金按运营商收款户划付</span></div>
+          <div class="row"><span class="when">D+1 10:30</span><span class="what">划付回执推送给运营商，同步至住建厅资金监管台</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h4>合规审计 · 本次批次</h4>
+        <div class="audit-list">
+          <div class="row"><span class="dot ok"></span><div style="flex:1;">监管账户余额 ≥ 待划付总额</div><span style="color: var(--success); font-weight: 600;">通过</span></div>
+          <div class="row"><span class="dot ok"></span><div style="flex:1;">每个运营商收款户均在白名单且 KYC 有效期内</div><span style="color: var(--success); font-weight: 600;">通过</span></div>
+          <div class="row"><span class="dot ok"></span><div style="flex:1;">划付金额与合同备案逐笔可追溯</div><span style="color: var(--success); font-weight: 600;">通过</span></div>
+          <div class="row"><span class="dot err"></span><div style="flex:1;">公安备案逐笔比对 · 3 笔未通过</div><span style="color: var(--danger); font-weight: 600;">已锁付</span></div>
+          <div class="row"><span class="dot ok"></span><div style="flex:1;">单笔划付限额（≤ ¥ 5,000,000）</div><span style="color: var(--success); font-weight: 600;">通过</span></div>
+          <div class="row"><span class="dot ok"></span><div style="flex:1;">反洗钱规则（流向集中度、可疑模式）</div><span style="color: var(--success); font-weight: 600;">通过</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- sticky bottom CTA -->
+    <div class="sticky-cta">
+      <div>
+        <div class="x">已勾选批次</div>
+        <div class="y">5 个 · ¥ 4,632,920</div>
+      </div>
+      <div>
+        <div class="x">复核人</div>
+        <div class="y">王经理 · 普惠金融部</div>
+      </div>
+      <div>
+        <div class="x">待会签</div>
+        <div class="y">陈主任 · 运营管理部</div>
+      </div>
+      <div class="grow"></div>
+      <button class="btn btn-ghost" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">取消勾选</button>
+      <button class="btn btn-gold">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        提交双人复核
+      </button>
+    </div>
+
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

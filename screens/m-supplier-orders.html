@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>集采订单 + 对账 · 物资供应商 M 端</title>
+  <style>
+    :root {
+      --bg: #faf5ff; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e5e7eb; --accent: #6b21a8;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.55;}
+    a{color:inherit; text-decoration:none}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;}
+    .kpi{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px;}
+    .kpi .lbl{font-size:12px; color:var(--muted);}
+    .kpi .num{font-size:26px; font-weight:700; margin-top:4px; line-height:1.1;}
+    .kpi .delta{font-size:12px; margin-top:6px;}
+    .kpi .delta.up{color:var(--success);}
+    .kpi .delta.warn{color:var(--warn);}
+
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px;}
+    .card-head{padding:13px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0; flex:1;}
+    .card-head .pill{font-size:11px; padding:2px 8px; border-radius:3px;}
+    .card-head .pill.warn{background:#fef3c7; color:#92400e;}
+    .card-head .pill.ok{background:#dcfce7; color:#15803d;}
+    .card-body{padding:0;}
+
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th, td{padding:11px 18px; text-align:left; border-bottom:1px solid #f1f5f9;}
+    th{font-size:11.5px; font-weight:600; color:var(--muted); background:var(--bg); text-transform:uppercase; letter-spacing:0.3px;}
+    tr:last-child td{border-bottom:0;}
+    td.num{font-family:monospace;}
+    .status{display:inline-block; padding:1px 8px; border-radius:3px; font-size:10.5px; font-weight:700;}
+    .status.s1{background:#e0e7ff; color:#3730a3;} /* 已下单 */
+    .status.s2{background:#fef3c7; color:#92400e;} /* 配送中 */
+    .status.s3{background:#dcfce7; color:#15803d;} /* 已验收 */
+    .status.s4{background:#fee2e2; color:#991b1b;} /* 异常 */
+    .money{font-weight:600; font-family:monospace;}
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="m" data-active="orders"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>集采订单 + 对账</h1>
+      <span style="font-size:12px; color:var(--muted);">北新建材 · 2026-06</span>
+      <button class="btn">导出对账单</button>
+      <button class="btn pri">申请开票</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="lbl">本月待发货</div><div class="num">12</div><div class="delta up">↑ 3 单</div></div>
+      <div class="kpi"><div class="lbl">本月已验收</div><div class="num">28</div><div class="delta up">↑ 12% MoM</div></div>
+      <div class="kpi"><div class="lbl">待对账金额</div><div class="num">¥ 86.4 万</div><div class="delta warn">3 单 SLA 临近</div></div>
+      <div class="kpi"><div class="lbl">本月已结算</div><div class="num">¥ 142 万</div><div class="delta up">T+5 准时</div></div>
+    </div>
+
+    <!-- 待对账订单 -->
+    <div class="card">
+      <div class="card-head"><h3>待对账订单</h3><span class="pill warn">3 单临近 SLA</span></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>订单号</th><th>项目</th><th>运营商</th><th>品类 / SKU</th><th>数量</th><th>金额</th><th>状态</th><th>验收 SLA</th></tr></thead>
+          <tbody>
+            <tr><td class="num">PO-2026-0521</td><td>梧桐公馆 · 江宁</td><td>自如</td><td>家具 · FN-BS-001 ×24</td><td>24 套</td><td class="money">¥ 37,920</td><td><span class="status s2">配送中</span></td><td>06-12 截止</td></tr>
+            <tr><td class="num">PO-2026-0528</td><td>江北建发 · 浦口</td><td>龙湖冠寓</td><td>建材 · BM-FL-001 ×360㎡</td><td>360 ㎡</td><td class="money">¥ 31,680</td><td><span class="status s2">配送中</span></td><td>06-14 截止</td></tr>
+            <tr><td class="num">PO-2026-0531</td><td>河西国际社区</td><td>华润有巢</td><td>涂料 · PT-IN-001 ×42 桶</td><td>42 桶</td><td class="money">¥ 15,960</td><td><span class="status s1">已下单</span></td><td>06-18 截止</td></tr>
+            <tr><td class="num">PO-2026-0535</td><td>梧桐公馆 · 江宁</td><td>自如</td><td>建材 · BM-TL-003 ×80㎡</td><td>80 ㎡</td><td class="money">¥ 5,200</td><td><span class="status s4">质检异常</span></td><td>待重发</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 已验收订单 -->
+    <div class="card">
+      <div class="card-head"><h3>本月已验收订单（节选）</h3><span class="pill ok">28 单全部 T+5 准时</span></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>订单号</th><th>项目</th><th>运营商</th><th>品类</th><th>金额</th><th>验收日期</th><th>结算状态</th><th>对账</th></tr></thead>
+          <tbody>
+            <tr><td class="num">PO-2026-0492</td><td>梧桐公馆 · 江宁</td><td>自如</td><td>家具 ×30 套</td><td class="money">¥ 47,400</td><td>06-01</td><td><span class="status s3">已结算</span></td><td><a style="color:var(--accent);">查看 →</a></td></tr>
+            <tr><td class="num">PO-2026-0495</td><td>江北建发</td><td>龙湖冠寓</td><td>建材 ×450㎡</td><td class="money">¥ 39,600</td><td>06-03</td><td><span class="status s3">已结算</span></td><td><a style="color:var(--accent);">查看 →</a></td></tr>
+            <tr><td class="num">PO-2026-0501</td><td>河西国际社区</td><td>华润有巢</td><td>涂料 ×38 桶</td><td class="money">¥ 14,440</td><td>06-05</td><td><span class="status s3">已结算</span></td><td><a style="color:var(--accent);">查看 →</a></td></tr>
+            <tr><td class="num">PO-2026-0512</td><td>玄武紫金家园</td><td>招商伊敦</td><td>家具 + 建材 组合</td><td class="money">¥ 82,500</td><td>06-08</td><td><span class="status s3">已结算</span></td><td><a style="color:var(--accent);">查看 →</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 对账与开票说明 -->
+    <div class="card">
+      <div class="card-head"><h3>对账与开票流程</h3></div>
+      <div style="padding:14px 18px; font-size:12.5px; line-height:1.8;">
+        <div>① 订单完成验收后 T+1，自动生成对账单，运营商签字确认</div>
+        <div>② 月度对账（每月 5 日截止上月订单），可申请开票</div>
+        <div>③ 资金通过 <a href="f-escrow.html" style="color:var(--accent);">江苏银行监管账户</a> 结算，T+5 到账</div>
+        <div>④ 异常处理：质检不达标 → 重发 + 信用积分扣分；连续 2 次异常 → 暂停白名单</div>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); color:var(--muted);">
+          数据回流至 <a href="g-export.html" style="color:var(--accent);">G 端政府数据导出</a> 及 <a href="suppliers.html" style="color:var(--accent);">合格供应商公示</a>（更新供应商入驻项目数）
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

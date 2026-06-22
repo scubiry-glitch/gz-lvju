@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>江苏保租房 · 服务者认证公示门户</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0;
+      --accent: #115e59; --accent-2: #14b8a6;
+      --gold: #ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.55;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    /* gov header strip */
+    .gov-strip{background:linear-gradient(90deg, #064e3b, #115e59); color:white; padding:8px 24px; font-size:11.5px; display:flex; align-items:center; gap:12px;}
+    .gov-strip .emblem{font-size:14px;}
+    .gov-strip .spacer{flex:1;}
+    .gov-strip a{opacity:0.85;}
+    .gov-strip a:hover{opacity:1;}
+
+    /* top nav */
+    .navbar{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 24px; display:flex; align-items:center; gap:18px;}
+    .brand{display:flex; align-items:center; gap:10px;}
+    .brand-mark{width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; color:white; font-weight:700;}
+    .brand-text .nm{font-size:14px; font-weight:600; color:var(--accent);}
+    .brand-text .sub{font-size:11px; color:var(--muted);}
+    .nav-links{display:flex; gap:24px; margin-left:auto; font-size:13px;}
+    .nav-links a{color:var(--muted);}
+    .nav-links a.on{color:var(--accent); font-weight:600;}
+    .nav-cta{padding:6px 14px; background:var(--accent); color:white; border-radius:6px; font-size:12.5px; font-weight:600;}
+
+    /* hero search */
+    .hero{padding:48px 24px 36px; background:linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%); border-bottom:1px solid var(--border); position:relative; overflow:hidden;}
+    .hero::after{content:''; position:absolute; right:-80px; top:-80px; width:280px; height:280px; border-radius:50%; background:radial-gradient(circle, color-mix(in oklab, var(--accent-2) 30%, transparent), transparent 70%); pointer-events:none;}
+    .hero-inner{max-width:1080px; margin:0 auto; position:relative;}
+    .hero h1{font-size:30px; font-weight:700; margin:0; color:var(--fg);}
+    .hero h1 .em{color:var(--accent);}
+    .hero p{font-size:14px; color:var(--muted); margin:8px 0 24px;}
+    .seal{display:inline-flex; align-items:center; gap:8px; padding:6px 14px; background:rgba(202,138,4,0.08); color:var(--gold); border:1px solid rgba(202,138,4,0.3); border-radius:999px; font-size:12px; font-weight:600; margin-bottom:14px;}
+
+    .search-box{display:flex; gap:0; background:var(--surface); border:2px solid var(--accent); border-radius:12px; overflow:hidden; box-shadow:0 8px 24px rgba(17,94,89,0.12); max-width:780px;}
+    .search-tab-row{display:flex; gap:0; padding:8px 8px 0;}
+    .stab{flex:0 0 auto; padding:8px 16px; font-size:12.5px; color:var(--muted); border-radius:6px; cursor:pointer;}
+    .stab.on{background:color-mix(in oklab, var(--accent) 10%, transparent); color:var(--accent); font-weight:600;}
+    .search-input{flex:1; display:flex; align-items:center; padding:14px 18px; gap:10px;}
+    .search-input svg{width:20px; height:20px; color:var(--muted); flex-shrink:0;}
+    .search-input input{flex:1; border:0; outline:none; background:transparent; font-size:16px; font-family:inherit;}
+    .search-btn{padding:0 28px; background:var(--accent); color:white; font-size:14px; font-weight:600;}
+    .hint{margin-top:10px; font-size:12px; color:var(--muted);}
+    .hint .ex{color:var(--accent); font-family:var(--mono); padding:1px 5px; background:color-mix(in oklab, var(--accent) 6%, transparent); border-radius:3px; cursor:pointer;}
+
+    /* entry cards */
+    .entries{max-width:1080px; margin:32px auto; padding:0 24px;}
+    .entries-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:14px;}
+    .ec{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 18px; cursor:pointer; transition:border-color 0.15s, transform 0.15s;}
+    .ec:hover{border-color:var(--accent); transform:translateY(-2px);}
+    .ec .ic{font-size:32px; margin-bottom:10px;}
+    .ec .nm{font-size:15px; font-weight:600; margin-bottom:4px;}
+    .ec .cnt{font-size:11px; color:var(--accent); font-weight:600;}
+    .ec .desc{font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5;}
+
+    /* stats strip */
+    .stats{background:linear-gradient(90deg, #064e3b, #115e59); color:white; padding:24px;}
+    .stats-grid{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:repeat(4, 1fr); gap:18px; text-align:center;}
+    .stat .v{font-size:30px; font-weight:800; line-height:1; font-family:var(--mono);}
+    .stat .l{font-size:11px; opacity:0.85; margin-top:6px; letter-spacing:0.5px;}
+    .stat .delta{font-size:11px; opacity:0.85; margin-top:2px;}
+
+    /* recent verify */
+    .section{max-width:1080px; margin:36px auto; padding:0 24px;}
+    .section-h{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;}
+    .section-h h2{font-size:18px; font-weight:600; margin:0;}
+    .section-h a{font-size:12.5px; color:var(--accent);}
+
+    .recent-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;}
+    .rv{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; display:flex; gap:12px; align-items:center;}
+    .rv .av{width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); color:white; display:grid; place-items:center; font-weight:700; font-size:15px; flex-shrink:0; position:relative;}
+    .rv .av .lv{position:absolute; bottom:-2px; right:-2px; font-size:8px; padding:1px 4px; border-radius:5px; color:white; border:2px solid white; font-weight:700;}
+    .rv .lv.L3{background:linear-gradient(135deg, #047857, #10b981);}
+    .rv .lv.L4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .rv .lv.L5{background:linear-gradient(135deg, #7c3aed, #a855f7);}
+    .rv .body .nm{font-size:13.5px; font-weight:600;}
+    .rv .body .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .rv .v{margin-left:auto; font-size:11px; color:var(--success); font-weight:600;}
+
+    /* policy + report */
+    .col-2{display:grid; grid-template-columns:2fr 1fr; gap:18px;}
+    .panel{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:18px 20px;}
+    .panel h3{font-size:15px; font-weight:600; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+    .panel h3 .ic{color:var(--accent);}
+    .policy-row{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:13px;}
+    .policy-row:last-child{border-bottom:0;}
+    .policy-row .nm{color:var(--fg);}
+    .policy-row .date{font-size:11px; color:var(--muted); font-family:var(--mono);}
+
+    .report-card{padding:14px 16px; background:linear-gradient(135deg, #fef3c7, #fde68a); border-radius:8px; margin-bottom:12px;}
+    .report-card .ic{font-size:24px;}
+    .report-card .nm{font-size:13.5px; font-weight:600; color:#78350f; margin-top:6px;}
+    .report-card .desc{font-size:11.5px; color:#92400e; margin-top:4px; line-height:1.55;}
+    .report-card .cta{display:inline-flex; align-items:center; gap:4px; margin-top:10px; padding:7px 14px; background:#ca8a04; color:white; border-radius:6px; font-size:12px; font-weight:600;}
+
+    /* footer */
+    .footer{background:#0c1f1c; color:#94a3b8; padding:32px 24px 24px; margin-top:36px;}
+    .footer-inner{max-width:1080px; margin:0 auto; display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:24px;}
+    .footer h4{color:white; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; margin:0 0 10px;}
+    .footer p{font-size:12px; line-height:1.6;}
+    .footer a{color:#94a3b8; font-size:12px; display:block; padding:3px 0;}
+    .footer-bot{max-width:1080px; margin:24px auto 0; padding-top:20px; border-top:1px solid #1e3a3f; text-align:center; font-size:11px;}
+
+    @media (max-width: 900px){
+      .entries-grid, .recent-grid, .stats-grid{grid-template-columns:repeat(2, 1fr);}
+      .col-2{grid-template-columns:1fr;}
+      .footer-inner{grid-template-columns:1fr 1fr;}
+      .hero h1{font-size:24px;}
+      .navbar .nav-links{display:none;}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- gov strip -->
+  <div class="gov-strip">
+    <span class="emblem">⚖</span>
+    <span>江苏省人民政府 · 住房和城乡建设厅 主办</span>
+    <span class="spacer"></span>
+    <a>政府网站</a>
+    <a>无障碍</a>
+    <a>简体 / EN</a>
+  </div>
+
+  <!-- nav -->
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-mark">认</div>
+      <div class="brand-text">
+        <div class="nm">江苏保租房 · 服务者认证公示门户</div>
+        <div class="sub">National Affordable Rental Service Certification Portal</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a class="on">公示查询</a>
+      <a>认证体系</a>
+      <a>政策法规</a>
+      <a>投诉举报</a>
+      <a>关于</a>
+    </div>
+    <a class="nav-cta">扫码验真</a>
+  </nav>
+
+  <!-- hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="seal">✓ 政府背书 · 平台运营 · 商业准入</span>
+      <h1>查询<span class="em">真实有效</span>的保租房服务者 / 服务商</h1>
+      <p>全省 2,468 名服务者 · 312 家服务商 · 已上链可验真 · T+0 同步更新</p>
+
+      <div class="search-box">
+        <div class="search-tab-row">
+          <span class="stab on">服务者</span>
+          <span class="stab">服务商</span>
+          <span class="stab">房源</span>
+          <span class="stab">运营方</span>
+          <span class="stab">物资批次</span>
+        </div>
+        <div class="search-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input placeholder="输入证书编号 / 姓名 / 手机号后 4 位 / 公司名" />
+          <button class="search-btn">查 询</button>
+        </div>
+      </div>
+      <div class="hint">
+        试试：<span class="ex">NJ-BZF-L4-2024-0021</span>　·　<span class="ex">陈*国</span>　·　<span class="ex">优家装饰</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 entries -->
+  <section class="entries">
+    <div class="entries-grid">
+      <a class="ec">
+        <div class="ic">👷</div>
+        <div class="nm">服务者认证名册</div>
+        <div class="cnt">2,468 人</div>
+        <div class="desc">L0-L7 八级 · 12 类岗位 · 实时同步</div>
+      </a>
+      <a class="ec">
+        <div class="ic">🏭</div>
+        <div class="nm">服务商认证名册</div>
+        <div class="cnt">312 家</div>
+        <div class="desc">含装修 / 家具 / 检修 / 服家</div>
+      </a>
+      <a class="ec">
+        <div class="ic">🏘</div>
+        <div class="nm">房源公示</div>
+        <div class="cnt">4,608 套</div>
+        <div class="desc">46 个白名单项目 · 含星级</div>
+      </a>
+      <a class="ec">
+        <div class="ic">🛒</div>
+        <div class="nm">物资批次验真</div>
+        <div class="cnt">6 类 · 18 家</div>
+        <div class="desc">家具/家电/建材/智能锁/涂料/卫浴 · 扫码看具体批次去向</div>
+      </a>
+      <a class="ec">
+        <div class="ic">🛡</div>
+        <div class="nm">投诉 / 可疑举报</div>
+        <div class="cnt">12345 · 7×24</div>
+        <div class="desc">匿名举报 · 必查必复</div>
+      </a>
+      <a class="ec" href="property-intake-api.html">
+        <div class="ic">🔌</div>
+        <div class="nm">房源接入 API</div>
+        <div class="cnt">v1.2 · 6-8 周</div>
+        <div class="desc">面向运营机构 / 国资业主 / 项目方的统一房屋数据接入规范</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- stats -->
+  <section class="stats">
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="v">2,780</div>
+        <div class="l">在册认证（人+家）</div>
+        <div class="delta">↑ 312 本月</div>
+      </div>
+      <div class="stat">
+        <div class="v">18,432</div>
+        <div class="l">本月扫码验真</div>
+        <div class="delta">↑ 24% 同比</div>
+      </div>
+      <div class="stat">
+        <div class="v">99.0%</div>
+        <div class="l">区块链上链率</div>
+        <div class="delta">实时同步</div>
+      </div>
+      <div class="stat">
+        <div class="v">26</div>
+        <div class="l">累计已吊销</div>
+        <div class="delta">公示透明</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- recent verify -->
+  <section class="section">
+    <div class="section-h">
+      <h2>最近被扫码验真</h2>
+      <a>查看更多 →</a>
+    </div>
+    <div class="recent-grid">
+      <a class="rv" href="portal-verify.html">
+        <div class="av">陈<span class="lv L4">L4</span></div>
+        <div class="body">
+          <div class="nm">陈*国</div>
+          <div class="meta">旅居房管 · 江宁 · 3 分钟前</div>
+        </div>
+        <span class="v">✓ 真</span>
+      </a>
+      <a class="rv">
+        <div class="av">王<span class="lv L4">L4</span></div>
+        <div class="body">
+          <div class="nm">王*琳</div>
+          <div class="meta">旅居门店 · 建邺 · 8 分钟前</div>
+        </div>
+        <span class="v">✓ 真</span>
+      </a>
+      <a class="rv">
+        <div class="av" style="background:linear-gradient(135deg, #c2410c, #ea580c);">优<span class="lv L5">L5</span></div>
+        <div class="body">
+          <div class="nm">优家装饰</div>
+          <div class="meta">装修服务商 · 14 分钟前</div>
+        </div>
+        <span class="v">✓ 真</span>
+      </a>
+      <a class="rv">
+        <div class="av">郑<span class="lv L3">L3</span></div>
+        <div class="body">
+          <div class="nm">郑*涛</div>
+          <div class="meta">旅居管家 · 江北 · 22 分钟前</div>
+        </div>
+        <span class="v">✓ 真</span>
+      </a>
+      <a class="rv">
+        <div class="av">林<span class="lv L4">L4</span></div>
+        <div class="body">
+          <div class="nm">林*英</div>
+          <div class="meta">服家督导 · 栖霞 · 38 分钟前</div>
+        </div>
+        <span class="v">✓ 真</span>
+      </a>
+      <a class="rv">
+        <div class="av" style="background:linear-gradient(135deg, #6b7280, #9ca3af);">钱<span class="lv L2" style="background:#dc2626;">!</span></div>
+        <div class="body">
+          <div class="nm">钱*宝</div>
+          <div class="meta">已吊销 · 不可雇佣 · 1h 前</div>
+        </div>
+        <span class="v" style="color:var(--danger);">✗ 失效</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- policies + report -->
+  <section class="section">
+    <div class="col-2">
+      <div class="panel">
+        <h3><span class="ic">📜</span> 最新政策与公告</h3>
+        <div class="policy-row"><span class="nm">L0-L7 八级认证标准（v3.0）正式发布</span><span class="date">2026-06-04</span></div>
+        <div class="policy-row"><span class="nm">服务商负责人 L5 商业认证考·考纲调整</span><span class="date">2026-05-28</span></div>
+        <div class="policy-row"><span class="nm">月度数据回流报送规范（市监督局）</span><span class="date">2026-05-20</span></div>
+        <div class="policy-row"><span class="nm">公示门户上线 v3·新增扫码验真</span><span class="date">2026-05-10</span></div>
+        <div class="policy-row"><span class="nm">服务者「持续升级」通道开放（L4→L5）</span><span class="date">2026-04-28</span></div>
+      </div>
+
+      <div class="panel">
+        <h3><span class="ic">🛡</span> 发现可疑？立即举报</h3>
+        <div class="report-card">
+          <div class="ic">⚠️</div>
+          <div class="nm">遇到没有公示的"自称服务者"？</div>
+          <div class="desc">所有上岗服务者必须公示。如发现冒充、超出认证范围、强制收费等行为，请立即举报。</div>
+          <a class="cta">📞 12345 一键投诉</a>
+        </div>
+        <div style="font-size:11.5px; color:var(--muted); line-height:1.6;">
+          <b style="color:var(--fg);">本月处置</b><br>
+          投诉受理 28 · 闭环 24 · 平均处置 1.4 天 · 满意度 96%
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <h4>关于公示门户</h4>
+        <p>由江苏省住房和城乡建设厅授权运营，所有认证数据由<b style="color:white;">「服务认证中台」</b>统一管理，公开透明、实时同步、可验真、可追溯。</p>
+      </div>
+      <div>
+        <h4>查询服务</h4>
+        <a>服务者认证</a><a>服务商认证</a><a>房源公示</a><a>运营方白名单</a>
+      </div>
+      <div>
+        <h4>政府服务</h4>
+        <a>政策法规</a><a>标准体系</a><a>统计数据</a><a>新闻发布</a>
+      </div>
+      <div>
+        <h4>联系我们</h4>
+        <a>12345 · 政务热线</a><a>住建局信箱</a><a>开发者接入 API</a>
+      </div>
+    </div>
+    <div class="footer-bot">
+      © 2026 江苏省住建厅 · 公示门户 v3.0 · 苏 ICP 备 20*****1 号 · 公网安备 320*****0001
+    </div>
+  </footer>
+
+<script>
+  document.querySelectorAll('.stab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.stab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+</body>
+</html>

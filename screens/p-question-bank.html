@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>题库与试卷 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    /* sidebar */
+    .brand-text .nm{font-size:13px; font-weight:600;}
+    .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    /* main */
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);}
+    .crumb b{color:var(--fg); font-weight:600; font-size:14px; margin-right:2px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI mini */
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:220px 1fr 400px; gap:14px;}
+
+    /* tree */
+    .tree-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px;}
+    .tree-card h4{font-size:11px; color:var(--muted); letter-spacing:0.6px; text-transform:uppercase; margin:0 0 10px;}
+    .tree-search{padding:6px 10px; background:var(--line); border-radius:6px; font-size:12px; color:var(--muted); margin-bottom:10px;}
+    .tree li{list-style:none; font-size:12.5px; cursor:pointer; padding:5px 8px; border-radius:5px; display:flex; align-items:center; gap:6px;}
+    .tree li:hover{background:var(--line);}
+    .tree li.on{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+    .tree li.parent{font-weight:600; margin-top:6px;}
+    .tree ul{list-style:none; padding:0 0 0 14px; margin:2px 0;}
+    .tree li .cnt{margin-left:auto; font-size:10px; color:var(--muted); font-weight:400;}
+    .tree li.on .cnt{color:var(--accent);}
+
+    /* question list */
+    .pane{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); display:flex; flex-direction:column; overflow:hidden;}
+    .pane-top{display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line);}
+    .pane-top h3{font-size:14px; font-weight:600; margin:0;}
+    .pane-top .pill{font-size:11px; padding:2px 8px; background:var(--line); color:var(--muted); border-radius:3px;}
+    .pane-top .pri{margin-left:auto; padding:6px 12px; background:var(--accent); color:white; border-radius:6px; font-size:12px; font-weight:500;}
+
+    .filter-row{display:flex; gap:6px; padding:10px 18px; border-bottom:1px solid var(--line); overflow-x:auto;}
+    .fchip{flex-shrink:0; font-size:12px; padding:4px 10px; border-radius:999px; background:var(--line); color:var(--muted); border:1px solid transparent;}
+    .fchip.on{color:var(--accent); border-color:var(--accent); background:var(--accent-soft);}
+
+    .qtable{padding:0;}
+    .qrow{padding:14px 18px; border-bottom:1px solid var(--line); cursor:pointer; display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start;}
+    .qrow:hover{background:var(--line);}
+    .qrow.on{background:var(--accent-soft);}
+    .qrow .qid{font-family:var(--mono); font-size:11px; color:var(--muted); background:var(--line); padding:2px 6px; border-radius:3px; align-self:start;}
+    .qrow .qbody{min-width:0;}
+    .qrow .qttl{font-size:13px; font-weight:500; margin-bottom:5px; line-height:1.5;}
+    .qrow .qmeta{display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--muted); align-items:center;}
+    .qrow .qmeta .qtype{padding:1px 6px; background:var(--line); border-radius:3px; font-weight:500;}
+    .qrow .qmeta .diff{display:inline-flex; gap:1px;}
+    .qrow .qmeta .diff span{width:8px; height:6px; background:var(--border); border-radius:1px;}
+    .qrow .qmeta .diff.d1 span:nth-child(-n+1),
+    .qrow .qmeta .diff.d2 span:nth-child(-n+2),
+    .qrow .qmeta .diff.d3 span:nth-child(-n+3),
+    .qrow .qmeta .diff.d4 span:nth-child(-n+4),
+    .qrow .qmeta .diff.d5 span:nth-child(-n+5){background:var(--warn);}
+    .qrow .qmeta .stat{display:flex; gap:8px;}
+    .qrow .qmeta .stat .v{color:var(--fg); font-weight:600;}
+    .qrow .qmeta .stat .v.warn{color:var(--warn);}
+    .qrow .qmeta .stat .v.danger{color:var(--danger);}
+    .qrow .qmeta .tg{font-size:10px; padding:1px 5px; background:var(--surface); border:1px solid var(--border); border-radius:3px;}
+    .qrow .qmeta .tg.pub{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success); border-color:transparent;}
+    .qrow .qmeta .tg.draft{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn); border-color:transparent;}
+    .qrow .qmeta .tg.rev{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger); border-color:transparent;}
+
+    /* detail */
+    .detail{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .detail h3{font-size:14px; font-weight:600; margin:0 0 6px;}
+    .detail h3 .qid{font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-soft); padding:2px 6px; border-radius:3px; margin-left:6px;}
+    .detail .subm{font-size:11px; color:var(--muted); margin-bottom:14px;}
+    .detail .stem{font-size:14px; padding:14px; background:var(--line); border-radius:6px; margin-bottom:14px; line-height:1.6;}
+    .opt-list{display:flex; flex-direction:column; gap:8px; margin-bottom:14px;}
+    .opt{padding:10px 12px; border:1px solid var(--border); border-radius:6px; display:flex; gap:10px; font-size:13px;}
+    .opt .lbl{font-weight:600; color:var(--muted);}
+    .opt.correct{border-color:var(--success); background:color-mix(in oklab, var(--success) 5%, transparent);}
+    .opt.correct .lbl{color:var(--success);}
+    .opt.correct::after{content:'✓ 正解'; margin-left:auto; font-size:11px; color:var(--success); font-weight:600;}
+
+    .det-section{margin-bottom:12px;}
+    .det-section h4{font-size:11px; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; margin:0 0 6px;}
+    .det-section .body{font-size:12.5px; line-height:1.6;}
+    .det-section .body em{font-style:normal; color:var(--muted);}
+
+    .stat-row{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;}
+    .stat-row .sc{padding:8px; background:var(--line); border-radius:5px; text-align:center;}
+    .stat-row .sc .l{font-size:10px; color:var(--muted);}
+    .stat-row .sc .v{font-size:14px; font-weight:700; margin-top:2px;}
+    .stat-row .sc .v.warn{color:var(--warn);}
+
+    .actbar{display:flex; gap:6px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line);}
+    .actbar .btn{flex:1; text-align:center;}
+
+    @media (max-width: 1200px){
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+      .content{grid-template-columns:180px 1fr 360px;}
+    }
+    @media (max-width: 1000px){
+      .content{grid-template-columns:1fr; grid-template-rows:auto auto auto;}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="question-bank"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>题库与试卷</b></div>
+      <div class="top-actions">
+        <button class="btn">下载题库</button>
+        <button class="btn">批量导入</button>
+        <button class="btn pri">+ 新建试卷</button>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">题目总数</div><div class="n">1,248<span class="u">道</span></div><div class="d">↑ 38 本周</div></div>
+      <div class="ki"><div class="l">试卷模板</div><div class="n">84<span class="u">套</span></div><div class="d">11 工种</div></div>
+      <div class="ki"><div class="l">本月通过率</div><div class="n">89.5<span class="u">%</span></div><div class="d">健康区间</div></div>
+      <div class="ki"><div class="l">题目质量分</div><div class="n">A−<span class="u">/B+ 占比 82%</span></div><div class="d">区分度 0.42</div></div>
+      <div class="ki"><div class="l">审核中</div><div class="n" style="color:var(--warn);">32</div><div class="d" style="color:var(--warn);">含 6 单改版</div></div>
+      <div class="ki"><div class="l">高错率告警</div><div class="n" style="color:var(--danger);">7</div><div class="d" style="color:var(--danger);">错率 &gt; 80%</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- tree -->
+      <div class="tree-card">
+        <h4>分类</h4>
+        <div class="tree-search">🔍 搜分类 / 章节</div>
+        <ul class="tree">
+          <li style="color:var(--accent); font-size:10px; font-weight:600; letter-spacing:0.5px; padding:6px 8px 2px;">第一阶段 · 6 类核心岗位</li>
+          <li class="parent">⌃ 经纪服务者（186）</li>
+          <ul>
+            <li>客户接待与画像 42</li>
+            <li class="on">合同与备案 <span class="cnt">62</span></li>
+            <li>带看与转化 38</li>
+            <li>合规与反佣 28</li>
+            <li>客诉处理 16</li>
+          </ul>
+          <li class="parent">⌃ 旅居门店（148）</li>
+          <ul>
+            <li>店面运营 32</li>
+            <li>团队管理基础 36</li>
+            <li>财务与对账 28</li>
+            <li>到访接待 28</li>
+            <li>VIP 服务 24</li>
+          </ul>
+          <li class="parent">⌃ 旅居房管（142）</li>
+          <li class="parent">⌃ 房源托管（118）</li>
+          <li class="parent">⌃ 入住服务（98）</li>
+          <li class="parent">⌃ 客服投诉处理（86）</li>
+          <li style="color:var(--success); font-size:10px; font-weight:600; letter-spacing:0.5px; padding:10px 8px 2px;">第二阶段 · 6 类延伸岗位</li>
+          <li class="parent">⌃ 检修（156）</li>
+          <li class="parent">⌃ 保洁（124）</li>
+          <li class="parent">⌃ 服家（72）</li>
+          <li class="parent">＋ 装修交付（试 64）</li>
+          <li class="parent">＋ 四保一服（48）</li>
+          <li class="parent">＋ 服务商负责人（86）</li>
+        </ul>
+      </div>
+
+      <!-- question list -->
+      <div class="pane">
+        <div class="pane-top">
+          <h3>经纪服务者 · 合同与备案</h3>
+          <span class="pill">62 题</span>
+          <span class="pill">L2-L4 适配</span>
+          <button class="pri">+ 新增题</button>
+        </div>
+        <div class="filter-row">
+          <span class="fchip on">全部 62</span>
+          <span class="fchip">单选 36</span>
+          <span class="fchip">多选 12</span>
+          <span class="fchip">判断 8</span>
+          <span class="fchip">情景实操 6</span>
+          <span class="fchip">难度 ≥ 4</span>
+          <span class="fchip">高错率</span>
+        </div>
+        <div class="qtable">
+          <div class="qrow on">
+            <span class="qid">Q-1042</span>
+            <div class="qbody">
+              <div class="qttl">客户离家前要求"完全恢复"室内布置，正确处理顺序是？</div>
+              <div class="qmeta">
+                <span class="qtype">单选</span>
+                <span class="diff d3"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v">78%</span></span><span>区分度 <span class="v">0.48</span></span><span>使用 <span class="v">12 套</span></span></span>
+                <span class="tg pub">PUB</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1043</span>
+            <div class="qbody">
+              <div class="qttl">下列哪种摆放方式可降低布草发霉风险？</div>
+              <div class="qmeta">
+                <span class="qtype">单选</span>
+                <span class="diff d2"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v">92%</span></span><span>区分度 <span class="v">0.32</span></span></span>
+                <span class="tg pub">PUB</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1044</span>
+            <div class="qbody">
+              <div class="qttl">情景：客户家中有 3 个易碎物展示架。请描述拍照备份与归位的完整流程。</div>
+              <div class="qmeta">
+                <span class="qtype">情景实操</span>
+                <span class="diff d5"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v warn">42%</span></span><span>区分度 <span class="v">0.62</span></span><span>批改 <span class="v">人工</span></span></span>
+                <span class="tg pub">PUB</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1045</span>
+            <div class="qbody">
+              <div class="qttl">以下属于"客户隐私物品"的有？（多选）</div>
+              <div class="qmeta">
+                <span class="qtype">多选</span>
+                <span class="diff d4"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v warn">36%</span></span><span>区分度 <span class="v">0.18</span></span></span>
+                <span class="tg rev">改版中</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1046</span>
+            <div class="qbody">
+              <div class="qttl">"客户允许范围" 包含哪些区域？</div>
+              <div class="qmeta">
+                <span class="qtype">多选</span>
+                <span class="diff d3"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v">84%</span></span><span>区分度 <span class="v">0.41</span></span></span>
+                <span class="tg pub">PUB</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1047</span>
+            <div class="qbody">
+              <div class="qttl">下列做法是否符合"少打扰"原则？</div>
+              <div class="qmeta">
+                <span class="qtype">判断</span>
+                <span class="diff d1"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v">96%</span></span><span>区分度 <span class="v">0.12</span></span></span>
+                <span class="tg draft">待审</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1048</span>
+            <div class="qbody">
+              <div class="qttl">情景：在归位过程中发现客户私人贵重物品被前一服务者损坏，应？</div>
+              <div class="qmeta">
+                <span class="qtype">情景实操</span>
+                <span class="diff d5"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v warn">28%</span></span><span>区分度 <span class="v">0.71</span></span><span style="color:var(--danger);">⚠ 题库待评估</span></span>
+                <span class="tg rev">高错</span>
+              </div>
+            </div>
+          </div>
+          <div class="qrow">
+            <span class="qid">Q-1049</span>
+            <div class="qbody">
+              <div class="qttl">家庭"动线"梳理的目的是？</div>
+              <div class="qmeta">
+                <span class="qtype">单选</span>
+                <span class="diff d2"><span></span><span></span><span></span><span></span><span></span></span>
+                <span class="stat"><span>通过 <span class="v">88%</span></span></span>
+                <span class="tg pub">PUB</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- detail -->
+      <div class="detail">
+        <h3>题目详情 <span class="qid">Q-1042</span></h3>
+        <div class="subm">家政 · 物品归位与整理 · 单选 · 难度 ★★★ · 创建于 2025-11-12 · 修订 4 次</div>
+        <div class="stem">
+          客户离家前要求"完全恢复"室内布置。在服务结束、临走前的 5 分钟内，<strong>正确的处理顺序</strong>是？
+        </div>
+        <div class="opt-list">
+          <div class="opt"><span class="lbl">A.</span>关窗 → 摆放原位 → 清点贵重物 → 拍归位照</div>
+          <div class="opt correct"><span class="lbl">B.</span>清点贵重物 → 拍归位照 → 摆放原位 → 关窗</div>
+          <div class="opt"><span class="lbl">C.</span>摆放原位 → 关窗 → 拍归位照 → 清点</div>
+          <div class="opt"><span class="lbl">D.</span>关窗 → 拍归位照 → 清点 → 摆放原位</div>
+        </div>
+
+        <div class="det-section">
+          <h4>解析</h4>
+          <div class="body">先<strong>清点贵重物 + 拍归位照</strong>能形成可追溯证据链，再<em>摆放</em>能避免遗漏，最后<em>关窗</em>属于离家最后一步。</div>
+        </div>
+
+        <div class="det-section">
+          <h4>知识点 / 技能映射</h4>
+          <div class="body">
+            <span style="font-size:11px; padding:2px 7px; background:var(--accent-soft); color:var(--accent); border-radius:3px;">证据链管理</span>
+            <span style="font-size:11px; padding:2px 7px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:4px;">动线收尾</span>
+            <span style="font-size:11px; padding:2px 7px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:4px;">L3 实操技能</span>
+          </div>
+        </div>
+
+        <div class="det-section">
+          <h4>统计</h4>
+          <div class="stat-row">
+            <div class="sc"><div class="l">作答次数</div><div class="v">3,184</div></div>
+            <div class="sc"><div class="l">通过率</div><div class="v">78%</div></div>
+            <div class="sc"><div class="l">区分度</div><div class="v">0.48</div></div>
+            <div class="sc"><div class="l">A 选率</div><div class="v warn">18%</div></div>
+            <div class="sc"><div class="l">B（正确）</div><div class="v">78%</div></div>
+            <div class="sc"><div class="l">C+D 选率</div><div class="v">4%</div></div>
+          </div>
+        </div>
+
+        <div class="actbar">
+          <button class="btn">查看错题人群</button>
+          <button class="btn">编辑</button>
+          <button class="btn pri">克隆改版</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.qrow').forEach(r => r.addEventListener('click', () => {
+    document.querySelectorAll('.qrow').forEach(x => x.classList.remove('on'));
+    r.classList.add('on');
+  }));
+  document.querySelectorAll('.fchip').forEach(r => r.addEventListener('click', () => r.classList.toggle('on')));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

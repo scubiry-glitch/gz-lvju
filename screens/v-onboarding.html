@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>入驻申请 · 保租房 V 端</title>
+  <style>
+    :root {
+      --bg: #fef7ed; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #c2410c;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* progress steps */
+    .stepper{display:grid; grid-template-columns:repeat(5, 1fr); gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px 20px; margin-bottom:18px;}
+    .step{position:relative; padding-top:34px;}
+    .step::before{content:''; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:18px; height:18px; border-radius:50%; background:var(--bg); border:2px solid var(--border); font-size:10px; display:grid; place-items:center; font-weight:700; color:var(--muted); z-index:2;}
+    .step.done::before{background:var(--success); border-color:var(--success); content:'✓'; color:white;}
+    .step.now::before{background:var(--accent); border-color:var(--accent); content:attr(data-n); color:white;}
+    .step:not(:last-child)::after{content:''; position:absolute; top:17px; left:50%; right:-50%; height:2px; background:var(--border);}
+    .step.done:not(:last-child)::after{background:var(--success);}
+    .step .nm{text-align:center; font-size:12.5px; font-weight:600;}
+    .step .meta{text-align:center; font-size:11px; color:var(--muted); margin-top:2px;}
+    .step.now .nm{color:var(--accent);}
+
+    /* form grid 2 col */
+    .row2{display:grid; grid-template-columns:1.5fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .card-head{padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; font-size:12px;}
+    .card-head .actions a{color:var(--accent);}
+    .card-body{padding:18px 20px;}
+
+    /* form fields */
+    .field{margin-bottom:14px;}
+    .field:last-child{margin-bottom:0;}
+    .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px;}
+    .field label .req{color:var(--danger); margin-left:2px;}
+    .field input, .field select, .field textarea{width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--bg); outline:none; font-family:inherit;}
+    .field input:focus, .field textarea:focus{border-color:var(--accent); background:var(--surface);}
+    .field textarea{min-height:78px; resize:vertical;}
+    .field .hint{font-size:11px; color:var(--muted); margin-top:4px;}
+    .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+    /* upload */
+    .upload-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    .up-card{padding:12px; background:var(--bg); border:2px dashed var(--border); border-radius:8px; display:flex; gap:10px; align-items:center;}
+    .up-card.done{border-style:solid; border-color:var(--success); background:color-mix(in oklab, var(--success) 6%, transparent);}
+    .up-card.warn{border-color:var(--warn);}
+    .up-card .ic{width:36px; height:36px; border-radius:8px; background:var(--surface); color:var(--accent); display:grid; place-items:center; font-size:18px; flex-shrink:0;}
+    .up-card.done .ic{background:var(--success); color:white;}
+    .up-card .body{flex:1; min-width:0;}
+    .up-card .nm{font-size:13px; font-weight:600;}
+    .up-card .nm .req{color:var(--danger); margin-left:3px;}
+    .up-card .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .up-card .stat{font-size:11px; color:var(--accent); font-weight:600;}
+    .up-card.done .stat{color:var(--success);}
+
+    /* cases */
+    .case-row{display:flex; gap:10px; padding:12px; background:var(--bg); border-radius:8px; margin-bottom:8px;}
+    .case-row .pic{width:60px; height:60px; border-radius:6px; background:linear-gradient(135deg, #ffedd5, #fdba74); display:grid; place-items:center; flex-shrink:0; font-size:24px;}
+    .case-row .body{flex:1;}
+    .case-row .nm{font-size:13.5px; font-weight:600;}
+    .case-row .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .case-row .stats{display:flex; gap:10px; font-size:11px; margin-top:6px;}
+    .case-row .stats b{color:var(--fg); font-weight:600;}
+    .case-row .actions{display:flex; gap:6px;}
+    .case-row .actions a{font-size:11px; color:var(--accent);}
+
+    /* checklist for L5 exam */
+    .ck-grid{display:grid; grid-template-columns:1fr; gap:8px;}
+    .ck-row{display:flex; gap:10px; padding:10px 12px; background:var(--bg); border-radius:6px; align-items:center; font-size:12.5px;}
+    .ck-row .ic{font-size:14px; flex-shrink:0;}
+    .ck-row.done .ic{color:var(--success);}
+    .ck-row.warn .ic{color:var(--warn);}
+    .ck-row.todo .ic{color:var(--muted);}
+    .ck-row .body{flex:1;}
+    .ck-row .nm{font-weight:600;}
+    .ck-row .meta{font-size:11px; color:var(--muted); margin-top:1px;}
+    .ck-row .v{font-size:11px; font-weight:600;}
+    .ck-row.done .v{color:var(--success);}
+    .ck-row.warn .v{color:var(--warn);}
+
+    /* status panel right */
+    .stat-card{background:linear-gradient(135deg, #fff7ed, #ffedd5); border:1px solid #fed7aa; border-radius:var(--radius-md); padding:18px 20px; margin-bottom:14px;}
+    .stat-card h3{font-size:13px; font-weight:600; margin:0 0 6px; color:var(--accent);}
+    .stat-card .big{font-size:32px; font-weight:800; color:var(--accent); line-height:1; margin-bottom:8px;}
+    .stat-card .desc{font-size:12px; color:#9a3412;}
+    .stat-card .meta-row{display:flex; justify-content:space-between; font-size:11px; color:#9a3412; margin-top:10px; padding-top:10px; border-top:1px dashed #fed7aa;}
+    .stat-card .meta-row b{color:var(--accent); font-weight:700;}
+
+    /* reviewer notes */
+    .rv-note{padding:10px 12px; background:var(--bg); border-left:3px solid var(--accent); border-radius:5px; font-size:12px; margin-bottom:8px;}
+    .rv-note .head{display:flex; justify-content:space-between; margin-bottom:4px; align-items:center;}
+    .rv-note .who{font-weight:600; font-size:11px;}
+    .rv-note .t{font-size:10px; color:var(--muted);}
+    .rv-note .ctx{font-size:12px; line-height:1.5;}
+
+    /* bottom action */
+    .bot-bar{position:sticky; bottom:0; margin-top:18px; padding:14px 20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); display:flex; align-items:center; gap:12px; box-shadow:0 -2px 12px rgba(0,0,0,0.06);}
+    .bot-bar .save{font-size:12px; color:var(--muted);}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="v" data-active="onboarding"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>服务商入驻申请</h1>
+      <span style="font-size:12px; color:var(--muted);">VEN-2026-0118 · 申请进度 70% · 平台审核中</span>
+      <button class="btn">保存草稿</button>
+      <button class="btn pri">提交审核</button>
+    </div>
+
+    <!-- 5-step stepper -->
+    <div class="stepper">
+      <div class="step done"><div class="nm">基本资料</div><div class="meta">2026-06-04</div></div>
+      <div class="step done"><div class="nm">资质上传</div><div class="meta">2026-06-05</div></div>
+      <div class="step now" data-n="3"><div class="nm">案例与背调</div><div class="meta">进行中</div></div>
+      <div class="step"><div class="nm">L5 商业认证考</div><div class="meta">待预约</div></div>
+      <div class="step"><div class="nm">现场踏勘 + 签约</div><div class="meta">7 个工作日内</div></div>
+    </div>
+
+    <div class="row2">
+
+      <!-- LEFT main form -->
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <h3>① 基本资料</h3>
+            <span class="pill">✓ 已审核</span>
+            <div class="actions"><a>修改 →</a></div>
+          </div>
+          <div class="card-body">
+            <div class="field-row">
+              <div class="field"><label>公司名称 <span class="req">*</span></label><input value="优家装饰工程有限公司" disabled style="background:var(--bg); color:var(--fg);"></div>
+              <div class="field"><label>统一社会信用代码 <span class="req">*</span></label><input value="91320105MA1XXXX0XX" disabled style="background:var(--bg);"></div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>主营业务（参考"服务供给岗位 12 类"）</label><input value="装修交付 · 服家 · 检修" disabled style="background:var(--bg);"></div>
+              <div class="field"><label>注册资本 / 成立时间</label><input value="¥500 万 · 2018-04" disabled style="background:var(--bg);"></div>
+            </div>
+            <div class="field"><label>负责人 / 联系方式</label><input value="吴志强 · 138****5546 · wuzq@youjia.com" disabled style="background:var(--bg);"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head">
+            <h3>② 资质上传</h3>
+            <span class="pill">✓ 4/4 已通过</span>
+          </div>
+          <div class="card-body">
+            <div class="upload-grid">
+              <div class="up-card done">
+                <div class="ic">📄</div>
+                <div class="body"><div class="nm">营业执照 <span class="req">*</span></div><div class="meta">国家市监查重 ✓ · 2.4 MB</div></div>
+                <span class="stat">已核</span>
+              </div>
+              <div class="up-card done">
+                <div class="ic">🏛</div>
+                <div class="body"><div class="nm">行业资质 <span class="req">*</span></div><div class="meta">装饰二级 · 江苏住建厅签发</div></div>
+                <span class="stat">已核</span>
+              </div>
+              <div class="up-card done">
+                <div class="ic">🌳</div>
+                <div class="body"><div class="nm">环保 / 安全证书</div><div class="meta">两项均合规</div></div>
+                <span class="stat">已核</span>
+              </div>
+              <div class="up-card done">
+                <div class="ic">📊</div>
+                <div class="body"><div class="nm">3 年财报（脱敏）</div><div class="meta">营收 / 纳税 / 用工证明</div></div>
+                <span class="stat">已核</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px; border-color:var(--accent); border-width:2px;">
+          <div class="card-head" style="background:color-mix(in oklab, var(--accent) 5%, transparent);">
+            <h3>③ 案例与背调 <span style="color:var(--accent); font-size:12px; margin-left:8px;">· 当前阶段</span></h3>
+            <span class="pill">2/3 案例 · 背调进行中</span>
+          </div>
+          <div class="card-body">
+            <div class="field"><label>历史合作项目案例（至少 3 个）<span class="req">*</span></label></div>
+            <div class="case-row">
+              <div class="pic">🏠</div>
+              <div class="body">
+                <div class="nm">百家湖樾 · 软装交付 38 套</div>
+                <div class="meta">2024-09 → 2024-12 · 委托方：江苏安居</div>
+                <div class="stats"><span>合同额 <b>¥86 万</b></span><span>客评 <b style="color:var(--success);">4.92</b></span><span>逾期 <b style="color:var(--success);">0 单</b></span></div>
+              </div>
+              <div class="actions"><a>查看资料</a><a>编辑</a></div>
+            </div>
+            <div class="case-row">
+              <div class="pic">🏘</div>
+              <div class="body">
+                <div class="nm">河西新青年 · 整装交付 12 套</div>
+                <div class="meta">2025-04 → 2025-06 · 委托方：南京安居</div>
+                <div class="stats"><span>合同额 <b>¥42 万</b></span><span>客评 <b style="color:var(--success);">4.86</b></span><span>逾期 <b>1 单（4 天）</b></span></div>
+              </div>
+              <div class="actions"><a>查看资料</a><a>编辑</a></div>
+            </div>
+            <div style="padding:24px; border:2px dashed var(--border); border-radius:8px; text-align:center; color:var(--muted); margin-bottom:14px;">
+              + 上传第 3 个案例（必填）
+            </div>
+
+            <div class="field"><label>背景调查 / 行业污点查重</label></div>
+            <div class="ck-grid">
+              <div class="ck-row done"><div class="ic">✓</div><div class="body"><div class="nm">国家市监 · 经营异常名录</div><div class="meta">无记录</div></div><span class="v">通过</span></div>
+              <div class="ck-row done"><div class="ic">✓</div><div class="body"><div class="nm">中国裁判文书网 · 涉诉查询</div><div class="meta">2 件，均为劳务合同，已和解</div></div><span class="v">可解释</span></div>
+              <div class="ck-row warn"><div class="ic">⚠</div><div class="body"><div class="nm">12345 投诉热线 · 历史投诉</div><div class="meta">2024 年 3 件，已整改归档</div></div><span class="v">需说明</span></div>
+              <div class="ck-row todo"><div class="ic">○</div><div class="body"><div class="nm">区域同业 · 互查反馈</div><div class="meta">向 6 家同业征求意见</div></div><span class="v" style="color:var(--muted);">第 3 天 · 待回复 2 家</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head">
+            <h3>④ L5 商业认证考</h3>
+            <span class="pill" style="background:var(--bg); color:var(--muted);">待预约</span>
+          </div>
+          <div class="card-body">
+            <div style="font-size:12.5px; line-height:1.6; color:var(--muted); margin-bottom:12px;">
+              L5 等级特有：服务商负责人需通过<b style="color:var(--fg);">商业认证考</b>（商业模式 + 财务 + 合规 + 用工，120 题 / 通过线 ≥ 80）。
+              通过后可进入"现场踏勘"。
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn">查看考纲</button>
+              <button class="btn">下载样题</button>
+              <button class="btn pri">预约考试时间</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT status -->
+      <div>
+        <div class="stat-card">
+          <h3>申请进度</h3>
+          <div class="big">70%</div>
+          <div class="desc">阶段 3 / 5 · 平台审核员已分配</div>
+          <div class="meta-row">
+            <span>提交时间</span><b>2026-06-04 11:42</b>
+          </div>
+          <div class="meta-row" style="margin-top:4px;">
+            <span>预计完成</span><b>2026-06-15 ~ 06-18</b>
+          </div>
+          <div class="meta-row" style="margin-top:4px;">
+            <span>审核员</span><b>赵审核 · ZJ-008</b>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>审核回执</h3></div>
+          <div class="card-body">
+            <div class="rv-note">
+              <div class="head"><span class="who">赵审核 · 平台审核组</span><span class="t">1h 前</span></div>
+              <div class="ctx">案例 2 中"4 天逾期"请补 1 张完工签收照 + 业主谅解说明，作为同期对照资料。</div>
+            </div>
+            <div class="rv-note">
+              <div class="head"><span class="who">系统提示</span><span class="t">06-05 14:00</span></div>
+              <div class="ctx">12345 投诉历史已标记为"需说明"，请上传 2024 年整改总结报告 PDF（&lt; 5 MB）。</div>
+            </div>
+            <div class="rv-note">
+              <div class="head"><span class="who">赵审核</span><span class="t">06-05 09:30</span></div>
+              <div class="ctx">资质 4 项全部通过 ✓，进入案例阶段，请按进度推进。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>申请后的权益预览</h3></div>
+          <div class="card-body" style="font-size:12.5px; line-height:1.7;">
+            <div>📋 进入<b style="color:var(--accent);">服务商白名单</b>（住建厅 + 平台联签）</div>
+            <div>🎯 可对接 <b>3 家国企持有方 + 白名单运营商</b>项目池（南京安居 / 江苏安居 / 江北建发）</div>
+            <div>👥 旗下可签约 <b>≤ 50 人</b>（L1-L4）经平台认证服务者</div>
+            <div>💰 项目制结算 T+5 · 平台分润 88%</div>
+            <div>🏛 获得"政府品牌使用权"标识</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bot-bar">
+      <span class="save">最后保存：1 分钟前 · 自动保存开启</span>
+      <button class="btn" style="margin-left:auto;">退出</button>
+      <button class="btn">保存草稿</button>
+      <button class="btn pri">提交本阶段审核 →</button>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>收银台 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .payhead{text-align:center;padding:18px 20px 8px;}
+  .payhead .amt{font-family:var(--serif);font-size:34px;font-weight:800;color:var(--ink);}
+  .payhead .on{font-size:11px;color:var(--muted);margin-top:5px;}
+  .payhead .cd{display:inline-block;margin-top:8px;font-size:11px;font-weight:600;color:var(--gold-deep);background:var(--gold-soft);padding:3px 11px;border-radius:999px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar">
+      <a class="bk" href="lvju-app-booking.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="ttl">收银台<small>选择支付方式</small></div>
+    </div>
+
+    <div class="steps">
+      <span class="st done"><span class="n">✓</span>预定下单</span><span class="sep">›</span>
+      <span class="st on"><span class="n">2</span>支付</span><span class="sep">›</span>
+      <span class="st"><span class="n">3</span>完成</span>
+    </div>
+
+    <div class="payhead">
+      <div class="amt">¥1,176</div>
+      <div class="on">订单号 LJ20260614-8821 · 云上观景民宿 · 2 晚</div>
+      <div class="cd">⏱ 请在 14:59 内完成支付</div>
+    </div>
+
+    <div class="seg">选择支付方式</div>
+    <div>
+      <div class="payopt sel"><div class="pi" style="background:var(--brand-soft)">🐚</div>
+        <div class="nm">贝壳支付<small>资金存管 · 入住确认后结算给房东</small></div><div class="rd"></div></div>
+      <div class="payopt"><div class="pi" style="background:#dcfce7">💚</div>
+        <div class="nm">微信支付</div><div class="rd"></div></div>
+      <div class="payopt"><div class="pi" style="background:#dbeafe">🏦</div>
+        <div class="nm">贵州银行 APP<small>可分期 · 积分抵扣</small></div><div class="rd"></div></div>
+      <div class="payopt"><div class="pi" style="background:#fef9c3">🧳</div>
+        <div class="nm">同程支付</div><div class="rd"></div></div>
+      <div class="payopt"><div class="pi" style="background:#ffedd5">🍔</div>
+        <div class="nm">美团支付</div><div class="rd"></div></div>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);padding:14px 18px 18px;line-height:1.6;">
+      🛡 贝壳存管：付款后资金冻结在监管账户，入住确认无误后才结算给房东，未入住可按协议退款。
+    </div>
+  </div>
+
+  <div class="cta">
+    <a class="btn" href="lvju-app-paid.html" style="flex:1;text-align:center;">确认支付 ¥1,176</a>
+  </div>
+</div>
+</body>
+</html>

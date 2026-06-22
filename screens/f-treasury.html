@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>资金流水大盘 · 江苏银行 · 保租房金融端</title>
+  <style>
+    :root {
+      --bg: #0b1024; --surface: #131938; --panel: #1a2147;
+      --fg: #e9eeff; --muted: #8896c4; --border: rgba(255,255,255,0.08);
+      --accent: #60a5fa; --gold: #fbbf24;
+      --success: #34d399; --warn: #fb923c; --danger: #f87171;
+      --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+    a { color: inherit; text-decoration: none; }
+    .wrap { padding: 18px 24px 28px; max-width: 1480px; margin: 0 auto; }
+
+    /* top */
+    .top {
+      background: linear-gradient(135deg, #0f1a4d 0%, #1d4ed8 50%, #3b82f6 100%);
+      border-radius: var(--radius-md); padding: 16px 22px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 18px; position: relative; overflow: hidden;
+    }
+    .top::after { content: '¥'; position: absolute; right: 16px; bottom: -36px; font-size: 130px; opacity: 0.1; font-weight: 900; }
+    .top .em {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); display: grid; place-items: center;
+    }
+    .top .em svg { width: 24px; height: 24px; color: white; }
+    .top .ttl { flex: 1; }
+    .top h1 { font-size: 20px; font-weight: 700; margin: 0; }
+    .top .sub { font-size: 12px; opacity: 0.85; }
+    .top .right { text-align: right; font-size: 12px; opacity: 0.85; }
+    .top .right .now { font-size: 16px; font-weight: 600; opacity: 1; margin-bottom: 2px; }
+
+    /* KPI strip */
+    .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; position: relative; }
+    .kpi::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+    .kpi.gold::before { background: var(--gold); }
+    .kpi.ok::before { background: var(--success); }
+    .kpi.warn::before { background: var(--warn); }
+    .kpi .l { font-size: 11px; color: var(--muted); }
+    .kpi .n { font-size: 22px; font-weight: 700; margin-top: 4px; line-height: 1.1; }
+    .kpi .u { font-size: 12px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+    .kpi .d { font-size: 11px; margin-top: 4px; color: var(--muted); }
+    .kpi .d.ok { color: var(--success); }
+
+    /* main grid */
+    .grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .card h3 { font-size: 13px; font-weight: 600; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+    .card h3 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .card h3 .sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: auto; }
+
+    /* flow chart - faux */
+    .flow-chart { display: flex; align-items: flex-end; gap: 6px; height: 200px; padding: 8px 0; }
+    .fb { flex: 1; background: linear-gradient(180deg, var(--accent), transparent); border-radius: 3px 3px 0 0; position: relative; min-height: 6px; }
+    .fb::after { content: attr(data-v); position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .fb.out { background: linear-gradient(180deg, var(--gold), transparent); }
+    .flow-x { display: flex; gap: 6px; font-size: 10px; color: var(--muted); padding-top: 4px; }
+    .flow-x span { flex: 1; text-align: center; }
+    .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .legend .sw { display: inline-block; width: 14px; height: 8px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+    /* breakdown */
+    .pie-row { display: flex; gap: 14px; align-items: center; }
+    .donut {
+      width: 110px; height: 110px; flex-shrink: 0; border-radius: 50%;
+      background: conic-gradient(
+        var(--accent) 0% 42%,
+        var(--gold) 42% 68%,
+        var(--success) 68% 86%,
+        var(--warn) 86% 100%
+      );
+      display: grid; place-items: center; position: relative;
+    }
+    .donut::before { content: ''; position: absolute; inset: 22px; background: var(--surface); border-radius: 50%; }
+    .donut-txt { position: relative; z-index: 1; text-align: center; }
+    .donut-txt .n { font-size: 18px; font-weight: 700; }
+    .donut-txt .l { font-size: 10px; color: var(--muted); }
+    .pie-list { flex: 1; font-size: 12px; }
+    .pie-row-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .pie-row-item .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .pie-row-item .lbl { flex: 1; color: var(--muted); }
+    .pie-row-item strong { color: var(--fg); font-weight: 600; }
+
+    /* topflow */
+    .topflow-list { list-style: none; margin: 0; padding: 0; max-height: 230px; overflow-y: auto; }
+    .tfl { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .tfl:last-child { border-bottom: 0; }
+    .tfl .ix { width: 22px; height: 22px; border-radius: 4px; background: var(--panel); display: grid; place-items: center; font-weight: 700; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+    .tfl .ix.g { background: var(--gold); color: #422006; }
+    .tfl .nm { font-weight: 500; }
+    .tfl .mt { color: var(--muted); font-size: 11px; margin-top: 1px; }
+    .tfl .v { color: var(--accent); font-weight: 600; font-size: 13px; margin-left: auto; }
+
+    /* bottom row */
+    .row-bot { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* multi project table */
+    table.pj { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.pj th, table.pj td { padding: 9px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.pj th { color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: 0.5px; }
+    table.pj tr:last-child td { border-bottom: 0; }
+    .ok-cell { color: var(--success); font-weight: 600; }
+    .warn-cell { color: var(--warn); font-weight: 600; }
+
+    /* yearchart */
+    .yc { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding: 8px 0; }
+    .yb { flex: 1; background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 40%, transparent)); border-radius: 2px 2px 0 0; position: relative; min-height: 8px; }
+    .yb::after { content: attr(data-v); position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .yc-x { display: flex; gap: 6px; font-size: 10px; color: var(--muted); padding-top: 4px; }
+    .yc-x span { flex: 1; text-align: center; }
+
+    @media (max-width: 1100px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+      .row-bot { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+<div id="side-nav" data-series="f" data-active="treasury"></div>
+<div class="wrap">
+
+  <!-- top -->
+  <div class="top">
+    <div class="em">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M3 10h18"/><path d="M12 3l9 7-9-1-9 1z"/></svg>
+    </div>
+    <div class="ttl">
+      <h1>江苏银行 · 保租房资金流水大盘</h1>
+      <div class="sub">监管账户 + 公积金直付 + 自营银行卡 三通道汇总 · 数据每 5 分钟同步</div>
+    </div>
+    <div class="right">
+      <div class="now">2026-06-05 09:41:32</div>
+      <div>本期：2026 年 6 月</div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpis">
+    <div class="kpi gold"><div class="l">监管账户余额</div><div class="n">¥ 24.82<span class="u"> M</span></div><div class="d ok">↑ ¥3.2M 月初至今</div></div>
+    <div class="kpi"><div class="l">本月入账</div><div class="n">¥ 9.13<span class="u"> M</span></div><div class="d ok">↑ 4.2% 环比</div></div>
+    <div class="kpi"><div class="l">本月划付</div><div class="n">¥ 8.94<span class="u"> M</span></div><div class="d">运营方 6 家</div></div>
+    <div class="kpi ok"><div class="l">公积金直付占比</div><div class="n">39.6%</div><div class="d ok">↑ 5.2 pp 同比</div></div>
+    <div class="kpi warn"><div class="l">活期日均沉淀</div><div class="n">¥ 22.4<span class="u"> M</span></div><div class="d">银行储蓄收益</div></div>
+  </div>
+
+  <!-- main grid -->
+  <div class="grid">
+
+    <div class="card">
+      <h3><span class="dot"></span> 资金流向（近 12 月） <span class="sub">蓝=入账 / 金=划付</span></h3>
+      <div class="flow-chart">
+        <div class="fb" style="height: 30%" data-v=""></div>
+        <div class="fb out" style="height: 26%" data-v=""></div>
+        <div class="fb" style="height: 36%" data-v=""></div>
+        <div class="fb out" style="height: 32%" data-v=""></div>
+        <div class="fb" style="height: 42%" data-v=""></div>
+        <div class="fb out" style="height: 38%" data-v=""></div>
+        <div class="fb" style="height: 50%" data-v=""></div>
+        <div class="fb out" style="height: 46%" data-v=""></div>
+        <div class="fb" style="height: 58%" data-v=""></div>
+        <div class="fb out" style="height: 54%" data-v=""></div>
+        <div class="fb" style="height: 68%" data-v=""></div>
+        <div class="fb out" style="height: 64%" data-v=""></div>
+        <div class="fb" style="height: 76%" data-v=""></div>
+        <div class="fb out" style="height: 72%" data-v=""></div>
+        <div class="fb" style="height: 82%" data-v=""></div>
+        <div class="fb out" style="height: 78%" data-v=""></div>
+        <div class="fb" style="height: 86%" data-v=""></div>
+        <div class="fb out" style="height: 82%" data-v=""></div>
+        <div class="fb" style="height: 90%" data-v=""></div>
+        <div class="fb out" style="height: 86%" data-v=""></div>
+        <div class="fb" style="height: 94%" data-v=""></div>
+        <div class="fb out" style="height: 90%" data-v=""></div>
+        <div class="fb" style="height: 98%" data-v="9.13M"></div>
+        <div class="fb out" style="height: 96%" data-v="8.94M"></div>
+      </div>
+      <div class="flow-x">
+        <span>7月</span><span></span>
+        <span>8月</span><span></span>
+        <span>9月</span><span></span>
+        <span>10月</span><span></span>
+        <span>11月</span><span></span>
+        <span>12月</span><span></span>
+        <span>1月</span><span></span>
+        <span>2月</span><span></span>
+        <span>3月</span><span></span>
+        <span>4月</span><span></span>
+        <span>5月</span><span></span>
+        <span>6月</span><span></span>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background: var(--accent);"></span>入账（租客缴款）</span>
+        <span><span class="sw" style="background: var(--gold);"></span>划付（T+1 至运营方）</span>
+        <span style="margin-left: auto;">同比 +180.4%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background: var(--gold);"></span> 支付渠道占比 <span class="sub">本月入账</span></h3>
+      <div class="pie-row">
+        <div class="donut"><div class="donut-txt"><div class="n">¥ 9.13M</div><div class="l">本月入账</div></div></div>
+        <div class="pie-list">
+          <div class="pie-row-item"><span class="sw" style="background: var(--accent);"></span><span class="lbl">江苏银行借记卡</span><strong>42% · 3.83M</strong></div>
+          <div class="pie-row-item"><span class="sw" style="background: var(--gold);"></span><span class="lbl">公积金直付</span><strong>26% · 2.37M</strong></div>
+          <div class="pie-row-item"><span class="sw" style="background: var(--success);"></span><span class="lbl">微信支付</span><strong>18% · 1.64M</strong></div>
+          <div class="pie-row-item"><span class="sw" style="background: var(--warn);"></span><span class="lbl">支付宝</span><strong>14% · 1.29M</strong></div>
+        </div>
+      </div>
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted);">
+        <div style="display: flex; justify-content: space-between;"><span>江苏银行直接渠道占比</span><strong style="color: var(--success);">68%</strong></div>
+        <div style="display: flex; justify-content: space-between; margin-top: 4px;"><span>目标（年底）</span><strong>75%</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background: var(--success);"></span> 运营方划付 Top 6 <span class="sub">本月</span></h3>
+      <ul class="topflow-list">
+        <li class="tfl">
+          <div class="ix g">1</div>
+          <div><div class="nm">南京安居集团</div><div class="mt">12 项目 / 3,438 笔</div></div>
+          <div class="v">¥ 2.94 M</div>
+        </li>
+        <li class="tfl">
+          <div class="ix">2</div>
+          <div><div class="nm">江北建发</div><div class="mt">3 项目 / 868 笔</div></div>
+          <div class="v">¥ 1.82 M</div>
+        </li>
+        <li class="tfl">
+          <div class="ix">3</div>
+          <div><div class="nm">江苏安居</div><div class="mt">4 项目 / 1,148 笔</div></div>
+          <div class="v">¥ 1.46 M</div>
+        </li>
+        <li class="tfl">
+          <div class="ix">4</div>
+          <div><div class="nm">苏宁置业</div><div class="mt">2 项目 / 562 笔</div></div>
+          <div class="v">¥ 1.12 M</div>
+        </li>
+        <li class="tfl">
+          <div class="ix">5</div>
+          <div><div class="nm">金陵新华</div><div class="mt">2 项目 / 484 笔</div></div>
+          <div class="v">¥ 0.94 M</div>
+        </li>
+        <li class="tfl">
+          <div class="ix">6</div>
+          <div><div class="nm">溧水城投</div><div class="mt">1 项目 / 152 笔</div></div>
+          <div class="v">¥ 0.66 M</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- bottom -->
+  <div class="row-bot">
+
+    <div class="card">
+      <h3><span class="dot"></span> 项目级资金沉淀 <span class="sub">监管专户余额</span></h3>
+      <table class="pj">
+        <thead><tr><th>项目</th><th>在租房源</th><th>本月入账</th><th>专户余额</th><th>沉淀天数</th></tr></thead>
+        <tbody>
+          <tr><td>梧桐公馆人才公寓</td><td>620</td><td>¥ 1.42 M</td><td>¥ 5.18 M</td><td class="ok-cell">11</td></tr>
+          <tr><td>河西青年公寓</td><td>480</td><td>¥ 1.34 M</td><td>¥ 4.84 M</td><td class="ok-cell">12</td></tr>
+          <tr><td>江北未来谷公寓</td><td>720</td><td>¥ 1.81 M</td><td>¥ 6.42 M</td><td class="ok-cell">11</td></tr>
+          <tr><td>龙江新青年社区</td><td>360</td><td>¥ 0.94 M</td><td>¥ 3.16 M</td><td class="ok-cell">10</td></tr>
+          <tr><td>南部新城人才家园</td><td>540</td><td>¥ 1.06 M</td><td>¥ 3.42 M</td><td class="warn-cell">9</td></tr>
+          <tr><td>仙林湖国际社区</td><td>420</td><td>¥ 0.71 M</td><td>¥ 1.80 M</td><td class="warn-cell">8</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background: var(--gold);"></span> 公积金直付年度趋势 <span class="sub">单位：笔</span></h3>
+      <div class="yc">
+        <div class="yb" style="height: 20%;" data-v="142"></div>
+        <div class="yb" style="height: 28%;" data-v="218"></div>
+        <div class="yb" style="height: 36%;" data-v="284"></div>
+        <div class="yb" style="height: 44%;" data-v="362"></div>
+        <div class="yb" style="height: 52%;" data-v="432"></div>
+        <div class="yb" style="height: 62%;" data-v="528"></div>
+        <div class="yb" style="height: 70%;" data-v="612"></div>
+        <div class="yb" style="height: 76%;" data-v="688"></div>
+        <div class="yb" style="height: 84%;" data-v="762"></div>
+        <div class="yb" style="height: 90%;" data-v="848"></div>
+        <div class="yb" style="height: 96%;" data-v="918"></div>
+        <div class="yb" style="height: 99%;" data-v="966"></div>
+      </div>
+      <div class="yc-x">
+        <span>7月</span><span>8月</span><span>9月</span><span>10月</span><span>11月</span><span>12月</span>
+        <span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span>
+      </div>
+      <div style="margin-top: 14px; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; padding-top: 12px; border-top: 1px solid var(--border);">
+        <span>累计开通 <strong style="color: var(--fg);">1,284 户</strong> · 月活 <strong style="color: var(--fg);">966 户</strong></span>
+        <span style="color: var(--success);">同比 +580%</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

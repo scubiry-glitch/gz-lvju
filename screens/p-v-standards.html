@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>V 人力服务商分级标准 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg:#f8fafc; --surface:#fff; --fg:#0f172a;
+      --muted:#64748b; --border:#e2e8f0; --line:#f1f5f9;
+      --accent:#c2410c; --accent-soft:color-mix(in oklab, var(--accent) 10%, transparent);
+      --success:#16a34a; --warn:#ea580c; --danger:#dc2626;
+      --radius-sm:6px; --radius-md:10px;
+      --font:ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:22px 28px; display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .lv-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;}
+    .lv-card{padding:14px; border-radius:8px; color:#fff; min-height:280px; display:flex; flex-direction:column; gap:8px;}
+    .lv-card.l1{background:linear-gradient(135deg,#7c2d12,#c2410c);}
+    .lv-card.l2{background:linear-gradient(135deg,#9a3412,#ea580c);}
+    .lv-card.l3{background:linear-gradient(135deg,#7e22ce,#a855f7);}
+    .lv-card .hd{display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);}
+    .lv-card .lv{font-size:18px; font-weight:700;}
+    .lv-card .lvl-name{font-size:12px; opacity:0.85;}
+    .lv-card .row{font-size:11.5px; line-height:1.55;}
+    .lv-card .row .k{font-size:10px; opacity:0.7; text-transform:uppercase; letter-spacing:0.4px;}
+    .lv-card .row .v{display:block; margin-top:2px;}
+    .lv-card .ct{margin-top:auto; padding-top:8px; border-top:1px solid rgba(255,255,255,0.2); font-size:11px; opacity:0.85;}
+
+    .ck{display:flex; gap:10px; padding:9px 12px; background:var(--line); border-radius:6px; margin-bottom:6px; font-size:12px;}
+    .ck .ic{color:var(--success); font-weight:700;}
+    .ck .body{flex:1;}
+    .ck .nm{font-weight:600;}
+    .ck .val{font-size:11px; color:var(--muted); margin-top:1px;}
+
+    .gate-table{font-size:12px; width:100%; border-collapse:collapse;}
+    .gate-table th, .gate-table td{padding:9px 10px; text-align:left; border-bottom:1px solid var(--line);}
+    .gate-table th{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px;}
+    .gate-table td.num{font-family:ui-monospace, Menlo, monospace; text-align:right;}
+    .gate-table tr:last-child td{border-bottom:0;}
+
+    .holder-list .row{display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); align-items:center; font-size:12px;}
+    .holder-list .row:last-child{border-bottom:0;}
+    .holder-list .nm{flex:1; font-weight:600;}
+    .holder-list .lv{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:700;}
+    .holder-list .lv.l1{background:#fed7aa; color:#7c2d12;}
+    .holder-list .lv.l2{background:#fdba74; color:#7c2d12;}
+    .holder-list .lv.l3{background:#ddd6fe; color:#5b21b6;}
+
+    .crosslink{padding:11px 14px; background:#fff7ed; border:1px solid #fdba74; border-radius:8px; font-size:12px; color:#7c2d12; margin-bottom:14px;}
+    .crosslink a{font-weight:600; color:#7c2d12;}
+
+    @media (max-width:1100px){ .content{grid-template-columns:1fr;} .lv-grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="v-standards"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × V 人力服务商 / <b>分级标准 + 服务商证 + 持证率门槛</b></div>
+      <div class="top-actions">
+        <button class="btn">导出标准 PDF</button>
+        <button class="btn">克隆为草稿</button>
+        <button class="btn pri">新建版本</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div>
+        <div class="crosslink">
+          📐 本页定义 V 人力服务商分级（LV1-3）+ 服务商证书要求 + 持证率门槛。配套页：
+          <a href="p-admin-v.html">V 入驻 + 持证审计</a> · <a href="v-onboarding.html">V 端自助入驻</a> · <a href="v-team.html">旗下持证人</a>
+        </div>
+
+        <div class="card">
+          <h3>分级标准 LV1 → LV3 <span class="pill">v2.4 生效</span> <span class="extra">按持证人数 + 项目交付能力</span></h3>
+          <div class="lv-grid">
+            <div class="lv-card l1">
+              <div class="hd"><span class="lv">LV1</span><span class="lvl-name">小型机构 · 单项目</span></div>
+              <div class="row"><span class="k">旗下持证 S</span><span class="v">10 ~ 30 人</span></div>
+              <div class="row"><span class="k">持证率门槛</span><span class="v">≥ 70%</span></div>
+              <div class="row"><span class="k">运营年限</span><span class="v">≥ 2 年</span></div>
+              <div class="row"><span class="k">项目交付</span><span class="v">单项目派单</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">机构得 8% + 流量 ×1</span></div>
+              <div class="ct">当前 52 家</div>
+            </div>
+            <div class="lv-card l2">
+              <div class="hd"><span class="lv">LV2</span><span class="lvl-name">中型机构 · 跨项目</span></div>
+              <div class="row"><span class="k">旗下持证 S</span><span class="v">30 ~ 100 人</span></div>
+              <div class="row"><span class="k">持证率门槛</span><span class="v">≥ 80%</span></div>
+              <div class="row"><span class="k">运营年限</span><span class="v">≥ 5 年 + 跨项目记录</span></div>
+              <div class="row"><span class="k">项目交付</span><span class="v">跨项目同时 ≥ 3 + 培训资质</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">机构得 10% + 流量 ×1.3</span></div>
+              <div class="ct">当前 26 家</div>
+            </div>
+            <div class="lv-card l3">
+              <div class="hd"><span class="lv">LV3</span><span class="lvl-name">标杆机构 · 参与标准制定</span></div>
+              <div class="row"><span class="k">旗下持证 S</span><span class="v">100+ 人</span></div>
+              <div class="row"><span class="k">持证率门槛</span><span class="v">≥ 90%</span></div>
+              <div class="row"><span class="k">运营年限</span><span class="v">≥ 8 年 + 行业荣誉</span></div>
+              <div class="row"><span class="k">项目交付</span><span class="v">跨项目 ≥ 6 + 参与 P 标准制定</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">机构得 12% + 流量 ×1.5 + 标杆补贴</span></div>
+              <div class="ct">当前 8 家</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- § 服务商证书 + 旗下持证人审计 -->
+        <div class="card">
+          <h3>服务商证书要求 + 旗下持证人审计 <span class="pill">季度审</span></h3>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">营业执照 + 信用 A</div><div class="val">企查查/天眼查 信用评级 A 及以上 · 无行政处罚记录</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">劳动合同合规</div><div class="val">旗下持证 S 必须签劳动合同（不接受派遣 + 灵活用工）· 缴纳社保</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">持证率门槛</div><div class="val">LV1: ≥70% · LV2: ≥80% · LV3: ≥90% （季度审）</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">L3+ 比例</div><div class="val">LV2 旗下 L3+ ≥ 30% · LV3 旗下 L3+ ≥ 50%（含 L4+ ≥ 15%）</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">项目交付准时率</div><div class="val">LV2: ≥ 92% · LV3: ≥ 96%</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">分账合规承诺</div><div class="val">承诺按 P 中台分账规则向 S 服务者足额发放 · 接受抽审</div></div></div>
+        </div>
+
+        <!-- 持证率审计表 -->
+        <div class="card">
+          <h3>持证率审计模板 <span class="pill">2026 Q2</span></h3>
+          <table class="gate-table">
+            <thead><tr><th>机构</th><th>当前 LV</th><th>旗下 S</th><th>持证</th><th>持证率</th><th>L3+ 比例</th><th>判定</th></tr></thead>
+            <tbody>
+              <tr><td>优家装饰</td><td>LV3</td><td class="num">186</td><td class="num">171</td><td class="num">92%</td><td class="num">58%</td><td style="color:var(--success);">✓ 维持</td></tr>
+              <tr><td>南京安居服务</td><td>LV2</td><td class="num">142</td><td class="num">125</td><td class="num">88%</td><td class="num">35%</td><td style="color:var(--success);">✓ 维持</td></tr>
+              <tr><td>家泰物业</td><td>LV2</td><td class="num">98</td><td class="num">83</td><td class="num">85%</td><td class="num">32%</td><td style="color:var(--success);">✓ 维持</td></tr>
+              <tr><td>金陵建工</td><td>LV2</td><td class="num">84</td><td class="num">64</td><td class="num">76%</td><td class="num">26%</td><td style="color:var(--warn);">⚠ 整改 · 持证率 &lt; 80%</td></tr>
+              <tr><td>新东方家政</td><td>LV1</td><td class="num">28</td><td class="num">20</td><td class="num">71%</td><td class="num">18%</td><td style="color:var(--success);">✓ 维持</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h3>当前在网 86 家</h3>
+          <div class="holder-list">
+            <div class="row"><div class="nm">优家装饰</div><span class="lv l3">LV3</span><span style="color:var(--muted); font-size:11px;">186 持证</span></div>
+            <div class="row"><div class="nm">嘉源物业</div><span class="lv l3">LV3</span><span style="color:var(--muted); font-size:11px;">142 持证</span></div>
+            <div class="row"><div class="nm">南京安居服务</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">142 持证</span></div>
+            <div class="row"><div class="nm">家泰物业</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">98 持证</span></div>
+            <div class="row"><div class="nm">+ 82 家</div><span class="lv l1">LV1</span><span style="color:var(--muted); font-size:11px;">见 admin-v</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>LV 跃迁路径</h3>
+          <div style="font-size:12px; line-height:1.7; color:#334155;">
+            <div style="padding:8px 10px; background:var(--line); border-radius:6px; margin-bottom:6px;">
+              <b>LV1 → LV2</b>：旗下持证 ≥ 30 人 + 持证率 ≥ 80% + 跨项目 ≥ 3
+            </div>
+            <div style="padding:8px 10px; background:var(--line); border-radius:6px; margin-bottom:6px;">
+              <b>LV2 → LV3</b>：旗下持证 ≥ 100 人 + L3+ ≥ 50% + 参与 P 标准制定 ≥ 1 项
+            </div>
+            <div style="padding:8px 10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:6px;">
+              <b>降级触发</b>：持证率连续 2 季 &lt; 当前 LV 门槛
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>横向能力联动</h3>
+          <div style="font-size:12px; line-height:1.85;">
+            <div>🛠 <a href="p-standards.html" style="color:var(--accent); font-weight:600;">S 服务者标准</a> · V 旗下 S 持证</div>
+            <div>📜 <a href="p-cert-issue.html" style="color:var(--accent); font-weight:600;">证书签发</a> · V 服务商证</div>
+            <div>⚙ <a href="p-credit-engine.html" style="color:var(--accent); font-weight:600;">信用规则</a> · 持证率 / 准时率</div>
+            <div>💰 <a href="p-transaction.html" style="color:var(--accent); font-weight:600;">派单交易</a> · 分账规则</div>
+            <div>👥 <a href="v-onboarding.html" style="color:var(--accent); font-weight:600;">V 端门户</a> · 服务商自助入口</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

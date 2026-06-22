@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>API 网关 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);} .ki .d.danger{color:var(--danger);}
+
+    .content{padding:18px 28px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* api routes table */
+    .api-row{display:grid; grid-template-columns:60px 1.6fr 1fr auto auto auto auto; gap:12px; padding:11px 14px; border-radius:6px; background:var(--line); margin-bottom:6px; align-items:center; font-size:12px;}
+    .api-row.head{background:transparent; font-size:10.5px; color:var(--muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px; padding:6px 14px;}
+    .api-row .m{font-family:var(--mono); font-size:10.5px; padding:2px 6px; border-radius:3px; font-weight:700; text-align:center;}
+    .api-row .m.GET{background:color-mix(in oklab, var(--accent) 14%, transparent); color:var(--accent);}
+    .api-row .m.POST{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .api-row .m.PUT{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .api-row .m.DEL{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .api-row .path{font-family:var(--mono); font-size:12px;}
+    .api-row .desc{font-size:11px; color:var(--muted); margin-top:2px;}
+    .api-row .who{font-size:11px;}
+    .api-row .who .tag{display:inline-block; padding:1px 5px; background:var(--surface); border:1px solid var(--border); border-radius:3px; font-size:10px; margin-right:3px; color:var(--muted);}
+    .api-row .v{font-family:var(--mono); font-weight:700; font-size:12px;}
+    .api-row .v.warn{color:var(--warn);} .api-row .v.danger{color:var(--danger);}
+    .api-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .api-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .api-row .stat.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+
+    /* consumer cards */
+    .consumer-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;}
+    .cons{padding:14px; background:var(--line); border-radius:8px; border-left:3px solid var(--accent);}
+    .cons .head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .cons .head .ic{font-size:18px;}
+    .cons .head .nm{font-size:13px; font-weight:600;}
+    .cons .head .ver{margin-left:auto; font-family:var(--mono); font-size:10.5px; padding:1px 5px; background:var(--surface); color:var(--accent); border-radius:3px; font-weight:600;}
+    .cons .desc{font-size:11px; color:var(--muted); margin-bottom:8px;}
+    .cons .stat{display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11px;}
+    .cons .stat .row{display:flex; justify-content:space-between;}
+    .cons .stat .row .l{color:var(--muted);}
+    .cons .stat .row .v{font-weight:700; font-family:var(--mono);}
+    .cons .stat .row .v.ok{color:var(--success);} .cons .stat .row .v.warn{color:var(--warn);}
+    .cons.gov{border-left-color:#1e40af;}
+    .cons.op{border-left-color:#0f766e;}
+    .cons.bank{border-left-color:#0f1a4d;}
+    .cons.gov-ext{border-left-color:var(--gold);}
+
+    .row2{display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+
+    /* err pie */
+    .pie{width:120px; height:120px; border-radius:50%; flex-shrink:0; background:conic-gradient(
+      #16a34a 0% 92%, #ea580c 92% 96.5%, #dc2626 96.5% 100%
+    ); position:relative;}
+    .pie::before{content:''; position:absolute; inset:22px; background:var(--surface); border-radius:50%;}
+    .pie::after{content:'99.4%'; position:absolute; inset:0; display:grid; place-items:center; font-size:13px; font-weight:800; color:var(--success); z-index:1;}
+    .pie-row{display:flex; align-items:center; gap:18px;}
+    .pie-leg{font-size:12px; flex:1;}
+    .pie-leg .row{display:flex; padding:3px 0; align-items:center; gap:8px;}
+    .pie-leg .dot{width:10px; height:10px; border-radius:3px;}
+    .pie-leg .v{margin-left:auto; font-family:var(--mono); font-weight:600;}
+
+    /* rate limit settings */
+    .rl-row{display:grid; grid-template-columns:1fr auto auto auto; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12.5px; align-items:center;}
+    .rl-row:last-child{border-bottom:0;}
+    .rl-row .nm{font-weight:600;}
+    .rl-row .sub{font-size:11px; color:var(--muted);}
+    .rl-row .v{font-family:var(--mono); font-weight:700;}
+    .rl-row .used{font-size:11px; color:var(--muted); font-family:var(--mono);}
+
+    /* req chart */
+    .chart{display:flex; align-items:flex-end; gap:2px; height:90px; padding:8px 0;}
+    .chart .b{flex:1; background:linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 30%, transparent)); border-radius:2px 2px 0 0; min-height:6px;}
+    .chart .b.err{background:linear-gradient(180deg, var(--danger), color-mix(in oklab, var(--danger) 30%, transparent));}
+    .chart-x{display:flex; gap:2px; font-size:10px; color:var(--muted); padding-top:4px;}
+    .chart-x span{flex:1; text-align:center;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="api-gateway"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>API 网关</b></div>
+      <span style="font-size:11px; padding:3px 8px; background:var(--accent-soft); color:var(--accent); border-radius:4px; font-weight:600;">v3 · OAuth2 + 国密 SM3</span>
+      <div class="top-actions">
+        <button class="btn">OpenAPI 文档</button>
+        <button class="btn">下发 SDK</button>
+        <button class="btn pri">+ 注册消费方</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">在线接口</div><div class="n">86</div><div class="d ok">v2 + v3 兼容</div></div>
+      <div class="ki"><div class="l">今日调用</div><div class="n">4.8M</div><div class="d ok">↑ 12%</div></div>
+      <div class="ki"><div class="l">P95 延迟</div><div class="n">24<span class="u">ms</span></div><div class="d ok">健康</div></div>
+      <div class="ki"><div class="l">成功率</div><div class="n">99.4<span class="u">%</span></div><div class="d ok">SLA 99%</div></div>
+      <div class="ki"><div class="l">消费方</div><div class="n">38</div><div class="d">含 12 政务</div></div>
+      <div class="ki"><div class="l">限流命中</div><div class="n" style="color:var(--warn);">12</div><div class="d warn">含 2 异常</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- consumers -->
+      <div class="card">
+        <h3>消费方 · 12 政务 + 26 业务 <span class="extra">网关路由 = 消费方 × 接口</span></h3>
+        <div class="consumer-grid">
+          <div class="cons gov">
+            <div class="head"><span class="ic">⚖</span><span class="nm">G 端 · 住建厅</span><span class="ver">v3</span></div>
+            <div class="desc">监管驾驶舱 + 月报 + 投诉回写</div>
+            <div class="stat">
+              <div class="row"><span class="l">QPS</span><span class="v">3.4k</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">99.99%</span></div>
+              <div class="row"><span class="l">配额</span><span class="v">5k QPS</span></div>
+              <div class="row"><span class="l">订阅</span><span class="v">12 事件</span></div>
+            </div>
+          </div>
+          <div class="cons op">
+            <div class="head"><span class="ic">🐚</span><span class="nm">B 端 · 白名单运营商 ×3</span><span class="ver">v3</span></div>
+            <div class="desc">派单 + 绩效 + 续约</div>
+            <div class="stat">
+              <div class="row"><span class="l">QPS</span><span class="v">1.2k</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">99.96%</span></div>
+              <div class="row"><span class="l">配额</span><span class="v">2k QPS</span></div>
+              <div class="row"><span class="l">订阅</span><span class="v">8 事件</span></div>
+            </div>
+          </div>
+          <div class="cons bank">
+            <div class="head"><span class="ic">🏦</span><span class="nm">F 端 · 江苏银行</span><span class="ver">v3</span></div>
+            <div class="desc">托管 + 分账 + 对账</div>
+            <div class="stat">
+              <div class="row"><span class="l">日均</span><span class="v">412</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">99.96%</span></div>
+              <div class="row"><span class="l">SLA</span><span class="v">T+1</span></div>
+              <div class="row"><span class="l">国密</span><span class="v ok">SM3</span></div>
+            </div>
+          </div>
+          <div class="cons gov-ext">
+            <div class="head"><span class="ic">📞</span><span class="nm">12345 政务热线</span><span class="ver">v2</span></div>
+            <div class="desc">投诉双向 webhook</div>
+            <div class="stat">
+              <div class="row"><span class="l">QPS</span><span class="v">186/h</span></div>
+              <div class="row"><span class="l">成功</span><span class="v warn">98.2%</span></div>
+              <div class="row"><span class="l">P95</span><span class="v">2.4s</span></div>
+              <div class="row"><span class="l">超时</span><span class="v warn">3%</span></div>
+            </div>
+          </div>
+          <div class="cons gov-ext">
+            <div class="head"><span class="ic">🏛</span><span class="nm">公积金中心</span><span class="ver">v2</span></div>
+            <div class="desc">代付 + 缴存核验</div>
+            <div class="stat">
+              <div class="row"><span class="l">日均</span><span class="v">412</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">99.6%</span></div>
+              <div class="row"><span class="l">SLA</span><span class="v">T+0</span></div>
+              <div class="row"><span class="l">协议</span><span class="v">国密</span></div>
+            </div>
+          </div>
+          <div class="cons gov-ext">
+            <div class="head"><span class="ic">📊</span><span class="nm">税务局</span><span class="ver">v2</span></div>
+            <div class="desc">服务者月度收入申报</div>
+            <div class="stat">
+              <div class="row"><span class="l">月度</span><span class="v">2.4k 人</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">100%</span></div>
+              <div class="row"><span class="l">SLA</span><span class="v">月 1</span></div>
+              <div class="row"><span class="l">签</span><span class="v ok">SM2</span></div>
+            </div>
+          </div>
+          <div class="cons" style="background:#faf5ff; border-color:#d8b4fe;">
+            <div class="head"><span class="ic">🛒</span><span class="nm">M 端 · 物资供应商 ×6</span><span class="ver">v1</span></div>
+            <div class="desc">入驻 + 商品目录 + 集采订单 + 对账</div>
+            <div class="stat">
+              <div class="row"><span class="l">QPS</span><span class="v">186</span></div>
+              <div class="row"><span class="l">成功</span><span class="v ok">99.92%</span></div>
+              <div class="row"><span class="l">配额</span><span class="v">500 QPS/家</span></div>
+              <div class="row"><span class="l">订阅</span><span class="v">6 事件</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API routes -->
+      <div class="card">
+        <h3>核心接口 <span class="pill">86 个 · v3</span> <span class="extra">前 8 个按 QPS 排序</span></h3>
+        <div class="api-row head">
+          <span>方法</span><span>路径</span><span>消费方</span><span style="text-align:right;">QPS</span><span style="text-align:right;">P95</span><span style="text-align:right;">错误率</span><span>状态</span>
+        </div>
+        <div class="api-row">
+          <span class="m GET">GET</span>
+          <div><div class="path">/v3/credit/{spid}</div><div class="desc">获取服务者实时信用分（B 端派单决策）</div></div>
+          <div class="who"><span class="tag">B</span><span class="tag">G</span><span class="tag">V</span></div>
+          <span class="v">3.4k</span>
+          <span class="v">24ms</span>
+          <span class="v">0.04%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row">
+          <span class="m POST">POST</span>
+          <div><div class="path">/v3/order/dispatch</div><div class="desc">触发智能派单（B 端发起 + 中台规则计算）</div></div>
+          <div class="who"><span class="tag">B</span></div>
+          <span class="v">1.2k</span>
+          <span class="v">38ms</span>
+          <span class="v warn">0.6%</span>
+          <span class="stat warn">背压</span>
+        </div>
+        <div class="api-row">
+          <span class="m GET">GET</span>
+          <div><div class="path">/pub/cert/verify</div><div class="desc">扫码验真公开接口（公示门户 + 第三方）</div></div>
+          <div class="who"><span class="tag">Portal</span><span class="tag">Pub</span></div>
+          <span class="v">486</span>
+          <span class="v">6ms</span>
+          <span class="v">0.01%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row">
+          <span class="m GET">GET</span>
+          <div><div class="path">/v3/levels</div><div class="desc">获取 L0-L7 等级与晋级规则</div></div>
+          <div class="who"><span class="tag">B</span><span class="tag">S</span><span class="tag">V</span><span class="tag">T</span></div>
+          <span class="v">412</span>
+          <span class="v">8ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row" style="background:#faf5ff;">
+          <span class="m GET">GET</span>
+          <div><div class="path">/v3/material/catalog</div><div class="desc">M 端商品目录（B 运营商集采查询）</div></div>
+          <div class="who"><span class="tag" style="background:#6b21a8; color:#fff;">M</span><span class="tag">B</span></div>
+          <span class="v">86</span>
+          <span class="v">18ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row" style="background:#faf5ff;">
+          <span class="m POST">POST</span>
+          <div><div class="path">/v3/material/po</div><div class="desc">M 端集采下单 · B 端发起</div></div>
+          <div class="who"><span class="tag" style="background:#6b21a8; color:#fff;">M</span><span class="tag">B</span><span class="tag">F</span></div>
+          <span class="v">62/d</span>
+          <span class="v">68ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row" style="background:#faf5ff;">
+          <span class="m POST">POST</span>
+          <div><div class="path">/v3/material/batch/qc</div><div class="desc">M 端物资批次质检结果上报（触发信用规则）</div></div>
+          <div class="who"><span class="tag" style="background:#6b21a8; color:#fff;">M</span><span class="tag">P</span><span class="tag">G</span></div>
+          <span class="v">3/d</span>
+          <span class="v">42ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row">
+          <span class="m POST">POST</span>
+          <div><div class="path">/v3/cert/issue</div><div class="desc">签发证书（需中台运营+主管双签）· 已覆盖 S/B/V/M/T 5 类</div></div>
+          <div class="who"><span class="tag">P</span></div>
+          <span class="v">86/h</span>
+          <span class="v">412ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row">
+          <span class="m POST">POST</span>
+          <div><div class="path">/v3/webhook/12345</div><div class="desc">12345 政务热线 投诉单 webhook 接收</div></div>
+          <div class="who"><span class="tag">12345</span></div>
+          <span class="v">186/h</span>
+          <span class="v warn">2.4s</span>
+          <span class="v warn">1.8%</span>
+          <span class="stat warn">超时</span>
+        </div>
+        <div class="api-row">
+          <span class="m PUT">PUT</span>
+          <div><div class="path">/v3/credit/{spid}/event</div><div class="desc">上报信用事件（评价/投诉/带徒等）</div></div>
+          <div class="who"><span class="tag">B</span><span class="tag">S</span></div>
+          <span class="v">2.4k</span>
+          <span class="v">18ms</span>
+          <span class="v">0.02%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+        <div class="api-row">
+          <span class="m DEL">DEL</span>
+          <div><div class="path">/v3/cert/{id}/revoke</div><div class="desc">证书吊销（高危 · 需审批流）</div></div>
+          <div class="who"><span class="tag">P</span></div>
+          <span class="v">8/d</span>
+          <span class="v">218ms</span>
+          <span class="v">0%</span>
+          <span class="stat ok">RUN</span>
+        </div>
+      </div>
+
+      <div class="row2">
+        <!-- traffic chart -->
+        <div class="card">
+          <h3>24 小时调用趋势 <span class="extra">蓝=成功 / 红=错误</span></h3>
+          <div class="chart">
+            <div class="b" style="height:32%;"></div><div class="b" style="height:28%;"></div><div class="b" style="height:30%;"></div>
+            <div class="b" style="height:24%;"></div><div class="b" style="height:18%;"></div><div class="b" style="height:14%;"></div>
+            <div class="b" style="height:24%;"></div><div class="b" style="height:46%;"></div><div class="b" style="height:68%;"></div>
+            <div class="b" style="height:82%;"></div><div class="b" style="height:96%;"></div><div class="b" style="height:88%;"></div>
+            <div class="b err" style="height:18%;"></div>
+            <div class="b" style="height:82%;"></div><div class="b" style="height:84%;"></div><div class="b" style="height:78%;"></div>
+            <div class="b" style="height:88%;"></div><div class="b" style="height:96%;"></div><div class="b" style="height:90%;"></div>
+            <div class="b" style="height:78%;"></div><div class="b" style="height:64%;"></div><div class="b" style="height:54%;"></div>
+            <div class="b" style="height:42%;"></div><div class="b" style="height:36%;"></div>
+          </div>
+          <div class="chart-x">
+            <span>00</span><span></span><span></span><span></span><span>04</span><span></span><span></span><span></span>
+            <span>08</span><span></span><span></span><span></span><span>12</span><span></span><span></span><span></span>
+            <span>16</span><span></span><span></span><span></span><span>20</span><span></span><span></span><span></span>
+          </div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--line); font-size:11px; color:var(--muted); display:flex; justify-content:space-between;">
+            <span>峰值 14:00 · 5,124 QPS</span>
+            <span style="color:var(--warn);">⚠ 12:30 短暂错误高峰（已自愈）</span>
+          </div>
+        </div>
+
+        <!-- error pie + rate limits -->
+        <div class="card">
+          <h3>状态码分布 <span class="extra">今日</span></h3>
+          <div class="pie-row">
+            <div class="pie"></div>
+            <div class="pie-leg">
+              <div class="row"><span class="dot" style="background:#16a34a;"></span>2xx 成功<span class="v">4,772,400</span></div>
+              <div class="row"><span class="dot" style="background:#ea580c;"></span>4xx 客户端<span class="v">21,800</span></div>
+              <div class="row"><span class="dot" style="background:#dc2626;"></span>5xx 服务端<span class="v">2,400</span></div>
+            </div>
+          </div>
+
+          <h3 style="margin-top:18px;">限流配置 <span class="pill">本月命中 12</span></h3>
+          <div class="rl-row">
+            <div><div class="nm">G 端·住建厅</div><div class="sub">关键路径 + 报表查询</div></div>
+            <div class="v">5,000</div>
+            <div style="font-size:11px; color:var(--muted);">QPS</div>
+            <div class="used">68%</div>
+          </div>
+          <div class="rl-row">
+            <div><div class="nm">B 端 · 白名单运营商</div><div class="sub">按租户隔离 · 5 家</div></div>
+            <div class="v">2,000</div>
+            <div style="font-size:11px; color:var(--muted);">QPS/家</div>
+            <div class="used">60%</div>
+          </div>
+          <div class="rl-row" style="background:#faf5ff;">
+            <div><div class="nm">M 端 · 物资供应商</div><div class="sub">按租户隔离 · 6 家</div></div>
+            <div class="v">500</div>
+            <div style="font-size:11px; color:var(--muted);">QPS/家</div>
+            <div class="used">37%</div>
+          </div>
+          <div class="rl-row">
+            <div><div class="nm">公开验真接口</div><div class="sub">单 IP 防爬</div></div>
+            <div class="v">60</div>
+            <div style="font-size:11px; color:var(--muted);">QPS/IP</div>
+            <div class="used">12%</div>
+          </div>
+          <div class="rl-row">
+            <div><div class="nm">12345 政务回写</div><div class="sub">异步 + 重试</div></div>
+            <div class="v">200</div>
+            <div style="font-size:11px; color:var(--muted);">QPS</div>
+            <div class="used" style="color:var(--warn);">93%</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

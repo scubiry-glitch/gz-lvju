@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>监管数据大屏 · 江苏保租房 G 端</title>
+  <style>
+    :root {
+      --bg: #0b1224; --surface: #121b34; --panel: #1a2444;
+      --fg: #e6ecff; --muted: #8a99c2; --border: rgba(255,255,255,0.08);
+      --accent: #60a5fa; --gold: #fbbf24;
+      --success: #34d399; --warn: #f59e0b; --danger: #f87171;
+      --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    .wrap { padding: 18px 24px 28px; max-width: 1480px; margin: 0 auto; }
+
+    /* header */
+    .top {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+      border-radius: var(--radius-md); padding: 16px 22px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 18px; position: relative; overflow: hidden;
+    }
+    .top::after { content: '⛩'; position: absolute; right: -8px; bottom: -28px; font-size: 130px; opacity: 0.08; }
+    .top .emblem {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); display: grid; place-items: center;
+    }
+    .top .emblem svg { width: 24px; height: 24px; color: white; }
+    .top .title { flex: 1; }
+    .top h1 { font-size: 20px; font-weight: 700; margin: 0; }
+    .top .sub { font-size: 12px; opacity: 0.85; }
+    .top .time { text-align: right; font-size: 12px; opacity: 0.85; }
+    .top .time .now { font-size: 16px; font-weight: 600; opacity: 1; margin-bottom: 2px; }
+
+    /* KPI strip */
+    .kpi-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
+    .ks { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; position: relative; }
+    .ks::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; background: var(--accent); border-radius: 0 3px 3px 0; }
+    .ks.gold::before { background: var(--gold); }
+    .ks.ok::before { background: var(--success); }
+    .ks.warn::before { background: var(--warn); }
+    .ks.danger::before { background: var(--danger); }
+    .ks .lbl { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
+    .ks .num { font-size: 22px; font-weight: 700; margin-top: 4px; line-height: 1.1; }
+    .ks .unit { font-size: 12px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+    .ks .delta { font-size: 11px; margin-top: 4px; color: var(--muted); }
+
+    /* main grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      gap: 14px; margin-bottom: 14px;
+    }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .card h3 { font-size: 13px; font-weight: 600; margin: 0 0 14px; color: var(--fg); display: flex; align-items: center; gap: 8px; }
+    .card h3 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .card h3 .sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-left: auto; }
+
+    /* map - faux nanjing districts */
+    .map-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .dist {
+      padding: 12px 10px; background: var(--panel);
+      border-radius: 6px; font-size: 11px;
+      border-left: 3px solid var(--accent);
+    }
+    .dist.high { border-color: var(--success); }
+    .dist.mid { border-color: var(--accent); }
+    .dist.low { border-color: var(--warn); }
+    .dist .name { font-weight: 600; font-size: 13px; }
+    .dist .val { font-size: 18px; font-weight: 700; color: var(--accent); margin-top: 2px; }
+    .dist.high .val { color: var(--success); }
+    .dist.low .val { color: var(--warn); }
+    .dist .info { color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+    /* compliance gauge */
+    .gauge { position: relative; height: 140px; display: grid; place-items: center; }
+    .ring {
+      width: 130px; height: 130px; border-radius: 50%;
+      background: conic-gradient(var(--success) 0% 99.2%, var(--panel) 99.2% 100%);
+      display: grid; place-items: center;
+      position: relative;
+    }
+    .ring::before { content: ''; position: absolute; inset: 12px; background: var(--surface); border-radius: 50%; }
+    .ring-text { position: relative; text-align: center; z-index: 1; }
+    .ring-text .pct { font-size: 28px; font-weight: 700; color: var(--success); }
+    .ring-text .lbl { font-size: 11px; color: var(--muted); }
+    .gauge-list { margin-top: 14px; }
+    .gauge-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-top: 1px solid var(--border); }
+    .gauge-row:first-of-type { border-top: 0; }
+    .gauge-row span { color: var(--muted); }
+    .gauge-row strong { color: var(--fg); font-weight: 600; }
+    .gauge-row strong.ok { color: var(--success); }
+    .gauge-row strong.warn { color: var(--warn); }
+
+    /* alerts */
+    .alerts { list-style: none; margin: 0; padding: 0; max-height: 290px; overflow-y: auto; }
+    .alert {
+      display: grid; grid-template-columns: 6px 1fr auto; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+    }
+    .alert:last-child { border-bottom: 0; }
+    .alert .bar { width: 4px; border-radius: 2px; }
+    .alert.h .bar { background: var(--danger); }
+    .alert.m .bar { background: var(--warn); }
+    .alert.l .bar { background: var(--muted); }
+    .alert .ctx { line-height: 1.3; }
+    .alert .ctx strong { display: block; font-weight: 500; }
+    .alert .ctx small { color: var(--muted); font-size: 11px; }
+    .alert .t { color: var(--muted); font-size: 11px; align-self: center; }
+
+    /* full row */
+    .row-bot { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* operator rank */
+    table.ot { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.ot th, table.ot td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.ot th { color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: 0.5px; }
+    table.ot tr:last-child td { border-bottom: 0; }
+    .rank { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; background: var(--panel); font-weight: 700; color: var(--muted); font-size: 11px; }
+    .rank.gold { background: var(--gold); color: #422006; }
+    .rank.silver { background: #cbd5e1; color: #1e293b; }
+    .rank.bronze { background: #d97706; color: #fef3c7; }
+    .grade { font-size: 11px; padding: 1px 6px; border-radius: 3px; font-weight: 500; }
+    .grade.A { background: color-mix(in oklab, var(--success) 30%, transparent); color: var(--success); }
+    .grade.B { background: color-mix(in oklab, var(--accent) 30%, transparent); color: var(--accent); }
+    .grade.C { background: color-mix(in oklab, var(--warn) 30%, transparent); color: var(--warn); }
+
+    /* trend chart */
+    .ymchart { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 8px 0; }
+    .ymchart .b { flex: 1; background: linear-gradient(180deg, var(--accent), transparent); border-radius: 2px 2px 0 0; position: relative; min-height: 8px; }
+    .ymchart .b::after { content: attr(data-v); position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .ymchart-x { display: flex; gap: 4px; font-size: 10px; color: var(--muted); padding-top: 4px; }
+    .ymchart-x span { flex: 1; text-align: center; }
+
+    @media (max-width: 1100px) and (min-width: 1024px) {
+      .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+      .grid { grid-template-columns: 1fr; }
+      .row-bot { grid-template-columns: 1fr; }
+    }
+
+    /* ========== 移动版 ========== */
+    .m-shell{display:none;}
+    @media (max-width: 1023px) {
+      .wrap{display:none !important;}
+      body{background:#f3f4f6; color:#111;}
+      .m-shell{display:block; max-width:430px; margin:0 auto; min-height:100vh; padding-bottom:96px; background:#f3f4f6;}
+      .m-kpi{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:12px;}
+      .m-kc{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;}
+      .m-kc .l{font-size:11px; color:#6b7280;}
+      .m-kc .n{font-size:24px; font-weight:700; margin:4px 0 2px;}
+      .m-kc .d{font-size:10px; color:#16a34a;}
+      .m-kc.warn .n{color:#ea580c;}
+      .m-kc.ok .n{color:#16a34a;}
+      .m-kc.danger .n{color:#dc2626;}
+
+      .m-sec{margin:0 12px 12px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;}
+      .m-sec h3{font-size:13px; font-weight:600; margin:0 0 10px;}
+      .m-sec .b{font-size:11px; color:#6b7280; margin-bottom:8px;}
+
+      .m-map{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+      .m-map .c{padding:8px 4px; text-align:center; border-radius:6px; font-size:11px; border:1px solid #e5e7eb;}
+      .m-map .c.good{background:color-mix(in oklab,#16a34a 10%,transparent); border-color:color-mix(in oklab,#16a34a 30%,transparent);}
+      .m-map .c.warn{background:color-mix(in oklab,#ea580c 10%,transparent); border-color:color-mix(in oklab,#ea580c 30%,transparent);}
+      .m-map .c.danger{background:color-mix(in oklab,#dc2626 10%,transparent); border-color:color-mix(in oklab,#dc2626 30%,transparent);}
+      .m-map .c .nm{font-weight:600; color:#111;}
+      .m-map .c .stat{font-size:10px; color:#6b7280; margin-top:2px;}
+
+      .m-bar{display:flex; height:32px; border-radius:6px; overflow:hidden; margin-bottom:6px;}
+      .m-bar > div{display:grid; place-items:center; font-size:11px; color:#fff; font-weight:600;}
+
+      .m-alert{padding:10px 12px; background:color-mix(in oklab,#dc2626 8%,transparent); border:1px solid color-mix(in oklab,#dc2626 30%,transparent); border-radius:8px; margin-bottom:6px; font-size:13px; display:flex; align-items:center; gap:8px;}
+      .m-alert .dot{width:8px; height:8px; border-radius:50%; background:#dc2626; flex-shrink:0; animation:pulse 1.6s infinite;}
+      .m-alert strong{flex:1; font-weight:600;}
+      .m-alert .cnt{font-size:11px; padding:2px 8px; background:#dc2626; color:#fff; border-radius:99px;}
+      @keyframes pulse {0%{box-shadow:0 0 0 0 rgba(220,38,38,0.5);} 70%{box-shadow:0 0 0 8px rgba(220,38,38,0);} 100%{box-shadow:0 0 0 0 rgba(220,38,38,0);}}
+
+      .m-rank .r{display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #e5e7eb; font-size:13px;}
+      .m-rank .r:last-child{border-bottom:0;}
+      .m-rank .r .num{width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:700; flex-shrink:0;}
+      .m-rank .r .num.g{background:#fef3c7; color:#b45309;}
+      .m-rank .r .num.s{background:#e5e7eb; color:#4b5563;}
+      .m-rank .r .num.b{background:#fed7aa; color:#9a3412;}
+      .m-rank .r .num.n{background:#f3f4f6; color:#6b7280;}
+      .m-rank .r .nm{flex:1;}
+      .m-rank .r .sc{font-weight:700; color:#1e40af;}
+      .m-rank .r .sc.bad{color:#dc2626;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ========== 移动版（≤1023） ========== -->
+<div class="m-shell">
+  <div id="m-header" data-series="g" data-active="dashboard" data-title="监管大屏" data-icon="📊" data-ttl="全省运行数据中心" data-sub="13 设区市 · 数据 T+1 同步" data-right="2026 年 6 月"></div>
+
+  <div class="m-kpi">
+    <div class="m-kc"><div class="l">在库项目</div><div class="n">46</div><div class="d">▲ 较年初 +9</div></div>
+    <div class="m-kc"><div class="l">在租房源</div><div class="n">12,684</div><div class="d">▲ +6.2% 月环比</div></div>
+    <div class="m-kc ok"><div class="l">综合入住率</div><div class="n">94.6%</div><div class="d">▲ +2.1pt 月环比</div></div>
+    <div class="m-kc ok"><div class="l">三方备案率</div><div class="n">99.6%</div><div class="d">▲ 0.4pt 全省达标</div></div>
+    <div class="m-kc danger"><div class="l">待处置预警</div><div class="n">14</div><div class="d" style="color:#dc2626;">▲ +3 较昨日</div></div>
+    <div class="m-kc warn"><div class="l">待处置投诉</div><div class="n">7</div><div class="d" style="color:#dc2626;">▼ -12 较上周</div></div>
+  </div>
+
+  <div class="m-sec">
+    <h3>🚨 实时风险预警</h3>
+    <div class="m-alert"><span class="dot"></span><strong>租金超 90% 红线</strong><span class="cnt">14 套</span></div>
+    <div class="m-alert"><span class="dot"></span><strong>服务费超 8% 封顶</strong><span class="cnt">3 家</span></div>
+    <div class="m-alert"><span class="dot"></span><strong>重复挂牌嫌疑</strong><span class="cnt">22 套</span></div>
+    <div class="m-alert"><span class="dot"></span><strong>核验 SLA 超期</strong><span class="cnt">4 项</span></div>
+  </div>
+
+  <div class="m-sec">
+    <h3>🗺 江苏 13 市运行态势</h3>
+    <div class="b">绿/橙/红 = 良好 / 待提升 / 未接入</div>
+    <div class="m-map">
+      <div class="c good"><div class="nm">南京</div><div class="stat">4,608 套</div></div>
+      <div class="c good"><div class="nm">苏州</div><div class="stat">3,124 套</div></div>
+      <div class="c good"><div class="nm">无锡</div><div class="stat">1,506 套</div></div>
+      <div class="c good"><div class="nm">常州</div><div class="stat">892 套</div></div>
+      <div class="c warn"><div class="nm">镇江</div><div class="stat">412 套</div></div>
+      <div class="c good"><div class="nm">扬州</div><div class="stat">680 套</div></div>
+      <div class="c warn"><div class="nm">泰州</div><div class="stat">298 套</div></div>
+      <div class="c good"><div class="nm">南通</div><div class="stat">540 套</div></div>
+      <div class="c warn"><div class="nm">盐城</div><div class="stat">256 套</div></div>
+      <div class="c good"><div class="nm">徐州</div><div class="stat">388 套</div></div>
+      <div class="c danger"><div class="nm">淮安</div><div class="stat">未接入</div></div>
+      <div class="c danger"><div class="nm">宿迁</div><div class="stat">未接入</div></div>
+    </div>
+  </div>
+
+  <div class="m-sec">
+    <h3>🏗 接入模式结构（全省）</h3>
+    <div class="m-bar">
+      <div style="background:#1e40af; flex:58;">58% 自营</div>
+      <div style="background:#ea580c; color:#1f1f1f; flex:28;">28% 委托</div>
+      <div style="background:#dc2626; flex:14;">14% 深托</div>
+    </div>
+    <div style="font-size:11px; color:#6b7280;">自营 7,357 · 委托 3,552 · 深托 1,775（套）</div>
+  </div>
+
+  <div class="m-sec">
+    <h3>🏆 运营主体 Q2 考核排行</h3>
+    <div class="m-rank">
+      <div class="r"><div class="num g">1</div><div class="nm">贝壳租房·苏州运营中心</div><div class="sc">98.2</div></div>
+      <div class="r"><div class="num s">2</div><div class="nm">南京安居保障房集团</div><div class="sc">96.8</div></div>
+      <div class="r"><div class="num b">3</div><div class="nm">万科泊寓·无锡</div><div class="sc">94.5</div></div>
+      <div class="r"><div class="num n">…</div><div class="nm" style="color:#6b7280;">省略 41 家 · 平均 87.2</div><div class="sc" style="color:#6b7280;">87.2 avg</div></div>
+      <div class="r"><div class="num" style="background:#dc2626; color:#fff;">45</div><div class="nm">南京自如住房租赁</div><div class="sc bad">61.4</div></div>
+      <div class="r"><div class="num" style="background:#dc2626; color:#fff;">47</div><div class="nm">镇江·恒大公馆运营公司</div><div class="sc bad">52.0</div></div>
+    </div>
+  </div>
+
+  <div class="m-sec">
+    <h3>👥 承租人结构</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <div style="padding:10px; background:#f3f4f6; border-radius:8px;"><div style="font-size:11px; color:#6b7280;">新市民</div><div style="font-size:16px; font-weight:700;">5,066</div><div style="font-size:11px; color:#1e40af;">52%</div></div>
+      <div style="padding:10px; background:#f3f4f6; border-radius:8px;"><div style="font-size:11px; color:#6b7280;">青年人(≤35)</div><div style="font-size:16px; font-weight:700;">3,020</div><div style="font-size:11px; color:#16a34a;">31%</div></div>
+      <div style="padding:10px; background:#f3f4f6; border-radius:8px;"><div style="font-size:11px; color:#6b7280;">人才引进</div><div style="font-size:16px; font-weight:700;">1,169</div><div style="font-size:11px; color:#b45309;">12%</div></div>
+      <div style="padding:10px; background:#f3f4f6; border-radius:8px;"><div style="font-size:11px; color:#6b7280;">公积金直付率</div><div style="font-size:16px; font-weight:700; color:#16a34a;">76.1%</div><div style="font-size:11px; color:#16a34a;">▲ +18%</div></div>
+    </div>
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="cockpit"></div>
+</div>
+
+<!-- ========== PC 大屏（≥1024） ========== -->
+<div class="wrap">
+
+  <!-- top header -->
+  <div class="top">
+    <div class="emblem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+    </div>
+    <div class="title">
+      <h1>江苏省保障性租赁住房 监管数据中心</h1>
+      <div class="sub">江苏省住房和城乡建设厅 · 南京市试点 · 数据 T+1 同步</div>
+    </div>
+    <div class="time">
+      <div class="now">2026-06-05 09:41:32</div>
+      <div>本期：2026 年 6 月 · 数据更新于 09:00</div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-strip">
+    <div class="ks"><div class="lbl">在库项目</div><div class="num">46<span class="unit">个</span></div><div class="delta">↑ 6 本年新增</div></div>
+    <div class="ks gold"><div class="lbl">总房源</div><div class="num">4,608<span class="unit">套</span></div><div class="delta">↑ 412 本月</div></div>
+    <div class="ks"><div class="lbl">在租 / 入住率</div><div class="num">3,438<span class="unit">套 · 74.6%</span></div><div class="delta">↑ 1.8 pp 环比</div></div>
+    <div class="ks ok"><div class="lbl">租金合规率</div><div class="num">99.2<span class="unit">%</span></div><div class="delta">国家标准 ≥ 95%</div></div>
+    <div class="ks warn"><div class="lbl">在管运营方</div><div class="num">6<span class="unit">家</span></div><div class="delta">5 家甲级 1 家乙级</div></div>
+    <div class="ks danger"><div class="lbl">本月违规预警</div><div class="num">14<span class="unit">起</span></div><div class="delta">已处置 11 起</div></div>
+  </div>
+
+  <!-- middle grid -->
+  <div class="grid">
+    <div class="card">
+      <h3><span class="dot"></span> 南京市分区项目分布 <span class="sub">单位：在管房源</span></h3>
+      <div class="map-grid">
+        <div class="dist mid"><div class="name">江宁区</div><div class="val">620</div><div class="info">3 项目 · 入住 89%</div></div>
+        <div class="dist high"><div class="name">建邺区</div><div class="val">480</div><div class="info">2 项目 · 入住 92%</div></div>
+        <div class="dist high"><div class="name">鼓楼区</div><div class="val">360</div><div class="info">2 项目 · 入住 88%</div></div>
+        <div class="dist mid"><div class="name">秦淮区</div><div class="val">540</div><div class="info">3 项目 · 入住 76%</div></div>
+        <div class="dist low"><div class="name">栖霞区</div><div class="val">420</div><div class="info">2 项目 · 入住 64%</div></div>
+        <div class="dist high"><div class="name">江北新区</div><div class="val">720</div><div class="info">4 项目 · 入住 93%</div></div>
+        <div class="dist mid"><div class="name">玄武区</div><div class="val">280</div><div class="info">2 项目 · 入住 86%</div></div>
+        <div class="dist mid"><div class="name">雨花台区</div><div class="val">340</div><div class="info">2 项目 · 入住 82%</div></div>
+        <div class="dist low"><div class="name">浦口区</div><div class="val">250</div><div class="info">1 项目 · 入住 68%</div></div>
+        <div class="dist mid"><div class="name">六合区</div><div class="val">180</div><div class="info">1 项目 · 入住 78%</div></div>
+        <div class="dist low"><div class="name">溧水区</div><div class="val">240</div><div class="info">1 项目 · 入住 62%</div></div>
+        <div class="dist mid"><div class="name">高淳区</div><div class="val">178</div><div class="info">1 项目 · 入住 75%</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background: var(--success);"></span> 合规率综合 <span class="sub">本月数据</span></h3>
+      <div class="gauge">
+        <div class="ring">
+          <div class="ring-text">
+            <div class="pct">99.2%</div>
+            <div class="lbl">综合合规率</div>
+          </div>
+        </div>
+      </div>
+      <div class="gauge-list">
+        <div class="gauge-row"><span>租金 ≤ 市场价 90%</span><strong class="ok">99.8%</strong></div>
+        <div class="gauge-row"><span>年涨幅 ≤ 5%</span><strong class="ok">100%</strong></div>
+        <div class="gauge-row"><span>押金 ≤ 2 月租金</span><strong class="ok">99.6%</strong></div>
+        <div class="gauge-row"><span>合同备案率</span><strong class="warn">97.2%</strong></div>
+        <div class="gauge-row"><span>资质有效率</span><strong class="ok">99.4%</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot" style="background: var(--danger);"></span> 实时预警流 <span class="sub">高优先</span></h3>
+      <ul class="alerts">
+        <li class="alert h">
+          <div class="bar"></div>
+          <div class="ctx"><strong>仙林湖项目 4-0612 挂牌价异常</strong><small>低于片区指导价 21%，疑似违规倾销</small></div>
+          <div class="t">3 分钟前</div>
+        </li>
+        <li class="alert h">
+          <div class="bar"></div>
+          <div class="ctx"><strong>梧桐公馆 12 户欠租</strong><small>超 7 天 · 总额 ¥28,400</small></div>
+          <div class="t">28 分钟前</div>
+        </li>
+        <li class="alert m">
+          <div class="bar"></div>
+          <div class="ctx"><strong>河西青年 3 个合同未及时备案</strong><small>已生效 5 天未走备案流程</small></div>
+          <div class="t">1 小时前</div>
+        </li>
+        <li class="alert m">
+          <div class="bar"></div>
+          <div class="ctx"><strong>南部新城客诉激增</strong><small>本周客诉量 +180%</small></div>
+          <div class="t">2 小时前</div>
+        </li>
+        <li class="alert m">
+          <div class="bar"></div>
+          <div class="ctx"><strong>溧水区项目入住率连续 3 月下滑</strong><small>建议运营方调价</small></div>
+          <div class="t">今天 09:00</div>
+        </li>
+        <li class="alert l">
+          <div class="bar"></div>
+          <div class="ctx"><strong>系统：江苏银行监管账户对账完成</strong><small>本月对账无差异</small></div>
+          <div class="t">今天 08:00</div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- bottom row -->
+  <div class="row-bot">
+    <div class="card">
+      <h3><span class="dot" style="background: var(--gold);"></span> 运营方合规排名 <span class="sub">本月评分</span></h3>
+      <table class="ot">
+        <thead><tr><th>名次</th><th>运营方</th><th>项目</th><th>入住率</th><th>合规率</th><th>等级</th><th>评分</th></tr></thead>
+        <tbody>
+          <tr><td><span class="rank gold">1</span></td><td>江苏安居</td><td>4</td><td>92.6%</td><td>99.8%</td><td><span class="grade A">甲级</span></td><td>96.2</td></tr>
+          <tr><td><span class="rank silver">2</span></td><td>南京安居集团</td><td>12</td><td>89.4%</td><td>99.2%</td><td><span class="grade A">甲级</span></td><td>94.1</td></tr>
+          <tr><td><span class="rank bronze">3</span></td><td>江北建发</td><td>3</td><td>87.2%</td><td>99.4%</td><td><span class="grade A">甲级</span></td><td>93.5</td></tr>
+          <tr><td><span class="rank">4</span></td><td>苏宁置业</td><td>2</td><td>83.8%</td><td>98.6%</td><td><span class="grade A">甲级</span></td><td>90.2</td></tr>
+          <tr><td><span class="rank">5</span></td><td>金陵新华</td><td>2</td><td>78.4%</td><td>99.0%</td><td><span class="grade B">乙级</span></td><td>85.8</td></tr>
+          <tr><td><span class="rank">6</span></td><td>溧水城投</td><td>1</td><td>62.4%</td><td>97.2%</td><td><span class="grade C">乙级·观察</span></td><td>76.4</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> 月度趋势 <span class="sub">在租 + 合规</span></h3>
+      <div class="ymchart">
+        <div class="b" style="height: 50%" data-v="58%"></div>
+        <div class="b" style="height: 56%" data-v="62%"></div>
+        <div class="b" style="height: 62%" data-v="66%"></div>
+        <div class="b" style="height: 66%" data-v="68%"></div>
+        <div class="b" style="height: 70%" data-v="70%"></div>
+        <div class="b" style="height: 74%" data-v="71%"></div>
+        <div class="b" style="height: 78%" data-v="73%"></div>
+        <div class="b" style="height: 80%" data-v="74%"></div>
+        <div class="b" style="height: 82%" data-v="74%"></div>
+        <div class="b" style="height: 84%" data-v="75%"></div>
+        <div class="b" style="height: 85%" data-v="74%"></div>
+        <div class="b" style="height: 86%" data-v="75%"></div>
+      </div>
+      <div class="ymchart-x"><span>7月</span><span>8月</span><span>9月</span><span>10月</span><span>11月</span><span>12月</span><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span></div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
+        <span>同比入住率 +16.4 pp</span>
+        <span style="color: var(--success);">合规率持续 ≥ 99%</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

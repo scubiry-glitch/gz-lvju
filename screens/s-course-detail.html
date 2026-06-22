@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>课程详情 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:140px; position:relative;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+
+    .top-h{background:linear-gradient(135deg, #047857 0%, #10b981 100%); color:white; padding:12px 16px 18px;}
+    .nav-row{display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+    .nav-row .back{width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,0.18); display:grid; place-items:center; font-size:18px; flex-shrink:0;}
+    .nav-row .ti{font-size:15px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    /* course hero */
+    .hero{display:flex; gap:12px;}
+    .hero .cover{width:72px; height:72px; border-radius:10px; flex-shrink:0; display:grid; place-items:center; font-size:34px; background:linear-gradient(135deg,#fef3c7,#fcd34d);}
+    .hero .body{flex:1; min-width:0;}
+    .hero .nm{font-size:16px; font-weight:700;}
+    .hero .meta{font-size:11px; opacity:0.92; margin-top:4px; line-height:1.6;}
+    .hero .tags{display:flex; gap:5px; flex-wrap:wrap; margin-top:7px;}
+    .hero .tags span{font-size:10px; padding:2px 7px; background:rgba(255,255,255,0.18); border-radius:5px;}
+
+    /* chain strip */
+    .chain{display:flex; gap:6px; overflow-x:auto; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); font-size:11px; -webkit-overflow-scrolling:touch;}
+    .chain a,.chain span{padding:4px 8px; border-radius:6px; white-space:nowrap; font-weight:600;}
+    .chain a{background:var(--line); color:var(--fg);}
+    .chain .here{background:var(--accent); color:#fff; font-weight:700;}
+
+    /* progress */
+    .pg-card{margin:12px 16px 0; padding:14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .pg-row{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+    .pg-row .l{font-size:11px; color:var(--muted);} .pg-row .v{font-size:16px; font-weight:700;}
+    .bar{height:8px; background:var(--line); border-radius:4px; overflow:hidden;}
+    .bar .fill{height:100%; background:linear-gradient(90deg, var(--emerald), var(--accent)); border-radius:4px;}
+    .pg-stats{display:flex; justify-content:space-around; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border);}
+    .pg-stat{text-align:center; flex:1;} .pg-stat .v{font-size:15px; font-weight:700;} .pg-stat .l{font-size:10px; color:var(--muted); margin-top:1px;}
+
+    .section-h{padding:18px 16px 8px; display:flex; align-items:center;}
+    .section-h h2{font-size:15px; font-weight:600; margin:0; flex:1;}
+    .section-h .ex{font-size:11px; color:var(--muted);}
+
+    /* chapter list */
+    .ch-list{padding:0 16px;}
+    .ch{display:flex; gap:11px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:11px 12px; margin-bottom:8px;}
+    .ch .ico{width:30px; height:30px; border-radius:8px; flex-shrink:0; display:grid; place-items:center; font-size:13px; font-weight:700;}
+    .ch.done .ico{background:var(--accent-soft); color:var(--accent);}
+    .ch.cur .ico{background:var(--accent); color:#fff;}
+    .ch.lock .ico{background:var(--line); color:var(--muted);}
+    .ch .body{flex:1; min-width:0;}
+    .ch .nm{font-size:13px; font-weight:600;}
+    .ch .nm small{font-weight:400; color:var(--muted); margin-left:6px; font-size:11px;}
+    .ch .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ch .ty{font-size:10px; padding:1px 6px; border-radius:4px; font-weight:600; flex-shrink:0;}
+    .ch .ty.v{background:color-mix(in oklab,var(--accent) 14%,transparent); color:var(--accent);}
+    .ch .ty.p{background:color-mix(in oklab,var(--gold) 14%,transparent); color:var(--gold);}
+    .ch .ty.q{background:color-mix(in oklab,var(--success) 14%,transparent); color:var(--success);}
+    .ch.cur{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft);}
+    .ch.lock{opacity:0.7;}
+    .ch .cta{font-size:11px; color:var(--accent); font-weight:700; flex-shrink:0;}
+    .ch.done .cta{color:var(--success);}
+    .ch.lock .cta{color:var(--muted);}
+
+    /* exam entry */
+    .exam-entry{margin:8px 16px 0; padding:14px; background:linear-gradient(135deg,#fef3c7,#fde68a); border:1px solid #fcd34d; border-radius:var(--radius-md);}
+    .exam-entry .hd{display:flex; align-items:center; gap:8px;}
+    .exam-entry .ic{font-size:20px;} .exam-entry .nm{font-size:13.5px; font-weight:700; color:#78350f; flex:1;}
+    .exam-entry .meta{font-size:11px; color:#92400e; margin-top:6px; line-height:1.6;}
+    .exam-entry .go{display:inline-block; margin-top:10px; padding:8px 14px; background:var(--gold); color:#fff; border-radius:8px; font-size:12px; font-weight:700;}
+    .exam-entry .go.dim{background:#d6d3d1; color:#fff;}
+
+    /* linkage note */
+    .link-card{margin:12px 16px 0; padding:13px 14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); font-size:12px; line-height:1.8;}
+    .link-card .k{color:var(--muted);}
+    .link-card a{color:var(--accent); font-weight:600;}
+    .link-card .verify{display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-soft); padding:3px 8px; border-radius:6px;}
+
+    /* sticky action */
+    .sticky{position:fixed; left:50%; transform:translateX(-50%); bottom:64px; width:100%; max-width:430px; background:var(--surface); border-top:1px solid var(--border); padding:10px 16px; display:flex; gap:10px; z-index:20;}
+    .sticky .btn{flex:1; text-align:center; padding:12px; border-radius:10px; font-size:14px; font-weight:700;}
+    .sticky .btn.ghost{background:var(--line); color:var(--fg); flex:0 0 38%;}
+    .sticky .btn.pri{background:linear-gradient(90deg,var(--accent),var(--emerald)); color:#fff;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-h">
+    <div class="nav-row">
+      <a class="back" href="s-learn.html">‹</a>
+      <div class="ti">课程详情</div>
+      <a href="s-learn.html" style="font-size:12px;opacity:.9;">学习中心</a>
+    </div>
+    <div class="hero">
+      <div class="cover">🎩</div>
+      <div class="body">
+        <div class="nm">高端管家·L4→L5 客户沟通进阶</div>
+        <div class="meta">家协培训中心 · 主讲 L6 周敏<br>对位 L4→L5 · 14 章 · 112 学时 · ★4.8</div>
+        <div class="tags"><span>已认证课程</span><span>角色扮演 6 场</span><span>商业认证备考</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 课程全链路（当前：④ 学习） -->
+  <div class="chain">
+    <a href="t-courses.html">① 开发</a>
+    <a href="p-course-cert.html">② 认证</a>
+    <a href="p-training-center.html">③ 上架</a>
+    <span class="here">④ 学习</span>
+    <a href="s-exam.html">⑤ 考试</a>
+    <a href="p-exam-admin.html">⑥ 考务</a>
+    <a href="p-graduation.html">⑦ 学时</a>
+    <a href="s-cert.html">⑧ 持证</a>
+  </div>
+
+  <!-- progress -->
+  <div class="pg-card">
+    <div class="pg-row">
+      <div><span class="l">课程进度</span><br><span class="v">已完成 9 / 14 章</span></div>
+      <div style="text-align:right;"><span class="l">完课率</span><br><span class="v" style="color:var(--accent);">64%</span></div>
+    </div>
+    <div class="bar"><div class="fill" style="width:64%;"></div></div>
+    <div class="pg-stats">
+      <div class="pg-stat"><div class="v">72 / 112</div><div class="l">已学学时</div></div>
+      <div class="pg-stat"><div class="v" style="color:var(--success);">2 / 2</div><div class="l">章节测验</div></div>
+      <div class="pg-stat"><div class="v">5 / 6</div><div class="l">实操场次</div></div>
+      <div class="pg-stat"><div class="v">★4.8</div><div class="l">课程评分</div></div>
+    </div>
+  </div>
+
+  <!-- chapters -->
+  <div class="section-h"><h2>章节目录</h2><span class="ex">视频 / 实操 / 测验</span></div>
+  <div class="ch-list">
+    <div class="ch done">
+      <div class="ico">✓</div>
+      <div class="body"><div class="nm">1 · 高端客户画像与需求洞察</div><div class="meta">8 学时 · 已学完</div></div>
+      <span class="ty v">视频</span><a class="cta" href="s-lesson.html">重温</a>
+    </div>
+    <div class="ch done">
+      <div class="ico">✓</div>
+      <div class="body"><div class="nm">2 · 高净值沟通礼仪与边界</div><div class="meta">8 学时 · 已学完</div></div>
+      <span class="ty v">视频</span><a class="cta" href="s-lesson.html">重温</a>
+    </div>
+    <div class="ch done">
+      <div class="ico">✓</div>
+      <div class="body"><div class="nm">3 · 投诉升级处置实操</div><div class="meta">12 学时 · 师傅评分 A</div></div>
+      <span class="ty p">实操</span><a class="cta" href="s-lesson.html">重温</a>
+    </div>
+    <div class="ch done">
+      <div class="ico">✓</div>
+      <div class="body"><div class="nm">章节测验 1 <small>1–4 章</small></div><div class="meta">20 题 · 得分 92</div></div>
+      <span class="ty q">测验</span><a class="cta" href="s-quiz.html">查看</a>
+    </div>
+    <div class="ch done">
+      <div class="ico">✓</div>
+      <div class="body"><div class="nm">5 · 多方关系协调（管家×业主×平台）</div><div class="meta">8 学时 · 已学完</div></div>
+      <span class="ty v">视频</span><a class="cta" href="s-lesson.html">重温</a>
+    </div>
+    <div class="ch cur" id="ch10">
+      <div class="ico">▶</div>
+      <div class="body"><div class="nm">10 · 商业谈判与续约话术</div><div class="meta">10 学时 · 已学 4 / 10 · 上次看到 06-11</div></div>
+      <span class="ty v">视频</span><a class="cta" href="s-lesson.html">继续 →</a>
+    </div>
+    <div class="ch lock">
+      <div class="ico">🔒</div>
+      <div class="body"><div class="nm">11 · 团队带教与服务标准输出</div><div class="meta">8 学时 · 完成第 10 章后解锁</div></div>
+      <span class="ty p">实操</span><span class="cta">未解锁</span>
+    </div>
+    <div class="ch lock">
+      <div class="ico">🔒</div>
+      <div class="body"><div class="nm">章节测验 2 <small>9–11 章</small></div><div class="meta">20 题 · 通过线 80</div></div>
+      <span class="ty q">测验</span><span class="cta">未解锁</span>
+    </div>
+    <div class="ch lock">
+      <div class="ico">🔒</div>
+      <div class="body"><div class="nm">14 · 毕业综合考 <small>50 题 + 现场面试</small></div><div class="meta">需完成全部章节 + 章节测验</div></div>
+      <span class="ty q">综合</span><span class="cta">未解锁</span>
+    </div>
+  </div>
+
+  <!-- exam entry -->
+  <div class="section-h"><h2>结业与考试</h2></div>
+  <div class="exam-entry">
+    <div class="hd"><span class="ic">🎓</span><span class="nm">学完即可报名 L4→L5 升级考</span></div>
+    <div class="meta">本课为 L4→L5 商业认证备考课。完成全部章节 + 章节测验后，可在考试中心报名结业升级考；考试通过 → 中台学时认定 → 统一发证。</div>
+    <a class="go" href="s-exam.html">去考试中心报名 →</a>
+  </div>
+
+  <!-- linkage -->
+  <div class="link-card">
+    <div><span class="k">课程来源：</span><a href="t-courses.html">家协培训中心 · 课程开发 ↗</a></div>
+    <div><span class="k">课程认证：</span><a href="p-course-cert.html">中台课程认证审核 ↗</a> · 已认证在架</div>
+    <div><span class="k">学时认定：</span><a href="p-graduation.html">结业核发 · 学时认定 ↗</a></div>
+    <a class="verify" href="portal-verify.html?code=GZ-LJC-2026-0000888">🔍 课程认证编号 GZ-LJC-2026-0000888 · 扫码验真</a>
+  </div>
+
+  <!-- sticky -->
+  <div class="sticky">
+    <a class="btn ghost" href="s-learn.html">返回学习中心</a>
+    <a class="btn pri" href="s-lesson.html">继续学习 第 10 章</a>
+  </div>
+
+  <div id="tab-bar" data-series="s" data-active="learn"></div>
+</div>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

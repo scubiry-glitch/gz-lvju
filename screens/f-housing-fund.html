@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>公积金直付通道 · 江苏银行 · 保租房金融端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1d4ed8; --gold: #b45309;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .side::after { content: '¥'; position: absolute; right: -16px; bottom: -30px; font-size: 180px; color: rgba(255,255,255,0.04); font-weight: 900; }
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    /* KPI */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .kpi .l { font-size: 12px; color: var(--muted); }
+    .kpi .n { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .kpi .d { font-size: 12px; margin-top: 4px; }
+    .kpi .d.ok { color: var(--success); }
+    .kpi .d.warn { color: var(--warn); }
+
+    /* config panel */
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-head h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .card-head .meta { font-size: 11px; color: var(--muted); }
+    .card-body { padding: 16px 20px; }
+
+    /* quota config */
+    .quota-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .quota-row:last-child { border-bottom: 0; }
+    .quota-row .k { color: var(--muted); }
+    .quota-row .v { font-weight: 600; }
+    .quota-row .v.danger { color: var(--danger); }
+
+    /* bar progress */
+    .bar { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 6px; }
+    .bar .track { flex: 1; height: 8px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .bar .fill { height: 100%; background: var(--accent); border-radius: 999px; }
+    .bar .pct { font-weight: 600; color: var(--accent); min-width: 50px; text-align: right; }
+
+    /* tabs */
+    .tab-row { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 16px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+    .tab .cnt { font-size: 11px; padding: 1px 6px; background: var(--bg); border-radius: 3px; margin-left: 4px; }
+
+    /* filter */
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+    .filter-bar input { flex: 1; min-width: 180px; }
+
+    /* table */
+    table.tx { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.tx th, table.tx td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.tx th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.tx tr:last-child td { border-bottom: 0; }
+    .status-pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; display: inline-block; }
+    .status-pill.ok { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .status-pill.proc { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+    .status-pill.warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .status-pill.danger { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+
+    @media (max-width: 1100px) { .console { grid-template-columns: 1fr; } .side { display: none; } .row2 { grid-template-columns: 1fr; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="f" data-active="housing-fund"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>公积金直付通道</h1>
+      <button class="btn btn-ghost">通道配置</button>
+      <button class="btn btn-primary">应急熔断</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="l">已开通直付租客</div><div class="n">1,284</div><div class="d ok">↑ 86 本周</div></div>
+      <div class="kpi"><div class="l">本月直付总额</div><div class="n">¥ 3.62 M</div><div class="d ok">↑ 12.4% 环比</div></div>
+      <div class="kpi"><div class="l">直付成功率</div><div class="n">98.6%</div><div class="d ok">目标 ≥ 95%</div></div>
+      <div class="kpi"><div class="l">异常处理中</div><div class="n">14</div><div class="d warn">需介入</div></div>
+    </div>
+
+    <!-- channel + quota -->
+    <div class="row2">
+      <div class="card">
+        <div class="card-head">
+          <h3>南京公积金通道</h3>
+          <span class="meta">江苏银行 ↔ 南京公积金中心</span>
+        </div>
+        <div class="card-body">
+          <div class="quota-row"><span class="k">通道状态</span><span class="v" style="color: var(--success);">● 正常运行</span></div>
+          <div class="quota-row"><span class="k">日处理能力</span><span class="v">10,000 笔 / 日</span></div>
+          <div class="quota-row"><span class="k">本月已用配额</span><span class="v">3,620 笔 / 月</span></div>
+          <div style="margin: 8px 0;">
+            <div class="bar">
+              <div class="track"><div class="fill" style="width: 36%; background: var(--success);"></div></div>
+              <div class="pct" style="color: var(--success);">36%</div>
+            </div>
+            <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">月配额上限 10,000 笔</div>
+          </div>
+          <div class="quota-row"><span class="k">下次结算窗口</span><span class="v">每月 5 日 03:00</span></div>
+          <div class="quota-row"><span class="k">单笔上限</span><span class="v">¥ 6,000</span></div>
+          <div class="quota-row"><span class="k">月累计上限（按租客）</span><span class="v">¥ 12,000</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>其他城市通道 · 规划中</h3>
+          <span class="meta">阶段三（2027 H1）</span>
+        </div>
+        <div class="card-body">
+          <div class="quota-row"><span class="k">苏州公积金中心</span><span class="v warn">协议商议中</span></div>
+          <div class="quota-row"><span class="k">无锡公积金中心</span><span class="v warn">需求确认中</span></div>
+          <div class="quota-row"><span class="k">常州公积金中心</span><span class="v" style="color: var(--muted);">未启动</span></div>
+          <div class="quota-row"><span class="k">省内互通方案</span><span class="v" style="color: var(--accent);">2027 H2</span></div>
+
+          <div style="margin-top: 16px; padding: 12px; background: color-mix(in oklab, var(--warn) 8%, transparent); border-radius: 8px; font-size: 12px;">
+            <strong style="color: var(--warn);">⚠ 跨市直付依赖</strong>
+            <div style="color: var(--muted); margin-top: 4px;">江苏省公积金管理中心牵头的"省内互通"项目落地后，可实现全省 13 市跨市直付。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- tabs -->
+    <div class="tab-row">
+      <div class="tab active">本月直付明细 <span class="cnt">3,620</span></div>
+      <div class="tab">待结算（次月） <span class="cnt">512</span></div>
+      <div class="tab">异常处置 <span class="cnt">14</span></div>
+      <div class="tab">授权撤销 <span class="cnt">6</span></div>
+    </div>
+
+    <!-- filter -->
+    <div class="filter-bar">
+      <select><option>全部状态</option><option>已成功</option><option>处理中</option><option>已失败</option></select>
+      <select><option>全部运营方</option><option>南京安居集团</option><option>江苏安居</option><option>江北建发</option></select>
+      <input placeholder="搜索租客姓名、合同号、公积金账号…" />
+      <button class="btn btn-ghost">重置</button>
+    </div>
+
+    <!-- table -->
+    <div class="card">
+      <table class="tx">
+        <thead>
+          <tr>
+            <th>扣划日</th>
+            <th>租客 / 公积金账号</th>
+            <th>合同 / 房源</th>
+            <th>授权额度</th>
+            <th>实际扣划</th>
+            <th>差额来源</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>张涛 · 3010****8825</td>
+            <td>NJBZF-04528 · 梧桐公馆 3-1506</td>
+            <td>¥ 1,860</td>
+            <td>¥ 1,860</td>
+            <td>江苏银行借记卡 ¥ 520</td>
+            <td><span class="status-pill ok">已成功</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>李娜 · 3010****6612</td>
+            <td>NJBZF-03891 · 梧桐公馆 3-0903</td>
+            <td>¥ 1,500</td>
+            <td>¥ 1,500</td>
+            <td>江苏银行借记卡 ¥ 680</td>
+            <td><span class="status-pill ok">已成功</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>王伟 · 3010****4982</td>
+            <td>NJBZF-05214 · 河西青年 2-1208</td>
+            <td>¥ 2,400</td>
+            <td>¥ 2,400</td>
+            <td>江苏银行借记卡 ¥ 720</td>
+            <td><span class="status-pill ok">已成功</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>陈静 · 3010****3201</td>
+            <td>NJBZF-06478 · 南部新城 5-1801</td>
+            <td>¥ 1,860</td>
+            <td>¥ 320</td>
+            <td>余额不足 · 已通知补缴</td>
+            <td><span class="status-pill warn">部分扣划</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>赵磊 · 3010****1158</td>
+            <td>NJBZF-06012 · 龙江新青年</td>
+            <td>¥ 1,860</td>
+            <td>¥ 0</td>
+            <td>账户冻结 · 异地公积金</td>
+            <td><span class="status-pill danger">失败</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>刘洋 · 3010****8847</td>
+            <td>NJBZF-04102 · 玄武湖公寓</td>
+            <td>¥ 2,200</td>
+            <td>¥ 2,200</td>
+            <td>—</td>
+            <td><span class="status-pill ok">已成功</span></td>
+          </tr>
+          <tr>
+            <td>2026-06-05 03:01</td>
+            <td>吴敏 · 3010****6680</td>
+            <td>NJBZF-05847 · 雨花软件谷公寓</td>
+            <td>¥ 1,860</td>
+            <td>¥ 1,860</td>
+            <td>—</td>
+            <td><span class="status-pill ok">已成功</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>权限与角色 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* role × permission matrix */
+    .mtx-wrap{overflow:auto; border:1px solid var(--border); border-radius:var(--radius-sm);}
+    .mtx{width:100%; border-collapse:collapse; font-size:11.5px;}
+    .mtx th, .mtx td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:center; min-width:78px;}
+    .mtx th{background:var(--line); font-weight:600; font-size:10.5px; color:var(--muted);}
+    .mtx td:first-child, .mtx th:first-child{text-align:left; font-weight:600; position:sticky; left:0; background:var(--surface); border-right:1px solid var(--line); min-width:200px;}
+    .mtx th:first-child{background:var(--line);}
+    .mtx .grp-row td{background:linear-gradient(90deg, var(--accent-soft), transparent); padding:6px 10px; font-size:10.5px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; text-align:left;}
+    .mtx .cell{display:inline-grid; place-items:center; width:22px; height:22px; border-radius:4px; font-size:10px; font-weight:700;}
+    .mtx .cell.RW{background:color-mix(in oklab, var(--success) 18%, transparent); color:#065f46;}
+    .mtx .cell.R{background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent);}
+    .mtx .cell.A{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .mtx .cell.X{background:var(--line); color:var(--muted);}
+
+    /* role chips above */
+    .role-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+    .role-chip{padding:6px 12px; border-radius:6px; font-size:12px; background:var(--line); display:flex; align-items:center; gap:6px;}
+    .role-chip .ic{width:24px; height:24px; border-radius:50%; background:var(--accent); color:white; display:grid; place-items:center; font-size:11px; font-weight:700;}
+    .role-chip .ic.gov{background:#1e40af;}
+    .role-chip .ic.op{background:#0f766e;}
+    .role-chip .ic.svc{background:#0d9488;}
+    .role-chip .ic.ven{background:#c2410c;}
+    .role-chip .ic.train{background:#7c3aed;}
+    .role-chip .ic.adm{background:#6366f1;}
+    .role-chip .ic.audit{background:#475569;}
+    .role-chip .nm{font-weight:600;}
+    .role-chip .cnt{font-family:var(--mono); font-size:11px; color:var(--muted);}
+
+    /* user list */
+    .user-tbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+    .user-tbl th, .user-tbl td{padding:10px 12px; text-align:left; border-bottom:1px solid var(--line);}
+    .user-tbl th{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; background:#f9fafb;}
+    .user-tbl tr:hover td{background:#f9fafb;}
+    .av{display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:700; margin-right:8px; vertical-align:middle; font-size:11px;}
+    .nm{font-weight:600; vertical-align:middle;}
+    .sub{font-size:10.5px; color:var(--muted); margin-top:1px;}
+    .role-tag{display:inline-block; padding:1px 7px; background:var(--accent-soft); color:var(--accent); border-radius:3px; font-size:10.5px; font-weight:600;}
+    .role-tag.gov{background:color-mix(in oklab, #1e40af 14%, transparent); color:#1e40af;}
+    .role-tag.op{background:color-mix(in oklab, #0f766e 14%, transparent); color:#0f766e;}
+    .role-tag.audit{background:color-mix(in oklab, #475569 14%, transparent); color:#475569;}
+    .role-tag.adm{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .stat-pill{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .stat-pill.on{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .stat-pill.off{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* audit log */
+    .audit-row{display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); align-items:center; font-size:12px;}
+    .audit-row:last-child{border-bottom:0;}
+    .audit-row .t{font-family:var(--mono); font-size:10px; color:var(--muted);}
+    .audit-row .act{font-family:var(--mono); font-size:9.5px; padding:2px 5px; border-radius:3px; font-weight:600;}
+    .audit-row .act.grant{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .audit-row .act.revoke{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .audit-row .act.role{background:var(--accent-soft); color:var(--accent);}
+    .audit-row .act.login{background:color-mix(in oklab, var(--muted) 14%, transparent); color:var(--muted);}
+    .audit-row .who{font-weight:600; color:var(--accent);}
+
+    .row2{display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="permissions"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>权限与角色</b></div>
+      <span style="font-size:11px; padding:3px 8px; background:var(--accent-soft); color:var(--accent); border-radius:4px; font-weight:600;">RBAC v2 · 多租户</span>
+      <div class="top-actions">
+        <button class="btn">导出 IAM</button>
+        <button class="btn">SSO 配置</button>
+        <button class="btn pri">+ 新建角色</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">角色总数</div><div class="n">14</div><div class="d">含 4 系统角色</div></div>
+      <div class="ki"><div class="l">权限点</div><div class="n">186</div><div class="d">资源 × 动作</div></div>
+      <div class="ki"><div class="l">在用账号</div><div class="n">486</div><div class="d ok">↑ 32</div></div>
+      <div class="ki"><div class="l">本月新登录</div><div class="n">3,486</div><div class="d ok">活跃度 92%</div></div>
+      <div class="ki"><div class="l">异常登录</div><div class="n" style="color:var(--danger);">6</div><div class="d" style="color:var(--danger);">已阻断 4</div></div>
+      <div class="ki"><div class="l">SSO 覆盖率</div><div class="n">100<span class="u">%</span></div><div class="d ok">钉钉 + 企微</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- role chips -->
+      <div class="card">
+        <h3>角色定义 <span class="pill">16 个 · 多租户 · 覆盖 5 类机构</span> <span class="extra">点击查看用户与权限</span></h3>
+        <div class="role-row">
+          <span class="role-chip"><span class="ic adm">管</span><span class="nm">超级管理员</span><span class="cnt">3</span></span>
+          <span class="role-chip"><span class="ic adm">中</span><span class="nm">中台运营</span><span class="cnt">12</span></span>
+          <span class="role-chip"><span class="ic gov">G</span><span class="nm">监管员</span><span class="cnt">28</span></span>
+          <span class="role-chip"><span class="ic gov">G</span><span class="nm">监管主管</span><span class="cnt">6</span></span>
+          <span class="role-chip"><span class="ic svc">S</span><span class="nm">S · 服务者（个人）</span><span class="cnt">186</span></span>
+          <span class="role-chip"><span class="ic op">B</span><span class="nm">B · 运营经理</span><span class="cnt">42</span></span>
+          <span class="role-chip"><span class="ic op">B</span><span class="nm">B · 运营调度员</span><span class="cnt">86</span></span>
+          <span class="role-chip"><span class="ic ven">V</span><span class="nm">V · 人力服务商负责人</span><span class="cnt">86</span></span>
+          <span class="role-chip" style="background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;"><span class="ic" style="background:#6b21a8; color:#fff;">M</span><span class="nm">M · 物资供应商管理员</span><span class="cnt">6</span></span>
+          <span class="role-chip" style="background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe;"><span class="ic" style="background:#6b21a8; color:#fff;">M</span><span class="nm">M · 物资集采采购员</span><span class="cnt">18</span></span>
+          <span class="role-chip"><span class="ic train">T</span><span class="nm">T · 培训机构</span><span class="cnt">8</span></span>
+          <span class="role-chip"><span class="ic train">T</span><span class="nm">T · 讲师 / 师傅</span><span class="cnt">24</span></span>
+          <span class="role-chip"><span class="ic audit">审</span><span class="nm">审计员</span><span class="cnt">3</span></span>
+          <span class="role-chip"><span class="ic audit">D</span><span class="nm">DPO（数据保护官）</span><span class="cnt">2</span></span>
+        </div>
+
+        <h3 style="margin-top:18px;">权限矩阵 <span class="pill">资源 × 角色</span> <span class="extra">RW=读写 · R=只读 · A=审批 · ✗=无</span></h3>
+        <div class="mtx-wrap">
+          <table class="mtx">
+            <thead>
+              <tr>
+                <th>资源 / 角色</th>
+                <th>超管</th>
+                <th>中台运营</th>
+                <th>监管员</th>
+                <th>监管主管</th>
+                <th>运营经理</th>
+                <th>调度员</th>
+                <th>服务商负责人</th>
+                <th>服务者</th>
+                <th>培训机构</th>
+                <th>讲师</th>
+                <th>审计员</th>
+                <th>DPO</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="grp-row"><td colspan="13">认证标准 · 等级 / 工种 / 技能矩阵</td></tr>
+              <tr>
+                <td>等级与技能矩阵</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+              </tr>
+              <tr>
+                <td>题库 / 试卷</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr class="grp-row"><td colspan="13">认证流程 · 签发 / 吊销 / 续期</td></tr>
+              <tr>
+                <td>证书签发（L3-L4）</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr>
+                <td>L5+ 证书签发（多签）</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell A">A</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr>
+                <td>证书吊销（红牌）</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell A">A</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr class="grp-row"><td colspan="13">业务运营 · 派单 / 信用 / 流量</td></tr>
+              <tr>
+                <td>派单与匹配</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr>
+                <td>信用规则配置</td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell A">A</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+              </tr>
+              <tr class="grp-row"><td colspan="13">敏感数据 · PII / 财务 / 审计</td></tr>
+              <tr>
+                <td>用户 PII 数据</td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell RW">RW</span></td>
+              </tr>
+              <tr>
+                <td>交易 / 分账</td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell R">R</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell A">A</span></td><td><span class="cell R">R</span></td>
+              </tr>
+              <tr>
+                <td>审计日志</td>
+                <td><span class="cell R">R</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell R">R</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell X">✗</span></td><td><span class="cell X">✗</span></td>
+                <td><span class="cell RW">RW</span></td><td><span class="cell RW">RW</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="row2">
+
+        <!-- user list -->
+        <div class="card">
+          <h3>账号管理 <span class="pill">本周新增 12</span> <span class="extra">486 在用</span></h3>
+          <table class="user-tbl">
+            <thead><tr><th>账号</th><th>角色</th><th>所属</th><th>最近登录</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="av">张</span><span class="nm">张主任</span><div class="sub">zhang.zr@bzf.jsgov.cn · SSO</div></td>
+                <td><span class="role-tag gov">监管主管</span></td>
+                <td>南京市住建局</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">10:32</span></td>
+                <td><span class="stat-pill on">活跃</span></td>
+              </tr>
+              <tr>
+                <td><span class="av">李</span><span class="nm">李运营总监</span><div class="sub">li.yyz@nj-anju.cn · 钉钉</div></td>
+                <td><span class="role-tag op">运营经理</span></td>
+                <td>南京安居集团</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">09:08</span></td>
+                <td><span class="stat-pill on">活跃</span></td>
+              </tr>
+              <tr>
+                <td><span class="av">吴</span><span class="nm">吴志强</span><div class="sub">wu.zq@youjia.com</div></td>
+                <td><span class="role-tag" style="background:color-mix(in oklab, #c2410c 14%, transparent); color:#c2410c;">服务商负责人</span></td>
+                <td>优家装饰</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">昨</span></td>
+                <td><span class="stat-pill on">活跃</span></td>
+              </tr>
+              <tr>
+                <td><span class="av">A</span><span class="nm">中台 Admin</span><div class="sub">admin@cert-os.platform</div></td>
+                <td><span class="role-tag adm">超管</span></td>
+                <td>平台</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">10:48</span></td>
+                <td><span class="stat-pill on">活跃</span></td>
+              </tr>
+              <tr>
+                <td><span class="av">审</span><span class="nm">审计·钱</span><div class="sub">audit.qian · 双因子</div></td>
+                <td><span class="role-tag audit">审计员</span></td>
+                <td>合规组</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">06-05</span></td>
+                <td><span class="stat-pill on">活跃</span></td>
+              </tr>
+              <tr>
+                <td><span class="av" style="background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);">某</span><span class="nm">某离职运营</span><div class="sub">leaver@nj-anju.cn</div></td>
+                <td><span class="role-tag op">运营经理</span></td>
+                <td>南京安居集团</td>
+                <td><span style="font-family:var(--mono); font-size:11px;">06-01</span></td>
+                <td><span class="stat-pill off">已禁用</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- audit log -->
+        <div class="card">
+          <h3>权限审计 <span class="extra">最近 24h</span></h3>
+          <div>
+            <div class="audit-row">
+              <span class="t">10:32:18</span>
+              <span class="act grant">GRANT</span>
+              <div><strong>给 li.yyz 赋予 「运营经理」</strong><br><span style="font-size:11px; color:var(--muted);">资源：派单/绩效/续约</span></div>
+              <span class="who">超管 A</span>
+            </div>
+            <div class="audit-row">
+              <span class="t">09:08:42</span>
+              <span class="act login">LOGIN</span>
+              <div><strong>钉钉 SSO 登录</strong><br><span style="font-size:11px; color:var(--muted);">IP 117.136.*.* · 南京</span></div>
+              <span class="who">李运营总监</span>
+            </div>
+            <div class="audit-row">
+              <span class="t">08:51:10</span>
+              <span class="act role">ROLE</span>
+              <div><strong>角色权限调整</strong><br><span style="font-size:11px; color:var(--muted);">「审计员」+「交易/分账：A」（审批）</span></div>
+              <span class="who">超管 A</span>
+            </div>
+            <div class="audit-row">
+              <span class="t">06-05 18:12</span>
+              <span class="act revoke">REVOKE</span>
+              <div><strong>禁用「某离职运营」</strong><br><span style="font-size:11px; color:var(--muted);">B 端运营经理 · HR 发起</span></div>
+              <span class="who">系统</span>
+            </div>
+            <div class="audit-row">
+              <span class="t">06-05 14:42</span>
+              <span class="act login" style="background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);">DENY</span>
+              <div><strong>异常登录拦截</strong><br><span style="font-size:11px; color:var(--muted);">IP 黑名单 · 阻断</span></div>
+              <span class="who">系统</span>
+            </div>
+            <div class="audit-row">
+              <span class="t">06-05 11:08</span>
+              <span class="act grant">GRANT</span>
+              <div><strong>新建讲师账号 × 4</strong><br><span style="font-size:11px; color:var(--muted);">T 端 · 江苏家协批量导入</span></div>
+              <span class="who">中台运营 王</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

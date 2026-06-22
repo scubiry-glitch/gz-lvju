@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>控制台 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    /* sidebar */
+    .brand-text .nm{font-size:13px; font-weight:600;}
+    .brand-text .sub{font-size:10px; color:var(--side-muted);}
+    .side-foot .ev{display:flex; justify-content:space-between; padding:3px 0; color:var(--side-muted);}
+
+    /* main */
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);}
+    .crumb b{color:var(--fg); font-weight:600; font-size:14px; margin-right:2px;}
+    .env-tag{padding:3px 8px; background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success); font-size:11px; border-radius:4px; font-weight:600;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:22px 28px;}
+    .h-row{display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:14px;}
+    .h-row h1{font-size:22px; font-weight:600; margin:0;}
+    .h-row .sub{font-size:12px; color:var(--muted); margin-top:4px;}
+    .h-row .meta{font-size:11px; color:var(--muted); display:flex; gap:14px;}
+    .h-row .meta b{color:var(--fg); font-weight:600;}
+
+    /* KPI */
+    .kpi-row{display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;}
+    .ki .l{font-size:11px; color:var(--muted); letter-spacing:0.3px; display:flex; align-items:center; gap:5px;}
+    .ki .l .dot{width:6px; height:6px; border-radius:50%; background:var(--accent);}
+    .ki .l .dot.ok{background:var(--success);}
+    .ki .l .dot.warn{background:var(--warn);}
+    .ki .n{font-size:24px; font-weight:700; margin-top:6px; line-height:1.1;}
+    .ki .n .u{font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:6px; display:flex; justify-content:space-between;}
+    .ki .d .delta{color:var(--success);}
+    .ki .d .delta.dn{color:var(--danger);}
+
+    /* grid */
+    .grid{display:grid; grid-template-columns:2fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+    .card h3 .tg{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px; font-weight:500;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* module entries */
+    .mod-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    .mod{display:flex; gap:12px; padding:14px 16px; background:var(--line); border-radius:var(--radius-md); border:1px solid transparent; cursor:pointer; transition:border-color .15s;}
+    .mod:hover{border-color:var(--accent); background:var(--surface);}
+    .mod .icn{width:38px; height:38px; border-radius:9px; display:grid; place-items:center; font-size:18px; flex-shrink:0;}
+    .mod .icn.m1{background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent);}
+    .mod .icn.m2{background:color-mix(in oklab, var(--success) 12%, transparent); color:var(--success);}
+    .mod .icn.m3{background:color-mix(in oklab, var(--warn) 12%, transparent); color:var(--warn);}
+    .mod .icn.m4{background:color-mix(in oklab, #a855f7 12%, transparent); color:#a855f7;}
+    .mod .body{flex:1; min-width:0;}
+    .mod .nm{font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;}
+    .mod .nm .badge{font-size:10px; padding:1px 5px; border-radius:3px; background:var(--surface); color:var(--muted); border:1px solid var(--border); font-weight:500;}
+    .mod .desc{font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.45;}
+    .mod .stat{font-size:11px; color:var(--muted); margin-top:6px; display:flex; gap:10px;}
+    .mod .stat b{color:var(--fg); font-weight:600;}
+
+    /* activity */
+    .log{font-size:12px;}
+    .log .row{display:grid; grid-template-columns:auto 1fr auto; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); align-items:start;}
+    .log .row:last-child{border-bottom:0;}
+    .log .t{font-size:11px; color:var(--muted); padding-top:1px;}
+    .log .a{font-family:var(--mono); font-size:10px; color:var(--accent); background:var(--accent-soft); padding:2px 5px; border-radius:3px; align-self:start;}
+    .log .ctx strong{font-weight:500;}
+    .log .ctx em{font-style:normal; color:var(--muted);}
+
+    /* health */
+    .health{display:flex; flex-direction:column; gap:8px;}
+    .h-row2{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px;}
+    .h-row2:last-child{border-bottom:0;}
+    .h-row2 .nm{color:var(--muted);}
+    .h-row2 .vv{font-weight:600;}
+    .h-row2 .vv.ok::before{content:'● '; color:var(--success);}
+    .h-row2 .vv.warn::before{content:'● '; color:var(--warn);}
+    .h-row2 .vv.danger::before{content:'● '; color:var(--danger);}
+
+    /* downstream consumers */
+    .ds-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;}
+    .ds{padding:10px; border:1px dashed var(--border); border-radius:var(--radius-sm); text-align:center; font-size:12px;}
+    .ds .ic{font-size:18px; margin-bottom:3px;}
+    .ds .nm{font-weight:600; margin-bottom:2px;}
+    .ds .v{font-size:11px; color:var(--muted);}
+    .ds.live{border-style:solid; border-color:var(--success); background:color-mix(in oklab, var(--success) 4%, transparent);}
+
+    @media (max-width: 1100px){
+      .kpi-row{grid-template-columns:repeat(2, 1fr);}
+      .grid{grid-template-columns:1fr;}
+      .mod-grid{grid-template-columns:1fr;}
+      .ds-grid{grid-template-columns:repeat(2, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="console"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb"><b>控制台</b> · 全局概览</div>
+      <span class="env-tag">PROD</span>
+      <div class="top-actions">
+        <button class="btn">切换租户</button>
+        <button class="btn">发布管理</button>
+        <button class="btn pri">新建规则</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="h-row">
+        <div>
+          <h1>服务认证中台 · 控制台</h1>
+          <div class="sub">标准 + 规则 + 数据 — 为 5 类机构（S 服务者 / B 运营商 / V 人力 / M 物资 / T 培训）+ G / C / F 提供统一能力</div>
+        </div>
+        <div class="meta">
+          <span>当前租户：<b>江苏住房与城乡建设厅</b></span>
+          <span>主版本：<b>v2.4.6</b></span>
+          <span>上次发布：<b>3 小时前</b></span>
+        </div>
+      </div>
+
+      <!-- KPI -->
+      <div class="kpi-row">
+        <div class="ki"><div class="l"><span class="dot"></span>规则版本</div><div class="n">42<span class="u">条</span></div><div class="d"><span>生效 38 · 灰度 4</span><span class="delta">↑ 6</span></div></div>
+        <div class="ki"><div class="l"><span class="dot ok"></span>等级标准</div><div class="n">6<span class="u">级 / 11 工种</span></div><div class="d"><span>v2.4 已发布</span><span class="delta">↑ 1</span></div></div>
+        <div class="ki"><div class="l"><span class="dot"></span>题库题目</div><div class="n">1,248<span class="u">道</span></div><div class="d"><span>试卷 84 套</span><span class="delta">↑ 38</span></div></div>
+        <div class="ki"><div class="l"><span class="dot warn"></span>待审变更</div><div class="n">7<span class="u">单</span></div><div class="d"><span>含 2 单加急</span><span class="delta dn">需处理</span></div></div>
+        <div class="ki"><div class="l"><span class="dot ok"></span>下游消费端</div><div class="n">8<span class="u">端在线</span></div><div class="d"><span>S / B / V / M / T + G / C / F</span><span class="delta">100%</span></div></div>
+      </div>
+
+      <!-- 架构图：公共底座 + 5 类机构分组 -->
+      <div style="margin:14px 0; padding:18px; background:linear-gradient(135deg,#0f172a,#1e293b); color:white; border-radius:10px;">
+        <div style="display:flex; align-items:baseline; margin-bottom:14px;">
+          <div style="font-size:14px; font-weight:700;">🏗 P 中台架构 · 1 公共底座 + 5 类机构分组</div>
+          <div style="margin-left:auto; font-size:11px; opacity:0.7;">公共抽象，业务独立</div>
+        </div>
+
+        <!-- 公共底座 -->
+        <div style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px 14px; margin-bottom:12px;">
+          <div style="font-size:11px; opacity:0.75; margin-bottom:6px;">🧱 公共底座（横跨 5 类机构 · 共享基础设施 · 9 张）</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; font-size:11px;">
+            <a href="p-console.html" style="padding:3px 8px; background:#b45309; color:white; border-radius:4px; font-weight:600;">控制台</a>
+            <a href="p-cert-issue.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">发证管理</a>
+            <a href="p-credit-engine.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">信用规则</a>
+            <a href="p-data-hub.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">数据中台</a>
+            <a href="p-permissions.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">权限 RBAC</a>
+            <a href="p-workflow.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">工作流</a>
+            <a href="p-webhooks.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">Webhook</a>
+            <a href="p-api-gateway.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">API 网关</a>
+            <a href="p-notifications.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">通知</a>
+          </div>
+        </div>
+
+        <!-- 5 类机构分组 -->
+        <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px;">
+          <div style="background:rgba(37,99,235,0.18); border:1px solid rgba(37,99,235,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#93c5fd;">🛠 × S 服务者</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">个人持证轨道</div>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+              <a href="p-standards.html" style="font-size:11px; color:white; padding:2px 0;">L0-L7 标准 ›</a>
+              <a href="p-question-bank.html" style="font-size:11px; color:white; padding:2px 0;">题库试卷 ›</a>
+              <a href="p-traffic-policy.html" style="font-size:11px; color:white; padding:2px 0;">派单流量 ›</a>
+              <a href="p-transaction.html" style="font-size:11px; color:white; padding:2px 0;">派单分账 ›</a>
+            </div>
+          </div>
+
+          <div style="background:rgba(15,118,110,0.18); border:1px solid rgba(15,118,110,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#5eead4;">🏬 × B 运营商</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">白名单 + 评级</div>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+              <a href="p-b-whitelist.html" style="font-size:11px; color:white; padding:2px 0;">★ 白名单审定 ›</a>
+              <a href="b-house-rating-input.html" style="font-size:11px; color:white; padding:2px 0;">好房子评级 ↗</a>
+              <a href="b-operator-console.html" style="font-size:11px; color:white; padding:2px 0;">B 工作台 ↗</a>
+            </div>
+          </div>
+
+          <div style="background:rgba(194,65,12,0.18); border:1px solid rgba(194,65,12,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#fdba74;">👥 × V 人力</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">服务商入驻 + LV</div>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+              <a href="g-whitelist-supplier.html" style="font-size:11px; color:white; padding:2px 0;">V 入驻审定 ↗</a>
+              <a href="v-onboarding.html" style="font-size:11px; color:white; padding:2px 0;">V 门户 ↗</a>
+            </div>
+          </div>
+
+          <div style="background:rgba(107,33,168,0.18); border:1px solid rgba(107,33,168,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#c4b5fd;">🛒 × M 物资</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">6 品类 + 批次质检</div>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+              <a href="p-m-catalog-cert.html" style="font-size:11px; color:white; padding:2px 0;">★ 品类认证 ›</a>
+              <a href="p-m-batch-qc.html" style="font-size:11px; color:white; padding:2px 0;">★ 批次质检 ›</a>
+              <a href="m-supplier-onboarding.html" style="font-size:11px; color:white; padding:2px 0;">M 门户 ↗</a>
+            </div>
+          </div>
+
+          <div style="background:rgba(124,58,237,0.18); border:1px solid rgba(124,58,237,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#d8b4fe;">🎓 × T 培训</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">课程 + 排课 + 讲师</div>
+            <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+              <a href="p-training-center.html" style="font-size:11px; color:white; padding:2px 0;">培训中心 ›</a>
+              <a href="t-courses.html" style="font-size:11px; color:white; padding:2px 0;">T 课程开发 ↗</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; padding:8px 12px; background:rgba(255,255,255,0.06); border-left:3px solid #b45309; border-radius:4px; font-size:11px; line-height:1.6; opacity:0.85;">
+          <b>设计原则</b>：① 公共部分（证书 / 信用 / 工作流 / 权限 / 数据 / 事件 / API / 通知 / 控制台）= 一份代码 9 张页，所有机构共用。<br/>
+          ② 5 类机构分组 = 各自业务逻辑独立，互不耦合；S 用派单分账，B 用白名单审定，M 用品类质检，T 用课程排课。<br/>
+          ③ 跨链接（↗）指向 B/V/M/T 系列页面，避免 P 中台重建已有功能。
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+
+          <!-- 4 modules -->
+          <div class="card">
+            <h3>核心模块 <span class="tg">P1</span> <span class="extra">独立可单建 / 接口暴露</span></h3>
+            <div class="mod-grid">
+              <a class="mod" href="p-standards.html">
+                <div class="icn m1">📐</div>
+                <div class="body">
+                  <div class="nm">等级与技能矩阵 <span class="badge">v2.4</span></div>
+                  <div class="desc">L0–L7 八级定义、晋级条件、11 工种 × 6 维能力</div>
+                  <div class="stat"><span>规则 <b>38</b></span><span>映射 <b>11 工种</b></span><span>发布 <b>3h 前</b></span></div>
+                </div>
+              </a>
+              <a class="mod" href="p-question-bank.html">
+                <div class="icn m2">📚</div>
+                <div class="body">
+                  <div class="nm">题库与试卷 <span class="badge">1248 题</span></div>
+                  <div class="desc">题型 / 难度 / 章节 / 抽题规则 / 错题画像</div>
+                  <div class="stat"><span>试卷 <b>84</b></span><span>平均通过 <b>89.5%</b></span><span>审核中 <b>32</b></span></div>
+                </div>
+              </a>
+              <a class="mod" href="p-credit-engine.html">
+                <div class="icn m3">⚙️</div>
+                <div class="body">
+                  <div class="nm">信用规则引擎 <span class="badge">42 规则</span></div>
+                  <div class="desc">14 维加减分 · 阈值告警 · 冻结与解冻 · 灰度发布</div>
+                  <div class="stat"><span>命中/日 <b>3.4k</b></span><span>误判 <b>0.6%</b></span><span>灰度 <b>4 规则</b></span></div>
+                </div>
+              </a>
+              <a class="mod" href="p-traffic-policy.html">
+                <div class="icn m4">📡</div>
+                <div class="body">
+                  <div class="nm">流量倾斜策略 <span class="badge">7 策略</span></div>
+                  <div class="desc">分级权重 · 新人扶持 · 区域调控 · A/B 实验</div>
+                  <div class="stat"><span>覆盖 <b>南京 11 区</b></span><span>命中 <b>78%</b></span><span>实验 <b>3 in flight</b></span></div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- 下游端 -->
+          <div class="card" style="margin-top:14px;">
+            <h3>下游消费端 <span class="extra">订阅 · 数据流向</span></h3>
+            <div class="ds-grid">
+              <div class="ds live"><div class="ic">🛠</div><div class="nm">S 端</div><div class="v">服务者 · 2,468 持证</div></div>
+              <div class="ds live"><div class="ic">🏬</div><div class="nm">B 端</div><div class="v">白名单运营商 · 5 家</div></div>
+              <div class="ds live"><div class="ic">👥</div><div class="nm">V 端</div><div class="v">人力服务商 · 312</div></div>
+              <div class="ds live"><div class="ic">🛒</div><div class="nm">M 端</div><div class="v">物资供应商 · 6 家 6 品类</div></div>
+              <div class="ds"><div class="ic">🎓</div><div class="nm">T 端</div><div class="v">培训机构 · 待接入</div></div>
+              <div class="ds live"><div class="ic">⚖</div><div class="nm">G 端</div><div class="v">监管 · T+0 同步</div></div>
+              <div class="ds live"><div class="ic">🏠</div><div class="nm">C 端</div><div class="v">居住者 · 38k MAU</div></div>
+              <div class="ds live"><div class="ic">📊</div><div class="nm">公示门户</div><div class="v">portal · 扫码验真</div></div>
+              <div class="ds"><div class="ic">🏦</div><div class="nm">F 端</div><div class="v">银行 · 公积金</div></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div>
+          <!-- activity log -->
+          <div class="card">
+            <h3>最近变更 <span class="extra">操作日志</span></h3>
+            <div class="log">
+              <div class="row">
+                <div class="t">3h</div>
+                <div class="ctx"><strong>L3 晋级条件调整</strong><br><em>张主任 · 客评门槛 4.5 → 4.7</em></div>
+                <span class="a">PUB</span>
+              </div>
+              <div class="row">
+                <div class="t">5h</div>
+                <div class="ctx"><strong>家政试卷 v3 上线</strong><br><em>张主任 · 28 题 + 实操评估</em></div>
+                <span class="a">PUB</span>
+              </div>
+              <div class="row">
+                <div class="t">昨</div>
+                <div class="ctx"><strong>信用规则 R-018 灰度</strong><br><em>风控组 · 5% 流量观察</em></div>
+                <span class="a">CANARY</span>
+              </div>
+              <div class="row">
+                <div class="t">昨</div>
+                <div class="ctx"><strong>L5 流量加权 ×3 → ×2.5</strong><br><em>策略组 · 防垄断调整</em></div>
+                <span class="a">PUB</span>
+              </div>
+              <div class="row">
+                <div class="t">2d</div>
+                <div class="ctx"><strong>装修工种规范引入</strong><br><em>标准组 · 6 维 + 新增 38 题</em></div>
+                <span class="a">DRAFT</span>
+              </div>
+              <div class="row">
+                <div class="t">3d</div>
+                <div class="ctx"><strong>API v2.4 公告</strong><br><em>研发组 · 增加 credit/event webhook</em></div>
+                <span class="a">API</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- health -->
+          <div class="card" style="margin-top:14px;">
+            <h3>系统健康</h3>
+            <div class="health">
+              <div class="h-row2"><span class="nm">规则引擎 QPS</span><span class="vv ok">3,412 / 5,000</span></div>
+              <div class="h-row2"><span class="nm">下游 API 成功率</span><span class="vv ok">99.99%</span></div>
+              <div class="h-row2"><span class="nm">事件总线积压</span><span class="vv warn">12k / 阈值 10k</span></div>
+              <div class="h-row2"><span class="nm">数据回流 T+0</span><span class="vv ok">已完成</span></div>
+              <div class="h-row2"><span class="nm">最近批量任务</span><span class="vv ok">12 / 12</span></div>
+              <div class="h-row2"><span class="nm">审计完整性</span><span class="vv ok">100%</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

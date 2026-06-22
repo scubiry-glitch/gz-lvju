@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>好房子标准 · 江苏保租房</title>
+  <style>
+    :root {
+      --bg:#fafafa; --surface:#fff; --fg:#111; --muted:#6b7280;
+      --border:#e5e7eb; --accent:#2563eb;
+      --comfort:#f59e0b; --green:#10b981; --tech:#3b82f6; --safety:#ef4444;
+      --safe-bottom:env(safe-area-inset-bottom,0px);
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,'PingFang SC',sans-serif; font-size:14px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .app-shell{max-width:430px; margin:0 auto; background:var(--surface); min-height:100vh; padding-bottom:32px;}
+
+    .hero{
+      background:linear-gradient(135deg, #0f172a 0%, #b45309 100%);
+      color:#fff; padding:24px 20px 30px;
+    }
+    .hero .back{display:inline-flex; align-items:center; gap:6px; font-size:12px; opacity:0.8; margin-bottom:14px;}
+    .hero h1{margin:0 0 8px; font-size:22px; font-weight:700;}
+    .hero .sub{font-size:13px; opacity:0.9; line-height:1.55;}
+    .hero .auth{
+      margin-top:14px; padding:8px 12px; background:rgba(255,255,255,0.12);
+      border-radius:8px; font-size:11px;
+      display:inline-flex; align-items:center; gap:6px;
+    }
+
+    .section{padding:20px;}
+    .section h2{font-size:16px; margin:0 0 12px; font-weight:700; display:flex; align-items:center; gap:8px;}
+    .section h2 .num{
+      width:24px; height:24px; border-radius:50%;
+      background:#0f172a; color:#fff;
+      display:grid; place-items:center; font-size:12px; font-weight:700;
+    }
+
+    /* 5 星级表格 */
+    .star-table{
+      background:var(--surface); border-radius:10px; overflow:hidden;
+      border:1px solid var(--border);
+    }
+    .star-table .row{
+      display:grid; grid-template-columns:60px 1fr 64px;
+      padding:10px 12px; border-bottom:1px solid var(--border);
+      align-items:center;
+    }
+    .star-table .row:last-child{border-bottom:none;}
+    .star-table .lv{font-size:13px; font-weight:700;}
+    .star-table .lv1{color:#94a3b8;}.star-table .lv2{color:#64748b;}
+    .star-table .lv3{color:#eab308;}.star-table .lv4{color:#ea580c;}
+    .star-table .lv5{color:#7c3aed;}
+    .star-table .desc{font-size:12px; color:var(--muted); line-height:1.4;}
+    .star-table .desc b{color:var(--fg); display:block; font-size:13px;}
+    .star-table .th{
+      font-size:10px; color:var(--muted); font-weight:600;
+      text-align:right; letter-spacing:0.5px;
+    }
+
+    /* 四维度 */
+    .dim-list{display:grid; gap:10px;}
+    .dim-row{
+      background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      padding:12px; display:grid; grid-template-columns:40px 1fr; gap:10px;
+    }
+    .dim-row .ico{
+      width:40px; height:40px; border-radius:10px;
+      display:grid; place-items:center; color:#fff; font-size:18px;
+    }
+    .dim-row.comfort .ico{background:var(--comfort);}
+    .dim-row.green   .ico{background:var(--green);}
+    .dim-row.tech    .ico{background:var(--tech);}
+    .dim-row.safety  .ico{background:var(--safety);}
+    .dim-row .name{font-size:14px; font-weight:700;}
+    .dim-row .items{font-size:11.5px; color:var(--muted); line-height:1.6; margin-top:4px;}
+
+    /* 6 大类 */
+    .cat-list{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .cat-card{
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      padding:10px;
+    }
+    .cat-card .ico{font-size:20px; margin-bottom:4px;}
+    .cat-card .n{font-size:12px; font-weight:700;}
+    .cat-card .w{font-size:10px; color:var(--muted); margin-top:2px;}
+
+    /* 房源样例 */
+    .demo-card{
+      background:var(--surface); border:1px solid var(--border); border-radius:12px;
+      padding:14px; position:relative;
+    }
+    .demo-badge{
+      position:absolute; top:10px; right:10px;
+      padding:3px 8px; border-radius:999px;
+      background:linear-gradient(90deg,#0f172a,#b45309);
+      color:#fff; font-size:10px; font-weight:700;
+    }
+    .demo-badge::before{content:"★ ";}
+    .demo-card h3{margin:0 0 6px; font-size:14px;}
+    .demo-card .stars{color:#eab308; font-size:12px; letter-spacing:1px;}
+    .demo-card .stars .e{color:var(--border);}
+    .demo-card .dims{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
+    .demo-card .dim{display:flex; align-items:center; gap:3px; font-size:10px; color:var(--muted);}
+    .demo-card .dim .bar{width:28px; height:4px; border-radius:2px; background:#f1f5f9; overflow:hidden;}
+    .demo-card .dim .fill{height:100%;}
+    .demo-card .dim.comfort .fill{background:var(--comfort);}
+    .demo-card .dim.green .fill{background:var(--green);}
+    .demo-card .dim.tech .fill{background:var(--tech);}
+    .demo-card .dim.safety .fill{background:var(--safety);}
+
+    .footer-note{
+      margin:20px; padding:14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:10px;
+      font-size:12px; color:#1e40af; line-height:1.6;
+    }
+    .footer-note strong{display:block; margin-bottom:4px;}
+    .footer-note a{font-weight:600; text-decoration:underline;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <div class="hero">
+    <a class="back" href="home.html">← 返回</a>
+    <h1>什么是「好房子」标准？</h1>
+    <div class="sub">江苏省住建厅主导 · 贝壳承建 · 第三方审计背书<br/>
+      所有保租房从「住有所居」升级到「住有宜居」</div>
+    <div class="auth">🛡 V25 江苏租赁行业标准 · 已发布</div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">1</span>综合星级 · 1–5 星</h2>
+    <div class="star-table">
+      <div class="row"><div class="lv lv1">★</div>
+        <div class="desc"><b>基础型</b>具备最基本居住条件</div>
+        <div class="th">≥2.0</div></div>
+      <div class="row"><div class="lv lv2">★★</div>
+        <div class="desc"><b>经济型</b>独卫+洗衣机，基础保障</div>
+        <div class="th">≥2.8</div></div>
+      <div class="row"><div class="lv lv3">★★★</div>
+        <div class="desc"><b>舒适型</b>客房齐全 + 智能设备</div>
+        <div class="th">≥3.5</div></div>
+      <div class="row"><div class="lv lv4">★★★★</div>
+        <div class="desc"><b>高档型</b>增值服务 + 租客/房间保险</div>
+        <div class="th">≥4.2</div></div>
+      <div class="row"><div class="lv lv5">★★★★★</div>
+        <div class="desc"><b>豪华型</b>高水平服务 + 社区生活 + 周边配套</div>
+        <div class="th">≥4.6</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">2</span>好房子 · 四个维度</h2>
+    <div class="dim-list">
+      <div class="dim-row comfort">
+        <div class="ico">🛋</div>
+        <div>
+          <div class="name">舒适</div>
+          <div class="items">面积达标 · 干湿分离 · 沙发 ≥3 人 · 领包入住套件 · 餐桌家电齐全</div>
+        </div>
+      </div>
+      <div class="dim-row green">
+        <div class="ico">🌿</div>
+        <div>
+          <div class="name">绿色</div>
+          <div class="items">智能水电（节能）· 环保认证家具 · 入住甲醛检测 · 建材可回收</div>
+        </div>
+      </div>
+      <div class="dim-row tech">
+        <div class="ico">📡</div>
+        <div>
+          <div class="name">科技</div>
+          <div class="items">智能门锁（隐私加密）· 智能水电表 · 智能马桶 · WiFi · 线上报修 · 公积金直付</div>
+        </div>
+      </div>
+      <div class="dim-row safety">
+        <div class="ico">🛡</div>
+        <div>
+          <div class="name">安全</div>
+          <div class="items">闭路电视全覆盖 · 24h 保安 · 安全组件 · 加强型家财险 · 租客保险</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">3</span>评分 · 6 大类 55 项</h2>
+    <div class="cat-list">
+      <div class="cat-card"><div class="ico">📷</div><div class="n">信息图片</div><div class="w">10%</div></div>
+      <div class="cat-card"><div class="ico">🏗</div><div class="n">基础设施</div><div class="w">20%</div></div>
+      <div class="cat-card"><div class="ico">🛏</div><div class="n">房间配套</div><div class="w">30%</div></div>
+      <div class="cat-card"><div class="ico">🛎</div><div class="n">服务配套</div><div class="w">15%</div></div>
+      <div class="cat-card"><div class="ico">🏛</div><div class="n">公区配套</div><div class="w">15%</div></div>
+      <div class="cat-card"><div class="ico">🌳</div><div class="n">周边休闲 3km</div><div class="w">10%</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2><span class="num">4</span>怎么看房源的星级？</h2>
+    <p style="color:var(--muted); font-size:12px; margin:0 0 12px;">每张房源卡片右上角都有星级浮标，下方有四维度迷你条：</p>
+    <div class="demo-card">
+      <span class="demo-badge">4 星</span>
+      <h3>江宁·梧桐公馆人才公寓</h3>
+      <div class="stars">★★★★<span class="e">★</span> <span style="color:var(--muted); font-size:10px;">4.2/5.0 · 84分</span></div>
+      <div class="dims">
+        <div class="dim comfort"><span>舒适</span><div class="bar"><div class="fill" style="width:84%"></div></div></div>
+        <div class="dim green"><span>绿</span><div class="bar"><div class="fill" style="width:70%"></div></div></div>
+        <div class="dim tech"><span>科技</span><div class="bar"><div class="fill" style="width:96%"></div></div></div>
+        <div class="dim safety"><span>安全</span><div class="bar"><div class="fill" style="width:90%"></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    <strong>🛡 政府背书 · 可验真</strong>
+    本标准由江苏省住建厅主导制定，贝壳承建落地实施。详细标准说明 →
+    <a href="d-property-standard.html">查看完整《房的标准》</a>
+  </div>
+
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

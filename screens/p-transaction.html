@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>派单交易 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* commission rates */
+    .rate-tbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+    .rate-tbl th, .rate-tbl td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--line);}
+    .rate-tbl th:first-child, .rate-tbl td:first-child{text-align:left; font-weight:600;}
+    .rate-tbl th{background:var(--line); font-size:11px; color:var(--muted); font-weight:600;}
+    .rate-tbl .lv{display:inline-grid; place-items:center; width:28px; height:22px; border-radius:4px; font-size:11px; font-weight:700; color:white;}
+    .rate-tbl .lv.l5{background:linear-gradient(135deg, #ca8a04, #fbbf24);}
+    .rate-tbl .lv.l4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .rate-tbl .lv.l3{background:linear-gradient(135deg, #047857, #10b981);}
+    .rate-tbl .lv.l2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .rate-tbl .lv.l1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .rate-tbl .lv.l0{background:linear-gradient(135deg, #475569, #64748b);}
+    .rate-tbl .pct{font-family:var(--mono); font-weight:700;}
+    .rate-tbl .pct.svc{color:var(--success);}
+    .rate-tbl .pct.plat{color:var(--accent);}
+    .rate-tbl .pct.gov{color:var(--gold);}
+
+    /* settlement bar chart */
+    .stack{display:flex; height:32px; border-radius:5px; overflow:hidden; margin:14px 0 6px;}
+    .stack .seg{display:grid; place-items:center; font-size:11px; color:white; font-weight:600;}
+    .stack .seg.svc{background:linear-gradient(90deg, #16a34a, #22c55e);}
+    .stack .seg.plat{background:linear-gradient(90deg, #6366f1, #818cf8);}
+    .stack .seg.gov{background:linear-gradient(90deg, #ca8a04, #eab308);}
+    .stack .seg.train{background:linear-gradient(90deg, #ea580c, #fb923c);}
+    .stack-legend{display:flex; gap:14px; font-size:11px; color:var(--muted);}
+    .stack-legend .dot{width:10px; height:10px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:middle;}
+    .stack-legend .dot.svc{background:#16a34a;}
+    .stack-legend .dot.plat{background:#6366f1;}
+    .stack-legend .dot.gov{background:#ca8a04;}
+    .stack-legend .dot.train{background:#ea580c;}
+
+    /* payout queue */
+    .pq-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); align-items:center; font-size:12.5px;}
+    .pq-row:last-child{border-bottom:0;}
+    .pq-row .av{width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:700; display:grid; place-items:center;}
+    .pq-row .body .nm{font-weight:600;}
+    .pq-row .body .meta{font-size:11px; color:var(--muted); margin-top:1px;}
+    .pq-row .amt{font-family:var(--mono); font-size:14px; font-weight:700; color:var(--fg);}
+    .pq-row .net{font-size:11px; color:var(--muted);}
+    .pq-row .stat{padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600;}
+    .pq-row .stat.q{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .pq-row .stat.r{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .pq-row .stat.h{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* order summary */
+    .order-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px;}
+    .ob{padding:12px 14px; background:var(--line); border-radius:6px;}
+    .ob .l{font-size:11px; color:var(--muted);}
+    .ob .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ob .d{font-size:11px; color:var(--success); margin-top:2px;}
+
+    .invo-row{display:grid; grid-template-columns:1fr auto auto; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:12px; align-items:center;}
+    .invo-row:last-child{border-bottom:0;}
+    .invo-row .meta{font-size:11px; color:var(--muted);}
+    .invo-row .v{font-family:var(--mono); font-weight:700;}
+
+    /* dispute */
+    .disp-row{padding:10px 12px; background:color-mix(in oklab, var(--danger) 5%, transparent); border-left:3px solid var(--danger); border-radius:4px; margin-bottom:8px; font-size:12.5px;}
+    .disp-row .head{display:flex; justify-content:space-between; font-weight:600;}
+    .disp-row .meta{font-size:11px; color:var(--muted); margin-top:3px;}
+    .disp-row.warn{background:color-mix(in oklab, var(--warn) 5%, transparent); border-color:var(--warn);}
+
+    @media (max-width: 1200px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="transaction"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>派单交易</b></div>
+      <div class="top-actions">
+        <button class="btn">对账</button>
+        <button class="btn">税票导出</button>
+        <button class="btn pri">+ 分账规则</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">本月 GMV</div><div class="n">¥ 18.6<span class="u">万</span></div><div class="d">↑ 12% 环比</div></div>
+      <div class="ki"><div class="l">完结工单</div><div class="n">12,486<span class="u">单</span></div><div class="d">↑ 1,486</div></div>
+      <div class="ki"><div class="l">平均客单</div><div class="n">¥ 149</div><div class="d">↑ 4 元</div></div>
+      <div class="ki"><div class="l">服务者分成</div><div class="n">¥ 14.4<span class="u">万</span></div><div class="d">77.4%</div></div>
+      <div class="ki"><div class="l">平台抽佣</div><div class="n">¥ 2.8<span class="u">万</span></div><div class="d">15.1%</div></div>
+      <div class="ki"><div class="l">政府品牌费</div><div class="n">¥ 0.93<span class="u">万</span></div><div class="d">5.0%</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- left: rates & settlement -->
+      <div>
+        <div class="card">
+          <h3>分级抽佣矩阵 <span class="pill">L0–L7 基线</span> <span class="extra">v2.3 生效</span></h3>
+          <table class="rate-tbl">
+            <thead>
+              <tr><th>等级</th><th>服务者得</th><th>平台抽</th><th>政府品牌</th><th>培训分成</th><th>到账周期</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="lv l5">L7</span> 区域级专家</td><td colspan="5" style="text-align:center; color:var(--muted); font-style:italic;">独立顾问轨道 · 按项目结算</td></tr>
+              <tr><td><span class="lv l5">L6</span> 平台认证讲师</td><td colspan="5" style="text-align:center; color:var(--muted); font-style:italic;">按授课课时结算 · 走培训分成</td></tr>
+              <tr><td><span class="lv l5">L5</span> 服务商负责人</td><td class="pct svc">88%</td><td class="pct plat">6%</td><td class="pct gov">5%</td><td class="pct" style="color:var(--warn);">1%</td><td>T+3</td></tr>
+              <tr><td><span class="lv l4">L4</span> 督导/店长</td><td class="pct svc">82%</td><td class="pct plat">10%</td><td class="pct gov">5%</td><td class="pct" style="color:var(--warn);">3%</td><td>T+5</td></tr>
+              <tr><td><span class="lv l3">L3</span> 高级管家</td><td class="pct svc">77.4%</td><td class="pct plat">15.1%</td><td class="pct gov">5%</td><td class="pct" style="color:var(--warn);">2.5%</td><td>T+7</td></tr>
+              <tr><td><span class="lv l2">L2</span> 独立服务</td><td class="pct svc">70%</td><td class="pct plat">22%</td><td class="pct gov">5%</td><td class="pct" style="color:var(--warn);">3%</td><td>T+15</td></tr>
+              <tr><td><span class="lv l1">L1</span> 基础认证</td><td colspan="5" style="text-align:center; color:var(--muted); font-style:italic;">仅师傅带单 · 50% 分润给师傅</td></tr>
+              <tr><td><span class="lv l0">L0</span> 注册准入</td><td colspan="5" style="text-align:center; color:var(--muted); font-style:italic;">不参与计费</td></tr>
+            </tbody>
+          </table>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px; padding:10px 12px; background:color-mix(in oklab, var(--accent) 5%, transparent); border-radius:5px; line-height:1.6;">
+            <b>说明：</b>L5+ 是经营/培训/标准角色，走独立结算轨道；L1-L4 才是交易主体。师傅带徒满 90 天可在徒弟订单中分润 1.5%（R-006 触发）。
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>本月分账总图 <span class="extra">¥18.6 万 GMV</span></h3>
+          <div class="stack">
+            <div class="seg svc" style="flex:0 0 77.4%;">服务者 77.4% · ¥14.4 万</div>
+            <div class="seg plat" style="flex:0 0 15.1%;">平台 15.1%</div>
+            <div class="seg gov" style="flex:0 0 5%;">政府 5%</div>
+            <div class="seg train" style="flex:0 0 2.5%;">培训 2.5%</div>
+          </div>
+          <div class="stack-legend">
+            <span><span class="dot svc"></span>服务者分成</span>
+            <span><span class="dot plat"></span>平台抽佣（含技术服务费）</span>
+            <span><span class="dot gov"></span>政府品牌使用费</span>
+            <span><span class="dot train"></span>培训机构分成（R-006）</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>今日订单 <span class="extra">实时</span></h3>
+          <div class="order-grid">
+            <div class="ob"><div class="l">新派</div><div class="n">486</div><div class="d">↑ 28</div></div>
+            <div class="ob"><div class="l">进行中</div><div class="n">312</div><div class="d">活跃</div></div>
+            <div class="ob"><div class="l">完结</div><div class="n">418</div><div class="d">↑ 86</div></div>
+            <div class="ob"><div class="l">已取消</div><div class="n" style="color:var(--warn);">14</div><div class="d" style="color:var(--warn);">2.9%</div></div>
+            <div class="ob"><div class="l">异常</div><div class="n" style="color:var(--danger);">3</div><div class="d" style="color:var(--danger);">争议中</div></div>
+            <div class="ob"><div class="l">应付金额</div><div class="n">¥6.2k</div><div class="d">待结算</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right: payout queue + dispute -->
+      <div>
+        <div class="card">
+          <h3>待结算队列 <span class="extra">本批 T+7 · 06-12 出账</span></h3>
+          <div>
+            <div class="pq-row">
+              <div class="av">陈</div>
+              <div class="body"><div class="nm">陈建国 · L5</div><div class="meta">42 单 · 已完结 · 客评均 4.96</div></div>
+              <div class="amt">¥ 5,486<div class="net">净 ¥ 4,663</div></div>
+              <div></div>
+              <span class="stat r">排队中</span>
+            </div>
+            <div class="pq-row">
+              <div class="av">王</div>
+              <div class="body"><div class="nm">王晓琳 · L4</div><div class="meta">36 单 · 已完结</div></div>
+              <div class="amt">¥ 3,820<div class="net">净 ¥ 3,056</div></div>
+              <div></div>
+              <span class="stat r">排队中</span>
+            </div>
+            <div class="pq-row">
+              <div class="av">张</div>
+              <div class="body"><div class="nm">张师傅 · L3</div><div class="meta">28 单 · 已完结 · 1 单争议</div></div>
+              <div class="amt">¥ 4,128<div class="net">净 ¥ 3,195</div></div>
+              <div></div>
+              <span class="stat q">部分扣押</span>
+            </div>
+            <div class="pq-row">
+              <div class="av">郑</div>
+              <div class="body"><div class="nm">郑文涛 · L3</div><div class="meta">14 单（本月首结）</div></div>
+              <div class="amt">¥ 1,860<div class="net">净 ¥ 1,440</div></div>
+              <div></div>
+              <span class="stat r">排队中</span>
+            </div>
+            <div class="pq-row">
+              <div class="av">刘</div>
+              <div class="body"><div class="nm">刘小红 · L3</div><div class="meta">18 单 · 投诉 ×3 中</div></div>
+              <div class="amt">¥ 2,680<div class="net">净 ¥ 0</div></div>
+              <div></div>
+              <span class="stat h">冻结</span>
+            </div>
+          </div>
+          <a style="display:inline-block; margin-top:8px; font-size:12px; color:var(--accent); font-weight:500;">查看全部 412 笔 →</a>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>资金流向（含银行托管）</h3>
+          <div class="invo-row">
+            <div>客户支付（C 端）<div class="meta">微信 / 支付宝 / 公积金 · 江苏银行托管账户</div></div>
+            <div></div>
+            <div class="v">+ ¥18.6 万</div>
+          </div>
+          <div class="invo-row">
+            <div>分账 → 服务者钱包<div class="meta">T+3/7/15 自动放款</div></div>
+            <div></div>
+            <div class="v" style="color:var(--success);">−14.4 万</div>
+          </div>
+          <div class="invo-row">
+            <div>分账 → 平台技术费<div class="meta">月底统一结算</div></div>
+            <div></div>
+            <div class="v" style="color:var(--accent);">−2.8 万</div>
+          </div>
+          <div class="invo-row">
+            <div>分账 → 政府监管账户<div class="meta">代收品牌使用费</div></div>
+            <div></div>
+            <div class="v" style="color:var(--gold);">−0.93 万</div>
+          </div>
+          <div class="invo-row">
+            <div>分账 → 合作培训机构<div class="meta">R-006 师傅带徒激励</div></div>
+            <div></div>
+            <div class="v" style="color:var(--warn);">−0.46 万</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>交易争议 <span class="extra">3 单</span></h3>
+          <div class="disp-row">
+            <div class="head"><span>O-202606-1284 · 维修</span><span style="color:var(--danger);">高</span></div>
+            <div class="meta">客户主张未完工，服务者主张已完工。证据：照片 3 张，时长 86 分钟。AI 仲裁建议：部分退款 40%。</div>
+          </div>
+          <div class="disp-row warn">
+            <div class="head"><span>O-202606-1356 · 保洁</span><span style="color:var(--warn);">中</span></div>
+            <div class="meta">客评 1 星但描述与现场不一致。已暂扣分润 ¥186。</div>
+          </div>
+          <div class="disp-row warn">
+            <div class="head"><span>O-202606-1402 · 家具</span><span style="color:var(--warn);">中</span></div>
+            <div class="meta">家具到货延期 5 天，服务商主张工厂事故。</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

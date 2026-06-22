@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>收入 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:80px;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+
+    /* wallet hero */
+    .wallet{background:linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%); color:white; padding:18px 18px 26px; position:relative; overflow:hidden;}
+    .wallet::after{content:'¥'; position:absolute; right:-20px; bottom:-30px; font-size:200px; opacity:0.06; font-weight:700;}
+    .wallet h1{font-size:18px; font-weight:700; margin:0 0 16px;}
+    .balance{font-size:11px; opacity:0.85;}
+    .amt{font-size:36px; font-weight:800; margin-top:4px; line-height:1; letter-spacing:-1px;}
+    .amt .u{font-size:18px; opacity:0.85; font-weight:600; margin-left:4px;}
+    .balance-row{display:flex; justify-content:space-between; align-items:flex-end; margin-top:14px;}
+    .next-payout{font-size:11px; opacity:0.85; text-align:right;}
+    .next-payout b{font-size:14px; opacity:1; font-weight:700;}
+
+    .actions{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:18px;}
+    .act{padding:10px; background:rgba(255,255,255,0.18); border-radius:10px; text-align:center; font-size:12px; backdrop-filter:blur(10px);}
+    .act .ic{font-size:18px; display:block; margin-bottom:3px;}
+
+    /* this month */
+    .month-card{margin:-14px 16px 0; padding:16px; background:var(--surface); border-radius:var(--radius-md); border:1px solid var(--border); position:relative; z-index:2; box-shadow:0 4px 12px rgba(0,0,0,0.06);}
+    .mc-h{display:flex; justify-content:space-between; margin-bottom:14px;}
+    .mc-h h3{font-size:13px; font-weight:600; margin:0;}
+    .mc-h a{font-size:11px; color:var(--accent);}
+    .stack{display:flex; height:36px; border-radius:6px; overflow:hidden; margin-bottom:10px;}
+    .seg{display:grid; place-items:center; color:white; font-size:11px; font-weight:600;}
+    .seg.base{background:linear-gradient(90deg, #047857, #10b981);}
+    .seg.tip{background:linear-gradient(90deg, #ca8a04, #fbbf24);}
+    .seg.bonus{background:linear-gradient(90deg, #6366f1, #818cf8);}
+    .seg.deduct{background:#9ca3af;}
+    .stack-legend{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); flex-wrap:wrap; gap:6px;}
+    .stack-legend div{display:flex; align-items:center; gap:4px;}
+    .stack-legend .dot{width:8px; height:8px; border-radius:2px;}
+    .stack-legend .dot.base{background:#10b981;}
+    .stack-legend .dot.tip{background:#fbbf24;}
+    .stack-legend .dot.bonus{background:#818cf8;}
+    .stack-legend .dot.deduct{background:#9ca3af;}
+
+    /* section header */
+    .section-h{padding:18px 16px 8px; display:flex; justify-content:space-between; align-items:center;}
+    .section-h h2{font-size:15px; font-weight:600; margin:0;}
+    .section-h a{font-size:12px; color:var(--accent);}
+
+    /* trend chart */
+    .chart-card{margin:0 16px; padding:14px; background:var(--surface); border-radius:var(--radius-md); border:1px solid var(--border);}
+    .bars{display:flex; align-items:flex-end; gap:5px; height:96px; padding-top:8px;}
+    .bars .b{flex:1; background:linear-gradient(180deg, var(--emerald), var(--accent)); border-radius:3px 3px 0 0; min-height:8px; position:relative;}
+    .bars .b.now{background:linear-gradient(180deg, var(--gold), #fbbf24);}
+    .bars .b::after{content:attr(data-v); position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-size:9px; color:var(--muted); white-space:nowrap;}
+    .bars-x{display:flex; gap:5px; font-size:10px; color:var(--muted); padding-top:4px;}
+    .bars-x span{flex:1; text-align:center;}
+    .chart-meta{margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); display:flex; justify-content:space-between; font-size:11px; color:var(--muted);}
+
+    /* payout list */
+    .pay-row{padding:0 16px;}
+    .pay{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center;}
+    .pay .ic{width:36px; height:36px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:16px;}
+    .pay .body .nm{font-size:13px; font-weight:600;}
+    .pay .body .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .pay .amt-sm{font-family:ui-monospace, monospace; font-size:15px; font-weight:700;}
+    .pay .amt-sm.in{color:var(--success);}
+    .pay .amt-sm.out{color:var(--fg);}
+    .pay .amt-sm .tax{display:block; font-size:10px; color:var(--muted); font-weight:400; margin-top:1px;}
+
+    /* review block */
+    .review{margin:0 16px 10px; padding:14px; background:var(--surface); border-radius:var(--radius-md); border:1px solid var(--border);}
+    .review .head{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .review .star{color:var(--gold); letter-spacing:1px; font-size:14px;}
+    .review .star .e{color:var(--border);}
+    .review .who{font-size:13px; font-weight:600;}
+    .review .when{font-size:11px; color:var(--muted); margin-left:auto;}
+    .review .txt{font-size:12.5px; line-height:1.5; color:var(--fg);}
+    .review .order-info{font-size:11px; color:var(--muted); margin-top:8px; padding-top:6px; border-top:1px dashed var(--border);}
+    .review.pos{border-left:3px solid var(--success);}
+    .review.neg{border-left:3px solid var(--warn);}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <!-- wallet -->
+  <div class="wallet">
+    <h1>钱包</h1>
+    <div class="balance">可提现余额</div>
+    <div class="amt">8,486<span class="u">.20 元</span></div>
+    <div class="balance-row">
+      <div style="font-size:11px; opacity:0.85;">在途结算 <b style="color:white; font-weight:700;">¥1,820</b></div>
+      <div class="next-payout">下次到账<br><b>06-12 · T+7</b></div>
+    </div>
+    <div class="actions">
+      <div class="act"><span class="ic">💵</span>立即提现</div>
+      <div class="act"><span class="ic">📊</span>账单明细</div>
+      <div class="act"><span class="ic">🧾</span>开发票</div>
+    </div>
+  </div>
+
+  <!-- this month -->
+  <div class="month-card">
+    <div class="mc-h">
+      <h3>本月分账（GMV ¥18,648）</h3>
+      <a>查看详情 ›</a>
+    </div>
+    <div class="stack">
+      <div class="seg base" style="flex:0 0 78%;">基础 ¥14,545</div>
+      <div class="seg tip" style="flex:0 0 8%;">小费 ¥1,492</div>
+      <div class="seg bonus" style="flex:0 0 12%;">奖励 ¥2,238</div>
+      <div class="seg deduct" style="flex:0 0 2%;"></div>
+    </div>
+    <div class="stack-legend">
+      <div><span class="dot base"></span>基础分润 78%</div>
+      <div><span class="dot tip"></span>客户小费 8%</div>
+      <div><span class="dot bonus"></span>奖励/带徒 12%</div>
+      <div><span class="dot deduct"></span>扣 ¥373</div>
+    </div>
+    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); font-size:11.5px; color:var(--muted);">
+      实得 <b style="color:var(--success); font-size:14px;">¥17,902</b> · L4 分润 82% · 平台 10% · 政府品牌 5% · 培训 3%
+    </div>
+  </div>
+
+  <!-- trend -->
+  <div class="section-h"><h2>近 6 月趋势</h2><a>导出</a></div>
+  <div class="chart-card">
+    <div class="bars">
+      <div class="b" style="height:58%" data-v="¥12k"></div>
+      <div class="b" style="height:64%" data-v="¥13.2k"></div>
+      <div class="b" style="height:72%" data-v="¥14.8k"></div>
+      <div class="b" style="height:78%" data-v="¥16.1k"></div>
+      <div class="b" style="height:82%" data-v="¥17k"></div>
+      <div class="b now" style="height:92%" data-v="¥17.9k"></div>
+    </div>
+    <div class="bars-x"><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span></div>
+    <div class="chart-meta">
+      <span>本月 ¥17,902</span>
+      <span style="color:var(--success);">↑ 49% 半年</span>
+    </div>
+  </div>
+
+  <!-- payout list -->
+  <div class="section-h"><h2>近期流水</h2><a>全部 ›</a></div>
+  <div class="pay-row">
+    <div class="pay">
+      <div class="ic">🟢</div>
+      <div class="body"><div class="nm">订单结算 · 6 单</div><div class="meta">06-05 · 06-12 出账</div></div>
+      <div class="amt-sm in">+ ¥1,820<span class="tax">税后 ¥1,747</span></div>
+    </div>
+    <div class="pay">
+      <div class="ic" style="background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);">⭐</div>
+      <div class="body"><div class="nm">月度全勤奖励</div><div class="meta">规则 R-002 · 6 月触发</div></div>
+      <div class="amt-sm in">+ ¥500</div>
+    </div>
+    <div class="pay">
+      <div class="ic" style="background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);">🎓</div>
+      <div class="body"><div class="nm">带徒成功分润</div><div class="meta">徒弟孙建华 L1→L2 通过</div></div>
+      <div class="amt-sm in">+ ¥186</div>
+    </div>
+    <div class="pay">
+      <div class="ic">💸</div>
+      <div class="body"><div class="nm">提现到江苏银行尾号 8821</div><div class="meta">06-03 18:42 · 实时到账</div></div>
+      <div class="amt-sm out">− ¥8,000</div>
+    </div>
+    <div class="pay">
+      <div class="ic" style="background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);">↩</div>
+      <div class="body"><div class="nm">O-202606-1284 部分退款</div><div class="meta">争议处置 · 暂扣 40%</div></div>
+      <div class="amt-sm" style="color:var(--danger);">− ¥74</div>
+    </div>
+  </div>
+
+  <!-- reviews -->
+  <div class="section-h"><h2>近期评价</h2><a>客评全部 · 4.96 ★</a></div>
+  <div class="review pos">
+    <div class="head">
+      <span class="star">★★★★★</span>
+      <span class="who">王女士 · L 客</span>
+      <span class="when">06-05 11:42</span>
+    </div>
+    <div class="txt">陈管家非常细致，主动询问入住偏好，主动整理了厨房备品。第一次入住就感觉像家一样。强烈推荐！</div>
+    <div class="order-info">O-202606-1280 · 物业接待 · ¥298 · 客户加小费 ¥50</div>
+  </div>
+  <div class="review pos">
+    <div class="head">
+      <span class="star">★★★★★</span>
+      <span class="who">张爷爷 · 续约客户</span>
+      <span class="when">06-04 17:08</span>
+    </div>
+    <div class="txt">第 3 次预约小陈，每次都很周到。这次还帮我换了灯泡。非常满意。</div>
+    <div class="order-info">O-202606-1271 · 老人陪护 · ¥186</div>
+  </div>
+  <div class="review neg">
+    <div class="head">
+      <span class="star">★★★★<span class="e">★</span></span>
+      <span class="who">黄先生</span>
+      <span class="when">06-02 09:30</span>
+    </div>
+    <div class="txt">服务整体不错，但希望水龙头更换时能提前告知备件型号，临时跑了一趟。</div>
+    <div class="order-info">O-202606-1232 · 维修 · ¥186 · 已回复</div>
+  </div>
+
+  <div id="tab-bar" data-series="s" data-active="income"></div>
+</div>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

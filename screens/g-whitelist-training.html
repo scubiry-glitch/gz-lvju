@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>培训机构白名单 · 江苏保租房 G 端</title>
+  <style>
+    :root {
+      --bg:#f3f4f6; --surface:#fff; --fg:#111; --muted:#6b7280; --border:#e5e7eb;
+      --accent:#1e40af; --accent-soft:color-mix(in oklab, var(--accent) 12%, transparent);
+      --t-accent:#7c3aed; --t-accent-soft:color-mix(in oklab, var(--t-accent) 12%, transparent);
+      --success:#16a34a; --warn:#ea580c; --danger:#dc2626;
+      --radius-sm:6px; --radius-md:10px;
+      --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .topbar .btn{padding:8px 14px; border-radius:6px; font-size:13px; background:var(--surface); border:1px solid var(--border);}
+    .topbar .btn.pri{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+    .kpi-row{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:24px; font-weight:700; margin-top:4px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; margin-top:4px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .filter-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+    .fc{padding:6px 12px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:12px; color:var(--muted); cursor:pointer;}
+    .fc.on{color:var(--t-accent); border-color:var(--t-accent); background:var(--t-accent-soft);}
+
+    .layout{display:grid; grid-template-columns:1.5fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 7px; background:var(--t-accent-soft); color:var(--t-accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .app-list{display:flex; flex-direction:column; gap:8px;}
+    .app{padding:14px; border:1px solid var(--border); border-radius:8px; display:grid; grid-template-columns:42px 1fr auto; gap:12px; align-items:center; cursor:pointer; transition:border-color .15s;}
+    .app:hover{border-color:var(--t-accent);}
+    .app.active{background:var(--t-accent-soft); border-color:var(--t-accent);}
+    .app .av{width:42px; height:42px; border-radius:8px; background:var(--t-accent-soft); color:var(--t-accent); display:grid; place-items:center; font-size:18px;}
+    .app .info .nm{font-size:14px; font-weight:600;}
+    .app .info .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .app .info .meta .sep{margin:0 4px;}
+    .app .stat{font-size:10.5px; padding:3px 10px; border-radius:3px; font-weight:600;}
+    .app .stat.review{background:#fef3c7; color:#92400e;}
+    .app .stat.urgent{background:#fee2e2; color:#b91c1c;}
+
+    .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; font-size:13px;}
+    .info-grid .k{color:var(--muted);}
+    .info-grid .v{font-weight:500;}
+
+    .check-list{list-style:none; padding:0; margin:0;}
+    .check-list li{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border); font-size:13px;}
+    .check-list li:last-child{border-bottom:0;}
+    .ck{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; flex-shrink:0; font-size:12px; font-weight:700;}
+    .ck.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .ck.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .ck.no{background:var(--bg); color:var(--muted); border:1px dashed var(--border);}
+    .ckm small{color:var(--muted); display:block; margin-top:2px;}
+
+    .actions{display:flex; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid var(--border);}
+    .actions .btn{padding:10px 16px; border-radius:6px; font-size:13px; font-weight:500;}
+    .btn-pri{background:var(--success); color:#fff; flex:2; text-align:center;}
+    .btn-rej{background:var(--surface); color:var(--danger); border:1px solid var(--danger);}
+    .btn-gh{background:var(--surface); border:1px solid var(--border);}
+
+    @media (max-width:1100px){
+      .layout{grid-template-columns:1fr;}
+      .kpi-row{grid-template-columns:repeat(2,1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="g" data-active="whitelist-training"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>🎓 T 培训机构白名单</h1>
+      <span style="font-size:12px; color:var(--muted);">3 家待审 · 含人社联合审核</span>
+      <button class="btn">导出 T 名录</button>
+      <button class="btn pri">+ 受理新申请</button>
+    </div>
+
+    <div class="kpi-row">
+      <div class="ki"><div class="l">在网 T 机构</div><div class="n">6<span class="u">家</span></div><div class="d ok">LV2 ×4 · LV3 ×2</div></div>
+      <div class="ki"><div class="l">待审申请</div><div class="n">3<span class="u">家</span></div><div class="d warn">含 1 加急</div></div>
+      <div class="ki"><div class="l">本月新增</div><div class="n">2<span class="u">家</span></div><div class="d ok">高校 + 职校</div></div>
+      <div class="ki"><div class="l">持证讲师</div><div class="n">24<span class="u">人</span></div><div class="d ok">L6 平台讲师 ×8</div></div>
+      <div class="ki"><div class="l">学员通过率</div><div class="n">89.5<span class="u">%</span></div><div class="d ok">达标 ≥ 85%</div></div>
+    </div>
+
+    <div class="filter-row">
+      <span class="fc on">全部状态</span>
+      <span class="fc">待审 3</span>
+      <span class="fc">已通过 6</span>
+      <span class="fc">驳回 2</span>
+      <span class="fc">LV1 申请</span>
+      <span class="fc">LV2 申请</span>
+      <span class="fc">LV3 申请</span>
+    </div>
+
+    <div class="layout">
+      <div class="card">
+        <h3>待审申请 <span class="pill">3 家</span> <span class="extra">P + 住建 + 人社三审</span></h3>
+        <div class="app-list">
+          <div class="app active">
+            <div class="av">🎓</div>
+            <div class="info">
+              <div class="nm">江苏开放大学 · LV2 申请</div>
+              <div class="meta">远程教育<span class="sep">·</span>装修/维修课程<span class="sep">·</span>L6 讲师 ×2</div>
+            </div>
+            <span class="stat urgent">加急</span>
+          </div>
+          <div class="app">
+            <div class="av">🏥</div>
+            <div class="info">
+              <div class="nm">南京康养职校 · LV1 申请</div>
+              <div class="meta">康养 / 适老化改造<span class="sep">·</span>L5 讲师 ×1</div>
+            </div>
+            <span class="stat review">复核中</span>
+          </div>
+          <div class="app">
+            <div class="av">🚨</div>
+            <div class="info">
+              <div class="nm">智联应急培训 · LV1 申请</div>
+              <div class="meta">急救 + 消防特种作业<span class="sep">·</span>L5 讲师 ×2</div>
+            </div>
+            <span class="stat review">复核中</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>详情 · 江苏开放大学 LV2 申请 <span class="pill">P-T-2026-0018</span></h3>
+        <h4 style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin:0 0 8px;">机构信息</h4>
+        <div class="info-grid">
+          <div><span class="k">机构名称</span><div class="v">江苏开放大学</div></div>
+          <div><span class="k">类别</span><div class="v">省级公办高校</div></div>
+          <div><span class="k">负责人</span><div class="v">陆校长</div></div>
+          <div><span class="k">办学年限</span><div class="v">38 年</div></div>
+          <div><span class="k">申请课程</span><div class="v">装修 L2-L3 / 维修 L2-L3</div></div>
+          <div><span class="k">基地</span><div class="v">主校区 + 13 市分校</div></div>
+        </div>
+
+        <h4 style="font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin:18px 0 8px;">资质核验（对位 <a href="p-t-partner-cert.html" style="color:var(--t-accent);">T 合作伙伴认证 LV2</a>）</h4>
+        <ul class="check-list">
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>民办教育许可 + 人社培训资质</strong><small>省级颁发 + 有效期至 2030</small></div></li>
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>讲师 L5 ≥ 2 + L6 ≥ 1</strong><small>实际 L5 ×4 · L6 ×2</small></div></li>
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>5 年办学 + 自有实训基地</strong><small>南京江宁实训基地（占地 12 亩）</small></div></li>
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>课程对位 P 中台标准</strong><small>已提交装修 L2-L3 + 维修 L2-L3 大纲 · 通过审核</small></div></li>
+          <li><span class="ck warn">!</span><div class="ckm"><strong>学员通过率 ≥ 85%</strong><small>历史数据未追溯（首次入网）· 需 1 期试运行验证</small></div></li>
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>题库共建承诺</strong><small>已签 · 承诺月度贡献 ≥ 15 题</small></div></li>
+          <li><span class="ck ok">✓</span><div class="ckm"><strong>分账与发票合规</strong><small>对公账户 + 增值税专用发票资质</small></div></li>
+        </ul>
+
+        <div class="actions">
+          <button class="btn btn-rej">驳回</button>
+          <button class="btn btn-gh">试运行 1 期</button>
+          <button class="btn btn-pri">✓ 通过审定（同步 P + 人社）</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

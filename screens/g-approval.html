@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>待批 · 江苏保租房监管</title>
+  <style>
+    :root {
+      --bg:#f3f4f6; --surface:#fff; --fg:#111;
+      --muted:#6b7280; --border:#e5e7eb;
+      --accent:#1e40af; --accent-soft:color-mix(in oklab, var(--accent) 12%, transparent);
+      --success:#16a34a; --warn:#ea580c; --danger:#dc2626;
+      --radius-md:12px;
+      --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    a{color:inherit; text-decoration:none;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:96px;}
+
+    /* summary row */
+    .sum{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:12px;}
+    .sc{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px;}
+    .sc .l{font-size:11px; color:var(--muted);}
+    .sc .n{font-size:20px; font-weight:700; margin-top:2px;}
+    .sc.urg{border-color:color-mix(in oklab, var(--danger) 30%, transparent);}
+    .sc.urg .n{color:var(--danger);}
+
+    /* tabs */
+    .tabs{display:flex; gap:0; padding:0 12px; background:var(--bg); overflow-x:auto; border-bottom:1px solid var(--border);}
+    .tabs .t{flex-shrink:0; padding:11px 14px; font-size:13px; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer; position:relative;}
+    .tabs .t.on{color:var(--accent); border-color:var(--accent); font-weight:600;}
+    .tabs .t .cnt{margin-left:4px; font-size:10px; background:var(--bg); padding:1px 6px; border-radius:3px;}
+    .tabs .t.on .cnt{background:var(--accent-soft); color:var(--accent);}
+
+    /* approval card */
+    .list{padding:8px 12px 12px;}
+    .ac{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:10px;}
+    .ac .row1{display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;}
+    .kind{font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;}
+    .kind.policy{background:var(--accent-soft); color:var(--accent);}
+    .kind.whitelist{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .kind.warning{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .kind.discipline{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .pri-tag{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .pri-tag.h{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .pri-tag.m{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .ac .ttl{font-size:15px; font-weight:600; margin:4px 0;}
+    .ac .meta{display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; margin-top:8px; font-size:12px; color:var(--muted);}
+    .ac .meta strong{color:var(--fg); font-weight:500;}
+    .ac .deadline{margin-top:8px; padding:8px 10px; background:var(--bg); border-radius:6px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px;}
+    .ac .deadline.urg{background:color-mix(in oklab, var(--danger) 8%, transparent); color:var(--danger);}
+    .ac .acts{display:flex; gap:6px; margin-top:12px;}
+    .ac .acts a{flex:1; padding:9px; border-radius:6px; text-align:center; font-size:13px; font-weight:600; cursor:pointer;}
+    .ac .acts a.app{background:var(--accent); color:white;}
+    .ac .acts a.rej{background:var(--surface); color:var(--danger); border:1px solid var(--danger);}
+    .ac .acts a.dt{background:var(--surface); color:var(--muted); border:1px solid var(--border); flex:0 0 auto; padding:9px 14px;}
+
+    .empty{text-align:center; padding:60px 20px; color:var(--muted);}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div id="m-header" data-series="g" data-active="approval" data-title="待批" data-icon="✍" data-ttl="待我签批" data-sub="政策签发 / 白名单 / 约谈 / 整改告知 · 按截止日排序" data-right="共 5 件"></div>
+
+  <div class="sum">
+    <div class="sc urg"><div class="l">高优 · 24h 内</div><div class="n">2</div></div>
+    <div class="sc"><div class="l">本周到期</div><div class="n">3</div></div>
+    <div class="sc"><div class="l">已批 · 本月</div><div class="n">42</div></div>
+    <div class="sc"><div class="l">驳回 · 本月</div><div class="n">3</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="t on">全部 <span class="cnt">5</span></div>
+    <div class="t">政策 <span class="cnt">2</span></div>
+    <div class="t">白名单 <span class="cnt">1</span></div>
+    <div class="t">约谈 <span class="cnt">1</span></div>
+    <div class="t">整改 <span class="cnt">1</span></div>
+  </div>
+
+  <div class="list">
+
+    <div class="ac">
+      <div class="row1">
+        <span class="kind discipline">约谈通知</span>
+        <span class="pri-tag h">急</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px; color:var(--muted);">提请：李厅长</span>
+      </div>
+      <div class="ttl">约谈"南京自如" · 服务费整改</div>
+      <div class="meta">
+        <div><strong>事由：</strong>服务费 10.5% 超 8% 封顶 · 投诉 8 起</div>
+        <div><strong>涉及房源：</strong>建邺 / 鼓楼 84 套</div>
+        <div><strong>建议处置：</strong>限期 30 日整改 + 暂停接单 7 日</div>
+        <div><strong>关联：</strong>投诉 #TS-26060103</div>
+      </div>
+      <div class="deadline urg">⏰ 截止 2026-06-08 18:00 · 剩余 18h</div>
+      <div class="acts">
+        <a class="dt">详情</a>
+        <a class="rej">驳回</a>
+        <a class="app">签字下发</a>
+      </div>
+    </div>
+
+    <div class="ac">
+      <div class="row1">
+        <span class="kind policy">政策签发</span>
+        <span class="pri-tag h">急</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px; color:var(--muted);">起草：陈科员 · 政策处</span>
+      </div>
+      <div class="ttl">新市民保租房资格放宽试行办法（征求意见稿）</div>
+      <div class="meta">
+        <div><strong>文号：</strong>SJZ-2026-022</div>
+        <div><strong>拟生效：</strong>2026-07-01</div>
+        <div><strong>会签状态：</strong>2/3（待您）</div>
+        <div><strong>影响：</strong>预计新增 6,800 申请人</div>
+      </div>
+      <div class="deadline urg">⏰ 截止 2026-06-09 中午 · 剩余 23h</div>
+      <div class="acts">
+        <a class="dt">查看正文</a>
+        <a class="rej">退回修改</a>
+        <a class="app">签发</a>
+      </div>
+    </div>
+
+    <div class="ac">
+      <div class="row1">
+        <span class="kind discipline">末位整改</span>
+        <span class="pri-tag m">中</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px; color:var(--muted);">触发：Q2 考核</span>
+      </div>
+      <div class="ttl">Q2 末位 3 家整改告知书</div>
+      <div class="meta">
+        <div><strong>名单：</strong>南京自如 · 镇江恒大 · 常州龙湖</div>
+        <div><strong>处置：</strong>限期 90 日整改</div>
+        <div><strong>抄送：</strong>3 家运营方法人 / 市住建局</div>
+        <div><strong>合规：</strong>已过法务初审</div>
+      </div>
+      <div class="deadline">截止 2026-06-12</div>
+      <div class="acts">
+        <a class="dt">详情</a>
+        <a class="rej">驳回</a>
+        <a class="app">盖章下发</a>
+      </div>
+    </div>
+
+    <div class="ac">
+      <div class="row1">
+        <span class="kind whitelist">白名单复审</span>
+        <span class="pri-tag m">中</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px; color:var(--muted);">年度复审</span>
+      </div>
+      <div class="ttl">2026 年度运营方白名单复审 · 47 家</div>
+      <div class="meta">
+        <div><strong>已核：</strong>44 家通过</div>
+        <div><strong>异议：</strong>3 家（南京自如 / 镇江恒大 / 苏州凯德）</div>
+        <div><strong>初审：</strong>市场监管处已签</div>
+        <div><strong>处置建议：</strong>2 家暂停 · 1 家约谈</div>
+      </div>
+      <div class="deadline">截止 2026-06-15</div>
+      <div class="acts">
+        <a class="dt">查看名单</a>
+        <a class="rej">退回</a>
+        <a class="app">批复</a>
+      </div>
+    </div>
+
+    <div class="ac">
+      <div class="row1">
+        <span class="kind policy">政策签发</span>
+        <span class="pri-tag m">中</span>
+        <span style="flex:1"></span>
+        <span style="font-size:11px; color:var(--muted);">起草：王科员 · 价格监管处</span>
+      </div>
+      <div class="ttl">2026 年度南京市保租房指导价目录修订</div>
+      <div class="meta">
+        <div><strong>文号：</strong>SJZ-2026-029</div>
+        <div><strong>拟生效：</strong>2026-07-01</div>
+        <div><strong>会签状态：</strong>3/3 完成（待签发）</div>
+        <div><strong>公示期：</strong>7 日</div>
+      </div>
+      <div class="deadline">截止 2026-06-20</div>
+      <div class="acts">
+        <a class="dt">查看正文</a>
+        <a class="rej">退回</a>
+        <a class="app">签发</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="approval"></div>
+</div>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+<script>
+  // 简单 tab 切换占位
+  document.querySelectorAll('.tabs .t').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tabs .t').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+</body>
+</html>

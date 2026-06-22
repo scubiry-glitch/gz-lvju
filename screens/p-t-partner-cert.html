@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>T 培训机构合作伙伴认证 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg:#f8fafc; --surface:#fff; --fg:#0f172a;
+      --muted:#64748b; --border:#e2e8f0; --line:#f1f5f9;
+      --accent:#7c3aed; --accent-soft:color-mix(in oklab, var(--accent) 10%, transparent);
+      --success:#16a34a; --warn:#ea580c; --danger:#dc2626;
+      --radius-sm:6px; --radius-md:10px;
+      --font:ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:22px 28px; display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .lv-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;}
+    .lv-card{padding:14px; border-radius:8px; color:#fff; min-height:260px; display:flex; flex-direction:column; gap:8px;}
+    .lv-card.l1{background:linear-gradient(135deg,#5b21b6,#7c3aed);}
+    .lv-card.l2{background:linear-gradient(135deg,#6b21a8,#a855f7);}
+    .lv-card.l3{background:linear-gradient(135deg,#581c87,#c084fc);}
+    .lv-card .hd{display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);}
+    .lv-card .lv{font-size:18px; font-weight:700;}
+    .lv-card .lvl-name{font-size:12px; opacity:0.85;}
+    .lv-card .row{font-size:11.5px; line-height:1.55;}
+    .lv-card .row .k{font-size:10px; opacity:0.7; text-transform:uppercase; letter-spacing:0.4px;}
+    .lv-card .row .v{display:block; margin-top:2px;}
+    .lv-card .ct{margin-top:auto; padding-top:8px; border-top:1px solid rgba(255,255,255,0.2); font-size:11px; opacity:0.85;}
+
+    /* 讲师持证 L 体系 */
+    .lecturer-table{font-size:12px; width:100%; border-collapse:collapse;}
+    .lecturer-table th, .lecturer-table td{padding:9px 10px; text-align:left; border-bottom:1px solid var(--line);}
+    .lecturer-table th{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.3px; background:#fafafa;}
+    .lecturer-table tr:last-child td{border-bottom:0;}
+    .lecturer-table .lv-tag{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:700;}
+    .lecturer-table .lv-tag.l5{background:#fef3c7; color:#92400e;}
+    .lecturer-table .lv-tag.l6{background:#fde68a; color:#78350f;}
+    .lecturer-table .lv-tag.l7{background:#fbbf24; color:#451a03;}
+
+    .ck{display:flex; gap:10px; padding:9px 12px; background:var(--line); border-radius:6px; margin-bottom:6px; font-size:12px;}
+    .ck .ic{color:var(--success); font-weight:700;}
+    .ck .body{flex:1;}
+    .ck .nm{font-weight:600;}
+    .ck .val{font-size:11px; color:var(--muted); margin-top:1px;}
+
+    .holder-list .row{display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); align-items:center; font-size:12px;}
+    .holder-list .row:last-child{border-bottom:0;}
+    .holder-list .nm{flex:1; font-weight:600;}
+    .holder-list .lv{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:700;}
+    .holder-list .lv.l1{background:#ede9fe; color:#5b21b6;}
+    .holder-list .lv.l2{background:#ddd6fe; color:#5b21b6;}
+    .holder-list .lv.l3{background:#c4b5fd; color:#4c1d95;}
+
+    .crosslink{padding:11px 14px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:8px; font-size:12px; color:var(--accent); margin-bottom:14px;}
+    .crosslink a{font-weight:600; color:var(--accent);}
+
+    @media (max-width:1100px){ .content{grid-template-columns:1fr;} .lv-grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="t-partner-cert"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × T 培训机构 / <b>合作伙伴认证 + 讲师持证</b></div>
+      <div class="top-actions">
+        <button class="btn">导出 T 名录</button>
+        <button class="btn">讲师持证名单</button>
+        <button class="btn pri">新建版本</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div>
+        <div class="crosslink">
+          📐 本页定义 T 培训机构合作伙伴分级 + 讲师持证体系（L5-L7）+ 题库共建权限。配套页：
+          <a href="p-admin-t.html">T 入驻+课程+讲师</a> · <a href="p-training-center.html">培训中心</a> · <a href="p-question-bank.html">题库与试卷</a>
+        </div>
+
+        <div class="card">
+          <h3>合作伙伴分级 LV1 → LV3 <span class="pill">v1.2 生效</span> <span class="extra">按课程范围 + 讲师持证 + 题库贡献</span></h3>
+          <div class="lv-grid">
+            <div class="lv-card l1">
+              <div class="hd"><span class="lv">LV1</span><span class="lvl-name">基础培训 · L0–L1 范围</span></div>
+              <div class="row"><span class="k">课程范围</span><span class="v">L0–L1 基础课 ≥ 6 门</span></div>
+              <div class="row"><span class="k">讲师持证</span><span class="v">L5 讲师 ≥ 1 人</span></div>
+              <div class="row"><span class="k">机构资质</span><span class="v">人社备案 + 民办教育许可</span></div>
+              <div class="row"><span class="k">权限</span><span class="v">学时证明签发</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">课时费 + 0% 题库分润</span></div>
+              <div class="ct">当前 0 家（生态发展期）</div>
+            </div>
+            <div class="lv-card l2">
+              <div class="hd"><span class="lv">LV2</span><span class="lvl-name">进阶培训 · L2–L3 + 题库共建</span></div>
+              <div class="row"><span class="k">课程范围</span><span class="v">L0–L3 ≥ 12 门 + 实操评估</span></div>
+              <div class="row"><span class="k">讲师持证</span><span class="v">L5 ≥ 2 + L6 ≥ 1</span></div>
+              <div class="row"><span class="k">机构资质</span><span class="v">+ 5 年办学经验 + 自有实训基地</span></div>
+              <div class="row"><span class="k">权限</span><span class="v">L3 证书签发 + 题库共建（被采纳分润）</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">课时费 + 题库分润 ¥ 80/题</span></div>
+              <div class="ct">当前 4 家</div>
+            </div>
+            <div class="lv-card l3">
+              <div class="hd"><span class="lv">LV3</span><span class="lvl-name">省级合作 · L4–L5 + 标准制定</span></div>
+              <div class="row"><span class="k">课程范围</span><span class="v">L0–L7 全覆盖 + 跨工种</span></div>
+              <div class="row"><span class="k">讲师持证</span><span class="v">L6 ≥ 3 + L7 ≥ 1</span></div>
+              <div class="row"><span class="k">机构资质</span><span class="v">+ 高校/省级行业协会/省属职校</span></div>
+              <div class="row"><span class="k">权限</span><span class="v">L4-L5 证书签发 + L4-L5 题库审定 + 参与 P 标准制定</span></div>
+              <div class="row"><span class="k">分账</span><span class="v">课时费 + 题库 ¥80/题 + 标准制定补贴</span></div>
+              <div class="ct">当前 2 家（江苏家协 · 东南大学继教院）</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 讲师持证体系 L5-L7 -->
+        <div class="card">
+          <h3>讲师持证体系 L5 → L7 <span class="pill">独立轨道</span> <span class="extra">与 S 服务者持证体系 L0-L4 衔接</span></h3>
+          <table class="lecturer-table">
+            <thead><tr><th>等级</th><th>名称</th><th>授课时门槛</th><th>学员评分</th><th>权益</th><th>当前人数</th></tr></thead>
+            <tbody>
+              <tr><td><span class="lv-tag l5">L5</span></td><td>服务商负责人</td><td>—</td><td>—</td><td>经营 / 资源整合（非授课）</td><td>142 人</td></tr>
+              <tr><td><span class="lv-tag l6">L6</span></td><td>平台认证讲师</td><td>≥ 200 h · 课程开发 ≥ 2 门</td><td>≥ 4.5</td><td>签发学时证明 + L3 题库共建</td><td>8 人</td></tr>
+              <tr><td><span class="lv-tag l7">L7</span></td><td>区域级专家</td><td>≥ 1,000 h · 标准制定 ≥ 1 项</td><td>≥ 4.7</td><td>L4-L5 评审 + 题库审定 + 标准发布</td><td>2 人</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:10px; padding:10px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; font-size:11.5px; color:#15803d;">
+            ✓ L6+ 讲师必须挂靠 LV2+ 培训机构 · 跨机构授课 ≥ 2 家可申请 L7
+          </div>
+        </div>
+
+        <!-- 入驻准入门槛 -->
+        <div class="card">
+          <h3>入驻准入硬门槛 <span class="pill">P + 人社双审</span></h3>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">机构资质</div><div class="val">民办教育许可证 + 人社培训资质备案</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">讲师持证比例</div><div class="val">LV1: 至少 1 名 L5 · LV2: ≥ 2 L5 + 1 L6 · LV3: ≥ 3 L6 + 1 L7</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">课程对位 P 标准</div><div class="val">课程须匹配 P 中台 11 工种 × L0-L4 等级标准 + 提供大纲与考纲</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">学员通过率门槛</div><div class="val">LV1: ≥ 80% · LV2: ≥ 85% · LV3: ≥ 90%</div></div></div>
+          <div class="ck"><span class="ic">✓</span><div class="body"><div class="nm">题库共建承诺</div><div class="val">LV2+ 承诺月度贡献 ≥ 10 题 · LV3 承诺参与 L4-L5 评审</div></div></div>
+        </div>
+      </div>
+
+      <div>
+        <!-- 当前在网 -->
+        <div class="card">
+          <h3>当前在网 6 家</h3>
+          <div class="holder-list">
+            <div class="row"><div class="nm">江苏家协培训中心</div><span class="lv l3">LV3</span><span style="color:var(--muted); font-size:11px;">8 讲师 · 92.4% 通过</span></div>
+            <div class="row"><div class="nm">东南大学继教院</div><span class="lv l3">LV3</span><span style="color:var(--muted); font-size:11px;">6 讲师 · 88.6%</span></div>
+            <div class="row"><div class="nm">南京职业技术学院</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">4 讲师 · 87.2%</span></div>
+            <div class="row"><div class="nm">金陵物业学院</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">3 讲师 · 89.8%</span></div>
+            <div class="row"><div class="nm">智链客服学院</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">2 讲师 · 91.2%</span></div>
+            <div class="row"><div class="nm">江苏旅居培训</div><span class="lv l2">LV2</span><span style="color:var(--muted); font-size:11px;">1 讲师 · 84.4%</span></div>
+          </div>
+        </div>
+
+        <!-- LV 跃迁 -->
+        <div class="card">
+          <h3>LV 跃迁路径</h3>
+          <div style="font-size:12px; line-height:1.7; color:#334155;">
+            <div style="padding:8px 10px; background:var(--line); border-radius:6px; margin-bottom:6px;">
+              <b>LV1 → LV2</b>：讲师 L5≥2 + L6≥1 + 通过率 ≥85% + 累计学员 ≥ 50
+            </div>
+            <div style="padding:8px 10px; background:var(--line); border-radius:6px; margin-bottom:6px;">
+              <b>LV2 → LV3</b>：讲师 L6≥3 + L7≥1 + 题库贡献被采纳 ≥ 100 题 + 参与 P 标准制定
+            </div>
+            <div style="padding:8px 10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:6px;">
+              <b>降级触发</b>：通过率连续 2 季 &lt; 80% · 讲师持证不达标
+            </div>
+          </div>
+        </div>
+
+        <!-- 横向能力 -->
+        <div class="card">
+          <h3>横向能力联动</h3>
+          <div style="font-size:12px; line-height:1.85;">
+            <div>🛠 <a href="p-standards.html" style="color:var(--accent); font-weight:600;">S 标准 L0-L7</a> · T 培训对位</div>
+            <div>📚 <a href="p-question-bank.html" style="color:var(--accent); font-weight:600;">题库</a> · T 共建 1,248 题</div>
+            <div>📖 <a href="p-training-center.html" style="color:var(--accent); font-weight:600;">培训中心</a> · 课程 + 排课</div>
+            <div>📜 <a href="p-cert-issue.html" style="color:var(--accent); font-weight:600;">证书签发</a> · 学时证明 + 讲师证</div>
+            <div>🎓 <a href="t-courses.html" style="color:var(--accent); font-weight:600;">T 端门户</a> · 培训机构自助</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>监管账户对账 · 江苏银行 · 保租房金融端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1d4ed8; --gold: #b45309;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --gold-soft: color-mix(in oklab, var(--gold) 14%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .side::after { content: '¥'; position: absolute; right: -16px; bottom: -30px; font-size: 180px; color: rgba(255,255,255,0.04); font-weight: 900; }
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    /* account selector */
+    .acc-card {
+      background: linear-gradient(135deg, #0f1a4d 0%, #1d4ed8 60%, #3b82f6 100%);
+      color: white; border-radius: var(--radius-md); padding: 20px 24px;
+      margin-bottom: 18px; position: relative; overflow: hidden;
+    }
+    .acc-card::after {
+      content: ''; position: absolute; right: -40px; top: -40px;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+    }
+    .acc-row { display: flex; gap: 28px; flex-wrap: wrap; align-items: center; position: relative; z-index: 1; }
+    .acc-col { flex: 1; min-width: 180px; }
+    .acc-col .l { font-size: 11px; opacity: 0.75; }
+    .acc-col .v { font-size: 22px; font-weight: 700; margin-top: 4px; letter-spacing: 0.5px; }
+    .acc-col .s { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+    .acc-tag {
+      display: inline-block; padding: 2px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.18); font-size: 11px; font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    /* kpi */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .kpi .l { font-size: 12px; color: var(--muted); }
+    .kpi .n { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .kpi .d { font-size: 12px; margin-top: 4px; }
+    .kpi .d.ok { color: var(--success); }
+    .kpi .d.warn { color: var(--warn); }
+    .kpi .d.muted { color: var(--muted); }
+
+    /* recon status */
+    .recon-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 18px 22px; margin-bottom: 16px;
+      display: grid; grid-template-columns: 2fr 1fr; gap: 24px;
+    }
+    .recon-flow { display: flex; align-items: center; gap: 8px; }
+    .rf-step {
+      flex: 1; text-align: center; padding: 12px 6px;
+      background: var(--bg); border-radius: var(--radius-sm); position: relative;
+    }
+    .rf-step .num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; font-weight: 700; font-size: 12px; margin-bottom: 6px; }
+    .rf-step.done .num { background: var(--success); color: white; }
+    .rf-step.done .lbl { color: var(--success); }
+    .rf-step.now .num { background: var(--accent); color: white; }
+    .rf-step .lbl { font-size: 11px; }
+    .rf-arrow { font-size: 16px; color: var(--muted); flex-shrink: 0; }
+    .recon-stat .gauge { text-align: center; padding: 10px 0; }
+    .recon-stat .pct { font-size: 36px; font-weight: 700; color: var(--success); line-height: 1; }
+    .recon-stat .lb { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .recon-stat .breakdown { font-size: 11px; color: var(--muted); margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; }
+    .recon-stat .breakdown strong { color: var(--fg); }
+
+    /* filter */
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+    .filter-bar input { flex: 1; min-width: 180px; }
+    .filter-bar .l { font-size: 12px; color: var(--muted); }
+
+    /* tx list */
+    .tx-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+    .tx-head { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .tx-head h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .tx-head .meta { font-size: 11px; color: var(--muted); }
+    table.tx { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.tx th, table.tx td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.tx th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.tx tr:last-child td { border-bottom: 0; }
+    .amt-in { color: var(--success); font-weight: 600; }
+    .amt-out { color: var(--accent); font-weight: 600; }
+    .match { font-size: 11px; padding: 2px 7px; border-radius: 3px; font-weight: 500; }
+    .match.ok { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .match.warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    @media (max-width: 1100px) { .console { grid-template-columns: 1fr; } .side { display: none; } .recon-card { grid-template-columns: 1fr; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="f" data-active="escrow"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>监管账户对账</h1>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        下载对账单
+      </button>
+      <button class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        立即对账
+      </button>
+    </div>
+
+    <!-- account card -->
+    <div class="acc-card">
+      <span class="acc-tag">监管账户 · 已开立</span>
+      <div class="acc-row">
+        <div class="acc-col">
+          <div class="l">账户名称</div>
+          <div class="v" style="font-size: 17px;">南京市保租房监管专户（试点）</div>
+          <div class="s">账号：6217 **** **** **** 8825 · 户行：江苏银行新街口支行</div>
+        </div>
+        <div class="acc-col">
+          <div class="l">实时余额（监管专户）</div>
+          <div class="v">¥ 24,816,420.18</div>
+          <div class="s">较月初 +¥ 3.2M · 本月已划付 ¥ 8.94M</div>
+        </div>
+        <div class="acc-col">
+          <div class="l">本月对账状态</div>
+          <div class="v" style="color: #86efac;">✓ 已闭环</div>
+          <div class="s">最近对账：2026-06-05 09:00 · 差异 ¥ 0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="l">本月入账</div><div class="n">¥ 9.13 M</div><div class="d ok">↑ 4.2% 环比</div></div>
+      <div class="kpi"><div class="l">本月划付</div><div class="n">¥ 8.94 M</div><div class="d muted">运营方 6 家</div></div>
+      <div class="kpi"><div class="l">在途资金</div><div class="n">¥ 188,420</div><div class="d muted">T+1 划付池</div></div>
+      <div class="kpi"><div class="l">异常差异</div><div class="n">0</div><div class="d ok">连续 92 天</div></div>
+    </div>
+
+    <!-- recon flow -->
+    <div class="recon-card">
+      <div>
+        <h3 style="font-size: 14px; font-weight: 600; margin: 0 0 12px;">日终对账流程</h3>
+        <div class="recon-flow">
+          <div class="rf-step done"><div class="num">✓</div><div class="lbl">租客缴款</div></div>
+          <span class="rf-arrow">→</span>
+          <div class="rf-step done"><div class="num">✓</div><div class="lbl">入监管账户</div></div>
+          <span class="rf-arrow">→</span>
+          <div class="rf-step done"><div class="num">✓</div><div class="lbl">系统对账</div></div>
+          <span class="rf-arrow">→</span>
+          <div class="rf-step now"><div class="num">4</div><div class="lbl">T+1 划付</div></div>
+          <span class="rf-arrow">→</span>
+          <div class="rf-step"><div class="num">5</div><div class="lbl">回执通知</div></div>
+        </div>
+        <div style="margin-top: 14px; font-size: 12px; color: var(--muted);">
+          数据来源：贝壳支付 → 江苏银行 → 住建厅备案 三方对账，差异率 0.00%
+        </div>
+      </div>
+      <div class="recon-stat">
+        <div class="gauge">
+          <div class="pct">100%</div>
+          <div class="lb">本月对账成功率</div>
+        </div>
+        <div class="breakdown">
+          <span>笔数 <strong>2,428</strong></span>
+          <span>总额 <strong>¥9.13M</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 子模块快捷入口（详情拆为独立页面） -->
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+      <a href="f-public-security.html" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 13px;">公安备案核验</div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">划付前置闸门 · 待补录 9 · 锁付 3</div>
+        </div>
+        <span style="font-size: 14px; color: var(--muted);">→</span>
+      </a>
+      <a href="f-settlement.html" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 13px;">结算付款</div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">T+1 待发起 ¥4.86M · 6 批次</div>
+        </div>
+        <span style="font-size: 14px; color: var(--muted);">→</span>
+      </a>
+      <a href="f-account-config.html" style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33"/></svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 13px;">结算账户配置</div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">运营商收款户 · 6 家已配 · 待审 1</div>
+        </div>
+        <span style="font-size: 14px; color: var(--muted);">→</span>
+      </a>
+    </div>
+
+
+    <!-- filter -->
+    <div class="filter-bar">
+      <span class="l">日期：</span>
+      <select><option>2026-06-04 ~ 2026-06-05</option><option>本月</option><option>本季度</option></select>
+      <select><option>全部运营方</option><option>南京安居集团</option><option>江苏安居</option><option>江北建发</option></select>
+      <select><option>全部状态</option><option>已对账</option><option>差异</option><option>在途</option></select>
+      <input placeholder="搜索交易号、合同号、租客身份…" />
+      <button class="btn btn-ghost">重置</button>
+    </div>
+
+    <!-- tx list -->
+    <div class="tx-card">
+      <div class="tx-head">
+        <h3>资金流水（最近 24 小时）</h3>
+        <span class="meta">2,428 笔 · 收入 ¥ 9.13M · 支出 ¥ 8.94M</span>
+      </div>
+      <table class="tx">
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>交易号</th>
+            <th>类型</th>
+            <th>对手方 / 合同</th>
+            <th>金额</th>
+            <th>渠道</th>
+            <th>对账状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>09:32:14</td>
+            <td>TX-20260605-08214</td>
+            <td>租客缴款</td>
+            <td>张涛 · NJBZF-04528</td>
+            <td><span class="amt-in">+ ¥ 2,380.00</span></td>
+            <td>公积金直付</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+          <tr>
+            <td>09:28:42</td>
+            <td>TX-20260605-08213</td>
+            <td>租客缴款</td>
+            <td>李娜 · NJBZF-03891</td>
+            <td><span class="amt-in">+ ¥ 2,180.00</span></td>
+            <td>微信支付</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+          <tr>
+            <td>09:20:08</td>
+            <td>TX-20260605-08212</td>
+            <td>租客缴款</td>
+            <td>王伟 · NJBZF-05214</td>
+            <td><span class="amt-in">+ ¥ 3,120.00</span></td>
+            <td>支付宝</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+          <tr>
+            <td>09:00:00</td>
+            <td>TX-20260605-DA001</td>
+            <td>T+1 划付</td>
+            <td>南京安居集团</td>
+            <td><span class="amt-out">− ¥ 1,420,360.00</span></td>
+            <td>江苏银行内部清算</td>
+            <td><span class="match ok">已划付</span></td>
+          </tr>
+          <tr>
+            <td>09:00:00</td>
+            <td>TX-20260605-DA002</td>
+            <td>T+1 划付</td>
+            <td>江苏安居</td>
+            <td><span class="amt-out">− ¥ 932,180.00</span></td>
+            <td>江苏银行内部清算</td>
+            <td><span class="match ok">已划付</span></td>
+          </tr>
+          <tr>
+            <td>08:42:55</td>
+            <td>TX-20260605-08211</td>
+            <td>租客缴款</td>
+            <td>陈静 · NJBZF-06478</td>
+            <td><span class="amt-in">+ ¥ 2,180.00</span></td>
+            <td>公积金直付</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+          <tr>
+            <td>08:33:18</td>
+            <td>TX-20260605-08210</td>
+            <td>租客缴款</td>
+            <td>赵磊 · NJBZF-06012</td>
+            <td><span class="amt-in">+ ¥ 2,680.00</span></td>
+            <td>江苏银行借记卡</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+          <tr>
+            <td>08:35:10</td>
+            <td>TX-20260605-LK003</td>
+            <td>锁付</td>
+            <td>孙磊 · NJBZF-05871（公安备案未完成）</td>
+            <td><span class="amt-out" style="color: var(--danger);">⊘ ¥ 2,180.00</span></td>
+            <td>—</td>
+            <td><span class="match warn">已锁定</span></td>
+          </tr>
+          <tr>
+            <td>08:30:42</td>
+            <td>TX-20260605-08209</td>
+            <td>退款</td>
+            <td>刘洋 · NJBZF-04102（解约）</td>
+            <td><span class="amt-out">− ¥ 4,560.00</span></td>
+            <td>原路退回</td>
+            <td><span class="match ok">已对账</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>人力服务商白名单 · 保租房</title>
+  <style>
+    :root {
+      --bg:#fafafa; --surface:#fff; --fg:#111; --muted:#6b6b6b; --border:#e5e5e5;
+      --accent:#c2410c; --accent-soft:color-mix(in oklab, var(--accent) 12%, transparent);
+      --success:#16a34a; --warn:#eab308; --danger:#dc2626;
+      --radius-sm:8px; --radius-md:12px;
+      --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; padding:0; font-family:var(--font); font-size:15px; line-height:1.5; background:var(--bg); color:var(--fg);}
+    a{color:inherit; text-decoration:none;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:64px;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+    .page-nav{display:flex; align-items:center; padding:8px 12px; background:var(--surface); position:sticky; top:0; z-index:10; border-bottom:1px solid var(--border);}
+    .page-nav .back-btn{width:36px; height:36px; display:grid; place-items:center; border-radius:50%; background:var(--bg);}
+    .page-nav .back-btn svg{width:20px; height:20px;}
+    .page-nav h1{flex:1; font-size:16px; font-weight:600; text-align:center; margin:0;}
+
+    .page-header{background:linear-gradient(135deg,#fff7ed,#fff); padding:18px 16px; border-bottom:1px solid var(--border);}
+    .page-header h2{font-size:18px; font-weight:600; margin:0 0 6px;}
+    .page-header p{font-size:13px; color:var(--muted); margin:0;}
+    .page-header .badges{display:flex; gap:6px; margin-top:10px;}
+    .badge{font-size:11px; padding:3px 10px; background:#fff; border:1px solid var(--accent); color:var(--accent); border-radius:999px;}
+
+    .filter-bar{display:flex; gap:8px; padding:12px 16px; overflow-x:auto; background:var(--surface); border-bottom:1px solid var(--border);}
+    .filter-chip{white-space:nowrap; padding:6px 14px; border-radius:999px; font-size:13px; background:var(--bg); color:var(--muted); border:1px solid var(--border);}
+    .filter-chip.active{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+
+    .content{padding:12px 16px;}
+    .section-label{font-size:13px; font-weight:500; margin:8px 0 8px; display:flex; align-items:center; gap:6px;}
+    .section-label .count{font-size:11px; color:var(--muted); font-weight:400;}
+
+    .v-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:10px;}
+    .v-head{display:flex; gap:10px; align-items:center; margin-bottom:10px;}
+    .v-head .ico{width:44px; height:44px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:22px;}
+    .v-head .ttl{flex:1; min-width:0;}
+    .v-head .nm{font-size:15px; font-weight:600;}
+    .v-head .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .lv-badge{font-size:10px; padding:3px 8px; border-radius:4px; font-weight:700;}
+    .lv-badge.l1{background:#fed7aa; color:#7c2d12;}
+    .lv-badge.l2{background:#fdba74; color:#7c2d12;}
+    .lv-badge.l3{background:#ddd6fe; color:#5b21b6;}
+    .v-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-bottom:10px;}
+    .v-stats .item{text-align:center;}
+    .v-stats .item .v{font-size:14px; font-weight:700; color:var(--fg);}
+    .v-stats .item .l{font-size:10px; color:var(--muted); margin-top:1px;}
+    .v-tags{display:flex; flex-wrap:wrap; gap:5px;}
+    .v-tag{font-size:10.5px; padding:3px 8px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--muted);}
+    .v-tag.cert{background:color-mix(in oklab, var(--success) 10%, transparent); color:var(--success); border-color:color-mix(in oklab, var(--success) 30%, transparent);}
+
+    .verify-note{padding:10px 14px; background:color-mix(in oklab, var(--success) 6%, transparent); border:1px solid color-mix(in oklab, var(--success) 30%, transparent); border-radius:var(--radius-md); margin:12px 16px; font-size:11px; color:var(--success); display:flex; align-items:center; gap:8px;}
+
+    .cta{display:block; margin-top:12px; padding:14px; background:linear-gradient(135deg,#fff7ed,#fff); border:1px solid #fdba74; border-radius:var(--radius-md); text-align:center;}
+    .cta .nm{font-size:14px; font-weight:600; color:var(--accent);}
+    .cta .sub{font-size:11px; color:var(--muted); margin-top:3px;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>合格人力服务商</h1>
+  </div>
+
+  <div class="page-header">
+    <h2>白名单人力服务商名录</h2>
+    <p>服务者人员的雇主机构 · 持证审计 + 项目交付能力评级 · 住建 + P 中台双审</p>
+    <div class="badges">
+      <span class="badge">LV1-3 分级</span>
+      <span class="badge">86 家在网</span>
+      <span class="badge">2,468 持证 S</span>
+    </div>
+  </div>
+
+  <div class="verify-note">
+    ✓ 全部白名单经省住建厅 + P 中台双审 · 二维码扫一扫可验真
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-chip active">全部 86</span>
+    <span class="filter-chip">装修交付 32</span>
+    <span class="filter-chip">服家管家 24</span>
+    <span class="filter-chip">应急维修 12</span>
+    <span class="filter-chip">家政保洁 18</span>
+    <span class="filter-chip">LV3 标杆</span>
+  </div>
+
+  <div class="content">
+    <div class="section-label">⭐ LV3 标杆机构（参与标准制定）<span class="count">8 家</span></div>
+    <div class="v-card">
+      <div class="v-head">
+        <div class="ico">🏗</div>
+        <div class="ttl"><div class="nm">优家装饰</div><div class="meta">装修交付 + 服家 · 南京/苏州 · 8 年</div></div>
+        <span class="lv-badge l3">LV3</span>
+      </div>
+      <div class="v-stats">
+        <div class="item"><div class="v">186</div><div class="l">旗下持证 S</div></div>
+        <div class="item"><div class="v">92%</div><div class="l">持证率</div></div>
+        <div class="item"><div class="v">4.8</div><div class="l">客评</div></div>
+      </div>
+      <div class="v-tags">
+        <span class="v-tag cert">✓ 营业执照</span>
+        <span class="v-tag cert">✓ 信用 A+</span>
+        <span class="v-tag cert">✓ 5 年托管</span>
+        <span class="v-tag">L4+ 58%</span>
+        <span class="v-tag">月交付 5 项目</span>
+      </div>
+    </div>
+    <div class="v-card">
+      <div class="v-head">
+        <div class="ico">🛏</div>
+        <div class="ttl"><div class="nm">嘉源物业</div><div class="meta">服家 + 检修 · 南京/无锡 · 10 年</div></div>
+        <span class="lv-badge l3">LV3</span>
+      </div>
+      <div class="v-stats">
+        <div class="item"><div class="v">142</div><div class="l">持证 S</div></div>
+        <div class="item"><div class="v">90%</div><div class="l">持证率</div></div>
+        <div class="item"><div class="v">4.7</div><div class="l">客评</div></div>
+      </div>
+      <div class="v-tags">
+        <span class="v-tag cert">✓ 营业执照</span>
+        <span class="v-tag cert">✓ 信用 A</span>
+        <span class="v-tag">L4+ 52%</span>
+      </div>
+    </div>
+
+    <div class="section-label">🥈 LV2 跨项目机构 <span class="count">26 家（节选 3 家）</span></div>
+    <div class="v-card">
+      <div class="v-head">
+        <div class="ico">🛠</div>
+        <div class="ttl"><div class="nm">南京安居服务</div><div class="meta">管家 + 维修 · 南京 · 6 年</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="v-stats">
+        <div class="item"><div class="v">142</div><div class="l">持证 S</div></div>
+        <div class="item"><div class="v">88%</div><div class="l">持证率</div></div>
+        <div class="item"><div class="v">4.5</div><div class="l">客评</div></div>
+      </div>
+    </div>
+    <div class="v-card">
+      <div class="v-head">
+        <div class="ico">🧹</div>
+        <div class="ttl"><div class="nm">家泰物业</div><div class="meta">保洁 + 服家 · 南京 · 5 年</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="v-stats">
+        <div class="item"><div class="v">98</div><div class="l">持证 S</div></div>
+        <div class="item"><div class="v">85%</div><div class="l">持证率</div></div>
+        <div class="item"><div class="v">4.4</div><div class="l">客评</div></div>
+      </div>
+    </div>
+    <div class="v-card">
+      <div class="v-head">
+        <div class="ico">⚡</div>
+        <div class="ttl"><div class="nm">速维修 24h</div><div class="meta">应急维修 · 南京 · 3 年</div></div>
+        <span class="lv-badge l1">LV1</span>
+      </div>
+      <div class="v-stats">
+        <div class="item"><div class="v">12</div><div class="l">持证 S</div></div>
+        <div class="item"><div class="v">92%</div><div class="l">持证率</div></div>
+        <div class="item"><div class="v">4.6</div><div class="l">客评</div></div>
+      </div>
+    </div>
+
+    <a href="m-supplier-onboarding.html" style="display:none;"></a>
+    <a href="v-onboarding.html" class="cta">
+      <div class="nm">我是服务商 · 申请入驻 →</div>
+      <div class="sub">LV1-3 分级 · 持证率门槛 · 项目分账透明</div>
+    </a>
+  </div>
+</div>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

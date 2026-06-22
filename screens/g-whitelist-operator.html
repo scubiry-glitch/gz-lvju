@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>运营方白名单 · 江苏保租房 G 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    /* sidebar styles 由 _nav.js 提供 */
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+
+    /* category tabs */
+    .cat-tabs { display: flex; gap: 4px; margin-bottom: 16px; background: var(--surface); padding: 4px; border-radius: 999px; border: 1px solid var(--border); width: fit-content; }
+    .cat-tab { padding: 8px 16px; font-size: 13px; color: var(--muted); border-radius: 999px; cursor: pointer; }
+    .cat-tab.on { background: var(--accent); color: white; font-weight: 500; }
+
+    /* layout */
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
+
+    /* left list */
+    .pending-list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; max-height: 78vh; display: flex; flex-direction: column; }
+    .pl-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+    .pl-head strong { font-weight: 600; }
+    .pl-search { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .pl-search input { width: 100%; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; outline: none; }
+    .pl-items { flex: 1; overflow-y: auto; }
+    .item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 10px; align-items: center; }
+    .item:hover { background: var(--bg); }
+    .item.active { background: var(--accent-soft); border-left: 3px solid var(--accent); padding-left: 13px; }
+    .item .ico { width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex-shrink: 0; }
+    .item .ico svg { width: 18px; height: 18px; }
+    .item .nm { font-weight: 500; font-size: 13px; }
+    .item .mt { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .badge-new { background: var(--danger); color: white; font-size: 10px; padding: 1px 6px; border-radius: 999px; }
+    .badge-due { background: var(--warn); color: white; font-size: 10px; padding: 1px 6px; border-radius: 999px; }
+    .pl-pane, .d-pane { display: none; }
+    .pl-pane.on, .d-pane.on { display: block; }
+    .d-pane { flex: 1; display: none; flex-direction: column; min-height: 0; }
+    .d-pane.on { display: flex; }
+    .cat-tab { cursor: pointer; }
+
+    /* detail */
+    .detail { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); display: flex; flex-direction: column; }
+    .dh { padding: 18px 22px; border-bottom: 1px solid var(--border); }
+    .dh .row { display: flex; align-items: center; gap: 12px; }
+    .dh .nm { font-size: 22px; font-weight: 700; flex: 1; }
+    .dh .pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .dh .mt { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+    .db { padding: 18px 22px; flex: 1; overflow-y: auto; }
+    .db h4 { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin: 12px 0 10px; }
+    .db h4:first-child { margin-top: 0; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; font-size: 13px; }
+    .info-grid .k { color: var(--muted); }
+    .info-grid .v { font-weight: 500; }
+    .doc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .doc {
+      padding: 14px; background: var(--bg); border-radius: 8px;
+      display: flex; align-items: center; gap: 10px; font-size: 12px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .doc:hover { background: var(--accent-soft); }
+    .doc .di { width: 32px; height: 32px; border-radius: 6px; background: var(--surface); display: grid; place-items: center; color: var(--accent); flex-shrink: 0; }
+    .doc .di svg { width: 16px; height: 16px; }
+    .doc strong { display: block; font-size: 12px; font-weight: 500; }
+    .doc small { color: var(--muted); }
+
+    /* check list */
+    .check-list { list-style: none; padding: 0; margin: 0; }
+    .check-list li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .check-list li:last-child { border-bottom: 0; }
+    .ck { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 12px; font-weight: 700; }
+    .ck.ok { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .ck.warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .ck.no { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); }
+    .ckm small { color: var(--muted); }
+
+    /* actions */
+    .df { padding: 16px 22px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+    .btn { padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--success); color: white; flex: 2; justify-content: center; }
+    .btn-danger { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    @media (max-width: 1100px) {
+      .console { grid-template-columns: 1fr; }
+      .nv-side { display: none; }
+      .layout { grid-template-columns: 1fr; }
+      .pending-list { max-height: 400px; }
+    }
+
+    /* ========== 移动版 ========== */
+    .m-shell{display:none;}
+    @media (max-width: 1023px) {
+      body{background:#f3f4f6;}
+      .console{display:none !important;}
+      .m-shell{display:block; max-width:430px; margin:0 auto; min-height:100vh; padding-bottom:96px; background:#f3f4f6;}
+      .m-sum{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:12px;}
+      .m-sb{background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:10px; text-align:center;}
+      .m-sb .l{font-size:10px; color:#6b7280;}
+      .m-sb .n{font-size:18px; font-weight:700; margin-top:2px;}
+      .m-sb.urg .n{color:#dc2626;}
+      .m-search{padding:6px 12px;}
+      .m-search input{width:100%; padding:9px 10px; background:#fff; border:1px solid #e5e7eb; border-radius:8px; font:inherit; font-size:13px;}
+      .m-list{padding:8px 12px 12px;}
+      .m-card{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:10px;}
+      .m-card .row1{display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;}
+      .m-card .ico-box{width:36px; height:36px; border-radius:8px; background:color-mix(in oklab,#1e40af 12%,transparent); color:#1e40af; display:grid; place-items:center; flex-shrink:0;}
+      .m-card .ico-box svg{width:18px; height:18px;}
+      .m-card .info{flex:1; min-width:0;}
+      .m-card .nm{font-size:15px; font-weight:600;}
+      .m-card .mt{font-size:11px; color:#6b7280; margin-top:2px;}
+      .m-card .bdg{font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;}
+      .m-card .bdg.new{background:#dc2626; color:#fff;}
+      .m-card .bdg.due{background:#ea580c; color:#fff;}
+      .m-card .qual{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+      .m-card .qual .tg{font-size:11px; padding:2px 6px; background:#f3f4f6; border-radius:3px; color:#6b7280;}
+      .m-card .acts{display:flex; gap:6px; margin-top:12px; padding-top:10px; border-top:1px solid #e5e7eb;}
+      .m-card .acts a{flex:1; padding:8px; border-radius:6px; text-align:center; font-size:12px; cursor:pointer;}
+      .m-card .acts a.dt{background:#f3f4f6; color:#1e40af; border:1px solid #e5e7eb;}
+      .m-card .acts a.ok{background:#1e40af; color:#fff; font-weight:600;}
+      .m-card .acts a.rej{background:#fff; color:#dc2626; border:1px solid #dc2626;}
+    }
+  </style>
+</head>
+<body>
+<!-- ========== 移动视图（≤1023px） ========== -->
+<div class="m-shell">
+  <div id="m-header" data-series="g" data-active="whitelist-operator" data-title="运营方白名单" data-icon="✓" data-ttl="运营方资质审核" data-sub="5 家待审 · 平均等待 3.2 天" data-right="共 5"></div>
+  <div class="m-sum">
+    <div class="m-sb urg"><div class="l">待审</div><div class="n">5</div></div>
+        <div class="m-sb"><div class="l">已通过</div><div class="n">42</div></div>
+        <div class="m-sb"><div class="l">驳回</div><div class="n">2</div></div>
+  </div>
+  <div class="m-search"><input placeholder="搜索机构名称 / 信用代码…"/></div>
+  <div class="m-list">
+    <div class="m-card">
+      <div class="row1">
+        <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div class="info"><div class="nm">南京安居集团有限公司</div><div class="mt">续期申报 · 已等待 1 天</div></div>
+        <span class="bdg new">新</span>
+      </div>
+      <div class="qual"><span class="tg">🏛 国企</span><span class="tg">46 项目</span><span class="tg">4,608 套</span><span class="tg">AAA 级</span></div>
+      <div class="acts"><a class="dt">查看材料</a><a class="rej">驳回</a><a class="ok">通过</a></div>
+    </div>
+    <div class="m-card">
+      <div class="row1">
+        <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div class="info"><div class="nm">苏宁置业管理有限公司</div><div class="mt">首次申报 · 等待 2 天</div></div>
+        
+      </div>
+      <div class="qual"><span class="tg">🏢 民企</span><span class="tg">12 项目</span><span class="tg">1,420 套</span><span class="tg">AA 级</span></div>
+      <div class="acts"><a class="dt">查看材料</a><a class="rej">驳回</a><a class="ok">通过</a></div>
+    </div>
+    <div class="m-card">
+      <div class="row1">
+        <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div class="info"><div class="nm">江北建发集团</div><div class="mt">资质升级 · 等待 4 天</div></div>
+        
+      </div>
+      <div class="qual"><span class="tg">🏛 国企</span><span class="tg">8 项目</span><span class="tg">1,180 套</span><span class="tg">AA → AAA</span></div>
+      <div class="acts"><a class="dt">查看材料</a><a class="rej">驳回</a><a class="ok">通过</a></div>
+    </div>
+    <div class="m-card">
+      <div class="row1">
+        <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div class="info"><div class="nm">金陵新华房地产</div><div class="mt">首次申报 · 等待 6 天</div></div>
+        <span class="bdg due">逾期</span>
+      </div>
+      <div class="qual"><span class="tg">🏢 民企</span><span class="tg">3 项目</span><span class="tg">320 套</span><span class="tg">材料不全</span></div>
+      <div class="acts"><a class="dt">查看材料</a><a class="rej">驳回</a><a class="ok">通过</a></div>
+    </div>
+    <div class="m-card">
+      <div class="row1">
+        <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <div class="info"><div class="nm">溧水城投运营公司</div><div class="mt">续期申报 · 等待 3 天</div></div>
+        
+      </div>
+      <div class="qual"><span class="tg">🏛 国企</span><span class="tg">4 项目</span><span class="tg">780 套</span><span class="tg">AA 级</span></div>
+      <div class="acts"><a class="dt">查看材料</a><a class="rej">驳回</a><a class="ok">通过</a></div>
+    </div>
+  </div>
+  <div id="m-tabbar" data-series="g" data-active="cockpit"></div>
+</div>
+
+<div class="console">
+
+  <div id="side-nav" data-series="g" data-active="whitelist-operator"></div>
+
+  <main class="main">
+
+    <div class="topbar">
+      <h1>运营方白名单</h1>
+    </div>
+
+    <div class="layout">
+
+      <!-- LEFT -->
+      <div class="pending-list">
+        <div class="pl-head" id="plHead">
+          <strong id="plTitle">待审运营方</strong>
+          <span id="plMeta" style="color: var(--muted);">5 家 · 平均等待 3.2 天</span>
+        </div>
+        <div class="pl-search">
+          <input id="plSearch" placeholder="搜索机构名称/统一社会信用代码…" />
+        </div>
+        <div class="pl-items">
+          <!-- 运营方面板 -->
+          <div class="pl-pane on" data-cat="op">
+          <div class="item active" data-id="op-1">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="nm">南京安居集团有限公司</div>
+              <div class="mt">续期申报 · 已等待 1 天</div>
+            </div>
+            <span class="badge-new">新</span>
+          </div>
+          <div class="item" data-id="op-2">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="nm">苏宁置业管理有限公司</div>
+              <div class="mt">首次申报 · 等待 2 天</div>
+            </div>
+          </div>
+          <div class="item" data-id="op-3">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="nm">江北建发集团</div>
+              <div class="mt">资质升级 · 等待 4 天</div>
+            </div>
+          </div>
+          <div class="item" data-id="op-4">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="nm">金陵新华房地产</div>
+              <div class="mt">首次申报 · 等待 6 天</div>
+            </div>
+            <span class="badge-due">逾期</span>
+          </div>
+          <div class="item" data-id="op-5">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+            </div>
+            <div style="flex: 1;">
+              <div class="nm">溧水城投运营公司</div>
+              <div class="mt">续期申报 · 等待 3 天</div>
+            </div>
+          </div>
+          </div><!-- /op pane -->
+        </div>
+      </div>
+
+      <!-- RIGHT detail (JS-rendered) -->
+      <div class="detail" id="detailHost"><!-- 内容由脚本根据当前选中 item 渲染 --></div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ============ 数据 ============
+  const meta = {
+    op: { title: '待审运营方', sub: '5 家 · 平均等待 3.2 天', placeholder: '搜索机构名称/统一社会信用代码…' },
+    sw: { title: '待认证服务者', sub: '11 人 · 平均等待 2.8 天', placeholder: '搜索姓名/身份证/隶属机构…' },
+    sp: { title: '待审供应商', sub: '3 家 · 平均等待 3.7 天', placeholder: '搜索名称/统一社会信用代码…' }
+  };
+
+  const data = {
+    op: [
+      { id:'op-1', name:'南京安居集团有限公司', tag:'续期申报', code:'91320100MA1Y******2X', submit:'2026-06-04 14:32',
+        basic: [['注册资本','¥ 50,000 万'],['成立时间','2008-03-12'],['实控人','南京市国资委（100%）'],['在管房源','3,842 套 / 12 项目'],['现有资质等级','甲级（2024-2026）'],['本次申报等级','甲级（续期）']],
+        docs: ['营业执照','运营资质证书','财务审计报告','无违法证明','承诺书','年度报告 2025'],
+        checks: [['ok','工商信息核验','营业执照真实有效 · 经营状态正常 · 无变更预警'],['ok','司法风险','近 3 年无重大行政处罚、无被执行记录'],['ok','历史合规率','2025 年度综合合规率 99.2% · 超过甲级标准 95%'],['warn','本期合规率（待月底定档）','当前 99.4%，仙林湖项目入住率偏低需关注'],['ok','实控人变更监控','100% 国资 · 无变更记录'],['no','人工实地核查','由复核员现场抽查 2 个项目 · 待人工执行']],
+        actions: ['驳回 / 补正','不予通过','通过审核 · 续签甲级'] },
+      { id:'op-2', name:'苏宁置业管理有限公司', tag:'首次申报 · 升级', code:'91320500MA1U******7P', submit:'2026-06-03 11:08',
+        basic: [['注册资本','¥ 30,000 万'],['成立时间','2015-08-22'],['实控人','苏宁控股集团'],['在管房源','568 套 / 2 项目'],['现有资质等级','乙级'],['本次申报等级','甲级（升级）']],
+        docs: ['营业执照','运营资质证书','财务审计报告','无违法证明','承诺书'],
+        checks: [['ok','工商信息核验','营业执照有效'],['ok','司法风险','无重大行政处罚'],['warn','在管规模','低于甲级最低门槛 800 套，需说明扩张计划'],['ok','服务质量','客户满意度 92%'],['no','人工实地核查','需复核员现场抽查']],
+        actions: ['驳回 / 补正','维持乙级','通过 · 升级甲级'] },
+      { id:'op-3', name:'江北建发集团', tag:'资质升级', code:'91320111MA20******5L', submit:'2026-06-02 09:21',
+        basic: [['注册资本','¥ 80,000 万'],['成立时间','2003-11-18'],['实控人','江北新区国资委'],['在管房源','1,128 套 / 3 项目'],['现有资质等级','甲级（2024-2026）'],['本次申报等级','甲级（特优续期）']],
+        docs: ['营业执照','运营资质证书','财务审计报告','无违法证明','承诺书','优秀案例集'],
+        checks: [['ok','工商信息核验','有效'],['ok','司法风险','无'],['ok','历史合规率','99.4% · 连续 2 年达标'],['ok','创新指标','获 2025 年度江苏省优秀长租运营奖'],['ok','现场核查','3 月已抽查通过']],
+        actions: ['驳回 / 补正','维持甲级','通过 · 授予特优等级'] },
+      { id:'op-4', name:'金陵新华房地产', tag:'首次申报 · 逾期', code:'91320104MA1Y******9Q', submit:'2026-05-30 17:42',
+        basic: [['注册资本','¥ 12,000 万'],['成立时间','2018-04-09'],['实控人','金陵控股'],['在管房源','312 套 / 2 项目'],['现有资质等级','无（首次）'],['本次申报等级','乙级']],
+        docs: ['营业执照','财务审计报告','无违法证明','承诺书'],
+        checks: [['warn','申报材料','缺少运营资质证书 · 已逾期 3 天'],['ok','工商信息','营业执照真实有效'],['warn','在管规模','刚达乙级门槛 200 套'],['ok','法律风险','无重大行政处罚'],['no','现场核查','待复核员排期']],
+        actions: ['补正材料并重审','不予通过','通过 · 授予乙级'] },
+      { id:'op-5', name:'溧水城投运营公司', tag:'续期申报', code:'91320117MA1R******2A', submit:'2026-06-01 10:15',
+        basic: [['注册资本','¥ 6,000 万'],['成立时间','2019-06-28'],['实控人','溧水区国资委'],['在管房源','240 套 / 1 项目'],['现有资质等级','乙级（2024-2026）'],['本次申报等级','乙级（续期）']],
+        docs: ['营业执照','运营资质证书','财务审计报告','无违法证明','承诺书'],
+        checks: [['ok','工商信息核验','有效'],['ok','司法风险','无'],['warn','历史合规率','97.2% · 略低于平均水平'],['warn','入住率','62.4% · 需提升经营能力'],['ok','现场核查','5 月已抽查']],
+        actions: ['驳回 / 补正','降为观察期','通过 · 续签乙级'] },
+    ],
+    sw: [
+      { id:'sw-1', name:'李建国', tag:'维修技师 · 续证', code:'身份证 3201**********4321', submit:'2026-06-04 16:10',
+        basic: [['岗位','水电维修技师'],['隶属机构','南京安居集团'],['工龄','12 年'],['服务项目','梧桐公馆、河西青年'],['本期评分','★ 4.92 / 5.00'],['累计工单','428 单 · 好评率 98.6%']],
+        docs: ['身份证（2034-08）','电工证（2027-03）','建筑装修工（2026-12）','无犯罪证明（2026-05）'],
+        checks: [['ok','身份核验','公安系统人脸 + 证件核验通过'],['ok','持证有效性','4 项资质均在有效期内'],['ok','服务历史','无投诉 · 平均响应 1.8 小时'],['warn','电工证临近到期','剩 9 个月，建议提前续证']],
+        actions: ['补充材料','驳回','通过 · 颁发持证标识'] },
+      { id:'sw-2', name:'王小芳', tag:'运营管家 · 首次认证', code:'身份证 3201**********6782', submit:'2026-06-03 14:55',
+        basic: [['岗位','24H 在线管家'],['隶属机构','江苏安居'],['工龄','5 年'],['服务项目','江北未来谷公寓'],['本期评分','★ 4.78 / 5.00'],['累计工单','186 单 · 好评率 97.2%']],
+        docs: ['身份证','管家服务培训证','心理咨询师三级','无犯罪证明'],
+        checks: [['ok','身份核验','通过'],['ok','培训记录','已完成 60h 总部培训'],['warn','工龄','不足 8 年高级管家门槛'],['ok','服务历史','无投诉 · 平均响应 1.2h']],
+        actions: ['延期复审','驳回','通过 · 颁发初级管家标识'] },
+      { id:'sw-3', name:'陈志伟', tag:'电工 · 续证', code:'身份证 3201**********1145', submit:'2026-06-02 11:32',
+        basic: [['岗位','电工'],['隶属机构','江北建发'],['工龄','18 年'],['服务项目','江北未来谷公寓'],['本期评分','★ 4.95 / 5.00'],['累计工单','612 单 · 好评率 99.1%']],
+        docs: ['身份证','高级电工证（2028-04）','应急电工证','无犯罪证明'],
+        checks: [['ok','身份核验','通过'],['ok','持证有效性','所有资质有效'],['ok','服务历史','零投诉，金牌评级'],['ok','应急能力','参与 2024 江北停电应急抢修']],
+        actions: ['延期复审','驳回','通过 · 颁发金牌技师标识'] },
+      { id:'sw-4', name:'赵敏', tag:'客服专员 · 首次认证', code:'身份证 3201**********8920', submit:'2026-06-01 09:18',
+        basic: [['岗位','客服专员'],['隶属机构','南京安居集团'],['工龄','3 年'],['服务项目','梧桐公馆'],['本期评分','★ 4.65 / 5.00'],['累计工单','892 单（咨询） · 满意率 96%']],
+        docs: ['身份证','客服培训证书','普通话二级甲等','无犯罪证明'],
+        checks: [['ok','身份核验','通过'],['ok','培训记录','完成 40h 培训'],['warn','工龄偏短','需主管担保人签字'],['ok','服务历史','零投诉']],
+        actions: ['延期复审','驳回','通过 · 颁发客服专员标识'] },
+      { id:'sw-5', name:'周天明', tag:'保洁主管 · 续证（逾期）', code:'身份证 3201**********4408', submit:'2026-05-29 16:40',
+        basic: [['岗位','保洁主管'],['隶属机构','苏宁置业'],['工龄','9 年'],['服务项目','河西青年公寓'],['本期评分','★ 4.32 / 5.00'],['累计工单','312 单 · 好评率 92.4%']],
+        docs: ['身份证','保洁主管培训证（已过期）','无犯罪证明'],
+        checks: [['ok','身份核验','通过'],['warn','培训证过期','保洁主管证已过期 28 天，需补办'],['warn','申报已逾期','已超 SLA 5 天'],['warn','投诉记录','近 30 天有 2 起卫生投诉']],
+        actions: ['补正材料','驳回 · 限期 30 天','降级为普通保洁员'] },
+    ],
+    sp: [
+      { id:'sp-1', name:'苏宁智能家居有限公司', tag:'家电品类 · 续期', code:'91320100MA1Y******8K', submit:'2026-06-03 09:30',
+        basic: [['入围品类','空调 / 冰箱 / 洗衣机 / 智能门锁'],['注册资本','¥ 8,000 万'],['合作年限','3 年（2023 起）'],['交付保证金','¥ 200 万 · 已托管'],['SLA 标准','3 年质保 + 24h 上门'],['本期评分','★ 4.86 / 5.00']],
+        docs: ['营业执照','ISO 9001','产品检测报告','3C 认证','财务审计'],
+        checks: [['ok','工商信息核验','营业执照真实有效'],['ok','产品合规','所有品类均有 3C 认证'],['ok','历史交付','3 年累计交付 ¥ 1,820 万 · 无重大违约'],['ok','SLA 达成率','2025 年度 99.4%'],['warn','用户投诉率','近 30 天投诉率 0.8%，略高于行业基准 0.5%']],
+        actions: ['要求改进计划','不予续期','通过 · 续期 2 年'] },
+      { id:'sp-2', name:'金螳螂建筑装饰', tag:'装修品类 · 首次申报', code:'91320500MA15******3J', submit:'2026-06-01 14:12',
+        basic: [['申报品类','装修施工 / 软装设计'],['注册资本','¥ 22,000 万'],['行业资质','建筑装饰一级'],['交付保证金','¥ 500 万 · 待托管'],['SLA 标准','3 年质保 + 7 天工期'],['本期评分','首次申报 · 无评分']],
+        docs: ['营业执照','装饰一级资质','ISO 9001','项目业绩集','财务审计'],
+        checks: [['ok','工商信息核验','有效'],['ok','资质等级','建筑装饰一级 · 顶配'],['ok','行业口碑','上交所主板上市 · 头部企业'],['no','合作历史','与江苏保租房无既往合作 · 待评估'],['no','保证金','¥500 万保证金待托管']],
+        actions: ['延期复审','不予入围','通过 · 试点 6 个月'] },
+      { id:'sp-3', name:'万科物业服务', tag:'物业品类 · 续期（逾期）', code:'91440300MA1Y******1F', submit:'2026-05-28 10:08',
+        basic: [['入围品类','物业管理 / 安保 / 保洁'],['注册资本','¥ 100,000 万'],['合作年限','2 年（2024 起）'],['交付保证金','¥ 800 万 · 已托管'],['SLA 标准','24H 在岗 + 投诉 1h 响应'],['本期评分','★ 4.42 / 5.00']],
+        docs: ['营业执照','物业管理一级','ISO 14001','财务审计'],
+        checks: [['ok','工商信息','有效'],['warn','申报已逾期','已超 SLA 5 天'],['warn','SLA 达成率','2025 年 96.2% · 低于行业平均 98%'],['warn','投诉率','近 90 天 1.4% · 高于基准'],['warn','社保缴纳','3 名员工社保未足额，已责令整改']],
+        actions: ['补正材料','降级为观察供应商','通过 · 续期 1 年（半年评估）'] },
+    ],
+  };
+
+  // ============ 渲染 ============
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+  function checkIcon(lv){ return lv==='ok'?'✓':lv==='warn'?'!':'—'; }
+  function btnClass(i, total){
+    if (i === total - 1) return 'btn-primary';
+    if (i === total - 2 && total >= 3) return 'btn-danger';
+    return 'btn-ghost';
+  }
+  function tpl(d) {
+    return `
+    <div class="dh">
+      <div class="row">
+        <div class="nm">${escapeHtml(d.name)}</div>
+        <span class="pill">${escapeHtml(d.tag)}</span>
+      </div>
+      <div class="mt">${escapeHtml(d.code)} · 申报时间：${escapeHtml(d.submit)}</div>
+    </div>
+    <div class="db">
+      <h4>基础信息</h4>
+      <div class="info-grid">
+        ${d.basic.map(([k,v])=>`<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div>`).join('')}
+      </div>
+      <h4>资质材料（${d.docs.length} 份）</h4>
+      <div class="doc-grid">
+        ${d.docs.map(name=>`<div class="doc"><div class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/></svg></div><div><strong>${escapeHtml(name)}</strong></div></div>`).join('')}
+      </div>
+      <h4>系统核验</h4>
+      <ul class="check-list">
+        ${d.checks.map(([lv,t,desc])=>`<li><span class="ck ${lv}">${checkIcon(lv)}</span><div class="ckm"><strong>${escapeHtml(t)}</strong><br><small>${escapeHtml(desc)}</small></div></li>`).join('')}
+      </ul>
+    </div>
+    <div class="df">
+      ${d.actions.map((label,i,arr)=>`<button class="btn ${btnClass(i, arr.length)}">${escapeHtml(label)}</button>`).join('')}
+    </div>`;
+  }
+
+  const host = document.getElementById('detailHost');
+  function renderById(cat, id) {
+    const d = data[cat].find(x => x.id === id);
+    if (!d) return;
+    host.innerHTML = tpl(d);
+  }
+
+  // ============ 事件绑定 ============
+  document.querySelectorAll('.cat-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const cat = tab.dataset.cat;
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('on', t === tab));
+      document.querySelectorAll('.pl-pane').forEach(p => p.classList.toggle('on', p.dataset.cat === cat));
+      document.getElementById('plTitle').textContent = meta[cat].title;
+      document.getElementById('plMeta').textContent = meta[cat].sub;
+      document.getElementById('plSearch').placeholder = meta[cat].placeholder;
+      // 切到该分类的当前 active item（默认第一条）
+      const pane = document.querySelector(`.pl-pane[data-cat="${cat}"]`);
+      const cur = pane.querySelector('.item.active') || pane.querySelector('.item');
+      pane.querySelectorAll('.item').forEach(i => i.classList.toggle('active', i === cur));
+      if (cur && cur.dataset.id) renderById(cat, cur.dataset.id);
+    });
+  });
+
+  document.querySelectorAll('.pl-pane').forEach(pane => {
+    pane.addEventListener('click', e => {
+      const it = e.target.closest('.item');
+      if (!it || !it.dataset.id) return;
+      pane.querySelectorAll('.item').forEach(i => i.classList.toggle('active', i === it));
+      renderById(pane.dataset.cat, it.dataset.id);
+    });
+  });
+
+  // 初始渲染：默认运营方第一条
+  renderById('op', 'op-1');
+</script>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+
+<script>
+(function(){
+  document.querySelectorAll('.m-card .acts a').forEach(a => {
+    if (a.textContent.trim() !== '查看材料') return;
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const card = a.closest('.m-card');
+      const nm = card.querySelector('.nm').textContent;
+      const mt = card.querySelector('.mt').textContent;
+      const quals = Array.from(card.querySelectorAll('.qual .tg')).map(t => t.textContent).join(' · ');
+      const M = window.BZF_NAVMOBILE; if (!M) return;
+      M.openSheet({
+        title: nm,
+        body: `
+          <h4>基本信息</h4>
+          <div class="kv">
+            <div class="k">机构 / 人员</div><div class="v">${nm}</div>
+            <div class="k">申报类型</div><div class="v">${mt}</div>
+            <div class="k">基础信息</div><div class="v">${quals}</div>
+          </div>
+          <h4>资质材料（4 份）</h4>
+          <div class="doc-row"><span class="nm">营业执照（副本）</span><span class="sz">PDF · 1.2 MB</span></div>
+          <div class="doc-row"><span class="nm">法定代表人身份证</span><span class="sz">PDF · 0.8 MB</span></div>
+          <div class="doc-row"><span class="nm">企业年报</span><span class="sz">PDF · 3.5 MB</span></div>
+          <div class="doc-row"><span class="nm">合规承诺书</span><span class="sz">PDF · 0.4 MB</span></div>
+          <h4>系统核验</h4>
+          <ul>
+            <li>✓ 工商信息匹配（信用江苏）</li>
+            <li>✓ 法人无失信记录</li>
+            <li>✓ 无重大行政处罚</li>
+            <li>✓ 历年合规率 100%</li>
+          </ul>
+          <h4>三人协审意见</h4>
+          <div class="kv">
+            <div class="k">王科员</div><div class="v">建议通过</div>
+            <div class="k">陈科员</div><div class="v">建议通过</div>
+            <div class="k">李科长</div><div class="v">待您批复</div>
+          </div>
+        `,
+        actions: [
+          { label: '驳回', kind: 'rej' },
+          { label: '通过', kind: 'ok' },
+        ],
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

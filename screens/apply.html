@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>申请资格 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+    input, select { font: inherit; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 24px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .form-nav {
+      display: flex; align-items: center; padding: 8px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .form-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+
+    /* step indicator */
+    .step-bar { display: flex; padding: 16px; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .step {
+      flex: 1; text-align: center; position: relative;
+    }
+    .step-circle {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: grid; place-items: center; margin: 0 auto 6px;
+      font-size: 13px; font-weight: 600;
+      background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+    }
+    .step.active .step-circle { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
+    .step.done .step-circle { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+    .step-label { font-size: 11px; color: var(--muted); }
+    .step.active .step-label { color: var(--accent); font-weight: 500; }
+    .step-line {
+      position: absolute; top: 14px; right: 50%;
+      width: 100%; height: 2px; background: var(--border);
+    }
+    .step:last-child .step-line { display: none; }
+    .step.done .step-line { background: var(--accent); }
+
+    /* form area */
+    .form-area { padding: 16px; }
+
+    .form-card {
+      background: var(--surface); border-radius: var(--radius-md);
+      border: 1px solid var(--border); padding: 20px;
+      margin-bottom: 12px;
+    }
+    .form-card h3 { font-size: 16px; font-weight: 600; margin: 0 0 16px; display: flex; align-items: center; gap: 6px; }
+    .form-card h3 .step-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent-soft); color: var(--accent);
+      display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--fg); }
+    .field .hint { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+    .input {
+      width: 100%; padding: 11px 14px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--fg); font-size: 15px;
+    }
+    .input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+    .input.error { border-color: var(--danger); }
+
+    .radio-group { display: flex; flex-direction: column; gap: 8px; }
+    .radio-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--surface);
+      cursor: pointer; transition: border-color 0.15s;
+    }
+    .radio-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+    .radio-option .radio-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid var(--border); flex-shrink: 0;
+      display: grid; place-items: center;
+    }
+    .radio-option.selected .radio-dot { border-color: var(--accent); }
+    .radio-option.selected .radio-dot::after {
+      content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+    }
+    .radio-option .opt-label { font-size: 14px; }
+    .radio-option .opt-desc { font-size: 12px; color: var(--muted); }
+
+    /* file upload */
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: var(--radius-md);
+      padding: 24px; text-align: center; cursor: pointer;
+      background: var(--bg);
+    }
+    .upload-area svg { width: 32px; height: 32px; color: var(--muted); margin: 0 auto 8px; }
+    .upload-area p { font-size: 13px; color: var(--muted); }
+    .uploaded-file {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px; background: var(--accent-soft); border-radius: var(--radius-sm);
+      margin-top: 8px; font-size: 13px;
+    }
+    .uploaded-file svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+
+    .form-actions { display: flex; gap: 12px; margin-top: 20px; }
+    .btn-prev {
+      padding: 14px 24px; border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+      font-size: 15px; font-weight: 500;
+    }
+    .btn-next {
+      flex: 1; padding: 14px; border-radius: var(--radius-sm);
+      background: var(--accent); color: var(--accent-on);
+      font-size: 15px; font-weight: 600;
+    }
+    .btn-next:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-next:active:not(:disabled) { opacity: 0.9; }
+
+    /* success state */
+    .success-card {
+      text-align: center; padding: 40px 20px;
+      background: var(--surface); border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    .success-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: color-mix(in oklab, var(--success) 12%, transparent);
+      display: grid; place-items: center; margin: 0 auto 16px;
+    }
+    .success-icon svg { width: 32px; height: 32px; color: var(--success); }
+    .success-card h2 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+    .success-card p { font-size: 14px; color: var(--muted); max-width: 30ch; margin: 0 auto; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 24px; }
+      .form-area { padding-inline: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="form-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>申请保租房</h1>
+    <div style="width: 36px;"></div>
+  </div>
+
+  <!-- step indicator -->
+  <div class="step-bar">
+    <div class="step active" data-step="1">
+      <div class="step-line"></div>
+      <div class="step-circle">1</div>
+      <div class="step-label">资格自检</div>
+    </div>
+    <div class="step" data-step="2">
+      <div class="step-line"></div>
+      <div class="step-circle">2</div>
+      <div class="step-label">提交材料</div>
+    </div>
+    <div class="step" data-step="3">
+      <div class="step-line"></div>
+      <div class="step-circle">3</div>
+      <div class="step-label">确认提交</div>
+    </div>
+  </div>
+
+  <!-- step 1: eligibility -->
+  <div class="form-area" id="step1">
+    <div class="form-card">
+      <h3><span class="step-num">1</span> 资格自检</h3>
+      <p style="font-size: 13px; color: var(--muted); margin-bottom: 16px;">请确认以下条件，仅用于初步判断申请资格。</p>
+
+      <div class="field">
+        <label>申请人类别</label>
+        <div class="radio-group" data-question="category">
+          <div class="radio-option" data-value="new-citizen">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">新市民 / 青年人</div><div class="opt-desc">在宁就业创业，不限户籍</div></div>
+          </div>
+          <div class="radio-option" data-value="talent">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">人才引进</div><div class="opt-desc">经市人才部门认定，不限年龄</div></div>
+          </div>
+          <div class="radio-option" data-value="basic">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">城镇住房困难家庭</div><div class="opt-desc">本市户籍、人均住房面积＜15㎡</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>社保 / 公积金缴纳情况</label>
+        <div class="radio-group" data-question="social-security">
+          <div class="radio-option" data-value="yes">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">在宁连续缴纳 ≥6 个月</div></div>
+          </div>
+          <div class="radio-option" data-value="no">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">未在宁缴纳 / 不足 6 个月</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>南京市住房情况</label>
+        <div class="radio-group" data-question="housing">
+          <div class="radio-option" data-value="none">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">本人及配偶在宁无自有住房</div></div>
+          </div>
+          <div class="radio-option" data-value="has">
+            <div class="radio-dot"></div>
+            <div><div class="opt-label">在宁已有自有住房</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-next" id="toStep2">下一步 · 提交材料</button>
+    </div>
+  </div>
+
+  <!-- step 2: documents (hidden) -->
+  <div class="form-area" id="step2" style="display:none;">
+    <div class="form-card">
+      <h3><span class="step-num">2</span> 提交材料</h3>
+
+      <div class="field">
+        <label>身份证（正反面）</label>
+        <div class="upload-area" data-file="id">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>点击上传身份证照片</p>
+          <div class="uploaded-file" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>身份证-正反面.pdf</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>社保 / 公积金缴纳证明</label>
+        <div class="upload-area" data-file="social">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>点击上传近 6 个月缴纳证明</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>工作证明（可选）</label>
+        <div class="upload-area" data-file="work" style="border-style: solid; opacity: 0.7;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>劳动合同 / 在职证明（非必须）</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-prev" id="backToStep1">上一步</button>
+      <button class="btn-next" id="toStep3">下一步 · 确认</button>
+    </div>
+  </div>
+
+  <!-- step 3: confirm (hidden) -->
+  <div class="form-area" id="step3" style="display:none;">
+    <div class="form-card">
+      <h3><span class="step-num">3</span> 确认提交</h3>
+
+      <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 16px;">
+        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+          <tr><td style="color: var(--muted); padding: 6px 0;">申请人类型</td><td style="font-weight: 500; text-align: right;" id="confirm-category">—</td></tr>
+          <tr><td style="color: var(--muted); padding: 6px 0;">社保缴纳</td><td style="font-weight: 500; text-align: right;" id="confirm-ss">—</td></tr>
+          <tr><td style="color: var(--muted); padding: 6px 0;">住房情况</td><td style="font-weight: 500; text-align: right;" id="confirm-housing">—</td></tr>
+          <tr><td style="color: var(--muted); padding: 6px 0;">申请房源</td><td style="font-weight: 500; text-align: right;">江宁·梧桐公馆人才公寓</td></tr>
+          <tr><td style="color: var(--muted); padding: 6px 0;">身份证</td><td style="font-weight: 500; text-align: right; color: var(--success);">已上传 ✓</td></tr>
+          <tr><td style="color: var(--muted); padding: 6px 0;">社保证明</td><td style="font-weight: 500; text-align: right; color: var(--warn);">待上传 ⚠</td></tr>
+        </table>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--muted);">
+        <input type="checkbox" id="agree" style="margin-top: 2px;" />
+        <label for="agree">我已确认以上信息真实准确，同意《保租房申请协议》及《个人信息授权书》</label>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-prev" id="backToStep2">上一步</button>
+      <button class="btn-next" id="submitApplication" disabled>提交申请</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStep = 1;
+const stepEls = document.querySelectorAll('.step');
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const step3 = document.getElementById('step3');
+
+let formData = { category: '', socialSecurity: '', housing: '', agree: false };
+
+function updateSteps(step) {
+  currentStep = step;
+  stepEls.forEach((el, i) => {
+    const num = i + 1;
+    el.classList.toggle('active', num === step);
+    el.classList.toggle('done', num < step);
+  });
+  step1.style.display = step === 1 ? 'block' : 'none';
+  step2.style.display = step === 2 ? 'block' : 'none';
+  step3.style.display = step === 3 ? 'block' : 'none';
+}
+
+// radio selection
+document.querySelectorAll('.radio-group').forEach(group => {
+  group.querySelectorAll('.radio-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      group.querySelectorAll('.radio-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      const q = group.dataset.question;
+      if (q === 'category') formData.category = opt.dataset.value;
+      else if (q === 'social-security') formData.socialSecurity = opt.dataset.value;
+      else if (q === 'housing') formData.housing = opt.dataset.value;
+    });
+  });
+});
+
+// upload simulation
+document.querySelectorAll('.upload-area').forEach(area => {
+  area.addEventListener('click', () => {
+    const existing = area.querySelector('.uploaded-file');
+    if (existing && existing.style.display !== 'none') return;
+    const uploaded = area.querySelector('.uploaded-file');
+    if (uploaded) {
+      uploaded.style.display = 'flex';
+      area.querySelector('p')?.style.setProperty('display', 'none');
+    } else {
+      // create a fake uploaded state
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'uploaded-file';
+      fileDiv.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>已上传文件.pdf</span>';
+      area.style.borderStyle = 'solid';
+      area.querySelector('p').textContent = '重新上传';
+      area.appendChild(fileDiv);
+    }
+  });
+});
+
+// navigation
+document.getElementById('toStep2').addEventListener('click', () => {
+  if (!formData.category || !formData.socialSecurity || !formData.housing) {
+    alert('请完成所有资格问题');
+    return;
+  }
+  updateSteps(2);
+});
+
+document.getElementById('backToStep1').addEventListener('click', () => updateSteps(1));
+document.getElementById('toStep3').addEventListener('click', () => {
+  // populate confirm
+  const catMap = { 'new-citizen': '新市民 / 青年人', 'talent': '人才引进', 'basic': '住房困难家庭' };
+  const ssMap = { 'yes': '在宁缴纳 ≥6 个月', 'no': '未缴纳 / 不足 6 个月' };
+  const houseMap = { 'none': '在宁无自有住房', 'has': '已有自有住房' };
+  document.getElementById('confirm-category').textContent = catMap[formData.category] || '—';
+  document.getElementById('confirm-ss').textContent = ssMap[formData.socialSecurity] || '—';
+  document.getElementById('confirm-housing').textContent = houseMap[formData.housing] || '—';
+  updateSteps(3);
+});
+
+document.getElementById('backToStep2').addEventListener('click', () => updateSteps(2));
+
+document.getElementById('agree').addEventListener('change', (e) => {
+  formData.agree = e.target.checked;
+  document.getElementById('submitApplication').disabled = !e.target.checked;
+});
+
+document.getElementById('submitApplication').addEventListener('click', () => {
+  if (!formData.agree) return;
+  // show success
+  document.querySelector('.form-area').innerHTML = `
+    <div class="success-card">
+      <div class="success-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h2>申请已提交</h2>
+      <p>申请编号：NJ-BZ-${Date.now().toString(36).toUpperCase()}</p>
+      <p style="margin-top: 8px;">我们将在 5 个工作日内完成审核<br/>可在"我的申请"中查看进度</p>
+      <button class="btn-next" style="margin-top: 24px;" onclick="window.location.href='my-applications.html'">查看我的申请</button>
+    </div>
+  `;
+});
+</script>
+<script src="_region.js"></script>
+</body>
+</html>

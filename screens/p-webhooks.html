@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>事件订阅与 Webhook · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);} .ki .d.danger{color:var(--danger);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* event catalog */
+    .ev-row{display:grid; grid-template-columns:1fr auto auto auto; gap:12px; padding:12px 14px; border-radius:6px; background:var(--line); margin-bottom:6px; align-items:center; font-size:12.5px;}
+    .ev-row .nm{font-family:var(--mono); font-weight:700; color:var(--accent); font-size:12.5px;}
+    .ev-row .desc{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ev-row .pub{font-size:11px;}
+    .ev-row .pub b{color:var(--fg); font-weight:600;}
+    .ev-row .sub-cnt{font-family:var(--mono); font-size:14px; font-weight:700;}
+    .ev-row .freq{font-size:11px; color:var(--muted); text-align:right;}
+
+    /* subscriber list */
+    .sub-row{display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:12px; padding:12px 14px; border-radius:6px; background:var(--line); margin-bottom:6px; align-items:center; font-size:12.5px;}
+    .sub-row .av{width:36px; height:36px; border-radius:8px; display:grid; place-items:center; font-size:18px; color:white; flex-shrink:0;}
+    .sub-row .av.gov{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .sub-row .av.op{background:linear-gradient(135deg, #0f766e, #14b8a6);}
+    .sub-row .av.bank{background:linear-gradient(135deg, #0f1a4d, #1e3a8a);}
+    .sub-row .av.portal{background:linear-gradient(135deg, #064e3b, #115e59);}
+    .sub-row .av.gov-ext{background:linear-gradient(135deg, #b45309, #ca8a04);}
+    .sub-row .nm{font-weight:600;}
+    .sub-row .url{font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:2px;}
+    .sub-row .ev-tag{font-family:var(--mono); font-size:10px; padding:1px 5px; background:var(--surface); color:var(--accent); border-radius:3px; font-weight:600; margin:1px 2px 1px 0; display:inline-block;}
+    .sub-row .v{font-family:var(--mono); font-weight:700; text-align:right;}
+    .sub-row .v.ok{color:var(--success);}
+    .sub-row .v.warn{color:var(--warn);}
+    .sub-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .sub-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .sub-row .stat.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .sub-row .stat.fail{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* delivery log */
+    .dlog-row{display:grid; grid-template-columns:auto auto 1fr auto auto auto; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12px; align-items:center;}
+    .dlog-row:last-child{border-bottom:0;}
+    .dlog-row .t{font-family:var(--mono); font-size:10px; color:var(--muted);}
+    .dlog-row .ev{font-family:var(--mono); font-size:10.5px; padding:1px 5px; background:var(--accent-soft); color:var(--accent); border-radius:3px; font-weight:600;}
+    .dlog-row .to{font-size:11px;}
+    .dlog-row .to b{font-weight:600;}
+    .dlog-row .lat{font-family:var(--mono); font-size:11px; color:var(--muted);}
+    .dlog-row .attempt{font-size:10px; padding:1px 5px; background:var(--line); color:var(--muted); border-radius:3px;}
+    .dlog-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .dlog-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .dlog-row .stat.retry{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .dlog-row .stat.dead{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* retry policy */
+    .retry-card{padding:14px 16px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 3%, transparent)); border-left:3px solid var(--accent); border-radius:6px; margin-bottom:8px;}
+    .retry-card .head{font-weight:600; margin-bottom:4px; display:flex; gap:6px; align-items:center;}
+    .retry-card .desc{font-size:11.5px; color:var(--muted); line-height:1.55;}
+    .retry-card .desc code{font-family:var(--mono); font-size:11px; background:var(--surface); padding:1px 4px; border-radius:3px; color:var(--accent);}
+
+    /* recurring reports */
+    .rep-row{display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12.5px; align-items:center;}
+    .rep-row:last-child{border-bottom:0;}
+    .rep-row .ic{font-size:18px;}
+    .rep-row .nm{font-weight:600;}
+    .rep-row .sub{font-size:11px; color:var(--muted);}
+    .rep-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .rep-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="webhooks"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>事件订阅 & Webhook</b></div>
+      <span style="font-size:11px; padding:3px 8px; background:var(--accent-soft); color:var(--accent); border-radius:4px; font-weight:600;">CloudEvents v1.0 · 含数据回流</span>
+      <div class="top-actions">
+        <button class="btn">事件目录</button>
+        <button class="btn">死信队列</button>
+        <button class="btn pri">+ 新建订阅</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">事件类型</div><div class="n">24</div><div class="d">业务 + 系统</div></div>
+      <div class="ki"><div class="l">订阅方</div><div class="n">38</div><div class="d ok">↑ 2 本月</div></div>
+      <div class="ki"><div class="l">今日投递</div><div class="n">186k</div><div class="d ok">同比 +24%</div></div>
+      <div class="ki"><div class="l">P95 端到端</div><div class="n">2.4<span class="u">s</span></div><div class="d ok">健康</div></div>
+      <div class="ki"><div class="l">投递成功率</div><div class="n">99.6<span class="u">%</span></div><div class="d ok">SLA 99%</div></div>
+      <div class="ki"><div class="l">死信</div><div class="n" style="color:var(--danger);">14</div><div class="d" style="color:var(--danger);">需手动</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT events + subscribers + log -->
+      <div>
+        <div class="card">
+          <h3>事件目录 <span class="pill">24 类</span> <span class="extra">业务发出 · 订阅消费</span></h3>
+          <div class="ev-row">
+            <div>
+              <div class="nm">cert.issued</div>
+              <div class="desc">证书签发完成 · 含等级/工种/有效期</div>
+            </div>
+            <div class="pub">由 <b>P 端发出</b></div>
+            <div class="sub-cnt">6</div>
+            <div class="freq">186/月</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">cert.revoked</div>
+              <div class="desc">证书吊销 · 高危事件 · 多端广播</div>
+            </div>
+            <div class="pub">由 <b>P 端发出</b></div>
+            <div class="sub-cnt">8</div>
+            <div class="freq">3/月</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">level.changed</div>
+              <div class="desc">等级变化（升级/降级/续期）</div>
+            </div>
+            <div class="pub">由 <b>P 端发出</b></div>
+            <div class="sub-cnt">5</div>
+            <div class="freq">86/月</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">credit.score.updated</div>
+              <div class="desc">信用分变化（每事件批量推送）</div>
+            </div>
+            <div class="pub">由 <b>P 端发出</b></div>
+            <div class="sub-cnt">4</div>
+            <div class="freq">3.4k/日</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">order.completed</div>
+              <div class="desc">订单完结 · 触发信用更新+分账</div>
+            </div>
+            <div class="pub">由 <b>B 端发出</b></div>
+            <div class="sub-cnt">3</div>
+            <div class="freq">12k/日</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">complaint.created</div>
+              <div class="desc">投诉新建 · 12345 / 频道 / 内部</div>
+            </div>
+            <div class="pub">由 <b>多端发出</b></div>
+            <div class="sub-cnt">4</div>
+            <div class="freq">86/月</div>
+          </div>
+          <div class="ev-row">
+            <div>
+              <div class="nm">exam.passed</div>
+              <div class="desc">考试通过 · 触发证书签发流</div>
+            </div>
+            <div class="pub">由 <b>T 端 / P 端发出</b></div>
+            <div class="sub-cnt">2</div>
+            <div class="freq">186/月</div>
+          </div>
+          <div class="ev-row" style="background:#faf5ff;">
+            <div>
+              <div class="nm">material.batch.qc-passed</div>
+              <div class="desc">M 端物资批次质检合格 · 触发批次上链 + 公示</div>
+            </div>
+            <div class="pub">由 <b>M 端 / P 端发出</b></div>
+            <div class="sub-cnt">3</div>
+            <div class="freq">84/月</div>
+          </div>
+          <div class="ev-row" style="background:#faf5ff;">
+            <div>
+              <div class="nm">material.batch.qc-failed</div>
+              <div class="desc">M 端批次质检不合格 · 触发信用扣分 + 重发流</div>
+            </div>
+            <div class="pub">由 <b>M 端 / P 端发出</b></div>
+            <div class="sub-cnt">4</div>
+            <div class="freq">3/月</div>
+          </div>
+          <div class="ev-row" style="background:#faf5ff;">
+            <div>
+              <div class="nm">material.po.settled</div>
+              <div class="desc">M 端集采订单结算（T+5 到账）→ 财务/对账系统</div>
+            </div>
+            <div class="pub">由 <b>F 端 + M 端发出</b></div>
+            <div class="sub-cnt">3</div>
+            <div class="freq">120/月</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>订阅方 <span class="pill">38 个</span> <span class="extra">含数据回流任务</span></h3>
+          <div class="sub-row">
+            <div class="av gov">⚖</div>
+            <div>
+              <div class="nm">G 端 · 住建厅监管驾驶舱</div>
+              <div class="url">https://bzf.jsgov.cn/_webhook/cert</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">cert.issued</span>
+                <span class="ev-tag">cert.revoked</span>
+                <span class="ev-tag">level.changed</span>
+                <span class="ev-tag">complaint.created</span>
+                <span class="ev-tag">+ 8</span>
+              </div>
+            </div>
+            <div class="v ok">99.99%</div>
+            <div style="font-size:11px; color:var(--muted);">T+0</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row">
+            <div class="av portal">🛡</div>
+            <div>
+              <div class="nm">公示门户</div>
+              <div class="url">https://bzf.meizu.life/_webhook/cert</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">cert.issued</span>
+                <span class="ev-tag">cert.revoked</span>
+                <span class="ev-tag">level.changed</span>
+              </div>
+            </div>
+            <div class="v ok">100%</div>
+            <div style="font-size:11px; color:var(--muted);">实时</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row">
+            <div class="av op">🐚</div>
+            <div>
+              <div class="nm">B 端 · 南京安居集团</div>
+              <div class="url">https://nj-anju.cn/api/cert-os/_webhook</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">credit.score.updated</span>
+                <span class="ev-tag">level.changed</span>
+                <span class="ev-tag">order.completed</span>
+              </div>
+            </div>
+            <div class="v ok">99.96%</div>
+            <div style="font-size:11px; color:var(--muted);">P95 86ms</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row">
+            <div class="av bank">🏦</div>
+            <div>
+              <div class="nm">F 端 · 江苏银行托管账户</div>
+              <div class="url">https://api.jsbank.com.cn/bzf/webhook</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">order.completed</span>
+                <span class="ev-tag">cert.issued</span>
+              </div>
+            </div>
+            <div class="v ok">99.94%</div>
+            <div style="font-size:11px; color:var(--muted);">P95 218ms</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row">
+            <div class="av gov-ext">📞</div>
+            <div>
+              <div class="nm">12345 政务热线</div>
+              <div class="url">https://12345.nj.gov.cn/api/bzf/in</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">complaint.status.changed</span>
+              </div>
+            </div>
+            <div class="v warn">98.2%</div>
+            <div style="font-size:11px; color:var(--muted);">P95 2.4s</div>
+            <span class="stat warn">背压</span>
+          </div>
+          <div class="sub-row">
+            <div class="av gov-ext">🏛</div>
+            <div>
+              <div class="nm">税务局·收入申报</div>
+              <div class="url">https://etax.jiangsu.gov.cn/_in</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">income.monthly.report</span>
+              </div>
+            </div>
+            <div class="v ok">100%</div>
+            <div style="font-size:11px; color:var(--muted);">月度</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row" style="background:#faf5ff;">
+            <div class="av" style="background:#6b21a8; color:#fff;">🛒</div>
+            <div>
+              <div class="nm">M 端 · 北新建材集团</div>
+              <div class="url">https://api.bnbm.cn/bzf/webhook</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">material.batch.qc-passed</span>
+                <span class="ev-tag">material.batch.qc-failed</span>
+                <span class="ev-tag">material.po.settled</span>
+              </div>
+            </div>
+            <div class="v ok">99.92%</div>
+            <div style="font-size:11px; color:var(--muted);">P95 142ms</div>
+            <span class="stat ok">健康</span>
+          </div>
+          <div class="sub-row" style="background:#faf5ff;">
+            <div class="av" style="background:#6b21a8; color:#fff;">🛒</div>
+            <div>
+              <div class="nm">M 端 · 美的家电（集采监听）</div>
+              <div class="url">https://oa.midea.com/bzf-bid/webhook</div>
+              <div style="margin-top:4px;">
+                <span class="ev-tag">material.po.created</span>
+                <span class="ev-tag">material.po.settled</span>
+              </div>
+            </div>
+            <div class="v ok">99.88%</div>
+            <div style="font-size:11px; color:var(--muted);">P95 96ms</div>
+            <span class="stat ok">健康</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>近期投递日志 <span class="extra">10 分钟</span></h3>
+          <div>
+            <div class="dlog-row">
+              <span class="t">10:32:18</span>
+              <span class="ev">cert.issued</span>
+              <div>→ <b>G 端</b> + 公示门户 + B 端</div>
+              <span class="lat">86 ms</span>
+              <span class="attempt">1/3</span>
+              <span class="stat ok">200</span>
+            </div>
+            <div class="dlog-row">
+              <span class="t">10:32:14</span>
+              <span class="ev">credit.score.updated</span>
+              <div>→ <b>B 端 (×3)</b></div>
+              <span class="lat">42 ms</span>
+              <span class="attempt">1/3</span>
+              <span class="stat ok">200</span>
+            </div>
+            <div class="dlog-row">
+              <span class="t">10:31:48</span>
+              <span class="ev">complaint.status.changed</span>
+              <div>→ <b>12345</b></div>
+              <span class="lat">2.4 s</span>
+              <span class="attempt">2/3</span>
+              <span class="stat retry">202 重试</span>
+            </div>
+            <div class="dlog-row">
+              <span class="t">10:31:22</span>
+              <span class="ev">order.completed</span>
+              <div>→ <b>F 端 + B 端</b></div>
+              <span class="lat">128 ms</span>
+              <span class="attempt">1/3</span>
+              <span class="stat ok">200</span>
+            </div>
+            <div class="dlog-row">
+              <span class="t">10:30:12</span>
+              <span class="ev">cert.revoked</span>
+              <div>→ <b>多端广播</b> (G/B/V/S/Portal)</div>
+              <span class="lat">412 ms</span>
+              <span class="attempt">1/3</span>
+              <span class="stat ok">200×5</span>
+            </div>
+            <div class="dlog-row">
+              <span class="t">10:28:42</span>
+              <span class="ev">level.changed</span>
+              <div>→ <b>某第三方</b> (废弃地址)</div>
+              <span class="lat">timeout</span>
+              <span class="attempt">3/3</span>
+              <span class="stat dead">死信</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT retry / data-loopback / recurring -->
+      <div>
+        <div class="card">
+          <h3>重试与可靠性 <span class="pill">通用策略</span></h3>
+          <div class="retry-card">
+            <div class="head">⏱ 指数退避</div>
+            <div class="desc">默认 <code>1s · 4s · 16s · 64s</code>，最多 3 次重试；超时后入死信队列等待人工。</div>
+          </div>
+          <div class="retry-card">
+            <div class="head">🔐 签名校验</div>
+            <div class="desc">所有 webhook 出站附 <code>X-Signature</code>（HMAC-SHA256 + 国密 SM3）+ <code>X-Timestamp</code>，订阅方需 5 分钟内验签。</div>
+          </div>
+          <div class="retry-card">
+            <div class="head">🧊 幂等键</div>
+            <div class="desc">每条事件含 <code>event_id</code>（UUID）· 24h 去重窗口；订阅方需自行幂等处理。</div>
+          </div>
+          <div class="retry-card">
+            <div class="head">💀 死信处理</div>
+            <div class="desc">连续 3 次失败入 DLQ · 24h 内可手动重投；超过 24h 通知 DPO 审计 + 通知订阅方负责人。</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>政府数据回流任务 <span class="pill">合规必报</span></h3>
+          <div class="rep-row">
+            <div class="ic">📅</div>
+            <div>
+              <div class="nm">月度认证名册回流</div>
+              <div class="sub">每月 1 日 09:00 · 推送 12 张表至住建厅</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">月 1</div>
+            <span class="stat ok">已批</span>
+          </div>
+          <div class="rep-row">
+            <div class="ic">💰</div>
+            <div>
+              <div class="nm">服务者月度收入申报</div>
+              <div class="sub">每月 5 日推送至省税务局 · SM2 签</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">月 1</div>
+            <span class="stat ok">已批</span>
+          </div>
+          <div class="rep-row">
+            <div class="ic">🏛</div>
+            <div>
+              <div class="nm">公积金代付月报</div>
+              <div class="sub">每月 28 日 · 含 6 万+ 缴存记录</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">月 1</div>
+            <span class="stat ok">已批</span>
+          </div>
+          <div class="rep-row">
+            <div class="ic">📊</div>
+            <div>
+              <div class="nm">季度行业监测报表</div>
+              <div class="sub">每季度推全省 13 市住建局</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">季 1</div>
+            <span class="stat ok">已批</span>
+          </div>
+          <div class="rep-row">
+            <div class="ic">⚠️</div>
+            <div>
+              <div class="nm">高危事件即时上报</div>
+              <div class="sub">证书吊销 / 重大投诉 · 实时推送</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">实时</div>
+            <span class="stat ok">已批</span>
+          </div>
+          <div class="rep-row">
+            <div class="ic">📈</div>
+            <div>
+              <div class="nm">年度行业白皮书数据集</div>
+              <div class="sub">每年 1 月 31 日 · 含汇总 + 趋势</div>
+            </div>
+            <div style="font-family:var(--mono); font-size:11px; color:var(--muted);">年 1</div>
+            <span class="stat ok">已批</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px; background:linear-gradient(135deg, color-mix(in oklab, var(--success) 6%, transparent), transparent); border-color:var(--success);">
+          <h3 style="color:var(--success);">✓ 通用化设计</h3>
+          <div style="font-size:12.5px; line-height:1.7; color:var(--muted);">
+            <div>① <b style="color:var(--fg);">事件中心解耦</b>：业务模块只发<b>领域事件</b>，不感知任何订阅方</div>
+            <div>② <b style="color:var(--fg);">订阅自助</b>：消费方在自助 portal 注册 webhook + 选事件 + 试投</div>
+            <div>③ <b style="color:var(--fg);">合规可审</b>：所有出站事件留痕 90 天 + DPO 季度审 PII</div>
+            <div>④ <b style="color:var(--fg);">多协议</b>：HTTP webhook / WebSocket 长连 / MQ 主题 三选一</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

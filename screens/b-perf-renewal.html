@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>绩效与续约 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI */
+    .kpi-row{display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin-bottom:18px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:22px; font-weight:700; margin-top:3px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:3px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);} .ki .d.danger{color:var(--danger);}
+
+    /* row 2 col */
+    .row2{display:grid; grid-template-columns:1.4fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .card-head{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; font-size:12px; display:flex; gap:8px;}
+    .card-head .actions a{color:var(--accent);}
+    .card-body{padding:16px 18px;}
+
+    /* perf list rows */
+    .perf-tabs{display:flex; gap:6px; padding:12px 18px 0; border-bottom:1px solid var(--border);}
+    .pt{padding:10px 12px; font-size:12.5px; color:var(--muted); border-bottom:2px solid transparent;}
+    .pt.on{color:var(--accent); border-color:var(--accent); font-weight:600;}
+    .pt .cnt{font-size:10px; padding:1px 6px; background:var(--bg); border-radius:8px; margin-left:4px;}
+
+    .perf-row{display:grid; grid-template-columns:32px 1.6fr 80px 100px 120px 1fr 140px; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border); align-items:center; font-size:12.5px;}
+    .perf-row:last-child{border-bottom:0;}
+    .perf-row.head{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; background:#f9fafb; font-weight:600; padding-top:8px; padding-bottom:8px;}
+    .perf-row .av{width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-weight:700; font-size:13px;}
+    .perf-row .who .nm{font-weight:600;}
+    .perf-row .who .meta{font-size:11px; color:var(--muted); margin-top:1px; display:flex; gap:6px;}
+    .perf-row .lv-badge{font-size:10px; padding:2px 7px; border-radius:4px; color:white; font-weight:700; display:inline-block;}
+    .perf-row .lv-badge.L1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .perf-row .lv-badge.L2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .perf-row .lv-badge.L3{background:linear-gradient(135deg, #047857, #10b981);}
+    .perf-row .lv-badge.L4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .perf-row .score{font-family:var(--mono); font-size:17px; font-weight:700;}
+    .perf-row .score.ok{color:var(--success);} .perf-row .score.warn{color:var(--warn);} .perf-row .score.danger{color:var(--danger);}
+    .perf-row .stars{color:var(--gold); font-size:12px; letter-spacing:1px;}
+    .perf-row .trend{font-size:11px; color:var(--muted); margin-top:2px;}
+    .perf-row .trend.up{color:var(--success);}
+    .perf-row .trend.dn{color:var(--danger);}
+    .perf-row .card-line{display:flex; gap:4px;}
+    .card-tag{display:inline-flex; align-items:center; gap:3px; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;}
+    .card-tag.gold{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .card-tag.green{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .card-tag.yellow{background:color-mix(in oklab, #facc15 30%, transparent); color:#854d0e;}
+    .card-tag.red{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .perf-row .actions a{font-size:11.5px; color:var(--accent); margin-right:8px;}
+    .perf-row .actions a.danger{color:var(--danger);}
+
+    /* contract */
+    .contract-block{padding:16px 18px;}
+    .ct-row{display:flex; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); align-items:center; font-size:12.5px;}
+    .ct-row:last-child{border-bottom:0;}
+    .ct-row .who{flex:1;}
+    .ct-row .nm{font-weight:600;}
+    .ct-row .meta{font-size:11px; color:var(--muted); margin-top:1px;}
+    .ct-row .end{font-family:var(--mono); font-size:12px;}
+    .ct-row .end.warn{color:var(--warn);} .ct-row .end.danger{color:var(--danger); font-weight:700;}
+    .ct-row .rec{font-size:11px; padding:3px 8px; border-radius:4px; font-weight:600;}
+    .ct-row .rec.renew{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .ct-row .rec.review{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .ct-row .rec.end{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* heatmap-style perf distribution */
+    .dist{display:flex; flex-direction:column; gap:8px;}
+    .dist-row{display:grid; grid-template-columns:60px 1fr 50px; gap:10px; align-items:center; font-size:12px;}
+    .dist-row .lv{font-weight:600;}
+    .dist-row .bar{height:14px; background:var(--bg); border-radius:7px; overflow:hidden; position:relative;}
+    .dist-row .seg{height:100%; float:left;}
+    .dist-row .seg.gold{background:linear-gradient(90deg, #ca8a04, #fbbf24);}
+    .dist-row .seg.green{background:var(--success);}
+    .dist-row .seg.yellow{background:#facc15;}
+    .dist-row .seg.red{background:var(--danger);}
+    .dist-row .total{font-family:var(--mono); font-weight:700; text-align:right;}
+
+    /* contribution graph */
+    .heat{display:grid; grid-template-columns:repeat(30, 1fr); gap:2px;}
+    .h{aspect-ratio:1; background:#f3f4f6; border-radius:2px;}
+    .h.l1{background:#dcfce7;} .h.l2{background:#bbf7d0;} .h.l3{background:#86efac;}
+    .h.l4{background:#22c55e;} .h.l5{background:#15803d;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="b" data-active="perf-renewal"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>绩效与续约</h1>
+      <span style="font-size:12px; color:var(--muted);">本月评估周期 · 6 月 1-30 日</span>
+      <button class="btn">评估规则</button>
+      <button class="btn">导出 PDF</button>
+      <button class="btn pri">批量决策</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="ki"><div class="l">本月平均绩效</div><div class="n">87.4</div><div class="d ok">↑ 2.4 同比</div></div>
+      <div class="ki"><div class="l">金牌（≥95）</div><div class="n" style="color:var(--gold);">38</div><div class="d">L3-L4 主力</div></div>
+      <div class="ki"><div class="l">优秀（85-94）</div><div class="n" style="color:var(--success);">142</div><div class="d ok">↑ 18</div></div>
+      <div class="ki"><div class="l">需观察（70-84）</div><div class="n" style="color:var(--warn);">98</div><div class="d warn">含 12 警示</div></div>
+      <div class="ki"><div class="l">红牌（&lt;70）</div><div class="n" style="color:var(--danger);">14</div><div class="d danger">建议清退 6</div></div>
+    </div>
+
+    <!-- distribution -->
+    <div class="row2" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="card-head">
+          <h3>等级 × 绩效分布</h3>
+          <span class="pill">312 人</span>
+          <div class="actions"><a>详细分布 →</a></div>
+        </div>
+        <div class="card-body">
+          <div class="dist">
+            <div class="dist-row">
+              <span class="lv">L4</span>
+              <div class="bar">
+                <div class="seg gold" style="width:64%;"></div>
+                <div class="seg green" style="width:28%;"></div>
+                <div class="seg yellow" style="width:8%;"></div>
+              </div>
+              <div class="total">14</div>
+            </div>
+            <div class="dist-row">
+              <span class="lv">L3</span>
+              <div class="bar">
+                <div class="seg gold" style="width:18%;"></div>
+                <div class="seg green" style="width:56%;"></div>
+                <div class="seg yellow" style="width:22%;"></div>
+                <div class="seg red" style="width:4%;"></div>
+              </div>
+              <div class="total">86</div>
+            </div>
+            <div class="dist-row">
+              <span class="lv">L2</span>
+              <div class="bar">
+                <div class="seg green" style="width:38%;"></div>
+                <div class="seg yellow" style="width:48%;"></div>
+                <div class="seg red" style="width:14%;"></div>
+              </div>
+              <div class="total">168</div>
+            </div>
+            <div class="dist-row">
+              <span class="lv">L1</span>
+              <div class="bar">
+                <div class="seg green" style="width:8%;"></div>
+                <div class="seg yellow" style="width:72%;"></div>
+                <div class="seg red" style="width:20%;"></div>
+              </div>
+              <div class="total">44</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:14px; font-size:11px; color:var(--muted); margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:linear-gradient(90deg, #ca8a04, #fbbf24); border-radius:2px;"></span>金牌 ≥95</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#16a34a; border-radius:2px;"></span>优秀 85-94</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#facc15; border-radius:2px;"></span>观察 70-84</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px; height:10px; background:#dc2626; border-radius:2px;"></span>红牌 &lt;70</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>合同到期时间表</h3><span class="pill">90 天内 36 单</span></div>
+        <div class="contract-block">
+          <div class="ct-row">
+            <div class="who"><div class="nm">王晓琳 <span class="lv-badge L4" style="font-size:9px; padding:1px 5px;">L4</span></div><div class="meta">旅居门店 · 河西青年</div></div>
+            <div class="end warn">2026-12-30</div>
+            <span class="rec renew">建议续约 +2 年</span>
+          </div>
+          <div class="ct-row">
+            <div class="who"><div class="nm">刘小红 <span class="lv-badge L3" style="font-size:9px; padding:1px 5px;">L3</span></div><div class="meta">保洁 · 河西青年 · 观察期</div></div>
+            <div class="end danger">2026-11-15</div>
+            <span class="rec review">续约 +6 月 · 限期改善</span>
+          </div>
+          <div class="ct-row">
+            <div class="who"><div class="nm">钱小宝 <span class="lv-badge L2" style="font-size:9px; padding:1px 5px;">L2</span></div><div class="meta">检修 · 栖霞蓝湾</div></div>
+            <div class="end danger">2026-10-08</div>
+            <span class="rec end">建议不续约</span>
+          </div>
+          <div class="ct-row">
+            <div class="who"><div class="nm">周丽华 <span class="lv-badge L2" style="font-size:9px; padding:1px 5px;">L2</span></div><div class="meta">入住服务 · 江宁安居</div></div>
+            <div class="end">2026-08-12</div>
+            <span class="rec renew">续约转正</span>
+          </div>
+          <div class="ct-row">
+            <div class="who"><div class="nm">孙建华 <span class="lv-badge L1" style="font-size:9px; padding:1px 5px;">L1</span></div><div class="meta">房源托管 · 栖霞驻点</div></div>
+            <div class="end">2026-09-30</div>
+            <span class="rec review">视 L2 升级</span>
+          </div>
+          <div style="text-align:center; padding-top:10px; font-size:11px;">
+            <a style="color:var(--accent);">查看全部 36 个待决策 →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- perf list -->
+    <div class="card">
+      <div class="card-head">
+        <h3>本月绩效明细</h3>
+        <span class="pill">¥ 绩效工资 = 基础 + 客评加权 + 红黄牌调整</span>
+        <div class="actions"><a>发放工资单</a><a>下钻</a></div>
+      </div>
+      <div class="perf-tabs">
+        <span class="pt on">全部 <span class="cnt">312</span></span>
+        <span class="pt">L4 <span class="cnt">14</span></span>
+        <span class="pt">L3 <span class="cnt">86</span></span>
+        <span class="pt">L2 <span class="cnt">168</span></span>
+        <span class="pt">L1 <span class="cnt">44</span></span>
+        <span class="pt">需关注 <span class="cnt">12</span></span>
+      </div>
+      <div class="perf-row head">
+        <div></div><div>员工</div><div>等级</div><div>绩效分</div><div>客评</div><div>红黄牌 / 备注</div><div style="text-align:right;">操作</div>
+      </div>
+      <div class="perf-row">
+        <div class="av">陈</div>
+        <div class="who"><div class="nm">陈建国</div><div class="meta"><span>旅居房管</span><span>梧桐公馆</span><span>92 单</span></div></div>
+        <div><span class="lv-badge L4">L4</span></div>
+        <div><span class="score ok">98.6</span><div class="trend up">↑ 2.4</div></div>
+        <div><span class="stars">★★★★★</span> 4.98</div>
+        <div class="card-line"><span class="card-tag gold">★ 月度之星</span><span class="card-tag green">续约候选</span></div>
+        <div class="actions" style="text-align:right;"><a>晋升 L5</a><a>奖金 +20%</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">王</div>
+        <div class="who"><div class="nm">王晓琳</div><div class="meta"><span>旅居门店</span><span>河西青年</span><span>78 单</span></div></div>
+        <div><span class="lv-badge L4">L4</span></div>
+        <div><span class="score ok">94.2</span><div class="trend up">↑ 1.2</div></div>
+        <div><span class="stars">★★★★★</span> 4.92</div>
+        <div class="card-line"><span class="card-tag green">续约 +2 年</span></div>
+        <div class="actions" style="text-align:right;"><a>续约决议</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">郑</div>
+        <div class="who"><div class="nm">郑文涛</div><div class="meta"><span>旅居管家</span><span>江北建发</span><span>48 单</span></div></div>
+        <div><span class="lv-badge L3">L3</span></div>
+        <div><span class="score ok">91.0</span><div class="trend up">↑ 4.6</div></div>
+        <div><span class="stars">★★★★★</span> 4.90</div>
+        <div class="card-line"><span class="card-tag green">优秀</span><span class="card-tag gold">L4 候选</span></div>
+        <div class="actions" style="text-align:right;"><a>晋升预审</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">张</div>
+        <div class="who"><div class="nm">张师傅</div><div class="meta"><span>检修</span><span>鼓楼物业</span><span>62 单</span></div></div>
+        <div><span class="lv-badge L3">L3</span></div>
+        <div><span class="score ok">88.4</span><div class="trend up">↑ 1.0</div></div>
+        <div><span class="stars">★★★★<span style="color:var(--border);">★</span></span> 4.84</div>
+        <div class="card-line"><span class="card-tag green">稳定</span></div>
+        <div class="actions" style="text-align:right;"><a>详情</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">刘</div>
+        <div class="who"><div class="nm">刘小红</div><div class="meta"><span>保洁</span><span>河西青年</span><span>38 单</span></div></div>
+        <div><span class="lv-badge L3">L3</span></div>
+        <div><span class="score warn">76.2</span><div class="trend dn">↓ 4.8</div></div>
+        <div><span class="stars">★★★★<span style="color:var(--border);">★</span></span> 4.42</div>
+        <div class="card-line"><span class="card-tag yellow">⚠ 黄牌 · 3 投诉</span></div>
+        <div class="actions" style="text-align:right;"><a>谈话</a><a>限期改善</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">周</div>
+        <div class="who"><div class="nm">周丽华</div><div class="meta"><span>入住服务</span><span>江宁安居</span><span>54 单</span></div></div>
+        <div><span class="lv-badge L2">L2</span></div>
+        <div><span class="score ok">82.4</span><div class="trend up">↑ 6.2</div></div>
+        <div><span class="stars">★★★★<span style="color:var(--border);">★</span></span> 4.72</div>
+        <div class="card-line"><span class="card-tag green">优秀</span><span class="card-tag gold">L3 候选</span></div>
+        <div class="actions" style="text-align:right;"><a>晋升预审</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">钱</div>
+        <div class="who"><div class="nm">钱小宝</div><div class="meta"><span>检修</span><span>栖霞蓝湾</span><span>14 单</span></div></div>
+        <div><span class="lv-badge L2">L2</span></div>
+        <div><span class="score danger">58.0</span><div class="trend dn">↓ 14</div></div>
+        <div><span class="stars">★★★<span style="color:var(--border);">★★</span></span> 3.86</div>
+        <div class="card-line"><span class="card-tag red">🚫 红牌 · 超时 ×3</span></div>
+        <div class="actions" style="text-align:right;"><a>申诉</a><a class="danger">不续约</a></div>
+      </div>
+      <div class="perf-row">
+        <div class="av">孙</div>
+        <div class="who"><div class="nm">孙建华</div><div class="meta"><span>房源托管</span><span>栖霞驻点</span><span>28 单（带）</span></div></div>
+        <div><span class="lv-badge L1">L1</span></div>
+        <div><span class="score">68.0</span><div class="trend">基础分</div></div>
+        <div>—</div>
+        <div class="card-line"><span class="card-tag yellow">培训中</span><span class="card-tag green">06-12 考试</span></div>
+        <div class="actions" style="text-align:right;"><a>培训档案</a></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.pt').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.pt').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

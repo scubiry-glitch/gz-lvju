@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>公安备案核验 · 江苏银行 · 保租房金融端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1d4ed8; --gold: #b45309;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --gold-soft: color-mix(in oklab, var(--gold) 14%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .crumb { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    /* 闸门状态卡 */
+    .gate-card {
+      background: linear-gradient(135deg, #0f1a4d 0%, #1d4ed8 60%, #b45309 140%);
+      color: white; border-radius: var(--radius-md); padding: 22px 26px; margin-bottom: 18px;
+      position: relative; overflow: hidden;
+    }
+    .gate-card::after {
+      content: '🛡'; position: absolute; right: 22px; top: 10px;
+      font-size: 100px; opacity: 0.08;
+    }
+    .gate-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.18); font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+    .gate-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; position: relative; z-index: 1; }
+    .gate-row .l { font-size: 11px; opacity: 0.75; }
+    .gate-row .v { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .gate-row .s { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+
+    /* api status */
+    .api-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 16px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .api-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px color-mix(in oklab, var(--success) 20%, transparent); }
+    .api-card .x { font-size: 12px; color: var(--muted); }
+    .api-card .x strong { color: var(--fg); }
+
+    /* filter */
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-bar input, .filter-bar select { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+    .filter-bar input { flex: 1; min-width: 220px; }
+    .filter-bar .l { font-size: 12px; color: var(--muted); }
+    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip { padding: 4px 10px; border-radius: 999px; background: var(--bg); font-size: 12px; cursor: pointer; }
+    .chip.on { background: var(--accent); color: white; }
+    .chip.warn.on { background: var(--warn); }
+    .chip.danger.on { background: var(--danger); }
+
+    /* list */
+    .list-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+    .list-head { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .list-head h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .list-head .meta { font-size: 11px; color: var(--muted); }
+    table.t { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.t th, table.t td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table.t th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.t tr:last-child td { border-bottom: 0; }
+    .who { font-weight: 600; }
+    .meta-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .st { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 500; }
+    .st.ok { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .st.wait { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .st.miss { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .act { color: var(--accent); font-size: 12px; }
+    .lockfund { color: var(--danger); font-weight: 600; }
+
+    /* policy note */
+    .policy {
+      background: var(--gold-soft); border: 1px solid color-mix(in oklab, var(--gold) 30%, transparent);
+      border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 16px;
+      font-size: 12px; line-height: 1.7;
+    }
+    .policy strong { color: var(--gold); }
+
+    @media (max-width: 1100px) { .console { grid-template-columns: 1fr; } .side { display: none; } .gate-row { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="f" data-active="public-security"></div>
+
+  <main class="main">
+    <div class="crumb">江苏银行 · 保租房通道 / 账户与结算 / 公安备案核验</div>
+    <div class="topbar">
+      <h1>公安实有人口备案核验</h1>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        与金鹰系统同步
+      </button>
+      <button class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        导出核验报告
+      </button>
+    </div>
+
+    <!-- 闸门状态总览 -->
+    <div class="gate-card">
+      <span class="gate-tag">划付前置闸门 · T+1 06:00 截断</span>
+      <div class="gate-row">
+        <div>
+          <div class="l">应核验合同</div>
+          <div class="v">428</div>
+          <div class="s">本月新签 + 续签</div>
+        </div>
+        <div>
+          <div class="l">已备案 · 放行</div>
+          <div class="v" style="color: #86efac;">416</div>
+          <div class="s">通过率 97.2%</div>
+        </div>
+        <div>
+          <div class="l">待补录 · 暂缓</div>
+          <div class="v" style="color: #fde68a;">9</div>
+          <div class="s">≤ 7 天，运营商已提醒</div>
+        </div>
+        <div>
+          <div class="l">超期未办 · 锁付</div>
+          <div class="v" style="color: #fecaca;">3</div>
+          <div class="s">＞ 7 天，已锁定划付额度</div>
+        </div>
+        <div>
+          <div class="l">锁付金额合计</div>
+          <div class="v">¥ 8,420</div>
+          <div class="s">占月度划付 0.09%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 接口状态 -->
+    <div class="api-card">
+      <span class="api-dot"></span>
+      <div class="x"><strong>江苏银行 ↔ 南京公安"金鹰系统"</strong> API · 在线</div>
+      <div class="x">最近同步：<strong>06-05 02:00</strong></div>
+      <div class="x">本次增量：<strong>+ 38 条回执</strong></div>
+      <div class="x">下次同步：<strong>06-06 02:00</strong>（每日 02:00 增量）</div>
+      <div class="x">SLA：<strong>99.95%</strong> · 月度延迟 0 次</div>
+    </div>
+
+    <!-- 政策红线 -->
+    <div class="policy">
+      <strong>合规规则：</strong>租客签约后 7 个自然日内须在租住地派出所完成"实有人口登记"。银行作为监管账户履约方，
+      在首月租金 T+1 划付前自动比对回执；<strong>未取得回执则锁定该笔合同对应的运营商划付额度，直至完成备案</strong>。
+      银行<strong>只负责回执比对与划付闸门控制</strong>，不直接录入备案信息——录入动作由白名单运营商和租客在地方端完成（参见 [S 端 · 签证带看] 与 [C 端 · 备案提醒]）。
+    </div>
+
+    <!-- filter -->
+    <div class="filter-bar">
+      <span class="l">状态：</span>
+      <div class="chip-row">
+        <span class="chip on">全部 428</span>
+        <span class="chip">已备案 416</span>
+        <span class="chip warn on">待补录 9</span>
+        <span class="chip danger on">超期锁付 3</span>
+      </div>
+      <span class="l" style="margin-left: 10px;">运营方：</span>
+      <select>
+        <option>全部白名单运营商</option>
+        <option>贝壳·南京</option>
+        <option>自如·南京</option>
+        <option>龙湖冠寓·南京</option>
+        <option>南京安居集团</option>
+      </select>
+      <input placeholder="搜索租客姓名 / 身份证后 4 位 / 合同号 / 房源编号…" />
+      <button class="btn btn-ghost">重置</button>
+    </div>
+
+    <!-- list -->
+    <div class="list-card">
+      <div class="list-head">
+        <h3>核验明细 · 待处理 12 条</h3>
+        <span class="meta">数据时点：2026-06-05 09:30 · 仅显示待补录 + 超期</span>
+      </div>
+      <table class="t">
+        <thead>
+          <tr>
+            <th style="width: 24%;">租客 / 合同</th>
+            <th style="width: 22%;">房源 / 运营商</th>
+            <th>入住日</th>
+            <th>距备案截止</th>
+            <th>金鹰回执</th>
+            <th>影响划付</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <div class="who">陈静</div>
+              <div class="meta-sub">身份证 …4528 · NJBZF-06478</div>
+            </td>
+            <td>
+              <div>万达华府 5-1206 · 建邺</div>
+              <div class="meta-sub">贝壳·南京 江北片区</div>
+            </td>
+            <td>06-02</td>
+            <td><span style="color: var(--warn);">剩 4 天</span></td>
+            <td>未收到</td>
+            <td>¥ 2,180</td>
+            <td><span class="st wait">待补录</span></td>
+            <td><a class="act" href="#">推送提醒</a></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="who">林倩</div>
+              <div class="meta-sub">身份证 …8812 · NJBZF-06481</div>
+            </td>
+            <td>
+              <div>金鹰国际公馆 17-602 · 鼓楼</div>
+              <div class="meta-sub">自如·南京</div>
+            </td>
+            <td>06-01</td>
+            <td><span style="color: var(--warn);">剩 3 天</span></td>
+            <td>未收到</td>
+            <td>¥ 3,260</td>
+            <td><span class="st wait">待补录</span></td>
+            <td><a class="act" href="#">推送提醒</a></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="who">周磊</div>
+              <div class="meta-sub">身份证 …1093 · NJBZF-06402</div>
+            </td>
+            <td>
+              <div>仙林湖畔 7-1804 · 栖霞</div>
+              <div class="meta-sub">栖霞建设 · 贝壳省心租</div>
+            </td>
+            <td>05-31</td>
+            <td><span style="color: var(--warn);">剩 2 天</span></td>
+            <td>未收到</td>
+            <td>¥ 2,580</td>
+            <td><span class="st wait">待补录</span></td>
+            <td><a class="act" href="#">推送提醒</a></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="who">孙磊</div>
+              <div class="meta-sub">身份证 …6701 · NJBZF-05871</div>
+            </td>
+            <td>
+              <div>仙林湖畔 3-407 · 栖霞</div>
+              <div class="meta-sub">栖霞建设 · 贝壳省心租</div>
+            </td>
+            <td>05-29</td>
+            <td><span style="color: var(--danger);">超期 8 天</span></td>
+            <td><span class="st miss">未收到</span></td>
+            <td class="lockfund">⊘ ¥ 2,180 已锁付</td>
+            <td><span class="st miss">超期锁付</span></td>
+            <td><a class="act" href="#">详情</a> · <a class="act" href="#">人工干预</a></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="who">吴敏</div>
+              <div class="meta-sub">身份证 …4180 · NJBZF-05802</div>
+            </td>
+            <td>
+              <div>万达华府 8-902 · 建邺</div>
+              <div class="meta-sub">贝壳·南京</div>
+            </td>
+            <td>05-27</td>
+            <td><span style="color: var(--danger);">超期 10 天</span></td>
+            <td><span class="st miss">未收到</span></td>
+            <td class="lockfund">⊘ ¥ 3,120 已锁付</td>
+            <td><span class="st miss">超期锁付</span></td>
+            <td><a class="act" href="#">详情</a> · <a class="act" href="#">人工干预</a></td>
+          </tr>
+          <tr>
+            <td>
+              <div class="who">许翔</div>
+              <div class="meta-sub">身份证 …2207 · NJBZF-05776</div>
+            </td>
+            <td>
+              <div>弘阳上院 12-308 · 江北新区</div>
+              <div class="meta-sub">江北建发 · 贝壳运营</div>
+            </td>
+            <td>05-25</td>
+            <td><span style="color: var(--danger);">超期 12 天</span></td>
+            <td><span class="st miss">未收到</span></td>
+            <td class="lockfund">⊘ ¥ 3,120 已锁付</td>
+            <td><span class="st miss">超期锁付</span></td>
+            <td><a class="act" href="#">详情</a> · <a class="act" href="#">人工干预</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

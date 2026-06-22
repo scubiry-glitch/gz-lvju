@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>履约保障与责任险 · 服务认证中台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .crumb{font-size:14px;color:var(--muted);} .crumb b{color:var(--fg);}
+  .top-actions .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:7px 12px;margin-left:6px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .full{grid-column:1/-1;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .crosslink{grid-column:1/-1;background:var(--accent-soft);border:1px solid color-mix(in oklab,var(--accent) 25%,transparent);border-radius:10px;padding:11px 14px;font-size:12.5px;color:#3730a3;}
+  .crosslink a{color:var(--accent);font-weight:600;}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .row:last-child{border-bottom:0;} .row .k{color:var(--muted);} .row .v{font-weight:600;text-align:right;}
+  .steps{display:flex;gap:8px;flex-wrap:wrap;}
+  .step{flex:1;min-width:120px;border:1px solid var(--border);border-radius:9px;padding:10px;}
+  .step .n{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:999px;padding:1px 8px;}
+  .step b{display:block;font-size:13px;margin:6px 0 2px;} .step span{font-size:11px;color:var(--muted);}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;} .kpi b{font-size:20px;display:block;} .kpi span{font-size:11px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;} th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);} th{color:var(--muted);font-weight:600;}
+  .note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;}
+  @media(max-width:1023px){.console{grid-template-columns:1fr;} .content{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="insurance"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / 公共底座 / <b>履约保障与责任险</b></div>
+      <div class="top-actions"><button class="btn">导出保单</button><button class="btn pri">新建保障方案</button></div>
+    </div>
+    <div class="content">
+      <div class="crosslink">📐 本页定义服务者/服务商的<b>履约保障与责任险</b>：投保即派单资格前置、信用分联动保费、理赔闭环。配套：
+        <a href="p-credit-engine.html">信用规则引擎</a> · <a href="p-transaction.html">派单交易</a> · <a href="f-escrow.html">江苏银行·监管账户</a></div>
+
+      <div class="card full">
+        <h3>保障产品矩阵 <span class="pill">4 类</span></h3>
+        <table>
+          <thead><tr><th>保障产品</th><th>覆盖</th><th>保额</th><th>承保/通道</th></tr></thead>
+          <tbody>
+            <tr><td>服务者责任险</td><td>服务过程人身/第三者财物/纠纷</td><td>最高 ¥50 万/次</td><td>保险公司 · 平台统投</td></tr>
+            <tr><td>履约保证金</td><td>爽约/违规/服务不达标先行赔付</td><td>¥2,000 起 · 可信用替代</td><td>江苏银行 · 监管账户</td></tr>
+            <tr><td>客房安心险</td><td>入住期间家电家具损坏</td><td>最高 ¥10 万</td><td>对接 F 金融</td></tr>
+            <tr><td>家财险</td><td>房源端财产保障</td><td>最高 ¥10 万</td><td>运营方投保</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>责任险方案 · 服务者</h3>
+        <div class="row"><span class="k">承保对象</span><span class="v">L0–L7 持证服务者（必投保才可接单）</span></div>
+        <div class="row"><span class="k">基础保费</span><span class="v">¥18/月 · 平台统一议价</span></div>
+        <div class="row"><span class="k">信用联动</span><span class="v">信用分 &gt;4.5 保费 8 折</span></div>
+        <div class="row"><span class="k">覆盖范围</span><span class="v">人身伤害 / 第三者财物 / 服务纠纷</span></div>
+        <div class="row"><span class="k">理赔时效</span><span class="v">资料齐全 T+3 到账</span></div>
+      </div>
+
+      <div class="card">
+        <h3>在保概览</h3>
+        <div class="kpis">
+          <div class="kpi"><b>2,468</b><span>在保服务者</span></div>
+          <div class="kpi"><b>312</b><span>在保服务商</span></div>
+          <div class="kpi"><b>98.6%</b><span>持证投保率</span></div>
+        </div>
+        <div class="kpis" style="margin-top:10px;">
+          <div class="kpi"><b>14</b><span>本月理赔</span></div>
+          <div class="kpi"><b>¥36 万</b><span>本月赔付</span></div>
+          <div class="kpi"><b>T+3</b><span>平均到账</span></div>
+        </div>
+      </div>
+
+      <div class="card full">
+        <h3>理赔流程 <span class="pill">全程线上</span></h3>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><b>在线报案</b><span>App 内一键报案 + 上传凭证</span></div>
+          <div class="step"><span class="n">2</span><b>定损核验</b><span>平台 + 保险公司联合定损</span></div>
+          <div class="step"><span class="n">3</span><b>审核</b><span>责任认定 + 信用记录关联</span></div>
+          <div class="step"><span class="n">4</span><b>赔付</b><span>江苏银行监管账户 T+3 划付</span></div>
+        </div>
+        <div class="note">保障是"留得住"的兜底：服务者无责任险不得接单；理赔结果回流<a href="p-credit-engine.html" style="color:var(--accent);font-weight:600;">信用引擎</a>，影响等级与派单权重。</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

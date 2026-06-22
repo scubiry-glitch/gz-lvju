@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M 物资批次质检 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #fafaf9; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e7e5e4; --line: #f5f5f4;
+      --accent: #6b21a8; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+    .ki .d.warn{color:var(--warn);}
+    .ki .d.danger{color:var(--danger);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* tabs */
+    .tabs{display:flex; gap:4px; margin-bottom:12px;}
+    .tab{padding:7px 14px; border-radius:6px; font-size:12px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .tab.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .tab .ct{font-size:10px; margin-left:4px; opacity:0.85;}
+
+    /* batch table */
+    table{width:100%; border-collapse:collapse; font-size:12px;}
+    th, td{padding:10px 8px; text-align:left; border-bottom:1px solid var(--line);}
+    th{font-size:10.5px; font-weight:600; color:var(--muted); background:var(--line); text-transform:uppercase; letter-spacing:0.3px;}
+    tr:last-child td{border-bottom:0;}
+    td.num{font-family:var(--mono); font-size:11px;}
+    .cat-tag{font-size:10px; padding:1px 6px; background:#f3e8ff; color:#6b21a8; border-radius:3px; font-weight:600;}
+    .status{display:inline-block; padding:2px 7px; border-radius:3px; font-size:10px; font-weight:700;}
+    .status.qc-pass{background:#dcfce7; color:#15803d;}
+    .status.qc-pend{background:#fef3c7; color:#92400e;}
+    .status.qc-fail{background:#fee2e2; color:#b91c1c;}
+    .status.resent{background:#dbeafe; color:#1e40af;}
+
+    /* trace flow */
+    .trace-line{display:flex; gap:8px; align-items:stretch; padding:10px 0;}
+    .trace-step{flex:1; min-width:0; background:var(--line); border-radius:6px; padding:10px; text-align:center; position:relative;}
+    .trace-step.done{background:#dcfce7;}
+    .trace-step.fail{background:#fee2e2;}
+    .trace-step .nm{font-size:11.5px; font-weight:700;}
+    .trace-step .desc{font-size:10px; color:var(--muted); margin-top:2px;}
+    .trace-step:not(:last-child)::after{content:"→"; position:absolute; right:-6px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:700;}
+
+    /* qc rate per category */
+    .qc-row{display:grid; grid-template-columns:1fr auto auto; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center; font-size:12px;}
+    .qc-row:last-child{border-bottom:0;}
+    .qc-row .bar-bg{width:100px; height:6px; background:var(--line); border-radius:3px; overflow:hidden;}
+    .qc-row .bar-fl{height:100%; background:var(--success);}
+    .qc-row .pct{font-family:var(--mono); font-weight:700; width:50px; text-align:right;}
+
+    /* fail-trace card */
+    .fail-card{padding:12px; background:#fff7ed; border:1px solid #fdba74; border-radius:8px; margin-bottom:10px;}
+    .fail-card .head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .fail-card .head .id{font-family:var(--mono); font-weight:700; font-size:12px;}
+    .fail-card .head .badge{font-size:10px; padding:1px 6px; background:var(--danger); color:white; border-radius:3px;}
+    .fail-card .desc{font-size:11px; color:#7c2d12; line-height:1.5;}
+    .fail-card .impact{margin-top:8px; padding:6px 8px; background:white; border:1px dashed #fdba74; border-radius:5px; font-size:10.5px;}
+    .fail-card .impact b{color:#c2410c;}
+
+    @media (max-width: 1100px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="m-batch-qc"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × M 物资供应商 / <b>批次质检追溯</b></div>
+      <div class="top-actions">
+        <button class="btn">导出质检月报</button>
+        <button class="btn">异常工单</button>
+        <button class="btn pri">+ 新建抽检任务</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">本月质检批次</div><div class="n">120<span class="u">批</span></div><div class="d">↑ 18 vs 上月</div></div>
+      <div class="ki"><div class="l">合格批次</div><div class="n">118<span class="u">/120</span></div><div class="d">98.3%</div></div>
+      <div class="ki"><div class="l">异常批次</div><div class="n">2<span class="u">批</span></div><div class="d danger">触发信用扣分</div></div>
+      <div class="ki"><div class="l">重发批次</div><div class="n">2<span class="u">批</span></div><div class="d">100% 已重发</div></div>
+      <div class="ki"><div class="l">P95 抽检耗时</div><div class="n">3.2<span class="u">天</span></div><div class="d">↓ 0.4 d</div></div>
+      <div class="ki"><div class="l">扫码追溯次数</div><div class="n">18.6k<span class="u">次</span></div><div class="d">公示门户</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT: 批次表 -->
+      <div>
+        <div class="card">
+          <h3>质检批次 <span class="pill">本月 120 批 · 6 品类</span> <span class="extra">事件: material.batch.qc-*</span></h3>
+
+          <div class="tabs">
+            <div class="tab on">在检 <span class="ct">3</span></div>
+            <div class="tab">合格 <span class="ct">118</span></div>
+            <div class="tab">异常 <span class="ct">2</span></div>
+            <div class="tab">已重发 <span class="ct">2</span></div>
+            <div class="tab">全部 <span class="ct">120</span></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr><th>批次号</th><th>供应商</th><th>品类</th><th>SKU</th><th>数量</th><th>抽检日</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="num">QC-2026-0612-001</td>
+                <td>北新建材</td>
+                <td><span class="cat-tag">🪵 家具</span></td>
+                <td class="num">FN-BS-001</td>
+                <td>24 套</td>
+                <td>06-12</td>
+                <td><span class="status qc-pend">第三方在检</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">详情 ›</a></td>
+              </tr>
+              <tr>
+                <td class="num">QC-2026-0611-008</td>
+                <td>圣象地板</td>
+                <td><span class="cat-tag">🧱 建材</span></td>
+                <td class="num">BM-FL-002</td>
+                <td>360 ㎡</td>
+                <td>06-11</td>
+                <td><span class="status qc-pend">现场抽样</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">详情 ›</a></td>
+              </tr>
+              <tr>
+                <td class="num">QC-2026-0610-014</td>
+                <td>立邦漆</td>
+                <td><span class="cat-tag">🎨 涂料</span></td>
+                <td class="num">PT-IN-001</td>
+                <td>42 桶</td>
+                <td>06-10</td>
+                <td><span class="status qc-pend">VOC 复测中</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">详情 ›</a></td>
+              </tr>
+              <tr style="background:#dcfce7;">
+                <td class="num">QC-2026-0608-022</td>
+                <td>美的家电</td>
+                <td><span class="cat-tag">🌀 家电</span></td>
+                <td class="num">AP-AC-001</td>
+                <td>18 台</td>
+                <td>06-08</td>
+                <td><span class="status qc-pass">合格 · 已上链</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">查链 ›</a></td>
+              </tr>
+              <tr style="background:#dcfce7;">
+                <td class="num">QC-2026-0608-019</td>
+                <td>凯迪仕</td>
+                <td><span class="cat-tag">🔒 智能锁</span></td>
+                <td class="num">LK-SM-001</td>
+                <td>96 把</td>
+                <td>06-08</td>
+                <td><span class="status qc-pass">合格 · 已上链</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">查链 ›</a></td>
+              </tr>
+              <tr style="background:#fee2e2;">
+                <td class="num">QC-2026-0605-031</td>
+                <td>北新建材</td>
+                <td><span class="cat-tag">🧱 建材</span></td>
+                <td class="num">BM-TL-003</td>
+                <td>80 ㎡</td>
+                <td>06-05</td>
+                <td><span class="status qc-fail">不合格 · 扣 3 信用</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">追溯 ›</a></td>
+              </tr>
+              <tr style="background:#dbeafe;">
+                <td class="num">QC-2026-0605-031R</td>
+                <td>北新建材</td>
+                <td><span class="cat-tag">🧱 建材</span></td>
+                <td class="num">BM-TL-003</td>
+                <td>80 ㎡</td>
+                <td>06-09</td>
+                <td><span class="status resent">重发批次 · 已合格</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">查链 ›</a></td>
+              </tr>
+              <tr style="background:#fee2e2;">
+                <td class="num">QC-2026-0602-007</td>
+                <td>立邦漆</td>
+                <td><span class="cat-tag">🎨 涂料</span></td>
+                <td class="num">PT-IN-001</td>
+                <td>20 桶</td>
+                <td>06-02</td>
+                <td><span class="status qc-fail">VOC 超标 · 扣 5 信用</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">追溯 ›</a></td>
+              </tr>
+              <tr style="background:#dbeafe;">
+                <td class="num">QC-2026-0602-007R</td>
+                <td>立邦漆</td>
+                <td><span class="cat-tag">🎨 涂料</span></td>
+                <td class="num">PT-IN-001</td>
+                <td>20 桶</td>
+                <td>06-06</td>
+                <td><span class="status resent">重发批次 · 已合格</span></td>
+                <td><a style="color:var(--accent); font-size:11px;">查链 ›</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT: 流程 + 合格率 + 异常追溯 -->
+      <div>
+        <div class="card">
+          <h3>质检流程 <span class="pill">5 步追溯</span></h3>
+          <div class="trace-line">
+            <div class="trace-step done"><div class="nm">B 端验收</div><div class="desc">运营商<br/>收货签收</div></div>
+            <div class="trace-step done"><div class="nm">现场抽样</div><div class="desc">P 中台<br/>5% 抽样</div></div>
+            <div class="trace-step done"><div class="nm">第三方检</div><div class="desc">国家建材<br/>检验中心</div></div>
+            <div class="trace-step done"><div class="nm">判定</div><div class="desc">合格 / 不合格<br/>双签</div></div>
+            <div class="trace-step done"><div class="nm">上链/重发</div><div class="desc">区块链<br/>+ 公示</div></div>
+          </div>
+          <div style="margin-top:10px; padding:8px 10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; font-size:11px; color:#15803d;">
+            ✓ 合格 → cert.batch.qc-passed event → 上链 + 推 portal-verify · 不合格 → qc-failed event → R-M01 触发 + 重发流
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>品类合格率 <span class="pill">本月 6 类</span></h3>
+          <div class="qc-row">
+            <div><span class="cat-tag">🪵 家具</span> 3 家 · 24 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:100%;"></div></div>
+            <div class="pct">100%</div>
+          </div>
+          <div class="qc-row">
+            <div><span class="cat-tag">🌀 家电</span> 2 家 · 28 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:100%;"></div></div>
+            <div class="pct">100%</div>
+          </div>
+          <div class="qc-row">
+            <div><span class="cat-tag">🧱 建材</span> 2 家 · 32 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:96.9%; background:var(--warn);"></div></div>
+            <div class="pct" style="color:var(--warn);">96.9%</div>
+          </div>
+          <div class="qc-row">
+            <div><span class="cat-tag">🔒 智能锁</span> 1 家 · 6 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:100%;"></div></div>
+            <div class="pct">100%</div>
+          </div>
+          <div class="qc-row">
+            <div><span class="cat-tag">🎨 涂料</span> 1 家 · 24 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:95.8%; background:var(--warn);"></div></div>
+            <div class="pct" style="color:var(--warn);">95.8%</div>
+          </div>
+          <div class="qc-row">
+            <div><span class="cat-tag">🚿 卫浴</span> 1 家 · 6 批</div>
+            <div class="bar-bg"><div class="bar-fl" style="width:100%;"></div></div>
+            <div class="pct">100%</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>异常批次追溯 <span class="pill">本月 2 起</span></h3>
+          <div class="fail-card">
+            <div class="head">
+              <span class="id">QC-2026-0605-031</span>
+              <span class="badge">建材 不合格</span>
+            </div>
+            <div class="desc">
+              北新建材 · 抛光砖 800×800mm · 抽检发现 1 块表面釉裂 + 1 块吸水率超标。<br/>
+              判定：单批次良品率 < 99% → 触发 <b>R-M01</b> 扣 3 信用 → 暂停该 SKU 集采 5 天 → 已重发新批次（QC-...031R）已合格。
+            </div>
+            <div class="impact">
+              <b>影响</b>：梧桐公馆 · 江宁 项目延迟 1.5 天 · 自如运营商已确认无 SLA 违约
+            </div>
+          </div>
+          <div class="fail-card">
+            <div class="head">
+              <span class="id">QC-2026-0602-007</span>
+              <span class="badge">涂料 不合格</span>
+            </div>
+            <div class="desc">
+              立邦漆 · 内墙乳胶漆 18L · VOC 实测 92 g/L（标准 ≤80 g/L）。<br/>
+              判定：超环保标准 → 触发 <b>R-M01 + 加倍扣分</b> = 扣 5 信用 → 强制重检 → 重发批次 100% 合格。
+            </div>
+            <div class="impact">
+              <b>影响</b>：河西国际社区项目 · 已替换合格批次 · 同时建议立邦漆下次申请扩品类需补 VOC 复测报告
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

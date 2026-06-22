@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>研判中台 · 贝壳数据资产输出</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #fff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --gov: #1e40af;
+      --bank: #0f1a4d;
+      --op: #0f766e;
+      --vendor: #c2410c;
+      --supplier: #6b21a8;
+      --training: #7c3aed;
+      --user: #2563eb;
+      --media: #db2777;
+      --ok: #16a34a;
+      --warn: #ea580c;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; padding:24px; background:#fff;
+      border:1px solid var(--border); border-radius:14px; margin-bottom:18px;
+    }
+    .doc-header h1{font-size:26px; font-weight:700; margin:0 0 8px;}
+    .doc-header .sub{color:var(--muted); font-size:14px;}
+    .doc-header .tags{display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .doc-header .tag{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fef3c7; color:#92400e; font-weight:500;
+    }
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:16px; font-weight:700; margin-bottom:16px;
+      padding-bottom:10px; border-bottom:2px solid var(--plat-accent);
+    }
+    .section-title .num{
+      width:28px; height:28px; border-radius:50%;
+      background:var(--plat); color:#fff;
+      display:grid; place-items:center; font-size:14px; font-weight:700;
+    }
+    .section-title .label{flex:1;}
+    .section-title .badge{
+      font-size:11px; padding:3px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    .crosslink{
+      margin-bottom:14px; padding:10px 14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:8px;
+      font-size:12px; color:#1e40af;
+    }
+    .crosslink a{font-weight:600; text-decoration:underline;}
+
+    /* 数据治理委员会 */
+    .gov-box{
+      display:grid; grid-template-columns:1.4fr 1fr; gap:14px;
+    }
+    .gov-card{
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; border-radius:12px; padding:18px;
+    }
+    .gov-card h3{font-size:15px; font-weight:700; margin:0 0 6px;}
+    .gov-card .sub{font-size:12px; opacity:0.85; margin-bottom:12px;}
+    .gov-card .members{display:flex; flex-wrap:wrap; gap:6px;}
+    .gov-card .m{
+      font-size:11px; padding:4px 10px; border-radius:6px;
+      background:rgba(255,255,255,0.18); color:#fff; font-weight:600;
+    }
+    .gov-card .m.lead{background:rgba(180,83,9,0.55);}
+    .gov-card .m.build{background:rgba(15,23,42,0.55); border:1px solid rgba(255,255,255,0.2);}
+    .gov-side{
+      background:#fafafa; border:1px solid var(--border); border-radius:12px;
+      padding:14px;
+    }
+    .gov-side h4{margin:0 0 10px; font-size:13px; font-weight:700;}
+    .gov-side .item{
+      display:flex; gap:8px; font-size:12px; margin:6px 0;
+      align-items:flex-start;
+    }
+    .gov-side .item::before{content:"▸"; color:var(--muted); flex-shrink:0;}
+
+    /* 十受众价值矩阵 5×2 grid（含 5 类机构 + 政府/银行/持有方/租客/媒体）*/
+    .audience-grid{
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;
+    }
+    .aud-card{
+      border-radius:10px; padding:12px; color:#fff;
+      min-height:165px; display:flex; flex-direction:column; gap:6px;
+    }
+    .aud-card.gov     {background:linear-gradient(135deg, #1e3a8a 0%, var(--gov) 100%);}
+    .aud-card.bank    {background:linear-gradient(135deg, #0a1238 0%, var(--bank) 100%);}
+    .aud-card.op      {background:linear-gradient(135deg, #134e4a 0%, var(--op) 100%);}
+    .aud-card.vendor  {background:linear-gradient(135deg, #7c2d12 0%, var(--vendor) 100%);}
+    .aud-card.supply  {background:linear-gradient(135deg, #581c87 0%, var(--supplier) 100%);}
+    .aud-card.staff   {background:linear-gradient(135deg, #5b21b6 0%, var(--training) 100%);}
+    .aud-card.user    {background:linear-gradient(135deg, #1e3a8a 0%, var(--user) 100%);}
+    .aud-card.media   {background:linear-gradient(135deg, #831843 0%, var(--media) 100%);}
+    .aud-card.training{background:linear-gradient(135deg, #5b21b6 0%, #a855f7 100%);}
+    .aud-card .ah{
+      display:flex; align-items:center; gap:8px;
+      padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.2);
+    }
+    .aud-card .ah .icon{
+      width:28px; height:28px; border-radius:6px;
+      background:rgba(255,255,255,0.2);
+      display:grid; place-items:center; font-size:14px;
+    }
+    .aud-card .ah .name{font-size:12px; font-weight:700; line-height:1.2;}
+    .aud-card .scene{font-size:11px; line-height:1.5; opacity:0.92;}
+    .aud-card .out{
+      margin-top:auto; font-size:10px; padding:3px 8px;
+      background:rgba(255,255,255,0.18); border-radius:6px; font-weight:600;
+    }
+    .aud-card .out::before{content:"📤 输出："; opacity:0.7;}
+
+    /* 四大能力组件 */
+    .cap-grid{
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
+    }
+    .cap-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:12px;
+      padding:16px; border-top:4px solid;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .cap-card.c1{border-top-color:#0f1a4d;}
+    .cap-card.c2{border-top-color:var(--plat-accent); position:relative;}
+    .cap-card.c2::after{content:"★ 核心"; position:absolute; top:8px; right:10px; font-size:10px; padding:2px 8px; background:var(--plat-accent); color:#fff; border-radius:6px; font-weight:700;}
+    .cap-card.c3{border-top-color:var(--op);}
+    .cap-card.c4{border-top-color:var(--training);}
+    .cap-card .ch{display:flex; align-items:center; gap:8px;}
+    .cap-card .ch .icon{
+      width:36px; height:36px; border-radius:10px;
+      background:linear-gradient(135deg, #0f172a, var(--plat-accent));
+      color:#fff; display:grid; place-items:center; font-size:18px;
+    }
+    .cap-card .ch .t{font-size:14px; font-weight:700;}
+    .cap-card .ch .scope{font-size:10px; color:var(--muted);}
+    .cap-card .d{font-size:12px; color:#475569; line-height:1.55;}
+    .cap-card .inputs, .cap-card .outputs{
+      font-size:11px; color:#475569; line-height:1.5;
+    }
+    .cap-card .inputs strong, .cap-card .outputs strong{
+      color:var(--plat); display:block; font-size:10px;
+      letter-spacing:0.4px; margin-bottom:3px;
+    }
+
+    /* 月报 4 分版 */
+    .report-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .report-card{
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      padding:14px; border-left:4px solid;
+    }
+    .report-card.r1{border-left-color:var(--gov);}
+    .report-card.r2{border-left-color:var(--bank);}
+    .report-card.r3{border-left-color:var(--op);}
+    .report-card.r4{border-left-color:var(--media);}
+    .report-card .ed{font-size:11px; color:var(--muted); font-weight:600; letter-spacing:0.3px;}
+    .report-card .name{font-size:14px; font-weight:700; margin:4px 0 8px;}
+    .report-card .sect{font-size:11px; line-height:1.6; color:#475569;}
+    .report-card .sect strong{color:var(--plat);}
+
+    /* 时间线 5 */
+    .timeline-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;}
+    .tl-card{
+      border-radius:10px; padding:12px; border-top:3px solid;
+      background:#fff; border:1px solid var(--border);
+    }
+    .tl-card.s1{border-top-color:#3b82f6;}
+    .tl-card.s2{border-top-color:#22c55e;}
+    .tl-card.s3{border-top-color:#eab308;}
+    .tl-card.s4{border-top-color:var(--warn);}
+    .tl-card.s5{border-top-color:#7c3aed;}
+    .tl-card .date{font-size:11px; color:var(--muted); font-weight:600;}
+    .tl-card .t{font-size:13px; font-weight:700; margin:4px 0 6px;}
+    .tl-card .d{font-size:11px; color:#475569; line-height:1.5;}
+    .tl-card .metric{
+      margin-top:8px; padding:4px 8px; border-radius:6px;
+      background:#f0fdf4; color:#15803d; font-size:11px; font-weight:600;
+    }
+
+    /* 商业模式 3 列 */
+    .biz-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;}
+    .biz-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .biz-card h4{margin:0 0 10px; font-size:13px; font-weight:700; color:var(--plat);}
+    .biz-card ul{margin:0; padding-left:18px; font-size:12px; line-height:1.8; color:#334155;}
+
+    .doc-footer{
+      margin-top:16px; padding:18px; border-radius:12px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; text-align:center;
+    }
+    .doc-footer .em{font-size:18px; font-weight:700;}
+    .doc-footer .sub{font-size:12px; opacity:0.85; margin-top:6px;}
+
+    /* impl-aligned */
+    .impl-aligned{display:grid; gap:8px; margin-top:14px; padding:12px; background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;}
+    .impl-aligned.cols-2{grid-template-columns:repeat(2, 1fr);}
+    .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
+    .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
+    .impl-aligned.cols-8{grid-template-columns:repeat(8, 1fr);}
+    .impl-aligned .impl-banner{grid-column:1 / -1; font-size:11px; color:#64748b; font-weight:600; letter-spacing:0.3px; margin-bottom:2px;}
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px; padding:0 0 4px; border-bottom:1px solid #e2e8f0; margin-bottom:2px; text-align:center;}
+    .impl-aligned .col a.impl-pill{display:block; font-size:11px; padding:4px 8px; border-radius:6px; background:#fff; border:1px solid #e2e8f0; color:#334155; text-decoration:none; font-weight:500; line-height:1.35; transition:all 0.15s; text-align:left;}
+    .impl-aligned .col a.impl-pill:hover{background:#0f172a; color:#fff; border-color:#0f172a;}
+    .impl-aligned .col a.impl-pill .file{display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px; opacity:0.55; margin-top:2px;}
+    .impl-aligned .col .empty-pill{font-size:10px; color:#94a3b8; padding:4px 8px; text-align:center; border:1px dashed #e2e8f0; border-radius:6px; background:#fff; line-height:1.3;}
+
+    @media (max-width: 1100px){
+      .audience-grid, .cap-grid, .report-grid, .timeline-grid{grid-template-columns:repeat(2, 1fr);}
+      .impl-aligned.cols-5, .impl-aligned.cols-8{grid-template-columns:repeat(4, 1fr);}
+      .gov-box{grid-template-columns:1fr;}
+    }
+    @media (max-width: 600px){
+      .audience-grid, .cap-grid, .report-grid, .timeline-grid, .biz-grid{grid-template-columns:1fr;}
+      .impl-aligned{grid-template-columns:1fr 1fr !important;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="research-platform"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>研判中台 · 贝壳数据资产输出</h1>
+      <div class="sub">省级研判底座 · 4 大能力组件 · 服务 8 类受众 · 数据治理委员会背书</div>
+      <div class="tags">
+        <span class="tag">🏛 住建厅</span>
+        <span class="tag">🏦 江苏银行</span>
+        <span class="tag">🏢 国企持有方</span>
+        <span class="tag">🏬 白名单运营商</span>
+        <span class="tag">🛒 物资供应商</span>
+        <span class="tag">👥 服务者</span>
+        <span class="tag">🏠 租客</span>
+        <span class="tag">📰 媒体协会</span>
+      </div>
+    </div>
+
+    <div class="crosslink">
+      📐 顶层定位：对应 <a href="d-master-blueprint.html">总图谱</a> 的「贝壳 5 种核心能力·数字化能力」。
+      <strong>与三大标准的关系：</strong>「<a href="d-people-standard.html">人</a>·<a href="d-property-standard.html">房</a>·<a href="d-org-standard.html">机构</a>」是规则与标准，本文是<strong>数据资产与研判输出</strong>——构成生态的第 4 大支柱。
+      所有评估口径接受 § 1 数据治理委员会审计与质询，避免单源公信力风险。
+    </div>
+
+    <!-- § 1 数据治理委员会 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">1</span>
+        <span class="label">数据治理委员会 · 治理结构</span>
+        <span class="badge">第三方背书</span>
+      </div>
+      <div class="gov-box">
+        <div class="gov-card">
+          <h3>江苏住房租赁数据治理委员会</h3>
+          <div class="sub">月度数据 + 研判模型口径接受第三方审计与公开质询，避免单源公信力风险</div>
+          <div class="members">
+            <span class="m lead">🏛 江苏住建厅·主导</span>
+            <span class="m build">⭐ 贝壳·承建</span>
+            <span class="m">🎓 清华大学</span>
+            <span class="m">🏛 江苏省社科院</span>
+            <span class="m">🎓 东南大学</span>
+            <span class="m">🏢 省房协</span>
+          </div>
+        </div>
+        <div class="gov-side">
+          <h4>📋 治理机制（V25 研字诀）</h4>
+          <div class="item">数据字典与口径由委员会季度评审</div>
+          <div class="item">研判模型参数对委员会成员开放质询</div>
+          <div class="item">月报输出前提交第三方审计</div>
+          <div class="item">单源垄断兜底：3 年中评 + 5 年回看</div>
+          <div class="item">价格红线设定需委员会多数通过</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 2 十受众价值矩阵（5 类机构 + 政府/银行/持有方/租客/媒体） -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">2</span>
+        <span class="label">十受众价值矩阵 · 同一底座 / 多种输出（5 类机构 + G/F/持有方/租客/媒体）</span>
+        <span class="badge">公共数据产品</span>
+      </div>
+      <div class="audience-grid">
+        <div class="aud-card gov">
+          <div class="ah"><div class="icon">🏛</div><div class="name">住建厅</div></div>
+          <div class="scene">价格红线设定 · 月度市场监测 · 租金合规预警阈值 · 政策定向调整依据</div>
+          <div class="out">监管版月报 + 阈值表</div>
+        </div>
+        <div class="aud-card bank">
+          <div class="ah"><div class="icon">🏦</div><div class="name">江苏银行</div></div>
+          <div class="scene">抵押估值 · REITs 信贷定价 · 风控参数校准 · 信托产品定价</div>
+          <div class="out">信贷版月报 + API</div>
+        </div>
+        <div class="aud-card op">
+          <div class="ah"><div class="icon">🏢</div><div class="name">国企持有方</div></div>
+          <div class="scene">资管视角：项目首发定价 · 资产估值 · REITs 准入 · 运营商绩效横评 · 投改决策</div>
+          <div class="out">资管版月报 + API（不含一线运维）</div>
+        </div>
+        <div class="aud-card vendor">
+          <div class="ah"><div class="icon">🏬</div><div class="name">白名单运营商</div></div>
+          <div class="scene">自如/龙湖/华润/招商/贝壳省心租 等：续约调价 · 工单 ROI · 续约策略 · 运营基准对比</div>
+          <div class="out">运营版月报 + API</div>
+        </div>
+        <div class="aud-card vendor">
+          <div class="ah"><div class="icon">👥</div><div class="name">V 人力服务商</div></div>
+          <div class="scene">旗下持证 S 收入对比 · 项目交付准时率 · 跨工种调度 · 续约策略</div>
+          <div class="out">V 端运营版月报 + API</div>
+        </div>
+        <div class="aud-card supply">
+          <div class="ah"><div class="icon">🛒</div><div class="name">M 物资供应商</div></div>
+          <div class="scene">装改投入产出测算 · 单方造价基准 · 集采价格博弈 · 6 品类同业对标</div>
+          <div class="out">M 端装改 ROI 计算器 + 集采底价 API</div>
+        </div>
+        <div class="aud-card training">
+          <div class="ah"><div class="icon">🎓</div><div class="name">T 培训机构</div></div>
+          <div class="scene">学员通过率诊断 · 题库使用热区 · 工种需求预测 · 课程定价参考</div>
+          <div class="out">T 端培训运营月报</div>
+        </div>
+        <div class="aud-card staff">
+          <div class="ah"><div class="icon">🛠</div><div class="name">S 服务者</div></div>
+          <div class="scene">个人业绩参考 · 户型定位推荐 · 区域行情速查</div>
+          <div class="out">S 端 App 内嵌</div>
+        </div>
+        <div class="aud-card user">
+          <div class="ah"><div class="icon">🏠</div><div class="name">租客 / 用户</div></div>
+          <div class="scene">透明对比 · 议价工具 · 同社区均价 · 价格趋势</div>
+          <div class="out">C 端市场对比模块</div>
+        </div>
+        <div class="aud-card media">
+          <div class="ah"><div class="icon">📰</div><div class="name">媒体协会</div></div>
+          <div class="scene">公共数据产品 · 行业月报 · 趋势报道素材</div>
+          <div class="out">精简版月报</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 十受众触达 · 已实现页面（5 类机构 + 5 横向角色）</div>
+        <div class="col">
+          <div class="col-head">🏛 住建厅</div>
+          <a href="g-dashboard.html" class="impl-pill">监管大屏<span class="file">g-dashboard.html</span></a>
+          <a href="g-rent-alert.html" class="impl-pill">租金合规预警<span class="file">g-rent-alert.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏦 江苏银行</div>
+          <a href="f-treasury.html" class="impl-pill">资金流水大盘<span class="file">f-treasury.html</span></a>
+          <a href="f-escrow.html" class="impl-pill">监管账户对账<span class="file">f-escrow.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏢 国企持有方</div>
+          <a href="b-operator-console.html" class="impl-pill">资管大盘<span class="file">b-operator-console.html</span></a>
+          <a href="b-occupancy.html" class="impl-pill">运营商绩效与 SLA<span class="file">b-occupancy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏬 白名单运营商</div>
+          <a href="b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
+          <a href="operators.html" class="impl-pill">同业开放公示<span class="file">operators.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">👥 V 人力服务商</div>
+          <a href="vendors.html" class="impl-pill">V 公示名录<span class="file">vendors.html</span></a>
+          <a href="v-projects.html" class="impl-pill">项目对接<span class="file">v-projects.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🛒 M 物资供应商</div>
+          <a href="suppliers.html" class="impl-pill">M 公示名录<span class="file">suppliers.html</span></a>
+          <a href="m-supplier-catalog.html" class="impl-pill">商品目录<span class="file">m-supplier-catalog.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎓 T 培训机构</div>
+          <a href="training-orgs.html" class="impl-pill">T 公示名录<span class="file">training-orgs.html</span></a>
+          <a href="t-courses.html" class="impl-pill">课程开发<span class="file">t-courses.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🛠 S 服务者</div>
+          <a href="s-income.html" class="impl-pill">收入<span class="file">s-income.html</span></a>
+          <a href="s-orders.html" class="impl-pill">接单<span class="file">s-orders.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏠 租客</div>
+          <a href="c-compare.html" class="impl-pill">房源对比<span class="file">c-compare.html</span></a>
+          <a href="c-persona-home.html" class="impl-pill">个性化推荐<span class="file">c-persona-home.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">📰 媒体</div>
+          <span class="empty-pill">月报精简版<br/>由月报引擎按月发布</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 3 四大能力组件 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">3</span>
+        <span class="label">四大能力组件 · 基于美租 1000+ AI 底座</span>
+        <span class="badge">3 个月出版</span>
+      </div>
+      <div class="cap-grid">
+        <div class="cap-card c1">
+          <div class="ch">
+            <div class="icon">📋</div>
+            <div><div class="t">房屋数据字典</div><div class="scope">与 d-property 联动</div></div>
+          </div>
+          <div class="d">统一字段 + 治理委员会背书 · 17 项静态披露 + 11 项动态运营</div>
+          <div class="inputs"><strong>输入</strong>各项目按日/周推送</div>
+          <div class="outputs"><strong>输出</strong>清洗 · 验真 · 上架 + 监管只读</div>
+        </div>
+        <div class="cap-card c2">
+          <div class="ch">
+            <div class="icon">💹</div>
+            <div><div class="t">租金价格评估模型</div><div class="scope">★ 核心研判能力</div></div>
+          </div>
+          <div class="d">基于美租 1000+ AI 模型 · 户型/区域/楼层/朝向/装修多维定价 · 同步对接信贷与价格红线</div>
+          <div class="inputs"><strong>输入</strong>历史成交 + 同业挂牌 + 户型属性 + 配套数据</div>
+          <div class="outputs"><strong>输出</strong>定价区间 + 置信区间 + 预警阈值</div>
+        </div>
+        <div class="cap-card c3">
+          <div class="ch">
+            <div class="icon">🛠</div>
+            <div><div class="t">装改 ROI 测算</div><div class="scope">服务运营/物资/国企</div></div>
+          </div>
+          <div class="d">单方造价 / 装修后月租金 / 回本周期测算 · 改造场景四象限模型（轻/中/重/新启）</div>
+          <div class="inputs"><strong>输入</strong>改造方案 + 物资清单 + 当地基准</div>
+          <div class="outputs"><strong>输出</strong>ROI 报告 + 推荐档位 + 风险提示</div>
+        </div>
+        <div class="cap-card c4">
+          <div class="ch">
+            <div class="icon">🔮</div>
+            <div><div class="t">供需+户型预测</div><div class="scope">中长期研判</div></div>
+          </div>
+          <div class="d">租赁供需预测 + 户型/产品定位预测 + 区域人口/产业匹配 · 服务投改决策与规划</div>
+          <div class="inputs"><strong>输入</strong>人口/就业/产业/交通/政策</div>
+          <div class="outputs"><strong>输出</strong>区域热力 + 户型组合建议</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 四大能力 · 已实现页面（与上方 4 张能力卡对齐）</div>
+        <div class="col">
+          <div class="col-head">数据字典</div>
+          <a href="property-intake-api.html" class="impl-pill">房源接入 API<span class="file">property-intake-api.html</span></a>
+          <a href="p-data-hub.html" class="impl-pill">数据中台<span class="file">p-data-hub.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">★ 租金评估</div>
+          <a href="detail.html" class="impl-pill">详情·政府指导价对比<span class="file">detail.html</span></a>
+          <a href="g-rent-alert.html" class="impl-pill">租金合规预警·住建端<span class="file">g-rent-alert.html</span></a>
+          <a href="c-compare.html" class="impl-pill">租客·价格对比<span class="file">c-compare.html</span></a>
+          <span class="empty-pill">独立估值页未单独立项</span>
+        </div>
+        <div class="col">
+          <div class="col-head">装改 ROI</div>
+          <a href="b-perf-renewal.html" class="impl-pill">绩效与续约·ROI 视图<span class="file">b-perf-renewal.html</span></a>
+          <a href="v-projects.html" class="impl-pill">服务商·项目对接<span class="file">v-projects.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">供需+户型预测</div>
+          <a href="g-dashboard.html" class="impl-pill">监管大屏·趋势<span class="file">g-dashboard.html</span></a>
+          <span class="empty-pill">预测模型独立 UI<br/>由月报承载</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 4 月报生产引擎 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">4</span>
+        <span class="label">江苏住房租赁市场月报 · 4 受众分版</span>
+        <span class="badge">AI 工具引擎驱动</span>
+      </div>
+      <div class="report-grid">
+        <div class="report-card r1">
+          <div class="ed">面向 🏛 住建/监管</div>
+          <div class="name">决策版</div>
+          <div class="sect">
+            <strong>口径</strong>全省价格红线 / 合规预警 / 涨幅监测 · 政策建议<br/>
+            <strong>频次</strong>月度 + 季度专项
+          </div>
+        </div>
+        <div class="report-card r2">
+          <div class="ed">面向 🏦 江苏银行 / 同业</div>
+          <div class="name">信贷与运营版</div>
+          <div class="sect">
+            <strong>口径</strong>资产估值参数 / 抵押折扣率 / REITs 定价参考<br/>
+            <strong>频次</strong>月度 + 信贷事件触发
+          </div>
+        </div>
+        <div class="report-card r3">
+          <div class="ed">面向 🏢 城投/项目主体</div>
+          <div class="name">运营版</div>
+          <div class="sect">
+            <strong>口径</strong>区域行情 / 同业空置对标 / 续约策略建议<br/>
+            <strong>频次</strong>月度 + 季度盘点
+          </div>
+        </div>
+        <div class="report-card r4">
+          <div class="ed">面向 📰 媒体协会 / 公众</div>
+          <div class="name">精简版</div>
+          <div class="sect">
+            <strong>口径</strong>核心指标 + 趋势图表 + 行业故事<br/>
+            <strong>频次</strong>月度公开发布
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 5 落地路径 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">5</span>
+        <span class="label">落地路径 · 五步走</span>
+        <span class="badge">2026.6 → 2027</span>
+      </div>
+      <div class="timeline-grid">
+        <div class="tl-card s1">
+          <div class="date">2026.6</div>
+          <div class="t">数据字典定稿</div>
+          <div class="d">委员会审定 17+11 字段 · 治理机制发布</div>
+          <div class="metric">✓ 字典 1.0</div>
+        </div>
+        <div class="tl-card s2">
+          <div class="date">2026.8</div>
+          <div class="t">AI 模型上线</div>
+          <div class="d">美租 1000+ 底座 · 4 大能力组件首版</div>
+          <div class="metric">✓ 估值/ROI/预测可用</div>
+        </div>
+        <div class="tl-card s3">
+          <div class="date">2026.9</div>
+          <div class="t">月报首发</div>
+          <div class="d">4 分版同步发布 · 委员会审计通过</div>
+          <div class="metric">✓ 首期月报</div>
+        </div>
+        <div class="tl-card s4">
+          <div class="date">2026.11</div>
+          <div class="t">发布会公开</div>
+          <div class="d">+2 公共产品官宣 · 江苏样本对外</div>
+          <div class="metric">✓ 江苏样本立项</div>
+        </div>
+        <div class="tl-card s5">
+          <div class="date">2027</div>
+          <div class="t">复制到外省</div>
+          <div class="d">月报订阅 + API 调用商业化 · REITs 估值场景</div>
+          <div class="metric">✓ 全国公共数据底座</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 6 商业模式 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">6</span>
+        <span class="label">商业模式与价值</span>
+      </div>
+      <div class="biz-grid">
+        <div class="biz-card">
+          <h4>💰 收入来源</h4>
+          <ul>
+            <li>月报订阅（银行/城投/同业）</li>
+            <li>API 调用按次计费（信贷定价/估值）</li>
+            <li>装改 ROI 计算器（运营/物资按项目）</li>
+            <li>专项定制报告（住建/媒体）</li>
+            <li>政府公共数据采购（年度预算）</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>🎯 公信力</h4>
+          <ul>
+            <li>住建主导 + 治理委员会背书</li>
+            <li>清华/社科院/东南/省房协 第三方审计</li>
+            <li>月度口径接受公开质询</li>
+            <li>3 年中评 + 5 年回看</li>
+            <li>对同业开放接入与互认</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>⚙ 关键能力</h4>
+          <ul>
+            <li>美租 1000+ AI 底座（房价租金评估）</li>
+            <li>统一字段 + 数据治理</li>
+            <li>多受众分版生产引擎</li>
+            <li>API 网关 + Webhook 推送</li>
+            <li>历史数据资产沉淀</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 商业模式 · 已实现页面（与上方 3 个 biz-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">💰 收入来源</div>
+          <a href="p-api-gateway.html" class="impl-pill">数据 API 网关<span class="file">p-api-gateway.html</span></a>
+          <a href="p-webhooks.html" class="impl-pill">Webhook 推送<span class="file">p-webhooks.html</span></a>
+          <a href="p-transaction.html" class="impl-pill">交易计费<span class="file">p-transaction.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎯 公信力</div>
+          <a href="portal-index.html" class="impl-pill">公示门户·公开质询<span class="file">portal-index.html</span></a>
+          <a href="g-export.html" class="impl-pill">监管数据导出<span class="file">g-export.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">⚙ 关键能力</div>
+          <a href="p-data-hub.html" class="impl-pill">数据中台<span class="file">p-data-hub.html</span></a>
+          <a href="p-workflow.html" class="impl-pill">工作流引擎<span class="file">p-workflow.html</span></a>
+          <a href="p-credit-engine.html" class="impl-pill">信用规则引擎<span class="file">p-credit-engine.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div class="em">省级研判底座 · 服务 8 类受众 · 第三方审计背书</div>
+      <div class="sub">人 · 房 · 机构 · 数据 — 四大支柱构成江苏租赁治理新生态</div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

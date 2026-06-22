@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>电子合同 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-nav {
+      display: flex; align-items: center; padding: 8px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .page-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+
+    /* tab bar */
+    .tab-bar {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border); padding: 0 16px;
+    }
+    .tab-bar button {
+      flex: 1; padding: 12px 0; font-size: 14px;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      position: relative;
+    }
+    .tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+    .tab-bar button .badge {
+      position: absolute; top: 8px; right: calc(50% - 36px);
+      min-width: 16px; height: 16px; padding: 0 4px;
+      background: var(--danger); color: white; font-size: 9px;
+      border-radius: 999px; display: grid; place-items: center;
+    }
+
+    .content { padding: 16px; }
+
+    /* contract card */
+    .contract-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .contract-card.pending { border-color: var(--accent); }
+    .contract-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 16px 16px 10px;
+    }
+    .contract-header .project { font-size: 15px; font-weight: 600; }
+    .contract-header .contract-id { font-size: 11px; color: var(--muted); margin-top: 2px; font-family: var(--font-mono); }
+
+    .status-tag {
+      font-size: 11px; padding: 3px 10px; border-radius: 999px;
+      font-weight: 500; white-space: nowrap;
+    }
+    .status-tag.pending { background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .status-tag.signed { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+    .status-tag.ended { background: var(--bg); color: var(--muted); }
+
+    .contract-body { padding: 0 16px 14px; font-size: 13px; }
+    .contract-row {
+      display: flex; justify-content: space-between;
+      padding: 4px 0; color: var(--muted);
+    }
+    .contract-row .value { color: var(--fg); font-weight: 500; }
+
+    .contract-actions {
+      display: flex; gap: 1px; background: var(--border);
+      border-top: 1px solid var(--border);
+    }
+    .contract-actions button, .contract-actions a {
+      flex: 1; padding: 12px 0; font-size: 13px;
+      background: var(--surface); color: var(--fg);
+      text-align: center; display: block;
+    }
+    .contract-actions button:active, .contract-actions a:active { background: var(--bg); }
+    .contract-actions .primary { color: var(--accent); font-weight: 500; }
+
+    /* empty state */
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+    }
+    .empty-state svg { width: 48px; height: 48px; color: var(--border); margin: 0 auto 12px; }
+    .empty-state p { font-size: 14px; color: var(--muted); }
+
+    /* sign modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      z-index: 50; display: none; align-items: flex-end;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-sheet {
+      width: 100%; max-width: 430px; background: var(--surface);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 24px 20px calc(24px + var(--safe-bottom));
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-sheet h2 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+    .modal-sheet .desc { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+    .modal-sheet .contract-preview {
+      width: 100%; height: 200px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); margin-bottom: 16px;
+      display: grid; place-items: center; font-size: 13px; color: var(--muted);
+    }
+    .sign-check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+    .sign-check input { margin-top: 2px; }
+    .btn-sign {
+      width: 100%; padding: 14px; border-radius: var(--radius-sm);
+      background: var(--accent); color: var(--accent-on);
+      font-size: 16px; font-weight: 600;
+    }
+    .btn-sign:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* bottom tabs */
+    .bottom-tabs {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 4px 0; color: var(--muted); font-size: 10px;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item svg { width: 22px; height: 22px; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .content { padding-inline: 0; }
+      .tab-bar { border-radius: var(--radius-md) var(--radius-md) 0 0; margin-inline: 24px; }
+      .contract-card { margin-inline: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>电子合同</h1>
+    <div style="width: 36px;"></div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="active" data-tab="pending">待签署 <span class="badge">1</span></button>
+    <button data-tab="signed">已签署</button>
+    <button data-tab="ended">已到期</button>
+  </div>
+
+  <div class="content">
+    <!-- tab: pending -->
+    <div id="tab-pending">
+      <div class="contract-card pending">
+        <div class="contract-header">
+          <div>
+            <div class="project">秦淮·南部新城人才家园</div>
+            <div class="contract-id">合同编号：NJ-BZ-HT-2026-0421</div>
+          </div>
+          <span class="status-tag pending">待签署</span>
+        </div>
+        <div class="contract-body">
+          <div class="contract-row"><span>房源</span><span class="value">2 栋 805 室 · 一室一厅</span></div>
+          <div class="contract-row"><span>租期</span><span class="value">2026-06-10 至 2027-06-09</span></div>
+          <div class="contract-row"><span>租金</span><span class="value">¥2,180 / 月</span></div>
+          <div class="contract-row"><span>服务费</span><span class="value">¥174 / 月（租金 8%）</span></div>
+          <div class="contract-row"><span>付款方式</span><span class="value">押一付一</span></div>
+          <div style="margin-top: 8px; font-size: 12px; color: var(--danger); background: color-mix(in oklab, var(--danger) 6%, transparent); padding: 6px 10px; border-radius: 4px;">
+            距离签署截止还有 3 天
+          </div>
+        </div>
+        <div class="contract-actions">
+          <button>查看合同</button>
+          <button class="primary" onclick="openSignModal()">立即签署</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- tab: signed (hidden) -->
+    <div id="tab-signed" style="display:none;">
+      <div class="contract-card">
+        <div class="contract-header">
+          <div>
+            <div class="project">建邺·河西青年公寓</div>
+            <div class="contract-id">合同编号：NJ-BZ-HT-2026-0215</div>
+          </div>
+          <span class="status-tag signed">已签署</span>
+        </div>
+        <div class="contract-body">
+          <div class="contract-row"><span>房源</span><span class="value">5 栋 1203 室 · 一室一厅</span></div>
+          <div class="contract-row"><span>租期</span><span class="value">2026-05-01 至 2027-04-30</span></div>
+          <div class="contract-row"><span>租金</span><span class="value">¥3,120 / 月</span></div>
+          <div class="contract-row"><span>签署日期</span><span class="value">2026-04-25</span></div>
+        </div>
+        <div class="contract-actions">
+          <a href="#">查看合同</a>
+          <a href="payment.html">去缴费</a>
+          <a href="#">下载 PDF</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- tab: ended (hidden) -->
+    <div id="tab-ended" style="display:none;">
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>暂无已到期的合同</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- sign modal -->
+  <div class="modal-overlay" id="signModal">
+    <div class="modal-sheet">
+      <h2>签署电子合同</h2>
+      <p class="desc">秦淮·南部新城人才家园 · 2 栋 805 室</p>
+      <div class="contract-preview">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 8px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span style="display: block;">点击预览完整合同</span>
+      </div>
+      <div class="contract-body" style="padding: 0; margin-bottom: 12px; font-size: 12px; color: var(--muted);">
+        <div class="contract-row" style="font-size: 12px;"><span>承租人</span><span class="value">张明（3201********0012）</span></div>
+        <div class="contract-row" style="font-size: 12px;"><span>出租人</span><span class="value">南京南部新城保障房运营管理有限公司</span></div>
+        <div class="contract-row" style="font-size: 12px;"><span>租金总额</span><span class="value">¥28,248（含服务费，12 个月）</span></div>
+      </div>
+      <label class="sign-check">
+        <input type="checkbox" id="signAgree" />
+        <span>我已阅读并同意《保租房租赁合同》全部条款，确认信息真实有效</span>
+      </label>
+      <button class="btn-sign" id="btnSign" disabled onclick="confirmSign()">确认签署</button>
+    </div>
+  </div>
+
+  <!-- sign success overlay -->
+  <div class="modal-overlay" id="signSuccess" style="display:none; align-items: center;">
+    <div style="background: var(--surface); border-radius: var(--radius-lg); padding: 40px 32px; max-width: 360px; width: 90%; text-align: center;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; background: color-mix(in oklab, var(--success) 12%, transparent); display: grid; place-items: center; margin: 0 auto 16px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2 style="font-size: 18px; font-weight: 600; margin: 0 0 6px;">签署成功</h2>
+      <p style="font-size: 14px; color: var(--muted); margin-bottom: 20px;">合同已生效，可在「已签署」中查看</p>
+      <button class="btn-sign" onclick="closeSuccess()">完成</button>
+    </div>
+  </div>
+
+  <!-- bottom tabs -->
+  <div id="tab-bar" data-series="c" data-active="applications"></div>
+</div>
+
+<script>
+// tab filtering
+document.querySelectorAll('.tab-bar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-pending').style.display = tab === 'pending' ? 'block' : 'none';
+    document.getElementById('tab-signed').style.display = tab === 'signed' ? 'block' : 'none';
+    document.getElementById('tab-ended').style.display = tab === 'ended' ? 'block' : 'none';
+  });
+});
+
+// sign modal
+function openSignModal() {
+  document.getElementById('signModal').classList.add('open');
+  document.getElementById('signModal').style.display = 'flex';
+  document.getElementById('signAgree').checked = false;
+  document.getElementById('btnSign').disabled = true;
+}
+document.getElementById('signAgree').addEventListener('change', (e) => {
+  document.getElementById('btnSign').disabled = !e.target.checked;
+});
+function confirmSign() {
+  document.getElementById('signModal').classList.remove('open');
+  document.getElementById('signModal').style.display = 'none';
+  document.getElementById('signSuccess').style.display = 'flex';
+}
+function closeSuccess() {
+  document.getElementById('signSuccess').style.display = 'none';
+  // mark contract as signed
+  document.querySelector('.status-tag.pending').textContent = '已签署';
+  document.querySelector('.status-tag.pending').className = 'status-tag signed';
+  document.querySelector('.contract-card.pending').classList.remove('pending');
+  document.querySelector('.badge').textContent = '0';
+}
+
+// bottom tab nav
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', e => {
+    const href = tab.getAttribute('href');
+    if (href && href !== '#' && !href.startsWith('http')) {
+      e.preventDefault();
+      window.location.href = href;
+    }
+  });
+});
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

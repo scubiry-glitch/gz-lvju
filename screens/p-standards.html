@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>等级与技能矩阵 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;}
+    .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);}
+    .crumb b{color:var(--fg); font-weight:600; font-size:14px; margin-right:2px;}
+    .ver-tag{padding:3px 8px; background:var(--accent-soft); color:var(--accent); font-size:11px; border-radius:4px; font-weight:600;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:22px 28px; display:grid; grid-template-columns:170px 1fr 340px; gap:18px;}
+
+    /* 8-level rail */
+    .rail h4{font-size:11px; color:var(--muted); letter-spacing:1px; margin:0 0 10px; text-transform:uppercase;}
+    .rail-list{display:flex; flex-direction:column; gap:5px;}
+    .rl{display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; cursor:pointer;}
+    .rl.on{border-color:var(--accent); background:var(--accent-soft);}
+    .rl .lv{width:30px; height:30px; border-radius:7px; display:grid; place-items:center; font-size:11px; font-weight:700; color:white; flex-shrink:0;}
+    .rl.l0 .lv{background:linear-gradient(135deg, #475569, #64748b);}
+    .rl.l1 .lv{background:linear-gradient(135deg, #92400e, #d97706);}
+    .rl.l2 .lv{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .rl.l3 .lv{background:linear-gradient(135deg, #047857, #10b981);}
+    .rl.l4 .lv{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .rl.l5 .lv{background:linear-gradient(135deg, #7c3aed, #a855f7);}
+    .rl.l6 .lv{background:linear-gradient(135deg, #be185d, #ec4899);}
+    .rl.l7 .lv{background:linear-gradient(135deg, #ca8a04, #fbbf24);}
+    .rl .info{flex:1; min-width:0;}
+    .rl .nm{font-size:12.5px; font-weight:600;}
+    .rl .ct{font-size:10px; color:var(--muted);}
+    .track-divider{font-size:10px; color:var(--muted); padding:6px 4px 2px; letter-spacing:0.5px;}
+
+    .pane{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:22px;}
+    .pane-head{display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--line); margin-bottom:18px;}
+    .pane-head .lv-large{width:48px; height:48px; border-radius:10px; background:linear-gradient(135deg, #047857, #10b981); display:grid; place-items:center; color:white; font-weight:700; font-size:16px; transition:background 0.2s;}
+    .pane-head .lv-large.l0{background:linear-gradient(135deg, #475569, #64748b);}
+    .pane-head .lv-large.l1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .pane-head .lv-large.l2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .pane-head .lv-large.l3{background:linear-gradient(135deg, #047857, #10b981);}
+    .pane-head .lv-large.l4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .pane-head .lv-large.l5{background:linear-gradient(135deg, #7c3aed, #a855f7);}
+    .pane-head .lv-large.l6{background:linear-gradient(135deg, #be185d, #ec4899);}
+    .pane-head .lv-large.l7{background:linear-gradient(135deg, #ca8a04, #fbbf24);}
+    .pane-head .ttl{flex:1;}
+    .pane-head h2{margin:0; font-size:18px; font-weight:600;}
+    .pane-head .desc{font-size:12px; color:var(--muted); margin-top:2px;}
+    .pane-head .track-tag{padding:3px 8px; background:color-mix(in oklab, var(--success) 12%, transparent); color:var(--success); border-radius:4px; font-size:10px; font-weight:600;}
+    .pane-head .track-tag.mgmt{background:color-mix(in oklab, #a855f7 14%, transparent); color:#7c3aed;}
+    .pane-head .track-tag.entry{background:color-mix(in oklab, var(--muted) 14%, transparent); color:var(--muted);}
+    .pane-head .pill.pub{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success); padding:3px 8px; border-radius:4px; font-size:11px; font-weight:600;}
+
+    .sec{margin-bottom:22px;}
+    .sec h4{font-size:12px; color:var(--muted); letter-spacing:0.5px; margin:0 0 10px; text-transform:uppercase; display:flex; align-items:center; gap:6px;}
+    .sec h4 .help{font-size:11px; text-transform:none; color:var(--accent); letter-spacing:0; cursor:pointer; margin-left:auto;}
+
+    .crit{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .ck{display:flex; align-items:flex-start; gap:8px; padding:10px 12px; background:var(--line); border-radius:var(--radius-sm); font-size:12.5px;}
+    .ck .ic{font-size:14px; color:var(--accent); flex-shrink:0;}
+    .ck .nm{font-weight:600;}
+    .ck .val{color:var(--muted); font-size:11px; margin-top:1px;}
+    .ck .val b{color:var(--fg); font-weight:600;}
+
+    .perk-row{display:flex; flex-wrap:wrap; gap:6px;}
+    .perk{font-size:12px; padding:5px 10px; background:var(--accent-soft); color:var(--accent); border-radius:999px;}
+
+    .track-fork{margin-bottom:14px; padding:12px 14px; background:linear-gradient(135deg, color-mix(in oklab, var(--accent) 6%, transparent), transparent); border-radius:8px; border:1px dashed var(--accent);}
+    .track-fork .lbl{font-size:11px; color:var(--muted); margin-bottom:6px;}
+    .track-fork .desc{font-size:12.5px; line-height:1.55;}
+    .track-fork .desc b{color:var(--accent);}
+
+    .up-flow{display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;}
+    .up-step{padding:10px 8px; background:var(--line); border-radius:var(--radius-sm); text-align:center; font-size:11.5px;}
+    .up-step.now{background:color-mix(in oklab, var(--success) 14%, transparent); border:1px solid var(--success);}
+    .up-step .h{font-weight:600; margin-bottom:3px; font-size:11px;}
+    .up-step .v{color:var(--muted); font-size:10px; line-height:1.4;}
+
+    .mtx-tabs{display:flex; gap:6px; margin-bottom:10px;}
+    .mt{padding:6px 14px; font-size:12px; border-radius:6px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .mt.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+
+    .mtx-wrap{overflow:auto; border:1px solid var(--border); border-radius:var(--radius-sm);}
+    .mtx{width:100%; border-collapse:collapse; font-size:11.5px;}
+    .mtx th, .mtx td{padding:7px 8px; border-bottom:1px solid var(--line); text-align:center; min-width:62px;}
+    .mtx th{background:var(--line); font-weight:600; font-size:10.5px; color:var(--muted);}
+    .mtx td:first-child, .mtx th:first-child{text-align:left; font-weight:600; position:sticky; left:0; background:var(--surface); border-right:1px solid var(--line); min-width:130px;}
+    .mtx th:first-child{background:var(--line);}
+    .mtx tr.stage-hd td{background:linear-gradient(90deg, color-mix(in oklab, var(--accent) 8%, transparent), transparent); padding:6px 8px; font-size:10px; color:var(--accent); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; text-align:left;}
+    .mtx .sk-cell{display:inline-grid; place-items:center; width:24px; height:22px; border-radius:5px; font-size:10px; font-weight:600;}
+    .mtx .sk-cell.s0{background:var(--line); color:var(--muted);}
+    .mtx .sk-cell.s1{background:color-mix(in oklab, var(--success) 10%, transparent); color:var(--success);}
+    .mtx .sk-cell.s2{background:color-mix(in oklab, var(--success) 22%, transparent); color:var(--success);}
+    .mtx .sk-cell.s3{background:color-mix(in oklab, var(--success) 40%, transparent); color:#065f46;}
+    .mtx .sk-cell.req{outline:2px solid var(--accent);}
+
+    .right{display:flex; flex-direction:column; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px 18px;}
+    .card h3{font-size:13px; font-weight:600; margin:0 0 12px; display:flex; align-items:center; gap:6px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .vh{font-size:12px;}
+    .vh-row{display:grid; grid-template-columns:auto 1fr auto; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); align-items:start;}
+    .vh-row:last-child{border-bottom:0;}
+    .vh .v{font-family:var(--mono); font-size:11px; font-weight:600; color:var(--accent);}
+    .vh .ctx strong{font-weight:500;}
+    .vh .ctx em{font-style:normal; color:var(--muted); font-size:11px;}
+    .vh .tg{font-size:10px; padding:1px 6px; border-radius:3px; background:var(--line); color:var(--muted);}
+    .vh .tg.pub{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+
+    .imp{display:flex; flex-direction:column; gap:10px; font-size:12px;}
+    .imp-row{display:flex; justify-content:space-between; align-items:center;}
+    .imp-row .nm{color:var(--muted);}
+    .imp-row .v{font-weight:600;}
+    .imp-row .v.up{color:var(--success);}
+
+    @media (max-width: 1280px){
+      .content{grid-template-columns:140px 1fr 320px;}
+    }
+    @media (max-width: 1000px){
+      .content{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="standards"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>等级与技能矩阵</b></div>
+      <span class="ver-tag">● v3.0 生效 · 8 级 12 工种</span>
+      <div class="top-actions">
+        <button class="btn">导出 JSON</button>
+        <button class="btn">克隆为草稿</button>
+        <button class="btn pri">新建版本</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- 5 类机构标准索引（新）· 横跨 3 列，作为本页头部导航 -->
+      <div style="grid-column:1 / -1; background:linear-gradient(135deg,#fefce8,#fff); border:1px solid #fde68a; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:4px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <div style="font-size:13px; font-weight:700; color:#92400e;">📐 5 类机构标准索引</div>
+          <div style="font-size:11px; color:var(--muted);">本页详细展示 S 服务者；其余 4 类 → 跳 <a href="d-org-standard.html#sec-grading" style="color:#92400e; font-weight:600;">机构的标准 § 4</a></div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px;">
+          <a style="padding:10px 12px; background:#dbeafe; border:1px solid #93c5fd; border-radius:8px; text-decoration:none;">
+            <div style="font-size:12px; font-weight:700; color:#1e40af; display:flex; align-items:center; gap:6px;">🛠 S 服务者 <span style="background:#fde68a; color:#92400e; padding:1px 6px; border-radius:3px; font-size:9.5px;">本页</span></div>
+            <div style="font-size:10.5px; color:#1e3a8a; margin-top:3px;">L0-L7 · 12 工种 · 6 维能力</div>
+          </a>
+          <a href="d-org-standard.html#sec-grading" style="padding:10px 12px; background:#ccfbf1; border:1px solid #5eead4; border-radius:8px; text-decoration:none;">
+            <div style="font-size:12px; font-weight:700; color:#0f766e;">🏬 B 运营商</div>
+            <div style="font-size:10.5px; color:#134e4a; margin-top:3px;">LV1-3 · 单城/跨市/省级</div>
+          </a>
+          <a href="d-org-standard.html#sec-grading" style="padding:10px 12px; background:#fff7ed; border:1px solid #fdba74; border-radius:8px; text-decoration:none;">
+            <div style="font-size:12px; font-weight:700; color:#c2410c;">👥 V 人力</div>
+            <div style="font-size:10.5px; color:#7c2d12; margin-top:3px;">LV1-3 · 持证人数 + 项目</div>
+          </a>
+          <a href="d-org-standard.html#sec-grading" style="padding:10px 12px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:8px; text-decoration:none;">
+            <div style="font-size:12px; font-weight:700; color:#6b21a8;">🛒 M 物资</div>
+            <div style="font-size:10.5px; color:#4c1d95; margin-top:3px;">LV1-3 · 6 品类 · 集采资格</div>
+          </a>
+          <a href="d-org-standard.html#sec-grading" style="padding:10px 12px; background:#f3e8ff; border:1px solid #c4b5fd; border-radius:8px; text-decoration:none;">
+            <div style="font-size:12px; font-weight:700; color:#7c3aed;">🎓 T 培训</div>
+            <div style="font-size:10.5px; color:#5b21b6; margin-top:3px;">LV1-3 · 课程范围 + 题库</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- 8 level rail with track separator -->
+      <div class="rail">
+        <h4>等级 · L0–L7（双轨）<span style="font-size:11px; color:var(--muted); font-weight:400; margin-left:8px;">S 服务者标准</span></h4>
+        <div class="rail-list">
+          <div class="rl l0"><div class="lv">L0</div><div class="info"><div class="nm">注册准入</div><div class="ct">112 在审</div></div></div>
+          <div class="rl l1"><div class="lv">L1</div><div class="info"><div class="nm">基础认证</div><div class="ct">286 人</div></div></div>
+          <div class="rl l2"><div class="lv">L2</div><div class="info"><div class="nm">独立服役</div><div class="ct">582 人</div></div></div>
+          <div class="rl l3 on"><div class="lv">L3</div><div class="info"><div class="nm">高级管家</div><div class="ct">868 人</div></div></div>
+          <div class="rl l4"><div class="lv">L4</div><div class="info"><div class="nm">督导·店长</div><div class="ct">438 人</div></div></div>
+          <div class="track-divider">— 管理 / 输出轨 —</div>
+          <div class="rl l5"><div class="lv">L5</div><div class="info"><div class="nm">服务商负责人</div><div class="ct">142 人</div></div></div>
+          <div class="rl l6"><div class="lv">L6</div><div class="info"><div class="nm">平台认证讲师</div><div class="ct">28 人</div></div></div>
+          <div class="rl l7"><div class="lv">L7</div><div class="info"><div class="nm">区域级专家</div><div class="ct">6 人</div></div></div>
+        </div>
+        <div style="margin-top:12px; padding:10px 12px; background:var(--surface); border:1px dashed var(--border); border-radius:var(--radius-md); font-size:11px; color:var(--muted); line-height:1.5;">
+          <div style="font-weight:600; color:var(--fg); margin-bottom:4px;">通用模型</div>
+          L0–L4 是<b>个人服务者</b>晋升轨：注册 → 基础 → 独立 → 高级 → 督导。<br>L5–L7 是<b>管理 + 输出</b>轨：负责人 → 讲师 → 区域专家。可按行业拆并层数。
+        </div>
+      </div>
+
+      <!-- center pane -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="lv-large">L3</div>
+          <div class="ttl">
+            <h2>L3 · 高级管家</h2>
+            <div class="desc">复杂场景 / 专业服务 · 可独立承接高价值订单</div>
+          </div>
+          <span class="track-tag">个人轨</span>
+          <span class="pill pub">● 已发布</span>
+        </div>
+
+        <div class="sec">
+          <h4>认证门槛 <span class="help">↗ 历史调整</span></h4>
+          <div class="crit">
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">L2 在岗时长</div><div class="val">≥ <b>90 天</b> · 完结单 ≥ 60</div></div></div>
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">客评门槛</div><div class="val">L2 期均评 ≥ <b>4.7</b></div></div></div>
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">培训学时</div><div class="val">≥ <b>160 学时</b> · 含复杂场景 6 节</div></div></div>
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">高级综合考</div><div class="val">综合分 ≥ <b>85</b>（含情景实操）</div></div></div>
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">复杂工单</div><div class="val">完成 <b>≥ 5 单</b>跨工种 / 应急类</div></div></div>
+            <div class="ck"><div class="ic">✓</div><div><div class="nm">背景与信用</div><div class="val">无投诉超 3 单 · 信用 ≥ <b>80</b></div></div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <h4>权益与流量</h4>
+          <div class="perk-row">
+            <span class="perk">独立接高价单</span>
+            <span class="perk">流量权重 ×1.5</span>
+            <span class="perk">基础分润 78%</span>
+            <span class="perk">复购客户绑定</span>
+            <span class="perk">L4 督导候选池</span>
+            <span class="perk">VIP 客户白名单</span>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="track-fork">
+            <div class="lbl">职业路径分叉</div>
+            <div class="desc">L4 之后<b>分叉</b>：业绩 + 团队管理 → <b>督导/店长（个人轨终点）</b>。<br>跳轨进入管理 / 输出 → <b>L5 服务商负责人</b> → <b>L6 平台讲师</b> → <b>L7 区域级专家</b>。</div>
+          </div>
+
+          <h4>晋级路径 · L0 → L7 全图</h4>
+          <div class="up-flow">
+            <div class="up-step"><div class="h">L0 注册准入</div><div class="v">实名 · 资料 · 背调</div></div>
+            <div class="up-step"><div class="h">L1 基础认证</div><div class="v">通用知识考 ≥ 60</div></div>
+            <div class="up-step"><div class="h">L2 独立服役</div><div class="v">岗位技能 + 师傅评估</div></div>
+            <div class="up-step now"><div class="h">L3 高级管家 ★</div><div class="v">复杂场景 + 客评 4.7</div></div>
+            <div class="up-step"><div class="h">L4 督导·店长</div><div class="v">带 5+ 人 · 团队 KPI</div></div>
+            <div class="up-step"><div class="h">L5 服务商负责人</div><div class="v">经营 + 资源整合</div></div>
+            <div class="up-step"><div class="h">L6 认证讲师</div><div class="v">课程开发 · 授课</div></div>
+            <div class="up-step"><div class="h">L7 区域级专家</div><div class="v">标准制定 · 评审</div></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <h4>技能矩阵 <span class="help">12 工种 · 双阶段 · 紫框为本级必备</span></h4>
+          <div class="mtx-tabs">
+            <span class="mt on">第 I 阶段 · 交易核心 6 类</span>
+            <span class="mt">第 II 阶段 · 服务供给 6 类</span>
+          </div>
+          <div class="mtx-wrap">
+            <table class="mtx">
+              <thead>
+                <tr>
+                  <th>工种</th>
+                  <th>专业知识</th>
+                  <th>实操技能</th>
+                  <th>客户沟通</th>
+                  <th>合规规范</th>
+                  <th>应急处置</th>
+                  <th>行业证书</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="stage-hd"><td colspan="7">第 I 阶段 · 聚焦交易相关，6 类核心岗位</td></tr>
+                <tr><td>经纪服务者</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s2">经纪</span></td></tr>
+                <tr><td>旅居门店</td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s0">—</span></td></tr>
+                <tr><td>旅居管家</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s0">—</span></td></tr>
+                <tr><td>房源托管服务者</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s2">物业</span></td></tr>
+                <tr><td>入住服务者</td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s0">—</span></td></tr>
+                <tr><td>客服与投诉处理</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s0">—</span></td></tr>
+                <tr class="stage-hd"><td colspan="7">第 II 阶段 · 扩展服务供给，6 类延伸岗位</td></tr>
+                <tr><td>维修</td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2">特种作业</span></td></tr>
+                <tr><td>保洁</td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s0">—</span></td></tr>
+                <tr><td>搬家</td><td><span class="sk-cell s1">L2</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s1">驾驶</span></td></tr>
+                <tr><td>装修交付</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3">装饰二级</span></td></tr>
+                <tr><td>四保一服</td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s2 req">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s1">综合</span></td></tr>
+                <tr><td>服务商负责人</td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2">L3</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s3 req">L4</span></td><td><span class="sk-cell s2">L3</span></td><td><span class="sk-cell s2">营业执照</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px; padding:10px; background:var(--line); border-radius:5px; line-height:1.6;">
+            <b>第 I 阶段</b>「交易核心」聚焦房产 / 旅居业态本身（经纪 / 门店 / 管家 / 托管 / 入住 / 客投），是平台业务地基；<b>第 II 阶段</b>「服务供给」延伸到后市场（维修 / 保洁 / 搬家 / 装修交付 / 四保一服 / 服务商负责人），构建生态闭环。
+          </div>
+        </div>
+
+      </div>
+
+      <!-- right -->
+      <div class="right">
+        <div class="card">
+          <h3>版本历史 <span class="extra">v3.0.0</span></h3>
+          <div class="vh">
+            <div class="vh-row">
+              <span class="v">v3.0.0</span>
+              <div class="ctx"><strong>升级 6 级 → 8 级双轨</strong><br><em>2h 前 · 张主任 · 新增 L5/L6/L7 管理输出轨</em></div>
+              <span class="tg pub">PUB</span>
+            </div>
+            <div class="vh-row">
+              <span class="v">v3.0.0</span>
+              <div class="ctx"><strong>工种重构：交易 6 + 供给 6 = 12</strong><br><em>2h 前 · 标准组 · 引入贝壳旅居业务岗位</em></div>
+              <span class="tg pub">PUB</span>
+            </div>
+            <div class="vh-row">
+              <span class="v">v2.4.6</span>
+              <div class="ctx"><strong>客评门槛 4.5 → 4.7</strong><br><em>1w 前 · 历史版本</em></div>
+              <span class="tg" style="background:var(--line); color:var(--muted);">已归档</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>分布 · 双轨人数 <span class="extra">8 级</span></h3>
+          <div class="imp">
+            <div class="imp-row"><span class="nm">个人轨（L0-L4）</span><span class="v">2,286 人</span></div>
+            <div class="imp-row"><span class="nm">管理/输出轨（L5-L7）</span><span class="v up">176 人</span></div>
+            <div class="imp-row"><span class="nm">轨道迁移 · 本月</span><span class="v">12 人 L4→L5</span></div>
+            <div class="imp-row"><span class="nm">分布健康度</span><span class="v up">优 · 头部稳</span></div>
+            <div style="font-size:11px; color:var(--muted); padding-top:8px; border-top:1px solid var(--line);">
+              ⓘ L7 仅 6 人是设计预期 — 区域级专家应稀缺。
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>下游接口</h3>
+          <div style="font-family:var(--mono); font-size:11px; line-height:1.7; color:var(--muted);">
+            <div><span style="color:var(--accent);">GET</span> /v3/levels　(8 级)</div>
+            <div><span style="color:var(--accent);">GET</span> /v3/skill-matrix?stage=1|2</div>
+            <div><span style="color:var(--accent);">GET</span> /v3/tracks　(individual|mgmt)</div>
+            <div><span style="color:#16a34a;">POST</span> /v3/levels/{id}/check</div>
+            <div><span style="color:#ea580c;">EVT</span> level.published · track.switched</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  // Level data — 8 levels, each with criteria + perks + track + path-index
+  const LD = {
+    L0: {nm:'注册准入', desc:'基础信息 · 实名认证 · 准入审核', track:'准入', trackCls:'entry', cls:'l0', pi:0,
+      crit:[
+        ['实名认证','身份证 + 人脸 + 活体'],
+        ['健康证','<b>必备</b> · 半年内出具'],
+        ['背景查重','行业污点库 <b>无冲突</b>'],
+        ['知情同意','签署服务协议 + 数据授权'],
+        ['年龄','<b>18-60 周岁</b>'],
+        ['资料完整度','≥ <b>100%</b>'],
+      ],
+      perks:['仅可申请岗位','查看课程','无法接单','不参与排序','准入档案'],
+    },
+    L1: {nm:'基础认证', desc:'通用知识 · 基础服务', track:'个人轨', trackCls:'', cls:'l1', pi:1,
+      crit:[
+        ['L0 通过','含背调 + 准入审核'],
+        ['通用知识考','≥ <b>60 分</b> · 行业法规 / 平台规则'],
+        ['培训学时','≥ <b>60 学时</b> · 基础模块 6 门'],
+        ['师傅指定','由 L3+ 服务者认领'],
+        ['实习单','≥ <b>5 单</b> · 师傅陪同'],
+        ['客评门槛','试岗期均评 ≥ <b>4.3</b>'],
+      ],
+      perks:['仅师傅带单','50% 分润到师傅','流量 ×0.5','限制低难度工单','培训补贴 ¥800/月'],
+    },
+    L2: {nm:'独立服役', desc:'岗位技能 · 独立服务', track:'个人轨', trackCls:'', cls:'l2', pi:2,
+      crit:[
+        ['L1 在岗','≥ <b>60 天</b> · 师傅评 ≥ 4.5'],
+        ['岗位技能考','≥ <b>75 分</b>（含实操）'],
+        ['实习单','≥ <b>20 单</b> · 通过率 ≥ 90%'],
+        ['客评门槛','均评 ≥ <b>4.5</b>'],
+        ['复杂场景','至少处置 1 起'],
+        ['信用分','≥ <b>70</b>'],
+      ],
+      perks:['独立接单','基础分润 <b>70%</b>','流量 ×1.0','区域内排序','复购客户通知'],
+    },
+    L3: {nm:'高级管家', desc:'复杂场景 / 专业服务 · 可独立承接高价值订单', track:'个人轨', trackCls:'', cls:'l3', pi:3,
+      crit:[
+        ['L2 在岗时长','≥ <b>90 天</b> · 完结单 ≥ 60'],
+        ['客评门槛','L2 期均评 ≥ <b>4.7</b>'],
+        ['培训学时','≥ <b>160 学时</b> · 含复杂场景 6 节'],
+        ['高级综合考','综合分 ≥ <b>85</b>（含情景实操）'],
+        ['复杂工单','完成 <b>≥ 5 单</b>跨工种 / 应急类'],
+        ['背景与信用','无投诉超 3 单 · 信用 ≥ <b>80</b>'],
+      ],
+      perks:['独立接高价单','流量权重 ×1.5','基础分润 78%','复购客户绑定','L4 督导候选池','VIP 客户白名单'],
+    },
+    L4: {nm:'督导·店长', desc:'团队管理 · 质量监督 · 个人轨终点', track:'个人轨终点', trackCls:'', cls:'l4', pi:4,
+      crit:[
+        ['L3 在岗时长','≥ <b>180 天</b> · 完结 ≥ 200'],
+        ['客评门槛','均评 ≥ <b>4.85</b>'],
+        ['团队管理考','≥ <b>80 分</b>'],
+        ['带学徒','累计 <b>≥ 3 人</b>已通过 L3'],
+        ['团队 KPI','管 5+ 人 · 月 NPS ≥ 40'],
+        ['信用分','≥ <b>88</b>'],
+      ],
+      perks:['团队 KPI 提成','流量权重 ×2.0','投诉处置权','调度子团队','L5 跳轨候选','驻点经理候选'],
+    },
+    L5: {nm:'服务商负责人', desc:'经营整合 · 资源整合 · 管理/输出轨入口', track:'管理输出轨', trackCls:'mgmt', cls:'l5', pi:5,
+      crit:[
+        ['L4 在岗','≥ <b>12 个月</b>'],
+        ['团队 NPS','≥ <b>50</b>'],
+        ['经营营收','同比 <b>+20%</b>'],
+        ['商业认证考','商业模式 + 财务 + 合规 ≥ 80'],
+        ['现场调研','通过区域经理 + 平台双调研'],
+        ['资质','营业执照 + 行业许可'],
+      ],
+      perks:['项目制结算','独立分润轨','学员分润抽成','区域品牌使用权','数据报表 API','独立带团队'],
+    },
+    L6: {nm:'平台认证讲师', desc:'授课能力 · 培训输出', track:'管理输出轨', trackCls:'mgmt', cls:'l6', pi:6,
+      crit:[
+        ['L5 在岗','≥ <b>6 个月</b>'],
+        ['课程开发','至少 <b>1 套</b>完整课程'],
+        ['试讲评估','评分 ≥ <b>85</b>'],
+        ['累计授课','≥ <b>100 学时</b>'],
+        ['学员通过率','≥ <b>90%</b>'],
+        ['行业讲师证','受平台 + 协会颁发'],
+      ],
+      perks:['课时分润','课程版权分润','行业讲师证','受邀评审席','L7 候选池','跨区授课'],
+    },
+    L7: {nm:'区域级专家', desc:'行业专家 · 标准制定 · 双轨顶点', track:'管理输出轨顶点', trackCls:'mgmt', cls:'l7', pi:7,
+      crit:[
+        ['评审委员会提名','由 L7 + 行业 + 政府 三方'],
+        ['行业贡献','证据 ≥ <b>3 项</b>（论文/课程/标准）'],
+        ['L6 在岗','≥ <b>12 个月</b>'],
+        ['行业奖项','全国 / 省级奖 ≥ 1 项'],
+        ['标准参与','参与 ≥ <b>1 项</b>行业标准制定'],
+        ['终身记录','无重大投诉 · 信用 ≥ <b>95</b>'],
+      ],
+      perks:['标准制定参与权','行业评审权','区域咨询费','终身荣誉','独立顾问轨道','行业代表'],
+    },
+  };
+
+  const paneHead = document.querySelector('.pane-head');
+  const lvLargeEl = paneHead.querySelector('.lv-large');
+  const h2El = paneHead.querySelector('h2');
+  const descEl = paneHead.querySelector('.desc');
+  const trackEl = paneHead.querySelector('.track-tag');
+  const critEl = document.querySelector('.crit');
+  const perkEl = document.querySelector('.perk-row');
+
+  function selectLevel(lv) {
+    const d = LD[lv]; if (!d) return;
+    lvLargeEl.textContent = lv;
+    lvLargeEl.className = 'lv-large ' + d.cls;
+    h2El.textContent = lv + ' · ' + d.nm;
+    descEl.textContent = d.desc;
+    trackEl.textContent = d.track;
+    trackEl.className = 'track-tag' + (d.trackCls ? ' ' + d.trackCls : '');
+    critEl.innerHTML = d.crit.map(c => `<div class="ck"><div class="ic">✓</div><div><div class="nm">${c[0]}</div><div class="val">${c[1]}</div></div></div>`).join('');
+    perkEl.innerHTML = d.perks.map(p => `<span class="perk">${p}</span>`).join('');
+    document.querySelectorAll('.up-flow .up-step').forEach((s, i) => s.classList.toggle('now', i === d.pi));
+  }
+
+  document.querySelectorAll('.rail .rl').forEach(r => r.addEventListener('click', () => {
+    document.querySelectorAll('.rail .rl').forEach(x => x.classList.remove('on'));
+    r.classList.add('on');
+    // derive level from class l0..l7
+    const lvNum = Array.from(r.classList).find(c => /^l[0-7]$/.test(c));
+    if (lvNum) selectLevel('L' + lvNum.slice(1));
+  }));
+
+  document.querySelectorAll('.mt').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.mt').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

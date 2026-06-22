@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>全站导航总览 · 江苏保租房专用频道</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #fff; --fg: #111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --radius: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.55;}
+    a{color:inherit; text-decoration:none;}
+    .container{max-width:1280px; margin:0 auto; padding:24px;}
+    header{margin-bottom:24px;}
+    h1{font-size:22px; font-weight:700; margin:0 0 6px;}
+    .desc{color:var(--muted); font-size:13px;}
+    .toolbar{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .toolbar input{
+      flex:1; min-width:200px; max-width:360px; padding:8px 12px;
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      font:inherit; font-size:13px;
+    }
+    .toolbar .chip{
+      padding:6px 12px; background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; font-size:12px; color:var(--muted); cursor:pointer;
+    }
+    .toolbar .chip.on{background:#111; color:#fff; border-color:#111;}
+
+    .report-group{margin-bottom:40px; padding:16px; background:rgba(0,0,0,0.025); border-radius:14px;}
+    .rg-head{
+      display:flex; align-items:center; gap:12px; margin-bottom:14px;
+      padding:14px 18px; border-radius:10px; color:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,0.12);
+    }
+    .rg-label{font-size:18px; font-weight:700; line-height:1.2;}
+    .rg-desc{font-size:12px; opacity:0.85; margin-top:4px;}
+    .rg-count{
+      margin-left:auto; font-size:12px;
+      padding:4px 12px; background:rgba(255,255,255,0.22); border-radius:12px;
+      white-space:nowrap;
+    }
+    .series-section{margin-bottom:18px;}
+    .series-head{
+      display:flex; align-items:center; gap:10px; margin-bottom:12px;
+      padding:10px 14px; border-radius:8px;
+      color:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.08);
+    }
+    .series-head .icon{
+      width:32px; height:32px; border-radius:8px;
+      background:rgba(255,255,255,0.18); display:grid; place-items:center;
+      font-size:16px; font-weight:700;
+    }
+    .series-head .label{font-size:16px; font-weight:600;}
+    .series-head .sub{font-size:11px; opacity:0.85;}
+    .series-head .count{
+      margin-left:auto; font-size:12px;
+      padding:3px 10px; background:rgba(255,255,255,0.2); border-radius:10px;
+    }
+
+    .pages-grid{
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px;
+    }
+    .page-card{
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:12px 14px;
+      display:flex; align-items:center; gap:10px;
+      transition:transform 0.1s, box-shadow 0.1s;
+    }
+    .page-card:hover{transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.06);}
+    .page-card svg{width:18px; height:18px; flex-shrink:0; color:var(--muted);}
+    .page-card .name{flex:1; font-size:13px; font-weight:500;}
+    .page-card .meta{font-size:11px; color:var(--muted);}
+    .page-card .file{font-family:ui-monospace, Menlo, monospace; font-size:10px; color:#9ca3af; margin-top:2px; display:block;}
+    .page-card .badge{
+      font-size:10px; padding:1px 6px; border-radius:6px;
+      background:#dc2626; color:#fff; font-weight:600;
+    }
+    .page-card .badge.warn{background:#ea580c;}
+    .page-card .group-tag{
+      font-size:10px; padding:1px 6px; background:#f3f4f6;
+      border-radius:4px; color:var(--muted); margin-right:4px;
+    }
+
+    .stats{
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+      gap:10px; margin-bottom:24px;
+    }
+    .stat{
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+      padding:12px 14px;
+    }
+    .stat .v{font-size:22px; font-weight:700;}
+    .stat .l{font-size:11px; color:var(--muted);}
+
+    .footer{
+      margin-top:32px; padding-top:16px; border-top:1px solid var(--border);
+      font-size:12px; color:var(--muted); text-align:center;
+    }
+    .footer .stamp{display:inline-block; padding:3px 10px; border:1px solid var(--border); border-radius:4px; margin-top:6px;}
+
+    .hidden{display:none !important;}
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📋 全站导航总览</h1>
+    <div class="desc">
+      江苏保租房专用频道 ·
+      <strong>5 个汇报视角</strong>（严格对齐 <a href="screens/d-master-blueprint.html" style="color:#2f6feb;">总图谱·四方共建模式</a>）·
+      数据来源：<code>screens/_nav.js</code>
+    </div>
+    <div class="toolbar">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#475569;">
+        🌐 预设：<select id="regionSwitch" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;"></select>
+      </label>
+      <input type="text" id="search" placeholder="搜索页面标题 / 文件名 / 系列…" />
+      <span class="chip on" data-group="all">全部</span>
+      <span class="chip" data-group="doc">📐 方案与标准</span>
+      <span class="chip" data-group="gov">🏛 政府方</span>
+      <span class="chip" data-group="bank">🏦 金融方</span>
+      <span class="chip" data-group="plat">⭐ 平台方·贝壳承建（含供应链）</span>
+      <span class="chip" data-group="op">🏢 运营机构（持有方+运营商）</span>
+      <span class="chip" data-group="user">👥 终端用户</span>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <main id="main"></main>
+
+  <div class="footer">
+    每次新增/修改/删除 <code>screens/*.html</code> 都应同步更新 <code>screens/_nav.js</code> 与本页。<br>
+    见 <code>CLAUDE.md · 规则 1</code>。
+    <div><span class="stamp">江苏省住房和城乡建设厅 × 贝壳保租房频道</span></div>
+  </div>
+</div>
+
+<!-- 桌面 _nav.js（G/B/F/P/V sidebar）+ 移动 _navmobile.js（S/C tabbar） -->
+<script src="screens/_region.js"></script>
+<script src="screens/_nav.js"></script>
+<script src="screens/_navmobile.js"></script>
+<script>
+  // 地域/部门预设切换器（来自 _region.js）
+  (function(){
+    const sel = document.getElementById('regionSwitch');
+    if (!sel || !window.BZF_PRESETS) return;
+    const cur = (window.BZF_REGION && window.BZF_REGION.key) || 'js';
+    sel.innerHTML = Object.keys(window.BZF_PRESETS).map(k =>
+      '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + window.BZF_PRESETS[k].label + '</option>'
+    ).join('');
+    sel.addEventListener('change', function(){
+      const u = new URL(location.href);
+      u.searchParams.set('region', sel.value);
+      location.href = u.toString();
+    });
+  })();
+
+  // 合并：桌面 sidebar 数据 ∪ 移动 tabbar 数据
+  function getMergedSeries() {
+    const desktop = (window.BZF_NAV && window.BZF_NAV.SERIES) || {};
+    const mobile  = (window.BZF_NAVMOBILE && window.BZF_NAVMOBILE.MOBILE) || {};
+    const merged = { ...desktop };
+    ['s', 'c'].forEach(k => {
+      if (mobile[k] && !merged[k]) {
+        merged[k] = {
+          name: k === 's' ? '服务者 App' : '保租房 · 租客',
+          short: mobile[k].stamp || '',
+          icon: k === 's' ? '🛠' : '🏠',
+          primary: mobile[k].primary,
+          primaryDeep: mobile[k].primaryDeep,
+          mobile: true,
+          tabbar: mobile[k].tabbar,
+        };
+      }
+    });
+    return merged;
+  }
+  // 6 个汇报视角分组 — 严格对齐总图谱「四方共建模式」 + 顶部方案文档
+  // 平台方 · 贝壳承建 = 中台(p) + 培训(t) + 供应链(V 服务商 + M 物资供应商)
+  // 运营机构 = B 系列拆 2 个二级分类（国企持有方·资管视角 / 白名单运营商·日常动作）
+  // 系列条目可以是字符串（直接渲染整个系列），或对象 {source, filterGroups, name, icon, primary, primaryDeep, short}
+  const REPORT_GROUPS = [
+    { key: 'doc',  label: '📐 方案与标准',         desc: '对外发布物 · 总图谱 + 三大标准 + 三档方案',           series: ['d'],          color: '#0f172a' },
+    { key: 'gov',  label: '🏛 政府方 · 江苏住建厅', desc: '出规则：政策制定、标准制定、监管管理（不直接参与运营）', series: ['g', 'portal'], color: '#1e40af' },
+    { key: 'bank', label: '🏦 金融方 · 江苏银行',  desc: '出金融：监管账户、公积金直付、信用体系、资金流大盘',  series: ['f'],          color: '#0f1a4d' },
+    { key: 'plat', label: '⭐ 平台方 · 贝壳承建',
+      desc: '出能力：中台/培训/数据 + 承建供应链生态（V 服务商门户 + M 物资供应商门户）',
+      series: ['p', 't', 'v', 'm'],
+      color: '#0f172a' },
+    { key: 'op',   label: '🏢 运营机构 · 国企持有方 + 白名单运营商',
+      desc: '国企=持有资产+委托运营+资管视角；白名单运营商（自如/龙湖/华润/招商/贝壳省心租）=日常派单/工单/上架/管家',
+      series: [
+        { source: 'b', filterGroups: ['国企资管视角（持有方）'],
+          name: 'B · 国企持有方 · 资管视角', short: '只读 SLA / 资管大盘 · 不做派单/上架/管家',
+          icon: '🏢', primary: '#0f766e', primaryDeep: '#134e4a' },
+        { source: 'b', filterGroups: ['运营商工作台（白名单机构使用）', '业主托管', '生态联动'],
+          name: 'B · 白名单运营商 + 业主托管', short: '自如/龙湖/华润/招商/贝壳省心租 等 · 日常派单/上架/管家/工单',
+          icon: '🏬', primary: '#14b8a6', primaryDeep: '#0f766e' },
+      ],
+      color: '#0f766e' },
+    { key: 'user', label: '👥 终端用户',            desc: '市场出效率：服务者上岗、租客找房与履约',              series: ['s', 'c'],      color: '#2563eb' },
+  ];
+
+  // 解析系列条目：字符串 → { key, data }；对象 → 构造虚拟系列（按 filterGroups 过滤）
+  function resolveSeriesEntry(entry, S) {
+    if (typeof entry === 'string') {
+      return S[entry] ? { key: entry, data: S[entry] } : null;
+    }
+    const src = S[entry.source];
+    if (!src) return null;
+    const wanted = new Set(entry.filterGroups || []);
+    const groups = (src.groups || []).filter(g => wanted.has(g.name));
+    return {
+      key: entry.source + '__' + (entry.name || '').replace(/\s+/g, '').slice(0, 16),
+      data: {
+        name: entry.name, short: entry.short || src.short, icon: entry.icon || src.icon,
+        primary: entry.primary || src.primary, primaryDeep: entry.primaryDeep || src.primaryDeep,
+        groups,
+      },
+    };
+  }
+
+  function render() {
+    const S = getMergedSeries();
+    if (!Object.keys(S).length) { document.getElementById('main').innerHTML = '<p style="color:#dc2626">无法加载 _nav.js / _navmobile.js</p>'; return; }
+
+    // 统计
+    const totalPages = Object.values(S).reduce((acc, s) => {
+      if (s.mobile) return acc + (s.tabbar || []).length;
+      return acc + (s.groups || []).reduce((a, g) => a + g.items.length, 0);
+    }, 0);
+    const seriesCount = Object.keys(S).length;
+    const platTotal = (REPORT_GROUPS.find(g => g.key === 'plat').series || [])
+      .map(e => resolveSeriesEntry(e, S)).filter(Boolean)
+      .reduce((a, x) => a + countSeriesItems(x.data), 0);
+    document.getElementById('stats').innerHTML = `
+      <div class="stat"><div class="v">5</div><div class="l">汇报视角（四方共建+方案）</div></div>
+      <div class="stat"><div class="v">${seriesCount}</div><div class="l">系列总数</div></div>
+      <div class="stat"><div class="v">${totalPages}</div><div class="l">页面总数</div></div>
+      <div class="stat"><div class="v">${countSeriesItems(S.d)}</div><div class="l">📐 方案文档</div></div>
+      <div class="stat"><div class="v">${platTotal}</div><div class="l">⭐ 平台方 · 贝壳承建（含供应链）</div></div>
+    `;
+
+    // 主体：按 5 大汇报视角分组（支持虚拟二级分类：把同一系列拆为多个子视角）
+    let html = '';
+    REPORT_GROUPS.forEach(grp => {
+      const subSeries = grp.series.map(e => resolveSeriesEntry(e, S)).filter(Boolean);
+      const grpPages = subSeries.reduce((a, x) => a + countSeriesItems(x.data), 0);
+
+      html += `<section class="report-group" data-group="${grp.key}">`;
+      html += `<div class="rg-head" style="background:linear-gradient(135deg, ${grp.color} 0%, ${grp.color}dd 100%);">
+        <div>
+          <div class="rg-label">${grp.label}</div>
+          <div class="rg-desc">${grp.desc}</div>
+        </div>
+        <div class="rg-count">${subSeries.length} 个二级分类 · ${grpPages} 页</div>
+      </div>`;
+
+      subSeries.forEach(({ key, data: s }) => {
+        const cnt = countSeriesItems(s);
+        html += `<div class="series-section" data-series="${key}">`;
+        html += `<div class="series-head" style="background:linear-gradient(135deg, ${s.primaryDeep || s.primary} 0%, ${s.primary} 100%);">
+          <div class="icon">${s.icon || '■'}</div>
+          <div>
+            <div class="label">${s.name}</div>
+            <div class="sub">${s.short || ''}</div>
+          </div>
+          <div class="count">${cnt} 页</div>
+        </div>`;
+        html += `<div class="pages-grid">`;
+        if (s.mobile) {
+          s.tabbar.forEach(it => { html += renderCard(it, '移动端 · tabbar'); });
+        } else {
+          s.groups.forEach(g => {
+            g.items.forEach(it => { html += renderCard(it, g.name || ''); });
+          });
+        }
+        html += `</div></div>`;
+      });
+
+      html += `</section>`;
+    });
+    document.getElementById('main').innerHTML = html;
+
+    bindFilter();
+  }
+
+  function countSeriesItems(s) {
+    if (!s) return 0;
+    if (s.mobile) return (s.tabbar || []).length;
+    return (s.groups || []).reduce((a, g) => a + g.items.length, 0);
+  }
+
+  function renderCard(it, group) {
+    const badge = it.badge != null ? `<span class="badge ${it.badgeKind || ''}">${it.badge}</span>` : '';
+    const groupTag = group ? `<span class="group-tag">${group}</span>` : '';
+    const href = it.href.startsWith('../') ? it.href.replace('../', '') : 'screens/' + it.href;
+    return `<a class="page-card" href="${href}" data-label="${it.label}" data-file="${it.href}">
+      <span class="name">${groupTag}${it.label}<span class="file">${it.href}</span></span>
+      ${badge}
+    </a>`;
+  }
+
+  function bindFilter() {
+    const input = document.getElementById('search');
+    const chips = document.querySelectorAll('.chip');
+    let curGroup = 'all';
+    function apply() {
+      const q = input.value.toLowerCase().trim();
+      document.querySelectorAll('.report-group').forEach(grp => {
+        const grpOk = curGroup === 'all' || grp.dataset.group === curGroup;
+        grp.classList.toggle('hidden', !grpOk);
+        let grpVisible = 0;
+        grp.querySelectorAll('.series-section').forEach(sec => {
+          let visibleCnt = 0;
+          sec.querySelectorAll('.page-card').forEach(c => {
+            const text = (c.dataset.label + ' ' + c.dataset.file).toLowerCase();
+            const qOk = !q || text.includes(q);
+            c.classList.toggle('hidden', !qOk);
+            if (qOk) visibleCnt++;
+          });
+          sec.classList.toggle('hidden', q && visibleCnt === 0);
+          if (!q || visibleCnt > 0) grpVisible++;
+        });
+        if (q && grpVisible === 0) grp.classList.add('hidden');
+      });
+    }
+    input.addEventListener('input', apply);
+    chips.forEach(c => c.addEventListener('click', () => {
+      chips.forEach(x => x.classList.remove('on'));
+      c.classList.add('on');
+      curGroup = c.dataset.group;
+      // 同步 URL hash，便于分享/书签
+      if (curGroup === 'all') history.replaceState(null, '', location.pathname + location.search);
+      else history.replaceState(null, '', '#' + curGroup);
+      apply();
+    }));
+
+    // 初始 hash 选中：支持 #plat / #group=plat 两种形式
+    function applyInitialHash() {
+      const raw = (location.hash || '').replace(/^#/, '').replace(/^group=/, '');
+      if (!raw) return;
+      const target = document.querySelector(`.chip[data-group="${raw}"]`);
+      if (target) target.click();
+    }
+    applyInitialHash();
+    window.addEventListener('hashchange', applyInitialHash);
+  }
+
+  // 等 _nav.js 加载完
+  if (window.BZF_NAV) render();
+  else window.addEventListener('DOMContentLoaded', render);
+</script>
+</body>
+</html>

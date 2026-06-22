@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M 物资 6 品类分级标准 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg:#f8fafc; --surface:#fff; --fg:#0f172a;
+      --muted:#64748b; --border:#e2e8f0; --line:#f1f5f9;
+      --accent:#6b21a8; --accent-soft:color-mix(in oklab, var(--accent) 10%, transparent);
+      --success:#16a34a; --warn:#ea580c; --danger:#dc2626;
+      --radius-sm:6px; --radius-md:10px;
+      --font:ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:22px 28px; display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .lv-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;}
+    .lv-card{padding:14px; border-radius:8px; color:#fff; min-height:240px; display:flex; flex-direction:column; gap:8px;}
+    .lv-card.l1{background:linear-gradient(135deg,#4c1d95,#6b21a8);}
+    .lv-card.l2{background:linear-gradient(135deg,#5b21b6,#7c3aed);}
+    .lv-card.l3{background:linear-gradient(135deg,#581c87,#a855f7);}
+    .lv-card .hd{display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);}
+    .lv-card .lv{font-size:18px; font-weight:700;}
+    .lv-card .lvl-name{font-size:12px; opacity:0.85;}
+    .lv-card .row{font-size:11.5px; line-height:1.55;}
+    .lv-card .row .k{font-size:10px; opacity:0.7; text-transform:uppercase; letter-spacing:0.4px;}
+    .lv-card .row .v{display:block; margin-top:2px;}
+    .lv-card .ct{margin-top:auto; padding-top:8px; border-top:1px solid rgba(255,255,255,0.2); font-size:11px; opacity:0.85;}
+
+    /* 6 品类网格 */
+    .cat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+    .cat{padding:14px; background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px;}
+    .cat .hd{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .cat .ic{font-size:20px;}
+    .cat .nm{font-weight:700; color:var(--accent);}
+    .cat .req{font-size:11px; color:var(--muted); line-height:1.6;}
+    .cat .req b{color:var(--fg);}
+
+    .price-list{font-size:12px;}
+    .price-list .row{display:grid; grid-template-columns:80px 1fr 70px 70px; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); align-items:center;}
+    .price-list .row:last-child{border-bottom:0;}
+    .price-list .sku{font-family:ui-monospace, Menlo, monospace; color:var(--muted); font-size:11px;}
+    .price-list .v{font-weight:700; text-align:right;}
+    .price-list .delta{text-align:right; font-size:11px; color:var(--success);}
+
+    .crosslink{padding:11px 14px; background:#faf5ff; border:1px solid #d8b4fe; border-radius:8px; font-size:12px; color:var(--accent); margin-bottom:14px;}
+    .crosslink a{font-weight:600; color:var(--accent);}
+
+    @media (max-width:1100px){ .content{grid-template-columns:1fr;} .lv-grid{grid-template-columns:1fr;} .cat-grid{grid-template-columns:1fr 1fr;} }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="m-standards"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × M 物资供应商 / <b>分级标准 + 6 品类技术要求 + 集采底价</b></div>
+      <div class="top-actions">
+        <button class="btn">导出标准 PDF</button>
+        <button class="btn">月度发布底价</button>
+        <button class="btn pri">新建版本</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div>
+        <div class="crosslink">
+          📐 本页定义 M 物资 6 品类技术标准 + LV1-3 分级 + 省级集采底价。配套页：
+          <a href="p-m-catalog-cert.html">品类认证审核</a> · <a href="p-m-batch-qc.html">批次质检追溯</a> · <a href="m-supplier-onboarding.html">M 端门户</a>
+        </div>
+
+        <div class="card">
+          <h3>分级标准 LV1 → LV3 <span class="pill">v1.2 生效</span> <span class="extra">按品类覆盖 + 集采资格 + 售后能力</span></h3>
+          <div class="lv-grid">
+            <div class="lv-card l1">
+              <div class="hd"><span class="lv">LV1</span><span class="lvl-name">单品类 · 按需供货</span></div>
+              <div class="row"><span class="k">品类覆盖</span><span class="v">单品类 · 入网 ≥ 1 SKU</span></div>
+              <div class="row"><span class="k">企业资质</span><span class="v">ISO 9001 + 行业认证</span></div>
+              <div class="row"><span class="k">售后</span><span class="v">≥ 1 年质保 + 48h 响应</span></div>
+              <div class="row"><span class="k">集采权限</span><span class="v">按需调拨 · 单笔上限 ¥ 50 万</span></div>
+              <div class="ct">当前 0 家</div>
+            </div>
+            <div class="lv-card l2">
+              <div class="hd"><span class="lv">LV2</span><span class="lvl-name">多品类 · 省级集采</span></div>
+              <div class="row"><span class="k">品类覆盖</span><span class="v">≥ 2 品类 · 入网 ≥ 5 SKU</span></div>
+              <div class="row"><span class="k">企业资质</span><span class="v">ISO 9001 + 14001 + 行业认证</span></div>
+              <div class="row"><span class="k">售后</span><span class="v">≥ 3 年质保 + 24h 响应</span></div>
+              <div class="row"><span class="k">集采权限</span><span class="v">省级集采 · 单笔上限 ¥ 200 万 + 月度对账</span></div>
+              <div class="ct">当前 5 家（北新/圣象/凯迪仕/立邦/九牧）</div>
+            </div>
+            <div class="lv-card l3">
+              <div class="hd"><span class="lv">LV3</span><span class="lvl-name">全品类 · 集采底价制定</span></div>
+              <div class="row"><span class="k">品类覆盖</span><span class="v">≥ 4 品类 · 入网 ≥ 12 SKU</span></div>
+              <div class="row"><span class="k">企业资质</span><span class="v">ISO 9001/14001/45001 + 上市/规上</span></div>
+              <div class="row"><span class="k">售后</span><span class="v">≥ 5 年质保 + 24h 响应 + 驻点工程师</span></div>
+              <div class="row"><span class="k">集采权限</span><span class="v">参与底价制定 + 同业开放 + 标杆补贴</span></div>
+              <div class="ct">当前 1 家（美的家电）</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6 品类技术标准 -->
+        <div class="card">
+          <h3>6 品类技术标准 <span class="pill">好房子准入</span> <span class="extra">每品类独立认证 + 复检周期</span></h3>
+          <div class="cat-grid">
+            <div class="cat">
+              <div class="hd"><span class="ic">🪵</span><div><div class="nm">家具</div></div></div>
+              <div class="req">
+                甲醛 <b>E0 级</b>（≤0.5mg/L）· 防火等级 ≥ <b>B1</b><br>
+                复检周期 <b>12 月</b> · 第三方抽样
+              </div>
+            </div>
+            <div class="cat">
+              <div class="hd"><span class="ic">🌀</span><div><div class="nm">家电</div></div></div>
+              <div class="req">
+                能效 <b>1 级</b>（强制）· 安全 <b>3C</b> + 节能减排<br>
+                复检周期 <b>18 月</b>
+              </div>
+            </div>
+            <div class="cat">
+              <div class="hd"><span class="ic">🧱</span><div><div class="nm">建材</div></div></div>
+              <div class="req">
+                甲醛 <b>E0</b> · 防火 <b>A 级</b> · 不可含石棉<br>
+                复检周期 <b>12 月</b>
+              </div>
+            </div>
+            <div class="cat">
+              <div class="hd"><span class="ic">🔒</span><div><div class="nm">智能锁</div></div></div>
+              <div class="req">
+                <b>公安认证</b> + 国密 <b>SM2/SM4</b> · 防撬 ≥ B 级<br>
+                复检周期 <b>12 月</b>
+              </div>
+            </div>
+            <div class="cat">
+              <div class="hd"><span class="ic">🎨</span><div><div class="nm">涂料</div></div></div>
+              <div class="req">
+                <b>VOC ≤ 50g/L</b> · 抗菌防霉 + 零醛<br>
+                复检周期 <b>12 月</b>
+              </div>
+            </div>
+            <div class="cat">
+              <div class="hd"><span class="ic">🚿</span><div><div class="nm">卫浴</div></div></div>
+              <div class="req">
+                节水 <b>1 级</b> · 釉面无瑕疵 · 陶瓷抗压 ≥ 5kN<br>
+                复检周期 <b>18 月</b>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- 当月集采底价 -->
+        <div class="card">
+          <h3>省级集采底价 <span class="pill">2026-06</span> <span class="extra">住建+贝壳+省房协联合发布</span></h3>
+          <div class="price-list">
+            <div class="row" style="font-size:10.5px; color:var(--muted); text-transform:uppercase; font-weight:700; border-bottom:2px solid var(--border);">
+              <span>SKU</span><span>名称</span><span style="text-align:right;">底价</span><span style="text-align:right;">最低报价</span>
+            </div>
+            <div class="row"><span class="sku">FN-BS-001</span><span>三人位布艺沙发 · E0+防火</span><span class="v">¥ 1,718</span><span class="delta">−8%</span></div>
+            <div class="row"><span class="sku">FN-WD-003</span><span>四门衣柜 · E0</span><span class="v">¥ 1,114</span><span class="delta">−12%</span></div>
+            <div class="row"><span class="sku">AC-CN-001</span><span>1.5P 变频空调 · 能效 1 级</span><span class="v">¥ 2,680</span><span class="delta">−6%</span></div>
+            <div class="row"><span class="sku">BM-FL-001</span><span>强化复合地板 12mm · E0</span><span class="v">¥ 98/㎡</span><span class="delta">−10%</span></div>
+            <div class="row"><span class="sku">LK-SM-001</span><span>指纹智能锁 · 公安认证</span><span class="v">¥ 980</span><span class="delta">+3%</span></div>
+            <div class="row"><span class="sku">PT-IN-001</span><span>内墙乳胶漆 18L · VOC 达标</span><span class="v">¥ 418</span><span class="delta">−9%</span></div>
+            <div class="row"><span class="sku">BR-TL-001</span><span>陶瓷小便器 · 节水 1 级</span><span class="v">¥ 520</span><span class="delta">−5%</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>横向能力联动</h3>
+          <div style="font-size:12px; line-height:1.85;">
+            <div>📐 <a href="d-property-standard.html" style="color:var(--accent); font-weight:600;">房标准 § 物资</a> · 6 品类技术要求</div>
+            <div>📜 <a href="p-cert-issue.html" style="color:var(--accent); font-weight:600;">证书签发</a> · M 类目认证 + 批次质检</div>
+            <div>⚙ <a href="p-credit-engine.html" style="color:var(--accent); font-weight:600;">信用规则</a> · R-M01/R-M02 良品率/底价</div>
+            <div>🔁 <a href="p-workflow.html" style="color:var(--accent); font-weight:600;">工作流</a> · 入驻 6 步 + 批次追溯</div>
+            <div>🛒 <a href="suppliers.html" style="color:var(--accent); font-weight:600;">C 端公示</a> · 合格供应商</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>降级与吊销触发</h3>
+          <div style="font-size:12px; line-height:1.7; color:#334155;">
+            <div style="padding:8px 10px; background:#fef3c7; border:1px solid #fde68a; border-radius:6px; margin-bottom:6px;">
+              <b>整改</b>：连续 2 单批次质检异常 · 售后超时 ≥ 3 次
+            </div>
+            <div style="padding:8px 10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:6px;">
+              <b>吊销</b>：3 单批次不合格 · 集采报价高于底价 ≥ 15% · 重大产品质量事件
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

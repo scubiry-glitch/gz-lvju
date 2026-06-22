@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>租金合规说明 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a; --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+      --warn: #eab308; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: var(--accent); text-decoration: none; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 80px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+    .top-nav { display: flex; align-items: center; padding: 8px 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .top-nav h1 { flex: 1; font-size: 15px; font-weight: 600; text-align: center; margin: 0; }
+
+    /* hero */
+    .hero {
+      background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+      color: white; padding: 26px 20px 28px; text-align: center;
+    }
+    .hero .seal {
+      width: 64px; height: 64px; margin: 0 auto 12px;
+      background: rgba(255,255,255,0.18); border-radius: 50%;
+      display: grid; place-items: center;
+    }
+    .hero .seal svg { width: 32px; height: 32px; color: white; }
+    .hero h2 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+    .hero p { font-size: 13px; opacity: 0.9; margin: 0; }
+
+    /* this property compare */
+    .prop-card {
+      margin: -16px 16px 0; background: var(--surface);
+      border-radius: var(--radius-md); padding: 16px;
+      box-shadow: 0 4px 16px color-mix(in oklab, var(--fg) 6%, transparent);
+      border: 1px solid var(--border); position: relative;
+    }
+    .prop-card .pname { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; }
+    .bar-row .lbl { width: 64px; color: var(--muted); flex-shrink: 0; }
+    .bar-row .track { flex: 1; height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .bar-row .fill { height: 100%; border-radius: 999px; display: block; }
+    .bar-row .amt { width: 70px; text-align: right; font-weight: 700; flex-shrink: 0; }
+    .market .fill { background: var(--muted); width: 100%; }
+    .market .amt { color: var(--muted); }
+    .cap .fill { background: var(--warn); width: 90%; }
+    .cap .amt { color: var(--warn); }
+    .actual .fill { background: var(--success); width: 74.4%; }
+    .actual .amt { color: var(--success); }
+    .delta-line {
+      margin-top: 12px; padding: 10px 12px;
+      background: var(--success-soft); color: var(--success);
+      border-radius: var(--radius-sm); font-size: 13px;
+      display: flex; align-items: center; gap: 6px; font-weight: 600;
+    }
+    .delta-line svg { width: 14px; height: 14px; }
+
+    /* rule cards */
+    .rule { padding: 12px 16px 4px; }
+    .rule h3 { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin: 14px 0 8px; }
+    .rule-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px;
+      display: flex; gap: 12px; align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .rule-card .ic {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: var(--success-soft); color: var(--success);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .rule-card .ic svg { width: 18px; height: 18px; }
+    .rule-card h4 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+    .rule-card p { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+    .rule-card .src { font-size: 11px; color: var(--accent); }
+
+    /* historical chart (faux) */
+    .chart-card {
+      margin: 0 16px 12px; padding: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+    .chart-card h4 { font-size: 13px; font-weight: 600; margin: 0 0 12px; }
+    .chart-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; align-items: flex-end; height: 100px; padding: 0 4px; }
+    .bar { background: linear-gradient(180deg, var(--success), color-mix(in oklab, var(--success) 60%, white)); border-radius: 3px 3px 0 0; position: relative; }
+    .bar::after { content: attr(data-val); position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 600; color: var(--success); white-space: nowrap; }
+    .chart-x { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; padding: 0 4px; font-size: 10px; color: var(--muted); text-align: center; }
+    .chart-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+    /* report violation */
+    .report-card {
+      margin: 14px 16px 4px;
+      background: color-mix(in oklab, var(--danger) 6%, transparent);
+      border: 1px solid color-mix(in oklab, var(--danger) 25%, transparent);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .report-card .ic { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; color: var(--danger); flex-shrink: 0; }
+    .report-card .ic svg { width: 18px; height: 18px; }
+    .report-card .txt { flex: 1; }
+    .report-card .txt strong { font-size: 13px; font-weight: 600; display: block; }
+    .report-card .txt small { font-size: 11px; color: var(--muted); }
+    .report-card .go { font-size: 12px; color: var(--danger); font-weight: 600; }
+
+    /* faq */
+    .faq { padding: 4px 16px 16px; }
+    .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 6px; font-size: 13px; }
+    .faq-item strong { display: block; margin-bottom: 4px; }
+    .faq-item p { margin: 0; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>租金合规说明</h1>
+    <span style="width: 36px"></span>
+  </div>
+
+  <div class="hero">
+    <div class="seal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+    </div>
+    <h2>政府认证 · 价格透明 · 涨幅有顶</h2>
+    <p>南京市住建局 / 江苏省住建厅 联合监管</p>
+  </div>
+
+  <!-- this property comparison -->
+  <div class="prop-card">
+    <div class="pname">江宁·梧桐公馆人才公寓 3 栋 1506</div>
+
+    <div class="bar-row market">
+      <span class="lbl">市场价</span>
+      <span class="track"><span class="fill"></span></span>
+      <span class="amt">¥3,200</span>
+    </div>
+    <div class="bar-row cap">
+      <span class="lbl">合规上限</span>
+      <span class="track"><span class="fill"></span></span>
+      <span class="amt">¥2,880</span>
+    </div>
+    <div class="bar-row actual">
+      <span class="lbl">本房源</span>
+      <span class="track"><span class="fill"></span></span>
+      <span class="amt">¥2,380</span>
+    </div>
+
+    <div class="delta-line">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      本房源比市场价低 25.6%，符合"≤市场价 90%"政府认证标准
+    </div>
+  </div>
+
+  <!-- rules -->
+  <div class="rule">
+    <h3>四条核心合规规则</h3>
+
+    <div class="rule-card">
+      <div class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      </div>
+      <div>
+        <h4>规则 1 · 租金 ≤ 市场价 90%</h4>
+        <p>住建局会同价格主管部门每季度发布片区指导价；保租房挂牌价不得高于片区指导价 90%。</p>
+        <a class="src" href="policy.html">江苏租赁标准 V25 §4.2 →</a>
+      </div>
+    </div>
+
+    <div class="rule-card">
+      <div class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      </div>
+      <div>
+        <h4>规则 2 · 年涨幅 ≤ 5%</h4>
+        <p>合同续约/重新签约时，月租金年涨幅不得超过 5% 且不得超过同期居民消费价格指数（CPI）+ 3 个百分点。</p>
+        <a class="src" href="policy.html">江苏租赁标准 V25 §4.5 →</a>
+      </div>
+    </div>
+
+    <div class="rule-card">
+      <div class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+      </div>
+      <div>
+        <h4>规则 3 · 押金不超过 2 月租金</h4>
+        <p>租赁押金最高不得超过 2 个月租金；押三、押六等高押方式禁止用于保租房。</p>
+        <a class="src" href="policy.html">江苏租赁标准 V25 §5.3 →</a>
+      </div>
+    </div>
+
+    <div class="rule-card">
+      <div class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M9 9h6v6H9z"/></svg>
+      </div>
+      <div>
+        <h4>规则 4 · 不得搭售附加条款</h4>
+        <p>禁止以"装修费、清洁费、服务包"等名义变相加价；服务费不超过月租 8%。</p>
+        <a class="src" href="policy.html">江苏租赁标准 V25 §6.1 →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- historical -->
+  <div class="rule" style="padding-top: 0;">
+    <h3>本房源近三年价格走势</h3>
+  </div>
+  <div class="chart-card">
+    <h4>江宁·梧桐公馆 3 栋 1506 · 月租金（元）</h4>
+    <div class="chart-grid">
+      <div class="bar" style="height: 78%" data-val="¥2,180"></div>
+      <div class="bar" style="height: 84%" data-val="¥2,260"></div>
+      <div class="bar" style="height: 89%" data-val="¥2,320"></div>
+      <div class="bar" style="height: 92%" data-val="¥2,380"></div>
+    </div>
+    <div class="chart-x"><span>2023</span><span>2024</span><span>2025</span><span>2026 当前</span></div>
+    <div class="chart-note">三年累计涨幅 9.2%（年均 2.99%），远低于 5% 合规上限 ✓</div>
+  </div>
+
+  <!-- report -->
+  <a class="report-card" href="repair.html">
+    <div class="ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="txt">
+      <strong>发现违规收费？一键举报</strong>
+      <small>反馈直达南京市住建局监管视图，3 个工作日内回复</small>
+    </div>
+    <span class="go">举报 →</span>
+  </a>
+
+  <!-- faq -->
+  <div class="faq">
+    <div class="faq-item">
+      <strong>Q：片区指导价怎么查？</strong>
+      <p>住建局每季度公示一次，可在"政策资讯 → 价格公示"栏目查询。</p>
+    </div>
+    <div class="faq-item">
+      <strong>Q：服务费 8% 包含哪些？</strong>
+      <p>含管家服务、保洁、报修响应等。家电、装修按市场价单独计算，且需提前公示。</p>
+    </div>
+    <div class="faq-item">
+      <strong>Q：如何确认本房源真的合规？</strong>
+      <p>点击详情页"政府认证"标识可查看住建局备案号、片区指导价、合规校验时间。</p>
+    </div>
+  </div>
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

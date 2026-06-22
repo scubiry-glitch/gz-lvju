@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>在线考试 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0; color:inherit;}
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:150px; position:relative;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+
+    /* exam header */
+    .top-h{position:sticky; top:0; z-index:20; background:linear-gradient(135deg,#047857,#10b981); color:#fff; padding:10px 14px 12px;}
+    .nav-row{display:flex; align-items:center; gap:10px;}
+    .nav-row .back{width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:18px;}
+    .nav-row .ti{flex:1; font-size:14px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .nav-row .timer{display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:14px; font-weight:700; background:rgba(255,255,255,.18); padding:4px 10px; border-radius:8px;}
+    .nav-row .timer.warn{background:var(--warn); animation:none;}
+    .nav-row .timer.crit{background:var(--danger); animation:blink 1s steps(2) infinite;}
+    @keyframes blink{50%{opacity:.5;}}
+    .qbar{display:flex; align-items:center; gap:8px; margin-top:9px; font-size:11px;}
+    .qbar .bar{flex:1; height:5px; background:rgba(255,255,255,.25); border-radius:3px; overflow:hidden;}
+    .qbar .bar i{display:block; height:100%; background:#fff; transition:width .25s;}
+
+    /* question */
+    .qcard{margin:14px 14px 0; padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .qhd{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+    .qtype{font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:2px 8px; border-radius:5px;}
+    .qno{font-size:11px; color:var(--muted);}
+    .flag{margin-left:auto; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; padding:3px 9px; border:1px solid var(--border); border-radius:999px;}
+    .flag.on{color:var(--gold); border-color:var(--gold); background:color-mix(in oklab,var(--gold) 10%,transparent);}
+    .qstem{font-size:15.5px; font-weight:600; line-height:1.6; margin-bottom:14px;}
+    .opts{display:flex; flex-direction:column; gap:10px;}
+    .opt{display:flex; gap:11px; align-items:flex-start; padding:13px; border:1.5px solid var(--border); border-radius:10px; font-size:14px;}
+    .opt .lbl{width:23px; height:23px; border:1.5px solid var(--border); display:grid; place-items:center; font-size:12px; font-weight:700; color:var(--muted); flex-shrink:0; border-radius:50%;}
+    .opt.multi .lbl{border-radius:6px;}
+    .opt.sel{border-color:var(--accent); background:var(--accent-soft);}
+    .opt.sel .lbl{background:var(--accent); color:#fff; border-color:var(--accent);}
+    .qhint{font-size:11px; color:var(--muted); margin-top:10px;}
+
+    /* answer-sheet sheet */
+    .mask{position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:60; display:none; align-items:flex-end; justify-content:center;}
+    .mask.on{display:flex;}
+    .sheet{background:var(--surface); width:100%; max-width:430px; border-radius:16px 16px 0 0; padding:16px; max-height:75vh; overflow:auto;}
+    .sheet h4{margin:0 0 4px; font-size:15px;}
+    .sheet .leg{display:flex; gap:14px; font-size:11px; color:var(--muted); margin:8px 0 12px;}
+    .sheet .leg i{display:inline-block; width:11px; height:11px; border-radius:3px; margin-right:4px; vertical-align:-1px;}
+    .grid{display:grid; grid-template-columns:repeat(6,1fr); gap:9px;}
+    .grid .g{aspect-ratio:1; border-radius:8px; display:grid; place-items:center; font-size:13px; font-weight:700; background:var(--line); color:var(--muted); position:relative;}
+    .grid .g.done{background:var(--accent-soft); color:var(--accent);}
+    .grid .g.cur{outline:2px solid var(--accent); outline-offset:1px; color:var(--accent);}
+    .grid .g.flag::after{content:'⚑'; position:absolute; top:-3px; right:1px; font-size:10px; color:var(--gold);}
+
+    /* confirm modal */
+    .modal{position:fixed; inset:0; background:rgba(15,23,42,.5); z-index:80; display:none; align-items:center; justify-content:center; padding:24px;}
+    .modal.on{display:flex;}
+    .modal .box{background:var(--surface); border-radius:14px; width:100%; max-width:360px; padding:20px; text-align:center;}
+    .modal .box h3{margin:0 0 6px; font-size:17px;}
+    .modal .box .sub{font-size:12.5px; color:var(--muted); margin-bottom:14px;}
+    .modal .stat{display:flex; gap:8px; margin-bottom:16px;}
+    .modal .stat .s{flex:1; background:var(--line); border-radius:9px; padding:9px;}
+    .modal .stat .s .v{font-size:18px; font-weight:800;} .modal .stat .s .l{font-size:10px; color:var(--muted);}
+    .modal .stat .s.warn .v{color:var(--warn);}
+    .modal .btns{display:flex; gap:10px;}
+    .modal .btns .b{flex:1; padding:12px; border-radius:10px; font-size:14px; font-weight:700;}
+    .modal .btns .ghost{background:var(--line);} .modal .btns .pri{background:linear-gradient(90deg,var(--accent),var(--emerald)); color:#fff;}
+
+    .botnav{position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:100%; max-width:430px; background:var(--surface); border-top:1px solid var(--border); padding:10px 14px; display:flex; gap:9px; z-index:40;}
+    .botnav .btn{padding:12px; border-radius:10px; font-size:14px; font-weight:700; text-align:center;}
+    .botnav .prev{flex:0 0 26%; background:var(--line); color:var(--fg);}
+    .botnav .card-btn{flex:0 0 26%; background:var(--line); color:var(--fg);}
+    .botnav .next{flex:1; background:linear-gradient(90deg,var(--accent),var(--emerald)); color:#fff;}
+    .botnav .next.submit{background:var(--gold);}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-h">
+    <div class="nav-row">
+      <a class="back" href="s-exam.html">‹</a>
+      <div class="ti">L4→L5 升级考 · 在线机考</div>
+      <div class="timer" id="timer">⏱ 30:00</div>
+    </div>
+    <div class="qbar"><span id="qnum">第 1 / 8 题</span><div class="bar"><i id="qfill" style="width:12%"></i></div><span id="answered">已答 0</span></div>
+  </div>
+
+  <div class="qcard">
+    <div class="qhd">
+      <span class="qtype" id="qtype">单选</span>
+      <span class="qno" id="qno">第 1 题 · 5 分</span>
+      <button class="flag" id="flag">⚑ 标记疑难</button>
+    </div>
+    <div class="qstem" id="qstem">加载中…</div>
+    <div class="opts" id="opts"></div>
+    <div class="qhint" id="qhint"></div>
+  </div>
+
+  <!-- bottom nav -->
+  <div class="botnav">
+    <button class="btn prev" id="prev">上一题</button>
+    <button class="btn card-btn" id="cardBtn">答题卡</button>
+    <button class="btn next" id="next">下一题</button>
+  </div>
+
+  <!-- answer sheet -->
+  <div class="mask" id="sheetMask">
+    <div class="sheet">
+      <h4>答题卡</h4>
+      <div class="leg"><span><i style="background:var(--accent-soft)"></i>已答</span><span><i style="background:var(--line)"></i>未答</span><span>⚑ 标记疑难</span></div>
+      <div class="grid" id="grid"></div>
+      <button class="btn next" style="width:100%;margin-top:16px;padding:12px;border-radius:10px;background:var(--gold);color:#fff;font-weight:700;" id="sheetSubmit">交卷</button>
+    </div>
+  </div>
+
+  <!-- confirm submit -->
+  <div class="modal" id="confirm">
+    <div class="box">
+      <h3>确认交卷？</h3>
+      <div class="sub">交卷后不可修改，系统将自动判分</div>
+      <div class="stat">
+        <div class="s"><div class="v" id="cDone">0</div><div class="l">已答</div></div>
+        <div class="s warn"><div class="v" id="cUnans">0</div><div class="l">未答</div></div>
+        <div class="s"><div class="v" id="cFlag">0</div><div class="l">标记</div></div>
+      </div>
+      <div class="btns">
+        <button class="b ghost" id="cCancel">继续答题</button>
+        <button class="b pri" id="cOk">确认交卷</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-bar" data-series="s" data-active="exam"></div>
+</div>
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const QS=[
+    {type:'单选',stem:'客户续约时强调"价格太贵"，最稳妥的第一步是？',
+      opts:['立即申请折扣','先复述已交付的价值与服务记录','转交主管处理','建议客户换低价房源'],ans:1,
+      exp:'先做价值锚定（复述已交付价值/服务记录），再谈条款，避免一上来就让价。'},
+    {type:'单选',stem:'谈判中客户提出超出你权限的承诺要求，应？',
+      opts:['先口头答应稳住客户','明确权限边界并上报平台走签约流程','私下加微信约定','直接拒绝并结束沟通'],ans:1,
+      exp:'不越权承诺是红线；超权限事项须上报并走平台签约存证。'},
+    {type:'多选',stem:'下列哪些属于续约沟通中必须留痕的内容？（多选）',
+      opts:['报价与优惠口径','客户特殊诉求','双方确认的续约条款','与工作无关的闲聊'],ans:[0,1,2],
+      exp:'报价口径、客户诉求、确认条款都需留痕可追溯；闲聊不属于留痕范围。'},
+    {type:'判断',stem:'为尽快成交，可以先口头承诺平台尚未上线的服务。',
+      opts:['正确','错误'],ans:1,
+      exp:'不可承诺未上线服务，属越权/虚假承诺，违反服务红线。'},
+    {type:'情景',stem:'客户因一次保洁延误要求降价续约，最佳处理顺序是？',
+      opts:['共情致歉 → 澄清原因 → 给补偿方案 → 谈续约','直接降价了事','解释是客户自身问题','先谈续约价再说延误'],ans:0,
+      exp:'异议处理三步：共情 → 澄清 → 给方案；用非价格补偿替代直接降价。'},
+    {type:'单选',stem:'"价值锚定"话术的核心是？',
+      opts:['强调价格最低','先呈现已交付价值再谈价格','承诺额外赠品','对比竞品缺点'],ans:1,
+      exp:'价值锚定＝先建立价值认知，弱化纯价格比较。'},
+    {type:'多选',stem:'异议处理三步法包含以下哪些环节？（多选）',
+      opts:['共情','澄清','给方案','拖延'],ans:[0,1,2],
+      exp:'共情 → 澄清 → 给方案，三步缺一不可；拖延会激化矛盾。'},
+    {type:'判断',stem:'确需对客户让价时，应走平台审批而非个人决定。',
+      opts:['正确','错误'],ans:0,
+      exp:'让价须走平台审批流程，保证合规与可追溯。'},
+  ];
+  const total=QS.length;
+  let cur=0; const picked={}, flagged={};
+  let left=1800, timer=null;
+
+  function isMulti(q){return Array.isArray(q.ans);}
+  function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+  function answeredCount(){return Object.keys(picked).filter(k=>{const v=picked[k];return Array.isArray(v)?v.length:v!==undefined;}).length;}
+
+  function render(){
+    const q=QS[cur];
+    $('#qtype').textContent=q.type+(isMulti(q)?' · 多选':'');
+    $('#qno').textContent='第 '+(cur+1)+' 题 · '+(isMulti(q)?'10':'5')+' 分';
+    $('#qstem').textContent=q.stem;
+    $('#qnum').textContent='第 '+(cur+1)+' / '+total+' 题';
+    $('#qfill').style.width=((cur+1)/total*100)+'%';
+    $('#answered').textContent='已答 '+answeredCount();
+    $('#qhint').textContent=isMulti(q)?'可多选，选完点「下一题」':'';
+    $('#flag').classList.toggle('on',!!flagged[cur]);
+    $('#flag').textContent=flagged[cur]?'⚑ 已标记':'⚑ 标记疑难';
+    const wrap=$('#opts'); wrap.innerHTML='';
+    q.opts.forEach((o,i)=>{
+      const sel=isMulti(q)?(picked[cur]||[]).includes(i):picked[cur]===i;
+      const el=document.createElement('div');
+      el.className='opt'+(isMulti(q)?' multi':'')+(sel?' sel':'');
+      el.innerHTML='<span class="lbl">'+String.fromCharCode(65+i)+'</span><span>'+o+'</span>';
+      el.onclick=()=>{
+        if(isMulti(q)){ const arr=picked[cur]||[]; const k=arr.indexOf(i); if(k>=0)arr.splice(k,1); else arr.push(i); picked[cur]=arr; }
+        else picked[cur]=i;
+        render();
+      };
+      wrap.appendChild(el);
+    });
+    $('#prev').style.visibility=cur===0?'hidden':'visible';
+    const nx=$('#next'); if(cur===total-1){ nx.textContent='交卷'; nx.classList.add('submit'); } else { nx.textContent='下一题'; nx.classList.remove('submit'); }
+  }
+  function renderGrid(){
+    const g=$('#grid'); g.innerHTML='';
+    QS.forEach((q,i)=>{
+      const done=isMulti(q)?(picked[i]||[]).length>0:picked[i]!==undefined;
+      const d=document.createElement('div');
+      d.className='g'+(done?' done':'')+(i===cur?' cur':'')+(flagged[i]?' flag':'');
+      d.textContent=i+1; d.onclick=()=>{cur=i;render();closeSheet();};
+      g.appendChild(d);
+    });
+  }
+  function go(d){const t=cur+d; if(t>=0&&t<total){cur=t;render();}}
+  function openSheet(){renderGrid();$('#sheetMask').classList.add('on');}
+  function closeSheet(){$('#sheetMask').classList.remove('on');}
+  function openConfirm(){
+    const done=answeredCount();
+    $('#cDone').textContent=done; $('#cUnans').textContent=total-done; $('#cFlag').textContent=Object.keys(flagged).filter(k=>flagged[k]).length;
+    closeSheet(); $('#confirm').classList.add('on');
+  }
+  function grade(){
+    let correct=0; const items=QS.map((q,i)=>{
+      const your=picked[i];
+      let ok;
+      if(isMulti(q)){ const a=[...q.ans].sort().join(','); const b=(your||[]).slice().sort().join(','); ok=a===b; }
+      else ok=your===q.ans;
+      if(ok)correct++;
+      return {n:i+1,type:q.type,multi:isMulti(q),stem:q.stem,opts:q.opts,your:(your===undefined?null:your),ans:q.ans,ok,exp:q.exp};
+    });
+    const score=Math.round(correct/total*100);
+    const result={title:'L4→L5 升级考',score,pass:score>=80,total,correct,
+      used:fmt(1800-left),items};
+    try{ localStorage.setItem('bzf_exam_result', JSON.stringify(result)); }catch(e){}
+    location.href='s-exam-result.html';
+  }
+  function submit(){ if(cur===total-1) openConfirm(); else go(1); }
+
+  function tick(){ left--; const el=$('#timer'); el.textContent='⏱ '+fmt(left);
+    el.classList.toggle('warn',left<=300&&left>60); el.classList.toggle('crit',left<=60);
+    if(left<=0){ clearInterval(timer); grade(); } }
+
+  $('#next').onclick=submit;
+  $('#prev').onclick=()=>go(-1);
+  $('#cardBtn').onclick=openSheet; $('#sheetSubmit').onclick=openConfirm;
+  $('#sheetMask').onclick=e=>{if(e.target===$('#sheetMask'))closeSheet();};
+  $('#flag').onclick=()=>{flagged[cur]=!flagged[cur];render();};
+  $('#cCancel').onclick=()=>$('#confirm').classList.remove('on');
+  $('#cOk').onclick=grade;
+
+  render(); timer=setInterval(tick,1000);
+})();
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

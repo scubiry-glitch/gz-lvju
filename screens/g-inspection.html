@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>抽查记录 · 江苏保租房监管</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:90px;}
+
+
+    /* big CTA */
+    .new-cta{
+      margin: -12px 16px 0; padding: 16px;
+      background: var(--surface);
+      border:1px solid var(--border); border-radius: var(--radius-md);
+      box-shadow: 0 4px 16px color-mix(in oklab, var(--fg) 6%, transparent);
+      display:flex; align-items:center; gap:12px;
+    }
+    .new-cta .ic{width:44px; height:44px; border-radius:50%; background:var(--accent); color:white; display:grid; place-items:center; flex-shrink:0;}
+    .new-cta .ic svg{width:22px; height:22px;}
+    .new-cta strong{font-size:14px; display:block;}
+    .new-cta small{color:var(--muted); font-size:11px;}
+    .new-cta .go{color:var(--accent); font-weight:600; font-size:13px;}
+
+    /* tabs */
+    .tabs{display:flex; gap:4px; padding:14px 12px 0; overflow-x:auto;}
+    .tabs .t{flex-shrink:0; padding:8px 14px; font-size:13px; color:var(--muted); border-radius:999px; background:var(--surface); border:1px solid var(--border);}
+    .tabs .t.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:500;}
+
+    /* timeline list */
+    .timeline{padding:14px 12px;}
+    .item{position:relative; padding-left:24px; padding-bottom:14px;}
+    .item:not(:last-child)::before{content:''; position:absolute; left:7px; top:18px; bottom:-4px; width:2px; background:var(--border);}
+    .item .dot{position:absolute; left:0; top:6px; width:16px; height:16px; border-radius:50%; background:var(--surface); border:3px solid var(--accent);}
+    .item.pass .dot{border-color:var(--success);}
+    .item.warn .dot{border-color:var(--warn);}
+    .item.fail .dot{border-color:var(--danger);}
+
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;}
+    .row{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .row .date{font-size:11px; color:var(--muted);}
+    .row .badge{margin-left:auto; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600;}
+    .badge.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .badge.w{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .badge.f{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .ttl2{font-size:14px; font-weight:600; margin-bottom:4px;}
+    .meta{display:flex; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--muted); margin-bottom:8px;}
+    .meta span{padding:1px 6px; background:var(--bg); border-radius:3px;}
+
+    /* score */
+    .score{display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--bg); border-radius:6px; margin-top:8px; font-size:12px;}
+    .score .l{color:var(--muted);}
+    .score .v{font-size:18px; font-weight:700;}
+    .score .v.ok{color:var(--success);}
+    .score .v.warn{color:var(--warn);}
+    .score .v.fail{color:var(--danger);}
+
+    .items-list{margin-top:8px; padding:8px 10px; background:var(--bg); border-radius:6px;}
+    .items-list .il-row{display:flex; justify-content:space-between; padding:3px 0; font-size:12px;}
+    .items-list .il-row span{color:var(--muted);}
+    .items-list .il-row strong{font-weight:500;}
+    .items-list .il-row strong.warn{color:var(--warn);}
+    .items-list .il-row strong.fail{color:var(--danger);}
+
+    /* g tabbar */
+    /* ============ PC 版（≥1024px）============ */
+    @media (min-width: 1024px) {
+      .app-shell > .tabs { padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 56px; z-index: 4; }
+      .app-shell > .timeline {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 12px; padding: 14px 24px 28px;
+      }
+      .app-shell > .timeline > .card { margin-bottom: 0; }
+      .app-shell > .cta-new { max-width: 320px; margin: 14px 24px; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+<div id="side-nav" data-series="g" data-active="inspection"></div>
+<div class="app-shell">
+  <div id="m-header" data-series="g" data-active="inspection" data-title="抽查记录" data-icon="🔍" data-ttl="现场抽查与暗访记录" data-sub="月度抽样 + 投诉触发 + 续期复核 三类来源" data-right="本季 142"></div>
+  <a class="new-cta" href="#">
+    <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+    <div style="flex:1;">
+      <strong>发起新抽查</strong>
+      <small>选择项目、抽查项目清单（28 项）、安排人员 / 时间</small>
+    </div>
+    <span class="go">立即发起 →</span>
+  </a>
+
+  <div class="tabs">
+    <div class="t on">全部</div>
+    <div class="t">月度抽样</div>
+    <div class="t">投诉触发</div>
+    <div class="t">续期复核</div>
+    <div class="t">本人发起</div>
+  </div>
+
+  <div class="timeline">
+
+    <div class="item pass">
+      <span class="dot"></span>
+      <div class="card">
+        <div class="row">
+          <span class="date">2026-06-04</span>
+          <span class="badge ok">通过</span>
+        </div>
+        <div class="ttl2">梧桐公馆人才公寓 · 月度抽样</div>
+        <div class="meta">
+          <span>项目 ID NJ-001</span>
+          <span>抽 5 套</span>
+          <span>检查员 张科长</span>
+        </div>
+        <div class="score">
+          <span class="l">综合评分</span>
+          <span class="v ok">96.4</span>
+        </div>
+        <div class="items-list">
+          <div class="il-row"><span>租金合规（4 项）</span><strong>4/4</strong></div>
+          <div class="il-row"><span>消防安全（6 项）</span><strong>6/6</strong></div>
+          <div class="il-row"><span>设施维护（12 项）</span><strong>12/12</strong></div>
+          <div class="il-row"><span>服务者持证（4 项）</span><strong>4/4</strong></div>
+          <div class="il-row"><span>合同备案（2 项）</span><strong class="warn">1/2 · 1 项延迟备案</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item warn">
+      <span class="dot"></span>
+      <div class="card">
+        <div class="row">
+          <span class="date">2026-06-02</span>
+          <span class="badge w">整改</span>
+        </div>
+        <div class="ttl2">仙林湖国际社区 · 投诉触发</div>
+        <div class="meta">
+          <span>项目 ID NJ-005</span>
+          <span>抽 4 套</span>
+          <span>检查员 李监管 + 实习生</span>
+        </div>
+        <div class="score">
+          <span class="l">综合评分</span>
+          <span class="v warn">76.2</span>
+        </div>
+        <div class="items-list">
+          <div class="il-row"><span>租金合规</span><strong>4/4</strong></div>
+          <div class="il-row"><span>消防安全</span><strong>6/6</strong></div>
+          <div class="il-row"><span>设施维护</span><strong class="warn">9/12 · 卫浴 3 处漏水未修</strong></div>
+          <div class="il-row"><span>服务者持证</span><strong class="warn">3/4 · 1 名保洁证已过期</strong></div>
+          <div class="il-row"><span>合同备案</span><strong>2/2</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fail">
+      <span class="dot"></span>
+      <div class="card">
+        <div class="row">
+          <span class="date">2026-05-28</span>
+          <span class="badge f">未通过 · 复查</span>
+        </div>
+        <div class="ttl2">溧水城投人才公寓 · 续期复核</div>
+        <div class="meta">
+          <span>项目 ID NJ-012</span>
+          <span>抽 6 套</span>
+          <span>检查员 王科长 + 张科长</span>
+        </div>
+        <div class="score">
+          <span class="l">综合评分</span>
+          <span class="v fail">62.8</span>
+        </div>
+        <div class="items-list">
+          <div class="il-row"><span>租金合规</span><strong class="fail">2/4 · 2 套挂牌价超指导价</strong></div>
+          <div class="il-row"><span>消防安全</span><strong class="warn">5/6 · 灭火器过期</strong></div>
+          <div class="il-row"><span>设施维护</span><strong>10/12</strong></div>
+          <div class="il-row"><span>合同备案</span><strong class="warn">1/2 · 1 套未备案</strong></div>
+          <div class="il-row"><span>处置</span><strong>已下发整改通知 · 30 天复查</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item pass">
+      <span class="dot"></span>
+      <div class="card">
+        <div class="row">
+          <span class="date">2026-05-25</span>
+          <span class="badge ok">通过</span>
+        </div>
+        <div class="ttl2">河西青年公寓 · 月度抽样</div>
+        <div class="meta">
+          <span>项目 ID NJ-002</span>
+          <span>抽 4 套</span>
+          <span>检查员 张科长</span>
+        </div>
+        <div class="score">
+          <span class="l">综合评分</span>
+          <span class="v ok">94.2</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="item pass">
+      <span class="dot"></span>
+      <div class="card">
+        <div class="row">
+          <span class="date">2026-05-20</span>
+          <span class="badge ok">通过</span>
+        </div>
+        <div class="ttl2">江北未来谷公寓 · 月度抽样</div>
+        <div class="meta">
+          <span>项目 ID NJ-008</span>
+          <span>抽 8 套</span>
+          <span>检查员 李监管</span>
+        </div>
+        <div class="score">
+          <span class="l">综合评分</span>
+          <span class="v ok">93.8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="inspection"></div>
+</div>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

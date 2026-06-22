@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>云上观景民宿 · 房源详情 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .pd-hero{height:280px;position:relative;color:#fff;}
+  .pd-hero .badge{position:absolute;left:16px;bottom:16px;z-index:2;}
+  .pd-hero .badge .star{font-size:11px;font-weight:700;color:#ffd98a;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);padding:4px 11px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .pd-hero .badge .nm{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:8px;text-shadow:0 2px 14px rgba(0,0,0,.4);}
+  .pd-hero .badge .lo{font-size:12px;opacity:.92;margin-top:2px;}
+  .pd-hero .dots{position:absolute;right:14px;bottom:16px;z-index:2;font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
+  .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
+  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
+  .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
+  .tagline{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+  .tagline span{font-size:11px;color:var(--brand-deep);background:var(--brand-soft);padding:3px 9px;border-radius:6px;}
+  .verify{margin-top:12px;border:1px dashed var(--gold);background:var(--gold-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:11px;}
+  .verify .no{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:var(--gold-deep);}
+  .verify .vb{font-size:10.5px;color:var(--ink);margin-top:3px;}
+  .verify .vb b{color:var(--brand);}
+  .verify a.qrlink{flex-shrink:0;line-height:0;}
+  .verify .qrimg{width:48px;height:48px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+  .verify .vb a{color:var(--brand);}
+  .host{display:flex;align-items:center;gap:12px;margin-top:11px;}
+  .host .av{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-size:24px;flex-shrink:0;}
+  .host .hn{font-weight:700;font-size:14px;}
+  .host .hm{font-size:11px;color:var(--muted);margin-top:2px;}
+  .host .lvl{margin-left:auto;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-deep));padding:4px 10px;border-radius:999px;}
+  .cal{display:flex;gap:8px;margin-top:11px;overflow-x:auto;}
+  .cal .d{flex:0 0 auto;text-align:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:62px;}
+  .cal .d.on{border-color:var(--brand);background:var(--brand-soft);}
+  .cal .d .day{font-size:11px;color:var(--muted);}
+  .cal .d .p{font-family:var(--serif);font-weight:700;color:var(--gold-deep);font-size:14px;margin-top:3px;}
+  /* 可展开的整月价格日历 + 入住/离店区间选择 */
+  .cal-toggle{float:right;font-size:12px;font-weight:700;color:var(--brand-deep);cursor:pointer;user-select:none;}
+  .cal-toggle .arr{display:inline-block;transition:transform .2s;}
+  .cal-toggle.open .arr{transform:rotate(180deg);}
+  .calfull{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px 12px 13px;display:none;}
+  .calfull.open{display:block;}
+  .calnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+  .calnav .mo{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
+  .calnav button{border:1px solid var(--border);background:#fff;border-radius:8px;width:30px;height:30px;font-size:16px;line-height:1;color:var(--ink);cursor:pointer;}
+  .calnav button:disabled{opacity:.3;cursor:default;}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .calgrid .wk{text-align:center;font-size:11px;color:var(--muted);padding:1px 0 3px;}
+  .calgrid .cell{text-align:center;border-radius:9px;padding:5px 0 4px;min-height:40px;cursor:pointer;}
+  .calgrid .cell.blank{visibility:hidden;cursor:default;}
+  .calgrid .cell .dn{font-size:13px;font-weight:600;color:var(--ink);line-height:1.15;}
+  .calgrid .cell .cp{font-size:9px;color:var(--gold-deep);margin-top:1px;}
+  .calgrid .cell.wknd .cp{color:#b45309;}
+  .calgrid .cell.past{cursor:default;}
+  .calgrid .cell.past .dn{color:#cbd2ce;}
+  .calgrid .cell.range{background:var(--brand-soft);}
+  .calgrid .cell.end{background:linear-gradient(135deg,var(--brand),var(--brand-deep));}
+  .calgrid .cell.end .dn,.calgrid .cell.end .cp{color:#fff;}
+  .calsum{margin-top:11px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink);gap:8px;}
+  .calsum .hint{color:var(--muted);}
+  .calsum .tot b{font-family:var(--serif);color:var(--gold-deep);font-size:16px;margin-left:3px;}
+  .nearby a{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .nearby a:last-child{border-bottom:0;}
+  .nearby a .e{font-size:17px;}
+  .nearby a .ar{margin-left:auto;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar ghost">
+      <a class="bk" href="lvju-app-lvju.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="act"><span>♡</span><span>⤴</span></div>
+    </div>
+
+    <div class="pd-hero s-xijiang">
+      <div class="badge">
+        <span class="star">★ 4.9 五星旅居</span>
+        <div class="nm">云上观景民宿</div>
+        <div class="lo">黔东南州 · 西江千户苗寨 · 整栋可包</div>
+      </div>
+      <div class="dots">1 / 18</div>
+    </div>
+
+    <div class="block">
+      <div class="bt">苗寨核心 · 日落观景台</div>
+      <div class="bs">整栋 6 室 · 可住 10 人 · 含双早 · 旅居管家入驻</div>
+      <div class="tagline"><span>苗寨核心位</span><span>日落观景台</span><span>含双早</span><span>管家服务</span><span>地暖</span><span>可包栋</span></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">旅居星级评价 · 5 维</div>
+      <div class="bs">按旅居住宿维度评定</div>
+      <div style="margin-top:8px;">
+        <div class="rate-row"><span class="k">环境景观</span><span class="bar"><i style="width:96%"></i></span><span class="v">4.9</span></div>
+        <div class="rate-row"><span class="k">服务品质</span><span class="bar"><i style="width:92%"></i></span><span class="v">4.7</span></div>
+        <div class="rate-row"><span class="k">设施配套</span><span class="bar"><i style="width:88%"></i></span><span class="v">4.5</span></div>
+        <div class="rate-row"><span class="k">交通区位</span><span class="bar"><i style="width:84%"></i></span><span class="v">4.3</span></div>
+        <div class="rate-row"><span class="k">特色体验</span><span class="bar"><i style="width:98%"></i></span><span class="v">5.0</span></div>
+      </div>
+      <div class="verify">
+        <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJ-2026-0000888" title="扫码 / 点击验真"><img class="qrimg" alt="房源验真二维码"></a>
+        <div>
+          <div class="no">GZ-LJ-2026-0000888</div>
+          <div class="vb"><b>✓</b> 公安实名 · <b>✓</b> 住建备案 · <b>✓</b> 家财+客房安心险</div>
+          <div class="vb"><a href="screens/portal-verify.html?code=GZ-LJ-2026-0000888">扫码验真 ↗ lvju.guizhou.gov.cn/v/0000888</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bt">旅居管家</div>
+      <div class="host">
+        <div class="av g3">👩</div>
+        <div><div class="hn">杨晓芳 · 金牌旅居管家</div><div class="hm">持证上岗 · 信用分 4.8 · 客户评价 ★4.9</div></div>
+        <span class="lvl">L4 持证</span>
+      </div>
+      <div class="verify">
+        <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJS-2026-0007788" title="扫码 / 点击验真"><img class="qrimg" alt="管家持证验真二维码"></a>
+        <div>
+          <div class="no">GZ-LJS-2026-0007788</div>
+          <div class="vb"><b>✓</b> 人社职业资格 · <b>✓</b> 培训结业 86 课时 · <b>✓</b> 安心责任险</div>
+          <div class="vb"><a href="screens/portal-verify.html?code=GZ-LJS-2026-0007788">扫码验真 ↗ lvju.guizhou.gov.cn/v/0007788</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bt">价格日历 <span class="cal-toggle" id="caltoggle">展开选日期 <span class="arr">⌄</span></span></div>
+      <div class="bs">6 月 · 平日 ¥468 起 · 周末 ¥588</div>
+      <div class="cal">
+        <div class="d on"><div class="day">6/13 六</div><div class="p">¥588</div></div>
+        <div class="d on"><div class="day">6/14 日</div><div class="p">¥588</div></div>
+        <div class="d"><div class="day">6/15 一</div><div class="p">¥468</div></div>
+        <div class="d"><div class="day">6/16 二</div><div class="p">¥468</div></div>
+        <div class="d"><div class="day">6/17 三</div><div class="p">¥468</div></div>
+      </div>
+      <div class="calfull" id="calfull">
+        <div class="calnav">
+          <button id="calprev" aria-label="上个月">‹</button>
+          <div class="mo" id="calmo"></div>
+          <button id="calnext" aria-label="下个月">›</button>
+        </div>
+        <div class="calgrid" id="calgrid"></div>
+        <div class="calsum" id="calsum"></div>
+      </div>
+    </div>
+
+    <div class="block nearby">
+      <div class="bt" style="margin-bottom:6px;">周边玩法</div>
+      <a href="lvju-app-spots.html"><span class="e">⛰</span>西江千户苗寨观景台 · 步行 5 分钟<span class="ar">›</span></a>
+      <a href="lvju-app-food.html"><span class="e">🍲</span>苗家长桌宴 · 酸汤鱼 · 楼下即是<span class="ar">›</span></a>
+      <a href="lvju-app-routes.html"><span class="e">🧭</span>黔东南秘境 3 日路线 · 含本店<span class="ar">›</span></a>
+    </div>
+
+    <div style="height:14px;"></div>
+  </div>
+
+  <div class="cta">
+    <div class="p"><b>¥588<small> /晚起</small></b><span>含双早 · 可包栋</span></div>
+    <div class="heart">♡</div>
+    <a class="btn" href="lvju-app-booking.html">立即预订</a>
+  </div>
+</div>
+<script src="screens/_qr.js"></script>
+<script>
+/* 房源 / 管家 验证卡：本地离线生成真二维码，编码 portal-verify 真实绝对地址 */
+document.querySelectorAll('a.qrlink').forEach(function(a){
+  var img=a.querySelector('img.qrimg'); if(!img) return;
+  var target; try{ target=new URL(a.getAttribute('href'),location.href).href; }catch(e){ return; }
+  try{ var qr=qrcode(0,'M'); qr.addData(target); qr.make(); img.src=qr.createDataURL(3,0); }
+  catch(e){ img.src='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data='+encodeURIComponent(target); }
+  img.title='扫码直达：'+target;
+});
+</script>
+<script>
+/* 价格日历：展开整月网格，选择入住→离店区间，实时算晚数/合计并同步底部预订栏 */
+(function(){
+  var TODAY=new Date(2026,5,13);            // 演示基准日 2026-06-13
+  var MIN=new Date(2026,5,1), MAX=new Date(2026,8,1);  // 可看 6–9 月
+  var view=new Date(2026,5,1);
+  var ci=null, co=null;                     // 入住 / 离店
+  var WK=['日','一','二','三','四','五','六'];
+  var grid=document.getElementById('calgrid');
+  var moLbl=document.getElementById('calmo');
+  var prev=document.getElementById('calprev'), next=document.getElementById('calnext');
+  var sum=document.getElementById('calsum');
+  var toggle=document.getElementById('caltoggle'), full=document.getElementById('calfull');
+  var ctaP=document.querySelector('.cta .p');
+  var ctaOrig=ctaP?ctaP.innerHTML:'';
+
+  function price(d){var w=d.getDay();return (w===0||w===6)?588:468;}   // 周末 588 / 平日 468
+  function key(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
+  function fmt(d){return (d.getMonth()+1)+'/'+d.getDate();}
+  function nights(){return (ci&&co)?Math.round((co-ci)/864e5):0;}
+  function total(){var t=0;if(ci&&co){var d=new Date(ci);while(d<co){t+=price(d);d.setDate(d.getDate()+1);}}return t;}
+
+  function pick(d){
+    if(!ci || (ci&&co) || d<=ci){ ci=d; co=null; }   // 重新起算
+    else { co=d; }                                    // 选离店
+    render();
+  }
+
+  function render(){
+    moLbl.textContent=view.getFullYear()+' 年 '+(view.getMonth()+1)+' 月';
+    prev.disabled = view<=MIN; next.disabled = view>=MAX;
+    grid.innerHTML='';
+    WK.forEach(function(w){var e=document.createElement('div');e.className='wk';e.textContent=w;grid.appendChild(e);});
+    var lead=new Date(view.getFullYear(),view.getMonth(),1).getDay();
+    for(var i=0;i<lead;i++){var b=document.createElement('div');b.className='cell blank';grid.appendChild(b);}
+    var dim=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+    for(var dd=1;dd<=dim;dd++){
+      var d=new Date(view.getFullYear(),view.getMonth(),dd);
+      var c=document.createElement('div'); c.className='cell';
+      var w=d.getDay(); if(w===0||w===6) c.classList.add('wknd');
+      if(d<TODAY){
+        c.classList.add('past'); c.innerHTML='<div class="dn">'+dd+'</div>';
+      } else {
+        c.innerHTML='<div class="dn">'+dd+'</div><div class="cp">¥'+price(d)+'</div>';
+        (function(dt){c.addEventListener('click',function(){pick(dt);});})(d);
+      }
+      if(ci){
+        var k=key(d);
+        if(co){
+          if(k===key(ci)||k===key(co)) c.classList.add('end');
+          else if(d>ci && d<co) c.classList.add('range');
+        } else if(k===key(ci)) c.classList.add('end');
+      }
+      grid.appendChild(c);
+    }
+    updateSum();
+  }
+
+  function updateSum(){
+    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店</span>'; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
+    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选择离店日期</span>'; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
+    var n=nights(), t=total();
+    sum.innerHTML='<span>'+fmt(ci)+' 入住 → '+fmt(co)+' 离店 · '+n+' 晚</span>'
+      +'<span class="tot">合计<b>¥'+t.toLocaleString()+'</b></span>';
+    if(ctaP) ctaP.innerHTML='<b>¥'+t.toLocaleString()+'<small> / '+n+' 晚</small></b><span>'+fmt(ci)+'–'+fmt(co)+' · 含双早</span>';
+  }
+
+  toggle.addEventListener('click',function(){
+    full.classList.toggle('open'); toggle.classList.toggle('open');
+    if(full.classList.contains('open')) full.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+  prev.addEventListener('click',function(){ if(view>MIN){view=new Date(view.getFullYear(),view.getMonth()-1,1);render();} });
+  next.addEventListener('click',function(){ if(view<MAX){view=new Date(view.getFullYear(),view.getMonth()+1,1);render();} });
+  render();
+})();
+</script>
+</body>
+</html>

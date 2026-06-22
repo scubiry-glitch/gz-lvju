@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>旗下服务者 · 保租房 V 端</title>
+  <style>
+    :root {
+      --bg: #fef7ed; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #c2410c;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI */
+    .kpi-row{display:grid; grid-template-columns:repeat(6, 1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:20px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);} .ki .d.danger{color:var(--danger);}
+
+    /* 2 col layout */
+    .row2{display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .card-head{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; font-size:12px;}
+    .card-head .actions a{color:var(--accent);}
+    .card-body{padding:14px 18px;}
+
+    /* team filter */
+    .filter-row{display:flex; gap:6px; padding:12px 18px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+    .fc{padding:5px 12px; border-radius:6px; font-size:12.5px; background:var(--bg); color:var(--muted); cursor:pointer; border:1px solid transparent; display:flex; align-items:center; gap:5px;}
+    .fc.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .fc .ct{font-size:10px; padding:1px 5px; background:var(--surface); border-radius:6px; color:var(--muted); font-weight:600;}
+    .fc.on .ct{background:rgba(255,255,255,0.25); color:white;}
+
+    /* team table */
+    .tt{width:100%; border-collapse:collapse; font-size:13px;}
+    .tt th, .tt td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--border);}
+    .tt th{background:#f9fafb; font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;}
+    .tt tr:hover td{background:#f9fafb;}
+    .tt td .av{display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px; margin-right:8px; vertical-align:middle;}
+    .tt td .nm{font-weight:600; vertical-align:middle;}
+    .tt td .id{font-size:11px; color:var(--muted); margin-left:40px; display:block;}
+    .lv-badge{display:inline-block; padding:2px 7px; border-radius:4px; font-size:10px; font-weight:700; color:white;}
+    .lv-badge.L1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .lv-badge.L2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .lv-badge.L3{background:linear-gradient(135deg, #047857, #10b981);}
+    .lv-badge.L4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .role-pill{font-size:11px; color:var(--muted); padding:2px 8px; background:var(--bg); border-radius:4px;}
+    .src{font-size:11px; padding:2px 7px; border-radius:4px; background:color-mix(in oklab, var(--success) 12%, transparent); color:var(--success); font-weight:600;}
+    .src.flag{background:color-mix(in oklab, var(--warn) 12%, transparent); color:var(--warn);}
+    .src.fl{background:color-mix(in oklab, var(--accent) 12%, transparent); color:var(--accent);}
+    .stars{color:var(--gold); font-size:11px;}
+    .stars .e{color:var(--border);}
+    .row-actions a{font-size:11.5px; color:var(--accent); margin-right:8px;}
+
+    /* sync sidebar - 与中台联动 */
+    .sync-card{background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 4%, transparent)); border:1px solid color-mix(in oklab, var(--accent) 20%, var(--border)); border-radius:var(--radius-md); padding:16px 18px; margin-bottom:14px;}
+    .sync-card .head{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .sync-card .head .ic{font-size:18px;}
+    .sync-card .head .nm{font-size:13px; font-weight:600; color:var(--accent);}
+    .sync-card .head .ts{margin-left:auto; font-size:11px; color:var(--muted);}
+    .sync-card .desc{font-size:12px; color:#9a3412; line-height:1.5;}
+
+    /* training progress mini */
+    .tp-row{display:grid; grid-template-columns:1fr 80px 60px; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); font-size:12px; align-items:center;}
+    .tp-row:last-child{border-bottom:0;}
+    .tp-row .nm{font-weight:600;}
+    .tp-row .sub{font-size:11px; color:var(--muted); margin-top:1px;}
+    .tp-row .bar{height:6px; background:var(--bg); border-radius:3px; overflow:hidden;}
+    .tp-row .bar .fl{height:100%; background:var(--accent); border-radius:3px;}
+    .tp-row .pct{font-family:var(--mono); font-weight:700; text-align:right;}
+
+    /* monthly settlement */
+    .st-row{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--border); font-size:12px; align-items:center;}
+    .st-row:last-child{border-bottom:0; padding-top:14px; border-top:2px solid var(--border);}
+    .st-row .nm{color:var(--muted);}
+    .st-row .v{font-family:var(--mono); font-weight:700;}
+    .st-row.total .nm{color:var(--fg); font-weight:600;}
+    .st-row.total .v{font-size:18px; color:var(--accent);}
+    .st-row .v.dn{color:var(--danger);}
+    .st-row .v.ok{color:var(--success);}
+
+    /* compliance alert */
+    .alert{padding:10px 12px; background:color-mix(in oklab, var(--warn) 6%, transparent); border-left:3px solid var(--warn); border-radius:5px; margin-bottom:8px; font-size:12px;}
+    .alert.danger{background:color-mix(in oklab, var(--danger) 6%, transparent); border-color:var(--danger);}
+    .alert .head{display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;}
+    .alert .head .nm{font-weight:600;}
+    .alert .head .lvl{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:700;}
+    .alert .head .lvl.w{background:var(--warn); color:white;}
+    .alert .head .lvl.d{background:var(--danger); color:white;}
+    .alert .ctx{font-size:11.5px; color:#92400e; line-height:1.5;}
+    .alert.danger .ctx{color:#7f1d1d;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="v" data-active="team"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>旗下服务者</h1>
+      <span style="font-size:12px; color:var(--muted);">优家装饰 · 28 名签约服务者 · 全部通过平台 L0-L4 认证</span>
+      <button class="btn">导出花名册</button>
+      <button class="btn">从平台招募</button>
+      <button class="btn pri">+ 邀请入职</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="ki"><div class="l">签约总数</div><div class="n">28<span class="u">人</span></div><div class="d ok">↑ 4 本月</div></div>
+      <div class="ki"><div class="l">L4 督导</div><div class="n">2<span class="u">人</span></div><div class="d">驻 2 个项目</div></div>
+      <div class="ki"><div class="l">L3 高级</div><div class="n">12<span class="u">人</span></div><div class="d">主力骨干</div></div>
+      <div class="ki"><div class="l">L2 独立</div><div class="n">10<span class="u">人</span></div></div>
+      <div class="ki"><div class="l">L1 培训</div><div class="n">4<span class="u">人</span></div><div class="d warn">2 待考</div></div>
+      <div class="ki"><div class="l">本月人力费</div><div class="n">¥ 24.6<span class="u">万</span></div><div class="d">含五险</div></div>
+    </div>
+
+    <div class="row2">
+
+      <!-- LEFT: team table -->
+      <div class="card">
+        <div class="card-head">
+          <h3>团队名单</h3>
+          <span class="pill">数据由平台中台同步</span>
+          <div class="actions"><a>下钻报告</a></div>
+        </div>
+        <div class="filter-row">
+          <span class="fc on">全部 <span class="ct">28</span></span>
+          <span class="fc">L4 <span class="ct">2</span></span>
+          <span class="fc">L3 <span class="ct">12</span></span>
+          <span class="fc">L2 <span class="ct">10</span></span>
+          <span class="fc">L1 <span class="ct">4</span></span>
+          <span class="fc">在场 <span class="ct">22</span></span>
+          <span class="fc">待考 <span class="ct">2</span></span>
+        </div>
+        <table class="tt">
+          <thead>
+            <tr><th>员工</th><th>等级</th><th>岗位</th><th>本月项目</th><th>客评</th><th>来源</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="av">李</span><span class="nm">李振华</span><span class="id">EMP-2024-3284</span></td>
+              <td><span class="lv-badge L4">L4</span></td>
+              <td><span class="role-pill">装修交付</span></td>
+              <td>百家湖樾 · 督导</td>
+              <td><span class="stars">★★★★★</span> 4.92</td>
+              <td><span class="src">自有</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">林</span><span class="nm">林小英</span><span class="id">EMP-2025-1186</span></td>
+              <td><span class="lv-badge L4">L4</span></td>
+              <td><span class="role-pill">服家</span></td>
+              <td>栖霞蓝湾 · 项目经理</td>
+              <td><span class="stars">★★★★★</span> 4.88</td>
+              <td><span class="src">自有</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">韩</span><span class="nm">韩师傅</span><span class="id">EMP-2025-0512</span></td>
+              <td><span class="lv-badge L3">L3</span></td>
+              <td><span class="role-pill">装修交付</span></td>
+              <td>百家湖樾 · 核心</td>
+              <td><span class="stars">★★★★<span class="e">★</span></span> 4.86</td>
+              <td><span class="src">自有</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">梁</span><span class="nm">梁小雷</span><span class="id">EMP-2026-0218</span></td>
+              <td><span class="lv-badge L3">L3</span></td>
+              <td><span class="role-pill">装修交付</span></td>
+              <td>百家湖樾</td>
+              <td><span class="stars">★★★★<span class="e">★</span></span> 4.78</td>
+              <td><span class="src fl">平台招募</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">许</span><span class="nm">许大姐</span><span class="id">EMP-2025-0089</span></td>
+              <td><span class="lv-badge L3">L3</span></td>
+              <td><span class="role-pill">服家</span></td>
+              <td>栖霞蓝湾 · 8 户</td>
+              <td><span class="stars">★★★★★</span> 4.94</td>
+              <td><span class="src">自有</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">范</span><span class="nm">范师傅</span><span class="id">EMP-2026-0316</span></td>
+              <td><span class="lv-badge L2">L2</span></td>
+              <td><span class="role-pill">检修</span></td>
+              <td>栖霞蓝湾 · 4 户</td>
+              <td><span class="stars">★★★★<span class="e">★</span></span> 4.72</td>
+              <td><span class="src fl">平台招募</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">史</span><span class="nm">史晓燕</span><span class="id">EMP-2026-0512</span></td>
+              <td><span class="lv-badge L2">L2</span></td>
+              <td><span class="role-pill">服家</span></td>
+              <td>栖霞蓝湾</td>
+              <td><span class="stars">★★★★<span class="e">★</span></span> 4.68</td>
+              <td><span class="src">自有</span></td>
+              <td class="row-actions"><a>排班</a><a>详情</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">唐</span><span class="nm">唐师傅</span><span class="id">EMP-2026-0428</span></td>
+              <td><span class="lv-badge L1">L1</span></td>
+              <td><span class="role-pill">装修交付</span></td>
+              <td>培训中</td>
+              <td>—</td>
+              <td><span class="src flag">06-12 待考</span></td>
+              <td class="row-actions"><a>查培训</a><a>排考</a></td>
+            </tr>
+            <tr>
+              <td><span class="av">袁</span><span class="nm">袁小婷</span><span class="id">EMP-2026-0464</span></td>
+              <td><span class="lv-badge L1">L1</span></td>
+              <td><span class="role-pill">保洁</span></td>
+              <td>培训中</td>
+              <td>—</td>
+              <td><span class="src flag">06-18 待考</span></td>
+              <td class="row-actions"><a>查培训</a><a>排考</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- RIGHT: 中台联动 + 培训 + 结算 -->
+      <div>
+
+        <div class="sync-card">
+          <div class="head">
+            <span class="ic">🔌</span>
+            <span class="nm">与平台中台数据联动</span>
+            <span class="ts">实时同步</span>
+          </div>
+          <div class="desc">
+            团队等级 / 信用分 / 客评 / 考试 / 证书 — <b>全部由「服务认证中台」管理</b>，本端只读 + 排班。<br>
+            服务商不可<b>越权操作</b>：不能改等级、不能改信用分、不能颁发证书。
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>4 人培训进度</h3><span class="pill">L1 待考</span></div>
+          <div class="card-body">
+            <div class="tp-row">
+              <div><div class="nm">唐师傅</div><div class="sub">装修交付 · 入训 24 天</div></div>
+              <div class="bar"><div class="fl" style="width:92%;"></div></div>
+              <div class="pct">92%</div>
+            </div>
+            <div class="tp-row">
+              <div><div class="nm">袁小婷</div><div class="sub">保洁 · 入训 18 天</div></div>
+              <div class="bar"><div class="fl" style="width:78%;"></div></div>
+              <div class="pct">78%</div>
+            </div>
+            <div class="tp-row">
+              <div><div class="nm">阮师傅</div><div class="sub">检修 · 入训 12 天</div></div>
+              <div class="bar"><div class="fl" style="width:42%;"></div></div>
+              <div class="pct">42%</div>
+            </div>
+            <div class="tp-row">
+              <div><div class="nm">张燕</div><div class="sub">服家 · 刚入训</div></div>
+              <div class="bar"><div class="fl" style="width:14%;"></div></div>
+              <div class="pct">14%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>本月结算（向中台对账）</h3><span class="pill">T+5 结算</span></div>
+          <div class="card-body">
+            <div class="st-row"><span class="nm">人力费（28 人）</span><span class="v">¥ 24.6 万</span></div>
+            <div class="st-row"><span class="nm">项目奖金分润</span><span class="v ok">+ ¥ 3.2 万</span></div>
+            <div class="st-row"><span class="nm">L4 督导津贴</span><span class="v ok">+ ¥ 0.6 万</span></div>
+            <div class="st-row"><span class="nm">五险一金代缴</span><span class="v dn">− ¥ 4.8 万</span></div>
+            <div class="st-row"><span class="nm">个税代扣</span><span class="v dn">− ¥ 1.4 万</span></div>
+            <div class="st-row"><span class="nm">平台技术费 6%</span><span class="v dn">− ¥ 1.32 万</span></div>
+            <div class="st-row total"><span class="nm">本月应付服务者</span><span class="v">¥ 20.88 万</span></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>合规预警 · 来自中台</h3><span class="pill" style="background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);">2 项需处理</span></div>
+          <div class="card-body">
+            <div class="alert">
+              <div class="head"><span class="nm">健康证 30 天内到期</span><span class="lvl w">中</span></div>
+              <div class="ctx">史晓燕（EMP-2026-0512）健康证到期日 2026-07-08。请提前 10 天上传新证。</div>
+            </div>
+            <div class="alert danger">
+              <div class="head"><span class="nm">五险缴纳异常</span><span class="lvl d">高</span></div>
+              <div class="ctx">范师傅（EMP-2026-0316）社保账户 5 月断缴 1 个月。中台规则 R-107 已触发，未补缴前不可派单。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>资管大盘 · 国企持有方 + 白名单运营商（B 端）</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    /* layout */
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+    /* main */
+    .main { padding: 22px 28px 40px; overflow-x: hidden; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .topbar .range {
+      padding: 6px 12px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); font-size: 13px;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .topbar .range svg { width: 14px; height: 14px; color: var(--muted); }
+    .topbar .user { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .topbar .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 600; }
+
+    /* kpi */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+    .kpi {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px 18px;
+    }
+    .kpi .lbl { font-size: 12px; color: var(--muted); }
+    .kpi .num { font-size: 26px; font-weight: 700; margin-top: 4px; line-height: 1.1; }
+    .kpi .delta { font-size: 12px; margin-top: 6px; }
+    .kpi .delta.up { color: var(--success); }
+    .kpi .delta.dn { color: var(--danger); }
+    .kpi .spark { height: 32px; margin-top: 8px; background: linear-gradient(180deg, var(--accent-soft), transparent); border-radius: 4px; position: relative; }
+    .kpi .spark::after { content: ''; position: absolute; left: 0; right: 0; bottom: 4px; height: 1px; background: var(--accent); opacity: 0.6; }
+
+    /* two-col grid */
+    .row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-head h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .card-head .actions { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
+    .card-head .actions a { color: var(--accent); }
+    .card-body { padding: 14px 18px; }
+
+    /* table */
+    table.proj { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.proj th, table.proj td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.proj th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.proj tr:last-child td { border-bottom: 0; }
+    .rate { display: flex; align-items: center; gap: 6px; }
+    .rate-track { width: 60px; height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .rate-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+    .pill.ok { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .pill.warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .pill.danger { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+
+    /* alerts */
+    .alert-list { list-style: none; padding: 0; margin: 0; }
+    .alert-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .alert-item:last-child { border-bottom: 0; }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .alert-dot.h { background: var(--danger); }
+    .alert-dot.m { background: var(--warn); }
+    .alert-dot.l { background: var(--muted); }
+    .alert-item .title { font-weight: 500; }
+    .alert-item .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* upcoming */
+    .upcoming { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .up-box { padding: 12px; background: var(--bg); border-radius: var(--radius-sm); text-align: center; }
+    .up-box .n { font-size: 22px; font-weight: 700; color: var(--warn); }
+    .up-box .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .up-box .a { display: block; margin-top: 8px; font-size: 11px; color: var(--accent); }
+
+    @media (max-width: 900px) {
+      .console { grid-template-columns: 1fr; }
+      .side { display: none; }
+      .row2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <!-- sidebar -->
+  <div id="side-nav" data-series="b" data-active="console"></div>
+
+  <!-- main -->
+  <main class="main">
+
+    <div class="topbar">
+      <h1>运营总览</h1>
+      <div class="range">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+        本月 · 2026-06
+      </div>
+      <div class="user">
+        <div class="avatar">王</div>
+        王经理 · 运营总监
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="lbl">在管项目</div>
+        <div class="num">12</div>
+        <div class="delta up">↑ 2 本月新增</div>
+        <div class="spark"></div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">在租房源 / 入住率</div>
+        <div class="num">3,842<small style="font-size: 14px; color: var(--muted);"> / 89.4%</small></div>
+        <div class="delta up">↑ 2.1 pp 环比</div>
+        <div class="spark"></div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">本月租金回收</div>
+        <div class="num">¥9.13<small style="font-size: 14px; color: var(--muted);"> M</small></div>
+        <div class="delta up">回款率 96.8%</div>
+        <div class="spark"></div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">30 天内到期合同</div>
+        <div class="num">214</div>
+        <div class="delta dn">续约率 78%（低）</div>
+        <div class="spark"></div>
+      </div>
+    </div>
+
+    <!-- main + alerts -->
+    <div class="row2">
+      <div class="card">
+        <div class="card-head">
+          <h3>项目运营表现</h3>
+          <div class="actions"><a href="#">查看全部 →</a></div>
+        </div>
+        <div class="card-body" style="padding: 0;">
+          <table class="proj">
+            <thead>
+              <tr>
+                <th>项目</th>
+                <th>区域</th>
+                <th>房源</th>
+                <th>入住率</th>
+                <th>本月回款</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>梧桐公馆人才公寓</td>
+                <td>江宁区</td>
+                <td>620</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 96%"></div></div>96%</div></td>
+                <td>¥1.42 M</td>
+                <td><span class="pill ok">优秀</span></td>
+              </tr>
+              <tr>
+                <td>河西青年公寓</td>
+                <td>建邺区</td>
+                <td>480</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 92%"></div></div>92%</div></td>
+                <td>¥1.34 M</td>
+                <td><span class="pill ok">良好</span></td>
+              </tr>
+              <tr>
+                <td>龙江新青年社区</td>
+                <td>鼓楼区</td>
+                <td>360</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 88%"></div></div>88%</div></td>
+                <td>¥0.94 M</td>
+                <td><span class="pill ok">良好</span></td>
+              </tr>
+              <tr>
+                <td>南部新城人才家园</td>
+                <td>秦淮区</td>
+                <td>540</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 76%"></div></div>76%</div></td>
+                <td>¥1.06 M</td>
+                <td><span class="pill warn">需关注</span></td>
+              </tr>
+              <tr>
+                <td>仙林湖国际社区</td>
+                <td>栖霞区</td>
+                <td>420</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 64%"></div></div>64%</div></td>
+                <td>¥0.71 M</td>
+                <td><span class="pill danger">告警</span></td>
+              </tr>
+              <tr>
+                <td>江北未来谷公寓</td>
+                <td>江北新区</td>
+                <td>720</td>
+                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 93%"></div></div>93%</div></td>
+                <td>¥1.81 M</td>
+                <td><span class="pill ok">优秀</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>异常预警 <span style="color: var(--danger);">· 4</span></h3>
+          <div class="actions"><a href="#">全部</a></div>
+        </div>
+        <div class="card-body">
+          <ul class="alert-list">
+            <li class="alert-item">
+              <div class="alert-dot h"></div>
+              <div>
+                <div class="title">仙林湖项目空置 47 套超 30 天</div>
+                <div class="meta">建议下调挂牌价 5% · 立即处置</div>
+              </div>
+            </li>
+            <li class="alert-item">
+              <div class="alert-dot h"></div>
+              <div>
+                <div class="title">12 户欠租超 7 天</div>
+                <div class="meta">总额 ¥28,400 · 已发提醒</div>
+              </div>
+            </li>
+            <li class="alert-item">
+              <div class="alert-dot m"></div>
+              <div>
+                <div class="title">3 个合同 24h 内到期未续约</div>
+                <div class="meta">河西青年 / 龙江新青年</div>
+              </div>
+            </li>
+            <li class="alert-item">
+              <div class="alert-dot m"></div>
+              <div>
+                <div class="title">5 张工单超时未处理</div>
+                <div class="meta">已通知服务者主管</div>
+              </div>
+            </li>
+            <li class="alert-item">
+              <div class="alert-dot l"></div>
+              <div>
+                <div class="title">本月住建厅监管数据已同步</div>
+                <div class="meta">合规率 99.2% · 通过</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- upcoming -->
+    <div class="card">
+      <div class="card-head">
+        <h3>合同到期日历</h3>
+        <div class="actions"><a href="#">导出 Excel</a></div>
+      </div>
+      <div class="card-body">
+        <div class="upcoming">
+          <div class="up-box">
+            <div class="n">62</div>
+            <div class="l">未来 7 天到期</div>
+            <a class="a" href="#">提前致电 →</a>
+          </div>
+          <div class="up-box">
+            <div class="n">158</div>
+            <div class="l">未来 30 天到期</div>
+            <a class="a" href="#">发送续约链接 →</a>
+          </div>
+          <div class="up-box">
+            <div class="n">214</div>
+            <div class="l">未来 60 天到期</div>
+            <a class="a" href="#">规划替补房源 →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

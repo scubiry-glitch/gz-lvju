@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>数据导出 · 江苏保租房监管</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:90px;}
+
+
+    /* group */
+    .section{padding:8px 12px 4px;}
+    .section h3{font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:14px 4px 8px;}
+
+    /* template grid */
+    .tpl-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .tpl{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 12px; text-align:center; cursor:pointer;}
+    .tpl .ic{width:40px; height:40px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; margin:0 auto 8px;}
+    .tpl .ic svg{width:20px; height:20px;}
+    .tpl strong{font-size:13px; font-weight:600; display:block;}
+    .tpl small{font-size:10px; color:var(--muted); display:block; margin-top:2px;}
+    .tpl.green .ic{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .tpl.warn .ic{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+
+    /* form */
+    .form-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px;}
+    .field{margin-bottom:14px;}
+    .field:last-child{margin-bottom:0;}
+    .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
+    .field input, .field select{width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; font-size:14px; color:var(--fg); outline:none;}
+    .field input:focus, .field select:focus{border-color:var(--accent);}
+    .row-2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+
+    .checks{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+    .chk{display:flex; align-items:center; gap:6px; padding:8px 10px; background:var(--bg); border-radius:6px; font-size:12px;}
+    .chk input{width:14px; height:14px;}
+
+    /* CTA */
+    .cta-row{padding:14px 12px; display:flex; gap:8px;}
+    .cta-row button{flex:1; padding:14px; border-radius:10px; font-size:14px; font-weight:600;}
+    .cta-row .ghost{background:var(--surface); border:1px solid var(--border); color:var(--fg);}
+    .cta-row .pri{background:var(--accent); color:white;}
+
+    /* history list */
+    .hist-list .hist{display:flex; align-items:center; gap:10px; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:6px;}
+    .hist .icf{width:36px; height:36px; border-radius:8px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; flex-shrink:0; font-size:11px; font-weight:700;}
+    .hist .nm{font-size:13px; font-weight:600;}
+    .hist .mt{font-size:11px; color:var(--muted); margin-top:1px;}
+    .hist .status{margin-left:auto; font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600;}
+    .hist .status.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .hist .status.proc{background:var(--accent-soft); color:var(--accent);}
+
+    /* g tabbar */
+
+    .stamp-note{margin:14px 16px; padding:12px; background:color-mix(in oklab, var(--accent) 4%, transparent); border-left:3px solid var(--accent); border-radius:6px; font-size:12px; color:var(--muted);}
+    .stamp-note strong{color:var(--accent);}
+    /* ============ PC 版（≥1024px）============ */
+    @media (min-width: 1024px) {
+      .app-shell > .section { padding: 16px 24px 4px; max-width: 1080px; }
+      .app-shell > .section > .tpl-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      }
+      .app-shell > .section > .form-card { max-width: 680px; }
+      .app-shell > .section > .history-list { max-width: 820px; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+<div id="side-nav" data-series="g" data-active="export"></div>
+<div class="app-shell">
+  <div id="m-header" data-series="g" data-active="export" data-title="数据导出" data-icon="📊" data-ttl="监管数据导出与报表" data-sub="支持自定义字段 / 时间区间 / 项目筛选 · 自动加盖审计水印" data-right="本月 318"></div>
+  <div class="section">
+    <h3>常用模板（点击直接生成）</h3>
+    <div class="tpl-grid">
+      <div class="tpl">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg></div>
+        <strong>月度监管报表</strong>
+        <small>含合规率/入住率/工单</small>
+      </div>
+      <div class="tpl green">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <strong>租金合规专项</strong>
+        <small>近 90 天 · 含偏离详情</small>
+      </div>
+      <div class="tpl">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg></div>
+        <strong>承租人画像</strong>
+        <small>脱敏汇总数据</small>
+      </div>
+      <div class="tpl warn">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
+        <strong>违规处置档案</strong>
+        <small>含案卷 PDF</small>
+      </div>
+      <div class="tpl">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-6"/></svg></div>
+        <strong>趋势分析图</strong>
+        <small>近 12 月走势</small>
+      </div>
+      <div class="tpl green">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
+        <strong>白名单台账</strong>
+        <small>运营 / 服务者 / 供应商</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h3>自定义导出</h3>
+    <div class="form-card">
+      <div class="field">
+        <label>报表名称</label>
+        <input value="2026 年 6 月 · 南京市保租房监管报表" />
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>开始日期</label>
+          <input type="date" value="2026-06-01" />
+        </div>
+        <div class="field">
+          <label>结束日期</label>
+          <input type="date" value="2026-06-30" />
+        </div>
+      </div>
+      <div class="field">
+        <label>视角范围</label>
+        <select><option>全省 13 市</option><option selected>南京市（试点）</option><option>苏州市</option><option>无锡市</option></select>
+      </div>
+      <div class="field">
+        <label>项目范围</label>
+        <select><option selected>全部项目（46）</option><option>仅试点 6 项目</option><option>仅观察期项目</option><option>自定义勾选…</option></select>
+      </div>
+      <div class="field">
+        <label>包含字段（默认 5 项）</label>
+        <div class="checks">
+          <label class="chk"><input type="checkbox" checked>房源基础</label>
+          <label class="chk"><input type="checkbox" checked>租金合规</label>
+          <label class="chk"><input type="checkbox" checked>入住率</label>
+          <label class="chk"><input type="checkbox" checked>合同备案</label>
+          <label class="chk"><input type="checkbox" checked>工单/投诉</label>
+          <label class="chk"><input type="checkbox">承租人画像（脱敏）</label>
+          <label class="chk"><input type="checkbox">资金流水（江苏银行）</label>
+          <label class="chk"><input type="checkbox">服务者排班</label>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>导出格式</label>
+          <select><option>Excel (.xlsx)</option><option>PDF（含签章）</option><option>CSV</option><option>JSON</option></select>
+        </div>
+        <div class="field">
+          <label>密级</label>
+          <select><option>内部</option><option selected>秘密</option><option>机密</option></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta-row">
+    <button class="ghost">保存为模板</button>
+    <button class="pri">生成 · 加盖水印</button>
+  </div>
+
+  <div class="stamp-note">
+    <strong>合规提醒</strong>：导出报表自动加盖江苏省住建厅监管水印 + 审计员工号 + 时间戳。"秘密"级文件仅限本人内网下载，转发需在密级系统单独审批。
+  </div>
+
+  <div class="section">
+    <h3>近期导出历史</h3>
+    <div class="hist-list">
+      <div class="hist">
+        <div class="icf">PDF</div>
+        <div>
+          <div class="nm">2026 年 5 月监管报表 · 南京全市</div>
+          <div class="mt">2026-06-01 09:12 · 18 MB · 张科长</div>
+        </div>
+        <span class="status ok">已下载</span>
+      </div>
+      <div class="hist">
+        <div class="icf">XLSX</div>
+        <div>
+          <div class="nm">租金合规偏离详情 · 仙林湖</div>
+          <div class="mt">2026-05-29 16:42 · 1.2 MB · 李监管</div>
+        </div>
+        <span class="status ok">已下载</span>
+      </div>
+      <div class="hist">
+        <div class="icf">PDF</div>
+        <div>
+          <div class="nm">月度承租人画像 · Q2 季报</div>
+          <div class="mt">2026-05-28 11:30 · 6.4 MB · 张科长</div>
+        </div>
+        <span class="status proc">生成中</span>
+      </div>
+      <div class="hist">
+        <div class="icf">CSV</div>
+        <div>
+          <div class="nm">2025 全年白名单台账</div>
+          <div class="mt">2026-05-20 14:18 · 0.8 MB · 王科长</div>
+        </div>
+        <span class="status ok">已下载</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="export"></div>
+</div>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

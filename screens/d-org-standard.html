@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>机构的标准 · 五类机构生态</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #fff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --gov: #1e40af;
+      --op: #0f766e;
+      --vendor: #c2410c;
+      --supplier: #6b21a8;
+      --training: #7c3aed;
+      --ok: #16a34a;
+      --warn: #ea580c;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; padding:24px; background:#fff;
+      border:1px solid var(--border); border-radius:14px; margin-bottom:18px;
+    }
+    .doc-header h1{font-size:26px; font-weight:700; margin:0 0 8px;}
+    .doc-header .sub{color:var(--muted); font-size:14px;}
+    .doc-header .tags{display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .doc-header .tag{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fef3c7; color:#92400e; font-weight:500;
+    }
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:16px; font-weight:700; margin-bottom:16px;
+      padding-bottom:10px; border-bottom:2px solid var(--plat-accent);
+    }
+    .section-title .num{
+      width:28px; height:28px; border-radius:50%;
+      background:var(--plat); color:#fff;
+      display:grid; place-items:center; font-size:14px; font-weight:700;
+    }
+    .section-title .label{flex:1;}
+    .section-title .badge{
+      font-size:11px; padding:3px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    .crosslink{
+      margin-bottom:14px; padding:10px 14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:8px;
+      font-size:12px; color:#1e40af;
+    }
+    .crosslink a{font-weight:600; text-decoration:underline;}
+
+    /* 五类机构总览（5 列） */
+    .five-grid{
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;
+    }
+    .org-card{
+      border-radius:10px; padding:14px; color:#fff;
+      display:flex; flex-direction:column; gap:8px;
+      position:relative; overflow:hidden;
+      min-height:280px;
+    }
+    /* 5 类机构配色：S 服务者(蓝) / B 运营商(青绿) / V 人力(橙) / M 物资(紫) / T 培训(紫罗兰) */
+    .org-card.staff    {background:linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);}        /* S 服务者 */
+    .org-card.op       {background:linear-gradient(135deg, #134e4a 0%, var(--op) 100%);}      /* B 运营商 */
+    .org-card.vendor   {background:linear-gradient(135deg, #7c2d12 0%, var(--vendor) 100%);}  /* V 人力服务商 */
+    .org-card.material {background:linear-gradient(135deg, #4c1d95 0%, var(--supplier) 100%);}/* M 物资供应商 */
+    .org-card.training {background:linear-gradient(135deg, #5b21b6 0%, var(--training) 100%);}/* T 培训机构 */
+
+    /* ===== 可收起 section ===== */
+    .section.collapsible .section-title{cursor:pointer; user-select:none; position:relative; padding-right:32px;}
+    .section.collapsible .section-title::after{
+      content:"▾"; position:absolute; right:8px; top:50%; transform:translateY(-50%);
+      font-size:13px; color:var(--muted); transition:transform 0.18s;
+    }
+    .section.collapsible.collapsed .section-title{margin-bottom:0; padding-bottom:0; border-bottom:0;}
+    .section.collapsible.collapsed .section-title::after{transform:translateY(-50%) rotate(-90deg);}
+    .section.collapsible.collapsed .collapsible-body{display:none;}
+
+    /* ===== § 2 五类机构 × P 中台 关系图谱 ===== */
+    .rel-wrap{display:grid; grid-template-columns:1.6fr 1fr; gap:18px; align-items:start;}
+    .rel-svg{width:100%; height:auto; display:block; background:#fafbfc; border:1px solid var(--border); border-radius:10px;}
+    .rel-legend{font-size:12px; line-height:1.65;}
+    .rel-legend h4{font-size:13px; margin:0 0 8px; font-weight:700; color:var(--fg);}
+    .rel-legend .li{display:flex; gap:8px; margin-bottom:6px; align-items:flex-start;}
+    .rel-legend .li .swatch{
+      width:14px; height:14px; border-radius:3px; flex-shrink:0; margin-top:3px;
+    }
+    .rel-legend .li .text strong{color:var(--fg);}
+    .rel-legend .li .text{color:#334155;}
+    .rel-legend .note{
+      margin-top:12px; padding:10px 12px; background:#f0fdf4;
+      border:1px solid #bbf7d0; border-radius:8px; font-size:11.5px;
+      color:#15803d; line-height:1.6;
+    }
+    @media (max-width:1023px){ .rel-wrap{grid-template-columns:1fr;} }
+    .org-card .oh{
+      display:flex; align-items:center; gap:8px;
+      padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);
+    }
+    .org-card .oh .icon{
+      width:32px; height:32px; border-radius:8px;
+      background:rgba(255,255,255,0.2);
+      display:grid; place-items:center; font-size:16px;
+    }
+    .org-card .oh .name{font-size:13px; font-weight:700; line-height:1.2;}
+    .org-card .oh .scope{font-size:10px; opacity:0.75; line-height:1.3;}
+    .org-card .o-row{font-size:11px; line-height:1.5;}
+    .org-card .o-row .lbl{
+      display:inline-block; font-size:10px; padding:1px 7px; border-radius:4px;
+      background:rgba(255,255,255,0.2); color:#fff; font-weight:700;
+      margin-bottom:3px; letter-spacing:0.4px;
+    }
+    .org-card .o-row .txt{opacity:0.92;}
+
+    .unified-bar{
+      margin-top:16px; padding:12px;
+      background:linear-gradient(90deg, #0f172a 0%, #b45309 100%);
+      color:#fff; border-radius:8px;
+      display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px;
+    }
+    .unified-bar .ub{font-size:13px; font-weight:600; text-align:center;}
+    .unified-bar .ub .em{font-size:18px; font-weight:700; display:block; margin-bottom:2px;}
+
+    /* 准入六步流程 */
+    .flow-row{display:flex; gap:6px; align-items:stretch; overflow-x:auto;}
+    .flow-step{
+      flex:1; min-width:120px;
+      background:#fff; border:1px solid var(--border); border-radius:8px;
+      padding:10px 12px; position:relative;
+    }
+    .flow-step .n{font-size:10px; color:var(--muted); font-weight:600;}
+    .flow-step .t{font-size:13px; font-weight:600; margin-top:4px;}
+    .flow-step .d{font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;}
+    .flow-step + .flow-step::before{
+      content:"→"; position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-weight:700;
+    }
+
+    /* 三种接入模式 */
+    .mode-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:14px;}
+    .mode-card{
+      background:#fff; border:1px solid var(--border); border-radius:12px;
+      padding:16px; position:relative;
+      border-top:4px solid;
+    }
+    .mode-card.m1{border-top-color:#22c55e;}
+    .mode-card.m2{border-top-color:#eab308;}
+    .mode-card.m3{border-top-color:#7c3aed;}
+    .mode-card .lvl{
+      font-size:11px; padding:2px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:600;
+    }
+    .mode-card .name{font-size:15px; font-weight:700; margin:8px 0 10px;}
+    .mode-card .row{display:flex; gap:8px; font-size:12px; margin:6px 0;}
+    .mode-card .row .k{color:var(--muted); font-weight:600; flex-shrink:0; width:56px;}
+    .mode-card .row .v{color:#334155;}
+    .mode-card .fit{
+      margin-top:10px; padding:8px 10px;
+      background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;
+      font-size:11px; color:#15803d;
+    }
+    .mode-card .fit::before{content:"适合："; font-weight:700;}
+
+    /* 时间线 */
+    .timeline-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;}
+    .tl-card{
+      border-radius:10px; padding:12px; border-top:3px solid;
+      background:#fff; border:1px solid var(--border);
+    }
+    .tl-card.s1{border-top-color:#3b82f6;}
+    .tl-card.s2{border-top-color:#22c55e;}
+    .tl-card.s3{border-top-color:#eab308;}
+    .tl-card.s4{border-top-color:var(--warn);}
+    .tl-card.s5{border-top-color:#7c3aed;}
+    .tl-card .date{font-size:11px; color:var(--muted); font-weight:600;}
+    .tl-card .t{font-size:13px; font-weight:700; margin:4px 0 6px;}
+    .tl-card .d{font-size:11px; color:#475569; line-height:1.5;}
+    .tl-card .metric{
+      margin-top:8px; padding:4px 8px; border-radius:6px;
+      background:#f0fdf4; color:#15803d; font-size:11px; font-weight:600;
+    }
+
+    /* 运营管理基线 · 全程网办 + 三险一付 */
+    .baseline-block{margin-top:18px;}
+    .baseline-block h3{
+      font-size:14px; font-weight:700; margin:0 0 10px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .baseline-block h3 .pill{
+      font-size:11px; padding:2px 8px; border-radius:6px;
+      background:#fef3c7; color:#92400e; font-weight:600;
+    }
+    .step-card-rich{
+      flex:1; min-width:140px;
+      background:#fff; border:1px solid var(--border); border-radius:8px;
+      padding:12px; position:relative;
+    }
+    .step-card-rich .icon{
+      width:32px; height:32px; border-radius:8px; margin-bottom:6px;
+      background:linear-gradient(135deg, #1e40af 0%, #0f172a 100%);
+      color:#fff; display:grid; place-items:center; font-size:16px;
+    }
+    .step-card-rich .n{font-size:10px; color:var(--muted); font-weight:600;}
+    .step-card-rich .t{font-size:13px; font-weight:700; margin:2px 0 4px;}
+    .step-card-rich .d{font-size:11px; color:#475569; line-height:1.45;}
+    .step-card-rich + .step-card-rich::before{
+      content:"→"; position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-weight:700;
+    }
+
+    .baseline-grid{
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;
+    }
+    .baseline-card{
+      background:linear-gradient(135deg, #0a1238 0%, #0f1a4d 100%);
+      color:#fff; border-radius:10px; padding:14px;
+      position:relative; overflow:hidden;
+    }
+    .baseline-card::after{
+      content:""; position:absolute; right:-30px; top:-30px;
+      width:80px; height:80px; background:var(--plat-accent); opacity:0.2; border-radius:50%;
+    }
+    .baseline-card .icon{
+      width:32px; height:32px; border-radius:8px;
+      background:rgba(255,255,255,0.2);
+      display:grid; place-items:center; font-size:16px; margin-bottom:8px;
+      position:relative; z-index:1;
+    }
+    .baseline-card .t{font-size:14px; font-weight:700; margin-bottom:4px; position:relative; z-index:1;}
+    .baseline-card .sub{font-size:10px; opacity:0.7; margin-bottom:8px; position:relative; z-index:1;}
+    .baseline-card .d{font-size:11px; line-height:1.5; opacity:0.92; position:relative; z-index:1;}
+    .baseline-card .scope{
+      margin-top:8px; padding:4px 8px;
+      background:rgba(255,255,255,0.12); border-radius:6px;
+      font-size:10px; font-weight:600; position:relative; z-index:1;
+    }
+    .baseline-card .scope::before{content:"📍 "; }
+
+    .baseline-note{
+      margin-top:14px; padding:12px 14px;
+      background:#fffbeb; border:1px solid #fcd34d; border-radius:8px;
+      font-size:12px; color:#92400e; line-height:1.6;
+    }
+    .baseline-note strong{color:#7c2d12;}
+
+    /* 商业模式 */
+    .biz-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;}
+    .biz-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .biz-card h4{margin:0 0 10px; font-size:13px; font-weight:700; color:var(--plat);}
+    .biz-card ul{margin:0; padding-left:18px; font-size:12px; line-height:1.8; color:#334155;}
+
+    .doc-footer{
+      margin-top:16px; padding:18px; border-radius:12px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; text-align:center;
+    }
+    .doc-footer .em{font-size:18px; font-weight:700; line-height:1.5;}
+    .doc-footer .sub{font-size:12px; opacity:0.85; margin-top:6px;}
+
+    /* impl-aligned · 与上方卡片列数对齐 */
+    .impl-aligned{
+      display:grid; gap:8px; margin-top:14px; padding:12px;
+      background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;
+    }
+    .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
+    .impl-aligned.cols-6{grid-template-columns:repeat(6, 1fr);}
+    .impl-aligned .impl-banner{
+      grid-column:1 / -1; font-size:11px; color:#64748b; font-weight:600;
+      letter-spacing:0.3px; margin-bottom:2px;
+    }
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{
+      font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px;
+      padding:0 0 4px; border-bottom:1px solid #e2e8f0;
+      margin-bottom:2px; text-align:center;
+    }
+    .impl-aligned .col a.impl-pill{
+      display:block; font-size:11px; padding:4px 8px; border-radius:6px;
+      background:#fff; border:1px solid #e2e8f0; color:#334155;
+      text-decoration:none; font-weight:500; line-height:1.35;
+      transition:all 0.15s; text-align:left;
+    }
+    .impl-aligned .col a.impl-pill:hover{
+      background:#0f172a; color:#fff; border-color:#0f172a;
+    }
+    .impl-aligned .col a.impl-pill .file{
+      display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px;
+      opacity:0.55; margin-top:2px;
+    }
+    .impl-aligned .col .empty-pill{
+      font-size:10px; color:#94a3b8; padding:4px 8px; text-align:center;
+      border:1px dashed #e2e8f0; border-radius:6px; background:#fff; line-height:1.3;
+    }
+    @media (max-width: 1100px){
+      .five-grid{grid-template-columns:repeat(2, 1fr);}
+      .impl-aligned.cols-5, .impl-aligned.cols-6{grid-template-columns:repeat(3, 1fr);}
+    }
+    @media (max-width: 900px){
+      .timeline-grid, .mode-grid, .biz-grid{grid-template-columns:1fr 1fr;}
+    }
+    @media (max-width: 600px){
+      .five-grid, .timeline-grid, .mode-grid, .biz-grid{grid-template-columns:1fr;}
+      .impl-aligned{grid-template-columns:1fr 1fr !important;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="org-standard"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>机构的标准 · 五类机构生态</h1>
+      <div class="sub">江苏保租房五类机构准入·协作·考核·退出全流程标准 · 政府背书 + 贝壳承建 + 同业开放</div>
+      <div class="tags">
+        <span class="tag">🛠 S 服务者</span>
+        <span class="tag">🏬 B 白名单运营商</span>
+        <span class="tag">👥 V 人力服务商</span>
+        <span class="tag">🛒 M 物资供应商</span>
+        <span class="tag">🎓 T 培训机构</span>
+        <span class="tag" style="background:#f0fdf4; color:#0f766e; border:1px dashed #0f766e;">🏢 国企持有方（产权方·旁注）</span>
+      </div>
+    </div>
+
+    <div class="crosslink">
+      📐 顶层定位：与 <a href="d-people-standard.html">人的标准</a>、<a href="d-property-standard.html">房的标准</a> 三标合一 · 「人」回答谁来做、「房」回答做什么、本文回答<strong>谁能来、怎么来、来了怎么管</strong>。对应 <a href="d-master-blueprint.html">总图谱</a> 的「四方共建模式」机构生态层。参考前版 <a href="d-org-gov-standard.html">机构+政府合作模式 v1</a>。
+    </div>
+
+    <!-- § 1 五类机构 × P 认证中台 · 关系图谱 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">1</span>
+        <span class="label">五类机构 × P 服务认证中台 · 关系图谱</span>
+        <span class="badge">谁认证谁 · 谁雇佣谁 · 谁供给谁</span>
+      </div>
+
+      <div class="rel-wrap">
+        <svg class="rel-svg" viewBox="0 0 720 460" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/>
+            </marker>
+            <marker id="arr-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+            </marker>
+            <marker id="arr-hold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0,0 L10,5 L0,10 z" fill="#0f766e"/>
+            </marker>
+          </defs>
+
+          <!-- 主辐射：P → 5 机构（颁证 + 录入星级 + 公示） -->
+          <g stroke="#0f172a" stroke-width="1.6" fill="none" marker-end="url(#arr-p)" opacity="0.85">
+            <line x1="360" y1="220" x2="360" y2="60"/>     <!-- P → S 顶 -->
+            <line x1="430" y1="200" x2="590" y2="100"/>    <!-- P → T 右上 -->
+            <line x1="430" y1="240" x2="610" y2="240"/>    <!-- P → V 右 -->
+            <line x1="430" y1="270" x2="580" y2="400"/>    <!-- P → M 右下 -->
+            <line x1="290" y1="270" x2="140" y2="400"/>    <!-- P → B 左下 -->
+          </g>
+
+          <!-- 业务流动：T 培训 → S/V/B；V 雇佣 S；V→B 派单；M→B 供货；S→B 执行 -->
+          <g stroke="#64748b" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#arr-flow)" opacity="0.75">
+            <path d="M 600 130 Q 470 80 410 60"/>                  <!-- T → S 培训出证 -->
+            <path d="M 620 130 Q 660 200 640 240"/>                <!-- T → V 培训人员 -->
+            <path d="M 580 270 Q 480 320 240 410"/>                <!-- V → B 派单 -->
+            <path d="M 540 430 Q 320 460 180 430"/>                <!-- M → B 集采供货 -->
+            <path d="M 360 90 Q 220 220 160 400"/>                 <!-- S → B 执行 -->
+          </g>
+
+          <!-- 中心节点 P -->
+          <g>
+            <rect x="290" y="200" width="140" height="80" rx="14" ry="14"
+              fill="#0f172a" stroke="#b45309" stroke-width="2"/>
+            <text x="360" y="232" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">🛡</text>
+            <text x="360" y="252" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">P 服务认证中台</text>
+            <text x="360" y="268" text-anchor="middle" fill="#fbbf24" font-size="10">标准·颁证·星级·公示·验真</text>
+          </g>
+
+          <!-- S 服务者（顶） -->
+          <g>
+            <rect x="290" y="20" width="140" height="50" rx="10" fill="#2563eb" stroke="#1e3a8a" stroke-width="1.5"/>
+            <text x="360" y="42" text-anchor="middle" fill="#fff" font-size="16">🛠</text>
+            <text x="360" y="60" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">S · 服务者（个人持证）</text>
+          </g>
+
+          <!-- T 培训（右上） -->
+          <g>
+            <rect x="555" y="75" width="135" height="50" rx="10" fill="#7c3aed" stroke="#5b21b6" stroke-width="1.5"/>
+            <text x="622" y="97" text-anchor="middle" fill="#fff" font-size="16">🎓</text>
+            <text x="622" y="115" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">T · 培训机构</text>
+          </g>
+
+          <!-- V 人力服务商（右中） -->
+          <g>
+            <rect x="575" y="215" width="135" height="50" rx="10" fill="#c2410c" stroke="#7c2d12" stroke-width="1.5"/>
+            <text x="642" y="237" text-anchor="middle" fill="#fff" font-size="16">👥</text>
+            <text x="642" y="255" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">V · 人力服务商</text>
+          </g>
+
+          <!-- M 物资（右下） -->
+          <g>
+            <rect x="540" y="395" width="140" height="50" rx="10" fill="#6b21a8" stroke="#4c1d95" stroke-width="1.5"/>
+            <text x="610" y="417" text-anchor="middle" fill="#fff" font-size="16">🛒</text>
+            <text x="610" y="435" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">M · 物资供应商</text>
+          </g>
+
+          <!-- B 运营商（左下，与持有方相邻便于"委托运营"箭头） -->
+          <g>
+            <rect x="80" y="395" width="160" height="50" rx="10" fill="#0f766e" stroke="#134e4a" stroke-width="1.5"/>
+            <text x="160" y="417" text-anchor="middle" fill="#fff" font-size="16">🏬</text>
+            <text x="160" y="435" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">B · 白名单运营商</text>
+          </g>
+
+          <!-- 国企持有方（左侧旁注 dashed 框） -->
+          <g>
+            <rect x="35" y="240" width="145" height="60" rx="10"
+              fill="#f0fdf4" stroke="#0f766e" stroke-width="1.5" stroke-dasharray="5 3"/>
+            <text x="107" y="262" text-anchor="middle" fill="#0f766e" font-size="13">🏢</text>
+            <text x="107" y="280" text-anchor="middle" fill="#134e4a" font-size="11" font-weight="700">国企持有方（产权）</text>
+            <text x="107" y="294" text-anchor="middle" fill="#0f766e" font-size="10">资产委托 · 不在 5 类机构内</text>
+            <!-- 委托运营→B -->
+            <path d="M 110 305 Q 110 360 140 395"
+              stroke="#0f766e" stroke-width="1.6" fill="none"
+              stroke-dasharray="4 3" marker-end="url(#arr-hold)"/>
+            <text x="80" y="360" fill="#0f766e" font-size="10" font-weight="600">委托运营</text>
+          </g>
+
+          <!-- 箭头中段文字注解 -->
+          <text x="370" y="130" fill="#0f172a" font-size="10" font-weight="600">颁证</text>
+          <text x="495" y="148" fill="#0f172a" font-size="10" font-weight="600">资质 LV</text>
+          <text x="510" y="232" fill="#0f172a" font-size="10" font-weight="600">服务商 LV1-5</text>
+          <text x="495" y="345" fill="#0f172a" font-size="10" font-weight="600">物资 LV</text>
+          <text x="230" y="345" fill="#0f172a" font-size="10" font-weight="600">白名单 + 星级</text>
+
+          <text x="450" y="50" fill="#64748b" font-size="9.5" font-style="italic">T 培训 → S 持证</text>
+          <text x="555" y="195" fill="#64748b" font-size="9.5" font-style="italic">T 培训 V 人员</text>
+          <text x="400" y="380" fill="#64748b" font-size="9.5" font-style="italic">V 派单</text>
+          <text x="340" y="450" fill="#64748b" font-size="9.5" font-style="italic">M 集采供货</text>
+          <text x="200" y="200" fill="#64748b" font-size="9.5" font-style="italic">S 执行运营</text>
+        </svg>
+
+        <div class="rel-legend">
+          <h4>🧭 关系一句话</h4>
+          <div class="li"><span class="swatch" style="background:#0f172a;"></span><div class="text">
+            <strong>P 是中心</strong> —— 给 S/B/V/M/T 五类全部颁证、录入星级、提供公示验真。
+          </div></div>
+          <div class="li"><span class="swatch" style="background:#2563eb;"></span><div class="text">
+            <strong>S 服务者</strong>（个人持证）— 被 V 雇佣 · 被 B 派单 · 受 T 培训出证。
+          </div></div>
+          <div class="li"><span class="swatch" style="background:#0f766e;"></span><div class="text">
+            <strong>B 白名单运营商</strong> — 国企持有方委托运营 · 调度 V/S/M/T 四方资源做日常动作。
+          </div></div>
+          <div class="li"><span class="swatch" style="background:#c2410c;"></span><div class="text">
+            <strong>V 人力服务商</strong> — 雇佣 S 服务者，把团体派给 B 运营商，受 T 培训。
+          </div></div>
+          <div class="li"><span class="swatch" style="background:#6b21a8;"></span><div class="text">
+            <strong>M 物资供应商</strong> — 省级集采，给 B 运营商供货（家具/家电/建材/智能锁/涂料/卫浴 6 类）。
+          </div></div>
+          <div class="li"><span class="swatch" style="background:#7c3aed;"></span><div class="text">
+            <strong>T 培训机构</strong> — 培训 S 服务者持证 + V 人员复训 + B 内训定向培训。
+          </div></div>
+          <div class="note">
+            🏢 <b>国企持有方</b> 不在 5 类机构内 —— 它是 <b>资产方/产权方</b>，通过"委托运营"把资产交给 B 运营商执行；自身仍接受 P 中台的合规备案，但日常派单/上架/管家等动作 <b>不做</b>（详见 CLAUDE 规则 4）。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 2 五类机构总览 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">2</span>
+        <span class="label">五类机构总览 · 准入 / 协作 / 考核 / 贡献四维度</span>
+        <span class="badge">机构生态架构</span>
+      </div>
+
+      <div class="five-grid">
+        <div class="org-card staff">
+          <div class="oh">
+            <div class="icon">🛠</div>
+            <div>
+              <div class="name">S · 服务者</div>
+              <div class="scope">持证个人 · 一线执行<br/>管家 / 维修 / 带看 / 装修工</div>
+            </div>
+          </div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台个人证（L0-L7）+ 人社备案</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">受 V 雇佣 / B 派单 · S 端 App 接单履约</div></div>
+          <div class="o-row"><span class="lbl">考核</span><div class="txt">业绩量 · 客户评分 ≥4.4 · 持证升级</div></div>
+          <div class="o-row"><span class="lbl">贡献</span><div class="txt">5000+ 持证 · 服务素质 · 一线触达租客</div></div>
+        </div>
+
+        <div class="org-card op">
+          <div class="oh">
+            <div class="icon">🏬</div>
+            <div>
+              <div class="name">B · 白名单运营商</div>
+              <div class="scope">委托运营方 · 日常动作<br/>自如 / 龙湖 / 华润 / 招商 / 贝壳省心租</div>
+            </div>
+          </div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台白名单 + 省房协认证 + 5 年托管经验</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">国企持有方委托 · 调度 V/S/M/T 四方资源</div></div>
+          <div class="o-row"><span class="lbl">考核</span><div class="txt">入住率 · 投诉率 · SLA 时效 · 续约率 · 星级</div></div>
+          <div class="o-row"><span class="lbl">贡献</span><div class="txt">专业化运营 · 标准化交付 · 同业对标</div></div>
+        </div>
+
+        <div class="org-card vendor">
+          <div class="oh">
+            <div class="icon">👥</div>
+            <div>
+              <div class="name">V · 人力服务商</div>
+              <div class="scope">服务者所属机构 · 团体雇主<br/>派单接单 / 装修交付 / 服家团队</div>
+            </div>
+          </div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 V 端入驻 + 旗下持证 S ≥10</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">雇佣 S 服务者 · 承接 B 运营商派单（分账 3/2/3）</div></div>
+          <div class="o-row"><span class="lbl">考核</span><div class="txt">持证率 · 业绩量 · 项目交付准时率</div></div>
+          <div class="o-row"><span class="lbl">贡献</span><div class="txt">人力规模 · 服务素质 · 项目交付能力</div></div>
+        </div>
+
+        <div class="org-card material">
+          <div class="oh">
+            <div class="icon">🛒</div>
+            <div>
+              <div class="name">M · 物资供应商</div>
+              <div class="scope">物资供给 · 6 类<br/>家具 / 家电 / 建材 / 智能锁 / 涂料 / 卫浴</div>
+            </div>
+          </div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 M 端入驻 + 行业认证 + 第三方质检 + ≥3 年质保</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">省级集采 · 给 B 运营商供货 · 价格公示</div></div>
+          <div class="o-row"><span class="lbl">考核</span><div class="txt">单方造价 · 良品率 · 24h 售后响应</div></div>
+          <div class="o-row"><span class="lbl">贡献</span><div class="txt">集采降本 · 物资标准化 · 单方造价↓</div></div>
+        </div>
+
+        <div class="org-card training">
+          <div class="oh">
+            <div class="icon">🎓</div>
+            <div>
+              <div class="name">T · 培训机构</div>
+              <div class="scope">课程开发 + 讲师 + 排课方<br/>江苏家协 / 高校 / 第三方</div>
+            </div>
+          </div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 T 端入驻 + 人社认证 + 讲师持证</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">培训 S 服务者 + V 人员 + B 内训 · 出"持证人"</div></div>
+          <div class="o-row"><span class="lbl">考核</span><div class="txt">学员通过率 · 课程评分 · 排课满载率</div></div>
+          <div class="o-row"><span class="lbl">贡献</span><div class="txt">人才输送 · 标准化培训 · L0-L7 持证体系</div></div>
+        </div>
+      </div>
+
+      <div class="unified-bar">
+        <div class="ub"><span class="em">5 类机构 · 4 维度标准</span>资质准入 · 协作模式 · 考核指标 · 价值贡献</div>
+      </div>
+
+      <div class="impl-aligned cols-5">
+        <div class="impl-banner">📎 五类机构 · 已实现页面（与上方 5 张 org-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">🛠 S 服务者</div>
+          <a href="service-workers.html" class="impl-pill">服务者公示<span class="file">service-workers.html</span></a>
+          <a href="home.html" class="impl-pill">服务者 App 首页<span class="file">home.html</span></a>
+          <a href="orders.html" class="impl-pill">订单履约<span class="file">orders.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏬 B 白名单运营商</div>
+          <a href="operators.html" class="impl-pill">同业开放公示<span class="file">operators.html</span></a>
+          <a href="b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
+          <a href="b-dispatch-board.html" class="impl-pill">派单看板<span class="file">b-dispatch-board.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">👥 V 人力服务商</div>
+          <a href="v-onboarding.html" class="impl-pill">服务商入驻<span class="file">v-onboarding.html</span></a>
+          <a href="v-team.html" class="impl-pill">旗下持证人<span class="file">v-team.html</span></a>
+          <a href="v-projects.html" class="impl-pill">项目对接<span class="file">v-projects.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🛒 M 物资供应商</div>
+          <a href="suppliers.html" class="impl-pill">合格供应商公示<span class="file">suppliers.html</span></a>
+          <a href="m-supplier-onboarding.html" class="impl-pill">入驻申请<span class="file">m-supplier-onboarding.html</span></a>
+          <a href="m-supplier-catalog.html" class="impl-pill">商品目录<span class="file">m-supplier-catalog.html</span></a>
+          <a href="m-supplier-orders.html" class="impl-pill">集采订单<span class="file">m-supplier-orders.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎓 T 培训机构</div>
+          <a href="t-courses.html" class="impl-pill">课程开发<span class="file">t-courses.html</span></a>
+          <a href="t-students.html" class="impl-pill">学员管理<span class="file">t-students.html</span></a>
+          <a href="t-schedule.html" class="impl-pill">排课排考<span class="file">t-schedule.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 3 准入六步流程 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">3</span>
+        <span class="label">MTV 系列机构准入六步流程</span>
+        <span class="badge">~ 45 天</span>
+      </div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="n">STEP 1</div>
+          <div class="t">申请入驻</div>
+          <div class="d">机构资质 + 法人信息 + 业务范围上传</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 2</div>
+          <div class="t">标准学习</div>
+          <div class="d">合规 + 服务标准 + 系统对接培训</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 3</div>
+          <div class="t">双审核</div>
+          <div class="d">贝壳初审资质 + 住建终审合规</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 4</div>
+          <div class="t">进入白名单</div>
+          <div class="d">分类公示 · 公众扫码可验真</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 5</div>
+          <div class="t">业务对接</div>
+          <div class="d">派单 / 采购 / 合作运营开通</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 6</div>
+          <div class="t">持续考核</div>
+          <div class="d">信用积分 · 季度评级 · 续约或淘汰</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-6">
+        <div class="impl-banner">📎 准入六步 · 已实现页面（与上方 6 个 STEP 对齐）</div>
+        <div class="col">
+          <div class="col-head">STEP 1 申请</div>
+          <a href="v-onboarding.html" class="impl-pill">服务商入驻申请<span class="file">v-onboarding.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 2 学习</div>
+          <a href="p-training-center.html" class="impl-pill">培训中心<span class="file">p-training-center.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 3 双审</div>
+          <a href="g-whitelist-operator.html" class="impl-pill">运营白名单审定<span class="file">g-whitelist-operator.html</span></a>
+          <a href="g-whitelist-supplier.html" class="impl-pill">供应商审定<span class="file">g-whitelist-supplier.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 4 公示</div>
+          <a href="portal-index.html" class="impl-pill">公示门户<span class="file">portal-index.html</span></a>
+          <a href="portal-verify.html" class="impl-pill">扫码验真<span class="file">portal-verify.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 5 对接</div>
+          <a href="v-projects.html" class="impl-pill">项目对接<span class="file">v-projects.html</span></a>
+          <a href="p-transaction.html" class="impl-pill">派单交易<span class="file">p-transaction.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 6 考核</div>
+          <a href="p-credit-engine.html" class="impl-pill">信用规则引擎<span class="file">p-credit-engine.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 4 五类机构分级标准（可收起） -->
+    <div class="section collapsible collapsed" id="sec-grading">
+      <div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span class="num">4</span>
+        <span class="label">五类机构分级标准 · 每类机构的 LV1–LV3</span>
+        <span class="badge">向上跃迁路径 · 点击展开/收起</span>
+      </div>
+
+     <div class="collapsible-body">
+      <div class="five-grid">
+        <div class="org-card staff">
+          <div class="oh">
+            <div class="icon">🛠</div>
+            <div><div class="name">S 服务者分级</div><div class="scope">按持证等级（个人）</div></div>
+          </div>
+          <div class="o-row"><span class="lbl">L0-L1</span><div class="txt">见习/初级 · 基础持证 · 单一岗位</div></div>
+          <div class="o-row"><span class="lbl">L2-L3</span><div class="txt">熟练/资深 · 跨岗 · 客评 ≥4.4 · 可独立带新</div></div>
+          <div class="o-row"><span class="lbl">L4-L5</span><div class="txt">专家/领军 · 跨项目调度 · 参与标准/题库共建</div></div>
+        </div>
+
+        <div class="org-card op">
+          <div class="oh">
+            <div class="icon">🏬</div>
+            <div><div class="name">B 运营商分级</div><div class="scope">按规模 + 跨城能力</div></div>
+          </div>
+          <div class="o-row"><span class="lbl">LV1</span><div class="txt">市级运营 · 单城市 · 1000 套以下</div></div>
+          <div class="o-row"><span class="lbl">LV2</span><div class="txt">跨市运营 · 多城联动 · 5000 套以下</div></div>
+          <div class="o-row"><span class="lbl">LV3</span><div class="txt">省级运营 · 全省覆盖 · 5000 套以上 · 同业标杆</div></div>
+        </div>
+
+        <div class="org-card vendor">
+          <div class="oh">
+            <div class="icon">👥</div>
+            <div><div class="name">V 人力分级</div><div class="scope">按持证人数 + 项目交付</div></div>
+          </div>
+          <div class="o-row"><span class="lbl">LV1</span><div class="txt">10–30 人 · 单项目派单</div></div>
+          <div class="o-row"><span class="lbl">LV2</span><div class="txt">30–100 人 · 跨项目 + 培训资质</div></div>
+          <div class="o-row"><span class="lbl">LV3</span><div class="txt">100+ 人 · 标杆机构 · 参与标准制定</div></div>
+        </div>
+
+        <div class="org-card material">
+          <div class="oh">
+            <div class="icon">🛒</div>
+            <div><div class="name">M 物资分级</div><div class="scope">按品类 + 集采资格</div></div>
+          </div>
+          <div class="o-row"><span class="lbl">LV1</span><div class="txt">单品类 · 按需供货</div></div>
+          <div class="o-row"><span class="lbl">LV2</span><div class="txt">多品类 · 省级集采资格</div></div>
+          <div class="o-row"><span class="lbl">LV3</span><div class="txt">全品类 · 集采底价制定 · 同业开放</div></div>
+        </div>
+
+        <div class="org-card training">
+          <div class="oh">
+            <div class="icon">🎓</div>
+            <div><div class="name">T 培训分级</div><div class="scope">按课程范围</div></div>
+          </div>
+          <div class="o-row"><span class="lbl">LV1</span><div class="txt">基础课程 · L0–L1 培训</div></div>
+          <div class="o-row"><span class="lbl">LV2</span><div class="txt">进阶课程 · L2–L3 + 题库共建</div></div>
+          <div class="o-row"><span class="lbl">LV3</span><div class="txt">省级合作 · L4–L5 + 标准制定参与</div></div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-5">
+        <div class="impl-banner">📎 分级标准 · 已实现页面（与上方 5 类机构分级对齐）</div>
+        <div class="col">
+          <div class="col-head">S 服务者分级</div>
+          <a href="service-workers.html" class="impl-pill">服务者公示 + 持证<span class="file">service-workers.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">B 运营商分级</div>
+          <a href="b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">V 人力分级</div>
+          <a href="v-team.html" class="impl-pill">旗下团队<span class="file">v-team.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">M 物资分级</div>
+          <a href="m-supplier-catalog.html" class="impl-pill">商品目录 LV<span class="file">m-supplier-catalog.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">T 培训分级</div>
+          <a href="t-courses.html" class="impl-pill">课程范围<span class="file">t-courses.html</span></a>
+        </div>
+      </div>
+     </div>
+    </div>
+
+    <!-- § 5 三种接入模式 + 同业开放 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">5</span>
+        <span class="label">B-三种接入模式</span>
+        <span class="badge">对同业开放</span>
+      </div>
+      <div class="mode-grid">
+        <div class="mode-card m1">
+          <span class="lvl">模式一 · 最常用</span>
+          <div class="name">机构自营 → 接入贝壳平台</div>
+          <div class="row"><span class="k">主体</span><span class="v">国企持有方自营 · 或 B 运营商既有团队接入</span></div>
+          <div class="row"><span class="k">运营</span><span class="v">机构自管 · 数据按统一字段推送</span></div>
+          <div class="row"><span class="k">分成</span><span class="v">服务费 6–8% · 不参与租金</span></div>
+          <div class="fit">已有团队、不放权的持有方/运营商</div>
+        </div>
+        <div class="mode-card m2">
+          <span class="lvl">模式二 · 总代监管</span>
+          <div class="name">第三方运营 + 贝壳监管</div>
+          <div class="row"><span class="k">主体</span><span class="v">B 白名单运营商 + V 人力服务商</span></div>
+          <div class="row"><span class="k">贝壳</span><span class="v">统一招商、平台、标准、投诉</span></div>
+          <div class="row"><span class="k">分成</span><span class="v">叠加监管服务费 · 双重监管</span></div>
+          <div class="fit">已委托第三方但管理质量不齐</div>
+        </div>
+        <div class="mode-card m3">
+          <span class="lvl">模式三 · 深度托管</span>
+          <div class="name">政府指定贝壳深度托管</div>
+          <div class="row"><span class="k">主体</span><span class="v">国企持有方委托贝壳 + M 物资集采</span></div>
+          <div class="row"><span class="k">运营</span><span class="v">收房 / 改造 / 出房 / 运维 / 签约</span></div>
+          <div class="row"><span class="k">分成</span><span class="v">完整经营权 + 议价权 · 单方造价↓</span></div>
+          <div class="fit">存量多、主体杂、管理弱（快速上量）</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 三种接入模式 · 已实现页面（与上方 3 张 mode-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">① 自营接入</div>
+          <a href="b-operator-console.html" class="impl-pill">运营工作台<span class="file">b-operator-console.html</span></a>
+          <a href="b-listing-mgmt.html" class="impl-pill">房源上下架<span class="file">b-listing-mgmt.html</span></a>
+          <a href="b-occupancy.html" class="impl-pill">入住率工单<span class="file">b-occupancy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">② 总代监管</div>
+          <a href="operators.html" class="impl-pill">同业开放公示<span class="file">operators.html</span></a>
+          <a href="b-dispatch-board.html" class="impl-pill">派单看板<span class="file">b-dispatch-board.html</span></a>
+          <a href="b-staff-roster.html" class="impl-pill">员工花名册<span class="file">b-staff-roster.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">③ 深度托管</div>
+          <a href="landlord.html" class="impl-pill">业主托管端<span class="file">landlord.html</span></a>
+          <a href="suppliers.html" class="impl-pill">物资集采公示<span class="file">suppliers.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 6 运营管理基线 · 所有机构通用 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">6</span>
+        <span class="label">B-运营管理基线</span>
+        <span class="badge">通用底座</span>
+      </div>
+      <p style="margin:0 0 18px; color:#475569; font-size:13px;">
+        无论机构走 <strong>模式①自营</strong>、<strong>模式②总代监管</strong> 还是 <strong>模式③深度托管</strong>，都必须遵循以下两套通用基线 ——
+        <strong>全程网办五步</strong> 是租客侧体验底线，<strong>三险一付</strong> 是金融与风险保障底线。这些是机构入驻的"硬约束"，不达标即取消白名单。
+      </p>
+
+      <!-- 基线 A · 全程网办五步 -->
+      <div class="baseline-block">
+        <h3>A · 全程网办五步流程 <span class="pill">租客体验底线 · 全程留痕</span></h3>
+        <div class="flow-row">
+          <div class="step-card-rich">
+            <div class="icon">🪪</div>
+            <div class="n">STEP 1</div>
+            <div class="t">资格核验</div>
+            <div class="d">对接住建简易入口 / 贝壳身份+人脸+准入校验，政府兜底</div>
+          </div>
+          <div class="step-card-rich">
+            <div class="icon">🏠</div>
+            <div class="n">STEP 2</div>
+            <div class="t">房源展示</div>
+            <div class="d">统一模板 · 实景图 · 政府指导价 · ★ 星级 · 无虚假</div>
+          </div>
+          <div class="step-card-rich">
+            <div class="icon">👀</div>
+            <div class="n">STEP 3</div>
+            <div class="t">预约带看</div>
+            <div class="d">一键预约 · 分配项目管家 / 贝壳管家</div>
+          </div>
+          <div class="step-card-rich">
+            <div class="icon">📝</div>
+            <div class="n">STEP 4</div>
+            <div class="t">签约备案</div>
+            <div class="d">电子合同 · 三方（政府/运营/租客）备案 · 留痕</div>
+          </div>
+          <div class="step-card-rich">
+            <div class="icon">💳</div>
+            <div class="n">STEP 5</div>
+            <div class="t">支付维修</div>
+            <div class="d">月付 · 公积金直付 · 线上报修 · 24h 响应</div>
+          </div>
+        </div>
+
+        <div class="impl-aligned cols-5">
+          <div class="impl-banner">📎 全程网办五步 · 已实现页面（与上方 5 个 STEP 对齐）</div>
+          <div class="col">
+            <div class="col-head">STEP 1 资格核验</div>
+            <a href="apply.html" class="impl-pill">申请·资格自检<span class="file">apply.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">STEP 2 房源展示</div>
+            <a href="home.html" class="impl-pill">首页·房源列表<span class="file">home.html</span></a>
+            <a href="detail.html" class="impl-pill">详情页<span class="file">detail.html</span></a>
+            <a href="c-compare.html" class="impl-pill">房源对比<span class="file">c-compare.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">STEP 3 预约带看</div>
+            <a href="my-applications.html" class="impl-pill">我的申请·进度<span class="file">my-applications.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">STEP 4 签约备案</div>
+            <a href="contracts.html" class="impl-pill">电子合同·三方备案<span class="file">contracts.html</span></a>
+            <a href="c-rent-compliance.html" class="impl-pill">租约合规<span class="file">c-rent-compliance.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">STEP 5 支付维修</div>
+            <a href="payment.html" class="impl-pill">在线缴费<span class="file">payment.html</span></a>
+            <a href="c-housing-fund.html" class="impl-pill">公积金直付<span class="file">c-housing-fund.html</span></a>
+            <a href="repair.html" class="impl-pill">报修<span class="file">repair.html</span></a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基线 B · 三险一付 -->
+      <div class="baseline-block">
+        <h3>B · 三险一付基线 <span class="pill">金融保障底线 · ★ 3 星舒适型及以上强制</span></h3>
+        <div class="baseline-grid">
+          <div class="baseline-card">
+            <div class="icon">🆓</div>
+            <div class="t">免押金</div>
+            <div class="sub">0 押 / 江苏银行担保</div>
+            <div class="d">替代押三付一，租客零押金入住，江苏银行作为担保方对运营机构兜底，违约风险由银行+保险池承担</div>
+            <div class="scope">★ 3 星及以上 · 强制基线</div>
+          </div>
+          <div class="baseline-card">
+            <div class="icon">🔄</div>
+            <div class="t">换租险</div>
+            <div class="sub">换城/换工作免违约</div>
+            <div class="d">租客因调岗/换城/疾病等不可抗力提前退租，险种覆盖剩余租期违约金，租客无后顾之忧</div>
+            <div class="scope">★ 3 星及以上 · 强制基线</div>
+          </div>
+          <div class="baseline-card">
+            <div class="icon">🛡</div>
+            <div class="t">家财险</div>
+            <div class="sub">漏水/电器/火灾保障</div>
+            <div class="d">加强型家财险覆盖漏水、电器故障、火灾、第三方责任。3 星基础版 / 4-5 星加强版</div>
+            <div class="scope">★ 3 星及以上 · 强制基线</div>
+          </div>
+          <div class="baseline-card">
+            <div class="icon">💰</div>
+            <div class="t">公积金直付</div>
+            <div class="sub">月冲 / 直划 / 银行通道</div>
+            <div class="d">江苏银行通道对接公积金中心，租客授权后按月直划，无需自行垫付申报</div>
+            <div class="scope">★ 3 星及以上 · 强制基线</div>
+          </div>
+        </div>
+
+        <div class="impl-aligned cols-4" style="grid-template-columns:repeat(4,1fr);">
+          <div class="impl-banner">📎 三险一付 · 已实现页面（与上方 4 张 baseline-card 对齐）</div>
+          <div class="col">
+            <div class="col-head">免押金</div>
+            <a href="f-escrow.html" class="impl-pill">监管账户·担保留痕<span class="file">f-escrow.html</span></a>
+            <a href="contracts.html" class="impl-pill">合同·押金条款<span class="file">contracts.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">换租险</div>
+            <span class="empty-pill">险种产品页<br/>由江苏银行/保险方提供</span>
+          </div>
+          <div class="col">
+            <div class="col-head">家财险</div>
+            <a href="b-house-rating-input.html" class="impl-pill">运营·保单录入（55 项自查含保险）<span class="file">b-house-rating-input.html</span></a>
+            <a href="detail.html" class="impl-pill">详情页·保险展示<span class="file">detail.html</span></a>
+          </div>
+          <div class="col">
+            <div class="col-head">公积金直付</div>
+            <a href="c-housing-fund.html" class="impl-pill">租客·授权直付<span class="file">c-housing-fund.html</span></a>
+            <a href="f-housing-fund.html" class="impl-pill">银行·公积金通道<span class="file">f-housing-fund.html</span></a>
+          </div>
+        </div>
+
+        <div class="baseline-note">
+          ⚠️ <strong>基准范围说明：</strong>三险一付对 <strong>★ 3 星舒适型及以上</strong> 房源属于强制基线（4 星 / 5 星只在保额、押金天数上递增），1–2 星可作可选项。
+          运营机构提供的 3 星房源若未配套三险一付，<strong>该房源不得在贝壳频道展示</strong>，且机构信用积分扣分。详见 <a href="d-property-standard.html" style="color:#7c2d12; font-weight:600; text-decoration:underline;">房的标准 § 综合星级阈值</a>。
+        </div>
+      </div>
+    </div>
+
+    <!-- § 7 落地路径（可收起） -->
+    <div class="section collapsible collapsed" id="sec-roadmap">
+      <div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span class="num">7</span>
+        <span class="label">落地路径 · 五步走（按 V25 GR 节奏校准）</span>
+        <span class="badge">2026.6 → 2027 · 点击展开/收起</span>
+      </div>
+
+     <div class="collapsible-body">
+      <div class="timeline-grid">
+        <div class="tl-card s1">
+          <div class="date">2026.6</div>
+          <div class="t">机构标准发布</div>
+          <div class="d">五类机构准入标准定稿 · 接受市场监管局公平竞争审查</div>
+          <div class="metric">✓ 标准 1.0 发文</div>
+        </div>
+        <div class="tl-card s2">
+          <div class="date">2026.7</div>
+          <div class="t">首批机构入驻</div>
+          <div class="d">南京浦口标杆配套 · 5 类机构各首批 5 家</div>
+          <div class="metric">✓ 25 家机构持证</div>
+        </div>
+        <div class="tl-card s3">
+          <div class="date">2026.8–10</div>
+          <div class="t">江苏首批 100 家</div>
+          <div class="d">4 设区市试点 · 同业开放接入</div>
+          <div class="metric">✓ 100 家公示</div>
+        </div>
+        <div class="tl-card s4">
+          <div class="date">2026.11</div>
+          <div class="t">发布会公示</div>
+          <div class="d">11 月联合发布会 · 首批合规机构名单 + 江苏样板</div>
+          <div class="metric">✓ 江苏样本立项</div>
+        </div>
+        <div class="tl-card s5">
+          <div class="date">2027</div>
+          <div class="t">全省 500+</div>
+          <div class="d">13 个设区市全覆盖 · 3 年中评 · 5 年回看</div>
+          <div class="metric">✓ 全国试点省份</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-5">
+        <div class="impl-banner">📎 落地路径 · 已实现页面（与上方 5 个时间节点对齐）</div>
+        <div class="col">
+          <div class="col-head">2026.6 标准</div>
+          <a href="g-policy.html" class="impl-pill">政策发文<span class="file">g-policy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.7 首批 25</div>
+          <a href="g-whitelist-operator.html" class="impl-pill">白名单审定<span class="file">g-whitelist-operator.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.8–10 100 家</div>
+          <a href="operators.html" class="impl-pill">同业公示<span class="file">operators.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.11 发布会</div>
+          <a href="portal-index.html" class="impl-pill">公示门户·名单<span class="file">portal-index.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2027 全省 500+</div>
+          <a href="g-dashboard.html" class="impl-pill">监管大屏·覆盖率<span class="file">g-dashboard.html</span></a>
+        </div>
+      </div>
+     </div>
+    </div>
+
+    <!-- § 8 商业模式与价值（可收起） -->
+    <div class="section collapsible collapsed" id="sec-biz">
+      <div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span class="num">8</span>
+        <span class="label">商业模式与价值</span>
+        <span class="badge">点击展开/收起</span>
+      </div>
+     <div class="collapsible-body">
+      <div class="biz-grid">
+        <div class="biz-card">
+          <h4>💰 收入来源（多机构联动）</h4>
+          <ul>
+            <li>机构入驻年费（V/T 端）</li>
+            <li>派单服务费分成（运营/服务者 6–8%）</li>
+            <li>物资集采返点（物资供应商）</li>
+            <li>课程销售分成（培训机构）</li>
+            <li>数据 API 调用（同业开放）</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>🎯 核心价值</h4>
+          <ul>
+            <li><strong>持证准入</strong>：机构责任边界清晰</li>
+            <li><strong>勤勉尽职 · 尽职免责</strong> 写入标准</li>
+            <li>避免长租公寓暴雷覆辙</li>
+            <li>对同业开放 · 避免「政府指定 = 永久独占」</li>
+            <li>3 年中评 + 5 年回看 合规底线</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>⚙ 关键能力</h4>
+          <ul>
+            <li>B 端 · 国企/运营商工作台</li>
+            <li>V 端 · 服务商门户（入驻/团队/项目）</li>
+            <li>T 端 · 培训机构（课程/学员/排课）</li>
+            <li>P 端中台 · 信用引擎 + 派单交易</li>
+            <li>G 端 · 三大白名单 + 公示门户</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 商业模式 · 已实现页面（与上方 3 个 biz-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">💰 收入来源</div>
+          <a href="p-transaction.html" class="impl-pill">派单交易·服务费<span class="file">p-transaction.html</span></a>
+          <a href="p-api-gateway.html" class="impl-pill">数据 API（同业）<span class="file">p-api-gateway.html</span></a>
+          <a href="p-traffic-policy.html" class="impl-pill">流量策略<span class="file">p-traffic-policy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎯 核心价值</div>
+          <a href="p-credit-engine.html" class="impl-pill">信用规则·持证准入<span class="file">p-credit-engine.html</span></a>
+          <a href="p-permissions.html" class="impl-pill">权限与角色·边界<span class="file">p-permissions.html</span></a>
+          <a href="g-rent-alert.html" class="impl-pill">租金合规预警<span class="file">g-rent-alert.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">⚙ 关键能力</div>
+          <a href="p-console.html" class="impl-pill">P 中台总览<span class="file">p-console.html</span></a>
+          <a href="p-workflow.html" class="impl-pill">工作流引擎<span class="file">p-workflow.html</span></a>
+          <a href="p-webhooks.html" class="impl-pill">事件 Webhook<span class="file">p-webhooks.html</span></a>
+        </div>
+      </div>
+     </div>
+    </div>
+
+    <div class="doc-footer">
+      <div class="em">建立江苏保租房五类机构生态</div>
+      <div class="sub">国企·运营·服务者·物资·培训 五位一体 · 政府背书 + 贝壳承建 + 同业开放 · 合规可持续</div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

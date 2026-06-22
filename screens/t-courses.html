@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>课程开发 · 培训机构端</title>
+  <style>
+    :root {
+      --bg: #faf5ff; --surface: #ffffff; --fg: #1e1b4b;
+      --muted: #6b7280; --border: #e5e7eb; --line:#f3f4f6;
+      --accent: #7c3aed; --accent-deep:#5b21b6;
+      --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-row{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px; position:relative;}
+    .ki::before{content:''; position:absolute; left:0; top:14px; bottom:14px; width:3px; background:var(--accent); border-radius:0 2px 2px 0;}
+    .ki.gold::before{background:var(--gold);}
+    .ki.ok::before{background:var(--success);}
+    .ki.warn::before{background:var(--warn);}
+    .ki .l{font-size:11px; color:var(--muted); margin-left:8px;}
+    .ki .n{font-size:22px; font-weight:700; margin:2px 0 0 8px; line-height:1.1;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:11px; color:var(--muted); margin-left:8px; margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .row{display:grid; grid-template-columns:1.5fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+    .card-head{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; display:flex; gap:8px;}
+    .card-head .actions a{font-size:12px; color:var(--accent);}
+    .card-body{padding:14px 18px;}
+
+    /* course list */
+    .filter-row{display:flex; gap:6px; padding:10px 18px; border-bottom:1px solid var(--border); flex-wrap:wrap; background:#fafbfc;}
+    .fc{padding:5px 12px; border-radius:6px; font-size:12.5px; background:var(--surface); color:var(--muted); cursor:pointer; border:1px solid var(--border);}
+    .fc.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+
+    .cs-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:14px; padding:14px 18px; border-bottom:1px solid var(--line); align-items:center; cursor:pointer;}
+    .cs-row:hover{background:#fafbfc;}
+    .cs-row.on{background:var(--accent-soft);}
+    .cs-row .cover{width:54px; height:54px; border-radius:8px; display:grid; place-items:center; font-size:22px; flex-shrink:0;}
+    .cs-row .cover.c1{background:linear-gradient(135deg, #fef3c7, #fbbf24);}
+    .cs-row .cover.c2{background:linear-gradient(135deg, #dbeafe, #60a5fa);}
+    .cs-row .cover.c3{background:linear-gradient(135deg, #ddd6fe, #a78bfa);}
+    .cs-row .cover.c4{background:linear-gradient(135deg, #fce7f3, #f9a8d4);}
+    .cs-row .cover.c5{background:linear-gradient(135deg, #dcfce7, #86efac);}
+    .cs-row .body .nm{font-size:13.5px; font-weight:600;}
+    .cs-row .body .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .cs-row .v{font-size:11px; padding:1px 6px; background:var(--bg); color:var(--accent); border-radius:3px; font-weight:600; font-family:var(--mono);}
+    .cs-row .badge{font-size:10px; padding:2px 7px; border-radius:4px; font-weight:600;}
+    .cs-row .badge.pub{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .cs-row .badge.draft{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .cs-row .badge.review{background:var(--accent-soft); color:var(--accent);}
+    .cs-row .stat{text-align:right; font-size:11px; color:var(--muted);}
+    .cs-row .stat .v{font-size:14px; font-weight:700; color:var(--fg); display:block; font-family:var(--mono);}
+
+    /* chapter editor */
+    .ch-list{list-style:none; padding:0; margin:0;}
+    .ch{display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; padding:10px 12px; background:var(--line); border-radius:6px; margin-bottom:6px; align-items:center; font-size:12.5px;}
+    .ch .num{width:22px; height:22px; border-radius:50%; background:var(--accent); color:white; font-size:11px; font-weight:700; display:grid; place-items:center;}
+    .ch.draft .num{background:var(--muted);}
+    .ch .nm{font-weight:500;}
+    .ch .meta{font-size:11px; color:var(--muted);}
+    .ch .ty{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600;}
+    .ch .ty.v{background:color-mix(in oklab, var(--accent) 14%, transparent); color:var(--accent);}
+    .ch .ty.p{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .ch .ty.q{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+
+    /* version + audit */
+    .review-card{padding:12px 14px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 4%, transparent)); border-left:3px solid var(--accent); border-radius:6px; margin-bottom:8px; font-size:12.5px;}
+    .review-card .head{display:flex; justify-content:space-between; margin-bottom:4px;}
+    .review-card .who{font-weight:600; color:var(--accent);}
+    .review-card .t{font-size:10px; color:var(--muted);}
+
+    /* revenue card */
+    .rev{padding:14px 16px; background:linear-gradient(135deg, #fef3c7, #fde68a); border:1px solid #fcd34d; border-radius:8px;}
+    .rev h4{font-size:11px; margin:0 0 6px; color:#92400e; text-transform:uppercase; letter-spacing:0.5px;}
+    .rev .big{font-size:28px; font-weight:800; color:#78350f; font-family:var(--mono);}
+    .rev .row2{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed #fcd34d;}
+    .rev .row2 .row{display:flex; justify-content:space-between; font-size:11.5px; color:#92400e;}
+    .rev .row2 .row b{color:#78350f;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="t" data-active="courses"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>课程开发</h1>
+      <span style="font-size:12px; color:var(--muted);">江苏家协培训中心 · 与平台中台 v3.0 标准对齐</span>
+      <button class="btn" id="btnQbank">题库联动</button>
+      <button class="btn" id="btnImport">导入大纲</button>
+      <button class="btn pri" id="btnNew">+ 新建课程</button>
+    </div>
+
+    <!-- 课程全生命周期链路（当前：① 课程开发） -->
+    <div style="background:var(--accent-soft);border:1px solid color-mix(in oklab,var(--accent) 22%,transparent);border-radius:10px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;">
+      <b style="color:var(--accent);margin-right:2px;">🔗 课程全链路</b>
+      <span style="padding:3px 9px;border-radius:6px;background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:700;white-space:nowrap;">① 课程开发</span>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-course-cert.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">② 课程认证</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-training-center.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">③ 上架·培训中心</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="s-learn.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">④ 学员学习</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="s-exam.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑤ 结业考试</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-exam-admin.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑥ 考务·成绩</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-graduation.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑦ 结业·学时</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-cert-issue.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑧ 统一发证</a>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="ki"><div class="l">课程总数</div><div class="n">28<span class="u">门</span></div><div class="d ok">↑ 4 本季</div></div>
+      <div class="ki ok"><div class="l">已上架</div><div class="n">22<span class="u">门</span></div><div class="d">中台公示</div></div>
+      <div class="ki warn"><div class="l">审核中</div><div class="n">4<span class="u">门</span></div><div class="d warn">3 待补材料</div></div>
+      <div class="ki gold"><div class="l">学员服务</div><div class="n">2,486<span class="u">人次</span></div><div class="d">本年累计</div></div>
+      <div class="ki"><div class="l">本月分润</div><div class="n">¥ 4.8<span class="u">万</span></div><div class="d ok">课时 ×0.65</div></div>
+    </div>
+
+    <div class="row">
+
+      <!-- LEFT course list + chapters -->
+      <div>
+        <div class="card">
+          <div class="card-head">
+            <h3>课程目录</h3>
+            <span class="pill">28 门 · 12 类岗位映射</span>
+            <div class="actions"><a>映射岗位</a><a>分润规则</a></div>
+          </div>
+          <div class="filter-row">
+            <span class="fc on">全部 28</span>
+            <span class="fc">已上架 22</span>
+            <span class="fc">审核中 4</span>
+            <span class="fc">草稿 2</span>
+            <span class="fc">L0-L4 个人轨</span>
+            <span class="fc">L5+ 管理输出轨</span>
+          </div>
+
+          <div id="csList"></div>
+        </div>
+
+        <!-- chapter editor for selected -->
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head">
+            <h3 id="dtTitle">课程详情</h3>
+            <span class="pill" id="dtPill">—</span>
+            <div class="actions">
+              <a id="btnEdit" style="cursor:pointer;">编辑</a>
+              <a id="btnAddCh" style="cursor:pointer;">+ 章节</a>
+              <a id="btnVer" style="cursor:pointer;">新建版本</a>
+              <a id="btnSubmit" style="cursor:pointer;color:var(--accent);font-weight:600;">提交认证 ↗</a>
+            </div>
+          </div>
+          <div class="card-body">
+            <ul class="ch-list" id="chList"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT review + revenue + linkage -->
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>平台审核回执</h3><span class="pill">4 课在审</span></div>
+          <div class="card-body">
+            <div class="review-card">
+              <div class="head"><span class="who">中台·标准组 张主任</span><span class="t">2h 前</span></div>
+              <div>L3→L4 进阶课 · v1.4 章节 6「团队 KPI 制定」与 p-standards L4 晋级要求"团队 NPS≥40"匹配度不足，建议补 1 个案例研习。</div>
+            </div>
+            <div class="review-card">
+              <div class="head"><span class="who">系统</span><span class="t">5h 前</span></div>
+              <div>L4→L5 商业认证备考 · 题库覆盖率 78%，距上架阈值（≥90%）差 12 题。</div>
+            </div>
+            <div class="review-card">
+              <div class="head"><span class="who">中台·课审组</span><span class="t">昨</span></div>
+              <div>合同备案 v1.0 · 全部通过，已自动推送至中台 · 触发 R-005「培训学时」加分。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>合作中台数据</h3><span class="pill">联动 OS v3.0</span></div>
+          <div class="card-body" style="font-size:12.5px; line-height:1.7;">
+            <div><b>映射岗位：</b>旅居房管 / 经纪服务者 / 入住服务（3 类核心岗位）</div>
+            <div><b>映射等级：</b>L0-L4 个人轨</div>
+            <div><b>题库联动：</b>来自 p-question-bank · 「旅居房管」分类共 142 题</div>
+            <div><b>实操评估：</b>师傅评分 + 平台模拟工单 ≥ 3 次（来自 R-006 规则）</div>
+            <div><b>结业判定：</b>毕业测验 ≥ 80 → 中台自动颁发 L1 证书</div>
+            <div style="margin-top:10px; padding:8px 10px; background:var(--line); border-radius:5px; font-size:11px; color:var(--muted);">
+              ⓘ 此机构作为「合作培训方」不可直接颁证。所有证书由<b>中台 p-cert-issue</b> 统一签发并上链。
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>课程经营 · 本月</h3></div>
+          <div class="card-body">
+            <div class="rev">
+              <h4>本月分润</h4>
+              <div class="big">¥ 48,260</div>
+              <div class="row2">
+                <div class="row"><span>课时收入</span><b>¥ 32,400</b></div>
+                <div class="row"><span>带徒分润 R-006</span><b>¥ 9,600</b></div>
+                <div class="row"><span>版权使用费</span><b>¥ 4,260</b></div>
+                <div class="row"><span>政府品牌费 5%</span><b>− ¥ 2,000</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<!-- 新建 / 编辑课程 模态 -->
+<div id="modalMask" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--surface);border-radius:14px;width:100%;max-width:440px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);">
+    <div style="padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;">
+      <h3 id="mTitle" style="margin:0;font-size:16px;flex:1;">新建课程</h3>
+      <button id="mClose" style="font-size:20px;color:var(--muted);">✕</button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:13px;">
+      <label style="font-size:12px;color:var(--muted);">课程名称
+        <input id="fName" type="text" placeholder="如：旅居管家服务规范" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:14px;">
+      </label>
+      <div style="display:flex;gap:10px;">
+        <label style="font-size:12px;color:var(--muted);flex:1;">封面图标
+          <select id="fIcon" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:14px;">
+            <option>🏠</option><option>⚖</option><option>🎩</option><option>📜</option><option>🚨</option><option>💼</option><option>🧭</option><option>🛎</option><option>🧹</option><option>🔧</option>
+          </select>
+        </label>
+        <label style="font-size:12px;color:var(--muted);flex:1;">对位等级
+          <select id="fLevel" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:14px;">
+            <option>L1</option><option>L2</option><option selected>L2→L3</option><option>L3</option><option>L3→L4</option><option>L4</option><option>L4→L5</option><option>L5</option>
+          </select>
+        </label>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <label style="font-size:12px;color:var(--muted);flex:1;">总学时
+          <input id="fHours" type="number" value="48" min="1" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:14px;">
+        </label>
+        <label style="font-size:12px;color:var(--muted);flex:1;">映射岗位
+          <input id="fRole" type="text" value="旅居房管" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:14px;">
+        </label>
+      </div>
+      <label style="font-size:12px;color:var(--muted);">课程简介
+        <textarea id="fDesc" rows="2" placeholder="一句话说明课程目标与适用人群" style="display:block;width:100%;margin-top:5px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13px;resize:vertical;"></textarea>
+      </label>
+      <div style="font-size:11px;color:var(--muted);background:var(--line);border-radius:8px;padding:9px 11px;">新建课程默认进入<b>草稿</b>，完成章节后可「提交认证」送中台 <a href="p-course-cert.html" style="color:var(--accent);">课程认证审核</a>。</div>
+    </div>
+    <div style="padding:14px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
+      <button id="mCancel" class="btn">取消</button>
+      <button id="mSave" class="btn pri">保存</button>
+    </div>
+  </div>
+</div>
+<div id="toast" style="position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:13px;padding:10px 18px;border-radius:999px;opacity:0;transition:opacity .25s;z-index:300;white-space:nowrap;"></div>
+
+<script>
+(function(){
+  const TPL = [
+    {n:1,nm:'岗位认知与平台规则',meta:'6 学时',ty:'v'},
+    {n:2,nm:'核心服务流程与规范',meta:'8 学时',ty:'v'},
+    {n:3,nm:'实操演练',meta:'12 学时',ty:'p'},
+    {n:4,nm:'章节测验 1',meta:'20 题',ty:'q'},
+  ];
+  const TYN={v:'视频',p:'实操',q:'测验',z:'综合'};
+  let COURSES = [
+    {id:1,cover:'c1',emoji:'🏠',name:'旅居房管·L3 入门 12 课',level:'L2→L3',hours:96,role:'旅居房管',ver:'v3.0',status:'pub',statN:'648',statL:'本年学员',
+      chapters:[{n:1,nm:'岗位认知与平台规则',meta:'6 学时',ty:'v'},{n:2,nm:'客户接待与首次入户',meta:'8 学时',ty:'v'},{n:3,nm:'合同备案流程实操',meta:'12 学时',ty:'p'},{n:4,nm:'复杂场景情景演练',meta:'14 学时',ty:'p'},{n:5,nm:'章节测验 1（1-4 章）',meta:'20 题',ty:'q'},{n:6,nm:'客诉处理基础',meta:'6 学时',ty:'v'},{n:7,nm:'应急响应规范',meta:'8 学时',ty:'p'},{n:8,nm:'隐私保护与合规底线',meta:'4 学时',ty:'v'},{n:9,nm:'章节测验 2（5-8 章）',meta:'20 题',ty:'q'},{n:10,nm:'综合情景模拟（带客户）',meta:'14 学时',ty:'p'},{n:11,nm:'客评与持续改进',meta:'4 学时',ty:'v'},{n:12,nm:'毕业综合考',meta:'50 题 + 现场面试',ty:'z'}]},
+    {id:2,cover:'c2',emoji:'⚖',name:'客诉调解与情绪管理',level:'L3',hours:64,role:'入住服务',ver:'v2.1',status:'pub',statN:'412',statL:'本年学员',
+      chapters:[{n:1,nm:'客诉类型与升级判定',meta:'8 学时',ty:'v'},{n:2,nm:'情绪安抚话术',meta:'8 学时',ty:'v'},{n:3,nm:'角色扮演 · 现场调解',meta:'12 学时',ty:'p'},{n:4,nm:'章节测验',meta:'20 题',ty:'q'}]},
+    {id:3,cover:'c3',emoji:'🎩',name:'L3→L4 团队管理进阶',level:'L3→L4',hours:112,role:'店长/督导',ver:'v1.4',status:'review',statN:'—',statL:'待上架',
+      chapters:[{n:1,nm:'团队角色与分工',meta:'8 学时',ty:'v'},{n:2,nm:'排班与绩效',meta:'10 学时',ty:'v'},{n:3,nm:'团队 KPI 制定',meta:'案例',ty:'p'},{n:4,nm:'章节测验',meta:'20 题',ty:'q'}]},
+    {id:4,cover:'c4',emoji:'📜',name:'合同备案与法规更新（2026 修订）',level:'全员',hours:48,role:'全员必修',ver:'v1.0',status:'pub',statN:'2,468',statL:'全员',
+      chapters:[{n:1,nm:'2026 法规要点',meta:'8 学时',ty:'v'},{n:2,nm:'备案流程实操',meta:'12 学时',ty:'p'},{n:3,nm:'结业测验',meta:'20 题',ty:'q'}]},
+    {id:5,cover:'c5',emoji:'🚨',name:'突发应急复证培训（2 年期）',level:'L2+',hours:80,role:'全员',ver:'v2.0',status:'pub',statN:'486',statL:'本年学员',
+      chapters:[{n:1,nm:'应急响应总则',meta:'8 学时',ty:'v'},{n:2,nm:'消防/医疗实操',meta:'16 学时',ty:'p'},{n:3,nm:'复证测验',meta:'30 题',ty:'q'}]},
+    {id:6,cover:'c3',emoji:'💼',name:'L4→L5 商业认证备考',level:'L4→L5',hours:142,role:'服务商负责人',ver:'v0.9',status:'draft',statN:'—',statL:'草稿 70%',
+      chapters:[{n:1,nm:'商业模式与定价',meta:'12 学时',ty:'v'},{n:2,nm:'财务与对账',meta:'12 学时',ty:'v'},{n:3,nm:'合规与风控',meta:'10 学时',ty:'v'},{n:4,nm:'模拟答辩',meta:'实操',ty:'p'}]},
+  ];
+  let selId = 1, seq = 100, filter = 'all';
+  const $ = s => document.querySelector(s);
+  const STMAP = {pub:['已上架','pub'],review:['审核中','review'],draft:['草稿','draft']};
+
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.style.opacity='.96'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity='0',1800); }
+
+  function renderList(){
+    const wrap = $('#csList'); wrap.innerHTML='';
+    COURSES.filter(c=> filter==='all'||c.status===filter).forEach(c=>{
+      const [stxt,scls]=STMAP[c.status];
+      const row=document.createElement('div');
+      row.className='cs-row'+(c.id===selId?' on':'');
+      row.innerHTML='<div class="cover '+c.cover+'">'+c.emoji+'</div>'+
+        '<div class="body"><div class="nm">'+c.name+'</div><div class="meta">'+c.chapters.length+' 章 · '+c.hours+' 学时 · 映射 '+c.level+'</div></div>'+
+        '<span class="v">'+c.ver+'</span>'+
+        '<span class="badge '+scls+'">'+stxt+'</span>'+
+        '<div class="stat"><span class="v">'+c.statN+'</span>'+(c.statL||'')+'</div>';
+      row.onclick=()=>{ selId=c.id; renderList(); renderDetail(); };
+      wrap.appendChild(row);
+    });
+  }
+  function cur(){ return COURSES.find(c=>c.id===selId); }
+  function renderDetail(){
+    const c=cur(); if(!c) return;
+    $('#dtTitle').textContent='课程详情 · '+c.name;
+    $('#dtPill').textContent=c.ver+' · 对位 '+c.level+' · 与 p-standards 同步';
+    const ul=$('#chList'); ul.innerHTML='';
+    c.chapters.forEach(ch=>{
+      const li=document.createElement('li'); li.className='ch';
+      li.innerHTML='<div class="num">'+ch.n+'</div><div class="nm">'+ch.nm+'</div><div class="meta">'+ch.meta+'</div><span class="ty '+ch.ty+'">'+TYN[ch.ty]+'</span>';
+      ul.appendChild(li);
+    });
+    $('#btnSubmit').style.display = (c.status==='pub')?'none':'';
+  }
+
+  // 模态
+  let mode='new';
+  function openModal(m){
+    mode=m; const c=cur();
+    $('#mTitle').textContent = m==='new'?'新建课程':'编辑课程 · '+c.name;
+    $('#fName').value = m==='edit'?c.name:'';
+    $('#fIcon').value = m==='edit'?c.emoji:'🏠';
+    $('#fLevel').value = m==='edit'?c.level:'L2→L3';
+    $('#fHours').value = m==='edit'?c.hours:48;
+    $('#fRole').value = m==='edit'?c.role:'旅居房管';
+    $('#fDesc').value = '';
+    $('#modalMask').style.display='flex';
+  }
+  function closeModal(){ $('#modalMask').style.display='none'; }
+  function save(){
+    const name=$('#fName').value.trim(); if(!name){ $('#fName').focus(); return; }
+    const data={emoji:$('#fIcon').value,level:$('#fLevel').value,hours:+$('#fHours').value||48,role:$('#fRole').value.trim()};
+    if(mode==='new'){
+      const id=++seq;
+      COURSES.unshift({id,cover:'c'+(1+id%5),emoji:data.emoji,name,level:data.level,hours:data.hours,role:data.role,ver:'v0.1',status:'draft',statN:'—',statL:'草稿',chapters:TPL.map(t=>({...t}))});
+      selId=id; toast('✓ 已新建课程「'+name+'」· 草稿');
+    } else {
+      Object.assign(cur(),{name,...data}); toast('✓ 已保存修改');
+    }
+    closeModal(); renderList(); renderDetail();
+  }
+
+  function newVersion(){
+    const c=cur(); const parts=c.ver.replace('v','').split('.'); const nv='v'+parts[0]+'.'+((+parts[1]||0)+1);
+    const id=++seq;
+    COURSES.unshift({...c,id,ver:nv,status:'draft',statN:'—',statL:'新版草稿',chapters:c.chapters.map(x=>({...x}))});
+    selId=id; renderList(); renderDetail(); toast('✓ 已基于 '+c.ver+' 新建版本 '+nv+'（草稿）');
+  }
+  function addChapter(){
+    const c=cur(); const nm=(window.prompt&&prompt('章节名称','新章节'))||'新章节';
+    c.chapters.push({n:c.chapters.length+1,nm,meta:'4 学时',ty:'v'});
+    renderDetail(); renderList(); toast('✓ 已添加章节');
+  }
+  function submitCert(){
+    const c=cur(); if(c.status==='pub'){ return; }
+    c.status='review'; c.statL='待上架'; renderList(); renderDetail();
+    toast('✓ 已提交中台课程认证审核（→ p-course-cert）');
+  }
+
+  // 绑定
+  $('#btnNew').onclick=()=>openModal('new');
+  $('#btnEdit').onclick=()=>openModal('edit');
+  $('#btnVer').onclick=newVersion;
+  $('#btnAddCh').onclick=addChapter;
+  $('#btnSubmit').onclick=submitCert;
+  $('#mClose').onclick=closeModal; $('#mCancel').onclick=closeModal; $('#mSave').onclick=save;
+  $('#modalMask').onclick=e=>{ if(e.target===$('#modalMask')) closeModal(); };
+  $('#btnImport').onclick=()=>{ openModal('new'); toast('从大纲导入（演示）：可手填课程信息'); };
+  $('#btnQbank').onclick=()=>{ location.href='p-question-bank.html'; };
+  // 过滤 chip
+  document.querySelectorAll('.fc').forEach((f,i)=>{ f.onclick=()=>{
+    document.querySelectorAll('.fc').forEach(x=>x.classList.remove('on')); f.classList.add('on');
+    filter=['all','pub','review','draft','all','all'][i]||'all'; renderList();
+  };});
+
+  renderList(); renderDetail();
+})();
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>B 白名单审定 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0f766e; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+    .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.6fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* tabs */
+    .tabs{display:flex; gap:4px; margin-bottom:12px;}
+    .tab{padding:7px 14px; border-radius:6px; font-size:12px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .tab.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .tab .ct{font-size:10px; margin-left:4px; opacity:0.85;}
+
+    /* application list */
+    .app-row{display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:12px; padding:12px 14px; border-bottom:1px solid var(--line); align-items:center;}
+    .app-row:last-child{border-bottom:0;}
+    .app-row .av{width:38px; height:38px; border-radius:8px; background:var(--accent-soft); color:var(--accent); font-size:16px; font-weight:700; display:grid; place-items:center;}
+    .app-row .info .nm{font-size:13.5px; font-weight:600;}
+    .app-row .info .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .app-row .info .meta .sep{margin:0 4px;}
+    .app-row .lvl{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:700;}
+    .app-row .lvl.l1{background:#dbeafe; color:#1e40af;}
+    .app-row .lvl.l2{background:#fef3c7; color:#92400e;}
+    .app-row .lvl.l3{background:#dcfce7; color:#15803d;}
+    .app-row .lvl.pend{background:var(--line); color:var(--muted);}
+    .app-row .scope{font-size:11px; color:var(--muted);}
+    .app-row .stat{font-size:10px; padding:2px 8px; border-radius:3px; font-weight:600;}
+    .app-row .stat.review{background:#fef3c7; color:#92400e;}
+    .app-row .stat.passed{background:#dcfce7; color:#15803d;}
+    .app-row .stat.rejected{background:#fee2e2; color:#b91c1c;}
+    .app-row .stat.draft{background:var(--line); color:var(--muted);}
+    .app-row .act{font-size:11px; color:var(--accent); font-weight:600;}
+
+    /* review flow */
+    .flow-step{display:flex; gap:10px; padding:10px 12px; background:var(--line); border-radius:6px; margin-bottom:6px; align-items:center;}
+    .flow-step .n{width:24px; height:24px; border-radius:50%; background:var(--accent); color:white; font-size:11px; font-weight:700; display:grid; place-items:center;}
+    .flow-step.done .n{background:var(--success);}
+    .flow-step.pending .n{background:var(--warn);}
+    .flow-step .body{flex:1;}
+    .flow-step .nm{font-size:12.5px; font-weight:600;}
+    .flow-step .desc{font-size:11px; color:var(--muted); margin-top:2px;}
+    .flow-step .who{font-size:10px; color:var(--muted);}
+
+    /* lv criteria */
+    .lv-table{font-size:12px;}
+    .lv-row{display:grid; grid-template-columns:50px 1fr 60px; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center;}
+    .lv-row:last-child{border-bottom:0;}
+    .lv-row .badge{font-size:10px; padding:3px 8px; border-radius:4px; font-weight:700; text-align:center;}
+    .lv-row .badge.l1{background:#dbeafe; color:#1e40af;}
+    .lv-row .badge.l2{background:#fef3c7; color:#92400e;}
+    .lv-row .badge.l3{background:#dcfce7; color:#15803d;}
+    .lv-row .desc{font-size:11px; color:#334155; line-height:1.5;}
+    .lv-row .cnt{font-size:11px; color:var(--muted); text-align:right;}
+
+    @media (max-width: 1100px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="b-whitelist"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × B 白名单运营商 / <b>白名单审定</b></div>
+      <div class="top-actions">
+        <button class="btn">导出已审定名单</button>
+        <button class="btn">同业开放公示设置</button>
+        <button class="btn pri">+ 受理新申请</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">已审定运营商</div><div class="n">5<span class="u">家</span></div><div class="d">↑ 2 vs 上季</div></div>
+      <div class="ki"><div class="l">在审</div><div class="n">3<span class="u">家</span></div><div class="d warn">含 1 加急</div></div>
+      <div class="ki"><div class="l">LV3 省级</div><div class="n">2<span class="u">家</span></div><div class="d">自如 · 龙湖</div></div>
+      <div class="ki"><div class="l">LV2 跨市</div><div class="n">2<span class="u">家</span></div><div class="d">华润 · 招商</div></div>
+      <div class="ki"><div class="l">LV1 单城</div><div class="n">1<span class="u">家</span></div><div class="d">贝壳省心租 南京</div></div>
+      <div class="ki"><div class="l">同业开放评分</div><div class="n">94<span class="u">/100</span></div><div class="d">未现垄断</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT: 申请列表 -->
+      <div>
+        <div class="card">
+          <h3>申请受理 <span class="pill">8 个状态</span> <span class="extra">含已审 + 在审 + 已撤回</span></h3>
+
+          <div class="tabs">
+            <div class="tab on">在审 <span class="ct">3</span></div>
+            <div class="tab">已审定 <span class="ct">5</span></div>
+            <div class="tab">已驳回 <span class="ct">1</span></div>
+            <div class="tab">已撤回 <span class="ct">2</span></div>
+            <div class="tab">全部 <span class="ct">11</span></div>
+          </div>
+
+          <!-- 在审 (3) -->
+          <div class="app-row">
+            <div class="av">蛋</div>
+            <div class="info">
+              <div class="nm">蛋壳公寓 · 江苏运营管理有限公司</div>
+              <div class="meta">申请 LV2 跨市运营 <span class="sep">·</span> 申请号 BAP-2026-008 <span class="sep">·</span> 受理 06-06</div>
+            </div>
+            <span class="lvl pend">待评级</span>
+            <span class="scope">南京 + 苏州 + 无锡 · 2400 套</span>
+            <span class="stat review">贝壳初审中</span>
+            <a class="act">详情 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av">建</div>
+            <div class="info">
+              <div class="nm">建发租赁 · 南京分公司 <span style="font-size:10px; color:var(--warn); padding:1px 5px; background:#fef3c7; border-radius:3px;">加急</span></div>
+              <div class="meta">申请 LV1 单城 <span class="sep">·</span> 申请号 BAP-2026-009 <span class="sep">·</span> 受理 06-04</div>
+            </div>
+            <span class="lvl pend">待评级</span>
+            <span class="scope">南京江北 · 800 套</span>
+            <span class="stat review">住建终审中</span>
+            <a class="act">详情 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av">魔</div>
+            <div class="info">
+              <div class="nm">魔方公寓 · 长三角运营公司</div>
+              <div class="meta">申请 LV3 省级 <span class="sep">·</span> 申请号 BAP-2026-010 <span class="sep">·</span> 受理 06-08</div>
+            </div>
+            <span class="lvl pend">待评级</span>
+            <span class="scope">江苏全省 · 5800 套</span>
+            <span class="stat draft">资料补全中</span>
+            <a class="act">详情 ›</a>
+          </div>
+
+          <h3 style="margin-top:18px;">已审定运营商 <span class="pill">5 家 · LV1-3</span> <span class="extra">同业并列在白名单</span></h3>
+
+          <div class="app-row">
+            <div class="av">自</div>
+            <div class="info">
+              <div class="nm">自如生活（江苏） <span style="font-size:10px; color:var(--success); padding:1px 5px; background:#dcfce7; border-radius:3px;">★ 标杆</span></div>
+              <div class="meta">审定 2024-08 <span class="sep">·</span> 续约 2026-08 <span class="sep">·</span> 5 年托管经验</div>
+            </div>
+            <span class="lvl l3">LV3</span>
+            <span class="scope">江苏 13 市 · 12,400 套</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av">龙</div>
+            <div class="info">
+              <div class="nm">龙湖冠寓 · 长三角</div>
+              <div class="meta">审定 2024-09 <span class="sep">·</span> 续约 2026-09 <span class="sep">·</span> 5800 套</div>
+            </div>
+            <span class="lvl l3">LV3</span>
+            <span class="scope">江苏 + 上海 · 8200 套</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av">华</div>
+            <div class="info">
+              <div class="nm">华润有巢 · 江苏</div>
+              <div class="meta">审定 2025-03 <span class="sep">·</span> 续约 2027-03 <span class="sep">·</span> 4200 套</div>
+            </div>
+            <span class="lvl l2">LV2</span>
+            <span class="scope">南京 + 苏州 · 3800 套</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av">招</div>
+            <div class="info">
+              <div class="nm">招商伊敦 · 南京</div>
+              <div class="meta">审定 2025-05 <span class="sep">·</span> 续约 2027-05 <span class="sep">·</span> 2400 套</div>
+            </div>
+            <span class="lvl l2">LV2</span>
+            <span class="scope">南京 · 2400 套</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="app-row">
+            <div class="av" style="background:#fef3c7; color:#92400e;">贝</div>
+            <div class="info">
+              <div class="nm">贝壳省心租 · 南京 <span style="font-size:10px; color:var(--muted); padding:1px 5px; background:var(--line); border-radius:3px;">承建方关联 · 同业开放</span></div>
+              <div class="meta">审定 2025-08 <span class="sep">·</span> 续约 2027-08 <span class="sep">·</span> 1200 套</div>
+            </div>
+            <span class="lvl l1">LV1</span>
+            <span class="scope">南京江宁 · 1200 套</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: 双审流程 + LV 评级 -->
+      <div>
+        <div class="card">
+          <h3>双审制流程 <span class="pill">~ 45 天</span></h3>
+          <div class="flow-step done">
+            <div class="n">1</div>
+            <div class="body"><div class="nm">受理申请</div><div class="desc">企业资质 + 法人 + 业务范围上传</div><div class="who">P 中台运营</div></div>
+          </div>
+          <div class="flow-step done">
+            <div class="n">2</div>
+            <div class="body"><div class="nm">资质初审</div><div class="desc">营业执照 + 5 年托管经验证明 + 现有项目佐证</div><div class="who">贝壳初审组</div></div>
+          </div>
+          <div class="flow-step done">
+            <div class="n">3</div>
+            <div class="body"><div class="nm">财务与诉讼背景</div><div class="desc">无重大诉讼 + 注册资本核查 + 信用穿透</div><div class="who">第三方尽调</div></div>
+          </div>
+          <div class="flow-step pending">
+            <div class="n">4</div>
+            <div class="body"><div class="nm">合规终审</div><div class="desc">租金 ≤90% 市价 + 押金合规 + 投诉率历史</div><div class="who">江苏住建厅</div></div>
+          </div>
+          <div class="flow-step">
+            <div class="n">5</div>
+            <div class="body"><div class="nm">LV 评级</div><div class="desc">套数 / 跨市能力 / 同业评分 → LV1/LV2/LV3</div><div class="who">P 中台 + 省房协</div></div>
+          </div>
+          <div class="flow-step">
+            <div class="n">6</div>
+            <div class="body"><div class="nm">公示与上链</div><div class="desc">入网公示 30 天无异议 + 区块链留痕 + 推送公示门户</div><div class="who">G/P/Portal</div></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>LV 评级标准 <span class="pill">3 档</span></h3>
+          <div class="lv-table">
+            <div class="lv-row">
+              <span class="badge l1">LV1</span>
+              <div class="desc">市级运营 · 单城 · 1000 套以下 · 入网 6 个月内</div>
+              <span class="cnt">1 家</span>
+            </div>
+            <div class="lv-row">
+              <span class="badge l2">LV2</span>
+              <div class="desc">跨市运营 · 多城联动 · 5000 套以下 · 入网 1 年 + 续约 ≥ 1 次</div>
+              <span class="cnt">2 家</span>
+            </div>
+            <div class="lv-row">
+              <span class="badge l3">LV3</span>
+              <div class="desc">省级运营 · 全省覆盖 · 5000 套以上 · 同业标杆 · 参与标准制定</div>
+              <span class="cnt">2 家</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>同业开放保护 <span class="pill">防垄断</span></h3>
+          <div style="font-size:12px; line-height:1.7; color:#334155;">
+            <div>· 任何运营商（含贝壳省心租）市占率不超过 <b>30%</b></div>
+            <div>· 持有方可同时委托 ≥ 2 家运营商（避免锁定）</div>
+            <div>· 集采底价与流量分配对全部白名单运营商 <b>同业并列</b>，不向贝壳省心租倾斜</div>
+            <div>· 公平竞争审查每年 1 次 · 3 年中评 + 5 年回看</div>
+          </div>
+          <div style="margin-top:10px; padding:10px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; font-size:11px; color:#15803d;">
+            ✓ 当前同业开放评分 <b>94/100</b> · 未触发垄断阈值（详见 <a href="d-org-standard.html" style="font-weight:600;">机构标准 § 5 接入模式</a>）
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

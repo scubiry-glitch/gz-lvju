@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>服务者认证 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-nav {
+      display: flex; align-items: center;
+      padding: 8px 12px; background: var(--surface);
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-nav .back-btn {
+      width: 36px; height: 36px; display: grid; place-items: center;
+      border-radius: 50%; background: var(--bg);
+    }
+    .page-nav .back-btn svg { width: 20px; height: 20px; }
+    .page-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+    .page-nav .nav-action {
+      width: 36px; height: 36px; display: grid; place-items: center;
+    }
+
+    .page-header {
+      background: var(--surface); padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h2 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+    .page-header p { font-size: 13px; color: var(--muted); }
+
+    .stats-banner {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+      padding: 12px 16px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; text-align: center;
+    }
+    .stat-card .num { font-size: 22px; font-weight: 700; color: var(--accent); }
+    .stat-card .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .tab-bar {
+      display: flex; gap: 0; background: var(--surface);
+      border-bottom: 1px solid var(--border); padding: 0 16px;
+    }
+    .tab-bar button {
+      flex: 1; padding: 10px 0; font-size: 14px;
+      color: var(--muted); border-bottom: 2px solid transparent;
+    }
+    .tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+    .content { padding: 12px 16px; }
+
+    .section-label {
+      font-size: 13px; font-weight: 500; margin: 0 0 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .section-label .count { font-size: 11px; color: var(--muted); font-weight: 400; }
+    .sort-bar {
+      display: flex; justify-content: flex-end; gap: 12px;
+      font-size: 12px; color: var(--muted); margin-bottom: 8px;
+    }
+    .sort-bar .active { color: var(--accent); font-weight: 500; }
+
+    .worker-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .worker-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+    }
+    .worker-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 15px; font-weight: 600; flex-shrink: 0;
+    }
+    .worker-header h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .worker-title { font-size: 11px; color: var(--muted); }
+    .worker-stars { color: var(--warn); font-size: 12px; letter-spacing: 1px; margin-left: auto; }
+    .worker-stars .empty { color: var(--border); }
+    .worker-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .worker-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 3px;
+      background: var(--bg); color: var(--muted);
+    }
+    .worker-badge.green { background: color-mix(in oklab, var(--success) 10%, transparent); color: var(--success); }
+    .worker-badge.accent { background: var(--accent-soft); color: var(--accent); }
+    .worker-body { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .wr-collapse-open .wr-detail-body { max-height: 200px !important; }
+    .wr-collapse-open .wr-arrow { transform: rotate(180deg); }
+
+    .apply-card {
+      display: flex; align-items: center; gap: 14px;
+      background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 60%, black) 0%, var(--accent) 100%);
+      border-radius: var(--radius-md); padding: 18px; color: white; margin-bottom: 16px;
+    }
+    .apply-card h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .apply-card p { font-size: 12px; opacity: 0.85; }
+    .apply-btn {
+      margin-left: auto; white-space: nowrap;
+      padding: 8px 16px; background: rgba(255,255,255,0.2);
+      border-radius: var(--radius-sm); color: white;
+      font-size: 13px; font-weight: 500; border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .std-card-link {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      margin-bottom: 8px; cursor: pointer;
+    }
+    .std-card-link:active { background: var(--surface); }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .content { padding-inline: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>服务者认证</h1>
+    <div class="nav-action"></div>
+  </div>
+
+  <div class="page-header">
+    <h2>持证上岗 · 服务可追溯</h2>
+    <p>经住建局认证的保租房服务从业人员，覆盖运营管家、维修技师、客服专员三大岗位</p>
+  </div>
+
+  <!-- stats -->
+  <div class="stats-banner">
+    <div class="stat-card"><div class="num">24</div><div class="lbl">认证服务者</div></div>
+    <div class="stat-card"><div class="num">98.6%</div><div class="lbl">整体好评率</div></div>
+    <div class="stat-card"><div class="num">2.8K</div><div class="lbl">累计服务单</div></div>
+  </div>
+
+  <!-- apply CTA -->
+  <div style="padding: 0 16px;">
+    <div class="apply-card">
+      <div>
+        <h3>成为认证服务者</h3>
+        <p>提交资料 → 培训考核 → 持证上岗</p>
+      </div>
+      <button class="apply-btn" onclick="alert('进入服务者认证申请流程')">立即申请</button>
+    </div>
+  </div>
+
+  <!-- tab bar -->
+  <div class="tab-bar">
+    <button class="active" data-tab="all">全部</button>
+    <button data-tab="manager">运营管家</button>
+    <button data-tab="tech">维修技师</button>
+    <button data-tab="cs">客服专员</button>
+  </div>
+
+  <div class="content">
+    <div class="sort-bar">
+      <span class="active">按服务评分</span>
+      <span>按服务单数</span>
+      <span>按好评率</span>
+    </div>
+
+    <div id="list-all">
+      <!-- Worker cards -->
+      <div class="worker-card" data-type="manager">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: var(--accent-soft); color: var(--accent);">张</div>
+          <div style="flex:1;">
+            <h3>张明华</h3>
+            <div class="worker-title">运营管家 · 工号 BK-NJ-20250012</div>
+          </div>
+          <div class="worker-stars">★★★★★</div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 186 单</span>
+              <span class="worker-badge accent">好评率 98%</span>
+              <span class="worker-badge">从业 6 年</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">负责项目: 江北新区 · 青奥国际社区 · 覆盖 320 套保租房源</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="worker-card" data-type="tech">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success);">李</div>
+          <div style="flex:1;">
+            <h3>李婷</h3>
+            <div class="worker-title">维修技师 · 工号 BK-NJ-20250037</div>
+          </div>
+          <div class="worker-stars">★★★★☆<span class="empty">★</span></div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 94 单</span>
+              <span class="worker-badge accent">好评率 96%</span>
+              <span class="worker-badge">持证: 水电工资质</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">擅长: 水电维修 · 家电维修 · 平均响应 15 分钟 · 覆盖建邺区 · 鼓楼区</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="worker-card" data-type="cs">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black);">王</div>
+          <div style="flex:1;">
+            <h3>王强</h3>
+            <div class="worker-title">客服专员 · 工号 BK-NJ-20250058</div>
+          </div>
+          <div class="worker-stars">★★★★☆<span class="empty">★</span></div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 312 单</span>
+              <span class="worker-badge accent">好评率 95%</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">负责: 签约咨询 · 投诉处理 · 政策解读 · 覆盖全市</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="worker-card" data-type="manager">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--accent);">陈</div>
+          <div style="flex:1;">
+            <h3>陈佳妮</h3>
+            <div class="worker-title">运营管家 · 工号 BK-NJ-20250079</div>
+          </div>
+          <div class="worker-stars">★★★★★</div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 203 单</span>
+              <span class="worker-badge accent">好评率 99%</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">负责项目: 秦淮区 · 南部新城人才家园 · 覆盖 280 套保租房源</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="worker-card" data-type="tech">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: color-mix(in oklab, var(--success) 10%, transparent); color: var(--success);">刘</div>
+          <div style="flex:1;">
+            <h3>刘建国</h3>
+            <div class="worker-title">维修技师 · 工号 BK-NJ-20250044</div>
+          </div>
+          <div class="worker-stars">★★★★☆<span class="empty">★</span></div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 157 单</span>
+              <span class="worker-badge accent">好评率 97%</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">擅长: 智能门锁 · 空调维修 · 平均响应 20 分钟 · 覆盖江宁区</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="worker-card" data-type="cs">
+        <div class="worker-header" onclick="this.parentNode.classList.toggle('wr-collapse-open')" style="cursor: pointer;">
+          <div class="worker-avatar" style="background: color-mix(in oklab, var(--accent) 8%, transparent); color: var(--accent);">赵</div>
+          <div style="flex:1;">
+            <h3>赵雪</h3>
+            <div class="worker-title">客服专员 · 工号 BK-NJ-20250092</div>
+          </div>
+          <div class="worker-stars">★★★★<span class="empty">★★</span></div>
+          <svg class="wr-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="wr-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+          <div style="padding-top: 4px;">
+            <div class="worker-badges">
+              <span class="worker-badge green">持证上岗</span>
+              <span class="worker-badge accent">服务 267 单</span>
+              <span class="worker-badge accent">好评率 94%</span>
+            </div>
+            <div class="worker-body" style="margin-top:4px;">负责: 投诉处理 · 报修派单 · 满意度回访</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Certification standards -->
+    <div class="std-card-link" onclick="alert('查看完整认证标准')">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>
+          <div style="font-size: 13px; font-weight: 500;">服务者认证标准</div>
+          <div style="font-size: 11px; color: var(--muted);">认证条件 · 培训要求 · 考核办法 · 年度复审</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <div class="std-card-link" style="margin-bottom: 0;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        <div>
+          <div style="font-size: 13px; font-weight: 500;">培训课程目录</div>
+          <div style="font-size: 11px; color: var(--muted);">从业基础 · 专业技能 · 服务礼仪 · 政策法规</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom tabs -->
+  <nav class="bottom-tabs" style="display: flex; position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;">
+    <a class="tab-item" href="home.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>首页</span>
+    </a>
+    <a class="tab-item active" href="policy.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--accent); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      <span>政策</span>
+    </a>
+    <a class="tab-item" href="my-applications.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      <span>我的申请</span>
+    </a>
+    <a class="tab-item" href="profile.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>个人</span>
+    </a>
+  </nav>
+</div>
+<script>
+document.querySelectorAll('[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const type = btn.dataset.tab;
+    document.querySelectorAll('.worker-card').forEach(c => {
+      if (type === 'all') { c.style.display = ''; return; }
+      c.style.display = c.dataset.type === type ? '' : 'none';
+    });
+  });
+});
+</script>
+<script src="_region.js"></script>
+</body>
+</html>

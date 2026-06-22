@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>课程学习 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0; color:inherit;}
+    a{color:inherit; text-decoration:none;}
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:132px; position:relative;}
+
+    /* ===== sticky player ===== */
+    .player{position:sticky; top:0; z-index:30; background:#0f172a;}
+    .pl-top{display:flex; align-items:center; gap:8px; padding:8px 12px; color:#fff;}
+    .pl-top .back{width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.16); display:grid; place-items:center; font-size:17px;}
+    .pl-top .ti{flex:1; min-width:0; font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+    .pl-top .ti small{display:block; font-size:10px; opacity:.65; font-weight:400;}
+    .stage{position:relative; aspect-ratio:16/9; background:radial-gradient(circle at 50% 40%,#334155,#0f172a); display:grid; place-items:center; overflow:hidden;}
+    .stage .ttl{position:absolute; top:10px; left:12px; right:12px; color:#e2e8f0; font-size:12px; font-weight:600; text-shadow:0 1px 4px rgba(0,0,0,.6);}
+    .stage .bigplay{width:58px; height:58px; border-radius:50%; background:rgba(255,255,255,.92); color:#0f172a; display:grid; place-items:center; font-size:24px;}
+    .stage .quizmask{position:absolute; inset:0; background:rgba(15,23,42,.78); display:none; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#fff; text-align:center; padding:16px;}
+    .stage .quizmask.on{display:flex;}
+    .stage .quizmask .go{background:var(--gold); color:#fff; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:700;}
+    /* control bar */
+    .ctrl{display:flex; align-items:center; gap:8px; padding:7px 12px 9px; color:#cbd5e1; font-size:11px;}
+    .ctrl .pp{font-size:16px; color:#fff;}
+    .ctrl .t{font-family:var(--mono); font-size:10.5px;}
+    .ctrl .bar{flex:1; height:4px; background:rgba(255,255,255,.2); border-radius:2px; position:relative; cursor:pointer;}
+    .ctrl .bar i{position:absolute; left:0; top:0; bottom:0; background:var(--emerald); border-radius:2px; width:42%;}
+    .ctrl .bar i::after{content:''; position:absolute; right:-4px; top:50%; transform:translateY(-50%); width:9px; height:9px; border-radius:50%; background:#fff;}
+    .ctrl .ic{font-size:13px; padding:0 1px;}
+    .ctrl .spd{font-weight:700; color:#fff;}
+
+    /* ===== lesson head ===== */
+    .lh{padding:12px 16px 0;}
+    .lh .nm{font-size:16px; font-weight:700;}
+    .lh .meta{font-size:11px; color:var(--muted); margin-top:3px;}
+    .lh .prog{display:flex; align-items:center; gap:8px; margin-top:10px;}
+    .lh .prog .bar{flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden;}
+    .lh .prog .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--emerald),var(--accent));}
+    .lh .prog .v{font-size:11px; color:var(--muted); white-space:nowrap;}
+
+    /* ===== tabs ===== */
+    .tabs{display:flex; margin:12px 16px 0; border-bottom:1px solid var(--border); position:sticky; top:0;}
+    .tab{flex:1; text-align:center; padding:9px 0; font-size:13px; color:var(--muted); border-bottom:2px solid transparent;}
+    .tab.on{color:var(--accent); border-color:var(--accent); font-weight:700;}
+    .panel{display:none; padding:12px 16px;}
+    .panel.on{display:block;}
+
+    /* curriculum */
+    .sec{margin-bottom:10px; border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; background:var(--surface);}
+    .sec-h{display:flex; align-items:center; gap:8px; padding:11px 12px; cursor:pointer; background:#fafdfc;}
+    .sec-h .nm{flex:1; font-size:13px; font-weight:700;}
+    .sec-h .mt{font-size:10.5px; color:var(--muted);}
+    .sec-h .ar{font-size:11px; color:var(--muted); transition:transform .2s;}
+    .sec.open .sec-h .ar{transform:rotate(90deg);}
+    .sec-body{display:none;} .sec.open .sec-body{display:block;}
+    .les{display:flex; align-items:center; gap:10px; padding:10px 12px; border-top:1px solid var(--line); font-size:12.5px;}
+    .les .ck{width:20px; height:20px; border-radius:50%; flex-shrink:0; display:grid; place-items:center; font-size:11px;}
+    .les.done .ck{background:var(--accent-soft); color:var(--accent);}
+    .les.cur .ck{background:var(--accent); color:#fff;}
+    .les.lock .ck{background:var(--line); color:var(--muted);}
+    .les .body{flex:1; min-width:0;}
+    .les .body .ln{font-weight:500;} .les.cur .body .ln{color:var(--accent); font-weight:700;}
+    .les .body .lm{font-size:10.5px; color:var(--muted); margin-top:1px; display:flex; gap:6px; align-items:center;}
+    .les .ty{font-size:9.5px; padding:1px 5px; border-radius:3px; font-weight:600;}
+    .les .ty.video{background:var(--accent-soft); color:var(--accent);}
+    .les .ty.quiz{background:color-mix(in oklab,var(--gold) 16%,transparent); color:var(--gold);}
+    .les .ty.doc{background:var(--line); color:var(--muted);}
+    .les.lock{opacity:.6;}
+    .les.cur{background:var(--accent-soft);}
+
+    /* intro */
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:12px;}
+    .card h4{margin:0 0 8px; font-size:13px;}
+    .pts{margin:0; padding-left:18px;} .pts li{font-size:13px; margin-bottom:6px;}
+    .res{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:13px;}
+    .res:last-child{border-bottom:0;} .res .ic{width:28px;height:28px;border-radius:7px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex-shrink:0;}
+    .res .b{flex:1;} .res .b .m{font-size:11px;color:var(--muted);} .res .dl{font-size:11px;color:var(--accent);font-weight:600;}
+    .tutor{display:flex; align-items:center; gap:10px;}
+    .tutor .av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#0d9488,#5eead4);display:grid;place-items:center;color:#fff;font-weight:700;}
+
+    /* notes */
+    .notebox{display:flex; gap:8px; margin-bottom:12px;}
+    .notebox .ts{font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-soft); padding:8px 9px; border-radius:8px; white-space:nowrap; align-self:flex-start;}
+    .notebox input{flex:1; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font:inherit; font-size:13px;}
+    .notebox .add{padding:9px 13px; background:var(--accent); color:#fff; border-radius:8px; font-size:13px; font-weight:700;}
+    .note{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px; padding:10px 12px; margin-bottom:8px;}
+    .note .h{display:flex; gap:8px; font-size:11px; color:var(--muted); margin-bottom:4px;}
+    .note .h .ts{color:var(--accent); font-weight:700; font-family:var(--mono);}
+    .note .tx{font-size:13px;}
+
+    /* discussion */
+    .qa{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 12px; margin-bottom:8px;}
+    .qa .h{display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:4px;}
+    .qa .h .who{font-weight:700;} .qa .h .t{color:var(--muted); font-size:10.5px; margin-left:auto;}
+    .qa .q{font-size:13px; font-weight:600;} .qa .a{font-size:12px; color:var(--muted); margin-top:4px; padding-left:10px; border-left:2px solid var(--line);}
+
+    /* bottom nav */
+    .botnav{position:fixed; left:50%; transform:translateX(-50%); bottom:64px; width:100%; max-width:430px; background:var(--surface); border-top:1px solid var(--border); padding:9px 14px; display:flex; gap:9px; z-index:25;}
+    .botnav .btn{padding:11px; border-radius:10px; font-size:13.5px; font-weight:700; text-align:center;}
+    .botnav .prev{flex:0 0 28%; background:var(--line); color:var(--fg);}
+    .botnav .done{flex:1; background:linear-gradient(90deg,var(--accent),var(--emerald)); color:#fff;}
+    .toast{position:fixed; left:50%; bottom:140px; transform:translateX(-50%); background:#0f172a; color:#fff; font-size:12px; padding:9px 16px; border-radius:999px; opacity:0; transition:opacity .25s; z-index:50; white-space:nowrap;}
+    .toast.on{opacity:.96;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ===== player ===== -->
+  <div class="player">
+    <div class="pl-top">
+      <a class="back" href="s-course-detail.html">‹</a>
+      <div class="ti" id="plTitle">商业谈判与续约话术<small>高端管家·L4→L5 客户沟通进阶</small></div>
+      <button class="back" id="btnList" title="目录">☰</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="ttl" id="stTitle">第三章 · 商业谈判与续约话术</div>
+      <button class="bigplay" id="bigplay">▶</button>
+      <div class="quizmask" id="quizmask">
+        <div style="font-size:13px;">本节为测验</div>
+        <a class="go" href="s-quiz.html">进入答题 →</a>
+      </div>
+    </div>
+    <div class="ctrl">
+      <button class="pp" id="pp">▶</button>
+      <span class="t" id="tcur">04:12</span>
+      <div class="bar" id="seek"><i id="seekfill"></i></div>
+      <span class="t" id="tdur">10:00</span>
+      <button class="ic spd" id="spd">1.0×</button>
+      <button class="ic">字幕</button>
+      <button class="ic" id="next" title="下一节">⏭</button>
+      <button class="ic">⛶</button>
+    </div>
+  </div>
+
+  <!-- lesson head -->
+  <div class="lh">
+    <div class="nm" id="lhNm">商业谈判与续约话术</div>
+    <div class="meta" id="lhMeta">第三章 · 谈判与续约 · 视频 10:00 · 主讲 L6 周敏</div>
+    <div class="prog"><span class="v">课程进度</span><div class="bar"><i id="cpFill" style="width:54%"></i></div><span class="v" id="cpTxt">7 / 13 节</span></div>
+  </div>
+
+  <!-- tabs -->
+  <div class="tabs">
+    <div class="tab on" data-p="cat">目录</div>
+    <div class="tab" data-p="intro">简介</div>
+    <div class="tab" data-p="note">笔记</div>
+    <div class="tab" data-p="qa">讨论</div>
+  </div>
+
+  <!-- 目录 -->
+  <div class="panel on" id="p-cat"><div id="curr"></div></div>
+
+  <!-- 简介 -->
+  <div class="panel" id="p-intro">
+    <div class="card">
+      <h4>本节要点</h4>
+      <ol class="pts">
+        <li>识别客户续约动机：价格敏感型 / 服务依赖型 / 关系型</li>
+        <li>价值锚定话术：先讲已交付价值，再谈续约条款</li>
+        <li>异议处理三步：共情 → 澄清 → 给方案，不直接降价</li>
+        <li>续约红线：不越权承诺、留痕、走平台签约存证</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h4>配套资料</h4>
+      <div class="res"><div class="ic">📄</div><div class="b"><div>续约话术模板（2026 版）</div><div class="m">PDF · 8 页</div></div><span class="dl">下载</span></div>
+      <div class="res"><div class="ic">🎧</div><div class="b"><div>真实续约通话拆解（脱敏）</div><div class="m">音频 · 12 分</div></div><span class="dl">播放</span></div>
+    </div>
+    <div class="card">
+      <h4>主讲老师</h4>
+      <div class="tutor"><div class="av">周</div><div><div style="font-weight:700;">周敏 · L6 区域专家</div><div style="font-size:11px;color:var(--muted);">12 年高端管家经验 · 累计授课 1,240 人</div></div></div>
+    </div>
+  </div>
+
+  <!-- 笔记 -->
+  <div class="panel" id="p-note">
+    <div class="notebox">
+      <span class="ts" id="noteTs">04:12</span>
+      <input id="noteIn" type="text" placeholder="记下这一刻的要点…">
+      <button class="add" id="noteAdd">记</button>
+    </div>
+    <div id="noteList"></div>
+  </div>
+
+  <!-- 讨论 -->
+  <div class="panel" id="p-qa">
+    <div class="notebox">
+      <input id="qaIn" type="text" placeholder="向老师 / 同学提问…">
+      <button class="add" id="qaAdd">问</button>
+    </div>
+    <div id="qaList">
+      <div class="qa"><div class="h"><span class="who">学员 王磊</span><span class="t">2 天前</span></div><div class="q">客户坚持要降价才续约，话术里怎么把握底线？</div><div class="a">老师 周敏：先复述价值与服务记录，给"非价格"补偿方案；确需让价须走平台审批，不可口头承诺。</div></div>
+      <div class="qa"><div class="h"><span class="who">学员 李静</span><span class="t">3 天前</span></div><div class="q">第 8 节话术模板在哪下载？</div><div class="a">在"简介 → 配套资料"里下载 PDF。</div></div>
+    </div>
+  </div>
+
+  <!-- bottom nav -->
+  <div class="botnav">
+    <button class="btn prev" id="btnPrev">上一节</button>
+    <button class="btn done" id="btnDone">标记完成 · 下一节</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="tab-bar" data-series="s" data-active="learn"></div>
+</div>
+
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const SECTIONS=[
+    {t:'第一章 · 客户洞察',ls:[
+      {id:1,nm:'高端客户画像与需求洞察',ty:'video',dur:'08:20',st:'done'},
+      {id:2,nm:'高净值沟通礼仪与边界',ty:'video',dur:'07:10',st:'done'},
+      {id:3,nm:'章节测验 1（1-2 节）',ty:'quiz',dur:'20 题',st:'done'},
+    ]},
+    {t:'第二章 · 沟通进阶',ls:[
+      {id:4,nm:'倾听与提问技巧',ty:'video',dur:'09:00',st:'done'},
+      {id:5,nm:'多方关系协调（管家×业主×平台）',ty:'video',dur:'08:30',st:'done'},
+      {id:6,nm:'情景实操：异议处理',ty:'doc',dur:'实操',st:'done'},
+    ]},
+    {t:'第三章 · 谈判与续约',ls:[
+      {id:7,nm:'商业谈判策略',ty:'video',dur:'10:00',st:'done'},
+      {id:8,nm:'商业谈判与续约话术',ty:'video',dur:'10:00',st:'cur'},
+      {id:9,nm:'续约合同与签约存证',ty:'video',dur:'06:40',st:'lock'},
+      {id:10,nm:'章节测验 2（7-9 节）',ty:'quiz',dur:'20 题',st:'lock'},
+    ]},
+    {t:'第四章 · 团队输出',ls:[
+      {id:11,nm:'团队带教与标准输出',ty:'video',dur:'08:00',st:'lock'},
+      {id:12,nm:'行业标杆案例研习',ty:'video',dur:'07:30',st:'lock'},
+    ]},
+    {t:'结业',ls:[
+      {id:13,nm:'毕业综合考',ty:'quiz',dur:'50 题 + 面试',st:'lock'},
+    ]},
+  ];
+  const TYN={video:'视频',quiz:'测验',doc:'实操'};
+  const ICO={video:'▶',quiz:'✎',doc:'⛏'};
+  const flat=()=>SECTIONS.flatMap(s=>s.ls);
+  let curId=8, playing=false, t=252, dur=600, timer=null;
+
+  function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(e._h);e._h=setTimeout(()=>e.classList.remove('on'),1700);}
+  const fmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  function les(id){return flat().find(l=>l.id===id);}
+
+  function renderProg(){
+    const all=flat(), done=all.filter(l=>l.st==='done').length;
+    $('#cpFill').style.width=Math.round(done/all.length*100)+'%';
+    $('#cpTxt').textContent=done+' / '+all.length+' 节';
+  }
+  function renderCurr(){
+    const wrap=$('#curr'); wrap.innerHTML='';
+    SECTIONS.forEach((sec,si)=>{
+      const done=sec.ls.filter(l=>l.st==='done').length;
+      const hasCur=sec.ls.some(l=>l.id===curId);
+      const box=document.createElement('div'); box.className='sec'+(hasCur?' open':'');
+      const h=document.createElement('div'); h.className='sec-h';
+      h.innerHTML='<span class="ar">▸</span><span class="nm">'+sec.t+'</span><span class="mt">'+done+'/'+sec.ls.length+'</span>';
+      h.onclick=()=>box.classList.toggle('open');
+      box.appendChild(h);
+      const body=document.createElement('div'); body.className='sec-body';
+      sec.ls.forEach(l=>{
+        const isCur=l.id===curId;
+        const row=document.createElement('div'); row.className='les '+(isCur?'cur':l.st);
+        const ck=l.st==='done'?'✓':(isCur?ICO[l.ty]:(l.st==='lock'?'🔒':ICO[l.ty]));
+        row.innerHTML='<span class="ck">'+ck+'</span><div class="body"><div class="ln">'+l.nm+'</div>'+
+          '<div class="lm"><span class="ty '+l.ty+'">'+TYN[l.ty]+'</span><span>'+l.dur+'</span>'+(isCur?'<span style="color:var(--accent);font-weight:700;">· 正在学</span>':'')+'</div></div>';
+        row.onclick=()=>open(l.id);
+        body.appendChild(row);
+      });
+      box.appendChild(body); wrap.appendChild(box);
+    });
+  }
+  function open(id){
+    const l=les(id); if(!l) return;
+    if(l.st==='lock'){ toast('完成前序章节后解锁'); return; }
+    if(l.id!==curId){ const c=les(curId); if(c&&c.st==='cur') c.st='done'; if(l.st!=='done') l.st='cur'; curId=id; }
+    // 切换播放器
+    pause(); t=0; dur=l.ty==='video'?(parseInt(l.dur)*60+ (+(l.dur.split(':')[1]||0))):600;
+    $('#plTitle').innerHTML=l.nm+'<small>高端管家·L4→L5 客户沟通进阶</small>';
+    $('#stTitle').textContent=l.nm;
+    $('#lhNm').textContent=l.nm;
+    $('#lhMeta').textContent=(SECTIONS.find(s=>s.ls.includes(l)).t)+' · '+TYN[l.ty]+' · '+l.dur+' · 主讲 L6 周敏';
+    $('#quizmask').classList.toggle('on', l.ty==='quiz');
+    $('#tcur').textContent='00:00'; $('#tdur').textContent=l.ty==='video'?l.dur:'—'; $('#seekfill').style.width='0%';
+    renderProg(); renderCurr();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function tick(){ if(t<dur){ t++; $('#tcur').textContent=fmt(t); $('#seekfill').style.width=(t/dur*100)+'%'; $('#noteTs').textContent=fmt(t);} else { pause(); toast('本节已看完，可标记完成进入下一节'); } }
+  function play(){ if(les(curId).ty!=='video') return; playing=true; $('#pp').textContent='⏸'; $('#bigplay').textContent='⏸'; timer=setInterval(tick,1000); }
+  function pause(){ playing=false; $('#pp').textContent='▶'; $('#bigplay').textContent='▶'; clearInterval(timer); }
+  function toggle(){ playing?pause():play(); }
+  function nextLesson(){
+    const all=flat(), i=all.findIndex(l=>l.id===curId);
+    for(let j=i+1;j<all.length;j++){ if(all[j].st!=='lock'||true){ return all[j]; } }
+    return null;
+  }
+  function markDone(){
+    const c=les(curId);
+    if(c.ty==='quiz'){ location.href='s-quiz.html'; return; }
+    c.st='done';
+    const all=flat(), i=all.findIndex(l=>l.id===curId), nx=all[i+1];
+    renderProg();
+    if(nx){ if(nx.st==='lock') nx.st='cur'; open(nx.id); if(nx.ty==='quiz'){ toast('下一节为测验'); } else toast('✓ 已完成本节，进入下一节'); }
+    else { toast('🎉 全部章节已学完，去结业考试'); setTimeout(()=>location.href='s-exam.html',900); }
+  }
+
+  // tabs
+  document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+    tb.classList.add('on'); $('#p-'+tb.dataset.p).classList.add('on');
+  });
+  // player controls
+  $('#pp').onclick=toggle; $('#bigplay').onclick=toggle;
+  $('#seek').onclick=e=>{ const r=e.currentTarget.getBoundingClientRect(); t=Math.round((e.clientX-r.left)/r.width*dur); $('#tcur').textContent=fmt(t); $('#seekfill').style.width=(t/dur*100)+'%'; };
+  const SPD=['1.0×','1.25×','1.5×','2.0×','0.75×']; let si=0;
+  $('#spd').onclick=()=>{ si=(si+1)%SPD.length; $('#spd').textContent=SPD[si]; toast('倍速 '+SPD[si]); };
+  $('#next').onclick=()=>{ const n=nextLesson(); if(n) open(n.id); };
+  $('#btnList').onclick=()=>{ document.querySelector('.tab[data-p=cat]').click(); $('#curr').scrollIntoView({behavior:'smooth'}); };
+  $('#btnPrev').onclick=()=>{ const all=flat(), i=all.findIndex(l=>l.id===curId); if(i>0) open(all[i-1].id); };
+  $('#btnDone').onclick=markDone;
+  // notes
+  const NOTES=[{ts:'02:40',tx:'价值锚定：先讲已交付价值再谈条款'},{ts:'05:10',tx:'异议处理三步——共情/澄清/给方案'}];
+  function renderNotes(){ const w=$('#noteList'); w.innerHTML=''; NOTES.forEach(n=>{ const d=document.createElement('div'); d.className='note'; d.innerHTML='<div class="h"><span class="ts">'+n.ts+'</span><span>我的笔记</span></div><div class="tx">'+n.tx+'</div>'; w.appendChild(d); }); }
+  $('#noteAdd').onclick=()=>{ const v=$('#noteIn').value.trim(); if(!v)return; NOTES.unshift({ts:$('#noteTs').textContent,tx:v}); $('#noteIn').value=''; renderNotes(); toast('✓ 笔记已保存 @'+NOTES[0].ts); };
+  // qa
+  $('#qaAdd').onclick=()=>{ const v=$('#qaIn').value.trim(); if(!v)return; const d=document.createElement('div'); d.className='qa'; d.innerHTML='<div class="h"><span class="who">我</span><span class="t">刚刚</span></div><div class="q">'+v+'</div><div class="a">老师将尽快回复（演示）</div>'; $('#qaList').prepend(d); $('#qaIn').value=''; toast('✓ 已提问'); };
+
+  renderProg(); renderCurr(); renderNotes();
+})();
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>房源对比 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a; --warn: #eab308; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--surface); padding-bottom: 80px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; }
+    .top-nav { display: flex; align-items: center; padding: 8px 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .top-nav h1 { flex: 1; font-size: 15px; font-weight: 600; text-align: center; margin: 0; }
+    .add-btn { font-size: 13px; color: var(--accent); padding: 8px 10px; font-weight: 500; }
+
+    /* listing thumbs */
+    .thumbs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 12px; background: var(--bg); }
+    .thumb { background: var(--surface); border-radius: var(--radius-sm); padding: 10px 8px; text-align: center; position: relative; border: 1px solid var(--border); }
+    .thumb .img {
+      height: 60px; border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent-soft) 60%, white));
+      display: grid; place-items: center; color: var(--accent); margin-bottom: 6px;
+    }
+    .thumb .img svg { width: 22px; height: 22px; }
+    .thumb .name { font-size: 11px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .thumb .price { font-size: 12px; color: var(--accent); font-weight: 700; margin-top: 4px; }
+    .thumb .rm {
+      position: absolute; top: -4px; right: -4px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      display: grid; place-items: center; font-size: 10px; color: var(--muted);
+    }
+    .thumb.best::after {
+      content: '推荐'; position: absolute; top: 4px; left: 4px;
+      background: var(--success); color: white; font-size: 9px;
+      padding: 1px 4px; border-radius: 3px; font-weight: 600;
+    }
+
+    /* compare table */
+    .ct { padding: 8px 12px 0; }
+    .ct-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; }
+    .ct-section-head {
+      padding: 10px 14px; background: var(--bg);
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      letter-spacing: 1px; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .ct-section-head svg { width: 14px; height: 14px; }
+    .ct-row { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; align-items: center; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 12px; }
+    .ct-row .lbl { color: var(--muted); font-size: 11px; }
+    .ct-row .cell { text-align: center; padding: 0 4px; line-height: 1.3; }
+    .ct-row .cell.best { color: var(--success); font-weight: 700; }
+    .ct-row .cell.worst { color: var(--danger); }
+    .ct-row .cell.tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--bg); display: inline-block; }
+    .ct-row .cell.has-amenity { color: var(--success); }
+    .ct-row .cell.no-amenity { color: var(--border); }
+    .stars { color: var(--warn); font-size: 12px; letter-spacing: 1px; }
+    .stars .e { color: var(--border); }
+
+    /* summary banner */
+    .summary {
+      margin: 12px; padding: 16px;
+      background: linear-gradient(135deg, color-mix(in oklab, var(--success) 12%, transparent), transparent);
+      border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
+      border-radius: var(--radius-md);
+    }
+    .summary h3 { font-size: 14px; font-weight: 600; margin: 0 0 6px; color: var(--success); display: flex; align-items: center; gap: 6px; }
+    .summary h3 svg { width: 16px; height: 16px; }
+    .summary p { font-size: 13px; color: var(--fg); margin: 0; line-height: 1.6; }
+    .summary p strong { color: var(--success); }
+
+    .bottom-cta {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 16px calc(12px + var(--safe-bottom));
+      display: flex; gap: 10px; z-index: 20;
+    }
+    .btn-share { flex: 1; height: 44px; background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .btn-share svg { width: 16px; height: 16px; }
+    .btn-apply { flex: 2; height: 44px; background: var(--accent); color: white; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>房源对比（3 / 3）</h1>
+    <button class="add-btn">清空</button>
+  </div>
+
+  <!-- thumbs -->
+  <div class="thumbs">
+    <div class="thumb best">
+      <div class="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+      <div class="name">江宁·梧桐公馆人才公寓</div>
+      <div class="price">¥2,380/月</div>
+      <span class="rm">×</span>
+    </div>
+    <div class="thumb">
+      <div class="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+      <div class="name">建邺·河西青年公寓</div>
+      <div class="price">¥3,120/月</div>
+      <span class="rm">×</span>
+    </div>
+    <div class="thumb">
+      <div class="img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+      <div class="name">鼓楼·龙江新青年</div>
+      <div class="price">¥2,680/月</div>
+      <span class="rm">×</span>
+    </div>
+  </div>
+
+  <!-- compare table -->
+  <div class="ct">
+
+    <div class="ct-section">
+      <div class="ct-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        价格 & 性价比
+      </div>
+      <div class="ct-row"><span class="lbl">月租</span><span class="cell best">¥2,380</span><span class="cell worst">¥3,120</span><span class="cell">¥2,680</span></div>
+      <div class="ct-row"><span class="lbl">市场价</span><span class="cell">¥3,200</span><span class="cell">¥4,100</span><span class="cell">¥3,500</span></div>
+      <div class="ct-row"><span class="lbl">省幅</span><span class="cell best">-25.6%</span><span class="cell">-23.9%</span><span class="cell">-23.4%</span></div>
+      <div class="ct-row"><span class="lbl">押付方式</span><span class="cell">押一付一</span><span class="cell">押一付三</span><span class="cell best">押一付一</span></div>
+      <div class="ct-row"><span class="lbl">月省金额</span><span class="cell best">¥820</span><span class="cell">¥980</span><span class="cell">¥820</span></div>
+    </div>
+
+    <div class="ct-section">
+      <div class="ct-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        房屋本身
+      </div>
+      <div class="ct-row"><span class="lbl">户型</span><span class="cell">一室一厅</span><span class="cell">两室一厅</span><span class="cell">一室一厅</span></div>
+      <div class="ct-row"><span class="lbl">面积</span><span class="cell">45 ㎡</span><span class="cell best">68 ㎡</span><span class="cell">42 ㎡</span></div>
+      <div class="ct-row"><span class="lbl">朝向</span><span class="cell best">南</span><span class="cell">东南</span><span class="cell">北</span></div>
+      <div class="ct-row"><span class="lbl">楼层</span><span class="cell">15/26</span><span class="cell">8/32</span><span class="cell">22/26</span></div>
+      <div class="ct-row"><span class="lbl">星级</span><span class="cell"><span class="stars">★★★★<span class="e">★</span></span></span><span class="cell"><span class="stars">★★★★<span class="e">★</span></span></span><span class="cell"><span class="stars">★★★<span class="e">★★</span></span></span></div>
+    </div>
+
+    <div class="ct-section">
+      <div class="ct-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+        位置 & 通勤
+      </div>
+      <div class="ct-row"><span class="lbl">区域</span><span class="cell">江宁区</span><span class="cell">建邺区</span><span class="cell">鼓楼区</span></div>
+      <div class="ct-row"><span class="lbl">地铁</span><span class="cell">1 号线 · 500m</span><span class="cell best">2 号线 · 300m</span><span class="cell best">4 号线 · 200m</span></div>
+      <div class="ct-row"><span class="lbl">通勤到新街口</span><span class="cell worst">40 min</span><span class="cell">25 min</span><span class="cell best">15 min</span></div>
+    </div>
+
+    <div class="ct-section">
+      <div class="ct-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        配套设施
+      </div>
+      <div class="ct-row"><span class="lbl">空调/冰洗</span><span class="cell has-amenity">✓ 全包</span><span class="cell has-amenity">✓ 全包</span><span class="cell">✓ 仅空调</span></div>
+      <div class="ct-row"><span class="lbl">智能门锁</span><span class="cell has-amenity">✓</span><span class="cell has-amenity">✓</span><span class="cell no-amenity">—</span></div>
+      <div class="ct-row"><span class="lbl">24H 管家</span><span class="cell has-amenity">✓</span><span class="cell has-amenity">✓</span><span class="cell no-amenity">—</span></div>
+      <div class="ct-row"><span class="lbl">公共健身房</span><span class="cell has-amenity">✓</span><span class="cell has-amenity">✓</span><span class="cell no-amenity">—</span></div>
+    </div>
+
+    <div class="ct-section">
+      <div class="ct-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        合规 & 运营
+      </div>
+      <div class="ct-row"><span class="lbl">运营方</span><span class="cell">国企 A</span><span class="cell">国企 B</span><span class="cell">国企 A</span></div>
+      <div class="ct-row"><span class="lbl">认证</span><span class="cell has-amenity">政府认证</span><span class="cell has-amenity">政府认证</span><span class="cell has-amenity">政府认证</span></div>
+      <div class="ct-row"><span class="lbl">公积金直付</span><span class="cell has-amenity">✓</span><span class="cell has-amenity">✓</span><span class="cell has-amenity">✓</span></div>
+      <div class="ct-row"><span class="lbl">可看房</span><span class="cell">明日</span><span class="cell">今日</span><span class="cell">明日</span></div>
+    </div>
+
+  </div>
+
+  <!-- summary -->
+  <div class="summary">
+    <h3>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      综合推荐：江宁·梧桐公馆
+    </h3>
+    <p>租金最低（<strong>省 ¥820/月</strong>）· 押付灵活（押一付一）· 朝南采光好 · 四星品质且支持公积金直付。如果您不依赖地铁通勤新街口，<strong>这一套综合得分最高</strong>。</p>
+  </div>
+</div>
+
+<div class="bottom-cta">
+  <button class="btn-share">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98"/><path d="M15.41 6.51l-6.82 3.98"/></svg>
+    分享
+  </button>
+  <button class="btn-apply" onclick="location.href='apply.html'">选「梧桐公馆」申请 →</button>
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

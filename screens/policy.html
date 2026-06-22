@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>政策资讯 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-header {
+      background: var(--surface); padding: 12px 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0 0 12px; }
+    .tab-bar { display: flex; gap: 0; }
+    .tab-bar button {
+      flex: 1; padding: 10px 0; font-size: 14px;
+      color: var(--muted); border-bottom: 2px solid transparent;
+    }
+    .tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+    .content { padding: 16px; }
+
+    /* article card */
+    .article-card {
+      background: var(--surface); border-radius: var(--radius-md);
+      border: 1px solid var(--border); padding: 16px;
+      margin-bottom: 10px; display: block;
+    }
+    .article-card:active { background: var(--bg); }
+    .article-card .date { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .article-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; line-height: 1.4; }
+    .article-card .summary { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .article-tags { display: flex; gap: 4px; margin-top: 8px; }
+    .article-tag {
+      font-size: 10px; padding: 2px 8px; border-radius: 3px;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .article-tag.warn { background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .article-tag.green { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+
+    /* FAQ */
+    .faq-section { margin-top: 20px; }
+    .faq-section h2 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+    .faq-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .faq-q {
+      display: flex; justify-content: space-between; align-items: center;
+      width: 100%; padding: 14px 16px; font-size: 14px; font-weight: 500;
+      text-align: left;
+    }
+    .faq-q svg { width: 16px; height: 16px; flex-shrink: 0; transition: transform 0.2s; }
+    .faq-item.open .faq-q svg { transform: rotate(180deg); }
+    .faq-a {
+      padding: 0 16px 14px; font-size: 13px; color: var(--muted);
+      line-height: 1.6; display: none;
+    }
+    .faq-item.open .faq-a { display: block; }
+
+    /* guide card */
+    .guide-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); border-radius: var(--radius-md);
+      border: 1px solid var(--border); padding: 16px; margin-bottom: 10px;
+    }
+    .guide-icon {
+      width: 44px; height: 44px; border-radius: var(--radius-sm);
+      background: var(--accent-soft); display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .guide-icon svg { width: 22px; height: 22px; color: var(--accent); }
+    .guide-info h4 { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+    .guide-info p { font-size: 12px; color: var(--muted); }
+
+    /* standard system — hub + star ratings */
+    .std-banner {
+      background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 80%, black 35%) 0%, color-mix(in oklab, var(--accent) 70%, black) 100%);
+      border-radius: var(--radius-md); padding: 16px; color: white; margin-bottom: 16px;
+    }
+    .std-banner .tagline { font-size: 11px; opacity: 0.7; margin-bottom: 6px; }
+    .std-banner h2 { font-size: 17px; font-weight: 700; margin: 0 0 4px; }
+    .std-banner p { font-size: 12px; opacity: 0.85; line-height: 1.5; }
+
+    .nav-channel-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px;
+      margin-bottom: 10px;
+    }
+    .nav-channel-card:active { background: var(--bg); }
+    .nav-channel-card .nav-icon {
+      width: 48px; height: 48px; border-radius: var(--radius-sm);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .nav-channel-card .nav-icon svg { width: 24px; height: 24px; }
+    .nav-channel-card .nav-info { flex: 1; }
+    .nav-channel-card .nav-info h3 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+    .nav-channel-card .nav-info p { font-size: 12px; color: var(--muted); }
+    .nav-channel-card .nav-arrow { color: var(--muted); flex-shrink: 0; }
+
+    .star-standards { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px; }
+    .star-standards h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .star-standards .sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+    .star-level { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .star-level:last-child { border-bottom: 0; }
+    .star-level .stars { color: var(--warn); font-size: 14px; letter-spacing: 1px; white-space: nowrap; width: 72px; flex-shrink: 0; padding-top: 1px; }
+    .star-level .stars .e { color: var(--border); }
+    .star-level .desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .star-level .desc strong { color: var(--fg); }
+    .star-detail-link {
+      display: flex; align-items: center; gap: 8px; padding: 10px 0 0;
+      color: var(--accent); font-size: 13px;
+    }
+    .star-detail-link svg { width: 16px; height: 16px; }
+
+    /* bottom tabs */
+    .bottom-tabs {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 4px 0; color: var(--muted); font-size: 10px;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item svg { width: 22px; height: 22px; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .content { padding-inline: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-header">
+    <h1>政策资讯</h1>
+    <div class="tab-bar">
+      <button class="active" data-tab="news">最新政策</button>
+      <button data-tab="guide">申请指南</button>
+      <button data-tab="faq">常见问题</button>
+      <button data-tab="standard">标准体系</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- === tab: news (default) === -->
+    <div id="tab-news">
+      <!-- banner -->
+      <div style="background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 60%, black) 0%, var(--accent) 100%); border-radius: var(--radius-md); padding: 16px; color: white; margin-bottom: 16px;">
+        <div style="font-size: 12px; opacity: 0.8; margin-bottom: 4px;">南京市住建局 · 2026-05-28</div>
+        <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">保租房申请条件重大调整</div>
+        <div style="font-size: 13px; opacity: 0.9;">取消户籍限制 · 扩大覆盖范围 · 简化审批流程</div>
+      </div>
+
+      <div class="article-card">
+        <div class="date">2026-05-28 · 南京市住建局</div>
+        <h3>南京保租房申请条件放宽：不限户籍、取消收入限制</h3>
+        <p class="summary">新政策将申请对象扩大到所有在宁就业创业人员，不再设置户籍和收入门槛。同时简化申请材料，线上办理时限压缩至 5 个工作日。</p>
+        <div class="article-tags"><span class="article-tag">新政</span><span class="article-tag warn">重要</span></div>
+      </div>
+
+      <div class="article-card">
+        <div class="date">2026-05-20 · 省公积金中心</div>
+        <h3>江苏省公积金直付保租房租金全面推行</h3>
+        <p class="summary">符合条件的缴存职工可申请按月提取公积金直接支付保租房租金，无需先垫付后报销，单月提取额度不超过实际租金。</p>
+        <div class="article-tags"><span class="article-tag">新政</span><span class="article-tag green">利好</span></div>
+      </div>
+
+      <div class="article-card">
+        <div class="date">2026-05-15 · 住建部</div>
+        <h3>住建部：今年全国计划筹集保障性租赁住房 200 万套</h3>
+        <p class="summary">住建部表示将加大保租房供给，重点面向新市民、青年人等群体，推动实现"职住平衡"。鼓励市场化机构参与运营。</p>
+        <div class="article-tags"><span class="article-tag">政策</span></div>
+      </div>
+
+      <div class="article-card">
+        <div class="date">2026-05-08 · 南京市政府</div>
+        <h3>南京市保租房项目认定管理办法（试行）</h3>
+        <p class="summary">明确保租房项目认定标准、运营管理要求和退出机制。项目租金应低于同地段同品质市场租金 90%，年度涨幅不超过 5%。</p>
+        <div class="article-tags"><span class="article-tag">办法</span><span class="article-tag">解读</span></div>
+      </div>
+    </div>
+
+    <!-- === tab: guide (hidden) === -->
+    <div id="tab-guide" style="display:none;">
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 14l2 2 4-4"/></svg>
+        </div>
+        <div class="guide-info">
+          <h4>资格自检清单</h4>
+          <p>5 步确认是否符合申请条件</p>
+        </div>
+      </div>
+
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <div class="guide-info">
+          <h4>材料准备指南</h4>
+          <p>身份证、社保证明、工作证明等材料要求</p>
+        </div>
+      </div>
+
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="guide-info">
+          <h4>签约入住流程</h4>
+          <p>从选房到入住完整指引</p>
+        </div>
+      </div>
+
+      <div class="guide-card">
+        <div class="guide-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15h4l2-8 4 14 2-8h4"/></svg>
+        </div>
+        <div class="guide-info">
+          <h4>公积金直付操作指南</h4>
+          <p>如何用公积金直接支付保租房租金</p>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; padding: 16px; background: var(--accent-soft); border-radius: var(--radius-md);">
+        <h4 style="margin: 0 0 6px; font-size: 14px; color: var(--accent);">需要人工帮助？</h4>
+        <p style="font-size: 13px; color: var(--muted);">拨打 025-12345 咨询保租房政策<br/>或联系贝壳管家在线解答</p>
+      </div>
+    </div>
+
+    <!-- === tab: FAQ (hidden) === -->
+    <div id="tab-faq" style="display:none;">
+      <div class="faq-section">
+        <h2>常见问题</h2>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>保租房和普通租房有什么区别？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">保租房是政府为保障新市民、青年人住房需求而推出的政策性租赁住房。相比普通租房，保租房有租金上限（≤市场价 90%）、年涨幅限制（≤5%）、政府认证房东、统一的合同备案和投诉渠道，更安全可靠。</div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>申请保租房需要满足什么条件？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">基本条件：在南京市无自有住房、在宁缴纳社保或公积金（≥6 个月）、未满 45 周岁（人才引进不限）。不限户籍、不限收入。具体项目可能有额外要求，请以各项目公示为准。</div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>保租房的租金怎么定？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">保租房租金不高于同地段同品质市场租金的 90%，年度涨幅不超过 5%。贝壳平台展示的房源均包含政府指导价和市场参考价的对比，您可以清晰地看到租金优惠幅度。</div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>可以用公积金支付保租房租金吗？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">可以。江苏省已全面推行公积金直付保租房租金政策。符合条件的缴存职工可在签约后申请按月提取公积金直接支付租金，无需先垫付后报销。具体办理流程可咨询公积金中心或贝壳管家。</div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>申请提交后多久能知道结果？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">资格核验一般在 5 个工作日内完成。核验通过后，您可以在"我的申请"中查看审核进度，并进入选房签约流程。部分项目支持"先到先得"，建议尽快完成申请。</div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q">
+            <span>签约后可以转租或提前退租吗？</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="faq-a">保租房严禁转租、转借。如需提前退租，请按合同约定提前（通常为 30 天）通知运营方办理退租手续。押金退还标准以合同约定为准。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === tab: standard system (hidden) === -->
+    <div id="tab-standard" style="display:none;">
+
+      <div class="std-banner">
+        <div class="tagline">南京市住建局 · 保租房质量保障</div>
+        <h2>好房子标准体系</h2>
+        <p>从运营主体资质到服务质量到物资品质，全链路标准化管理，让每一位租客住得安心。</p>
+      </div>
+
+      <!-- Channel nav cards → 二级频道入口 -->
+      <a class="nav-channel-card" href="operators.html">
+        <div class="nav-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="nav-info">
+          <h3>运营主体白名单</h3>
+          <p>经住建局审核认可的保租房运营机构 · 6 家</p>
+        </div>
+        <svg class="nav-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+
+      <a class="nav-channel-card" href="service-workers.html">
+        <div class="nav-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="nav-info">
+          <h3>服务者认证</h3>
+          <p>持证上岗 · 服务可追溯 · 24 人已认证</p>
+        </div>
+        <svg class="nav-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+
+      <a class="nav-channel-card" href="suppliers.html">
+        <div class="nav-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div class="nav-info">
+          <h3>合格物资供应商公示</h3>
+          <p>家电 · 装修 · 物业 · 家具软装 · 6 家</p>
+        </div>
+        <svg class="nav-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </a>
+
+      <!-- 星级评价标准 -->
+      <div class="star-standards">
+        <h3>房源星级评价标准</h3>
+        <p class="sub">保租房项目综合评星标准，从设施配备、服务质量、社区配套等多维度评估</p>
+
+        <div class="star-level">
+          <div class="stars">★★★<span class="e">★★</span></div>
+          <div class="desc"><strong>三星：舒适型</strong> — 客房设备齐全且美观实用，配备多种智能设备（智能门锁、智能水电表），独立卫浴、洗衣机、WiFi、电梯、空调/暖气齐备。</div>
+        </div>
+        <div class="star-level">
+          <div class="stars">★★★★<span class="e">★</span></div>
+          <div class="desc"><strong>四星：优质型</strong> — 在三星基础上，提供增值服务（管家24H服务、行李寄存、每日清洁可选），配备租客保险+家财险，信用分≥4.2。公区含健身器械、可容纳10人以上活动空间。</div>
+        </div>
+        <div class="star-level">
+          <div class="stars">★★★★★</div>
+          <div class="desc"><strong>五星：旗舰型</strong> — 在四星基础上，提供高水平服务（24H管家持证上岗、24H保安、代购、叫醒），丰富的社区生活配套（≥30人活动大厅/投影/LED/音响），周边3km内有餐厅、咖啡厅、健身房≥5件器械。零押金入住，信用分≥4.4。</div>
+        </div>
+
+        <a class="star-detail-link" href="#" onclick="alert('查看完整评星工具表（58 项细则）');return false;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          查看完整评星细则（58 项评估维度）
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="tab-bar" data-series="c" data-active="policy"></div>
+</div>
+
+<script>
+// tab switching
+document.querySelectorAll('[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    ['tab-news', 'tab-guide', 'tab-faq', 'tab-standard'].forEach(id => {
+      document.getElementById(id).style.display = id === 'tab-' + tab ? 'block' : 'none';
+    });
+  });
+});
+// FAQ toggle
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => {
+    q.parentElement.classList.toggle('open');
+  });
+});
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>机构 + 政府合作模式</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #fff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --gov: #1e40af;
+      --op: #0f766e;
+      --ok: #16a34a;
+      --warn: #ea580c;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; padding:24px; background:#fff;
+      border:1px solid var(--border); border-radius:14px; margin-bottom:18px;
+    }
+    .doc-header h1{font-size:26px; font-weight:700; margin:0 0 8px;}
+    .doc-header .sub{color:var(--muted); font-size:14px;}
+    .doc-header .tags{display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .doc-header .tag{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fef3c7; color:#92400e; font-weight:500;
+    }
+    .doc-header .punch{
+      margin:14px auto 0; max-width:680px;
+      padding:12px 16px; background:#0f172a; color:#fff;
+      border-radius:10px; font-size:13px; line-height:1.6;
+    }
+    .doc-header .punch em{color:#fbbf24; font-style:normal;}
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:16px; font-weight:700; margin-bottom:16px;
+      padding-bottom:10px; border-bottom:2px solid var(--plat-accent);
+    }
+    .section-title .num{
+      width:28px; height:28px; border-radius:50%;
+      background:var(--plat); color:#fff;
+      display:grid; place-items:center; font-size:14px; font-weight:700;
+    }
+    .section-title .label{flex:1;}
+    .section-title .badge{
+      font-size:11px; padding:3px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    .crosslink{
+      margin-bottom:14px; padding:10px 14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:8px;
+      font-size:12px; color:#1e40af;
+    }
+    .crosslink a{font-weight:600; text-decoration:underline;}
+
+    /* 已实现页面标注 · 网格对齐版 */
+    .impl-aligned{display:grid; gap:8px; margin-top:14px; padding:12px; background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;}
+    .impl-aligned.cols-2{grid-template-columns:repeat(2, 1fr);}
+    .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
+    .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
+    .impl-aligned .impl-banner{grid-column:1 / -1; font-size:11px; color:#64748b; font-weight:600; letter-spacing:0.3px; margin-bottom:2px;}
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px; padding:0 0 4px; border-bottom:1px solid #e2e8f0; margin-bottom:2px; text-align:center;}
+    .impl-aligned .col a.impl-pill{display:block; font-size:11px; padding:4px 8px; border-radius:6px; background:#fff; border:1px solid #e2e8f0; color:#334155; text-decoration:none; font-weight:500; line-height:1.35; transition:all 0.15s; text-align:left;}
+    .impl-aligned .col a.impl-pill:hover{background:#0f172a; color:#fff; border-color:#0f172a;}
+    .impl-aligned .col a.impl-pill .file{display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px; opacity:0.55; margin-top:2px;}
+    .impl-aligned .col a.impl-pill:hover .file{opacity:0.9;}
+    .impl-aligned .col .empty-pill{font-size:10px; color:#94a3b8; padding:4px 8px; text-align:center; border:1px dashed #e2e8f0; border-radius:6px; background:#fff; line-height:1.3;}
+    @media (max-width: 900px){
+      .impl-aligned.cols-5{grid-template-columns:repeat(3, 1fr);}
+      .impl-aligned.cols-4{grid-template-columns:repeat(2, 1fr);}
+    }
+    @media (max-width: 600px){.impl-aligned{grid-template-columns:1fr 1fr !important;}}
+
+    /* ===== 两栏 ===== */
+    .two-col{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+    .col-card{
+      border-radius:12px; padding:18px; color:#fff;
+    }
+    .col-card.gov{background:linear-gradient(135deg, #1e3a8a 0%, var(--gov) 100%);}
+    .col-card.plat{background:linear-gradient(135deg, #020617 0%, var(--plat) 100%); position:relative; overflow:hidden;}
+    .col-card.plat::after{content:"⭐"; position:absolute; right:14px; top:14px; opacity:0.2; font-size:32px;}
+    .col-card .role{font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:4px;}
+    .col-card .name{font-size:18px; font-weight:700; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);}
+    .col-card .sub-title{font-size:12px; font-weight:700; margin:10px 0 6px; opacity:0.9;}
+    .col-card ol, .col-card ul{margin:0 0 8px; padding-left:20px; font-size:12.5px; line-height:1.7;}
+    .col-card .note{
+      font-size:11px; padding:6px 10px; background:rgba(255,255,255,0.1);
+      border-radius:6px; margin-top:8px;
+    }
+
+    /* ===== 三种接入模式 ===== */
+    .mode-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:14px;}
+    .mode-card{
+      background:#fff; border:1px solid var(--border); border-radius:12px;
+      padding:16px; position:relative;
+      border-top:4px solid;
+    }
+    .mode-card.m1{border-top-color:#22c55e;}
+    .mode-card.m2{border-top-color:#eab308;}
+    .mode-card.m3{border-top-color:#7c3aed;}
+    .mode-card .lvl{
+      font-size:11px; padding:2px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:600;
+    }
+    .mode-card .name{font-size:15px; font-weight:700; margin:8px 0 10px;}
+    .mode-card .row{display:flex; gap:8px; font-size:12px; margin:6px 0;}
+    .mode-card .row .k{color:var(--muted); font-weight:600; flex-shrink:0; width:56px;}
+    .mode-card .row .v{color:#334155;}
+    .mode-card .fit{
+      margin-top:10px; padding:8px 10px;
+      background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px;
+      font-size:11px; color:#15803d;
+    }
+    .mode-card .fit::before{content:"适合："; font-weight:700;}
+
+    /* ===== 全程网办 5 步 ===== */
+    .step-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;}
+    .step-card{
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      padding:12px; text-align:center; position:relative;
+    }
+    .step-card .icon{
+      width:36px; height:36px; border-radius:10px; margin:0 auto 6px;
+      background:linear-gradient(135deg, var(--gov) 0%, var(--plat) 100%);
+      color:#fff; display:grid; place-items:center; font-size:16px;
+    }
+    .step-card .n{font-size:10px; color:var(--muted); font-weight:600;}
+    .step-card .t{font-size:13px; font-weight:700; margin:4px 0;}
+    .step-card .d{font-size:11px; color:#475569; line-height:1.45;}
+    .step-card + .step-card::before{
+      content:"→"; position:absolute; left:-10px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-weight:700; font-size:14px;
+    }
+
+    /* ===== 实施步骤 6-8 周时间线 ===== */
+    .week-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .week-card{
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      padding:14px; border-left:3px solid;
+    }
+    .week-card.w1{border-left-color:#3b82f6;}
+    .week-card.w2{border-left-color:#22c55e;}
+    .week-card.w3{border-left-color:#eab308;}
+    .week-card.w4{border-left-color:#7c3aed;}
+    .week-card .when{font-size:11px; color:var(--muted); font-weight:600;}
+    .week-card .t{font-size:14px; font-weight:700; margin:4px 0 8px;}
+    .week-card .actions{font-size:12px; color:#475569; line-height:1.55;}
+    .week-card .actions div::before{content:"▸ "; color:var(--muted);}
+
+    /* ===== 合规底线 ===== */
+    .compliance-card{
+      background:linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%);
+      border:1px solid #fecaca; border-radius:12px; padding:18px;
+    }
+    .compliance-card h4{margin:0 0 10px; font-size:14px; font-weight:700; color:#991b1b;}
+    .compliance-card .grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:10px;}
+    .compliance-card .item{
+      background:#fff; padding:10px 12px; border-radius:8px;
+      border:1px solid #fecaca; font-size:12px;
+    }
+    .compliance-card .item strong{display:block; color:#991b1b; margin-bottom:4px; font-size:13px;}
+    .compliance-card .item div{color:#7c2d12; line-height:1.5;}
+
+    /* ===== 字段引用 ===== */
+    .field-pills{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+    .field-pills .p{
+      font-size:11px; padding:3px 9px; border-radius:6px;
+      background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+    }
+
+    .doc-footer{
+      margin-top:16px; padding:18px; border-radius:12px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; text-align:center;
+    }
+    .doc-footer .em{font-size:18px; font-weight:700;}
+    .doc-footer .sub{font-size:12px; opacity:0.85; margin-top:6px;}
+
+    @media (max-width: 1024px){
+      .two-col, .mode-grid, .week-grid{grid-template-columns:1fr;}
+      .step-grid{grid-template-columns:1fr 1fr;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="org-gov-standard"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>机构 + 政府合作模式</h1>
+      <div class="sub">关于贝壳租房面向江苏上线「保租房」频道 · 助力租赁供需高效匹配的初步设想</div>
+      <div class="tags">
+        <span class="tag">渐进式合作</span>
+        <span class="tag">政府认证 + 贝壳建统一入口</span>
+        <span class="tag">项目分批接入</span>
+        <span class="tag">6–8 周上线</span>
+        <span class="tag">三种接入模式并行</span>
+      </div>
+      <div class="punch">
+        用一句话概括：<em>不用建全市统一数据库</em>，建立「政府认证 + 贝壳建统一入口 + 项目分批接入」的渐进式合作模式 ——
+        <em>政府出政策、贝壳出平台+运营+流量</em>，用市场化效率提升保障房的民生效果。
+      </div>
+    </div>
+
+    <div class="crosslink">
+      📐 顶层定位：本方案对应 <a href="d-master-blueprint.html">总图谱</a>「四方共建模式」的政府方与平台方分工，配合 <a href="d-property-standard.html">房的标准</a>（统一字段）与 <a href="d-people-standard.html">人的标准</a>（服务者认证）三标合一。
+    </div>
+
+    <!-- 两栏：政府端 vs 贝壳端 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">1</span>
+        <span class="label">先把规则理顺 · 政府端做「认证 + 标准 + 监管」</span>
+        <span class="badge">原文一</span>
+      </div>
+
+      <div class="two-col">
+        <div class="col-card gov">
+          <div class="role">🏛 江苏住建厅</div>
+          <div class="name">先做 3 件事 · 不用自建系统</div>
+
+          <div class="sub-title">1. 认定运营主体白名单</div>
+          <ol>
+            <li>把现有项目国企/民企运营公司统一认定为「保租房运营单位」</li>
+            <li>明确权责、租金上限（<strong>≤市场价 90%</strong>）</li>
+            <li>服务标准 + 禁收费用清单</li>
+          </ol>
+
+          <div class="sub-title">2. 统一房源标准与字段</div>
+          <div class="field-pills">
+            <span class="p">楼栋房号</span><span class="p">面积</span><span class="p">户型</span>
+            <span class="p">朝向</span><span class="p">照片/视频</span><span class="p">政府指导价</span>
+            <span class="p">配套</span><span class="p">准入条件</span><span class="p">联系人</span>
+            <span class="p">空置状态</span>
+          </div>
+
+          <div class="sub-title" style="margin-top:14px;">3. 统一准入与合同模板</div>
+          <ul>
+            <li>新市民/青年人 · 不限户籍社保</li>
+            <li>统一电子合同 · 备案要素 · 投诉渠道</li>
+          </ul>
+
+          <div class="note">
+            <strong>监管模式：</strong>不做系统，只做审核 + 抽查 + 公示。房源真实性、合规性由项目主体自审、贝壳复验、住建局抽查。租金、涨幅、服务费明码标价，在贝壳专区公示。
+          </div>
+        </div>
+
+        <div class="col-card plat">
+          <div class="role">⭐ 贝壳（承建方）</div>
+          <div class="name">市级统一频道 + 数据库 + 线上流程</div>
+
+          <div class="sub-title">1. 建市保租房官方频道</div>
+          <ul>
+            <li>入口：贝壳 App / 小程序 → 租房 → 本市保租房专区</li>
+            <li>政府背书 + 住建局认证标识</li>
+            <li>对外是全市<strong>唯一官方入口</strong>，后台数据来自各项目</li>
+          </ul>
+
+          <div class="sub-title">2. 建市级保租房数据库（集中式）</div>
+          <ul>
+            <li>贝壳提供标准 API/Excel 模板</li>
+            <li>各项目主体按日/周推送（空置、价格、状态）</li>
+            <li>贝壳清洗、验真、去重、上架</li>
+            <li>住建局后台<strong>只读查看、导出、监管</strong>，不用自己开发</li>
+          </ul>
+
+          <div class="sub-title">3. 统一线上流程</div>
+          <ul>
+            <li>资格核验 · 房源展示 · 预约带看</li>
+            <li>签约备案 · 支付维修 · 公积金直付</li>
+            <li>全程网办、留痕、政府可查</li>
+          </ul>
+
+          <div class="note">
+            <strong>替代关系：</strong>相当于贝壳帮设区市低成本、快速搭建全市保租房「<strong>虚拟总平台</strong>」，替代政府自建系统。
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-2">
+        <div class="impl-banner">📎 政府端 vs 贝壳端 · 已实现页面（与上方两栏对齐）</div>
+        <div class="col">
+          <div class="col-head">🏛 江苏住建厅 · 3 件事 + 监管</div>
+          <a href="g-whitelist-operator.html" class="impl-pill">① 运营白名单审定<span class="file">g-whitelist-operator.html</span></a>
+          <a href="property-intake-api.html" class="impl-pill">② 统一字段接入 API（标准）<span class="file">property-intake-api.html</span></a>
+          <a href="contracts.html" class="impl-pill">③ 统一电子合同模板<span class="file">contracts.html</span></a>
+          <a href="g-inspection.html" class="impl-pill">监管·抽查记录<span class="file">g-inspection.html</span></a>
+          <a href="g-dashboard.html" class="impl-pill">住建后台·只读监管<span class="file">g-dashboard.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">⭐ 贝壳承建 · 虚拟总平台</div>
+          <a href="home.html" class="impl-pill">市级官方频道入口<span class="file">home.html</span></a>
+          <a href="p-data-hub.html" class="impl-pill">市级数据库·清洗验真<span class="file">p-data-hub.html</span></a>
+          <a href="portal-index.html" class="impl-pill">公示门户·公众可查<span class="file">portal-index.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全程网办 5 步 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">2</span>
+        <span class="label">统一线上流程 · 全程网办五步</span>
+        <span class="badge">全程留痕</span>
+      </div>
+      <div class="step-grid">
+        <div class="step-card">
+          <div class="icon">🪪</div>
+          <div class="n">STEP 1</div>
+          <div class="t">资格核验</div>
+          <div class="d">对接住建局简易入口，或贝壳做身份+人脸+准入校验，政府兜底</div>
+        </div>
+        <div class="step-card">
+          <div class="icon">🏠</div>
+          <div class="n">STEP 2</div>
+          <div class="t">房源展示</div>
+          <div class="d">统一模板、实景图、政府指导价、★ 星级、无虚假</div>
+        </div>
+        <div class="step-card">
+          <div class="icon">👀</div>
+          <div class="n">STEP 3</div>
+          <div class="t">预约带看</div>
+          <div class="d">一键预约，分配到对应项目管家 / 贝壳管家</div>
+        </div>
+        <div class="step-card">
+          <div class="icon">📝</div>
+          <div class="n">STEP 4</div>
+          <div class="t">签约备案</div>
+          <div class="d">电子合同，三方（政府/运营/租客）备案，贝壳留痕、政府可查</div>
+        </div>
+        <div class="step-card">
+          <div class="icon">💳</div>
+          <div class="n">STEP 5</div>
+          <div class="t">支付维修</div>
+          <div class="d">支持月付、公积金直付、线上报修</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-5">
+        <div class="impl-banner">📎 全程网办五步 · 已实现页面（与上方 5 个 STEP 卡片对齐）</div>
+        <div class="col">
+          <div class="col-head">STEP 1 资格核验</div>
+          <a href="apply.html" class="impl-pill">申请·资格自检<span class="file">apply.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 2 房源展示</div>
+          <a href="home.html" class="impl-pill">首页·房源列表<span class="file">home.html</span></a>
+          <a href="detail.html" class="impl-pill">详情页<span class="file">detail.html</span></a>
+          <a href="c-compare.html" class="impl-pill">房源对比<span class="file">c-compare.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 3 预约带看</div>
+          <a href="my-applications.html" class="impl-pill">我的申请·进度<span class="file">my-applications.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 4 签约备案</div>
+          <a href="contracts.html" class="impl-pill">电子合同·三方备案<span class="file">contracts.html</span></a>
+          <a href="c-rent-compliance.html" class="impl-pill">租约合规<span class="file">c-rent-compliance.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 5 支付维修</div>
+          <a href="payment.html" class="impl-pill">在线缴费<span class="file">payment.html</span></a>
+          <a href="c-housing-fund.html" class="impl-pill">租客·公积金直付<span class="file">c-housing-fund.html</span></a>
+          <a href="f-housing-fund.html" class="impl-pill">银行·公积金通道<span class="file">f-housing-fund.html</span></a>
+          <a href="repair.html" class="impl-pill">报修<span class="file">repair.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 三种接入模式 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">3</span>
+        <span class="label">三种接入模式并行 · 适合「项目分散」现状</span>
+        <span class="badge">原文三</span>
+      </div>
+      <div class="mode-grid">
+        <div class="mode-card m1">
+          <span class="lvl">模式一 · 最常用</span>
+          <div class="name">项目自营 → 接入贝壳平台</div>
+          <div class="row"><span class="k">运营</span><span class="v">各项目主体继续自己运营、自己收租、自己管房</span></div>
+          <div class="row"><span class="k">推送</span><span class="v">按标准把空置房源推到贝壳数据库</span></div>
+          <div class="row"><span class="k">展示</span><span class="v">在官方频道展示，贝壳提供流量、获客、品牌背书</span></div>
+          <div class="row"><span class="k">分成</span><span class="v"><strong>服务费 6–8%</strong>，不参与租金分成</span></div>
+          <div class="fit">已有成熟团队、不想放权的国企项目</div>
+        </div>
+        <div class="mode-card m2">
+          <span class="lvl">模式二 · 总代监管</span>
+          <div class="name">第三方运营 + 贝壳监管</div>
+          <div class="row"><span class="k">运营</span><span class="v">现有第三方运营公司保留日常运维</span></div>
+          <div class="row"><span class="k">贝壳</span><span class="v">统一招商、平台、服务标准、投诉处理</span></div>
+          <div class="row"><span class="k">监管</span><span class="v">政府对贝壳 + 项目主体双重监管</span></div>
+          <div class="row"><span class="k">分成</span><span class="v">在模式一基础上叠加监管服务费</span></div>
+          <div class="fit">已委托第三方但管理质量不齐的项目</div>
+        </div>
+        <div class="mode-card m3">
+          <span class="lvl">模式三 · 深度托管</span>
+          <div class="name">政府指定贝壳深度托管</div>
+          <div class="row"><span class="k">运营</span><span class="v">贝壳负责收房、改造、出房、运维、签约</span></div>
+          <div class="row"><span class="k">租金</span><span class="v">政府定租金上限 ≤市场价 90%</span></div>
+          <div class="row"><span class="k">改造</span><span class="v">配合好房子四维度 + 物资标准认证</span></div>
+          <div class="row"><span class="k">分成</span><span class="v">完整经营权 + 议价权 → 单方造价显著下降</span></div>
+          <div class="fit">存量多、主体杂、管理弱的情况（快速上量）</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 三种接入模式 · 已实现页面（与上方 3 张 mode-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">① 自营接入</div>
+          <a href="b-operator-console.html" class="impl-pill">运营工作台<span class="file">b-operator-console.html</span></a>
+          <a href="b-listing-mgmt.html" class="impl-pill">房源上下架<span class="file">b-listing-mgmt.html</span></a>
+          <a href="b-occupancy.html" class="impl-pill">入住率<span class="file">b-occupancy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">② 总代监管</div>
+          <a href="operators.html" class="impl-pill">同业开放接入公示<span class="file">operators.html</span></a>
+          <a href="b-dispatch-board.html" class="impl-pill">派单看板<span class="file">b-dispatch-board.html</span></a>
+          <a href="b-staff-roster.html" class="impl-pill">员工花名册<span class="file">b-staff-roster.html</span></a>
+          <a href="b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">③ 深度托管</div>
+          <a href="landlord.html" class="impl-pill">业主托管端<span class="file">landlord.html</span></a>
+          <a href="suppliers.html" class="impl-pill">物资供应链准入<span class="file">suppliers.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 实施步骤 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">4</span>
+        <span class="label">实施步骤 · 6–8 周可上线</span>
+        <span class="badge">不用建全市保租房系统</span>
+      </div>
+      <div class="week-grid">
+        <div class="week-card w1">
+          <div class="when">第 1–2 周</div>
+          <div class="t">政策启动</div>
+          <div class="actions">
+            <div>住建局发文 · 认定贝壳为市级合作平台</div>
+            <div>发布服务标准 + 收费上限</div>
+            <div>同步对接江苏银行（监管账户/公积金）</div>
+          </div>
+        </div>
+        <div class="week-card w2">
+          <div class="when">第 2–4 周</div>
+          <div class="t">频道开发</div>
+          <div class="actions">
+            <div>贝壳开发本市保租房频道</div>
+            <div>政府认证标识 · UI 定稿</div>
+            <div>统一 API / Excel 模板发布</div>
+          </div>
+        </div>
+        <div class="week-card w3">
+          <div class="when">第 4–6 周</div>
+          <div class="t">数据通道联调</div>
+          <div class="actions">
+            <div>首批项目按字段推送房源</div>
+            <div>贝壳清洗 · 验真 · 去重 · 上架</div>
+            <div>住建后台只读权限开通</div>
+            <div>备案回流测试 + 三方对账</div>
+          </div>
+        </div>
+        <div class="week-card w4">
+          <div class="when">第 6–8 周</div>
+          <div class="t">上线运营</div>
+          <div class="actions">
+            <div>正式上线 · 公众查询入口公开</div>
+            <div>首批 100 服务者持证上岗</div>
+            <div>月报与监管数据开始流转</div>
+            <div>对其他项目主体开放接入文档</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 实施 6–8 周 · 已实现页面（与上方 4 个时间段卡片对齐）</div>
+        <div class="col">
+          <div class="col-head">1–2 周 政策启动</div>
+          <a href="g-policy.html" class="impl-pill">住建发文授权<span class="file">g-policy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2–4 周 频道开发</div>
+          <a href="policy.html" class="impl-pill">政策资讯页<span class="file">policy.html</span></a>
+          <a href="profile.html" class="impl-pill">租客个人中心<span class="file">profile.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">4–6 周 数据联调</div>
+          <a href="p-webhooks.html" class="impl-pill">备案回流·Webhook<span class="file">p-webhooks.html</span></a>
+          <a href="p-workflow.html" class="impl-pill">工作流引擎<span class="file">p-workflow.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">6–8 周 上线运营</div>
+          <a href="portal-verify.html" class="impl-pill">公众扫码验真<span class="file">portal-verify.html</span></a>
+          <a href="p-notifications.html" class="impl-pill">通知中心<span class="file">p-notifications.html</span></a>
+          <a href="f-treasury.html" class="impl-pill">资金流水大盘<span class="file">f-treasury.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 合规底线 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">5</span>
+        <span class="label">合规底线 · 公平竞争审查 + 3 年中评 + 5 年回看</span>
+        <span class="badge">V25 补充</span>
+      </div>
+      <div class="compliance-card">
+        <h4>⚠️ 所有「省级标准」条款接受市场监管局公平竞争审查</h4>
+        <p style="margin:0; font-size:12px; color:#7c2d12; line-height:1.6;">
+          贝壳承建平台与运营业务设置以下硬性合规约束，避免「政府指定 = 永久独占」的合规风险：
+        </p>
+        <div class="grid">
+          <div class="item">
+            <strong>3 年中期评估</strong>
+            <div>对接入率、租客满意度、投诉率进行校验，未达标则调整边界</div>
+          </div>
+          <div class="item">
+            <strong>5 年回看条款</strong>
+            <div>终评不达标，住建有权重新招选承建方</div>
+          </div>
+          <div class="item">
+            <strong>对同业开放</strong>
+            <div>自如、龙湖冠寓、华润有巢、招商伊敦按同等资质开放接入，避免垄断</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 合规底线 · 已实现页面（与上方 3 项硬约束对齐）</div>
+        <div class="col">
+          <div class="col-head">3 年中期评估</div>
+          <a href="g-rent-alert.html" class="impl-pill">租金合规预警<span class="file">g-rent-alert.html</span></a>
+          <a href="g-complaint.html" class="impl-pill">投诉处置率<span class="file">g-complaint.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">5 年回看条款</div>
+          <a href="g-export.html" class="impl-pill">数据导出·历史回看<span class="file">g-export.html</span></a>
+          <a href="p-permissions.html" class="impl-pill">权限与角色·承建方边界<span class="file">p-permissions.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">对同业开放</div>
+          <a href="service-workers.html" class="impl-pill">服务者公示<span class="file">service-workers.html</span></a>
+          <a href="g-whitelist-service.html" class="impl-pill">服务者白名单<span class="file">g-whitelist-service.html</span></a>
+          <a href="g-whitelist-supplier.html" class="impl-pill">供应商白名单<span class="file">g-whitelist-supplier.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div class="em">政府零财政 · 国资零垫资 · 6–8 周上线</div>
+      <div class="sub">市场化效率提升保障房民生效果 · 替代政府自建系统的渐进式合作样板</div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

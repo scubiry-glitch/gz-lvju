@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贵州旅居 · 旅居住宿星级评价体系</title>
+<style>
+  :root{
+    --bg:#f6f8f7; --surface:#fff; --fg:#0f172a; --muted:#64748b; --border:#e3e8e6;
+    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
+    --brand-soft:color-mix(in oklab,var(--brand) 12%,transparent);
+    --gold:#b45309; --gold-soft:color-mix(in oklab,var(--gold) 14%,transparent);
+    --ok:#16a34a; --warn:#ea580c;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  a{color:var(--brand);text-decoration:none;}
+  h1,h2,h3,h4{margin:0;}
+  .container{max-width:1240px;margin:0 auto;padding:26px 22px 56px;}
+
+  .hero{background:linear-gradient(135deg,var(--brand-deep),var(--brand) 60%,var(--brand-2) 120%);
+    color:#fff;border-radius:var(--r-lg);padding:28px 30px;position:relative;overflow:hidden;margin-bottom:22px;}
+  .hero::after{content:"★";position:absolute;right:6px;bottom:-26px;font-size:150px;opacity:.10;}
+  .hero .crumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .hero .crumbs a{background:rgba(255,255,255,.16);color:#fff;font-size:12px;padding:5px 12px;border-radius:999px;}
+  .hero h1{font-size:clamp(22px,3vw,32px);font-weight:700;}
+  .hero .lead{font-size:14px;opacity:.92;margin-top:8px;max-width:70ch;}
+  .hero .src{font-size:11px;opacity:.8;margin-top:10px;}
+
+  .sec{margin-bottom:34px;}
+  .sec-head{display:flex;align-items:baseline;gap:11px;margin-bottom:14px;flex-wrap:wrap;}
+  .sec-head .idx{width:28px;height:28px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;}
+  .sec-head h2{font-size:20px;font-weight:700;}
+  .sec-head .sub{font-size:13px;color:var(--muted);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);}
+
+  /* star tiers */
+  .tiers{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  .tier{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);display:flex;flex-direction:column;}
+  .tier .th{padding:12px 13px;color:#fff;}
+  .tier .stars{font-size:14px;letter-spacing:1px;}
+  .tier .tname{font-weight:700;font-size:14px;margin-top:3px;}
+  .tier.t1 .th{background:#94a3b8;} .tier.t2 .th{background:#0d9488;}
+  .tier.t3 .th{background:var(--brand);} .tier.t4 .th{background:var(--brand-deep);}
+  .tier.t5 .th{background:linear-gradient(120deg,#0b5d56,#b45309);}
+  .tier .tb{padding:11px 13px;font-size:12px;color:var(--muted);flex:1;}
+  .tier .tb b{color:var(--fg);}
+
+  /* dimensions */
+  .dims{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  .dimc{border:1px solid var(--border);border-radius:var(--r-md);padding:15px;background:var(--surface);}
+  .dimc .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .dimc .ic{font-size:22px;}
+  .dimc .w{font-size:11px;font-weight:700;color:var(--brand);background:var(--brand-soft);padding:3px 9px;border-radius:999px;}
+  .dimc b{font-size:14px;display:block;}
+  .dimc ul{margin:8px 0 0;padding-left:16px;}
+  .dimc li{font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .dimc .wbar{height:5px;border-radius:3px;background:#eef2f1;margin-top:9px;overflow:hidden;}
+  .dimc .wbar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--gold));}
+
+  /* filter toggle */
+  .toggle{display:inline-flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px;margin-bottom:14px;}
+  .toggle button{padding:6px 16px;border-radius:999px;font-size:13px;color:var(--muted);}
+  .toggle button.active{background:var(--brand);color:#fff;}
+
+  /* matrix */
+  .matrix-wrap{overflow-x:auto;}
+  table.mx{width:100%;border-collapse:collapse;font-size:13px;min-width:760px;}
+  table.mx thead th{position:sticky;top:0;background:var(--bg);text-align:left;padding:11px 13px;font-size:13px;font-weight:600;border-bottom:2px solid var(--border);z-index:1;}
+  table.mx thead th.s5{color:var(--gold);} table.mx thead th.s4{color:var(--brand-deep);} table.mx thead th.s3{color:var(--muted);}
+  table.mx td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.mx tr.grp td{background:linear-gradient(90deg,var(--brand-soft),transparent);font-weight:700;font-size:12px;letter-spacing:.5px;color:var(--brand-deep);padding:9px 13px;}
+  table.mx tr.grp td .dimtag{font-size:10px;font-weight:600;color:#fff;background:var(--brand);padding:1px 7px;border-radius:6px;margin-left:6px;}
+  table.mx .item{font-weight:500;width:24%;}
+  table.mx td.req{width:25.3%;}
+  .req .y{color:var(--ok);font-weight:600;} .req .n{color:var(--muted);} .req .star{color:var(--gold);font-weight:600;}
+  table.mx tr:hover td{background:color-mix(in oklab,var(--bg) 55%,transparent);}
+  /* star single-view */
+  body.only5 .c4,body.only5 .c3,body.only4 .c5,body.only4 .c3,body.only3 .c5,body.only3 .c4{display:none;}
+
+  /* compare */
+  table.cmp{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px;}
+  table.cmp th,table.cmp td{border:1px solid var(--border);padding:9px 11px;text-align:left;vertical-align:top;}
+  table.cmp th{background:var(--bg);font-weight:600;}
+  table.cmp td.lv{font-weight:700;color:var(--brand-deep);white-space:nowrap;background:var(--brand-soft);}
+  table.cmp .lj{background:color-mix(in oklab,var(--gold-soft) 60%,transparent);}
+
+  /* flow */
+  .flow{display:flex;gap:10px;flex-wrap:wrap;}
+  .fstep{flex:1;min-width:150px;border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--surface);position:relative;}
+  .fstep .n{width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700;margin-bottom:8px;}
+  .fstep b{font-size:14px;} .fstep p{font-size:12px;color:var(--muted);margin:5px 0 0;}
+
+  .footer{text-align:center;padding:24px 0 6px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;}
+
+  @media(max-width:980px){.tiers,.dims{grid-template-columns:1fr 1fr;}}
+  @media(max-width:620px){.container{padding:16px 12px;}.tiers,.dims{grid-template-columns:1fr;}}
+</style>
+</head>
+<body class="onall">
+<div class="container">
+
+  <div class="hero">
+    <div class="crumbs">
+      <a href="lvju-overview.html">← 贵州旅居总览</a>
+      <a href="overview.html">📋 全站导航</a>
+    </div>
+    <h1>贵州旅居 · 旅居住宿星级评价体系</h1>
+    <p class="lead">面向旅居住宿的星级评价体系：融合酒店国标、携程钻级、民宿评价与长租体验，
+       新增旅居特有的<b>环境景观 / 在地文化 / 康养 / 景区联动</b>维度，作为贝壳旅居中台「房源评级管理」的判定依据。</p>
+    <p class="src">参考行业住宿星级标准提案 · 星级规则 + 评星工具表（钻级设施自查表）改编 · 仅供演示</p>
+  </div>
+
+  <!-- ① 综合星级总览 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">一</div><h2>综合星级总览 · 1–5 星旅居</h2>
+      <span class="sub">由 5 大维度加权得分映射，挂牌公示并动态调级</span></div>
+    <div class="tiers">
+      <div class="tier t1"><div class="th"><div class="stars">★</div><div class="tname">一星 · 平价旅居</div></div>
+        <div class="tb">具备<b>食宿基本功能</b>，满足最基本旅居需要；可无接待人员。</div></div>
+      <div class="tier t2"><div class="th"><div class="stars">★★</div><div class="tname">二星 · 经济旅居</div></div>
+        <div class="tb">环境整洁干净，<b>独立卫生间 + 基础生活用品</b>，提供基本保障设施。</div></div>
+      <div class="tier t3"><div class="th"><div class="stars">★★★</div><div class="tname">三星 · 舒适旅居</div></div>
+        <div class="tb">客房设备齐全美观，<b>配多种智能设备</b>，提供基础服务与含早。</div></div>
+      <div class="tier t4"><div class="th"><div class="stars">★★★★</div><div class="tname">四星 · 品质旅居</div></div>
+        <div class="tb">环境典雅、<b>个性化服务 + 增值服务</b>，配安心保险，公区设施较完善。</div></div>
+      <div class="tier t5"><div class="th"><div class="stars">★★★★★</div><div class="tname">五星 · 特色/豪华旅居</div></div>
+        <div class="tb">高水平服务，<b>丰富在地体验 + 康养/文化主题</b>，社区生活与周边配套完备。</div></div>
+    </div>
+  </section>
+
+  <!-- ② 五大评价维度 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">二</div><h2>五大评价维度 · 加权 100 分</h2>
+      <span class="sub">与小程序房源详情页"旅居星级 5 维"一致</span></div>
+    <div class="dims">
+      <div class="dimc"><div class="top"><span class="ic">🏞</span><span class="w">22 分</span></div>
+        <b>环境景观</b>
+        <ul><li>自然/建筑景观位</li><li>公区与庭院环境</li><li>信息图片真实度</li></ul>
+        <div class="wbar"><i style="width:22%"></i></div></div>
+      <div class="dimc"><div class="top"><span class="ic">🛎</span><span class="w">22 分</span></div>
+        <b>服务品质</b>
+        <ul><li>旅居管家·24H 客服</li><li>安心保险·信用分</li><li>安保与维修</li></ul>
+        <div class="wbar"><i style="width:22%"></i></div></div>
+      <div class="dimc"><div class="top"><span class="ic">🛏</span><span class="w">24 分</span></div>
+        <b>设施配套</b>
+        <ul><li>客房硬件·智能设备</li><li>基础设施·交付标准</li><li>领包入住套件</li></ul>
+        <div class="wbar"><i style="width:24%"></i></div></div>
+      <div class="dimc"><div class="top"><span class="ic">🚏</span><span class="w">14 分</span></div>
+        <b>交通区位</b>
+        <ul><li>距核心景区距离</li><li>交通接驳·停车</li><li>价格合理性</li></ul>
+        <div class="wbar"><i style="width:14%"></i></div></div>
+      <div class="dimc"><div class="top"><span class="ic">🪔</span><span class="w">18 分</span></div>
+        <b>特色体验</b>
+        <ul><li>在地文化主题</li><li>民俗/研学·康养</li><li>景区联动·接送</li></ul>
+        <div class="wbar"><i style="width:18%"></i></div></div>
+    </div>
+  </section>
+
+  <!-- ③ 评星工具表 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">三</div><h2>评星工具表 · 3 / 4 / 5 星设施自查</h2>
+      <span class="sub">改编自"钻级设施自查表"，按旅居场景重构</span></div>
+    <div class="toggle" id="tg">
+      <button data-v="all" class="active">全部对比</button>
+      <button data-v="3">仅看 3 星</button>
+      <button data-v="4">仅看 4 星</button>
+      <button data-v="5">仅看 5 星</button>
+    </div>
+    <div class="card matrix-wrap">
+      <table class="mx">
+        <thead><tr>
+          <th>评定项</th>
+          <th class="c5 s5">★★★★★ 五星</th>
+          <th class="c4 s4">★★★★ 四星</th>
+          <th class="c3 s3">★★★ 三星</th>
+        </tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">环境景观<span class="dimtag">维度①</span></td></tr>
+          <tr><td class="item">信息图片 · 照片总数</td><td class="req c5"><span class="y">不重复 &gt;50 张</span></td><td class="req c4"><span class="y">&gt;50 张</span></td><td class="req c3"><span class="y">&gt;30 张</span></td></tr>
+          <tr><td class="item">外观 / 公区 / 客房相册</td><td class="req c5"><span class="y">店招全貌+公区特写+客房&gt;5 张</span></td><td class="req c4"><span class="y">外观+公区+客房&gt;5 张</span></td><td class="req c3"><span class="y">外观+客房&gt;5 张</span></td></tr>
+          <tr><td class="item">景观位</td><td class="req c5"><span class="star">一线景观 / 观景台</span></td><td class="req c4"><span class="y">部分景观</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">建筑与庭院</td><td class="req c5"><span class="star">特色建筑 + 庭院/露台</span></td><td class="req c4"><span class="y">庭院或露台</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+
+          <tr class="grp"><td colspan="4">设施配套<span class="dimtag">维度③</span></td></tr>
+          <tr><td class="item">客房面积</td><td class="req c5"><span class="y">70% &gt;30㎡</span></td><td class="req c4"><span class="y">70% &gt;25㎡</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">干湿分离</td><td class="req c5"><span class="y">要求</span></td><td class="req c4"><span class="y">要求</span></td><td class="req c3"><span class="y">要求</span></td></tr>
+          <tr><td class="item">智能门锁 / 水电表</td><td class="req c5"><span class="y">有 · 隐私加密</span></td><td class="req c4"><span class="y">有 · 隐私加密</span></td><td class="req c3"><span class="y">有</span></td></tr>
+          <tr><td class="item">智能马桶 / 安全组件</td><td class="req c5"><span class="star">马桶强制 + 安全件≥3</span></td><td class="req c4"><span class="y">安全件≥1</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">客房标配</td><td class="req c5"><span class="y">电视/Wi-Fi/空调/冰箱/沙发≥3人/餐桌</span></td><td class="req c4"><span class="y">电视/Wi-Fi/空调/冰箱/沙发</span></td><td class="req c3"><span class="y">电视/Wi-Fi/空调/洗衣机</span></td></tr>
+          <tr><td class="item">基础设施</td><td class="req c5"><span class="y">洗衣房+3层电梯+车位&gt;15%+监控</span></td><td class="req c4"><span class="y">洗衣房+电梯+停车+监控</span></td><td class="req c3"><span class="y">洗衣房+监控</span></td></tr>
+          <tr><td class="item">交付标准</td><td class="req c5"><span class="y">保洁+全屋整备+甲醛检测</span></td><td class="req c4"><span class="y">保洁+全屋整备</span></td><td class="req c3"><span class="y">入住保洁</span></td></tr>
+          <tr><td class="item">领包入住套件</td><td class="req c5"><span class="y">矿泉水/洗漱/毛巾/吹风机</span></td><td class="req c4"><span class="y">矿泉水/洗漱/一次性毛巾/吹风机</span></td><td class="req c3"><span class="y">矿泉水/洗漱/一次性毛巾</span></td></tr>
+
+          <tr class="grp"><td colspan="4">服务品质<span class="dimtag">维度②</span></td></tr>
+          <tr><td class="item">旅居管家</td><td class="req c5"><span class="y">24H + 持证资格</span></td><td class="req c4"><span class="y">24H 服务</span></td><td class="req c3"><span class="y">有</span></td></tr>
+          <tr><td class="item">24H 客服 / 每日清洁 / 行李寄存</td><td class="req c5"><span class="y">全部提供</span></td><td class="req c4"><span class="y">客服+行李寄存</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">安心保险</td><td class="req c5"><span class="y">加强型家财险+客房安心险</span></td><td class="req c4"><span class="y">加强型家财险</span></td><td class="req c3"><span class="y">普通家财险</span></td></tr>
+          <tr><td class="item">信用分</td><td class="req c5"><span class="y">&gt;4.4</span></td><td class="req c4"><span class="y">&gt;4.2</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">24H 维修 / 保安 · 押金</td><td class="req c5"><span class="y">维修保安持证 · 0 押金</span></td><td class="req c4"><span class="y">维修保安 · 1 个月押金</span></td><td class="req c3"><span class="y">维修 · 1 个月押金</span></td></tr>
+
+          <tr class="grp"><td colspan="4">特色体验<span class="dimtag">维度⑤ · 旅居差异化</span></td></tr>
+          <tr><td class="item">在地文化主题</td><td class="req c5"><span class="star">鲜明主题 + 民俗陈设</span></td><td class="req c4"><span class="y">一定主题元素</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">民俗 / 研学活动</td><td class="req c5"><span class="star">定期组织 + 在地向导</span></td><td class="req c4"><span class="y">可提供</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">在地餐饮</td><td class="req c5"><span class="y">特色餐厅 + 三餐</span></td><td class="req c4"><span class="y">含早 + 特色</span></td><td class="req c3"><span class="y">含早</span></td></tr>
+          <tr><td class="item">康养配套</td><td class="req c5"><span class="star">SPA/温泉/理疗 任一</span></td><td class="req c4"><span class="y">加分项</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">休闲娱乐</td><td class="req c5"><span class="y">泳池/健身/茶室咖啡 任二</span></td><td class="req c4"><span class="y">任一加分</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">景区联动 / 接送</td><td class="req c5"><span class="star">自营接送(车 LOGO) + 景区直通</span></td><td class="req c4"><span class="y">提供接送</span></td><td class="req c3"><span class="n">无</span></td></tr>
+
+          <tr class="grp"><td colspan="4">交通区位<span class="dimtag">维度④</span></td></tr>
+          <tr><td class="item">距核心景区</td><td class="req c5"><span class="y">≤3km 或景区内</span></td><td class="req c4"><span class="y">≤8km</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">交通接驳 / 停车</td><td class="req c5"><span class="y">高铁机场接驳 + 车位&gt;15%</span></td><td class="req c4"><span class="y">公共交通可达 + 停车</span></td><td class="req c3"><span class="y">可达 + 路边停车</span></td></tr>
+          <tr><td class="item">价格</td><td class="req c5"><span class="y">达同城 5 星水平</span></td><td class="req c4"><span class="y">达同城 4 星水平</span></td><td class="req c3"><span class="y">达同城 3 星水平</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ④ 星级规则对照 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">四</div><h2>星级规则对照 · 旅居 vs 既有标准</h2>
+      <span class="sub">融合酒店国标 / 携程钻级 / 民宿携程 / 长租体验，统一为旅居星级</span></div>
+    <div class="card matrix-wrap" style="padding:14px;">
+      <table class="cmp">
+        <thead><tr><th>星级</th><th class="lj">旅居定位（本体系）</th><th>酒店 · 国标 / 携程钻级</th><th>民宿 · 携程</th><th>长租 · 体验</th></tr></thead>
+        <tbody>
+          <tr><td class="lv">★ 一星</td><td class="lj">平价旅居：食宿基本功能</td><td>设备简单 / 1 钻平价</td><td>1 钻：装修简单，可无接待</td><td>仅基本住宿，可无接待</td></tr>
+          <tr><td class="lv">★★ 二星</td><td class="lj">经济旅居：整洁 + 独卫 + 基础用品</td><td>设备一般 / 2 钻经济</td><td>2 钻：整洁干净，基础设施</td><td>独立卫浴 + 洗衣机</td></tr>
+          <tr><td class="lv">★★★ 三星</td><td class="lj">舒适旅居：设备齐全 + 智能 + 含早</td><td>设备齐全 / 3 钻舒适</td><td>3 钻：温馨舒适，设备美观</td><td>设备齐全，配智能设备</td></tr>
+          <tr><td class="lv">★★★★ 四星</td><td class="lj">品质旅居：个性化 + 增值 + 安心险</td><td>设备豪华 / 4 钻高档</td><td>4 钻：典雅，个性化服务</td><td>增值服务 + 安心保险</td></tr>
+          <tr><td class="lv">★★★★★ 五星</td><td class="lj">特色旅居：在地体验 + 康养/文化主题</td><td>十分豪华 / 5 钻豪华（铂钻·金钻为超奢）</td><td>5 钻：豪华，多样休闲娱乐</td><td>高水平服务 + 社区与周边配套</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ⑤ 评定流程 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">五</div><h2>评定与管理流程 · 接入中台「房源评级管理」</h2>
+      <span class="sub">运营方录入 → 复核 → 公示 → 动态调级，住建厅大屏只读监管</span></div>
+    <div class="flow">
+      <div class="fstep"><div class="n">1</div><b>运营方录入</b><p>按 5 维自查表上传材料、照片与设施清单</p></div>
+      <div class="fstep"><div class="n">2</div><b>中台复核</b><p>规则引擎初评 + 人工/抽检复核，得分映射星级</p></div>
+      <div class="fstep"><div class="n">3</div><b>挂牌公示</b><p>★星级徽章上小程序/多渠道，扫码可验真</p></div>
+      <div class="fstep"><div class="n">4</div><b>动态调级</b><p>结合信用分、客诉、复核结果升降级</p></div>
+      <div class="fstep"><div class="n">5</div><b>监管驾驶舱</b><p>住建厅只读：星级达标率 / 复核待审 / 投诉</p></div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <p>贵州旅居 · 旅居住宿星级评价体系 — <strong>lvju-rating-standard.html</strong></p>
+    <p style="margin-top:6px;">改编自行业住宿星级标准提案的星级规则与评星工具表 · 数值为演示示例，正式评级口径以最终评定细则为准</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const body=document.body, btns=[...document.querySelectorAll('#tg button')];
+  btns.forEach(b=>b.addEventListener('click',()=>{
+    btns.forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    body.classList.remove('onall','only3','only4','only5');
+    const v=b.dataset.v;
+    body.classList.add(v==='all'?'onall':'only'+v);
+  }));
+})();
+</script>
+</body>
+</html>

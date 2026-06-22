@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>信用规则引擎 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;}
+    .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);}
+    .crumb b{color:var(--fg); font-weight:600; font-size:14px; margin-right:2px;}
+    .ver-tag{padding:3px 8px; background:color-mix(in oklab, var(--warn) 12%, transparent); color:var(--warn); font-size:11px; border-radius:4px; font-weight:600;}
+    .ver-tag.live{background:color-mix(in oklab, var(--success) 12%, transparent); color:var(--success);}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:200px 1fr 400px; gap:14px;}
+
+    /* category */
+    .cat-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px;}
+    .cat-card h4{font-size:11px; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; margin:0 0 10px;}
+    .cat-list{display:flex; flex-direction:column; gap:4px;}
+    .cat{padding:8px 10px; border-radius:6px; font-size:12.5px; cursor:pointer; display:flex; align-items:center; gap:6px;}
+    .cat:hover{background:var(--line);}
+    .cat.on{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+    .cat .ic{font-size:13px;}
+    .cat .cnt{margin-left:auto; font-size:11px; color:var(--muted);}
+    .cat.on .cnt{color:var(--accent);}
+
+    .legend{margin-top:14px; padding-top:14px; border-top:1px solid var(--line); font-size:11px; color:var(--muted);}
+    .legend-row{display:flex; gap:6px; align-items:center; margin-bottom:3px;}
+    .legend-row .dot{width:10px; height:10px; border-radius:3px;}
+    .legend-row .dot.add{background:color-mix(in oklab, var(--success) 30%, transparent); border:1px solid var(--success);}
+    .legend-row .dot.sub{background:color-mix(in oklab, var(--danger) 30%, transparent); border:1px solid var(--danger);}
+    .legend-row .dot.thr{background:color-mix(in oklab, var(--warn) 30%, transparent); border:1px solid var(--warn);}
+    .legend-row .dot.freeze{background:var(--side); border:1px solid var(--fg);}
+
+    /* rules table */
+    .pane{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); display:flex; flex-direction:column;}
+    .pane-top{display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line);}
+    .pane-top h3{font-size:14px; font-weight:600; margin:0;}
+    .pane-top .pill{font-size:11px; padding:2px 8px; background:var(--line); color:var(--muted); border-radius:3px;}
+    .pane-top .pri{margin-left:auto; padding:6px 12px; background:var(--accent); color:white; border-radius:6px; font-size:12px; font-weight:500;}
+
+    .rules{padding:8px;}
+    .rule{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:12px; padding:14px; border-radius:6px; align-items:center; border:1px solid transparent; cursor:pointer;}
+    .rule:hover{background:var(--line);}
+    .rule.on{background:var(--accent-soft); border-color:var(--accent);}
+    .rule .rid{font-family:var(--mono); font-size:11px; color:var(--muted); background:var(--line); padding:2px 6px; border-radius:3px;}
+    .rule .info{min-width:0;}
+    .rule .nm{font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:6px;}
+    .rule .nm .typetag{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:500;}
+    .rule .nm .typetag.add{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .rule .nm .typetag.sub{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .rule .nm .typetag.thr{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .rule .nm .typetag.freeze{background:var(--side); color:white;}
+    .rule .desc{font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5;}
+    .rule .score{font-family:var(--mono); font-size:14px; font-weight:700;}
+    .rule .score.add{color:var(--success);}
+    .rule .score.sub{color:var(--danger);}
+    .rule .score.thr{color:var(--warn);}
+    .rule .freq{text-align:center; font-size:11px;}
+    .rule .freq .v{font-weight:700; font-size:13px;}
+    .rule .freq .l{color:var(--muted); font-size:10px;}
+    .rule .toggle{display:flex; align-items:center; gap:6px;}
+    .rule .switch{width:32px; height:18px; background:var(--border); border-radius:9px; position:relative; cursor:pointer;}
+    .rule .switch::after{content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; background:white; border-radius:50%; transition:0.2s;}
+    .rule.live .switch{background:var(--success);}
+    .rule.live .switch::after{left:16px;}
+    .rule.canary .switch{background:var(--warn);}
+    .rule.canary .switch::after{left:9px;}
+    .rule .state{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600;}
+    .rule .state.live{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .rule .state.canary{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .rule .state.off{background:var(--line); color:var(--muted);}
+
+    /* simulator */
+    .sim{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .sim h3{font-size:14px; font-weight:600; margin:0 0 4px;}
+    .sim .subm{font-size:11px; color:var(--muted); margin-bottom:14px;}
+    .picker{display:flex; gap:8px; padding:8px; background:var(--line); border-radius:6px; align-items:center; margin-bottom:14px; font-size:12px;}
+    .picker .av{width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-weight:700;}
+    .picker .info{flex:1;}
+    .picker .nm{font-weight:600;}
+    .picker .meta{font-size:11px; color:var(--muted);}
+
+    /* gauge */
+    .gauge-wrap{display:flex; align-items:center; gap:18px; margin-bottom:16px;}
+    .ring{width:120px; height:120px; border-radius:50%; background:conic-gradient(var(--success) 0% 88.4%, var(--line) 88.4% 100%); display:grid; place-items:center; position:relative; flex-shrink:0;}
+    .ring::before{content:''; position:absolute; inset:12px; background:var(--surface); border-radius:50%;}
+    .ring-text{position:relative; text-align:center; z-index:1;}
+    .ring-text .v{font-size:28px; font-weight:700; color:var(--success);}
+    .ring-text .l{font-size:11px; color:var(--muted); margin-top:-2px;}
+    .ring-side{font-size:12px; flex:1;}
+    .ring-side .delta{font-size:18px; font-weight:700;}
+    .ring-side .delta.up{color:var(--success);}
+    .ring-side .delta.dn{color:var(--danger);}
+    .ring-side .ctx{color:var(--muted); margin-top:4px; line-height:1.4;}
+
+    .breakdown h4{font-size:11px; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; margin:0 0 8px;}
+    .bd-row{display:grid; grid-template-columns:1fr auto; gap:8px; padding:7px 0; font-size:12.5px; border-bottom:1px dashed var(--line); align-items:center;}
+    .bd-row:last-child{border-bottom:0;}
+    .bd-row .ctx{color:var(--muted);}
+    .bd-row .ctx b{color:var(--fg); font-weight:600;}
+    .bd-row .v{font-family:var(--mono); font-weight:700;}
+    .bd-row .v.add{color:var(--success);}
+    .bd-row .v.sub{color:var(--danger);}
+
+    .sim-actbar{display:flex; gap:6px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line);}
+    .sim-actbar .btn{flex:1; text-align:center;}
+
+    /* drift warning */
+    .drift{margin-top:14px; padding:10px 12px; background:color-mix(in oklab, var(--warn) 6%, transparent); border-left:3px solid var(--warn); border-radius:5px; font-size:11.5px; color:var(--muted);}
+    .drift b{color:var(--warn);}
+
+    @media (max-width: 1200px){
+      .content{grid-template-columns:180px 1fr 360px;}
+    }
+    @media (max-width: 1000px){
+      .content{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="credit-engine"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>信用规则引擎</b></div>
+      <span class="ver-tag live">● v3.2 生效</span>
+      <span class="ver-tag">● v3.3 灰度 5%</span>
+      <div class="top-actions">
+        <button class="btn">规则对比</button>
+        <button class="btn">导出 YAML</button>
+        <button class="btn pri">+ 新规则</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- categories -->
+      <div class="cat-card">
+        <h4>规则分类</h4>
+        <div class="cat-list">
+          <div class="cat on"><span class="ic">＋</span>加分项<span class="cnt">18</span></div>
+          <div class="cat"><span class="ic">−</span>扣分项<span class="cnt">14</span></div>
+          <div class="cat"><span class="ic">⚠</span>阈值告警<span class="cnt">6</span></div>
+          <div class="cat"><span class="ic">🧊</span>冻结/解冻<span class="cnt">4</span></div>
+        </div>
+
+        <h4 style="margin-top:14px;">作用域 · 5 类机构</h4>
+        <div class="cat-list">
+          <div class="cat">全部<span class="cnt">42</span></div>
+          <div class="cat">仅 S 服务者<span class="cnt">14</span></div>
+          <div class="cat">仅 B 运营商<span class="cnt">7</span></div>
+          <div class="cat">仅 V 人力<span class="cnt">5</span></div>
+          <div class="cat">仅 M 物资<span class="cnt">6</span></div>
+          <div class="cat">仅 T 培训<span class="cnt">3</span></div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-row"><span class="dot add"></span> 加分（最高 +10）</div>
+          <div class="legend-row"><span class="dot sub"></span> 扣分（最低 −20）</div>
+          <div class="legend-row"><span class="dot thr"></span> 阈值告警</div>
+          <div class="legend-row"><span class="dot freeze"></span> 冻结操作</div>
+        </div>
+      </div>
+
+      <!-- rules -->
+      <div class="pane">
+        <div class="pane-top">
+          <h3>加分项规则 · 18 条</h3>
+          <span class="pill">v3.2 生效中</span>
+          <span class="pill">触发 12.4k / 日</span>
+          <button class="pri">+ 新规则</button>
+        </div>
+        <div class="rules">
+          <div class="rule live on">
+            <span class="rid">R-001</span>
+            <div class="info">
+              <div class="nm">五星好评 <span class="typetag add">加分</span></div>
+              <div class="desc">客户评价 = 5 星，且评论字数 ≥ 20，且无关键词风险</div>
+            </div>
+            <div class="score add">+1.5</div>
+            <div class="freq"><div class="v">3.4k</div><div class="l">/ 日</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-002</span>
+            <div class="info">
+              <div class="nm">月度全勤 <span class="typetag add">加分</span></div>
+              <div class="desc">单月接单 ≥ 22 天，且取消率 &lt; 3%</div>
+            </div>
+            <div class="score add">+5.0</div>
+            <div class="freq"><div class="v">186</div><div class="l">/ 月</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-003</span>
+            <div class="info">
+              <div class="nm">复购客户 <span class="typetag add">加分</span></div>
+              <div class="desc">客户 30 天内二次指定本人服务，且评分 ≥ 4.5</div>
+            </div>
+            <div class="score add">+2.0</div>
+            <div class="freq"><div class="v">412</div><div class="l">/ 日</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule canary">
+            <span class="rid">R-018</span>
+            <div class="info">
+              <div class="nm">复杂工单完成 <span class="typetag add">加分</span> <span class="typetag" style="background:var(--accent-soft); color:var(--accent);">灰度</span></div>
+              <div class="desc">完成难度 ≥ 4 的工单（含突发应急、跨工种），客评 ≥ 4.7</div>
+            </div>
+            <div class="score add">+3.5</div>
+            <div class="freq"><div class="v">42</div><div class="l">/ 日 · 5%</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state canary">CANARY</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-005</span>
+            <div class="info">
+              <div class="nm">培训学时超标 <span class="typetag add">加分</span></div>
+              <div class="desc">月度完成自选课 ≥ 4 节，且全部通过测验</div>
+            </div>
+            <div class="score add">+1.0</div>
+            <div class="freq"><div class="v">96</div><div class="l">/ 月</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-006</span>
+            <div class="info">
+              <div class="nm">师傅带徒成功 <span class="typetag add">加分</span></div>
+              <div class="desc">L4+ 服务者所带 L1/L2 在 90 天内通过 L3 认证</div>
+            </div>
+            <div class="score add">+6.0</div>
+            <div class="freq"><div class="v">18</div><div class="l">/ 月</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule">
+            <span class="rid">R-007</span>
+            <div class="info">
+              <div class="nm">媒体好评事件 <span class="typetag add">加分</span></div>
+              <div class="desc">被官方媒体 / 公示渠道点名表扬</div>
+            </div>
+            <div class="score add">+8.0</div>
+            <div class="freq"><div class="v">2</div><div class="l">/ 季</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state off">关</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-021</span>
+            <div class="info">
+              <div class="nm">客户高 NPS <span class="typetag add">加分</span></div>
+              <div class="desc">客户填写 NPS = 9 或 10，且回复评论</div>
+            </div>
+            <div class="score add">+0.8</div>
+            <div class="freq"><div class="v">1.2k</div><div class="l">/ 日</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-M01</span>
+            <div class="info">
+              <div class="nm">M 物资批次良品率 <span class="typetag add">加分</span> <span class="typetag" style="background:#f3e8ff; color:#6b21a8;">M 端</span></div>
+              <div class="desc">单批次抽检良品率 ≥ 99%，且 24h 售后响应率 100%</div>
+            </div>
+            <div class="score add">+3.0</div>
+            <div class="freq"><div class="v">84</div><div class="l">/ 月</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-M02</span>
+            <div class="info">
+              <div class="nm">M 物资集采价低于底价 <span class="typetag add">加分</span> <span class="typetag" style="background:#f3e8ff; color:#6b21a8;">M 端</span></div>
+              <div class="desc">报价 ≤ 省级集采底价 -5%，且 SKU 全检测合格</div>
+            </div>
+            <div class="score add">+2.0</div>
+            <div class="freq"><div class="v">36</div><div class="l">/ 月</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+          <div class="rule live">
+            <span class="rid">R-B01</span>
+            <div class="info">
+              <div class="nm">B 运营商 SLA 100% <span class="typetag add">加分</span> <span class="typetag" style="background:#ccfbf1; color:#0f766e;">B 端</span></div>
+              <div class="desc">连续 3 个月工单 SLA 完成率 100%，且续约率 ≥ 90%</div>
+            </div>
+            <div class="score add">+4.0</div>
+            <div class="freq"><div class="v">3</div><div class="l">/ 季</div></div>
+            <div class="toggle"><div class="switch"></div><span class="state live">PROD</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- simulator -->
+      <div class="sim">
+        <h3>规则模拟器</h3>
+        <div class="subm">选一名服务者，预演 v3.3 上线后 30 天信用变化</div>
+
+        <div class="picker">
+          <div class="av">张</div>
+          <div class="info">
+            <div class="nm">张师傅 · EMP-2025-0312</div>
+            <div class="meta">L3 · 维修 · 鼓楼区 · 当前 88.4 分</div>
+          </div>
+          <a style="font-size:11px; color:var(--accent);">切换 ›</a>
+        </div>
+
+        <div class="gauge-wrap">
+          <div class="ring">
+            <div class="ring-text">
+              <div class="v">88.4</div>
+              <div class="l">当前信用</div>
+            </div>
+          </div>
+          <div class="ring-side">
+            <div class="delta up">+5.6 → 94.0</div>
+            <div class="ctx">v3.3 上线 30 天后，预期晋级 L4。<br>命中 R-018（复杂工单 +3.5）+ R-003 复购 +2.0。</div>
+          </div>
+        </div>
+
+        <div class="breakdown">
+          <h4>预演明细 · 命中规则</h4>
+          <div class="bd-row"><div class="ctx"><b>R-001</b> 五星好评 × 18 次</div><div class="v add">+27.0</div></div>
+          <div class="bd-row"><div class="ctx"><b>R-003</b> 复购客户 × 4 次</div><div class="v add">+8.0</div></div>
+          <div class="bd-row"><div class="ctx"><b>R-018</b> 复杂工单 × 2 次（灰度）</div><div class="v add">+7.0</div></div>
+          <div class="bd-row"><div class="ctx"><b>R-201</b> 投诉受理 × 1 次</div><div class="v sub">−4.0</div></div>
+          <div class="bd-row"><div class="ctx"><b>R-205</b> 退单次数偏高</div><div class="v sub">−2.4</div></div>
+          <div class="bd-row"><div class="ctx">月度衰减（30 天 +）</div><div class="v sub">−1.5</div></div>
+          <div class="bd-row" style="border-top:2px solid var(--line); margin-top:6px; padding-top:10px;"><div class="ctx" style="font-weight:600; color:var(--fg);">净变化</div><div class="v add">+34.1 → 上限 +5.6</div></div>
+        </div>
+
+        <div class="drift">
+          <b>⚠ 漂移检测：</b>R-018 在该候选集人群上升幅明显，建议把灰度比例从 5% → 10% 进一步观察，或为 L4+ 设上限抑制。
+        </div>
+
+        <div class="sim-actbar">
+          <button class="btn">导出 CSV</button>
+          <button class="btn">批量预演</button>
+          <button class="btn pri">基于此调参</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.cat').forEach(r => r.addEventListener('click', () => {
+    r.parentNode.querySelectorAll('.cat').forEach(x => x.classList.remove('on'));
+    r.classList.add('on');
+  }));
+  document.querySelectorAll('.rule').forEach(r => r.addEventListener('click', (e) => {
+    if (e.target.closest('.switch')) return;
+    document.querySelectorAll('.rule').forEach(x => x.classList.remove('on'));
+    r.classList.add('on');
+  }));
+  document.querySelectorAll('.switch').forEach(s => s.addEventListener('click', e => {
+    e.stopPropagation();
+    const rule = s.closest('.rule');
+    rule.classList.toggle('live');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

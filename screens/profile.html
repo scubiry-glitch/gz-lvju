@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>个人中心 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    /* header */
+    .page-header {
+      background: var(--surface); padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0; }
+
+    /* user card */
+    .user-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent-soft); display: grid; place-items: center;
+      flex-shrink: 0; color: var(--accent);
+    }
+    .avatar svg { width: 28px; height: 28px; }
+    .user-info .name { font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+    .user-info .meta { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .verify-badge {
+      display: inline-flex; align-items: center; gap: 2px;
+      padding: 1px 6px; border-radius: 3px;
+      background: color-mix(in oklab, var(--success) 12%, transparent);
+      color: var(--success); font-size: 10px;
+    }
+
+    /* service grid */
+    .service-section { padding: 12px 16px; }
+    .service-section h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+    .service-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    }
+    .service-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px 8px;
+      text-align: center; display: block;
+      position: relative;
+    }
+    .service-item:active { background: var(--bg); }
+    .service-icon {
+      width: 40px; height: 40px; margin: 0 auto 8px;
+      border-radius: var(--radius-sm); display: grid; place-items: center;
+    }
+    .service-icon.blue { background: var(--accent-soft); color: var(--accent); }
+    .service-icon.green { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+    .service-icon.amber { background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .service-icon svg { width: 20px; height: 20px; }
+    .service-item .label { font-size: 12px; }
+    .service-badge {
+      position: absolute; top: 6px; right: 6px;
+      min-width: 16px; height: 16px; padding: 0 4px;
+      background: var(--danger); color: white; font-size: 9px;
+      border-radius: 999px; display: grid; place-items: center;
+    }
+
+    /* order section */
+    .order-links {
+      display: flex; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .order-links a {
+      flex: 1; text-align: center; padding: 14px 0;
+      font-size: 13px; position: relative;
+    }
+    .order-links a:not(:last-child)::after {
+      content: ''; position: absolute; right: 0; top: 25%;
+      height: 50%; width: 1px; background: var(--border);
+    }
+    .order-links a:active { background: var(--bg); }
+
+    /* menu list */
+    .menu-list { margin: 0 16px; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+    .menu-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px; background: var(--surface);
+      border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .menu-item:last-child { border-bottom: 0; }
+    .menu-item:active { background: var(--bg); }
+    .menu-item .menu-icon { width: 20px; height: 20px; color: var(--muted); flex-shrink: 0; }
+    .menu-item .menu-arrow { margin-left: auto; color: var(--border); width: 16px; height: 16px; }
+    .menu-item .menu-right { margin-left: auto; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+
+    /* bottom tabs */
+    .bottom-tabs {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 4px 0; color: var(--muted); font-size: 10px;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item svg { width: 22px; height: 22px; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .user-card { border-radius: var(--radius-md); margin: 8px 24px 0; border: 1px solid var(--border); }
+      .page-header { border-radius: var(--radius-md) var(--radius-md) 0 0; margin-inline: 24px; }
+      .service-section, .menu-list { margin-inline: 24px; }
+      .service-section { padding-inline: 0; }
+      .order-links { margin-top: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-header">
+    <h1>个人中心</h1>
+  </div>
+
+  <!-- user -->
+  <div class="user-card">
+    <div class="avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div class="user-info">
+      <div class="name">张明</div>
+      <div class="meta">
+        <span>身份证实名认证</span>
+        <span class="verify-badge">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          已认证
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- service grid -->
+  <div class="service-section">
+    <h2>我的服务</h2>
+    <div class="service-grid">
+      <a class="service-item" href="contracts.html">
+        <div class="service-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <div class="label">电子合同</div>
+        <span class="service-badge">1</span>
+      </a>
+      <a class="service-item" href="payment.html">
+        <div class="service-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="5" width="22" height="14" rx="2"/><line x1="1" y1="11" x2="23" y2="11"/><circle cx="12" cy="15" r="1"/></svg>
+        </div>
+        <div class="label">在线缴费</div>
+      </a>
+      <a class="service-item" href="repair.html">
+        <div class="service-icon amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <div class="label">报修服务</div>
+      </a>
+      <a class="service-item" href="my-applications.html">
+        <div class="service-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 14l2 2 4-4"/></svg>
+        </div>
+        <div class="label">申请记录</div>
+      </a>
+      <a class="service-item" href="#">
+        <div class="service-icon amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        </div>
+        <div class="label">收藏房源</div>
+      </a>
+      <a class="service-item" href="#">
+        <div class="service-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </div>
+        <div class="label">联系管家</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- order status -->
+  <div class="service-section">
+    <h2>我的订单</h2>
+    <div class="order-links">
+      <a href="payment.html">待缴费</a>
+      <a href="repair.html">处理中</a>
+      <a href="contracts.html">待签署</a>
+      <a href="#">已完成</a>
+    </div>
+  </div>
+
+  <!-- menu list -->
+  <div style="height: 12px;"></div>
+  <div class="menu-list">
+    <a class="menu-item" href="#">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span>设置</span>
+      <svg class="menu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    <a class="menu-item" href="#">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span>消息通知</span>
+      <span class="menu-right">
+        <span style="background: var(--danger); color: white; font-size: 10px; padding: 1px 6px; border-radius: 999px;">2</span>
+        <svg class="menu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </span>
+    </a>
+    <a class="menu-item" href="#">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>账号安全</span>
+      <svg class="menu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    <a class="menu-item" href="#">
+      <svg class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>帮助与客服</span>
+      <span class="menu-right">025-12345 <svg class="menu-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </a>
+  </div>
+
+  <!-- bottom tabs -->
+  <div id="tab-bar" data-series="c" data-active="profile"></div>
+</div>
+
+<script>
+// tab navigation
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', e => {
+    const href = tab.getAttribute('href');
+    if (href && href !== '#' && !href.startsWith('http')) {
+      e.preventDefault();
+      window.location.href = href;
+    }
+  });
+});
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

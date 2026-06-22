@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>合格供应商 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-nav {
+      display: flex; align-items: center;
+      padding: 8px 12px; background: var(--surface);
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-nav .back-btn {
+      width: 36px; height: 36px; display: grid; place-items: center;
+      border-radius: 50%; background: var(--bg);
+    }
+    .page-nav .back-btn svg { width: 20px; height: 20px; }
+    .page-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+
+    .page-header {
+      background: var(--surface); padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h2 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+    .page-header p { font-size: 13px; color: var(--muted); }
+
+    .category-label {
+      font-size: 15px; font-weight: 600; margin: 16px 16px 8px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .category-label svg { width: 18px; height: 18px; color: var(--accent); }
+    .category-label .count { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+    .content { padding: 0 16px 12px; }
+
+    .sup-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 16px;
+      margin-bottom: 10px;
+    }
+    .sup-header {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+    }
+    .sup-icon {
+      width: 44px; height: 44px; border-radius: var(--radius-sm);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .sup-icon svg { width: 22px; height: 22px; }
+    .sup-header h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .sup-header .status {
+      margin-left: auto; font-size: 10px; padding: 2px 8px;
+      border-radius: 3px; font-weight: 500; white-space: nowrap;
+    }
+    .sup-header .status.green-bg { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+    .sup-header .status.warn-bg { background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .sup-sub { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .sup-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .sup-badge {
+      font-size: 10px; padding: 2px 8px; border-radius: 3px;
+      background: var(--bg); color: var(--muted);
+    }
+    .sup-badge.accent { background: var(--accent-soft); color: var(--accent); }
+    .sup-badge.green { background: color-mix(in oklab, var(--success) 10%, transparent); color: var(--success); }
+    .sup-meta { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .sup-collapse-open .sup-detail-body { max-height: 200px !important; }
+    .sup-collapse-open .sup-arrow { transform: rotate(180deg); }
+
+    .std-card-link {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+    }
+    .std-card-link:active { background: var(--surface); }
+
+    .std-enter-btn {
+      width: 100%; padding: 12px; margin-top: 4px;
+      background: var(--accent); color: white; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 500; text-align: center;
+    }
+    .std-enter-btn:active { opacity: 0.9; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .content { padding-inline: 0; }
+      .category-label { margin-inline: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>合格物资供应商公示</h1>
+  </div>
+
+  <div class="page-header">
+    <h2>经审核的合格供应商名录</h2>
+    <p>物资 6 类 + 服务 2 类 · 国企持有方采购 + 白名单运营商执行 + 住建只读监管 · V2 阶段</p>
+  </div>
+
+  <!-- V2 新增：物资认证 6 类全覆盖 · 对应 PRD §8.1 物资类目 -->
+  <div class="category-label">
+    🛒 物资认证 6 类（好房子标准 · V2 新增） <span class="count">6 类 · 试点 6 家</span>
+  </div>
+  <div class="content">
+    <div class="sup-card" style="background:linear-gradient(180deg,#f0fdf4 0%,#fff 60%); border-color:#bbf7d0;">
+      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:8px;">
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🪵 家具 · 环保 E0</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">北新建材 LV2</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2027-12 · 入驻 5 项目</div>
+        </div>
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🌀 家电 · 能效 1 级</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">美的 LV3</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2028-06 · 入驻 12 项目</div>
+        </div>
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🧱 建材 · 甲醛 E0</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">圣象地板 LV2</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2027-09 · 入驻 8 项目</div>
+        </div>
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🔒 智能锁 · 公安认证</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">凯迪仕 LV2</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2028-03 · 入驻 6 项目</div>
+        </div>
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🎨 涂料 · VOC 达标</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">立邦漆 LV2</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2027-11 · 入驻 9 项目</div>
+        </div>
+        <div style="padding:10px; background:#fff; border:1px solid var(--border); border-radius:8px;">
+          <div style="font-size:11px; color:#16a34a; font-weight:600;">🚿 卫浴 · 节水 1 级</div>
+          <div style="font-size:13px; font-weight:600; margin-top:3px;">九牧 LV2</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">证书有效期至 2028-01 · 入驻 7 项目</div>
+        </div>
+      </div>
+      <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border); font-size:11px; color:var(--muted); line-height:1.6;">
+        ✓ 省级集采底价公示 · ✓ 政府抽查留痕 · ✓ 物资批次扫码可在 <a href="portal-verify.html" style="color:#0f766e;">公示门户</a> 验真<br/>
+        分级规则：LV1（单品类）/ LV2（多品类 + 省级集采）/ LV3（全品类 + 集采底价制定）
+      </div>
+    </div>
+
+    <!-- 供应商入驻 CTA -->
+    <a href="m-supplier-onboarding.html" style="display:block; margin-top:10px; padding:12px 14px; background:linear-gradient(135deg,#faf5ff,#fff); border:1px solid #d8b4fe; border-radius:10px; text-decoration:none; color:#6b21a8;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="width:34px; height:34px; border-radius:8px; background:#6b21a8; color:white; display:grid; place-items:center; font-size:18px; flex-shrink:0;">🛒</div>
+        <div style="flex:1;">
+          <div style="font-size:13.5px; font-weight:600;">我是供应商 · 申请入驻</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:2px;">物资 6 类 LV 分级 + 省级集采报价 · 住建终审</div>
+        </div>
+        <div style="font-size:18px; color:#6b21a8;">›</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="category-label" style="margin-top:14px; color:var(--muted);">
+    🔧 服务供应商（装修/物业 · 已有详细名录） <span class="count">2 类 · 4 家</span>
+  </div>
+
+  <!-- Category: 家电供应 -->
+  <div class="category-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+    家电供应 <span class="count">2 家</span>
+  </div>
+  <div class="content">
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>苏宁易购集团股份有限公司</h3>
+          <div class="sup-sub">家电供应 · 品类: 空调 · 冰箱 · 洗衣机 · 热水器 · 电视</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">合同期: 2026-01 至 2027-12</span>
+            <span class="sup-badge accent">覆盖: 全市</span>
+            <span class="sup-badge">合作年限: 3 年</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">售后保障: 整机 3 年保修 · 24 小时上门 · 免费安装调试 · 以旧换新服务</div>
+        </div>
+      </div>
+    </div>
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>南京京东电器旗舰店</h3>
+          <div class="sup-sub">家电供应 · 品类: 空调 · 冰箱 · 智能家居 · 厨电</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">合同期: 2026-03 至 2028-02</span>
+            <span class="sup-badge accent">覆盖: 全市</span>
+            <span class="sup-badge">合作年限: 2 年</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">售后保障: 整机保修 · 极速达 4 小时 · 免费上门勘测</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category: 装修施工 -->
+  <div class="category-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    装修施工 <span class="count">2 家</span>
+  </div>
+  <div class="content">
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>南京匠心装饰工程有限公司</h3>
+          <div class="sup-sub">装修施工 · 翻新改造 · 维修维护</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">资质: 建筑装修装饰工程专业承包二级</span>
+            <span class="sup-badge accent">合同期: 2025-06 至 2027-06</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">施工保障: 5 年隐蔽工程质保 · 2 年整体质保 · 甲醛检测合格交付</div>
+        </div>
+      </div>
+    </div>
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>南京金螳螂家装饰</h3>
+          <div class="sup-sub">装修施工 · 批量精装 · 装配式装修</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">资质: 建筑装修装饰工程专业承包一级</span>
+            <span class="sup-badge accent">合同期: 2025-09 至 2027-08</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">施工保障: 装配式装修技术 · 工期缩短 30% · 环保材料 · 10 年质保</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category: 物业服务 -->
+  <div class="category-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    物业服务 <span class="count">2 家</span>
+  </div>
+  <div class="content">
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>南京银城物业服务有限公司</h3>
+          <div class="sup-sub">物业服务 · 安保 · 保洁 · 绿化维护</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">资质: 物业服务一级</span>
+            <span class="sup-badge accent">合同期: 2026-01 至 2028-12</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">在管保租房项目: 5 个 · 服务团队: 120 人 · 24 小时安保 · 智能巡检</div>
+        </div>
+      </div>
+    </div>
+    <div class="sup-card">
+      <div class="sup-header" onclick="this.parentNode.classList.toggle('sup-collapse-open')" style="cursor: pointer;">
+        <div class="sup-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div style="flex:1;">
+          <h3>南京万科物业服务有限公司</h3>
+          <div class="sup-sub">物业服务 · 社区运营 · 智慧物业平台</div>
+        </div>
+        <span class="status green-bg">合格</span>
+        <svg class="sup-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.25s; flex-shrink:0; margin-left:4px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sup-detail-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+        <div style="padding-top: 4px;">
+          <div class="sup-badges">
+            <span class="sup-badge accent">资质: 物业服务一级</span>
+            <span class="sup-badge accent">合同期: 2026-04 至 2029-03</span>
+          </div>
+          <div class="sup-meta" style="margin-top:4px;">在管保租房项目: 3 个 · 服务团队: 85 人 · 住这儿 APP 线上服务 · 15 分钟响应</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supplier entry link -->
+  <div class="content">
+    <div class="std-card-link" onclick="alert('查看供应商准入标准')">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>
+          <div style="font-size: 13px; font-weight: 500;">供应商准入标准</div>
+          <div style="font-size: 11px; color: var(--muted);">资质要求 · 质量评审 · 履约评估 · 退出机制</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="margin-left: auto;"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <button class="std-enter-btn" onclick="alert('申请成为合格供应商')">申请成为合格供应商</button>
+
+    <div style="font-size: 11px; color: var(--muted); text-align: center; margin-top: 16px; padding-bottom: 16px;">
+      数据更新至 2026-06 · 南京市住建局监制
+    </div>
+  </div>
+
+  <!-- bottom tabs -->
+  <nav class="bottom-tabs" style="display: flex; position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;">
+    <a class="tab-item" href="home.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>首页</span>
+    </a>
+    <a class="tab-item active" href="policy.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--accent); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      <span>政策</span>
+    </a>
+    <a class="tab-item" href="my-applications.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      <span>我的申请</span>
+    </a>
+    <a class="tab-item" href="profile.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; color: var(--muted); font-size: 10px; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>个人</span>
+    </a>
+  </nav>
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

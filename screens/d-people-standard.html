@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人的标准 · 江苏保租房服务者认证体系</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #fff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --gov: #1e40af;
+      --ok: #16a34a;
+      --warn: #ea580c;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; padding:24px; background:#fff;
+      border:1px solid var(--border); border-radius:14px; margin-bottom:18px;
+    }
+    .doc-header h1{font-size:26px; font-weight:700; margin:0 0 8px;}
+    .doc-header .sub{color:var(--muted); font-size:14px;}
+    .doc-header .tags{display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .doc-header .tag{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fef3c7; color:#92400e; font-weight:500;
+    }
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:16px; font-weight:700; margin-bottom:16px;
+      padding-bottom:10px; border-bottom:2px solid var(--plat-accent);
+    }
+    .section-title .num{
+      width:28px; height:28px; border-radius:50%;
+      background:var(--plat); color:#fff;
+      display:grid; place-items:center; font-size:14px; font-weight:700;
+    }
+    .section-title .label{flex:1;}
+    .section-title .badge{
+      font-size:11px; padding:3px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    /* ===== 图 1：模式总览四列横向布局 ===== */
+    .mode-overview{
+      display:grid; grid-template-columns:1fr 1.4fr 1.4fr 1fr; gap:12px;
+      align-items:stretch;
+    }
+    .mo-col{
+      border-radius:10px; padding:14px;
+      display:flex; flex-direction:column;
+    }
+    .mo-col h3{
+      font-size:13px; font-weight:700; margin:0 0 10px;
+      padding-bottom:8px; border-bottom:1px solid;
+    }
+    .mo-col .item{
+      display:flex; align-items:flex-start; gap:6px;
+      font-size:11.5px; line-height:1.5; margin-bottom:6px;
+    }
+    .mo-col .ico{
+      width:18px; height:18px; border-radius:4px;
+      display:grid; place-items:center; flex-shrink:0;
+      font-size:10px; font-weight:700; color:#fff;
+    }
+    .mo-col.gov{background:#eff6ff; border:1px solid #bfdbfe;}
+    .mo-col.gov h3{color:var(--gov); border-color:#bfdbfe;}
+    .mo-col.gov .ico{background:var(--gov);}
+    .mo-col.plat{background:#0f172a; color:#fff; position:relative; overflow:hidden;}
+    .mo-col.plat h3{color:#fef3c7; border-color:rgba(255,255,255,0.15);}
+    .mo-col.plat .ico{background:var(--plat-accent);}
+    .mo-col.flow{background:#f0fdf4; border:1px solid #bbf7d0;}
+    .mo-col.flow h3{color:var(--ok); border-color:#bbf7d0;}
+    .mo-col.flow .ico{background:var(--ok);}
+    .mo-col.value{background:#fff7ed; border:1px solid #fed7aa;}
+    .mo-col.value h3{color:var(--warn); border-color:#fed7aa;}
+    .mo-col.value .ico{background:var(--warn);}
+
+    .unified-bar{
+      margin-top:16px; padding:12px;
+      background:linear-gradient(90deg, #0f172a 0%, #b45309 100%);
+      color:#fff; border-radius:8px;
+      display:flex; justify-content:space-around; flex-wrap:wrap; gap:10px;
+    }
+    .unified-bar .ub{font-size:13px; font-weight:600; text-align:center;}
+    .unified-bar .ub .em{font-size:18px; font-weight:700; display:block; margin-bottom:2px;}
+
+    /* ===== 流程横条 ===== */
+    .flow-row{
+      display:flex; gap:6px; align-items:stretch; margin-top:14px;
+      overflow-x:auto;
+    }
+    .flow-step{
+      flex:1; min-width:120px;
+      background:#fff; border:1px solid var(--border); border-radius:8px;
+      padding:10px 12px; position:relative;
+    }
+    .flow-step .n{
+      font-size:10px; color:var(--muted); font-weight:600;
+    }
+    .flow-step .t{font-size:13px; font-weight:600; margin-top:4px;}
+    .flow-step .d{font-size:11px; color:var(--muted); margin-top:4px; line-height:1.4;}
+    .flow-step + .flow-step::before{
+      content:"→"; position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-weight:700;
+    }
+
+    /* ===== 图 2：分级认证 L0–L7 ===== */
+    .level-grid{
+      display:grid; grid-template-columns:repeat(6, 1fr); gap:8px;
+    }
+    .lv-card{
+      background:#fff; border:2px solid; border-radius:10px;
+      padding:10px; text-align:center; position:relative;
+    }
+    .lv-card .lv{
+      display:inline-block; padding:2px 10px; border-radius:6px;
+      color:#fff; font-size:12px; font-weight:700; margin-bottom:6px;
+    }
+    .lv-card .n{font-size:13px; font-weight:700; margin-bottom:4px;}
+    .lv-card .d{font-size:10px; color:var(--muted); line-height:1.4;}
+    .lv-card.l0{border-color:#cbd5e1;} .lv-card.l0 .lv{background:#64748b;}
+    .lv-card.l1{border-color:#93c5fd;} .lv-card.l1 .lv{background:#3b82f6;}
+    .lv-card.l2{border-color:#86efac;} .lv-card.l2 .lv{background:#22c55e;}
+    .lv-card.l3{border-color:#fcd34d;} .lv-card.l3 .lv{background:#eab308;}
+    .lv-card.l4{border-color:#fdba74;} .lv-card.l4 .lv{background:var(--warn);}
+    .lv-card.l5{border-color:#c4b5fd;} .lv-card.l5 .lv{background:#7c3aed;}
+
+    .upgrade-bar{
+      display:flex; gap:10px; margin-top:14px;
+      padding:12px; background:#f8fafc; border-radius:8px;
+    }
+    .upgrade-bar .lbl{font-size:11px; color:var(--muted); font-weight:600; align-self:center;}
+    .upgrade-bar .pill{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fff; border:1px solid var(--border);
+    }
+
+    /* ===== 时间线 ===== */
+    .timeline-grid{
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;
+    }
+    .tl-card{
+      border-radius:10px; padding:12px; border-top:3px solid;
+      background:#fff; border:1px solid var(--border);
+    }
+    .tl-card.s1{border-top-color:#3b82f6;}
+    .tl-card.s2{border-top-color:#22c55e;}
+    .tl-card.s3{border-top-color:#eab308;}
+    .tl-card.s4{border-top-color:var(--warn);}
+    .tl-card.s5{border-top-color:#7c3aed;}
+    .tl-card .date{font-size:11px; color:var(--muted); font-weight:600;}
+    .tl-card .t{font-size:13px; font-weight:700; margin:4px 0 6px;}
+    .tl-card .d{font-size:11px; color:#475569; line-height:1.5;}
+    .tl-card .metric{
+      margin-top:8px; padding:4px 8px; border-radius:6px;
+      background:#f0fdf4; color:#15803d; font-size:11px; font-weight:600;
+    }
+
+    /* ===== 商业模式 ===== */
+    .biz-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;}
+    .biz-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .biz-card h4{margin:0 0 10px; font-size:13px; font-weight:700; color:var(--plat);}
+    .biz-card ul{margin:0; padding-left:18px; font-size:12px; line-height:1.8; color:#334155;}
+
+    /* ===== Footer 目标 ===== */
+    .doc-footer{
+      margin-top:16px; padding:18px; border-radius:12px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; text-align:center;
+    }
+    .doc-footer .em{font-size:18px; font-weight:700; line-height:1.5;}
+    .doc-footer .sub{font-size:12px; opacity:0.85; margin-top:6px;}
+
+    .crosslink{
+      margin-top:14px; padding:10px 14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:8px;
+      font-size:12px; color:#1e40af;
+    }
+    .crosslink a{font-weight:600; text-decoration:underline;}
+
+    /* 已实现页面标注 · 网格对齐版（列数与上方卡片对齐） */
+    .impl-aligned{
+      display:grid; gap:8px;
+      margin-top:14px; padding:12px;
+      background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;
+    }
+    .impl-aligned.cols-2{grid-template-columns:repeat(2, 1fr);}
+    .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
+    .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
+    .impl-aligned.cols-6{grid-template-columns:repeat(6, 1fr);}
+    .impl-aligned .impl-banner{
+      grid-column:1 / -1; font-size:11px; color:#64748b; font-weight:600;
+      letter-spacing:0.3px; margin-bottom:2px;
+    }
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{
+      font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px;
+      padding:0 0 4px; border-bottom:1px solid #e2e8f0;
+      margin-bottom:2px; text-align:center;
+    }
+    .impl-aligned .col a.impl-pill{
+      display:block; font-size:11px; padding:4px 8px; border-radius:6px;
+      background:#fff; border:1px solid #e2e8f0; color:#334155;
+      text-decoration:none; font-weight:500; line-height:1.35;
+      transition:all 0.15s; text-align:left;
+    }
+    .impl-aligned .col a.impl-pill:hover{
+      background:#0f172a; color:#fff; border-color:#0f172a;
+    }
+    .impl-aligned .col a.impl-pill .file{
+      display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px;
+      opacity:0.55; margin-top:2px;
+    }
+    .impl-aligned .col a.impl-pill:hover .file{opacity:0.9;}
+    .impl-aligned .col .empty-pill{
+      font-size:10px; color:#94a3b8; padding:4px 8px; text-align:center;
+      border:1px dashed #e2e8f0; border-radius:6px; background:#fff;
+    }
+    @media (max-width: 900px){
+      .impl-aligned.cols-5, .impl-aligned.cols-6{grid-template-columns:repeat(3, 1fr);}
+      .impl-aligned.cols-4{grid-template-columns:repeat(2, 1fr);}
+    }
+    @media (max-width: 600px){
+      .impl-aligned{grid-template-columns:1fr 1fr !important;}
+    }
+
+    @media (max-width: 1024px){
+      .mode-overview, .level-grid, .timeline-grid, .biz-grid{grid-template-columns:1fr 1fr;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="people-standard"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>人的标准 · 江苏保租房服务者认证体系</h1>
+      <div class="sub">平台认证 + 政府背书 + 商业准入 ·「不是行政许可，而是商业准入；不是培训学校，而是建立可咨询、可复制、可清算的人才准入信用体系」</div>
+      <div class="tags">
+        <span class="tag">江苏住建厅 主导</span>
+        <span class="tag">江苏人社厅 联合认证</span>
+        <span class="tag">贝壳 承建</span>
+        <span class="tag">L0–L7 分级</span>
+        <span class="tag">2027 全省 5000+</span>
+      </div>
+    </div>
+
+    <div class="crosslink">
+      📐 顶层定位：本标准对应 <a href="d-master-blueprint.html">总图谱</a>「贝壳核心能力 · 标准落地能力」+「服务者人才流」长期目标，与 <a href="d-property-standard.html">房的标准</a>、<a href="d-org-gov-standard.html">机构+政府合作模式</a> 三标合一。
+    </div>
+
+    <!-- 图 1：模式总览 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">1</span>
+        <span class="label">模式总览 · 平台认证 + 政府背书 + 商业准入</span>
+        <span class="badge">认证体系架构</span>
+      </div>
+
+      <div class="mode-overview">
+        <div class="mo-col gov">
+          <h3>🏛 政府授权与背书</h3>
+          <div class="item"><span class="ico">1</span>出政策、定标准</div>
+          <div class="item"><span class="ico">2</span>品牌联合传播</div>
+          <div class="item"><span class="ico">3</span>政策资源对接</div>
+          <div class="item"><span class="ico">4</span>数据回流与共享</div>
+          <div class="item"><span class="ico">5</span>纳入江苏住建/人社联合认证</div>
+        </div>
+
+        <div class="mo-col plat">
+          <h3>⭐ 贝壳承建 · 江苏保租房统一平台</h3>
+          <div class="item"><span class="ico">A</span>标准准入</div>
+          <div class="item"><span class="ico">B</span>培训学习</div>
+          <div class="item"><span class="ico">C</span>考试发证</div>
+          <div class="item"><span class="ico">D</span>信用留痕</div>
+          <div class="item"><span class="ico">E</span>黑名单共享</div>
+          <div class="item"><span class="ico">F</span>数据回流政府</div>
+        </div>
+
+        <div class="mo-col flow">
+          <h3>📋 服务者/服务商入驻流程</h3>
+          <div class="item"><span class="ico">1</span>申请入驻</div>
+          <div class="item"><span class="ico">2</span>标准学习</div>
+          <div class="item"><span class="ico">3</span>考试通过</div>
+          <div class="item"><span class="ico">4</span>进入白名单</div>
+          <div class="item"><span class="ico">5</span>流量分发</div>
+          <div class="item"><span class="ico">6</span>持续考核 · 信用累积</div>
+        </div>
+
+        <div class="mo-col value">
+          <h3>🎯 价值输出与闭环</h3>
+          <div class="item"><span class="ico">⬆</span>服务者跃迁（L0→L5）</div>
+          <div class="item"><span class="ico">★</span>客户权益保障</div>
+          <div class="item"><span class="ico">🏷</span>行业品牌升级</div>
+          <div class="item"><span class="ico">📊</span>数据回流政府</div>
+          <div class="item"><span class="ico">🛡</span>勤勉尽职·尽职免责</div>
+        </div>
+      </div>
+
+      <div class="unified-bar">
+        <div class="ub"><span class="em">5 个统一</span>标准 · 认证 · 信用 · 数据 · 服务</div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 模式总览 · 已实现页面（与上方四列卡片一一对齐）</div>
+        <div class="col">
+          <div class="col-head">🏛 政府授权背书</div>
+          <a href="g-policy.html" class="impl-pill">政策发布<span class="file">g-policy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">⭐ 贝壳承建</div>
+          <a href="p-console.html" class="impl-pill">中台控制台<span class="file">p-console.html</span></a>
+          <a href="p-standards.html" class="impl-pill">标准体系<span class="file">p-standards.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">📋 入驻流程</div>
+          <a href="s-cert.html" class="impl-pill">服务者认证入口<span class="file">s-cert.html</span></a>
+          <a href="v-onboarding.html" class="impl-pill">机构入驻<span class="file">v-onboarding.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎯 价值输出</div>
+          <a href="portal-index.html" class="impl-pill">公示门户<span class="file">portal-index.html</span></a>
+          <a href="p-data-hub.html" class="impl-pill">数据回流<span class="file">p-data-hub.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 入驻流程详细横条 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">2</span>
+        <span class="label">服务者入驻六步流程 · 全程网办</span>
+        <span class="badge">~ 30 天通过</span>
+      </div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="n">STEP 1</div>
+          <div class="t">申请入驻</div>
+          <div class="d">实名认证 + 资质上传，对接江苏人社职业资格库</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 2</div>
+          <div class="t">标准学习</div>
+          <div class="d">P 端培训中心 86 门课，含房源/法规/服务/系统</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 3</div>
+          <div class="t">考试通过</div>
+          <div class="d">题库 1.2k 道，按 L1-L7 分级机考</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 4</div>
+          <div class="t">白名单</div>
+          <div class="d">G 端住建厅审定 + 公示门户对外可查</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 5</div>
+          <div class="t">流量分发</div>
+          <div class="d">P 端派单交易 T+7，按等级分级派单</div>
+        </div>
+        <div class="flow-step">
+          <div class="n">STEP 6</div>
+          <div class="t">持续考核</div>
+          <div class="d">业绩 + 客户评价 + 信用积分，按月滚动</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-6">
+        <div class="impl-banner">📎 六步流程 · 已实现页面（与上方 6 个 STEP 卡片对齐）</div>
+        <div class="col">
+          <div class="col-head">STEP 1 申请</div>
+          <a href="s-cert.html" class="impl-pill">服务者认证<span class="file">s-cert.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 2 学习</div>
+          <a href="s-learn.html" class="impl-pill">服务者·学习<span class="file">s-learn.html</span></a>
+          <a href="p-training-center.html" class="impl-pill">培训中心<span class="file">p-training-center.html</span></a>
+          <a href="t-courses.html" class="impl-pill">培训方·课程<span class="file">t-courses.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 3 考试</div>
+          <a href="s-exam.html" class="impl-pill">服务者·考试<span class="file">s-exam.html</span></a>
+          <a href="p-question-bank.html" class="impl-pill">题库与试卷<span class="file">p-question-bank.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 4 白名单</div>
+          <a href="g-whitelist-service.html" class="impl-pill">住建审定<span class="file">g-whitelist-service.html</span></a>
+          <a href="portal-verify.html" class="impl-pill">扫码验真<span class="file">portal-verify.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 5 派单</div>
+          <a href="p-transaction.html" class="impl-pill">派单交易<span class="file">p-transaction.html</span></a>
+          <a href="p-traffic-policy.html" class="impl-pill">流量策略<span class="file">p-traffic-policy.html</span></a>
+          <a href="s-orders.html" class="impl-pill">服务者·接单<span class="file">s-orders.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">STEP 6 考核</div>
+          <a href="p-credit-engine.html" class="impl-pill">信用规则<span class="file">p-credit-engine.html</span></a>
+          <a href="s-income.html" class="impl-pill">服务者·收入<span class="file">s-income.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图 2：分级认证 L0-L7 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">3</span>
+        <span class="label">分级认证体系 · 不动产资产规划师 L0–L7</span>
+        <span class="badge">向上扩到机构级</span>
+      </div>
+
+      <div class="level-grid">
+        <div class="lv-card l0">
+          <div class="lv">L0</div>
+          <div class="n">实名注册</div>
+          <div class="d">个人实名 + 完成入门培训</div>
+        </div>
+        <div class="lv-card l1">
+          <div class="lv">L1</div>
+          <div class="n">见习服务者</div>
+          <div class="d">考试合格 · 可承接带看</div>
+        </div>
+        <div class="lv-card l2">
+          <div class="lv">L2</div>
+          <div class="n">认证服务者</div>
+          <div class="d">满 6 个月业绩达标 · 可签约</div>
+        </div>
+        <div class="lv-card l3">
+          <div class="lv">L3</div>
+          <div class="n">高级服务者</div>
+          <div class="d">满 1 年 · 客户评分 ≥4.4 · 可独立管家</div>
+        </div>
+        <div class="lv-card l4">
+          <div class="lv">L4</div>
+          <div class="n">认证服务商</div>
+          <div class="d">机构准入 · 旗下持证人 ≥10</div>
+        </div>
+        <div class="lv-card l5">
+          <div class="lv">L5</div>
+          <div class="n">服务商负责人</div>
+          <div class="d">机构经营 · 商业认证</div>
+        </div>
+        <div class="lv-card l6">
+          <div class="lv">L6</div>
+          <div class="n">区域专家</div>
+          <div class="d">跨区域 · 题库共建 / 评审</div>
+        </div>
+        <div class="lv-card l7">
+          <div class="lv">L7</div>
+          <div class="n">首席专家</div>
+          <div class="d">行业级 · 标准发布</div>
+        </div>
+      </div>
+
+      <div class="upgrade-bar">
+        <span class="lbl">升级要素 →</span>
+        <span class="pill">📚 培训完成度</span>
+        <span class="pill">📝 考试分数</span>
+        <span class="pill">📊 业绩量</span>
+        <span class="pill">⭐ 客户评价</span>
+        <span class="pill">🛡 信用积分</span>
+        <span class="pill">⏱ 在岗时长</span>
+      </div>
+
+      <div class="impl-aligned cols-6">
+        <div class="impl-banner">📎 分级认证 · 已实现页面（与上方 L0–L7 卡片对齐）</div>
+        <div class="col">
+          <div class="col-head">L0 实名注册</div>
+          <a href="s-cert.html" class="impl-pill">服务者认证入口<span class="file">s-cert.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">L1 见习</div>
+          <a href="p-cert-issue.html" class="impl-pill">发证管理<span class="file">p-cert-issue.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">L2 认证</div>
+          <a href="g-whitelist-service.html" class="impl-pill">白名单审定<span class="file">g-whitelist-service.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">L3 高级</div>
+          <a href="p-credit-engine.html" class="impl-pill">信用积分引擎<span class="file">p-credit-engine.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">L4 服务商</div>
+          <a href="v-onboarding.html" class="impl-pill">机构入驻<span class="file">v-onboarding.html</span></a>
+          <a href="v-team.html" class="impl-pill">机构团队<span class="file">v-team.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">L5 标杆</div>
+          <a href="g-whitelist-supplier.html" class="impl-pill">省级白名单<span class="file">g-whitelist-supplier.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 落地时间线 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">4</span>
+        <span class="label">落地路径 · 五步走（按 V25 GR 节奏校准）</span>
+        <span class="badge">2026.6 → 2027</span>
+      </div>
+
+      <div class="timeline-grid">
+        <div class="tl-card s1">
+          <div class="date">2026.6</div>
+          <div class="t">标准定稿</div>
+          <div class="d">L0–L7 分级标准发布，纳入江苏人社/住建联合认证</div>
+          <div class="metric">✓ 标准 1.0 发文</div>
+        </div>
+        <div class="tl-card s2">
+          <div class="date">2026.7</div>
+          <div class="t">首批 100 人</div>
+          <div class="d">南京浦口标杆项目 · 不动产资产规划师首批培养</div>
+          <div class="metric">✓ 100 人 L1 持证</div>
+        </div>
+        <div class="tl-card s3">
+          <div class="date">2026.8–10</div>
+          <div class="t">江苏首批 1000 人</div>
+          <div class="d">4 个设区市试点，培训 + 考试 + 发证全流程跑通</div>
+          <div class="metric">✓ 1000 人持证上岗</div>
+        </div>
+        <div class="tl-card s4">
+          <div class="date">2026.11</div>
+          <div class="t">发布会公示</div>
+          <div class="d">11 月联合发布会 · 公示首批合格名单 + 江苏样本对外官宣</div>
+          <div class="metric">✓ 江苏样本立项</div>
+        </div>
+        <div class="tl-card s5">
+          <div class="date">2027</div>
+          <div class="t">全省 5000+</div>
+          <div class="d">13 个设区市全覆盖 · 持续输出 · 复制到外省</div>
+          <div class="metric">✓ 全国试点省份</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-5">
+        <div class="impl-banner">📎 落地路径 · 已实现页面（与上方 5 个时间节点对齐）</div>
+        <div class="col">
+          <div class="col-head">2026.6 标准</div>
+          <a href="g-policy.html" class="impl-pill">政策发文<span class="file">g-policy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.7 首批 100</div>
+          <span class="empty-pill">复用 p-cert-issue<br/>+ p-training-center</span>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.8–10 1000</div>
+          <span class="empty-pill">规模化复用<br/>无新增页面</span>
+        </div>
+        <div class="col">
+          <div class="col-head">2026.11 发布会</div>
+          <a href="portal-index.html" class="impl-pill">公示首批名单<span class="file">portal-index.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">2027 全省 5000+</div>
+          <a href="g-dashboard.html" class="impl-pill">监管大屏·覆盖率<span class="file">g-dashboard.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 商业模式 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">5</span>
+        <span class="label">商业模式与价值</span>
+      </div>
+      <div class="biz-grid">
+        <div class="biz-card">
+          <h4>💰 收入来源</h4>
+          <ul>
+            <li>认证费（按级别一次性）</li>
+            <li>培训费（在线课程 + 线下集训）</li>
+            <li>派单服务费分成（6–8%）</li>
+            <li>机构入驻年费（L4–L5）</li>
+            <li>数据 API 调用（B 端付费）</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>🎯 核心价值</h4>
+          <ul>
+            <li>持证上岗（机构责任边界清晰）</li>
+            <li>勤勉尽职 · <strong>尽职免责</strong> 写入标准</li>
+            <li>避免长租公寓暴雷覆辙</li>
+            <li>政府背书 + 商业流量双重保障</li>
+            <li>服务者跃迁路径透明</li>
+          </ul>
+        </div>
+        <div class="biz-card">
+          <h4>⚙ 关键能力</h4>
+          <ul>
+            <li>P 端中台 · 培训/题库/发证/信用引擎</li>
+            <li>T 端培训机构 · 课程开发与排课</li>
+            <li>V 端服务商门户 · 机构入驻管理</li>
+            <li>S 端服务者 App · 持证查询/学习/接单</li>
+            <li>G 端白名单审定 + 公示门户验真</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 商业模式 · 已实现页面（与上方 3 个 biz-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">💰 收入来源</div>
+          <a href="p-transaction.html" class="impl-pill">派单服务费分成<span class="file">p-transaction.html</span></a>
+          <a href="p-api-gateway.html" class="impl-pill">数据 API 调用<span class="file">p-api-gateway.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🎯 核心价值</div>
+          <span class="empty-pill">尽职免责<br/>(政策性写入，无单独页)</span>
+        </div>
+        <div class="col">
+          <div class="col-head">⚙ 关键能力</div>
+          <a href="t-students.html" class="impl-pill">T 端·学员管理<span class="file">t-students.html</span></a>
+          <a href="t-schedule.html" class="impl-pill">T 端·排课<span class="file">t-schedule.html</span></a>
+          <a href="v-projects.html" class="impl-pill">V 端·项目对接<span class="file">v-projects.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div class="em">建立江苏保租房服务者认证体系</div>
+      <div class="sub">打造全国保租房居住服务基础设施 · 助力江苏成为全国保租房服务标杆省份</div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>南京市保租房 · 阶段三（+ 交易闭环）</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a; --warn: #eab308;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+    .version-switcher {
+      display: flex; justify-content: center; gap: 10px;
+      flex-wrap: wrap; margin-bottom: 28px;
+    }
+    .version-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: 999px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 13px; color: var(--muted); text-decoration: none;
+      transition: all 0.15s;
+    }
+    .version-pill .num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--bg); color: var(--muted);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 12px;
+    }
+    .version-pill.active {
+      background: var(--success); color: white; border-color: var(--success);
+    }
+    .version-pill.active .num { background: rgba(255,255,255,0.25); color: white; }
+    .version-pill:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+    .header { text-align: center; margin-bottom: 36px; }
+    .header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 600; margin: 0 0 8px;
+      letter-spacing: -0.015em;
+    }
+    .header .lead { font-size: 16px; color: var(--muted); max-width: 56ch; margin: 0 auto; }
+    .meta-badge {
+      display: inline-block;
+      padding: 4px 12px; border-radius: 999px;
+      background: color-mix(in oklab, var(--success) 12%, transparent);
+      color: var(--success);
+      font-size: 12px; font-weight: 500; margin-top: 12px;
+    }
+    .scope-banner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 4px solid var(--success);
+      border-radius: var(--radius-md);
+      padding: 18px 22px; margin: 0 auto 40px; max-width: 760px;
+      display: flex; gap: 14px; align-items: flex-start;
+    }
+    .scope-banner .label {
+      font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+      color: var(--success); text-transform: uppercase; margin-bottom: 4px;
+    }
+    .scope-banner h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+    .scope-banner p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px; margin-bottom: 48px;
+    }
+    .feature-item { text-align: center; padding: 24px; }
+    .feature-item .icon {
+      width: 40px; height: 40px; margin: 0 auto 12px;
+      background: var(--accent-soft); border-radius: 50%;
+      display: grid; place-items: center;
+    }
+    .feature-item .icon svg { width: 20px; height: 20px; color: var(--accent); }
+    .feature-item h4 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+    .feature-item p { font-size: 13px; color: var(--muted); margin: 0; }
+
+    .section-title { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+    .section-title .badge {
+      display: inline-block; vertical-align: middle; margin-left: 10px;
+      padding: 3px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 11px; font-weight: 600;
+    }
+    .section-title .badge.new {
+      background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success);
+    }
+    .section-desc { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+    /* ========= 四方共建生态 part（V1/V2/V3 共用样式） ========= */
+    .ecosystem{margin:48px 0 32px; padding:28px 24px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);}
+    .ecosystem .e-head{display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; padding-bottom:16px; margin-bottom:20px; border-bottom:1px solid var(--border);}
+    .ecosystem .e-head h2{font-size:20px; font-weight:700; margin:0 0 4px;}
+    .ecosystem .e-head .sub{font-size:13px; color:var(--muted);}
+    .ecosystem .e-head .activation{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap;}
+    .ecosystem .e-head .a-chip{font-size:11px; padding:4px 10px; border-radius:999px; font-weight:600; background:#f1f5f9; color:#64748b;}
+    .ecosystem .e-head .a-chip.on{background:#dcfce7; color:#15803d;}
+    .ecosystem .e-head .a-chip.dim{background:#fef3c7; color:#92400e;}
+    .flow-diagram{position:relative; height:380px; margin:0 auto 28px; max-width:880px; background:linear-gradient(180deg,#fafbfc 0%,#fff 100%); border:1px solid var(--border); border-radius:12px; overflow:hidden;}
+    .flow-diagram .node{position:absolute; transform:translate(-50%,-50%); width:148px; padding:12px 10px; border-radius:12px; background:#fff; border:2px solid; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.06); z-index:2;}
+    .flow-diagram .node .ico{width:30px; height:30px; border-radius:8px; margin:0 auto 4px; display:grid; place-items:center; font-size:14px; color:#fff;}
+    .flow-diagram .node .name{font-size:12px; font-weight:700; line-height:1.25;}
+    .flow-diagram .node .role{font-size:10px; color:var(--muted); margin-top:2px;}
+    .flow-diagram .node .status{display:inline-block; margin-top:4px; font-size:9px; padding:1px 6px; border-radius:4px; font-weight:600;}
+    .flow-diagram .node.on .status{background:#dcfce7; color:#15803d;}
+    .flow-diagram .node.dim .status{background:#fef3c7; color:#92400e;}
+    .flow-diagram .node.dim{opacity:0.55; border-style:dashed;}
+    .node.op{border-color:#0f766e; left:18%; top:24%;} .node.op .ico{background:#0f766e;}
+    .node.gov{border-color:#1e40af; left:18%; top:76%;} .node.gov .ico{background:#1e40af;}
+    .node.plat{border-color:#0f172a; left:50%; top:50%; width:170px;} .node.plat .ico{background:linear-gradient(135deg,#0f172a,#b45309);} .node.plat .name{font-size:13px;}
+    .node.user{border-color:#2563eb; left:82%; top:24%;} .node.user .ico{background:#2563eb;}
+    .node.bank{border-color:#0f1a4d; left:82%; top:76%;} .node.bank .ico{background:linear-gradient(135deg,#0f1a4d,#b45309);}
+    .flow-diagram svg.arrows{position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none;}
+    .flow-diagram svg.arrows path{fill:none; stroke-width:1.8; marker-end:url(#arrowhead);}
+    .flow-diagram svg.arrows path.on{stroke:#0f172a; opacity:0.7;}
+    .flow-diagram svg.arrows path.dim{stroke:#94a3b8; stroke-dasharray:4 4; opacity:0.5;}
+    .quad-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;}
+    .quad-card{border-radius:12px; padding:14px; color:#fff; display:flex; flex-direction:column; gap:8px; position:relative; overflow:hidden;}
+    .quad-card.gov{background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);}
+    .quad-card.bank{background:linear-gradient(135deg,#0a1238 0%,#0f1a4d 100%);}
+    .quad-card.plat{background:linear-gradient(135deg,#020617 0%,#0f172a 100%);}
+    .quad-card.op{background:linear-gradient(135deg,#134e4a 0%,#0f766e 100%);}
+    .quad-card.dim{opacity:0.7;}
+    .quad-card .dim-overlay{position:absolute; top:8px; right:8px; font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.18); color:#fff; font-weight:600;}
+    .quad-card .qh{display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.2);}
+    .quad-card .qh .icon{width:30px; height:30px; border-radius:8px; background:rgba(255,255,255,0.18); display:grid; place-items:center; font-size:16px;}
+    .quad-card .qh .name{font-size:13px; font-weight:700; line-height:1.2;}
+    .quad-card .qh .role{font-size:10px; opacity:0.7;}
+    .quad-card .qrow{font-size:11px; line-height:1.5;}
+    .quad-card .qrow .lbl{display:inline-block; font-size:10px; padding:1px 7px; border-radius:4px; background:rgba(255,255,255,0.18); color:#fff; font-weight:700; margin-bottom:3px; letter-spacing:0.4px;}
+    .quad-card .qrow .txt{opacity:0.9;}
+    @media (max-width: 900px){
+      .quad-grid{grid-template-columns:1fr 1fr;}
+      .flow-diagram{height:520px;}
+      .node.op{left:18%; top:18%;} .node.user{left:82%; top:18%;}
+      .node.gov{left:18%; top:82%;} .node.bank{left:82%; top:82%;}
+    }
+    @media (max-width: 600px){.quad-grid{grid-template-columns:1fr;} .flow-diagram{height:600px;}}
+
+    /* SVG 流转编号 */
+    .flow-diagram svg.arrows a{cursor:pointer; pointer-events:auto;}
+    .flow-diagram svg.arrows a .flow-num,
+    .flow-diagram svg.arrows a .flow-label{pointer-events:auto;}
+    .flow-diagram svg.arrows .flow-num circle{fill:#0f172a; stroke:#fff; stroke-width:1.5;}
+    .flow-diagram svg.arrows .flow-num.dim circle{fill:#94a3b8;}
+    .flow-diagram svg.arrows .flow-num text{fill:#fff; font-size:11px; font-weight:700; text-anchor:middle; dominant-baseline:central; pointer-events:none; font-family:system-ui,sans-serif;}
+    .flow-diagram svg.arrows .flow-label{font-size:10px; fill:#0f172a; font-weight:600; text-anchor:middle; pointer-events:none; font-family:system-ui,sans-serif;}
+    .flow-diagram svg.arrows .flow-num:hover circle{fill:#b45309;}
+
+    /* impl-aligned grid */
+    .impl-aligned{display:grid; gap:8px; margin-top:14px; padding:12px; background:#fafafa; border:1px dashed #e5e7eb; border-radius:10px;}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
+    .impl-aligned .impl-banner{grid-column:1 / -1; font-size:11px; color:#6b7280; font-weight:600; letter-spacing:0.3px; margin-bottom:2px;}
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px; padding:0 0 4px; border-bottom:1px solid #e5e7eb; margin-bottom:2px; text-align:center;}
+    .impl-aligned .col a.impl-pill{display:block; font-size:11px; padding:4px 8px; border-radius:6px; background:#fff; border:1px solid #e5e7eb; color:#374151; text-decoration:none; font-weight:500; line-height:1.35; transition:all 0.15s; text-align:left;}
+    .impl-aligned .col a.impl-pill:hover{background:#0f172a; color:#fff; border-color:#0f172a;}
+    .impl-aligned .col a.impl-pill .file{display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px; opacity:0.55; margin-top:2px;}
+    @media (max-width: 900px){.impl-aligned.cols-4{grid-template-columns:repeat(2, 1fr);}}
+    @media (max-width: 600px){.impl-aligned{grid-template-columns:1fr 1fr !important;}}
+
+    .flow-diagram .node a.node-link{display:block; text-decoration:none; color:inherit;}
+    .flow-diagram .node:hover{box-shadow:0 8px 20px rgba(0,0,0,0.12);}
+
+    .screen-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+    .screen-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+      display: flex; flex-direction: column;
+      position: relative;
+    }
+    .screen-card:hover { box-shadow: 0 4px 20px color-mix(in oklab, var(--fg) 8%, transparent); }
+    .screen-card .new-pin {
+      position: absolute; top: 12px; right: 12px;
+      padding: 2px 8px; border-radius: 999px;
+      background: var(--success); color: white;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    }
+    .preview-bar { height: 6px; flex-shrink: 0; }
+    .preview-strip {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      min-height: 72px;
+    }
+    .preview-icon {
+      width: 44px; height: 44px; border-radius: var(--radius-sm);
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .preview-icon svg { width: 22px; height: 22px; }
+    .preview-label h3 { font-size: 15px; font-weight: 600; margin: 0 0 2px; }
+    .preview-label .sub { font-size: 12px; color: var(--muted); }
+    .preview-pages {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+    }
+    .mini-tag {
+      font-size: 10px; padding: 2px 8px; border-radius: 3px;
+      background: var(--bg); color: var(--muted);
+    }
+    .preview-desc {
+      flex: 1; padding: 12px 16px;
+      font-size: 13px; color: var(--muted); line-height: 1.5;
+    }
+    .preview-actions { padding: 0 16px 16px; display: flex; gap: 8px; }
+    .btn-primary {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 8px 16px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; text-decoration: none;
+      background: var(--accent); color: white;
+    }
+    .btn-primary:active { opacity: 0.85; }
+
+    .data-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+      margin-bottom: 32px;
+    }
+    .data-card h3 { font-size: 16px; font-weight: 600; margin: 0 0 12px; }
+    .data-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px; font-size: 13px; color: var(--muted);
+    }
+    .data-grid strong { color: var(--fg); display: block; margin-bottom: 2px; }
+
+    /* flow diagram */
+    .flow {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 24px;
+      margin-bottom: 32px;
+    }
+    .flow h3 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+    .flow-track {
+      display: flex; align-items: center; gap: 8px;
+      overflow-x: auto; padding-bottom: 6px;
+    }
+    .flow-step {
+      flex: 0 0 auto; padding: 10px 14px;
+      background: var(--accent-soft); color: var(--accent);
+      border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
+      white-space: nowrap;
+    }
+    .flow-arrow { color: var(--muted); font-size: 18px; flex-shrink: 0; }
+
+    .footer {
+      text-align: center; padding: 24px 0;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 13px;
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 680px) {
+      .container { padding: 16px 12px; }
+      .screen-grid { gap: 16px; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+<div id="side-nav" data-series="d" data-active="tier-v3" data-base="screens/"></div>
+<script src="screens/_region.js"></script>
+<script src="screens/_nav.js"></script>
+<div class="container">
+
+  <nav class="version-switcher">
+    <a class="version-pill" href="baozufang-overview-v1-basic.html">
+      <span class="num">1</span><span>阶段一 · 仅展示</span>
+    </a>
+    <a class="version-pill" href="baozufang-overview-v2-standard.html">
+      <span class="num">2</span><span>阶段二 · + 标准体系</span>
+    </a>
+    <a class="version-pill active" href="baozufang-overview-v3-full.html">
+      <span class="num">3</span><span>阶段三 · + 交易闭环</span>
+    </a>
+  </nav>
+
+  <div class="header">
+    <h1>南京市保障性租赁住房</h1>
+    <p class="lead">贝壳租房 × 南京市住建局合作官方频道 · 移动端原型</p>
+    <span class="meta-badge">阶段三方案 · 12 个页面 · 全流程一站式</span>
+  </div>
+
+  <!-- ========== 四方共建生态 · V3 状态（顶部全景） ========== -->
+  <div class="ecosystem">
+    <div class="e-head">
+      <div>
+        <h2>📡 四方共建生态 · 数据与业务流转</h2>
+        <div class="sub">V3：四方全要素闭环 · 端到端在线 · 流转线上 ① ② ③ 可点击跳转</div>
+      </div>
+      <div class="activation">
+        <span class="a-chip on">国企持有方 ●</span>
+        <span class="a-chip on">白名单运营商 ●</span>
+        <span class="a-chip on">贝壳平台 ●</span>
+        <span class="a-chip on">官方频道 ●</span>
+        <span class="a-chip on">监管 ● 全</span>
+        <span class="a-chip on">金融 ● 全</span>
+      </div>
+    </div>
+
+    <div class="flow-diagram">
+      <svg class="arrows" viewBox="0 0 880 380" preserveAspectRatio="none">
+        <defs>
+          <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/></marker>
+        </defs>
+        <!-- ① 国企 → 贝壳：房源推送 -->
+        <path class="on" d="M222,108 Q330,220 380,180" />
+        <a href="screens/b-house-rating-input.html"><title>① 房源推送 + 星级自评</title>
+          <g class="flow-num"><circle cx="306" cy="172" r="13"/><text x="306" y="172">①</text></g>
+          <text class="flow-label" x="306" y="200">房源+星级</text>
+        </a>
+        <!-- ② 贝壳 → 官方频道：房源展示 -->
+        <path class="on" d="M500,180 Q610,150 660,108" />
+        <a href="screens/home.html"><title>② 房源展示 + 星级 + 推荐</title>
+          <g class="flow-num"><circle cx="582" cy="140" r="13"/><text x="582" y="140">②</text></g>
+          <text class="flow-label" x="582" y="168">展示+推荐</text>
+        </a>
+        <!-- ③ 租客 ↔ 平台：全程网办（双向） -->
+        <path class="on" d="M722,108 Q780,160 720,200" />
+        <path class="on" d="M720,200 Q780,260 722,108" />
+        <a href="screens/apply.html"><title>③ 全程网办 — 申请/合同/缴费/报修</title>
+          <g class="flow-num"><circle cx="780" cy="154" r="13"/><text x="780" y="154">③</text></g>
+          <text class="flow-label" x="780" y="182">全程网办</text>
+        </a>
+        <!-- ④ 贝壳 ↔ 住建：备案回流 -->
+        <path class="on" d="M420,250 Q300,300 222,290" />
+        <path class="on" d="M222,250 Q330,260 380,240" />
+        <a href="screens/contracts.html"><title>④ 合同备案回流 — 三方备案</title>
+          <g class="flow-num"><circle cx="306" cy="272" r="13"/><text x="306" y="272">④</text></g>
+          <text class="flow-label" x="306" y="300">备案回流</text>
+        </a>
+        <!-- ⑤ 贝壳 ↔ 金融：公积金/支付 -->
+        <path class="on" d="M500,220 Q610,290 660,290" />
+        <path class="on" d="M660,250 Q580,260 500,250" />
+        <a href="screens/f-housing-fund.html"><title>⑤ 公积金直付通道 — 江苏银行</title>
+          <g class="flow-num"><circle cx="582" cy="270" r="13"/><text x="582" y="270">⑤</text></g>
+          <text class="flow-label" x="582" y="298">公积金通道</text>
+        </a>
+        <!-- ⑥ 监管 ↔ 金融：三方对账 -->
+        <path class="on" d="M280,330 Q450,360 620,330" />
+        <a href="screens/f-escrow.html"><title>⑥ 三方对账 — 监管账户 + 资金留痕</title>
+          <g class="flow-num"><circle cx="450" cy="354" r="13"/><text x="450" y="354">⑥</text></g>
+          <text class="flow-label" x="450" y="378">三方对账</text>
+        </a>
+      </svg>
+
+      <div class="node op on">
+        <a class="node-link" href="screens/b-operator-console.html">
+          <div class="ico">🏢</div>
+          <div class="name">国企持有方<br/>+ 白名单运营商</div>
+          <div class="role">国企出资产 · 白名单出运营</div>
+          <span class="status">● 激活</span>
+        </a>
+      </div>
+      <div class="node plat on">
+        <a class="node-link" href="screens/p-console.html">
+          <div class="ico">⭐</div>
+          <div class="name">贝壳平台<br/>+ 官方频道</div>
+          <div class="role">数据库中台 · 用户端</div>
+          <span class="status">● 激活</span>
+        </a>
+      </div>
+      <div class="node user on">
+        <a class="node-link" href="screens/apply.html">
+          <div class="ico">👥</div>
+          <div class="name">租客 / 用户</div>
+          <div class="role">端到端全程网办</div>
+          <span class="status">● 激活</span>
+        </a>
+      </div>
+      <div class="node gov on">
+        <a class="node-link" href="screens/gov-admin.html">
+          <div class="ico">🏛</div>
+          <div class="name">政府监管端</div>
+          <div class="role">江苏住建厅</div>
+          <span class="status">● 全激活</span>
+        </a>
+      </div>
+      <div class="node bank on">
+        <a class="node-link" href="screens/f-escrow.html">
+          <div class="ico">🏦</div>
+          <div class="name">金融生态</div>
+          <div class="role">江苏银行</div>
+          <span class="status">● 全激活</span>
+        </a>
+      </div>
+    </div>
+    <p style="font-size:12px; color:var(--muted); text-align:center; margin:-12px 0 24px;">
+      点击 ① ② ③ ④ ⑤ ⑥ 跳转到核心实现页 · V3 完成「政府备案 ↔ 银行资金 ↔ 平台留痕」三方对账闭环
+    </p>
+
+    <div class="quad-grid">
+      <div class="quad-card gov">
+        <div class="qh">
+          <div class="icon">🏛</div>
+          <div>
+            <div class="name">江苏住建厅</div>
+            <div class="role">政策引导 · 监督管理</div>
+          </div>
+        </div>
+        <div class="qrow"><span class="lbl">动力</span><div class="txt">民生指标 · 零财政启动 · 政绩样板</div></div>
+        <div class="qrow"><span class="lbl">贡献</span><div class="txt">政策/标准/白名单/监督 + 合同备案 + 资金留痕监管</div></div>
+        <div class="qrow"><span class="lbl">收获</span><div class="txt">试点验证后 → 全省一张网 · 江苏样板（推广目标，非时间承诺）</div></div>
+      </div>
+
+      <div class="quad-card bank">
+        <div class="qh">
+          <div class="icon">🏦</div>
+          <div>
+            <div class="name">江苏银行</div>
+            <div class="role">金融赋能 · 数据对接</div>
+          </div>
+        </div>
+        <div class="qrow"><span class="lbl">动力</span><div class="txt">资金沉淀 · 普惠指标 · 场景金融 · REITs 退出</div></div>
+        <div class="qrow"><span class="lbl">贡献</span><div class="txt">监管账户 + 公积金直付 + 在线支付 + 补贴 + 租住消费金融</div></div>
+        <div class="qrow"><span class="lbl">收获</span><div class="txt">资金沉淀 · 公积金使用率 · 信用体系</div></div>
+      </div>
+
+      <div class="quad-card plat">
+        <div class="qh">
+          <div class="icon">⭐</div>
+          <div>
+            <div class="name">贝壳</div>
+            <div class="role">住房运营能力提供者</div>
+          </div>
+        </div>
+        <div class="qrow"><span class="lbl">动力</span><div class="txt">承建升级 · 商业回报 · 数据资产</div></div>
+        <div class="qrow"><span class="lbl">贡献</span><div class="txt">统一入口 + 数据库 + 运营 + 标准 + 全程网办</div></div>
+        <div class="qrow"><span class="lbl">收获</span><div class="txt">服务费 6–8% · 品牌跃迁 · 数据资产沉淀</div></div>
+      </div>
+
+      <div class="quad-card op">
+        <div class="qh">
+          <div class="icon">🏢</div>
+          <div>
+            <div class="name">国企持有方 + 白名单运营商</div>
+            <div class="role">国企出资产（资管视角）· 白名单出运营</div>
+          </div>
+        </div>
+        <div class="qrow"><span class="lbl">动力</span><div class="txt">国企：空置降低·估值提升·运营外包减负；运营商：流量获客·数字化降本</div></div>
+        <div class="qrow"><span class="lbl">贡献</span><div class="txt">国企：持有产权·委托运营·监督 SLA；运营商：日常派单/上架/管家/工单 + 电签/缴费/报修 接入</div></div>
+        <div class="qrow"><span class="lbl">收获</span><div class="txt">国企：空置率↓·资产增值·REITs 通道；运营商：去化效率↑·同业开放接入</div></div>
+      </div>
+    </div>
+
+    <!-- 已实现页面 · 与 4 方贡献卡 1:1 对齐 -->
+    <div class="impl-aligned cols-4">
+      <div class="impl-banner">📎 V3 已实现页面（与上方 4 方贡献卡对齐）</div>
+      <div class="col">
+        <div class="col-head">🏛 政府方（全激活）</div>
+        <a href="screens/g-whitelist-operator.html" class="impl-pill">运营白名单<span class="file">g-whitelist-operator.html</span></a>
+        <a href="screens/g-whitelist-service.html" class="impl-pill">服务者白名单<span class="file">g-whitelist-service.html</span></a>
+        <a href="screens/g-whitelist-supplier.html" class="impl-pill">供应商白名单<span class="file">g-whitelist-supplier.html</span></a>
+        <a href="screens/g-inspection.html" class="impl-pill">监管抽查<span class="file">g-inspection.html</span></a>
+        <a href="screens/g-complaint.html" class="impl-pill">投诉处置<span class="file">g-complaint.html</span></a>
+        <a href="screens/g-rent-alert.html" class="impl-pill">租金合规预警<span class="file">g-rent-alert.html</span></a>
+        <a href="screens/g-dashboard.html" class="impl-pill">监管大屏<span class="file">g-dashboard.html</span></a>
+      </div>
+      <div class="col">
+        <div class="col-head">🏦 金融方（全激活）</div>
+        <a href="screens/f-escrow.html" class="impl-pill">监管账户对账<span class="file">f-escrow.html</span></a>
+        <a href="screens/f-housing-fund.html" class="impl-pill">公积金直付通道<span class="file">f-housing-fund.html</span></a>
+        <a href="screens/f-treasury.html" class="impl-pill">资金流水大盘<span class="file">f-treasury.html</span></a>
+      </div>
+      <div class="col">
+        <div class="col-head">⭐ 贝壳承建</div>
+        <a href="screens/apply.html" class="impl-pill">资格自检·申请<span class="file">apply.html</span></a>
+        <a href="screens/my-applications.html" class="impl-pill">我的申请·进度<span class="file">my-applications.html</span></a>
+        <a href="screens/contracts.html" class="impl-pill">电子合同·三方备案<span class="file">contracts.html</span></a>
+        <a href="screens/payment.html" class="impl-pill">在线缴费<span class="file">payment.html</span></a>
+        <a href="screens/repair.html" class="impl-pill">报修服务<span class="file">repair.html</span></a>
+        <a href="screens/c-housing-fund.html" class="impl-pill">租客·公积金直付<span class="file">c-housing-fund.html</span></a>
+        <a href="screens/c-compare.html" class="impl-pill">房源对比<span class="file">c-compare.html</span></a>
+        <a href="screens/p-transaction.html" class="impl-pill">派单交易<span class="file">p-transaction.html</span></a>
+        <a href="screens/p-workflow.html" class="impl-pill">工作流引擎<span class="file">p-workflow.html</span></a>
+      </div>
+      <div class="col">
+        <div class="col-head">🏢 国企持有方 + 白名单运营商</div>
+        <a href="screens/b-listing-mgmt.html" class="impl-pill">房源上下架<span class="file">b-listing-mgmt.html</span></a>
+        <a href="screens/b-occupancy.html" class="impl-pill">工单与入住率<span class="file">b-occupancy.html</span></a>
+        <a href="screens/b-dispatch-board.html" class="impl-pill">派单看板<span class="file">b-dispatch-board.html</span></a>
+        <a href="screens/b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
+        <a href="screens/landlord.html" class="impl-pill">业主端·托管<span class="file">landlord.html</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="scope-banner">
+    <div>
+      <div class="label">本版本范围</div>
+      <h2>展示 + 标准体系 + 完整交易闭环</h2>
+      <p>在版本 2 基础上叠加「资格自检 → 申请提交 → 进度追踪 → 电子签约 → 在线缴费 → 入住报修」全流程，与贝壳支付体系、电子签平台、住建局备案系统打通，实现端到端线上办理。</p>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="feature-item">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h4>政府认证</h4>
+      <p>住建局认证 · 租金上限 ≤ 市场价 90%</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 14l2 2 4-4"/></svg></div>
+      <h4>全程网办</h4>
+      <p>资格核验 → 选房 → 签约备案 → 支付</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15h4l2-8 4 14 2-8h4"/></svg></div>
+      <h4>服务保障</h4>
+      <p>管家带看 · 电子合同 · 在线报修 · 公积金直付</p>
+    </div>
+    <div class="feature-item">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+      <h4>标准体系</h4>
+      <p>运营 / 服务者 / 供应商 / 星级标准公示</p>
+    </div>
+  </div>
+
+  <!-- e2e flow -->
+  <div class="flow">
+    <h3>端到端交易流程</h3>
+    <div class="flow-track">
+      <div class="flow-step">浏览房源</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">资格自检</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">材料上传</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">申请审核</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">电子签约</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">在线缴费</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">入住报修</div>
+    </div>
+  </div>
+
+  <h2 class="section-title">核心展示页面 <span class="badge">继承自版本 1</span></h2>
+  <p class="section-desc">房源、详情、政策、个人中心</p>
+  <div class="screen-grid">
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: var(--accent);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="preview-label"><h3>频道首页</h3><div class="sub">screens/home.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">房源列表</span>
+        <span class="mini-tag">3 张幻灯</span>
+        <span class="mini-tag">申请流程</span>
+        <span class="mini-tag">标准体系</span>
+      </div>
+      <div class="preview-desc">幻灯片头图 · 完整入口：申请、政策、合同、缴费、报修</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/home.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: color-mix(in oklab, var(--accent) 70%, black);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--accent) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </div>
+        <div class="preview-label"><h3>房源详情</h3><div class="sub">screens/detail.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">实景图</span>
+        <span class="mini-tag">价格对比</span>
+        <span class="mini-tag">配套信息</span>
+        <span class="mini-tag">立即申请</span>
+      </div>
+      <div class="preview-desc">市场价 vs 保租价对比 · 星级评价 · 基础+智能配套 · 立即申请入口直通资格自检</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/detail.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: color-mix(in oklab, var(--accent) 50%, black);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--accent) 10%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+        </div>
+        <div class="preview-label"><h3>政策资讯</h3><div class="sub">screens/policy.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">最新政策</span>
+        <span class="mini-tag">申请指南</span>
+        <span class="mini-tag">FAQ</span>
+        <span class="mini-tag">标准体系</span>
+      </div>
+      <div class="preview-desc">4 个标签页 · 文章列表 · 折叠 FAQ · 标准体系四入口</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/policy.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: var(--accent);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="preview-label"><h3>个人中心</h3><div class="sub">screens/profile.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">我的服务</span>
+        <span class="mini-tag">合同</span>
+        <span class="mini-tag">缴费</span>
+        <span class="mini-tag">报修</span>
+      </div>
+      <div class="preview-desc">用户信息 · 4 项服务入口 · 申请记录 · 收藏房源 · 设置</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/profile.html">打开页面</a></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">好房子标准体系 <span class="badge">继承自版本 2</span></h2>
+  <p class="section-desc">运营 / 服务者 / 供应商 公示</p>
+  <div class="screen-grid">
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: var(--accent);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: var(--accent-soft);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div class="preview-label"><h3>运营主体白名单</h3><div class="sub">screens/operators.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">6 家机构</span>
+        <span class="mini-tag">资质筛选</span>
+        <span class="mini-tag">年度考核</span>
+      </div>
+      <div class="preview-desc">审核认可的运营机构 · 资质等级 · 管理房源 · 服务范围</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/operators.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: var(--success);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        </div>
+        <div class="preview-label"><h3>服务者认证</h3><div class="sub">screens/service-workers.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">24 人认证</span>
+        <span class="mini-tag">数据看板</span>
+        <span class="mini-tag">持证上岗</span>
+      </div>
+      <div class="preview-desc">认证数据看板 · 运营管家/维修技师/客服专员 · 按评分排序</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/service-workers.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="preview-bar" style="background: color-mix(in oklab, var(--accent) 50%, black);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--accent) 10%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <div class="preview-label"><h3>合格物资供应商公示</h3><div class="sub">screens/suppliers.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">家电供应</span>
+        <span class="mini-tag">装修施工</span>
+        <span class="mini-tag">物业服务</span>
+      </div>
+      <div class="preview-desc">3 个品类 · 6 家供应商 · 资质/合同期/售后 · 准入标准</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/suppliers.html">打开页面</a></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">交易闭环 <span class="badge new">本版本新增</span></h2>
+  <p class="section-desc">5 个交易页面 — 申请 · 我的申请 · 合同 · 缴费 · 报修</p>
+  <div class="screen-grid">
+
+    <div class="screen-card">
+      <div class="new-pin">新增</div>
+      <div class="preview-bar" style="background: var(--success);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><polyline points="9 14l2 2 4-4"/></svg>
+        </div>
+        <div class="preview-label"><h3>申请 / 资格</h3><div class="sub">screens/apply.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">资格自检</span>
+        <span class="mini-tag">材料上传</span>
+        <span class="mini-tag">确认提交</span>
+      </div>
+      <div class="preview-desc">三步流程 · 社保/户籍/收入自动校验 · 材料预览 · 提交确认</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/apply.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="new-pin">新增</div>
+      <div class="preview-bar" style="background: var(--success);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--success) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+        </div>
+        <div class="preview-label"><h3>我的申请 / 进度</h3><div class="sub">screens/my-applications.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">状态看板</span>
+        <span class="mini-tag">签约入口</span>
+        <span class="mini-tag">进度追踪</span>
+      </div>
+      <div class="preview-desc">状态筛选 · 进度条 · 待签约/已入住卡片 · 缴费/报修快捷入口</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/my-applications.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="new-pin">新增</div>
+      <div class="preview-bar" style="background: color-mix(in oklab, var(--accent) 60%, black);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--accent) 10%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div class="preview-label"><h3>电子合同</h3><div class="sub">screens/contracts.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">待签署</span>
+        <span class="mini-tag">已签署</span>
+        <span class="mini-tag">合同下载</span>
+        <span class="mini-tag">三方备案</span>
+      </div>
+      <div class="preview-desc">3 个标签页 · 签署弹窗 · 到期提醒 · 合同下载 · 电子签流程</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/contracts.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="new-pin">新增</div>
+      <div class="preview-bar" style="background: var(--warn);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--warn) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </div>
+        <div class="preview-label"><h3>在线缴费</h3><div class="sub">screens/payment.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">租金缴纳</span>
+        <span class="mini-tag">微信/支付宝</span>
+        <span class="mini-tag">公积金直付</span>
+        <span class="mini-tag">自动代扣</span>
+      </div>
+      <div class="preview-desc">本月待缴 · 多支付方式 · 多房源选择 · 自动代扣开关 · 历史记录</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/payment.html">打开页面</a></div>
+    </div>
+
+    <div class="screen-card">
+      <div class="new-pin">新增</div>
+      <div class="preview-bar" style="background: color-mix(in oklab, var(--accent) 50%, black);"></div>
+      <div class="preview-strip">
+        <div class="preview-icon" style="background: color-mix(in oklab, var(--warn) 12%, transparent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="color-mix(in oklab, var(--warn) 70%, black)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <div class="preview-label"><h3>报修服务</h3><div class="sub">screens/repair.html</div></div>
+      </div>
+      <div class="preview-pages">
+        <span class="mini-tag">我要报修</span>
+        <span class="mini-tag">报修记录</span>
+        <span class="mini-tag">进度追踪</span>
+      </div>
+      <div class="preview-desc">分类选择 · 描述/照片上传 · 联系信息 · 进度追踪 · 历史记录</div>
+      <div class="preview-actions"><a class="btn-primary" href="screens/repair.html">打开页面</a></div>
+    </div>
+  </div>
+
+  <div class="data-card">
+    <h3>版本 3 · 核心摘要</h3>
+    <div class="data-grid">
+      <div><strong>定位</strong>端到端一站式办理 · 完整交易闭环</div>
+      <div><strong>页面数</strong>12 个（4 核心 + 3 标准体系 + 5 交易）</div>
+      <div><strong>上线周期</strong>预估 14~18 周（含电子签 / 支付 / 备案对接）</div>
+      <div><strong>合规要求</strong>电子合同备案 · 支付牌照 · 个人信息保护</div>
+      <div><strong>系统依赖</strong>住建局备案、贝壳支付、电子签平台、公积金直付通道</div>
+      <div><strong>商业价值</strong>服务费 8%（低于行业）· 用户留存 · 数据闭环</div>
+    </div>
+  </div>
+
+
+  <div class="footer">
+    <p>当前查看：<strong>阶段三方案</strong> · 切换 <a href="baozufang-overview-v1-basic.html">阶段一</a> · <a href="baozufang-overview-v2-standard.html">阶段二</a></p>
+  </div>
+</div>
+</body>
+</html>

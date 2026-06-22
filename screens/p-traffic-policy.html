@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>流量倾斜策略 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --gold: #ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;}
+    .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);}
+    .crumb b{color:var(--fg); font-weight:600; font-size:14px; margin-right:2px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .content{padding:18px 28px;}
+    .h-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+    .h-row h1{font-size:22px; font-weight:600; margin:0;}
+    .h-row .sub{font-size:12px; color:var(--muted); margin-top:4px;}
+
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px; font-weight:500;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* level weights */
+    .wgt-list{display:flex; flex-direction:column; gap:10px;}
+    .wgt{display:grid; grid-template-columns:38px 1fr 80px 50px; gap:10px; align-items:center;}
+    .wgt .lv{width:38px; height:38px; border-radius:8px; display:grid; place-items:center; font-size:13px; font-weight:700; color:white;}
+    .wgt.l5 .lv{background:linear-gradient(135deg, #ca8a04, #fbbf24);}
+    .wgt.l4 .lv{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .wgt.l3 .lv{background:linear-gradient(135deg, #047857, #10b981);}
+    .wgt.l2 .lv{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .wgt.l1 .lv{background:linear-gradient(135deg, #92400e, #d97706);}
+    .wgt.l0 .lv{background:linear-gradient(135deg, #475569, #64748b);}
+    .wgt .lname{font-size:13px; font-weight:600;}
+    .wgt .lsub{font-size:11px; color:var(--muted);}
+    .wgt .slider{position:relative; height:24px;}
+    .wgt .track{position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); height:6px; background:var(--line); border-radius:3px;}
+    .wgt .fill{height:100%; border-radius:3px;}
+    .wgt.l5 .fill{background:linear-gradient(90deg, #ca8a04, #fbbf24);}
+    .wgt.l4 .fill{background:linear-gradient(90deg, #1e40af, #3b82f6);}
+    .wgt.l3 .fill{background:linear-gradient(90deg, #047857, #10b981);}
+    .wgt.l2 .fill{background:#9ca3af;}
+    .wgt.l1 .fill{background:#d97706;}
+    .wgt.l0 .fill{background:#64748b;}
+    .wgt .knob{position:absolute; top:50%; transform:translate(-50%, -50%); width:14px; height:14px; border-radius:50%; background:var(--surface); border:2px solid var(--accent); cursor:pointer; z-index:2;}
+    .wgt .x{font-family:var(--mono); font-size:14px; font-weight:700; text-align:right;}
+    .wgt .pct{font-size:11px; color:var(--muted); text-align:right;}
+
+    /* policies switches */
+    .pol-list{display:flex; flex-direction:column; gap:10px;}
+    .pol{display:grid; grid-template-columns:1fr auto; gap:10px; padding:14px; background:var(--line); border-radius:6px; align-items:center;}
+    .pol .nm{font-size:13.5px; font-weight:600;}
+    .pol .desc{font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5;}
+    .pol .switch{width:36px; height:20px; background:var(--border); border-radius:10px; position:relative; cursor:pointer;}
+    .pol .switch::after{content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; background:white; border-radius:50%; transition:0.2s;}
+    .pol.on .switch{background:var(--success);}
+    .pol.on .switch::after{left:18px;}
+
+    /* heatmap */
+    .heatmap{display:grid; grid-template-columns:repeat(11, 1fr); gap:3px;}
+    .heat-cell{aspect-ratio:1.4; border-radius:3px; display:grid; place-items:center; font-size:10px; cursor:pointer; color:white; font-weight:600;}
+    .heat-cell.lvl1{background:color-mix(in oklab, var(--accent) 25%, transparent); color:var(--accent);}
+    .heat-cell.lvl2{background:color-mix(in oklab, var(--accent) 50%, transparent);}
+    .heat-cell.lvl3{background:color-mix(in oklab, var(--accent) 75%, transparent);}
+    .heat-cell.lvl4{background:var(--accent);}
+    .heat-cell.lvl5{background:linear-gradient(135deg, var(--accent), #a855f7);}
+    .heat-labels{display:grid; grid-template-columns:repeat(11, 1fr); gap:3px; margin-top:6px; font-size:10px; color:var(--muted); text-align:center;}
+
+    /* AB test table */
+    .ab-table{font-size:12px;}
+    .ab-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:10px 0; border-bottom:1px dashed var(--line); align-items:center;}
+    .ab-row:last-child{border-bottom:0;}
+    .ab-row .nm{font-weight:600; min-width:0; font-size:12.5px;}
+    .ab-row .meta{font-size:11px; color:var(--muted);}
+    .ab-row .pct{font-family:var(--mono); font-weight:700; text-align:right; min-width:50px;}
+    .ab-row .pct.up{color:var(--success);}
+    .ab-row .pct.dn{color:var(--danger);}
+    .ab-row .pct.flat{color:var(--muted);}
+    .ab-row .state{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .ab-row .state.run{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .ab-row .state.pend{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .ab-row .state.done{background:var(--line); color:var(--muted);}
+
+    /* trend chart */
+    .chart{display:flex; align-items:flex-end; gap:3px; height:120px; padding:8px 0;}
+    .chart .b{flex:1; background:linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 30%, transparent)); border-radius:2px 2px 0 0; min-height:8px; position:relative;}
+    .chart-x{display:flex; gap:3px; font-size:10px; color:var(--muted); padding-top:4px;}
+    .chart-x span{flex:1; text-align:center;}
+
+    /* fairness gauge */
+    .fair{display:flex; align-items:center; gap:12px; padding:14px; background:color-mix(in oklab, var(--success) 6%, transparent); border-left:3px solid var(--success); border-radius:5px; margin-top:14px;}
+    .fair .ic{font-size:28px;}
+    .fair .ctx{font-size:12px;}
+    .fair .ctx b{display:block; font-size:13px; margin-bottom:3px; color:var(--success);}
+
+    @media (max-width: 1100px){
+      .grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="traffic-policy"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>流量倾斜策略</b></div>
+      <div class="top-actions">
+        <button class="btn">导出策略</button>
+        <button class="btn">回滚</button>
+        <button class="btn pri">发布</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <div class="h-row">
+        <div>
+          <h1>流量倾斜策略</h1>
+          <div class="sub">服务者推荐 / 派单分配 · 权重 + 扶持 + 区域调控 + A/B 实验</div>
+        </div>
+      </div>
+
+      <div class="grid">
+
+        <!-- 等级权重 -->
+        <div class="card">
+          <h3>分级流量权重 <span class="pill">主策略</span> <span class="extra">L0–L7 · 7 天命中 78%</span></h3>
+          <div class="wgt-list">
+            <div class="wgt l5">
+              <div class="lv">L7</div>
+              <div><div class="lname">区域级专家</div><div class="lsub">行业标杆 · 不参与日常派单</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:0%;"></div></div><div class="knob" style="left:0%;"></div></div>
+              <div><div class="x">×0</div><div class="pct">独立轨道</div></div>
+            </div>
+            <div class="wgt l5">
+              <div class="lv">L6</div>
+              <div><div class="lname">平台认证讲师</div><div class="lsub">面向培训场景</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:0%;"></div></div><div class="knob" style="left:0%;"></div></div>
+              <div><div class="x">×0</div><div class="pct">独立轨道</div></div>
+            </div>
+            <div class="wgt l5">
+              <div class="lv">L5</div>
+              <div><div class="lname">服务商负责人</div><div class="lsub">面向运营 · 不抢单</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:0%;"></div></div><div class="knob" style="left:0%;"></div></div>
+              <div><div class="x">×0</div><div class="pct">独立轨道</div></div>
+            </div>
+            <div class="wgt l4">
+              <div class="lv">L4</div>
+              <div><div class="lname">督导 / 店长</div><div class="lsub">优先派单 + 团队工单</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:80%;"></div></div><div class="knob" style="left:80%;"></div></div>
+              <div><div class="x">×2.5</div><div class="pct">原 ×3</div></div>
+            </div>
+            <div class="wgt l3">
+              <div class="lv">L3</div>
+              <div><div class="lname">高级管家</div><div class="lsub">复杂场景 + 复购绑定</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:60%;"></div></div><div class="knob" style="left:60%;"></div></div>
+              <div><div class="x">×2.0</div><div class="pct">不变</div></div>
+            </div>
+            <div class="wgt l2">
+              <div class="lv">L2</div>
+              <div><div class="lname">独立服务</div><div class="lsub">基础流量基线</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:35%;"></div></div><div class="knob" style="left:35%;"></div></div>
+              <div><div class="x">×1.0</div><div class="pct">基线</div></div>
+            </div>
+            <div class="wgt l1">
+              <div class="lv">L1</div>
+              <div><div class="lname">基础认证</div><div class="lsub">仅师傅带单 · 扶持</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:25%;"></div></div><div class="knob" style="left:25%;"></div></div>
+              <div><div class="x">×0.8</div><div class="pct">扶持中</div></div>
+            </div>
+            <div class="wgt l0">
+              <div class="lv">L0</div>
+              <div><div class="lname">注册准入</div><div class="lsub">不参与派单</div></div>
+              <div class="slider"><div class="track"><div class="fill" style="width:0%;"></div></div><div class="knob" style="left:0%;"></div></div>
+              <div><div class="x">×0</div><div class="pct">隔离</div></div>
+            </div>
+          </div>
+          <div class="fair">
+            <div class="ic">⚖</div>
+            <div class="ctx">
+              <b>公平性检测</b>
+              基尼系数 0.38（健康区间 &lt; 0.5）。L5 接单占比从 28% → 22%，反垄断生效。
+            </div>
+          </div>
+        </div>
+
+        <!-- 扶持策略 -->
+        <div class="card">
+          <h3>子策略开关 <span class="pill">6 项</span></h3>
+          <div class="pol-list">
+            <div class="pol on">
+              <div>
+                <div class="nm">新人扶持池</div>
+                <div class="desc">L2 转 L3 后 14 天内额外 +30% 派单机会，但限低难度</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+            <div class="pol on">
+              <div>
+                <div class="nm">客户复购绑定</div>
+                <div class="desc">客户 30 天内指定原服务者，绕过权重排序</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+            <div class="pol on">
+              <div>
+                <div class="nm">距离硬约束</div>
+                <div class="desc">≥ 5 km 不派单，无论等级</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+            <div class="pol">
+              <div>
+                <div class="nm">高峰时段补贴</div>
+                <div class="desc">周末 / 假期，L2-L3 权重短时 ×1.3</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+            <div class="pol on">
+              <div>
+                <div class="nm">投诉冷静期</div>
+                <div class="desc">中优以上投诉处置中，自动隔离 24h</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+            <div class="pol">
+              <div>
+                <div class="nm">区域反垄断</div>
+                <div class="desc">单点驻店连续 90 天，强制轮岗</div>
+              </div>
+              <div class="switch"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 区域调控 -->
+        <div class="card">
+          <h3>区域调控热力 <span class="pill">11 区</span> <span class="extra">数字 = 等级加权倍率</span></h3>
+          <div class="heatmap">
+            <div class="heat-cell lvl1">江宁<br>×0.9</div>
+            <div class="heat-cell lvl3">建邺<br>×1.2</div>
+            <div class="heat-cell lvl4">鼓楼<br>×1.5</div>
+            <div class="heat-cell lvl3">秦淮<br>×1.2</div>
+            <div class="heat-cell lvl5">玄武<br>×1.8</div>
+            <div class="heat-cell lvl1">栖霞<br>×0.8</div>
+            <div class="heat-cell lvl2">江北<br>×1.0</div>
+            <div class="heat-cell lvl2">雨花<br>×1.0</div>
+            <div class="heat-cell lvl1">浦口<br>×0.9</div>
+            <div class="heat-cell lvl1">六合<br>×0.9</div>
+            <div class="heat-cell lvl1">溧水<br>×0.8</div>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:14px; padding:10px 12px; background:var(--line); border-radius:5px; line-height:1.6;">
+            <b>规则：</b>缺人区域（玄武、鼓楼）适度抬高吸引服务者跨区；过密区域（栖霞、溧水）降权防内卷。指标：覆盖率、平均响应时间、跨区里程。
+          </div>
+        </div>
+
+        <!-- AB 实验 -->
+        <div class="card">
+          <h3>A/B 实验 <span class="pill">3 in flight</span></h3>
+          <div class="ab-table">
+            <div class="ab-row">
+              <div>
+                <div class="nm">EXP-018 · L5 权重 ×3 vs ×2.5</div>
+                <div class="meta">5 月 6 日 · 14 天 · 全市 · 4,200 候选</div>
+              </div>
+              <div></div>
+              <div class="pct up">+2.4%</div>
+              <div class="meta">完结率</div>
+              <span class="state run">RUN</span>
+            </div>
+            <div class="ab-row">
+              <div>
+                <div class="nm">EXP-019 · 新人扶持 14d → 21d</div>
+                <div class="meta">5 月 22 日 · 28 天 · 江宁/建邺 · 286 新人</div>
+              </div>
+              <div></div>
+              <div class="pct up">+11%</div>
+              <div class="meta">L3 通过率</div>
+              <span class="state run">RUN</span>
+            </div>
+            <div class="ab-row">
+              <div>
+                <div class="nm">EXP-020 · 距离 5km → 3km 硬约束</div>
+                <div class="meta">5 月 28 日 · 14 天 · 玄武 / 鼓楼 · 1,200 单</div>
+              </div>
+              <div></div>
+              <div class="pct dn">−8%</div>
+              <div class="meta">客户响应</div>
+              <span class="state pend">需决</span>
+            </div>
+            <div class="ab-row">
+              <div>
+                <div class="nm">EXP-017 · 高峰 ×1.3 补贴（已完结）</div>
+                <div class="meta">4 月 12 日 · 21 天</div>
+              </div>
+              <div></div>
+              <div class="pct flat">+0.3%</div>
+              <div class="meta">客评</div>
+              <span class="state done">DONE</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- trend -->
+      <div class="card">
+        <h3>策略命中率 · 30 天</h3>
+        <div class="chart">
+          <div class="b" style="height:60%;"></div>
+          <div class="b" style="height:62%;"></div>
+          <div class="b" style="height:64%;"></div>
+          <div class="b" style="height:65%;"></div>
+          <div class="b" style="height:68%;"></div>
+          <div class="b" style="height:70%;"></div>
+          <div class="b" style="height:69%;"></div>
+          <div class="b" style="height:71%;"></div>
+          <div class="b" style="height:73%;"></div>
+          <div class="b" style="height:74%;"></div>
+          <div class="b" style="height:74%;"></div>
+          <div class="b" style="height:73%;"></div>
+          <div class="b" style="height:72%;"></div>
+          <div class="b" style="height:75%;"></div>
+          <div class="b" style="height:76%;"></div>
+          <div class="b" style="height:78%;"></div>
+          <div class="b" style="height:77%;"></div>
+          <div class="b" style="height:78%;"></div>
+          <div class="b" style="height:80%;"></div>
+          <div class="b" style="height:81%;"></div>
+          <div class="b" style="height:80%;"></div>
+          <div class="b" style="height:82%;"></div>
+          <div class="b" style="height:84%;"></div>
+          <div class="b" style="height:82%;"></div>
+          <div class="b" style="height:83%;"></div>
+          <div class="b" style="height:85%;"></div>
+          <div class="b" style="height:86%;"></div>
+          <div class="b" style="height:88%;"></div>
+          <div class="b" style="height:86%;"></div>
+          <div class="b" style="height:78%;"></div>
+        </div>
+        <div class="chart-x">
+          <span>D-30</span><span></span><span></span><span></span><span>D-25</span><span></span><span></span><span></span><span>D-20</span><span></span><span></span><span></span><span>D-15</span><span></span><span></span><span></span><span>D-10</span><span></span><span></span><span></span><span>D-5</span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span>今日</span>
+        </div>
+        <div style="font-size:11px; color:var(--muted); margin-top:10px; padding-top:10px; border-top:1px solid var(--line); display:flex; justify-content:space-between;">
+          <span>主策略命中率 78%（健康区间）</span>
+          <span style="color:var(--success);">↑ 18 pp 同比</span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.pol .switch').forEach(s => s.addEventListener('click', () => {
+    s.closest('.pol').classList.toggle('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>扫码验真 · 陈*国 L4 · 江苏保租房公示门户</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0;
+      --accent: #115e59; --accent-2: #14b8a6;
+      --gold: #ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.55;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .gov-strip{background:linear-gradient(90deg, #064e3b, #115e59); color:white; padding:8px 24px; font-size:11.5px; display:flex; align-items:center; gap:12px;}
+    .gov-strip .spacer{flex:1;}
+
+    .navbar{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 24px; display:flex; align-items:center; gap:18px;}
+    .brand{display:flex; align-items:center; gap:10px;}
+    .brand-mark{width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; color:white; font-weight:700;}
+    .brand-text .nm{font-size:14px; font-weight:600; color:var(--accent);}
+    .brand-text .sub{font-size:11px; color:var(--muted);}
+    .back{margin-left:auto; padding:6px 14px; border-radius:6px; font-size:12.5px; color:var(--muted); border:1px solid var(--border); background:var(--surface);}
+
+    /* status hero - 真伪验证 banner */
+    .verify-banner{background:linear-gradient(135deg, #064e3b 0%, #115e59 60%, #14b8a6 100%); color:white; padding:36px 24px; position:relative; overflow:hidden;}
+    .verify-banner::after{content:'✓'; position:absolute; right:-30px; top:50%; transform:translateY(-50%); font-size:280px; opacity:0.06; font-weight:900;}
+    .vb-inner{max-width:920px; margin:0 auto; display:flex; align-items:center; gap:22px; position:relative;}
+    .check-circle{width:80px; height:80px; border-radius:50%; background:rgba(255,255,255,0.15); border:3px solid white; display:grid; place-items:center; font-size:42px; flex-shrink:0;}
+    .vb-text h1{margin:0; font-size:26px; font-weight:700;}
+    .vb-text .seal{display:inline-flex; align-items:center; gap:6px; padding:4px 12px; background:rgba(255,255,255,0.18); border-radius:999px; font-size:12px; font-weight:600; margin-top:6px;}
+    .vb-text .ts{font-size:12px; opacity:0.85; margin-top:8px;}
+
+    .container{max-width:920px; margin:-20px auto 36px; padding:0 24px; position:relative; z-index:2;}
+
+    .row2{display:grid; grid-template-columns:1.4fr 1fr; gap:16px;}
+    .panel{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 24px; box-shadow:0 4px 12px rgba(0,0,0,0.04);}
+    .panel h3{font-size:13px; font-weight:600; margin:0 0 14px; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase;}
+
+    /* main identity card */
+    .id-card{padding:24px 26px;}
+    .id-top{display:flex; gap:18px; align-items:center; padding-bottom:18px; border-bottom:1px solid var(--border);}
+    .id-av{width:80px; height:80px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); display:grid; place-items:center; color:white; font-size:32px; font-weight:700; flex-shrink:0; position:relative;}
+    .id-av .lv-badge{position:absolute; bottom:-4px; right:-4px; padding:4px 8px; background:linear-gradient(135deg, #1e40af, #3b82f6); color:white; border-radius:6px; font-size:11px; font-weight:700; border:3px solid white;}
+    .id-info .nm{font-size:24px; font-weight:700;}
+    .id-info .nm .public{font-size:11px; color:var(--muted); font-weight:400; margin-left:8px;}
+    .id-info .meta{display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;}
+    .id-info .meta .p{font-size:11px; padding:3px 10px; background:color-mix(in oklab, var(--accent) 8%, transparent); color:var(--accent); border-radius:999px; font-weight:500;}
+    .id-info .meta .p.gold{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+
+    .id-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding-top:18px;}
+    .id-cell{padding:8px 0;}
+    .id-cell .l{font-size:11px; color:var(--muted);}
+    .id-cell .v{font-size:14px; font-weight:600; margin-top:2px; font-family:var(--mono);}
+    .id-cell .v.normal{font-family:inherit;}
+
+    /* level definition box */
+    .lv-box{margin-top:18px; padding:14px 16px; background:color-mix(in oklab, var(--accent) 5%, transparent); border-left:3px solid var(--accent); border-radius:6px;}
+    .lv-box .head{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+    .lv-box .head .lv-tag{font-size:11px; padding:2px 8px; background:linear-gradient(135deg, #1e40af, #3b82f6); color:white; border-radius:4px; font-weight:700;}
+    .lv-box .head .nm{font-weight:600; font-size:14px; color:var(--accent);}
+    .lv-box .desc{font-size:12px; color:var(--muted); line-height:1.6;}
+
+    /* skills */
+    .skill-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-top:14px;}
+    .skill{padding:8px 12px; background:var(--bg); border-radius:6px; font-size:12.5px; display:flex; align-items:center; gap:6px;}
+    .skill .ic{font-size:14px; color:var(--accent);}
+    .skill .nm{flex:1;}
+    .skill .star{color:var(--gold); font-size:10px; letter-spacing:1px;}
+    .skill .star .e{color:var(--border);}
+
+    /* credit score gauge */
+    .credit-ring{display:flex; align-items:center; gap:18px;}
+    .ring{width:120px; height:120px; border-radius:50%; background:conic-gradient(var(--success) 0% 94.6%, var(--bg) 94.6% 100%); display:grid; place-items:center; position:relative; flex-shrink:0;}
+    .ring::before{content:''; position:absolute; inset:14px; background:var(--surface); border-radius:50%;}
+    .ring-text{position:relative; text-align:center; z-index:1;}
+    .ring-text .v{font-size:28px; font-weight:800; color:var(--success); font-family:var(--mono);}
+    .ring-text .l{font-size:11px; color:var(--muted);}
+    .credit-info{font-size:12.5px; flex:1;}
+    .credit-info .row{display:flex; justify-content:space-between; padding:4px 0;}
+    .credit-info .l{color:var(--muted);}
+    .credit-info .v{font-weight:600;}
+    .credit-info .v.ok{color:var(--success);}
+    .credit-info .v.warn{color:var(--warn);}
+
+    /* blockchain card */
+    .chain-card{background:linear-gradient(135deg, #fef3c7, #fde68a); border:1px solid #fcd34d; padding:18px 20px; border-radius:10px;}
+    .chain-card .head{display:flex; align-items:center; gap:8px; margin-bottom:12px;}
+    .chain-card .head .ic{font-size:20px;}
+    .chain-card .head .nm{font-size:14px; font-weight:700; color:#78350f;}
+    .chain-card .row{display:flex; justify-content:space-between; padding:6px 0; font-size:12px; border-bottom:1px dashed #fcd34d;}
+    .chain-card .row:last-child{border-bottom:0;}
+    .chain-card .l{color:#92400e;}
+    .chain-card .v{font-family:var(--mono); font-weight:600; color:#78350f; max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+    /* timeline */
+    .tl{position:relative; padding-left:20px;}
+    .tl-item{position:relative; padding-bottom:14px; border-left:2px solid var(--border); padding-left:18px; margin-left:-1px;}
+    .tl-item:last-child{padding-bottom:0;}
+    .tl-item::before{content:''; position:absolute; left:-7px; top:2px; width:12px; height:12px; border-radius:50%; background:var(--surface); border:2px solid var(--accent);}
+    .tl-item.gold::before{border-color:var(--gold);}
+    .tl-item.warn::before{border-color:var(--warn);}
+    .tl-item .nm{font-size:13px; font-weight:600;}
+    .tl-item .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+
+    /* reviews */
+    .rev{padding:12px 14px; background:var(--bg); border-radius:8px; margin-bottom:8px; border-left:3px solid var(--success);}
+    .rev .head{display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:5px;}
+    .rev .star{color:var(--gold); letter-spacing:1px;}
+    .rev .who{color:var(--muted); margin-left:auto;}
+    .rev .txt{font-size:12.5px; color:var(--fg); line-height:1.5;}
+
+    /* action footer */
+    .action-row{display:flex; gap:10px; justify-content:center; padding:20px; margin-top:24px;}
+    .ab{padding:10px 22px; border-radius:8px; font-size:13px; font-weight:600;}
+    .ab.pri{background:var(--accent); color:white;}
+    .ab.warn{background:var(--surface); color:var(--warn); border:1px solid var(--warn);}
+    .ab.ghost{background:var(--surface); color:var(--muted); border:1px solid var(--border);}
+
+    @media (max-width: 900px){
+      .row2{grid-template-columns:1fr;}
+      .vb-text h1{font-size:20px;}
+      .skill-grid{grid-template-columns:repeat(2,1fr);}
+      .check-circle{width:60px; height:60px; font-size:30px;}
+    }
+    /* —— 手机端 —— */
+    @media (max-width: 560px){
+      .gov-strip{padding:7px 14px; font-size:10.5px; flex-wrap:wrap; gap:6px;}
+      .navbar{padding:12px 14px; gap:10px; flex-wrap:wrap;}
+      .brand-text .nm{font-size:13px;} .brand-text .sub{font-size:10.5px;}
+      .back{padding:5px 10px; font-size:11.5px;}
+      .verify-banner{padding:22px 16px;}
+      .verify-banner::after{font-size:160px; right:-20px;}
+      .vb-inner{gap:14px;}
+      .check-circle{width:48px; height:48px; font-size:24px; border-width:2px;}
+      .vb-text h1{font-size:17px;}
+      .vb-text .seal{font-size:10.5px;} .vb-text .ts{font-size:10.5px;}
+      .container{padding:0 12px; margin:-16px auto 28px;}
+      .panel{padding:16px 15px;} .id-card{padding:18px 16px;}
+      .id-top{gap:12px;}
+      .id-av{width:60px; height:60px; font-size:26px;}
+      .id-info .nm{font-size:19px;}
+      .id-grid{grid-template-columns:1fr 1fr; gap:10px;}
+      .credit-ring{flex-direction:column; align-items:flex-start; gap:12px;}
+      .action-row{flex-wrap:wrap; padding:16px 12px; gap:8px;}
+      .action-row .ab{flex:1 1 45%; text-align:center;}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="gov-strip">
+    <span>⚖</span><span>江苏省人民政府 · 住房和城乡建设厅 主办</span>
+    <span class="spacer"></span><a>简体 / EN</a>
+  </div>
+
+  <nav class="navbar">
+    <div class="brand">
+      <div class="brand-mark">认</div>
+      <div class="brand-text">
+        <div class="nm">江苏保租房 · 服务者认证公示门户</div>
+        <div class="sub">扫码验真 · Verification Result</div>
+      </div>
+    </div>
+    <a class="back" href="portal-index.html">← 返回首页</a>
+  </nav>
+
+  <!-- verify banner -->
+  <div class="verify-banner">
+    <div class="vb-inner">
+      <div class="check-circle">✓</div>
+      <div class="vb-text">
+        <h1>真实有效 · 已上链可验</h1>
+        <div class="seal">⛓ 区块链上链时间 2024-08-12 10:24:36</div>
+        <div class="ts">本次验真时间 2026-06-06 14:32:18 · 来源 二维码扫码</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- container -->
+  <div class="container">
+    <div class="row2">
+
+      <!-- LEFT main info -->
+      <div>
+        <div class="panel id-card">
+          <div class="id-top">
+            <div class="id-av">陈<div class="lv-badge">L4</div></div>
+            <div class="id-info">
+              <div class="nm">陈*国 <span class="public">(脱敏显示)</span></div>
+              <div class="meta">
+                <span class="p">EMP-2024-0021</span>
+                <span class="p">岗位：旅居房管</span>
+                <span class="p gold">驻点：梧桐公馆</span>
+                <span class="p">服务区域：江宁区</span>
+              </div>
+            </div>
+          </div>
+          <div class="id-grid">
+            <div class="id-cell"><div class="l">证书编号</div><div class="v">NJ-BZF-L4-2024-0021</div></div>
+            <div class="id-cell"><div class="l">签发机构</div><div class="v normal">江苏省住建厅</div></div>
+            <div class="id-cell"><div class="l">签发时间</div><div class="v">2024-08-12</div></div>
+            <div class="id-cell"><div class="l">有效期至</div><div class="v">2026-08-11</div></div>
+            <div class="id-cell"><div class="l">入行年限</div><div class="v normal">3.2 年</div></div>
+            <div class="id-cell"><div class="l">合作运营方</div><div class="v normal">南京安居集团</div></div>
+          </div>
+
+          <div class="lv-box">
+            <div class="head">
+              <span class="lv-tag">L4</span>
+              <span class="nm">督导 / 店长</span>
+            </div>
+            <div class="desc">团队管理 · 质量监督 · 个人服务者轨道终点。可独立带 5+ 团队、可处置中等投诉、可作为 L5 跳轨候选。</div>
+          </div>
+
+          <h3 style="margin-top:18px;">技能认证（5 项）</h3>
+          <div class="skill-grid">
+            <div class="skill"><span class="ic">🎩</span><span class="nm">物业接待</span><span class="star">★★★★★</span></div>
+            <div class="skill"><span class="ic">📜</span><span class="nm">合同备案</span><span class="star">★★★★★</span></div>
+            <div class="skill"><span class="ic">⚖</span><span class="nm">客户调解</span><span class="star">★★★★<span class="e">★</span></span></div>
+            <div class="skill"><span class="ic">🚨</span><span class="nm">应急响应</span><span class="star">★★★★★</span></div>
+            <div class="skill"><span class="ic">👥</span><span class="nm">团队管理</span><span class="star">★★★★<span class="e">★</span></span></div>
+            <div class="skill"><span class="ic">📊</span><span class="nm">质量监督</span><span class="star">★★★★★</span></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <h3>信用分（中台 R-001 ~ R-218 规则自动计算）</h3>
+          <div class="credit-ring">
+            <div class="ring">
+              <div class="ring-text">
+                <div class="v">94.6</div>
+                <div class="l">信用分</div>
+              </div>
+            </div>
+            <div class="credit-info">
+              <div class="row"><span class="l">累计完结订单</span><span class="v">486 单</span></div>
+              <div class="row"><span class="l">平均客评</span><span class="v ok">4.98 ★</span></div>
+              <div class="row"><span class="l">投诉记录（半年）</span><span class="v ok">0 起</span></div>
+              <div class="row"><span class="l">月度全勤次数</span><span class="v">22 个月</span></div>
+              <div class="row"><span class="l">已带学徒数</span><span class="v">5 人 · 4 已 L3</span></div>
+              <div class="row"><span class="l">月度信用变化</span><span class="v ok">↑ 2.4</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <h3>最近评价（已脱敏）</h3>
+          <div class="rev">
+            <div class="head">
+              <span class="star">★★★★★</span>
+              <span style="color:var(--accent);">5.0 满分</span>
+              <span class="who">王*女士 · 2026-06-05</span>
+            </div>
+            <div class="txt">陈管家非常细致，主动询问入住偏好，主动整理了厨房备品。第一次入住就感觉像家一样。</div>
+          </div>
+          <div class="rev">
+            <div class="head">
+              <span class="star">★★★★★</span>
+              <span style="color:var(--accent);">5.0 满分</span>
+              <span class="who">张*爷爷 · 续约客户 · 2026-06-04</span>
+            </div>
+            <div class="txt">第 3 次预约小陈，每次都很周到。这次还帮我换了灯泡。非常满意。</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT chain + timeline + report -->
+      <div>
+        <div class="chain-card">
+          <div class="head">
+            <span class="ic">⛓</span>
+            <span class="nm">区块链验真信息</span>
+          </div>
+          <div class="row"><span class="l">链类型</span><span class="v">江苏政务链</span></div>
+          <div class="row"><span class="l">Tx Hash</span><span class="v">0x4a2f3b8c19...0e8c91</span></div>
+          <div class="row"><span class="l">出块号</span><span class="v">#10,486,021</span></div>
+          <div class="row"><span class="l">上链时间</span><span class="v">2024-08-12 10:24:36</span></div>
+          <div class="row"><span class="l">最近续期</span><span class="v">2025-08-12</span></div>
+          <div class="row"><span class="l">数据完整性</span><span class="v" style="color:var(--success);">✓ 一致</span></div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <h3>认证晋升历程</h3>
+          <div class="tl">
+            <div class="tl-item gold">
+              <div class="nm">L4 督导 / 店长（在岗）</div>
+              <div class="meta">2024-08-12 通过 · 团队管理考 94 分</div>
+            </div>
+            <div class="tl-item">
+              <div class="nm">L3 高级管家</div>
+              <div class="meta">2023-04-18 通过 · 88 分</div>
+            </div>
+            <div class="tl-item">
+              <div class="nm">L2 独立服役</div>
+              <div class="meta">2022-11-12 通过 · 一次过 · 82 分</div>
+            </div>
+            <div class="tl-item">
+              <div class="nm">L1 基础认证</div>
+              <div class="meta">2022-09-08 通过 · 培训 96 学时</div>
+            </div>
+            <div class="tl-item">
+              <div class="nm">L0 注册准入</div>
+              <div class="meta">2022-08-21 提交 · 资料 100% 通过</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px;">
+          <h3>所属服务商 / 运营方</h3>
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 0;">
+            <div style="width:36px; height:36px; border-radius:8px; background:linear-gradient(135deg, #0f766e, #14b8a6); color:white; display:grid; place-items:center; font-weight:700;">安</div>
+            <div>
+              <div style="font-size:13px; font-weight:600;">南京安居保障房集团</div>
+              <div style="font-size:11px; color:var(--muted);">运营方·甲级·在管 12 项目</div>
+            </div>
+            <span style="margin-left:auto; font-size:11px; color:var(--success);">✓ 白名单</span>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:14px; background:#fff7ed; border-color:#fed7aa;">
+          <h3 style="color:#9a3412;">🛡 信息有误 · 立即举报</h3>
+          <div style="font-size:12.5px; color:#9a3412; line-height:1.6; margin-bottom:12px;">
+            如果你发现此人冒名/资质过期/收费异常等问题，请立即举报。所有举报会在 24 小时内回应，并由住建厅监管处处置。
+          </div>
+          <a style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; background:#ca8a04; color:white; border-radius:6px; font-size:12px; font-weight:600;">📞 12345 一键举报</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- action bar -->
+    <div class="action-row">
+      <a class="ab ghost">📥 下载证书 PDF</a>
+      <a class="ab ghost">📤 分享验真页</a>
+      <a class="ab warn">举报问题</a>
+      <a class="ab pri" href="portal-index.html">返回公示首页</a>
+    </div>
+  </div>
+
+<script src="_region.js"></script>
+<script>
+/* 按 ?code 前缀区分验真类型，渲染不同展示。无 code / 旧编号(NJ-BZF) → 保留上方服务者示例页 */
+(function(){
+  var code=(new URLSearchParams(location.search).get('code')||'').toUpperCase();
+  function typeOf(c){
+    if(/^GZ-LJV/.test(c))return 'v';
+    if(/^GZ-LJT/.test(c))return 't';
+    if(/^GZ-LJC/.test(c))return 'c';
+    if(/^GZ-LJS/.test(c))return 's';
+    if(/^GZ-LJ-/.test(c))return 'h';
+    return '';
+  }
+  var t=typeOf(code); if(!t) return;
+  var T={
+    s:{theme:['#064e3b','#115e59','#14b8a6'],sub:'服务者持证验真',ic:'杨',badge:'L4',name:'杨*芳 <span class="public">(脱敏)</span>',
+       meta:['EMP-2026-7788','岗位：旅居管家','驻点：西江服务站','区域：黔东南'],
+       grid:[['证书编号',code],['签发机构','贵州省住建厅'],['签发时间','2026-03-12'],['有效期至','2028-03-11'],['入行年限','2.6 年'],['合作服务商','黔行旅居服务公司']],
+       ck:['人社职业资格 · 已核验','培训结业 86 课时 · 考试通过','安心责任险 · 已投保'],extra:'信用分 4.8 · 客户评价 ★4.9 · 月度滚动'},
+    v:{theme:['#312e81','#3730a3','#6366f1'],sub:'服务商商业认证验真',ic:'🏢',badge:'L5',name:'黔行旅居服务公司',
+       meta:['负责人 吴志强','在营房源 128','5 门店 · 6 渠道'],
+       grid:[['证书编号',code],['签发机构','贵州省住建厅'],['认证级别','L5 服务商负责人'],['有效期至','2028-05-31'],['营业执照','已核验'],['履约保证金','已缴 ¥20 万']],
+       ck:['营业执照 / 经营许可 · 已核验','团队持证率 86% · L2+ 达标','履约保证金 + 团队责任险'],extra:'月 GMV ¥86 万 · 评价 ★4.8'},
+    t:{theme:['#4c1d95','#6d28d9','#a78bfa'],sub:'培训机构合作认证验真',ic:'🎓',badge:'LV3',name:'家协培训中心',
+       meta:['省级合作 LV3','8 讲师','累计结业 1,240'],
+       grid:[['证书编号',code],['签发机构','贵州省住建厅'],['合作级别','LV3 · L4–L5 范围'],['有效期至','2027-12-31'],['办学资质','许可 + 人社备案'],['学员通过率','92.4%']],
+       ck:['办学许可 + 人社培训备案','讲师持证 L6×3 + L7×1','题库共建被采纳 ≥100 题'],extra:'认证课程在架 12 门'},
+    c:{theme:['#7c2d12','#b45309','#f59e0b'],sub:'课程认证验真',ic:'📜',badge:'L2–L3',name:'旅居管家服务规范',
+       meta:['研发机构 家协培训中心','主讲 L6 周敏','对位 L2–L3'],
+       grid:[['课程编号',code],['认证机构','贵州省住建厅 + 中台'],['对位等级','L2–L3'],['有效期至','2027-06-30'],['考纲','已备案'],['学时','24 课时']],
+       ck:['大纲审核 · 对位等级标准','考纲备案 + 题库匹配','L7 专家试讲评审通过'],extra:'已开班 18 · 累计结业 320'},
+    h:{theme:['#0b5d56','#0f766e','#b45309'],sub:'房源验真',ic:'🏠',badge:'★4.9',name:'西江千户苗寨 · 云上观景民宿',
+       meta:['黔东南州 · 西江镇','整栋可包','五星旅居'],
+       grid:[['房源编号',code],['评定机构','贵州省住建厅 + 中台'],['综合星级','★★★★★ 4.9'],['有效期至','2027-06-30'],['运营方','黔行旅居服务公司'],['评定时间','2026-06']],
+       ck:['公安实名备案 · 已核验','住建产权 / 租赁备案 · 已核验','家财 + 客房安心险 · 已投保'],extra:'旅居星级 5 维达标 · 动态复核'}
+  };
+  var d=T[t];
+  var bn=document.querySelector('.verify-banner');
+  if(bn) bn.style.background='linear-gradient(135deg,'+d.theme[0]+' 0%,'+d.theme[1]+' 60%,'+d.theme[2]+' 100%)';
+  var sub=document.querySelector('.brand-text .sub'); if(sub) sub.textContent='贵州旅居 · '+d.sub;
+  document.title=d.sub+' · '+code+' · 贵州旅居公示门户';
+  var av='linear-gradient(135deg,'+d.theme[1]+','+d.theme[2]+')';
+  var grid=d.grid.map(function(g){return '<div class="id-cell"><div class="l">'+g[0]+'</div><div class="v'+(/编号|星级|级别/.test(g[0])?'':' normal')+'">'+g[1]+'</div></div>';}).join('');
+  var meta=d.meta.map(function(m){return '<span class="p">'+m+'</span>';}).join('');
+  var ck=d.ck.map(function(x){return '<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;"><span style="color:var(--success);font-weight:700;">✓</span><span>'+x+'</span></div>';}).join('');
+  var row2=document.querySelector('.row2');
+  if(row2) row2.innerHTML=
+   '<div><div class="panel id-card">'+
+     '<div class="id-top"><div class="id-av" style="background:'+av+';font-size:'+(d.ic.length>1?'34px':'32px')+';">'+d.ic+'<div class="lv-badge" style="background:'+av+';">'+d.badge+'</div></div>'+
+       '<div class="id-info"><div class="nm">'+d.name+'</div><div class="meta">'+meta+'</div></div></div>'+
+     '<div class="id-grid">'+grid+'</div>'+
+     '<h3 style="margin-top:18px;">核验要点</h3>'+ck+
+     '<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:12.5px;color:var(--muted);">'+d.extra+'</div>'+
+   '</div></div>'+
+   '<div><div class="chain-card"><div class="head"><span class="ic">⛓</span><span class="nm">区块链验真信息</span></div>'+
+       '<div class="row"><span class="l">链类型</span><span class="v">贵州政务链</span></div>'+
+       '<div class="row"><span class="l">验真编号</span><span class="v">'+code+'</span></div>'+
+       '<div class="row"><span class="l">数据完整性</span><span class="v" style="color:var(--success);">✓ 一致</span></div>'+
+       '<div class="row"><span class="l">来源</span><span class="v">二维码扫码</span></div></div>'+
+     '<div class="panel" style="margin-top:14px;background:#fff7ed;border-color:#fed7aa;"><h3 style="color:#9a3412;">🛡 信息有误 · 立即举报</h3>'+
+       '<div style="font-size:12.5px;color:#9a3412;line-height:1.6;margin-bottom:12px;">如发现冒名 / 资质过期 / 收费异常，请立即举报，由住建厅监管处 24h 内处置。</div>'+
+       '<a style="display:inline-flex;gap:6px;padding:8px 14px;background:#ca8a04;color:white;border-radius:6px;font-size:12px;font-weight:600;">📞 12345 一键举报</a></div>'+
+   '</div>';
+})();
+</script>
+</body>
+</html>

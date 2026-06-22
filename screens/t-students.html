@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>学员管理 · 培训机构端</title>
+  <style>
+    :root {
+      --bg: #faf5ff; --surface: #ffffff; --fg: #1e1b4b;
+      --muted: #6b7280; --border: #e5e7eb; --line:#f3f4f6;
+      --accent: #7c3aed; --accent-deep:#5b21b6;
+      --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-row{display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:20px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    /* tabs */
+    .tabs{display:flex; gap:6px; margin-bottom:14px;}
+    .tab{padding:8px 14px; border-radius:6px; font-size:13px; background:var(--surface); color:var(--muted); cursor:pointer; border:1px solid var(--border);}
+    .tab.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .tab .cnt{margin-left:4px; font-size:11px; opacity:0.85;}
+
+    .row{display:grid; grid-template-columns:1.5fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+    .card-head{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; font-size:12px;}
+    .card-head .actions a{color:var(--accent);}
+
+    /* student table */
+    .st-row{display:grid; grid-template-columns:auto 1.5fr auto 1.2fr auto auto auto; gap:12px; padding:11px 18px; border-bottom:1px solid var(--line); align-items:center; font-size:12.5px;}
+    .st-row:last-child{border-bottom:0;}
+    .st-row.head{background:#fafbfc; font-size:10px; color:var(--muted); text-transform:uppercase; font-weight:600; letter-spacing:0.5px;}
+    .st-row .av{width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-weight:700;}
+    .st-row .nm{font-weight:600;}
+    .st-row .sub{font-size:11px; color:var(--muted); margin-top:1px;}
+    .lv{font-size:10px; padding:2px 6px; border-radius:4px; color:white; font-weight:700;}
+    .lv.L0{background:linear-gradient(135deg, #475569, #64748b);}
+    .lv.L1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .lv.L2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .lv.L3{background:linear-gradient(135deg, #047857, #10b981);}
+    .lv.L4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .pgbar{position:relative; height:6px; background:var(--bg); border-radius:3px; overflow:hidden;}
+    .pgbar .fl{position:absolute; left:0; top:0; height:100%; background:var(--accent); border-radius:3px;}
+    .pgbar .fl.ok{background:var(--success);}
+    .pgbar .fl.warn{background:var(--warn);}
+    .pct{font-family:var(--mono); font-weight:700; text-align:right; font-size:12px;}
+    .pct.ok{color:var(--success);} .pct.warn{color:var(--warn);}
+    .stat-pill{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:600;}
+    .stat-pill.on{background:color-mix(in oklab, var(--accent) 14%, transparent); color:var(--accent);}
+    .stat-pill.exam{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .stat-pill.done{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .stat-pill.late{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .row-actions a{font-size:11.5px; color:var(--accent); margin-right:6px;}
+
+    /* evaluation panel */
+    .eval-card{padding:14px 16px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 3%, transparent)); border-left:3px solid var(--accent); border-radius:6px; margin-bottom:8px;}
+    .eval-card .head{display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;}
+    .eval-card .nm{font-weight:600;}
+    .eval-card .grade{font-size:11px; padding:1px 8px; border-radius:3px; font-weight:700; color:white;}
+    .eval-card .grade.A{background:var(--success);}
+    .eval-card .grade.B{background:#3b82f6;}
+    .eval-card .grade.C{background:var(--warn);}
+    .eval-card .grade.D{background:var(--danger);}
+    .eval-card .desc{font-size:11.5px; color:var(--muted); line-height:1.55;}
+
+    /* sync banner */
+    .sync{padding:14px 16px; background:linear-gradient(135deg, #fef3c7, #fde68a); border:1px solid #fcd34d; border-radius:8px; margin-bottom:14px; display:flex; gap:10px; align-items:center;}
+    .sync .ic{font-size:22px;}
+    .sync .body{flex:1; font-size:12.5px;}
+    .sync .body strong{color:#78350f;}
+    .sync .body .desc{color:#92400e; margin-top:2px;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="t" data-active="students"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>学员管理</h1>
+      <span style="font-size:12px; color:var(--muted);">中台分配的待训 + 自招学员 · 数据 T+0 同步</span>
+      <button class="btn">中台拉取</button>
+      <button class="btn">导出名单</button>
+      <button class="btn pri">+ 添加学员</button>
+    </div>
+
+    <div class="kpi-row">
+      <div class="ki"><div class="l">在训学员</div><div class="n">186</div><div class="d ok">↑ 24 本月</div></div>
+      <div class="ki"><div class="l">中台分配</div><div class="n">142</div><div class="d">76.3%</div></div>
+      <div class="ki"><div class="l">机构自招</div><div class="n">44</div><div class="d">23.7%</div></div>
+      <div class="ki"><div class="l">本月毕业</div><div class="n" style="color:var(--success);">38</div><div class="d ok">通过率 89%</div></div>
+      <div class="ki"><div class="l">待补考</div><div class="n" style="color:var(--warn);">6</div><div class="d warn">06-18 安排</div></div>
+      <div class="ki"><div class="l">超时未结</div><div class="n" style="color:var(--danger);">3</div><div class="d" style="color:var(--danger);">需介入</div></div>
+    </div>
+
+    <div class="sync">
+      <span class="ic">🔌</span>
+      <div class="body">
+        <strong>与中台数据联动</strong>
+        <div class="desc">学员等级 / 信用分 / 考试结果 / 证书 — 全部由「服务认证中台」管理。本端只能<b>排课、培训、模考、评估、上报</b>，<b>不可直接发证</b>。</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <span class="tab on">全部 <span class="cnt">186</span></span>
+      <span class="tab">L0→L1 培训 <span class="cnt">86</span></span>
+      <span class="tab">L1→L2 实习 <span class="cnt">52</span></span>
+      <span class="tab">L2→L3 进阶 <span class="cnt">28</span></span>
+      <span class="tab">L3→L4 督导 <span class="cnt">14</span></span>
+      <span class="tab">L4→L5 商业认证 <span class="cnt">6</span></span>
+    </div>
+
+    <div class="row">
+
+      <!-- LEFT student list -->
+      <div class="card">
+        <div class="card-head">
+          <h3>在训学员</h3>
+          <span class="pill">L0-L4 个人轨</span>
+          <div class="actions"><a>批量排考</a></div>
+        </div>
+        <div class="st-row head">
+          <div></div><div>学员</div><div>等级</div><div>课程 / 进度</div><div>模考</div><div>状态</div><div>操作</div>
+        </div>
+        <div class="st-row">
+          <div class="av">唐</div>
+          <div><div class="nm">唐师傅</div><div class="sub">EMP-2026-0428 · 优家装饰</div></div>
+          <div><span class="lv L1">L1→L2</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">L1 入门 · 11 / 12 章</div>
+            <div class="pgbar"><div class="fl ok" style="width:92%;"></div></div>
+          </div>
+          <div class="pct ok">86</div>
+          <span class="stat-pill exam">06-12 待考</span>
+          <div class="row-actions"><a>详情</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">袁</div>
+          <div><div class="nm">袁小婷</div><div class="sub">EMP-2026-0464 · 优家装饰</div></div>
+          <div><span class="lv L1">L1→L2</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">保洁 入门</div>
+            <div class="pgbar"><div class="fl" style="width:78%;"></div></div>
+          </div>
+          <div class="pct">78</div>
+          <span class="stat-pill on">在训</span>
+          <div class="row-actions"><a>详情</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">孙</div>
+          <div><div class="nm">孙建华</div><div class="sub">EMP-2026-0218 · 南京安居</div></div>
+          <div><span class="lv L1">L1</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">房源托管 入门</div>
+            <div class="pgbar"><div class="fl" style="width:67%;"></div></div>
+          </div>
+          <div class="pct">—</div>
+          <span class="stat-pill on">在训</span>
+          <div class="row-actions"><a>详情</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">周</div>
+          <div><div class="nm">周丽华</div><div class="sub">EMP-2026-0089 · 南京安居</div></div>
+          <div><span class="lv L2">L2→L3</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">入住服务 进阶</div>
+            <div class="pgbar"><div class="fl ok" style="width:100%;"></div></div>
+          </div>
+          <div class="pct ok">92</div>
+          <span class="stat-pill done">已结业</span>
+          <div class="row-actions"><a>已发证</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">梁</div>
+          <div><div class="nm">梁小雷</div><div class="sub">EMP-2026-0218 · 优家装饰</div></div>
+          <div><span class="lv L3">L3</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">高级管家 · 选修</div>
+            <div class="pgbar"><div class="fl" style="width:34%;"></div></div>
+          </div>
+          <div class="pct">—</div>
+          <span class="stat-pill on">在训</span>
+          <div class="row-actions"><a>详情</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">吴</div>
+          <div><div class="nm">吴桂英</div><div class="sub">EMP-2026-0042 · 南京安居</div></div>
+          <div><span class="lv L2">L2→L3</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">补训中</div>
+            <div class="pgbar"><div class="fl warn" style="width:54%;"></div></div>
+          </div>
+          <div class="pct warn">58</div>
+          <span class="stat-pill exam">06-18 补考</span>
+          <div class="row-actions"><a>补训</a></div>
+        </div>
+        <div class="st-row">
+          <div class="av">姜</div>
+          <div><div class="nm">姜师傅</div><div class="sub">EMP-2026-0512 · 自招</div></div>
+          <div><span class="lv L1">L1</span></div>
+          <div>
+            <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">检修 入门 · 超时</div>
+            <div class="pgbar"><div class="fl warn" style="width:32%;"></div></div>
+          </div>
+          <div class="pct">—</div>
+          <span class="stat-pill late">超时</span>
+          <div class="row-actions"><a>催办</a></div>
+        </div>
+      </div>
+
+      <!-- RIGHT evaluations -->
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>最近导师评估</h3><span class="pill">A 优 / B 良 / C 中 / D 差</span></div>
+          <div style="padding:14px 16px;">
+            <div class="eval-card">
+              <div class="head"><span class="nm">周丽华 · L2 毕业评估</span><span class="grade A">A</span></div>
+              <div class="desc">毕业测验 92 分（满分 100），实操情景模拟 95 分。客户沟通展现出色，建议给予 L3 提前转正。<br><b style="color:var(--success);">→ 已上报中台，证书已签发</b></div>
+            </div>
+            <div class="eval-card">
+              <div class="head"><span class="nm">唐师傅 · 模考反馈</span><span class="grade B">B</span></div>
+              <div class="desc">L1 模考 86 分，技能熟练度尚可，但客户接待环节口语不够规范。建议 06-12 考前补练 2 次。</div>
+            </div>
+            <div class="eval-card">
+              <div class="head"><span class="nm">吴桂英 · 补训诊断</span><span class="grade C">C</span></div>
+              <div class="desc">首考综合 68 分（笔试 58、实操 82），主因为「复杂场景理论」薄弱。已分配 12 学时补训计划。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>结业上报中台</h3><span class="pill">06-04 至今</span></div>
+          <div style="padding:14px 16px; font-size:12.5px;">
+            <div style="display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border);"><span>本周已结业上报</span><b style="color:var(--success);">18 人</b></div>
+            <div style="display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border);"><span>中台已颁证</span><b>16 人</b></div>
+            <div style="display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0; border-bottom:1px dashed var(--border);"><span>等待背调</span><b style="color:var(--warn);">2 人</b></div>
+            <div style="display:grid; grid-template-columns:1fr auto; gap:8px; padding:6px 0;"><span>本月分润预估</span><b>¥ 8,600</b></div>
+            <div style="font-size:11px; color:var(--muted); margin-top:10px; padding-top:10px; border-top:1px solid var(--border); line-height:1.55;">
+              结业上报后，中台执行：1) 颁发数字证书 → 2) 上链记录 → 3) 同步公示门户 → 4) 触发 R-005「培训学时」+ R-006「带徒分润」加分规则。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>房源上下架管理 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+    .main { padding: 22px 28px 40px; overflow-x: auto; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    .tab-row { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 16px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+    .tab .cnt { font-size: 11px; padding: 1px 6px; background: var(--bg); border-radius: 3px; margin-left: 4px; }
+    .tab.active .cnt { background: var(--accent-soft); color: var(--accent); }
+
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-bar .search { flex: 1; min-width: 200px; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 6px; }
+    .filter-bar .search svg { width: 14px; height: 14px; color: var(--muted); }
+    .filter-bar .search input { border: 0; background: transparent; outline: none; flex: 1; font-size: 13px; }
+    .filter-bar select { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--fg); }
+
+    .batch-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--accent-soft); border-radius: var(--radius-md); margin-bottom: 14px; font-size: 13px; }
+    .batch-bar strong { color: var(--accent); }
+
+    .lst-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+    table.lst { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.lst th, table.lst td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    table.lst th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.lst tr:last-child td { border-bottom: 0; }
+    table.lst input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+    .star-mini {
+      display:inline-block; padding:2px 8px; border-radius:6px;
+      background:linear-gradient(90deg,#0f172a,#b45309); color:#fff;
+      font-size:11px; font-weight:700; letter-spacing:0.5px;
+    }
+    .star-mini.s5 { background:linear-gradient(90deg,#7c3aed,#b45309); }
+    .star-mini.s3 { background:linear-gradient(90deg,#0f172a,#eab308); }
+    .star-mini.s2 { background:#94a3b8; }
+    .star-mini.pending {
+      background:#fef3c7; color:#92400e; border:1px dashed #fcd34d;
+      cursor:pointer;
+    }
+    .star-mini::before { content:"★ "; }
+    .star-mini.pending::before { content:""; }
+    .lst-thumb { width: 50px; height: 36px; border-radius: 4px; background: var(--accent-soft); display: inline-grid; place-items: center; color: var(--accent); }
+    .lst-thumb svg { width: 18px; height: 18px; }
+    .lst-name { font-weight: 500; }
+    .lst-meta { font-size: 11px; color: var(--muted); }
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; display: inline-block; }
+    .pill.on { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .pill.rented { background: var(--accent-soft); color: var(--accent); }
+    .pill.danger { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .price-edit { font-weight: 600; cursor: pointer; }
+    .price-edit:hover { color: var(--accent); }
+    .row-actions { display: flex; gap: 6px; }
+    .row-actions a { font-size: 12px; color: var(--accent); cursor: pointer; }
+    .row-actions a.danger { color: var(--danger); }
+
+    .pag { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--bg); border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+    .pag-controls { display: flex; gap: 4px; }
+    .pag-controls span { padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+    .pag-controls span.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } .side { display: none; } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="b" data-active="listing"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>房源管理</h1>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        导出 Excel
+      </button>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        批量导入
+      </button>
+      <button class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新增房源
+      </button>
+    </div>
+
+    <div class="tab-row">
+      <div class="tab active">在售 <span class="cnt">3,842</span></div>
+      <div class="tab">已租 <span class="cnt">3,438</span></div>
+      <div class="tab">下架 <span class="cnt">142</span></div>
+      <div class="tab">草稿 <span class="cnt">28</span></div>
+      <div class="tab">异常 <span class="cnt">12</span></div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input placeholder="搜索房源编号、小区、地址…" />
+      </div>
+      <select><option>全部项目</option><option>梧桐公馆</option><option>河西青年</option><option>龙江新青年</option></select>
+      <select><option>全部户型</option><option>一室一厅</option><option>两室一厅</option></select>
+      <select><option>全部区</option><option>江宁区</option><option>建邺区</option><option>鼓楼区</option></select>
+      <button class="btn btn-ghost">重置</button>
+    </div>
+
+    <div class="batch-bar">
+      已选 <strong>3</strong> 套 ·
+      <button class="btn btn-ghost" style="padding: 4px 10px;">批量调价</button>
+      <button class="btn btn-ghost" style="padding: 4px 10px;">批量下架</button>
+      <button class="btn btn-ghost" style="padding: 4px 10px;">分派服务者</button>
+      <a href="b-house-rating-input.html" style="padding:4px 10px; background:linear-gradient(90deg,#0f172a,#b45309); color:#fff; border-radius:6px; font-size:12px; font-weight:600;">★ 好房子评级录入</a>
+      <a style="color: var(--accent); margin-left: auto; font-size: 12px;">取消选择</a>
+    </div>
+
+    <div style="margin:0 0 12px; padding:10px 14px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:12px; color:#92400e;">
+      ⚠ <strong>7</strong> 套房源未完成好房子自评 · <strong>3</strong> 套自评已提交待 P 端复核 ·
+      <a href="b-house-rating-input.html" style="margin-left:6px; color:#92400e; text-decoration:underline; font-weight:600;">立即处理 →</a>
+    </div>
+
+    <div class="lst-card">
+      <table class="lst">
+        <thead>
+          <tr>
+            <th><input type="checkbox" /></th>
+            <th>房源</th>
+            <th>项目/区</th>
+            <th>户型·面积</th>
+            <th>挂牌价</th>
+            <th>市场价</th>
+            <th>★ 评级</th>
+            <th>状态</th>
+            <th>更新</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" checked /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">梧桐公馆 3-1506</div>
+                <div class="lst-meta">NJBZF-04528 · 南向 · 15F</div>
+              </div>
+            </td>
+            <td>梧桐公馆 / 江宁</td>
+            <td>1 室 1 厅 · 45㎡</td>
+            <td class="price-edit">¥ 2,380</td>
+            <td>¥ 3,200</td>
+            <td><span class="star-mini">4 星</span></td>
+            <td><span class="pill on">在售</span></td>
+            <td>10 分钟前</td>
+            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">梧桐公馆 3-0903</div>
+                <div class="lst-meta">NJBZF-03891 · 北向 · 9F</div>
+              </div>
+            </td>
+            <td>梧桐公馆 / 江宁</td>
+            <td>1 室 1 厅 · 42㎡</td>
+            <td class="price-edit">¥ 2,180</td>
+            <td>¥ 2,950</td>
+            <td><a href="b-house-rating-input.html"><span class="star-mini pending">待自评</span></a></td>
+            <td><span class="pill on">在售</span></td>
+            <td>2 小时前</td>
+            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">河西青年 2-1208</div>
+                <div class="lst-meta">NJBZF-05214 · 东南 · 12F</div>
+              </div>
+            </td>
+            <td>河西青年 / 建邺</td>
+            <td>2 室 1 厅 · 68㎡</td>
+            <td class="price-edit">¥ 3,120</td>
+            <td>¥ 4,100</td>
+            <td><span class="star-mini">4 星</span></td>
+            <td><span class="pill on">在售</span></td>
+            <td>4 小时前</td>
+            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">龙江新青年 1-2204</div>
+                <div class="lst-meta">NJBZF-06012 · 南向 · 22F</div>
+              </div>
+            </td>
+            <td>龙江新青年 / 鼓楼</td>
+            <td>1 室 1 厅 · 42㎡</td>
+            <td class="price-edit">¥ 2,680</td>
+            <td>¥ 3,500</td>
+            <td><span class="star-mini s3">3 星</span></td>
+            <td><span class="pill rented">已租</span></td>
+            <td>昨天</td>
+            <td class="row-actions"><a>查看合同</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">南部新城 5-1801</div>
+                <div class="lst-meta">NJBZF-06478 · 南向 · 18F</div>
+              </div>
+            </td>
+            <td>南部新城 / 秦淮</td>
+            <td>1 室 1 厅 · 48㎡</td>
+            <td class="price-edit">¥ 2,180</td>
+            <td>¥ 2,900</td>
+            <td><span class="star-mini s5">5 星</span></td>
+            <td><span class="pill on">在售</span></td>
+            <td>2 天前</td>
+            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" /></td>
+            <td>
+              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
+              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+                <div class="lst-name">仙林湖 4-0612</div>
+                <div class="lst-meta">NJBZF-07021 · 东向 · 6F</div>
+              </div>
+            </td>
+            <td>仙林湖 / 栖霞</td>
+            <td>1 室 1 厅 · 40㎡</td>
+            <td class="price-edit" style="color: var(--danger);">¥ 1,890</td>
+            <td>¥ 2,400</td>
+            <td><span class="star-mini s2">2 星</span></td>
+            <td><span class="pill danger">异常·空置 32 天</span></td>
+            <td>5 小时前</td>
+            <td class="row-actions"><a>处置</a><a class="danger">下架</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pag">
+        <div>显示 1-6 共 3,842 条</div>
+        <div class="pag-controls">
+          <span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>…</span><span>641</span><span>›</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

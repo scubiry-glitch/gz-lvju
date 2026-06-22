@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>业主托管 · 江苏保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a; --warn: #eab308; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-display); font-size: 15px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+    img, svg { display: block; max-width: 100%; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 96px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-nav {
+      display: flex; align-items: center;
+      padding: 8px 12px; background: var(--surface);
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid var(--border);
+    }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .page-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+
+    /* hero */
+    .hero {
+      background: linear-gradient(135deg, #b45309 0%, #ea580c 50%, #fbbf24 100%);
+      color: white; padding: 24px 20px 22px;
+      position: relative; overflow: hidden;
+    }
+    .hero h2 { font-size: 22px; font-weight: 700; margin: 0 0 6px; }
+    .hero p { font-size: 13px; opacity: 0.92; max-width: 26ch; }
+    .hero .badge {
+      display: inline-block; margin-top: 12px;
+      padding: 4px 12px; background: rgba(255,255,255,0.22);
+      border-radius: 999px; font-size: 11px;
+    }
+    .hero .deco {
+      position: absolute; right: -12px; bottom: -12px;
+      font-size: 110px; opacity: 0.16; line-height: 1;
+    }
+
+    /* stats */
+    .stat-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--border);
+      margin: 12px 16px; border-radius: var(--radius-md); overflow: hidden;
+    }
+    .stat-cell {
+      background: var(--surface); padding: 14px 8px;
+      text-align: center;
+    }
+    .stat-cell .num {
+      font-size: 18px; font-weight: 700; color: var(--accent);
+      line-height: 1.1;
+    }
+    .stat-cell .lbl {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+
+    /* benefits */
+    .section { background: var(--surface); padding: 18px 16px; margin-top: 8px; }
+    .section h3 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+    .benefit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .benefit-item {
+      padding: 12px; background: var(--bg);
+      border-radius: var(--radius-sm);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .benefit-item .icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: grid; place-items: center;
+      margin-bottom: 4px;
+    }
+    .benefit-item .icon svg { width: 18px; height: 18px; }
+    .benefit-item h4 { font-size: 13px; font-weight: 600; margin: 0; }
+    .benefit-item p { font-size: 11px; color: var(--muted); line-height: 1.45; }
+
+    /* steps */
+    .step-list { display: flex; flex-direction: column; gap: 10px; }
+    .step {
+      display: flex; gap: 12px; align-items: flex-start;
+      padding: 12px; background: var(--bg);
+      border-radius: var(--radius-sm);
+    }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); color: white;
+      display: grid; place-items: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+    }
+    .step-content h4 { font-size: 14px; font-weight: 600; margin: 0 0 2px; }
+    .step-content p { font-size: 12px; color: var(--muted); }
+
+    /* compare */
+    .compare {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      background: var(--border); border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .compare-col { background: var(--surface); padding: 14px 12px; }
+    .compare-col.right { background: var(--accent-soft); }
+    .compare-col h4 { font-size: 13px; font-weight: 600; margin: 0 0 10px; }
+    .compare-col ul { margin: 0; padding: 0; list-style: none; }
+    .compare-col li {
+      font-size: 12px; margin-bottom: 6px; color: var(--muted);
+      padding-left: 14px; position: relative;
+    }
+    .compare-col li::before {
+      content: '·'; position: absolute; left: 4px; top: 0;
+    }
+    .compare-col.right li { color: var(--fg); }
+    .compare-col.right li::before { content: '✓'; color: var(--accent); }
+
+    /* form preview */
+    .form-card {
+      background: var(--bg); border-radius: var(--radius-md);
+      padding: 14px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .form-row { display: flex; align-items: center; gap: 10px; }
+    .form-row label {
+      font-size: 13px; color: var(--muted); width: 88px; flex-shrink: 0;
+    }
+    .form-row input, .form-row select {
+      flex: 1; padding: 8px 10px; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--surface);
+      font: inherit; font-size: 13px;
+    }
+
+    /* qa */
+    .qa-item {
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .qa-item:last-child { border-bottom: 0; }
+    .qa-item summary {
+      cursor: pointer; font-weight: 500;
+      list-style: none; display: flex; justify-content: space-between; align-items: center;
+    }
+    .qa-item summary::-webkit-details-marker { display: none; }
+    .qa-item summary::after {
+      content: '+'; color: var(--muted); font-size: 18px;
+      transition: transform 0.2s;
+    }
+    .qa-item[open] summary::after { transform: rotate(45deg); }
+    .qa-item p {
+      margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.6;
+    }
+
+    /* cta */
+    .bottom-cta {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 16px calc(12px + var(--safe-bottom));
+      display: flex; gap: 12px; z-index: 20;
+    }
+    .btn-secondary {
+      height: 48px; padding: 0 16px;
+      background: var(--bg); color: var(--fg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .btn-primary {
+      flex: 1; height: 48px;
+      background: linear-gradient(90deg, #b45309, #ea580c);
+      color: white; border-radius: var(--radius-sm);
+      font-size: 16px; font-weight: 600;
+    }
+    .btn-primary:active { opacity: 0.92; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>业主托管 · 以租换购</h1>
+  </div>
+
+  <div class="hero">
+    <h2>把自家房 · 变成保租房</h2>
+    <p>江苏省住建厅认可 · 贝壳统一收房 · 政府税收抵扣</p>
+    <span class="badge">江苏 13 市同步开放 · 已托管 1,820+ 套</span>
+    <span class="deco">🏘️</span>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-cell"><div class="num">98.4%</div><div class="lbl">空置期保障</div></div>
+    <div class="stat-cell"><div class="num">3–5 年</div><div class="lbl">长租稳定</div></div>
+    <div class="stat-cell"><div class="num">0 元</div><div class="lbl">改造押金</div></div>
+  </div>
+
+  <!-- benefits -->
+  <div class="section">
+    <h3>业主托管 · 6 项保障</h3>
+    <div class="benefit-grid">
+      <div class="benefit-item">
+        <div class="icon" style="background: var(--accent-soft); color: var(--accent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h4>租金月结</h4>
+        <p>每月固定到账，不受空置影响</p>
+      </div>
+      <div class="benefit-item">
+        <div class="icon" style="background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h4>政府认证</h4>
+        <p>纳入江苏保租房，享税收抵扣</p>
+      </div>
+      <div class="benefit-item">
+        <div class="icon" style="background: color-mix(in oklab, var(--warn) 14%, transparent); color: color-mix(in oklab, var(--warn) 70%, black);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        </div>
+        <h4>免费勘验</h4>
+        <p>贝壳上门测量 · 出报告</p>
+      </div>
+      <div class="benefit-item">
+        <div class="icon" style="background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h4>电子合同</h4>
+        <p>三方备案 · 法律保障</p>
+      </div>
+      <div class="benefit-item">
+        <div class="icon" style="background: var(--accent-soft); color: var(--accent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <h4>装修代付</h4>
+        <p>0 元改造 · 租金分摊</p>
+      </div>
+      <div class="benefit-item">
+        <div class="icon" style="background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h4>专属管家</h4>
+        <p>1V1 服务 · 报修代办</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自营 vs 托管 对比 -->
+  <div class="section">
+    <h3>自行出租 vs 贝壳托管</h3>
+    <div class="compare">
+      <div class="compare-col">
+        <h4 style="color: var(--muted);">自行出租</h4>
+        <ul>
+          <li>空置期自担风险</li>
+          <li>租客难筛、合同纠纷</li>
+          <li>装修维修自掏腰包</li>
+          <li>不享税收优惠</li>
+          <li>无政府背书</li>
+        </ul>
+      </div>
+      <div class="compare-col right">
+        <h4>贝壳托管</h4>
+        <ul>
+          <li>空置期保底租金</li>
+          <li>贝壳筛客 · 三方备案</li>
+          <li>0 元装修 · 维修兜底</li>
+          <li>纳入保租房 · 个税抵扣</li>
+          <li>住建厅认证 · 阳光透明</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 步骤 -->
+  <div class="section">
+    <h3>4 步上线 · 最快 7 天</h3>
+    <div class="step-list">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>提交房源信息</h4>
+          <p>地址 · 户型 · 期望租金 · 上传房产证</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>贝壳上门勘验</h4>
+          <p>48 小时内出具评估报告与定价建议</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>签订托管协议 + 政府备案</h4>
+          <p>三方电子签 · 江苏省住建厅同步备案</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>开始月度结算</h4>
+          <p>首付 30 天租金到账 · 后续每月 5 日打款</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 简易报名表 -->
+  <div class="section">
+    <h3>预约勘验 · 30 秒登记</h3>
+    <div class="form-card">
+      <div class="form-row">
+        <label>所在城市</label>
+        <select>
+          <option>南京</option>
+          <option>苏州</option><option>无锡</option><option>常州</option>
+          <option>镇江</option><option>扬州</option><option>泰州</option>
+          <option>南通</option><option>盐城</option><option>徐州</option>
+          <option>淮安</option><option>宿迁</option><option>连云港</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>小区名称</label>
+        <input type="text" placeholder="如：保利天悦" />
+      </div>
+      <div class="form-row">
+        <label>户型 / 面积</label>
+        <input type="text" placeholder="如：两室一厅 / 78㎡" />
+      </div>
+      <div class="form-row">
+        <label>联系电话</label>
+        <input type="tel" placeholder="贝壳管家会在 1 小时内联系" />
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section">
+    <h3>常见问题</h3>
+    <details class="qa-item">
+      <summary>托管期间我能随时收回房子吗？</summary>
+      <p>可以。提前 60 天书面通知贝壳并补偿剩余装修折旧，即可终止。租客权利由贝壳兜底。</p>
+    </details>
+    <details class="qa-item">
+      <summary>租金怎么定？我能涨价吗？</summary>
+      <p>初始租金按贝壳评估 + 政府指导价 ≤ 市场价 90% 上限确定；每年涨幅不超过 5%，由系统自动结算。</p>
+    </details>
+    <details class="qa-item">
+      <summary>纳入保租房后能享哪些政策？</summary>
+      <p>① 个人房屋租赁所得税 10% → 0；② 部分城市免房产税；③ 出售时计入"保障性供给贡献"加分。</p>
+    </details>
+    <details class="qa-item">
+      <summary>装修费需要我先垫付吗？</summary>
+      <p>无需。贝壳出资改造，按 36–60 个月摊销在月租金中。合同到期由贝壳承担残值风险。</p>
+    </details>
+  </div>
+
+  <div style="font-size: 11px; color: var(--muted); text-align: center; padding: 16px;">
+    业主托管业务执行《江苏省保障性租赁住房房源接入规范》
+  </div>
+
+  <div class="bottom-cta">
+    <a class="btn-secondary" href="tel:96512">咨询 96512</a>
+    <button class="btn-primary" onclick="alert('已提交！贝壳管家将在 1 小时内回电')">立即预约上门勘验</button>
+  </div>
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

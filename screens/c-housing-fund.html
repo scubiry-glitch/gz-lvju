@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>公积金直付申请 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+    img, svg { display: block; max-width: 100%; }
+    a { color: var(--accent); text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 96px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .top-nav { display: flex; align-items: center; padding: 8px 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .top-nav h1 { flex: 1; font-size: 15px; font-weight: 600; text-align: center; margin: 0; }
+    .help-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); font-size: 13px; color: var(--accent); }
+
+    /* hero */
+    .hero {
+      background: linear-gradient(135deg, #1e40af 0%, #2f6feb 50%, #60a5fa 100%);
+      color: white; padding: 24px 20px 28px;
+    }
+    .hero .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.2); font-size: 11px; font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .hero .badge svg { width: 12px; height: 12px; }
+    .hero h2 { font-size: 22px; font-weight: 700; margin: 0 0 4px; letter-spacing: 0.3px; }
+    .hero .sub { font-size: 13px; opacity: 0.9; margin: 0 0 18px; }
+    .balance-card {
+      background: rgba(255,255,255,0.12); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .balance-card .lbl { font-size: 12px; opacity: 0.8; }
+    .balance-card .amt { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .balance-card .qry { font-size: 12px; color: white; opacity: 0.85; }
+
+    /* steps */
+    .step-card { background: var(--surface); margin: 12px 16px; border-radius: var(--radius-md); padding: 18px 16px; border: 1px solid var(--border); }
+    .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+    .step-head h3 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; }
+    .step-head .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+    .status.done { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+    .status.todo { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+    .status.now { background: var(--accent-soft); color: var(--accent); }
+
+    .auth-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 0; border-top: 1px solid var(--border); }
+    .auth-row:first-of-type { border-top: 0; }
+    .auth-row .k { color: var(--muted); }
+    .auth-row .v { font-weight: 500; }
+    .scan-cta {
+      width: 100%; padding: 14px;
+      background: var(--accent); color: white;
+      border-radius: var(--radius-sm); font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      margin-top: 10px;
+    }
+    .scan-cta svg { width: 18px; height: 18px; }
+
+    /* contract picker */
+    .contract-pick {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px; background: var(--bg);
+      border-radius: var(--radius-sm); margin-top: 8px;
+      cursor: pointer; border: 2px solid transparent;
+    }
+    .contract-pick.selected { background: var(--accent-soft); border-color: var(--accent); }
+    .contract-pick .check {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid var(--border); flex-shrink: 0;
+      display: grid; place-items: center; background: var(--surface);
+    }
+    .contract-pick.selected .check { border-color: var(--accent); background: var(--accent); }
+    .contract-pick.selected .check::after {
+      content: ''; width: 6px; height: 10px;
+      border-right: 2px solid white; border-bottom: 2px solid white;
+      transform: rotate(45deg); margin-top: -2px;
+    }
+    .contract-pick .name { font-size: 14px; font-weight: 500; }
+    .contract-pick .meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .contract-pick .price { font-size: 14px; font-weight: 700; color: var(--accent); }
+    .contract-pick .price small { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+    /* deduct preview */
+    .preview-box {
+      background: color-mix(in oklab, var(--success) 8%, transparent);
+      border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
+      border-radius: var(--radius-sm); padding: 12px 14px;
+      margin-top: 12px;
+    }
+    .preview-box h4 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--success); display: flex; align-items: center; gap: 6px; }
+    .preview-box h4 svg { width: 14px; height: 14px; }
+    .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; font-size: 12px; }
+    .preview-grid div { color: var(--fg); }
+    .preview-grid span { color: var(--muted); }
+
+    /* faq */
+    .faq { padding: 4px 16px 16px; }
+    .faq h3 { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 8px; }
+    .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 6px; font-size: 13px; }
+    .faq-item strong { display: block; font-size: 13px; margin-bottom: 4px; }
+    .faq-item p { margin: 0; font-size: 12px; color: var(--muted); }
+
+    /* bottom CTA */
+    .bottom-cta {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 12px 16px calc(12px + var(--safe-bottom));
+      display: flex; gap: 10px; z-index: 20;
+    }
+    .btn-secondary { flex: 1; height: 48px; background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 14px; }
+    .btn-primary { flex: 2; height: 48px; background: var(--accent); color: white; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; }
+    .btn-primary:disabled { background: var(--border); color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>公积金直付申请</h1>
+    <button class="help-btn">帮助</button>
+  </div>
+
+  <!-- hero -->
+  <div class="hero">
+    <span class="badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      南京公积金中心 × 江苏银行 联合通道
+    </span>
+    <h2>公积金直付保租房租金</h2>
+    <p class="sub">授权一次 · 每月自动扣划 · 无需垫付</p>
+    <div class="balance-card">
+      <div>
+        <div class="lbl">您的公积金账户余额</div>
+        <div class="amt">¥ 38,420.50</div>
+      </div>
+      <a class="qry">查询明细 ›</a>
+    </div>
+  </div>
+
+  <!-- step 1 -->
+  <div class="step-card">
+    <div class="step-head">
+      <span class="step-num">1</span>
+      <h3>授权公积金账户</h3>
+      <span class="status done">已完成</span>
+    </div>
+    <div class="auth-row"><span class="k">姓名</span><span class="v">张 *涛</span></div>
+    <div class="auth-row"><span class="k">证件号</span><span class="v">3201**********4521</span></div>
+    <div class="auth-row"><span class="k">公积金账号</span><span class="v">3010 **** **** 8825</span></div>
+    <div class="auth-row"><span class="k">月缴存额</span><span class="v">¥ 1,860.00</span></div>
+    <div class="auth-row"><span class="k">缴存单位</span><span class="v">南京 ××× 科技有限公司</span></div>
+  </div>
+
+  <!-- step 2 -->
+  <div class="step-card">
+    <div class="step-head">
+      <span class="step-num">2</span>
+      <h3>选择需直付的租赁合同</h3>
+      <span class="status now">进行中</span>
+    </div>
+
+    <div class="contract-pick selected">
+      <div class="check"></div>
+      <div style="flex: 1;">
+        <div class="name">江宁·梧桐公馆 3 栋 1506</div>
+        <div class="meta">合同编号 NJBZF-2026-04528 · 租期 2026-06 ~ 2027-05</div>
+      </div>
+      <div class="price">¥2,380<small>/月</small></div>
+    </div>
+
+    <div class="contract-pick">
+      <div class="check"></div>
+      <div style="flex: 1;">
+        <div class="name">江宁·梧桐公馆 3 栋 0903</div>
+        <div class="meta">合同编号 NJBZF-2026-03891 · 备用合同</div>
+      </div>
+      <div class="price">¥2,180<small>/月</small></div>
+    </div>
+
+    <div class="preview-box">
+      <h4>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        直付预览
+      </h4>
+      <div class="preview-grid">
+        <span>每月扣划日</span><div>每月 5 日</div>
+        <span>扣划金额</span><div>¥ 1,860（公积金）+ ¥ 520（绑定银行卡）</div>
+        <span>租金合计</span><div>¥ 2,380 / 月</div>
+        <span>余额可用</span><div>支持 20 个月</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- step 3 -->
+  <div class="step-card">
+    <div class="step-head">
+      <span class="step-num">3</span>
+      <h3>确认并扫码授权</h3>
+      <span class="status todo">待操作</span>
+    </div>
+    <p style="font-size: 13px; color: var(--muted); margin: 0 0 8px;">扫码完成公积金中心 + 江苏银行 双重身份核验，授权完成后将于次月 5 日开始自动扣划。</p>
+    <button class="scan-cta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="14" x2="21" y2="14"/><line x1="14" y1="21" x2="21" y2="21"/></svg>
+      打开扫码授权
+    </button>
+  </div>
+
+  <!-- faq -->
+  <div class="faq">
+    <h3>常见问题</h3>
+    <div class="faq-item">
+      <strong>Q：扣款失败会怎样？</strong>
+      <p>当月公积金余额不足时，差额自动从绑定的江苏银行借记卡扣划；如均失败，将提前 3 日短信提醒。</p>
+    </div>
+    <div class="faq-item">
+      <strong>Q：可以同时绑定多套合同吗？</strong>
+      <p>可以。多套合同按合同金额顺序依次扣划，超出公积金额度部分走绑定银行卡。</p>
+    </div>
+    <div class="faq-item">
+      <strong>Q：解约怎么处理？</strong>
+      <p>合同解约后系统自动终止该合同的直付授权，无需手动操作。</p>
+    </div>
+    <div class="faq-item">
+      <strong>Q：异地公积金可以用吗？</strong>
+      <p>南京试点期间仅支持南京本地公积金。江苏全省互通预计 2027 年第二阶段上线。</p>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-cta">
+  <button class="btn-secondary" onclick="history.back()">取消</button>
+  <button class="btn-primary">确认申请并授权</button>
+</div>
+<script src="_region.js"></script>
+</body>
+</html>

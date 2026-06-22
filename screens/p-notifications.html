@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>通知中心 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.5fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* templates */
+    .tpl{display:grid; grid-template-columns:36px 1fr auto auto auto auto; gap:12px; padding:12px 14px; border-radius:6px; background:var(--line); margin-bottom:8px; align-items:center; font-size:12.5px;}
+    .tpl .ic{font-size:18px; text-align:center;}
+    .tpl .info .nm{font-weight:600;}
+    .tpl .info .desc{font-size:11px; color:var(--muted); margin-top:2px;}
+    .tpl .info .ch-row{display:flex; gap:4px; margin-top:6px;}
+    .tpl .ch{font-size:9.5px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .tpl .ch.sms{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .tpl .ch.push{background:var(--accent-soft); color:var(--accent);}
+    .tpl .ch.wechat{background:color-mix(in oklab, #16a34a 14%, transparent); color:#16a34a;}
+    .tpl .ch.email{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .tpl .ch.in{background:color-mix(in oklab, #a855f7 14%, transparent); color:#7c3aed;}
+    .tpl .ch.webhook{background:color-mix(in oklab, var(--muted) 14%, transparent); color:var(--muted);}
+    .tpl .v{font-family:var(--mono); font-size:10.5px; padding:2px 5px; background:var(--surface); color:var(--accent); border-radius:3px; font-weight:600;}
+    .tpl .stat{text-align:center; font-size:11px;}
+    .tpl .stat .num{font-size:13px; font-weight:700; font-family:var(--mono);}
+    .tpl .stat .lbl{font-size:10px; color:var(--muted);}
+    .swt{width:32px; height:18px; background:var(--success); border-radius:9px; position:relative; cursor:pointer; flex-shrink:0;}
+    .swt::after{content:''; position:absolute; top:2px; left:16px; width:14px; height:14px; background:white; border-radius:50%;}
+    .swt.off{background:var(--border);}
+    .swt.off::after{left:2px;}
+
+    /* channel pie */
+    .channel-block{display:grid; grid-template-columns:auto 1fr; gap:18px; align-items:center;}
+    .pie{width:120px; height:120px; border-radius:50%; flex-shrink:0; background:conic-gradient(
+      #16a34a 0% 36%, #6366f1 36% 64%, #16a34a 0% 36%, #a855f7 64% 78%, #ca8a04 78% 88%, #6b7280 88% 100%
+    ); position:relative;}
+    .pie::before{content:''; position:absolute; inset:24px; background:var(--surface); border-radius:50%;}
+    .pie::after{content:'12.4k'; position:absolute; inset:0; display:grid; place-items:center; font-size:13px; font-weight:700; color:var(--fg); z-index:1;}
+    .pie-side{font-size:12px;}
+    .pie-side .row{display:flex; align-items:center; gap:8px; padding:4px 0;}
+    .pie-side .row .dot{width:10px; height:10px; border-radius:3px;}
+    .pie-side .v{margin-left:auto; font-weight:600; font-family:var(--mono);}
+
+    /* preview phone */
+    .phone{padding:18px; background:linear-gradient(135deg, #f1f5f9, #e2e8f0); border-radius:12px;}
+    .phone-screen{background:var(--surface); border-radius:10px; padding:14px 16px; box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+    .phone-screen .h{display:flex; align-items:center; gap:8px; padding-bottom:10px; border-bottom:1px solid var(--line); margin-bottom:10px;}
+    .phone-screen .h .av{width:32px; height:32px; border-radius:50%; background:var(--accent); color:white; display:grid; place-items:center; font-weight:700; font-size:12px;}
+    .phone-screen .h .nm{font-weight:600; font-size:12.5px;}
+    .phone-screen .h .t{margin-left:auto; font-size:10px; color:var(--muted);}
+    .phone-screen .ctx{font-size:12.5px; line-height:1.6;}
+    .phone-screen .ctx .ttl{font-weight:600; margin-bottom:4px;}
+    .phone-screen .cta{margin-top:10px; padding:7px 12px; background:var(--accent); color:white; border-radius:6px; font-size:11.5px; font-weight:600; display:inline-block;}
+
+    /* throttle / quiet hours */
+    .qh{padding:12px 14px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 3%, transparent)); border-left:3px solid var(--accent); border-radius:6px; margin-bottom:8px; font-size:12.5px;}
+    .qh .head{font-weight:600; margin-bottom:4px; display:flex; gap:6px; align-items:center;}
+    .qh .head .ic{font-size:14px;}
+    .qh .desc{font-size:11.5px; color:var(--muted); line-height:1.55;}
+
+    /* send queue */
+    .queue-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; align-items:center;}
+    .queue-row:last-child{border-bottom:0;}
+    .queue-row .t{font-family:var(--mono); font-size:10px; color:var(--muted);}
+    .queue-row .ch-tag{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600;}
+    .queue-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .queue-row .stat.sent{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .queue-row .stat.queue{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .queue-row .stat.fail{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="notifications"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>通知中心</b></div>
+      <span style="font-size:11px; padding:3px 8px; background:var(--accent-soft); color:var(--accent); border-radius:4px; font-weight:600;">v2 多通道 · 模板 + 触发 + 节流</span>
+      <div class="top-actions">
+        <button class="btn">通道配置</button>
+        <button class="btn">送达分析</button>
+        <button class="btn pri">+ 新建模板</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">模板总数</div><div class="n">86</div><div class="d ok">↑ 12 本月</div></div>
+      <div class="ki"><div class="l">今日发送</div><div class="n">12.4k</div><div class="d ok">高峰 14:00</div></div>
+      <div class="ki"><div class="l">送达率</div><div class="n">99.4<span class="u">%</span></div><div class="d ok">健康</div></div>
+      <div class="ki"><div class="l">读取率</div><div class="n">86.2<span class="u">%</span></div><div class="d ok">↑ 2 pp</div></div>
+      <div class="ki"><div class="l">投诉退订</div><div class="n">0.6<span class="u">%</span></div><div class="d">行业 2%</div></div>
+      <div class="ki"><div class="l">本月费用</div><div class="n">¥ 2,168</div><div class="d">短信占 78%</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT templates + queue -->
+      <div>
+        <div class="card">
+          <h3>消息模板 <span class="pill">86 个</span> <span class="extra">业务触发 + 多通道</span></h3>
+
+          <div class="tpl">
+            <div class="ic">📜</div>
+            <div class="info">
+              <div class="nm">证书签发通知</div>
+              <div class="desc">cert.issued 触发 · L0-L7 通用</div>
+              <div class="ch-row">
+                <span class="ch sms">短信</span>
+                <span class="ch push">App push</span>
+                <span class="ch wechat">微信</span>
+                <span class="ch in">站内信</span>
+              </div>
+            </div>
+            <span class="v">v2.4</span>
+            <div class="stat"><div class="num">186</div><div class="lbl">本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">🎓</div>
+            <div class="info">
+              <div class="nm">考试准考证下发</div>
+              <div class="desc">exam.ticket.ready 触发</div>
+              <div class="ch-row">
+                <span class="ch sms">短信</span>
+                <span class="ch push">App push</span>
+                <span class="ch in">站内信</span>
+              </div>
+            </div>
+            <span class="v">v1.8</span>
+            <div class="stat"><div class="num">96</div><div class="lbl">本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">⚠️</div>
+            <div class="info">
+              <div class="nm">投诉处置进度</div>
+              <div class="desc">complaint.status.changed 触发 · 4 种语态</div>
+              <div class="ch-row">
+                <span class="ch sms">短信</span>
+                <span class="ch wechat">微信</span>
+                <span class="ch webhook">12345 回写</span>
+              </div>
+            </div>
+            <span class="v">v3.0</span>
+            <div class="stat"><div class="num">86</div><div class="lbl">本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">⚡</div>
+            <div class="info">
+              <div class="nm">派单通知（响应限时）</div>
+              <div class="desc">order.dispatched 触发 · 含 2 分钟超时</div>
+              <div class="ch-row">
+                <span class="ch push">App push</span>
+                <span class="ch sms">短信</span>
+              </div>
+            </div>
+            <span class="v">v2.1</span>
+            <div class="stat"><div class="num">3.4k</div><div class="lbl">本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">📊</div>
+            <div class="info">
+              <div class="nm">月度运营报表（B 端）</div>
+              <div class="desc">cron 每月 1 日 09:00 · 含 PDF 附件</div>
+              <div class="ch-row">
+                <span class="ch email">邮件</span>
+                <span class="ch wechat">微信</span>
+                <span class="ch in">站内信</span>
+              </div>
+            </div>
+            <span class="v">v1.4</span>
+            <div class="stat"><div class="num">14</div><div class="lbl">月度</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">🚫</div>
+            <div class="info">
+              <div class="nm">证书吊销公告</div>
+              <div class="desc">cert.revoked 触发 · 多端广播 + 公示</div>
+              <div class="ch-row">
+                <span class="ch sms">短信</span>
+                <span class="ch push">App push</span>
+                <span class="ch wechat">微信</span>
+                <span class="ch webhook">公示门户</span>
+                <span class="ch email">邮件</span>
+              </div>
+            </div>
+            <span class="v">v1.8</span>
+            <div class="stat"><div class="num">3</div><div class="lbl">本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+
+          <div class="tpl">
+            <div class="ic">🎄</div>
+            <div class="info">
+              <div class="nm">节日营销推送（试点）</div>
+              <div class="desc">manual 触发 · 仅 C 端授权用户</div>
+              <div class="ch-row">
+                <span class="ch push">App push</span>
+                <span class="ch wechat">微信</span>
+              </div>
+            </div>
+            <span class="v">v0.4</span>
+            <div class="stat"><div class="num">—</div><div class="lbl">草稿</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt off"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>实时发送队列 <span class="pill">最近 10 分钟</span></h3>
+          <div>
+            <div class="queue-row">
+              <span class="t">10:32:18</span>
+              <div>证书签发·郑文涛<br><span style="font-size:10px; color:var(--muted);">短信 + push + 微信 + 站内信</span></div>
+              <span class="ch-tag sms">SMS</span>
+              <span>4/4 通道</span>
+              <span class="stat sent">已送达</span>
+            </div>
+            <div class="queue-row">
+              <span class="t">10:32:08</span>
+              <div>派单·梧桐公馆 3-1502<br><span style="font-size:10px; color:var(--muted);">push 优先 · SMS 备援</span></div>
+              <span class="ch-tag" style="background:var(--accent-soft); color:var(--accent);">PUSH</span>
+              <span>陈建国</span>
+              <span class="stat sent">已读</span>
+            </div>
+            <div class="queue-row">
+              <span class="t">10:31:45</span>
+              <div>准考证下发·12 名学员<br><span style="font-size:10px; color:var(--muted);">06-12 L1→L2 考试</span></div>
+              <span class="ch-tag sms">SMS</span>
+              <span>12 人</span>
+              <span class="stat sent">12/12</span>
+            </div>
+            <div class="queue-row">
+              <span class="t">10:31:22</span>
+              <div>投诉进度·梧桐公馆漏水<br><span style="font-size:10px; color:var(--muted);">回写 12345</span></div>
+              <span class="ch-tag" style="background:color-mix(in oklab, var(--muted) 14%, transparent); color:var(--muted);">WEBHOOK</span>
+              <span>12345 / 王某</span>
+              <span class="stat queue">重试 1/3</span>
+            </div>
+            <div class="queue-row">
+              <span class="t">10:30:08</span>
+              <div>批量月报推送<br><span style="font-size:10px; color:var(--muted);">14 名 B 端运营经理</span></div>
+              <span class="ch-tag" style="background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);">EMAIL</span>
+              <span>14 人</span>
+              <span class="stat sent">14/14</span>
+            </div>
+            <div class="queue-row">
+              <span class="t">10:28:42</span>
+              <div>异常登录提醒·钱某<br><span style="font-size:10px; color:var(--muted);">非常用设备 · 已拒绝</span></div>
+              <span class="ch-tag" style="background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);">SECURITY</span>
+              <span>1 人</span>
+              <span class="stat fail">送达失败</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT pie + preview + quiet -->
+      <div>
+        <div class="card">
+          <h3>通道分布 <span class="extra">今日 12.4k 条</span></h3>
+          <div class="channel-block">
+            <div class="pie"></div>
+            <div class="pie-side">
+              <div class="row"><span class="dot" style="background:#16a34a;"></span>SMS 短信 <span class="v">4,460</span></div>
+              <div class="row"><span class="dot" style="background:#6366f1;"></span>App Push <span class="v">3,472</span></div>
+              <div class="row"><span class="dot" style="background:#16a34a; opacity:0.7;"></span>微信服务号 <span class="v">2,360</span></div>
+              <div class="row"><span class="dot" style="background:#a855f7;"></span>站内信 <span class="v">1,736</span></div>
+              <div class="row"><span class="dot" style="background:#ca8a04;"></span>邮件 <span class="v">248</span></div>
+              <div class="row"><span class="dot" style="background:#6b7280;"></span>Webhook <span class="v">124</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>模板预览 · 证书签发通知 <span class="pill">App Push</span></h3>
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="h">
+                <div class="av">认</div>
+                <div>
+                  <div class="nm">江苏保租房 · 服务者 App</div>
+                  <div style="font-size:10px; color:var(--muted);">通知</div>
+                </div>
+                <div class="t">现在</div>
+              </div>
+              <div class="ctx">
+                <div class="ttl">🎉 您的 L4 督导/店长 证书已签发</div>
+                <div>证书编号：NJ-BZF-L4-2024-0021<br>有效期至 2026-08-11，已上链可验真。</div>
+                <a class="cta">查看证书 →</a>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:10px; font-size:11px; color:var(--muted); padding:8px 10px; background:var(--line); border-radius:5px;">
+            <b style="color:var(--fg);">变量：</b> <code style="font-family:var(--mono);">{{user_name}}</code> · <code style="font-family:var(--mono);">{{level}}</code> · <code style="font-family:var(--mono);">{{cert_no}}</code> · <code style="font-family:var(--mono);">{{expires}}</code>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>节流与勿扰 <span class="pill">用户偏好</span></h3>
+          <div class="qh">
+            <div class="head"><span class="ic">🌙</span> 全局勿扰时段</div>
+            <div class="desc">默认 22:00-08:00 不推送营销/普通通知；<b>仅高优工单 + 安全告警</b>允许穿透。</div>
+          </div>
+          <div class="qh">
+            <div class="head"><span class="ic">📉</span> 单用户节流</div>
+            <div class="desc">同模板对同人 4h 内 ≤ 1 次；当日同人总条数 ≤ 8；超出转站内信。</div>
+          </div>
+          <div class="qh">
+            <div class="head"><span class="ic">🛡</span> 退订与合规</div>
+            <div class="desc">短信附"回 TD 退订"；C 端用户可在 profile 单独关闭 7 类通知；DPO 季度审 PII 推送日志。</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>好房子评级 · 自评录入</title>
+  <style>
+    :root {
+      --bg:#f5f7fa; --surface:#fff; --fg:#0f172a; --muted:#64748b;
+      --border:#e2e8f0; --accent:#0f766e; --warn:#ea580c; --ok:#16a34a;
+      --comfort:#f59e0b; --green:#10b981; --tech:#3b82f6; --safety:#ef4444;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,'PingFang SC',sans-serif; font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 80px;}
+
+    .page-header{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:18px 22px; margin-bottom:18px;
+      display:flex; align-items:center; gap:14px;
+    }
+    .page-header h1{font-size:20px; margin:0; font-weight:700;}
+    .page-header .sub{color:var(--muted); font-size:12px; margin-top:2px;}
+    .page-header .right{margin-left:auto; display:flex; gap:8px; align-items:center;}
+    .page-header .breadcrumb{
+      font-size:11px; color:var(--muted); margin-bottom:4px;
+    }
+    .page-header .breadcrumb a{color:var(--accent);}
+
+    /* 顶部：当前评分预览 */
+    .score-preview{
+      display:grid; grid-template-columns:auto 1fr auto; gap:20px;
+      background:linear-gradient(135deg, #0f172a 0%, #b45309 100%);
+      color:#fff; border-radius:12px; padding:20px;
+      margin-bottom:18px; align-items:center;
+    }
+    .score-preview .left{text-align:center;}
+    .score-preview .left .label{font-size:11px; opacity:0.7; letter-spacing:1px;}
+    .score-preview .left .stars{font-size:28px; letter-spacing:3px; margin:6px 0;}
+    .score-preview .left .num{font-size:11px; opacity:0.85;}
+    .score-preview .left .num b{font-size:18px; font-weight:700;}
+    .score-preview .dims{display:grid; gap:6px;}
+    .score-preview .drow{display:grid; grid-template-columns:60px 1fr 36px; gap:10px; align-items:center; font-size:12px;}
+    .score-preview .drow .bar{height:6px; background:rgba(255,255,255,0.18); border-radius:3px; overflow:hidden;}
+    .score-preview .drow .fill{height:100%;}
+    .score-preview .drow .v{font-weight:700; text-align:right;}
+    .score-preview .right{
+      padding:14px 18px; background:rgba(255,255,255,0.1); border-radius:10px;
+      text-align:center;
+    }
+    .score-preview .right .label{font-size:11px; opacity:0.7;}
+    .score-preview .right .ratio{font-size:24px; font-weight:700; margin-top:4px;}
+
+    /* 项目信息 */
+    .target-row{
+      display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px;
+      margin-bottom:18px;
+    }
+    .target-cell{
+      background:#fff; border:1px solid var(--border); border-radius:8px;
+      padding:10px 14px;
+    }
+    .target-cell .lbl{font-size:11px; color:var(--muted);}
+    .target-cell .val{font-size:14px; font-weight:600; margin-top:2px;}
+
+    /* 类别 section */
+    .cat-section{
+      background:#fff; border:1px solid var(--border); border-radius:12px;
+      margin-bottom:14px; overflow:hidden;
+    }
+    .cat-head{
+      display:flex; align-items:center; gap:10px;
+      padding:14px 18px; background:#fafafa; border-bottom:1px solid var(--border);
+      cursor:pointer;
+    }
+    .cat-head .ico{
+      width:32px; height:32px; border-radius:8px;
+      background:linear-gradient(135deg, #0f172a, #b45309); color:#fff;
+      display:grid; place-items:center; font-size:14px;
+    }
+    .cat-head .t{font-size:14px; font-weight:700;}
+    .cat-head .meta{font-size:11px; color:var(--muted);}
+    .cat-head .right{margin-left:auto; display:flex; gap:8px; align-items:center;}
+    .cat-head .progress{font-size:12px; color:var(--ok); font-weight:600;}
+    .cat-head .weight{font-size:11px; padding:2px 8px; background:#fef3c7; color:#92400e; border-radius:4px;}
+
+    /* 项目清单 */
+    .items{padding:8px 18px 16px;}
+    .item-row{
+      display:grid; grid-template-columns:24px 1fr 100px 90px;
+      gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9;
+      align-items:center; font-size:12.5px;
+    }
+    .item-row:last-child{border-bottom:none;}
+    .item-row .chk{
+      width:18px; height:18px; border-radius:4px; border:1.5px solid #cbd5e1;
+      display:grid; place-items:center; cursor:pointer; background:#fff;
+    }
+    .item-row.checked .chk{background:var(--ok); border-color:var(--ok); color:#fff;}
+    .item-row.checked .chk::after{content:"✓"; font-size:12px; font-weight:700;}
+    .item-row .name{color:#334155;}
+    .item-row .req{
+      font-size:11px; color:var(--muted);
+      padding:2px 8px; border-radius:4px; background:#f1f5f9;
+      text-align:center;
+    }
+    .item-row .req.r5{background:#ede9fe; color:#7c3aed;}
+    .item-row .req.r4{background:#fed7aa; color:#c2410c;}
+    .item-row .upload{
+      font-size:11px; color:var(--accent); text-align:center;
+      padding:2px 8px; border:1px dashed var(--border); border-radius:4px;
+      cursor:pointer;
+    }
+    .item-row.checked .upload{color:var(--ok); border-color:var(--ok);}
+
+    /* 底部提交栏 */
+    .submit-bar{
+      position:sticky; bottom:0; left:0; right:0;
+      background:#fff; border-top:1px solid var(--border);
+      padding:14px 28px; margin:18px -28px -80px;
+      display:flex; gap:10px; align-items:center;
+    }
+    .submit-bar .info{font-size:12px; color:var(--muted);}
+    .submit-bar .info b{color:var(--fg);}
+    .btn{
+      padding:10px 22px; border-radius:8px; font-size:13px; font-weight:600;
+      cursor:pointer; border:0;
+    }
+    .btn-primary{background:linear-gradient(90deg,#0f172a,#b45309); color:#fff;}
+    .btn-ghost{background:#fff; color:var(--fg); border:1px solid var(--border);}
+    .submit-bar .actions{margin-left:auto; display:flex; gap:8px;}
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="b" data-active="listing"></div>
+
+  <div class="main-wrap">
+    <div class="page-header">
+      <div>
+        <div class="breadcrumb"><a href="b-listing-mgmt.html">← 房源管理</a></div>
+        <h1>★ 好房子评级 · 自评录入</h1>
+        <div class="sub">梧桐公馆 3-0903 · NJBZF-03891 · 按 <a href="d-property-standard.html" style="color:var(--accent);">房的标准</a> 55 项自查清单逐项勾选 · 含<b style="color:#16a34a;">物资 6 类（家具/家电/建材/智能锁/涂料/卫浴）</b> + 服务 4 类 + 其他 45 项三层</div>
+      </div>
+      <div class="right">
+        <button class="btn btn-ghost">导入上次自评</button>
+        <button class="btn btn-ghost">下载 PDF 模板</button>
+      </div>
+    </div>
+
+    <!-- 当前评分预览 -->
+    <div class="score-preview">
+      <div class="left">
+        <div class="label">实时预估</div>
+        <div class="stars">★★★★<span style="opacity:0.3;">★</span></div>
+        <div class="num"><b>4</b> 星 · <b>82</b> / 100 分</div>
+      </div>
+      <div class="dims">
+        <div class="drow"><span>🛋 舒适</span><div class="bar"><div class="fill" style="width:82%; background:var(--comfort);"></div></div><span class="v">4.1</span></div>
+        <div class="drow"><span>🌿 绿色</span><div class="bar"><div class="fill" style="width:68%; background:var(--green);"></div></div><span class="v">3.4</span></div>
+        <div class="drow"><span>📡 科技</span><div class="bar"><div class="fill" style="width:92%; background:var(--tech);"></div></div><span class="v">4.6</span></div>
+        <div class="drow"><span>🛡 安全</span><div class="bar"><div class="fill" style="width:88%; background:var(--safety);"></div></div><span class="v">4.4</span></div>
+      </div>
+      <div class="right">
+        <div class="label">已勾选 / 总项</div>
+        <div class="ratio">42 / 55</div>
+      </div>
+    </div>
+
+    <!-- 目标房源信息 -->
+    <div class="target-row">
+      <div class="target-cell"><div class="lbl">房源编号</div><div class="val">NJBZF-03891</div></div>
+      <div class="target-cell"><div class="lbl">户型 · 面积</div><div class="val">1 室 1 厅 · 42㎡</div></div>
+      <div class="target-cell"><div class="lbl">所属项目</div><div class="val">梧桐公馆 / 江宁</div></div>
+      <div class="target-cell"><div class="lbl">运营主体</div><div class="val">南京安居 · 模式①</div></div>
+    </div>
+
+    <!-- 类别 1：信息图片 -->
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">📷</div>
+        <div>
+          <div class="t">1. 信息图片</div>
+          <div class="meta">照片总数 · 外观 · 公区 · 客房 · 卫生间</div>
+        </div>
+        <div class="right">
+          <span class="progress">✓ 5 / 5</span>
+          <span class="weight">权重 10%</span>
+        </div>
+      </div>
+      <div class="items">
+        <div class="item-row checked"><div class="chk"></div><div class="name">照片总数（不重复）&gt; 50 张</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 已上传</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">每个相册 &gt; 5 张</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 已上传</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">外观图（店招/全貌）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 已上传</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">公区图（全貌+局部特写）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 已上传</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">客房床照 + 卫生间</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 已上传</div></div>
+      </div>
+    </div>
+
+    <!-- 类别 2：基础设施 -->
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">🏗</div>
+        <div>
+          <div class="t">2. 基础设施</div>
+          <div class="meta">电梯 · 停车 · 监控 · 洗衣房</div>
+        </div>
+        <div class="right">
+          <span class="progress">✓ 3 / 4</span>
+          <span class="weight">权重 20%</span>
+        </div>
+      </div>
+      <div class="items">
+        <div class="item-row checked"><div class="chk"></div><div class="name">洗衣房（公区或户内）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">电梯（≥3 层）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row"><div class="chk"></div><div class="name">停车场车位 &gt; 客房数 15%</div><div class="req r5">5★ 强制</div><div class="upload">上传佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">闭路电视监控</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+      </div>
+    </div>
+
+    <!-- 类别 3：房间配套 -->
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">🛏</div>
+        <div>
+          <div class="t">3. 房间配套</div>
+          <div class="meta">面积 · 智能锁 · 家电 · 保险 · 甲醛检测</div>
+        </div>
+        <div class="right">
+          <span class="progress" style="color:var(--warn);">○ 13 / 17</span>
+          <span class="weight">权重 30%</span>
+        </div>
+      </div>
+      <div class="items">
+        <div class="item-row"><div class="chk"></div><div class="name">面积 ≥ 30㎡（70% 房源）</div><div class="req r5">5★ 强制</div><div class="upload">上传佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">面积 ≥ 25㎡（70% 房源）</div><div class="req r4">4★ 强制</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">卫生间干湿分离</div><div class="req">4/5★ 强制</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">实体衣柜 + 衣架</div><div class="req">4/5★ 强制</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">智能门锁（隐私加密标准）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">智能水电表（隐私加密）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row"><div class="chk"></div><div class="name">智能马桶</div><div class="req r5">5★ 强制</div><div class="upload">上传佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">沙发 ≥ 2 人（环保认证可加分）</div><div class="req">3★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">空调 / 暖气</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">洗衣机</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">电视机</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">无线 WiFi（隐私加密）</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row"><div class="chk"></div><div class="name">冰箱</div><div class="req r4">4/5★ 强制</div><div class="upload">上传佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">交付：入住保洁</div><div class="req">3/4/5★ 通用</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">交付：全屋整备（4★+）</div><div class="req r4">4/5★ 强制</div><div class="upload">✓ 佐证</div></div>
+        <div class="item-row"><div class="chk"></div><div class="name">交付：甲醛检测</div><div class="req r5">5★ 强制</div><div class="upload">上传报告</div></div>
+        <div class="item-row checked"><div class="chk"></div><div class="name">加强型家财险（漏水/电器）</div><div class="req r4">4/5★ 强制</div><div class="upload">✓ 保单</div></div>
+      </div>
+      <!-- 物资 6 类供应商绑定状态（V2 新增 · 对应 PRD §8.1 物资类目） -->
+      <div style="margin-top:10px; padding:10px 12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;">
+        <div style="font-size:12px; font-weight:600; color:#0f766e; margin-bottom:6px;">🛒 物资 6 类供应商绑定（V2 必填 · 详见 <a href="suppliers.html" style="color:#0f766e;">合格供应商公示</a>）</div>
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:4px; font-size:11px;">
+          <div>✓ 家具 · 北新建材 LV2</div>
+          <div>✓ 家电 · 美的 LV3</div>
+          <div>✓ 建材 · 圣象 LV2</div>
+          <div>✓ 智能锁 · 凯迪仕 LV2</div>
+          <div>✓ 涂料 · 立邦 LV2</div>
+          <div>✓ 卫浴 · 九牧 LV2</div>
+        </div>
+        <div style="font-size:10px; color:var(--muted); margin-top:6px;">绑定状态：6/6 已配 · 全部来自合格供应商名录 · 详情页将展示"环保认证 6/6"徽章</div>
+      </div>
+    </div>
+
+    <!-- 类别 4-6 折叠示意 -->
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">🛎</div>
+        <div>
+          <div class="t">4. 服务配套</div>
+          <div class="meta">24h 客服 · 行李寄存 · 清洁 · 信用分</div>
+        </div>
+        <div class="right">
+          <span class="progress">✓ 7 / 8</span>
+          <span class="weight">权重 15%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">🏛</div>
+        <div>
+          <div class="t">5. 公区配套</div>
+          <div class="meta">管家 · 活动公区 · 24h 维修保安</div>
+        </div>
+        <div class="right">
+          <span class="progress">✓ 8 / 10</span>
+          <span class="weight">权重 15%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cat-section">
+      <div class="cat-head">
+        <div class="ico">🌳</div>
+        <div>
+          <div class="t">6. 周边休闲 3km</div>
+          <div class="meta">餐厅 · 健身房 · 茶室咖啡 · SPA · 泳池</div>
+        </div>
+        <div class="right">
+          <span class="progress" style="color:var(--warn);">○ 6 / 11</span>
+          <span class="weight">权重 10%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提交栏 -->
+    <div class="submit-bar">
+      <div class="info">
+        已勾选 <b>42 / 55</b> 项 · 预估 <b>4 星</b>（82 分）·
+        提交后由 <b><a href="p-cert-issue.html" style="color:var(--accent);">P 端发证管理</a></b> 复核
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost">保存草稿</button>
+        <button class="btn btn-primary">提交复核</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

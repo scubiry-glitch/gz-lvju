@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>商品目录 + 集采报价 · 物资供应商 M 端</title>
+  <style>
+    :root {
+      --bg: #faf5ff; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e5e7eb; --accent: #6b21a8;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.55;}
+    a{color:inherit; text-decoration:none}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* 我的认证 6 类 */
+    .cert-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-bottom:18px;}
+    .cert{padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); text-align:center;}
+    .cert.on{background:#f0fdf4; border-color:#bbf7d0;}
+    .cert.off{opacity:0.5;}
+    .cert .ico{font-size:20px; margin-bottom:4px;}
+    .cert .nm{font-size:12px; font-weight:600;}
+    .cert .lv{font-size:10px; margin-top:3px; color:var(--muted);}
+    .cert.on .lv{color:var(--success); font-weight:600;}
+
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px;}
+    .card-head{padding:13px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0; flex:1;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card-body{padding:0;}
+
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th, td{padding:11px 18px; text-align:left; border-bottom:1px solid #f1f5f9;}
+    th{font-size:11.5px; font-weight:600; color:var(--muted); background:var(--bg); text-transform:uppercase; letter-spacing:0.3px;}
+    tr:last-child td{border-bottom:0;}
+    td.num{font-family:monospace;}
+    .lvl{display:inline-block; padding:1px 7px; border-radius:3px; font-size:10.5px; font-weight:700;}
+    .lvl.l3{background:#dcfce7; color:#15803d;}
+    .lvl.l2{background:#fef3c7; color:#92400e;}
+    .lvl.l1{background:#e0e7ff; color:#3730a3;}
+    .price{font-weight:600; color:var(--accent);}
+    .compare{font-size:11px; color:var(--success);}
+    .compare.warn{color:var(--warn);}
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="m" data-active="catalog"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>商品目录 + 集采报价</h1>
+      <span style="font-size:12px; color:var(--muted);">北新建材 · LV2 · 当前覆盖 3 类</span>
+      <button class="btn">导出价目表</button>
+      <button class="btn pri">+ 新增 SKU</button>
+    </div>
+
+    <!-- 我的 6 类认证 -->
+    <div class="cert-grid">
+      <div class="cert on"><div class="ico">🪵</div><div class="nm">家具</div><div class="lv">✓ LV2 · 至 2027-12</div></div>
+      <div class="cert off"><div class="ico">🌀</div><div class="nm">家电</div><div class="lv">未申请</div></div>
+      <div class="cert on"><div class="ico">🧱</div><div class="nm">建材</div><div class="lv">✓ LV2 · 至 2027-09</div></div>
+      <div class="cert off"><div class="ico">🔒</div><div class="nm">智能锁</div><div class="lv">未申请</div></div>
+      <div class="cert on"><div class="ico">🎨</div><div class="nm">涂料</div><div class="lv">✓ LV2 · 至 2027-11</div></div>
+      <div class="cert off"><div class="ico">🚿</div><div class="nm">卫浴</div><div class="lv">未申请</div></div>
+    </div>
+
+    <!-- 家具品类 SKU -->
+    <div class="card">
+      <div class="card-head"><h3>🪵 家具品类 SKU（8 项）</h3><span class="pill">环保 E0 · LV2</span></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>SKU</th><th>商品名</th><th>规格</th><th>认证</th><th>我的报价（元）</th><th>vs 省级集采底价</th><th>入驻项目</th></tr></thead>
+          <tbody>
+            <tr><td class="num">FN-BS-001</td><td>三人位布艺沙发</td><td>2.1m</td><td><span class="lvl l2">E0 + 防火</span></td><td class="price">¥ 1,580</td><td class="compare">↓ 8% 低于底价</td><td>5 项目</td></tr>
+            <tr><td class="num">FN-BS-002</td><td>双人床（含床垫）</td><td>1.5×2.0m</td><td><span class="lvl l2">E0</span></td><td class="price">¥ 1,200</td><td class="compare">↓ 5% 低于底价</td><td>5 项目</td></tr>
+            <tr><td class="num">FN-WD-003</td><td>四门衣柜</td><td>2.4×0.6×2.2m</td><td><span class="lvl l2">E0</span></td><td class="price">¥ 980</td><td class="compare">↓ 12% 低于底价</td><td>4 项目</td></tr>
+            <tr><td class="num">FN-DR-004</td><td>书桌 + 椅子</td><td>1.2×0.6m</td><td><span class="lvl l2">E0</span></td><td class="price">¥ 480</td><td class="compare warn">↑ 3% 高于底价</td><td>3 项目</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 建材品类 SKU -->
+    <div class="card">
+      <div class="card-head"><h3>🧱 建材品类 SKU（6 项）</h3><span class="pill">甲醛 E0 · LV2</span></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>SKU</th><th>商品名</th><th>规格</th><th>认证</th><th>我的报价（元/㎡）</th><th>vs 省级集采底价</th><th>入驻项目</th></tr></thead>
+          <tbody>
+            <tr><td class="num">BM-FL-001</td><td>强化复合地板</td><td>12mm</td><td><span class="lvl l2">E0</span></td><td class="price">¥ 88</td><td class="compare">↓ 10% 低于底价</td><td>8 项目</td></tr>
+            <tr><td class="num">BM-FL-002</td><td>多层实木地板</td><td>15mm</td><td><span class="lvl l3">E0 + FSC</span></td><td class="price">¥ 168</td><td class="compare">↓ 6% 低于底价</td><td>3 项目</td></tr>
+            <tr><td class="num">BM-TL-003</td><td>抛光砖</td><td>800×800mm</td><td><span class="lvl l2">A 级</span></td><td class="price">¥ 65</td><td class="compare">↓ 8% 低于底价</td><td>6 项目</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 涂料品类 -->
+    <div class="card">
+      <div class="card-head"><h3>🎨 涂料品类 SKU（4 项）</h3><span class="pill">VOC 达标 · LV2</span></div>
+      <div class="card-body">
+        <table>
+          <thead><tr><th>SKU</th><th>商品名</th><th>规格</th><th>认证</th><th>我的报价（元/桶）</th><th>vs 省级集采底价</th><th>入驻项目</th></tr></thead>
+          <tbody>
+            <tr><td class="num">PT-IN-001</td><td>内墙乳胶漆</td><td>18L</td><td><span class="lvl l2">VOC 达标</span></td><td class="price">¥ 380</td><td class="compare">↓ 9% 低于底价</td><td>9 项目</td></tr>
+            <tr><td class="num">PT-IN-002</td><td>儿童房专用乳胶漆</td><td>5L</td><td><span class="lvl l3">VOC 零醛 + 抗菌</span></td><td class="price">¥ 280</td><td class="compare">↓ 4% 低于底价</td><td>2 项目</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="font-size:11px; color:var(--muted); text-align:center; padding:14px;">
+      集采底价由住建厅会同贝壳供应链 + 中房协联合发布 · 月度更新 · 详见 <a href="d-property-standard.html" style="color:var(--accent);">房的标准 § 物资标准认证</a>
+    </div>
+  </main>
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

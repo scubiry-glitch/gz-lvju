@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>投诉处置 · 江苏保租房监管</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:80px;}
+
+
+    /* KPI mini */
+    .kpi-row{display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; padding:12px;}
+    .ks{background:var(--surface); padding:10px 8px; border-radius:8px; text-align:center; border:1px solid var(--border);}
+    .ks .l{font-size:10px; color:var(--muted);}
+    .ks .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ks.danger .n{color:var(--danger);}
+    .ks.warn .n{color:var(--warn);}
+    .ks.ok .n{color:var(--success);}
+
+    /* status tab */
+    .tabs{display:flex; gap:4px; padding:0 12px; background:var(--bg); overflow-x:auto;}
+    .tabs .t{flex-shrink:0; padding:10px 14px; font-size:13px; color:var(--muted); border-bottom:2px solid transparent;}
+    .tabs .t.on{color:var(--accent); border-color:var(--accent); font-weight:600;}
+    .tabs .t .cnt{background:var(--bg); padding:1px 6px; border-radius:3px; font-size:10px; margin-left:4px;}
+    .tabs .t.on .cnt{background:var(--accent-soft); color:var(--accent);}
+
+    /* complaint card */
+    .list{padding:8px 12px 12px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 14px 10px; margin-bottom:10px;}
+    .head{display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;}
+    .sev{font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;}
+    .sev.h{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .sev.m{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .sev.l{background:var(--accent-soft); color:var(--accent);}
+    .head .ttl2{flex:1; font-size:14px; font-weight:600;}
+    .head .time{font-size:11px; color:var(--muted);}
+    .who{display:flex; gap:6px; font-size:12px; color:var(--muted); margin-bottom:6px; flex-wrap:wrap;}
+    .who .pill{padding:1px 6px; background:var(--bg); border-radius:3px;}
+    .desc{font-size:13px; color:var(--fg); margin:6px 0;}
+    .progress{display:flex; gap:4px; padding-top:8px; border-top:1px solid var(--border); font-size:11px; color:var(--muted);}
+    .progress .step{flex:1; padding:4px 6px; background:var(--bg); border-radius:3px; text-align:center;}
+    .progress .step.done{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .progress .step.now{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+    .acts{display:flex; gap:6px; margin-top:10px;}
+    .acts a{flex:1; padding:8px; background:var(--bg); border-radius:6px; text-align:center; font-size:12px; color:var(--accent); border:1px solid var(--border);}
+    .acts a.pri{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .acts a.dn{color:var(--danger);}
+
+    /* g tabbar */
+    /* ============ PC 版（≥1024px）============ */
+    @media (min-width: 1024px) {
+      .app-shell > .kpi-row { padding: 16px 24px 4px; }
+      .app-shell > .tabs { padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 56px; z-index: 4; }
+      .app-shell > .list {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 12px; padding: 14px 24px 28px;
+      }
+      .app-shell > .list > .card { margin-bottom: 0; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+<div id="side-nav" data-series="g" data-active="complaint"></div>
+<div class="app-shell">
+  <div id="m-header" data-series="g" data-active="complaint" data-title="投诉处置" data-icon="💬" data-ttl="租客投诉与处置工单" data-sub="数据源：12345 政务热线 + 频道内反馈 + 住建局信箱" data-right="本月 24"></div>
+  <div class="kpi-row">
+    <div class="ks danger"><div class="l">高优待办</div><div class="n">3</div></div>
+    <div class="ks warn"><div class="l">中优</div><div class="n">8</div></div>
+    <div class="ks"><div class="l">本月新增</div><div class="n">24</div></div>
+    <div class="ks ok"><div class="l">完结率</div><div class="n">89%</div></div>
+  </div>
+
+  <div class="tabs">
+    <div class="t on">全部 <span class="cnt">24</span></div>
+    <div class="t">高优 <span class="cnt">3</span></div>
+    <div class="t">处置中 <span class="cnt">12</span></div>
+    <div class="t">已闭环 <span class="cnt">21</span></div>
+    <div class="t">已驳回 <span class="cnt">2</span></div>
+  </div>
+
+  <div class="list">
+
+    <div class="card">
+      <div class="head">
+        <span class="sev h">高</span>
+        <div class="ttl2">仙林湖 4-0612 漏水严重 · 第 3 次投诉</div>
+        <div class="time">23 分钟前</div>
+      </div>
+      <div class="who">
+        <span class="pill">租客 王 ** · 138****4521</span>
+        <span class="pill">运营方：南京安居</span>
+        <span class="pill">渠道：12345</span>
+      </div>
+      <div class="desc">"卫生间漏水第 3 次报修，水电费翻倍，运营方一直拖延，已影响居住安全。"</div>
+      <div class="progress">
+        <span class="step done">受理 09:18</span>
+        <span class="step done">分派 09:25</span>
+        <span class="step now">现场核查中</span>
+        <span class="step">处置完成</span>
+        <span class="step">回访</span>
+      </div>
+      <div class="acts">
+        <a>转工单到运营方</a>
+        <a class="pri">现场督办</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <span class="sev h">高</span>
+        <div class="ttl2">建邺 河西青年 3-1108 押金不予退还</div>
+        <div class="time">1 小时前</div>
+      </div>
+      <div class="who">
+        <span class="pill">租客 陈 ** · 139****8842</span>
+        <span class="pill">运营方：江苏安居</span>
+        <span class="pill">渠道：频道反馈</span>
+      </div>
+      <div class="desc">"退房 30 天，押金 ¥6,000 仍未退还，运营方以"清洁费"扣 ¥4,000，疑似违规。"</div>
+      <div class="progress">
+        <span class="step done">受理 08:42</span>
+        <span class="step now">已发函询问运营方</span>
+        <span class="step">复核</span>
+        <span class="step">处置</span>
+        <span class="step">回访</span>
+      </div>
+      <div class="acts">
+        <a>查看合同 / 退款记录</a>
+        <a class="pri">约谈运营方</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <span class="sev m">中</span>
+        <div class="ttl2">梧桐公馆 服务者态度问题</div>
+        <div class="time">3 小时前</div>
+      </div>
+      <div class="who">
+        <span class="pill">租客 李 ** · 137****2118</span>
+        <span class="pill">服务者：周天明</span>
+        <span class="pill">渠道：频道反馈</span>
+      </div>
+      <div class="desc">"保洁主管态度恶劣，多次延迟服务。"</div>
+      <div class="progress">
+        <span class="step done">受理</span>
+        <span class="step done">分派</span>
+        <span class="step now">运营方处理</span>
+        <span class="step">回访</span>
+      </div>
+      <div class="acts">
+        <a>记入服务者档案</a>
+        <a class="pri">运营方反馈</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <span class="sev m">中</span>
+        <div class="ttl2">江北未来谷 5-2204 智能门锁失灵 24h 未修</div>
+        <div class="time">昨天 16:30</div>
+      </div>
+      <div class="who">
+        <span class="pill">租客 张 ** · 136****6022</span>
+        <span class="pill">运营方：江北建发</span>
+      </div>
+      <div class="desc">"智能门锁失灵 24 小时未维修，被关在门外 2 次。"</div>
+      <div class="progress">
+        <span class="step done">受理</span>
+        <span class="step done">分派</span>
+        <span class="step done">维修</span>
+        <span class="step now">回访中</span>
+      </div>
+      <div class="acts">
+        <a>查看工单</a>
+        <a class="pri">关闭并回访</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">
+        <span class="sev l">低</span>
+        <div class="ttl2">南部新城 公共区域 WiFi 不稳定</div>
+        <div class="time">2 天前</div>
+      </div>
+      <div class="who">
+        <span class="pill">租客 吴 ** · 135****1180</span>
+        <span class="pill">运营方：苏宁置业</span>
+      </div>
+      <div class="progress">
+        <span class="step done">受理</span>
+        <span class="step done">已闭环</span>
+      </div>
+      <div class="acts">
+        <a>查看处置记录</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="complaint"></div>
+</div>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

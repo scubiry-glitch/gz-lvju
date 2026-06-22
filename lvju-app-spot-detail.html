@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>景点详情 · 购景区门票 · 贝壳旅居·内容服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .pd-hero{height:250px;position:relative;color:#fff;}
+  .pd-hero .badge{position:absolute;left:16px;bottom:16px;z-index:2;}
+  .pd-hero .badge .star{font-size:11px;font-weight:700;color:#ffd98a;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);padding:4px 11px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .pd-hero .badge .nm{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:8px;text-shadow:0 2px 14px rgba(0,0,0,.4);}
+  .pd-hero .badge .lo{font-size:12px;opacity:.92;margin-top:2px;}
+  .pd-hero .dots{position:absolute;right:14px;bottom:16px;z-index:2;font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
+  .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
+  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
+  .block .bs{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.65;}
+  .tagline{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+  .tagline span{font-size:11px;color:var(--brand-deep);background:var(--brand-soft);padding:3px 9px;border-radius:6px;}
+  .nearby a{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .nearby a:last-child{border-bottom:0;}
+  .nearby a .e{font-size:17px;}
+  .nearby a .ar{margin-left:auto;color:var(--muted);}
+  /* 票种选择 */
+  .tk-opt{display:flex;align-items:center;gap:11px;border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-top:10px;cursor:pointer;}
+  .tk-opt.sel{border-color:var(--brand);background:var(--brand-soft);}
+  .tk-opt .rd{width:18px;height:18px;border-radius:50%;border:2px solid #cdd6d3;flex-shrink:0;position:relative;}
+  .tk-opt.sel .rd{border-color:var(--brand);}
+  .tk-opt.sel .rd::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--brand);}
+  .tk-opt .ti{flex:1;min-width:0;}
+  .tk-opt .ti .n{font-size:14px;font-weight:700;color:var(--ink);}
+  .tk-opt .ti .d{font-size:11px;color:var(--muted);margin-top:2px;}
+  .tk-opt .tp{font-family:var(--serif);font-weight:700;color:var(--gold-deep);font-size:17px;flex-shrink:0;}
+  .tk-opt .tp small{font-size:10px;font-weight:400;color:var(--muted);font-family:var(--font);}
+  .tk-opt .recb{font-size:9px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-deep));padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:middle;}
+  /* 日期条 */
+  .dstrip{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}
+  .dstrip::-webkit-scrollbar{height:0;}
+  .dchip{flex:0 0 auto;text-align:center;border:1px solid var(--border);border-radius:10px;padding:7px 13px;min-width:58px;cursor:pointer;}
+  .dchip.sel{border-color:var(--brand);background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;}
+  .dchip .dl{font-size:11px;color:var(--muted);}
+  .dchip.sel .dl{color:rgba(255,255,255,.85);}
+  .dchip .dd{font-size:14px;font-weight:700;margin-top:2px;}
+  /* 展开整月日历选任意日期 */
+  .cal-toggle{float:right;font-size:12px;font-weight:700;color:var(--brand-deep);cursor:pointer;user-select:none;}
+  .cal-toggle .arr{display:inline-block;transition:transform .2s;}
+  .cal-toggle.open .arr{transform:rotate(180deg);}
+  .calfull{margin-top:11px;border:1px solid var(--border);border-radius:14px;padding:12px;display:none;}
+  .calfull.open{display:block;}
+  .calnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+  .calnav .mo{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
+  .calnav button{border:1px solid var(--border);background:#fff;border-radius:8px;width:30px;height:30px;font-size:16px;line-height:1;color:var(--ink);cursor:pointer;}
+  .calnav button:disabled{opacity:.3;cursor:default;}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .calgrid .wk{text-align:center;font-size:11px;color:var(--muted);padding:1px 0 3px;}
+  .calgrid .cell{text-align:center;border-radius:9px;padding:8px 0;min-height:34px;cursor:pointer;}
+  .calgrid .cell.blank{visibility:hidden;cursor:default;}
+  .calgrid .cell .dn{font-size:13px;font-weight:600;color:var(--ink);}
+  .calgrid .cell.past{cursor:default;}
+  .calgrid .cell.past .dn{color:#cbd2ce;}
+  .calgrid .cell.sel{background:linear-gradient(135deg,var(--brand),var(--brand-deep));}
+  .calgrid .cell.sel .dn{color:#fff;}
+  /* 数量步进 */
+  .qrow{display:flex;align-items:center;justify-content:space-between;margin-top:14px;}
+  .qrow .ql{font-size:13px;font-weight:600;color:var(--ink);}
+  .stepper{display:flex;align-items:center;gap:0;border:1px solid var(--border);border-radius:9px;overflow:hidden;}
+  .stepper b{width:34px;height:32px;display:grid;place-items:center;font-size:18px;color:var(--brand-deep);cursor:pointer;user-select:none;background:#fff;}
+  .stepper b.dis{color:#cdd6d3;cursor:default;}
+  .stepper .qn{width:40px;text-align:center;font-size:15px;font-weight:700;color:var(--ink);}
+  /* 购票成功电子票 */
+  .ticket-sheet{position:fixed;inset:0;z-index:50;background:rgba(8,18,16,.55);display:none;align-items:flex-end;}
+  .ticket-sheet.open{display:flex;}
+  .ts-card{background:var(--bg,#f4f7f5);width:100%;border-radius:20px 20px 0 0;padding:20px 18px max(20px,env(safe-area-inset-bottom));animation:tsup .25s ease;}
+  @keyframes tsup{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  .ts-card .ok{text-align:center;font-family:var(--serif);font-weight:700;font-size:18px;color:var(--ink);}
+  .ts-card .ok .ic{display:block;font-size:34px;color:var(--brand);margin-bottom:4px;}
+  .eticket{background:#fff;border-radius:16px;margin-top:14px;overflow:hidden;border:1px solid var(--border);}
+  .eticket .et-top{padding:14px 16px;border-bottom:1px dashed var(--border);}
+  .eticket .et-top .en{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
+  .eticket .et-top .em{font-size:11px;color:var(--muted);margin-top:3px;}
+  .eticket .et-qr{display:flex;align-items:center;gap:14px;padding:14px 16px;}
+  .eticket .et-qr img{width:96px;height:96px;border-radius:8px;border:4px solid #fff;outline:1px solid var(--border);background:#fff;flex-shrink:0;}
+  .eticket .et-qr .ec{flex:1;}
+  .eticket .et-qr .ec .lab{font-size:10px;color:var(--muted);}
+  .eticket .et-qr .ec .code{font-family:ui-monospace,Menlo,monospace;font-size:18px;font-weight:700;color:var(--gold-deep);letter-spacing:.06em;margin-top:2px;}
+  .eticket .et-qr .ec .tip{font-size:10.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .ts-card .ts-done{display:block;text-align:center;margin-top:16px;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:15px;padding:13px;border-radius:999px;}
+  .ts-card .ts-close{display:block;text-align:center;margin-top:10px;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar ghost">
+      <a class="bk" href="lvju-app-spots.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="act"><span>♡</span><span>⤴</span></div>
+    </div>
+
+    <div class="pd-hero" id="hero">
+      <div class="badge">
+        <span class="star" id="h-lv"></span>
+        <div class="nm" id="h-nm"></div>
+        <div class="lo" id="h-lo"></div>
+      </div>
+      <div class="dots">1 / 20</div>
+    </div>
+
+    <div class="block">
+      <div class="bt" id="i-tt"></div>
+      <div class="bs" id="i-intro"></div>
+      <div class="tagline" id="i-tags"></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">购景区门票</div>
+      <div class="bs" style="margin-top:4px;">在线购票 · 凭码入园 · 未使用可退</div>
+
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin-top:14px;">选择票种</div>
+      <div id="tk-opts"></div>
+
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.04em;margin-top:16px;">游玩日期 <span class="cal-toggle" id="dtoggle">更多日期 <span class="arr">⌄</span></span></div>
+      <div class="dstrip" id="dstrip"></div>
+      <div class="calfull" id="dcal">
+        <div class="calnav">
+          <button id="dcal-prev" aria-label="上个月">‹</button>
+          <div class="mo" id="dcal-mo"></div>
+          <button id="dcal-next" aria-label="下个月">›</button>
+        </div>
+        <div class="calgrid" id="dcal-grid"></div>
+      </div>
+
+      <div class="qrow">
+        <span class="ql">购买数量</span>
+        <div class="stepper">
+          <b id="q-minus">−</b><span class="qn" id="q-n">1</span><b id="q-plus">＋</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="block" style="padding-bottom:6px;">
+      <div class="bt">游玩须知</div>
+    </div>
+    <div class="panel">
+      <div class="kv"><span class="k">开放时间</span><span class="v" id="p-open"></span></div>
+      <div class="kv"><span class="k">建议游玩</span><span class="v" id="p-dur"></span></div>
+      <div class="kv"><span class="k">交通</span><span class="v" id="p-traffic" style="max-width:62%;text-align:right;"></span></div>
+    </div>
+    <div class="block">
+      <div class="bs" id="p-notice" style="margin-top:0;"></div>
+    </div>
+
+    <div class="block nearby">
+      <div class="bt" style="margin-bottom:6px;">玩完住哪儿</div>
+      <a href="lvju-app-lvju.html"><span class="e">🏡</span>景区旁 · 旅居星级旅居 · 住进风景里<span class="ar">›</span></a>
+      <a href="lvju-app-routes.html"><span class="e">🧭</span>把这里串进 3 日精华路线<span class="ar">›</span></a>
+      <a href="lvju-app-food.html"><span class="e">🍲</span>周边地道美食 · 酸汤鱼 / 长桌宴<span class="ar">›</span></a>
+    </div>
+
+    <div style="height:14px;"></div>
+  </div>
+
+  <div class="cta">
+    <div class="p"><b id="cta-amt">¥0</b><span id="cta-sub">请选择票种与日期</span></div>
+    <a class="btn" id="buy-btn">立即购票</a>
+  </div>
+
+  <!-- 购票成功 · 电子票 -->
+  <div class="ticket-sheet" id="sheet">
+    <div class="ts-card">
+      <div class="ok"><span class="ic">✓</span>购票成功</div>
+      <div class="eticket">
+        <div class="et-top">
+          <div class="en" id="t-name"></div>
+          <div class="em" id="t-meta"></div>
+        </div>
+        <div class="et-qr">
+          <img id="t-qr" alt="电子门票二维码">
+          <div class="ec">
+            <div class="lab">入园取票码</div>
+            <div class="code" id="t-code"></div>
+            <div class="tip">闸机扫码或报取票码入园 · 实付 <b id="t-amt"></b><br>资金由贝壳存管，未使用可在订单内申请退款。</div>
+          </div>
+        </div>
+      </div>
+      <a class="ts-done" id="t-done">完成</a>
+      <span class="ts-close" id="t-close">查看我的订单 ›</span>
+    </div>
+  </div>
+</div>
+<script src="screens/_qr.js"></script>
+<script>
+(function(){
+  var SPOTS={
+    huangguoshu:{nm:'黄果树瀑布',lv:'★ 5A · 大瀑布',lo:'安顺 · 镇宁',bg:'s-huangguoshu',
+      tt:'亚洲第一大瀑布 · 雷霆万钧',
+      intro:'宽 101 米、高 77.8 米的黄果树大瀑布，水帘洞穿瀑而行；陡坡塘、天星桥串成三大片区，旺季水量震撼。',
+      tags:['世界级瀑布','5A 景区','水帘洞','亲子'],
+      open:'07:30–18:00',dur:'建议 1 天',traffic:'安顺西站约 50 分钟，景区间有观光车接驳',
+      notice:'1.2m 以下儿童免大门票；大瀑布—陡坡塘—天星桥三片区距离较远，建议购观光车票；扶梯单独计费。',
+      tickets:[{n:'大门票',d:'含大瀑布·陡坡塘·天星桥三片区',p:160},{n:'门票 + 观光车',d:'三片区接驳 · 省脚力',p:210,rec:1},{n:'门票 + 观光车 + 扶梯',d:'全程轻松无负担',p:240}]},
+    xiaoqikong:{nm:'荔波小七孔',lv:'★ 5A · 世界遗产',lo:'黔南 · 荔波',bg:'s-xiaoqikong',
+      tt:'地球绿宝石 · 喀斯特水上森林',
+      intro:'七孔古桥横卧碧水，68 级跌水瀑布、卧龙潭、水上森林一线串珠，是中国最美的喀斯特峡谷之一。',
+      tags:['世界遗产','喀斯特','水上森林','亲子'],
+      open:'08:00–17:30',dur:'建议 1 天',traffic:'荔波站 / 荔波机场约 30 分钟，景区内观光车通达',
+      notice:'1.2m 以下儿童免票；门票当日有效；旺季建议线上预约分时入园，观光车强烈建议购买。',
+      tickets:[{n:'大门票',d:'樟江全景区 · 含大小七孔',p:110},{n:'门票 + 观光车',d:'园内通达 · 省脚力',p:150,rec:1}]},
+    xijiang:{nm:'西江千户苗寨',lv:'★ 5A · 民族村寨',lo:'黔东南 · 雷山',bg:'s-xijiang',
+      tt:'千户灯火 · 苗疆云端村寨',
+      intro:'依山而建的上千座吊脚楼，入夜万家灯火如银河倾泻；长桌宴、苗族歌舞、观景台日落是必体验。',
+      tags:['5A 景区','民族村寨','夜景','歌舞表演'],
+      open:'全天开放（表演场次另定）',dur:'建议 1–2 天',traffic:'凯里南站约 1 小时，景区外换乘观光车进寨',
+      notice:'门票含观景台；苗族歌舞表演分日/ 夜两场需另购或套票；住在寨内次日可免二次购票（以景区规则为准）。',
+      tickets:[{n:'大门票',d:'含观景台 · 当日有效',p:90},{n:'门票 + 观光车',d:'寨外停车场往返接驳',p:110,rec:1},{n:'门票 + 歌舞演出套票',d:'含一场民族歌舞演出',p:190}]},
+    fanjing:{nm:'梵净山',lv:'★ 世界遗产 · 名山',lo:'铜仁 · 江口',bg:'s-fanjing',
+      tt:'武陵之巅 · 云端佛国',
+      intro:'世界自然遗产，红云金顶、蘑菇石矗立云海之上；登顶需缆车 + 攀爬，是观云海日出的绝佳之地。',
+      tags:['世界遗产','名山','云海','索道'],
+      open:'08:00–16:00（旺季提前）',dur:'建议 1 天',traffic:'铜仁站约 1.5 小时；山门到半山需乘观光车，登顶建议乘索道',
+      notice:'金顶台阶陡峭，雨雾天注意安全；旺季需提前线上预约；索道往返与门票可分开购买。',
+      tickets:[{n:'大门票',d:'含山门 + 环保观光车',p:110},{n:'门票 + 索道往返',d:'省体力 · 直达半山',p:260,rec:1}]},
+    wanfeng:{nm:'万峰林',lv:'★ 4A · 喀斯特',lo:'黔西南 · 兴义',bg:'s-wanfeng',
+      tt:'天下奇观 · 万峰成林',
+      intro:'两万余座锥状喀斯特峰林铺展天际，田园村寨点缀其间，是徐霞客盛赞的「天下奇观」。',
+      tags:['喀斯特','峰林','田园','骑行'],
+      open:'08:00–18:00',dur:'建议 半天',traffic:'兴义万峰林机场约 20 分钟，景区内电瓶车 / 自行车游览',
+      notice:'峰林观光线较长，建议购电瓶车票或租自行车；油菜花季（春季）景观最佳。',
+      tickets:[{n:'大门票',d:'东峰林观光线',p:60},{n:'门票 + 电瓶车',d:'峰林全线接驳',p:90,rec:1}]}
+  };
+
+  var KEY=(function(){var m=location.search.match(/[?&]spot=([a-z]+)/);return m&&SPOTS[m[1]]?m[1]:'huangguoshu';})();
+  var S=SPOTS[KEY];
+
+  var TODAY=new Date(2026,5,13);
+  var WK=['日','一','二','三','四','五','六'];
+  var selT=0, qty=1;
+  var selDate=new Date(TODAY);
+  var viewM=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
+  var MINM=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
+  var MAXM=new Date(TODAY.getFullYear(),TODAY.getMonth()+3,1);
+  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+  function fmtMD(d){return (d.getMonth()+1)+'/'+d.getDate();}
+
+  // 默认票种 = 标记 rec 的那张
+  S.tickets.forEach(function(t,i){ if(t.rec) selT=i; });
+
+  function $(id){return document.getElementById(id);}
+
+  // 头图 + 简介
+  $('hero').className='pd-hero '+S.bg;
+  $('h-lv').textContent=S.lv; $('h-nm').textContent=S.nm; $('h-lo').textContent='📍 '+S.lo;
+  $('i-tt').textContent=S.tt; $('i-intro').textContent=S.intro;
+  $('i-tags').innerHTML=S.tags.map(function(t){return '<span>'+t+'</span>';}).join('');
+  $('p-open').textContent=S.open; $('p-dur').textContent=S.dur; $('p-traffic').textContent=S.traffic;
+  $('p-notice').textContent='ℹ️ '+S.notice;
+
+  // 票种
+  function renderTickets(){
+    $('tk-opts').innerHTML=S.tickets.map(function(t,i){
+      return '<div class="tk-opt'+(i===selT?' sel':'')+'" data-i="'+i+'">'
+        +'<span class="rd"></span>'
+        +'<div class="ti"><div class="n">'+t.n+(t.rec?'<span class="recb">推荐</span>':'')+'</div><div class="d">'+t.d+'</div></div>'
+        +'<div class="tp">¥'+t.p+'<small> /人</small></div></div>';
+    }).join('');
+    $('tk-opts').querySelectorAll('.tk-opt').forEach(function(el){
+      el.addEventListener('click',function(){ selT=+el.getAttribute('data-i'); renderTickets(); updateTotal(); });
+    });
+  }
+
+  // 日期条（今天起 7 天）
+  function dateAt(i){var d=new Date(TODAY);d.setDate(d.getDate()+i);return d;}
+  function renderDates(){
+    var html='';
+    for(var i=0;i<7;i++){
+      var d=dateAt(i);
+      var lab=i===0?'今天':(i===1?'明天':'周'+WK[d.getDay()]);
+      html+='<div class="dchip'+(sameDay(d,selDate)?' sel':'')+'" data-i="'+i+'"><div class="dl">'+lab+'</div><div class="dd">'+fmtMD(d)+'</div></div>';
+    }
+    $('dstrip').innerHTML=html;
+    $('dstrip').querySelectorAll('.dchip').forEach(function(el){
+      el.addEventListener('click',function(){ selDate=dateAt(+el.getAttribute('data-i')); renderDates(); renderCal(); updateTotal(); });
+    });
+  }
+
+  // 整月日历（单选任意日期，过去禁用）
+  function renderCal(){
+    $('dcal-mo').textContent=viewM.getFullYear()+' 年 '+(viewM.getMonth()+1)+' 月';
+    $('dcal-prev').disabled=viewM<=MINM; $('dcal-next').disabled=viewM>=MAXM;
+    var g=$('dcal-grid'); g.innerHTML='';
+    WK.forEach(function(w){var e=document.createElement('div');e.className='wk';e.textContent=w;g.appendChild(e);});
+    var lead=new Date(viewM.getFullYear(),viewM.getMonth(),1).getDay();
+    for(var i=0;i<lead;i++){var b=document.createElement('div');b.className='cell blank';g.appendChild(b);}
+    var dim=new Date(viewM.getFullYear(),viewM.getMonth()+1,0).getDate();
+    for(var dd=1;dd<=dim;dd++){
+      var d=new Date(viewM.getFullYear(),viewM.getMonth(),dd);
+      var c=document.createElement('div'); c.className='cell'; c.innerHTML='<div class="dn">'+dd+'</div>';
+      if(d<TODAY && !sameDay(d,TODAY)){ c.classList.add('past'); }
+      else {
+        if(sameDay(d,selDate)) c.classList.add('sel');
+        (function(dt){c.addEventListener('click',function(){ selDate=dt; renderDates(); renderCal(); updateTotal(); });})(d);
+      }
+      g.appendChild(c);
+    }
+  }
+
+  function unit(){return S.tickets[selT].p;}
+  function total(){return unit()*qty;}
+  function updateTotal(){
+    $('q-n').textContent=qty;
+    $('q-minus').className=qty<=1?'dis':'';
+    $('cta-amt').textContent='¥'+total().toLocaleString();
+    $('cta-sub').textContent=S.tickets[selT].n+' · '+fmtMD(selDate)+'游玩 · '+qty+'张';
+  }
+
+  $('q-plus').addEventListener('click',function(){ if(qty<10){qty++;updateTotal();} });
+  $('q-minus').addEventListener('click',function(){ if(qty>1){qty--;updateTotal();} });
+
+  // 立即购票 → 电子票
+  function pad(n){return n<10?'0'+n:''+n;}
+  $('buy-btn').addEventListener('click',function(){
+    var d=selDate;
+    var code='GZ-TKT-'+pad(d.getMonth()+1)+pad(d.getDate())+'-'+(1000+selT*100+qty*7);
+    $('t-name').textContent=S.nm+' · '+S.tickets[selT].n;
+    $('t-meta').textContent=(d.getFullYear())+'/'+(d.getMonth()+1)+'/'+d.getDate()+' 游玩 · '+qty+' 张 · 凭码当日入园';
+    $('t-code').textContent=code;
+    $('t-amt').textContent='¥'+total().toLocaleString();
+    var url=new URL('screens/portal-verify.html?code='+code,location.href).href;
+    var img=$('t-qr');
+    try{ var qr=qrcode(0,'M'); qr.addData(url); qr.make(); img.src=qr.createDataURL(4,0); }
+    catch(e){ img.src='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(url); }
+    $('sheet').classList.add('open');
+  });
+  $('t-done').addEventListener('click',function(){ $('sheet').classList.remove('open'); });
+  $('t-close').addEventListener('click',function(){ location.href='lvju-app-orders.html'; });
+  $('sheet').addEventListener('click',function(e){ if(e.target===$('sheet')) $('sheet').classList.remove('open'); });
+
+  // 展开/收起整月日历 + 翻月
+  $('dtoggle').addEventListener('click',function(){
+    var open=$('dcal').classList.toggle('open'); $('dtoggle').classList.toggle('open');
+    if(open){ viewM=new Date(selDate.getFullYear(),selDate.getMonth(),1); if(viewM<MINM) viewM=new Date(MINM); renderCal(); $('dcal').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  });
+  $('dcal-prev').addEventListener('click',function(){ if(viewM>MINM){viewM=new Date(viewM.getFullYear(),viewM.getMonth()-1,1);renderCal();} });
+  $('dcal-next').addEventListener('click',function(){ if(viewM<MAXM){viewM=new Date(viewM.getFullYear(),viewM.getMonth()+1,1);renderCal();} });
+
+  document.title=S.nm+' · 景点详情 · 贝壳旅居';
+  renderTickets(); renderDates(); updateTotal();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>考务 · 排考与成绩核发 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+    .btn.ok{background:var(--success); color:white; border-color:var(--success);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.5fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .stat-tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}
+    .st{padding:6px 14px; border-radius:6px; font-size:12px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .st.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .st .cnt{margin-left:4px; opacity:0.85; font-size:11px;}
+
+    /* 排考申请审批行（承接 T 培训机构排课排考的「申请考试·中台审批」） */
+    .appr-row{border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:8px;}
+    .appr-row .hd{display:flex; align-items:center; gap:8px;}
+    .appr-row .hd .org{font-size:13px; font-weight:600;}
+    .appr-row .hd .src{font-size:10px; padding:1px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .appr-row .hd .when{margin-left:auto; font-size:11px; color:var(--muted);}
+    .appr-row .meta{display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:12px; color:var(--muted);}
+    .appr-row .meta b{color:var(--fg); font-weight:600;}
+    .appr-row .lv{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:700; color:white; background:linear-gradient(135deg,#047857,#10b981);}
+    .appr-row .lv.l4{background:linear-gradient(135deg,#1e40af,#3b82f6);}
+    .appr-row .act{display:flex; gap:6px; margin-top:10px;}
+    .appr-row .act .b{padding:5px 12px; font-size:11px; border-radius:5px; border:1px solid var(--border); background:var(--surface);}
+    .appr-row .act .b.ok{background:var(--success); color:white; border-color:var(--success); font-weight:600;}
+    .appr-row .act .b.no{color:var(--danger); border-color:color-mix(in oklab,var(--danger) 40%,transparent);}
+    .appr-row.pending{border-left:3px solid var(--warn);}
+
+    /* 考场 / 监考 */
+    .sess{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px dashed var(--line); font-size:12px;}
+    .sess:last-child{border-bottom:0;}
+    .sess .nm{font-weight:600;} .sess .nm .sub{font-size:11px; color:var(--muted); font-weight:400; margin-top:2px;}
+    .sess .tg{font-size:10px; padding:2px 8px; border-radius:999px;}
+    .sess .tg.run{background:color-mix(in oklab,var(--success) 14%,transparent); color:var(--success);}
+    .sess .tg.soon{background:color-mix(in oklab,var(--warn) 14%,transparent); color:var(--warn);}
+    .sess .tg.done{background:var(--line); color:var(--muted);}
+
+    /* 成绩核发 */
+    .score-row{display:grid; grid-template-columns:1fr auto auto auto; gap:10px; padding:10px 0; border-bottom:1px dashed var(--line); align-items:center; font-size:12px;}
+    .score-row:last-child{border-bottom:0;}
+    .score-row .nm{font-weight:600;} .score-row .nm .sub{font-size:11px; color:var(--muted); font-weight:400;}
+    .score-row .sc{font-size:15px; font-weight:700;} .score-row .sc.pass{color:var(--success);} .score-row .sc.fail{color:var(--danger);}
+    .score-row .b{padding:4px 10px; font-size:11px; border-radius:4px; border:1px solid var(--border); background:var(--surface);}
+    .score-row .b.pri{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+
+    /* 闭环链路条 */
+    .chain{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:12px; background:var(--line); border-radius:8px; margin-top:4px; font-size:11px;}
+    .chain a,.chain span.node{padding:5px 10px; border-radius:6px; background:var(--surface); border:1px solid var(--border); font-weight:600; color:var(--fg);}
+    .chain a:hover{border-color:var(--accent); color:var(--accent);}
+    .chain .here{background:var(--accent); color:white; border-color:var(--accent);}
+    .chain .ar{color:var(--accent); font-weight:700;}
+
+    @media (max-width: 1200px){ .content{grid-template-columns:1fr;} .kpi-bar{grid-template-columns:repeat(3,1fr);} }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="exam-admin"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>考务 · 排考与成绩核发</b></div>
+      <div class="top-actions">
+        <button class="btn">考点管理</button>
+        <button class="btn">监考排班</button>
+        <button class="btn pri">+ 新建考试场次</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">待审排考申请</div><div class="n" style="color:var(--warn);">14<span class="u">单</span></div><div class="d warn">T 机构提交</div></div>
+      <div class="ki"><div class="l">本月考试场次</div><div class="n">38<span class="u">场</span></div><div class="d ok">↑ 6 较上月</div></div>
+      <div class="ki"><div class="l">在用考点</div><div class="n">12<span class="u">个</span></div><div class="d">机考 + 实操</div></div>
+      <div class="ki"><div class="l">监考排班</div><div class="n">96<span class="u">%</span></div><div class="d ok">已覆盖</div></div>
+      <div class="ki"><div class="l">待核发成绩</div><div class="n" style="color:var(--warn);">128<span class="u">人</span></div><div class="d warn">含 6 单复核</div></div>
+      <div class="ki"><div class="l">成绩核发率</div><div class="n">99.2<span class="u">%</span></div><div class="d ok">T+1 内</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- 左：排考申请审批 + 考场 -->
+      <div>
+        <div class="card">
+          <h3>排考申请审批 <span class="pill">14 待审</span> <span class="extra">承接 T 培训机构「排课排考」提交的考试申请</span></h3>
+          <div class="stat-tabs">
+            <span class="st on">待审 <span class="cnt">14</span></span>
+            <span class="st">已排期 <span class="cnt">38</span></span>
+            <span class="st">实操考核 <span class="cnt">9</span></span>
+            <span class="st">已驳回 <span class="cnt">3</span></span>
+          </div>
+
+          <div class="appr-row pending">
+            <div class="hd">
+              <span class="org">家协培训中心</span>
+              <span class="src">来自 T·排课排考 ↗</span>
+              <span class="when">2h 前提交</span>
+            </div>
+            <div class="meta">
+              <span>认证 <span class="lv">L3</span> <b>旅居房管·中级</b></span>
+              <span>拟考日期 <b>2026-06-20</b></span>
+              <span>考点 <b>江北建发实训基地</b></span>
+              <span>考生 <b>32 人</b></span>
+              <span>形式 <b>机考 + 情景实操</b></span>
+            </div>
+            <div class="act">
+              <a class="b ok">通过排期 + 分配考点</a>
+              <a class="b">改期</a>
+              <a class="b no">驳回</a>
+            </div>
+          </div>
+
+          <div class="appr-row pending">
+            <div class="hd">
+              <span class="org">江苏家协职业培训学校</span>
+              <span class="src">来自 T·排课排考 ↗</span>
+              <span class="when">5h 前提交</span>
+            </div>
+            <div class="meta">
+              <span>认证 <span class="lv l4">L4</span> <b>金牌管家 / 督导</b></span>
+              <span>拟考日期 <b>2026-06-22</b></span>
+              <span>考点 <b>江宁安居考点</b></span>
+              <span>考生 <b>18 人</b></span>
+              <span>形式 <b>机考 + 答辩</b></span>
+            </div>
+            <div class="act">
+              <a class="b ok">通过排期 + 分配考点</a>
+              <a class="b">改期</a>
+              <a class="b no">驳回</a>
+            </div>
+          </div>
+
+          <div class="appr-row">
+            <div class="hd">
+              <span class="org">梧桐公馆内训中心</span>
+              <span class="src">来自 T·排课排考 ↗</span>
+              <span class="when">1 天前 · 已排期</span>
+            </div>
+            <div class="meta">
+              <span>认证 <span class="lv">L2</span> <b>初级管家</b></span>
+              <span>已排 <b>2026-06-18</b></span>
+              <span>考点 <b>线上机考</b></span>
+              <span>考生 <b>26 人</b></span>
+              <span>监考 <b>已排班 ✓</b></span>
+            </div>
+            <div class="act">
+              <a class="b">查看准考证</a>
+              <a class="b">考场详情</a>
+            </div>
+          </div>
+
+          <div style="font-size:11px; color:var(--muted); margin-top:12px; padding:10px; background:color-mix(in oklab,var(--accent) 5%,transparent); border-left:3px solid var(--accent); border-radius:5px;">
+            排期通过后自动生成准考证、推送至考生 S 端，并向 T 机构「排课排考」回执考试时间与考点。
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>今日考场 <span class="extra">3 场进行 · 监考已覆盖</span></h3>
+          <div class="sess">
+            <div class="nm">L3 旅居房管·机考<div class="sub">江北建发实训基地 · 32 人 · 监考 2</div></div>
+            <span class="tg run">● 进行中</span>
+          </div>
+          <div class="sess">
+            <div class="nm">L2 初级管家·机考<div class="sub">线上机考 · 26 人 · 防作弊已开</div></div>
+            <span class="tg run">● 进行中</span>
+          </div>
+          <div class="sess">
+            <div class="nm">L4 金牌管家·答辩<div class="sub">江宁安居考点 · 18 人 · 14:00 开始</div></div>
+            <span class="tg soon">即将开始</span>
+          </div>
+          <div class="sess">
+            <div class="nm">L3 入住服务·情景实操<div class="sub">梧桐公馆 · 20 人 · 已结束</div></div>
+            <span class="tg done">已结束 · 待核成绩</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：成绩核发 + 闭环 -->
+      <div>
+        <div class="card">
+          <h3>成绩核发 <span class="pill">128 待核</span> <span class="extra">机考自动判 + 实操人工复核</span></h3>
+          <div class="score-row">
+            <div class="nm">郑文涛<div class="sub">L3 旅居房管 · 机考</div></div>
+            <div class="sc pass">94</div>
+            <a class="b">明细</a>
+            <a class="b pri">核发</a>
+          </div>
+          <div class="score-row">
+            <div class="nm">周丽华<div class="sub">L2 初级管家 · 机考</div></div>
+            <div class="sc pass">88</div>
+            <a class="b">明细</a>
+            <a class="b pri">核发</a>
+          </div>
+          <div class="score-row">
+            <div class="nm">陈建国<div class="sub">L4 金牌管家 · 答辩复核中</div></div>
+            <div class="sc">—</div>
+            <a class="b">复核</a>
+            <a class="b">挂起</a>
+          </div>
+          <div class="score-row">
+            <div class="nm">某考生<div class="sub">L3 入住服务 · 实操</div></div>
+            <div class="sc fail">52</div>
+            <a class="b">退回补学</a>
+            <a class="b">复议</a>
+          </div>
+          <div style="margin-top:12px; padding:10px 14px; background:var(--accent); color:white; border-radius:6px; font-size:12px; display:flex; align-items:center; gap:10px;">
+            ✓ 已勾选 2 人<b> · 平均分 91.0</b>
+            <a style="margin-left:auto; padding:6px 12px; background:rgba(255,255,255,.2); border-radius:5px; font-weight:600;">批量核发 → 转结业核发</a>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>育人发证闭环 · 本页位置</h3>
+          <div class="chain">
+            <a href="t-schedule.html">T·排课排考</a>
+            <span class="ar">→</span>
+            <span class="node here">P·考务排考审批</span>
+            <span class="ar">→</span>
+            <span class="node here">成绩核发</span>
+            <span class="ar">→</span>
+            <a href="p-graduation.html">P·结业核发·学时认定</a>
+            <span class="ar">→</span>
+            <a href="p-cert-issue.html">P·发证管理</a>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px; line-height:1.7;">
+            考务承接 T 培训机构的<b style="color:var(--fg);">排考申请</b>，统一安排考点 / 监考 / 防作弊，机考自动判分、实操人工复核；
+            成绩核发后流转至<a href="p-graduation.html" style="color:var(--accent);">结业核发与学时认定</a>，再由<a href="p-cert-issue.html" style="color:var(--accent);">发证管理</a>签发持证编号并上链公示。
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>题库与等级映射 <span class="extra">考务取卷来源</span></h3>
+          <div style="font-size:12px; color:var(--muted); line-height:1.8;">
+            · 试卷模板来自 <a href="p-question-bank.html" style="color:var(--accent);">考题题库 + 试卷</a><br>
+            · 等级口径对齐 <a href="p-standards.html" style="color:var(--accent);">L0-L7 等级标准</a><br>
+            · 考生端应试入口 <a href="s-exam.html" style="color:var(--accent);">服务者 App · 考试 ↗</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.st').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.st').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

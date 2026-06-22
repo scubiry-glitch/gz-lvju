@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>数据中台 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .live-tag{padding:3px 8px; background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success); font-size:11px; border-radius:4px; font-weight:600;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+    .ki .d.warn{color:var(--warn);} .ki .d.danger{color:var(--danger);}
+
+    .content{padding:18px 28px;}
+    .grid{display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-bottom:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* dataflow diagram */
+    .flow{display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:8px; align-items:start;}
+    .pole{display:flex; flex-direction:column; gap:6px;}
+    .pole-h{font-size:11px; color:var(--muted); text-align:center; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding-bottom:6px; border-bottom:1px solid var(--line);}
+    .src{padding:8px 10px; background:var(--line); border-radius:5px; font-size:11.5px; display:flex; gap:6px; align-items:center;}
+    .src .ic{font-size:14px;}
+    .src .nm{flex:1; font-weight:500;}
+    .src .v{font-size:10px; color:var(--muted); font-family:var(--mono);}
+    .src.ok{border-left:3px solid var(--success);}
+    .src.warn{border-left:3px solid var(--warn);}
+    .src.danger{border-left:3px solid var(--danger);}
+    .flow-arrow{display:grid; place-items:center; color:var(--accent); font-size:18px;}
+
+    /* pipeline list */
+    .pipe-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:12px 14px; background:var(--line); border-radius:5px; margin-bottom:6px; align-items:center; font-size:12.5px;}
+    .pipe-row .ic{font-size:18px;}
+    .pipe-row .nm{font-weight:600;}
+    .pipe-row .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .pipe-row .qps{font-family:var(--mono); font-weight:700; text-align:right; font-size:12px;}
+    .pipe-row .lat{font-size:11px; color:var(--muted); text-align:right;}
+    .pipe-row .stat{padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600;}
+    .pipe-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .pipe-row .stat.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .pipe-row .stat.fail{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+
+    /* recipient cards */
+    .rec-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;}
+    .rec{padding:12px; background:var(--line); border-radius:6px; border-left:3px solid var(--accent);}
+    .rec .nm{font-size:13px; font-weight:600; display:flex; justify-content:space-between;}
+    .rec .nm .live{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600; background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .rec .desc{font-size:11px; color:var(--muted); margin-top:3px;}
+    .rec .stat{font-size:11px; margin-top:6px; display:flex; justify-content:space-between;}
+    .rec .stat b{font-weight:600;}
+
+    /* data quality */
+    .dq-row{display:grid; grid-template-columns:1fr 100px 50px; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; align-items:center;}
+    .dq-row:last-child{border-bottom:0;}
+    .dq-row .nm{font-weight:500;}
+    .dq-row .nm .sub{font-size:11px; color:var(--muted);}
+    .dq-row .bar{height:6px; background:var(--line); border-radius:3px; overflow:hidden;}
+    .dq-row .bar .fill{height:100%; border-radius:3px; background:var(--success);}
+    .dq-row .bar .fill.warn{background:var(--warn);}
+    .dq-row .pct{font-family:var(--mono); font-weight:700; text-align:right;}
+    .dq-row .pct.warn{color:var(--warn);}
+
+    /* api monitor */
+    .api-list{font-size:12px;}
+    .api-row{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); align-items:center;}
+    .api-row:last-child{border-bottom:0;}
+    .api-row .m{font-family:var(--mono); font-size:11px; font-weight:700; padding:1px 6px; border-radius:3px;}
+    .api-row .m.g{background:color-mix(in oklab, var(--accent) 14%, transparent); color:var(--accent);}
+    .api-row .m.p{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .api-row .m.d{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .api-row .path{font-family:var(--mono); font-size:11.5px;}
+    .api-row .qps{font-family:var(--mono); font-weight:600; text-align:right; font-size:11px;}
+    .api-row .lat{font-family:var(--mono); font-size:11px; color:var(--muted); text-align:right;}
+    .api-row .err{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600;}
+    .api-row .err.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .api-row .err.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+
+    @media (max-width: 1100px){
+      .grid{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+      .flow{grid-template-columns:1fr; grid-template-rows:auto auto auto auto auto;}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="data-hub"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>数据中台</b></div>
+      <span class="live-tag">● 实时同步</span>
+      <div class="top-actions">
+        <button class="btn">血缘图</button>
+        <button class="btn">SLA 报告</button>
+        <button class="btn pri">+ 新管道</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">数据源</div><div class="n">12<span class="u">个</span></div><div class="d">全部在线</div></div>
+      <div class="ki"><div class="l">活跃管道</div><div class="n">38<span class="u">条</span></div><div class="d">2 个暂停</div></div>
+      <div class="ki"><div class="l">事件总量</div><div class="n">1.8M<span class="u">/ 日</span></div><div class="d">↑ 12%</div></div>
+      <div class="ki"><div class="l">回流任务</div><div class="n">24<span class="u">条</span></div><div class="d">T+0 即时</div></div>
+      <div class="ki"><div class="l">数据质量</div><div class="n">96.4<span class="u">分</span></div><div class="d warn">2 项告警</div></div>
+      <div class="ki"><div class="l">本月成本</div><div class="n">¥1.2<span class="u">万</span></div><div class="d">存算 + 流量</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- dataflow -->
+      <div class="card">
+        <h3>数据流向地图 <span class="pill">采 → 治 → 出</span> <span class="extra">实时刷新 5s</span></h3>
+        <div class="flow">
+          <div class="pole">
+            <div class="pole-h">↓ 数据源（采集）</div>
+            <div class="src ok"><span class="ic">🛠</span><span class="nm">S 端行为</span><span class="v">2.4k 持证</span></div>
+            <div class="src ok"><span class="ic">🏬</span><span class="nm">B 端订单库</span><span class="v">5 家运营商</span></div>
+            <div class="src ok"><span class="ic">👥</span><span class="nm">V 端项目交付</span><span class="v">312</span></div>
+            <div class="src ok"><span class="ic">🛒</span><span class="nm">M 端集采订单</span><span class="v">6 家 · 6 品类</span></div>
+            <div class="src ok"><span class="ic">📦</span><span class="nm">M 端物资批次</span><span class="v">扫码追溯</span></div>
+            <div class="src ok"><span class="ic">🎓</span><span class="nm">T 端培训进度</span><span class="v">实时</span></div>
+            <div class="src ok"><span class="ic">📱</span><span class="nm">C 端事件流</span><span class="v">38k MAU</span></div>
+            <div class="src ok"><span class="ic">✍️</span><span class="nm">考试系统</span><span class="v">事件</span></div>
+            <div class="src warn"><span class="ic">🏦</span><span class="nm">银行托管</span><span class="v">T+1 拉取</span></div>
+            <div class="src ok"><span class="ic">📞</span><span class="nm">12345 热线</span><span class="v">webhook</span></div>
+          </div>
+          <div class="flow-arrow">▶</div>
+          <div class="pole">
+            <div class="pole-h">○ 中台（治理）</div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">🧹</span><span class="nm">清洗规则</span><span class="v">42 条</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">🔗</span><span class="nm">主键打通</span><span class="v">SPID</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">📐</span><span class="nm">标签体系</span><span class="v">216 标签</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">⚙️</span><span class="nm">规则引擎</span><span class="v">v3.2</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">🗄</span><span class="nm">湖仓存储</span><span class="v">2.4 TB</span></div>
+            <div class="src warn" style="border-left:3px solid var(--warn);"><span class="ic">📊</span><span class="nm">事件总线</span><span class="v">积压 12k</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">🔐</span><span class="nm">脱敏/分级</span><span class="v">L1-L4</span></div>
+            <div class="src" style="border-left:3px solid var(--accent);"><span class="ic">📜</span><span class="nm">审计日志</span><span class="v">100%</span></div>
+          </div>
+          <div class="flow-arrow">▶</div>
+          <div class="pole">
+            <div class="pole-h">↑ 输出（回流 / 服务）</div>
+            <div class="src ok"><span class="ic">⚖</span><span class="nm">G 端监管驾驶舱</span><span class="v">T+0</span></div>
+            <div class="src ok"><span class="ic">🏛</span><span class="nm">政府月报报送</span><span class="v">月 12 报</span></div>
+            <div class="src ok"><span class="ic">📊</span><span class="nm">公示门户</span><span class="v">18k 扫码</span></div>
+            <div class="src ok"><span class="ic">💰</span><span class="nm">F 端财政对账</span><span class="v">日 1 次</span></div>
+            <div class="src ok"><span class="ic">📞</span><span class="nm">12345 回单</span><span class="v">实时</span></div>
+            <div class="src ok"><span class="ic">📦</span><span class="nm">公积金中心</span><span class="v">代付接口</span></div>
+            <div class="src ok"><span class="ic">📈</span><span class="nm">B 端报表</span><span class="v">自助看板</span></div>
+            <div class="src ok"><span class="ic">🛒</span><span class="nm">M 端对账回流</span><span class="v">T+5 · 月度</span></div>
+            <div class="src ok"><span class="ic">🧠</span><span class="nm">AI 模型训练</span><span class="v">夜间批</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+
+        <!-- pipelines -->
+        <div class="card">
+          <h3>核心管道 <span class="pill">38 条</span> <span class="extra">QPS + SLA</span></h3>
+          <div>
+            <div class="pipe-row">
+              <span class="ic">📥</span>
+              <div><div class="nm">订单事件 → 中台</div><div class="meta">order.created · order.completed · order.refunded</div></div>
+              <div class="qps">1.4k/s</div>
+              <div class="lat">P95 12ms</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">📤</span>
+              <div><div class="nm">认证事件 → G 端</div><div class="meta">cert.issued · cert.revoked · level.changed</div></div>
+              <div class="qps">86/min</div>
+              <div class="lat">P95 41ms</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">🧮</span>
+              <div><div class="nm">信用分批量计算</div><div class="meta">每日 02:00 · 全量重算 + 增量</div></div>
+              <div class="qps">2,468 用户</div>
+              <div class="lat">12 分钟</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">📊</span>
+              <div><div class="nm">G 端月报报送</div><div class="meta">12 张表 · 加密 + 数字签名 · 月初推送</div></div>
+              <div class="qps">月 12 次</div>
+              <div class="lat">3 分钟</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">🔗</span>
+              <div><div class="nm">公示门户实时同步</div><div class="meta">cert.issued → public-portal 30s 内</div></div>
+              <div class="qps">实时</div>
+              <div class="lat">P99 8.2s</div>
+              <span class="stat warn">背压</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">⚠️</span>
+              <div><div class="nm">投诉热点告警</div><div class="meta">12345 热线 → 风控模型 → 推 G 端</div></div>
+              <div class="qps">186/h</div>
+              <div class="lat">P95 2.4s</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">🧠</span>
+              <div><div class="nm">客评情感分析</div><div class="meta">NLP 模型 · 夜间批 · 反哺信用分</div></div>
+              <div class="qps">14k/晚</div>
+              <div class="lat">38 分钟</div>
+              <span class="stat ok">RUN</span>
+            </div>
+            <div class="pipe-row">
+              <span class="ic">🏦</span>
+              <div><div class="nm">银行托管对账</div><div class="meta">江苏银行 → 流水 → 三方对账</div></div>
+              <div class="qps">日 1 次</div>
+              <div class="lat">86 秒</div>
+              <span class="stat fail">昨夜失败</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- consumers + quality -->
+        <div>
+          <div class="card">
+            <h3>下游订阅方 <span class="extra">5 端 + 3 政府接口</span></h3>
+            <div class="rec-grid">
+              <div class="rec">
+                <div class="nm">G 端监管 <span class="live">● LIVE</span></div>
+                <div class="desc">T+0 全量数据 · 月报 12 张</div>
+                <div class="stat"><span>QPS</span><b>3.4k</b></div>
+              </div>
+              <div class="rec">
+                <div class="nm">公示门户 <span class="live">● LIVE</span></div>
+                <div class="desc">扫码验真 · 名单查询</div>
+                <div class="stat"><span>查询</span><b>18.4k/月</b></div>
+              </div>
+              <div class="rec">
+                <div class="nm">F 端银行 <span class="live">● LIVE</span></div>
+                <div class="desc">分账 + 对账 + 报表</div>
+                <div class="stat"><span>对账率</span><b>99.96%</b></div>
+              </div>
+              <div class="rec">
+                <div class="nm">12345 热线</div>
+                <div class="desc">投诉单回写 + 处置结果</div>
+                <div class="stat"><span>响应</span><b>P95 2.4s</b></div>
+              </div>
+              <div class="rec">
+                <div class="nm">公积金中心</div>
+                <div class="desc">代付接口 + 缴存核验</div>
+                <div class="stat"><span>日均</span><b>412 单</b></div>
+              </div>
+              <div class="rec">
+                <div class="nm">税务局接口</div>
+                <div class="desc">服务者收入申报</div>
+                <div class="stat"><span>月度</span><b>2.4k 人</b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <h3>数据质量 <span class="extra">综合 96.4 分</span></h3>
+            <div class="dq-row">
+              <div class="nm">完整性<div class="sub">关键字段非空</div></div>
+              <div class="bar"><div class="fill" style="width:99%;"></div></div>
+              <div class="pct">99.2%</div>
+            </div>
+            <div class="dq-row">
+              <div class="nm">准确性<div class="sub">主键命中率</div></div>
+              <div class="bar"><div class="fill" style="width:98%;"></div></div>
+              <div class="pct">98.4%</div>
+            </div>
+            <div class="dq-row">
+              <div class="nm">一致性<div class="sub">跨端口径</div></div>
+              <div class="bar"><div class="fill warn" style="width:92%;"></div></div>
+              <div class="pct warn">92.1%</div>
+            </div>
+            <div class="dq-row">
+              <div class="nm">时效性<div class="sub">SLA 达成</div></div>
+              <div class="bar"><div class="fill" style="width:97%;"></div></div>
+              <div class="pct">97.6%</div>
+            </div>
+            <div class="dq-row">
+              <div class="nm">合规性<div class="sub">脱敏/分级</div></div>
+              <div class="bar"><div class="fill" style="width:100%;"></div></div>
+              <div class="pct">100%</div>
+            </div>
+            <div style="font-size:11px; color:var(--warn); margin-top:10px; padding:8px 10px; background:color-mix(in oklab, var(--warn) 5%, transparent); border-left:3px solid var(--warn); border-radius:4px;">
+              ⚠ 一致性下降：B 端订单库与中台口径在 06-04 后存在 12% 字段命名差异，已建工单 DQ-2026-018。
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- API monitor -->
+      <div class="card">
+        <h3>对外 API 监测 <span class="pill">v2.4</span> <span class="extra">15 分钟窗口</span></h3>
+        <div class="api-list">
+          <div class="api-row"><span class="m g">GET</span><span class="path">/v2/levels</span><span class="qps">412</span><span class="lat">P95 8ms</span><span class="err ok">99.99%</span></div>
+          <div class="api-row"><span class="m g">GET</span><span class="path">/v2/skill-matrix</span><span class="qps">186</span><span class="lat">P95 12ms</span><span class="err ok">100%</span></div>
+          <div class="api-row"><span class="m g">GET</span><span class="path">/v2/credit/{spid}</span><span class="qps">3.4k</span><span class="lat">P95 24ms</span><span class="err ok">99.96%</span></div>
+          <div class="api-row"><span class="m p">POST</span><span class="path">/v2/cert/issue</span><span class="qps">86/h</span><span class="lat">P95 412ms</span><span class="err ok">100%</span></div>
+          <div class="api-row"><span class="m p">POST</span><span class="path">/v2/order/dispatch</span><span class="qps">1.2k</span><span class="lat">P95 38ms</span><span class="err warn">99.4%</span></div>
+          <div class="api-row"><span class="m d">POST</span><span class="path">/v2/cert/revoke</span><span class="qps">8/d</span><span class="lat">P95 218ms</span><span class="err ok">100%</span></div>
+          <div class="api-row"><span class="m g">GET</span><span class="path">/pub/cert/verify</span><span class="qps">486</span><span class="lat">P95 6ms</span><span class="err ok">99.99%</span></div>
+          <div class="api-row"><span class="m p">POST</span><span class="path">/v2/webhook/12345</span><span class="qps">186/h</span><span class="lat">P95 2.4s</span><span class="err warn">98.2%</span></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>入住核销 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar">
+      <a class="bk" href="lvju-app-order-detail.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="ttl">入住核销</div>
+      <div class="act"><span>🎧</span></div>
+    </div>
+
+    <div class="checkin">
+      <span class="badge">● 待核销 · 到店出示</span>
+      <div class="qrwrap"><img id="ciqr" alt="入住核销二维码"></div>
+      <div class="code">LJ20260614-8821</div>
+      <div class="hint">到店向旅居管家出示此二维码<br>管家扫码即完成入住核销，资金随后结算给房东</div>
+    </div>
+
+    <div class="minihouse">
+      <div class="th s-xijiang"></div>
+      <div class="mi">
+        <div class="nm">云上观景民宿</div>
+        <div class="meta">6/14 入住 14:00 后 · 6/16 离店 12:00 前</div>
+        <div class="st">观景大床房 · 2 位成人 · 含双早</div>
+      </div>
+    </div>
+
+    <div class="seg">核销信息</div>
+    <div class="panel">
+      <div class="kv"><span class="k">入住人</span><span class="v">张先生 · 138****6688</span></div>
+      <div class="kv"><span class="k">接待管家</span><span class="v">杨晓芳 · L4 持证</span></div>
+      <div class="kv"><span class="k">服务站</span><span class="v">西江服务站</span></div>
+      <div class="kv"><span class="k">存管状态</span><span class="v" style="color:var(--brand-deep)">已冻结 · 核销后结算</span></div>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);padding:14px 18px 18px;line-height:1.6;">
+      🛡 核销即代表您已确认入住，贝壳存管资金将在核销后结算给房东；如未到店可在入住前申请退改。
+    </div>
+    <div style="height:8px;"></div>
+  </div>
+
+  <div class="cta">
+    <a class="ghost" href="lvju-app-chat.html" style="border:1px solid var(--border);color:var(--brand-deep);padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;">联系管家</a>
+    <a class="btn" href="lvju-app-chat.html" style="margin-left:auto;">我已到店</a>
+  </div>
+</div>
+<script src="screens/_qr.js"></script>
+<script>
+(function(){var img=document.getElementById('ciqr');if(!img)return;
+var t=new URL('screens/portal-verify.html?code=LJ20260614-8821',location.href).href;
+try{var qr=qrcode(0,'M');qr.addData(t);qr.make();img.src=qr.createDataURL(5,0);}catch(e){}})();
+</script>
+</body>
+</html>

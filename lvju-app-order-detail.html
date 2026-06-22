@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>订单详情 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .qrbox{display:flex;align-items:center;gap:13px;background:#fff;margin:8px 0 0;padding:15px 18px;}
+  .qrbox a.qrlink{flex-shrink:0;line-height:0;}
+  .qrbox .qrimg{width:78px;height:78px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+  .qrbox .qt{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
+  .qrbox .qs{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar">
+      <a class="bk" href="lvju-app-orders.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="ttl">订单详情</div>
+      <div class="act"><a href="lvju-app-service.html">🎧</a></div>
+    </div>
+
+    <div class="statusbar stay">
+      <div class="s1">待入住 · 已确认</div>
+      <div class="s2">6/14 入住 · 资金已存管，入住确认后结算给房东</div>
+    </div>
+
+    <div class="minihouse">
+      <div class="th s-xijiang"></div>
+      <div class="mi">
+        <div class="nm">云上观景民宿</div>
+        <div class="meta">黔东南 · 西江千户苗寨 · 整栋可包</div>
+        <div class="st">★ 4.9 五星旅居 · 观景大床房</div>
+      </div>
+    </div>
+
+    <div class="qrbox">
+      <a class="qrlink" href="screens/portal-verify.html?code=LJ20260614-8821" title="到店出示"><img class="qrimg" alt="入住凭证二维码"></a>
+      <div>
+        <div class="qt">入住电子凭证</div>
+        <div class="qs">到店向旅居管家出示此码核验入住<br>凭证号 LJ20260614-8821</div>
+      </div>
+    </div>
+
+    <div class="seg">入住信息</div>
+    <div class="panel">
+      <div class="kv"><span class="k">入住 / 离店</span><span class="v">6/14 — 6/16 · 2 晚</span></div>
+      <div class="kv"><span class="k">房型</span><span class="v">观景大床房 · 整栋</span></div>
+      <div class="kv"><span class="k">入住人</span><span class="v">张先生 · 2 位成人</span></div>
+      <div class="kv"><span class="k">手机</span><span class="v">138****6688</span></div>
+      <div class="kv"><span class="k">套餐</span><span class="v">含双早 + 苗寨门票</span></div>
+      <div class="kv"><span class="k">旅居管家</span><span class="v">杨晓芳 · L4 持证</span></div>
+    </div>
+
+    <div class="seg">价格明细</div>
+    <div class="panel">
+      <div class="kv"><span class="k">房费 ¥588 × 2 晚</span><span class="v">¥1,176</span></div>
+      <div class="kv"><span class="k">门票套餐</span><span class="v">¥120</span></div>
+      <div class="kv"><span class="k">平台优惠</span><span class="v" style="color:var(--ok)">−¥120</span></div>
+      <div class="kv big"><span class="k">实付</span><span class="v">¥1,176</span></div>
+    </div>
+
+    <div class="seg">订单信息</div>
+    <div class="panel">
+      <div class="kv"><span class="k">订单号</span><span class="v">LJ20260614-8821</span></div>
+      <div class="kv"><span class="k">下单时间</span><span class="v">2026-06-13 15:42</span></div>
+      <div class="kv"><span class="k">支付方式</span><span class="v">贝壳支付 · 资金存管</span></div>
+      <div class="kv"><span class="k">支付时间</span><span class="v">2026-06-13 15:43</span></div>
+      <div class="kv"><span class="k">存管状态</span><span class="v" style="color:var(--brand-deep)">已冻结 · 入住后结算</span></div>
+    </div>
+
+    <div style="height:14px;"></div>
+  </div>
+
+  <div class="cta">
+    <a class="ghost" href="lvju-app-refund.html" style="border:1px solid var(--border);color:var(--brand-deep);padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;">申请退改</a>
+    <a class="btn" href="lvju-app-chat.html" style="margin-left:auto;">联系管家</a>
+  </div>
+</div>
+<script src="screens/_qr.js"></script>
+<script>
+document.querySelectorAll('a.qrlink').forEach(function(a){
+  var img=a.querySelector('img.qrimg'); if(!img) return;
+  var target; try{ target=new URL(a.getAttribute('href'),location.href).href; }catch(e){ return; }
+  try{ var qr=qrcode(0,'M'); qr.addData(target); qr.make(); img.src=qr.createDataURL(3,0); }catch(e){}
+});
+</script>
+</body>
+</html>

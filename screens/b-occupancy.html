@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>工单分派与入住率看板 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .tab-pair { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+    .tab-pair .t { padding: 6px 14px; font-size: 13px; color: var(--muted); border-radius: 6px; cursor: pointer; }
+    .tab-pair .t.on { background: var(--accent); color: white; font-weight: 500; }
+
+    /* kpi mini row */
+    .kpi-mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .kpi-mini .b { background: var(--surface); border: 1px solid var(--border); padding: 12px 14px; border-radius: var(--radius-sm); }
+    .kpi-mini .b .l { font-size: 11px; color: var(--muted); }
+    .kpi-mini .b .n { font-size: 20px; font-weight: 700; margin-top: 2px; }
+    .kpi-mini .b .d { font-size: 11px; margin-top: 2px; }
+    .kpi-mini .b .d.ok { color: var(--success); }
+    .kpi-mini .b .d.warn { color: var(--warn); }
+
+    /* heatmap */
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-head h3 { font-size: 14px; font-weight: 600; margin: 0; }
+    .card-head .meta { font-size: 12px; color: var(--muted); }
+    .card-body { padding: 16px 18px; }
+
+    .heat-grid { display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 4px; font-size: 11px; }
+    .heat-grid .hr { color: var(--muted); display: flex; align-items: center; }
+    .heat-grid .col-head { text-align: center; color: var(--muted); padding-bottom: 6px; }
+    .heat-cell { aspect-ratio: 1.4 / 1; border-radius: 4px; background: var(--accent-soft); display: grid; place-items: center; color: white; font-weight: 600; font-size: 10px; }
+    .h-0 { background: var(--bg); color: var(--muted); }
+    .h-1 { background: color-mix(in oklab, var(--accent) 25%, transparent); color: var(--accent); }
+    .h-2 { background: color-mix(in oklab, var(--accent) 50%, transparent); color: white; }
+    .h-3 { background: color-mix(in oklab, var(--accent) 75%, transparent); color: white; }
+    .h-4 { background: var(--accent); color: white; }
+    .heat-leg { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); margin-top: 12px; justify-content: flex-end; }
+    .heat-leg .sw { width: 14px; height: 10px; border-radius: 2px; }
+
+    /* trend bars */
+    .trend { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding: 6px 0; }
+    .trend .tb { flex: 1; background: linear-gradient(180deg, var(--accent), color-mix(in oklab, var(--accent) 50%, white)); border-radius: 3px 3px 0 0; position: relative; }
+    .trend .tb::after { content: attr(data-v); position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 600; color: var(--fg); }
+    .trend-x { display: flex; gap: 6px; font-size: 10px; color: var(--muted); padding: 4px 0 0; }
+    .trend-x span { flex: 1; text-align: center; }
+
+    /* workorder pool */
+    .pool-head {
+      display: flex; gap: 6px; padding: 0 18px 0; margin: 14px 0 0;
+      flex-wrap: wrap;
+    }
+    .pool-tab { padding: 6px 12px; font-size: 12px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); cursor: pointer; }
+    .pool-tab.on { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
+
+    table.wo { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.wo th, table.wo td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.wo th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.wo tr:last-child td { border-bottom: 0; }
+    .sev { font-size: 11px; padding: 1px 7px; border-radius: 3px; font-weight: 600; }
+    .sev.h { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .sev.m { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .sev.l { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+    .assignee { display: flex; align-items: center; gap: 6px; }
+    .av { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+    .av.un { background: var(--bg); color: var(--muted); }
+    .row-act a { font-size: 12px; color: var(--accent); cursor: pointer; }
+
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } .side { display: none; } .row2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="b" data-active="occupancy"></div>
+
+  <main class="main">
+
+    <div class="topbar">
+      <h1>工单 & 入住率看板</h1>
+      <div class="tab-pair">
+        <div class="t on">本月</div>
+        <div class="t">近 90 天</div>
+        <div class="t">全年</div>
+      </div>
+    </div>
+
+    <!-- KPI mini -->
+    <div class="kpi-mini">
+      <div class="b"><div class="l">在管房源</div><div class="n">3,842</div><div class="d ok">↑ 入住率 89.4%</div></div>
+      <div class="b"><div class="l">本月工单</div><div class="n">428</div><div class="d ok">已完结 89%</div></div>
+      <div class="b"><div class="l">平均响应</div><div class="n">2.4h</div><div class="d ok">↓ 优于 SLA</div></div>
+      <div class="b"><div class="l">超时工单</div><div class="n">5</div><div class="d warn">需介入</div></div>
+      <div class="b"><div class="l">本月好评率</div><div class="n">98.6%</div><div class="d ok">优秀</div></div>
+    </div>
+
+    <!-- heatmap + trend -->
+    <div class="row2">
+      <div class="card">
+        <div class="card-head">
+          <h3>入住率热力图（按项目 × 月）</h3>
+          <span class="meta">深 = 入住率高</span>
+        </div>
+        <div class="card-body">
+          <div class="heat-grid">
+            <span></span>
+            <span class="col-head">1月</span><span class="col-head">2月</span><span class="col-head">3月</span><span class="col-head">4月</span><span class="col-head">5月</span><span class="col-head">6月</span><span class="col-head">7月</span>
+
+            <span class="hr">梧桐公馆</span>
+            <span class="heat-cell h-3">88</span><span class="heat-cell h-3">90</span><span class="heat-cell h-4">93</span><span class="heat-cell h-4">95</span><span class="heat-cell h-4">96</span><span class="heat-cell h-4">96</span><span class="heat-cell h-0">—</span>
+
+            <span class="hr">河西青年</span>
+            <span class="heat-cell h-3">86</span><span class="heat-cell h-3">88</span><span class="heat-cell h-3">90</span><span class="heat-cell h-3">91</span><span class="heat-cell h-3">92</span><span class="heat-cell h-3">92</span><span class="heat-cell h-0">—</span>
+
+            <span class="hr">龙江新青年</span>
+            <span class="heat-cell h-2">78</span><span class="heat-cell h-3">82</span><span class="heat-cell h-3">85</span><span class="heat-cell h-3">87</span><span class="heat-cell h-3">88</span><span class="heat-cell h-3">88</span><span class="heat-cell h-0">—</span>
+
+            <span class="hr">南部新城</span>
+            <span class="heat-cell h-1">62</span><span class="heat-cell h-1">66</span><span class="heat-cell h-2">70</span><span class="heat-cell h-2">73</span><span class="heat-cell h-2">75</span><span class="heat-cell h-2">76</span><span class="heat-cell h-0">—</span>
+
+            <span class="hr">仙林湖</span>
+            <span class="heat-cell h-1">58</span><span class="heat-cell h-1">60</span><span class="heat-cell h-1">62</span><span class="heat-cell h-1">63</span><span class="heat-cell h-1">63</span><span class="heat-cell h-1">64</span><span class="heat-cell h-0">—</span>
+
+            <span class="hr">江北未来谷</span>
+            <span class="heat-cell h-3">86</span><span class="heat-cell h-3">88</span><span class="heat-cell h-4">91</span><span class="heat-cell h-4">93</span><span class="heat-cell h-4">93</span><span class="heat-cell h-4">93</span><span class="heat-cell h-0">—</span>
+          </div>
+          <div class="heat-leg">
+            低
+            <span class="sw h-0"></span>
+            <span class="sw h-1"></span>
+            <span class="sw h-2"></span>
+            <span class="sw h-3"></span>
+            <span class="sw h-4"></span>
+            高
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>工单趋势（近 7 日）</h3>
+          <span class="meta">单位：张</span>
+        </div>
+        <div class="card-body">
+          <div class="trend">
+            <div class="tb" style="height: 60%;" data-v="48"></div>
+            <div class="tb" style="height: 72%;" data-v="58"></div>
+            <div class="tb" style="height: 84%;" data-v="68"></div>
+            <div class="tb" style="height: 76%;" data-v="62"></div>
+            <div class="tb" style="height: 90%;" data-v="72"></div>
+            <div class="tb" style="height: 64%;" data-v="52"></div>
+            <div class="tb" style="height: 80%;" data-v="68"></div>
+          </div>
+          <div class="trend-x"><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span><span>今天</span></div>
+
+          <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>水电类</span><strong style="color: var(--fg);">156（36%）</strong></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>家具家电</span><strong style="color: var(--fg);">98（23%）</strong></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>门锁安防</span><strong style="color: var(--fg);">62（14%）</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span>公共区域</span><strong style="color: var(--fg);">112（27%）</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- workorder pool -->
+    <div class="card">
+      <div class="card-head">
+        <h3>工单池</h3>
+        <span class="meta">支持拖拽分派 · 自动派单按距离 + 评分排序</span>
+      </div>
+      <div class="pool-head">
+        <div class="pool-tab on">待分派 <strong style="color: var(--danger); margin-left:4px;">23</strong></div>
+        <div class="pool-tab">处理中 86</div>
+        <div class="pool-tab">超时 5</div>
+        <div class="pool-tab">待复核 14</div>
+        <div class="pool-tab">已完结 300</div>
+      </div>
+      <table class="wo">
+        <thead>
+          <tr>
+            <th>编号</th>
+            <th>房源</th>
+            <th>类目</th>
+            <th>描述</th>
+            <th>严重</th>
+            <th>到期</th>
+            <th>处理人</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>WO-20614</td>
+            <td>梧桐公馆 3-1506</td>
+            <td>水电</td>
+            <td>热水器无热水</td>
+            <td><span class="sev h">高</span></td>
+            <td style="color: var(--danger);">2h 内</td>
+            <td><div class="assignee"><div class="av un">?</div>未分派</div></td>
+            <td class="row-act"><a>智能派单</a> · <a>手动指派</a></td>
+          </tr>
+          <tr>
+            <td>WO-20613</td>
+            <td>河西青年 2-1208</td>
+            <td>门锁</td>
+            <td>智能门锁失灵</td>
+            <td><span class="sev h">高</span></td>
+            <td style="color: var(--danger);">2h 内</td>
+            <td><div class="assignee"><div class="av un">?</div>未分派</div></td>
+            <td class="row-act"><a>智能派单</a> · <a>手动指派</a></td>
+          </tr>
+          <tr>
+            <td>WO-20612</td>
+            <td>龙江新青年 1-1204</td>
+            <td>家具</td>
+            <td>沙发损坏需更换</td>
+            <td><span class="sev m">中</span></td>
+            <td>明日</td>
+            <td><div class="assignee"><div class="av un">?</div>未分派</div></td>
+            <td class="row-act"><a>智能派单</a> · <a>手动指派</a></td>
+          </tr>
+          <tr>
+            <td>WO-20611</td>
+            <td>南部新城 5-1801</td>
+            <td>公共区</td>
+            <td>2 楼走廊灯故障</td>
+            <td><span class="sev l">低</span></td>
+            <td>3 天内</td>
+            <td><div class="assignee"><div class="av un">?</div>未分派</div></td>
+            <td class="row-act"><a>智能派单</a></td>
+          </tr>
+          <tr>
+            <td>WO-20610</td>
+            <td>仙林湖 4-0612</td>
+            <td>水电</td>
+            <td>厕所漏水</td>
+            <td><span class="sev h">高</span></td>
+            <td>4h 内</td>
+            <td><div class="assignee"><div class="av">李</div>李师傅</div></td>
+            <td class="row-act"><a>已分派</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

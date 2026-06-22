@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>地图找房 · 西江 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+</head>
+<body>
+<div class="app">
+  <div class="scr" style="display:flex;flex-direction:column;overflow:hidden;">
+
+    <div class="appbar" style="flex-shrink:0;">
+      <a class="bk" href="lvju-app-search.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="searchin"><span class="ic">🔍</span><span class="kw">西江 · 旅居</span></div>
+      <a href="lvju-app-search.html" style="font-size:12px;font-weight:700;color:var(--brand-deep);flex-shrink:0;">≣ 列表</a>
+    </div>
+
+    <div class="mapwrap">
+      <div class="mapcanvas"></div>
+      <div class="maptoggle">🗺 西江千户苗寨 · 周边 28 套</div>
+
+      <!-- 价格 pin（示意分布） -->
+      <div class="pin on" style="left:46%;top:38%;">¥588</div>
+      <div class="pin" style="left:64%;top:30%;">¥1,280</div>
+      <div class="pin" style="left:30%;top:52%;">¥398</div>
+      <div class="pin" style="left:72%;top:58%;">¥466</div>
+      <div class="pin" style="left:52%;top:66%;">¥720</div>
+      <div class="pin" style="left:24%;top:34%;">¥698</div>
+
+      <!-- 选中房源卡 -->
+      <a class="mapsheet" href="lvju-app-detail.html">
+        <div class="th s-xijiang"></div>
+        <div class="mi">
+          <div class="nm">云上观景民宿 ★4.9</div>
+          <div class="meta">苗寨核心位 · 距景区 0.3km · 含双早</div>
+          <div class="pr"><b>¥588</b> /晚起 · 整栋可包</div>
+        </div>
+        <span class="bk">预订</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="tabbar" style="flex-shrink:0;">
+    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
+    <a class="on"><span class="ti">🔎</span>找房</a>
+    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
+    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+</body>
+</html>

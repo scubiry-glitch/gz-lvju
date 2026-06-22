@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>合格培训机构 · 保租房</title>
+  <style>
+    :root {
+      --bg:#fafafa; --surface:#fff; --fg:#111; --muted:#6b6b6b; --border:#e5e5e5;
+      --accent:#7c3aed; --accent-soft:color-mix(in oklab, var(--accent) 12%, transparent);
+      --success:#16a34a; --warn:#eab308; --danger:#dc2626;
+      --radius-sm:8px; --radius-md:12px;
+      --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; padding:0; font-family:var(--font); font-size:15px; line-height:1.5; background:var(--bg); color:var(--fg);}
+    a{color:inherit; text-decoration:none;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:64px;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+    .page-nav{display:flex; align-items:center; padding:8px 12px; background:var(--surface); position:sticky; top:0; z-index:10; border-bottom:1px solid var(--border);}
+    .page-nav .back-btn{width:36px; height:36px; display:grid; place-items:center; border-radius:50%; background:var(--bg);}
+    .page-nav .back-btn svg{width:20px; height:20px;}
+    .page-nav h1{flex:1; font-size:16px; font-weight:600; text-align:center; margin:0;}
+
+    .page-header{background:linear-gradient(135deg,#faf5ff,#fff); padding:18px 16px; border-bottom:1px solid var(--border);}
+    .page-header h2{font-size:18px; font-weight:600; margin:0 0 6px;}
+    .page-header p{font-size:13px; color:var(--muted); margin:0;}
+    .page-header .badges{display:flex; gap:6px; margin-top:10px;}
+    .badge{font-size:11px; padding:3px 10px; background:#fff; border:1px solid var(--accent); color:var(--accent); border-radius:999px;}
+
+    .filter-bar{display:flex; gap:8px; padding:12px 16px; overflow-x:auto; background:var(--surface); border-bottom:1px solid var(--border);}
+    .filter-chip{white-space:nowrap; padding:6px 14px; border-radius:999px; font-size:13px; background:var(--bg); color:var(--muted); border:1px solid var(--border);}
+    .filter-chip.active{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+
+    .content{padding:12px 16px;}
+    .section-label{font-size:13px; font-weight:500; margin:8px 0 8px; display:flex; align-items:center; gap:6px;}
+    .section-label .count{font-size:11px; color:var(--muted); font-weight:400;}
+
+    .t-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:10px;}
+    .t-head{display:flex; gap:10px; align-items:center; margin-bottom:10px;}
+    .t-head .ico{width:44px; height:44px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:22px;}
+    .t-head .ttl{flex:1; min-width:0;}
+    .t-head .nm{font-size:15px; font-weight:600;}
+    .t-head .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .lv-badge{font-size:10px; padding:3px 8px; border-radius:4px; font-weight:700;}
+    .lv-badge.l1{background:#ede9fe; color:#5b21b6;}
+    .lv-badge.l2{background:#ddd6fe; color:#5b21b6;}
+    .lv-badge.l3{background:#c4b5fd; color:#4c1d95;}
+    .t-stats{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:8px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); margin-bottom:10px;}
+    .t-stats .item{text-align:center;}
+    .t-stats .item .v{font-size:14px; font-weight:700; color:var(--fg);}
+    .t-stats .item .l{font-size:10px; color:var(--muted); margin-top:1px;}
+    .t-tags{display:flex; flex-wrap:wrap; gap:5px;}
+    .t-tag{font-size:10.5px; padding:3px 8px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--muted);}
+    .t-tag.cert{background:color-mix(in oklab, var(--success) 10%, transparent); color:var(--success); border-color:color-mix(in oklab, var(--success) 30%, transparent);}
+    .t-tag.lvl{background:#fef3c7; color:#92400e; border-color:#fde68a;}
+
+    .verify-note{padding:10px 14px; background:color-mix(in oklab, var(--success) 6%, transparent); border:1px solid color-mix(in oklab, var(--success) 30%, transparent); border-radius:var(--radius-md); margin:12px 16px; font-size:11px; color:var(--success); display:flex; align-items:center; gap:8px;}
+
+    .cta{display:block; margin-top:12px; padding:14px; background:linear-gradient(135deg,#faf5ff,#fff); border:1px solid #c4b5fd; border-radius:var(--radius-md); text-align:center;}
+    .cta .nm{font-size:14px; font-weight:600; color:var(--accent);}
+    .cta .sub{font-size:11px; color:var(--muted); margin-top:3px;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>合格培训机构</h1>
+  </div>
+
+  <div class="page-header">
+    <h2>白名单培训机构名录</h2>
+    <p>服务者人员的培训出口 · 课程对位 11 工种 × L0-L4 · 住建 + 人社 + P 中台三审</p>
+    <div class="badges">
+      <span class="badge">LV1-3 分级</span>
+      <span class="badge">6 家在网</span>
+      <span class="badge">24 持证讲师</span>
+      <span class="badge">86 门课程</span>
+    </div>
+  </div>
+
+  <div class="verify-note">
+    ✓ 全部白名单经省住建厅 + 人社厅 + P 中台三审 · 课程通过率公开
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-chip active">全部 6</span>
+    <span class="filter-chip">家政/服家</span>
+    <span class="filter-chip">不动产/经纪</span>
+    <span class="filter-chip">装修/维修</span>
+    <span class="filter-chip">物业/托管</span>
+    <span class="filter-chip">LV3 省级合作</span>
+  </div>
+
+  <div class="content">
+    <div class="section-label">⭐ LV3 省级合作机构（参与 P 标准制定）<span class="count">2 家</span></div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">🎓</div>
+        <div class="ttl"><div class="nm">江苏家协培训中心</div><div class="meta">家政 / 保洁 / 服家 · 自营基地 · 5 年合作</div></div>
+        <span class="lv-badge l3">LV3</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">8</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">92.4%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">286</div><div class="l">学员题库</div></div>
+      </div>
+      <div class="t-tags">
+        <span class="t-tag cert">✓ 人社认证</span>
+        <span class="t-tag cert">✓ 民办教育许可</span>
+        <span class="t-tag lvl">L6 讲师 ×3</span>
+        <span class="t-tag lvl">L7 专家 ×1</span>
+        <span class="t-tag">参与 L4-L5 题库审定</span>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">🏫</div>
+        <div class="ttl"><div class="nm">东南大学继教院</div><div class="meta">不动产 / 经纪 / 督导 · 高校合作</div></div>
+        <span class="lv-badge l3">LV3</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">6</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">88.6%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">418</div><div class="l">题库</div></div>
+      </div>
+      <div class="t-tags">
+        <span class="t-tag cert">✓ 高校</span>
+        <span class="t-tag lvl">L6 讲师 ×3</span>
+        <span class="t-tag lvl">L7 ×1</span>
+        <span class="t-tag">学历认证</span>
+      </div>
+    </div>
+
+    <div class="section-label">🥈 LV2 进阶培训机构 <span class="count">4 家</span></div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">🛠</div>
+        <div class="ttl"><div class="nm">南京职业技术学院</div><div class="meta">装修 / 维修 / 特种作业 · 公办职校</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">4</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">87.2%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">162</div><div class="l">题库</div></div>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">🏬</div>
+        <div class="ttl"><div class="nm">金陵物业学院</div><div class="meta">物业 / 租赁 / 房源托管</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">3</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">89.8%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">124</div><div class="l">题库</div></div>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">📞</div>
+        <div class="ttl"><div class="nm">智链客服学院</div><div class="meta">客服 / 投诉处置</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">2</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">91.2%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">86</div><div class="l">题库</div></div>
+      </div>
+    </div>
+    <div class="t-card">
+      <div class="t-head">
+        <div class="ico">🏖</div>
+        <div class="ttl"><div class="nm">江苏旅居培训</div><div class="meta">旅居门店 / 旅居管家</div></div>
+        <span class="lv-badge l2">LV2</span>
+      </div>
+      <div class="t-stats">
+        <div class="item"><div class="v">1</div><div class="l">持证讲师</div></div>
+        <div class="item"><div class="v">84.4%</div><div class="l">通过率</div></div>
+        <div class="item"><div class="v">32</div><div class="l">题库</div></div>
+      </div>
+    </div>
+
+    <a href="t-courses.html" class="cta">
+      <div class="nm">我是培训机构 · 申请入驻 →</div>
+      <div class="sub">LV1-3 分级 · 讲师 L5-L7 持证 · 题库共建分润</div>
+    </a>
+  </div>
+</div>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

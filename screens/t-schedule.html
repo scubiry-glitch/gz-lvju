@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>排课排考 · 培训机构端</title>
+  <style>
+    :root {
+      --bg: #faf5ff; --surface: #ffffff; --fg: #1e1b4b;
+      --muted: #6b7280; --border: #e5e7eb; --line:#f3f4f6;
+      --accent: #7c3aed; --accent-deep:#5b21b6;
+      --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI */
+    .kpi-row{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:22px; font-weight:700; margin-top:3px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    /* layout */
+    .row{display:grid; grid-template-columns:2.2fr 1fr; gap:16px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+    .card-head{padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center;}
+    .card-head h3{font-size:14px; font-weight:600; margin:0;}
+    .card-head .pill{font-size:11px; padding:2px 8px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:8px;}
+    .card-head .actions{margin-left:auto; display:flex; gap:8px;}
+    .card-head .actions a{font-size:12px; color:var(--accent);}
+
+    /* week calendar */
+    .cal-wrap{padding:0;}
+    .cal-head{display:grid; grid-template-columns:60px repeat(7, 1fr); gap:1px; background:var(--border); border-bottom:1px solid var(--border);}
+    .cal-day{padding:10px 8px; background:var(--surface); text-align:center;}
+    .cal-day.today{background:var(--accent-soft);}
+    .cal-day .dow{font-size:11px; color:var(--muted);}
+    .cal-day .date{font-size:14px; font-weight:600; margin-top:2px;}
+    .cal-day.today .date{color:var(--accent);}
+    .cal-day .events{font-size:10px; color:var(--accent); margin-top:1px; font-weight:600;}
+
+    .cal-body{display:grid; grid-template-columns:60px repeat(7, 1fr); gap:1px; background:var(--border); position:relative;}
+    .cal-time{padding:4px 6px; background:var(--surface); font-size:10px; color:var(--muted); text-align:right; min-height:42px;}
+    .cal-cell{background:var(--surface); min-height:42px; padding:1px; position:relative;}
+
+    /* event */
+    .ev{position:absolute; left:2px; right:2px; padding:5px 7px; border-radius:4px; font-size:10.5px; color:white; cursor:pointer; z-index:2; overflow:hidden;}
+    .ev .nm{font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .ev .meta{opacity:0.85; font-size:9.5px; margin-top:1px;}
+    .ev.cls{background:linear-gradient(135deg, #7c3aed, #a855f7);}
+    .ev.lab{background:linear-gradient(135deg, #ca8a04, #fbbf24); color:#451a03;}
+    .ev.exam{background:linear-gradient(135deg, #dc2626, #f87171);}
+    .ev.live{background:linear-gradient(135deg, #16a34a, #4ade80);}
+    .ev.review{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+
+    .legend{display:flex; gap:14px; padding:10px 18px; border-top:1px solid var(--border); font-size:11.5px; color:var(--muted); flex-wrap:wrap;}
+    .legend span{display:inline-flex; align-items:center; gap:5px;}
+    .legend .dot{width:10px; height:10px; border-radius:2px;}
+    .legend .dot.cls{background:#7c3aed;}
+    .legend .dot.lab{background:#ca8a04;}
+    .legend .dot.exam{background:#dc2626;}
+    .legend .dot.live{background:#16a34a;}
+    .legend .dot.review{background:#1e40af;}
+
+    /* upcoming events sidebar */
+    .ev-up{padding:12px 14px; border-bottom:1px solid var(--line); display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; font-size:12.5px;}
+    .ev-up:last-child{border-bottom:0;}
+    .ev-up .dt{font-family:var(--mono); font-size:11px; text-align:center; padding:4px 6px; background:var(--bg); border-radius:5px; min-width:48px;}
+    .ev-up .dt .d{font-size:14px; font-weight:700; color:var(--accent);}
+    .ev-up .dt .m{font-size:10px; color:var(--muted);}
+    .ev-up .body .nm{font-weight:600;}
+    .ev-up .body .meta{font-size:11px; color:var(--muted); margin-top:1px;}
+    .ev-up .badge{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .ev-up .badge.lab{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .ev-up .badge.exam{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .ev-up .badge.live{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .ev-up .badge.review{background:color-mix(in oklab, #1e40af 14%, transparent); color:#1e40af;}
+    .ev-up .badge.cls{background:var(--accent-soft); color:var(--accent);}
+
+    /* exam pool */
+    .ex-row{display:grid; grid-template-columns:1fr auto auto auto; gap:10px; padding:11px 16px; border-bottom:1px solid var(--line); align-items:center; font-size:12.5px;}
+    .ex-row:last-child{border-bottom:0;}
+    .ex-row .nm{font-weight:600;}
+    .ex-row .sub{font-size:11px; color:var(--muted); margin-top:1px;}
+    .ex-row .v{font-family:var(--mono); font-weight:700;}
+    .ex-row .stat{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:600;}
+    .ex-row .stat.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .ex-row .stat.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+
+    /* sync banner */
+    .sync{padding:14px 16px; background:linear-gradient(135deg, #ddd6fe, #c4b5fd); border:1px solid #a78bfa; border-radius:8px; margin-bottom:14px; display:flex; gap:10px; align-items:center;}
+    .sync .ic{font-size:22px;}
+    .sync .body{flex:1; font-size:12.5px;}
+    .sync .body strong{color:#4c1d95;}
+    .sync .body .desc{color:#5b21b6; margin-top:2px;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="t" data-active="schedule"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>排课排考</h1>
+      <span style="font-size:12px; color:var(--muted);">本周 6 月 8-14 日 · 江宁培训基地 + 河西考点</span>
+      <button class="btn">月视图</button>
+      <button class="btn">考点资源</button>
+      <button class="btn pri">+ 排课</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="ki"><div class="l">本周课次</div><div class="n">42</div><div class="d">含直播 8</div></div>
+      <div class="ki"><div class="l">本周考试</div><div class="n" style="color:var(--danger);">14</div><div class="d">含补考 4</div></div>
+      <div class="ki"><div class="l">实操室占用</div><div class="n">86<span class="u">%</span></div><div class="d warn">紧张</div></div>
+      <div class="ki"><div class="l">讲师在岗</div><div class="n">12<span class="u">/14</span></div><div class="d">2 出差</div></div>
+      <div class="ki"><div class="l">学员到课率</div><div class="n" style="color:var(--success);">94<span class="u">%</span></div><div class="d ok">↑ 2 pp</div></div>
+    </div>
+
+    <div class="sync">
+      <span class="ic">📅</span>
+      <div class="body">
+        <strong>考试需中台审批</strong>
+        <div class="desc">排考前需向「中台 p-cert-issue」申请考点 + 监考 → 通过后 4h 内生成准考证 → 推送至 S 端考试中心。</div>
+      </div>
+    </div>
+
+    <div class="row">
+
+      <!-- LEFT calendar -->
+      <div class="card">
+        <div class="card-head">
+          <h3>本周日历</h3>
+          <span class="pill">2026-06-08 → 06-14</span>
+          <div class="actions"><a>← 上周</a><a>下周 →</a></div>
+        </div>
+
+        <div class="cal-wrap">
+          <div class="cal-head">
+            <div></div>
+            <div class="cal-day"><div class="dow">周一</div><div class="date">08</div><div class="events">5 课</div></div>
+            <div class="cal-day"><div class="dow">周二</div><div class="date">09</div><div class="events">6 课</div></div>
+            <div class="cal-day today"><div class="dow">周三 · 今</div><div class="date">10</div><div class="events">7 课</div></div>
+            <div class="cal-day"><div class="dow">周四</div><div class="date">11</div><div class="events">5 课</div></div>
+            <div class="cal-day"><div class="dow">周五</div><div class="date">12</div><div class="events">8 项 ★</div></div>
+            <div class="cal-day"><div class="dow">周六</div><div class="date">13</div><div class="events">7 课</div></div>
+            <div class="cal-day"><div class="dow">周日</div><div class="date">14</div><div class="events">4 课</div></div>
+          </div>
+          <div class="cal-body">
+            <!-- 09:00 -->
+            <div class="cal-time">09:00</div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">L1 入门 12 课·3 章</div><div class="meta">王老师 · 教室 A · 18 人</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">合同备案 v1.0</div><div class="meta">李老师 · 教室 B</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev exam" style="top:0; height:130px;"><div class="nm">L1→L2 综合考</div><div class="meta">考点 · 河西 · 12 人</div></div></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">保洁 进阶</div><div class="meta">教室 A</div></div></div>
+            <div class="cal-cell"></div>
+
+            <!-- 11:00 -->
+            <div class="cal-time">11:00</div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev lab" style="top:0; height:130px;"><div class="nm">实操：入住接待</div><div class="meta">实操室 1 · 8 人</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev review" style="top:0; height:90px;"><div class="nm">导师评估</div><div class="meta">3 名学员</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">L1 入门</div><div class="meta">教室 C</div></div></div>
+
+            <!-- 14:00 -->
+            <div class="cal-time">14:00</div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">客诉调解</div><div class="meta">张老师 · 教室 A</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev live" style="top:0; height:130px;"><div class="nm">🔴 直播·老人陪护答疑</div><div class="meta">王老师 · 42 人预约</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev exam" style="top:0; height:170px;"><div class="nm">L4→L5 商业认证</div><div class="meta">考点 · 中山门 · 6 人</div></div></div>
+            <div class="cal-cell"><div class="ev lab" style="top:0; height:130px;"><div class="nm">实操：保洁深度</div><div class="meta">实操室 2</div></div></div>
+            <div class="cal-cell"></div>
+
+            <!-- 16:00 -->
+            <div class="cal-time">16:00</div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">复杂场景演练</div><div class="meta">实操室 1</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">L3 进阶 · 7 章</div><div class="meta">教室 B</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev cls" style="top:0; height:90px;"><div class="nm">毕业综合考预演</div><div class="meta">教室 A</div></div></div>
+            <div class="cal-cell"></div>
+
+            <!-- 19:00 -->
+            <div class="cal-time">19:00</div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev live" style="top:0; height:90px;"><div class="nm">🔴 直播·客诉调解</div><div class="meta">28 人预约</div></div></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"></div>
+            <div class="cal-cell"><div class="ev live" style="top:0; height:90px;"><div class="nm">🔴 直播·政策解读</div><div class="meta">86 人预约</div></div></div>
+          </div>
+
+          <div class="legend">
+            <span><span class="dot cls"></span>课程</span>
+            <span><span class="dot lab"></span>实操</span>
+            <span><span class="dot exam"></span>考试</span>
+            <span><span class="dot live"></span>直播</span>
+            <span><span class="dot review"></span>导师评估</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT upcoming + exam pool -->
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>未来 7 天关键日程</h3><span class="pill">高优先</span></div>
+          <div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">12</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">L1→L2 综合考</div><div class="meta">河西考点 · 12 人 · 唐师傅等</div></div>
+              <span class="badge exam">考试</span>
+            </div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">12</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">L4→L5 商业认证考</div><div class="meta">中山门 · 6 人 · 跨机构</div></div>
+              <span class="badge exam">考试</span>
+            </div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">13</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">毕业综合考预演</div><div class="meta">教室 A · 12 人</div></div>
+              <span class="badge cls">课程</span>
+            </div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">15</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">老人陪护进阶专项</div><div class="meta">直播 · 王老师 · 42 预约</div></div>
+              <span class="badge live">直播</span>
+            </div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">18</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">补考批次</div><div class="meta">河西考点 · 6 人（吴桂英等）</div></div>
+              <span class="badge exam">补考</span>
+            </div>
+            <div class="ev-up">
+              <div class="dt"><div class="d">20</div><div class="m">JUN</div></div>
+              <div class="body"><div class="nm">导师月度评估会</div><div class="meta">全 14 名讲师</div></div>
+              <span class="badge review">评估</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><h3>本月已申请考试（中台审批）</h3><span class="pill">需 ≥ 7 天提前</span></div>
+          <div>
+            <div class="ex-row">
+              <div><div class="nm">L1→L2 综合考</div><div class="sub">6 月 12 日 · 12 人</div></div>
+              <div class="v">12 人</div>
+              <span class="stat ok">已批</span>
+              <a style="font-size:11px; color:var(--accent);">准考证</a>
+            </div>
+            <div class="ex-row">
+              <div><div class="nm">L4→L5 商业认证考</div><div class="sub">6 月 12 日 · 6 人</div></div>
+              <div class="v">6 人</div>
+              <span class="stat ok">已批</span>
+              <a style="font-size:11px; color:var(--accent);">准考证</a>
+            </div>
+            <div class="ex-row">
+              <div><div class="nm">补考批次</div><div class="sub">6 月 18 日 · 6 人</div></div>
+              <div class="v">6 人</div>
+              <span class="stat ok">已批</span>
+              <a style="font-size:11px; color:var(--accent);">准考证</a>
+            </div>
+            <div class="ex-row">
+              <div><div class="nm">毕业综合考</div><div class="sub">6 月 26 日 · 18 人</div></div>
+              <div class="v">18 人</div>
+              <span class="stat warn">审核中</span>
+              <a style="font-size:11px; color:var(--accent);">催办</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

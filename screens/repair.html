@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>报修服务 · 保租房</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff; --success: #17a34a; --warn: #eab308;
+      --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+    textarea { font: inherit; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 64px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    .page-nav {
+      display: flex; align-items: center; padding: 8px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+    .back-btn svg { width: 20px; height: 20px; }
+    .page-nav h1 { flex: 1; font-size: 16px; font-weight: 600; text-align: center; margin: 0; }
+
+    /* tab bar */
+    .tab-bar {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-bar button {
+      flex: 1; padding: 12px 0; font-size: 14px;
+      color: var(--muted); border-bottom: 2px solid transparent;
+    }
+    .tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+
+    .content { padding: 16px; }
+
+    /* ===== report form ===== */
+    .form-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 20px; margin-bottom: 12px;
+    }
+    .form-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 14px; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+
+    .input {
+      width: 100%; padding: 11px 14px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--fg); font-size: 15px;
+    }
+    .input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+    .category-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .cat-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); cursor: pointer;
+      background: var(--surface); font-size: 13px;
+    }
+    .cat-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+    .cat-item .cat-icon { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
+
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: var(--radius-md);
+      padding: 20px; text-align: center; cursor: pointer;
+      background: var(--bg);
+    }
+    .upload-area svg { width: 24px; height: 24px; color: var(--muted); margin: 0 auto 6px; }
+    .upload-area p { font-size: 12px; color: var(--muted); }
+
+    .btn-submit {
+      width: 100%; padding: 14px; border-radius: var(--radius-sm);
+      background: var(--accent); color: var(--accent-on);
+      font-size: 16px; font-weight: 600; margin-top: 4px;
+    }
+    .btn-submit:active { opacity: 0.9; }
+
+    /* ===== repair records ===== */
+    .repair-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md); margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .repair-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 16px 16px 10px;
+    }
+    .repair-header .category { font-size: 15px; font-weight: 600; }
+    .repair-header .date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .r-status {
+      font-size: 11px; padding: 3px 10px; border-radius: 999px;
+      font-weight: 500; white-space: nowrap;
+    }
+    .r-status.pending { background: color-mix(in oklab, var(--warn) 12%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .r-status.progress { background: var(--accent-soft); color: var(--accent); }
+    .r-status.done { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+
+    .repair-body { padding: 0 16px 12px; font-size: 13px; color: var(--muted); }
+    .repair-progress { margin-top: 8px; }
+    .progress-bar-bg { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 2px; }
+    .progress-fill.pending { width: 20%; background: var(--warn); }
+    .progress-fill.progress { width: 60%; background: var(--accent); }
+    .progress-fill.done { width: 100%; background: var(--success); }
+    .progress-label { display: flex; justify-content: space-between; margin-top: 3px; font-size: 11px; color: var(--muted); }
+
+    .repair-actions {
+      display: flex; gap: 1px; background: var(--border);
+      border-top: 1px solid var(--border);
+    }
+    .repair-actions button {
+      flex: 1; padding: 10px 0; font-size: 13px;
+      background: var(--surface); color: var(--muted); text-align: center;
+    }
+    .repair-actions button:active { background: var(--bg); }
+
+    /* success banner */
+    .success-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      background: color-mix(in oklab, var(--success) 8%, transparent);
+      border: 1px solid color-mix(in oklab, var(--success) 20%, transparent);
+      border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;
+    }
+    .success-banner svg { width: 18px; height: 18px; color: var(--success); flex-shrink: 0; margin-top: 1px; }
+    .success-banner .sb-text { font-size: 13px; }
+    .success-banner .sb-text strong { color: var(--success); }
+
+    /* empty state */
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+    }
+    .empty-state svg { width: 48px; height: 48px; color: var(--border); margin: 0 auto 12px; }
+    .empty-state p { font-size: 14px; color: var(--muted); }
+
+    /* bottom tabs */
+    .bottom-tabs {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface); border-top: 1px solid var(--border);
+      display: flex; padding: 6px 0 calc(6px + var(--safe-bottom)); z-index: 30;
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 4px 0; color: var(--muted); font-size: 10px;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item svg { width: 22px; height: 22px; }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 600px; padding: 0 24px 64px; }
+      .content { padding-inline: 0; }
+      .tab-bar { border-radius: var(--radius-md) var(--radius-md) 0 0; margin-inline: 24px; }
+    }
+
+    /* ===== 需求类型 chips ===== */
+    .type-row { display: flex; gap: 8px; margin-bottom: 14px; }
+    .type-chip {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 12px 4px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); font-size: 12px; color: var(--muted);
+    }
+    .type-chip .te { font-size: 22px; line-height: 1; }
+    .type-chip.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+    /* ===== live record extras ===== */
+    .live-flag { font-size: 10px; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; margin-left: 6px; vertical-align: middle; }
+    .rec-divider { font-size: 12px; color: var(--muted); margin: 18px 2px 8px; display: flex; align-items: center; gap: 8px; }
+    .rec-divider::before, .rec-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .repair-actions button.cta { color: var(--accent); font-weight: 600; }
+    .order-worker { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+    .order-worker .av { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+
+    /* ===== rating sheet ===== */
+    .sheet-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
+    .sheet-mask.open { display: flex; }
+    .sheet {
+      width: 100%; max-width: 430px; background: var(--surface);
+      border-radius: 18px 18px 0 0; padding: 20px 18px calc(18px + var(--safe-bottom));
+      animation: sheet-up .22s ease;
+    }
+    @keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet h3 { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+    .sheet .sheet-sub { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+    .stars { display: flex; gap: 8px; justify-content: center; margin-bottom: 6px; }
+    .stars .star { font-size: 34px; line-height: 1; color: var(--border); transition: color .1s; }
+    .stars .star.on { color: #f5a623; }
+    .score-label { text-align: center; font-size: 13px; color: var(--accent); font-weight: 600; min-height: 18px; margin-bottom: 14px; }
+    .tag-pick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .tag-pick .tg { font-size: 13px; padding: 7px 14px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+    .tag-pick .tg.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .sheet textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; resize: none; margin-bottom: 14px; }
+    .sheet-btns { display: flex; gap: 10px; }
+    .sheet-btns button { flex: 1; padding: 13px; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; }
+    .sheet-btns .cancel { background: var(--bg); color: var(--muted); }
+    .sheet-btns .submit { background: var(--accent); color: #fff; }
+
+    /* toast */
+    .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: rgba(17,17,17,0.9); color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; z-index: 120; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; text-align: center; }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="page-nav">
+    <button class="back-btn" onclick="history.back()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h1>报修服务</h1>
+    <div style="width: 36px;"></div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="active" data-tab="report">我要报修</button>
+    <button data-tab="records">报修记录</button>
+  </div>
+
+  <div class="content">
+    <!-- ============ TAB: report ============ -->
+    <div id="tab-report">
+      <!-- success banner (hidden until submit) -->
+      <div class="success-banner" id="submitSuccess" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="sb-text">
+          <strong>报修已提交</strong><br/>
+          维修人员将在 48 小时内联系您 · 报修编号：<span id="repairId">BX-2026-0601</span>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>需求信息</h3>
+
+        <div class="field">
+          <label>需求类型</label>
+          <div class="type-row" id="typeRow">
+            <div class="type-chip selected" data-type="报修"><span class="te">🔧</span>报修</div>
+            <div class="type-chip" data-type="保洁"><span class="te">🧹</span>保洁</div>
+            <div class="type-chip" data-type="管家"><span class="te">🛎</span>管家</div>
+            <div class="type-chip" data-type="送物"><span class="te">📦</span>送物</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label id="catLabel">报修类别</label>
+          <div class="category-grid" id="categoryGrid"><!-- JS 按需求类型动态渲染 --></div>
+        </div>
+
+        <div class="field">
+          <label>问题描述</label>
+          <textarea class="input" id="repairDesc" rows="3" placeholder="请详细描述故障情况，如：水龙头漏水、空调不制冷等" style="resize: none;"></textarea>
+        </div>
+
+        <div class="field">
+          <label>上传照片（选填）</label>
+          <div class="upload-area" id="photoUpload">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <p>点击上传故障照片，最多 3 张</p>
+          </div>
+          <div style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;" id="photoPreview"></div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>联系信息</h3>
+        <div class="field">
+          <label>房源</label>
+          <select class="input" id="repairHouse">
+            <option>建邺·河西青年公寓 · 5 栋 1203</option>
+            <option>秦淮·南部新城人才家园 · 2 栋 805（待签约）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>联系电话</label>
+          <input class="input" id="repairPhone" type="tel" value="138****5567" />
+        </div>
+        <div class="field">
+          <label>期望上门时间</label>
+          <div style="display: flex; gap: 8px;">
+            <select class="input" id="repairWhen" style="flex:1;">
+              <option>工作日上午</option>
+              <option>工作日下午</option>
+              <option>周末上午</option>
+              <option>周末下午</option>
+            </select>
+            <select class="input" id="repairSoon" style="flex:1;">
+              <option>尽快</option>
+              <option>今天</option>
+              <option>明天</option>
+              <option>本周内</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-submit" onclick="submitRepair()">提交报修</button>
+    </div>
+
+    <!-- ============ TAB: records (hidden) ============ -->
+    <div id="tab-records" style="display:none;">
+      <!-- 实时工单（本机提交，贯通派单→评价闭环） -->
+      <div id="liveRecords"></div>
+      <div class="rec-divider" id="recDivider" style="display:none;">以下为示例记录</div>
+
+      <div class="repair-card">
+        <div class="repair-header">
+          <div>
+            <div class="category">🚿 卫生间花洒漏水</div>
+            <div class="date">2026-05-25 · 报修编号：BX-2026-0525</div>
+          </div>
+          <span class="r-status progress">处理中</span>
+        </div>
+        <div class="repair-body">
+          <span>花洒接口漏水，已安排维修师傅</span>
+          <div class="repair-progress">
+            <div class="progress-bar-bg"><div class="progress-fill progress"></div></div>
+            <div class="progress-label"><span>已分配师傅</span><span>预计 6 月 2 日前上门</span></div>
+          </div>
+        </div>
+        <div class="repair-actions">
+          <button>查看详情</button>
+          <button>联系师傅</button>
+          <button>取消报修</button>
+        </div>
+      </div>
+
+      <div class="repair-card">
+        <div class="repair-header">
+          <div>
+            <div class="category">🔌 客厅插座失灵</div>
+            <div class="date">2026-05-10 · 报修编号：BX-2026-0510</div>
+          </div>
+          <span class="r-status done">已完成</span>
+        </div>
+        <div class="repair-body">
+          <span>已更换插座面板，恢复正常</span>
+          <div class="repair-progress">
+            <div class="progress-bar-bg"><div class="progress-fill done"></div></div>
+            <div class="progress-label"><span>已完成</span><span>2026-05-12 上门维修</span></div>
+          </div>
+        </div>
+        <div class="repair-actions">
+          <button>查看详情</button>
+          <button>再次报修</button>
+        </div>
+      </div>
+
+      <div class="repair-card">
+        <div class="repair-header">
+          <div>
+            <div class="category">❄️ 空调制冷不足</div>
+            <div class="date">2026-04-28 · 报修编号：BX-2026-0428</div>
+          </div>
+          <span class="r-status done">已完成</span>
+        </div>
+        <div class="repair-body">
+          <span>添加制冷剂后恢复正常</span>
+          <div class="repair-progress">
+            <div class="progress-bar-bg"><div class="progress-fill done"></div></div>
+            <div class="progress-label"><span>已完成</span><span>2026-04-30 上门维修</span></div>
+          </div>
+        </div>
+        <div class="repair-actions">
+          <button>查看详情</button>
+          <button>再次报修</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- bottom tabs -->
+  <nav class="bottom-tabs">
+    <a class="tab-item" href="home.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>首页</span>
+    </a>
+    <a class="tab-item" href="policy.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+      <span>政策</span>
+    </a>
+    <a class="tab-item" href="my-applications.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+      <span>我的申请</span>
+    </a>
+    <a class="tab-item" href="profile.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>个人</span>
+    </a>
+  </nav>
+
+  <!-- ===== 评价弹层 ===== -->
+  <div class="sheet-mask" id="rateMask">
+    <div class="sheet">
+      <h3>服务评价</h3>
+      <p class="sheet-sub" id="rateSub">为本次服务打分，评价将回流至服务者信用</p>
+      <div class="stars" id="rateStars">
+        <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span>
+        <span class="star" data-v="3">★</span><span class="star" data-v="4">★</span>
+        <span class="star" data-v="5">★</span>
+      </div>
+      <div class="score-label" id="scoreLabel"></div>
+      <div class="tag-pick" id="tagPick">
+        <span class="tg" data-t="准时">准时</span><span class="tg" data-t="专业">专业</span>
+        <span class="tg" data-t="细致">细致</span><span class="tg" data-t="态度好">态度好</span>
+        <span class="tg" data-t="干净整洁">干净整洁</span>
+      </div>
+      <textarea id="rateText" rows="2" placeholder="说说服务体验（选填）"></textarea>
+      <div class="sheet-btns">
+        <button class="cancel" onclick="closeRate()">取消</button>
+        <button class="submit" onclick="submitRate()">提交评价</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="_orderbus.js"></script>
+<script>
+const BO = window.BZF_ORDERS;
+
+// ---- 需求类型 → 类别预设 ----
+const CATS = {
+  '报修': ['水电维修', '门窗家具', '家电维修', '其他问题'],
+  '保洁': ['日常保洁', '深度保洁', '开荒保洁', '玻璃清洗'],
+  '管家': ['入住引导', '退租核验', '代收快递', '协助报修'],
+  '送物': ['桶装水', '生活物资', '燃气配送', '其他代购']
+};
+const CAT_LABEL = { '报修': '报修类别', '保洁': '保洁类型', '管家': '管家服务', '送物': '配送内容' };
+let curType = '报修';
+let curCat = CATS['报修'][0];
+
+function renderCats() {
+  const grid = document.getElementById('categoryGrid');
+  document.getElementById('catLabel').textContent = CAT_LABEL[curType];
+  grid.innerHTML = '';
+  CATS[curType].forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'cat-item' + (i === 0 ? ' selected' : '');
+    el.dataset.cat = c;
+    el.innerHTML = '<svg class="cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>' + c;
+    el.addEventListener('click', () => {
+      grid.querySelectorAll('.cat-item').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      curCat = c;
+    });
+    grid.appendChild(el);
+  });
+  curCat = CATS[curType][0];
+}
+
+document.querySelectorAll('.type-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.type-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    curType = chip.dataset.type;
+    renderCats();
+  });
+});
+renderCats();
+
+// ---- tab switching ----
+document.querySelectorAll('.tab-bar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-report').style.display = tab === 'report' ? 'block' : 'none';
+    document.getElementById('tab-records').style.display = tab === 'records' ? 'block' : 'none';
+    if (tab === 'records') renderLive();
+  });
+});
+
+// ---- photo upload simulation ----
+document.getElementById('photoUpload').addEventListener('click', () => {
+  const preview = document.getElementById('photoPreview');
+  const count = preview.children.length;
+  if (count >= 3) { alert('最多上传 3 张照片'); return; }
+  const img = document.createElement('div');
+  img.style.cssText = 'width:64px;height:64px;border-radius:6px;background:var(--accent-soft);display:grid;place-items:center;font-size:10px;color:var(--accent);border:1px solid var(--border);';
+  img.textContent = '📷 ' + (count + 1);
+  preview.appendChild(img);
+});
+
+// ---- toast ----
+let toastTimer = null;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ---- submit demand ----
+function submitRepair() {
+  const desc = document.getElementById('repairDesc').value.trim();
+  if (!desc) { alert('请描述需求情况'); return; }
+
+  const o = BO.create({
+    type: curType,
+    category: curCat,
+    desc: desc,
+    house: document.getElementById('repairHouse').value,
+    phone: document.getElementById('repairPhone').value,
+    expectTime: document.getElementById('repairWhen').value + ' · ' + document.getElementById('repairSoon').value
+  });
+
+  document.getElementById('repairId').textContent = o.id;
+  document.querySelector('#submitSuccess .sb-text').innerHTML =
+    '<strong>需求已提交</strong><br/>已进入平台工单池等待派单 · 工单号：<span id="repairId">' + o.id + '</span>';
+  document.getElementById('submitSuccess').style.display = 'flex';
+  document.getElementById('repairDesc').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  renderLive();
+  toast('已提交，可在「报修记录」查看派单进度');
+}
+
+// ---- render live orders in records tab ----
+function renderLive() {
+  const box = document.getElementById('liveRecords');
+  const list = BO.all();
+  document.getElementById('recDivider').style.display = list.length ? 'flex' : 'none';
+  if (!list.length) { box.innerHTML = ''; return; }
+  box.innerHTML = list.map(cardHTML).join('');
+}
+
+function cardHTML(o) {
+  const st = BO.STATUS[o.status];
+  const icon = BO.ICON[o.type] || '🔧';
+  let worker = '';
+  if (o.worker) {
+    worker = '<div class="order-worker"><span class="av">' + BO.esc(o.worker.name.slice(0, 1)) +
+      '</span><span>服务者 ' + BO.esc(o.worker.name) + ' · ' + BO.esc(o.worker.level) +
+      '</span></div>';
+  }
+  let progLabel = st.c;
+  if (o.status === 'pending') progLabel = '工单池排队中';
+  else if (o.status === 'dispatched') progLabel = '已分配服务者，待上门';
+  else if (o.status === 'accepted' || o.status === 'serving') progLabel = '服务者处理中';
+  else if (o.status === 'done') progLabel = '服务完成，请评价';
+  else if (o.status === 'rated') progLabel = '已评价，感谢反馈';
+
+  let actions = '';
+  if (o.status === 'done') {
+    actions = '<div class="repair-actions"><button class="cta" onclick="openRate(\'' + o.id + '\')">去评价</button>' +
+      '<button onclick="toast(\'已转接客服\')">联系客服</button></div>';
+  } else if (o.status === 'rated') {
+    const r = o.rating || {};
+    actions = '<div class="repair-actions"><button onclick="toast(\'您的评分：' + (r.score || 5) + ' 星\')">查看评价</button></div>';
+  } else if (o.status === 'pending') {
+    actions = '<div class="repair-actions"><button onclick="cancelOrder(\'' + o.id + '\')">取消需求</button></div>';
+  } else {
+    actions = '<div class="repair-actions"><button onclick="toast(\'已为您呼叫服务者\')">联系师傅</button></div>';
+  }
+
+  return '<div class="repair-card">' +
+    '<div class="repair-header"><div>' +
+    '<div class="category">' + icon + ' ' + BO.esc(o.category || o.type) +
+    '<span class="live-flag">实时</span></div>' +
+    '<div class="date">' + BO.esc(o.createdLabel) + ' · 工单号：' + BO.esc(o.id) + '</div>' +
+    '</div><span class="r-status ' + st.cls + '">' + st.c + '</span></div>' +
+    '<div class="repair-body"><span>' + BO.esc(o.desc) + '</span>' + worker +
+    '<div class="repair-progress"><div class="progress-bar-bg"><div class="progress-fill" style="width:' + st.pct + '%;background:' +
+    (st.cls === 'done' ? 'var(--success)' : st.cls === 'pending' ? 'var(--warn)' : 'var(--accent)') + ';"></div></div>' +
+    '<div class="progress-label"><span>' + progLabel + '</span><span>¥' + o.fee + '</span></div></div></div>' +
+    actions + '</div>';
+}
+
+function cancelOrder(id) {
+  if (!confirm('确认取消该需求？')) return;
+  localStorage.setItem('bzf_orders', JSON.stringify(BO.all().filter(o => o.id !== id)));
+  renderLive();
+  toast('已取消');
+}
+
+// ---- rating sheet ----
+let rateTarget = null, rateScore = 0;
+function openRate(id) {
+  rateTarget = id; rateScore = 5;
+  setStars(5);
+  document.getElementById('tagPick').querySelectorAll('.tg').forEach(t => t.classList.remove('on'));
+  document.getElementById('rateText').value = '';
+  const o = BO.get(id);
+  document.getElementById('rateSub').textContent =
+    (o && o.worker ? '服务者 ' + o.worker.name + ' · ' + o.worker.level + ' · ' : '') + (o ? o.category : '');
+  document.getElementById('rateMask').classList.add('open');
+}
+function closeRate() { document.getElementById('rateMask').classList.remove('open'); }
+const SCORE_TXT = { 1: '很不满意', 2: '不满意', 3: '一般', 4: '满意', 5: '非常满意' };
+function setStars(v) {
+  rateScore = v;
+  document.querySelectorAll('#rateStars .star').forEach(s => {
+    s.classList.toggle('on', Number(s.dataset.v) <= v);
+  });
+  document.getElementById('scoreLabel').textContent = SCORE_TXT[v] || '';
+}
+document.querySelectorAll('#rateStars .star').forEach(s => {
+  s.addEventListener('click', () => setStars(Number(s.dataset.v)));
+});
+document.querySelectorAll('#tagPick .tg').forEach(t => {
+  t.addEventListener('click', () => t.classList.toggle('on'));
+});
+function submitRate() {
+  if (!rateScore) { alert('请先打分'); return; }
+  const tags = Array.from(document.querySelectorAll('#tagPick .tg.on')).map(t => t.dataset.t);
+  BO.rate(rateTarget, {
+    score: rateScore,
+    tags: tags,
+    text: document.getElementById('rateText').value.trim()
+  });
+  closeRate();
+  renderLive();
+  toast('评价已提交，已回流服务者信用');
+}
+
+// ---- bottom tab nav ----
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', e => {
+    const href = tab.getAttribute('href');
+    if (href && href !== '#' && !href.startsWith('http')) {
+      e.preventDefault();
+      window.location.href = href;
+    }
+  });
+});
+
+// 其它页面（派单/完工）改动后回到本页自动刷新
+BO.onChange(renderLive);
+window.addEventListener('pageshow', renderLive);
+renderLive();
+</script>
+<script src="_region.js"></script>
+</body>
+</html>

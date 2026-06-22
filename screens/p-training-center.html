@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>培训中心 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:2fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* course list */
+    .cs{display:flex; gap:12px; padding:12px; background:var(--line); border-radius:6px; margin-bottom:8px; cursor:pointer; border:1px solid transparent;}
+    .cs.on{background:var(--accent-soft); border-color:var(--accent);}
+    .cs .cover{width:74px; height:54px; border-radius:5px; flex-shrink:0; display:grid; place-items:center; font-size:22px;}
+    .cs.c1 .cover{background:linear-gradient(135deg, #fef3c7, #fcd34d);}
+    .cs.c2 .cover{background:linear-gradient(135deg, #dbeafe, #93c5fd);}
+    .cs.c3 .cover{background:linear-gradient(135deg, #dcfce7, #86efac);}
+    .cs.c4 .cover{background:linear-gradient(135deg, #fce7f3, #f9a8d4);}
+    .cs .body{flex:1; min-width:0;}
+    .cs .nm{font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:6px;}
+    .cs .nm .v{font-size:10px; padding:1px 5px; background:var(--surface); border:1px solid var(--border); border-radius:3px; color:var(--muted); font-weight:500;}
+    .cs .meta{font-size:11px; color:var(--muted); margin-top:3px;}
+    .cs .stat{display:flex; gap:12px; font-size:11px; margin-top:6px;}
+    .cs .stat .v{color:var(--fg); font-weight:600;}
+    .cs .stat .v.ok{color:var(--success);}
+    .cs .stat .v.warn{color:var(--warn);}
+    .cs .right{display:flex; flex-direction:column; align-items:flex-end; gap:4px; font-size:11px;}
+    .cs .right .badge{padding:2px 6px; border-radius:3px; font-size:10px; font-weight:600;}
+    .cs .right .badge.live{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .cs .right .badge.draft{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+
+    /* chapter list (detail) */
+    .ch-list{display:flex; flex-direction:column; gap:6px; font-size:12.5px;}
+    .ch{padding:9px 12px; background:var(--line); border-radius:5px; display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; align-items:center;}
+    .ch .num{width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:600; display:grid; place-items:center;}
+    .ch .nm{font-weight:500;}
+    .ch .meta{font-size:11px; color:var(--muted);}
+    .ch .ty{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:500;}
+    .ch .ty.v{background:color-mix(in oklab, var(--accent) 14%, transparent); color:var(--accent);}
+    .ch .ty.p{background:color-mix(in oklab, var(--gold) 14%, transparent); color:var(--gold);}
+    .ch .ty.q{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+
+    /* progress chart - learner */
+    .learn-row{display:grid; grid-template-columns:1fr 60px 80px 80px; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; align-items:center;}
+    .learn-row:last-child{border-bottom:0;}
+    .learn-row .nm{font-weight:500;}
+    .learn-row .nm .sub{font-size:10px; color:var(--muted); margin-top:2px;}
+    .learn-row .lvl{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600; text-align:center;}
+    .learn-row .lvl.l1{background:#fbbf24; color:#78350f;}
+    .learn-row .lvl.l2{background:#9ca3af; color:white;}
+    .learn-row .lvl.l3{background:#10b981; color:white;}
+    .learn-row .bar{position:relative; height:8px; background:var(--line); border-radius:4px;}
+    .learn-row .bar .fill{position:absolute; left:0; top:0; height:100%; border-radius:4px; background:var(--accent);}
+    .learn-row .bar .fill.ok{background:var(--success);}
+    .learn-row .bar .fill.warn{background:var(--warn);}
+    .learn-row .pct{font-family:var(--mono); font-weight:700; text-align:right;}
+
+    /* partner */
+    .partner-row{display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:12px; align-items:center;}
+    .partner-row:last-child{border-bottom:0;}
+    .partner-row .av{width:32px; height:32px; border-radius:6px; background:var(--accent-soft); color:var(--accent); font-weight:700; display:grid; place-items:center;}
+    .partner-row .body{flex:1;}
+    .partner-row .nm{font-weight:600;}
+    .partner-row .meta{font-size:10.5px; color:var(--muted);}
+    .partner-row .v{font-size:11px; font-weight:600;}
+
+    @media (max-width: 1100px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="training-center"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>培训中心</b></div>
+      <div class="top-actions">
+        <button class="btn">课程审核</button>
+        <button class="btn">学员导出</button>
+        <button class="btn pri">+ 新课程</button>
+      </div>
+    </div>
+
+    <!-- 课程全生命周期链路（当前：③ 上架·培训中心） -->
+    <div style="margin:16px 28px 0;background:var(--accent-soft);border:1px solid color-mix(in oklab,var(--accent) 22%,transparent);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12px;">
+      <b style="color:var(--accent);margin-right:2px;">🔗 课程全链路</b>
+      <a href="t-courses.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">① 课程开发</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-course-cert.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">② 课程认证</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <span style="padding:3px 9px;border-radius:6px;background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:700;white-space:nowrap;">③ 上架·培训中心</span>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="s-learn.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">④ 学员学习</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="s-exam.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑤ 结业考试</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-exam-admin.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑥ 考务·成绩</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-graduation.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑦ 结业·学时</a>
+      <span style="color:var(--accent);font-weight:700;">›</span>
+      <a href="p-cert-issue.html" style="padding:3px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--border);font-weight:600;white-space:nowrap;">⑧ 统一发证</a>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">课程总数</div><div class="n">86<span class="u">门</span></div><div class="d">↑ 12 本月</div></div>
+      <div class="ki"><div class="l">在学学员</div><div class="n">286<span class="u">人</span></div><div class="d">L1+L2</div></div>
+      <div class="ki"><div class="l">月度完课</div><div class="n">412<span class="u">课次</span></div><div class="d">↑ 18%</div></div>
+      <div class="ki"><div class="l">平均通过</div><div class="n">89.5<span class="u">%</span></div><div class="d">健康</div></div>
+      <div class="ki"><div class="l">合作机构</div><div class="n">6<span class="u">家</span></div><div class="d">3 家自营</div></div>
+      <div class="ki"><div class="l">直播预约</div><div class="n">18<span class="u">场</span></div><div class="d">本周</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- left: course list + chapters -->
+      <div>
+        <div class="card">
+          <h3>课程目录 <span class="pill">11 工种 · 86 门</span> <span class="extra">按工种 + 等级筛选</span></h3>
+          <div class="cs c1 on">
+            <div class="cover">🏠</div>
+            <div class="body">
+              <div class="nm">家政服务·L2 入门 12 课 <span class="v">v3.0</span></div>
+              <div class="meta">12 章 · 96 学时 · 实操 4 节 · 平均通过 91%</div>
+              <div class="stat"><span>学员 <span class="v">86</span></span><span>完课率 <span class="v ok">78%</span></span><span>评分 <span class="v">4.7</span></span></div>
+            </div>
+            <div class="right">
+              <span class="badge live">PUB</span>
+              <span style="color:var(--muted);">2026-05</span>
+            </div>
+          </div>
+          <div class="cs c2">
+            <div class="cover">🧹</div>
+            <div class="body">
+              <div class="nm">保洁专业·L2-L3 进阶 <span class="v">v2.1</span></div>
+              <div class="meta">10 章 · 80 学时 · 直播答疑 2 场</div>
+              <div class="stat"><span>学员 <span class="v">62</span></span><span>完课率 <span class="v ok">82%</span></span><span>评分 <span class="v">4.6</span></span></div>
+            </div>
+            <div class="right"><span class="badge live">PUB</span><span style="color:var(--muted);">2026-04</span></div>
+          </div>
+          <div class="cs c3">
+            <div class="cover">🔧</div>
+            <div class="body">
+              <div class="nm">维修工种·安全规范专项 <span class="v">v1.4</span></div>
+              <div class="meta">8 章 · 64 学时 · 含特种作业证备考</div>
+              <div class="stat"><span>学员 <span class="v">48</span></span><span>完课率 <span class="v warn">62%</span></span><span>评分 <span class="v">4.4</span></span></div>
+            </div>
+            <div class="right"><span class="badge live">PUB</span><span style="color:var(--muted);">2026-03</span></div>
+          </div>
+          <div class="cs c4">
+            <div class="cover">🎩</div>
+            <div class="body">
+              <div class="nm">管家服务·L4 客户沟通进阶 <span class="v">v0.9</span></div>
+              <div class="meta">14 章 · 112 学时 · 角色扮演 6 场</div>
+              <div class="stat"><span>学员 <span class="v">12</span></span><span>完课率 <span class="v">—</span></span><span>评分 <span class="v">—</span></span></div>
+            </div>
+            <div class="right"><span class="badge draft">DRAFT</span><span style="color:var(--muted);">待审</span></div>
+          </div>
+        </div>
+
+        <!-- chapter detail of selected -->
+        <div class="card" style="margin-top:14px;">
+          <h3>课程详情 · 家政服务·L2 入门 12 课 <span class="extra">章节大纲</span></h3>
+          <div class="ch-list">
+            <div class="ch"><div class="num">1</div><div class="nm">新客接待与首次入户</div><div class="meta">8 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">2</div><div class="nm">家庭动线梳理与作业计划</div><div class="meta">6 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">3</div><div class="nm">物品归位与拍照备份</div><div class="meta">10 学时</div><span class="ty p">实操</span></div>
+            <div class="ch"><div class="num">4</div><div class="nm">儿童照护与边界</div><div class="meta">6 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">5</div><div class="nm">章节测验 1（1-4 章）</div><div class="meta">20 题</div><span class="ty q">测验</span></div>
+            <div class="ch"><div class="num">6</div><div class="nm">老人陪护基础与急救常识</div><div class="meta">10 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">7</div><div class="nm">突发状况与应急响应</div><div class="meta">8 学时</div><span class="ty p">实操</span></div>
+            <div class="ch"><div class="num">8</div><div class="nm">隐私与"少打扰"原则</div><div class="meta">4 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">9</div><div class="nm">章节测验 2（5-8 章）</div><div class="meta">20 题</div><span class="ty q">测验</span></div>
+            <div class="ch"><div class="num">10</div><div class="nm">复杂工单情景演练</div><div class="meta">14 学时</div><span class="ty p">实操</span></div>
+            <div class="ch"><div class="num">11</div><div class="nm">客评与投诉处置</div><div class="meta">6 学时</div><span class="ty v">视频</span></div>
+            <div class="ch"><div class="num">12</div><div class="nm">毕业测验 + 师傅评估</div><div class="meta">综合 50 题 · 加面试</div><span class="ty q">综合</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right -->
+      <div>
+        <div class="card">
+          <h3>学员进度 <span class="extra">在学 286 人</span></h3>
+          <div>
+            <div class="learn-row">
+              <div class="nm">孙建华<div class="sub">EMP-2026-0218 · 家政</div></div>
+              <div class="lvl l1">L1</div>
+              <div class="bar"><div class="fill" style="width:67%;"></div></div>
+              <div class="pct">67%</div>
+            </div>
+            <div class="learn-row">
+              <div class="nm">赵丽芳<div class="sub">EMP-2026-0064 · 家政</div></div>
+              <div class="lvl l2">L2</div>
+              <div class="bar"><div class="fill ok" style="width:92%;"></div></div>
+              <div class="pct">92%</div>
+            </div>
+            <div class="learn-row">
+              <div class="nm">周丽华<div class="sub">EMP-2026-0089 · 保洁</div></div>
+              <div class="lvl l2">L2</div>
+              <div class="bar"><div class="fill ok" style="width:100%;"></div></div>
+              <div class="pct" style="color:var(--success);">完成</div>
+            </div>
+            <div class="learn-row">
+              <div class="nm">郑文涛<div class="sub">EMP-2026-0314 · 管家</div></div>
+              <div class="lvl l3">L3</div>
+              <div class="bar"><div class="fill ok" style="width:100%;"></div></div>
+              <div class="pct" style="color:var(--success);">已毕业</div>
+            </div>
+            <div class="learn-row">
+              <div class="nm">钱小宝<div class="sub">EMP-2026-0226 · 维修</div></div>
+              <div class="lvl l1">L1</div>
+              <div class="bar"><div class="fill warn" style="width:28%;"></div></div>
+              <div class="pct" style="color:var(--warn);">28%</div>
+            </div>
+            <div class="learn-row">
+              <div class="nm">吴桂英<div class="sub">EMP-2026-0042 · 家政</div></div>
+              <div class="lvl l2">L2</div>
+              <div class="bar"><div class="fill warn" style="width:54%;"></div></div>
+              <div class="pct" style="color:var(--warn);">补课</div>
+            </div>
+          </div>
+          <a style="display:inline-block; margin-top:10px; font-size:12px; color:var(--accent); font-weight:500;">查看全部 286 名学员 →</a>
+        </div>
+
+        <!-- 合作机构 -->
+        <div class="card" style="margin-top:14px;">
+          <h3>合作培训机构 <span class="extra">6 家</span></h3>
+          <div class="partner-row">
+            <div class="av">江</div>
+            <div class="body"><div class="nm">江苏家协培训中心</div><div class="meta">家政/保洁 · 自营基地 · 5 年合作</div></div>
+            <div class="v" style="color:var(--success);">★ 战略</div>
+          </div>
+          <div class="partner-row">
+            <div class="av">南</div>
+            <div class="body"><div class="nm">南京职业技术学院</div><div class="meta">特种作业 · 学历互认</div></div>
+            <div class="v">认证</div>
+          </div>
+          <div class="partner-row">
+            <div class="av">技</div>
+            <div class="body"><div class="nm">技工教育公司 A</div><div class="meta">维修/电工 · 输送 86 人</div></div>
+            <div class="v">认证</div>
+          </div>
+          <div class="partner-row">
+            <div class="av">东</div>
+            <div class="body"><div class="nm">东方家政学院</div><div class="meta">高端管家 · 国际证书</div></div>
+            <div class="v">观察</div>
+          </div>
+          <a style="display:inline-block; margin-top:10px; font-size:12px; color:var(--accent); font-weight:500;">+ 新增合作机构</a>
+        </div>
+
+        <!-- 直播预约 -->
+        <div class="card" style="margin-top:14px;">
+          <h3>本周直播 <span class="extra">18 场</span></h3>
+          <div style="font-size:12px;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line);"><span><b>06-09 14:00</b> · 老人陪护应急答疑</span><span style="color:var(--accent);">42 人预约</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line);"><span><b>06-10 19:30</b> · 复杂客诉调解</span><span style="color:var(--accent);">28 人</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line);"><span><b>06-11 09:00</b> · 特种作业实操</span><span style="color:var(--accent);">18 人</span></div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0;"><span><b>06-12 14:00</b> · 装修工种入行说明</span><span style="color:var(--accent);">52 人</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.cs').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.cs').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

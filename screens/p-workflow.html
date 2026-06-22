@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>工作流引擎 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* workflow template list */
+    .wf-row{display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:12px; padding:12px 14px; border-radius:6px; background:var(--line); margin-bottom:8px; align-items:center;}
+    .wf-row .ic{font-size:18px;}
+    .wf-row .info .nm{font-size:13px; font-weight:600;}
+    .wf-row .info .desc{font-size:11px; color:var(--muted); margin-top:2px;}
+    .wf-row .info .steps{display:flex; gap:3px; margin-top:6px;}
+    .wf-row .info .steps .s{font-size:9px; padding:2px 6px; background:var(--surface); color:var(--accent); border-radius:3px; font-weight:600;}
+    .wf-row .info .steps .arr{color:var(--muted); padding:0 2px;}
+    .wf-row .v{font-family:var(--mono); font-size:11px; color:var(--accent); background:var(--accent-soft); padding:2px 5px; border-radius:3px; font-weight:600;}
+    .wf-row .stat{font-size:11px; text-align:center;}
+    .wf-row .stat .num{font-size:14px; font-weight:700;}
+    .wf-row .swt{width:32px; height:18px; background:var(--success); border-radius:9px; position:relative; cursor:pointer;}
+    .wf-row .swt::after{content:''; position:absolute; top:2px; left:16px; width:14px; height:14px; background:white; border-radius:50%;}
+    .wf-row.off .swt{background:var(--border);}
+    .wf-row.off .swt::after{left:2px;}
+
+    /* in-flight kanban */
+    .kanban{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .col{background:var(--line); border-radius:6px; padding:10px; min-height:280px;}
+    .col-head{display:flex; align-items:center; gap:6px; margin-bottom:10px; font-size:12px; font-weight:600;}
+    .col-head .dot{width:8px; height:8px; border-radius:50%;}
+    .col-head.r1 .dot{background:var(--warn);}
+    .col-head.r2 .dot{background:var(--accent);}
+    .col-head.r3 .dot{background:#a855f7;}
+    .col-head.r4 .dot{background:var(--success);}
+    .col-head .cnt{margin-left:auto; font-size:10px; padding:1px 6px; background:var(--surface); color:var(--muted); border-radius:6px; font-weight:600;}
+
+    .tk{background:var(--surface); border-radius:5px; padding:8px 10px; margin-bottom:6px; font-size:11.5px; border:1px solid var(--border); border-left:3px solid var(--accent);}
+    .tk.urgent{border-left-color:var(--danger);}
+    .tk .head{display:flex; gap:6px; margin-bottom:4px; align-items:center;}
+    .tk .id{font-family:var(--mono); font-size:10px; color:var(--muted); background:var(--line); padding:1px 4px; border-radius:3px;}
+    .tk .ttl{font-weight:600; margin-bottom:3px;}
+    .tk .meta{font-size:10px; color:var(--muted); display:flex; gap:6px;}
+    .tk .meta .who{color:var(--accent); font-weight:600;}
+
+    /* audit log */
+    .log{font-size:12px;}
+    .log .row{display:grid; grid-template-columns:auto auto 1fr auto; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); align-items:start;}
+    .log .row:last-child{border-bottom:0;}
+    .log .t{font-size:10.5px; color:var(--muted); padding-top:1px; font-family:var(--mono);}
+    .log .a{font-family:var(--mono); font-size:9.5px; padding:2px 5px; border-radius:3px; font-weight:600;}
+    .log .a.appr{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .log .a.rej{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .log .a.start{background:var(--accent-soft); color:var(--accent);}
+    .log .a.fork{background:color-mix(in oklab, #a855f7 14%, transparent); color:#7c3aed;}
+    .log .ctx strong{font-weight:500;}
+    .log .ctx em{font-style:normal; color:var(--muted);}
+    .log .who{font-size:11px; color:var(--accent); font-weight:600;}
+
+    /* SLA gauge */
+    .sla{display:flex; gap:14px; align-items:center;}
+    .ring{width:88px; height:88px; border-radius:50%; background:conic-gradient(var(--success) 0% 92.4%, var(--line) 92.4% 100%); display:grid; place-items:center; position:relative; flex-shrink:0;}
+    .ring::before{content:''; position:absolute; inset:9px; background:var(--surface); border-radius:50%;}
+    .ring-text{position:relative; text-align:center; z-index:1;}
+    .ring-text .v{font-size:20px; font-weight:800; color:var(--success);}
+    .ring-text .l{font-size:9px; color:var(--muted); margin-top:-1px;}
+    .sla-info{font-size:11.5px; flex:1;}
+    .sla-info .r{display:flex; justify-content:space-between; padding:3px 0;}
+    .sla-info .r .l{color:var(--muted);}
+    .sla-info .r .v{font-weight:600;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="workflow"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>工作流引擎</b></div>
+      <span style="font-size:11px; padding:3px 8px; background:var(--accent-soft); color:var(--accent); border-radius:4px; font-weight:600;">v3 BPMN</span>
+      <div class="top-actions">
+        <button class="btn">导入 BPMN</button>
+        <button class="btn">导出</button>
+        <button class="btn pri">+ 新建工作流</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">工作流模板</div><div class="n">18<span class="u">套</span></div><div class="d ok">↑ 2</div></div>
+      <div class="ki"><div class="l">本月触发</div><div class="n">3,486</div><div class="d ok">↑ 612</div></div>
+      <div class="ki"><div class="l">进行中</div><div class="n" style="color:var(--warn);">142</div><div class="d warn">12 超时</div></div>
+      <div class="ki"><div class="l">本月闭环率</div><div class="n">96.4<span class="u">%</span></div><div class="d ok">健康</div></div>
+      <div class="ki"><div class="l">平均时长</div><div class="n">2.4<span class="u">天</span></div><div class="d">↓ 0.4 d</div></div>
+      <div class="ki"><div class="l">驳回率</div><div class="n">4.2<span class="u">%</span></div><div class="d">正常区间</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT templates + in-flight -->
+      <div>
+        <div class="card">
+          <h3>工作流模板 <span class="pill">18 套 · 已生效</span> <span class="extra">支持 BPMN 2.0</span></h3>
+          <div class="wf-row">
+            <div class="ic">🎓</div>
+            <div class="info">
+              <div class="nm">服务者 L0 准入审核</div>
+              <div class="desc">注册 → 资料 → 背调 → 准入</div>
+              <div class="steps">
+                <span class="s">填写</span><span class="arr">→</span>
+                <span class="s">系统查重</span><span class="arr">→</span>
+                <span class="s">审核员</span><span class="arr">→</span>
+                <span class="s">主管复核</span>
+              </div>
+            </div>
+            <span class="v">v3.2</span>
+            <div class="stat"><div class="num">412</div><div>本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row">
+            <div class="ic">📜</div>
+            <div class="info">
+              <div class="nm">L3-L4 证书签发</div>
+              <div class="desc">考试通过 → 自动生成 → 主管批 → 上链 → 推 S 端</div>
+              <div class="steps">
+                <span class="s">触发</span><span class="arr">→</span>
+                <span class="s">草稿</span><span class="arr">→</span>
+                <span class="s">主管</span><span class="arr">→</span>
+                <span class="s">上链</span>
+              </div>
+            </div>
+            <span class="v">v2.4</span>
+            <div class="stat"><div class="num">186</div><div>本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row">
+            <div class="ic">🏭</div>
+            <div class="info">
+              <div class="nm">服务商 L5 入驻（多签）</div>
+              <div class="desc">提交 → 资质 → 背调 → 商业考 → 现场 → 三方签</div>
+              <div class="steps">
+                <span class="s">资料</span><span class="arr">→</span>
+                <span class="s">资质</span><span class="arr">→</span>
+                <span class="s">背调</span><span class="arr">→</span>
+                <span class="s">商业考</span><span class="arr">→</span>
+                <span class="s">现场</span><span class="arr">→</span>
+                <span class="s">三方签</span>
+              </div>
+            </div>
+            <span class="v">v1.4</span>
+            <div class="stat"><div class="num">12</div><div>在途</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row">
+            <div class="ic">⚠️</div>
+            <div class="info">
+              <div class="nm">证书吊销（红牌）</div>
+              <div class="desc">触发 → 风控判定 → 主管批 → 公示同步</div>
+              <div class="steps">
+                <span class="s">触发</span><span class="arr">→</span>
+                <span class="s">风控</span><span class="arr">→</span>
+                <span class="s">主管</span><span class="arr">→</span>
+                <span class="s">公示</span>
+              </div>
+            </div>
+            <span class="v">v1.8</span>
+            <div class="stat"><div class="num">3</div><div>本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row">
+            <div class="ic">📞</div>
+            <div class="info">
+              <div class="nm">投诉处置（12345 触发）</div>
+              <div class="desc">受理 → 分派运营 → 现场 → 复核 → 闭环</div>
+              <div class="steps">
+                <span class="s">受理</span><span class="arr">→</span>
+                <span class="s">运营</span><span class="arr">→</span>
+                <span class="s">现场</span><span class="arr">→</span>
+                <span class="s">复核</span>
+              </div>
+            </div>
+            <span class="v">v2.1</span>
+            <div class="stat"><div class="num">86</div><div>本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row" style="background:#faf5ff;">
+            <div class="ic" style="background:#6b21a8; color:#fff;">🛒</div>
+            <div class="info">
+              <div class="nm">M 物资品类入驻审核 <span style="font-size:10px; color:#6b21a8; padding:1px 6px; background:#f3e8ff; border-radius:3px;">M 端</span></div>
+              <div class="desc">资质 → 检测报告 → 抽检验证 → LV 评级 → 集采底价确认 → 住建终审</div>
+              <div class="steps">
+                <span class="s">资质</span><span class="arr">→</span>
+                <span class="s">检测</span><span class="arr">→</span>
+                <span class="s">抽检</span><span class="arr">→</span>
+                <span class="s">LV 评级</span><span class="arr">→</span>
+                <span class="s">底价</span><span class="arr">→</span>
+                <span class="s">终审</span>
+              </div>
+            </div>
+            <span class="v">v1.0</span>
+            <div class="stat"><div class="num">6</div><div>已通过</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row" style="background:#faf5ff;">
+            <div class="ic" style="background:#6b21a8; color:#fff;">📦</div>
+            <div class="info">
+              <div class="nm">M 物资批次质检追溯 <span style="font-size:10px; color:#6b21a8; padding:1px 6px; background:#f3e8ff; border-radius:3px;">M 端</span></div>
+              <div class="desc">B 运营商验收 → 第三方抽检 → 合格上链 / 不合格触发信用扣分 + 重发</div>
+              <div class="steps">
+                <span class="s">验收</span><span class="arr">→</span>
+                <span class="s">抽检</span><span class="arr">→</span>
+                <span class="s">判定</span><span class="arr">→</span>
+                <span class="s">上链/重发</span>
+              </div>
+            </div>
+            <span class="v">v1.0</span>
+            <div class="stat"><div class="num">84</div><div>本月</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+          <div class="wf-row off">
+            <div class="ic">🧪</div>
+            <div class="info">
+              <div class="nm">L7 区域级专家提名（试点）</div>
+              <div class="desc">L7 评审委员会专用 · 暂未启用</div>
+              <div class="steps">
+                <span class="s">提名</span><span class="arr">→</span>
+                <span class="s">3 方核</span><span class="arr">→</span>
+                <span class="s">公示</span><span class="arr">→</span>
+                <span class="s">颁证</span>
+              </div>
+            </div>
+            <span class="v">v0.3</span>
+            <div class="stat"><div class="num">—</div><div>草稿</div></div>
+            <a style="font-size:11px; color:var(--accent);">编辑</a>
+            <div class="swt"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>进行中实例 <span class="pill">142 单</span> <span class="extra">按状态分布</span></h3>
+          <div class="kanban">
+            <div class="col">
+              <div class="col-head r1"><span class="dot"></span>受理 / 草稿<span class="cnt">42</span></div>
+              <div class="tk">
+                <div class="head"><span class="id">WF-3284</span></div>
+                <div class="ttl">L0 准入·李某某</div>
+                <div class="meta">优家装饰 · <span class="who">@审核员 02</span></div>
+              </div>
+              <div class="tk">
+                <div class="head"><span class="id">WF-3287</span></div>
+                <div class="ttl">证书续期·张师傅</div>
+                <div class="meta">自动 · <span class="who">@系统</span></div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col-head r2"><span class="dot"></span>审核中<span class="cnt">62</span></div>
+              <div class="tk urgent">
+                <div class="head"><span class="id">WF-3280</span></div>
+                <div class="ttl">L5 入驻·优家装饰</div>
+                <div class="meta">阶段 3 · <span class="who">@张主任</span> · ⚠ 12 天</div>
+              </div>
+              <div class="tk">
+                <div class="head"><span class="id">WF-3282</span></div>
+                <div class="ttl">L4 升级·12 人</div>
+                <div class="meta">批量 · <span class="who">@主管</span></div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col-head r3"><span class="dot"></span>多方签<span class="cnt">14</span></div>
+              <div class="tk">
+                <div class="head"><span class="id">WF-3275</span></div>
+                <div class="ttl">服务商 L5·三方签</div>
+                <div class="meta">平台 ✓·G 待·F 待</div>
+              </div>
+            </div>
+            <div class="col">
+              <div class="col-head r4"><span class="dot"></span>待执行<span class="cnt">24</span></div>
+              <div class="tk">
+                <div class="head"><span class="id">WF-3271</span></div>
+                <div class="ttl">证书上链·郑文涛</div>
+                <div class="meta">已批 · 排队中</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT SLA + audit + designer hint -->
+      <div>
+        <div class="card">
+          <h3>SLA 表现 <span class="extra">本月闭环率</span></h3>
+          <div class="sla">
+            <div class="ring">
+              <div class="ring-text">
+                <div class="v">96.4%</div>
+                <div class="l">闭环 SLA</div>
+              </div>
+            </div>
+            <div class="sla-info">
+              <div class="r"><span class="l">L0 准入</span><span class="v" style="color:var(--success);">98.6% · &lt;1d</span></div>
+              <div class="r"><span class="l">L3-L4 签发</span><span class="v" style="color:var(--success);">99.4% · &lt;4h</span></div>
+              <div class="r"><span class="l">L5 入驻</span><span class="v" style="color:var(--warn);">82% · 18d 均</span></div>
+              <div class="r"><span class="l">证书吊销</span><span class="v" style="color:var(--success);">100% · 2.4d</span></div>
+              <div class="r"><span class="l">投诉处置</span><span class="v" style="color:var(--success);">96% · 1.4d</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>近期审计 <span class="extra">操作日志</span></h3>
+          <div class="log">
+            <div class="row">
+              <span class="t">10:32</span>
+              <span class="a appr">APPROVE</span>
+              <div class="ctx"><strong>L5 入驻·优家装饰 阶段 3</strong><br><em>「案例与背调」通过 · 进入商业认证考</em></div>
+              <span class="who">张主任</span>
+            </div>
+            <div class="row">
+              <span class="t">10:18</span>
+              <span class="a appr">APPROVE</span>
+              <div class="ctx"><strong>L3-L4 升级·郑文涛</strong><br><em>团队管理考 94 分 · 已自动上链</em></div>
+              <span class="who">系统</span>
+            </div>
+            <div class="row">
+              <span class="t">09:42</span>
+              <span class="a fork">FORK</span>
+              <div class="ctx"><strong>三方签·VEN-2026-0118</strong><br><em>平台已签 · 推 G 端 · 推 F 端并行</em></div>
+              <span class="who">系统</span>
+            </div>
+            <div class="row">
+              <span class="t">09:08</span>
+              <span class="a rej">REJECT</span>
+              <div class="ctx"><strong>L0 准入·钱小宝</strong><br><em>背调命中行业不良记录 · 维持驳回</em></div>
+              <span class="who">赵审核</span>
+            </div>
+            <div class="row">
+              <span class="t">08:51</span>
+              <span class="a start">START</span>
+              <div class="ctx"><strong>证书吊销·L2 某保洁</strong><br><em>触发 R-201 投诉规则 · 风控复核中</em></div>
+              <span class="who">系统</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent) 3%, transparent)); border-color:var(--accent);">
+          <h3>📐 可视化设计器 <span class="extra">通用</span></h3>
+          <div style="font-size:12.5px; line-height:1.7; color:var(--muted);">
+            支持<b style="color:var(--fg);">拖拽节点 + BPMN 2.0 导出</b>。每个节点可挂：
+            <ul style="margin:8px 0; padding-left:18px;">
+              <li>角色（来自权限矩阵 RBAC）</li>
+              <li>条件（基于规则引擎 R-XXX）</li>
+              <li>通知（来自通知中心模板）</li>
+              <li>SLA（自动超时升级）</li>
+            </ul>
+            <div style="padding:8px 10px; background:var(--surface); border-radius:5px; font-size:11px; border:1px dashed var(--accent);">
+              <b style="color:var(--accent);">⓵ 独立通用</b>：此工作流引擎不写死任何业务逻辑，可被复用到「认证 / 投诉 / 吊销 / 续期 / 跨端审批」等任意场景。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>房的标准 · 好房子四维度 + 综合星级</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #fff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --gov: #1e40af;
+      --ok: #16a34a;
+      --warn: #ea580c;
+      --comfort: #f59e0b;
+      --green: #10b981;
+      --tech: #3b82f6;
+      --safety: #ef4444;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      font-size:13px; line-height:1.5;}
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; padding:24px; background:#fff;
+      border:1px solid var(--border); border-radius:14px; margin-bottom:18px;
+    }
+    .doc-header h1{font-size:26px; font-weight:700; margin:0 0 8px;}
+    .doc-header .sub{color:var(--muted); font-size:14px;}
+    .doc-header .tags{display:flex; justify-content:center; gap:8px; margin-top:14px; flex-wrap:wrap;}
+    .doc-header .tag{
+      font-size:11px; padding:4px 12px; border-radius:999px;
+      background:#fef3c7; color:#92400e; font-weight:500;
+    }
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:16px; font-weight:700; margin-bottom:16px;
+      padding-bottom:10px; border-bottom:2px solid var(--plat-accent);
+    }
+    .section-title .num{
+      width:28px; height:28px; border-radius:50%;
+      background:var(--plat); color:#fff;
+      display:grid; place-items:center; font-size:14px; font-weight:700;
+    }
+    .section-title .label{flex:1;}
+    .section-title .badge{
+      font-size:11px; padding:3px 10px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    .crosslink{
+      margin-bottom:14px; padding:10px 14px; background:#eff6ff;
+      border:1px solid #bfdbfe; border-radius:8px;
+      font-size:12px; color:#1e40af;
+    }
+    .crosslink a{font-weight:600; text-decoration:underline;}
+
+    /* 已实现页面标注 · 网格对齐版 */
+    .impl-aligned{
+      display:grid; gap:8px; margin-top:14px; padding:12px;
+      background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;
+    }
+    .impl-aligned.cols-2{grid-template-columns:repeat(2, 1fr);}
+    .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
+    .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
+    .impl-aligned.cols-6{grid-template-columns:repeat(6, 1fr);}
+    .impl-aligned .impl-banner{grid-column:1 / -1; font-size:11px; color:#64748b; font-weight:600; letter-spacing:0.3px; margin-bottom:2px;}
+    .impl-aligned .col{display:flex; flex-direction:column; gap:5px;}
+    .impl-aligned .col .col-head{font-size:10px; color:#94a3b8; font-weight:700; letter-spacing:0.4px; padding:0 0 4px; border-bottom:1px solid #e2e8f0; margin-bottom:2px; text-align:center;}
+    .impl-aligned .col a.impl-pill{display:block; font-size:11px; padding:4px 8px; border-radius:6px; background:#fff; border:1px solid #e2e8f0; color:#334155; text-decoration:none; font-weight:500; line-height:1.35; transition:all 0.15s; text-align:left;}
+    .impl-aligned .col a.impl-pill:hover{background:#0f172a; color:#fff; border-color:#0f172a;}
+    .impl-aligned .col a.impl-pill .file{display:block; font-family:ui-monospace,Menlo,monospace; font-size:9px; opacity:0.55; margin-top:2px;}
+    .impl-aligned .col a.impl-pill:hover .file{opacity:0.9;}
+    .impl-aligned .col .empty-pill{font-size:10px; color:#94a3b8; padding:4px 8px; text-align:center; border:1px dashed #e2e8f0; border-radius:6px; background:#fff; line-height:1.3;}
+    @media (max-width: 900px){
+      .impl-aligned.cols-5, .impl-aligned.cols-6{grid-template-columns:repeat(3, 1fr);}
+      .impl-aligned.cols-4{grid-template-columns:repeat(2, 1fr);}
+    }
+    @media (max-width: 600px){.impl-aligned{grid-template-columns:1fr 1fr !important;}}
+
+    /* ===== 综合星级总览 ===== */
+    .star-hero{
+      display:grid; grid-template-columns:1fr 2fr; gap:18px;
+      align-items:stretch;
+    }
+    .star-card{
+      background:linear-gradient(135deg, #0f172a 0%, #b45309 100%);
+      color:#fff; border-radius:12px; padding:20px;
+      display:flex; flex-direction:column; justify-content:center;
+    }
+    .star-card .label{font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:6px;}
+    .star-card .stars{font-size:32px; letter-spacing:4px; margin:4px 0;}
+    .star-card .em{font-size:18px; font-weight:700; margin-bottom:6px;}
+    .star-card .d{font-size:12px; opacity:0.85; line-height:1.5;}
+
+    /* ===== 四维度卡片 ===== */
+    .dim-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .dim-card{
+      background:#fff; border:2px solid; border-radius:10px;
+      padding:14px;
+    }
+    .dim-card .head{
+      display:flex; align-items:center; gap:8px; margin-bottom:10px;
+    }
+    .dim-card .icon{
+      width:36px; height:36px; border-radius:8px;
+      display:grid; place-items:center; color:#fff; font-size:18px;
+    }
+    .dim-card .name{font-size:14px; font-weight:700;}
+    .dim-card .score{margin-left:auto; font-size:18px; font-weight:700;}
+    .dim-card .bar{
+      height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden;
+      margin-bottom:10px;
+    }
+    .dim-card .bar .fill{height:100%; border-radius:3px;}
+    .dim-card .items{font-size:11px; color:#475569; line-height:1.6;}
+    .dim-card .items div::before{content:"· ";}
+    .dim-card.comfort{border-color:var(--comfort);} .dim-card.comfort .icon{background:var(--comfort);} .dim-card.comfort .score{color:var(--comfort);} .dim-card.comfort .bar .fill{background:var(--comfort);}
+    .dim-card.green{border-color:var(--green);} .dim-card.green .icon{background:var(--green);} .dim-card.green .score{color:var(--green);} .dim-card.green .bar .fill{background:var(--green);}
+    .dim-card.tech{border-color:var(--tech);} .dim-card.tech .icon{background:var(--tech);} .dim-card.tech .score{color:var(--tech);} .dim-card.tech .bar .fill{background:var(--tech);}
+    .dim-card.safety{border-color:var(--safety);} .dim-card.safety .icon{background:var(--safety);} .dim-card.safety .score{color:var(--safety);} .dim-card.safety .bar .fill{background:var(--safety);}
+
+    /* ===== 星级阈值表 ===== */
+    .star-table{
+      width:100%; border-collapse:collapse; font-size:12px;
+    }
+    .star-table th, .star-table td{
+      padding:10px 12px; text-align:left;
+      border-bottom:1px solid var(--border);
+    }
+    .star-table th{
+      background:#f8fafc; font-weight:600; color:var(--muted);
+      font-size:11px; text-transform:uppercase; letter-spacing:0.5px;
+    }
+    .star-table .lv{font-weight:700;}
+    .star-table .lv1{color:#94a3b8;}
+    .star-table .lv2{color:#64748b;}
+    .star-table .lv3{color:#eab308;}
+    .star-table .lv4{color:var(--warn);}
+    .star-table .lv5{color:#7c3aed;}
+    .star-table tr:hover td{background:#fafafa;}
+
+    /* ===== 评分六大类 ===== */
+    .cat-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;}
+    .cat-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .cat-card h4{margin:0 0 10px; font-size:13px; font-weight:700;}
+    .cat-card .weight{
+      float:right; font-size:11px; padding:2px 8px;
+      background:#fef3c7; color:#92400e; border-radius:6px;
+    }
+    .cat-card ul{margin:0; padding-left:18px; font-size:11.5px; line-height:1.7; color:#334155;}
+    .cat-card .row{display:flex; justify-content:space-between; font-size:11px; margin:2px 0;}
+    .cat-card .row .k{color:#334155;}
+    .cat-card .row .v{color:var(--muted);}
+
+    /* ===== 字段字典 ===== */
+    .field-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+    .field-box h4{margin:0 0 10px; font-size:13px; font-weight:700;}
+    .field-box{background:#fafafa; border-radius:10px; padding:14px; border:1px solid var(--border);}
+    .field-list{display:flex; flex-wrap:wrap; gap:6px;}
+    .field-list .f{
+      font-size:11px; padding:4px 10px; border-radius:6px;
+      background:#fff; border:1px solid var(--border);
+    }
+    .field-list .f.required{background:#fef3c7; border-color:#fcd34d; color:#92400e;}
+
+    /* ===== 改造场景四象限 ===== */
+    .scene-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .scene-card{
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      padding:14px; border-top:3px solid;
+    }
+    .scene-card.light{border-top-color:#22c55e;}
+    .scene-card.medium{border-top-color:#eab308;}
+    .scene-card.heavy{border-top-color:var(--warn);}
+    .scene-card.new{border-top-color:#3b82f6;}
+    .scene-card .lvl{
+      font-size:11px; padding:2px 8px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:600; display:inline-block;
+    }
+    .scene-card .name{font-size:14px; font-weight:700; margin:6px 0;}
+    .scene-card .num{font-size:13px; font-weight:600; color:var(--plat-accent);}
+    .scene-card .sample{font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4;}
+
+    /* ===== 落地展示样式 ===== */
+    .display-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:14px;}
+    .display-card{
+      background:#fafafa; border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .display-card h4{margin:0 0 8px; font-size:13px; font-weight:700;}
+    .display-card .where{font-size:11px; color:var(--muted); margin-bottom:8px;}
+    .display-card .mock{
+      background:#fff; border:1px dashed var(--border); border-radius:8px;
+      padding:10px; font-size:11px; line-height:1.6; color:#334155;
+    }
+    .mini-badge{
+      display:inline-block; padding:2px 6px; border-radius:4px;
+      background:linear-gradient(90deg, #0f172a, #b45309); color:#fff;
+      font-size:10px; font-weight:700;
+    }
+    .mini-bars{display:flex; gap:3px; align-items:center; margin-top:4px;}
+    .mini-bars .b{width:16px; height:4px; border-radius:2px;}
+
+    .doc-footer{
+      margin-top:16px; padding:18px; border-radius:12px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; text-align:center;
+    }
+    .doc-footer .em{font-size:18px; font-weight:700;}
+    .doc-footer .sub{font-size:12px; opacity:0.85; margin-top:6px;}
+
+    @media (max-width: 1024px){
+      .dim-grid, .scene-grid{grid-template-columns:1fr 1fr;}
+      .cat-grid, .display-grid{grid-template-columns:1fr;}
+      .field-grid{grid-template-columns:1fr;}
+      .star-hero{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="property-standard"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>房的标准 · 好房子四维度 + 综合星级</h1>
+      <div class="sub">江苏保租房省级房屋认证标准 · 数据治理委员会主导 · 第三方审计背书</div>
+      <div class="tags">
+        <span class="tag">★ 1–5 星 综合评级</span>
+        <span class="tag">舒适 / 绿色 / 科技 / 安全 四维度</span>
+        <span class="tag">6 大类 55 项自查表</span>
+        <span class="tag">改造场景四象限</span>
+        <span class="tag">物资 + 供应链准入</span>
+      </div>
+    </div>
+
+    <div class="crosslink">
+      📐 顶层定位：本标准对应 <a href="d-master-blueprint.html">总图谱</a>「贝壳核心能力 · 标准落地能力」+「研/改 字诀」，所有房源在 <a href="home.html">租客端</a>、<a href="detail.html">详情页</a>、<a href="b-listing-mgmt.html">运营端</a> 必须显示星级与四维度评分。
+    </div>
+
+    <!-- 综合星级总览 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">1</span>
+        <span class="label">综合星级 · 1–5 星总览</span>
+        <span class="badge">对外评级核心</span>
+      </div>
+
+      <div class="star-hero">
+        <div class="star-card">
+          <div class="label">示例 · 南京浦口星瀚 1 号楼</div>
+          <div class="stars">★★★★☆</div>
+          <div class="em">4 星 · 高档型</div>
+          <div class="d">综合得分 84/100，安全 4.5 / 科技 4.8 / 舒适 4.2 / 绿色 3.5</div>
+        </div>
+        <div>
+          <table class="star-table">
+            <thead>
+              <tr><th>星级</th><th>定位</th><th>核心要求</th><th>四维门槛</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="lv lv1">★</td><td>基础型</td><td>具备最基本居住条件，可独立卫生间</td><td>≥2.0</td></tr>
+              <tr><td class="lv lv2">★★</td><td>经济型</td><td>环境整洁、独卫+洗衣机，基础保障</td><td>≥2.8</td></tr>
+              <tr><td class="lv lv3">★★★</td><td>舒适型</td><td>客房设备齐全 + 智能设备 + <strong style="color:#0f1a4d;">三险一付基线（免押 / 换租险 / 家财险 / 公积金直付）</strong></td><td>≥3.5</td></tr>
+              <tr><td class="lv lv4">★★★★</td><td>高档型</td><td>3 星基础上 + 增值服务 + 加强型家财险（保额翻倍）</td><td>≥4.2</td></tr>
+              <tr><td class="lv lv5">★★★★★</td><td>豪华型</td><td>4 星基础上 + 高水平服务 + 社区生活 + 周边配套</td><td>≥4.6</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="margin-top:14px; padding:12px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; font-size:12px; color:#1e40af; line-height:1.6;">
+        💡 <strong>3 星舒适型起强制配套「三险一付」：</strong>免押金 / 换租险 / 家财险 / 公积金直付。
+        这是机构维度的<strong>运营基线</strong>，未配套则该房源不得在贝壳频道展示。
+        详见 <a href="d-org-standard.html#" style="color:#1e40af; text-decoration:underline; font-weight:600;">机构的标准 · §5 运营管理基线</a>。
+      </div>
+
+      <div class="impl-aligned cols-2">
+        <div class="impl-banner">📎 综合星级展示位（左侧示例卡 / 右侧星级阈值表 一一对齐）</div>
+        <div class="col">
+          <div class="col-head">星级展示位</div>
+          <a href="home.html" class="impl-pill">租客首页·卡片右上角浮标<span class="file">home.html</span></a>
+          <a href="detail.html" class="impl-pill">详情页·综合星级总览<span class="file">detail.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">星级阈值定义</div>
+          <a href="c-house-rating.html" class="impl-pill">租客科普·1–5 星说明<span class="file">c-house-rating.html</span></a>
+          <a href="d-property-standard.html" class="impl-pill">完整阈值表（本页）<span class="file">d-property-standard.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 四维度 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">2</span>
+        <span class="label">好房子 · 四维度评价指标</span>
+        <span class="badge">V25 行业标准</span>
+      </div>
+
+      <div class="dim-grid">
+        <div class="dim-card comfort">
+          <div class="head">
+            <div class="icon">🛋</div>
+            <div class="name">舒适</div>
+            <div class="score">4.2</div>
+          </div>
+          <div class="bar"><div class="fill" style="width:84%;"></div></div>
+          <div class="items">
+            <div>面积达标（5★ 70% &gt;30㎡）</div>
+            <div>干湿分离 · 实体衣柜</div>
+            <div>沙发 ≥3 人 · 餐桌齐全</div>
+            <div>领包入住套件</div>
+          </div>
+        </div>
+        <div class="dim-card green">
+          <div class="head">
+            <div class="icon">🌿</div>
+            <div class="name">绿色</div>
+            <div class="score">3.5</div>
+          </div>
+          <div class="bar"><div class="fill" style="width:70%;"></div></div>
+          <div class="items">
+            <div>智能水电表（节能监测）</div>
+            <div>环保认证家具</div>
+            <div>入住甲醛检测（5★ 强制）</div>
+            <div>建材可回收</div>
+          </div>
+        </div>
+        <div class="dim-card tech">
+          <div class="head">
+            <div class="icon">📡</div>
+            <div class="name">科技</div>
+            <div class="score">4.8</div>
+          </div>
+          <div class="bar"><div class="fill" style="width:96%;"></div></div>
+          <div class="items">
+            <div>智能门锁（隐私加密）</div>
+            <div>智能水电表 · 智能马桶</div>
+            <div>无线 WiFi 全覆盖</div>
+            <div>线上报修 · 公积金直付</div>
+          </div>
+        </div>
+        <div class="dim-card safety">
+          <div class="head">
+            <div class="icon">🛡</div>
+            <div class="name">安全</div>
+            <div class="score">4.5</div>
+          </div>
+          <div class="bar"><div class="fill" style="width:90%;"></div></div>
+          <div class="items">
+            <div>闭路电视监控全覆盖</div>
+            <div>24h 保安（4★+）</div>
+            <div>安全组件 ≥3 种（5★）</div>
+            <div>加强型家财险 · 租客保险</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 四维度评分 · 已实现页面（与上方四维度卡片对齐）</div>
+        <div class="col">
+          <div class="col-head">🛋 舒适</div>
+          <a href="home.html" class="impl-pill">租客·迷你条<span class="file">home.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🌿 绿色</div>
+          <a href="detail.html" class="impl-pill">详情·横向条<span class="file">detail.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">📡 科技</div>
+          <a href="c-house-rating.html" class="impl-pill">租客科普<span class="file">c-house-rating.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🛡 安全</div>
+          <a href="b-house-rating-input.html" class="impl-pill">运营·实时预估<span class="file">b-house-rating-input.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 综合评分 6 大类 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">3</span>
+        <span class="label">综合星级算法 · 6 大类 55 项自查表加权</span>
+        <span class="badge">xlsx 评星工具表</span>
+      </div>
+
+      <div class="cat-grid">
+        <div class="cat-card">
+          <h4>📷 信息图片 <span class="weight">10%</span></h4>
+          <ul>
+            <li>照片总数 &gt;50 张</li>
+            <li>外观（店招/全貌）</li>
+            <li>公区（全貌+局部）</li>
+            <li>客房 ≥5 张</li>
+            <li>房间+卫生间实拍</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h4>🏗 基础设施 <span class="weight">20%</span></h4>
+          <ul>
+            <li>洗衣房</li>
+            <li>电梯（≥3 层）</li>
+            <li>停车场（5★ 车位&gt;客房 15%）</li>
+            <li>闭路电视监控</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h4>🛏 房间配套 <span class="weight">30%</span></h4>
+          <ul>
+            <li>面积 · 干湿分离 · 衣柜</li>
+            <li>智能门锁 / 水电表 / 马桶</li>
+            <li>家电（空调/冰箱/洗衣机/电视）</li>
+            <li>领包入住套件 + 保险</li>
+            <li>甲醛检测（5★ 强制）</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h4>🛎 服务配套 <span class="weight">15%</span></h4>
+          <ul>
+            <li>24h 客服 · 行李寄存</li>
+            <li>叫醒 · 代购 · 每日清洁</li>
+            <li>信用分 &gt;4.4（5★）</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h4>🏛 公区配套 <span class="weight">15%</span></h4>
+          <ul>
+            <li>管家（24h 持证）</li>
+            <li>活动公区（5★ 可容 30+）</li>
+            <li>24h 维修 · 24h 保安</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h4>🌳 周边休闲（3km）<span class="weight">10%</span></h4>
+          <ul>
+            <li>租客保险 + 押金（5★ 0押金）</li>
+            <li>餐厅（5★ 早午晚）</li>
+            <li>健身房 · 茶室/咖啡</li>
+            <li>SPA/温泉/泳池（加分）</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 6 大类 55 项自查 · 已实现页面（与上方 cat-grid 3 列对齐）</div>
+        <div class="col">
+          <div class="col-head">列 1 · 图片 / 服务配套</div>
+          <a href="b-house-rating-input.html" class="impl-pill">运营自评录入<br/><small style="opacity:0.7;">55 项 UI 化勾选</small><span class="file">b-house-rating-input.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">列 2 · 基础设施 / 公区</div>
+          <a href="p-standards.html" class="impl-pill">中台·标准体系<br/><small style="opacity:0.7;">标准 v2.4</small><span class="file">p-standards.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">列 3 · 房间配套 / 周边</div>
+          <a href="p-cert-issue.html" class="impl-pill">中台·复核发证<br/><small style="opacity:0.7;">2.4k 张证书</small><span class="file">p-cert-issue.html</span></a>
+          <a href="detail.html" class="impl-pill">详情页·55 项达标<br/><small style="opacity:0.7;">折叠面板</small><span class="file">detail.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 物资与供应链准入 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">4</span>
+        <span class="label">物资标准认证 + 供应链准入</span>
+        <span class="badge">V25 改 · 字诀</span>
+      </div>
+      <p style="margin:0 0 12px; color:#475569; font-size:13px;">
+        贝壳供应链平台作为<strong>首批参考实现</strong>，对其他符合资质的供应链开放接入与互认。住建+中房协+贝壳+同业机构代表联合牵头物资标准认证与供应链准入认证体系。
+      </p>
+      <div class="cat-grid">
+        <div class="cat-card">
+          <h4>🪑 物资标准认证（6 类 · 映射 55 项中物资条目）</h4>
+          <div class="row"><span class="k">🪵 家具（沙发/床/衣柜）</span><span class="v">环保 E0/E1 + 防火 · 对 §3 房间配套行 #243/#239</span></div>
+          <div class="row"><span class="k">🌀 家电（空调/冰箱/洗衣机/电视）</span><span class="v">能效 ≥1 级 · 对 §3 行 #244-#248</span></div>
+          <div class="row"><span class="k">🧱 建材（地板/瓷砖）</span><span class="v">甲醛 E0/E1 级 · 对 §3 行 #251 甲醛检测</span></div>
+          <div class="row"><span class="k">🔒 智能锁 / 水电表</span><span class="v">公安认证 + 隐私加密 · 对 §3 行 #240/#241</span></div>
+          <div class="row"><span class="k">🎨 涂料</span><span class="v">VOC 达标 + 环保认证 · 对 §3 公区/客房涂装</span></div>
+          <div class="row"><span class="k">🚿 卫浴</span><span class="v">节水 1 级 + 干湿分离 · 对 §3 行 #238/#242</span></div>
+        </div>
+        <div class="cat-card">
+          <h4>🏭 供应链准入</h4>
+          <div class="row"><span class="k">资质审核</span><span class="v">营业执照 + 行业认证</span></div>
+          <div class="row"><span class="k">质量抽检</span><span class="v">按季度抽检 + 第三方报告</span></div>
+          <div class="row"><span class="k">价格透明</span><span class="v">省级集采底价公示</span></div>
+          <div class="row"><span class="k">售后服务</span><span class="v">≥3 年质保 + 24h 响应</span></div>
+        </div>
+        <div class="cat-card">
+          <h4>🛎 服务标准认证</h4>
+          <div class="row"><span class="k">管家服务</span><span class="v">L1+ 持证上岗</span></div>
+          <div class="row"><span class="k">维修响应</span><span class="v">24h 到场 · 48h 修复</span></div>
+          <div class="row"><span class="k">保洁标准</span><span class="v">入住保洁 + 周清</span></div>
+          <div class="row"><span class="k">投诉处理</span><span class="v">24h 首响 · 7d 闭环</span></div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 三大认证 · 已实现页面（与上方 3 列 cat-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">🪑 物资标准</div>
+          <a href="suppliers.html" class="impl-pill">合格供应商公示<span class="file">suppliers.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏭 供应链准入</div>
+          <a href="g-whitelist-supplier.html" class="impl-pill">供应商白名单审定<span class="file">g-whitelist-supplier.html</span></a>
+          <a href="v-projects.html" class="impl-pill">服务商·项目对接<span class="file">v-projects.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🛎 服务标准</div>
+          <a href="service-workers.html" class="impl-pill">服务者公示<span class="file">service-workers.html</span></a>
+          <a href="repair.html" class="impl-pill">报修服务<span class="file">repair.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 字段字典（研字诀） -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">5</span>
+        <span class="label">数据维度 · 房屋数据字典</span>
+        <span class="badge">V25 研 · 字诀</span>
+      </div>
+      <p style="margin:0 0 14px; color:#475569;">
+        以住建口径建立统一房屋数据字典，由<strong>江苏住房租赁数据治理委员会</strong>（住建主导 + 贝壳承建 + 清华大学/江苏省社科院/东南大学/省房协等第三方）背书。
+      </p>
+      <div class="field-grid">
+        <div class="field-box">
+          <h4>📋 静态披露字段（17 项·按日推送）</h4>
+          <div class="field-list">
+            <span class="f required">楼栋房号*</span>
+            <span class="f required">面积*</span>
+            <span class="f required">户型*</span>
+            <span class="f required">朝向*</span>
+            <span class="f required">照片/视频*</span>
+            <span class="f required">政府指导价*</span>
+            <span class="f required">配套清单*</span>
+            <span class="f required">准入条件*</span>
+            <span class="f required">联系人*</span>
+            <span class="f required">空置状态*</span>
+            <span class="f">装修标准</span>
+            <span class="f">所属项目</span>
+            <span class="f">运营主体</span>
+            <span class="f">交付时间</span>
+            <span class="f">能效等级</span>
+            <span class="f">绿色建筑等级</span>
+            <span class="f">★ 综合星级</span>
+          </div>
+        </div>
+        <div class="field-box">
+          <h4>📊 动态运营字段（11 项·按周/事件）</h4>
+          <div class="field-list">
+            <span class="f">巡查记录</span>
+            <span class="f">漏水/电气工单</span>
+            <span class="f">维修响应时长</span>
+            <span class="f">空置周期</span>
+            <span class="f">租金成交价</span>
+            <span class="f">合同备案号</span>
+            <span class="f">续约率</span>
+            <span class="f">投诉/纠纷</span>
+            <span class="f">租客评分</span>
+            <span class="f">四维度评分</span>
+            <span class="f">服务者派单记录</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-2">
+        <div class="impl-banner">📎 数据字典 · 已实现页面（与上方 2 列字段框对齐）</div>
+        <div class="col">
+          <div class="col-head">📋 静态披露（按日推送）</div>
+          <a href="property-intake-api.html" class="impl-pill">房源标准接入 API<span class="file">property-intake-api.html</span></a>
+          <a href="p-api-gateway.html" class="impl-pill">API 网关<span class="file">p-api-gateway.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">📊 动态运营（按周/事件）</div>
+          <a href="p-webhooks.html" class="impl-pill">事件与 Webhook<span class="file">p-webhooks.html</span></a>
+          <a href="p-data-hub.html" class="impl-pill">数据中台·治理委员会<span class="file">p-data-hub.html</span></a>
+          <a href="g-export.html" class="impl-pill">住建·只读监管导出<span class="file">g-export.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- § 6 研判输出（精简版，详见 d-research-platform） -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">6</span>
+        <span class="label">研判输出 · 租金评估 + ROI + 月报（精简版）</span>
+        <span class="badge">完整版见 研判中台</span>
+      </div>
+      <p style="margin:0 0 12px; color:#475569; font-size:13px;">
+        基于上面 § 5 房屋数据字典，贝壳承建 <strong>省级研判底座</strong>，沉淀为 4 大能力组件，服务 8 类受众。
+        完整能力栈、八受众价值矩阵、月报 4 分版与商业模式详见 → <a href="d-research-platform.html" style="color:#1e40af; font-weight:600; text-decoration:underline;">研判中台 · 贝壳数据资产输出</a>
+      </p>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;">
+        <div style="background:#fafafa; border:1px solid #e2e8f0; border-left:4px solid #0f1a4d; border-radius:10px; padding:14px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:4px;">📋 房屋数据字典</div>
+          <div style="font-size:11px; color:#64748b; line-height:1.55;">17 静态 + 11 动态字段 · 治理委员会背书 · 见 § 5</div>
+        </div>
+        <div style="background:#fafafa; border:1px solid #e2e8f0; border-left:4px solid #b45309; border-radius:10px; padding:14px; position:relative;">
+          <span style="position:absolute; top:8px; right:10px; font-size:9px; padding:2px 6px; background:#b45309; color:#fff; border-radius:4px; font-weight:700;">★ 核心</span>
+          <div style="font-size:13px; font-weight:700; margin-bottom:4px;">💹 租金价格评估</div>
+          <div style="font-size:11px; color:#64748b; line-height:1.55;">户型/区域/楼层多维定价 · 对接信贷与价格红线</div>
+        </div>
+        <div style="background:#fafafa; border:1px solid #e2e8f0; border-left:4px solid #0f766e; border-radius:10px; padding:14px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:4px;">🛠 装改 ROI 测算</div>
+          <div style="font-size:11px; color:#64748b; line-height:1.55;">单方造价 / 装修后月租 / 回本周期 · 服务改造决策</div>
+        </div>
+        <div style="background:#fafafa; border:1px solid #e2e8f0; border-left:4px solid #7c3aed; border-radius:10px; padding:14px;">
+          <div style="font-size:13px; font-weight:700; margin-bottom:4px;">🔮 供需+户型预测</div>
+          <div style="font-size:11px; color:#64748b; line-height:1.55;">租赁供需 + 户型定位 · 服务投改与规划</div>
+        </div>
+      </div>
+      <div style="margin-top:14px; padding:12px 14px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:12px; color:#92400e; line-height:1.6;">
+        💡 <strong>研判 vs 标准的关系：</strong>本 § 是「房的标准」对研判能力的简介；研判中台是独立专题，覆盖 8 类受众的完整应用与月报 4 分版输出，与「人/房/机构」三标共同构成生态 <strong>第 4 大支柱·数据</strong>。
+      </div>
+    </div>
+
+    <!-- 改造场景四象限 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">7</span>
+        <span class="label">改造场景四象限 · 11 个标杆项目覆盖</span>
+        <span class="badge">V25 附 2</span>
+      </div>
+      <div class="scene-grid">
+        <div class="scene-card light">
+          <span class="lvl">轻度改造</span>
+          <div class="name">商品房翻新</div>
+          <div class="num">月租增量 ¥300–800</div>
+          <div class="sample">回本 10–18 月 · 南京浦口（500 套）四字诀全要素首发标杆</div>
+        </div>
+        <div class="scene-card medium">
+          <span class="lvl">中度改造</span>
+          <div class="name">存量重塑</div>
+          <div class="num">月租增量 ¥850–1500</div>
+          <div class="sample">回本 10–18 月 · 杭州萧山时光城（2800 套）· 宁波城投（1800 套）</div>
+        </div>
+        <div class="scene-card heavy">
+          <span class="lvl">重度激活</span>
+          <div class="name">近零租金重整</div>
+          <div class="num">月租增量 ¥3500–8050</div>
+          <div class="sample">回本 10–18 月 · 北京通州远洋（1600 套）· 上海长宁三项（1806 套）</div>
+        </div>
+        <div class="scene-card new">
+          <span class="lvl">新启用</span>
+          <div class="name">产业园配套</div>
+          <div class="num">月租 ¥1500–3300</div>
+          <div class="sample">广州 4 项（财富广场/广开云汇/GIE/凯德 = 1578 套）</div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 改造场景 · 已实现页面（与上方 4 象限对齐）·  ⚠ 四象限专属可视化页未单独立项，复用 B 端运营工作台分类管理</div>
+        <div class="col">
+          <div class="col-head">轻度·商品房翻新</div>
+          <a href="b-operator-console.html" class="impl-pill">运营工作台<span class="file">b-operator-console.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">中度·存量重塑</div>
+          <a href="b-occupancy.html" class="impl-pill">入住率工单<span class="file">b-occupancy.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">重度·近零租金</div>
+          <a href="landlord.html" class="impl-pill">业主托管端<span class="file">landlord.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">新启·产业园配套</div>
+          <a href="v-projects.html" class="impl-pill">服务商项目对接<span class="file">v-projects.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 落地展示 -->
+    <div class="section">
+      <div class="section-title">
+        <span class="num">8</span>
+        <span class="label">星级 + 四维度在房源列表/卡片落地展示</span>
+        <span class="badge">必须体现</span>
+      </div>
+      <div class="display-grid">
+        <div class="display-card">
+          <h4>🏠 租客端 · 列表卡片</h4>
+          <div class="where">home.html · c-compare.html</div>
+          <div class="mock">
+            <div>南京浦口星瀚 · 2 居 65㎡</div>
+            <div style="margin:6px 0;"><span class="mini-badge">★★★★ 4 星</span> <span style="color:#16a34a;">●</span> 政府认证</div>
+            <div>¥2,380 / 月 <span style="color:#94a3b8; text-decoration:line-through;">市场价 ¥3,200</span></div>
+            <div class="mini-bars">
+              <span style="font-size:10px; color:#64748b;">舒适</span>
+              <span class="b" style="background:#f59e0b; width:32px;"></span>
+              <span style="font-size:10px; color:#64748b;">绿</span>
+              <span class="b" style="background:#10b981; width:26px;"></span>
+              <span style="font-size:10px; color:#64748b;">科技</span>
+              <span class="b" style="background:#3b82f6; width:38px;"></span>
+              <span style="font-size:10px; color:#64748b;">安全</span>
+              <span class="b" style="background:#ef4444; width:36px;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="display-card">
+          <h4>📄 详情页 · 好房子达标明细</h4>
+          <div class="where">detail.html · c-house-rating.html</div>
+          <div class="mock">
+            <div><strong>综合 ★★★★ 4 星</strong>（84 / 100 分）</div>
+            <div style="margin:4px 0;">▸ 四维度雷达图 · 四象限对比</div>
+            <div>▸ 6 大类自查表折叠面板（55 项达标清单）</div>
+            <div>▸ 同社区/同价位星级横向对比</div>
+            <div style="margin-top:4px; color:#16a34a;">✓ 物资认证 6/6 · 服务认证 4/4</div>
+          </div>
+        </div>
+        <div class="display-card">
+          <h4>🏢 运营端 · 评级管理</h4>
+          <div class="where">b-listing-mgmt.html · b-house-rating-input.html</div>
+          <div class="mock">
+            <div>· 列表新增「★ 评级」列（可排序/筛选）</div>
+            <div>· 新增「评级自评录入」入口</div>
+            <div>· 55 项自查清单 UI 化勾选</div>
+            <div>· 上传佐证图片 → 提交 P 端审核</div>
+            <div style="margin-top:4px; color:#ea580c;">⚠ 7 套房源待自评 · 3 套待复核</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="impl-aligned cols-3">
+        <div class="impl-banner">📎 落地展示 · 已实现页面（与上方 3 张 display-card 对齐）</div>
+        <div class="col">
+          <div class="col-head">🏠 租客端列表卡片</div>
+          <a href="home.html" class="impl-pill">首页·卡片浮标+四维度<span class="file">home.html</span></a>
+          <a href="c-compare.html" class="impl-pill">房源对比<span class="file">c-compare.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">📄 详情页 · 达标明细</div>
+          <a href="detail.html" class="impl-pill">综合星级+四维度+55 项<span class="file">detail.html</span></a>
+        </div>
+        <div class="col">
+          <div class="col-head">🏢 运营端 · 评级管理</div>
+          <a href="b-listing-mgmt.html" class="impl-pill">星级列+自评入口<span class="file">b-listing-mgmt.html</span></a>
+          <a href="b-house-rating-input.html" class="impl-pill">55 项自评录入<span class="file">b-house-rating-input.html</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-footer">
+      <div class="em">让江苏每一套保租房都达到「好房子」标准</div>
+      <div class="sub">舒适 · 绿色 · 科技 · 安全 · 在租客视角可见、在运营视角可管、在监管视角可查</div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>

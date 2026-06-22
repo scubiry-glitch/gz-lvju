@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>中铁·山语城 · 楼盘详情 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .pd-hero{height:260px;position:relative;color:#fff;}
+  .pd-hero .badge{position:absolute;left:16px;bottom:16px;z-index:2;}
+  .pd-hero .badge .star{font-size:11px;font-weight:700;color:#ffd98a;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);padding:4px 11px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .pd-hero .badge .nm{font-family:var(--serif);font-size:23px;font-weight:700;margin-top:8px;text-shadow:0 2px 14px rgba(0,0,0,.4);}
+  .pd-hero .badge .lo{font-size:12px;opacity:.92;margin-top:2px;}
+  .pd-hero .dots{position:absolute;right:14px;bottom:16px;z-index:2;font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
+  .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
+  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
+  .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
+  .tagline{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
+  .tagline span{font-size:11px;color:var(--brand-deep);background:var(--brand-soft);padding:3px 9px;border-radius:6px;}
+  .verify{margin-top:12px;border:1px dashed var(--gold);background:var(--gold-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:11px;}
+  .verify .no{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:var(--gold-deep);}
+  .verify .vb{font-size:10.5px;color:var(--ink);margin-top:3px;}
+  .verify .vb b{color:var(--brand);}
+  .verify a.qrlink{flex-shrink:0;line-height:0;}
+  .verify .qrimg{width:48px;height:48px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+  .verify .vb a{color:var(--brand);}
+  .host{display:flex;align-items:center;gap:12px;margin-top:11px;}
+  .host .av{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-size:24px;flex-shrink:0;background:var(--brand-soft);}
+  .host .hn{font-weight:700;font-size:14px;}
+  .host .hm{font-size:11px;color:var(--muted);margin-top:2px;}
+  .host .lvl{margin-left:auto;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-deep));padding:4px 10px;border-radius:999px;}
+  .nearby a{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .nearby a:last-child{border-bottom:0;}
+  .nearby a .e{font-size:17px;}
+  .nearby a .ar{margin-left:auto;color:var(--muted);}
+  .priceband{background:#fff;margin:8px 0 0;padding:15px 18px;display:flex;align-items:flex-end;gap:12px;}
+  .priceband .tp{font-family:var(--serif);font-weight:700;color:var(--gold-deep);font-size:27px;line-height:1;}
+  .priceband .tp small{font-size:12px;font-weight:400;color:var(--muted);font-family:var(--font);}
+  .priceband .up{font-size:12px;color:var(--muted);margin-bottom:3px;}
+  .priceband .dp{margin-left:auto;text-align:right;font-size:11px;color:var(--muted);}
+  .priceband .dp b{display:block;font-family:var(--serif);color:var(--ink);font-size:15px;}
+  .htypes{display:flex;gap:10px;overflow-x:auto;margin-top:11px;padding-bottom:2px;}
+  .htypes .ht{flex:0 0 auto;width:130px;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .htypes .ht .pic{height:74px;background-size:cover;background-position:center;}
+  .htypes .ht .tx{padding:8px 10px;}
+  .htypes .ht .tx .h{font-size:13px;font-weight:700;color:var(--ink);}
+  .htypes .ht .tx .a{font-size:11px;color:var(--muted);margin-top:2px;}
+  .htypes .ht .tx .pp{font-size:12px;font-weight:700;color:var(--gold-deep);margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar ghost">
+      <a class="bk" href="lvju-app-newhouse.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="act"><span>♡</span><span>⤴</span></div>
+    </div>
+
+    <div class="pd-hero s-city">
+      <div class="badge">
+        <span class="star">在售 · 现房</span>
+        <div class="nm">中铁·山语城</div>
+        <div class="lo">贵阳 · 观山湖区 · 高层社区</div>
+      </div>
+      <div class="dots">1 / 24</div>
+    </div>
+
+    <div class="priceband">
+      <div>
+        <div class="up">参考均价</div>
+        <div class="tp">¥9,800<small> /㎡起</small></div>
+      </div>
+      <div class="dp">三居总价<b>¥98 万起</b>首付约 ¥29.4 万起</div>
+    </div>
+
+    <div class="block">
+      <div class="bt">观山湖核心 · 地铁现房社区</div>
+      <div class="bs">高层 89–128㎡ · 三居为主 · 精装交付 · 即买即住</div>
+      <div class="tagline"><span>地铁盘</span><span>名校学区</span><span>现房</span><span>低密度</span><span>品牌开发商</span><span>精装交付</span></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">在售户型</div>
+      <div class="htypes">
+        <div class="ht"><div class="pic s-city"></div><div class="tx"><div class="h">A · 89㎡</div><div class="a">三房两厅 · 朝南</div><div class="pp">¥98 万起</div></div></div>
+        <div class="ht"><div class="pic s-river"></div><div class="tx"><div class="h">B · 108㎡</div><div class="a">三房两卫 · 南北通透</div><div class="pp">¥118 万起</div></div></div>
+        <div class="ht"><div class="pic s-country"></div><div class="tx"><div class="h">C · 128㎡</div><div class="a">四房两卫 · 双阳台</div><div class="pp">¥142 万起</div></div></div>
+      </div>
+    </div>
+
+    <div class="block" style="padding-bottom:6px;">
+      <div class="bt">楼盘信息</div>
+    </div>
+    <div class="panel">
+      <div class="kv"><span class="k">物业类型</span><span class="v">高层 · 住宅</span></div>
+      <div class="kv"><span class="k">在售户型</span><span class="v">89 / 108 / 128㎡</span></div>
+      <div class="kv"><span class="k">交房时间</span><span class="v">现房 · 即买即住</span></div>
+      <div class="kv"><span class="k">产权年限</span><span class="v">70 年</span></div>
+      <div class="kv"><span class="k">容积率 / 绿化率</span><span class="v">2.4 / 38%</span></div>
+      <div class="kv"><span class="k">物业费</span><span class="v">¥2.8 /㎡·月</span></div>
+      <div class="kv"><span class="k">开发商</span><span class="v">中铁置业（贵州）</span></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">预售许可 · 备案核验</div>
+      <div class="verify">
+        <a class="qrlink" href="screens/portal-verify.html?code=GZ-FY-2026-0512001" title="扫码 / 点击验真"><img class="qrimg" alt="楼盘预售许可验真二维码"></a>
+        <div>
+          <div class="no">GZ-FY-2026-0512001</div>
+          <div class="vb"><b>✓</b> 商品房预售许可 · <b>✓</b> 不动产首次登记 · <b>✓</b> 资金监管账户</div>
+          <div class="vb"><a href="screens/portal-verify.html?code=GZ-FY-2026-0512001">扫码验真 ↗ lvju.guizhou.gov.cn/v/0512001</a></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bt">置业顾问</div>
+      <div class="host">
+        <div class="av">🧑‍💼</div>
+        <div><div class="hn">李伟 · 贝壳认证置业顾问</div><div class="hm">山语城驻场 · 成交 128 套 · 客户评价 ★4.9</div></div>
+        <span class="lvl">认证顾问</span>
+      </div>
+    </div>
+
+    <div class="block nearby">
+      <div class="bt" style="margin-bottom:6px;">周边配套</div>
+      <a href="lvju-app-map.html"><span class="e">🚇</span>地铁 2 号线 · 会展中心站 步行 8 分钟<span class="ar">›</span></a>
+      <a href="lvju-app-map.html"><span class="e">🏫</span>贵阳一中实验学校（学区）· 1.1km<span class="ar">›</span></a>
+      <a href="lvju-app-map.html"><span class="e">🛒</span>万达广场 · 1.5km · 商圈环绕<span class="ar">›</span></a>
+    </div>
+
+    <div style="height:14px;"></div>
+  </div>
+
+  <div class="cta">
+    <div class="p"><b>¥9,800<small> /㎡起</small></b><span>三居 ¥98 万起 · 现房</span></div>
+    <div class="heart">♡</div>
+    <a class="btn" href="lvju-app-guide.html">预约看房</a>
+  </div>
+</div>
+<script src="screens/_qr.js"></script>
+<script>
+document.querySelectorAll('a.qrlink').forEach(function(a){
+  var img=a.querySelector('img.qrimg'); if(!img) return;
+  var target; try{ target=new URL(a.getAttribute('href'),location.href).href; }catch(e){ return; }
+  try{ var qr=qrcode(0,'M'); qr.addData(target); qr.make(); img.src=qr.createDataURL(3,0); }
+  catch(e){ img.src='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data='+encodeURIComponent(target); }
+  img.title='扫码直达：'+target;
+});
+</script>
+</body>
+</html>

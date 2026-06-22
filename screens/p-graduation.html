@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>结业核发 · 学时认定 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .stat-tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}
+    .st{padding:6px 14px; border-radius:6px; font-size:12px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .st.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .st .cnt{margin-left:4px; opacity:0.85; font-size:11px;}
+
+    /* 结业上报审核行（承接 T 学员管理「结业上报中台」） */
+    .grad-row{border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:8px;}
+    .grad-row.pending{border-left:3px solid var(--warn);}
+    .grad-row .hd{display:flex; align-items:center; gap:8px;}
+    .grad-row .hd .nm{font-size:13px; font-weight:600;}
+    .grad-row .hd .lv{font-size:10px; padding:1px 6px; border-radius:3px; font-weight:700; color:white; background:linear-gradient(135deg,#047857,#10b981);}
+    .grad-row .hd .lv.l4{background:linear-gradient(135deg,#1e40af,#3b82f6);}
+    .grad-row .hd .src{font-size:10px; padding:1px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .grad-row .hd .when{margin-left:auto; font-size:11px; color:var(--muted);}
+    /* 学时认定进度条 */
+    .hours{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;}
+    .hb{flex:1; min-width:120px; background:var(--line); border-radius:6px; padding:8px 10px;}
+    .hb .l{font-size:10px; color:var(--muted);} .hb .v{font-size:14px; font-weight:700; margin-top:2px;}
+    .hb .bar{height:5px; background:var(--border); border-radius:3px; margin-top:6px; overflow:hidden;}
+    .hb .bar i{display:block; height:100%; background:var(--success);}
+    .hb .v small{font-size:10px; color:var(--muted); font-weight:400;}
+    .grad-row .req{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; font-size:11px;}
+    .grad-row .req .c{padding:3px 8px; border-radius:4px; background:color-mix(in oklab,var(--success) 12%,transparent); color:var(--success);}
+    .grad-row .req .c.miss{background:color-mix(in oklab,var(--danger) 12%,transparent); color:var(--danger);}
+    .grad-row .act{display:flex; gap:6px; margin-top:10px;}
+    .grad-row .act .b{padding:5px 12px; font-size:11px; border-radius:5px; border:1px solid var(--border); background:var(--surface);}
+    .grad-row .act .b.ok{background:var(--success); color:white; border-color:var(--success); font-weight:600;}
+    .grad-row .act .b.no{color:var(--danger); border-color:color-mix(in oklab,var(--danger) 40%,transparent);}
+
+    /* 学时证明预览 */
+    .cert-preview{padding:22px; background:linear-gradient(135deg,#fffbeb,#fef3c7); border:2px solid var(--gold); border-radius:8px; text-align:center; position:relative; overflow:hidden;}
+    .cp-head{font-size:10px; color:var(--gold); letter-spacing:3px; margin-bottom:6px;}
+    .cp-title{font-size:16px; font-weight:700; margin-bottom:12px;}
+    .cp-num{font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:14px;}
+    .cp-name{font-size:22px; font-weight:700; margin:8px 0; color:#78350f;}
+    .cp-line{font-size:12px; margin-bottom:6px;}
+    .cp-badge{display:inline-flex; gap:6px; padding:5px 14px; background:var(--gold); color:white; border-radius:999px; font-size:12px; font-weight:700; margin:8px 0;}
+    .cp-foot{display:flex; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px dashed var(--gold); font-size:11px; text-align:left;}
+    .cp-foot .qr{width:54px; height:54px; background:var(--surface); display:grid; place-items:center; border-radius:5px; font-size:9px; color:var(--muted); border:1px solid var(--border);}
+
+    .chain{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:12px; background:var(--line); border-radius:8px; font-size:11px;}
+    .chain a,.chain span.node{padding:5px 10px; border-radius:6px; background:var(--surface); border:1px solid var(--border); font-weight:600; color:var(--fg);}
+    .chain a:hover{border-color:var(--accent); color:var(--accent);}
+    .chain .here{background:var(--accent); color:white; border-color:var(--accent);}
+    .chain .ar{color:var(--accent); font-weight:700;}
+
+    @media (max-width: 1200px){ .content{grid-template-columns:1fr;} .kpi-bar{grid-template-columns:repeat(3,1fr);} }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="graduation"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>结业核发 · 学时认定</b></div>
+      <div class="top-actions">
+        <button class="btn">学时规则</button>
+        <button class="btn">结业模板</button>
+        <button class="btn pri">批量认定</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">待审结业上报</div><div class="n" style="color:var(--warn);">42<span class="u">人</span></div><div class="d warn">T 机构上报</div></div>
+      <div class="ki"><div class="l">本月结业</div><div class="n">316<span class="u">人</span></div><div class="d ok">↑ 58 较上月</div></div>
+      <div class="ki"><div class="l">学时认定通过</div><div class="n">94.5<span class="u">%</span></div><div class="d ok">达标率</div></div>
+      <div class="ki"><div class="l">平均培训学时</div><div class="n">86<span class="u">学时</span></div><div class="d">含实操 24</div></div>
+      <div class="ki"><div class="l">待发学时证明</div><div class="n" style="color:var(--warn);">38<span class="u">份</span></div><div class="d warn">转发证</div></div>
+      <div class="ki"><div class="l">退回补学</div><div class="n" style="color:var(--danger);">7<span class="u">人</span></div><div class="d warn">学时不足</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- 左：结业上报审核（承接 t-students「结业上报中台」） -->
+      <div class="card">
+        <h3>结业上报审核 <span class="pill">42 待审</span> <span class="extra">承接 T 培训机构「学员管理」的结业上报</span></h3>
+        <div class="stat-tabs">
+          <span class="st on">待认定 <span class="cnt">42</span></span>
+          <span class="st">已认定 <span class="cnt">316</span></span>
+          <span class="st">退回补学 <span class="cnt">7</span></span>
+          <span class="st">L4+ 复核 <span class="cnt">9</span></span>
+        </div>
+
+        <div class="grad-row pending">
+          <div class="hd">
+            <span class="nm">郑文涛</span>
+            <span class="lv">L3</span>
+            <span class="src">来自 家协培训中心 · 学员管理 ↗</span>
+            <span class="when">1h 前上报</span>
+          </div>
+          <div class="hours">
+            <div class="hb"><div class="l">线上课时</div><div class="v">62 <small>/ 60 达标</small></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="hb"><div class="l">实操课时</div><div class="v">24 <small>/ 24 达标</small></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="hb"><div class="l">导师评估</div><div class="v">A <small>· 合格</small></div><div class="bar"><i style="width:92%"></i></div></div>
+          </div>
+          <div class="req">
+            <span class="c">课时达标 ✓</span>
+            <span class="c">考试通过 94 分 ✓</span>
+            <span class="c">实操合格 ✓</span>
+            <span class="c">无违规记录 ✓</span>
+          </div>
+          <div class="act">
+            <a class="b ok">认定结业 + 核发学时</a>
+            <a class="b">查看学习档案</a>
+            <a class="b no">退回</a>
+          </div>
+        </div>
+
+        <div class="grad-row pending">
+          <div class="hd">
+            <span class="nm">陈建国</span>
+            <span class="lv l4">L4</span>
+            <span class="src">来自 江苏家协职业培训学校 · 学员管理 ↗</span>
+            <span class="when">3h 前上报</span>
+          </div>
+          <div class="hours">
+            <div class="hb"><div class="l">线上课时</div><div class="v">88 <small>/ 80 达标</small></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="hb"><div class="l">实操课时</div><div class="v">36 <small>/ 36 达标</small></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="hb"><div class="l">导师评估</div><div class="v">A+ <small>· 优秀</small></div><div class="bar"><i style="width:98%"></i></div></div>
+          </div>
+          <div class="req">
+            <span class="c">课时达标 ✓</span>
+            <span class="c">答辩待出分</span>
+            <span class="c">实操合格 ✓</span>
+            <span class="c">管理案例 3 ✓</span>
+          </div>
+          <div class="act">
+            <a class="b">挂起 · 待答辩成绩</a>
+            <a class="b">查看学习档案</a>
+          </div>
+        </div>
+
+        <div class="grad-row">
+          <div class="hd">
+            <span class="nm">某学员</span>
+            <span class="lv">L2</span>
+            <span class="src">来自 梧桐公馆内训中心 · 学员管理 ↗</span>
+            <span class="when">退回补学</span>
+          </div>
+          <div class="hours">
+            <div class="hb"><div class="l">线上课时</div><div class="v" style="color:var(--danger);">38 <small>/ 48 不足</small></div><div class="bar"><i style="width:79%;background:var(--danger)"></i></div></div>
+            <div class="hb"><div class="l">实操课时</div><div class="v">16 <small>/ 16 达标</small></div><div class="bar"><i style="width:100%"></i></div></div>
+            <div class="hb"><div class="l">导师评估</div><div class="v">B <small>· 合格</small></div><div class="bar"><i style="width:80%"></i></div></div>
+          </div>
+          <div class="req">
+            <span class="c miss">线上课时缺 10 学时</span>
+            <span class="c">考试通过 ✓</span>
+          </div>
+          <div class="act">
+            <a class="b">已退回 T 机构补学</a>
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:var(--muted); margin-top:12px; padding:10px; background:color-mix(in oklab,var(--accent) 5%,transparent); border-left:3px solid var(--accent); border-radius:5px;">
+          认定结业后，自动生成<b style="color:var(--fg);">学时证明</b>，并将合格名单 + 成绩 + 学时档案推送至<a href="p-cert-issue.html" style="color:var(--accent);">发证管理</a>生成等级证书草稿；学时不足者退回 T 机构补学。
+        </div>
+      </div>
+
+      <!-- 右：学时证明预览 + 闭环 -->
+      <div>
+        <div class="card">
+          <h3>学时证明预览 · 郑文涛 <span class="extra">L3 · 86 学时</span></h3>
+          <div class="cert-preview">
+            <div class="cp-head">CERTIFICATE OF TRAINING HOURS</div>
+            <div class="cp-title">江苏保障性租赁住房 · 培训学时证明</div>
+            <div class="cp-num">证明编号：NJ-BZF-TH-2026-0314</div>
+            <div class="cp-line">兹证明</div>
+            <div class="cp-name">郑 文 涛</div>
+            <div class="cp-line">于家协培训中心完成 L3 旅居房管培训并考核合格</div>
+            <div class="cp-badge">📜 累计 86 学时 · 实操 24 学时</div>
+            <div class="cp-line" style="font-size:11px; color:var(--muted);">考试 94 分 · 导师评估 A · 结业日期 2026-06-13</div>
+            <div class="cp-foot">
+              <div>
+                <div style="color:var(--muted);">发证机构</div>
+                <div style="font-weight:700; margin-top:2px;">江苏省住房与城乡建设厅</div>
+                <div style="color:var(--muted); margin-top:2px;">家协培训中心 承办</div>
+              </div>
+              <div class="qr">扫码<br>验真</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn" style="flex:1;">下载 PDF</button>
+            <button class="btn pri" style="flex:1;">认定 + 转发证</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>育人发证闭环 · 本页位置</h3>
+          <div class="chain">
+            <a href="t-students.html">T·学员管理</a>
+            <span class="ar">→</span>
+            <a href="p-exam-admin.html">P·考务成绩</a>
+            <span class="ar">→</span>
+            <span class="node here">P·结业核发·学时认定</span>
+            <span class="ar">→</span>
+            <a href="p-cert-issue.html">P·发证管理</a>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px; line-height:1.7;">
+            结业核发承接 T 培训机构的<b style="color:var(--fg);">结业上报</b>，比对课时 / 考试 / 实操 / 导师评估完成<b style="color:var(--fg);">学时认定</b>；
+            达标即核发学时证明并流转<a href="p-cert-issue.html" style="color:var(--accent);">发证管理</a>，不达标退回 <a href="t-students.html" style="color:var(--accent);">T 学员管理</a>补学。
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>认定口径 <span class="extra">规则来源</span></h3>
+          <div style="font-size:12px; color:var(--muted); line-height:1.8;">
+            · 课时 / 等级口径对齐 <a href="p-standards.html" style="color:var(--accent);">L0-L7 等级标准</a><br>
+            · 考试成绩来自 <a href="p-exam-admin.html" style="color:var(--accent);">考务 · 排考与成绩</a><br>
+            · 课程与考纲来自 <a href="p-course-cert.html" style="color:var(--accent);">课程认证审核</a><br>
+            · 学员档案来自 <a href="t-students.html" style="color:var(--accent);">T 学员管理 ↗</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.st').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.st').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

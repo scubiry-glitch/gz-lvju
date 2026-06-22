@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>租金合规预警 · 江苏保租房 G 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    /* sidebar styles 由 _nav.js 提供 */
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .btn svg { width: 14px; height: 14px; }
+
+    /* summary cards */
+    .sum-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .sb { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; position: relative; }
+    .sb::before { content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+    .sb.danger::before { background: var(--danger); }
+    .sb.warn::before { background: var(--warn); }
+    .sb.ok::before { background: var(--success); }
+    .sb .lbl { font-size: 12px; color: var(--muted); }
+    .sb .n { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .sb .d { font-size: 11px; margin-top: 4px; color: var(--muted); }
+
+    /* filter */
+    .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+    .filter-bar select, .filter-bar input { padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; color: var(--fg); }
+    .filter-bar input { flex: 1; min-width: 200px; }
+    .filter-bar .l { font-size: 12px; color: var(--muted); }
+
+    /* tab */
+    .tab-row { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 16px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+    .tab .cnt { font-size: 11px; padding: 1px 6px; background: var(--bg); border-radius: 3px; margin-left: 4px; }
+
+    /* alert list */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+    table.al { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.al th, table.al td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table.al th { font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; background: var(--bg); }
+    table.al tr:last-child td { border-bottom: 0; }
+    .sev-pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; display: inline-block; }
+    .sev-pill.h { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .sev-pill.m { background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .sev-pill.l { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+    .price-cell .now { font-weight: 700; color: var(--danger); }
+    .price-cell .ref { font-size: 11px; color: var(--muted); }
+    .delta-bad { color: var(--danger); font-weight: 600; }
+    .delta-ok { color: var(--success); font-weight: 600; }
+    .status-pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; display: inline-block; }
+    .status-pill.new { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
+    .status-pill.proc { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+    .status-pill.done { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .row-actions a { font-size: 12px; color: var(--accent); cursor: pointer; margin-right: 6px; }
+
+    /* workflow */
+    .wf { display: flex; align-items: center; gap: 0; background: var(--bg); padding: 12px; border-radius: var(--radius-md); margin-bottom: 14px; font-size: 12px; flex-wrap: wrap; }
+    .wf-step { display: flex; align-items: center; gap: 6px; padding: 4px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; }
+    .wf-step.on { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
+    .wf-arrow { color: var(--muted); padding: 0 4px; }
+
+    /* ========== 默认（PC 视图）下隐藏移动壳 ========== */
+    .m-shell{display:none;}
+
+    /* ========== 移动视图（≤1023px） ========== */
+    @media (max-width: 1023px) {
+      .console{display:none !important;}
+      body{background:#f3f4f6;}
+      .m-shell{display:block; max-width:430px; margin:0 auto; min-height:100vh; padding-bottom:96px; background:#f3f4f6;}
+      .m-sum{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:12px;}
+      .m-sb{background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px;}
+      .m-sb .l{font-size:11px; color:#6b7280;}
+      .m-sb .n{font-size:22px; font-weight:700; margin-top:2px;}
+      .m-sb .d{font-size:10px; color:#6b7280; margin-top:2px;}
+      .m-sb.danger{border-color:color-mix(in oklab, #dc2626 30%, transparent);}
+      .m-sb.danger .n{color:#dc2626;}
+      .m-sb.warn .n{color:#ea580c;}
+      .m-sb.ok .n{color:#16a34a;}
+
+      .m-tabs{display:flex; gap:0; padding:0 12px; border-bottom:1px solid #e5e7eb; overflow-x:auto;}
+      .m-tabs .t{flex-shrink:0; padding:10px 14px; font-size:13px; color:#6b7280; border-bottom:2px solid transparent;}
+      .m-tabs .t.on{color:#1e40af; border-color:#1e40af; font-weight:600;}
+      .m-tabs .t .cnt{margin-left:4px; font-size:10px; padding:1px 6px; border-radius:3px; background:#f3f4f6;}
+      .m-tabs .t.on .cnt{background:color-mix(in oklab, #1e40af 12%, transparent); color:#1e40af;}
+
+      .m-list{padding:8px 12px 12px;}
+      .m-alert{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:10px;}
+      .m-alert .row1{display:flex; align-items:flex-start; gap:6px; margin-bottom:4px;}
+      .m-alert .sev{font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600; flex-shrink:0;}
+      .m-alert .sev.h{background:color-mix(in oklab, #dc2626 14%, transparent); color:#dc2626;}
+      .m-alert .sev.m{background:color-mix(in oklab, #ea580c 14%, transparent); color:#ea580c;}
+      .m-alert .sev.l{background:color-mix(in oklab, #1e40af 12%, transparent); color:#1e40af;}
+      .m-alert .st{font-size:10px; padding:2px 8px; border-radius:4px; background:#f3f4f6; color:#6b7280;}
+      .m-alert .id{font-size:10px; color:#9ca3af; font-family:ui-monospace,Menlo,monospace; margin-left:auto;}
+      .m-alert .nm{font-size:15px; font-weight:600; margin:4px 0 2px;}
+      .m-alert .who{font-size:12px; color:#6b7280;}
+      .m-alert .rule{margin-top:8px; padding:8px 10px; background:#f9fafb; border-radius:6px; font-size:12px; color:#111;}
+      .m-alert .rule strong{color:#dc2626;}
+      .m-alert .px{display:flex; align-items:baseline; gap:8px; margin-top:8px; font-size:12px;}
+      .m-alert .px .now{font-size:16px; font-weight:700; color:#dc2626;}
+      .m-alert .px .ref{color:#6b7280;}
+      .m-alert .px .delta{margin-left:auto; font-size:13px; font-weight:700; color:#dc2626;}
+      .m-alert .acts{display:flex; gap:6px; margin-top:12px; padding-top:10px; border-top:1px solid #e5e7eb;}
+      .m-alert .acts a{flex:1; padding:8px; background:#f3f4f6; border-radius:6px; text-align:center; font-size:12px; color:#1e40af; border:1px solid #e5e7eb; cursor:pointer;}
+      .m-alert .acts a.pri{background:#1e40af; color:#fff; border-color:#1e40af; font-weight:600;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ========== 移动视图（≤1023px） ========== -->
+<div class="m-shell">
+  <div id="m-header" data-series="g" data-active="rent-alert" data-title="租金合规预警" data-icon="⚠" data-ttl="租金合规预警" data-sub="待您处置 · 高优先有 8 项" data-right="共 14"></div>
+
+  <div class="m-sum">
+    <div class="m-sb danger"><div class="l">待处置</div><div class="n">14</div><div class="d">▲ 较昨日 +3</div></div>
+    <div class="m-sb warn"><div class="l">处置中</div><div class="n">8</div><div class="d">平均 1.4 天</div></div>
+    <div class="m-sb ok"><div class="l">本月闭环</div><div class="n">42</div><div class="d">闭环率 100%</div></div>
+    <div class="m-sb"><div class="l">综合合规率</div><div class="n">99.2%</div><div class="d">国家 ≥ 95%</div></div>
+  </div>
+
+  <div class="m-tabs">
+    <div class="t on">待处置 <span class="cnt">14</span></div>
+    <div class="t">处置中 <span class="cnt">8</span></div>
+    <div class="t">已闭环 <span class="cnt">42</span></div>
+    <div class="t">已驳回 <span class="cnt">3</span></div>
+  </div>
+
+  <div class="m-list">
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev h">高</span>
+        <span class="st">新建</span>
+        <span class="id">AL-26004</span>
+      </div>
+      <div class="nm">仙林湖 4-0612</div>
+      <div class="who">仙林湖国际社区 · 南京安居集团</div>
+      <div class="rule">📉 触发规则：<strong>租金低于指导价 21%</strong></div>
+      <div class="px">
+        <span class="now">¥ 1,890</span>
+        <span class="ref">指导价 ¥ 2,400 · 上限 ¥ 2,160</span>
+        <span class="delta">-21.3%</span>
+      </div>
+      <div class="acts"><a>详情</a><a class="pri">立即复核</a></div>
+    </div>
+
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev h">高</span>
+        <span class="st" style="background:color-mix(in oklab,#ea580c 14%,transparent); color:#ea580c;">处置中</span>
+        <span class="id">AL-26003</span>
+      </div>
+      <div class="nm">梧桐公馆 12-0608</div>
+      <div class="who">梧桐公馆人才公寓 · 南京安居集团</div>
+      <div class="rule">📈 触发规则：<strong>续约涨幅超 5%</strong></div>
+      <div class="px">
+        <span class="now">¥ 2,520</span>
+        <span class="ref">原 ¥ 2,380 · 上限 ¥ 2,499</span>
+        <span class="delta">+5.88%</span>
+      </div>
+      <div class="acts"><a>跟进</a><a class="pri">通知整改</a></div>
+    </div>
+
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev m">中</span>
+        <span class="st" style="background:color-mix(in oklab,#ea580c 14%,transparent); color:#ea580c;">处置中</span>
+        <span class="id">AL-26002</span>
+      </div>
+      <div class="nm">河西青年 2-0815</div>
+      <div class="who">河西青年公寓 · 江苏安居</div>
+      <div class="rule">💰 触发规则：<strong>押金超 2 月租金</strong></div>
+      <div class="px">
+        <span class="now">押金 ¥ 7,200</span>
+        <span class="ref">租金 ¥ 3,120 · 上限 ¥ 6,240</span>
+        <span class="delta">+15.4%</span>
+      </div>
+      <div class="acts"><a>详情</a><a class="pri">跟进</a></div>
+    </div>
+
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev m">中</span>
+        <span class="st">新建</span>
+        <span class="id">AL-26001</span>
+      </div>
+      <div class="nm">南部新城 5-1108</div>
+      <div class="who">南部新城人才家园 · 苏宁置业</div>
+      <div class="rule">📅 触发规则：<strong>合同未及时备案 · 超期 3 天</strong></div>
+      <div class="px">
+        <span class="now" style="font-size:13px;">合同已生效 6 天</span>
+        <span class="ref">应在 3 工作日内备案</span>
+        <span class="delta" style="color:#ea580c;">超期</span>
+      </div>
+      <div class="acts"><a>催办</a><a class="pri">派单</a></div>
+    </div>
+
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev h">高</span>
+        <span class="st" style="background:color-mix(in oklab,#ea580c 14%,transparent); color:#ea580c;">处置中</span>
+        <span class="id">AL-25998</span>
+      </div>
+      <div class="nm">溧水城投 1-0306</div>
+      <div class="who">溧水人才公寓 · 溧水城投</div>
+      <div class="rule">📈 触发规则：<strong>挂牌价超片区指导价 25%</strong></div>
+      <div class="px">
+        <span class="now">¥ 2,260</span>
+        <span class="ref">指导价 ¥ 2,000 · 上限 ¥ 1,800</span>
+        <span class="delta">+25.5%</span>
+      </div>
+      <div class="acts"><a>跟进</a><a class="pri">升级督办</a></div>
+    </div>
+
+    <div class="m-alert">
+      <div class="row1">
+        <span class="sev l">低</span>
+        <span class="st">新建</span>
+        <span class="id">AL-25992</span>
+      </div>
+      <div class="nm">江北未来谷 7-2204</div>
+      <div class="who">江北未来谷公寓 · 江北建发</div>
+      <div class="rule">💼 触发规则：<strong>服务费占比超 8%</strong></div>
+      <div class="px">
+        <span class="now">服务费 ¥ 280/月</span>
+        <span class="ref">租金 ¥ 3,200 · 上限 ¥ 256</span>
+        <span class="delta">8.75%</span>
+      </div>
+      <div class="acts"><a>详情</a><a class="pri">立即复核</a></div>
+    </div>
+  </div>
+
+  <div id="m-tabbar" data-series="g" data-active="cockpit"></div>
+</div>
+
+<!-- ========== PC 视图（≥1024px） ========== -->
+<div class="console">
+
+  <div id="side-nav" data-series="g" data-active="rent-alert"></div>
+
+  <main class="main">
+
+    <div class="topbar">
+      <h1>租金合规预警</h1>
+      <button class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>
+        导出报表
+      </button>
+      <button class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 6 12 13 2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+        群发通知
+      </button>
+    </div>
+
+    <!-- summary -->
+    <div class="sum-grid">
+      <div class="sb danger"><div class="lbl">待处置预警</div><div class="n">14</div><div class="d">较昨日 +3</div></div>
+      <div class="sb warn"><div class="lbl">处置中</div><div class="n">8</div><div class="d">平均时长 1.4 天</div></div>
+      <div class="sb ok"><div class="lbl">本月已闭环</div><div class="n">42</div><div class="d">闭环率 100%</div></div>
+      <div class="sb"><div class="lbl">综合合规率</div><div class="n">99.2%</div><div class="d">国家标准 ≥ 95%</div></div>
+    </div>
+
+    <!-- filter -->
+    <div class="filter-bar">
+      <span class="l">规则：</span>
+      <select><option>全部规则</option><option>租金超片区指导价</option><option>年涨幅超 5%</option><option>押金 &gt; 2 月</option><option>未备案</option></select>
+      <select><option>全部区</option><option>江宁区</option><option>建邺区</option><option>鼓楼区</option></select>
+      <select><option>全部严重度</option><option>高</option><option>中</option><option>低</option></select>
+      <input placeholder="搜索房源编号/项目/运营方…" />
+      <button class="btn btn-ghost">重置</button>
+    </div>
+
+    <!-- status tabs -->
+    <div class="tab-row">
+      <div class="tab active">待处置 <span class="cnt">14</span></div>
+      <div class="tab">处置中 <span class="cnt">8</span></div>
+      <div class="tab">已闭环 <span class="cnt">42</span></div>
+      <div class="tab">已驳回 <span class="cnt">3</span></div>
+    </div>
+
+    <!-- workflow -->
+    <div class="wf">
+      <span style="color: var(--muted); margin-right: 6px;">标准处置流程：</span>
+      <span class="wf-step on">1 系统识别</span>
+      <span class="wf-arrow">→</span>
+      <span class="wf-step on">2 复核派单</span>
+      <span class="wf-arrow">→</span>
+      <span class="wf-step">3 通知运营方</span>
+      <span class="wf-arrow">→</span>
+      <span class="wf-step">4 整改完成</span>
+      <span class="wf-arrow">→</span>
+      <span class="wf-step">5 闭环销账</span>
+    </div>
+
+    <!-- alert list -->
+    <div class="card">
+      <table class="al">
+        <thead>
+          <tr>
+            <th>预警编号</th>
+            <th>房源 / 项目 / 运营方</th>
+            <th>规则触发</th>
+            <th>价格情况</th>
+            <th>偏差</th>
+            <th>严重</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AL-26004</td>
+            <td>
+              <strong>仙林湖 4-0612</strong><br>
+              <small style="color: var(--muted);">仙林湖国际社区 / 南京安居集团</small>
+            </td>
+            <td>租金低于指导价 21%</td>
+            <td class="price-cell">
+              <div class="now">¥ 1,890</div>
+              <div class="ref">指导价 ¥ 2,400 · 上限 ¥ 2,160</div>
+            </td>
+            <td class="delta-bad">-21.3%</td>
+            <td><span class="sev-pill h">高</span></td>
+            <td><span class="status-pill new">新建</span></td>
+            <td class="row-actions"><a>立即复核</a><a>派单</a></td>
+          </tr>
+          <tr>
+            <td>AL-26003</td>
+            <td>
+              <strong>梧桐公馆 12-0608</strong><br>
+              <small style="color: var(--muted);">梧桐公馆人才公寓 / 南京安居集团</small>
+            </td>
+            <td>续约涨幅超 5%</td>
+            <td class="price-cell">
+              <div class="now">¥ 2,520</div>
+              <div class="ref">原 ¥ 2,380 · 上限 ¥ 2,499</div>
+            </td>
+            <td class="delta-bad">+5.88%</td>
+            <td><span class="sev-pill h">高</span></td>
+            <td><span class="status-pill proc">处置中</span></td>
+            <td class="row-actions"><a>跟进</a><a>通知整改</a></td>
+          </tr>
+          <tr>
+            <td>AL-26002</td>
+            <td>
+              <strong>河西青年 2-0815</strong><br>
+              <small style="color: var(--muted);">河西青年公寓 / 江苏安居</small>
+            </td>
+            <td>押金超 2 月租金</td>
+            <td class="price-cell">
+              <div class="now">押金 ¥ 7,200</div>
+              <div class="ref">租金 ¥ 3,120 · 上限 ¥ 6,240</div>
+            </td>
+            <td class="delta-bad">+15.4%</td>
+            <td><span class="sev-pill m">中</span></td>
+            <td><span class="status-pill proc">处置中</span></td>
+            <td class="row-actions"><a>跟进</a></td>
+          </tr>
+          <tr>
+            <td>AL-26001</td>
+            <td>
+              <strong>南部新城 5-1108</strong><br>
+              <small style="color: var(--muted);">南部新城人才家园 / 苏宁置业</small>
+            </td>
+            <td>合同未及时备案</td>
+            <td class="price-cell">
+              <div class="now">合同已生效 6 天</div>
+              <div class="ref">应在 3 个工作日内备案</div>
+            </td>
+            <td class="delta-bad">超期 3 天</td>
+            <td><span class="sev-pill m">中</span></td>
+            <td><span class="status-pill new">新建</span></td>
+            <td class="row-actions"><a>催办</a><a>派单</a></td>
+          </tr>
+          <tr>
+            <td>AL-25998</td>
+            <td>
+              <strong>溧水城投 1-0306</strong><br>
+              <small style="color: var(--muted);">溧水人才公寓 / 溧水城投</small>
+            </td>
+            <td>挂牌价超片区指导价</td>
+            <td class="price-cell">
+              <div class="now">¥ 2,260</div>
+              <div class="ref">指导价 ¥ 2,000 · 上限 ¥ 1,800</div>
+            </td>
+            <td class="delta-bad">+25.5%</td>
+            <td><span class="sev-pill h">高</span></td>
+            <td><span class="status-pill proc">处置中</span></td>
+            <td class="row-actions"><a>跟进</a><a>升级</a></td>
+          </tr>
+          <tr>
+            <td>AL-25992</td>
+            <td>
+              <strong>江北未来谷 7-2204</strong><br>
+              <small style="color: var(--muted);">江北未来谷公寓 / 江北建发</small>
+            </td>
+            <td>服务费占比超 8%</td>
+            <td class="price-cell">
+              <div class="now">服务费 ¥ 280 / 月</div>
+              <div class="ref">租金 ¥ 3,200 · 上限 ¥ 256</div>
+            </td>
+            <td class="delta-bad">8.75%</td>
+            <td><span class="sev-pill l">低</span></td>
+            <td><span class="status-pill new">新建</span></td>
+            <td class="row-actions"><a>立即复核</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+
+<script>
+(function(){
+  // 移动端：卡片详情 sheet
+  document.querySelectorAll('.m-alert .acts a').forEach((a, i, all) => {
+    if (a.textContent.trim() !== '详情') return;
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const card = a.closest('.m-alert');
+      const name = card.querySelector('.nm').textContent;
+      const who = card.querySelector('.who').textContent;
+      const rule = card.querySelector('.rule').textContent;
+      const id = card.querySelector('.id').textContent;
+      const sevText = card.querySelector('.sev').textContent;
+      const px = card.querySelector('.px').textContent.replace(/\s+/g, ' ').trim();
+      const M = window.BZF_NAVMOBILE; if (!M) return;
+      M.openSheet({
+        title: id + ' · 预警详情',
+        body: `
+          <h4>房源信息</h4>
+          <div class="kv">
+            <div class="k">编号</div><div class="v">${id}</div>
+            <div class="k">房源</div><div class="v">${name}</div>
+            <div class="k">项目/运营方</div><div class="v">${who}</div>
+            <div class="k">严重度</div><div class="v">${sevText}</div>
+          </div>
+          <h4>触发与价格</h4>
+          <div class="kv">
+            <div class="k">规则</div><div class="v">${rule.replace('触发规则：', '')}</div>
+            <div class="k">价格情况</div><div class="v">${px}</div>
+          </div>
+          <h4>系统判断</h4>
+          <ul>
+            <li>历史涨幅：近 12 月 +18%（超 5% 红线）</li>
+            <li>同片区参考：8 套同户型均价 ¥ 2,180</li>
+            <li>合同备案：已备案 · 2026-04 生效</li>
+            <li>租客投诉：无</li>
+          </ul>
+          <h4>处置流程</h4>
+          <ul>
+            <li>系统识别 ✓ → 复核派单 ✓ → 通知运营方 → 整改 → 闭环</li>
+            <li>当前在「待复核」阶段</li>
+          </ul>
+        `,
+        actions: [
+          { label: '驳回预警', kind: 'rej' },
+          { label: '立即复核', kind: 'pri' },
+        ],
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

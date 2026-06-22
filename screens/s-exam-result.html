@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>考试成绩 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    a{color:inherit; text-decoration:none;}
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:140px; position:relative;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+
+    .top-h{color:#fff; padding:12px 16px 30px; background:linear-gradient(135deg,#047857,#10b981);}
+    .top-h.fail{background:linear-gradient(135deg,#b45309,#dc2626);}
+    .nav-row{display:flex; align-items:center; gap:10px;}
+    .nav-row .back{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:18px;}
+    .nav-row .ti{font-size:14px; font-weight:700;}
+
+    .score-card{margin:-22px 16px 0; padding:20px 16px 16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); text-align:center; box-shadow:0 6px 18px rgba(13,148,136,.1);}
+    .dial{width:132px; height:132px; margin:0 auto; border-radius:50%; display:grid; place-items:center;}
+    .dial .inner{width:106px; height:106px; border-radius:50%; background:var(--surface); display:grid; place-items:center; flex-direction:column;}
+    .dial .n{font-size:36px; font-weight:800; line-height:1; font-family:var(--mono);}
+    .dial .u{font-size:11px; color:var(--muted); margin-top:3px;}
+    .badge{display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:6px 16px; border-radius:999px; font-size:13px; font-weight:700;}
+    .badge.ok{background:color-mix(in oklab,var(--success) 14%,transparent); color:var(--success);}
+    .badge.no{background:color-mix(in oklab,var(--danger) 14%,transparent); color:var(--danger);}
+    .sub{font-size:12px; color:var(--muted); margin-top:8px;}
+
+    .section-h{padding:16px 16px 8px; display:flex; align-items:center;} .section-h h2{font-size:15px; font-weight:600; margin:0; flex:1;} .section-h .ex{font-size:11px; color:var(--muted);}
+    .card{margin:0 16px; padding:14px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);}
+    .brk{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dashed var(--line); font-size:13px;} .brk:last-child{border-bottom:0;}
+    .brk .k{width:64px; color:var(--muted); font-size:12px;} .brk .bar{flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden;} .brk .bar i{display:block;height:100%;background:var(--accent);} .brk .v{width:48px; text-align:right; font-weight:700; font-family:var(--mono);}
+
+    /* review list */
+    .rv{margin:0 16px 10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+    .rv .h{display:flex; align-items:center; gap:8px; padding:11px 13px; cursor:pointer;}
+    .rv .h .ck{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; flex-shrink:0; color:#fff;}
+    .rv.ok .h .ck{background:var(--success);} .rv.no .h .ck{background:var(--danger);} .rv.miss .h .ck{background:var(--muted);}
+    .rv .h .nm{flex:1; font-size:13px; font-weight:600;} .rv .h .tag{font-size:10px; padding:1px 6px; border-radius:4px; background:var(--line); color:var(--muted);}
+    .rv .h .ar{color:var(--muted); font-size:12px; transition:transform .2s;}
+    .rv.open .h .ar{transform:rotate(90deg);}
+    .rv .bd{display:none; padding:0 13px 13px;} .rv.open .bd{display:block;}
+    .rv .o{display:flex; gap:8px; padding:7px 10px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; font-size:12.5px;}
+    .rv .o .l{font-weight:700; color:var(--muted);}
+    .rv .o.cor{border-color:var(--success); background:color-mix(in oklab,var(--success) 7%,transparent);} .rv .o.cor .l{color:var(--success);}
+    .rv .o.wr{border-color:var(--danger); background:color-mix(in oklab,var(--danger) 7%,transparent);} .rv .o.wr .l{color:var(--danger);}
+    .rv .o .tag2{margin-left:auto; font-size:10px; font-weight:700;}
+    .rv .exp{font-size:12px; color:var(--muted); background:var(--line); border-radius:8px; padding:9px 11px; margin-top:6px; line-height:1.6;}
+    .rv .exp b{color:var(--fg);}
+    .filterbar{display:flex; gap:6px; padding:0 16px 6px;}
+    .filterbar .f{font-size:12px; padding:4px 11px; border-radius:999px; background:var(--surface); border:1px solid var(--border); color:var(--muted);}
+    .filterbar .f.on{background:var(--accent); color:#fff; border-color:var(--accent);}
+
+    /* cert flow */
+    .flow{margin:0 16px; padding:14px; border-radius:var(--radius-md);}
+    .flow.ok{background:linear-gradient(135deg,#ecfdf5,#d1fae5); border:1px solid #a7f3d0;}
+    .flow.no{background:linear-gradient(135deg,#fff7ed,#fee2e2); border:1px solid #fecaca;}
+    .flow .step{display:flex; align-items:center; gap:10px; padding:8px 0; font-size:13px;}
+    .flow .step .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0;}
+    .flow .step.done .ic{background:var(--success);color:#fff;} .flow .step.run .ic{background:var(--gold);color:#fff;} .flow .step.wait .ic{background:var(--line);color:var(--muted);}
+    .flow .step .body{flex:1;} .flow .step .body .meta{font-size:11px;color:var(--muted);} .flow .step a{font-size:11px;color:var(--accent);font-weight:700;}
+    .retry{margin:0 16px; padding:14px; background:linear-gradient(135deg,#fff7ed,#fee2e2); border:1px solid #fecaca; border-radius:var(--radius-md); font-size:13px;}
+    .retry .go{display:inline-block; margin-top:10px; padding:9px 16px; background:var(--danger); color:#fff; border-radius:8px; font-weight:700;}
+
+    .sticky{position:fixed; left:50%; transform:translateX(-50%); bottom:64px; width:100%; max-width:430px; background:var(--surface); border-top:1px solid var(--border); padding:10px 16px; display:flex; gap:10px; z-index:20;}
+    .sticky .btn{flex:1; text-align:center; padding:12px; border-radius:10px; font-size:14px; font-weight:700;} .sticky .ghost{background:var(--line); color:var(--fg); flex:0 0 38%;} .sticky .pri{background:linear-gradient(90deg,var(--accent),var(--emerald)); color:#fff;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-h" id="topH">
+    <div class="nav-row"><a class="back" href="s-exam.html">‹</a><div class="ti" id="hTitle">考试成绩</div></div>
+  </div>
+
+  <div class="score-card">
+    <div class="dial" id="dial"><div class="inner"><div class="n" id="score">—</div><div class="u">通过线 80</div></div></div>
+    <div class="badge" id="badge">—</div>
+    <div class="sub" id="sub">—</div>
+  </div>
+
+  <div class="section-h"><h2>题型得分</h2></div>
+  <div class="card" id="brk"></div>
+
+  <div class="section-h"><h2>逐题解析</h2><span class="ex" id="rvSum"></span></div>
+  <div class="filterbar">
+    <span class="f on" data-f="all">全部</span>
+    <span class="f" data-f="no">错题</span>
+    <span class="f" data-f="miss">未答</span>
+  </div>
+  <div id="rvList"></div>
+
+  <div class="section-h"><h2 id="flowH">结业发证进度</h2></div>
+  <div id="flowWrap"></div>
+
+  <div class="sticky">
+    <a class="btn ghost" href="s-exam.html">返回考试</a>
+    <a class="btn pri" id="primaryBtn" href="s-cert.html">查看我的证书</a>
+  </div>
+
+  <div id="tab-bar" data-series="s" data-active="exam"></div>
+</div>
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const DEMO={title:'L4→L5 升级考',score:86,pass:true,total:8,correct:7,used:'19:42',items:[
+    {n:1,type:'单选',multi:false,stem:'客户续约"价格太贵"第一步？',opts:['立即折扣','复述已交付价值','转交主管','换低价房源'],your:1,ans:1,ok:true,exp:'先做价值锚定再谈条款。'},
+    {n:2,type:'单选',multi:false,stem:'超权限承诺要求应？',opts:['口头答应','上报走签约','私下约定','直接拒绝'],your:1,ans:1,ok:true,exp:'不越权承诺，超权限须上报。'},
+    {n:3,type:'多选',multi:true,stem:'续约必须留痕的内容？',opts:['报价口径','客户诉求','确认条款','闲聊'],your:[0,1],ans:[0,1,2],ok:false,exp:'确认条款也须留痕。'},
+  ]};
+  let R; try{ R=JSON.parse(localStorage.getItem('bzf_exam_result')); }catch(e){}
+  if(!R||!R.items) R=DEMO;
+
+  const pass=R.pass;
+  // header + dial
+  $('#hTitle').textContent='考试成绩 · '+R.title;
+  if(!pass) $('#topH').classList.add('fail');
+  $('#score').textContent=R.score;
+  $('#score').style.color=pass?'var(--success)':'var(--danger)';
+  $('#dial').style.background='conic-gradient('+(pass?'var(--success)':'var(--danger)')+' 0 '+R.score+'%, var(--line) '+R.score+'% 100%)';
+  const b=$('#badge'); b.className='badge '+(pass?'ok':'no'); b.textContent=pass?'✓ 已通过 · L4 → L5':'✕ 未通过 · 需补考';
+  $('#sub').textContent='答对 '+R.correct+' / '+R.total+' 题 · 用时 '+(R.used||'—')+' · 通过线 80';
+
+  // breakdown by type
+  const types={}; R.items.forEach(it=>{ const k=it.type; types[k]=types[k]||{c:0,t:0}; types[k].t++; if(it.ok)types[k].c++; });
+  const bw=$('#brk'); bw.innerHTML='';
+  Object.keys(types).forEach(k=>{ const o=types[k]; const pct=Math.round(o.c/o.t*100);
+    bw.insertAdjacentHTML('beforeend','<div class="brk"><span class="k">'+k+'</span><div class="bar"><i style="width:'+pct+'%"></i></div><span class="v">'+o.c+'/'+o.t+'</span></div>'); });
+
+  // review list
+  let filter='all';
+  function letter(i){return String.fromCharCode(65+i);}
+  function ansText(it){ const a=it.multi?it.ans:[it.ans]; return a.map(letter).join(''); }
+  function yourText(it){ if(it.your===null||it.your===undefined||(Array.isArray(it.your)&&!it.your.length))return '未作答'; const y=Array.isArray(it.your)?it.your:[it.your]; return y.map(letter).join(''); }
+  function status(it){ if(it.your===null||(Array.isArray(it.your)&&!it.your.length))return 'miss'; return it.ok?'ok':'no'; }
+  function renderRv(){
+    const w=$('#rvList'); w.innerHTML='';
+    const list=R.items.filter(it=>filter==='all'||status(it)===filter);
+    let wrong=R.items.filter(it=>status(it)==='no').length, miss=R.items.filter(it=>status(it)==='miss').length;
+    $('#rvSum').textContent='错 '+wrong+' · 未答 '+miss;
+    if(!list.length){ w.innerHTML='<div class="card" style="text-align:center;color:var(--muted);">没有符合的题目 🎉</div>'; return; }
+    list.forEach(it=>{
+      const st=status(it); const ck=st==='ok'?'✓':(st==='no'?'✕':'—');
+      const box=document.createElement('div'); box.className='rv '+st;
+      const yourArr=it.your===null?[]:(Array.isArray(it.your)?it.your:[it.your]);
+      const ansArr=it.multi?it.ans:[it.ans];
+      let opts=it.opts.map((o,i)=>{ const cor=ansArr.includes(i), chosen=yourArr.includes(i);
+        const cls=cor?'cor':(chosen?'wr':''); const tag=cor?'正确答案':(chosen?'你的选择':'');
+        return '<div class="o '+cls+'"><span class="l">'+letter(i)+'</span><span>'+o+'</span>'+(tag?'<span class="tag2" style="color:'+(cor?'var(--success)':'var(--danger)')+'">'+tag+'</span>':'')+'</div>'; }).join('');
+      box.innerHTML='<div class="h"><span class="ck">'+ck+'</span><span class="nm">第'+it.n+'题 · '+it.stem+'</span><span class="tag">'+it.type+'</span><span class="ar">▸</span></div>'+
+        '<div class="bd">'+opts+'<div class="exp"><b>解析：</b>'+it.exp+'<br>正确答案 '+ansText(it)+' · 你的作答 '+yourText(it)+'</div></div>';
+      box.querySelector('.h').onclick=()=>box.classList.toggle('open');
+      w.appendChild(box);
+    });
+  }
+  document.querySelectorAll('.filterbar .f').forEach(f=>f.onclick=()=>{
+    document.querySelectorAll('.filterbar .f').forEach(x=>x.classList.remove('on')); f.classList.add('on'); filter=f.dataset.f; renderRv();
+  });
+  renderRv();
+
+  // cert flow / retry
+  const fw=$('#flowWrap');
+  if(pass){
+    $('#flowH').textContent='结业发证进度';
+    fw.innerHTML='<div class="flow ok">'+
+      '<div class="step done"><span class="ic">✓</span><div class="body"><div>学习完成 · 112 学时</div><div class="meta">全部章节 + 章节测验通过</div></div></div>'+
+      '<div class="step done"><span class="ic">✓</span><div class="body"><div>升级考通过 · '+R.score+' 分</div><div class="meta">超过通过线 80</div></div></div>'+
+      '<div class="step run"><span class="ic">⏳</span><div class="body"><div>中台学时认定中</div><div class="meta">结业核发 · 预计 T+1</div></div><a href="p-graduation.html">查看 ↗</a></div>'+
+      '<div class="step wait"><span class="ic">4</span><div class="body"><div>统一发证 · L5 证书</div><div class="meta">中台签发 + 上链公示验真</div></div><a href="p-cert-issue.html">了解 ↗</a></div></div>';
+    $('#primaryBtn').textContent='查看我的证书'; $('#primaryBtn').href='s-cert.html';
+  } else {
+    $('#flowH').textContent='补考与巩固';
+    fw.innerHTML='<div class="retry">本次未达通过线（80）。可在<b>错题本</b>巩固后申请补考（限 1 次）。先看上方「错题」逐题解析，针对薄弱题型复习。'+
+      '<br><a class="go" href="s-quiz.html">申请补考 →</a></div>';
+    $('#primaryBtn').textContent='去错题本巩固'; $('#primaryBtn').href='s-exam.html';
+  }
+})();
+</script>
+<script src="_region.js"></script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

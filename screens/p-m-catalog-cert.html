@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>M 物资品类认证 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #fafaf9; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e7e5e4; --line: #f5f5f4;
+      --accent: #6b21a8; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--success); margin-top:2px;}
+    .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.5fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* 6 categories overview */
+    .cat-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:14px;}
+    .cat{padding:12px 14px; background:var(--line); border-radius:8px; cursor:pointer; border:1px solid transparent; transition:0.15s;}
+    .cat.on{background:var(--accent-soft); border-color:var(--accent);}
+    .cat .ico{font-size:18px;}
+    .cat .nm{font-size:12.5px; font-weight:700; margin-top:3px;}
+    .cat .meta{font-size:10.5px; color:var(--muted); margin-top:2px;}
+    .cat .cnt{font-size:11px; color:var(--accent); font-weight:600; margin-top:4px;}
+
+    /* applicant list */
+    .a-row{display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:10px; padding:11px 12px; border-bottom:1px solid var(--line); align-items:center;}
+    .a-row:last-child{border-bottom:0;}
+    .a-row .av{width:34px; height:34px; border-radius:7px; background:var(--accent-soft); color:var(--accent); font-size:14px; font-weight:700; display:grid; place-items:center;}
+    .a-row .info .nm{font-size:13px; font-weight:600;}
+    .a-row .info .meta{font-size:11px; color:var(--muted); margin-top:2px;}
+    .a-row .cat-pill{font-size:10px; padding:2px 6px; background:#f3e8ff; color:#6b21a8; border-radius:3px;}
+    .a-row .lvl{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:700;}
+    .a-row .lvl.l1{background:#dbeafe; color:#1e40af;}
+    .a-row .lvl.l2{background:#fef3c7; color:#92400e;}
+    .a-row .lvl.l3{background:#dcfce7; color:#15803d;}
+    .a-row .lvl.pend{background:var(--line); color:var(--muted);}
+    .a-row .stat{font-size:10px; padding:2px 8px; border-radius:3px; font-weight:600;}
+    .a-row .stat.review{background:#fef3c7; color:#92400e;}
+    .a-row .stat.passed{background:#dcfce7; color:#15803d;}
+    .a-row .stat.rejected{background:#fee2e2; color:#b91c1c;}
+    .a-row .act{font-size:11px; color:var(--accent); font-weight:600;}
+
+    /* 6-step review */
+    .step-line{display:flex; gap:6px; align-items:stretch; padding:10px 0;}
+    .step{flex:1; min-width:0; background:var(--line); border-radius:6px; padding:8px 10px; text-align:center; position:relative;}
+    .step.done{background:#dcfce7;}
+    .step.now{background:var(--accent-soft); border:1px solid var(--accent);}
+    .step .nm{font-size:11.5px; font-weight:700;}
+    .step .desc{font-size:10px; color:var(--muted); margin-top:2px; line-height:1.3;}
+    .step:not(:last-child)::after{content:"›"; position:absolute; right:-7px; top:50%; transform:translateY(-50%); color:var(--muted); font-weight:700;}
+
+    /* lv criteria */
+    .lv-table{font-size:12px;}
+    .lv-row{display:grid; grid-template-columns:50px 1fr 60px; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center;}
+    .lv-row:last-child{border-bottom:0;}
+    .lv-row .badge{font-size:10px; padding:3px 8px; border-radius:4px; font-weight:700; text-align:center;}
+    .lv-row .badge.l1{background:#dbeafe; color:#1e40af;}
+    .lv-row .badge.l2{background:#fef3c7; color:#92400e;}
+    .lv-row .badge.l3{background:#dcfce7; color:#15803d;}
+    .lv-row .desc{font-size:11px; color:#334155; line-height:1.5;}
+    .lv-row .cnt{font-size:11px; color:var(--muted); text-align:right;}
+
+    /* required cert list */
+    .req-list{display:flex; flex-direction:column; gap:8px;}
+    .req{padding:9px 12px; background:var(--line); border-radius:6px; display:flex; gap:10px; align-items:center;}
+    .req .ic{width:24px; height:24px; border-radius:5px; background:var(--accent); color:white; font-size:12px; display:grid; place-items:center;}
+    .req .body{flex:1; font-size:12px;}
+    .req .body .nm{font-weight:600;}
+    .req .body .sub{font-size:10.5px; color:var(--muted); margin-top:1px;}
+    .req .v{font-size:10px; padding:2px 7px; background:#dcfce7; color:#15803d; border-radius:3px; font-weight:600;}
+
+    @media (max-width: 1100px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+      .cat-grid{grid-template-columns:repeat(2, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="m-catalog-cert"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × M 物资供应商 / <b>6 品类认证审核</b></div>
+      <div class="top-actions">
+        <button class="btn">导出已认证名单</button>
+        <button class="btn">集采底价管理</button>
+        <button class="btn pri">+ 受理新申请</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">在网供应商</div><div class="n">6<span class="u">家</span></div><div class="d">↑ 2 vs 上季</div></div>
+      <div class="ki"><div class="l">认证品类</div><div class="n">6<span class="u">/6</span></div><div class="d">全覆盖</div></div>
+      <div class="ki"><div class="l">在审品类</div><div class="n">4<span class="u">单</span></div><div class="d warn">3 单加急</div></div>
+      <div class="ki"><div class="l">LV3 全品类</div><div class="n">0<span class="u">家</span></div><div class="d warn">在培养</div></div>
+      <div class="ki"><div class="l">LV2 多品类</div><div class="n">2<span class="u">家</span></div><div class="d">北新 · 美的</div></div>
+      <div class="ki"><div class="l">月抽检合格率</div><div class="n">99.2<span class="u">%</span></div><div class="d">健康</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- LEFT: 6 品类 + 申请 -->
+      <div>
+        <div class="card">
+          <h3>6 物资品类 <span class="pill">全覆盖</span> <span class="extra">点击切换</span></h3>
+          <div class="cat-grid">
+            <div class="cat on">
+              <div class="ico">🪵</div>
+              <div class="nm">家具</div>
+              <div class="meta">环保 E0 · 防火等级</div>
+              <div class="cnt">3 家供应 · 在审 1</div>
+            </div>
+            <div class="cat">
+              <div class="ico">🌀</div>
+              <div class="nm">家电</div>
+              <div class="meta">能效 1 级 · 3C 认证</div>
+              <div class="cnt">2 家供应 · 在审 0</div>
+            </div>
+            <div class="cat">
+              <div class="ico">🧱</div>
+              <div class="nm">建材</div>
+              <div class="meta">甲醛 E0 · A 级防火</div>
+              <div class="cnt">2 家供应 · 在审 1</div>
+            </div>
+            <div class="cat">
+              <div class="ico">🔒</div>
+              <div class="nm">智能锁</div>
+              <div class="meta">公安认证 · 防撬等级 B+</div>
+              <div class="cnt">1 家供应 · 在审 0</div>
+            </div>
+            <div class="cat">
+              <div class="ico">🎨</div>
+              <div class="nm">涂料</div>
+              <div class="meta">VOC 达标 · 抗菌</div>
+              <div class="cnt">1 家供应 · 在审 1</div>
+            </div>
+            <div class="cat">
+              <div class="ico">🚿</div>
+              <div class="nm">卫浴</div>
+              <div class="meta">节水 1 级 · 排水标准</div>
+              <div class="cnt">1 家供应 · 在审 1</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>认证申请 <span class="pill">8 个状态</span> <span class="extra">家具品类 · 切换品类筛选</span></h3>
+
+          <!-- 在审 -->
+          <div class="a-row">
+            <div class="av">索</div>
+            <div class="info">
+              <div class="nm">索菲亚家具 · 江苏分公司 <span style="font-size:10px; color:var(--warn); padding:1px 5px; background:#fef3c7; border-radius:3px;">加急</span></div>
+              <div class="meta">申请 LV1 单品类 · 申请号 MAP-2026-014 · 受理 06-04</div>
+            </div>
+            <span class="cat-pill">🪵 家具</span>
+            <span class="lvl pend">待评级</span>
+            <span class="stat review">抽检中</span>
+            <a class="act">详情 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">圣</div>
+            <div class="info">
+              <div class="nm">圣象地板 · 申请扩品类</div>
+              <div class="meta">已有 LV2 建材 · 新申 涂料 · 申请号 MAP-2026-015 · 受理 06-06</div>
+            </div>
+            <span class="cat-pill">🎨 涂料</span>
+            <span class="lvl pend">待评级</span>
+            <span class="stat review">检测报告核验</span>
+            <a class="act">详情 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">九</div>
+            <div class="info">
+              <div class="nm">九牧卫浴 · 申请扩品类</div>
+              <div class="meta">已有 LV2 卫浴 · 新申 智能锁 · 申请号 MAP-2026-016 · 受理 06-07</div>
+            </div>
+            <span class="cat-pill">🔒 智能锁</span>
+            <span class="lvl pend">待评级</span>
+            <span class="stat review">贝壳初审中</span>
+            <a class="act">详情 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">东</div>
+            <div class="info">
+              <div class="nm">东鹏陶瓷 · 江苏代理 <span style="font-size:10px; color:var(--warn); padding:1px 5px; background:#fef3c7; border-radius:3px;">加急</span></div>
+              <div class="meta">申请 LV1 单品类 · 申请号 MAP-2026-017 · 受理 06-08</div>
+            </div>
+            <span class="cat-pill">🧱 建材</span>
+            <span class="lvl pend">待评级</span>
+            <span class="stat review">住建终审中</span>
+            <a class="act">详情 ›</a>
+          </div>
+
+          <h3 style="margin-top:18px;">已认证供应商 <span class="pill">6 家 · 6 品类</span></h3>
+          <div class="a-row">
+            <div class="av">北</div>
+            <div class="info">
+              <div class="nm">北新建材集团 <span style="font-size:10px; color:var(--success); padding:1px 5px; background:#dcfce7; border-radius:3px;">★ 标杆</span></div>
+              <div class="meta">家具 + 建材 + 涂料 3 品类 · 入网 2026-03</div>
+            </div>
+            <span class="cat-pill">3 品类</span>
+            <span class="lvl l2">LV2</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">美</div>
+            <div class="info">
+              <div class="nm">美的家电（集采监听）</div>
+              <div class="meta">家电 单品类 · 入网 2026-04</div>
+            </div>
+            <span class="cat-pill">🌀 家电</span>
+            <span class="lvl l2">LV2</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">凯</div>
+            <div class="info">
+              <div class="nm">凯迪仕智能锁</div>
+              <div class="meta">智能锁 单品类 · 入网 2026-04</div>
+            </div>
+            <span class="cat-pill">🔒 智能锁</span>
+            <span class="lvl l2">LV2</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+          <div class="a-row">
+            <div class="av">立</div>
+            <div class="info">
+              <div class="nm">立邦漆 · 江苏</div>
+              <div class="meta">涂料 单品类 · 入网 2026-05</div>
+            </div>
+            <span class="cat-pill">🎨 涂料</span>
+            <span class="lvl l2">LV2</span>
+            <span class="stat passed">已通过</span>
+            <a class="act">复审 ›</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: 6-step + LV + required certs -->
+      <div>
+        <div class="card">
+          <h3>6 步认证流程 <span class="pill">~ 60 天</span></h3>
+          <div class="step-line">
+            <div class="step done"><div class="nm">资质</div><div class="desc">营业执照<br/>三年质保承诺</div></div>
+            <div class="step done"><div class="nm">检测</div><div class="desc">第三方<br/>检测报告</div></div>
+            <div class="step done"><div class="nm">抽检</div><div class="desc">现场抽检<br/>样品送检</div></div>
+            <div class="step now"><div class="nm">LV 评级</div><div class="desc">品类数 +<br/>集采能力</div></div>
+            <div class="step"><div class="nm">底价</div><div class="desc">省级集采<br/>底价确认</div></div>
+            <div class="step"><div class="nm">终审</div><div class="desc">住建发证<br/>+ 公示</div></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>LV 评级标准 <span class="pill">3 档</span></h3>
+          <div class="lv-table">
+            <div class="lv-row">
+              <span class="badge l1">LV1</span>
+              <div class="desc">单品类供货 · 按需调拨 · 入网 6 个月内</div>
+              <span class="cnt">0 家</span>
+            </div>
+            <div class="lv-row">
+              <span class="badge l2">LV2</span>
+              <div class="desc">多品类（≥2）· 省级集采资格 · 抽检合格率 ≥99%</div>
+              <span class="cnt">4 家</span>
+            </div>
+            <div class="lv-row">
+              <span class="badge l3">LV3</span>
+              <div class="desc">全品类（6/6）· 参与制定集采底价 · 同业开放</div>
+              <span class="cnt">0 家</span>
+            </div>
+          </div>
+          <div style="margin-top:10px; padding:8px 10px; background:#fef3c7; border:1px solid #fde68a; border-radius:6px; font-size:11px; color:#92400e;">
+            ⚠ 目前无 LV3 供应商，集采底价由 P 中台 + 中房协联合发布；LV3 申请需 ≥6 品类 + 同业开放承诺
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>必备资质清单 <span class="pill">家具品类示例</span></h3>
+          <div class="req-list">
+            <div class="req">
+              <div class="ic">1</div>
+              <div class="body">
+                <div class="nm">营业执照（3 年内年检）</div>
+                <div class="sub">注册资本 ≥ 500 万 · 经营范围含家具制造</div>
+              </div>
+              <span class="v">必备</span>
+            </div>
+            <div class="req">
+              <div class="ic">2</div>
+              <div class="body">
+                <div class="nm">ISO 9001 质量管理体系</div>
+                <div class="sub">证书有效期内</div>
+              </div>
+              <span class="v">必备</span>
+            </div>
+            <div class="req">
+              <div class="ic">3</div>
+              <div class="body">
+                <div class="nm">环保认证（中国环境标志 · 十环）</div>
+                <div class="sub">甲醛 E0 + VOC 达标 · 品类对应</div>
+              </div>
+              <span class="v">必备</span>
+            </div>
+            <div class="req">
+              <div class="ic">4</div>
+              <div class="body">
+                <div class="nm">产品检测报告</div>
+                <div class="sub">国家建筑材料检验中心 · 6 个月内出具</div>
+              </div>
+              <span class="v">必备</span>
+            </div>
+            <div class="req">
+              <div class="ic">5</div>
+              <div class="body">
+                <div class="nm">售后服务承诺书</div>
+                <div class="sub">3 年质保 + 24h 响应 + 50 km 内 48h 到场</div>
+              </div>
+              <span class="v">必备</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.cat').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.cat').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

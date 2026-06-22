@@ -1,0 +1,1582 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>政府监管视图 · 江苏保租房</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #15803d; --warn: #ca8a04; --danger: #b91c1c;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-display); font-size: 14px; line-height: 1.5; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+    img, svg { display: block; max-width: 100%; }
+
+    .app-shell { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--bg); padding-bottom: 80px; }
+    .status-bar { display: flex; justify-content: space-between; padding: 8px 20px 6px; font-size: 12px; font-weight: 600; background: var(--surface); }
+
+    /* 政务风格 header */
+    .gov-header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+      color: white; padding: 14px 16px 18px;
+      position: relative; overflow: hidden;
+    }
+    .gov-emblem {
+      position: absolute; right: -20px; bottom: -10px;
+      font-size: 80px; opacity: 0.12; line-height: 1;
+    }
+    .gov-header .nav-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .gov-back {
+      width: 32px; height: 32px;
+      background: rgba(255,255,255,0.16); border-radius: 50%;
+      display: grid; place-items: center;
+    }
+    .gov-back svg { width: 16px; height: 16px; color: white; }
+    .gov-header h1 {
+      font-size: 16px; font-weight: 600; margin: 0;
+      flex: 1; text-align: center;
+    }
+    .gov-id {
+      font-size: 10px; padding: 3px 8px;
+      background: rgba(255,255,255,0.22);
+      border-radius: 999px;
+    }
+    .gov-meta {
+      display: flex; gap: 12px; font-size: 11px;
+      opacity: 0.92; margin-bottom: 8px;
+    }
+    .gov-title {
+      font-size: 20px; font-weight: 700; margin: 0;
+      line-height: 1.2;
+    }
+    .gov-subtitle {
+      font-size: 12px; opacity: 0.85; margin-top: 2px;
+    }
+
+    /* tab segment */
+    .tabs {
+      background: var(--surface); padding: 0 16px;
+      display: flex; gap: 0; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 12px 14px; font-size: 13px; color: var(--muted);
+      white-space: nowrap; position: relative; flex-shrink: 0;
+    }
+    .tab.active {
+      color: var(--accent); font-weight: 600;
+    }
+    .tab.active::after {
+      content: ''; position: absolute;
+      bottom: -1px; left: 14px; right: 14px;
+      height: 2px; background: var(--accent);
+    }
+
+    /* KPI cards */
+    .kpi-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      padding: 12px 16px;
+    }
+    .kpi {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      border: 1px solid var(--border);
+    }
+    .kpi-label {
+      font-size: 11px; color: var(--muted);
+      display: flex; align-items: center; gap: 4px;
+    }
+    .kpi-value {
+      font-size: 22px; font-weight: 700; margin: 4px 0 2px;
+      color: var(--fg);
+    }
+    .kpi-value .unit {
+      font-size: 11px; color: var(--muted); font-weight: 400;
+      margin-left: 2px;
+    }
+    .kpi-delta {
+      font-size: 11px; display: flex; align-items: center; gap: 2px;
+    }
+    .kpi-delta.up { color: var(--success); }
+    .kpi-delta.down { color: var(--danger); }
+
+    /* panel section */
+    .panel {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      margin: 12px 16px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 14px 10px;
+    }
+    .panel-header h3 {
+      font-size: 14px; font-weight: 600; margin: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .panel-header .more { font-size: 12px; color: var(--accent); }
+    .panel-body { padding: 0 14px 14px; }
+
+    /* 13 市矩阵 */
+    .city-matrix {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+    }
+    .city-cell {
+      padding: 8px 4px;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      font-size: 11px;
+      border: 1px solid var(--border);
+    }
+    .city-cell .city-name {
+      font-weight: 600; color: var(--fg); margin-bottom: 2px;
+    }
+    .city-cell .city-stat { font-size: 10px; color: var(--muted); }
+    .city-cell.good { background: color-mix(in oklab, var(--success) 8%, transparent); border-color: color-mix(in oklab, var(--success) 24%, transparent); }
+    .city-cell.warn { background: color-mix(in oklab, var(--warn) 10%, transparent); border-color: color-mix(in oklab, var(--warn) 28%, transparent); }
+    .city-cell.alert { background: color-mix(in oklab, var(--danger) 10%, transparent); border-color: color-mix(in oklab, var(--danger) 28%, transparent); }
+
+    /* trend chart - inline SVG */
+    .chart {
+      height: 88px; width: 100%;
+      margin-top: 4px;
+    }
+    .chart-axis {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* list (核验/投诉) */
+    .list-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .list-item:last-child { border-bottom: 0; }
+    .list-status {
+      width: 6px; align-self: stretch; border-radius: 3px; flex-shrink: 0;
+    }
+    .list-content { flex: 1; min-width: 0; }
+    .list-content .row1 {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; margin-bottom: 2px;
+    }
+    .list-content .row1 strong { flex: 1; font-weight: 600; }
+    .list-content .row1 .badge {
+      font-size: 10px; padding: 2px 6px; border-radius: 3px;
+    }
+    .list-content .row2 {
+      font-size: 12px; color: var(--muted);
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .list-content .row3 {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+    .list-cta {
+      font-size: 11px; padding: 4px 10px;
+      background: var(--accent-soft); color: var(--accent);
+      border-radius: 999px; align-self: center; flex-shrink: 0;
+    }
+    .badge.ok { background: color-mix(in oklab, var(--success) 12%, transparent); color: var(--success); }
+    .badge.warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
+    .badge.danger { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
+    .badge.mute { background: var(--bg); color: var(--muted); }
+
+    /* progress */
+    .progress { height: 6px; background: var(--bg); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+    .progress > div { height: 100%; background: var(--accent); border-radius: 3px; }
+    .progress > div.warn { background: var(--warn); }
+    .progress > div.danger { background: var(--danger); }
+
+    /* model split */
+    .mode-bar {
+      display: flex; height: 30px;
+      border-radius: var(--radius-sm); overflow: hidden;
+      margin-top: 6px;
+    }
+    .mode-seg {
+      display: grid; place-items: center;
+      font-size: 11px; color: white; font-weight: 600;
+    }
+    .mode-seg.m1 { background: var(--accent); }
+    .mode-seg.m2 { background: var(--warn); color: #1f1f1f; }
+    .mode-seg.m3 { background: var(--danger); }
+    .mode-legend {
+      display: flex; gap: 12px; font-size: 11px; margin-top: 8px;
+    }
+    .mode-legend > div { display: flex; align-items: center; gap: 4px; }
+    .mode-legend .dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* mobile role switcher（移动模式下显示在 m-header 下方） */
+    .m-role-switch{
+      display:flex; gap:4px; margin:10px 12px 0;
+      background:#fff; padding:3px; border-radius:999px;
+      border:1px solid var(--border); font-size:12px;
+    }
+    .m-role-switch button{
+      flex:1; padding:7px 8px; color:var(--muted); border-radius:999px;
+    }
+    .m-role-switch button.active{
+      background:var(--accent); color:#fff; font-weight:600;
+    }
+    @media (min-width:1024px){ .m-role-switch{display:none !important;} }
+
+    /* ============ 移动驾驶舱（领导画像） ============ */
+    .m-cockpit{display:none;}
+    @media (max-width: 1023px){
+      /* 隐藏 PC 全部 panel grid 与原 alert/kpi */
+      .app-shell > .kpi-grid, .app-shell > .alert-strip, .app-shell > .pc-grid,
+      .app-shell > .gov-footer{display:none !important;}
+      .m-cockpit{display:block;}
+
+      /* 顶部紧急红条 */
+      .mc-urg{
+        margin:10px 12px; padding:12px 14px;
+        background:linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+        color:#fff; border-radius:12px;
+        box-shadow:0 4px 14px -4px rgba(220,38,38,0.5);
+      }
+      .mc-urg .h{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:8px;}
+      .mc-urg .h .dot{width:8px; height:8px; border-radius:50%; background:#fff; animation:cockpit-pulse 1.6s infinite;}
+      .mc-urg .h .cnt{margin-left:auto; padding:2px 10px; background:rgba(255,255,255,0.22); border-radius:99px; font-size:12px;}
+      .mc-urg .row{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid rgba(255,255,255,0.18); font-size:13px;}
+      .mc-urg .row:first-of-type{border-top:0;}
+      .mc-urg .row .lbl{flex:1;}
+      .mc-urg .row .num{font-weight:700; font-size:14px;}
+      .mc-urg .row .arr{opacity:0.7;}
+      @keyframes cockpit-pulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,0.7);} 70%{box-shadow:0 0 0 8px rgba(255,255,255,0);} 100%{box-shadow:0 0 0 0 rgba(255,255,255,0);}}
+
+      /* 4 KPI */
+      .mc-kpi{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:0 12px 12px;}
+      .mc-kc{background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;}
+      .mc-kc .l{font-size:11px; color:#6b7280;}
+      .mc-kc .n{font-size:24px; font-weight:700; margin:4px 0 2px;}
+      .mc-kc .d{font-size:10px; color:#16a34a;}
+      .mc-kc.d-down .d{color:#dc2626;}
+
+      /* 简报卡 */
+      .mc-brief{
+        margin:0 12px 12px; padding:14px 16px;
+        background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+        position:relative;
+      }
+      .mc-brief h3{margin:0 0 8px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;}
+      .mc-brief h3 .ts{margin-left:auto; font-size:11px; color:#6b7280; font-weight:400;}
+      .mc-brief p{margin:0; font-size:14px; line-height:1.65; color:#111;}
+      .mc-brief p strong{color:#1e40af;}
+      .mc-brief .share{
+        display:flex; gap:6px; margin-top:10px; padding-top:10px;
+        border-top:1px solid #e5e7eb;
+      }
+      .mc-brief .share a{
+        flex:1; padding:7px; background:#f3f4f6; border-radius:6px;
+        text-align:center; font-size:11px; color:#1e40af; border:1px solid #e5e7eb;
+      }
+
+      /* 13 市态势 */
+      .mc-sec{margin:0 12px 12px; padding:14px; background:#fff; border:1px solid #e5e7eb; border-radius:12px;}
+      .mc-sec h3{margin:0 0 10px; font-size:13px; font-weight:600;}
+      .mc-sec .more{float:right; font-size:11px; color:#1e40af; font-weight:400;}
+      .mc-map{display:grid; grid-template-columns:repeat(4,1fr); gap:6px;}
+      .mc-map .c{padding:8px 4px; text-align:center; border-radius:6px; font-size:11px; border:1px solid #e5e7eb;}
+      .mc-map .c.good{background:color-mix(in oklab,#16a34a 10%,transparent); border-color:color-mix(in oklab,#16a34a 30%,transparent);}
+      .mc-map .c.warn{background:color-mix(in oklab,#ea580c 10%,transparent); border-color:color-mix(in oklab,#ea580c 30%,transparent);}
+      .mc-map .c.danger{background:color-mix(in oklab,#dc2626 10%,transparent); border-color:color-mix(in oklab,#dc2626 30%,transparent);}
+      .mc-map .c .nm{font-weight:600; color:#111;}
+      .mc-map .c .stat{font-size:10px; color:#6b7280; margin-top:2px;}
+
+      /* 待批入口 */
+      .mc-approval{
+        margin:0 12px 12px; padding:14px 16px;
+        background:linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        color:#fff; border-radius:12px;
+        display:flex; align-items:center; gap:12px;
+        text-decoration:none;
+      }
+      .mc-approval .ico{width:42px; height:42px; border-radius:10px; background:rgba(255,255,255,0.18); display:grid; place-items:center; font-size:20px; flex-shrink:0;}
+      .mc-approval .info{flex:1;}
+      .mc-approval .t{font-size:14px; font-weight:600;}
+      .mc-approval .s{font-size:11px; opacity:0.85; margin-top:2px;}
+      .mc-approval .cnt{font-size:22px; font-weight:700;}
+      .mc-approval .arr{font-size:18px; opacity:0.7;}
+
+      /* 排行精简 */
+      .mc-rank-row{display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f3f4f6; font-size:13px;}
+      .mc-rank-row:last-child{border-bottom:0;}
+      .mc-rank-row .nu{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:700; flex-shrink:0;}
+      .mc-rank-row .nu.g{background:#fef3c7; color:#b45309;}
+      .mc-rank-row .nu.s{background:#e5e7eb; color:#4b5563;}
+      .mc-rank-row .nu.b{background:#fed7aa; color:#9a3412;}
+      .mc-rank-row .nu.bad{background:#dc2626; color:#fff;}
+      .mc-rank-row .nm{flex:1;}
+      .mc-rank-row .sc{font-weight:700; color:#1e40af;}
+      .mc-rank-row .sc.bad{color:#dc2626;}
+    }
+
+    /* role switcher（PC 头部用，已迁移到 PC topbar） */
+    .role-switch {
+      display: flex; gap: 4px; margin-top: 10px;
+      background: rgba(255,255,255,0.14); padding: 3px; border-radius: 999px;
+      font-size: 11px;
+    }
+    .role-switch button {
+      flex: 1; padding: 5px 6px; color: rgba(255,255,255,0.78);
+      border-radius: 999px;
+    }
+    .role-switch button.active {
+      background: white; color: var(--accent); font-weight: 600;
+    }
+
+    /* alert center */
+    .alert-strip {
+      margin: 12px 16px;
+      background: linear-gradient(90deg, color-mix(in oklab, var(--danger) 14%, transparent), color-mix(in oklab, var(--danger) 4%, transparent));
+      border: 1px solid color-mix(in oklab, var(--danger) 28%, transparent);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .alert-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 14px;
+      background: color-mix(in oklab, var(--danger) 6%, transparent);
+    }
+    .alert-head .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.5);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.5); }
+      70% { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0); }
+    }
+    .alert-head h3 { font-size: 14px; font-weight: 700; color: var(--danger); margin: 0; flex: 1; }
+    .alert-count {
+      font-size: 11px; padding: 2px 8px;
+      background: var(--danger); color: white;
+      border-radius: 999px; font-weight: 600;
+    }
+    .alert-item {
+      padding: 10px 14px;
+      border-top: 1px solid color-mix(in oklab, var(--danger) 14%, transparent);
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12px;
+    }
+    .alert-icon {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: white;
+      display: grid; place-items: center; flex-shrink: 0;
+    }
+    .alert-icon svg { width: 14px; height: 14px; color: var(--danger); }
+    .alert-item .at-info { flex: 1; min-width: 0; }
+    .alert-item .at-info strong { font-weight: 600; color: var(--fg); display: block; }
+    .alert-item .at-info .at-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
+    .alert-item .at-cta {
+      font-size: 11px; padding: 5px 10px;
+      background: var(--danger); color: white;
+      border-radius: var(--radius-sm); font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* heat map (rent compliance) */
+    .heat-table {
+      width: 100%; border-collapse: separate; border-spacing: 2px;
+      font-size: 11px;
+    }
+    .heat-table th, .heat-table td {
+      text-align: center; padding: 6px 4px;
+      border-radius: 4px;
+    }
+    .heat-table th {
+      color: var(--muted); font-weight: 500;
+      background: transparent;
+    }
+    .heat-table th.row-label { text-align: left; }
+    .heat-table td.row-label {
+      text-align: left; color: var(--fg); font-weight: 500;
+      background: transparent;
+    }
+    .heat-cell { color: white; font-weight: 600; }
+    .heat-1 { background: #15803d; }   /* 全合规 */
+    .heat-2 { background: #65a30d; }
+    .heat-3 { background: #eab308; color: #1f1f1f; }
+    .heat-4 { background: #ea580c; }
+    .heat-5 { background: #b91c1c; }
+    .heat-na { background: var(--bg); color: var(--muted); font-weight: 400; }
+    .heat-legend {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--muted); margin-top: 10px;
+    }
+    .heat-legend .lg {
+      width: 14px; height: 10px; border-radius: 2px;
+    }
+
+    /* operator ranking */
+    .rank-list { display: flex; flex-direction: column; }
+    .rank-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .rank-row:last-child { border-bottom: 0; }
+    .rank-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: grid; place-items: center;
+      font-size: 11px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .rank-num.g { background: #fef3c7; color: #b45309; }
+    .rank-num.s { background: #e5e7eb; color: #4b5563; }
+    .rank-num.b { background: #fed7aa; color: #9a3412; }
+    .rank-num.n { background: var(--bg); color: var(--muted); }
+    .rank-row .name { flex: 1; min-width: 0; }
+    .rank-row .name strong { display: block; font-weight: 600; }
+    .rank-row .name .sub { font-size: 11px; color: var(--muted); }
+    .rank-score {
+      font-size: 14px; font-weight: 700; color: var(--accent);
+      min-width: 44px; text-align: right;
+    }
+    .rank-score.bad { color: var(--danger); }
+
+    /* tenant pie/persona */
+    .persona-card {
+      display: grid; grid-template-columns: 110px 1fr; gap: 14px;
+      align-items: center;
+    }
+    .donut { width: 110px; height: 110px; position: relative; }
+    .donut .center-num {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      flex-direction: column;
+    }
+    .donut .center-num strong {
+      font-size: 18px; font-weight: 700; color: var(--accent);
+    }
+    .donut .center-num span {
+      display: block; text-align: center;
+      font-size: 10px; color: var(--muted);
+    }
+    .persona-list { font-size: 12px; }
+    .persona-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-bottom: 6px;
+    }
+    .persona-row .swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .persona-row .lbl { flex: 1; color: var(--fg); }
+    .persona-row .pct { color: var(--muted); }
+
+    /* funnel */
+    .funnel { display: flex; flex-direction: column; gap: 4px; }
+    .funnel-step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: var(--radius-sm);
+      background: var(--bg);
+    }
+    .funnel-step .label { flex: 1; font-size: 12px; }
+    .funnel-step .num { font-size: 14px; font-weight: 700; }
+    .funnel-bar {
+      height: 4px; background: var(--accent); border-radius: 2px;
+      margin-top: 4px;
+    }
+
+    /* task / order */
+    .task-item {
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .task-item:last-child { border-bottom: 0; }
+    .task-prio {
+      width: 4px; align-self: stretch; border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .task-prio.high { background: var(--danger); }
+    .task-prio.mid { background: var(--warn); }
+    .task-prio.low { background: var(--accent); }
+    .task-body { flex: 1; min-width: 0; }
+    .task-body .t-title {
+      font-size: 13px; font-weight: 600;
+      display: flex; gap: 6px; align-items: center;
+    }
+    .task-body .t-meta {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+    .task-body .t-tag {
+      font-size: 10px; padding: 1px 6px;
+      background: var(--bg); color: var(--muted);
+      border-radius: 3px;
+    }
+    .task-cta {
+      font-size: 11px; padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--accent); color: white;
+      font-weight: 600; flex-shrink: 0; align-self: center;
+    }
+
+    /* policy publish */
+    .publish-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .publish-card {
+      padding: 12px; background: var(--bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 4px;
+      text-align: left; font-size: 12px; color: var(--fg);
+    }
+    .publish-card svg { width: 18px; height: 18px; color: var(--accent); }
+    .publish-card strong { font-size: 13px; font-weight: 600; }
+    .publish-card em {
+      font-size: 10px; color: var(--muted); font-style: normal;
+    }
+
+    /* audit log */
+    .audit-item {
+      display: flex; gap: 8px;
+      padding: 8px 0;
+      font-size: 11px; color: var(--muted);
+      border-bottom: 1px dashed var(--border);
+    }
+    .audit-item:last-child { border-bottom: 0; }
+    .audit-time {
+      width: 60px; flex-shrink: 0; font-variant-numeric: tabular-nums;
+    }
+    .audit-action { flex: 1; color: var(--fg); }
+
+    /* footer */
+    .gov-footer {
+      padding: 16px; text-align: center;
+      font-size: 10px; color: var(--muted);
+    }
+    .gov-footer .stamp {
+      display: inline-block; margin-top: 6px;
+      padding: 3px 10px; border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    @media (min-width: 600px) {
+      .app-shell { max-width: 760px; }
+      .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    /* G 端底部 tabbar — 跳转专业子模块 */
+    .g-tabbar {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex; padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+      z-index: 100;
+    }
+    .g-tabbar a {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 4px 2px; color: var(--muted);
+      font-size: 9px; text-decoration: none;
+    }
+    .g-tabbar a.active { color: var(--accent); }
+    .g-tabbar a svg { width: 20px; height: 20px; }
+    @media (min-width: 600px) { .g-tabbar { max-width: 760px; } }
+
+    /* ============ PC 版（≥1024px）============ */
+    .g-topbar, .pc-pagehead { display: none; }
+
+    @media (min-width: 1024px) {
+      body {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        grid-template-rows: 56px 1fr;
+        grid-template-areas: "side top" "side main";
+        min-height: 100vh;
+        background: var(--bg);
+      }
+      /* 共享 sidebar 嵌入本页 grid */
+      .nv-side { grid-area: side; }
+
+      /* topbar */
+      .g-topbar {
+        grid-area: top;
+        display: flex; align-items: center; gap: 16px;
+        padding: 0 24px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        position: sticky; top: 0; z-index: 10;
+      }
+      .gt-crumb { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+      .gt-crumb .cur { color: var(--fg); font-weight: 600; }
+      .gt-crumb .sep { color: #d4d4d8; }
+      .gt-search {
+        flex: 1; max-width: 420px;
+        position: relative;
+      }
+      .gt-search input {
+        width: 100%; padding: 7px 12px 7px 32px;
+        background: var(--bg); border: 1px solid var(--border);
+        border-radius: 6px; font: inherit; font-size: 13px;
+        color: var(--fg);
+      }
+      .gt-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--muted); }
+      .gt-actions { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+      .gt-act { position: relative; width: 32px; height: 32px; display: grid; place-items: center; color: var(--muted); cursor: pointer; border-radius: 6px; }
+      .gt-act:hover { background: var(--bg); }
+      .gt-act svg { width: 18px; height: 18px; }
+      .gt-act .dot {
+        position: absolute; top: 6px; right: 6px;
+        min-width: 14px; height: 14px; padding: 0 3px;
+        border-radius: 7px;
+        background: var(--danger); color: white;
+        font-size: 9px; font-weight: 700;
+        display: grid; place-items: center;
+      }
+      .gt-role {
+        display: flex; gap: 0; background: var(--bg); border-radius: 6px; padding: 2px; border: 1px solid var(--border);
+      }
+      .gt-role button {
+        padding: 5px 10px; font-size: 12px; color: var(--muted); border-radius: 4px;
+      }
+      .gt-role button.active { background: var(--surface); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+      .gt-user {
+        display: flex; align-items: center; gap: 8px;
+        padding: 4px 10px 4px 4px; border-radius: 20px;
+        background: var(--bg); cursor: pointer; font-size: 13px;
+      }
+      .gt-user .av { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: white; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+
+      /* main area */
+      body > .app-shell {
+        grid-area: main;
+        max-width: none !important;
+        margin: 0; padding: 20px 24px 32px;
+        min-height: auto;
+        background: var(--bg);
+        overflow-y: auto;
+      }
+      /* 隐藏移动端壳 */
+      .app-shell > .status-bar,
+      .app-shell > .gov-header,
+      .app-shell > .tabs,
+      .app-shell > .gov-footer,
+      .app-shell > .g-tabbar { display: none; }
+
+      /* PC page title */
+      .pc-pagehead {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .pc-pagehead h2 { font-size: 22px; font-weight: 700; margin: 0; }
+      .pc-pagehead .desc { font-size: 13px; color: var(--muted); margin-top: 4px; }
+      .pc-pagehead .meta { font-size: 12px; color: var(--muted); }
+      .pc-pagehead .meta strong { color: var(--fg); }
+
+      /* KPI 4 列固定 */
+      .app-shell > .kpi-grid {
+        grid-template-columns: repeat(4, 1fr); gap: 12px;
+        padding: 0; margin-bottom: 14px;
+      }
+      .kpi { padding: 18px 18px 14px; }
+      .kpi-value { font-size: 28px; }
+
+      /* alert strip 通栏，2 列内嵌 */
+      .app-shell > .alert-strip { margin: 0 0 14px; }
+      .alert-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; }
+
+      /* 主网格：12 列 */
+      .pc-grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 14px;
+      }
+      .pc-grid > .panel { margin: 0; }
+      /* 默认 panel = 1/3 宽 */
+      .pc-grid > .panel { grid-column: span 4; }
+      /* 大型 panel = 1/2 宽 */
+      .pc-grid > .panel.w-half { grid-column: span 6; }
+      /* 通栏 */
+      .pc-grid > .panel.w-full { grid-column: span 12; }
+
+      /* 城市矩阵 PC 7 列 */
+      .pc-grid .city-matrix { grid-template-columns: repeat(7, 1fr); }
+
+      /* 趋势图加高 */
+      .pc-grid .chart { height: 140px; }
+
+      /* persona card 横向 */
+      .pc-grid .persona-card { grid-template-columns: 140px 1fr; }
+      .pc-grid .donut, .pc-grid .donut svg { width: 140px; height: 140px; }
+    }
+
+    @media (min-width: 1440px) {
+      body { grid-template-columns: 240px 1fr; }
+      body > .app-shell { padding: 24px 32px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ====== PC 版：共享左侧栏（由 _nav.js render） ====== -->
+<div id="side-nav" data-series="g" data-active="admin"></div>
+
+<!-- ====== PC 版：顶部条 ====== -->
+<header class="g-topbar">
+  <div class="gt-crumb">
+    <span>江苏保租房监管</span>
+    <span class="sep">/</span>
+    <span class="cur">监管总览</span>
+  </div>
+  <div class="gt-search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" placeholder="搜索房源 / 运营方 / 投诉 / 政策…" />
+  </div>
+  <div class="gt-role" id="roleSwitchPc">
+    <button class="active" data-role="prov">省厅</button>
+    <button data-role="city">市局</button>
+    <button data-role="dist">分局</button>
+  </div>
+  <div class="gt-actions">
+    <div class="gt-act" title="通知">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="dot">23</span>
+    </div>
+    <div class="gt-act" title="审批">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      <span class="dot">5</span>
+    </div>
+    <div class="gt-user">
+      <div class="av">张</div>
+      <span>张科长</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+  </div>
+</header>
+
+<div class="app-shell">
+  <div class="pc-pagehead">
+    <div>
+      <h2>监管总览</h2>
+      <div class="desc">全省 13 市保租房运行态势 · 实时风险预警 · 待办处置</div>
+    </div>
+    <div class="meta">
+      数据更新 · <strong>今日 09:38</strong> &nbsp;|&nbsp; 在线 <strong>1,284</strong> 人
+    </div>
+  </div>
+
+  <!-- 移动顶部 chrome（汉堡 + 渐变 header） -->
+  <div id="m-header" data-series="g" data-active="cockpit" data-title="监管驾驶舱" data-icon="🎛" data-ttl="全省运行监管视图" data-sub="江苏省住建厅 × 贝壳 · 数据每日 02:00 同步" data-right="张科长"></div>
+
+  <div class="m-role-switch" id="roleSwitch">
+    <button class="active" data-role="prov">省厅视图</button>
+    <button data-role="city">市局视图</button>
+    <button data-role="dist">分局督查</button>
+  </div>
+
+  <!-- ============ 移动驾驶舱（≤1023px 专属） ============ -->
+  <div class="m-cockpit">
+
+    <!-- 顶部紧急红条 -->
+    <div class="mc-urg">
+      <div class="h"><span class="dot"></span>实时风险预警 · 待处置<span class="cnt">5</span></div>
+      <div class="row"><span class="lbl">租金超 90% 红线</span><span class="num">14 套</span><span class="arr">›</span></div>
+      <div class="row"><span class="lbl">服务费超 8% 封顶</span><span class="num">3 家</span><span class="arr">›</span></div>
+      <div class="row"><span class="lbl">重复挂牌嫌疑</span><span class="num">22 套</span><span class="arr">›</span></div>
+      <div class="row"><span class="lbl">核验 SLA 超期</span><span class="num">4 项</span><span class="arr">›</span></div>
+    </div>
+
+    <!-- 4 KPI -->
+    <div class="mc-kpi">
+      <div class="mc-kc"><div class="l">全省在租房源</div><div class="n">12,684</div><div class="d">▲ +6.2% 月环比</div></div>
+      <div class="mc-kc"><div class="l">累计承租人</div><div class="n">9,742</div><div class="d">▲ +312 本月</div></div>
+      <div class="mc-kc"><div class="l">三方备案率</div><div class="n">99.6%</div><div class="d">▲ 0.4pt 全省达标</div></div>
+      <div class="mc-kc d-down"><div class="l">待处置投诉</div><div class="n" style="color:#dc2626;">7</div><div class="d">▼ -12 较上周</div></div>
+    </div>
+
+    <!-- 一句话简报 -->
+    <div class="mc-brief">
+      <h3>📝 今日简报<span class="ts">2026-06-05 09:38</span></h3>
+      <p>全省 <strong>12,684 套</strong>保租房在租，备案率 <strong>99.6%</strong>。今日新增预警 <strong>3</strong> 起，已分派处置；末位 3 家整改进入复审。<br><span style="color:#6b7280; font-size:12px;">点击下方按钮生成汇报版。</span></p>
+      <div class="share">
+        <a>📄 PDF 简报</a>
+        <a>🎴 微信卡</a>
+        <a>🎙 语音稿</a>
+      </div>
+    </div>
+
+    <!-- 待批入口 -->
+    <a class="mc-approval" href="g-approval.html">
+      <div class="ico">✍</div>
+      <div class="info">
+        <div class="t">待我签批 · 5 件</div>
+        <div class="s">2 件高优 · 24h 内到期</div>
+      </div>
+      <div class="cnt">5</div>
+      <div class="arr">›</div>
+    </a>
+
+    <!-- 13 市态势 -->
+    <div class="mc-sec">
+      <h3>🗺 江苏 13 市运行态势<a class="more">明细 →</a></h3>
+      <div class="mc-map">
+        <div class="c good"><div class="nm">南京</div><div class="stat">4,608</div></div>
+        <div class="c good"><div class="nm">苏州</div><div class="stat">3,124</div></div>
+        <div class="c good"><div class="nm">无锡</div><div class="stat">1,506</div></div>
+        <div class="c good"><div class="nm">常州</div><div class="stat">892</div></div>
+        <div class="c warn"><div class="nm">镇江</div><div class="stat">412</div></div>
+        <div class="c good"><div class="nm">扬州</div><div class="stat">680</div></div>
+        <div class="c warn"><div class="nm">泰州</div><div class="stat">298</div></div>
+        <div class="c good"><div class="nm">南通</div><div class="stat">540</div></div>
+        <div class="c warn"><div class="nm">盐城</div><div class="stat">256</div></div>
+        <div class="c good"><div class="nm">徐州</div><div class="stat">388</div></div>
+        <div class="c danger"><div class="nm">淮安</div><div class="stat">未接</div></div>
+        <div class="c danger"><div class="nm">宿迁</div><div class="stat">未接</div></div>
+      </div>
+    </div>
+
+    <!-- 排行（前 3 + 末 2） -->
+    <div class="mc-sec">
+      <h3>🏆 运营主体 Q2 考核<a class="more">全部 47 家 →</a></h3>
+      <div class="mc-rank-row"><div class="nu g">1</div><div class="nm">贝壳租房·苏州运营中心</div><div class="sc">98.2</div></div>
+      <div class="mc-rank-row"><div class="nu s">2</div><div class="nm">南京安居保障房集团</div><div class="sc">96.8</div></div>
+      <div class="mc-rank-row"><div class="nu b">3</div><div class="nm">万科泊寓·无锡</div><div class="sc">94.5</div></div>
+      <div class="mc-rank-row"><div class="nu bad">45</div><div class="nm">南京自如住房租赁</div><div class="sc bad">61.4</div></div>
+      <div class="mc-rank-row"><div class="nu bad">47</div><div class="nm">镇江·恒大公馆</div><div class="sc bad">52.0</div></div>
+    </div>
+
+  </div>
+
+  <div class="tabs">
+    <div class="tab active">总览</div>
+    <a class="tab" href="g-rent-alert.html" style="color: inherit; text-decoration: none;">房源核验</a>
+    <a class="tab" href="g-complaint.html" style="color: inherit; text-decoration: none;">投诉处置</a>
+    <a class="tab" href="g-inspection.html" style="color: inherit; text-decoration: none;">抽查记录</a>
+    <a class="tab" href="g-policy.html" style="color: inherit; text-decoration: none;">政策发布</a>
+    <a class="tab" href="g-export.html" style="color: inherit; text-decoration: none;">数据导出</a>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+        全省在租房源
+      </div>
+      <div class="kpi-value">12,684<span class="unit">套</span></div>
+      <div class="kpi-delta up">▲ 6.2% · 较上月</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        累计承租人
+      </div>
+      <div class="kpi-value">9,742<span class="unit">人</span></div>
+      <div class="kpi-delta up">▲ 312 · 本月新签</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        三方备案率
+      </div>
+      <div class="kpi-value">99.6<span class="unit">%</span></div>
+      <div class="kpi-delta up">▲ 0.4 · 全省达标</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg>
+        待处置投诉
+      </div>
+      <div class="kpi-value" style="color: var(--danger);">7<span class="unit">件</span></div>
+      <div class="kpi-delta down">▼ 12 · 较上周</div>
+    </div>
+  </div>
+
+  <!-- 风险预警中心 -->
+  <div class="alert-strip">
+    <div class="alert-head">
+      <span class="pulse"></span>
+      <h3>🚨 实时风险预警 · 待处置</h3>
+      <span class="alert-count">5</span>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L1 21h22L12 2z"/><path d="M12 9v5M12 17h.01"/></svg>
+      </div>
+      <div class="at-info">
+        <strong>租金超 90% 红线 · 14 套</strong>
+        <div class="at-sub">常州·龙湖冠寓 +12.7% · 镇江·恒大公馆 +10.4% · 苏州 8 套</div>
+      </div>
+      <button class="at-cta">批量处置</button>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+      </div>
+      <div class="at-info">
+        <strong>服务费超 8% 封顶 · 3 家</strong>
+        <div class="at-sub">"南京自如" 收 10.5% · 投诉 6 起 · 已下发整改令</div>
+      </div>
+      <button class="at-cta">立即督办</button>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+      </div>
+      <div class="at-info">
+        <strong>重复挂牌嫌疑 · 22 套</strong>
+        <div class="at-sub">系统比对 78%+ 相似 · 集中在镇江/宿迁 · 待人工复核</div>
+      </div>
+      <button class="at-cta">查看证据</button>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="at-info">
+        <strong>核验 SLA 超期 · 4 项</strong>
+        <div class="at-sub">最长超期 48h · 苏州工业园 / 无锡梁溪 / 南通崇川 / 扬州邗江</div>
+      </div>
+      <button class="at-cta">分配督查</button>
+    </div>
+    <div class="alert-item">
+      <div class="alert-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+      </div>
+      <div class="at-info">
+        <strong>投诉密集预警 · 1 个小区</strong>
+        <div class="at-sub">建邺·河西青年公寓 7 日内投诉 8 起 · 同比 +300%</div>
+      </div>
+      <button class="at-cta">启动核查</button>
+    </div>
+  </div>
+
+  <div class="pc-grid">
+  <!-- 13 市矩阵 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>江苏 13 设区市接入态势</h3>
+      <a class="more">详情 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="city-matrix">
+        <div class="city-cell good"><div class="city-name">南京</div><div class="city-stat">4,608 套</div></div>
+        <div class="city-cell good"><div class="city-name">苏州</div><div class="city-stat">3,124 套</div></div>
+        <div class="city-cell good"><div class="city-name">无锡</div><div class="city-stat">1,506 套</div></div>
+        <div class="city-cell good"><div class="city-name">常州</div><div class="city-stat">892 套</div></div>
+        <div class="city-cell warn"><div class="city-name">镇江</div><div class="city-stat">412 套</div></div>
+        <div class="city-cell good"><div class="city-name">扬州</div><div class="city-stat">680 套</div></div>
+        <div class="city-cell warn"><div class="city-name">泰州</div><div class="city-stat">298 套</div></div>
+        <div class="city-cell good"><div class="city-name">南通</div><div class="city-stat">540 套</div></div>
+        <div class="city-cell warn"><div class="city-name">盐城</div><div class="city-stat">256 套</div></div>
+        <div class="city-cell good"><div class="city-name">徐州</div><div class="city-stat">388 套</div></div>
+        <div class="city-cell alert"><div class="city-name">淮安</div><div class="city-stat">— 未接入</div></div>
+        <div class="city-cell alert"><div class="city-name">宿迁</div><div class="city-stat">— 未接入</div></div>
+        <div class="city-cell warn"><div class="city-name">连云港</div><div class="city-stat">182 套</div></div>
+        <div class="city-cell" style="background: var(--bg); color: var(--muted);"><div class="city-name">+ 接入</div><div class="city-stat">申请中</div></div>
+      </div>
+      <div style="display: flex; gap: 10px; font-size: 11px; margin-top: 10px; color: var(--muted);">
+        <span style="color: var(--success);">■ 良好</span>
+        <span style="color: color-mix(in oklab, var(--warn) 70%, black);">■ 待提升</span>
+        <span style="color: var(--danger);">■ 未接入</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 接入模式分布 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>接入模式结构（全省）</h3>
+      <a class="more">分市钻取 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="mode-bar">
+        <div class="mode-seg m1" style="flex: 58;">58% 自营</div>
+        <div class="mode-seg m2" style="flex: 28;">28% 委托</div>
+        <div class="mode-seg m3" style="flex: 14;">14% 深托</div>
+      </div>
+      <div class="mode-legend">
+        <div><span class="dot" style="background: var(--accent);"></span>模式① 自营接入 · 7,357 套</div>
+        <div><span class="dot" style="background: var(--warn);"></span>模式② 委托运营 · 3,552 套</div>
+        <div><span class="dot" style="background: var(--danger);"></span>模式③ 深度托管 · 1,775 套</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 租金合规热力图 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>租金合规热力（市 × 接入模式）</h3>
+      <a class="more">规则 →</a>
+    </div>
+    <div class="panel-body">
+      <table class="heat-table">
+        <thead>
+          <tr>
+            <th class="row-label">城市 / 模式</th>
+            <th>① 自营</th>
+            <th>② 委托</th>
+            <th>③ 深托</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="row-label">南京</td><td class="heat-cell heat-1">95%</td><td class="heat-cell heat-2">88%</td><td class="heat-cell heat-1">100%</td></tr>
+          <tr><td class="row-label">苏州</td><td class="heat-cell heat-1">92%</td><td class="heat-cell heat-2">85%</td><td class="heat-cell heat-1">98%</td></tr>
+          <tr><td class="row-label">无锡</td><td class="heat-cell heat-2">86%</td><td class="heat-cell heat-3">76%</td><td class="heat-cell heat-1">100%</td></tr>
+          <tr><td class="row-label">常州</td><td class="heat-cell heat-3">72%</td><td class="heat-cell heat-4">62%</td><td class="heat-cell heat-2">88%</td></tr>
+          <tr><td class="row-label">镇江</td><td class="heat-cell heat-4">58%</td><td class="heat-cell heat-5">42%</td><td class="heat-cell heat-3">78%</td></tr>
+          <tr><td class="row-label">扬州</td><td class="heat-cell heat-2">84%</td><td class="heat-cell heat-2">82%</td><td class="heat-cell heat-na">—</td></tr>
+          <tr><td class="row-label">南通</td><td class="heat-cell heat-1">94%</td><td class="heat-cell heat-2">86%</td><td class="heat-cell heat-na">—</td></tr>
+          <tr><td class="row-label">徐州</td><td class="heat-cell heat-2">88%</td><td class="heat-cell heat-3">74%</td><td class="heat-cell heat-na">—</td></tr>
+        </tbody>
+      </table>
+      <div class="heat-legend">
+        <span>合规率：</span>
+        <span class="lg heat-1"></span><span>≥90%</span>
+        <span class="lg heat-2"></span><span>80–90</span>
+        <span class="lg heat-3"></span><span>70–80</span>
+        <span class="lg heat-4"></span><span>60–70</span>
+        <span class="lg heat-5"></span><span>&lt;60</span>
+      </div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 8px; padding: 8px; background: var(--bg); border-radius: var(--radius-sm);">
+        💡 系统建议：镇江委托模式（42%）严重偏离 90% 红线，建议召开整改约谈
+      </div>
+    </div>
+  </div>
+
+  <!-- 运营主体季度考核排行 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>运营主体 Q2 考核排行</h3>
+      <a class="more">全部 47 家 →</a>
+    </div>
+    <div class="panel-body">
+      <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">综合得分 = 合规 40% + 服务 30% + 投诉 20% + 备案 10%</div>
+      <div class="rank-list">
+        <div class="rank-row">
+          <div class="rank-num g">1</div>
+          <div class="name"><strong>贝壳租房 · 苏州运营中心</strong><div class="sub">3,124 套 · 模式③ · 投诉 0.3‰</div></div>
+          <div class="rank-score">98.2</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-num s">2</div>
+          <div class="name"><strong>南京安居保障房集团</strong><div class="sub">3,800 套 · 模式① · 投诉 0.5‰</div></div>
+          <div class="rank-score">96.8</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-num b">3</div>
+          <div class="name"><strong>万科泊寓 · 无锡</strong><div class="sub">1,420 套 · 模式② · 投诉 0.8‰</div></div>
+          <div class="rank-score">94.5</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-num n">…</div>
+          <div class="name" style="color: var(--muted); font-size: 11px;">省略 41 家 · 平均分 87.2</div>
+          <div class="rank-score" style="color: var(--muted); font-size: 12px;">87.2 avg</div>
+        </div>
+        <div class="rank-row" style="background: color-mix(in oklab, var(--danger) 4%, transparent); margin: 4px -10px 0; padding: 10px; border-radius: var(--radius-sm); border: 1px solid color-mix(in oklab, var(--danger) 18%, transparent);">
+          <div class="rank-num" style="background: var(--danger); color: white;">45</div>
+          <div class="name"><strong>南京自如住房租赁</strong><div class="sub">服务费超标 · 投诉 8 起 · 模式②</div></div>
+          <div class="rank-score bad">61.4</div>
+        </div>
+        <div class="rank-row" style="background: color-mix(in oklab, var(--danger) 4%, transparent); margin: 4px -10px 0; padding: 10px; border-radius: var(--radius-sm); border: 1px solid color-mix(in oklab, var(--danger) 18%, transparent);">
+          <div class="rank-num" style="background: var(--danger); color: white;">47</div>
+          <div class="name"><strong>镇江·恒大公馆运营公司</strong><div class="sub">重复挂牌 · 租金超标 · 暂停接入</div></div>
+          <div class="rank-score bad">52.0</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <button style="flex:1; padding: 8px; background: var(--accent-soft); color: var(--accent); font-weight: 600; border-radius: var(--radius-sm); font-size: 12px;">导出考核报告</button>
+        <button style="flex:1; padding: 8px; background: color-mix(in oklab, var(--danger) 10%, transparent); color: var(--danger); font-weight: 600; border-radius: var(--radius-sm); font-size: 12px;">约谈末位 3 家</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 30 日新增房源趋势 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>近 30 日新增房源趋势</h3>
+      <a class="more">导出 CSV →</a>
+    </div>
+    <div class="panel-body">
+      <svg class="chart" viewBox="0 0 320 88" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="trendG" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#2563eb" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- grid -->
+        <line x1="0" y1="22" x2="320" y2="22" stroke="#e5e7eb" stroke-dasharray="2 4"/>
+        <line x1="0" y1="44" x2="320" y2="44" stroke="#e5e7eb" stroke-dasharray="2 4"/>
+        <line x1="0" y1="66" x2="320" y2="66" stroke="#e5e7eb" stroke-dasharray="2 4"/>
+        <!-- area -->
+        <path d="M0 60 L20 58 L40 50 L60 54 L80 42 L100 44 L120 38 L140 32 L160 36 L180 28 L200 24 L220 30 L240 20 L260 22 L280 14 L300 18 L320 10 L320 88 L0 88 Z" fill="url(#trendG)"/>
+        <!-- line -->
+        <path d="M0 60 L20 58 L40 50 L60 54 L80 42 L100 44 L120 38 L140 32 L160 36 L180 28 L200 24 L220 30 L240 20 L260 22 L280 14 L300 18 L320 10" fill="none" stroke="#2563eb" stroke-width="2"/>
+      </svg>
+      <div class="chart-axis">
+        <span>5/7</span><span>5/14</span><span>5/21</span><span>5/28</span><span>6/4</span>
+      </div>
+      <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 12px;">
+        <div><span style="color: var(--muted);">本月新增 </span><strong>+786 套</strong></div>
+        <div><span style="color: var(--muted);">日均 </span><strong>26.2 套</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 承租人结构画像 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>承租人结构 · 民生覆盖</h3>
+      <a class="more">脱敏明细 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="persona-card">
+        <div class="donut">
+          <svg viewBox="0 0 36 36" width="110" height="110">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg)" stroke-width="4"/>
+            <!-- 新市民 52% -->
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#2563eb" stroke-width="4"
+              stroke-dasharray="52 100" stroke-dashoffset="25" transform="rotate(-90 18 18)"/>
+            <!-- 青年人 31% -->
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10b981" stroke-width="4"
+              stroke-dasharray="31 100" stroke-dashoffset="-27" transform="rotate(-90 18 18)"/>
+            <!-- 人才引进 12% -->
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f59e0b" stroke-width="4"
+              stroke-dasharray="12 100" stroke-dashoffset="-58" transform="rotate(-90 18 18)"/>
+            <!-- 其他 5% -->
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#9ca3af" stroke-width="4"
+              stroke-dasharray="5 100" stroke-dashoffset="-70" transform="rotate(-90 18 18)"/>
+          </svg>
+          <div class="center-num">
+            <div style="text-align: center;">
+              <strong>9,742</strong>
+              <span>累计承租人</span>
+            </div>
+          </div>
+        </div>
+        <div class="persona-list">
+          <div class="persona-row"><span class="swatch" style="background: #2563eb;"></span><span class="lbl">新市民</span><span class="pct">52% · 5,066 人</span></div>
+          <div class="persona-row"><span class="swatch" style="background: #10b981;"></span><span class="lbl">青年人 (≤35岁)</span><span class="pct">31% · 3,020 人</span></div>
+          <div class="persona-row"><span class="swatch" style="background: #f59e0b;"></span><span class="lbl">人才引进</span><span class="pct">12% · 1,169 人</span></div>
+          <div class="persona-row"><span class="swatch" style="background: #9ca3af;"></span><span class="lbl">其他</span><span class="pct">5% · 487 人</span></div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <div style="flex:1; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 11px;">
+          <div style="color: var(--muted);">非苏户籍占比</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--accent); margin-top: 2px;">68.4%</div>
+          <div style="color: var(--success); font-size: 10px;">▲ 4.2% · 较 Q1</div>
+        </div>
+        <div style="flex:1; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 11px;">
+          <div style="color: var(--muted);">月收入中位数</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--accent); margin-top: 2px;">¥6,820</div>
+          <div style="color: var(--muted); font-size: 10px;">租金占比 34.9%</div>
+        </div>
+        <div style="flex:1; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 11px;">
+          <div style="color: var(--muted);">公积金直付率</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--success); margin-top: 2px;">76.1%</div>
+          <div style="color: var(--success); font-size: 10px;">▲ 18% · 较去年</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 业主托管纳入漏斗 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>业主托管 · 以租换购漏斗</h3>
+      <a class="more">运营策略 →</a>
+    </div>
+    <div class="panel-body">
+      <div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;">把"居民自有住房"纳入保租房 · 本月数据</div>
+      <div class="funnel">
+        <div class="funnel-step">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 11px;">1</div>
+          <div class="label"><div>线上预约勘验</div><div class="funnel-bar" style="width: 100%;"></div></div>
+          <div class="num">5,820</div>
+        </div>
+        <div class="funnel-step">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 11px;">2</div>
+          <div class="label"><div>贝壳上门评估</div><div class="funnel-bar" style="width: 74%;"></div></div>
+          <div class="num">4,308</div>
+        </div>
+        <div class="funnel-step">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 11px;">3</div>
+          <div class="label"><div>签订托管协议</div><div class="funnel-bar" style="width: 52%;"></div></div>
+          <div class="num">3,026</div>
+        </div>
+        <div class="funnel-step">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 11px;">4</div>
+          <div class="label"><div>政府备案 · 纳入保租房</div><div class="funnel-bar" style="width: 31%;"></div></div>
+          <div class="num">1,820</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 12px; font-size: 11px;">
+        <div style="flex:1; padding: 8px; background: var(--bg); border-radius: var(--radius-sm); text-align: center;">
+          <div style="color: var(--muted);">整体转化率</div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--accent); margin-top: 2px;">31.3%</div>
+        </div>
+        <div style="flex:1; padding: 8px; background: var(--bg); border-radius: var(--radius-sm); text-align: center;">
+          <div style="color: var(--muted);">流失大头</div>
+          <div style="font-size: 13px; font-weight: 600; color: var(--warn); margin-top: 2px;">评估→签约</div>
+        </div>
+        <div style="flex:1; padding: 8px; background: var(--bg); border-radius: var(--radius-sm); text-align: center;">
+          <div style="color: var(--muted);">个税抵扣金额</div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--success); margin-top: 2px;">¥86万</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待核验房源 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>📋 待核验房源（最新 5 条）</h3>
+      <a class="more">全部 24 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="list-item">
+        <div class="list-status" style="background: var(--warn);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>江北新区·明发滨江公寓 12 栋</strong><span class="badge warn">材料待补</span></div>
+          <div class="row2"><span>运营方: 安居保障房集团</span><span>·</span><span>模式① 自营</span></div>
+          <div class="row3">缺失: 消防验收报告 · 提交于 2026-06-04 14:22</div>
+        </div>
+        <button class="list-cta">复核</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--accent);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>苏州工业园区·新青年公寓</strong><span class="badge mute">待初审</span></div>
+          <div class="row2"><span>运营方: 贝壳·苏州</span><span>·</span><span>模式③ 深托</span></div>
+          <div class="row3">52 套 · 提交于 2026-06-05 08:10 · SLA 剩余 18h</div>
+        </div>
+        <button class="list-cta">分配</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--success);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>无锡梁溪·万科泊寓</strong><span class="badge ok">已核验</span></div>
+          <div class="row2"><span>运营方: 泊寓·无锡</span><span>·</span><span>模式② 委托</span></div>
+          <div class="row3">88 套 · 现场抽查通过 · 2026-06-03</div>
+        </div>
+        <button class="list-cta">归档</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--warn);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>常州武进·龙湖冠寓</strong><span class="badge warn">价格偏高</span></div>
+          <div class="row2"><span>运营方: 冠寓·常州</span><span>·</span><span>模式② 委托</span></div>
+          <div class="row3">指导价 ¥2,200 vs 报价 ¥2,480（+12.7%，超 ≤90% 红线）</div>
+        </div>
+        <button class="list-cta">驳回</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--danger);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>镇江京口·恒大公馆</strong><span class="badge danger">疑似重复挂牌</span></div>
+          <div class="row2"><span>运营方: 镇江安居</span><span>·</span><span>模式① 自营</span></div>
+          <div class="row3">与"恒大·京口家园"重叠率 78% · 系统自动告警</div>
+        </div>
+        <button class="list-cta">介入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投诉处置 -->
+  <div class="panel">
+    <div class="panel-header">
+      <h3>🛡️ 投诉处置进度</h3>
+      <a class="more">投诉中心 →</a>
+    </div>
+    <div class="panel-body">
+      <div style="display: flex; gap: 8px; font-size: 11px; margin-bottom: 12px;">
+        <div style="flex:1; padding: 8px; background: color-mix(in oklab, var(--success) 8%, transparent); border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 17px; font-weight: 700; color: var(--success);">126</div>
+          <div style="color: var(--muted);">已结案</div>
+        </div>
+        <div style="flex:1; padding: 8px; background: color-mix(in oklab, var(--warn) 10%, transparent); border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 17px; font-weight: 700; color: color-mix(in oklab, var(--warn) 70%, black);">14</div>
+          <div style="color: var(--muted);">处理中</div>
+        </div>
+        <div style="flex:1; padding: 8px; background: color-mix(in oklab, var(--danger) 10%, transparent); border-radius: var(--radius-sm); text-align: center;">
+          <div style="font-size: 17px; font-weight: 700; color: var(--danger);">7</div>
+          <div style="color: var(--muted);">超 SLA</div>
+        </div>
+      </div>
+
+      <div class="list-item">
+        <div class="list-status" style="background: var(--danger);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>#TS-26060103 · 服务费超标</strong><span class="badge danger">超 SLA 6h</span></div>
+          <div class="row2"><span>投诉人: 王**</span><span>·</span><span>南京·建邺</span></div>
+          <div class="row3">运营方收取 10.5% 服务费 · 超 8% 封顶红线</div>
+        </div>
+        <button class="list-cta">立即督办</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--warn);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>#TS-26060098 · 维修响应慢</strong><span class="badge warn">处理中</span></div>
+          <div class="row2"><span>投诉人: 李**</span><span>·</span><span>苏州·吴中</span></div>
+          <div class="row3">报修 72h 未上门 · 运营方已签收 · 处置期限 6/6</div>
+        </div>
+        <button class="list-cta">查看</button>
+      </div>
+      <div class="list-item">
+        <div class="list-status" style="background: var(--success);"></div>
+        <div class="list-content">
+          <div class="row1"><strong>#TS-26060087 · 押金扣留</strong><span class="badge ok">已结案</span></div>
+          <div class="row2"><span>投诉人: 陈**</span><span>·</span><span>无锡·梁溪</span></div>
+          <div class="row3">运营方已全额退还 ¥2,400 · 满意度 5 ★</div>
+        </div>
+        <button class="list-cta">归档</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 抽查记录 -->
+  <div class="panel">
+    <div class="panel-header">
+      <h3>🔍 现场抽查记录 · 本季</h3>
+      <a class="more">完整列表 →</a>
+    </div>
+    <div class="panel-body">
+      <div style="font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+          <span>计划抽查（Q2）</span>
+          <strong>180 项</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+          <span>已完成</span>
+          <strong style="color: var(--success);">142 项</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+          <span>合格率</span>
+          <strong>96.4%</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+          <span>问题项</span>
+          <strong style="color: var(--danger);">5 项 · 限期整改中</strong>
+        </div>
+      </div>
+      <div style="margin-top: 10px;">
+        <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Q2 完成进度</div>
+        <div class="progress"><div style="width: 79%;"></div></div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">142 / 180 · 79%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据导出快捷 -->
+  <div class="panel">
+    <div class="panel-header">
+      <h3>📊 数据导出 · 报表</h3>
+    </div>
+    <div class="panel-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+      <button style="padding: 12px; background: var(--bg); border-radius: var(--radius-sm); font-size: 12px; text-align: left; border: 1px solid var(--border);">
+        <div style="font-weight: 600; margin-bottom: 2px;">全省房源台账</div>
+        <div style="color: var(--muted); font-size: 10px;">CSV · 12,684 行</div>
+      </button>
+      <button style="padding: 12px; background: var(--bg); border-radius: var(--radius-sm); font-size: 12px; text-align: left; border: 1px solid var(--border);">
+        <div style="font-weight: 600; margin-bottom: 2px;">承租人画像</div>
+        <div style="color: var(--muted); font-size: 10px;">脱敏 · XLSX</div>
+      </button>
+      <button style="padding: 12px; background: var(--bg); border-radius: var(--radius-sm); font-size: 12px; text-align: left; border: 1px solid var(--border);">
+        <div style="font-weight: 600; margin-bottom: 2px;">三方备案台账</div>
+        <div style="color: var(--muted); font-size: 10px;">本月 312 条</div>
+      </button>
+      <button style="padding: 12px; background: var(--bg); border-radius: var(--radius-sm); font-size: 12px; text-align: left; border: 1px solid var(--border);">
+        <div style="font-weight: 600; margin-bottom: 2px;">投诉处置月报</div>
+        <div style="color: var(--muted); font-size: 10px;">PDF · 自动生成</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 督办工单 · 待我处理 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>📌 待我处理 · 督办工单</h3>
+      <a class="more">全部 12 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="task-item">
+        <div class="task-prio high"></div>
+        <div class="task-body">
+          <div class="t-title">约谈"南京自如" · 服务费整改 <span class="t-tag">高优</span></div>
+          <div class="t-meta">来源：投诉 #TS-26060103 · 截止 2026-06-08 · 来自：李厅长</div>
+        </div>
+        <button class="task-cta">处置</button>
+      </div>
+      <div class="task-item">
+        <div class="task-prio high"></div>
+        <div class="task-body">
+          <div class="t-title">复核镇江·恒大公馆重复挂牌 <span class="t-tag">高优</span></div>
+          <div class="t-meta">系统告警 · 涉及 22 套 · 截止 2026-06-07</div>
+        </div>
+        <button class="task-cta">复核</button>
+      </div>
+      <div class="task-item">
+        <div class="task-prio mid"></div>
+        <div class="task-body">
+          <div class="t-title">签发 Q2 末位 3 家整改告知书 <span class="t-tag">中</span></div>
+          <div class="t-meta">考核排行触发 · 待我签字盖章 · 截止 2026-06-12</div>
+        </div>
+        <button class="task-cta">签发</button>
+      </div>
+      <div class="task-item">
+        <div class="task-prio low"></div>
+        <div class="task-body">
+          <div class="t-title">月度运行简报评审 <span class="t-tag">常规</span></div>
+          <div class="t-meta">系统自动生成 6 月简报 · 等待我确认发送至住建厅</div>
+        </div>
+        <button class="task-cta">评审</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 政策发布工作台 -->
+  <div class="panel w-half">
+    <div class="panel-header">
+      <h3>📜 政策与通知发布</h3>
+      <a class="more">历史 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="publish-grid">
+        <button class="publish-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <strong>发布新政策</strong>
+          <em>推送至全省 13 市 C 端</em>
+        </button>
+        <button class="publish-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2A19.79 19.79 0 014.13 4.18 2 2 0 016.11 2h3"/></svg>
+          <strong>下发约谈通知</strong>
+          <em>定向运营主体</em>
+        </button>
+        <button class="publish-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          <strong>FAQ 增补</strong>
+          <em>政策资讯页同步</em>
+        </button>
+        <button class="publish-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          <strong>调整指导价</strong>
+          <em>分项目分户型设定</em>
+        </button>
+      </div>
+      <div style="margin-top: 12px; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 11px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="color: var(--muted);">最近发布</span>
+          <span style="color: var(--accent);">查看全部 →</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+          <span>南京市保租房申请条件放宽</span>
+          <span style="color: var(--muted);">2026-05-28</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+          <span>公积金支付保租房租金指南</span>
+          <span style="color: var(--muted);">2026-05-20</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+          <span>Q2 运营主体考核标准更新</span>
+          <span style="color: var(--muted);">2026-05-08</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 审计日志 -->
+  <div class="panel w-full">
+    <div class="panel-header">
+      <h3>🔐 审计日志 · 近 24h</h3>
+      <a class="more">完整日志 →</a>
+    </div>
+    <div class="panel-body">
+      <div class="audit-item">
+        <span class="audit-time">09:38</span>
+        <span class="audit-action"><strong>张科长</strong> 查看了 5 项风险预警</span>
+      </div>
+      <div class="audit-item">
+        <span class="audit-time">09:12</span>
+        <span class="audit-action"><strong>李科员</strong> 导出"全省房源台账 6 月"CSV（12,684 行）</span>
+      </div>
+      <div class="audit-item">
+        <span class="audit-time">08:54</span>
+        <span class="audit-action"><strong>王副厅</strong> 签发"Q2 末位 3 家整改告知书"</span>
+      </div>
+      <div class="audit-item">
+        <span class="audit-time">昨 18:22</span>
+        <span class="audit-action"><strong>系统</strong> 自动驳回"龙湖冠寓"租金超 90% 红线房源 5 套</span>
+      </div>
+      <div class="audit-item">
+        <span class="audit-time">昨 16:05</span>
+        <span class="audit-action"><strong>陈科长</strong> 处置投诉 #TS-26060087 · 押金扣留</span>
+      </div>
+      <div class="audit-item">
+        <span class="audit-time">昨 14:30</span>
+        <span class="audit-action"><strong>贝壳系统</strong> 推送苏州工业园 52 套新房源数据</span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /pc-grid -->
+
+  <div class="gov-footer">
+    本平台为江苏省住建厅监管视图 · 数据由贝壳保租房频道实时推送 · 仅监管用<br/>
+    <span class="stamp">江苏省住房和城乡建设厅监制</span>
+  </div>
+
+  <!-- 移动 3 项 tabbar（由 _navmobile.js render） -->
+  <div id="m-tabbar" data-series="g" data-active="cockpit"></div>
+</div>
+
+<script>
+// tabs (visual only)
+document.querySelectorAll('.tabs .tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tabs .tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  });
+});
+
+// role switcher（移动 + PC 双向同步）
+function applyRole(role) {
+  document.querySelectorAll('#roleSwitch button, #roleSwitchPc button').forEach(x => {
+    x.classList.toggle('active', x.dataset.role === role);
+  });
+  const title = document.querySelector('.gov-title');
+  const subtitle = document.querySelector('.gov-subtitle');
+  const crumb = document.querySelector('.gt-crumb .cur');
+  const pageTtl = document.querySelector('.pc-pagehead h2');
+  const pageDesc = document.querySelector('.pc-pagehead .desc');
+  const map = {
+    prov: ['全省运行监管视图', '江苏省住建厅 × 贝壳保租房频道 · 数据每日 02:00 同步', '监管总览 · 省厅视角', '全省 13 市保租房运行态势 · 实时风险预警 · 待办处置'],
+    city: ['南京市运行监管视图', '南京市住建局 · 视角已切换 · 仅展示南京数据', '监管总览 · 南京市局视角', '南京 11 区保租房运行态势 · 仅本市数据'],
+    dist: ['建邺区分局督查视图', '建邺区监管员 · 待我处理工单优先', '监管总览 · 建邺区分局视角', '建邺区现场督查任务 + 待办工单优先']
+  };
+  const [t, s, c, d] = map[role] || map.prov;
+  if (title) title.textContent = t;
+  if (subtitle) subtitle.textContent = s;
+  if (crumb) crumb.textContent = c;
+  if (pageTtl) pageTtl.textContent = c.replace('监管总览 · ', '');
+  if (pageDesc) pageDesc.textContent = d;
+}
+document.querySelectorAll('#roleSwitch button, #roleSwitchPc button').forEach(b => {
+  b.addEventListener('click', () => applyRole(b.dataset.role));
+});
+</script>
+<script src="_region.js"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

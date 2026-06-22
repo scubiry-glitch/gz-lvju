@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>派单看板 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 30px; display:flex; flex-direction:column;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:16px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .live{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--success); font-weight:600;}
+    .live::before{content:''; width:8px; height:8px; background:var(--success); border-radius:50%; box-shadow:0 0 0 0 var(--success); animation:p 2s infinite;}
+    @keyframes p{50%{box-shadow:0 0 0 6px rgba(22,163,74,0);}}
+    .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI strip */
+    .kpi-row{display:grid; grid-template-columns:repeat(6, 1fr); gap:12px; margin-bottom:16px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;}
+    .ki .l{font-size:11px; color:var(--muted);}
+    .ki .n{font-size:20px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; color:var(--muted); margin-top:2px;}
+    .ki .n.warn{color:var(--warn);} .ki .n.danger{color:var(--danger);} .ki .n.ok{color:var(--success);}
+
+    /* kanban */
+    .kanban{display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; flex:1; min-height:600px;}
+    .col{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); display:flex; flex-direction:column; overflow:hidden;}
+    .col-head{padding:12px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px;}
+    .col-head .nm{font-size:13px; font-weight:600;}
+    .col-head .cnt{font-size:11px; padding:1px 7px; background:var(--bg); color:var(--muted); border-radius:8px; font-weight:600;}
+    .col-head .dot{width:8px; height:8px; border-radius:50%;}
+    .col-head.todo .dot{background:var(--warn);}
+    .col-head.match .dot{background:var(--accent);}
+    .col-head.assigned .dot{background:#a855f7;}
+    .col-head.doing .dot{background:#3b82f6;}
+    .col-head.done .dot{background:var(--success);}
+    .col-head .menu{margin-left:auto; color:var(--muted); cursor:pointer; font-size:14px;}
+    .col-body{flex:1; padding:8px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;}
+
+    /* card */
+    .tk{background:#fafbfc; border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab; position:relative;}
+    .tk:hover{box-shadow:0 2px 8px rgba(15,118,110,0.1); border-color:var(--accent);}
+    .tk.urgent{border-left:3px solid var(--danger);}
+    .tk.high{border-left:3px solid var(--warn);}
+    .tk.normal{border-left:3px solid var(--accent);}
+    .tk .head{display:flex; gap:6px; margin-bottom:5px; align-items:center;}
+    .tk .id{font-family:var(--mono); font-size:10px; color:var(--muted); background:var(--surface); padding:1px 5px; border-radius:3px;}
+    .tk .role-tag{font-size:9px; padding:1px 5px; border-radius:3px; background:var(--accent-soft); color:var(--accent); font-weight:600;}
+    .tk .time-tag{margin-left:auto; font-size:10px; color:var(--muted);}
+    .tk .title{font-size:13px; font-weight:600; margin-bottom:4px; line-height:1.3;}
+    .tk .where{font-size:11px; color:var(--muted); margin-bottom:6px;}
+    .tk .meta{display:flex; gap:6px; font-size:10.5px; color:var(--muted); flex-wrap:wrap; padding-top:6px; border-top:1px dashed var(--border);}
+    .tk .meta .p{padding:0; color:var(--fg); font-weight:600;}
+
+    /* assignee */
+    .tk .assignee{display:flex; align-items:center; gap:6px; margin-top:6px; padding:6px 8px; background:var(--surface); border-radius:5px;}
+    .tk .assignee .av{width:22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-size:10px; font-weight:700;}
+    .tk .assignee .nm{font-size:11px; font-weight:600;}
+    .tk .assignee .lv{font-size:9px; padding:1px 4px; border-radius:3px; color:white; font-weight:700;}
+    .tk .assignee .lv.L1{background:#d97706;}
+    .tk .assignee .lv.L2{background:#9ca3af;}
+    .tk .assignee .lv.L3{background:#10b981;}
+    .tk .assignee .lv.L4{background:#3b82f6;}
+    .tk .assignee .info{font-size:10px; color:var(--muted); margin-left:auto;}
+
+    /* match suggestions */
+    .tk .match{margin-top:6px; padding:6px 8px; background:color-mix(in oklab, var(--accent) 6%, transparent); border-radius:5px; font-size:10.5px;}
+    .tk .match .lbl{color:var(--accent); font-weight:600; margin-bottom:3px;}
+    .tk .match .row{display:flex; justify-content:space-between; align-items:center; padding:2px 0;}
+    .tk .match .row .nm{font-weight:500;}
+    .tk .match .row .score{font-family:var(--mono); color:var(--accent); font-weight:700;}
+    .tk .match .row.top{background:var(--accent); color:white; border-radius:3px; padding:3px 6px; margin:2px -2px;}
+    .tk .match .row.top .nm, .tk .match .row.top .score{color:white;}
+
+    .tk .actions{display:flex; gap:4px; margin-top:8px;}
+    .tk .actions a{flex:1; text-align:center; padding:4px 6px; font-size:11px; border:1px solid var(--border); background:var(--surface); border-radius:4px;}
+    .tk .actions a.pri{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+
+    /* progress in doing */
+    .tk .prog{margin-top:6px; padding:5px 8px; background:var(--surface); border-radius:5px; font-size:10px;}
+    .tk .prog-bar{height:4px; background:var(--bg); border-radius:2px; overflow:hidden; margin-top:3px;}
+    .tk .prog-bar .fl{height:100%; background:#3b82f6; border-radius:2px;}
+
+    /* done summary */
+    .tk.done-card{background:linear-gradient(135deg, color-mix(in oklab, var(--success) 5%, transparent), transparent); border-left-color:var(--success);}
+    .tk .done-row{display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:11px;}
+    .tk .done-row .star{color:var(--gold);}
+    .tk .done-row .v{font-weight:600;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="b" data-active="dispatch"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>派单看板</h1>
+      <span class="live">实时</span>
+      <span style="font-size:12px; color:var(--muted);">规则：等级 + 距离 + 客评 + 当前在岗</span>
+      <button class="btn">规则配置</button>
+      <button class="btn">导入工单</button>
+      <button class="btn pri">+ 手动派单</button>
+    </div>
+
+    <div class="kpi-row">
+      <div class="ki"><div class="l">今日待派</div><div class="n warn">38</div><div class="d">含 4 急单</div></div>
+      <div class="ki"><div class="l">匹配中</div><div class="n">14</div><div class="d">AI 推荐</div></div>
+      <div class="ki"><div class="l">已派发</div><div class="n">86</div><div class="d">↑ 12</div></div>
+      <div class="ki"><div class="l">进行中</div><div class="n">62</div><div class="d">在岗服务者 86</div></div>
+      <div class="ki"><div class="l">今完结</div><div class="n ok">186</div><div class="d ok">完结率 96%</div></div>
+      <div class="ki"><div class="l">超时风险</div><div class="n danger">3</div><div class="d" style="color:var(--danger);">需人工介入</div></div>
+    </div>
+
+    <!-- Kanban 5 columns -->
+    <div class="kanban">
+
+      <!-- col 1: 待派 -->
+      <div class="col">
+        <div class="col-head todo"><span class="dot"></span><span class="nm">待派</span><span class="cnt">38</span><span class="menu">⋮</span></div>
+        <div class="col-body">
+          <div class="tk urgent">
+            <div class="head">
+              <span class="id">WO-1284</span>
+              <span class="role-tag">检修</span>
+              <span class="time-tag">急 · 30 分</span>
+            </div>
+            <div class="title">梧桐公馆 3-1502 水龙头漏水</div>
+            <div class="where">📍 江宁 · 客户：黄女士 · 138****4521</div>
+            <div class="meta">
+              <span>难度 <span class="p">★★★</span></span>
+              <span>需 <span class="p">L3+</span></span>
+              <span>预 60 分</span>
+              <span>¥186</span>
+            </div>
+            <div class="actions">
+              <a>智能匹配</a>
+              <a class="pri">手动派</a>
+            </div>
+          </div>
+          <div class="tk high">
+            <div class="head">
+              <span class="id">WO-1286</span>
+              <span class="role-tag">保洁</span>
+              <span class="time-tag">今日 16:30</span>
+            </div>
+            <div class="title">河西青年 8-1208 月度深度</div>
+            <div class="where">📍 建邺 · 林先生 · 4 房 2 厅</div>
+            <div class="meta">
+              <span>难度 <span class="p">★★</span></span>
+              <span>需 <span class="p">L2+</span></span>
+              <span>预 90 分</span>
+              <span>¥248</span>
+            </div>
+            <div class="actions">
+              <a>智能匹配</a>
+              <a class="pri">手动派</a>
+            </div>
+          </div>
+          <div class="tk normal">
+            <div class="head">
+              <span class="id">WO-1290</span>
+              <span class="role-tag">入住服务</span>
+              <span class="time-tag">明 09:00</span>
+            </div>
+            <div class="title">江北建发 4-0508 入住交接</div>
+            <div class="where">📍 江北 · 王女士 · 携 1 老人</div>
+            <div class="meta">
+              <span>需 <span class="p">L2+</span></span>
+              <span>预 45 分</span>
+              <span>¥120</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- col 2: 匹配中 -->
+      <div class="col">
+        <div class="col-head match"><span class="dot"></span><span class="nm">智能匹配</span><span class="cnt">14</span><span class="menu">⋮</span></div>
+        <div class="col-body">
+          <div class="tk urgent">
+            <div class="head">
+              <span class="id">WO-1284</span>
+              <span class="role-tag">检修</span>
+              <span class="time-tag">急</span>
+            </div>
+            <div class="title">梧桐公馆 3-1502 水龙头漏水</div>
+            <div class="match">
+              <div class="lbl">📊 匹配候选（3 人）</div>
+              <div class="row top"><span class="nm">张师傅 L3</span><span class="score">94 分</span></div>
+              <div class="row"><span class="nm">陈师傅 L3</span><span class="score">82 分</span></div>
+              <div class="row"><span class="nm">钱小宝 L2</span><span class="score">68 分</span></div>
+            </div>
+            <div class="actions">
+              <a>看候选</a>
+              <a class="pri">采纳推荐</a>
+            </div>
+          </div>
+          <div class="tk normal">
+            <div class="head">
+              <span class="id">WO-1278</span>
+              <span class="role-tag">旅居管家</span>
+              <span class="time-tag">14:00</span>
+            </div>
+            <div class="title">梧桐公馆 1-2103 老人陪护 4h</div>
+            <div class="match">
+              <div class="lbl">📊 匹配候选（4 人）</div>
+              <div class="row top"><span class="nm">陈建国 L4</span><span class="score">98 分</span></div>
+              <div class="row"><span class="nm">王晓琳 L4</span><span class="score">88 分</span></div>
+            </div>
+            <div class="actions">
+              <a>看候选</a>
+              <a class="pri">采纳推荐</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- col 3: 已派发 -->
+      <div class="col">
+        <div class="col-head assigned"><span class="dot"></span><span class="nm">已派发 / 待响应</span><span class="cnt">22</span><span class="menu">⋮</span></div>
+        <div class="col-body">
+          <div class="tk high">
+            <div class="head">
+              <span class="id">WO-1281</span>
+              <span class="role-tag">客服与投诉处理</span>
+              <span class="time-tag">15:30</span>
+            </div>
+            <div class="title">客户投诉跟进 · 张爷爷</div>
+            <div class="assignee">
+              <span class="av">赵</span>
+              <span class="nm">赵丽芳</span>
+              <span class="lv L2">L2</span>
+              <span class="info">距 1.2km</span>
+            </div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px;">已通知 6 分钟前 · 2 分钟后超时未接</div>
+          </div>
+          <div class="tk normal">
+            <div class="head">
+              <span class="id">WO-1282</span>
+              <span class="role-tag">房源托管</span>
+            </div>
+            <div class="title">江宁安居 2-0708 周巡检</div>
+            <div class="assignee">
+              <span class="av">郑</span>
+              <span class="nm">郑文涛</span>
+              <span class="lv L3">L3</span>
+              <span class="info">已接</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- col 4: 进行中 -->
+      <div class="col">
+        <div class="col-head doing"><span class="dot"></span><span class="nm">进行中</span><span class="cnt">62</span><span class="menu">⋮</span></div>
+        <div class="col-body">
+          <div class="tk normal">
+            <div class="head">
+              <span class="id">WO-1276</span>
+              <span class="role-tag">检修</span>
+              <span class="time-tag">14:00 接</span>
+            </div>
+            <div class="title">河西青年 8-1203 水龙头</div>
+            <div class="assignee">
+              <span class="av">张</span>
+              <span class="nm">张师傅</span>
+              <span class="lv L3">L3</span>
+            </div>
+            <div class="prog">
+              <div>当前：服务中（预计完成 14:58）</div>
+              <div class="prog-bar"><div class="fl" style="width:65%;"></div></div>
+            </div>
+          </div>
+          <div class="tk normal">
+            <div class="head">
+              <span class="id">WO-1275</span>
+              <span class="role-tag">保洁</span>
+              <span class="time-tag">13:00 接</span>
+            </div>
+            <div class="title">梧桐公馆 2-0805 月度</div>
+            <div class="assignee">
+              <span class="av">刘</span>
+              <span class="nm">刘小红</span>
+              <span class="lv L3">L3</span>
+            </div>
+            <div class="prog">
+              <div>当前：收尾验收</div>
+              <div class="prog-bar"><div class="fl" style="width:88%;"></div></div>
+            </div>
+          </div>
+          <div class="tk urgent">
+            <div class="head">
+              <span class="id">WO-1268</span>
+              <span class="role-tag">检修</span>
+              <span class="time-tag">⚠ 超时 12 分</span>
+            </div>
+            <div class="title">栖霞蓝湾 4-0305 强电</div>
+            <div class="assignee">
+              <span class="av">钱</span>
+              <span class="nm">钱小宝</span>
+              <span class="lv L2">L2</span>
+            </div>
+            <div style="font-size:10px; color:var(--danger); margin-top:6px;">⚠ 已超时 · 需人工干预</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- col 5: 今完结 -->
+      <div class="col">
+        <div class="col-head done"><span class="dot"></span><span class="nm">今完结</span><span class="cnt">186</span><span class="menu">⋮</span></div>
+        <div class="col-body">
+          <div class="tk normal done-card">
+            <div class="head">
+              <span class="id">WO-1264</span>
+              <span class="role-tag">旅居管家</span>
+              <span class="time-tag">11:30</span>
+            </div>
+            <div class="title">梧桐公馆 4-1808 入住接待</div>
+            <div class="assignee">
+              <span class="av">陈</span>
+              <span class="nm">陈建国</span>
+              <span class="lv L4">L4</span>
+            </div>
+            <div class="done-row">
+              <span class="star">★★★★★</span>
+              <span>客户加小费 <span class="v">+¥50</span></span>
+            </div>
+          </div>
+          <div class="tk normal done-card">
+            <div class="head">
+              <span class="id">WO-1262</span>
+              <span class="role-tag">入住服务</span>
+              <span class="time-tag">10:42</span>
+            </div>
+            <div class="title">江北建发 4-0508 入住引导</div>
+            <div class="assignee">
+              <span class="av">周</span>
+              <span class="nm">周丽华</span>
+              <span class="lv L2">L2</span>
+            </div>
+            <div class="done-row">
+              <span class="star">★★★★★</span>
+              <span>客评 <span class="v">5.0</span></span>
+            </div>
+          </div>
+          <div class="tk normal done-card">
+            <div class="head">
+              <span class="id">WO-1258</span>
+              <span class="role-tag">保洁</span>
+              <span class="time-tag">09:30</span>
+            </div>
+            <div class="title">梧桐公馆 1-2105 月度</div>
+            <div class="assignee">
+              <span class="av">吴</span>
+              <span class="nm">吴某某</span>
+              <span class="lv L2">L2</span>
+            </div>
+            <div class="done-row">
+              <span class="star">★★★★<span style="color:var(--border);">★</span></span>
+              <span>客评 <span class="v">4.6</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

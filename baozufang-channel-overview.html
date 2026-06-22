@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>南京市保租房 · 三档方案对比</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a;
+      --success-soft: color-mix(in oklab, var(--success) 12%, transparent);
+      --warn: #eab308;
+      --neutral: #94a3b8;
+      --neutral-soft: color-mix(in oklab, var(--neutral) 18%, transparent);
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font-family: var(--font-body); line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+    .header { text-align: center; margin-bottom: 32px; }
+    .header h1 {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 4vw, 42px);
+      font-weight: 600; margin: 0 0 8px;
+      letter-spacing: -0.015em;
+    }
+    .header .lead { font-size: 16px; color: var(--muted); max-width: 56ch; margin: 0 auto; }
+    .header .meta-badge {
+      display: inline-block;
+      padding: 4px 12px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 12px; font-weight: 500; margin-top: 12px;
+    }
+
+    /* mode toggle */
+    .mode-toggle {
+      display: flex; justify-content: center; gap: 8px;
+      margin: 0 auto 28px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px;
+      width: fit-content;
+      flex-wrap: wrap;
+    }
+    .mode-btn {
+      padding: 8px 18px; border-radius: 999px;
+      font-size: 13px; color: var(--muted);
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.15s;
+    }
+    .mode-btn .num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--bg); color: var(--muted);
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 11px;
+    }
+    .mode-btn.active { background: var(--accent); color: white; }
+    .mode-btn.active .num { background: rgba(255,255,255,0.25); color: white; }
+    .mode-btn.v3.active { background: var(--success); }
+
+    /* compare columns */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .version-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .col-header { padding: 20px; border-bottom: 1px solid var(--border); }
+    .col-header .version-tag {
+      display: inline-block;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    .v1 .col-header { background: linear-gradient(180deg, color-mix(in oklab, var(--neutral) 8%, transparent) 0%, transparent 100%); }
+    .v1 .col-header .version-tag { background: var(--neutral-soft); color: #475569; }
+    .v2 .col-header { background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 100%); }
+    .v2 .col-header .version-tag { background: var(--accent-soft); color: var(--accent); }
+    .v3 .col-header { background: linear-gradient(180deg, var(--success-soft) 0%, transparent 100%); }
+    .v3 .col-header .version-tag { background: var(--success-soft); color: var(--success); }
+
+    .col-header h2 { font-size: 18px; font-weight: 600; margin: 0 0 6px; }
+    .col-header .pitch { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+    .col-header .stat-row {
+      display: flex; gap: 16px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border);
+      font-size: 12px; color: var(--muted);
+    }
+    .col-header .stat-row b {
+      display: block; color: var(--fg);
+      font-size: 16px; font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .col-body { flex: 1; padding: 16px 20px; }
+    .col-body h4 {
+      font-size: 12px; font-weight: 600;
+      letter-spacing: 1px; text-transform: uppercase;
+      color: var(--muted); margin: 12px 0 8px;
+    }
+    .col-body h4:first-child { margin-top: 0; }
+    .scope-list { list-style: none; margin: 0; padding: 0; }
+    .scope-list li {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+    }
+    .scope-list li:last-child { border-bottom: 0; }
+    .scope-list li.off { color: var(--muted); opacity: 0.55; }
+    .scope-list li .check {
+      flex-shrink: 0; width: 16px; height: 16px;
+      border-radius: 50%; display: grid; place-items: center;
+      font-size: 10px; font-weight: 700;
+      margin-top: 2px;
+    }
+    .scope-list li .check.yes { background: var(--success-soft); color: var(--success); }
+    .scope-list li .check.no { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); }
+    .scope-list li a { color: inherit; }
+    .scope-list li a:hover { color: var(--accent); }
+
+    .col-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: color-mix(in oklab, var(--bg) 50%, transparent);
+      display: flex; gap: 8px;
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; text-decoration: none;
+      flex: 1;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-secondary { background: var(--surface); color: var(--fg); border: 1px solid var(--border); }
+    .v1 .btn-primary { background: #475569; }
+    .btn:active { opacity: 0.85; }
+
+    /* feature matrix */
+    .matrix-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 32px;
+      overflow-x: auto;
+    }
+    .matrix-card h3 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+    .matrix-card .sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    table.matrix {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px;
+      min-width: 720px;
+    }
+    table.matrix thead th {
+      text-align: left; padding: 12px 14px;
+      font-weight: 600; font-size: 13px;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg);
+      position: sticky; top: 0; z-index: 1;
+    }
+    table.matrix thead th.v1 { color: #475569; }
+    table.matrix thead th.v2 { color: var(--accent); }
+    table.matrix thead th.v3 { color: var(--success); }
+    table.matrix tbody td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.matrix tbody tr:hover { background: color-mix(in oklab, var(--bg) 60%, transparent); }
+    table.matrix .group-row td {
+      background: var(--bg);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 8px 14px;
+    }
+    table.matrix .feature-name { font-weight: 500; color: var(--fg); }
+    table.matrix .feature-name .sub2 { display: block; color: var(--muted); font-weight: 400; font-size: 11px; margin-top: 2px; }
+    table.matrix .cell-yes,
+    table.matrix .cell-no { text-align: center; width: 18%; }
+    .badge-yes {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--success-soft); color: var(--success);
+      font-weight: 700; font-size: 13px;
+    }
+    .badge-no {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--bg); color: var(--muted);
+      border: 1px dashed var(--border);
+      font-size: 13px;
+    }
+    .badge-partial {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 2px 8px; border-radius: 999px;
+      background: color-mix(in oklab, var(--warn) 16%, transparent);
+      color: color-mix(in oklab, var(--warn) 70%, black);
+      font-weight: 600; font-size: 11px;
+    }
+
+    /* pick row */
+    .pick-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .pick-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .pick-card .pick-label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 1px; }
+    .pick-card h4 { font-size: 16px; font-weight: 600; margin: 0; }
+    .pick-card p { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+    .pick-card .pick-cta {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 13px; font-weight: 500;
+    }
+    .pick-card.v1 { border-top: 4px solid #94a3b8; }
+    .pick-card.v2 { border-top: 4px solid var(--accent); }
+    .pick-card.v3 { border-top: 4px solid var(--success); }
+
+    .footer {
+      text-align: center; padding: 28px 0 8px;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: 13px;
+    }
+    .footer a { color: var(--accent); }
+
+    /* single-version mode */
+    body.mode-v1 .version-col:not(.v1),
+    body.mode-v2 .version-col:not(.v2),
+    body.mode-v3 .version-col:not(.v3) { display: none; }
+    body.mode-v1 .compare-grid,
+    body.mode-v2 .compare-grid,
+    body.mode-v3 .compare-grid {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
+    }
+    body.mode-v1 table.matrix .v2-col,
+    body.mode-v1 table.matrix .v3-col,
+    body.mode-v2 table.matrix .v1-col,
+    body.mode-v2 table.matrix .v3-col,
+    body.mode-v3 table.matrix .v1-col,
+    body.mode-v3 table.matrix .v2-col { display: none; }
+    body.mode-v1 .pick-card:not(.v1),
+    body.mode-v2 .pick-card:not(.v2),
+    body.mode-v3 .pick-card:not(.v3) { display: none; }
+    body.mode-v1 .pick-row,
+    body.mode-v2 .pick-row,
+    body.mode-v3 .pick-row {
+      grid-template-columns: minmax(0, 720px);
+      justify-content: center;
+    }
+
+    @media (max-width: 980px) {
+      .compare-grid { grid-template-columns: 1fr; }
+      .pick-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .container { padding: 16px 12px; }
+    }
+  </style>
+</head>
+<body class="mode-all nv-with-side">
+<div id="side-nav" data-series="d" data-active="tier-overview" data-base="screens/"></div>
+<script src="screens/_region.js"></script>
+<script src="screens/_nav.js"></script>
+<div class="container">
+
+  <div class="header">
+    <div style="margin-bottom:14px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+      <a href="screens/d-master-blueprint.html" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:#0f172a; color:#fff; border-radius:999px; font-size:12px; font-weight:500;">
+        📐 先看总图谱（四方共建·三阶段·五能力）→
+      </a>
+      <a href="overview.html" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:#fff; color:#0f172a; border:1px solid #0f172a; border-radius:999px; font-size:12px; font-weight:500;">
+        📎 完整页面索引（70+ 页 · 9 系列）→
+      </a>
+    </div>
+    <h1>南京市保障性租赁住房</h1>
+    <p class="lead">贝壳租房 × 南京市住建局合作官方频道 · 三档方案对比</p>
+    <span class="meta-badge">阶段一 · 阶段二 · 阶段三 三档方案 · 按需取舍 · 一键切换</span>
+  </div>
+
+  <!-- mode toggle -->
+  <div class="mode-toggle" role="tablist">
+    <button class="mode-btn active" data-mode="all">三档对比</button>
+    <button class="mode-btn v1" data-mode="v1">
+      <span class="num">1</span><span>阶段一 · 仅展示</span>
+    </button>
+    <button class="mode-btn v2" data-mode="v2">
+      <span class="num">2</span><span>阶段二 · + 标准体系</span>
+    </button>
+    <button class="mode-btn v3" data-mode="v3">
+      <span class="num">3</span><span>阶段三 · + 交易闭环</span>
+    </button>
+  </div>
+
+  <!-- 3-column comparison -->
+  <div class="compare-grid">
+
+    <!-- V1 -->
+    <div class="version-col v1">
+      <div class="col-header">
+        <span class="version-tag">阶段一 · 展示型</span>
+        <h2>展示型频道</h2>
+        <p class="pitch">仅展示房源与政策，不带交易、不带标准体系。最快上线、零资金风险。</p>
+        <div class="stat-row">
+          <div><b>4</b>页面数</div>
+          <div><b>4~6 周</b>上线周期</div>
+          <div><b>低</b>合规风险</div>
+        </div>
+      </div>
+      <div class="col-body">
+        <h4>包含模块</h4>
+        <ul class="scope-list">
+          <li><span class="check yes">✓</span><a href="screens/home.html">频道首页（房源 + 幻灯）</a></li>
+          <li><span class="check yes">✓</span><a href="screens/detail.html">房源详情（线下咨询）</a></li>
+          <li><span class="check yes">✓</span><a href="screens/policy.html">政策资讯 / FAQ</a></li>
+          <li><span class="check yes">✓</span><a href="screens/profile.html">个人中心（仅收藏）</a></li>
+        </ul>
+        <h4>不包含</h4>
+        <ul class="scope-list">
+          <li class="off"><span class="check no">×</span>申请 / 资格自检 / 进度</li>
+          <li class="off"><span class="check no">×</span>电子合同 / 缴费 / 报修</li>
+          <li class="off"><span class="check no">×</span>标准体系四项公示</li>
+        </ul>
+      </div>
+      <div class="col-footer">
+        <a class="btn btn-primary" href="baozufang-overview-v1-basic.html">查看 V1 详情</a>
+        <a class="btn btn-secondary" href="screens/home.html">打开原型</a>
+      </div>
+    </div>
+
+    <!-- V2 -->
+    <div class="version-col v2">
+      <div class="col-header">
+        <span class="version-tag">阶段二 · + 标准体系</span>
+        <h2>展示 + 好房子标准体系</h2>
+        <p class="pitch">在 V1 基础上叠加运营、服务者、供应商、星级四项公示，强化政府背书与品牌信任。</p>
+        <div class="stat-row">
+          <div><b>7</b>页面数</div>
+          <div><b>6~9 周</b>上线周期</div>
+          <div><b>低</b>合规风险</div>
+        </div>
+      </div>
+      <div class="col-body">
+        <h4>包含模块（含 V1 全部）</h4>
+        <ul class="scope-list">
+          <li><span class="check yes">✓</span>V1 的 4 个展示页面</li>
+          <li><span class="check yes">✓</span><a href="screens/operators.html">运营主体白名单（6 家）</a></li>
+          <li><span class="check yes">✓</span><a href="screens/service-workers.html">服务者认证（24 人）</a></li>
+          <li><span class="check yes">✓</span><a href="screens/suppliers.html">合格供应商公示（6 家）</a></li>
+        </ul>
+        <h4>不包含</h4>
+        <ul class="scope-list">
+          <li class="off"><span class="check no">×</span>申请 / 进度 / 合同 / 缴费 / 报修</li>
+        </ul>
+      </div>
+      <div class="col-footer">
+        <a class="btn btn-primary" href="baozufang-overview-v2-standard.html">查看 V2 详情</a>
+        <a class="btn btn-secondary" href="screens/operators.html">打开原型</a>
+      </div>
+    </div>
+
+    <!-- V3 -->
+    <div class="version-col v3">
+      <div class="col-header">
+        <span class="version-tag">阶段三 · + 交易闭环</span>
+        <h2>展示 + 标准体系 + 交易闭环</h2>
+        <p class="pitch">资格自检 → 申请 → 电签 → 缴费 → 报修，端到端一站式办理，完整商业模式。</p>
+        <div class="stat-row">
+          <div><b>12</b>页面数</div>
+          <div><b>14~18 周</b>上线周期</div>
+          <div><b>中</b>合规要求</div>
+        </div>
+      </div>
+      <div class="col-body">
+        <h4>包含模块（含 V2 全部）</h4>
+        <ul class="scope-list">
+          <li><span class="check yes">✓</span>V2 的 7 个展示/公示页</li>
+          <li><span class="check yes">✓</span><a href="screens/apply.html">申请 / 资格自检</a></li>
+          <li><span class="check yes">✓</span><a href="screens/my-applications.html">我的申请 / 进度</a></li>
+          <li><span class="check yes">✓</span><a href="screens/contracts.html">电子合同 / 备案</a></li>
+          <li><span class="check yes">✓</span><a href="screens/payment.html">在线缴费 / 公积金直付</a></li>
+          <li><span class="check yes">✓</span><a href="screens/repair.html">报修服务</a></li>
+        </ul>
+        <h4>关键依赖</h4>
+        <ul class="scope-list">
+          <li><span class="check yes">✓</span>电子签 + 住建局备案对接</li>
+          <li><span class="check yes">✓</span>贝壳支付 / 公积金直付通道</li>
+        </ul>
+      </div>
+      <div class="col-footer">
+        <a class="btn btn-success" href="baozufang-overview-v3-full.html">查看 V3 详情</a>
+        <a class="btn btn-secondary" href="screens/apply.html">打开原型</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- feature matrix -->
+  <div class="matrix-card">
+    <h3>功能矩阵</h3>
+    <p class="sub">逐项对比三档方案的能力边界 — ✓ 包含 / × 不含 / 黄色 仅部分功能</p>
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th style="width: 40%;">功能</th>
+          <th class="v1 v1-col cell-yes">阶段一（V1）</th>
+          <th class="v2 v2-col cell-yes">阶段二（V2）</th>
+          <th class="v3 v3-col cell-yes">阶段三（V3）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="group-row"><td colspan="4">A · 展示与导览</td></tr>
+        <tr>
+          <td class="feature-name">频道首页 · 房源列表 · 3 张幻灯<span class="sub2">screens/home.html</span></td>
+          <td class="v1-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">房源详情 · 价格对比 · 配套<span class="sub2">screens/detail.html</span></td>
+          <td class="v1-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">政策资讯 · FAQ<span class="sub2">screens/policy.html</span></td>
+          <td class="v1-col cell-yes"><span class="badge-partial">不含标准体系</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">个人中心<span class="sub2">screens/profile.html</span></td>
+          <td class="v1-col cell-yes"><span class="badge-partial">仅收藏 / 浏览</span></td>
+          <td class="v2-col cell-yes"><span class="badge-partial">仅收藏 / 浏览</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+
+        <tr class="group-row"><td colspan="4">B · 好房子标准体系</td></tr>
+        <tr>
+          <td class="feature-name">运营主体白名单<span class="sub2">screens/operators.html · screens/g-whitelist-operator.html · screens/landlord.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">服务者认证<span class="sub2">screens/service-workers.html · screens/g-whitelist-service.html · screens/p-cert-issue.html · screens/s-cert.html · screens/d-people-standard.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">合格物资供应商公示<span class="sub2">screens/suppliers.html · screens/g-whitelist-supplier.html · screens/v-onboarding.html · screens/v-projects.html · screens/v-team.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">星级评价标准（55 项细则）<span class="sub2">screens/c-house-rating.html · screens/b-house-rating-input.html · screens/d-property-standard.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-yes"><span class="badge-yes">✓</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+
+        <tr class="group-row"><td colspan="4">C · 交易闭环</td></tr>
+        <tr>
+          <td class="feature-name">资格自检 / 申请提交<span class="sub2">screens/apply.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">我的申请 / 进度追踪<span class="sub2">screens/my-applications.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">电子合同 / 三方备案<span class="sub2">screens/contracts.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">在线缴费 / 公积金直付<span class="sub2">screens/payment.html · screens/c-housing-fund.html · screens/f-housing-fund.html · screens/f-escrow.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+        <tr>
+          <td class="feature-name">报修服务<span class="sub2">screens/repair.html</span></td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+
+        <tr class="group-row"><td colspan="4">D · 关键指标</td></tr>
+        <tr>
+          <td class="feature-name">页面总数</td>
+          <td class="v1-col cell-yes">4</td>
+          <td class="v2-col cell-yes">7</td>
+          <td class="v3-col cell-yes">12</td>
+        </tr>
+        <tr>
+          <td class="feature-name">上线周期（预估）</td>
+          <td class="v1-col cell-yes">4~6 周</td>
+          <td class="v2-col cell-yes">6~9 周</td>
+          <td class="v3-col cell-yes">14~18 周</td>
+        </tr>
+        <tr>
+          <td class="feature-name">合规与系统依赖</td>
+          <td class="v1-col cell-yes">仅内容审核</td>
+          <td class="v2-col cell-yes">公示数据接住建局</td>
+          <td class="v3-col cell-yes">电签 + 支付 + 备案</td>
+        </tr>
+        <tr>
+          <td class="feature-name">是否产生在线收入</td>
+          <td class="v1-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v2-col cell-no"><span class="badge-no">×</span></td>
+          <td class="v3-col cell-yes"><span class="badge-yes">✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="font-size: 18px; font-weight: 600; margin: 0 0 12px;">推荐场景</h3>
+  <div class="pick-row">
+    <div class="pick-card v1">
+      <span class="pick-label">选 V1 如果…</span>
+      <h4>抢节奏 · 信息门户</h4>
+      <p>需要尽快上线一个政府合规的展示频道；申请、签约仍在线下完成；不背任何资金/合同风险。</p>
+      <a class="pick-cta" href="baozufang-overview-v1-basic.html" style="color:#475569;">查看 V1 详情 →</a>
+    </div>
+    <div class="pick-card v2">
+      <span class="pick-label">选 V2 如果…</span>
+      <h4>强化品质背书</h4>
+      <p>希望与监管深度协同，公开运营主体、服务者、供应商、星级，提升用户信任度；交易仍走线下。</p>
+      <a class="pick-cta" href="baozufang-overview-v2-standard.html">查看 V2 详情 →</a>
+    </div>
+    <div class="pick-card v3">
+      <span class="pick-label">选 V3 如果…</span>
+      <h4>端到端商业闭环</h4>
+      <p>完整服务费 8% 收入模式，需要电子签、支付、备案对接资源到位；用户从看房到入住报修全在线。</p>
+      <a class="pick-cta" href="baozufang-overview-v3-full.html" style="color: var(--success);">查看 V3 详情 →</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>原型基于 <a href="#">Neutral Modern</a> 设计系统构建 · 参考：保租房频道方案文档 · 仅供演示</p>
+    <p style="margin-top: 6px;">单页对比 / 三档切换 · 当前页：<strong>baozufang-channel-overview.html</strong></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const body = document.body;
+  const btns = document.querySelectorAll('.mode-btn');
+  function setMode(mode) {
+    body.classList.remove('mode-all','mode-v1','mode-v2','mode-v3');
+    body.classList.add('mode-' + mode);
+    btns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    if (history.replaceState) history.replaceState(null, '', '#' + mode);
+  }
+  btns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  const initial = (location.hash || '').replace('#','');
+  if (['v1','v2','v3','all'].includes(initial)) setMode(initial);
+})();
+</script>
+</body>
+</html>

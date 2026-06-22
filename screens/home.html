@@ -1,0 +1,1240 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>保租房 · 首页</title>
+  <style>
+    /* ─── Neutral Modern tokens ────────────────────────────── */
+    :root {
+      --bg:      #fafafa;
+      --surface: #ffffff;
+      --fg:      #111111;
+      --muted:   #6b6b6b;
+      --border:  #e5e5e5;
+      --accent:  #2f6feb;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --accent-on: #ffffff;
+      --success: #17a34a;
+      --warn:    #eab308;
+      --danger:  #dc2626;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.5;
+      background: var(--bg);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+    }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
+    p { margin: 0; }
+    ::-webkit-scrollbar { display: none; }
+
+    /* ─── app shell ─────────────────────────────────────────── */
+    .app-shell {
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      background: var(--bg);
+      position: relative;
+      padding-bottom: 64px;
+    }
+    /* status bar */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 20px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface);
+    }
+    /* top header */
+    .app-header {
+      background: var(--surface);
+      padding: 12px 16px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .header-top h1 {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0;
+      line-height: 1.15;
+    }
+    .brand { flex: 1; display: flex; flex-direction: column; }
+    .brand-sub { font-size: 10px; color: var(--muted); margin-top: 1px; letter-spacing: 0.2px; }
+    /* city switcher sheet */
+    .sheet-mask {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 80; opacity: 0; pointer-events: none;
+      transition: opacity 0.22s;
+      display: flex; align-items: flex-end; justify-content: center;
+    }
+    .sheet-mask.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      width: 100%; max-width: 430px;
+      background: var(--surface);
+      border-radius: 18px 18px 0 0;
+      padding: 16px 16px calc(20px + var(--safe-bottom));
+      transform: translateY(100%);
+      transition: transform 0.28s;
+    }
+    .sheet-mask.open .sheet { transform: translateY(0); }
+    .sheet-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 13px; color: var(--muted);
+    }
+    .sheet-header button {
+      width: 28px; height: 28px;
+      font-size: 20px; color: var(--muted);
+    }
+    .city-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .city-pill {
+      padding: 10px 4px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: 13px; color: var(--fg);
+    }
+    .city-pill.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .sheet-tip {
+      margin-top: 12px; font-size: 11px; color: var(--muted); text-align: center;
+    }
+    .location-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--bg);
+    }
+    .location-btn svg { width: 14px; height: 14px; }
+    .icon-btn {
+      width: 36px; height: 36px;
+      display: grid; place-items: center;
+      border-radius: 50%;
+      background: var(--bg);
+    }
+    .icon-btn svg { width: 20px; height: 20px; color: var(--fg); }
+    /* search bar */
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border-radius: var(--radius-lg);
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+    }
+    .search-bar svg { width: 18px; height: 18px; color: var(--muted); flex-shrink: 0; }
+    .search-bar input {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      font-size: 14px;
+      color: var(--fg);
+      outline: none;
+    }
+    .search-bar input::placeholder { color: var(--muted); }
+
+    /* ─── filter chips ──────────────────────────────────────── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      overflow-x: auto;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-chip {
+      white-space: nowrap;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .filter-chip.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .filter-chip svg { width: 14px; height: 14px; }
+
+    /* ─── carousel banner ───────────────────────────────────── */
+    .banner-section { padding: 12px 16px; }
+    .carousel {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      height: 158px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .carousel-track {
+      display: flex;
+      height: 100%;
+      transition: transform 0.5s ease;
+      will-change: transform;
+    }
+    .carousel-slide {
+      flex: 0 0 100%;
+      padding: 22px 20px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .carousel-slide.s1 { background: linear-gradient(135deg, #5b2c91 0%, #7c3aed 55%, #a855f7 100%); }
+    .carousel-slide.s2 { background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 55%, #38bdf8 100%); }
+    .carousel-slide.s3 { background: linear-gradient(135deg, #b45309 0%, #ea580c 55%, #fb923c 100%); }
+    .carousel-slide h3 { margin: 0 0 4px; font-size: 19px; font-weight: 700; letter-spacing: 0.5px; max-width: 60%; position: relative; z-index: 1; }
+    .carousel-slide p { font-size: 13px; opacity: 0.92; max-width: 22ch; position: relative; z-index: 1; }
+    .carousel-slide .tag {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 3px 10px;
+      background: rgba(255,255,255,0.22);
+      border-radius: 999px;
+      font-size: 11px;
+      align-self: flex-start;
+      position: relative;
+      z-index: 1;
+    }
+    .carousel-slide .illu {
+      position: absolute;
+      right: 8px; bottom: 0;
+      width: 130px; height: 130px;
+      pointer-events: none;
+      opacity: 0.95;
+    }
+    .carousel-slide .skyline {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 28px;
+      opacity: 0.22;
+      pointer-events: none;
+    }
+    .carousel-dots {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 5px;
+      z-index: 2;
+    }
+    .carousel-dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.5);
+      transition: width 0.3s, background 0.3s;
+      cursor: pointer;
+    }
+    .carousel-dots span.active {
+      width: 18px;
+      border-radius: 3px;
+      background: #fff;
+    }
+
+    /* ─── quick actions ─────────────────────────────────────── */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 4px 16px 8px;
+    }
+    .quick-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      padding: 10px 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+    .quick-icon {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: grid; place-items: center;
+    }
+    .quick-icon svg { width: 20px; height: 20px; }
+    .quick-item span {
+      font-size: 12px; font-weight: 600; color: var(--fg);
+    }
+    .quick-item em {
+      font-size: 10px; color: var(--muted); font-style: normal;
+    }
+
+    /* ─── 住建认证 chip on header ─────────────────────────────── */
+    .gov-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      margin-top: 2px;
+      padding: 1px 6px 1px 4px;
+      background: color-mix(in oklab, var(--accent) 10%, transparent);
+      color: var(--accent);
+      border-radius: 999px;
+      font-size: 10px; font-weight: 600;
+      line-height: 1.4;
+      align-self: flex-start;
+    }
+    .gov-chip svg { width: 11px; height: 11px; }
+
+    /* ─── 省心三件套 + 支付通道 ────────────────────────────────── */
+    .trio-section {
+      margin: 4px 16px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 14px 12px;
+    }
+    .trio-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .trio-header h2 {
+      font-family: var(--font-display);
+      font-size: 14px; font-weight: 700; margin: 0;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .trio-header h2 svg { width: 16px; height: 16px; color: var(--accent); }
+    .trio-tip {
+      font-size: 10px; color: var(--accent);
+      padding: 2px 8px;
+      background: var(--accent-soft);
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .trio-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .trio-card {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 4px 8px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      text-align: center;
+    }
+    .trio-card .ico {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      background: var(--surface);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .trio-card .ico svg { width: 18px; height: 18px; }
+    .trio-card.c1 .ico svg { color: var(--success); }
+    .trio-card.c2 .ico svg { color: var(--accent); }
+    .trio-card.c3 .ico svg { color: #c026d3; }
+    .trio-card b { font-size: 13px; font-weight: 700; color: var(--fg); }
+    .trio-card em { font-size: 10px; color: var(--muted); font-style: normal; line-height: 1.3; }
+    .trio-pays {
+      display: flex; gap: 8px;
+    }
+    .trio-pay {
+      flex: 1;
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      font-size: 11px; color: var(--fg);
+    }
+    .trio-pay svg { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+    .trio-pay strong { font-weight: 700; font-size: 12px; }
+
+    /* sub-group separator inside trio-section */
+    .trio-sublabel {
+      display: flex; align-items: center; gap: 8px;
+      margin: 12px 0 8px;
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    .trio-sublabel::before,
+    .trio-sublabel::after {
+      content: ''; flex: 1; height: 1px;
+      background: var(--border);
+    }
+    /* inline entry chips inside trio-section (政府监管入口) */
+    .trio-entries {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .trio-entry {
+      flex: 1 1 calc(33.333% - 6px);
+      min-width: 105px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 8px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      font-size: 11px; color: var(--fg);
+      text-decoration: none;
+    }
+    .trio-entry .e-ic {
+      width: 22px; height: 22px; flex-shrink: 0;
+      border-radius: 6px;
+      display: grid; place-items: center;
+    }
+    .trio-entry .e-ic svg { width: 13px; height: 13px; }
+    .trio-entry .e-txt { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+    .trio-entry .e-txt b { font-size: 12px; font-weight: 700; color: var(--fg); }
+    .trio-entry .e-txt em { font-size: 9px; color: var(--muted); font-style: normal; }
+
+    /* ─── 同业开放接入栏 ─────────────────────────────────────── */
+    .operator-strip {
+      display: flex; gap: 8px;
+      padding: 0 16px 8px;
+      overflow-x: auto;
+    }
+    .operator-chip {
+      flex-shrink: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 12px;
+      min-width: 72px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+    }
+    .operator-chip .logo {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 14px;
+      color: white;
+    }
+    .operator-chip .logo.beike   { background: linear-gradient(135deg, #00b386, #00d39b); }
+    .operator-chip .logo.ziroom  { background: linear-gradient(135deg, #ff6b35, #ff8c42); }
+    .operator-chip .logo.longhu  { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+    .operator-chip .logo.huarun  { background: linear-gradient(135deg, #b91c1c, #ef4444); }
+    .operator-chip .logo.zsyd    { background: linear-gradient(135deg, #7c2d12, #c2410c); }
+    .operator-chip .logo.more    { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); }
+    .operator-chip .name {
+      font-size: 11px; color: var(--fg);
+      max-width: 70px;
+      text-align: center;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .operator-chip .name em { font-size: 10px; color: var(--muted); font-style: normal; }
+
+    /* ─── section header ────────────────────────────────────── */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 16px 8px;
+    }
+    .section-header h2 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .section-header a {
+      font-size: 13px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    /* ─── property card ─────────────────────────────────────── */
+    .property-list { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+    .property-card {
+      display: flex;
+      gap: 12px;
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .property-card:active { transform: scale(0.99); }
+    .prop-img {
+      width: 110px;
+      height: 82px;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent-soft) 80%, white));
+      display: grid; place-items: center;
+      color: var(--accent);
+      font-size: 11px;
+      overflow: hidden;
+    }
+    .prop-img img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); }
+    .prop-info { flex: 1; min-width: 0; }
+    .prop-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .prop-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+    .prop-tag {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .prop-tag.green {
+      background: color-mix(in oklab, var(--success) 12%, transparent);
+      color: var(--success);
+    }
+    .prop-tag.mode {
+      background: color-mix(in oklab, var(--accent) 18%, transparent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .prop-tag.mode-2 {
+      background: color-mix(in oklab, var(--warn) 18%, transparent);
+      color: color-mix(in oklab, var(--warn) 70%, black);
+      font-weight: 600;
+    }
+    .prop-tag.mode-3 {
+      background: color-mix(in oklab, var(--danger) 14%, transparent);
+      color: var(--danger);
+      font-weight: 600;
+    }
+    .prop-location {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      margin-bottom: 4px;
+    }
+    .prop-location svg { width: 12px; height: 12px; }
+    .prop-price-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .prop-price { font-size: 16px; font-weight: 700; color: var(--accent); }
+    .prop-price span { font-size: 12px; font-weight: 400; color: var(--muted); }
+    .prop-market-price {
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+    .prop-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* ─── bottom tab ────────────────────────────────────────── */
+    .bottom-tabs {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding: 6px 0 calc(6px + var(--safe-bottom));
+      z-index: 30;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 4px 0;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .tab-item.active { color: var(--accent); }
+    .tab-item svg { width: 22px; height: 22px; }
+
+    /* star rating */
+    .prop-stars { color: var(--warn); font-size: 11px; letter-spacing: 1px; margin-bottom: 3px; display:flex; align-items:center; gap:6px; }
+    .prop-stars .e { color: var(--border); }
+    .prop-stars .score { font-size: 10px; color: var(--muted); letter-spacing:0; font-weight:600; }
+    .prop-stars .score b { color: var(--fg); font-size:11px; }
+
+    /* 好房子四维度迷你条 — 出现在卡片上、与 d-property-standard.html 对齐 */
+    .prop-dims {
+      display:flex; gap:6px; align-items:center;
+      margin: 4px 0 6px;
+      flex-wrap:wrap;
+      font-size:10px;
+    }
+    .prop-dim {
+      display:flex; align-items:center; gap:3px;
+      color: var(--muted);
+    }
+    .prop-dim .lbl { font-size:10px; }
+    .prop-dim .bar {
+      width: 28px; height: 4px; border-radius: 2px;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+    .prop-dim .bar .fill { height:100%; border-radius:2px; }
+    .prop-dim.comfort .fill { background: #f59e0b; }
+    .prop-dim.green   .fill { background: #10b981; }
+    .prop-dim.tech    .fill { background: #3b82f6; }
+    .prop-dim.safety  .fill { background: #ef4444; }
+    .prop-dims .more {
+      font-size:10px; color: var(--accent); margin-left: auto;
+    }
+
+    /* 综合星级徽章（卡片右上角浮标） */
+    .prop-card-wrap { position: relative; }
+    .prop-rating-badge {
+      position: absolute; top: 6px; right: 6px;
+      padding: 3px 8px; border-radius: 999px;
+      background: linear-gradient(90deg, #0f172a 0%, #b45309 100%);
+      color: #fff; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.3px; z-index: 2;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .prop-rating-badge::before { content: "★ "; }
+
+    /* 筛选 chip · 好房子等级专用样式 */
+    .filter-chip.star-chip { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+    .filter-chip.star-chip.active { background: linear-gradient(90deg,#0f172a,#b45309); color:#fff; border-color:transparent; }
+
+    /* ─── tablet ────────────────────────────────────────────── */
+    @media (min-width: 600px) {
+      .app-shell { max-width: 820px; padding: 0 24px 72px; }
+      .status-bar { padding-inline: 24px; }
+      .app-header { padding-inline: 24px; }
+      .filter-row { padding-inline: 24px; }
+      .banner-section { padding-inline: 24px; }
+      .section-header { padding-inline: 24px; }
+      .property-list {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        padding-inline: 24px;
+      }
+      .property-card { flex-direction: column; }
+      .prop-img { width: 100%; height: 140px; }
+    }
+    @media (min-width: 820px) {
+      .property-list { grid-template-columns: 1fr 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- status bar -->
+  <div class="status-bar">
+    <span>9:41</span>
+    <span>🔋 100%</span>
+  </div>
+
+  <!-- header -->
+  <header class="app-header">
+    <div class="header-top">
+      <div class="brand">
+        <h1>江苏保租房</h1>
+        <span class="gov-chip">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l9 4v6c0 5.5-3.8 10.7-9 12-5.2-1.3-9-6.5-9-12V5l9-4z"/><path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" fill="none"/></svg>
+          省住建厅认证 · 市级统一服务平台
+        </span>
+      </div>
+      <button class="location-btn" id="cityBtn" onclick="document.getElementById('citySheet').classList.add('open')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <span id="cityLabel">南京</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <button class="icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+    </div>
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="搜索小区 / 楼栋房号 / 地铁站" />
+    </div>
+  </header>
+
+  <!-- city switcher sheet -->
+  <div class="sheet-mask" id="citySheet" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="sheet">
+      <div class="sheet-header">
+        <span id="citySheetTitle">切换城市 · 江苏省 13 设区市</span>
+        <button onclick="document.getElementById('citySheet').classList.remove('open')" aria-label="关闭">×</button>
+      </div>
+      <!-- 城市列表由 _region.js 的 BZF_REGION.prov.cities 渲染（见页尾脚本） -->
+      <div class="city-grid" id="cityGrid"></div>
+      <div class="sheet-tip">每市数据独立 · 由各市住建局核验后接入</div>
+    </div>
+  </div>
+
+  <!-- filter chips -->
+  <div class="filter-row">
+    <button class="filter-chip active">推荐</button>
+    <button class="filter-chip star-chip" onclick="location.href='c-house-rating.html'">★ 好房子 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button class="filter-chip">区域 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button class="filter-chip">租金 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button class="filter-chip">户型</button>
+    <button class="filter-chip">面积</button>
+    <button class="filter-chip">近地铁</button>
+  </div>
+
+  <!-- carousel banner -->
+  <div class="banner-section">
+    <div class="carousel" id="homeCarousel">
+      <div class="carousel-track">
+        <div class="carousel-slide s1">
+          <h3>给人才一个温馨的家</h3>
+          <p>人才公寓 · 温馨服务专家</p>
+          <span class="tag">人才引进 · 不限户籍 · 不限收入</span>
+          <svg class="skyline" viewBox="0 0 400 28" preserveAspectRatio="none"><path fill="#fff" d="M0 28 L0 18 L20 18 L20 10 L36 10 L36 16 L52 16 L52 6 L68 6 L68 14 L86 14 L86 8 L102 8 L102 18 L120 18 L120 12 L138 12 L138 20 L156 20 L156 4 L174 4 L174 14 L196 14 L196 10 L214 10 L214 18 L232 18 L232 8 L252 8 L252 14 L272 14 L272 6 L290 6 L290 16 L308 16 L308 10 L326 10 L326 18 L346 18 L346 12 L366 12 L366 6 L386 6 L386 16 L400 16 L400 28 Z"/></svg>
+          <svg class="illu" viewBox="0 0 130 130" fill="none">
+            <ellipse cx="65" cy="118" rx="48" ry="6" fill="rgba(0,0,0,0.18)"/>
+            <!-- man -->
+            <circle cx="48" cy="48" r="11" fill="#fde68a"/>
+            <path d="M48 38 a11 11 0 0 1 11 10 v-4 a11 11 0 0 0 -22 0 v4 a11 11 0 0 1 11 -10z" fill="#1f2937"/>
+            <path d="M34 110 v-32 a14 14 0 0 1 14 -14 h0 a14 14 0 0 1 14 14 v32 z" fill="#facc15"/>
+            <rect x="40" y="78" width="16" height="8" rx="2" fill="#0f172a" opacity="0.18"/>
+            <rect x="41" y="110" width="6" height="14" fill="#1e293b"/>
+            <rect x="50" y="110" width="6" height="14" fill="#1e293b"/>
+            <!-- woman -->
+            <circle cx="84" cy="50" r="11" fill="#fbcfe8"/>
+            <path d="M73 50 a11 11 0 0 1 22 0 v-4 a13 13 0 0 0 -22 -4 z" fill="#7c2d12"/>
+            <path d="M70 116 v-32 a14 14 0 0 1 14 -14 h0 a14 14 0 0 1 14 14 v32 z" fill="#fb7185"/>
+            <rect x="78" y="116" width="6" height="14" fill="#1e293b"/>
+            <rect x="87" y="116" width="6" height="14" fill="#1e293b"/>
+            <!-- heart -->
+            <path d="M66 38 c-2 -4 -8 -4 -8 1 c0 4 8 8 8 8 c0 0 8 -4 8 -8 c0 -5 -6 -5 -8 -1 z" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="carousel-slide s2">
+          <h3>三方电子备案 · 一键完成</h3>
+          <p>政府 · 运营方 · 租客 同步备案，签约即生效</p>
+          <span class="tag">江苏省统一备案系统 · 在线留痕</span>
+          <svg class="skyline" viewBox="0 0 400 28" preserveAspectRatio="none"><path fill="#fff" d="M0 28 L0 18 L20 18 L20 10 L36 10 L36 16 L52 16 L52 6 L68 6 L68 14 L86 14 L86 8 L102 8 L102 18 L120 18 L120 12 L138 12 L138 20 L156 20 L156 4 L174 4 L174 14 L196 14 L196 10 L214 10 L214 18 L232 18 L232 8 L252 8 L252 14 L272 14 L272 6 L290 6 L290 16 L308 16 L308 10 L326 10 L326 18 L346 18 L346 12 L366 12 L366 6 L386 6 L386 16 L400 16 L400 28 Z"/></svg>
+          <svg class="illu" viewBox="0 0 130 130" fill="none">
+            <ellipse cx="65" cy="118" rx="48" ry="6" fill="rgba(0,0,0,0.18)"/>
+            <rect x="22" y="38" width="36" height="78" rx="3" fill="#fbbf24"/>
+            <rect x="62" y="22" width="44" height="94" rx="3" fill="#fde68a"/>
+            <g fill="#0c4a6e" opacity="0.7">
+              <rect x="28" y="46" width="6" height="6"/><rect x="40" y="46" width="6" height="6"/><rect x="48" y="46" width="6" height="6"/>
+              <rect x="28" y="58" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/><rect x="48" y="58" width="6" height="6"/>
+              <rect x="28" y="70" width="6" height="6"/><rect x="40" y="70" width="6" height="6"/><rect x="48" y="70" width="6" height="6"/>
+              <rect x="28" y="82" width="6" height="6"/><rect x="40" y="82" width="6" height="6"/><rect x="48" y="82" width="6" height="6"/>
+              <rect x="28" y="94" width="6" height="6"/><rect x="40" y="94" width="6" height="6"/><rect x="48" y="94" width="6" height="6"/>
+              <rect x="68" y="30" width="7" height="7"/><rect x="80" y="30" width="7" height="7"/><rect x="92" y="30" width="7" height="7"/>
+              <rect x="68" y="44" width="7" height="7"/><rect x="80" y="44" width="7" height="7"/><rect x="92" y="44" width="7" height="7"/>
+              <rect x="68" y="58" width="7" height="7"/><rect x="80" y="58" width="7" height="7"/><rect x="92" y="58" width="7" height="7"/>
+              <rect x="68" y="72" width="7" height="7"/><rect x="80" y="72" width="7" height="7"/><rect x="92" y="72" width="7" height="7"/>
+              <rect x="68" y="86" width="7" height="7"/><rect x="80" y="86" width="7" height="7"/><rect x="92" y="86" width="7" height="7"/>
+              <rect x="68" y="100" width="7" height="7"/><rect x="80" y="100" width="7" height="7"/><rect x="92" y="100" width="7" height="7"/>
+            </g>
+            <path d="M22 38 L40 22 L58 38 Z" fill="#f59e0b"/>
+            <circle cx="84" cy="14" r="6" fill="#fef3c7"/>
+          </svg>
+        </div>
+        <div class="carousel-slide s3">
+          <h3>公积金月冲直付 · 0 操作</h3>
+          <p>江苏银行 × 贝壳 联合保障 · 房租公积金直扣</p>
+          <span class="tag">一键开通 · 全程免押 · 月付不涨</span>
+          <svg class="skyline" viewBox="0 0 400 28" preserveAspectRatio="none"><path fill="#fff" d="M0 28 L0 18 L20 18 L20 10 L36 10 L36 16 L52 16 L52 6 L68 6 L68 14 L86 14 L86 8 L102 8 L102 18 L120 18 L120 12 L138 12 L138 20 L156 20 L156 4 L174 4 L174 14 L196 14 L196 10 L214 10 L214 18 L232 18 L232 8 L252 8 L252 14 L272 14 L272 6 L290 6 L290 16 L308 16 L308 10 L326 10 L326 18 L346 18 L346 12 L366 12 L366 6 L386 6 L386 16 L400 16 L400 28 Z"/></svg>
+          <svg class="illu" viewBox="0 0 130 130" fill="none">
+            <ellipse cx="65" cy="118" rx="48" ry="6" fill="rgba(0,0,0,0.18)"/>
+            <!-- key -->
+            <g transform="translate(20,30) rotate(-20)">
+              <circle cx="20" cy="20" r="18" fill="none" stroke="#fef3c7" stroke-width="6"/>
+              <circle cx="20" cy="20" r="6" fill="#b45309"/>
+              <rect x="38" y="17" width="56" height="6" fill="#fef3c7"/>
+              <rect x="78" y="23" width="6" height="10" fill="#fef3c7"/>
+              <rect x="88" y="23" width="6" height="14" fill="#fef3c7"/>
+            </g>
+            <!-- house -->
+            <path d="M60 110 v-30 l24 -20 l24 20 v30 z" fill="#fcd34d"/>
+            <path d="M58 80 l26 -22 l26 22" stroke="#fef3c7" stroke-width="3" fill="none"/>
+            <rect x="78" y="92" width="12" height="18" fill="#92400e"/>
+            <rect x="72" y="84" width="6" height="6" fill="#fef3c7" opacity="0.7"/>
+            <rect x="92" y="84" width="6" height="6" fill="#fef3c7" opacity="0.7"/>
+          </svg>
+        </div>
+      </div>
+      <div class="carousel-dots">
+        <span class="active" data-i="0"></span>
+        <span data-i="1"></span>
+        <span data-i="2"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 省心租住 · 一站式保障（三件套 + 监管闭环 + 资金保障）-->
+  <div class="trio-section">
+    <div class="trio-header">
+      <h2>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        好房子：省心租住 · 一站式保障
+      </h2>
+      <span class="trio-tip">省级标准 · 非可选</span>
+    </div>
+
+    <div class="trio-grid">
+      <div class="trio-card c1">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <b>免押金</b>
+        <em>信用免押<br/>0 押金入住</em>
+      </div>
+      <div class="trio-card c2">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <b>家财险</b>
+        <em>最高 ¥10 万<br/>保障家电家具</em>
+      </div>
+      <div class="trio-card c3">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 12h14M5 16h10"/><path d="M17 16l4 4-4 4"/></svg></div>
+        <b>换租险</b>
+        <em>搬家无忧<br/>违约金兜底</em>
+      </div>
+    </div>
+
+    <div class="trio-sublabel">监管闭环</div>
+    <div class="trio-entries">
+      <a class="trio-entry" href="contracts.html">
+        <div class="e-ic" style="background: var(--accent-soft); color: var(--accent);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <div class="e-txt"><b>三方备案</b><em>政府·运营·租客</em></div>
+      </a>
+      <a class="trio-entry" href="landlord.html">
+        <div class="e-ic" style="background: color-mix(in oklab, var(--warn) 18%, transparent); color: color-mix(in oklab, var(--warn) 70%, black);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2h-4v-7H10v7H5a2 2 0 01-2-2z"/></svg>
+        </div>
+        <div class="e-txt"><b>业主托管</b><em>以租换购</em></div>
+      </a>
+      <a class="trio-entry" href="gov-admin.html">
+        <div class="e-ic" style="background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div class="e-txt"><b>政府监督</b><em>12345 直达</em></div>
+      </a>
+      <a class="trio-entry" href="service-workers.html">
+        <div class="e-ic" style="background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M15 11l1.5 1.5L20 9" stroke-linecap="round"/></svg>
+        </div>
+        <div class="e-txt"><b>服务者认证</b><em>持证上岗 · 24 人</em></div>
+      </a>
+      <a class="trio-entry" href="policy.html">
+        <div class="e-ic" style="background: color-mix(in oklab, var(--warn) 18%, transparent); color: color-mix(in oklab, var(--warn) 70%, black);">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="e-txt"><b>房屋星级评价</b><em>58 项评星细则</em></div>
+      </a>
+    </div>
+
+    <div class="trio-sublabel">资金保障</div>
+    <div class="trio-pays">
+      <div class="trio-pay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        <span><strong>公积金直付</strong> · 月度划扣</span>
+      </div>
+      <div class="trio-pay">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M3 11h18"/><path d="M7 15h2"/></svg>
+        <span><strong>银行监管</strong> · 江苏银行</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 同业开放接入运营机构 -->
+  <div class="section-header">
+    <h2>接入运营机构</h2>
+    <a href="property-intake-api.html">接入文档 →</a>
+  </div>
+  <div class="operator-strip">
+    <a class="operator-chip" href="operators.html">
+      <div class="logo beike">贝</div>
+      <span class="name">贝壳省心租<br/><em>承建方</em></span>
+    </a>
+    <a class="operator-chip" href="operators.html">
+      <div class="logo ziroom">自</div>
+      <span class="name">自如<br/><em>已接入</em></span>
+    </a>
+    <a class="operator-chip" href="operators.html">
+      <div class="logo longhu">龙</div>
+      <span class="name">龙湖冠寓<br/><em>已接入</em></span>
+    </a>
+    <a class="operator-chip" href="operators.html">
+      <div class="logo huarun">华</div>
+      <span class="name">华润有巢<br/><em>已接入</em></span>
+    </a>
+    <a class="operator-chip" href="operators.html">
+      <div class="logo zsyd">招</div>
+      <span class="name">招商伊敦<br/><em>已接入</em></span>
+    </a>
+    <a class="operator-chip" href="operators.html">
+      <div class="logo more">+6</div>
+      <span class="name">待接入<br/><em>同等资质</em></span>
+    </a>
+  </div>
+
+  <!-- featured section -->
+  <div class="section-header">
+    <h2>精选房源</h2>
+    <a href="detail.html">查看全部 <span>→</span></a>
+  </div>
+
+  <!-- property list -->
+  <div class="property-list">
+    <div class="prop-card-wrap">
+      <span class="prop-rating-badge">4 星</span>
+      <a class="property-card" href="detail.html">
+        <div class="prop-img">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="prop-info">
+          <h3>江宁·梧桐公馆人才公寓</h3>
+          <div class="prop-tags">
+            <span class="prop-tag mode">模式① 自营</span>
+            <span class="prop-tag">政府认证</span>
+            <span class="prop-tag green">近地铁</span>
+          </div>
+          <div class="prop-stars">★★★★<span class="e">★</span><span class="score"><b>4.2</b>/5.0 · 84分</span></div>
+          <div class="prop-dims">
+            <div class="prop-dim comfort"><span class="lbl">舒适</span><div class="bar"><div class="fill" style="width:84%"></div></div></div>
+            <div class="prop-dim green"><span class="lbl">绿</span><div class="bar"><div class="fill" style="width:70%"></div></div></div>
+            <div class="prop-dim tech"><span class="lbl">科技</span><div class="bar"><div class="fill" style="width:96%"></div></div></div>
+            <div class="prop-dim safety"><span class="lbl">安全</span><div class="bar"><div class="fill" style="width:90%"></div></div></div>
+          </div>
+          <div class="prop-location">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            江宁区 · 地铁 1 号线百家湖站 500m
+          </div>
+          <div class="prop-price-row">
+            <div>
+              <span class="prop-price">¥2,380<span> / 月</span></span>
+              <div class="prop-market-price">市场价 ¥3,200</div>
+            </div>
+            <span class="prop-badge">3 套可租</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="prop-card-wrap">
+      <span class="prop-rating-badge">4 星</span>
+      <a class="property-card" href="detail.html">
+        <div class="prop-img">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="prop-info">
+          <h3>建邺·河西青年公寓</h3>
+          <div class="prop-tags">
+            <span class="prop-tag mode-2">模式② 委托运营</span>
+            <span class="prop-tag">政府认证</span>
+          </div>
+          <div class="prop-stars">★★★★<span class="e">★</span><span class="score"><b>4.0</b>/5.0 · 80分</span></div>
+          <div class="prop-dims">
+            <div class="prop-dim comfort"><span class="lbl">舒适</span><div class="bar"><div class="fill" style="width:80%"></div></div></div>
+            <div class="prop-dim green"><span class="lbl">绿</span><div class="bar"><div class="fill" style="width:78%"></div></div></div>
+            <div class="prop-dim tech"><span class="lbl">科技</span><div class="bar"><div class="fill" style="width:86%"></div></div></div>
+            <div class="prop-dim safety"><span class="lbl">安全</span><div class="bar"><div class="fill" style="width:84%"></div></div></div>
+          </div>
+          <div class="prop-location">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            建邺区 · 地铁 2 号线奥体东站 300m
+          </div>
+          <div class="prop-price-row">
+            <div>
+              <span class="prop-price">¥3,120<span> / 月</span></span>
+              <div class="prop-market-price">市场价 ¥4,100</div>
+            </div>
+            <span class="prop-badge">5 套可租</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="prop-card-wrap">
+      <span class="prop-rating-badge">3 星</span>
+      <a class="property-card" href="detail.html">
+        <div class="prop-img">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="prop-info">
+          <h3>鼓楼·龙江新青年社区</h3>
+          <div class="prop-tags">
+            <span class="prop-tag mode-3">模式③ 贝壳深度托管</span>
+            <span class="prop-tag green">近地铁</span>
+          </div>
+          <div class="prop-stars">★★★<span class="e">★★</span><span class="score"><b>3.6</b>/5.0 · 72分</span></div>
+          <div class="prop-dims">
+            <div class="prop-dim comfort"><span class="lbl">舒适</span><div class="bar"><div class="fill" style="width:72%"></div></div></div>
+            <div class="prop-dim green"><span class="lbl">绿</span><div class="bar"><div class="fill" style="width:66%"></div></div></div>
+            <div class="prop-dim tech"><span class="lbl">科技</span><div class="bar"><div class="fill" style="width:74%"></div></div></div>
+            <div class="prop-dim safety"><span class="lbl">安全</span><div class="bar"><div class="fill" style="width:76%"></div></div></div>
+          </div>
+          <div class="prop-location">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            鼓楼区 · 地铁 4 号线龙江站 200m
+          </div>
+          <div class="prop-price-row">
+            <div>
+              <span class="prop-price">¥2,680<span> / 月</span></span>
+              <div class="prop-market-price">市场价 ¥3,500</div>
+            </div>
+            <span class="prop-badge">2 套可租</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="prop-card-wrap">
+      <span class="prop-rating-badge">5 星</span>
+      <a class="property-card" href="detail.html">
+        <div class="prop-img">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div class="prop-info">
+          <h3>秦淮·南部新城人才家园</h3>
+          <div class="prop-tags">
+            <span class="prop-tag mode">模式① 自营</span>
+            <span class="prop-tag">政府认证</span>
+            <span class="prop-tag">新上线</span>
+          </div>
+          <div class="prop-stars">★★★★★<span class="score"><b>4.7</b>/5.0 · 94分</span></div>
+          <div class="prop-dims">
+            <div class="prop-dim comfort"><span class="lbl">舒适</span><div class="bar"><div class="fill" style="width:94%"></div></div></div>
+            <div class="prop-dim green"><span class="lbl">绿</span><div class="bar"><div class="fill" style="width:88%"></div></div></div>
+            <div class="prop-dim tech"><span class="lbl">科技</span><div class="bar"><div class="fill" style="width:98%"></div></div></div>
+            <div class="prop-dim safety"><span class="lbl">安全</span><div class="bar"><div class="fill" style="width:96%"></div></div></div>
+          </div>
+          <div class="prop-location">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            秦淮区 · 地铁 3 号线大明路站 600m
+          </div>
+          <div class="prop-price-row">
+            <div>
+              <span class="prop-price">¥2,180<span> / 月</span></span>
+              <div class="prop-market-price">市场价 ¥2,900</div>
+            </div>
+            <span class="prop-badge">8 套可租</span>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- how it works -->
+  <div class="section-header"><h2>申请流程</h2></div>
+  <div style="padding: 0 16px 20px; display: flex; gap: 12px; overflow-x: auto;">
+    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
+      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">1</div>
+      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">资格核验</h4>
+      <p style="font-size: 12px; color: var(--muted);">在线提交身份与社保信息</p>
+    </div>
+    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
+      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">2</div>
+      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">选房看房</h4>
+      <p style="font-size: 12px; color: var(--muted);">线上预约 · 管家带看</p>
+    </div>
+    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
+      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">3</div>
+      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">签约备案</h4>
+      <p style="font-size: 12px; color: var(--muted);">电子合同 · 三方备案</p>
+    </div>
+    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
+      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">4</div>
+      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">入住服务</h4>
+      <p style="font-size: 12px; color: var(--muted);">月付 · 线上报修 · 公积金直付</p>
+    </div>
+  </div>
+
+  <!-- policy quick links -->
+  <div class="section-header"><h2>政策资讯</h2><a href="policy.html">更多 <span>→</span></a></div>
+  <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 8px;">
+    <a href="policy.html" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+      <div>
+        <span style="font-size: 13px; font-weight: 500;">南京市保租房申请条件放宽</span>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">2026-05-28 · 市住建局</div>
+      </div>
+      <span style="color: var(--accent); font-size: 12px;">新政</span>
+    </a>
+    <a href="policy.html" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+      <div>
+        <span style="font-size: 13px; font-weight: 500;">公积金支付保租房租金指南</span>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">2026-05-20 · 省公积金中心</div>
+      </div>
+      <span style="color: var(--success); font-size: 12px;">指南</span>
+    </a>
+  </div>
+
+  <!-- standard system section -->
+  <div class="section-header"><h2>好房子标准体系</h2><a href="policy.html">标准详情 <span>→</span></a></div>
+  <div style="padding: 0 16px 4px; display: flex; flex-direction: column; gap: 10px;">
+
+    <a href="operators.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">运营主体白名单</div>
+        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">经住建局审核认可的保租房运营机构</div>
+      </div>
+      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">6 家 →</span>
+    </a>
+
+    <a href="service-workers.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: color-mix(in oklab, var(--success) 12%, transparent); display: grid; place-items: center; flex-shrink: 0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">服务者认证</div>
+        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">持证上岗 · 服务可追溯 · 好评率 98.6%</div>
+      </div>
+      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">24 人 →</span>
+    </a>
+
+    <a href="suppliers.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">合格物资供应商公示</div>
+        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">家电 · 装修 · 物业 · 6 家合格供应商</div>
+      </div>
+      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">查看 →</span>
+    </a>
+
+    <!-- star rating standard inline -->
+    <div style="background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); padding: 16px; margin-top: 2px;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--warn)" stroke="var(--warn)" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <h3 style="font-size: 14px; font-weight: 600; margin: 0;">房源星级评价标准</h3>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+          <span style="color: var(--warn); letter-spacing: 1px;">★★★</span>
+          <span><strong>舒适型</strong> — 智能门锁/水电表 · 独立卫浴 · WiFi</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+          <span style="color: var(--warn); letter-spacing: 1px;">★★★★</span>
+          <span><strong>优质型</strong> — 管家 24H · 租客保险 · 公区 ≥10 人</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+          <span style="color: var(--warn); letter-spacing: 1px;">★★★★★</span>
+          <span><strong>旗舰型</strong> — 24H 持证管家 · 零押金 · 社区配套</span>
+        </div>
+      </div>
+      <a href="policy.html" style="display: inline-flex; align-items: center; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--accent);">查看 58 项评星细则 →</a>
+    </div>
+  </div>
+
+  <!-- bottom tabs (共享 tabbar) -->
+  <div id="tab-bar" data-series="c" data-active="home"></div>
+</div>
+
+<script src="_region.js"></script>
+<script>
+// tab navigation simulation
+document.querySelectorAll('.tab-item').forEach(tab => {
+  tab.addEventListener('click', e => {
+    const href = tab.getAttribute('href');
+    if (href && href !== '#' && !href.startsWith('http')) {
+      e.preventDefault();
+      // navigate — each page is a separate HTML file
+      window.location.href = href;
+    }
+  });
+});
+// filter chip toggle
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+// city switcher — 城市列表来自 _region.js 配置（省/市可换）
+(function(){
+  const grid = document.getElementById('cityGrid');
+  const label = document.getElementById('cityLabel');
+  const sheet = document.getElementById('citySheet');
+  const title = document.getElementById('citySheetTitle');
+  if (!grid) return;
+  const R = window.BZF_REGION || { prov: { full:'江苏省', capital:'南京',
+    cities:['南京','苏州','无锡','常州','镇江','扬州','泰州','南通','盐城','徐州','淮安','宿迁','连云港'] } };
+  const cities = R.prov.cities;
+  let saved = localStorage.getItem('bzf.city');
+  if (!saved || cities.indexOf(saved) === -1) saved = R.prov.capital;
+  if (title) title.textContent = '切换城市 · ' + R.prov.full + ' ' + cities.length + ' 设区市';
+  label.textContent = saved;
+  grid.innerHTML = cities.map(c =>
+    '<button class="city-pill' + (c === saved ? ' active' : '') + '" data-city="' + c + '">' + c + '</button>'
+  ).join('');
+  grid.addEventListener('click', e => {
+    const pill = e.target.closest('.city-pill');
+    if (!pill) return;
+    const city = pill.dataset.city;
+    label.textContent = city;
+    localStorage.setItem('bzf.city', city);
+    grid.querySelectorAll('.city-pill').forEach(p => p.classList.toggle('active', p === pill));
+    setTimeout(() => sheet.classList.remove('open'), 180);
+  });
+})();
+// header carousel — 3 slides auto-loop every 3.5s
+(function(){
+  const root = document.getElementById('homeCarousel');
+  if (!root) return;
+  const track = root.querySelector('.carousel-track');
+  const dots = root.querySelectorAll('.carousel-dots span');
+  let i = 0;
+  const total = dots.length;
+  function go(n){
+    i = (n + total) % total;
+    track.style.transform = 'translateX(-' + (i * 100) + '%)';
+    dots.forEach((d, k) => d.classList.toggle('active', k === i));
+  }
+  let timer = setInterval(() => go(i + 1), 3500);
+  dots.forEach(d => d.addEventListener('click', () => {
+    clearInterval(timer);
+    go(parseInt(d.dataset.i, 10));
+    timer = setInterval(() => go(i + 1), 3500);
+  }));
+})();
+</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

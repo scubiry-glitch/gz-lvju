@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>员工花名册 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .main{padding:22px 28px 40px;}
+    .topbar{display:flex; align-items:center; gap:14px; margin-bottom:18px;}
+    .topbar h1{font-size:22px; font-weight:600; margin:0; flex:1;}
+    .topbar .btn{padding:7px 14px; border-radius:6px; font-size:13px; border:1px solid var(--border); background:var(--surface);}
+    .topbar .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* KPI */
+    .kpi-row{display:grid; grid-template-columns:repeat(6, 1fr); gap:12px; margin-bottom:18px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; position:relative;}
+    .ki::before{content:''; position:absolute; left:0; top:14px; bottom:14px; width:3px; background:var(--accent); border-radius:0 2px 2px 0;}
+    .ki.gold::before{background:var(--gold);}
+    .ki.ok::before{background:var(--success);}
+    .ki.warn::before{background:var(--warn);}
+    .ki .l{font-size:11px; color:var(--muted); margin-left:8px;}
+    .ki .n{font-size:20px; font-weight:700; margin:2px 0 0 8px; line-height:1.1;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:11px; color:var(--muted); margin-left:8px; margin-top:2px;}
+    .ki .d.ok{color:var(--success);}
+
+    /* level filter row */
+    .lv-filter{display:flex; gap:6px; margin-bottom:14px; padding:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); align-items:center; flex-wrap:wrap;}
+    .lv-filter .lbl{font-size:12px; color:var(--muted); margin-right:6px;}
+    .lvc{padding:6px 14px; border-radius:6px; font-size:12.5px; background:var(--bg); cursor:pointer; border:1px solid transparent; display:flex; align-items:center; gap:6px;}
+    .lvc.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .lvc .ct{font-size:10px; padding:1px 6px; background:var(--surface); border-radius:8px; color:var(--muted); font-weight:600;}
+    .lvc.on .ct{background:rgba(255,255,255,0.25); color:white;}
+    .lvc .lv-dot{width:8px; height:8px; border-radius:50%;}
+    .lvc[data-lv=L1] .lv-dot{background:#d97706;}
+    .lvc[data-lv=L2] .lv-dot{background:#9ca3af;}
+    .lvc[data-lv=L3] .lv-dot{background:#10b981;}
+    .lvc[data-lv=L4] .lv-dot{background:#3b82f6;}
+    .lv-filter .info{margin-left:auto; font-size:11px; color:var(--muted);}
+
+    /* secondary filters */
+    .filter-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+    .fc{padding:6px 12px; border-radius:999px; background:var(--surface); border:1px solid var(--border); font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px;}
+    .fc.on{color:var(--accent); border-color:var(--accent);}
+    .fc svg{width:11px; height:11px;}
+    .search{flex:1; min-width:240px; padding:6px 12px; border-radius:6px; background:var(--surface); border:1px solid var(--border); font-size:12px; display:flex; align-items:center; gap:8px;}
+    .search input{flex:1; border:0; background:transparent; outline:none; font-size:12px;}
+
+    /* staff table */
+    .table-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;}
+    .staff-tbl{width:100%; border-collapse:collapse; font-size:13px;}
+    .staff-tbl th, .staff-tbl td{padding:11px 14px; text-align:left; border-bottom:1px solid var(--border);}
+    .staff-tbl th{background:#f9fafb; font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;}
+    .staff-tbl tr:hover td{background:#f9fafb;}
+    .staff-tbl td .av{display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:13px; margin-right:8px; vertical-align:middle;}
+    .staff-tbl td .nm{font-weight:600; vertical-align:middle;}
+    .staff-tbl td .id-line{font-size:11px; color:var(--muted); margin-top:1px; margin-left:40px;}
+    .lv-badge{display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:5px; font-size:11px; font-weight:700; color:white;}
+    .lv-badge.L1{background:linear-gradient(135deg, #92400e, #d97706);}
+    .lv-badge.L2{background:linear-gradient(135deg, #6b7280, #9ca3af);}
+    .lv-badge.L3{background:linear-gradient(135deg, #047857, #10b981);}
+    .lv-badge.L4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .role-pill{font-size:11px; color:var(--muted); padding:2px 8px; background:var(--bg); border-radius:4px;}
+    .stars{color:var(--gold); font-size:11px; letter-spacing:1px;}
+    .stars .e{color:var(--border);}
+    .progress-mini{display:inline-block; width:80px; height:5px; background:var(--bg); border-radius:3px; overflow:hidden; vertical-align:middle; margin-right:6px;}
+    .progress-mini .fl{height:100%; background:var(--accent); border-radius:3px;}
+    .progress-mini .fl.warn{background:var(--warn);}
+    .progress-mini .fl.ok{background:var(--success);}
+    .stat-pill{font-size:10px; padding:2px 7px; border-radius:3px; font-weight:600;}
+    .stat-pill.on{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .stat-pill.off{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .stat-pill.train{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .stat-pill.leave{background:var(--bg); color:var(--muted);}
+    .row-actions{font-size:11px;}
+    .row-actions a{color:var(--accent); margin-right:8px;}
+
+    /* batch action footer */
+    .table-foot{padding:12px 16px; background:#f9fafb; border-top:1px solid var(--border); display:flex; align-items:center; gap:12px; font-size:12px; color:var(--muted);}
+    .table-foot .pg{margin-left:auto; display:flex; gap:6px;}
+    .table-foot .pg a{padding:4px 8px; border:1px solid var(--border); border-radius:4px; background:var(--surface);}
+    .table-foot .pg a.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="b" data-active="staff"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>员工花名册</h1>
+      <span style="font-size:12px; color:var(--muted);">已签约 312 · L1-L4 调度池</span>
+      <button class="btn">导出名册</button>
+      <button class="btn">+ 邀请入职</button>
+      <button class="btn pri">+ 从平台招募</button>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpi-row">
+      <div class="ki"><div class="l">在岗总数</div><div class="n">312<span class="u">人</span></div><div class="d ok">↑ 28 本月</div></div>
+      <div class="ki gold"><div class="l">L4 督导/店长</div><div class="n">14<span class="u">人</span></div><div class="d">管 5+ 团队</div></div>
+      <div class="ki ok"><div class="l">L3 高级管家</div><div class="n">86<span class="u">人</span></div><div class="d">复杂场景骨干</div></div>
+      <div class="ki"><div class="l">L2 独立服役</div><div class="n">168<span class="u">人</span></div><div class="d">基本盘</div></div>
+      <div class="ki warn"><div class="l">L1 培训中</div><div class="n">44<span class="u">人</span></div><div class="d">含 12 待考</div></div>
+      <div class="ki"><div class="l">月均接单</div><div class="n">96<span class="u">/人</span></div><div class="d ok">↑ 8</div></div>
+    </div>
+
+    <!-- level quick filter -->
+    <div class="lv-filter">
+      <span class="lbl">等级</span>
+      <span class="lvc on" data-lv="ALL">全部 <span class="ct">312</span></span>
+      <span class="lvc" data-lv="L4"><span class="lv-dot"></span>L4 督导/店长 <span class="ct">14</span></span>
+      <span class="lvc" data-lv="L3"><span class="lv-dot"></span>L3 高级管家 <span class="ct">86</span></span>
+      <span class="lvc" data-lv="L2"><span class="lv-dot"></span>L2 独立服役 <span class="ct">168</span></span>
+      <span class="lvc" data-lv="L1"><span class="lv-dot"></span>L1 基础认证 <span class="ct">44</span></span>
+      <span class="info">L0 未签约 · L5+ 走经营轨</span>
+    </div>
+
+    <div class="filter-row">
+      <span class="fc on">岗位（12 类）<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+      <span class="fc">驻点 / 项目<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+      <span class="fc">在岗状态<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+      <span class="fc">合同到期 ≤90 天</span>
+      <span class="fc">客评 ≥ 4.7</span>
+      <span class="fc">本周可加单</span>
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input placeholder="搜姓名 / 工号 / 手机后 4 位" />
+      </div>
+    </div>
+
+    <!-- table -->
+    <div class="table-card">
+      <table class="staff-tbl">
+        <thead>
+          <tr>
+            <th style="width:24px;"><input type="checkbox"></th>
+            <th>员工</th>
+            <th>等级</th>
+            <th>岗位</th>
+            <th>驻点</th>
+            <th>本月单量</th>
+            <th>客评</th>
+            <th>合同</th>
+            <th>状态</th>
+            <th style="text-align:right;">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">陈</span><span class="nm">陈建国</span>
+              <div class="id-line">EMP-2024-0021 · 138****6582</div>
+            </td>
+            <td><span class="lv-badge L4">L4</span></td>
+            <td><span class="role-pill">旅居房管</span></td>
+            <td>梧桐公馆</td>
+            <td><span class="progress-mini"><span class="fl" style="width:92%;"></span></span>92 单</td>
+            <td><span class="stars">★★★★★</span> 4.98</td>
+            <td>至 2027-08</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">王</span><span class="nm">王晓琳</span>
+              <div class="id-line">EMP-2024-0156 · 138****2241</div>
+            </td>
+            <td><span class="lv-badge L4">L4</span></td>
+            <td><span class="role-pill">旅居门店</span></td>
+            <td>河西青年</td>
+            <td><span class="progress-mini"><span class="fl" style="width:78%;"></span></span>78 单</td>
+            <td><span class="stars">★★★★★</span> 4.92</td>
+            <td>至 2026-12 ⓘ</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">张</span><span class="nm">张师傅</span>
+              <div class="id-line">EMP-2025-0312 · 139****8842</div>
+            </td>
+            <td><span class="lv-badge L3">L3</span></td>
+            <td><span class="role-pill">检修</span></td>
+            <td>鼓楼物业</td>
+            <td><span class="progress-mini"><span class="fl" style="width:62%;"></span></span>62 单</td>
+            <td><span class="stars">★★★★<span class="e">★</span></span> 4.84</td>
+            <td>至 2027-04</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">郑</span><span class="nm">郑文涛</span>
+              <div class="id-line">EMP-2026-0314 · 139****0142</div>
+            </td>
+            <td><span class="lv-badge L3">L3</span></td>
+            <td><span class="role-pill">旅居管家</span></td>
+            <td>江北建发</td>
+            <td><span class="progress-mini"><span class="fl" style="width:48%;"></span></span>48 单</td>
+            <td><span class="stars">★★★★★</span> 4.90</td>
+            <td>至 2028-01</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">刘</span><span class="nm">刘小红</span>
+              <div class="id-line">EMP-2025-0418 · 137****2208</div>
+            </td>
+            <td><span class="lv-badge L3">L3</span></td>
+            <td><span class="role-pill">保洁</span></td>
+            <td>河西青年</td>
+            <td><span class="progress-mini"><span class="fl warn" style="width:38%;"></span></span>38 单</td>
+            <td><span class="stars">★★★★<span class="e">★</span></span> 4.42</td>
+            <td>至 2026-11 ⚠</td>
+            <td><span class="stat-pill train">观察期</span></td>
+            <td class="row-actions"><a>谈话</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">周</span><span class="nm">周丽华</span>
+              <div class="id-line">EMP-2026-0089 · 139****4128</div>
+            </td>
+            <td><span class="lv-badge L2">L2</span></td>
+            <td><span class="role-pill">入住服务</span></td>
+            <td>江宁安居</td>
+            <td><span class="progress-mini"><span class="fl" style="width:54%;"></span></span>54 单</td>
+            <td><span class="stars">★★★★<span class="e">★</span></span> 4.72</td>
+            <td>试用至 2026-08</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">赵</span><span class="nm">赵丽芳</span>
+              <div class="id-line">EMP-2026-0064 · 138****8821</div>
+            </td>
+            <td><span class="lv-badge L2">L2</span></td>
+            <td><span class="role-pill">客服与投诉处理</span></td>
+            <td>总部</td>
+            <td><span class="progress-mini"><span class="fl" style="width:66%;"></span></span>66 单</td>
+            <td><span class="stars">★★★★<span class="e">★</span></span> 4.74</td>
+            <td>至 2027-02</td>
+            <td><span class="stat-pill on">在岗</span></td>
+            <td class="row-actions"><a>排班</a><a>详情</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">孙</span><span class="nm">孙建华</span>
+              <div class="id-line">EMP-2026-0218 · 137****5546</div>
+            </td>
+            <td><span class="lv-badge L1">L1</span></td>
+            <td><span class="role-pill">房源托管</span></td>
+            <td>栖霞驻点</td>
+            <td><span class="progress-mini"><span class="fl warn" style="width:28%;"></span></span>28 单（师傅带）</td>
+            <td>—</td>
+            <td>试用至 2026-09</td>
+            <td><span class="stat-pill train">培训中</span></td>
+            <td class="row-actions"><a>查看培训</a></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td>
+              <span class="av">吴</span><span class="nm">吴桂英</span>
+              <div class="id-line">EMP-2026-0042 · 138****3361</div>
+            </td>
+            <td><span class="lv-badge L2">L2</span></td>
+            <td><span class="role-pill">保洁</span></td>
+            <td>建邺河西</td>
+            <td>—</td>
+            <td>—</td>
+            <td>停薪留职</td>
+            <td><span class="stat-pill leave">休假</span></td>
+            <td class="row-actions"><a>复岗排期</a></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="table-foot">
+        共 312 条 · 已选 0 ·
+        <a style="color:var(--accent);">批量排班</a>
+        <a style="color:var(--accent);">批量发课</a>
+        <a style="color:var(--danger);">批量离岗</a>
+        <div class="pg">
+          <a>‹</a>
+          <a class="on">1</a>
+          <a>2</a>
+          <a>3</a>
+          <a>…</a>
+          <a>26</a>
+          <a>›</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.lvc').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.lvc').forEach(x => x.classList.remove('on'));
+    c.classList.add('on');
+  }));
+  document.querySelectorAll('.fc').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>我的工单 · 服务者 App</title>
+  <style>
+    :root {
+      --bg: #f0fdf4; --surface: #ffffff; --fg: #042f2e;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0d9488; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --emerald: #10b981; --gold:#ca8a04;
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 8px; --radius-md: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+
+    .app-shell{max-width:430px; margin:0 auto; min-height:100vh; background:var(--bg); padding-bottom:80px;}
+    .status-bar{display:flex; justify-content:space-between; padding:8px 20px 6px; font-size:12px; font-weight:600; background:var(--surface);}
+
+    .top-h{background:linear-gradient(135deg, #047857 0%, #10b981 100%); color:white; padding:14px 16px 18px;}
+    .top-h h1{font-size:18px; font-weight:700; margin:0;}
+    .top-h .sub{font-size:12px; opacity:0.9; margin-top:4px;}
+
+    /* status filter tabs */
+    .stabs{display:flex; gap:0; padding:14px 0 0; margin:0 16px; border-bottom:1px solid var(--border); overflow-x:auto;}
+    .st{padding:10px 14px; font-size:13px; color:var(--muted); border-bottom:2px solid transparent; white-space:nowrap; display:flex; align-items:center; gap:4px;}
+    .st.on{color:var(--accent); border-color:var(--accent); font-weight:600;}
+    .st .cnt{font-size:10px; padding:1px 6px; background:var(--accent-soft); color:var(--accent); border-radius:8px; font-weight:600;}
+    .st:not(.on) .cnt{background:var(--line); color:var(--muted);}
+
+    /* new offer highlight */
+    .offer{margin:14px 16px 12px; padding:14px; background:linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--emerald) 8%, transparent)); border-radius:var(--radius-md); border:2px dashed var(--accent); position:relative;}
+    .offer .pulse-dot{position:absolute; top:14px; right:14px; width:8px; height:8px; background:var(--danger); border-radius:50%; box-shadow:0 0 0 0 var(--danger); animation:pulse 1.5s infinite;}
+    @keyframes pulse{50%{box-shadow:0 0 0 8px rgba(220,38,38,0);}}
+    .offer .head{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .offer .head .badge{font-size:10px; padding:2px 8px; background:var(--accent); color:white; border-radius:999px; font-weight:600;}
+    .offer .head .nm{font-size:13px; font-weight:600; color:var(--accent);}
+    .offer h3{font-size:15px; font-weight:600; margin:0 0 6px;}
+    .offer .meta{font-size:12px; color:var(--muted); margin-bottom:10px; line-height:1.6;}
+    .offer .meta b{color:var(--fg); font-weight:600;}
+    .offer-actions{display:flex; gap:8px;}
+    .offer-actions a{flex:1; padding:9px; text-align:center; border-radius:6px; font-size:13px; font-weight:600;}
+    .offer-actions .reject{background:var(--surface); color:var(--muted); border:1px solid var(--border);}
+    .offer-actions .accept{background:var(--accent); color:white;}
+
+    /* order list */
+    .olist{padding:0 16px;}
+    .order{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px; margin-bottom:10px;}
+    .order.active{border-left:4px solid var(--accent);}
+    .order .top{display:flex; align-items:start; gap:8px; margin-bottom:8px;}
+    .order .id{font-family:ui-monospace, monospace; font-size:10px; color:var(--muted); background:var(--line); padding:2px 6px; border-radius:3px; flex-shrink:0;}
+    .order .stat{font-size:10px; padding:2px 7px; border-radius:4px; font-weight:600; margin-left:auto;}
+    .order .stat.todo{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .order .stat.doing{background:var(--accent-soft); color:var(--accent);}
+    .order .stat.done{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .order .ttl{font-size:14px; font-weight:600;}
+    .order .meta{font-size:12px; color:var(--muted); margin-top:4px; display:flex; flex-wrap:wrap; gap:6px;}
+    .order .meta .p{padding:1px 6px; background:var(--bg); border-radius:3px;}
+    .order .info-row{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-size:12px;}
+    .order .info-row .row{display:flex; justify-content:space-between;}
+    .order .info-row .l{color:var(--muted);}
+    .order .info-row .v{font-weight:600;}
+    .order .timeline{display:grid; grid-template-columns:repeat(4, 1fr); gap:2px; margin-top:10px;}
+    .order .tl{padding:5px 4px; background:var(--bg); border-radius:3px; font-size:10px; color:var(--muted); text-align:center;}
+    .order .tl.done{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .order .tl.now{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+    .order .actions{display:flex; gap:6px; margin-top:10px;}
+    .order .actions a{flex:1; padding:7px; text-align:center; border-radius:5px; font-size:12px; border:1px solid var(--border); background:var(--bg); font-weight:500;}
+    .order .actions a.p{background:var(--accent); color:white; border-color:var(--accent);}
+
+    /* today summary */
+    .today{margin:14px 16px 0; padding:14px; background:var(--surface); border-radius:var(--radius-md); border:1px solid var(--border); display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;}
+    .ts{text-align:center;}
+    .ts .v{font-size:18px; font-weight:700;}
+    .ts .v.warn{color:var(--warn);}
+    .ts .v.ok{color:var(--success);}
+    .ts .l{font-size:10px; color:var(--muted); margin-top:2px;}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="status-bar"><span>9:41</span><span>🔋 100%</span></div>
+
+  <div class="top-h">
+    <h1>我的工单</h1>
+    <div class="sub">今天 12 单 · 本月 486 · 在岗 24 / 26 天</div>
+  </div>
+
+  <!-- today -->
+  <div class="today">
+    <div class="ts"><div class="v" style="color:var(--accent);" id="tsWait">3</div><div class="l">待响应</div></div>
+    <div class="ts"><div class="v" style="color:var(--warn);" id="tsDoing">2</div><div class="l">进行中</div></div>
+    <div class="ts"><div class="v ok" id="tsDone">7</div><div class="l">今完成</div></div>
+    <div class="ts"><div class="v">¥486</div><div class="l">今收入</div></div>
+  </div>
+
+  <!-- status tabs -->
+  <div class="stabs">
+    <span class="st on">全部<span class="cnt">12</span></span>
+    <span class="st">待响应<span class="cnt">3</span></span>
+    <span class="st">进行中<span class="cnt">2</span></span>
+    <span class="st">已完结<span class="cnt">7</span></span>
+    <span class="st">争议</span>
+  </div>
+
+  <!-- new offer -->
+  <div class="offer">
+    <div class="pulse-dot"></div>
+    <div class="head">
+      <span class="badge">⚡ 派单</span>
+      <span class="nm">3 分钟前 · 距你 0.8 km</span>
+    </div>
+    <h3>梧桐公馆 3-1502 · 全屋深度保洁</h3>
+    <div class="meta">
+      <b>2026-06-09 14:00-16:00</b> · 4 房 2 厅 · 入住客户特别提示：家中有 1 岁幼儿，<b>慎用化学清洁剂</b><br>
+      <b>L4+ 限定 · ¥386 · 预计佣金 ¥298</b>
+    </div>
+    <div class="offer-actions">
+      <a class="reject">2 分钟后超时</a>
+      <a class="accept">立即接单</a>
+    </div>
+  </div>
+
+  <!-- orders -->
+  <div class="olist">
+
+    <!-- 实时工单（来自中台派单，可推进至完工） -->
+    <div id="liveOrders"></div>
+
+    <div class="order active">
+      <div class="top">
+        <span class="id">O-202606-1284</span>
+        <span class="stat doing">进行中</span>
+      </div>
+      <div class="ttl">河西青年公寓 8 栋 1203 · 维修工单</div>
+      <div class="meta">
+        <span class="p">维修 · 水龙头</span>
+        <span class="p">客户：黄女士</span>
+        <span class="p">建邺区</span>
+      </div>
+      <div class="info-row">
+        <div class="row"><span class="l">预约时间</span><span class="v">今 14:00</span></div>
+        <div class="row"><span class="l">服务费</span><span class="v">¥186</span></div>
+        <div class="row"><span class="l">距离</span><span class="v">2.4 km</span></div>
+        <div class="row"><span class="l">预计耗时</span><span class="v">60 分</span></div>
+      </div>
+      <div class="timeline">
+        <div class="tl done">接单</div>
+        <div class="tl done">出发</div>
+        <div class="tl now">服务中</div>
+        <div class="tl">收尾</div>
+      </div>
+      <div class="actions">
+        <a>导航</a>
+        <a>呼叫</a>
+        <a class="p">上传完工照</a>
+      </div>
+    </div>
+
+    <div class="order active">
+      <div class="top">
+        <span class="id">O-202606-1286</span>
+        <span class="stat todo">待出发</span>
+      </div>
+      <div class="ttl">梧桐公馆 2-0805 · 月度保洁</div>
+      <div class="meta">
+        <span class="p">保洁 · 深度</span>
+        <span class="p">客户：林先生</span>
+        <span class="p">江宁区</span>
+      </div>
+      <div class="info-row">
+        <div class="row"><span class="l">预约时间</span><span class="v">今 16:30</span></div>
+        <div class="row"><span class="l">服务费</span><span class="v">¥248</span></div>
+      </div>
+      <div class="timeline">
+        <div class="tl done">接单</div>
+        <div class="tl now">待出发</div>
+        <div class="tl">服务</div>
+        <div class="tl">收尾</div>
+      </div>
+      <div class="actions">
+        <a>查看详情</a>
+        <a class="p">出发</a>
+      </div>
+    </div>
+
+    <div class="order">
+      <div class="top">
+        <span class="id">O-202606-1280</span>
+        <span class="stat done">已完结</span>
+      </div>
+      <div class="ttl">梧桐公馆 4-1808 · 物业接待 + 入住引导</div>
+      <div class="meta">
+        <span class="p">管家 · 入住</span>
+        <span class="p">客户：王女士</span>
+      </div>
+      <div class="info-row">
+        <div class="row"><span class="l">完成时间</span><span class="v">今 11:30</span></div>
+        <div class="row"><span class="l">客户评分</span><span class="v" style="color:var(--success);">5.0 ★</span></div>
+        <div class="row"><span class="l">服务费</span><span class="v">¥298</span></div>
+        <div class="row"><span class="l">小费</span><span class="v" style="color:var(--accent);">¥50</span></div>
+      </div>
+      <div class="actions">
+        <a>查看评价</a>
+        <a class="p">查看明细</a>
+      </div>
+    </div>
+
+    <div class="order">
+      <div class="top">
+        <span class="id">O-202606-1278</span>
+        <span class="stat done">已完结</span>
+      </div>
+      <div class="ttl">梧桐公馆 1-2103 · 老人陪护 4 小时</div>
+      <div class="meta">
+        <span class="p">家政 · 陪护</span>
+        <span class="p">江宁区</span>
+      </div>
+      <div class="info-row">
+        <div class="row"><span class="l">完成时间</span><span class="v">今 09:00</span></div>
+        <div class="row"><span class="l">客评</span><span class="v" style="color:var(--success);">5.0 ★</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="tab-bar" data-series="s" data-active="orders"></div>
+</div>
+<div class="toast" id="toast" style="position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(4,47,46,.92);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;z-index:120;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center;"></div>
+<script>
+  document.querySelectorAll('.st').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.st').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_orderbus.js"></script>
+<script>
+const BO = window.BZF_ORDERS;
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.opacity = '0', 2400);
+}
+
+// 服务者侧动作：接单 → 出发 → 完成
+const NEXT_BTN = { dispatched: '立即接单', accepted: '出发', serving: '完成服务' };
+
+function timeline(status){
+  const steps = [
+    { k: '接单', reached: ['accepted','serving','done','rated'] },
+    { k: '出发', reached: ['serving','done','rated'] },
+    { k: '服务中', reached: ['serving','done','rated'], now: ['serving'] },
+    { k: '收尾', reached: ['done','rated'], now: ['done'] }
+  ];
+  // 标记 now：当前待办步
+  let nowKey = '接单';
+  if (status === 'dispatched') nowKey = '接单';
+  else if (status === 'accepted') nowKey = '出发';
+  else if (status === 'serving') nowKey = '服务中';
+  else if (status === 'done' || status === 'rated') nowKey = '收尾';
+  return '<div class="timeline">' + steps.map(s => {
+    let cls = 'tl';
+    if (s.reached.indexOf(status) > -1) cls += ' done';
+    if (s.k === nowKey && status !== 'rated') cls = 'tl now';
+    if ((status === 'done' || status === 'rated') && s.k === '收尾') cls = 'tl done';
+    return '<div class="' + cls + '">' + s.k + '</div>';
+  }).join('') + '</div>';
+}
+
+function orderCard(o){
+  const st = BO.STATUS[o.status];
+  const statCls = o.status === 'done' || o.status === 'rated' ? 'done'
+    : o.status === 'dispatched' ? 'todo' : 'doing';
+  let actions = '';
+  if (NEXT_BTN[o.status]) {
+    actions = '<div class="actions"><a onclick="toast(\'已为您拨号\')">呼叫</a>' +
+      '<a class="p" onclick="step(\'' + o.id + '\')">' + NEXT_BTN[o.status] + '</a></div>';
+  } else if (o.status === 'done') {
+    actions = '<div class="actions"><a onclick="toast(\'等待客户在租客端评价\')">待客户评价</a></div>';
+  } else if (o.status === 'rated') {
+    const r = o.rating || {};
+    actions = '<div class="actions"><a onclick="toast(\'客评 ' + (r.score||5) + ' 星\')">查看评价</a></div>';
+  }
+  let extraRow = '';
+  if (o.status === 'rated' && o.rating) {
+    extraRow = '<div class="row"><span class="l">客户评分</span><span class="v" style="color:var(--success);">' +
+      o.rating.score + '.0 ★</span></div>';
+  }
+  return '<div class="order active">' +
+    '<div class="top"><span class="id">' + BO.esc(o.id) + '</span>' +
+    '<span class="stat ' + statCls + '">' + st.worker + '</span></div>' +
+    '<div class="ttl">' + BO.esc(o.house) + ' · ' + BO.esc(o.category || o.type) + '</div>' +
+    '<div class="meta"><span class="p">' + (BO.ICON[o.type] || '') + ' ' + BO.esc(o.type) + '</span>' +
+    '<span class="p">' + BO.esc(o.expectTime || '尽快') + '</span></div>' +
+    '<div class="info-row">' +
+    '<div class="row"><span class="l">服务费</span><span class="v">¥' + o.fee + '</span></div>' +
+    '<div class="row"><span class="l">来源</span><span class="v">中台派单</span></div>' +
+    extraRow + '</div>' +
+    timeline(o.status) + actions + '</div>';
+}
+
+function render(){
+  const box = document.getElementById('liveOrders');
+  const list = BO.byStatus(['dispatched','accepted','serving','done','rated']);
+  box.innerHTML = list.map(orderCard).join('');
+  document.getElementById('tsWait').textContent = 3 + BO.byStatus('dispatched').length;
+  document.getElementById('tsDoing').textContent = 2 + BO.byStatus(['accepted','serving']).length;
+  document.getElementById('tsDone').textContent = 7 + BO.byStatus(['done','rated']).length;
+}
+
+function step(id){
+  const before = BO.get(id);
+  const o = BO.advance(id);
+  const msg = { dispatched: '已接单，请尽快出发', accepted: '已出发，路上注意安全', serving: '服务已完成，等待客户评价' };
+  if (before) toast(msg[before.status] || '已更新');
+  render();
+}
+
+BO.onChange(render);
+window.addEventListener('pageshow', render);
+render();
+</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

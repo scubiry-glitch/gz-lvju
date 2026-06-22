@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贝壳 APP · 找房·旅居频道主入口 · 贵州旅居</title>
+<style>
+  :root{
+    --bg:#0b0f12; --stage:#0d1318; --surface:#ffffff; --fg:#0f172a; --muted:#6b7785;
+    --border:#e7ece9;
+    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
+    --brand-soft:color-mix(in oklab,var(--brand) 12%,transparent);
+    --gold:#b48a3f; --gold-deep:#8c6224; --gold-soft:color-mix(in oklab,var(--gold) 16%,transparent);
+    --ink:#10171c;
+    --r-sm:8px; --r-md:13px; --r-lg:18px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+    --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',Georgia,'Times New Roman',serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:
+      radial-gradient(1200px 600px at 18% -8%,#13322e 0%,transparent 60%),
+      radial-gradient(1000px 560px at 100% 0%,#2a2113 0%,transparent 55%),
+      var(--bg);
+    color:#e8eef0;font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+  h1,h2,h3,h4{margin:0;}
+  .wrap{max-width:1240px;margin:0 auto;padding:30px 22px 64px;}
+
+  /* ---------- page chrome ---------- */
+  .crumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;}
+  .crumbs a{background:rgba(255,255,255,.07);color:#cbd5d2;font-size:12px;padding:6px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.08);transition:.15s;}
+  .crumbs a:hover{background:rgba(255,255,255,.14);color:#fff;}
+
+  .masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;
+    padding-bottom:20px;margin-bottom:30px;border-bottom:1px solid rgba(255,255,255,.09);}
+  .masthead .kick{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;}
+  .masthead h1{font-family:var(--serif);font-weight:700;font-size:clamp(26px,3.8vw,40px);color:#fff;letter-spacing:.01em;line-height:1.2;}
+  .masthead h1 small{display:block;font-family:var(--font);font-weight:400;font-size:14px;color:#9fb0ab;letter-spacing:.02em;margin-top:9px;}
+  .masthead .seal{font-size:11px;color:#8ea39d;text-align:right;line-height:1.7;flex-shrink:0;}
+  .masthead .seal b{color:var(--gold);font-weight:600;}
+
+  /* ---------- stage ---------- */
+  .stage{display:grid;grid-template-columns:1fr 392px 1fr;gap:26px;align-items:start;}
+  .railcol{padding-top:8px;}
+  .rail-h{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--gold);margin:0 0 14px;
+    display:flex;align-items:center;gap:9px;}
+  .rail-h::before{content:"";width:22px;height:1px;background:var(--gold);opacity:.6;}
+  .anno{position:relative;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+    border-radius:var(--r-md);padding:13px 15px;margin-bottom:13px;}
+  .anno .t{font-size:13.5px;font-weight:600;color:#f3f7f6;display:flex;align-items:center;gap:8px;}
+  .anno .t .em{font-size:15px;}
+  .anno .tag{font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:auto;}
+  .anno .tag.keep{background:rgba(94,234,212,.14);color:#5eead4;border:1px solid rgba(94,234,212,.3);}
+  .anno .tag.new{background:var(--gold-soft);color:#e9c98c;border:1px solid rgba(180,138,63,.5);}
+  .anno p{margin:7px 0 0;font-size:11.5px;color:#9fb0ab;line-height:1.65;}
+  .anno .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
+  .anno .chips span{font-size:10px;color:#bcd0cb;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);padding:2px 8px;border-radius:6px;}
+
+  /* connector dots from anno to phone */
+  .rail-r .anno{text-align:right;}
+  .rail-r .anno .t{flex-direction:row-reverse;}
+  .rail-r .anno .tag{margin-left:0;margin-right:auto;}
+  .rail-r .anno .chips{justify-content:flex-end;}
+
+  /* ---------- phone ---------- */
+  .phone-stage{display:flex;flex-direction:column;align-items:center;}
+  .phone{width:392px;height:812px;background:#fff;border:11px solid #06090b;border-radius:46px;
+    overflow:hidden;position:relative;box-shadow:0 40px 90px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05) inset;}
+  .phone .dyn{position:absolute;top:13px;left:50%;transform:translateX(-50%);width:108px;height:28px;background:#06090b;border-radius:999px;z-index:30;}
+  .scr{position:absolute;inset:0;overflow-y:auto;background:#f5f7f6;}
+  .scr::-webkit-scrollbar{width:0;}
+
+  /* status bar */
+  .sbar{display:flex;justify-content:space-between;align-items:center;padding:13px 22px 4px;font-size:12px;font-weight:600;color:#fff;position:relative;z-index:20;}
+  .sbar .r{display:flex;gap:5px;align-items:center;font-size:11px;}
+
+  /* immersive hero */
+  .hero{position:relative;padding:0 0 18px;color:#fff;overflow:hidden;}
+  .hero .bgimg{position:absolute;inset:0;
+    background:
+      linear-gradient(180deg,rgba(8,18,16,.55) 0%,rgba(8,18,16,.05) 32%,rgba(8,18,16,.0) 50%,rgba(245,247,246,.0) 78%,#f5f7f6 100%),
+      url(assets/lvju/xijiang-night.jpg) center/cover;
+    z-index:0;}
+  .hero .bgimg::after{content:"";position:absolute;left:0;right:0;bottom:120px;height:160px;
+    background:
+      radial-gradient(60% 100% at 20% 100%,rgba(11,93,86,.0) 0,rgba(7,40,38,.9) 100%),
+      repeating-linear-gradient(85deg,rgba(255,255,255,.05) 0 2px,transparent 2px 16px);
+    opacity:.5;}
+  .hero .mist{position:absolute;left:-10%;right:-10%;bottom:96px;height:120px;
+    background:radial-gradient(50% 100% at 50% 100%,rgba(255,255,255,.22),transparent 70%);filter:blur(8px);z-index:1;}
+  .hero-in{position:relative;z-index:5;padding:6px 20px 0;}
+  .h-top{display:flex;align-items:center;justify-content:space-between;}
+  .h-loc{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;}
+  .h-loc .pin{font-size:13px;}
+  .h-loc .city{display:flex;flex-direction:column;line-height:1.15;}
+  .h-loc .city small{font-size:9px;font-weight:400;opacity:.8;letter-spacing:.04em;}
+  .h-ico{display:flex;gap:8px;}
+  .h-ico span{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:14px;backdrop-filter:blur(4px);}
+  .editorial{margin-top:34px;}
+  .editorial .ek{font-size:10px;letter-spacing:.4em;text-transform:uppercase;opacity:.85;}
+  .editorial h2{font-family:var(--serif);font-weight:700;font-size:30px;line-height:1.22;margin-top:8px;text-shadow:0 2px 18px rgba(0,0,0,.3);}
+  .editorial p{font-size:12px;opacity:.9;margin-top:7px;max-width:24ch;}
+  .searchbar{margin:18px 20px 0;position:relative;z-index:5;background:rgba(255,255,255,.96);border-radius:999px;
+    padding:11px 16px;display:flex;align-items:center;gap:9px;box-shadow:0 12px 30px rgba(6,30,26,.28);}
+  .searchbar .ic{color:var(--brand);font-size:14px;}
+  .searchbar .ph{color:#9aa6a2;font-size:12.5px;flex:1;}
+  .searchbar .go{font-size:11px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:6px 13px;border-radius:999px;}
+
+  /* sheet */
+  .sheet{position:relative;z-index:5;background:#f5f7f6;border-radius:22px 22px 0 0;margin-top:16px;padding:18px 0 10px;}
+
+  /* primary channels */
+  .seg-h{display:flex;align-items:baseline;gap:9px;padding:0 20px;margin:4px 0 13px;}
+  .seg-h .bar{width:3px;height:15px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
+  .seg-h h3{font-size:15px;font-weight:700;color:var(--ink);font-family:var(--serif);}
+  .seg-h .more{margin-left:auto;font-size:11px;color:var(--muted);}
+  .chan{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;padding:0 18px;}
+  .chan a{position:relative;background:#fff;border:1px solid var(--border);border-radius:15px;padding:14px 10px;text-align:center;
+    box-shadow:0 6px 16px rgba(15,42,38,.05);transition:.15s;display:block;color:var(--ink);}
+  .chan a:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(15,42,38,.12);border-color:color-mix(in oklab,var(--brand) 30%,var(--border));}
+  .chan .ic{width:40px;height:40px;margin:0 auto 8px;border-radius:12px;display:grid;place-items:center;font-size:20px;
+    background:linear-gradient(135deg,var(--brand-soft),#fff);}
+  .chan.feat .ic{background:linear-gradient(135deg,#1f6f5f,#0b5d56);color:#fff;box-shadow:0 6px 14px rgba(11,93,86,.3);}
+  .chan b{font-size:13px;font-weight:600;display:block;}
+  .chan small{font-size:10px;color:var(--muted);display:block;margin-top:2px;}
+  .chan .nb{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;color:#fff;
+    background:linear-gradient(90deg,var(--gold),var(--gold-deep));padding:1px 6px;border-radius:999px;letter-spacing:.04em;}
+
+  /* magazine cover card */
+  .feature{margin:20px 18px 4px;border-radius:18px;overflow:hidden;position:relative;height:172px;color:#fff;
+    box-shadow:0 16px 36px rgba(10,40,36,.22);}
+  .feature .fbg{position:absolute;inset:0;
+    background:linear-gradient(110deg,rgba(8,22,20,.78) 0%,rgba(8,22,20,.25) 60%,rgba(8,22,20,.05) 100%),
+      url(assets/lvju/stilt-miao.jpg) center/cover;}
+  .feature .fbg::after{content:"";position:absolute;right:-20px;bottom:-30px;font-size:150px;opacity:.16;}
+  .feature .fin{position:relative;z-index:2;padding:18px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
+  .feature .fk{font-size:10px;letter-spacing:.34em;text-transform:uppercase;opacity:.9;margin-bottom:6px;}
+  .feature h4{font-family:var(--serif);font-size:21px;font-weight:700;line-height:1.25;}
+  .feature p{font-size:11px;opacity:.88;margin-top:6px;}
+  .feature .pg{position:absolute;top:14px;right:16px;font-size:11px;font-weight:700;letter-spacing:.1em;opacity:.85;z-index:2;}
+
+  /* content services */
+  .content4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 18px;}
+  .content4 a{background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 6px;text-align:center;color:var(--ink);transition:.15s;}
+  .content4 a:hover{border-color:color-mix(in oklab,var(--gold) 40%,var(--border));box-shadow:0 8px 18px rgba(140,98,36,.12);}
+  .content4 .ic{font-size:23px;}
+  .content4 b{font-size:12px;font-weight:600;display:block;margin-top:6px;}
+  .content4 small{font-size:9px;color:var(--muted);}
+
+  /* listing magazine cards */
+  .list{padding:0 18px;}
+  .mcard{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;
+    box-shadow:0 8px 22px rgba(15,42,38,.06);}
+  .mcard .img{height:140px;position:relative;}
+  .mcard .img.a{background:url(assets/lvju/xijiang-night.jpg) center/cover,#0c4d44;}
+  .mcard .img.b{background:url(assets/lvju/xiaoqikong.jpg) center/cover,#0c4d44;}
+  .mcard .img::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.34),transparent 55%);}
+  .mcard .img .star{position:absolute;top:11px;left:11px;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);
+    color:#ffd98a;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .mcard .img .like{position:absolute;top:11px;right:11px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);display:grid;place-items:center;font-size:13px;color:#fff;}
+  .mcard .img .cap{position:absolute;left:13px;bottom:11px;color:#fff;}
+  .mcard .img .cap .nm{font-family:var(--serif);font-size:16px;font-weight:700;}
+  .mcard .img .cap .lo{font-size:10.5px;opacity:.92;margin-top:1px;}
+  .mcard .ci{padding:11px 13px 13px;}
+  .mcard .tags{display:flex;gap:6px;flex-wrap:wrap;}
+  .mcard .tags span{font-size:10px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
+  .mcard .pr{display:flex;align-items:baseline;justify-content:space-between;margin-top:10px;}
+  .mcard .pr b{color:var(--gold-deep);font-size:18px;font-family:var(--serif);}
+  .mcard .pr b small{font-size:10px;color:var(--muted);font-weight:400;font-family:var(--font);}
+  .mcard .pr .bk{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 16px;border-radius:999px;}
+
+  /* tab bar */
+  .tabbar{position:sticky;bottom:0;display:flex;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);
+    border-top:1px solid var(--border);padding:8px 0 22px;z-index:25;}
+  .tabbar a{flex:1;text-align:center;font-size:10px;color:#97a3a0;}
+  .tabbar a .ti{font-size:19px;display:block;}
+  .tabbar a.on{color:var(--brand);font-weight:700;}
+
+  .phone-cap{margin-top:18px;font-size:12px;color:#8ea39d;text-align:center;max-width:360px;line-height:1.7;}
+  .phone-cap b{color:#cdd9d4;}
+
+  /* legend / requirement mapping below */
+  .maprow{margin-top:46px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .mapc{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--r-lg);padding:18px 19px;}
+  .mapc .mh{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+  .mapc .mh .no{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:13px;color:#06090b;flex-shrink:0;}
+  .mapc.k1 .no{background:#5eead4;} .mapc.k2 .no{background:#e9c98c;} .mapc.k3 .no{background:linear-gradient(120deg,#5eead4,#e9c98c);}
+  .mapc .mh b{font-size:14.5px;color:#fff;}
+  .mapc .mh small{font-size:11px;color:#8ea39d;display:block;margin-top:1px;}
+  .mapc ul{margin:0;padding-left:2px;list-style:none;}
+  .mapc li{font-size:12px;color:#bcccc7;padding:5px 0 5px 20px;position:relative;border-top:1px solid rgba(255,255,255,.06);}
+  .mapc li:first-child{border-top:0;}
+  .mapc li::before{content:"›";position:absolute;left:4px;color:var(--gold);font-weight:700;}
+  .mapc li b{color:#eaf2ef;font-weight:600;}
+
+  .foot{margin-top:40px;text-align:center;color:#7e918c;font-size:12px;line-height:1.8;}
+  .foot b{color:#b9c8c3;}
+
+  @media(max-width:1080px){
+    .stage{grid-template-columns:1fr;max-width:420px;margin:0 auto;}
+    .railcol{order:2;}
+    .rail-r .anno{text-align:left;}
+    .rail-r .anno .t{flex-direction:row;}
+    .rail-r .anno .tag{margin-left:auto;margin-right:0;}
+    .rail-r .anno .chips{justify-content:flex-start;}
+    .phone-stage{order:1;}
+  }
+  @media(max-width:460px){
+    .phone{width:100%;height:780px;border-radius:34px;}
+    .maprow{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- breadcrumb -->
+  <div class="crumbs">
+    <a href="lvju-overview.html">‹ 返回 贵州旅居总览</a>
+    <a href="lvju-overview.html#liu">流 · 客户 + 业主视角</a>
+    <a href="lvju-rating-standard.html">★ 旅居星级评价体系</a>
+  </div>
+
+  <!-- masthead -->
+  <header class="masthead">
+    <div>
+      <div class="kick">Beike App · Travel-Living Channel</div>
+      <h1>找房 · 旅居 频道主入口
+        <small>贝壳 APP「找房·旅居」首页 — 一个入口，承接 找房 / 内容服务 / 旅居生活全场景</small>
+      </h1>
+    </div>
+    <div class="seal">
+      🐚 贝壳承建 · 贵州旅居<br>
+      <b>高端 · 大气 · 杂志风</b> 主入口设计稿<br>
+      仅供演示
+    </div>
+  </header>
+
+  <!-- stage: left rail · phone · right rail -->
+  <div class="stage">
+
+    <!-- LEFT RAIL -->
+    <div class="railcol rail-l">
+      <div class="rail-h">兼容 · 原找房能力</div>
+      <div class="anno">
+        <div class="t"><span class="em">📍</span>旅居城市选择 <span class="tag keep">保留</span></div>
+        <p>顶部沉浸式 Header 直接切换旅居目的地，省 / 设区市 / 景区三级联动。</p>
+        <div class="chips"><span>贵阳</span><span>黔东南</span><span>荔波</span><span>梵净山</span></div>
+      </div>
+      <div class="anno">
+        <div class="t"><span class="em">🏗</span>新房 · 二手 <span class="tag keep">保留</span></div>
+        <p>找房核心入口并入频道宫格：新房楼盘、二手房源照常进入列表与详情。</p>
+        <div class="chips"><span>新房楼盘</span><span>二手房源</span><span>房源列表</span></div>
+      </div>
+      <div class="anno">
+        <div class="t"><span class="em">🧭</span>置业导购 <span class="tag keep">子频道</span></div>
+        <p>作为子频道收纳到「找房」组：看房路线、贷款测算、专属顾问全程跟进。</p>
+        <div class="chips"><span>看房团</span><span>贷款测算</span><span>1对1顾问</span></div>
+      </div>
+    </div>
+
+    <!-- PHONE -->
+    <div class="phone-stage">
+      <div class="phone">
+        <div class="dyn"></div>
+        <div class="scr">
+
+          <!-- status bar -->
+          <div class="sbar"><span>9:41</span><span class="r">📶 5G&nbsp; 🔋 88%</span></div>
+
+          <!-- immersive hero -->
+          <div class="hero">
+            <div class="bgimg"></div>
+            <div class="mist"></div>
+            <div class="hero-in">
+              <div class="h-top">
+                <div class="h-loc">
+                  <span class="pin">📍</span>
+                  <span class="city">黔东南 ▾<small>贵州 · 旅居目的地</small></span>
+                </div>
+                <div class="h-ico"><span>♡</span><span>☷</span></div>
+              </div>
+              <div class="editorial">
+                <div class="ek">Live in the Scenery</div>
+                <h2>在贵州<br>住进风景里</h2>
+                <p>找房 · 旅居 · 民宿 · 长租，一处入口，安放整段旅程</p>
+              </div>
+            </div>
+            <div class="searchbar">
+              <span class="ic">🔍</span>
+              <span class="ph">搜目的地 / 楼盘 / 民宿 / 景区</span>
+              <span class="go">搜索</span>
+            </div>
+          </div>
+
+          <!-- sheet -->
+          <div class="sheet">
+
+            <!-- primary channels -->
+            <div class="seg-h"><span class="bar"></span><h3>找房 · 全频道</h3><span class="more">全部 ›</span></div>
+            <div class="chan">
+              <a class="chan feat" href="#"><span class="nb">新</span><div class="ic">🏔</div><b>旅居</b><small>短住·候鸟·康养</small></a>
+              <a class="chan feat" href="#"><span class="nb">新</span><div class="ic">🏡</div><b>民宿</b><small>整栋·星级·管家</small></a>
+              <a class="chan feat" href="#"><span class="nb">新</span><div class="ic">🗝</div><b>长租</b><small>整租·合租·月付</small></a>
+              <a class="chan" href="#"><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
+              <a class="chan" href="#"><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
+              <a class="chan" href="#"><div class="ic">🧭</div><b>置业导购</b><small>看房·测算</small></a>
+            </div>
+
+            <!-- magazine cover -->
+            <a class="feature" href="#" style="display:block;">
+              <div class="fbg" style="--c:''"></div>
+              <div class="pg">本期 · ISSUE 06</div>
+              <div class="fin">
+                <div class="fk">Editor's Pick · 旅居周刊</div>
+                <h4>黔东南秘境<br>住进千户苗寨的云端</h4>
+                <p>编辑实地探访 12 处五星旅居 · 含双早 + 苗寨向导</p>
+              </div>
+            </a>
+
+            <!-- content services -->
+            <div class="seg-h"><span class="bar"></span><h3>内容服务 · 玩在贵州</h3><span class="more">更多 ›</span></div>
+            <div class="content4">
+              <a href="#"><div class="ic">⛰</div><b>旅游景点</b><small>必打卡</small></a>
+              <a href="#"><div class="ic">🧭</div><b>旅游路线</b><small>精选行程</small></a>
+              <a href="#"><div class="ic">🍲</div><b>旅游美食</b><small>本地味道</small></a>
+              <a href="#"><div class="ic">🛎</div><b>旅游便民</b><small>出行·向导</small></a>
+            </div>
+
+            <!-- curated listings -->
+            <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选好房 · 五星旅居</h3><span class="more">查看列表 ›</span></div>
+            <div class="list">
+              <div class="mcard">
+                <div class="img a">
+                  <span class="star">★ 4.9 五星旅居</span>
+                  <span class="like">♡</span>
+                  <div class="cap"><div class="nm">云上观景民宿</div><div class="lo">黔东南 · 西江千户苗寨 · 整栋可包</div></div>
+                </div>
+                <div class="ci">
+                  <div class="tags"><span>苗寨核心</span><span>日落观景台</span><span>含双早</span><span>管家服务</span></div>
+                  <div class="pr"><b>¥588<small>/晚起</small></b><span class="bk">预订</span></div>
+                </div>
+              </div>
+              <div class="mcard">
+                <div class="img b">
+                  <span class="star">★ 4.8 五星旅居</span>
+                  <span class="like">♡</span>
+                  <div class="cap"><div class="nm">森林溪畔旅居</div><div class="lo">黔南 · 荔波小七孔 · 近景区</div></div>
+                </div>
+                <div class="ci">
+                  <div class="tags"><span>森林康养</span><span>溪畔独栋</span><span>可月租</span></div>
+                  <div class="pr"><b>¥466<small>/晚起</small></b><span class="bk">预订</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- tab bar -->
+          <div class="tabbar">
+            <a class="on"><span class="ti">🏠</span>首页</a>
+            <a><span class="ti">🔎</span>找房</a>
+            <a><span class="ti">📖</span>内容</a>
+            <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
+            <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+          </div>
+
+        </div>
+      </div>
+      <a href="lvju-app-home-demo.html" target="_blank" rel="noopener"
+         style="margin-top:18px;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#06090b;
+         background:linear-gradient(90deg,#e9c98c,#b48a3f);padding:11px 22px;border-radius:999px;box-shadow:0 10px 26px rgba(180,138,63,.32);">
+        ▶ 在独立页打开纯 Demo（新标签）</a>
+      <p class="phone-cap">贝壳 APP「找房·旅居」频道首页 · 沉浸式 Header + 杂志式编辑流<br>
+        <b>找房全频道</b>（旅居/民宿/长租/新房/二手/置业导购）+ <b>内容服务</b> + <b>精选好房</b> 单页承接<br>
+        <span style="font-size:11px;opacity:.85;">纯 Demo 页 <b>lvju-app-home-demo.html</b> 满屏铺满、无任何注释，适合截图 / 手机扫码演示</span></p>
+    </div>
+
+    <!-- RIGHT RAIL -->
+    <div class="railcol rail-r">
+      <div class="rail-h">新增 · 内容与频道</div>
+      <div class="anno">
+        <div class="t"><span class="em">📖</span>内容服务 <span class="tag new">新增</span></div>
+        <p>从"找房"延展到"玩法"，把目的地内容做进频道，提升停留与复访。</p>
+        <div class="chips"><span>旅游景点</span><span>旅游路线</span><span>旅游美食</span><span>旅游便民</span></div>
+      </div>
+      <div class="anno">
+        <div class="t"><span class="em">🏔</span>旅居 频道 <span class="tag new">新频道</span></div>
+        <p>短住 / 候鸟 / 康养式旅居独立成频，承接旅居星级房源与旅居管家服务。</p>
+        <div class="chips"><span>短住</span><span>候鸟过冬</span><span>康养旅居</span></div>
+      </div>
+      <div class="anno">
+        <div class="t"><span class="em">🏡</span>民宿 频道 <span class="tag new">新频道</span></div>
+        <p>整栋 / 星级民宿独立入口，对接★评级与验真卡片、含早含向导套餐。</p>
+        <div class="chips"><span>整栋包栋</span><span>星级民宿</span><span>管家服务</span></div>
+      </div>
+      <div class="anno">
+        <div class="t"><span class="em">🗝</span>长租 频道 <span class="tag new">新频道</span></div>
+        <p>整租 / 合租 / 月付长租独立成频，衔接置业导购与签约存管闭环。</p>
+        <div class="chips"><span>整租</span><span>合租</span><span>月付</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- requirement mapping -->
+  <div class="maprow">
+    <div class="mapc k1">
+      <div class="mh"><div class="no">1</div><div><b>兼容原有找房能力</b><small>原能力平移进频道，不丢功能</small></div></div>
+      <ul>
+        <li><b>旅居城市选择</b> · 沉浸式 Header 三级联动切换</li>
+        <li><b>新房 / 二手</b> · 并入「找房·全频道」宫格</li>
+        <li><b>房源列表查看</b> · 精选好房 → 完整列表与详情</li>
+        <li><b>置业导购</b> · 作为子频道收纳（看房 / 测算 / 顾问）</li>
+      </ul>
+    </div>
+    <div class="mapc k2">
+      <div class="mh"><div class="no">2</div><div><b>新增 内容服务</b><small>从找房延展到目的地玩法</small></div></div>
+      <ul>
+        <li><b>旅游景点</b> · 必打卡 + ★旅居星级联动</li>
+        <li><b>旅游路线</b> · 精选行程 / 一键收藏入行程单</li>
+        <li><b>旅游美食</b> · 本地味道 / 探店地图</li>
+        <li><b>旅游便民</b> · 出行 / 向导 / 票务等便民服务</li>
+      </ul>
+    </div>
+    <div class="mapc k3">
+      <div class="mh"><div class="no">3</div><div><b>新增 三大频道</b><small>旅居 · 民宿 · 长租 独立成频</small></div></div>
+      <ul>
+        <li><b>旅居</b> · 短住 / 候鸟 / 康养，接旅居星级房源</li>
+        <li><b>民宿</b> · 整栋 / 星级，对接验真 + 评级卡片</li>
+        <li><b>长租</b> · 整租 / 合租 / 月付，衔接签约存管</li>
+        <li>三频与「内容服务」「找房」在首页统一编排</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">
+    <p>贝壳 APP · 找房·旅居频道主入口设计稿 — <b>lvju-app-home.html</b></p>
+    <p>沿用 贵州旅居总览 的 流·留·居 叙事 · 高端杂志风首页 · 推广性指标均为政策推动后的上限假设，非承诺</p>
+  </div>
+
+</div>
+</body>
+</html>

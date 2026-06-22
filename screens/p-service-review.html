@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务评价 · 口碑回流 · 服务认证中台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .crumb{font-size:14px;color:var(--muted);} .crumb b{color:var(--fg);}
+  .top-actions .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:7px 12px;margin-left:6px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .full{grid-column:1/-1;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .crosslink{grid-column:1/-1;background:var(--accent-soft);border:1px solid color-mix(in oklab,var(--accent) 25%,transparent);border-radius:10px;padding:11px 14px;font-size:12.5px;color:#3730a3;}
+  .crosslink a{color:var(--accent);font-weight:600;}
+  .chain{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:600;}
+  .chain .node{padding:6px 12px;border-radius:8px;}
+  .chain .n1{background:#fef3c7;color:#92400e;} .chain .n2{background:var(--accent-soft);color:#3730a3;} .chain .n3{background:#dcfce7;color:#15803d;}
+  .chain .ar{color:var(--muted);font-weight:700;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;} .kpi b{font-size:20px;display:block;} .kpi span{font-size:11px;color:var(--muted);}
+  .src{display:flex;flex-wrap:wrap;gap:8px;}
+  .src .s{border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12px;display:flex;align-items:center;gap:7px;} .src .s .e{font-size:16px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;} th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);} th{color:var(--muted);font-weight:600;}
+  .badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:600;}
+  .b-ok{background:#dcfce7;color:#15803d;} .b-wait{background:#fef3c7;color:#92400e;} .b-bad{background:#fee2e2;color:#b91c1c;}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .row:last-child{border-bottom:0;} .row .k{color:var(--muted);} .row .v{font-weight:600;text-align:right;}
+  .lnk{color:var(--accent);font-weight:600;}
+  .note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;}
+  @media(max-width:1023px){.console{grid-template-columns:1fr;} .content{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="service-review"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × S 服务者 / <b>服务评价 · 口碑回流</b></div>
+      <div class="top-actions"><button class="btn">导出评价</button><button class="btn pri">差评处置</button></div>
+    </div>
+    <div class="content">
+      <div class="crosslink">📐 持续考核链路起点：<b>客户评价</b>回流 → 中台<b>信用引擎</b>计分 → 服务者升降级 / 收入。配套：
+        <a href="p-credit-engine.html">信用规则引擎</a> · <a href="s-income.html">服务者 · 收入与等级</a> · <a href="p-standards.html">L0–L7 等级标准</a></div>
+
+      <div class="card full">
+        <h3>考核闭环 <span class="pill">三段链</span></h3>
+        <div class="chain">
+          <span class="node n1">① 客户评价<br><small style="font-weight:400;">入住后打分 + 标签 + 文字</small></span>
+          <span class="ar">⇄</span>
+          <span class="node n2">② 信用引擎<br><small style="font-weight:400;">R-001~R-218 规则自动计分</small></span>
+          <span class="ar">⇄</span>
+          <span class="node n3">③ 服务者升降级<br><small style="font-weight:400;">等级 / 派单权重 / 收入</small></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>评价概览 <span class="pill">本月</span></h3>
+        <div class="kpis">
+          <div class="kpi"><b id="kpiCount">3,860</b><span>评价数</span></div>
+          <div class="kpi"><b>4.86</b><span>平均分</span></div>
+          <div class="kpi"><b>12</b><span>差评待处置</span></div>
+          <div class="kpi"><b>3</b><span>申诉中</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>评价来源</h3>
+        <div class="src">
+          <div class="s"><span class="e">📱</span>客户 App 服务后评价</div>
+          <div class="s"><span class="e">📞</span>平台回访</div>
+          <div class="s"><span class="e">🛡</span>投诉 / 工单关联</div>
+        </div>
+        <div class="note">评价 → 信用分权重：客评 40% · 投诉 30% · 全勤 15% · 带教 15%。</div>
+      </div>
+
+      <div class="card full">
+        <h3>最近评价 <span class="pill">已脱敏</span></h3>
+        <table>
+          <thead><tr><th>服务者</th><th>工单</th><th>评分</th><th>标签</th><th>状态</th><th>回流</th></tr></thead>
+          <tbody id="liveRows"></tbody>
+          <tbody>
+            <tr><td>陈*国 · L4</td><td>WO-58807</td><td>★ 5.0</td><td>细致 / 主动</td><td><span class="badge b-ok">已计分</span></td><td><a class="lnk" href="p-credit-engine.html">+2.4 →</a></td></tr>
+            <tr><td>杨*芳 · L4</td><td>WO-58791</td><td>★ 4.9</td><td>准时 / 周到</td><td><span class="badge b-ok">已计分</span></td><td><a class="lnk" href="s-income.html">收入 →</a></td></tr>
+            <tr><td>潘*军 · L2</td><td>WO-58772</td><td>★ 3.2</td><td>迟到</td><td><span class="badge b-bad">差评处置</span></td><td><a class="lnk" href="p-credit-engine.html">-3.0 →</a></td></tr>
+            <tr><td>王*强 · L3</td><td>WO-58760</td><td>★ 4.7</td><td>专业</td><td><span class="badge b-wait">待回访</span></td><td><a class="lnk" href="p-credit-engine.html">规则 →</a></td></tr>
+          </tbody>
+        </table>
+        <div class="note">差评进入处置流程（核实→申诉→裁定）；裁定结果回流 <a href="p-credit-engine.html" style="color:var(--accent);font-weight:600;">信用引擎</a>，影响 <a href="p-standards.html" style="color:var(--accent);font-weight:600;">L0–L7 等级</a> 与派单权重。</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="_region.js"></script>
+<script src="_orderbus.js"></script>
+<script>
+const BO = window.BZF_ORDERS;
+
+function maskName(n){
+  n = String(n || '');
+  if (n.length <= 1) return n;
+  return n[0] + '*' + n.slice(2);
+}
+function stars(s){ return '★ ' + Number(s || 5).toFixed(1); }
+
+function render(){
+  const rows = document.getElementById('liveRows');
+  const list = BO.byStatus('rated');
+  rows.innerHTML = list.map(o => {
+    const r = o.rating || {};
+    const w = o.worker || { name: '—', level: 'L1' };
+    const score = r.score || 5;
+    const bad = score <= 3;
+    const tagTxt = (r.tags && r.tags.length) ? r.tags.join(' / ') : (o.category || o.type);
+    const statusBadge = bad
+      ? '<span class="badge b-bad">差评处置</span>'
+      : '<span class="badge b-ok">已计分</span>';
+    const delta = bad ? '-3.0' : '+' + (score >= 5 ? '2.4' : '1.2');
+    return '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
+      '<td>' + maskName(w.name) + ' · ' + BO.esc(w.level) + '</td>' +
+      '<td>' + BO.esc(o.id.replace('WO-2026-', 'WO-')) + '</td>' +
+      '<td>' + stars(score) + '</td>' +
+      '<td>' + BO.esc(tagTxt) + '</td>' +
+      '<td>' + statusBadge + '</td>' +
+      '<td><a class="lnk" href="p-credit-engine.html">' + delta + ' →</a></td></tr>';
+  }).join('');
+
+  const n = list.length;
+  document.getElementById('kpiCount').textContent = (3860 + n).toLocaleString();
+}
+
+BO.onChange(render);
+window.addEventListener('pageshow', render);
+render();
+</script>
+<script src="_nav.js"></script>
+</body>
+</html>

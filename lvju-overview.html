@@ -1,0 +1,1188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贵州旅居 · 贝壳居住服务基础设施 · 总览</title>
+<style>
+  :root{
+    --bg:#f6f8f7; --surface:#ffffff; --fg:#0f172a; --muted:#64748b;
+    --border:#e3e8e6;
+    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
+    --brand-soft:color-mix(in oklab, var(--brand) 12%, transparent);
+    --gold:#b45309; --gold-soft:color-mix(in oklab, var(--gold) 14%, transparent);
+    --ok:#16a34a; --ok-soft:color-mix(in oklab,var(--ok) 13%,transparent);
+    --warn:#ea580c; --danger:#dc2626;
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  a{color:var(--brand);text-decoration:none;}
+  h1,h2,h3,h4{margin:0;}
+  .container{max-width:1280px;margin:0 auto;padding:28px 22px 60px;}
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,var(--brand-deep) 0%,var(--brand) 55%,var(--brand-2) 120%);
+    color:#fff;border-radius:var(--r-lg);padding:30px 30px 26px;position:relative;overflow:hidden;
+    margin-bottom:14px;
+  }
+  .hero::after{content:"⛰";position:absolute;right:-10px;bottom:-30px;font-size:150px;opacity:0.10;}
+  .hero .crumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .hero .crumbs a{background:rgba(255,255,255,0.16);color:#fff;font-size:12px;padding:5px 12px;border-radius:999px;}
+  .hero .crumbs a:hover{background:rgba(255,255,255,0.28);}
+  .hero h1{font-size:clamp(24px,3.4vw,34px);font-weight:700;letter-spacing:-0.01em;}
+  .hero .lead{font-size:14px;opacity:0.92;margin-top:8px;max-width:64ch;}
+  .hero .stamp{display:inline-flex;gap:6px;align-items:center;margin-top:14px;font-size:12px;background:rgba(255,255,255,0.14);padding:5px 12px;border-radius:999px;}
+
+  /* role nav */
+  .rolenav{position:sticky;top:0;z-index:40;background:color-mix(in oklab,var(--bg) 86%,transparent);
+    backdrop-filter:blur(8px);display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin-bottom:18px;border-bottom:1px solid var(--border);}
+  .rolenav a{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--border);
+    padding:7px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
+  .rolenav a .n{width:18px;height:18px;border-radius:50%;background:var(--brand-soft);color:var(--brand);
+    display:grid;place-items:center;font-size:11px;font-weight:700;}
+  .rolenav a:hover,.rolenav a.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .rolenav a:hover .n,.rolenav a.active .n{background:rgba(255,255,255,0.25);color:#fff;}
+
+  /* section shell */
+  .sec{margin-bottom:40px;scroll-margin-top:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .sec-head .idx{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;
+    display:grid;place-items:center;font-weight:700;font-size:15px;flex-shrink:0;}
+  .sec-head h2{font-size:21px;font-weight:700;}
+  .sec-head .sub{font-size:13px;color:var(--muted);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);}
+
+  /* ---------- §1 blueprint ---------- */
+  .bp-banner{background:linear-gradient(90deg,var(--brand-deep),var(--brand));color:#fff;
+    text-align:center;font-weight:700;font-size:16px;padding:12px;border-radius:var(--r-md) var(--r-md) 0 0;}
+  .bp-body{padding:20px;border:1px solid var(--border);border-top:0;border-radius:0 0 var(--r-md) var(--r-md);background:var(--surface);}
+  .pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .pillar{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;display:flex;flex-direction:column;}
+  .pillar .ph{background:var(--brand);color:#fff;padding:12px 14px;}
+  .pillar .ph .t{font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px;}
+  .pillar .ph .s{font-size:11px;opacity:0.9;margin-top:3px;}
+  .pillar .pb{padding:12px 14px;flex:1;}
+  .pillar .pb .row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+  .chip{font-size:11px;padding:3px 8px;border-radius:6px;background:var(--brand-soft);color:var(--brand-deep);}
+  .pillar .svc{border-top:1px dashed var(--border);padding-top:9px;}
+  .pillar .svc .lab{font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:5px;}
+  .chip.svc-chip{background:var(--gold-soft);color:var(--gold);}
+  .bp-foot{margin-top:14px;background:var(--brand-soft);border-radius:var(--r-md);padding:13px 16px;font-size:13px;color:var(--brand-deep);}
+  .bp-foot b{color:var(--brand-deep);}
+
+  /* role map */
+  .rolemap{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px;}
+  .rolemap .rm{border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;background:var(--surface);}
+  .rolemap .rm .e{font-size:22px;}
+  .rolemap .rm b{display:block;font-size:13px;margin-top:4px;}
+  .rolemap .rm span{font-size:11px;color:var(--muted);}
+
+  /* dev plan (§1 三阶段) */
+  .devplan{margin-top:16px;}
+  .devplan .dh{font-size:14px;font-weight:700;color:var(--brand-deep);margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .phase{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);display:flex;flex-direction:column;}
+  .phase .pt{padding:11px 13px;color:#fff;}
+  .phase.p1 .pt{background:#0d9488;} .phase.p2 .pt{background:var(--brand-deep);} .phase.p3 .pt{background:linear-gradient(120deg,#0b5d56,#b45309);}
+  .phase .pt b{font-size:14px;display:block;} .phase .pt span{font-size:11px;opacity:.9;}
+  .phase .pbd{padding:12px 13px;flex:1;}
+  .phase .pl{font-size:10px;color:var(--muted);letter-spacing:.5px;margin:0 0 5px;}
+  .phase .pills{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+  .phase ul{margin:0 0 10px;padding-left:15px;} .phase li{font-size:11.5px;color:var(--fg);margin-bottom:3px;}
+  .phase .gate{font-size:11px;background:var(--gold-soft);color:var(--gold);border-radius:7px;padding:8px 10px;line-height:1.5;}
+  .phase .gate b{color:var(--gold);}
+  .phase .cap-note{font-size:10px;color:var(--warn);margin-top:6px;}
+
+  /* ---------- channels ---------- */
+  .channels{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px;}
+  .ch{border:1px solid var(--border);border-radius:var(--r-md);padding:14px;background:var(--surface);position:relative;}
+  .ch .ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:19px;background:var(--brand-soft);margin-bottom:8px;}
+  .ch b{font-size:14px;}
+  .ch p{font-size:11px;color:var(--muted);margin:3px 0 0;}
+  .ch.on{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);}
+  .ch .tag{position:absolute;top:10px;right:10px;font-size:10px;font-weight:600;color:#fff;background:var(--brand);padding:2px 7px;border-radius:999px;}
+
+  /* phone flow */
+  .flow{display:flex;gap:18px;overflow-x:auto;padding:6px 2px 16px;}
+  .flow-step{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:8px;}
+  .flow-step .step-lab{font-size:12px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:3px 12px;border-radius:999px;}
+  .phone{width:236px;height:486px;background:#fff;border:9px solid #0f172a;border-radius:34px;overflow:hidden;position:relative;box-shadow:0 12px 30px rgba(15,23,42,.16);}
+  .phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:88px;height:18px;background:#0f172a;border-radius:0 0 12px 12px;z-index:6;}
+  .ps{position:absolute;inset:0;overflow-y:auto;font-size:11px;background:var(--bg);}
+  .ps::-webkit-scrollbar{width:0;}
+  .ps-stat{display:flex;justify-content:space-between;padding:7px 14px 3px;font-size:9px;color:var(--muted);}
+  .ps-hd{background:linear-gradient(135deg,var(--brand-deep),var(--brand));color:#fff;padding:9px 13px 12px;}
+  .ps-hd .brow{display:flex;align-items:center;justify-content:space-between;}
+  .ps-hd .bt{font-weight:700;font-size:14px;}
+  .ps-hd .loc{font-size:10px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px;}
+  .ps-hd .srch{margin-top:8px;background:rgba(255,255,255,.92);border-radius:999px;padding:6px 11px;color:#94a3b8;font-size:10px;}
+  .ps-chips{display:flex;gap:6px;padding:9px 12px 4px;flex-wrap:wrap;}
+  .ps-chip{font-size:10px;padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted);}
+  .ps-chip.star{background:linear-gradient(90deg,#0f766e,#b45309);color:#fff;border:0;font-weight:600;}
+  .ps-body{padding:6px 12px 16px;}
+  .lcard{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:10px;position:relative;}
+  .lcard .img{height:84px;background:linear-gradient(135deg,#0d9488,#5eead4);position:relative;}
+  .lcard .img .star-badge{position:absolute;top:6px;right:6px;background:linear-gradient(90deg,#0f172a,#b45309);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:999px;}
+  .lcard .img .terr{position:absolute;left:0;bottom:0;width:100%;height:30px;background:linear-gradient(0deg,rgba(0,0,0,.28),transparent);}
+  .lcard .ci{padding:8px 10px;}
+  .lcard .ci .nm{font-weight:600;font-size:12px;}
+  .lcard .ci .meta{color:var(--muted);font-size:10px;margin-top:2px;}
+  .dims{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0;}
+  .dim{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--muted);}
+  .dim .bar{width:22px;height:4px;border-radius:2px;background:#eef2f1;overflow:hidden;}
+  .dim .bar i{display:block;height:100%;background:var(--brand);}
+  .lcard .price{display:flex;align-items:baseline;justify-content:space-between;margin-top:4px;}
+  .lcard .price b{color:var(--gold);font-size:14px;}
+  .lcard .price b small{font-weight:400;font-size:9px;color:var(--muted);}
+  .lcard .price .bk{font-size:10px;background:var(--brand);color:#fff;padding:4px 10px;border-radius:999px;}
+
+  /* detail phone */
+  .pd-hero{height:120px;background:linear-gradient(135deg,#0d9488,#5eead4);position:relative;}
+  .pd-hero .back{position:absolute;top:10px;left:10px;width:24px;height:24px;background:rgba(0,0,0,.3);border-radius:50%;color:#fff;display:grid;place-items:center;}
+  .pd-hero .sb{position:absolute;bottom:8px;left:10px;background:linear-gradient(90deg,#0f172a,#b45309);color:#fff;font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;}
+  .pd-sec{padding:10px 12px;background:var(--surface);border-bottom:6px solid var(--bg);}
+  .pd-sec .t{font-weight:700;font-size:13px;}
+  .pd-sec .sub{font-size:10px;color:var(--muted);margin-top:2px;}
+  .rate-row{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:10px;}
+  .rate-row .k{width:48px;color:var(--muted);}
+  .rate-row .bar{flex:1;height:5px;background:#eef2f1;border-radius:3px;overflow:hidden;}
+  .rate-row .bar i{display:block;height:100%;background:linear-gradient(90deg,#0f766e,#b45309);}
+  .rate-row .v{width:22px;text-align:right;font-weight:600;color:var(--brand-deep);}
+  .tagline{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+  .tg{font-size:9px;padding:2px 7px;border-radius:6px;background:var(--brand-soft);color:var(--brand-deep);}
+  .sticky-buy{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:8px;}
+  .sticky-buy .pp{flex:1;}
+  .sticky-buy .pp b{color:var(--gold);font-size:16px;}
+  .sticky-buy .pp small{font-size:9px;color:var(--muted);}
+  .btn-buy{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-size:12px;font-weight:600;padding:9px 20px;border-radius:999px;}
+
+  /* order / pay rows */
+  .frow{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;}
+  .frow .k{color:var(--muted);}
+  .frow .v{font-weight:600;}
+  .frow.big .v{color:var(--gold);font-size:15px;}
+  .seg{padding:8px 12px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;background:var(--bg);}
+  .payopt{display:flex;align-items:center;gap:9px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;}
+  .payopt .pi{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font-size:13px;}
+  .payopt .nm{flex:1;font-weight:500;}
+  .payopt .rd{width:15px;height:15px;border-radius:50%;border:2px solid var(--border);}
+  .payopt.sel .rd{border-color:var(--brand);background:radial-gradient(circle at center,var(--brand) 0 4px,#fff 4px);}
+  .pay-done{margin:16px 12px;text-align:center;}
+  .pay-done .ck{width:46px;height:46px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center;font-size:24px;margin:0 auto 8px;}
+
+  /* ---------- owners (§3) ---------- */
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .owner{padding:20px;}
+  .owner .oh{display:flex;align-items:center;gap:11px;margin-bottom:6px;}
+  .owner .oh .e{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-size:22px;background:var(--brand-soft);}
+  .owner .oh b{font-size:17px;}
+  .owner .oh span{font-size:12px;color:var(--muted);}
+  .owner .desc{font-size:13px;color:var(--muted);margin:6px 0 12px;}
+  .feat{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .feat li{font-size:12px;display:flex;gap:6px;align-items:flex-start;}
+  .feat li::before{content:"✓";color:var(--brand);font-weight:700;}
+  .miniconsole{margin-top:14px;background:#0f172a;border-radius:var(--r-md);padding:13px;color:#e2e8f0;}
+  .miniconsole .mt{font-size:11px;color:#94a3b8;margin-bottom:8px;display:flex;justify-content:space-between;}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .kpi{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:9px;padding:9px;}
+  .kpi b{font-size:17px;color:#fff;display:block;}
+  .kpi b small{font-size:10px;color:#5eead4;font-weight:600;}
+  .kpi span{font-size:10px;color:#94a3b8;}
+
+  /* ---------- mid-platform (§4) ---------- */
+  .platform-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;align-items:start;}
+  .modblock{padding:18px 20px;}
+  .modblock h3{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+  .modblock .flowtag{font-size:10px;font-weight:700;color:#fff;padding:2px 9px;border-radius:6px;}
+  .flowtag.liu{background:var(--brand);}
+  .flowtag.liu2{background:var(--gold);}
+  .flowtag.ju{background:#475569;}
+  .modblock .bsub{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .mods{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .mod{border:1px solid var(--border);border-radius:var(--r-md);padding:12px;position:relative;}
+  .mod.core{border-color:var(--gold);background:var(--gold-soft);}
+  .mod .mi{font-size:18px;}
+  .mod b{display:block;font-size:13px;margin:5px 0 3px;}
+  .mod p{font-size:11px;color:var(--muted);margin:0;}
+  .mod .corebadge{position:absolute;top:9px;right:9px;font-size:9px;font-weight:700;color:#fff;background:var(--gold);padding:2px 7px;border-radius:999px;}
+  .base-strip{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);}
+  .base-chip{font-size:11px;padding:4px 10px;border-radius:7px;background:var(--bg);border:1px solid var(--border);color:var(--muted);}
+
+  /* subsection header + flow tag (used in §2/§3 sec-head) */
+  .subhd{font-size:14px;font-weight:700;color:var(--brand-deep);margin:20px 0 12px;padding-left:10px;border-left:3px solid var(--brand);}
+  .ftag{display:inline-block;font-size:13px;font-weight:700;color:#fff;padding:2px 11px;border-radius:8px;margin-right:8px;vertical-align:2px;}
+  .ftag.liu{background:var(--brand);}
+  .ftag.stay{background:var(--gold);}
+
+  /* asset hub (流·房源管理，评级为核心) */
+  .assethub .bsub{font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .hubrow{display:grid;grid-template-columns:1fr 36px 1.35fr 36px 1fr;align-items:stretch;}
+  .hubcol{border:1px solid var(--border);border-radius:var(--r-md);padding:13px;background:var(--surface);}
+  .hubcol h4{font-size:14px;display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+  .hubcol .tag{font-size:11px;color:var(--muted);}
+  .hubcol ul{margin:9px 0 0;padding-left:15px;}
+  .hubcol li{font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .hubcol.core{border:2px solid var(--gold);background:linear-gradient(180deg,var(--gold-soft),#fff);box-shadow:0 6px 18px rgba(180,83,9,.10);}
+  .hubcol.core .coremetric{display:flex;gap:7px;margin-top:9px;}
+  .hubcol.core .m{flex:1;background:#fff;border:1px solid var(--gold-soft);border-radius:8px;padding:7px 4px;text-align:center;}
+  .hubcol.core .m b{color:var(--gold);font-size:14px;display:block;}
+  .hubcol.core .m span{font-size:10px;color:var(--muted);}
+  .hubarrow{display:grid;place-items:center;color:var(--brand);font-size:20px;font-weight:700;}
+  .verifybar{margin-top:14px;border:1px dashed var(--brand);border-radius:var(--r-md);background:var(--brand-soft);padding:13px 15px;}
+  .verifybar .vh{font-size:13px;font-weight:700;color:var(--brand-deep);margin-bottom:9px;}
+  .vsys{display:flex;gap:9px;flex-wrap:wrap;align-items:center;}
+  .vsys .sysc{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;display:flex;align-items:center;gap:6px;}
+  .vsys .sysc .e{font-size:15px;}
+  .vsys .arrow{color:var(--brand);font-weight:700;font-size:16px;}
+  .vsys .issue{background:var(--gold);color:#fff;border-radius:8px;padding:8px 13px;font-size:12px;font-weight:700;}
+  .certwrap{display:grid;grid-template-columns:1fr 326px;gap:16px;margin-top:14px;align-items:start;}
+  .certnote{font-size:13px;color:var(--muted);line-height:1.7;}
+  .uch{font-size:12px;font-weight:700;color:var(--brand-deep);margin:16px 0 8px;}
+  .usecases{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
+  .uc{border:1px solid var(--border);border-radius:10px;padding:11px;background:var(--surface);}
+  .uc .e{font-size:18px;}
+  .uc b{display:block;font-size:12px;margin-top:4px;}
+  .uc span{font-size:10.5px;color:var(--muted);display:block;margin-top:2px;}
+  a.uc{color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s;}
+  a.uc:hover{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);}
+  .cert{border:1px solid var(--gold-soft);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 8px 22px rgba(15,23,42,.10);}
+  .cert .ch{background:linear-gradient(120deg,var(--brand-deep),var(--gold));color:#fff;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;}
+  .cert .ch b{font-size:13px;} .cert .ch .ok{font-size:10px;background:rgba(255,255,255,.22);padding:2px 9px;border-radius:999px;}
+  .cert .cb{padding:14px;}
+  .cert .no{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:700;color:var(--brand-deep);background:var(--brand-soft);padding:6px 10px;border-radius:7px;display:inline-block;}
+  .cert .nm{font-weight:700;font-size:14px;margin:11px 0 2px;} .cert .loc{font-size:11px;color:var(--muted);}
+  .cert .stars{color:var(--gold);font-weight:700;margin:9px 0;font-size:13px;}
+  .cert .vbadges{display:flex;flex-direction:column;gap:5px;margin:6px 0;}
+  .cert .vb{font-size:11.5px;display:flex;align-items:center;gap:6px;} .cert .vb .ck{color:var(--ok);font-weight:700;}
+  .cert .cf{border-top:1px dashed var(--border);padding-top:11px;margin-top:9px;display:flex;gap:11px;align-items:center;}
+  .cert .qr{width:52px;height:52px;border-radius:8px;flex-shrink:0;background:repeating-conic-gradient(#0f172a 0 25%,#fff 0 50%) 0/11px 11px;border:3px solid #fff;outline:1px solid var(--border);}
+  .cert .lk{font-size:10px;color:var(--muted);word-break:break-all;}
+  .usecases.u4{grid-template-columns:repeat(2,1fr);}
+  /* 验真 tab 切换 + 真实二维码 */
+  .certtabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+  .ct-tab{font:inherit;font-size:11px;padding:4px 9px;border:1px solid var(--border);background:#fff;border-radius:999px;color:var(--muted);cursor:pointer;transition:all .15s;}
+  .ct-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .cert[hidden]{display:none;}
+  .qrlink{display:block;flex-shrink:0;}
+  .qrimg{width:54px;height:54px;border-radius:6px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+
+  /* service open-platform (服务管理：居住服务开放平台) */
+  .svc-sub{font-size:11px;font-weight:700;color:var(--brand-deep);letter-spacing:.3px;margin:16px 0 9px;display:flex;align-items:center;gap:7px;}
+  .svc-sub .b{width:4px;height:14px;border-radius:2px;background:var(--brand);}
+  .svc-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  .svc-cap{border:1px solid var(--border);border-radius:var(--r-md);padding:12px;background:var(--surface);text-align:center;color:inherit;text-decoration:none;display:block;transition:border-color .15s,box-shadow .15s;}
+  a.svc-cap:hover,a.sstep:hover{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft);}
+  a.sstep{color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s;}
+  .svc-cap .mi{font-size:20px;} .svc-cap b{display:block;font-size:12.5px;margin:5px 0 2px;} .svc-cap span{font-size:10.5px;color:var(--muted);}
+  /* P 中台 ⇄ 角色端 双链 */
+  .duo{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:8px;flex-wrap:wrap;}
+  .duo a{font-size:10px;padding:2px 7px;border-radius:6px;text-decoration:none;font-weight:600;white-space:nowrap;}
+  .duo .pp{background:#eef2ff;color:#4338ca;} .duo .rr{background:var(--brand-soft);color:var(--brand-deep);}
+  .duo a:hover{text-decoration:underline;} .duo .sw{color:var(--muted);font-size:11px;}
+  .duo-legend{font-size:11px;color:var(--muted);margin:0 0 11px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .duo-legend .pp{background:#eef2ff;color:#4338ca;} .duo-legend .rr{background:var(--brand-soft);color:var(--brand-deep);}
+  .duo-legend .pp,.duo-legend .rr{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:600;}
+  .tri{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:11px;padding-top:11px;border-top:1px dashed var(--gold-soft);}
+  .tri .lab{font-size:11px;color:var(--muted);}
+  .tri-t{font-size:11px;padding:4px 9px;border-radius:7px;text-decoration:none;font-weight:600;}
+  .tri-t.ts{background:var(--brand-soft);color:var(--brand-deep);} .tri-t.tt{background:#ede9fe;color:#6d28d9;} .tri-t.tv{background:#ffedd5;color:#9a3412;}
+  .tri-t:hover{text-decoration:underline;}
+  .stepflow{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;}
+  .sstep{border:1px solid var(--border);border-radius:var(--r-md);padding:11px;background:var(--surface);position:relative;}
+  .sstep::after{content:"›";position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--brand);font-weight:700;font-size:18px;z-index:1;}
+  .sstep:last-child::after{display:none;}
+  .sstep .n{font-size:10px;font-weight:700;color:#fff;background:var(--brand);border-radius:999px;padding:1px 9px;display:inline-block;}
+  .sstep b{display:block;font-size:12.5px;margin:6px 0 2px;} .sstep span{font-size:10.5px;color:var(--muted);}
+  .ladder-wrap{border:2px solid var(--gold);background:linear-gradient(180deg,var(--gold-soft),#fff);border-radius:var(--r-md);padding:14px;box-shadow:0 6px 18px rgba(180,83,9,.10);}
+  .ladder-wrap .lh{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+  .ladder-wrap .lh .core{font-size:10px;color:#fff;background:var(--gold);padding:1px 7px;border-radius:999px;}
+  .ladder{display:flex;align-items:flex-end;gap:6px;}
+  .lv{flex:1;text-align:center;background:#fff;border:1px solid var(--gold-soft);border-bottom:0;border-radius:8px 8px 0 0;padding:6px 2px;display:flex;flex-direction:column;justify-content:flex-end;}
+  .lv .lg{font-weight:700;color:var(--brand-deep);font-size:12.5px;} .lv .ln{font-size:9px;color:var(--muted);margin-top:2px;}
+  .uprow{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;align-items:center;}
+  .uprow .lab{font-size:11px;color:var(--muted);}
+  .upchip{font-size:11px;background:#fff;border:1px solid var(--gold-soft);color:var(--gold);border-radius:6px;padding:4px 9px;}
+  .cockpit.wide{margin-top:16px;}
+  .cockpit.wide .gk{grid-template-columns:repeat(4,1fr);}
+  .ck2{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start;margin-top:0;}
+
+  /* gov cockpit */
+  .cockpit{background:linear-gradient(160deg,#0b1220,#0f2027);border-radius:var(--r-lg);padding:18px;color:#cbd5e1;}
+  .cockpit .ch-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .cockpit .ch-top b{color:#fff;font-size:14px;}
+  .cockpit .ch-top .ro{font-size:10px;color:#5eead4;border:1px solid rgba(94,234,212,.4);padding:2px 8px;border-radius:999px;}
+  .gk{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+  .gk .c{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:11px;}
+  .gk .c .v{font-size:20px;font-weight:700;color:#fff;}
+  .gk .c .v small{font-size:10px;color:#5eead4;}
+  .gk .c .l{font-size:10px;color:#94a3b8;margin-top:2px;}
+  .gk .c .cap{font-size:9px;color:#f59e0b;margin-top:3px;}
+  .gmap{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:12px;margin-bottom:12px;}
+  .gmap .ml{font-size:10px;color:#94a3b8;margin-bottom:8px;}
+  .dots{display:flex;flex-wrap:wrap;gap:6px;}
+  .dots span{font-size:10px;padding:3px 8px;border-radius:6px;background:rgba(94,234,212,.12);color:#5eead4;border:1px solid rgba(94,234,212,.22);}
+  .alerts{display:flex;flex-direction:column;gap:7px;}
+  .alert{display:flex;align-items:center;gap:8px;font-size:11px;background:rgba(255,255,255,.04);border-radius:8px;padding:8px 10px;}
+  .alert .d{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .alert .d.w{background:#f59e0b;} .alert .d.r{background:#ef4444;} .alert .d.o{background:#5eead4;}
+  .alert .ct{flex:1;color:#cbd5e1;} .alert .n{font-weight:700;color:#fff;}
+
+  .footer{text-align:center;padding:26px 0 6px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;}
+
+  @media(max-width:1000px){
+    .pillars{grid-template-columns:1fr 1fr;}
+    .channels{grid-template-columns:repeat(3,1fr);}
+    .rolemap{grid-template-columns:repeat(3,1fr);}
+    .two,.platform-grid{grid-template-columns:1fr;}
+    .hubrow{grid-template-columns:1fr;}
+    .hubarrow{transform:rotate(90deg);padding:3px 0;}
+    .certwrap{grid-template-columns:1fr;}
+    .svc-row,.stepflow{grid-template-columns:repeat(3,1fr);}
+    .sstep::after{display:none;}
+    .cockpit.wide .gk{grid-template-columns:repeat(2,1fr);}
+    .ck2{grid-template-columns:1fr;}
+  }
+  @media(max-width:620px){
+    .container{padding:16px 12px 48px;}
+    .pillars,.channels,.rolemap,.mods,.phases,.usecases{grid-template-columns:1fr;}
+    .gk,.cockpit.wide .gk{grid-template-columns:1fr;}
+    .svc-row,.stepflow{grid-template-columns:repeat(2,1fr);}
+    .ladder{flex-wrap:wrap;}
+    .lv{flex:1 0 22%;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== HERO ===== -->
+  <div class="hero">
+    <div class="crumbs">
+      <a href="overview.html">📋 全站导航总览</a>
+      <a href="index.html?region=gz_zj">📱 切到贵州旅居预设</a>
+      <a href="lvju-app-home.html" style="background:var(--gold);color:#fff;font-weight:600;">📱 贝壳 APP·找房旅居频道主入口 ↗</a>
+    </div>
+    <h1>贵州旅居 · 贝壳居住服务基础设施</h1>
+    <p class="lead">以旅居为入口，从"流·留·居"打通资产供给 → 房源呈现 → 居住服务 → 旅游产品推荐全链路，
+       成为旅居客到贵州的首选平台、贵州旅居产业综合服务平台、旅居经营主体的盟友。</p>
+    <span class="stamp">🛡 贵州省住建厅指导 · 贝壳承建 · 旅居服务网络化聚合 · 仅供演示</span>
+  </div>
+
+  <!-- ===== ROLE NAV ===== -->
+  <nav class="rolenav" id="rolenav">
+    <a href="#bp" class="active"><span class="n">蓝</span>贝壳能做什么</a>
+    <a href="#platform"><span class="n">台</span>旅居中台 + 监管</a>
+    <a href="#liu"><span class="n">流</span>客户 + 业主</a>
+    <a href="#stay"><span class="n">留</span>服务者 + 培训</a>
+  </nav>
+
+  <!-- ===== §1 BLUEPRINT ===== -->
+  <section class="sec" id="bp">
+    <div class="sec-head">
+      <div class="idx">一</div>
+      <h2>贝壳能做什么 · 贵州旅居平台模式</h2>
+      <span class="sub">贵州旅居产业综合服务平台 — 四大支柱 · 每一环都对应居住服务</span>
+    </div>
+    <div class="bp-banner">贵州旅居产业综合服务平台</div>
+    <div class="bp-body">
+      <div class="pillars">
+        <!-- 旅游地图 -->
+        <div class="pillar">
+          <div class="ph"><div class="t">🗺 旅游地图</div><div class="s">解决：去哪里玩、问哪里</div></div>
+          <div class="pb">
+            <div class="row"><span class="chip">旅游景点</span><span class="chip">旅游路线</span><span class="chip">旅游美食</span><span class="chip">旅游便民</span></div>
+            <div class="svc"><div class="lab">配套服务</div>
+              <span class="chip svc-chip">行程规划</span><span class="chip svc-chip">本地向导</span></div>
+          </div>
+        </div>
+        <!-- 房源中心 -->
+        <div class="pillar">
+          <div class="ph"><div class="t">🏠 房源中心</div><div class="s">解决：住哪里、住准房、选好房</div></div>
+          <div class="pb">
+            <div class="row"><span class="chip">分时式旅居</span><span class="chip">中式旅居</span><span class="chip">乡村式旅居</span><span class="chip">康养式旅居</span></div>
+            <div class="svc"><div class="lab">配套服务</div>
+              <span class="chip svc-chip">签约管理·线上客服</span><span class="chip svc-chip">旅居管家·服务承诺</span></div>
+          </div>
+        </div>
+        <!-- 置业导购 -->
+        <div class="pillar">
+          <div class="ph"><div class="t">🧭 置业导购</div><div class="s">解决：买哪里、租哪里</div></div>
+          <div class="pb">
+            <div class="row"><span class="chip">精装房源</span><span class="chip">软装房源</span><span class="chip">拎包入住</span><span class="chip">闲置资产</span></div>
+            <div class="svc"><div class="lab">配套服务</div>
+              <span class="chip svc-chip">装修设计·房屋整体</span><span class="chip svc-chip">装修管理·服务承诺</span></div>
+          </div>
+        </div>
+        <!-- 居住服务 -->
+        <div class="pillar">
+          <div class="ph"><div class="t">🛎 居住服务</div><div class="s">解决：找谁服务、选谁服务</div></div>
+          <div class="pb">
+            <div class="row"><span class="chip">家政服务</span><span class="chip">维修服务</span><span class="chip">搬家服务</span><span class="chip">社区运营</span></div>
+            <div class="svc"><div class="lab">配套服务</div>
+              <span class="chip svc-chip">入住·居住服务</span><span class="chip svc-chip">退住·居住保障</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="bp-foot">
+        利用 <b>贝壳全国化旅居服务沉淀</b>的能力，打通 <b>资产供给 → 房源呈现 → 居住服务管理 → 新房转化 → 旅游产品推荐</b> 全链路，
+        实现旅居产业网络化的聚合效应。
+      </div>
+      <!-- 五端角色地图 -->
+      <div class="rolemap">
+        <div class="rm"><div class="e">🧳</div><b>旅居客 C 端</b><span>多渠道浏览·下单·支付</span></div>
+        <div class="rm"><div class="e">🏡</div><b>业主端</b><span>个人业主 / 机构业主</span></div>
+        <div class="rm"><div class="e">⭐</div><b>贝壳旅居中台</b><span>评级·接入·渠道·服务</span></div>
+        <div class="rm"><div class="e">🏛</div><b>政府监管端</b><span>住建厅 · 大屏驾驶舱</span></div>
+        <div class="rm"><div class="e">🏦</div><b>金融/渠道</b><span>OTA 直连·社媒·异业合作</span></div>
+      </div>
+
+      <!-- 开发计划：四支柱拆三阶段 -->
+      <div class="devplan">
+        <div class="dh">🗓 开发计划 · 四支柱拆三阶段（先试点验证，再按 stage-gate 推进）</div>
+        <div class="phases">
+          <div class="phase p1">
+            <div class="pt"><b>阶段一 · 旅居入口跑通</b><span>MVP · 先把"流"验证出来</span></div>
+            <div class="pbd">
+              <div class="pl">覆盖支柱</div>
+              <div class="pills"><span class="chip">🏠 房源中心</span><span class="chip">🛎 基础居住服务</span></div>
+              <div class="pl">交付物</div>
+              <ul>
+                <li>小程序：浏览 → 下单 → 支付</li>
+                <li>房源评级 v1（旅居星级 5 维）</li>
+                <li>贝壳 APP / 小程序单渠道上线</li>
+              </ul>
+              <div class="gate"><b>出口标准</b>（承诺指标）：试点房源接入数达标 + 浏览→支付转化漏斗跑通。未达标 → 延期 / 缩范围 / 重做试点。</div>
+            </div>
+          </div>
+          <div class="phase p2">
+            <div class="pt"><b>阶段二 · 标准与监管闭环</b><span>+ 评级 + 政府核验 + 多渠道</span></div>
+            <div class="pbd">
+              <div class="pl">覆盖支柱</div>
+              <div class="pills"><span class="chip">🏠 房源中心标准化</span><span class="chip">🛎 居住服务完善</span></div>
+              <div class="pl">交付物</div>
+              <ul>
+                <li>房源评级管理（复核 / 公示 / 调级）</li>
+                <li>对接公安 / 住建 / 保险 → 验证编号 + 验真</li>
+                <li>多渠道分发：OTA 直连 / 社媒平台 / 异业合作</li>
+                <li>服务者认证 + 培训机构 + 课程认证</li>
+              </ul>
+              <div class="gate"><b>出口标准</b>（承诺指标）：星级达标率 + 验真覆盖率达标。住建厅监管驾驶舱上线。</div>
+            </div>
+          </div>
+          <div class="phase p3">
+            <div class="pt"><b>阶段三 · 全链路聚合</b><span>+ 置业导购 + 旅游地图</span></div>
+            <div class="pbd">
+              <div class="pl">覆盖支柱</div>
+              <div class="pills"><span class="chip">🧭 置业导购</span><span class="chip">🗺 旅游地图</span></div>
+              <div class="pl">交付物</div>
+              <ul>
+                <li>旅游地图：景点 / 路线 / 美食 / 便民</li>
+                <li>置业导购：新房转化 / 装修服务</li>
+                <li>康养 / 研学 / 旅游产品推荐聚合</li>
+              </ul>
+              <div class="gate"><b>上限假设</b>（非承诺）：全省房源数 / 旅居客 MAU 依赖政策传导与自愿复制，按 stage-gate 滚动，不自动达成。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §4 MID-PLATFORM + GOV ===== -->
+  <section class="sec" id="platform">
+    <div class="sec-head">
+      <div class="idx">二</div>
+      <h2>贝壳旅居中台（主体） + 住建厅监管大屏</h2>
+      <span class="sub">中台承载"流·留"全部管理动作；政府以监管大屏 + 驾驶舱只读总览</span>
+    </div>
+    <!-- 流 · 房源管理：以"房源评级管理"为核心 -->
+    <div class="card modblock assethub" style="margin-bottom:16px;">
+      <h3><span class="ftag liu">流</span>房源管理 · 资产供给与呈现 · 以「房源评级管理」为核心</h3>
+      <div class="bsub">运营方供信息 → 中台评级 + 政府/保险核验发证 → 渠道引用评级卡片；房源库居中沉淀全量数据</div>
+
+      <div class="hubrow">
+        <!-- 输入 -->
+        <div class="hubcol">
+          <h4>🔌 房源运营方接入</h4>
+          <div class="tag">提供评级所需信息 · API 文档 + Key / PMS 直连</div>
+          <ul>
+            <li>基本信息：位置 / 房型 / 面积 / 价格</li>
+            <li>服务情况：管家 / 客服 / 保洁 / 接送</li>
+            <li>物资认证：智能设备 / 家电 / 布草集采</li>
+            <li>照片与设施自查表（按 5 维）</li>
+          </ul>
+        </div>
+        <div class="hubarrow">→</div>
+        <!-- 核心 -->
+        <div class="hubcol core">
+          <h4>⭐ 房源评级管理　<span style="font-size:10px;color:#fff;background:var(--gold);padding:1px 7px;border-radius:999px;">核心</span></h4>
+          <div class="tag">房源库（数据中心）+ 旅居星级评级引擎</div>
+          <div class="coremetric">
+            <div class="m"><b>★ 5 维</b><span>评价维度</span></div>
+            <div class="m"><b>1–5 星</b><span>综合星级</span></div>
+            <div class="m"><b>动态</b><span>复核调级</span></div>
+          </div>
+          <a href="lvju-rating-standard.html" style="display:inline-block;margin-top:10px;font-size:12px;font-weight:700;color:var(--gold);">查看评价体系 →</a>
+        </div>
+        <div class="hubarrow">→</div>
+        <!-- 输出 -->
+        <div class="hubcol">
+          <h4>🎨 推广渠道管理</h4>
+          <div class="tag">引用评级数据与验真卡片对外分发</div>
+          <ul>
+            <li>自定义主题页面配置</li>
+            <li>★星级 + 验真卡片嵌入</li>
+            <li>分发：贝壳 / OTA 直连 / 社媒平台 / 异业合作</li>
+            <li>渠道转化效果回流房源库</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 政府/保险核验配套 → 发证 -->
+      <div class="verifybar">
+        <div class="vh">🛡 中台对接政府监管配套与服务完善 · 发放「房源验证编号 + 验真链接」</div>
+        <div class="vsys">
+          <div class="sysc"><span class="e">👮</span>公安系统 · 实名 / 治安备案</div>
+          <div class="sysc"><span class="e">🏛</span>住建系统 · 产权 / 租赁备案</div>
+          <div class="sysc"><span class="e">🛡</span>保险公司 · 家财 / 安心险投保</div>
+          <span class="arrow">→</span>
+          <div class="issue">发放 房源验证编号 + 验真链接</div>
+        </div>
+      </div>
+
+      <!-- 验真 + 评级卡片样例 -->
+      <div class="certwrap">
+        <div class="certnote">
+          <b style="color:var(--fg);">房源库居于数据中心。</b>运营方录入的信息、中台评级结果、公安 / 住建 / 保险核验状态，
+          全部沉淀到房源库；对外统一以一张 <b style="color:var(--gold);">「验真 + 评级卡片」</b> 呈现 —— 小程序详情页、渠道分发页、扫码验真都引用同一张卡片，确保口径一致、可追溯。
+          <div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap;">
+            <span class="base-chip">基本信息</span><span class="base-chip">服务情况</span><span class="base-chip">物资认证</span>
+            <span class="base-chip">★ 旅居星级</span><span class="base-chip">核验徽章</span><span class="base-chip">验证编号</span>
+          </div>
+          <div class="uch">一卡多用 · 同一张卡片在三处引用</div>
+          <div class="usecases">
+            <div class="uc"><span class="e">📱</span><b>小程序详情页</b><span>★星级 + 5 维 + 核验徽章直显</span></div>
+            <div class="uc"><span class="e">🎨</span><b>渠道分发页</b><span>OTA / 社媒 / 异业嵌入同款卡</span></div>
+            <div class="uc"><span class="e">🔍</span><b>扫码验真</b><span>公众扫码查编号与核验状态</span></div>
+          </div>
+        </div>
+        <!-- 卡片 -->
+        <div class="cert">
+          <div class="ch"><b>🐚 贝壳旅居 · 房源验真</b><span class="ok">● 有效</span></div>
+          <div class="cb">
+            <span class="no">GZ-LJ-2026-0000888</span>
+            <div class="nm">西江千户苗寨 · 云上观景民宿</div>
+            <div class="loc">黔东南州 · 西江镇 · 整栋可包</div>
+            <div class="stars">★★★★★ 4.9 · 五星旅居</div>
+            <div class="vbadges">
+              <div class="vb"><span class="ck">✓</span>公安实名备案 · 已核验</div>
+              <div class="vb"><span class="ck">✓</span>住建产权 / 租赁备案 · 已核验</div>
+              <div class="vb"><span class="ck">✓</span>家财 + 客房安心险 · 已投保</div>
+            </div>
+            <div class="cf">
+              <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJ-2026-0000888" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+              <div>
+                <div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0000888</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:5px;">评定 2026-06 · 中台复核 · 动态调级</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 留 · 服务管理：居住服务开放平台 -->
+    <div class="card modblock assethub" style="margin-bottom:16px;">
+      <h3><span class="ftag stay">留</span>服务管理：居住服务开放平台 · 以「统一认证发证」为核心</h3>
+      <div class="bsub">把"人"沉淀为基础设施：开放培训/认证/派单/保障六大能力，统一发证验真；服务者·服务商的入驻流程与 L0–L7 分级见 §四「留」视角（点卡片进对应中台页，默认贵州旅居模式）</div>
+
+      <!-- ① 居住服务基础设施的构成（开放能力，可点进中台页） -->
+      <div class="svc-sub"><span class="b"></span>① 居住服务基础设施的构成 · 开放平台对外开放六大能力</div>
+      <div class="duo-legend">协作双侧 <span class="pp">P 中台</span> 开放/管理 <span class="sw">⇄</span> <span class="rr">S 服务者</span> 使用 —— 即 <b>P × S</b> 交互</div>
+      <div class="svc-row">
+        <div class="svc-cap"><div class="mi">🎓</div><b>培训中心</b><span>86 门课 · 在线学</span>
+          <div class="duo"><a class="pp" href="screens/p-training-center.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-learn.html?region=gz_zj">服务者学</a></div></div>
+        <div class="svc-cap"><div class="mi">📝</div><b>考试认证</b><span>题库 1.2k · 机考</span>
+          <div class="duo"><a class="pp" href="screens/p-question-bank.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-exam.html?region=gz_zj">服务者考</a></div></div>
+        <div class="svc-cap"><div class="mi">🪜</div><b>分级标准</b><span>L0–L7 八级</span>
+          <div class="duo"><a class="pp" href="screens/p-standards.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-cert.html?region=gz_zj">我的认证</a></div></div>
+        <div class="svc-cap"><div class="mi">📡</div><b>派单流量</b><span>按级分发 · T+7</span>
+          <div class="duo"><a class="pp" href="screens/p-traffic-policy.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-orders.html?region=gz_zj">服务者接单</a></div></div>
+        <div class="svc-cap"><div class="mi">⭐</div><b>评价信用</b><span>信用分月滚动</span>
+          <div class="duo"><a class="pp" href="screens/p-credit-engine.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-income.html?region=gz_zj">服务者收入</a></div></div>
+        <div class="svc-cap"><div class="mi">🛡</div><b>安心保障</b><span>责任险 · 履约</span>
+          <div class="duo"><a class="pp" href="screens/p-insurance.html?region=gz_zj">中台</a><span class="sw">⇄</span><a class="rr" href="screens/s-cert.html?region=gz_zj">我的保障</a></div></div>
+      </div>
+
+      <!-- 中台对接监管配套与保障 → 发证 -->
+      <div class="verifybar">
+        <div class="vh">🛡 中台对接监管配套与服务完善 · 发放「持证编号 + 验真链接 + 派单资格」</div>
+        <div class="vsys">
+          <div class="sysc"><span class="e">👥</span>人社系统 · 职业资格</div>
+          <div class="sysc"><span class="e">🏛</span>住建厅 · 白名单审定</div>
+          <div class="sysc"><span class="e">🎓</span>培训机构 · 结业认证</div>
+          <div class="sysc"><span class="e">🛡</span>保险公司 · 责任险投保</div>
+          <span class="arrow">→</span>
+          <div class="issue">发放 持证编号 + 验真链接 + 派单资格</div>
+        </div>
+      </div>
+
+      <!-- 四类认证 + 持证卡样例 -->
+      <div class="certwrap">
+        <div class="certnote">
+          <b style="color:var(--fg);">认证是开放平台的信任底座。</b>培训机构、课程、服务者、服务商<b style="color:var(--gold);">四类主体统一认证</b>、统一持证编号、可扫码验真（接 <a href="screens/portal-index.html">公示门户</a>）；服务者凭证持证上岗、按级派单、客户评价回流信用分、责任险全程兜底。
+          <div style="margin-top:12px;display:flex;gap:7px;flex-wrap:wrap;">
+            <span class="base-chip">持证编号</span><span class="base-chip">L 等级</span><span class="base-chip">培训结业</span>
+            <span class="base-chip">考试成绩</span><span class="base-chip">信用分</span><span class="base-chip">责任险</span>
+          </div>
+          <div class="uch">一证多用 · 四类认证统一验真</div>
+          <div class="usecases u4">
+            <a class="uc" href="screens/p-t-partner-cert.html?region=gz_zj"><span class="e">🎓</span><b>培训机构认证 ↗</b><span>合作伙伴资质 + 讲师持证</span></a>
+            <a class="uc" href="screens/p-course-cert.html?region=gz_zj"><span class="e">📜</span><b>课程认证 ↗</b><span>课程开发审核 + 考纲备案</span></a>
+            <a class="uc" href="screens/s-cert.html?region=gz_zj"><span class="e">🪪</span><b>服务者认证 ↗</b><span>L0–L7 持证上岗 + 派单资格</span></a>
+            <a class="uc" href="screens/p-vendor-cert.html?region=gz_zj"><span class="e">🏢</span><b>服务商认证 ↗</b><span>负责人 L5 商业认证 + 保障</span></a>
+          </div>
+        </div>
+        <!-- 验真卡 · 四类主体 + 房源 tab 切换 -->
+        <div class="certbox">
+          <div class="certtabs">
+            <button class="ct-tab active" data-c="s">服务者</button>
+            <button class="ct-tab" data-c="v">服务商</button>
+            <button class="ct-tab" data-c="t">培训机构</button>
+            <button class="ct-tab" data-c="c">课程</button>
+            <button class="ct-tab" data-c="h">房源</button>
+          </div>
+
+          <!-- 服务者 -->
+          <div class="cert" data-cert="s">
+            <div class="ch"><b>🐚 贝壳旅居 · 服务者持证验真</b><span class="ok">● 在岗</span></div>
+            <div class="cb">
+              <span class="no">GZ-LJS-2026-0007788</span>
+              <div class="nm">杨晓芳 · 旅居管家</div>
+              <div class="loc">黔东南 · 西江服务站 · 派单资格 ✓</div>
+              <div class="stars">★ L4 · 金牌管家（L0–L7 八级）</div>
+              <div class="vbadges">
+                <div class="vb"><span class="ck">✓</span>人社职业资格 · 已核验</div>
+                <div class="vb"><span class="ck">✓</span>培训结业 86 课时 · 考试通过</div>
+                <div class="vb"><span class="ck">✓</span>安心责任险 · 已投保</div>
+              </div>
+              <div class="cf">
+                <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJS-2026-0007788" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+                <div><div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0007788</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:5px;">信用分 4.8 · 客户评价 ★4.9</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 服务商 -->
+          <div class="cert" data-cert="v" hidden>
+            <div class="ch"><b>🐚 贝壳旅居 · 服务商商业认证验真</b><span class="ok">● 在营</span></div>
+            <div class="cb">
+              <span class="no">GZ-LJV-2026-0003120</span>
+              <div class="nm">黔行旅居服务公司</div>
+              <div class="loc">负责人 吴志强 · L5 商业认证</div>
+              <div class="stars">🏢 L5 · 服务商负责人</div>
+              <div class="vbadges">
+                <div class="vb"><span class="ck">✓</span>营业执照 / 经营许可 · 已核验</div>
+                <div class="vb"><span class="ck">✓</span>团队持证率 86% · L2+ 达标</div>
+                <div class="vb"><span class="ck">✓</span>履约保证金 + 团队责任险</div>
+              </div>
+              <div class="cf">
+                <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJV-2026-0003120" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+                <div><div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0003120</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:5px;">在营房源 128 · 评价 ★4.8</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 培训机构 -->
+          <div class="cert" data-cert="t" hidden>
+            <div class="ch"><b>🐚 贝壳旅居 · 培训机构合作认证</b><span class="ok">● 合作中</span></div>
+            <div class="cb">
+              <span class="no">GZ-LJT-2026-0000206</span>
+              <div class="nm">家协培训中心</div>
+              <div class="loc">合作伙伴 LV3 · 省级合作</div>
+              <div class="stars">🎓 LV3 · L4–L5 课程范围</div>
+              <div class="vbadges">
+                <div class="vb"><span class="ck">✓</span>办学许可 + 人社培训备案</div>
+                <div class="vb"><span class="ck">✓</span>讲师持证 L6×3 + L7×1</div>
+                <div class="vb"><span class="ck">✓</span>学员通过率 92.4%</div>
+              </div>
+              <div class="cf">
+                <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJT-2026-0000206" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+                <div><div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0000206</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:5px;">8 讲师 · 累计结业 1,240</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 课程 -->
+          <div class="cert" data-cert="c" hidden>
+            <div class="ch"><b>🐚 贝壳旅居 · 课程认证验真</b><span class="ok">● 在架</span></div>
+            <div class="cb">
+              <span class="no">GZ-LJC-2026-0000888</span>
+              <div class="nm">旅居管家服务规范</div>
+              <div class="loc">对位 L2–L3 · 主讲 L6 周敏</div>
+              <div class="stars">📜 课程认证 · 考纲已备案</div>
+              <div class="vbadges">
+                <div class="vb"><span class="ck">✓</span>大纲审核 · 对位等级标准</div>
+                <div class="vb"><span class="ck">✓</span>考纲备案 + 题库匹配</div>
+                <div class="vb"><span class="ck">✓</span>L7 专家试讲评审通过</div>
+              </div>
+              <div class="cf">
+                <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJC-2026-0000888" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+                <div><div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0000888c</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:5px;">研发机构 家协培训中心</div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 房源 -->
+          <div class="cert" data-cert="h" hidden>
+            <div class="ch"><b>🐚 贝壳旅居 · 房源验真</b><span class="ok">● 有效</span></div>
+            <div class="cb">
+              <span class="no">GZ-LJ-2026-0000888</span>
+              <div class="nm">西江千户苗寨 · 云上观景民宿</div>
+              <div class="loc">黔东南州 · 西江镇 · 整栋可包</div>
+              <div class="stars">★★★★★ 4.9 · 五星旅居</div>
+              <div class="vbadges">
+                <div class="vb"><span class="ck">✓</span>公安实名备案 · 已核验</div>
+                <div class="vb"><span class="ck">✓</span>住建产权 / 租赁备案 · 已核验</div>
+                <div class="vb"><span class="ck">✓</span>家财 + 客房安心险 · 已投保</div>
+              </div>
+              <div class="cf">
+                <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJ-2026-0000888" title="扫码 / 点击验真 · 接公示门户"><img class="qrimg" alt="验真二维码" loading="lazy" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="></a>
+                <div><div class="lk">扫码验真 ↗<br>lvju.guizhou.gov.cn/v/0000888</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:5px;">评定 2026-06 · 中台复核</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="base-strip">
+        <span style="font-size:11px;color:var(--muted);align-self:center;">公共底座：</span>
+        <span class="base-chip">发证管理</span><span class="base-chip">信用引擎</span><span class="base-chip">数据中台</span>
+        <span class="base-chip">权限 RBAC</span><span class="base-chip">支付·分账</span><span class="base-chip">事件总线</span>
+      </div>
+    </div>
+
+    <!-- 政府监管大屏 / 驾驶舱（全宽） -->
+    <div class="cockpit wide">
+      <div class="ch-top"><b>🏛 贵州住建厅 · 旅居监管大屏</b><span class="ro">只读 · 驾驶舱</span></div>
+      <div class="gk">
+        <div class="c"><div class="v">12,860</div><div class="l">在营旅居房源</div></div>
+        <div class="c"><div class="v">91%<small> 达标</small></div><div class="l">旅居星级达标率</div></div>
+        <div class="c"><div class="v">38万</div><div class="l">旅居客 MAU</div><div class="cap">※ 政策推动后的上限假设</div></div>
+        <div class="c"><div class="v">98%</div><div class="l">投诉处置率</div></div>
+      </div>
+      <div class="ck2">
+        <div class="gmap">
+          <div class="ml">📍 全省接入热力 · 9 个地级行政区</div>
+          <div class="dots">
+            <span>贵阳 3.2k</span><span>遵义 2.1k</span><span>黔东南 2.4k</span><span>黔南 1.6k</span>
+            <span>铜仁 1.1k</span><span>安顺 0.8k</span><span>毕节 0.7k</span><span>六盘水 0.5k</span><span>黔西南 0.4k</span>
+          </div>
+        </div>
+        <div class="alerts">
+          <div class="alert"><span class="d r"></span><span class="ct">运营商 SLA 异常</span><span class="n">3</span></div>
+          <div class="alert"><span class="d w"></span><span class="ct">星级复核待审</span><span class="n">5</span></div>
+          <div class="alert"><span class="d w"></span><span class="ct">服务者认证待审</span><span class="n">8</span></div>
+          <div class="alert"><span class="d o"></span><span class="ct">本月新增接入房源</span><span class="n">+860</span></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#64748b;margin-top:12px;line-height:1.6;">
+        政府视角只读总览：看资产规模、星级达标、处置率与运营商绩效；
+        派单/上架/评级录入/发证等一线动作在<b style="color:#5eead4;">贝壳旅居中台</b>与运营方侧完成。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §2 C-END CHANNEL ===== -->
+  <section class="sec" id="liu">
+    <div class="sec-head">
+      <div class="idx">三</div>
+      <h2><span class="ftag liu">流</span>客户 + 业主视角 · 把人与房源引进来</h2>
+      <span class="sub">客户多渠道触达 + 业主多形态供给，构成"流"的两端</span>
+    </div>
+
+    <div class="subhd">A · 客户视角 — 旅居客频道（多渠道触达 + 小程序全流程：浏览 → 下单 → 支付）</div>
+
+    <!-- 多渠道 -->
+    <div class="channels">
+      <a class="ch" href="lvju-app-home.html" style="color:inherit;"><span class="tag" style="background:var(--gold);">主入口 ↗</span><div class="ico">📱</div><b>贝壳 APP</b><p>找房·旅居频道主入口</p></a>
+      <div class="ch on"><span class="tag">本次展开</span><div class="ico">🟢</div><b>贝壳找房·小程序</b><p>轻量入口 · 微信生态</p></div>
+      <div class="ch"><div class="ico">🧳</div><b>OTA 直连</b><p>同程·携程·途家·去哪儿·美团</p></div>
+      <a class="ch" href="https://xhs.ltyfa.top/#/dashboard" target="_blank" rel="noopener" style="color:inherit;"><span class="tag" style="background:var(--gold);">外链 ↗</span><div class="ico">📣</div><b>社交媒体管理平台</b><p>抖音 · 小红书 内容分发</p></a>
+      <div class="ch"><div class="ico">🤝</div><b>异业合作</b><p>哈啰单车·跳海酒吧·贵州银行</p></div>
+    </div>
+
+    <!-- 小程序全流程 -->
+    <div class="flow">
+      <!-- ① 浏览 -->
+      <div class="flow-step">
+        <span class="step-lab">① 浏览房源</span>
+        <div class="phone"><div class="notch"></div><div class="ps">
+          <div class="ps-stat"><span>9:41</span><span>🔋</span></div>
+          <div class="ps-hd">
+            <div class="brow"><span class="bt">贵州旅居</span><span class="loc">📍黔东南 ▾</span></div>
+            <div class="srch">🔍 搜索目的地 / 民宿 / 景区</div>
+          </div>
+          <div class="ps-chips">
+            <span class="ps-chip star">★ 旅居星级</span><span class="ps-chip">区域</span><span class="ps-chip">价格</span><span class="ps-chip">房型</span>
+          </div>
+          <div class="ps-body">
+            <div class="lcard">
+              <div class="img"><span class="star-badge">★4.9 五星旅居</span><div class="terr"></div></div>
+              <div class="ci">
+                <div class="nm">西江千户苗寨·云上观景民宿</div>
+                <div class="meta">黔东南 · 苗寨核心 · 含早 · 可观景</div>
+                <div class="dims">
+                  <span class="dim">环境<span class="bar"><i style="width:96%"></i></span></span>
+                  <span class="dim">服务<span class="bar"><i style="width:92%"></i></span></span>
+                  <span class="dim">体验<span class="bar"><i style="width:98%"></i></span></span>
+                </div>
+                <div class="price"><b>¥588<small>/晚</small></b><span class="bk">预订</span></div>
+              </div>
+            </div>
+            <div class="lcard">
+              <div class="img" style="background:linear-gradient(135deg,#0e7490,#67e8f9)"><span class="star-badge">★4.8 五星旅居</span><div class="terr"></div></div>
+              <div class="ci">
+                <div class="nm">荔波小七孔·森林溪畔旅居</div>
+                <div class="meta">黔南 · 近景区 · 整栋 · 康养</div>
+                <div class="dims">
+                  <span class="dim">环境<span class="bar"><i style="width:94%"></i></span></span>
+                  <span class="dim">设施<span class="bar"><i style="width:88%"></i></span></span>
+                  <span class="dim">区位<span class="bar"><i style="width:82%"></i></span></span>
+                </div>
+                <div class="price"><b>¥466<small>/晚</small></b><span class="bk">预订</span></div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- ② 详情 -->
+      <div class="flow-step">
+        <span class="step-lab">② 房源详情 · 旅居星级</span>
+        <div class="phone"><div class="notch"></div><div class="ps" style="display:flex;flex-direction:column;">
+          <div style="flex:1;overflow-y:auto;">
+            <div class="pd-hero"><div class="back">‹</div><span class="sb">★4.9 五星旅居</span></div>
+            <div class="pd-sec">
+              <div class="t">西江千户苗寨·云上观景民宿</div>
+              <div class="sub">黔东南州 · 西江镇 · 苗寨观景位 · 整栋可包</div>
+              <div class="tagline"><span class="tg">苗寨核心</span><span class="tg">日落观景台</span><span class="tg">含双早</span><span class="tg">管家服务</span></div>
+            </div>
+            <div class="pd-sec">
+              <div class="t">旅居星级评价 · 5 维</div>
+              <div class="sub">按旅居住宿 5 个维度评定</div>
+              <div class="rate-row"><span class="k">环境景观</span><span class="bar"><i style="width:96%"></i></span><span class="v">4.9</span></div>
+              <div class="rate-row"><span class="k">服务品质</span><span class="bar"><i style="width:92%"></i></span><span class="v">4.7</span></div>
+              <div class="rate-row"><span class="k">设施配套</span><span class="bar"><i style="width:88%"></i></span><span class="v">4.5</span></div>
+              <div class="rate-row"><span class="k">交通区位</span><span class="bar"><i style="width:84%"></i></span><span class="v">4.3</span></div>
+              <div class="rate-row"><span class="k">特色体验</span><span class="bar"><i style="width:98%"></i></span><span class="v">5.0</span></div>
+            </div>
+            <div class="pd-sec">
+              <div class="t">价格日历</div>
+              <div class="sub">6/14 周六 ¥588 · 6/15 周日 ¥588 · 平日 ¥468 起</div>
+            </div>
+          </div>
+          <div class="sticky-buy">
+            <div class="pp"><b>¥588</b><small>/晚 起 · 含双早</small></div>
+            <span class="btn-buy">立即预订</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- ③ 下单 -->
+      <div class="flow-step">
+        <span class="step-lab">③ 下单</span>
+        <div class="phone"><div class="notch"></div><div class="ps" style="display:flex;flex-direction:column;">
+          <div style="flex:1;overflow-y:auto;">
+            <div class="ps-hd"><div class="brow"><span class="bt">‹ 确认订单</span></div></div>
+            <div class="seg">入住信息</div>
+            <div class="frow"><span class="k">入住 / 离店</span><span class="v">6/14 — 6/16 · 2 晚</span></div>
+            <div class="frow"><span class="k">房型</span><span class="v">观景大床房 · 整栋</span></div>
+            <div class="frow"><span class="k">入住人</span><span class="v">2 位成人</span></div>
+            <div class="frow"><span class="k">套餐</span><span class="v">含双早 + 苗寨门票</span></div>
+            <div class="seg">入住人 / 联系方式</div>
+            <div class="frow"><span class="k">姓名</span><span class="v">张先生</span></div>
+            <div class="frow"><span class="k">手机</span><span class="v">138****6688</span></div>
+            <div class="seg">价格明细</div>
+            <div class="frow"><span class="k">房费 ¥588 × 2 晚</span><span class="v">¥1,176</span></div>
+            <div class="frow"><span class="k">门票套餐</span><span class="v">¥120</span></div>
+            <div class="frow"><span class="k">平台优惠</span><span class="v" style="color:var(--ok)">-¥120</span></div>
+          </div>
+          <div class="sticky-buy">
+            <div class="pp"><b>¥1,176</b><small>合计 · 含税费</small></div>
+            <span class="btn-buy">提交订单</span>
+          </div>
+        </div></div>
+      </div>
+
+      <!-- ④ 支付 -->
+      <div class="flow-step">
+        <span class="step-lab">④ 支付 · 多渠道</span>
+        <div class="phone"><div class="notch"></div><div class="ps" style="display:flex;flex-direction:column;">
+          <div style="flex:1;overflow-y:auto;">
+            <div class="ps-hd"><div class="brow"><span class="bt">‹ 收银台</span></div>
+              <div style="text-align:center;margin-top:10px;"><div style="font-size:26px;font-weight:800;">¥1,176</div><div style="font-size:10px;opacity:.85;">订单号 LJ20260614-8821 · 15:00 前支付</div></div>
+            </div>
+            <div class="seg">选择支付方式</div>
+            <div class="payopt sel"><div class="pi" style="background:var(--brand-soft)">🐚</div><div class="nm">贝壳支付<br><span style="font-size:9px;color:var(--muted)">资金存管 · 入住后结算给房东</span></div><div class="rd"></div></div>
+            <div class="payopt"><div class="pi" style="background:#dcfce7">💚</div><div class="nm">微信支付</div><div class="rd"></div></div>
+            <div class="payopt"><div class="pi" style="background:#dbeafe">🤝</div><div class="nm">异业合作 · 贵州银行<br><span style="font-size:9px;color:var(--muted)">可分期 · 积分抵扣</span></div><div class="rd"></div></div>
+            <div class="payopt"><div class="pi" style="background:#fef9c3">🧳</div><div class="nm">OTA 渠道支付<br><span style="font-size:9px;color:var(--muted)">同程 · 携程 · 美团</span></div><div class="rd"></div></div>
+            <div class="pay-done">
+              <div class="ck">✓</div>
+              <div style="font-weight:700;font-size:13px;">预订成功</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:3px;">电子凭证已发送 · 资金由贝壳存管，入住确认后结算</div>
+            </div>
+          </div>
+          <div class="sticky-buy"><span class="btn-buy" style="flex:1;text-align:center;">确认支付 ¥1,176</span></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="subhd">B · 业主视角 — 房源供给（个人业主一键托管 / 机构业主批量接入）</div>
+    <div class="two">
+      <!-- 个人业主 -->
+      <div class="card owner">
+        <div class="oh"><div class="e">🏡</div><div><b>个人业主</b><br><span>闲置房 / 自有房产 / 度假房</span></div></div>
+        <p class="desc">把闲置房源托管给贝壳旅居，省心收租。AI 估算收益、线上签约、按月结算，全程不用自己打理。</p>
+        <ul class="feat">
+          <li>一键托管 · 免费上门</li>
+          <li>AI 收益估算</li>
+          <li>线上签约存证</li>
+          <li>收益月结 · 透明账单</li>
+          <li>贝壳管家代运营</li>
+          <li>旅居星级辅导提级</li>
+        </ul>
+        <div class="miniconsole">
+          <div class="mt"><span>我的托管 · 收益看板</span><span>6 月</span></div>
+          <div class="kpis">
+            <div class="kpi"><b>¥4,320</b><span>本月预估收益</span></div>
+            <div class="kpi"><b>82%<small> ▲</small></b><span>出租率</span></div>
+            <div class="kpi"><b>★4.7</b><span>旅居星级</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- 机构业主 -->
+      <div class="card owner">
+        <div class="oh"><div class="e">🏬</div><div><b>机构业主</b><br><span>酒店集团 / 民宿运营商 / 旅居运营方</span></div></div>
+        <p class="desc">批量房源接入、PMS/API 直连、多门店统一运营。星级运营看板 + 多渠道分发 + 分账结算，规模化经营旅居资产。</p>
+        <ul class="feat">
+          <li>批量房源导入</li>
+          <li>API / PMS 直连</li>
+          <li>多门店统一管理</li>
+          <li>星级运营看板</li>
+          <li>多渠道分发</li>
+          <li>分账 · 自动结算</li>
+        </ul>
+        <div class="miniconsole">
+          <div class="mt"><span>机构控制台 · 华住贵州 / 锦江都城 等</span><span>实时</span></div>
+          <div class="kpis">
+            <div class="kpi"><b>128</b><span>在营房源</span></div>
+            <div class="kpi"><b>5</b><span>门店 · 6 渠道</span></div>
+            <div class="kpi"><b>¥86万</b><span>月 GMV</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §3 STAY · SERVICE PROVIDERS + TRAINING ===== -->
+  <section class="sec" id="stay">
+    <div class="sec-head">
+      <div class="idx">四</div>
+      <h2><span class="ftag stay">留</span>服务者 + 培训机构视角 · 把人留下来</h2>
+      <span class="sub">优质服务者 + 培训机构育人，是旅居客"留得住、住得好、愿复购"的根基（卡片点进对应中台页，默认贵州旅居模式）</span>
+    </div>
+
+    <!-- ② 服务者 / 服务商入驻流程（六步 · 全程网办） -->
+    <div class="svc-sub"><span class="b"></span>① 服务者 / 服务商入驻流程 · 全程网办 · ~30 天通过</div>
+    <div class="duo-legend">每步两侧 <span class="pp">P 中台</span> 受理/发证 <span class="sw">⇄</span> <span class="rr">S 服务者</span> 操作 —— 即 <b>P × S</b> 交互（STEP4 为住建审定 ⇄ 公示验真）</div>
+    <div class="stepflow">
+      <div class="sstep"><span class="n">STEP 1</span><b>申请入驻</b><span>实名 + 资质，对接人社职业资格库</span>
+        <div class="duo"><a class="pp" href="screens/p-onboarding-review.html?region=gz_zj">中台受理</a><span class="sw">⇄</span><a class="rr" href="screens/s-cert.html?region=gz_zj">服务者申请</a></div></div>
+      <div class="sstep"><span class="n">STEP 2</span><b>标准学习</b><span>培训机构供课 → 培训中心 86 门课 → 服务者学</span>
+        <div class="duo"><a class="rr" href="screens/t-courses.html?region=gz_zj">培训机构供课</a><span class="sw">⇄</span><a class="pp" href="screens/p-training-center.html?region=gz_zj">中台培训中心</a><span class="sw">⇄</span><a class="rr" href="screens/s-learn.html?region=gz_zj">服务者学</a></div></div>
+      <div class="sstep"><span class="n">STEP 3</span><b>考试认证</b><span>题库组卷 + 考务排考 + 成绩核发，按 L0–L7 分级</span>
+        <div class="duo"><a class="pp" href="screens/p-question-bank.html?region=gz_zj">中台题库</a><a class="pp" href="screens/p-exam-admin.html?region=gz_zj">考务排考</a><span class="sw">⇄</span><a class="rr" href="screens/s-exam.html?region=gz_zj">服务者考</a></div></div>
+      <div class="sstep"><span class="n">STEP 4</span><b>白名单</b><span>住建厅审定 + 公示门户可查</span>
+        <div class="duo"><a class="pp" href="screens/g-whitelist-service.html?region=gz_zj">住建审定</a><span class="sw">⇄</span><a class="rr" href="screens/portal-verify.html?region=gz_zj">公示验真</a></div></div>
+      <div class="sstep"><span class="n">STEP 5</span><b>流量分发</b><span>需求发起 → 按等级派单 · 分账 T+7</span>
+        <div class="duo"><a class="rr" href="screens/p-service-demand.html?region=gz_zj">需求发起</a><span class="sw">⇄</span><a class="pp" href="screens/p-transaction.html?region=gz_zj">中台派单</a><span class="sw">⇄</span><a class="rr" href="screens/s-orders.html?region=gz_zj">服务者接单</a></div></div>
+      <div class="sstep"><span class="n">STEP 6</span><b>持续考核</b><span>客户评价 → 信用分 → 升降级 月度滚动</span>
+        <div class="duo"><a class="rr" href="screens/p-service-review.html?region=gz_zj">客户评价</a><span class="sw">⇄</span><a class="pp" href="screens/p-credit-engine.html?region=gz_zj">信用引擎</a><span class="sw">⇄</span><a class="rr" href="screens/s-income.html?region=gz_zj">服务者升降级</a></div></div>
+    </div>
+
+    <!-- 培训机构育人发证闭环 · T 申请 ⇄ P 审批对端 -->
+    <div class="ladder-wrap" style="margin-top:14px;border-color:var(--brand);background:linear-gradient(180deg,var(--brand-soft),#fff);box-shadow:0 6px 18px rgba(15,118,110,.08);">
+      <div class="lh" style="color:var(--brand-deep);">🎓 培训机构育人发证闭环 · <span style="font-weight:600;">T 培训机构申请 ⇄ P 中台审批对端</span>
+        <span class="core" style="background:var(--brand);">补齐</span></div>
+      <div class="duo-legend" style="margin-bottom:12px;">培训机构在 T 端发起，P 中台逐环受理审批，闭环回流到统一发证 —— 把"招生·排课·考核·结业"接进中台</div>
+      <div class="stepflow" style="grid-template-columns:repeat(5,1fr);">
+        <a class="sstep" href="screens/t-students.html?region=gz_zj" style="display:block;"><span class="n" style="background:var(--gold);">T 端</span><b>招生 · 学员管理</b><span>报名录取 → 在训档案 → 结业上报</span></a>
+        <a class="sstep" href="screens/t-schedule.html?region=gz_zj" style="display:block;"><span class="n" style="background:var(--gold);">T 端</span><b>排课 · 排考</b><span>开班排课 → 申请考试场次（报中台）</span></a>
+        <a class="sstep" href="screens/p-exam-admin.html?region=gz_zj" style="display:block;"><span class="n">P 中台·新</span><b>考务 · 排考审批</b><span>排考审批 → 考点监考 → 成绩核发</span></a>
+        <a class="sstep" href="screens/p-graduation.html?region=gz_zj" style="display:block;"><span class="n">P 中台·新</span><b>结业核发 · 学时认定</b><span>核课时/成绩 → 认定结业 → 发学时证明</span></a>
+        <a class="sstep" href="screens/p-cert-issue.html?region=gz_zj" style="display:block;"><span class="n">P 中台</span><b>统一发证</b><span>等级证书 + 持证编号 → 上链公示验真</span></a>
+      </div>
+      <div class="uprow"><span class="lab">课程全链路：</span>
+        <a class="upchip" href="screens/t-courses.html?region=gz_zj" style="text-decoration:none;">① 课程开发 ↗</a>
+        <span style="color:var(--gold);font-weight:700;">›</span>
+        <a class="upchip" href="screens/p-course-cert.html?region=gz_zj" style="text-decoration:none;">② 课程认证 ↗</a>
+        <span style="color:var(--gold);font-weight:700;">›</span>
+        <a class="upchip" href="screens/p-training-center.html?region=gz_zj" style="text-decoration:none;">③ 上架·培训中心 ↗</a>
+        <span style="color:var(--gold);font-weight:700;">›</span>
+        <a class="upchip" href="screens/s-learn.html?region=gz_zj" style="text-decoration:none;">④ 学员学习 ↗</a>
+        <a class="upchip" href="screens/s-course-detail.html?region=gz_zj" style="text-decoration:none;">└ 单课学习页 ↗</a>
+        <span style="color:var(--gold);font-weight:700;">›</span>
+        <a class="upchip" href="screens/s-exam.html?region=gz_zj" style="text-decoration:none;">⑤ 结业考试 ↗</a>
+        <span class="lab" style="margin-left:4px;">（⑥考务→⑦学时→⑧发证见上方闭环）</span>
+      </div>
+      <div class="uprow"><span class="lab">机构资质：</span>
+        <a class="upchip" href="screens/p-t-partner-cert.html?region=gz_zj" style="text-decoration:none;">P 培训机构资质认证 ↗</a>
+        <a class="upchip" href="screens/p-question-bank.html?region=gz_zj" style="text-decoration:none;">P 题库与试卷 ↗</a>
+      </div>
+    </div>
+
+    <!-- ③ 分级认证体系 L0–L7（核心） -->
+    <div class="svc-sub"><span class="b"></span>② 分级认证体系 · L0–L7 八级（核心）</div>
+    <div class="ladder-wrap">
+      <div class="lh">🪜 L0–L7 八级持证晋级 <span class="core">核心</span><a href="screens/p-standards.html?region=gz_zj" style="margin-left:auto;font-size:11px;color:var(--gold);text-decoration:none;">查看分级标准 ↗</a></div>
+      <div class="ladder">
+        <div class="lv" style="height:34px;"><span class="lg">L0</span><span class="ln">实名注册</span></div>
+        <div class="lv" style="height:42px;"><span class="lg">L1</span><span class="ln">见习管家</span></div>
+        <div class="lv" style="height:50px;"><span class="lg">L2</span><span class="ln">初级管家</span></div>
+        <div class="lv" style="height:58px;"><span class="lg">L3</span><span class="ln">中级管家</span></div>
+        <div class="lv" style="height:66px;"><span class="lg">L4</span><span class="ln">金牌管家</span></div>
+        <div class="lv" style="height:74px;"><span class="lg">L5</span><span class="ln">服务商负责人</span></div>
+        <div class="lv" style="height:82px;"><span class="lg">L6</span><span class="ln">区域专家</span></div>
+        <div class="lv" style="height:90px;"><span class="lg">L7</span><span class="ln">首席专家</span></div>
+      </div>
+      <div class="uprow"><span class="lab">晋级要素：</span>
+        <span class="upchip">培训课时</span><span class="upchip">考试认证</span><span class="upchip">服务评价</span><span class="upchip">客户评价</span><span class="upchip">信用分</span>
+      </div>
+      <div class="tri"><span class="lab">角色交互（谁与 P 中台协作）：</span>
+        <a class="tri-t ts" href="screens/s-cert.html?region=gz_zj">P × S · 服务者持证 L0–L4 ↗</a>
+        <a class="tri-t tt" href="screens/p-course-cert.html?region=gz_zj">P × T · 培训育人 + 课程认证 ↗</a>
+        <a class="tri-t tv" href="screens/p-vendor-cert.html?region=gz_zj">P × V · 服务商 L5 商业认证 ↗</a>
+      </div>
+    </div>
+
+    <div class="svc-sub"><span class="b"></span>③ 四类主体 · 服务者/服务商 · 培训机构/课程研发机构（对齐上方四类认证）</div>
+    <div class="two">
+      <!-- 服务者 / 服务商 -->
+      <div class="card owner">
+        <div class="oh"><div class="e">🪪</div><div><b>服务者 / 服务商</b><br><span>个人持证（L0–L4）+ 机构经营（L5）</span></div></div>
+        <p class="desc">服务者持证上岗、接单赚钱；服务商（机构）做 L5 商业认证、组织团队、批量承接。旅居客能不能"留得住、住得好、愿复购"，靠的就是这两类被认证的供给方。</p>
+        <ul class="feat">
+          <li>服务者实名持证</li>
+          <li>服务商 L5 商业认证</li>
+          <li>接单 · 派单 · 分账</li>
+          <li>团队 · 多门店管理</li>
+          <li>服务星级 · 信用分</li>
+          <li>责任险 · 平台扶持</li>
+        </ul>
+        <div class="miniconsole">
+          <div class="mt"><span>服务者 App / 服务商控制台</span><span>实时</span></div>
+          <div class="kpis">
+            <div class="kpi"><b>2,468</b><span>持证服务者</span></div>
+            <div class="kpi"><b>312</b><span>认证服务商</span></div>
+            <div class="kpi"><b>★4.8</b><span>平均服务星级</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- 培训机构 / 课程研发机构 -->
+      <div class="card owner">
+        <div class="oh"><div class="e">🎓</div><div><b>培训机构 / 课程研发机构</b><br><span>育人发证 + 课程认证</span></div></div>
+        <p class="desc">培训机构招生、排课、考核、结业发证；课程研发机构开发课程并送审认证。两者向平台稳定输出标准化、被认证的人才与课程。</p>
+        <ul class="feat">
+          <li>培训机构合作认证</li>
+          <li>课程研发 · 课程认证</li>
+          <li>排课 · 排考</li>
+          <li>学员管理</li>
+          <li>讲师持证（L5–L7）</li>
+          <li>结业发证 + 考纲备案</li>
+        </ul>
+        <div class="miniconsole">
+          <div class="mt"><span>培训机构 / 课程研发 控制台</span><span>本月</span></div>
+          <div class="kpis">
+            <div class="kpi"><b>320</b><span>在培学员</span></div>
+            <div class="kpi"><b>18</b><span>开课数</span></div>
+            <div class="kpi"><b>248</b><span>认证课程在架</span></div>
+          </div>
+        </div>
+        <div class="tri"><span class="lab">中台对端（T 申请 ⇄ P 审批）：</span>
+          <a class="tri-t tt" href="screens/t-schedule.html?region=gz_zj">T 排课排考 ↗</a>
+          <a class="tri-t ts" href="screens/p-exam-admin.html?region=gz_zj">P 考务排考审批 ↗</a>
+          <a class="tri-t ts" href="screens/p-graduation.html?region=gz_zj">P 结业核发·学时认定 ↗</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <p>贵州旅居 · 贝壳居住服务基础设施总览 · 单页演示 — <strong>lvju-overview.html</strong></p>
+    <p style="margin-top:6px;">蓝图参考"贵州旅居平台模式"与"新居住服务生态试点（流-留-居）" · 推广性指标（MAU/房源数）均为政策推动后的上限假设，非承诺</p>
+  </div>
+</div>
+
+<script src="screens/_qr.js"></script>
+<script>
+(function(){
+  // 角色导航锚点高亮
+  const links=[...document.querySelectorAll('.rolenav a')];
+  const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+  links.forEach(a=>a.addEventListener('click',e=>{
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'});
+  }));
+  const io=new IntersectionObserver(es=>{
+    es.forEach(en=>{
+      if(en.isIntersecting){
+        const i=secs.indexOf(en.target);
+        links.forEach(l=>l.classList.remove('active'));
+        if(i>-1)links[i].classList.add('active');
+      }
+    });
+  },{rootMargin:'-45% 0px -50% 0px'});
+  secs.forEach(s=>s&&io.observe(s));
+
+  // 验真卡 tab 切换
+  document.querySelectorAll('.certtabs').forEach(function(tabs){
+    const box=tabs.closest('.certbox');
+    tabs.querySelectorAll('.ct-tab').forEach(function(t){
+      t.addEventListener('click',function(){
+        tabs.querySelectorAll('.ct-tab').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        box.querySelectorAll('.cert').forEach(c=>{ c.hidden = c.dataset.cert !== t.dataset.c; });
+      });
+    });
+  });
+
+  // 二维码：本地离线生成（qrcode-generator），编码"当前站点下 portal-verify 的真实绝对地址"
+  // 扫码与点击落到同一页；无需联网
+  document.querySelectorAll('a.qrlink').forEach(function(a){
+    const img=a.querySelector('img.qrimg'); if(!img) return;
+    let target;
+    try { target = new URL(a.getAttribute('href'), location.href).href; }
+    catch(e){ return; }
+    try {
+      const qr=qrcode(0,'M'); qr.addData(target); qr.make();
+      img.src=qr.createDataURL(4,0);            // 本地 GIF data-URL，离线可用
+    } catch(e){
+      // 兜底：库不可用时退回在线生成（仍可扫）
+      img.src='https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data='+encodeURIComponent(target);
+    }
+    img.title='扫码直达：'+target;
+  });
+})();
+</script>
+</body>
+</html>

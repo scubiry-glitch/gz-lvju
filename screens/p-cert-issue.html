@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>发证管理 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #6366f1; --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+      --side: #1e1b4b; --side-fg: #e0e7ff; --side-muted: rgba(224,231,255,0.55);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold:#ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+
+    .brand-text .nm{font-size:13px; font-weight:600;} .brand-text .sub{font-size:10px; color:var(--side-muted);}
+
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .top-actions{display:flex; gap:8px;}
+    .btn{padding:7px 14px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent); color:white; border-color:var(--accent);}
+    .btn.ok{background:var(--success); color:white; border-color:var(--success);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; padding:18px 28px 0;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);} .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .n .u{font-size:11px; color:var(--muted); font-weight:400; margin-left:3px;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .d.ok{color:var(--success);} .ki .d.warn{color:var(--warn);}
+
+    .content{padding:18px 28px; display:grid; grid-template-columns:1.4fr 1fr; gap:14px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 14px; display:flex; align-items:center; gap:8px;}
+    .card h3 .pill{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    /* status tabs */
+    .stat-tabs{display:flex; gap:6px; margin-bottom:14px;}
+    .st{padding:6px 14px; border-radius:6px; font-size:12px; background:var(--line); color:var(--muted); cursor:pointer; border:1px solid transparent;}
+    .st.on{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+    .st .cnt{margin-left:4px; opacity:0.85; font-size:11px;}
+
+    /* batch cert table */
+    .cert-row{display:grid; grid-template-columns:auto 1fr auto auto auto auto; gap:10px; padding:12px 14px; border-radius:6px; background:var(--line); margin-bottom:6px; align-items:center;}
+    .cert-row .chk{width:14px; height:14px; border:1.5px solid var(--border); border-radius:3px; cursor:pointer;}
+    .cert-row .chk.on{background:var(--accent); border-color:var(--accent); position:relative;}
+    .cert-row .chk.on::after{content:'✓'; position:absolute; left:1px; top:-3px; color:white; font-size:12px; font-weight:bold;}
+    .cert-row .info .nm{font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;}
+    .cert-row .info .lv{font-size:10px; padding:1px 5px; border-radius:3px; font-weight:700; color:white;}
+    .cert-row .info .lv.l3{background:linear-gradient(135deg, #047857, #10b981);}
+    .cert-row .info .lv.l4{background:linear-gradient(135deg, #1e40af, #3b82f6);}
+    .cert-row .info .lv.l5{background:linear-gradient(135deg, #ca8a04, #fbbf24);}
+    .cert-row .info .id{font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:2px;}
+    .cert-row .role{font-size:11px; color:var(--muted);}
+    .cert-row .score{font-size:13px; font-weight:700;}
+    .cert-row .src{font-size:11px; color:var(--muted);}
+    .cert-row .act{display:flex; gap:4px;}
+    .cert-row .act .b{padding:4px 10px; font-size:11px; border-radius:4px; background:var(--surface); border:1px solid var(--border); cursor:pointer;}
+    .cert-row .act .b.pri{background:var(--accent); color:white; border-color:var(--accent); font-weight:600;}
+
+    .batch-bar{margin-top:14px; padding:10px 14px; background:var(--accent); color:white; border-radius:6px; display:flex; align-items:center; gap:10px; font-size:12px;}
+    .batch-bar b{font-size:13px;}
+    .batch-bar a{margin-left:auto; padding:6px 14px; background:rgba(255,255,255,0.2); border-radius:5px; font-weight:600;}
+
+    /* cert preview */
+    .cert-preview{padding:24px; background:linear-gradient(135deg, #fffbeb, #fef3c7); border:2px solid var(--gold); border-radius:8px; text-align:center; position:relative; overflow:hidden;}
+    .cert-preview::before{content:''; position:absolute; left:-30px; top:-30px; width:100px; height:100px; background:radial-gradient(circle, var(--gold) 0%, transparent 70%); opacity:0.2;}
+    .cert-preview::after{content:''; position:absolute; right:-30px; bottom:-30px; width:100px; height:100px; background:radial-gradient(circle, var(--gold) 0%, transparent 70%); opacity:0.2;}
+    .cp-head{font-size:10px; color:var(--gold); letter-spacing:4px; margin-bottom:6px;}
+    .cp-title{font-size:18px; font-weight:700; margin-bottom:14px;}
+    .cp-num{font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:18px;}
+    .cp-line{font-size:13px; margin-bottom:8px;}
+    .cp-name{font-size:24px; font-weight:700; margin:8px 0; color:#78350f;}
+    .cp-lv-badge{display:inline-flex; align-items:center; gap:6px; padding:5px 14px; background:var(--gold); color:white; border-radius:999px; font-size:12px; font-weight:700; margin:8px 0;}
+    .cp-foot{display:flex; justify-content:space-between; margin-top:18px; padding-top:14px; border-top:1px dashed var(--gold); font-size:11px;}
+    .cp-foot .stamp{font-size:11px; color:var(--muted);}
+    .cp-foot .qr{width:60px; height:60px; background:var(--surface); display:grid; place-items:center; border-radius:5px; font-size:9px; color:var(--muted); border:1px solid var(--border);}
+
+    /* meta row */
+    .cert-meta{display:flex; gap:10px; margin-top:12px;}
+    .mb{flex:1; padding:8px 10px; background:var(--line); border-radius:5px; text-align:center;}
+    .mb .l{font-size:10px; color:var(--muted);}
+    .mb .v{font-size:13px; font-weight:600; margin-top:2px;}
+
+    /* tmpl */
+    .tmpl-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+    .tmpl{padding:10px 12px; background:var(--line); border-radius:5px; font-size:12px;}
+    .tmpl .nm{font-weight:600;}
+    .tmpl .meta{color:var(--muted); font-size:11px; margin-top:2px;}
+    .tmpl .pill{font-size:9px; padding:1px 5px; background:var(--accent-soft); color:var(--accent); border-radius:3px; margin-left:4px;}
+
+    /* api block */
+    .api-block{font-family:var(--mono); font-size:11px; color:var(--muted); padding:12px; background:var(--line); border-radius:5px; line-height:1.8;}
+    .api-block .m{font-weight:700;}
+    .api-block .m.g{color:var(--accent);}
+    .api-block .m.p{color:var(--success);}
+    .api-block .m.d{color:var(--danger);}
+
+    /* revoke */
+    .rv-row{display:flex; justify-content:space-between; padding:8px 0; font-size:12px; border-bottom:1px dashed var(--line);}
+    .rv-row:last-child{border-bottom:0;}
+    .rv-row .nm{flex:1;}
+    .rv-row .nm .sub{font-size:11px; color:var(--muted); margin-top:1px;}
+    .rv-row .v{color:var(--danger); font-size:11px; font-weight:600;}
+
+    @media (max-width: 1200px){
+      .content{grid-template-columns:1fr;}
+      .kpi-bar{grid-template-columns:repeat(3, 1fr);}
+    }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="cert-issue"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>发证管理</b></div>
+      <div class="top-actions">
+        <button class="btn">证书模板</button>
+        <button class="btn">区块链上链</button>
+        <button class="btn pri">批量签发</button>
+      </div>
+    </div>
+
+    <div class="kpi-bar">
+      <div class="ki"><div class="l">在册证书</div><div class="n">2,468<span class="u">张</span></div><div class="d ok">↑ 312 本月</div></div>
+      <div class="ki"><div class="l">待签发</div><div class="n" style="color:var(--warn);">86<span class="u">张</span></div><div class="d warn">考试通过</div></div>
+      <div class="ki"><div class="l">已上链</div><div class="n">2,442<span class="u">/ 2468</span></div><div class="d ok">99.0%</div></div>
+      <div class="ki"><div class="l">本月续期</div><div class="n">186<span class="u">张</span></div><div class="d">含 12 升级</div></div>
+      <div class="ki"><div class="l">已吊销</div><div class="n" style="color:var(--danger);">26<span class="u">张</span></div><div class="d warn">累计</div></div>
+      <div class="ki"><div class="l">公示扫码</div><div class="n">18.4k<span class="u">次/月</span></div><div class="d ok">公众查验</div></div>
+    </div>
+
+    <div class="content">
+
+      <!-- left: batch sign -->
+      <div class="card">
+        <h3>待签发 <span class="pill">86 张</span> <span class="extra">考试通过 + 草稿生成</span></h3>
+        <div class="stat-tabs">
+          <span class="st on">全部 <span class="cnt">86</span></span>
+          <span class="st">L3 高级管家 <span class="cnt">62</span></span>
+          <span class="st">L4 督导/店长 <span class="cnt">18</span></span>
+          <span class="st">L5 服务商负责人 <span class="cnt">4</span></span>
+          <span class="st">L6/L7 输出轨 <span class="cnt">2</span></span>
+        </div>
+        <div>
+          <div class="cert-row">
+            <div class="chk on"></div>
+            <div class="info">
+              <div class="nm">郑文涛 <span class="lv l3">L3</span></div>
+              <div class="id">NJ-BZF-L3-2026-0314 · 草稿生成于 3h 前</div>
+            </div>
+            <div class="role">管家</div>
+            <div class="score">94</div>
+            <div class="src">江北建发</div>
+            <div class="act"><a class="b">预览</a><a class="b pri">签发</a></div>
+          </div>
+          <div class="cert-row">
+            <div class="chk on"></div>
+            <div class="info">
+              <div class="nm">周丽华 <span class="lv l3">L3</span></div>
+              <div class="id">NJ-BZF-L3-2026-0315 · 草稿生成于 5h 前</div>
+            </div>
+            <div class="role">保洁</div>
+            <div class="score">88</div>
+            <div class="src">江宁安居</div>
+            <div class="act"><a class="b">预览</a><a class="b pri">签发</a></div>
+          </div>
+          <div class="cert-row">
+            <div class="chk"></div>
+            <div class="info">
+              <div class="nm">陈建国 <span class="lv l5">L5</span></div>
+              <div class="id">NJ-BZF-L5-2026-0021 · 升级续期</div>
+            </div>
+            <div class="role">管家</div>
+            <div class="score">98.6</div>
+            <div class="src">梧桐公馆</div>
+            <div class="act"><a class="b">预览</a><a class="b pri">签发</a></div>
+          </div>
+          <div class="cert-row">
+            <div class="chk"></div>
+            <div class="info">
+              <div class="nm">张师傅 <span class="lv l4">L4</span></div>
+              <div class="id">NJ-BZF-L4-2026-1042 · L3→L4 晋级</div>
+            </div>
+            <div class="role">维修</div>
+            <div class="score">91</div>
+            <div class="src">鼓楼物业</div>
+            <div class="act"><a class="b">预览</a><a class="b pri">签发</a></div>
+          </div>
+          <div class="cert-row">
+            <div class="chk"></div>
+            <div class="info">
+              <div class="nm">优家装饰 <span class="lv l4">L4</span></div>
+              <div class="id">NJ-VEN-L4-2026-0118 · 服务商首认</div>
+            </div>
+            <div class="role">装修商</div>
+            <div class="score">92.4</div>
+            <div class="src">总部</div>
+            <div class="act"><a class="b">预览</a><a class="b pri">签发</a></div>
+          </div>
+        </div>
+
+        <div class="batch-bar">
+          ✓ 已勾选 2 张<b> · 平均评分 91.0 · 预计签发耗时 4 秒 · 自动上链 + 推送至 S 端</b>
+          <a>批量签发 + 上链</a>
+        </div>
+
+        <!-- revoke alerts -->
+        <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--line);">
+          <h3 style="margin-bottom:8px;">最近吊销 <span class="extra">26 累计</span></h3>
+          <div class="rv-row"><div class="nm">钱小宝<div class="sub">维修 · L0 → 吊销 · 背景查重命中不良记录</div></div><div class="v">3 天前</div></div>
+          <div class="rv-row"><div class="nm">某保洁<div class="sub">L2 → 吊销 · 连续 3 单严重投诉</div></div><div class="v">8 天前</div></div>
+          <div class="rv-row"><div class="nm">某维修商<div class="sub">L3 → 吊销 · 资质造假</div></div><div class="v">2 周前</div></div>
+        </div>
+      </div>
+
+      <!-- right: preview + templates + api -->
+      <div>
+        <div class="card">
+          <h3>证书预览 · 郑文涛 <span class="extra">L3 高级管家</span></h3>
+          <div class="cert-preview">
+            <div class="cp-head">CERTIFICATE OF CERTIFICATION</div>
+            <div class="cp-title">江苏保障性租赁住房 · 服务者认证</div>
+            <div class="cp-num">证书编号：NJ-BZF-L3-2026-0314</div>
+            <div class="cp-line">兹证明</div>
+            <div class="cp-name">郑 文 涛</div>
+            <div class="cp-line">通过国家认证体系考核，达到</div>
+            <div class="cp-lv-badge">⭐ L3 高级管家 · 旅居管家</div>
+            <div class="cp-line" style="font-size:12px; color:var(--muted);">综合分 94 · 工种：管家 · 有效期至 2028-06-09</div>
+            <div class="cp-foot">
+              <div style="text-align:left;">
+                <div class="stamp">签发机构</div>
+                <div style="font-weight:700; margin-top:2px;">江苏省住房与城乡建设厅</div>
+                <div class="stamp">区块链 Tx: 0x4a2f...8c91</div>
+              </div>
+              <div class="qr">扫码<br>验真</div>
+            </div>
+          </div>
+
+          <div class="cert-meta">
+            <div class="mb"><div class="l">有效期</div><div class="v">24 个月</div></div>
+            <div class="mb"><div class="l">续期窗口</div><div class="v">到期前 60 天</div></div>
+            <div class="mb"><div class="l">公示状态</div><div class="v" style="color:var(--success);">● 待公示</div></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>证书模板 <span class="extra">5 类机构 · 8 套</span></h3>
+          <div class="tmpl-grid">
+            <div class="tmpl"><div class="nm">🛠 S 服务者标准 <span class="pill">v1.2 默认</span></div><div class="meta">L0-L7 · A4 · 加盖电子章 · QR</div></div>
+            <div class="tmpl"><div class="nm">🏬 B 运营商白名单</div><div class="meta">LV1-3 + 星级评价 · 公司章</div></div>
+            <div class="tmpl"><div class="nm">👥 V 人力服务商</div><div class="meta">企业名 + 资质 + 旗下持证人 · 公司章</div></div>
+            <div class="tmpl"><div class="nm">🛒 M 物资类目认证 <span class="pill">v1.0 新增</span></div><div class="meta">6 品类 · LV1-3 · 检测报告附件 · 二维码追溯</div></div>
+            <div class="tmpl"><div class="nm">🎓 T 培训机构资质</div><div class="meta">人社认证 + 讲师持证 · 排课范围</div></div>
+            <div class="tmpl"><div class="nm">⭐ 行业标杆 L5</div><div class="meta">烫金边 · 行业奖项栏（跨 5 类）</div></div>
+            <div class="tmpl"><div class="nm">📜 学时证明</div><div class="meta">培训完成 · 不含等级</div></div>
+            <div class="tmpl"><div class="nm">🏭 物资批次质检报告</div><div class="meta">M 端 · 每批次抽检 · 含 SKU + 二维码</div></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <h3>公示与验真 API <span class="extra">公开</span></h3>
+          <div class="api-block">
+            <div><span class="m g">GET</span> /pub/cert/{id}　→ 公示信息</div>
+            <div><span class="m g">GET</span> /pub/cert/verify?code=...　→ QR 扫码验真</div>
+            <div><span class="m p">POST</span> /v2/cert/issue　→ 签发（管理员）</div>
+            <div><span class="m d">POST</span> /v2/cert/revoke　→ 吊销（审批流）</div>
+            <div><span class="m p">POST</span> /v2/cert/renew　→ 续期</div>
+            <div><span style="color:var(--warn);">EVT</span> cert.issued · cert.revoked · cert.renewed</div>
+          </div>
+          <div style="font-size:11px; color:var(--muted); margin-top:10px; padding:10px; background:color-mix(in oklab, var(--success) 5%, transparent); border-left:3px solid var(--success); border-radius:5px;">
+            ✓ 公示门户已订阅 <code style="font-family:var(--mono);">cert.issued</code> 事件，签发后 30 秒内对外可查。
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+</div>
+<script>
+  document.querySelectorAll('.chk').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+  document.querySelectorAll('.st').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.st').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+  }));
+</script>
+<script src="_region.js"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

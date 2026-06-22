@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>总图谱 · 江苏省住房运营基础设施合作计划</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --fg: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --gov: #1e40af;
+      --bank: #0f1a4d;
+      --plat: #0f172a;
+      --plat-accent: #b45309;
+      --op: #0f766e;
+      --user: #2563eb;
+      --doc: #6b21a8;
+      --warn: #ea580c;
+      --ok: #16a34a;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{
+      margin:0; background:var(--bg); color:var(--fg);
+      font-family:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+      font-size:13px; line-height:1.5;
+    }
+    a{color:inherit; text-decoration:none}
+    .main-wrap{padding:24px 28px 60px;}
+
+    .doc-header{
+      text-align:center; margin-bottom:24px;
+      padding:24px 20px; background:#fff; border-radius:14px;
+      border:1px solid var(--border);
+    }
+    .doc-header h1{
+      font-size:26px; font-weight:700; margin:0 0 8px;
+      letter-spacing:-0.01em;
+    }
+    .doc-header .sub{
+      color:var(--muted); font-size:14px;
+      display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
+    }
+    .doc-header .sub span{position:relative;}
+    .doc-header .sub span:not(:last-child)::after{content:"·"; margin-left:18px; color:var(--border);}
+
+    .section{
+      background:#fff; border:1px solid var(--border); border-radius:14px;
+      padding:18px 20px; margin-bottom:18px;
+    }
+    .section-title{
+      display:flex; align-items:center; gap:10px;
+      font-size:15px; font-weight:700; margin-bottom:14px;
+      padding-bottom:10px; border-bottom:1px solid var(--border);
+    }
+    .section-title .badge{
+      font-size:11px; padding:2px 8px; border-radius:6px;
+      background:#f1f5f9; color:var(--muted); font-weight:500;
+    }
+
+    /* ===== 第一行：左痛点 + 右目标 ===== */
+    .row-1{
+      display:grid; grid-template-columns:1.6fr 1fr; gap:18px; margin-bottom:18px;
+    }
+    .pain-list{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;}
+    .pain-card{
+      background:#fef2f2; border:1px solid #fecaca; border-radius:10px;
+      padding:12px;
+    }
+    .pain-card .num{
+      display:inline-flex; width:24px; height:24px; border-radius:50%;
+      background:#dc2626; color:#fff; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; margin-bottom:8px;
+    }
+    .pain-card .t{font-size:13px; font-weight:600; margin-bottom:4px;}
+    .pain-card .d{font-size:11px; color:var(--muted); line-height:1.4;}
+
+    .goal-box{
+      background:linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
+      color:#fff; border-radius:10px; padding:16px;
+      display:flex; flex-direction:column; justify-content:center;
+    }
+    .goal-box .label{font-size:11px; opacity:0.7; margin-bottom:6px; letter-spacing:1px;}
+    .goal-box .t{font-size:18px; font-weight:700; line-height:1.35; margin-bottom:8px;}
+    .goal-box .d{font-size:12px; opacity:0.85; line-height:1.5;}
+
+    /* ===== 四方共建 ===== */
+    .four-grid{
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;
+    }
+    .party-card{
+      border-radius:12px; padding:14px; color:#fff;
+      cursor:pointer; transition:transform 0.15s, box-shadow 0.15s;
+      display:flex; flex-direction:column; gap:8px;
+      min-height:0;
+    }
+    .party-card:hover{transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,0.15);}
+    .party-card .ph{
+      display:flex; align-items:center; gap:8px;
+      padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.18);
+    }
+    .party-card .icon{
+      width:36px; height:36px; border-radius:8px;
+      background:rgba(255,255,255,0.2);
+      display:grid; place-items:center; font-size:18px;
+    }
+    .party-card .name{font-size:14px; font-weight:700; line-height:1.2;}
+    .party-card .role{font-size:10px; opacity:0.75;}
+    .party-card .resp{font-size:12px; line-height:1.5;}
+    .party-card .resp .item{
+      display:flex; align-items:flex-start; gap:6px; margin-bottom:3px;
+    }
+    .party-card .resp .item::before{content:"·"; opacity:0.7;}
+    .party-card .footer-link{
+      margin-top:auto; font-size:11px; opacity:0.8;
+      padding-top:8px; border-top:1px solid rgba(255,255,255,0.15);
+    }
+    .party-card.gov  {background:linear-gradient(135deg, #1e3a8a 0%, var(--gov) 100%);}
+    .party-card.bank {background:linear-gradient(135deg, #0a1238 0%, var(--bank) 100%); position:relative; overflow:hidden;}
+    .party-card.bank::after{content:""; position:absolute; right:-30px; top:-30px; width:80px; height:80px; background:var(--plat-accent); opacity:0.18; border-radius:50%;}
+    .party-card.plat {background:linear-gradient(135deg, #020617 0%, var(--plat) 100%); position:relative; overflow:hidden;}
+    .party-card.plat::after{content:"⭐"; position:absolute; right:10px; top:10px; opacity:0.18; font-size:36px;}
+    .party-card.op   {background:linear-gradient(135deg, #134e4a 0%, var(--op) 100%);}
+
+    /* ===== 贝壳5种核心能力 ===== */
+    .cap-grid{display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;}
+    .cap-card{
+      background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+      padding:12px; text-align:center;
+    }
+    .cap-card .icon{
+      width:36px; height:36px; border-radius:10px; margin:0 auto 8px;
+      background:linear-gradient(135deg, #0f172a 0%, var(--plat-accent) 100%);
+      color:#fff; display:grid; place-items:center; font-size:18px;
+    }
+    .cap-card .t{font-size:13px; font-weight:700; margin-bottom:6px;}
+    .cap-card .d{font-size:11px; color:var(--muted); line-height:1.45;}
+
+    /* ===== 三阶段时间线 ===== */
+    .phase-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; position:relative;}
+    .phase-card{
+      border-radius:10px; padding:14px;
+      border-top:3px solid;
+      background:#fff; border:1px solid var(--border);
+      display:flex; flex-direction:column;
+    }
+    .phase-card.p1{border-top-color:#3b82f6;}
+    .phase-card.p2{border-top-color:#0d9488;}
+    .phase-card.p3{border-top-color:#ea580c;}
+    .phase-card .hd{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .phase-card .tag{
+      font-size:10px; padding:3px 8px; border-radius:10px;
+      background:#f1f5f9; color:var(--muted); font-weight:600;
+    }
+    .phase-card .name{font-size:14px; font-weight:700;}
+    .phase-card .actions{font-size:12px; color:#334155; line-height:1.55;}
+    .phase-card .actions div{margin-bottom:3px;}
+    .phase-card .actions div::before{content:"▸ "; color:var(--muted);}
+    .phase-card .outcome{
+      margin-top:8px; padding:6px 8px; border-radius:6px;
+      background:#f0fdf4; border:1px solid #bbf7d0;
+      font-size:11px; color:#15803d;
+    }
+    .phase-card .outcome::before{content:"成果："; font-weight:600;}
+
+    /* 阶段卡内嵌的 V 档徽章（baozufang 同款配色） */
+    .phase-card .vbox{
+      margin-top:10px; padding:8px 10px; border-radius:8px;
+      border:1px solid; font-size:11px; line-height:1.5;
+    }
+    .phase-card .vbox.v1{background:#f8fafc; border-color:#cbd5e1; color:#475569;}
+    .phase-card .vbox.v2{background:#eff6ff; border-color:#bfdbfe; color:#1e40af;}
+    .phase-card .vbox.v3{background:#f0fdf4; border-color:#bbf7d0; color:#15803d;}
+    .phase-card .vbox .vtag{
+      display:inline-block; padding:1px 7px; border-radius:4px;
+      font-size:10px; font-weight:700; margin-right:6px; letter-spacing:0.3px;
+    }
+    .phase-card .vbox.v1 .vtag{background:#cbd5e1; color:#0f172a;}
+    .phase-card .vbox.v2 .vtag{background:#2f6feb; color:#fff;}
+    .phase-card .vbox.v3 .vtag{background:#17a34a; color:#fff;}
+    .phase-card .vbox .vname{font-weight:700;}
+    .phase-card .vbox .pages{
+      font-size:10px; opacity:0.8; margin-top:3px;
+      font-family:ui-monospace, Menlo, monospace; word-break:break-all;
+    }
+    .phase-card .vbox a{font-weight:600; text-decoration:underline; opacity:0.9;}
+
+    /* ===== 能力解锁条（A → A+B → A+B+C） ===== */
+    .unlock-bar{
+      display:grid; grid-template-columns:repeat(3, 1fr); gap:0;
+      margin:18px 0 0; border-radius:10px; overflow:hidden;
+      border:1px solid var(--border);
+    }
+    .unlock-cell{
+      padding:12px 14px; background:#fff;
+      position:relative; border-right:1px solid var(--border);
+    }
+    .unlock-cell:last-child{border-right:none;}
+    .unlock-cell + .unlock-cell::before{
+      content:"→"; position:absolute; left:-9px; top:50%; transform:translateY(-50%);
+      width:18px; height:18px; background:#fff;
+      border:1px solid var(--border); border-radius:50%;
+      display:grid; place-items:center; font-size:11px; font-weight:700;
+      color:var(--muted); z-index:1;
+    }
+    .unlock-cell .stage{font-size:11px; color:var(--muted); font-weight:600;}
+    .unlock-cell .caps{display:flex; gap:5px; margin-top:6px; flex-wrap:wrap;}
+    .unlock-cell .cap{
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:11px; padding:3px 8px; border-radius:6px;
+      font-weight:600;
+    }
+    .unlock-cell .cap.a{background:#f1f5f9; color:#475569;}
+    .unlock-cell .cap.b{background:#dbeafe; color:#1e40af;}
+    .unlock-cell .cap.c{background:#bbf7d0; color:#15803d;}
+    .unlock-cell .cap.dim{opacity:0.35;}
+    .unlock-cell .note{font-size:10px; color:var(--muted); margin-top:6px; line-height:1.4;}
+
+
+    /* ===== 数据与业务流转图 ===== */
+    .flow{
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;
+      align-items:stretch;
+    }
+    .flow-node{
+      background:#f8fafc; border:1px solid var(--border); border-radius:8px;
+      padding:10px 8px; text-align:center; position:relative;
+    }
+    .flow-node .icon{font-size:20px; margin-bottom:4px;}
+    .flow-node .t{font-size:11px; font-weight:600; line-height:1.3;}
+    .flow-node .d{font-size:10px; color:var(--muted); margin-top:3px;}
+    .flow-node + .flow-node::before{
+      content:"→"; position:absolute; left:-7px; top:50%; transform:translateY(-50%);
+      color:var(--muted); font-size:12px; font-weight:700;
+      background:var(--bg); padding:0 1px; line-height:1;
+    }
+
+    /* ===== 长期目标 ===== */
+    .longterm{
+      display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;
+      margin-top:14px;
+    }
+    .lt-card{
+      background:linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+      border:1px solid #ddd6fe; border-radius:10px; padding:12px;
+    }
+    .lt-card .t{font-size:13px; font-weight:700; color:#6b21a8; margin-bottom:4px;}
+    .lt-card .d{font-size:11px; color:#581c87; line-height:1.5;}
+
+    /* ===== 价值矩阵（各方价值） ===== */
+    .value-grid{
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;
+    }
+    .value-card{
+      background:#fff; border:1px solid var(--border); border-radius:10px;
+      padding:10px 12px;
+    }
+    .value-card .who{
+      font-size:11px; font-weight:700; padding-bottom:6px;
+      border-bottom:1px solid var(--border); margin-bottom:6px;
+      display:flex; align-items:center; gap:6px;
+    }
+    .value-card .who .dot{width:8px; height:8px; border-radius:50%;}
+    .value-card .who.gov  .dot{background:var(--gov);}
+    .value-card .who.bank .dot{background:var(--bank);}
+    .value-card .who.plat .dot{background:var(--plat-accent);}
+    .value-card .who.op   .dot{background:var(--op);}
+    .value-card .who.user .dot{background:var(--user);}
+    .value-card .vlist{font-size:11px; color:#334155; line-height:1.6;}
+    .value-card .vlist div::before{content:"• "; color:var(--muted);}
+
+    /* ===== 快速跳转条 ===== */
+    .quick-jump{
+      display:flex; gap:6px; flex-wrap:wrap;
+      padding:12px 18px; background:#fff; border:1px solid var(--border);
+      border-radius:10px; margin-bottom:18px;
+    }
+    .quick-jump .lbl{font-size:11px; color:var(--muted); align-self:center; margin-right:4px;}
+    .quick-jump a{
+      font-size:11px; padding:5px 10px; border-radius:6px;
+      background:#f1f5f9; color:#334155;
+    }
+    .quick-jump a:hover{background:#0f172a; color:#fff;}
+
+    /* 中等屏（含 sidebar 240px：实际主区 800-1040px）: 5/4 列降为 3/2 */
+    @media (min-width: 1024px) and (max-width: 1280px){
+      .cap-grid, .flow, .value-grid{ grid-template-columns:repeat(3, 1fr); }
+      .four-grid, .phase-grid, .longterm{ grid-template-columns:repeat(2, 1fr); }
+      .row-1{ grid-template-columns:1.4fr 1fr; }
+      /* 第二行/第三行换行时，下一行第一个的箭头要隐藏 */
+      .flow-node:nth-child(3n+1) + .flow-node::before{ display:none; }
+    }
+    /* 窄屏（含移动）: 全部 2 列 */
+    @media (max-width: 1023px){
+      .row-1, .four-grid, .cap-grid, .phase-grid, .flow, .value-grid, .longterm{
+        grid-template-columns:1fr 1fr;
+      }
+      .pain-list{grid-template-columns:1fr 1fr;}
+      /* 窄屏时箭头会指向上一行末尾，统一隐藏 */
+      .flow-node + .flow-node::before{ display:none; }
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="d" data-active="master-blueprint"></div>
+
+  <div class="main-wrap">
+    <div class="doc-header">
+      <h1>江苏省住房运营基础设施合作计划（总体图谱）</h1>
+      <div class="sub">
+        <span>政府出规则</span><span>平台出能力</span><span>国企出资产</span><span>银行出金融</span><span>市场出效率</span>
+      </div>
+    </div>
+
+    <div class="quick-jump">
+      <span class="lbl">汇报视角快速跳转：</span>
+      <a href="../overview.html#doc">📐 方案与标准</a>
+      <a href="../overview.html#gov">🏛 政府方</a>
+      <a href="../overview.html#bank">🏦 金融方</a>
+      <a href="../overview.html#plat">⭐ 平台方 · 贝壳承建（含供应链）</a>
+      <a href="../overview.html#op">🏢 运营机构 · 国企持有方 + 白名单运营商</a>
+      <a href="../overview.html#user">👥 终端用户 · 服务者 + 租客</a>
+    </div>
+
+    <!-- 第 1 行：左痛点 + 右目标 -->
+    <div class="row-1">
+      <div class="section">
+        <div class="section-title">江苏现状·核心痛点 <span class="badge">4 项</span></div>
+        <div class="pain-list">
+          <div class="pain-card">
+            <div class="num">1</div>
+            <div class="t">房源分散</div>
+            <div class="d">缺少全省统一入口，各项目自营或委托第三方，租客找房成本高</div>
+          </div>
+          <div class="pain-card">
+            <div class="num">2</div>
+            <div class="t">标准分散</div>
+            <div class="d">房源字段、服务质量、租金口径各自为战，无省级统一规范</div>
+          </div>
+          <div class="pain-card">
+            <div class="num">3</div>
+            <div class="t">数据分散</div>
+            <div class="d">政府看不到全市/全省盘面，企业数据各自留存，监管与研判无据可依</div>
+          </div>
+          <div class="pain-card">
+            <div class="num">4</div>
+            <div class="t">运营效率低</div>
+            <div class="d">空置周期长、去化慢、运营成本高、回款压力大</div>
+          </div>
+        </div>
+      </div>
+      <div class="goal-box">
+        <div class="label">总体目标</div>
+        <div class="t">建立全省住房运营基础设施</div>
+        <div class="d">通过四方共建，把保租房从「分散自营」逐步升级为「全省一张网」（试点验证后再推广，非时间承诺）；让租客好找、政府好管、运营高效、金融可控。</div>
+      </div>
+    </div>
+
+    <!-- 第 2 行：四方共建模式 -->
+    <div class="section">
+      <div class="section-title">四方共建模式 <span class="badge">G + F + P + B</span></div>
+      <div class="four-grid">
+        <a href="gov-admin.html" class="party-card gov">
+          <div class="ph">
+            <div class="icon">🏛</div>
+            <div>
+              <div class="name">江苏住建厅</div>
+              <div class="role">出规则 · 监管管理</div>
+            </div>
+          </div>
+          <div class="resp">
+            <div class="item">政策制定与发文授权</div>
+            <div class="item">省级标准制定（人/房/服务）</div>
+            <div class="item">运营白名单审定与抽查</div>
+            <div class="item"><strong>不直接参与运营</strong></div>
+          </div>
+          <div class="footer-link">→ 进入 G 端监管工作台</div>
+        </a>
+        <a href="f-escrow.html" class="party-card bank">
+          <div class="ph">
+            <div class="icon">🏦</div>
+            <div>
+              <div class="name">江苏银行</div>
+              <div class="role">出金融 · 资金底座</div>
+            </div>
+          </div>
+          <div class="resp">
+            <div class="item">监管账户与资金留痕</div>
+            <div class="item">公积金直付通道</div>
+            <div class="item">三险一付（免押/家财/换租）</div>
+            <div class="item">信托垫资 · 信用体系</div>
+          </div>
+          <div class="footer-link">→ 进入 F 端金融通道</div>
+        </a>
+        <a href="p-console.html" class="party-card plat">
+          <div class="ph">
+            <div class="icon">⭐</div>
+            <div>
+              <div class="name">贝壳（承建方）</div>
+              <div class="role">出能力 · 平台 + 生态</div>
+            </div>
+          </div>
+          <div class="resp">
+            <div class="item">统一入口 / 标准 / 数据 / 服务</div>
+            <div class="item">承建市级保租房服务平台</div>
+            <div class="item">数据治理委员会（住建主导）</div>
+            <div class="item">对同业开放接入</div>
+          </div>
+          <div class="footer-link">→ 进入 P 端服务认证中台</div>
+        </a>
+        <a href="b-operator-console.html" class="party-card op">
+          <div class="ph">
+            <div class="icon">🏢</div>
+            <div>
+              <div class="name">国企持有方 + 白名单运营商</div>
+              <div class="role">国企出资产 · 白名单出运营</div>
+            </div>
+          </div>
+          <div class="resp">
+            <div class="item"><strong>国企</strong>：持有产权 · 委托运营 · 监督 SLA · 资管视角</div>
+            <div class="item"><strong>白名单运营商</strong>：自如/龙湖/华润/招商/贝壳省心租 — 日常派单/上架/管家</div>
+            <div class="item">按统一字段推送房源数据</div>
+            <div class="item">三种接入模式：自管 / 委托运营 / 深度托管</div>
+          </div>
+          <div class="footer-link">→ 进入 B 端 资管/运营商工作台</div>
+        </a>
+      </div>
+    </div>
+
+    <!-- 第 3 行：贝壳 5 种核心能力 -->
+    <div class="section">
+      <div class="section-title">⭐ 贝壳提供的核心能力 <span class="badge">住房运营基础设施底座 · 5 种</span></div>
+      <div class="cap-grid">
+        <div class="cap-card">
+          <div class="icon">📱</div>
+          <div class="t">流量能力</div>
+          <div class="d">贝壳 App / 小程序<br/>全国流量体系</div>
+        </div>
+        <div class="cap-card">
+          <div class="icon">🤝</div>
+          <div class="t">去化能力</div>
+          <div class="d">经纪人网络<br/>全国资源调度</div>
+        </div>
+        <div class="cap-card">
+          <div class="icon">⚙️</div>
+          <div class="t">数字化能力</div>
+          <div class="d">数据中台<br/>标准化系统</div>
+        </div>
+        <div class="cap-card">
+          <div class="icon">🛠</div>
+          <div class="t">运营能力</div>
+          <div class="d">管家体系 · 社区运营<br/>24h 服务</div>
+        </div>
+        <div class="cap-card">
+          <div class="icon">🏅</div>
+          <div class="t">标准落地能力</div>
+          <div class="d">好房子四维度标准<br/>认证执行落地</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第 4 行：三阶段实施路径 -->
+    <div class="section">
+      <div class="section-title">三阶段实施路径 <span class="badge">12 个月节奏 · 对应三档交付</span></div>
+      <div class="phase-grid">
+        <div class="phase-card p1">
+          <div class="hd"><span class="tag">阶段一</span><span class="name">频道搭建</span><span class="tag" style="margin-left:auto; background:#dbeafe; color:#1e40af;">0–2 个月</span></div>
+          <div class="actions">
+            <div>江苏住建厅发文授权 · 认定贝壳为市级合作平台</div>
+            <div>贝壳「保租房专区」上线 · 政府认证标识</div>
+            <div>首批城市试点接入项目（南京浦口）</div>
+          </div>
+          <div class="vbox v1">
+            <span class="vtag">V1</span><span class="vname">阶段一 · 展示型频道</span>
+            <div style="margin-top:3px;">4 页面 / 4–6 周 / 低风险 / 无在线交易</div>
+            <div class="pages">home · detail · policy · profile</div>
+            <a href="../baozufang-overview-v1-basic.html">查看 V1 详情 →</a>
+          </div>
+          <div class="outcome">V1 上线 · 市级保租房统一入口可见</div>
+        </div>
+        <div class="phase-card p2">
+          <div class="hd"><span class="tag">阶段二</span><span class="name">运营提升</span><span class="tag" style="margin-left:auto; background:#ccfbf1; color:#0d9488;">2–6 个月</span></div>
+          <div class="actions">
+            <div>全省统一服务标准落地</div>
+            <div>接入率与覆盖率提升 · 对同业开放</div>
+            <div>流量与数据互通 · 备案回流住建</div>
+          </div>
+          <div class="vbox v2">
+            <span class="vtag">V2</span><span class="vname">阶段二 · + 好房子标准体系</span>
+            <div style="margin-top:3px;">7 页 (V1+3) / 6–9 周 / 低风险 / 含星级 + 三大白名单</div>
+            <div class="pages">+ operators · service-workers · suppliers</div>
+            <a href="../baozufang-overview-v2-standard.html">查看 V2 详情 →</a>
+          </div>
+          <div class="outcome">V2 落地 · 全省统一服务标准成型</div>
+        </div>
+        <div class="phase-card p3">
+          <div class="hd"><span class="tag">阶段三</span><span class="name">生态建设</span><span class="tag" style="margin-left:auto; background:#fed7aa; color:#ea580c;">6–12 个月</span></div>
+          <div class="actions">
+            <div>数据驱动决策 · 月报等公共数据产品</div>
+            <div>形成长期产业基础设施</div>
+            <div>11 月联合发布会 · 江苏样本对外官宣</div>
+          </div>
+          <div class="vbox v3">
+            <span class="vtag">V3</span><span class="vname">阶段三 · + 交易闭环</span>
+            <div style="margin-top:3px;">12 页 (V2+5) / 14–18 周 / 中风险 / 全程网办 + 在线收入</div>
+            <div class="pages">+ apply · my-applications · contracts · payment · repair</div>
+            <a href="../baozufang-overview-v3-full.html">查看 V3 详情 →</a>
+          </div>
+          <div class="outcome">V3 全要素上线 · 江苏租赁公共数据底座建成</div>
+        </div>
+      </div>
+
+      <!-- 能力解锁条：A → A+B → A+B+C 累进 -->
+      <div class="unlock-bar">
+        <div class="unlock-cell">
+          <div class="stage">阶段一 · 解锁能力</div>
+          <div class="caps">
+            <span class="cap a">A · 展示与导览</span>
+            <span class="cap b dim">B · 好房子标准</span>
+            <span class="cap c dim">C · 交易闭环</span>
+          </div>
+          <div class="note">仅 4 个公开展示页 · 线下办理 · 零资金风险</div>
+        </div>
+        <div class="unlock-cell">
+          <div class="stage">阶段二 · 累加能力</div>
+          <div class="caps">
+            <span class="cap a">A · 展示与导览</span>
+            <span class="cap b">B · 好房子标准</span>
+            <span class="cap c dim">C · 交易闭环</span>
+          </div>
+          <div class="note">+3 张公示页 + 星级评价 · 数据接住建局 · 仍走线下</div>
+        </div>
+        <div class="unlock-cell">
+          <div class="stage">阶段三 · 全要素累加</div>
+          <div class="caps">
+            <span class="cap a">A · 展示与导览</span>
+            <span class="cap b">B · 好房子标准</span>
+            <span class="cap c">C · 交易闭环</span>
+          </div>
+          <div class="note">+5 张交易页 · 电签 + 支付 + 备案 · 端到端在线</div>
+        </div>
+      </div>
+
+      <!-- 下钻入口：完整三档对比 + 功能矩阵（替代独立 section，避免与三阶段卡片重叠） -->
+      <div style="margin-top:14px; padding:12px 16px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <span style="font-size:12px; color:var(--muted);">📦 想看每档的完整页面清单、19 项功能矩阵、推荐场景？</span>
+        <a href="../baozufang-channel-overview.html" style="margin-left:auto; padding:6px 14px; background:#0f172a; color:#fff; border-radius:8px; font-size:12px; font-weight:600;">查看完整三档对比与功能矩阵 →</a>
+      </div>
+    </div>
+
+    <!-- 第 5 行：各方价值矩阵 -->
+    <div class="section">
+      <div class="section-title">各方价值 <span class="badge">五方共赢</span></div>
+      <div class="value-grid">
+        <div class="value-card">
+          <div class="who gov"><span class="dot"></span>对住建厅</div>
+          <div class="vlist">
+            <div>零财政启动</div>
+            <div>统一数据可监管</div>
+            <div>全省一张网</div>
+            <div>政绩样板</div>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="who bank"><span class="dot"></span>对江苏银行</div>
+          <div class="vlist">
+            <div>监管账户沉淀资金</div>
+            <div>公积金通道使用率</div>
+            <div>三险一付场景拓展</div>
+            <div>REITs 退出通道</div>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="who plat"><span class="dot"></span>对贝壳</div>
+          <div class="vlist">
+            <div>承建方角色升级</div>
+            <div>服务费 6–8%</div>
+            <div>数据资产沉淀</div>
+            <div>品牌跃迁</div>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="who op"><span class="dot"></span>对国企持有方</div>
+          <div class="vlist">
+            <div>空置率下降</div>
+            <div>运营成本降低（外包）</div>
+            <div>资产估值提升</div>
+            <div>合作半径扩大 + 运营商可比可换</div>
+          </div>
+        </div>
+        <div class="value-card">
+          <div class="who user"><span class="dot"></span>对租户/用户</div>
+          <div class="vlist">
+            <div>全市一个入口</div>
+            <div>政府背书可验真</div>
+            <div>租金透明 ≤90% 市场价</div>
+            <div>免押 · 公积金直付</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第 6 行：数据与业务流转 -->
+    <div class="section">
+      <div class="section-title">数据与业务流转 <span class="badge">闭环</span></div>
+      <div class="flow">
+        <div class="flow-node">
+          <div class="icon">🏢</div>
+          <div class="t">国企持有方 + 白名单运营商</div>
+          <div class="d">房源信息流（运营商上传 · 国企监督）</div>
+        </div>
+        <div class="flow-node">
+          <div class="icon">⭐</div>
+          <div class="t">贝壳官方频道</div>
+          <div class="d">清洗 · 验真 · 上架</div>
+        </div>
+        <div class="flow-node">
+          <div class="icon">👥</div>
+          <div class="t">租客 / 用户</div>
+          <div class="d">看房 · 签约 · 履约</div>
+        </div>
+        <div class="flow-node">
+          <div class="icon">🏛</div>
+          <div class="t">政府监管端</div>
+          <div class="d">备案 · 公示 · 监管</div>
+        </div>
+        <div class="flow-node">
+          <div class="icon">🏦</div>
+          <div class="t">金融机构</div>
+          <div class="d">支付 · 监管账户</div>
+        </div>
+      </div>
+
+      <div class="longterm">
+        <div class="lt-card">
+          <div class="t">📊 数据资产</div>
+          <div class="d">省级房屋数据字典 + 租赁市场月报 + 价格红线 → 沉淀为贝壳长期数据资产，第三方审计背书</div>
+        </div>
+        <div class="lt-card">
+          <div class="t">👥 人才流</div>
+          <div class="d">不动产资产规划师 L1-5 → 5000+ 持证从业者 → 江苏成为全国试点省份</div>
+        </div>
+        <div class="lt-card">
+          <div class="t">📜 政策导向</div>
+          <div class="d">「四字诀=江苏行业标准」 · 公平竞争审查 + 3 年中评 + 5 年回看 → 可推广到外省</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="_region.js"></script>
+  <script src="_nav.js"></script>
+</body>
+</html>
