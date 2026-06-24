@@ -36,7 +36,7 @@
   .content .highlight{background:linear-gradient(135deg,var(--brand-soft),var(--gold-soft));padding:2px 8px;border-radius:4px;font-weight:600;}
   
   .point-list{margin:16px 0;padding:0;list-style:none;}
-  .point-list li{display:flex;gap:12px;margin-bottom:12px;font-size:15px;}
+  .point-list li{display:flex;gap:12px;margin-bottom:10px;font-size:15px;}
   .point-list li::before{content:"✓";color:var(--brand);font-weight:700;flex-shrink:0;}
   .point-list li strong{color:var(--brand-deep);}
   
@@ -53,20 +53,20 @@
   
   .quote-box{margin:24px 0;padding:20px 24px;background:linear-gradient(135deg,var(--brand-soft),#fff);border-left:4px solid var(--brand);border-radius:0 var(--r-md) var(--r-md) 0;font-size:17px;font-family:var(--serif);color:var(--brand-deep);font-style:italic;}
   
-  .role-map{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:24px 0;}
-  .role-item{background:#fff;border:1px solid #e3e8e6;border-radius:var(--r-md);padding:12px 18px;text-align:center;min-width:140px;}
-  .role-item .icon{font-size:24px;margin-bottom:6px;}
-  .role-item b{display:block;font-size:13px;color:var(--brand-deep);}
-  .role-item span{font-size:11px;color:var(--muted);}
+  .flow-box{margin:20px 0;padding:20px;background:rgba(255,255,255,.8);border-radius:var(--r-md);border:1px dashed #d1d5db;}
+  .flow-box h4{font-size:15px;font-weight:600;color:var(--brand-deep);margin:0 0 12px;}
+  .flow-box h4 .arrow{color:var(--gold);margin:0 6px;}
   
-  .sub-section{margin:24px 0;padding:20px;background:rgba(255,255,255,.8);border-radius:var(--r-md);border:1px dashed #d1d5db;}
-  .sub-section h4{font-size:15px;font-weight:600;color:var(--brand-deep);margin:0 0 12px;}
+  .phase{display:flex;gap:14px;margin-bottom:16px;}
+  .phase .num{width:28px;height:28px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px;flex-shrink:0;}
+  .phase .body{flex:1;}
+  .phase .body h5{font-size:14px;font-weight:600;color:var(--brand-deep);margin:0 0 4px;}
+  .phase .body p{font-size:13px;color:#475569;margin:0;}
+  .phase .body .note{font-size:11px;color:var(--muted);margin-top:4px;}
   
-  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0;}
-  .col-card{background:#fff;border:1px solid #e3e8e6;border-radius:var(--r-md);padding:16px;}
-  .col-card h5{font-size:14px;font-weight:600;margin:0 0 8px;color:var(--brand-deep);}
-  .col-card ul{margin:0;padding-left:18px;font-size:13px;}
-  .col-card li{margin-bottom:4px;}
+  .warn-box{margin:20px 0;padding:16px;background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--r-md);}
+  .warn-box p{margin:0;font-size:13px;color:#78350f;}
+  .warn-box p strong{color:var(--gold);}
   
   .footer{text-align:center;padding-top:32px;border-top:1px solid #e3e8e6;color:var(--muted);font-size:13px;}
   .footer b{color:var(--brand-deep);}
@@ -76,7 +76,7 @@
   .quick-notes ol{margin:0;padding-left:20px;}
   .quick-notes li{margin-bottom:6px;font-size:14px;color:#78350f;}
   
-  @media(max-width:640px){.two-col{grid-template-columns:1fr;}}
+  @media(max-width:640px){.shell-showcase{gap:10px;}.shell-item .shell{width:44px;height:44px;font-size:14px;}}
 </style>
 </head>
 <body>
@@ -85,247 +85,207 @@
   <!-- header -->
   <div class="header">
     <h1>🐚 贵州旅居 · 贝壳旅居平台</h1>
-    <div class="subtitle">演讲稿 · 约 18 分钟</div>
+    <div class="subtitle">演讲稿 · 约 15 分钟</div>
     <div class="meta">
       <span>📍 贵州省住建厅指导</span>
       <span>🐚 贝壳承建</span>
     </div>
   </div>
 
-  <!-- 开场 -->
+  <!-- 一、开场 -->
   <div class="section">
     <div class="section-head">
       <div class="idx">一</div>
-      <h2>开场</h2>
+      <h2>开场：为什么做贵州旅居</h2>
       <span class="time">1 分钟</span>
     </div>
     <div class="content">
       <p>各位领导、各位嘉宾，大家好！</p>
-      <p>今天我想和大家分享的是——<strong>贵州旅居</strong>，如何通过<strong>贝壳旅居平台</strong>，打造一张具有贵州特色的旅居服务新名片。</p>
-      <p>贵州，有"公园省"的美誉。这里有<strong>西江千户苗寨</strong>的万家灯火，有<strong>赤水丹霞</strong>的瑰丽霞光，有<strong>加榜梯田</strong>的金色稻浪，更有苗侗文化的千年传承。</p>
+      <p>今天分享的是——如何通过<strong>贝壳旅居平台</strong>，打造一张具有贵州特色的旅居服务新名片。</p>
+      <p>贵州有"公园省"的美誉：<strong>西江千户苗寨</strong>的万家灯火、<strong>赤水丹霞</strong>的瑰丽霞光、<strong>加榜梯田</strong>的金色稻浪、苗侗文化的千年传承。</p>
       <div class="quote-box">
-        如何让游客不只是"看一看"，而是愿意"留下来"？答案就是——旅居。
+        问题只有一个：游客来了，看完就走。怎么让他们愿意"留下来"？答案就是——旅居。
       </div>
     </div>
   </div>
 
-  <!-- 平台定位 -->
+  <!-- 二、平台全貌 -->
   <div class="section">
     <div class="section-head">
       <div class="idx">二</div>
-      <h2>平台定位：四大支柱，打通全链路</h2>
-      <span class="time">3 分钟</span>
+      <h2>平台全貌：四大支柱 + 五端协同</h2>
+      <span class="time">2 分钟</span>
     </div>
     <div class="content">
-      <p>贝壳旅居平台的核心定位，是打造<strong>贵州旅居产业综合服务平台</strong>。</p>
-      <p>我们构建了四大业务支柱：</p>
-      <ul class="point-list">
-        <li><strong>🗺 旅游地图</strong>——解决"去哪里玩"。整合景点、路线、美食、便民服务，配套行程规划、本地向导。</li>
-        <li><strong>🏠 房源中心</strong>——解决"住哪里"。分时式旅居、中式旅居、乡村式旅居、康养式旅居，配套签约管理、旅居管家。</li>
-        <li><strong>🧭 置业导购</strong>——解决"买哪里、租哪里"。精装房源、软装房源、拎包入住、闲置资产，配套装修设计、装修管理。</li>
-        <li><strong>🛎 居住服务</strong>——解决"找谁服务"。家政服务、维修服务、搬家服务、社区运营，配套入住服务、退住保障。</li>
-      </ul>
-      <p>这四大支柱，打通了<strong>资产供给 → 房源呈现 → 居住服务管理 → 新房转化 → 旅游产品推荐</strong>的全链路，实现旅居产业网络化的聚合效应。</p>
+      <p>贝壳旅居平台的定位是<strong>贵州旅居产业综合服务平台</strong>，用两个字概括逻辑：<strong>"流"和"留"</strong>。</p>
+      <p><strong>"流"</strong>——把游客引进来，把房源接进来；<strong>"留"</strong>——把服务者培养好，让游客住得下、愿意再来。</p>
       
-      <div class="sub-section">
+      <div class="flow-box">
+        <h4>🏛 四大业务支柱</h4>
+        <p style="font-size:14px;margin:0;"><strong>🗺 旅游地图</strong>（玩什么）→ <strong>🏠 房源中心</strong>（住哪里）→ <strong>🧭 置业导购</strong>（买/租哪里）→ <strong>🛎 居住服务</strong>（找谁服务）</p>
+      </div>
+      
+      <div class="flow-box">
         <h4>🤝 五端角色协同</h4>
-        <div class="role-map">
-          <div class="role-item"><div class="icon">🧳</div><b>旅居客 C 端</b><span>多渠道浏览·下单·支付</span></div>
-          <div class="role-item"><div class="icon">🏡</div><b>业主端</b><span>个人业主 / 机构业主</span></div>
-          <div class="role-item"><div class="icon">🐚</div><b>贝壳旅居平台</b><span>评级·接入·渠道·服务</span></div>
-          <div class="role-item"><div class="icon">🏛</div><b>政府监管端</b><span>住建厅 · 大屏驾驶舱</span></div>
-          <div class="role-item"><div class="icon">🏦</div><b>金融/渠道</b><span>OTA 直连·社媒·异业合作</span></div>
-        </div>
+        <p style="font-size:14px;margin:0;"><strong>旅居客</strong>浏览下单 → <strong>业主</strong>托管房源 → <strong>贝壳平台</strong>评级分发 → <strong>政府</strong>监管驾驶舱 → <strong>金融/渠道</strong>（OTA/社媒/异业）引流</p>
       </div>
     </div>
   </div>
 
-  <!-- 核心能力：评级与验真 -->
+  <!-- 三、流 -->
   <div class="section">
     <div class="section-head">
       <div class="idx">三</div>
-      <h2>平台核心能力：评级与验真</h2>
-      <span class="time">4 分钟</span>
+      <h2>"流"：游客怎么来，业主怎么供</h2>
+      <span class="time">3 分钟</span>
     </div>
     <div class="content">
-      <p>平台的核心能力，围绕两个关键词展开：<strong>评级</strong>与<strong>验真</strong>。</p>
-      <p style="margin-top:24px;font-size:18px;font-weight:600;color:var(--brand-deep);">🐚 房源评级：五彩贝体系</p>
-      <p>我们创新性地推出了<strong>"五彩贝"旅居评级体系</strong>，用贵州意象命名五个等级：</p>
+      <p style="font-size:18px;font-weight:600;color:var(--brand-deep);">👤 游客端：多渠道触达，小程序闭环</p>
+      <p>游客可以通过<strong>贝壳 APP、小程序、OTA 直连（携程/美团）、社交媒体（抖音/小红书）、异业合作（贵州银行/哈啰）</strong>等多渠道触达。</p>
+      <p>在小程序内完成<strong>浏览 → 下单 → 支付</strong>全流程。支付支持贝壳支付（<strong>资金存管</strong>，入住后结算给房东）、微信支付、OTA 支付、银行分期。</p>
       
+      <div class="warn-box">
+        <p><strong>💡 关键机制：</strong>贝壳支付资金存管——游客的钱由平台托管，入住确认后才结算给房东。这是信任基础。</p>
+      </div>
+      
+      <p style="margin-top:24px;font-size:18px;font-weight:600;color:var(--brand-deep);">🏡 业主端：个人托管 + 机构接入</p>
+      <ul class="point-list">
+        <li><strong>个人业主</strong>：闲置房一键托管，AI 估算收益，线上签约，月结透明账单</li>
+        <li><strong>机构业主</strong>：批量房源导入，API/PMS 直连，多门店统一管理，分账自动结算</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 四、留 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">四</div>
+      <h2>"留"：服务者怎么培养，怎么保障</h2>
+      <span class="time">3 分钟</span>
+    </div>
+    <div class="content">
+      <p>旅居体验好不好，关键看服务者。平台建立<strong>居住服务开放平台</strong>，提供六大能力：</p>
+      <ul class="point-list">
+        <li><strong>🎓 培训</strong>：86门课程在线学</li>
+        <li><strong>📝 认证</strong>：1200+题库，机考通过</li>
+        <li><strong>🪜 分级</strong>：L0-L7 八级，能力越高收入越高</li>
+        <li><strong>📡 派单</strong>：按等级分发，T+7 结算</li>
+        <li><strong>⭐ 评价</strong>：客户评价回流，信用分月滚动</li>
+        <li><strong>🛡 保障</strong>：责任险全程兜底</li>
+      </ul>
+      
+      <p style="margin-top:20px;font-size:15px;">服务者入驻<strong>六步闭环</strong>：申请入驻 → 标准学习 → 考试认证 → 白名单审定 → 流量分发 → 持续考核。全程网办，约 30 天。</p>
+      <p style="font-size:15px;">培训机构同步引入，形成<strong>招生→排课→考核→结业→发证</strong>的育人闭环，向平台稳定输出标准化人才。</p>
+    </div>
+  </div>
+
+  <!-- 五、品质保障 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">五</div>
+      <h2>品质保障：五彩贝评级 + 一卡验真</h2>
+      <span class="time">2 分钟</span>
+    </div>
+    <div class="content">
+      <p>平台的核心差异，在于<strong>评级</strong>与<strong>验真</strong>两大机制。</p>
+      
+      <p style="font-size:18px;font-weight:600;color:var(--brand-deep);">🐚 五彩贝评级体系</p>
       <div class="shell-showcase">
         <div class="shell-item">
           <div class="shell s1">翠</div>
           <div class="name">一彩贝·翠曙</div>
-          <div class="desc">青山破晓</div>
+          <div class="desc">基本住宿</div>
         </div>
         <div class="shell-item">
           <div class="shell s2">靛</div>
           <div class="name">二彩贝·靛岚</div>
-          <div class="desc">苗侗蜡染</div>
+          <div class="desc">整洁舒适</div>
         </div>
         <div class="shell-item">
           <div class="shell s3">丹</div>
           <div class="name">三彩贝·丹霞</div>
-          <div class="desc">赤水丹霞</div>
+          <div class="desc">智能安心</div>
         </div>
         <div class="shell-item">
           <div class="shell s4">银</div>
           <div class="name">四彩贝·银宵</div>
-          <div class="desc">苗银月夜</div>
+          <div class="desc">品质雅居</div>
         </div>
         <div class="shell-item">
           <div class="shell s5">金</div>
           <div class="name">五彩贝·金禾</div>
-          <div class="desc">加榜梯田</div>
+          <div class="desc">在地康养</div>
         </div>
       </div>
+      <p style="text-align:center;font-size:13px;color:var(--muted);">命名融合贵州意象：青山破晓→苗侗蜡染→赤水丹霞→苗银月夜→加榜梯田</p>
       
-      <p>这不仅是评级，更是<strong>贵州文化的视觉表达</strong>。沿着<strong>"破晓→晨间→黄昏→深夜→臻境"</strong>的时间线递进，色彩从翠到金，居住体验同步升级。</p>
-      
-      <p style="margin-top:24px;font-size:18px;font-weight:600;color:var(--brand-deep);">🛡 验真机制</p>
-      <p>每一套房源都经过<strong>公安、住建、保险</strong>核验，生成唯一的<strong>房源验证编号</strong>和<strong>验真二维码</strong>，游客扫码即可查看房源真实性。</p>
-      <p>所有数据沉淀到房源库，对外以一张<strong>"验真+评级卡片"</strong>呈现——小程序详情页、渠道分发页、扫码验真都引用同一张卡片，确保口径一致、可追溯。</p>
-    </div>
-  </div>
-
-  <!-- 客户与业主视角 -->
-  <div class="section">
-    <div class="section-head">
-      <div class="idx">四</div>
-      <h2>"流"：客户 + 业主视角</h2>
-      <span class="time">3 分钟</span>
-    </div>
-    <div class="content">
-      <p>我们用<strong>"流"</strong>和<strong>"留"</strong>两个字概括平台的核心逻辑。</p>
-      <p>"流"——把人和房源引进来；"留"——把人留下来。</p>
-      
-      <div class="sub-section">
-        <h4>A · 客户视角：多渠道触达，全流程闭环</h4>
-        <p style="font-size:14px;">游客可以通过多个渠道触达：</p>
-        <ul class="point-list" style="font-size:14px;">
-          <li><strong>贝壳 APP</strong>——找房·旅居频道主入口</li>
-          <li><strong>贝壳找房小程序</strong>——轻量入口，微信生态</li>
-          <li><strong>OTA 直连</strong>——同程、携程、途家、美团</li>
-          <li><strong>社交媒体</strong>——抖音、小红书内容分发</li>
-          <li><strong>异业合作</strong>——哈啰单车、跳海酒吧、贵州银行</li>
-        </ul>
-        <p style="font-size:14px;">在小程序内，游客可以完成<strong>浏览 → 下单 → 支付</strong>的全流程。支付支持贝壳支付（资金存管）、微信支付、OTA 渠道支付、异业合作分期。</p>
-      </div>
-      
-      <div class="sub-section">
-        <h4>B · 业主视角：个人一键托管，机构批量接入</h4>
-        <div class="two-col">
-          <div class="col-card">
-            <h5>🏡 个人业主</h5>
-            <ul>
-              <li>闲置房/自有房产/度假房托管</li>
-              <li>一键托管，免费上门</li>
-              <li>AI 收益估算</li>
-              <li>线上签约存证</li>
-              <li>收益月结，透明账单</li>
-              <li>旅居彩贝辅导提级</li>
-            </ul>
-          </div>
-          <div class="col-card">
-            <h5>🏬 机构业主</h5>
-            <ul>
-              <li>酒店集团/惠居运营商</li>
-              <li>批量房源导入</li>
-              <li>API/PMS 直连</li>
-              <li>多门店统一管理</li>
-              <li>多渠道分发</li>
-              <li>分账自动结算</li>
-            </ul>
-          </div>
-        </div>
+      <p style="margin-top:24px;font-size:18px;font-weight:600;color:var(--brand-deep);">🛡 一卡验真，数据同源</p>
+      <p>每套房源经公安、住建、保险核验后，生成唯一的<strong>验真二维码</strong>。</p>
+      <div class="warn-box">
+        <p><strong>💡 关键设计：</strong>同一张「验真+评级卡片」——小程序详情页、渠道分发页、扫码验真三处引用同一数据源，确保口径一致、可追溯。</p>
       </div>
     </div>
   </div>
 
-  <!-- 服务者体系 -->
-  <div class="section">
-    <div class="section-head">
-      <div class="idx">五</div>
-      <h2>"留"：服务者体系 · 统一认证，持证上岗</h2>
-      <span class="time">4 分钟</span>
-    </div>
-    <div class="content">
-      <p>除了房源，服务者也是旅居体验的关键。</p>
-      <p>贝壳旅居平台建立了<strong>居住服务开放平台</strong>，开放六大能力：</p>
-      <ul class="point-list">
-        <li><strong>🎓 培训中心</strong>——86门专业课程在线学</li>
-        <li><strong>📝 考试认证</strong>——1200+题库，机考通过</li>
-        <li><strong>🪜 分级标准</strong>——L0-L7八个等级</li>
-        <li><strong>📡 派单流量</strong>——按级分发，T+7结算</li>
-        <li><strong>⭐ 评价信用</strong>——客户评价回流，信用分月滚动</li>
-        <li><strong>🛡 安心保障</strong>——责任险全程兜底</li>
-      </ul>
-      
-      <div class="sub-section">
-        <h4>🪜 L0-L7 八级体系</h4>
-        <p style="font-size:14px;">服务者从入门到专家，分为八个等级：</p>
-        <ul class="point-list" style="font-size:14px;">
-          <li><strong>L0</strong>——实名注册</li>
-          <li><strong>L1-L2</strong>——见习/初级管家，基础服务能力</li>
-          <li><strong>L3-L4</strong>——中级/金牌管家，可接中高端房源</li>
-          <li><strong>L5</strong>——服务商负责人，可做商业认证</li>
-          <li><strong>L6-L7</strong>——区域专家/首席专家，可担任培训讲师</li>
-        </ul>
-        <p style="font-size:14px;">等级越高，派单优先级越高，收入也越高。这形成了<strong>能力→等级→收入</strong>的正向激励。</p>
-      </div>
-      
-      <div class="sub-section">
-        <h4>📋 入驻流程：全程网办，约30天通过</h4>
-        <p style="font-size:14px;">服务者入驻分为六步：</p>
-        <ol style="font-size:14px;margin:0;padding-left:20px;">
-          <li><strong>STEP 1 申请入驻</strong>——实名+资质，对接人社职业资格库</li>
-          <li><strong>STEP 2 标准学习</strong>——培训机构供课，服务者在线学</li>
-          <li><strong>STEP 3 考试认证</strong>——题库组卷+考务排考+成绩核发</li>
-          <li><strong>STEP 4 白名单</strong>——住建厅审定+公示门户可查</li>
-          <li><strong>STEP 5 流量分发</strong>——按等级派单，分账T+7</li>
-          <li><strong>STEP 6 持续考核</strong>——客户评价→信用分→升降级</li>
-        </ol>
-      </div>
-      
-      <div class="sub-section">
-        <h4>🎓 培训机构育人闭环</h4>
-        <p style="font-size:14px;">平台还引入培训机构，形成<strong>招生→排课→考核→结业→发证</strong>的育人闭环：</p>
-        <ul class="point-list" style="font-size:14px;">
-          <li>培训机构招生、排课、排考</li>
-          <li>中台审批考务、核发结业</li>
-          <li>统一发证：等级证书+持证编号</li>
-          <li>上链公示验真</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-
-  <!-- 政府监管 -->
+  <!-- 六、推进计划 -->
   <div class="section">
     <div class="section-head">
       <div class="idx">六</div>
-      <h2>政府监管：数据总览</h2>
+      <h2>推进计划：三阶段，按 stage-gate 推进</h2>
       <span class="time">2 分钟</span>
     </div>
     <div class="content">
-      <p>平台与政府监管部门深度对接。</p>
-      <p>住建厅可通过<strong>监管驾驶舱</strong>，实时查看：</p>
-      <ul class="point-list">
-        <li><strong>资产规模</strong>——接入房源总数、资产总估值</li>
-        <li><strong>彩贝达标率</strong>——各等级房源分布</li>
-        <li><strong>验真覆盖率</strong>——公安/住建/保险核验状态</li>
-        <li><strong>复核待审数量</strong>——彩贝复核、房源信息补全</li>
-        <li><strong>投诉处置率</strong>——客诉处理进度</li>
-      </ul>
-      <p>所有数据一目了然，监管有据可依。</p>
-      <p>同时，平台与<strong>公安系统</strong>实名备案对接、与<strong>人社系统</strong>职业资格对接、与<strong>保险公司</strong>责任险对接，形成<strong>政府、平台、保险</strong>三方联动的监管闭环。</p>
+      <p>不盲目铺开，先试点验证，再按 stage-gate 推进。</p>
+      
+      <div class="phase">
+        <div class="num">1</div>
+        <div class="body">
+          <h5>阶段一 · 旅居入口跑通（MVP）</h5>
+          <p>覆盖房源中心 + 基础居住服务。交付小程序浏览→下单→支付，单渠道上线。</p>
+          <div class="note"><strong>出口标准：</strong>试点房源接入数达标 + 转化漏斗跑通。未达标 → 延期/缩范围/重做试点。</div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="num">2</div>
+        <div class="body">
+          <h5>阶段二 · 标准与监管闭环</h5>
+          <p>+ 评级管理（复核/公示/调级）+ 政府核验发证 + 多渠道分发 + 服务者认证。</p>
+          <div class="note"><strong>出口标准：</strong>彩贝达标率 + 验真覆盖率达标。住建厅监管驾驶舱上线。</div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="num">3</div>
+        <div class="body">
+          <h5>阶段三 · 全链路聚合</h5>
+          <p>+ 旅游地图（景点/路线/美食）+ 置业导购（新房转化/装修服务）+ 康养/研学产品推荐。</p>
+          <div class="note"><strong>上限假设（非承诺）：</strong>全省房源数/旅居客 MAU 依赖政策传导与自愿复制，按 stage-gate 滚动，不自动达成。</div>
+        </div>
+      </div>
+      
+      <div class="warn-box">
+        <p><strong>⚠️ 重要说明：</strong>推广性指标（MAU/房源数）均为政策推动后的<strong>上限假设，非承诺</strong>。每一阶段有明确的承诺指标和出口标准，未达标不进入下一阶段。</p>
+      </div>
     </div>
   </div>
 
-  <!-- 结语 -->
+  <!-- 七、政府协同 -->
   <div class="section">
     <div class="section-head">
       <div class="idx">七</div>
+      <h2>政府协同：监管驾驶舱</h2>
+      <span class="time">1 分钟</span>
+    </div>
+    <div class="content">
+      <p>平台与政府监管部门深度对接。</p>
+      <p>住建厅可通过<strong>监管驾驶舱</strong>实时查看：资产规模、彩贝达标率、验真覆盖率、复核待审数量、投诉处置率。所有数据一目了然，监管有据可依。</p>
+      <p>平台与<strong>公安系统</strong>实名备案对接、<strong>人社系统</strong>职业资格对接、<strong>保险公司</strong>责任险对接，形成<strong>政府、平台、保险</strong>三方联动的监管闭环。</p>
+    </div>
+  </div>
+
+  <!-- 八、结语 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">八</div>
       <h2>结语</h2>
       <span class="time">1 分钟</span>
     </div>
@@ -334,32 +294,24 @@
       <div class="quote-box">
         在西江千户苗寨的云端醒来，在赤水丹霞的霞光中漫步，在加榜梯田的金色稻浪里发呆——这是贵州给游客的礼物。
       </div>
-      <p>而贝壳旅居平台要做的，就是用<strong>专业的评级体系、完善的验真机制、标准化的服务者队伍</strong>，让这份礼物更有保障、更有品质、更有温度。</p>
-      
-      <p style="margin-top:24px;font-size:17px;font-weight:600;color:var(--brand-deep);">核心价值总结：</p>
-      <ul class="point-list">
-        <li><strong>对游客</strong>——住得安心、玩得舒心、走得留恋</li>
-        <li><strong>对业主</strong>——一键托管、收益透明、省心收租</li>
-        <li><strong>对服务者</strong>——清晰成长路径、公平派单机制</li>
-        <li><strong>对政府</strong>——数据一目了然、监管有据可依</li>
-      </ul>
-      
-      <p style="margin-top:24px;text-align:center;font-size:18px;font-weight:600;color:var(--brand-deep);">让每一位来到贵州的游客，都能感受到"流"的便捷与"留"的温度。</p>
-      <p style="text-align:center;margin-top:20px;font-size:17px;">谢谢大家！</p>
+      <p>贝壳旅居平台用<strong>四大支柱</strong>构建平台，用<strong>五彩贝评级</strong>保障品质，用<strong>统一认证</strong>培养服务者，用<strong> stage-gate </strong>稳健推进。</p>
+      <p style="margin-top:20px;text-align:center;font-size:18px;font-weight:600;color:var(--brand-deep);">让每一位来到贵州的游客，住得安心、玩得舒心、走得留恋。</p>
+      <p style="text-align:center;margin-top:16px;font-size:17px;">谢谢大家！</p>
     </div>
   </div>
 
   <!-- 快速要点 -->
   <div class="quick-notes">
-    <h4>📋 演讲要点速记</h4>
+    <h4>📋 演讲逻辑速记</h4>
     <ol>
-      <li>开场：贵州特色 + 旅居概念（1分钟）</li>
-      <li>平台定位：四大支柱 + 五端角色协同（3分钟）</li>
-      <li>核心能力：五彩贝评级 + 三重验真 + 验真卡片（4分钟）</li>
-      <li>"流"视角：客户多渠道触达 + 业主托管接入（3分钟）</li>
-      <li>"留"视角：服务者六大能力 + L0-L7分级 + 入驻流程（4分钟）</li>
-      <li>政府监管：数据总览（2分钟）</li>
-      <li>结语：核心价值总结（1分钟）</li>
+      <li><strong>为什么</strong>：贵州旅居的价值（1分钟）</li>
+      <li><strong>是什么</strong>：四大支柱 + 五端协同（2分钟）</li>
+      <li><strong>流</strong>：游客多渠道 + 业主托管（3分钟）</li>
+      <li><strong>留</strong>：服务者六能力 + 入驻闭环（3分钟）</li>
+      <li><strong>品质保障</strong>：五彩贝 + 一卡验真（2分钟）</li>
+      <li><strong>怎么推</strong>：三阶段 + stage-gate（2分钟）</li>
+      <li><strong>政府角色</strong>：监管驾驶舱（1分钟）</li>
+      <li><strong>结语</strong>：价值总结（1分钟）</li>
     </ol>
   </div>
 
