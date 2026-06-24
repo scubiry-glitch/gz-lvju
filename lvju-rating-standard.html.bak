@@ -109,13 +109,13 @@
     </div>
     <h1>贵州旅居 · 旅居住宿星级评价体系</h1>
     <p class="lead">面向旅居住宿的星级评价体系：融合酒店国标、携程钻级、惠居评价与长租体验，
-       新增旅居特有的<b>环境景观 / 在地文化 / 康养 / 景区联动</b>维度，作为贝壳旅居平台「房源评级管理」的判定依据。</p>
+       新增旅居特有的<b>环境景观 / 在地文化 / 康养 / 景区联动</b>维度，作为贝壳旅居中台「房源评级管理」的判定依据。</p>
     <p class="src">参考行业住宿星级标准提案 · 星级规则 + 评星工具表（钻级设施自查表）改编 · 仅供演示</p>
   </div>
 
-  <!-- ① 综合彩贝总览（已隐藏） -->
-  <section class="sec" style="display:none;">
-    <div class="sec-head"><div class="idx">一</div><h2>综合彩贝总览 · 1–5 彩贝旅居</h2>
+  <!-- ① 综合星级总览 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">一</div><h2>综合星级总览 · 1–5 星旅居</h2>
       <span class="sub">由 5 大维度加权得分映射，挂牌公示并动态调级</span></div>
     <div class="tiers">
       <div class="tier t1"><div class="th"><div class="stars">★</div><div class="tname">一星 · 平价旅居</div></div>
@@ -165,6 +165,65 @@
       <span class="sub">融合酒店国标 / 携程钻级 / 民宿携程 / 长租体验，统一为旅居星级</span></div>
     <div class="card matrix-wrap" style="padding:14px;">
       <table class="cmp">
+        <thead><tr>
+          <th>评定项</th>
+          <th class="c5 s5">★★★★★ 五星</th>
+          <th class="c4 s4">★★★★ 四星</th>
+          <th class="c3 s3">★★★ 三星</th>
+        </tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">环境景观<span class="dimtag">维度①</span></td></tr>
+          <tr><td class="item">信息图片 · 照片总数</td><td class="req c5"><span class="y">不重复 &gt;15 张</span></td><td class="req c4"><span class="y">&gt;10 张</span></td><td class="req c3"><span class="y">&gt;5 张</span></td></tr>
+          <tr><td class="item">外观 / 公区 / 客房相册</td><td class="req c5"><span class="y">店招全貌+公区特写+客房&gt;5 张</span></td><td class="req c4"><span class="y">外观+公区+客房&gt;5 张</span></td><td class="req c3"><span class="y">外观+客房&gt;5 张</span></td></tr>
+          <tr><td class="item">景观位</td><td class="req c5"><span class="star">一线景观 / 观景台</span></td><td class="req c4"><span class="y">部分景观</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">建筑与庭院</td><td class="req c5"><span class="star">特色建筑 + 庭院/露台</span></td><td class="req c4"><span class="y">庭院或露台</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+
+          <tr class="grp"><td colspan="4">设施配套<span class="dimtag">维度③</span></td></tr>
+          <tr><td class="item">客房面积</td><td class="req c5"><span class="y">70% &gt;30㎡</span></td><td class="req c4"><span class="y">70% &gt;25㎡</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">干湿分离</td><td class="req c5"><span class="y">要求</span></td><td class="req c4"><span class="y">要求</span></td><td class="req c3"><span class="y">要求</span></td></tr>
+          <tr><td class="item">智能门锁 / 水电表</td><td class="req c5"><span class="y">有 · 隐私加密</span></td><td class="req c4"><span class="y">有 · 隐私加密</span></td><td class="req c3"><span class="y">有</span></td></tr>
+          <tr><td class="item">智能马桶 / 安全组件</td><td class="req c5"><span class="star">马桶强制 + 安全件≥3</span></td><td class="req c4"><span class="y">安全件≥1</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">客房标配</td><td class="req c5"><span class="y">电视/Wi-Fi/空调/冰箱/沙发≥3人/餐桌</span></td><td class="req c4"><span class="y">电视/Wi-Fi/空调/冰箱/沙发</span></td><td class="req c3"><span class="y">电视/Wi-Fi/空调/洗衣机</span></td></tr>
+          <tr><td class="item">基础设施</td><td class="req c5"><span class="y">洗衣房+3层电梯+车位&gt;15%+监控</span></td><td class="req c4"><span class="y">洗衣房+电梯+停车+监控</span></td><td class="req c3"><span class="y">洗衣房+监控</span></td></tr>
+          <tr><td class="item">交付标准</td><td class="req c5"><span class="y">保洁+全屋整备+甲醛检测</span></td><td class="req c4"><span class="y">保洁+全屋整备</span></td><td class="req c3"><span class="y">入住保洁</span></td></tr>
+          <tr><td class="item">领包入住套件</td><td class="req c5"><span class="y">矿泉水/洗漱/毛巾/吹风机</span></td><td class="req c4"><span class="y">矿泉水/洗漱/一次性毛巾/吹风机</span></td><td class="req c3"><span class="y">矿泉水/洗漱/一次性毛巾</span></td></tr>
+
+          <tr class="grp"><td colspan="4">服务品质<span class="dimtag">维度②</span></td></tr>
+          <tr><td class="item">旅居管家</td><td class="req c5"><span class="y">24H + 持证资格</span></td><td class="req c4"><span class="y">24H 服务</span></td><td class="req c3"><span class="y">有</span></td></tr>
+          <tr><td class="item">24H 客服 / 每日清洁 / 行李寄存</td><td class="req c5"><span class="y">全部提供</span></td><td class="req c4"><span class="y">客服+行李寄存</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">安心保险</td><td class="req c5"><span class="y">加强型家财险+客房安心险</span></td><td class="req c4"><span class="y">加强型家财险</span></td><td class="req c3"><span class="y">普通家财险</span></td></tr>
+          <tr><td class="item">信用分</td><td class="req c5"><span class="y">&gt;4.4</span></td><td class="req c4"><span class="y">&gt;4.2</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
+          <tr><td class="item">24H 维修 / 保安 · 押金</td><td class="req c5"><span class="y">维修保安持证 · 0 押金</span></td><td class="req c4"><span class="y">维修保安 · 1 个月押金</span></td><td class="req c3"><span class="y">维修 · 1 个月押金</span></td></tr>
+
+          <tr class="grp"><td colspan="4">特色体验<span class="dimtag">维度⑤ · 旅居差异化</span></td></tr>
+          <tr><td class="item">在地文化主题</td><td class="req c5"><span class="star">鲜明主题 + 民俗陈设</span></td><td class="req c4"><span class="y">一定主题元素</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">民俗 / 研学活动</td><td class="req c5"><span class="star">定期组织 + 在地向导</span></td><td class="req c4"><span class="y">可提供</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">在地餐饮</td><td class="req c5"><span class="y">特色餐厅 + 三餐</span></td><td class="req c4"><span class="y">含早 + 特色</span></td><td class="req c3"><span class="y">含早</span></td></tr>
+          <tr><td class="item">康养配套</td><td class="req c5"><span class="star">SPA/温泉/理疗 任一</span></td><td class="req c4"><span class="y">加分项</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">休闲娱乐</td><td class="req c5"><span class="y">泳池/健身/茶室咖啡 任二</span></td><td class="req c4"><span class="y">任一加分</span></td><td class="req c3"><span class="n">无</span></td></tr>
+          <tr><td class="item">景区联动 / 接送</td><td class="req c5"><span class="star">自营接送(车 LOGO) + 景区直通</span></td><td class="req c4"><span class="y">提供接送</span></td><td class="req c3"><span class="n">无</span></td></tr>
+
+          <tr class="grp"><td colspan="4">交通区位<span class="dimtag">维度④</span></td></tr>
+          <tr><td class="item">距核心景区</td><td class="req c5"><span class="y">≤3km 或景区内</span></td><td class="req c4"><span class="y">≤8km</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
+          <tr><td class="item">交通接驳 / 停车</td><td class="req c5"><span class="y">高铁机场接驳 + 车位&gt;15%</span></td><td class="req c4"><span class="y">公共交通可达 + 停车</span></td><td class="req c3"><span class="y">可达 + 路边停车</span></td></tr>
+          <tr><td class="item">价格</td><td class="req c5"><span class="y">达同城 5 星水平</span></td><td class="req c4"><span class="y">达同城 4 星水平</span></td><td class="req c3"><span class="y">达同城 3 星水平</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ④ 评星工具表 -->
+  <section class="sec">
+    <div class="sec-head"><div class="idx">四</div><h2>评星工具表 · 3 / 4 / 5 星设施自查</h2>
+      <span class="sub">改编自"钻级设施自查表"，按旅居场景重构</span></div>
+    <div class="toggle" id="tg">
+      <button data-v="all" class="active">全部对比</button>
+      <button data-v="3">仅看 3 星</button>
+      <button data-v="4">仅看 4 星</button>
+      <button data-v="5">仅看 5 星</button>
+    </div>
+    <div class="card matrix-wrap">
+      <table class="mx">
         <thead><tr><th>彩贝级别</th><th class="lj">旅居定位（本体系）<br><small style="font-weight:400;color:#64748b;">双周起</small></th><th>酒店 · 国标 / 携程钻级<br><small style="font-weight:400;color:#64748b;">日租</small></th><th>民宿 · 携程<br><small style="font-weight:400;color:#64748b;">日租</small></th><th>长租 · 体验<br><small style="font-weight:400;color:#64748b;">月租起</small></th></tr></thead>
         <tbody>
           <tr><td class="lv">🐚 一彩贝<br><small style="color:#10b981;">翠曙</small></td><td class="lj">基本住宿</td><td>设备简单 / 1 钻平价</td><td>1 钻：装修简单，可无接待</td><td>仅基本住宿，可无接待</td></tr>
@@ -234,72 +293,13 @@
     </div>
   </section>
 
-  <!-- ④ 评星工具表 -->
-  <section class="sec">
-    <div class="sec-head"><div class="idx">四</div><h2>评星工具表 · 3 / 4 / 5 星设施自查</h2>
-      <span class="sub">改编自"钻级设施自查表"，按旅居场景重构</span></div>
-    <div class="toggle" id="tg">
-      <button data-v="all" class="active">全部对比</button>
-      <button data-v="3">仅看 3 贝</button>
-      <button data-v="4">仅看 4 贝</button>
-      <button data-v="5">仅看 5 贝</button>
-    </div>
-    <div class="card matrix-wrap">
-      <table class="mx">
-        <thead><tr>
-          <th>评定项</th>
-          <th class="c5 s5">🐚🐚🐚🐚🐚 五彩贝</th>
-          <th class="c4 s4">🐚🐚🐚🐚 四彩贝</th>
-          <th class="c3 s3">🐚🐚🐚 三彩贝</th>
-        </tr></thead>
-        <tbody>
-          <tr class="grp"><td colspan="4">环境景观<span class="dimtag">维度①</span></td></tr>
-          <tr><td class="item">信息图片 · 照片总数</td><td class="req c5"><span class="y">不重复 &gt;15 张</span></td><td class="req c4"><span class="y">&gt;10 张</span></td><td class="req c3"><span class="y">&gt;5 张</span></td></tr>
-          <tr><td class="item">外观 / 公区 / 客房相册</td><td class="req c5"><span class="y">店招全貌+公区特写+客房&gt;5 张</span></td><td class="req c4"><span class="y">外观+公区+客房&gt;5 张</span></td><td class="req c3"><span class="y">外观+客房&gt;5 张</span></td></tr>
-          <tr><td class="item">景观位</td><td class="req c5"><span class="star">一线景观 / 观景台</span></td><td class="req c4"><span class="y">部分景观</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
-          <tr><td class="item">建筑与庭院</td><td class="req c5"><span class="star">特色建筑 + 庭院/露台</span></td><td class="req c4"><span class="y">庭院或露台</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
-
-          <tr class="grp"><td colspan="4">设施配套<span class="dimtag">维度③</span></td></tr>
-          <tr><td class="item">客房面积</td><td class="req c5"><span class="y">70% &gt;30㎡</span></td><td class="req c4"><span class="y">70% &gt;25㎡</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
-          <tr><td class="item">干湿分离</td><td class="req c5"><span class="y">要求</span></td><td class="req c4"><span class="y">要求</span></td><td class="req c3"><span class="y">要求</span></td></tr>
-          <tr><td class="item">智能门锁 / 水电表</td><td class="req c5"><span class="y">有 · 隐私加密</span></td><td class="req c4"><span class="y">有 · 隐私加密</span></td><td class="req c3"><span class="y">有</span></td></tr>
-          <tr><td class="item">智能马桶 / 安全组件</td><td class="req c5"><span class="star">马桶强制 + 安全件≥3</span></td><td class="req c4"><span class="y">安全件≥1</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
-          <tr><td class="item">客房标配</td><td class="req c5"><span class="y">电视/Wi-Fi/空调/冰箱/沙发≥3人/餐桌</span></td><td class="req c4"><span class="y">电视/Wi-Fi/空调/冰箱/沙发</span></td><td class="req c3"><span class="y">电视/Wi-Fi/空调/洗衣机</span></td></tr>
-          <tr><td class="item">基础设施</td><td class="req c5"><span class="y">洗衣房+3层电梯+车位&gt;15%+监控</span></td><td class="req c4"><span class="y">洗衣房+电梯+停车+监控</span></td><td class="req c3"><span class="y">洗衣房+监控</span></td></tr>
-          <tr><td class="item">交付标准</td><td class="req c5"><span class="y">保洁+全屋整备+甲醛检测</span></td><td class="req c4"><span class="y">保洁+全屋整备</span></td><td class="req c3"><span class="y">入住保洁</span></td></tr>
-          <tr><td class="item">领包入住套件</td><td class="req c5"><span class="y">矿泉水/洗漱/毛巾/吹风机</span></td><td class="req c4"><span class="y">矿泉水/洗漱/一次性毛巾/吹风机</span></td><td class="req c3"><span class="y">矿泉水/洗漱/一次性毛巾</span></td></tr>
-
-          <tr class="grp"><td colspan="4">服务品质<span class="dimtag">维度②</span></td></tr>
-          <tr><td class="item">旅居管家</td><td class="req c5"><span class="y">24H + 持证资格</span></td><td class="req c4"><span class="y">24H 服务</span></td><td class="req c3"><span class="y">有</span></td></tr>
-          <tr><td class="item">24H 客服 / 每日清洁 / 行李寄存</td><td class="req c5"><span class="y">全部提供</span></td><td class="req c4"><span class="y">客服+行李寄存</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
-          <tr><td class="item">安心保险</td><td class="req c5"><span class="y">加强型家财险+客房安心险</span></td><td class="req c4"><span class="y">加强型家财险</span></td><td class="req c3"><span class="y">普通家财险</span></td></tr>
-          <tr><td class="item">信用分</td><td class="req c5"><span class="y">&gt;4.4</span></td><td class="req c4"><span class="y">&gt;4.2</span></td><td class="req c3"><span class="n">无要求</span></td></tr>
-          <tr><td class="item">24H 维修 / 保安 · 押金</td><td class="req c5"><span class="y">维修保安持证 · 0 押金</span></td><td class="req c4"><span class="y">维修保安 · 1 个月押金</span></td><td class="req c3"><span class="y">维修 · 1 个月押金</span></td></tr>
-
-          <tr class="grp"><td colspan="4">特色体验<span class="dimtag">维度⑤ · 旅居差异化</span></td></tr>
-          <tr><td class="item">在地文化主题</td><td class="req c5"><span class="star">鲜明主题 + 民俗陈设</span></td><td class="req c4"><span class="y">一定主题元素</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
-          <tr><td class="item">民俗 / 研学活动</td><td class="req c5"><span class="star">定期组织 + 在地向导</span></td><td class="req c4"><span class="y">可提供</span></td><td class="req c3"><span class="n">无</span></td></tr>
-          <tr><td class="item">在地餐饮</td><td class="req c5"><span class="y">特色餐厅 + 三餐</span></td><td class="req c4"><span class="y">含早 + 特色</span></td><td class="req c3"><span class="y">含早</span></td></tr>
-          <tr><td class="item">康养配套</td><td class="req c5"><span class="star">SPA/温泉/理疗 任一</span></td><td class="req c4"><span class="y">加分项</span></td><td class="req c3"><span class="n">无</span></td></tr>
-          <tr><td class="item">休闲娱乐</td><td class="req c5"><span class="y">泳池/健身/茶室咖啡 任二</span></td><td class="req c4"><span class="y">任一加分</span></td><td class="req c3"><span class="n">无</span></td></tr>
-          <tr><td class="item">景区联动 / 接送</td><td class="req c5"><span class="star">自营接送(车 LOGO) + 景区直通</span></td><td class="req c4"><span class="y">提供接送</span></td><td class="req c3"><span class="n">无</span></td></tr>
-
-          <tr class="grp"><td colspan="4">交通区位<span class="dimtag">维度④</span></td></tr>
-          <tr><td class="item">距核心景区</td><td class="req c5"><span class="y">≤3km 或景区内</span></td><td class="req c4"><span class="y">≤8km</span></td><td class="req c3"><span class="n">无硬性</span></td></tr>
-          <tr><td class="item">交通接驳 / 停车</td><td class="req c5"><span class="y">高铁机场接驳 + 车位&gt;15%</span></td><td class="req c4"><span class="y">公共交通可达 + 停车</span></td><td class="req c3"><span class="y">可达 + 路边停车</span></td></tr>
-          <tr><td class="item">价格</td><td class="req c5"><span class="y">达同城 5 星水平</span></td><td class="req c4"><span class="y">达同城 4 星水平</span></td><td class="req c3"><span class="y">达同城 3 星水平</span></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
   <!-- ⑤ 评定流程 -->
   <section class="sec">
     <div class="sec-head"><div class="idx">五</div><h2>评定与管理流程 · 接入中台「房源评级管理」</h2>
       <span class="sub">运营方录入 → 复核 → 公示 → 动态调级，住建厅大屏只读监管</span></div>
     <div class="flow">
       <div class="fstep"><div class="n">1</div><b>运营方录入</b><p>按 5 维自查表上传材料、照片与设施清单</p></div>
-      <div class="fstep"><div class="n">2</div><b>中台复核</b><p>AI引擎初评 + 人工/抽检复核，得分映射星级</p></div>
+      <div class="fstep"><div class="n">2</div><b>中台复核</b><p>规则引擎初评 + 人工/抽检复核，得分映射星级</p></div>
       <div class="fstep"><div class="n">3</div><b>挂牌公示</b><p>★星级徽章上小程序/多渠道，扫码可验真</p></div>
       <div class="fstep"><div class="n">4</div><b>动态调级</b><p>结合信用分、客诉、复核结果升降级</p></div>
       <div class="fstep"><div class="n">5</div><b>监管驾驶舱</b><p>住建厅只读：星级达标率 / 复核待审 / 投诉</p></div>

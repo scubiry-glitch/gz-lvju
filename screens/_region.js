@@ -66,10 +66,10 @@
               // 仅供 relabel 吸收江苏第 10-13 市（贵州无对应地级市，用县级市兜底，防江苏市名残留）
               extraCities: ['仁怀','清镇','赤水','盘州'] },
       dept: { short: '住建厅', orgFull: '住房和城乡建设', stem: '住建', division: '监管处' },
-      biz:  { term: '旅居住宿', termFull: '旅居住宿与民宿' },
+      biz:  { term: '旅居住宿', termFull: '旅居住宿与惠居' },
       bank: { name: '贵州银行', div: '普惠金融部' },
       soe:  { full: '贵阳旅居集团', mid: '旅居集团', short: '旅居集团' },
-      // 旅居域：运营机构从长租公寓换为酒店/民宿品牌（与 brands 顺序一一对应）
+      // 旅居域：运营机构从长租公寓换为酒店/惠居品牌（与 brands 顺序一一对应）
       roster: { brands: ['华住','锦江','都城','首旅','亚朵','省心住'],
                 vendor: '洁净家保洁', supplier: '布草供应链', training: '旅居服务培训' },
       operator: '贝壳',
@@ -118,7 +118,7 @@
     push(J.soe.short, R.soe.short);         // 安居集团 → 旅居集团
 
     // —— 业务词（先全称后简称） ——
-    push(J.biz.termFull, R.biz.termFull);   // 保障性租赁住房 → 旅居住宿与民宿
+    push(J.biz.termFull, R.biz.termFull);   // 保障性租赁住房 → 旅居住宿与惠居
     push(J.biz.term,     R.biz.term);       // 保租房 → 旅居住宿
     // 注：不替换裸 "保障房"——它是 "安居保障房集团" 的子串，会误伤国企名（详见规则 7）
 
