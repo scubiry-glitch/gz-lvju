@@ -1,828 +1,822 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>保租房 · 首页</title>
-  <style>
-    /* ─── Neutral Modern tokens ────────────────────────────── */
-    :root {
-      --bg:      #fafafa;
-      --surface: #ffffff;
-      --fg:      #111111;
-      --muted:   #6b6b6b;
-      --border:  #e5e5e5;
-      --accent:  #2f6feb;
-      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
-      --accent-on: #ffffff;
-      --success: #17a34a;
-      --warn:    #eab308;
-      --danger:  #dc2626;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --font-display: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
-      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
-      --font-mono: ui-monospace, 'JetBrains Mono', monospace;
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      font-family: var(--font-body);
-      font-size: 15px;
-      line-height: 1.5;
-      background: var(--bg);
-      color: var(--fg);
-      -webkit-font-smoothing: antialiased;
-      -webkit-tap-highlight-color: transparent;
-      overscroll-behavior: none;
-    }
-    img, svg { display: block; max-width: 100%; }
-    a { color: inherit; text-decoration: none; }
-    button { font: inherit; cursor: pointer; border: 0; background: none; padding: 0; }
-    p { margin: 0; }
-    ::-webkit-scrollbar { display: none; }
-
-    /* ─── app shell ─────────────────────────────────────────── */
-    .app-shell {
-      max-width: 430px;
-      margin: 0 auto;
-      min-height: 100vh;
-      background: var(--bg);
-      position: relative;
-      padding-bottom: 64px;
-    }
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 20px 6px;
-      font-size: 12px;
-      font-weight: 600;
-      background: var(--surface);
-    }
-    .app-header {
-      background: var(--surface);
-      padding: 12px 16px 8px;
-      position: sticky;
-      top: 0;
-      z-index: 20;
-    }
-    .header-top {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    .header-top h1 {
-      font-family: var(--font-display);
-      font-size: 18px;
-      font-weight: 700;
-      margin: 0;
-      line-height: 1.15;
-    }
-    .brand { flex: 1; display: flex; flex-direction: column; }
-    .brand-sub { font-size: 10px; color: var(--muted); margin-top: 1px; letter-spacing: 0.2px; }
-    /* city switcher sheet */
-    .sheet-mask {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-      z-index: 80; opacity: 0; pointer-events: none;
-      transition: opacity 0.22s;
-      display: flex; align-items: flex-end; justify-content: center;
-    }
-    .sheet-mask.open { opacity: 1; pointer-events: auto; }
-    .sheet {
-      width: 100%; max-width: 430px; background: var(--surface);
-      border-radius: 18px 18px 0 0;
-      padding: 16px 16px calc(20px + var(--safe-bottom));
-      transform: translateY(100%); transition: transform 0.28s;
-    }
-    .sheet-mask.open .sheet { transform: translateY(0); }
-    .sheet-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px; font-size: 13px; color: var(--muted);
-    }
-    .sheet-header button { width: 28px; height: 28px; font-size: 20px; color: var(--muted); }
-    .city-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .city-pill {
-      padding: 10px 4px; border-radius: var(--radius-sm);
-      background: var(--bg); border: 1px solid var(--border);
-      font-size: 13px; color: var(--fg);
-    }
-    .city-pill.active {
-      background: var(--accent-soft); color: var(--accent);
-      border-color: var(--accent); font-weight: 600;
-    }
-    .sheet-tip { margin-top: 12px; font-size: 11px; color: var(--muted); text-align: center; }
-    /* quick actions */
-    .quick-actions {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-      padding: 4px 16px 8px;
-    }
-    .quick-item {
-      display: flex; flex-direction: column;
-      align-items: center; gap: 4px;
-      padding: 10px 4px; background: var(--surface);
-      border: 1px solid var(--border); border-radius: var(--radius-md);
-      text-align: center;
-    }
-    .quick-icon {
-      width: 36px; height: 36px; border-radius: 10px;
-      display: grid; place-items: center;
-    }
-    .quick-icon svg { width: 20px; height: 20px; }
-    .quick-item span { font-size: 12px; font-weight: 600; color: var(--fg); }
-    .quick-item em { font-size: 10px; color: var(--muted); font-style: normal; }
-    .location-btn {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 13px;
-      color: var(--muted);
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      background: var(--bg);
-    }
-    .location-btn svg { width: 14px; height: 14px; }
-    .icon-btn {
-      width: 36px; height: 36px;
-      display: grid; place-items: center;
-      border-radius: 50%;
-      background: var(--bg);
-    }
-    .icon-btn svg { width: 20px; height: 20px; color: var(--fg); }
-    .search-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg);
-      border-radius: var(--radius-lg);
-      padding: 10px 14px;
-      border: 1px solid var(--border);
-    }
-    .search-bar svg { width: 18px; height: 18px; color: var(--muted); flex-shrink: 0; }
-    .search-bar input {
-      flex: 1;
-      border: 0;
-      background: transparent;
-      font-size: 14px;
-      color: var(--fg);
-      outline: none;
-    }
-    .search-bar input::placeholder { color: var(--muted); }
-
-    /* ─── filter chips ──────────────────────────────────────── */
-    .filter-row {
-      display: flex;
-      gap: 8px;
-      padding: 12px 16px;
-      overflow-x: auto;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-    .filter-chip {
-      white-space: nowrap;
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      background: var(--bg);
-      color: var(--muted);
-      border: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .filter-chip.active {
-      background: var(--accent-soft);
-      color: var(--accent);
-      border-color: var(--accent);
-    }
-    .filter-chip svg { width: 14px; height: 14px; }
-
-    /* ─── carousel banner ───────────────────────────────────── */
-    .banner-section { padding: 12px 16px; }
-    .carousel {
-      position: relative;
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      height: 140px;
-    }
-    .carousel-track {
-      display: flex;
-      height: 100%;
-      transition: transform 0.5s ease;
-      will-change: transform;
-    }
-    .carousel-slide {
-      flex: 0 0 100%;
-      padding: 20px;
-      color: white;
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .carousel-slide.s1 { background: linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #fb923c 100%); }
-    .carousel-slide.s2 { background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 60%, black) 0%, var(--accent) 100%); }
-    .carousel-slide.s3 { background: linear-gradient(135deg, #047857 0%, #10b981 100%); }
-    .carousel-slide h3 { margin: 0 0 4px; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
-    .carousel-slide p { font-size: 13px; opacity: 0.92; max-width: 24ch; }
-    .carousel-slide .tag {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 3px 10px;
-      background: rgba(255,255,255,0.22);
-      border-radius: 999px;
-      font-size: 11px;
-      align-self: flex-start;
-    }
-    .carousel-slide .deco {
-      position: absolute;
-      right: -10px; bottom: -10px;
-      font-size: 64px;
-      opacity: 0.18;
-      line-height: 1;
-      pointer-events: none;
-    }
-    .carousel-dots {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 5px;
-      z-index: 2;
-    }
-    .carousel-dots span {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.5);
-      transition: width 0.3s, background 0.3s;
-      cursor: pointer;
-    }
-    .carousel-dots span.active {
-      width: 18px;
-      border-radius: 3px;
-      background: #fff;
-    }
-
-    /* ─── section header ────────────────────────────────────── */
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 16px 8px;
-    }
-    .section-header h2 {
-      font-family: var(--font-display);
-      font-size: 17px;
-      font-weight: 600;
-      margin: 0;
-    }
-    .section-header a {
-      font-size: 13px;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 2px;
-    }
-
-    /* ─── property card ─────────────────────────────────────── */
-    .property-list { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 12px; }
-    .property-card {
-      display: flex;
-      gap: 12px;
-      background: var(--surface);
-      border-radius: var(--radius-md);
-      padding: 12px;
-      border: 1px solid var(--border);
-      color: inherit;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .property-card:active { background: var(--bg); }
-    .prop-img {
-      width: 110px;
-      height: 82px;
-      border-radius: var(--radius-sm);
-      flex-shrink: 0;
-      background: linear-gradient(135deg, var(--accent-soft), color-mix(in oklab, var(--accent-soft) 80%, white));
-      display: grid; place-items: center;
-      color: var(--accent);
-      font-size: 11px;
-      overflow: hidden;
-    }
-    .prop-img img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-sm); }
-    .prop-info { flex: 1; min-width: 0; }
-    .prop-info h3 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 3px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .prop-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
-    .prop-tag {
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 3px;
-      background: var(--accent-soft);
-      color: var(--accent);
-    }
-    .prop-tag.green {
-      background: color-mix(in oklab, var(--success) 12%, transparent);
-      color: var(--success);
-    }
-    .prop-tag.mode { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
-    .prop-tag.mode-2 { background: color-mix(in oklab, var(--warn) 18%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); font-weight: 600; }
-    .prop-tag.mode-3 { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); font-weight: 600; }
-    .prop-location {
-      font-size: 12px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      margin-bottom: 4px;
-    }
-    .prop-location svg { width: 12px; height: 12px; }
-    .prop-price-row {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-    }
-    .prop-price { font-size: 16px; font-weight: 700; color: var(--accent); }
-    .prop-price span { font-size: 12px; font-weight: 400; color: var(--muted); }
-    .prop-market-price {
-      font-size: 12px;
-      color: var(--muted);
-      text-decoration: line-through;
-    }
-    .prop-badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: var(--accent-soft);
-      color: var(--accent);
-    }
-
-    /* star rating */
-    .prop-stars { color: var(--warn); font-size: 11px; letter-spacing: 1px; margin-bottom: 3px; }
-    .prop-stars .e { color: var(--border); }
-
-    /* ─── bottom tab ────────────────────────────────────────── */
-    .bottom-tabs {
-      position: fixed;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 100%;
-      max-width: 430px;
-      background: var(--surface);
-      border-top: 1px solid var(--border);
-      display: flex;
-      padding: 6px 0 calc(6px + var(--safe-bottom));
-      z-index: 30;
-    }
-    .tab-item {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      padding: 4px 0;
-      color: var(--muted);
-      font-size: 10px;
-    }
-    .tab-item.active { color: var(--accent); }
-    .tab-item svg { width: 22px; height: 22px; }
-
-    /* ─── tablet ────────────────────────────────────────────── */
-    @media (min-width: 600px) {
-      .app-shell { max-width: 820px; padding: 0 24px 72px; }
-      .status-bar { padding-inline: 24px; }
-      .app-header { padding-inline: 24px; }
-      .filter-row { padding-inline: 24px; }
-      .banner-section { padding-inline: 24px; }
-      .section-header { padding-inline: 24px; }
-      .property-list {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        padding-inline: 24px;
-      }
-      .property-card { flex-direction: column; }
-      .prop-img { width: 100%; height: 140px; }
-    }
-    @media (min-width: 820px) {
-      .property-list { grid-template-columns: 1fr 1fr 1fr; }
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贵州旅居 · 原型导航故事板</title>
+<style>
+  :root{
+    --bg:#0f172a; --surface:#1e293b; --surface-hover:#334155; --fg:#f1f5f9; --muted:#94a3b8;
+    --brand:#10b981; --brand-soft:rgba(16,185,129,.15); --gold:#f59e0b; --gold-soft:rgba(245,158,11,.15);
+    --c-c:#3b82f6; --c-c-soft:rgba(59,130,246,.15);
+    --c-b:#8b5cf6; --c-b-soft:rgba(139,92,246,.15);
+    --c-s:#ec4899; --c-s-soft:rgba(236,72,153,.15);
+    --c-g:#ef4444; --c-g-soft:rgba(239,68,68,.15);
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;min-height:100vh;}
+  .container{max-width:1400px;margin:0 auto;padding:32px 24px 60px;}
+  
+  /* header */
+  .header{text-align:center;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .header h1{font-size:clamp(28px,4vw,40px);font-weight:800;margin:0 0 8px;background:linear-gradient(135deg,#fff,#94a3b8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .header .subtitle{font-size:16px;color:var(--muted);}
+  .header .meta{display:inline-flex;gap:20px;margin-top:16px;font-size:13px;color:var(--muted);}
+  .header .meta span{display:flex;align-items:center;gap:6px;}
+  .header .meta .dot{width:8px;height:8px;border-radius:50%;}
+  .header .meta .dot.c{background:var(--c-c);}
+  .header .meta .dot.b{background:var(--c-b);}
+  .header .meta .dot.s{background:var(--c-s);}
+  .header .meta .dot.g{background:var(--c-g);}
+  
+  /* nav pills */
+  .nav-pills{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:36px;}
+  .nav-pill{background:var(--surface);border:1px solid rgba(255,255,255,.08);color:var(--muted);padding:8px 18px;border-radius:999px;font-size:13px;cursor:pointer;transition:all .2s;font-weight:500;}
+  .nav-pill:hover{background:var(--surface-hover);color:var(--fg);}
+  .nav-pill.active{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);}
+  .nav-pill[data-filter="c"].active{background:var(--c-c-soft);border-color:var(--c-c);color:var(--c-c);}
+  .nav-pill[data-filter="b"].active{background:var(--c-b-soft);border-color:var(--c-b);color:var(--c-b);}
+  .nav-pill[data-filter="s"].active{background:var(--c-s-soft);border-color:var(--c-s);color:var(--c-s);}
+  .nav-pill[data-filter="g"].active{background:var(--c-g-soft);border-color:var(--c-g);color:var(--c-g);}
+  
+  /* section */
+  .story-section{margin-bottom:40px;}
+  .story-section.hidden{display:none;}
+  .sec-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06);}
+  .sec-head .icon{font-size:22px;}
+  .sec-head h2{font-size:18px;font-weight:700;margin:0;}
+  .sec-head .desc{font-size:13px;color:var(--muted);margin-left:auto;}
+  .sec-head.c{color:var(--c-c);}
+  .sec-head.b{color:var(--c-b);}
+  .sec-head.s{color:var(--c-s);}
+  .sec-head.g{color:var(--c-g);}
+  
+  /* journey flow */
+  .journey-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--surface);border-radius:var(--r-md);font-size:12px;}
+  .journey-flow .step{display:flex;align-items:center;gap:6px;color:var(--muted);}
+  .journey-flow .step .num{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.1);display:grid;place-items:center;font-size:10px;font-weight:700;}
+  .journey-flow .arrow{color:var(--muted);font-size:10px;}
+  
+  /* card grid */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+  .card{background:var(--surface);border:1px solid rgba(255,255,255,.06);border-radius:var(--r-md);overflow:hidden;transition:all .2s;cursor:pointer;text-decoration:none;color:inherit;display:flex;flex-direction:column;}
+  .card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.3);}
+  .card .thumb{height:120px;background:linear-gradient(135deg,var(--surface-hover),var(--surface));display:flex;align-items:center;justify-content:center;font-size:36px;position:relative;overflow:hidden;}
+  .card .thumb::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(0,0,0,.4));}
+  .card .thumb .badge{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;z-index:2;}
+  .card .body{padding:12px 14px;flex:1;display:flex;flex-direction:column;}
+  .card .body .title{font-size:13px;font-weight:600;color:var(--fg);margin-bottom:4px;}
+  .card .body .desc{font-size:11px;color:var(--muted);line-height:1.5;flex:1;}
+  .card .body .tag{display:inline-block;margin-top:8px;font-size:10px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.06);color:var(--muted);}
+  .card.c:hover{border-color:var(--c-c);}
+  .card.b:hover{border-color:var(--c-b);}
+  .card.s:hover{border-color:var(--c-s);}
+  .card.g:hover{border-color:var(--c-g);}
+  
+  /* quick access */
+  .quick-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:40px;}
+  .quick-card{background:linear-gradient(135deg,var(--surface),var(--surface-hover));border:1px solid rgba(255,255,255,.08);border-radius:var(--r-lg);padding:20px;display:flex;align-items:center;gap:16px;transition:all .2s;cursor:pointer;text-decoration:none;color:inherit;}
+  .quick-card:hover{border-color:var(--brand);transform:translateY(-2px);}
+  .quick-card .icon{font-size:32px;width:56px;height:56px;border-radius:var(--r-md);background:var(--brand-soft);display:grid;place-items:center;flex-shrink:0;}
+  .quick-card .info{flex:1;}
+  .quick-card .info h3{font-size:15px;font-weight:600;margin:0 0 4px;}
+  .quick-card .info p{font-size:12px;color:var(--muted);margin:0;}
+  .quick-card .arrow{color:var(--muted);font-size:18px;}
+  
+  .footer{text-align:center;padding-top:40px;border-top:1px solid rgba(255,255,255,.06);color:var(--muted);font-size:12px;}
+</style>
 </head>
 <body>
-<div class="app-shell">
-  <div class="status-bar">
-    <span>9:41</span>
-    <span>100%</span>
-  </div>
+<div class="container">
 
-  <header class="app-header">
-    <div class="header-top">
-      <div class="brand">
-        <h1>江苏保租房</h1>
-        <span class="brand-sub">省住建厅 × 贝壳官方频道</span>
-      </div>
-      <button class="location-btn" id="cityBtn" onclick="document.getElementById('citySheet').classList.add('open')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-        <span id="cityLabel">南京</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <button class="icon-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-      </button>
-    </div>
-    <div class="search-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" placeholder="搜索小区 / 楼栋房号 / 地铁站" />
-    </div>
-  </header>
-
-  <div class="sheet-mask" id="citySheet" onclick="if(event.target===this)this.classList.remove('open')">
-    <div class="sheet">
-      <div class="sheet-header">
-        <span id="citySheetTitle">切换城市 · 江苏省 13 设区市</span>
-        <button onclick="document.getElementById('citySheet').classList.remove('open')" aria-label="关闭">×</button>
-      </div>
-      <!-- 城市列表由 _region.js 的 BZF_REGION.prov.cities 渲染（见页尾脚本） -->
-      <div class="city-grid" id="cityGrid"></div>
-      <div class="sheet-tip">每市数据独立 · 由各市住建局核验后接入</div>
+  <div class="header">
+    <h1>🐚 贵州旅居 · 原型导航故事板</h1>
+    <div class="subtitle">按角色旅程探索全部原型页面</div>
+    <div class="meta">
+      <span><span class="dot c"></span> 旅居客 C 端</span>
+      <span><span class="dot b"></span> 业主 & 机构</span>
+      <span><span class="dot s"></span> 服务者 & 培训</span>
+      <span><span class="dot g"></span> 政府监管</span>
     </div>
   </div>
 
-  <div class="filter-row">
-    <button class="filter-chip active">推荐</button>
-    <button class="filter-chip">区域 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
-    <button class="filter-chip">租金 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
-    <button class="filter-chip">户型</button>
-    <button class="filter-chip">面积</button>
-    <button class="filter-chip">近地铁</button>
+  <!-- 快捷入口 -->
+  <div class="quick-bar">
+    <a class="quick-card" href="lvju-overview.html">
+      <div class="icon">🗺</div>
+      <div class="info">
+        <h3>平台总览蓝图</h3>
+        <p>四大支柱 · 五端协同 · 完整架构</p>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+    <a class="quick-card" href="lvju-overview-speech.html">
+      <div class="icon">🎤</div>
+      <div class="info">
+        <h3>演讲稿</h3>
+        <p>15分钟完整演讲 · 逻辑主线</p>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+    <a class="quick-card" href="lvju-gov-dashboard-map.html">
+      <div class="icon">📊</div>
+      <div class="info">
+        <h3>监管大屏</h3>
+        <p>住建厅驾驶舱 · 交互地图</p>
+      </div>
+      <div class="arrow">›</div>
+    </a>
+    <a class="quick-card" href="lvju-rating-standard.html">
+      <div class="icon">🐚</div>
+      <div class="info">
+        <h3>五彩贝评级标准</h3>
+        <p>评级体系 · AI引擎初评</p>
+      </div>
+      <div class="arrow">›</div>
+    </a>
   </div>
 
-  <div class="banner-section">
-    <div class="carousel" id="homeCarousel">
-      <div class="carousel-track">
-        <div class="carousel-slide s1">
-          <h3>给人才一个温馨的家</h3>
-          <p>人才公寓·拎包入住·一站式安居服务</p>
-          <span class="tag">人才引进 · 不限户籍 · 不限收入</span>
-          <span class="deco">🏠</span>
+  <!-- 筛选 -->
+  <div class="nav-pills">
+    <div class="nav-pill active" data-filter="all">全部</div>
+    <div class="nav-pill" data-filter="c">🧳 旅居客旅程</div>
+    <div class="nav-pill" data-filter="b">🏡 业主 & 机构</div>
+    <div class="nav-pill" data-filter="s">🧑‍🔧 服务者 & 培训</div>
+    <div class="nav-pill" data-filter="g">🏛 政府监管</div>
+    <div class="nav-pill" data-filter="platform">🐚 平台 & 全局</div>
+  </div>
+
+  <!-- ===== 旅居客旅程 ===== -->
+  <div class="story-section" data-category="c">
+    <div class="sec-head c">
+      <span class="icon">🧳</span>
+      <h2>旅居客旅程（C 端）</h2>
+      <span class="desc">从发现贵州 → 预订入住 → 体验评价</span>
+    </div>
+    <div class="journey-flow">
+      <div class="step"><div class="num">1</div>发现</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">2</div>浏览</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">3</div>预订</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">4</div>入住</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">5</div>评价</div>
+    </div>
+    <div class="card-grid">
+      <a class="card c" href="lvju-app-home.html">
+        <div class="thumb">📱<span class="badge">首页</span></div>
+        <div class="body">
+          <div class="title">旅居首页</div>
+          <div class="desc">旅居频道主入口，精选房源、惠居、内容频道</div>
+          <span class="tag">主入口</span>
         </div>
-        <div class="carousel-slide s2">
-          <h3>三方电子备案 · 一键完成</h3>
-          <p>政府 · 运营方 · 租客 同步备案，签约即生效</p>
-          <span class="tag">江苏省统一备案系统 · 在线留痕</span>
-          <span class="deco">📋</span>
+      </a>
+      <a class="card c" href="lvju-app-home-demo.html">
+        <div class="thumb">🏔<span class="badge">演示</span></div>
+        <div class="body">
+          <div class="title">旅居首页 · Demo</div>
+          <div class="desc">带编辑精选内容的演示版本</div>
+          <span class="tag">演示</span>
         </div>
-        <div class="carousel-slide s3">
-          <h3>公积金月冲直付 · 0 操作</h3>
-          <p>江苏银行 × 贝壳 联合保障 · 房租公积金直扣</p>
-          <span class="tag">一键开通 · 全程免押 · 月付不涨</span>
-          <span class="deco">💳</span>
+      </a>
+      <a class="card c" href="lvju-app-search.html">
+        <div class="thumb">🔍<span class="badge">搜索</span></div>
+        <div class="body">
+          <div class="title">搜索</div>
+          <div class="desc">目的地 / 惠居 / 景区搜索</div>
+          <span class="tag">发现</span>
         </div>
-      </div>
-      <div class="carousel-dots">
-        <span class="active" data-i="0"></span>
-        <span data-i="1"></span>
-        <span data-i="2"></span>
-      </div>
+      </a>
+      <a class="card c" href="lvju-app-detail.html">
+        <div class="thumb">🏠<span class="badge">详情</span></div>
+        <div class="body">
+          <div class="title">房源详情</div>
+          <div class="desc">旅居彩贝评价、价格日历、设施展示</div>
+          <span class="tag">浏览</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-booking.html">
+        <div class="thumb">📅<span class="badge">预订</span></div>
+        <div class="body">
+          <div class="title">确认订单</div>
+          <div class="desc">入住信息、价格明细、套餐选择</div>
+          <span class="tag">预订</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-pay.html">
+        <div class="thumb">💳<span class="badge">支付</span></div>
+        <div class="body">
+          <div class="title">收银台</div>
+          <div class="desc">贝壳支付/微信/OTA/银行分期</div>
+          <span class="tag">预订</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-paid.html">
+        <div class="thumb">✅<span class="badge">完成</span></div>
+        <div class="body">
+          <div class="title">预订成功</div>
+          <div class="desc">电子凭证、资金存管确认</div>
+          <span class="tag">预订</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-orders.html">
+        <div class="thumb">📋<span class="badge">订单</span></div>
+        <div class="body">
+          <div class="title">我的订单</div>
+          <div class="desc">全部订单、待入住、历史记录</div>
+          <span class="tag">入住</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-checkin.html">
+        <div class="thumb">🗝<span class="badge">入住</span></div>
+        <div class="body">
+          <div class="title">入住办理</div>
+          <div class="desc">扫码入住、房态确认</div>
+          <span class="tag">入住</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-review.html">
+        <div class="thumb">⭐<span class="badge">评价</span></div>
+        <div class="body">
+          <div class="title">评价房源</div>
+          <div class="desc">五彩贝评分、文字评价、照片上传</div>
+          <span class="tag">评价</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-map.html">
+        <div class="thumb">🗺<span class="badge">地图</span></div>
+        <div class="body">
+          <div class="title">地图找房</div>
+          <div class="desc">地图模式浏览周边房源</div>
+          <span class="tag">发现</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-spots.html">
+        <div class="thumb">🏞<span class="badge">景点</span></div>
+        <div class="body">
+          <div class="title">旅游景点</div>
+          <div class="desc">必打卡景点、旅居星级联动</div>
+          <span class="tag">内容</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-routes.html">
+        <div class="thumb">🛤<span class="badge">路线</span></div>
+        <div class="body">
+          <div class="title">旅游路线</div>
+          <div class="desc">推荐路线、行程规划</div>
+          <span class="tag">内容</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-food.html">
+        <div class="thumb">🍜<span class="badge">美食</span></div>
+        <div class="body">
+          <div class="title">旅游美食</div>
+          <div class="desc">本地特色美食推荐</div>
+          <span class="tag">内容</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-guide.html">
+        <div class="thumb">🧭<span class="badge">向导</span></div>
+        <div class="body">
+          <div class="title">本地向导</div>
+          <div class="desc">向导服务、陪游预约</div>
+          <span class="tag">服务</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-service.html">
+        <div class="thumb">🛎<span class="badge">服务</span></div>
+        <div class="body">
+          <div class="title">居住服务</div>
+          <div class="desc">保洁、维修、搬家、管家</div>
+          <span class="tag">服务</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-chat.html">
+        <div class="thumb">💬<span class="badge">消息</span></div>
+        <div class="body">
+          <div class="title">消息中心</div>
+          <div class="desc">客服对话、系统通知</div>
+          <span class="tag">沟通</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-me.html">
+        <div class="thumb">👤<span class="badge">我的</span></div>
+        <div class="body">
+          <div class="title">个人中心</div>
+          <div class="desc">个人信息、设置、收藏</div>
+          <span class="tag">个人</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-wallet.html">
+        <div class="thumb">👛<span class="badge">钱包</span></div>
+        <div class="body">
+          <div class="title">我的钱包</div>
+          <div class="desc">余额、优惠券、积分</div>
+          <span class="tag">个人</span>
+        </div>
+      </a>
+      <a class="card c" href="lvju-app-coupons.html">
+        <div class="thumb">🎫<span class="badge">优惠</span></div>
+        <div class="body">
+          <div class="title">优惠券</div>
+          <div class="desc">可用优惠券、历史记录</div>
+          <span class="tag">个人</span>
+        </div>
+      </a>
     </div>
   </div>
 
-  <!-- quick actions: 公积金 / 三方备案 / 业主托管 / 监督 -->
-  <div class="quick-actions">
-    <a class="quick-item" href="screens/payment.html">
-      <div class="quick-icon" style="background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-      </div>
-      <span>公积金直付</span>
-      <em>0 操作</em>
-    </a>
-    <a class="quick-item" href="screens/contracts.html">
-      <div class="quick-icon" style="background: var(--accent-soft); color: var(--accent);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
-      </div>
-      <span>三方备案</span>
-      <em>政府·运营·租客</em>
-    </a>
-    <a class="quick-item" href="screens/landlord.html">
-      <div class="quick-icon" style="background: color-mix(in oklab, var(--warn) 18%, transparent); color: color-mix(in oklab, var(--warn) 70%, black);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2h-4v-7H10v7H5a2 2 0 01-2-2z"/></svg>
-      </div>
-      <span>业主托管</span>
-      <em>以租换购</em>
-    </a>
-    <a class="quick-item" href="screens/gov-admin.html">
-      <div class="quick-icon" style="background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-      </div>
-      <span>政府监督</span>
-      <em>12345 直达</em>
-    </a>
-  </div>
-
-  <div class="section-header">
-    <h2>精选房源</h2>
-    <a href="screens/detail.html">查看全部 <span>→</span></a>
-  </div>
-
-  <div class="property-list">
-    <a class="property-card" href="screens/detail.html">
-      <div class="prop-img">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      </div>
-      <div class="prop-info">
-        <h3>江宁·梧桐公馆人才公寓</h3>
-        <div class="prop-tags">
-          <span class="prop-tag mode">模式① 自营</span>
-          <span class="prop-tag">政府认证</span>
-          <span class="prop-tag green">近地铁</span>
-        </div>
-        <div class="prop-stars">★★★★<span class="e">★</span></div>
-        <div class="prop-location">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          江宁区 · 地铁 1 号线百家湖站 500m
-        </div>
-        <div class="prop-price-row">
-          <div>
-            <span class="prop-price">¥2,380<span> / 月</span></span>
-            <div class="prop-market-price">市场价 ¥3,200</div>
-          </div>
-          <span class="prop-badge">3 套可租</span>
-        </div>
-      </div>
-    </a>
-
-    <a class="property-card" href="screens/detail.html">
-      <div class="prop-img">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      </div>
-      <div class="prop-info">
-        <h3>建邺·河西青年公寓</h3>
-        <div class="prop-tags">
-          <span class="prop-tag mode-2">模式② 委托运营</span>
-          <span class="prop-tag">政府认证</span>
-        </div>
-        <div class="prop-stars">★★★★<span class="e">★</span></div>
-        <div class="prop-location">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          建邺区 · 地铁 2 号线奥体东站 300m
-        </div>
-        <div class="prop-price-row">
-          <div>
-            <span class="prop-price">¥3,120<span> / 月</span></span>
-            <div class="prop-market-price">市场价 ¥4,100</div>
-          </div>
-          <span class="prop-badge">5 套可租</span>
-        </div>
-      </div>
-    </a>
-
-    <a class="property-card" href="screens/detail.html">
-      <div class="prop-img">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      </div>
-      <div class="prop-info">
-        <h3>鼓楼·龙江新青年社区</h3>
-        <div class="prop-tags">
-          <span class="prop-tag mode-3">模式③ 贝壳深度托管</span>
-          <span class="prop-tag green">近地铁</span>
-        </div>
-        <div class="prop-stars">★★★<span class="e">★★</span></div>
-        <div class="prop-location">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          鼓楼区 · 地铁 4 号线龙江站 200m
-        </div>
-        <div class="prop-price-row">
-          <div>
-            <span class="prop-price">¥2,680<span> / 月</span></span>
-            <div class="prop-market-price">市场价 ¥3,500</div>
-          </div>
-          <span class="prop-badge">2 套可租</span>
-        </div>
-      </div>
-    </a>
-
-    <a class="property-card" href="screens/detail.html">
-      <div class="prop-img">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      </div>
-      <div class="prop-info">
-        <h3>秦淮·南部新城人才家园</h3>
-        <div class="prop-tags">
-          <span class="prop-tag mode">模式① 自营</span>
-          <span class="prop-tag">政府认证</span>
-          <span class="prop-tag">新上线</span>
-        </div>
-        <div class="prop-stars">★★★★★</div>
-        <div class="prop-location">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-          秦淮区 · 地铁 3 号线大明路站 600m
-        </div>
-        <div class="prop-price-row">
-          <div>
-            <span class="prop-price">¥2,180<span> / 月</span></span>
-            <div class="prop-market-price">市场价 ¥2,900</div>
-          </div>
-          <span class="prop-badge">8 套可租</span>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="section-header"><h2>申请流程</h2></div>
-  <div style="padding: 0 16px 20px; display: flex; gap: 12px; overflow-x: auto;">
-    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
-      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">1</div>
-      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">资格核验</h4>
-      <p style="font-size: 12px; color: var(--muted);">在线提交身份与社保信息</p>
+  <!-- ===== 业主 & 机构 ===== -->
+  <div class="story-section" data-category="b">
+    <div class="sec-head b">
+      <span class="icon">🏡</span>
+      <h2>业主 & 机构旅程（B 端）</h2>
+      <span class="desc">房源托管 → 收益管理 → 机构运营</span>
     </div>
-    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
-      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">2</div>
-      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">选房看房</h4>
-      <p style="font-size: 12px; color: var(--muted);">线上预约 · 管家带看</p>
-    </div>
-    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
-      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">3</div>
-      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">签约备案</h4>
-      <p style="font-size: 12px; color: var(--muted);">电子合同 · 三方备案</p>
-    </div>
-    <div style="flex-shrink: 0; width: 140px; background: var(--surface); border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border);">
-      <div style="width: 32px; height: 32px; background: var(--accent-soft); border-radius: 50%; display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 10px;">4</div>
-      <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 600;">入住服务</h4>
-      <p style="font-size: 12px; color: var(--muted);">月付 · 线上报修 · 公积金直付</p>
+    <div class="card-grid">
+      <a class="card b" href="screens/home.html">
+        <div class="thumb">🏠<span class="badge">业主</span></div>
+        <div class="body">
+          <div class="title">业主端首页</div>
+          <div class="desc">房源托管、收益看板、签约管理</div>
+          <span class="tag">个人业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/landlord.html">
+        <div class="thumb">📊<span class="badge">房东</span></div>
+        <div class="body">
+          <div class="title">房东控制台</div>
+          <div class="desc">房源状态、出租率、收益分析</div>
+          <span class="tag">个人业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-operator-console.html">
+        <div class="thumb">🏬<span class="badge">机构</span></div>
+        <div class="body">
+          <div class="title">运营商控制台</div>
+          <div class="desc">多门店统一管理、批量操作</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-listing-mgmt.html">
+        <div class="thumb">📋<span class="badge">房源</span></div>
+        <div class="body">
+          <div class="title">房源管理</div>
+          <div class="desc">批量导入、上下架、信息维护</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-occupancy.html">
+        <div class="thumb">📈<span class="badge">入住</span></div>
+        <div class="body">
+          <div class="title">入住率分析</div>
+          <div class="desc">实时入住率、趋势分析</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-house-rating-input.html">
+        <div class="thumb">🐚<span class="badge">评级</span></div>
+        <div class="body">
+          <div class="title">房源评级录入</div>
+          <div class="desc">五维信息填报、照片上传</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-perf-renewal.html">
+        <div class="thumb">🔄<span class="badge">续签</span></div>
+        <div class="body">
+          <div class="title">绩效与续约</div>
+          <div class="desc">合同续约、绩效评估</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-staff-roster.html">
+        <div class="thumb">👥<span class="badge">人员</span></div>
+        <div class="body">
+          <div class="title">人员花名册</div>
+          <div class="desc">员工管理、权限配置</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/b-dispatch-board.html">
+        <div class="thumb">📡<span class="badge">派单</span></div>
+        <div class="body">
+          <div class="title">派单看板</div>
+          <div class="desc">服务工单派发、跟踪</div>
+          <span class="tag">机构业主</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/vendors.html">
+        <div class="thumb">🏢<span class="badge">服务商</span></div>
+        <div class="body">
+          <div class="title">服务商管理</div>
+          <div class="desc">服务商入驻、认证审核</div>
+          <span class="tag">服务商</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/v-onboarding.html">
+        <div class="thumb">📝<span class="badge">入驻</span></div>
+        <div class="body">
+          <div class="title">服务商入驻</div>
+          <div class="desc">资质提交、认证流程</div>
+          <span class="tag">服务商</span>
+        </div>
+      </a>
+      <a class="card b" href="screens/v-team.html">
+        <div class="thumb">👷<span class="badge">团队</span></div>
+        <div class="body">
+          <div class="title">团队管理</div>
+          <div class="desc">服务人员、等级配置</div>
+          <span class="tag">服务商</span>
+        </div>
+      </a>
     </div>
   </div>
 
-  <div class="section-header"><h2>政策资讯</h2><a href="screens/policy.html">更多 →</a></div>
-  <div style="padding: 0 16px 24px; display: flex; flex-direction: column; gap: 8px;">
-    <a href="screens/policy.html" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
-      <div>
-        <span style="font-size: 13px; font-weight: 500;">南京市保租房申请条件放宽</span>
-        <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">2026-05-28 · 市住建局</div>
-      </div>
-      <span style="color: var(--accent); font-size: 12px;">新政</span>
-    </a>
-    <a href="screens/policy.html" style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
-      <div>
-        <span style="font-size: 13px; font-weight: 500;">公积金支付保租房租金指南</span>
-        <div style="font-size: 11px; color: var(--muted); margin-top: 2px;">2026-05-20 · 省公积金中心</div>
-      </div>
-      <span style="color: var(--success); font-size: 12px;">指南</span>
-    </a>
-  </div>
-
-  <div class="section-header"><h2>好房子标准体系</h2><a href="screens/policy.html">标准详情 →</a></div>
-  <div style="padding: 0 16px 4px; display: flex; flex-direction: column; gap: 10px;">
-
-    <a href="screens/operators.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
-      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 22s-8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      </div>
-      <div style="flex: 1;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">运营主体白名单</div>
-        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">经住建局审核认可的保租房运营机构</div>
-      </div>
-      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">6 家 →</span>
-    </a>
-
-    <a href="screens/service-workers.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
-      <div style="width: 40px; height: 40px; border-radius: 10px; background: color-mix(in oklab, var(--success) 12%, transparent); display: grid; place-items: center; flex-shrink: 0;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-      <div style="flex: 1;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">服务者认证</div>
-        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">持证上岗 · 服务可追溯 · 好评率 98.6%</div>
-      </div>
-      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">24 人 →</span>
-    </a>
-
-    <a href="screens/suppliers.html" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); text-decoration: none;">
-      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; flex-shrink: 0;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-      </div>
-      <div style="flex: 1;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--fg);">合格物资供应商公示</div>
-        <div style="font-size: 12px; color: var(--muted); margin-top: 1px;">家电 · 装修 · 物业 · 6 家合格供应商</div>
-      </div>
-      <span style="font-size: 12px; color: var(--accent); white-space: nowrap;">查看 →</span>
-    </a>
-
-    <div class="collapse-wrap" style="background: var(--surface); border-radius: var(--radius-md); border: 1px solid var(--border); overflow: hidden; margin-top: 2px;">
-      <button class="collapse-trigger" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 16px; cursor: pointer; background: none; border: 0; text-align: left; font: inherit;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--warn)" stroke="var(--warn)" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <h3 style="font-size: 14px; font-weight: 600; margin: 0; flex: 1;">房源星级评价标准</h3>
-        <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" style="transition: transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      <div class="collapse-body" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease; padding: 0 16px;">
-        <div style="display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-            <span style="color: var(--warn); letter-spacing: 1px;">★★★</span>
-            <span><strong>舒适型</strong> — 智能门锁/水电表 · 独立卫浴 · WiFi</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-            <span style="color: var(--warn); letter-spacing: 1px;">★★★★</span>
-            <span><strong>优质型</strong> — 管家 24H · 租客保险 · 公区 ≥10 人</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-            <span style="color: var(--warn); letter-spacing: 1px;">★★★★★</span>
-            <span><strong>旗舰型</strong> — 24H 持证管家 · 零押金 · 社区配套</span>
-          </div>
-          <a href="screens/policy.html" style="display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: var(--accent);">查看 58 项评星细则 →</a>
-        </div>
-      </div>
+  <!-- ===== 服务者 & 培训 ===== -->
+  <div class="story-section" data-category="s">
+    <div class="sec-head s">
+      <span class="icon">🧑‍🔧</span>
+      <h2>服务者 & 培训旅程（S 端）</h2>
+      <span class="desc">入驻 → 学习 → 认证 → 接单 → 成长</span>
     </div>
-    <style>
-      .collapse-wrap.open .arrow-icon { transform: rotate(180deg); }
-      .collapse-wrap.open .collapse-body { max-height: 400px !important; }
-    </style>
+    <div class="journey-flow">
+      <div class="step"><div class="num">1</div>申请</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">2</div>学习</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">3</div>考试</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">4</div>认证</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">5</div>接单</div>
+      <span class="arrow">→</span>
+      <div class="step"><div class="num">6</div>评级</div>
+    </div>
+    <div class="card-grid">
+      <a class="card s" href="screens/s-cert.html">
+        <div class="thumb">🪪<span class="badge">认证</span></div>
+        <div class="body">
+          <div class="title">我的认证</div>
+          <div class="desc">持证编号、等级、信用分</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-learn.html">
+        <div class="thumb">📚<span class="badge">学习</span></div>
+        <div class="body">
+          <div class="title">在线学习</div>
+          <div class="desc">86门课程、学习进度</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-course-detail.html">
+        <div class="thumb">📖<span class="badge">课程</span></div>
+        <div class="body">
+          <div class="title">课程详情</div>
+          <div class="desc">单课学习、视频/文档</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-exam.html">
+        <div class="thumb">📝<span class="badge">考试</span></div>
+        <div class="body">
+          <div class="title">在线考试</div>
+          <div class="desc">机考答题、成绩查询</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-exam-result.html">
+        <div class="thumb">📊<span class="badge">成绩</span></div>
+        <div class="body">
+          <div class="title">考试成绩</div>
+          <div class="desc">考试结果、等级认定</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-orders.html">
+        <div class="thumb">📋<span class="badge">工单</span></div>
+        <div class="body">
+          <div class="title">我的工单</div>
+          <div class="desc">接单、派单、完成确认</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-income.html">
+        <div class="thumb">💰<span class="badge">收入</span></div>
+        <div class="body">
+          <div class="title">收入明细</div>
+          <div class="desc">T+7结算、历史收入</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/s-quiz.html">
+        <div class="thumb">❓<span class="badge">练习</span></div>
+        <div class="body">
+          <div class="title">题库练习</div>
+          <div class="desc">模拟练习、错题回顾</div>
+          <span class="tag">服务者</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/training-orgs.html">
+        <div class="thumb">🎓<span class="badge">机构</span></div>
+        <div class="body">
+          <div class="title">培训机构</div>
+          <div class="desc">培训机构列表、课程浏览</div>
+          <span class="tag">培训</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/t-courses.html">
+        <div class="thumb">📚<span class="badge">课程</span></div>
+        <div class="body">
+          <div class="title">课程开发</div>
+          <div class="desc">课程创建、内容编辑</div>
+          <span class="tag">培训</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/t-students.html">
+        <div class="thumb">👥<span class="badge">学员</span></div>
+        <div class="body">
+          <div class="title">学员管理</div>
+          <div class="desc">招生录取、在训档案</div>
+          <span class="tag">培训</span>
+        </div>
+      </a>
+      <a class="card s" href="screens/t-schedule.html">
+        <div class="thumb">📅<span class="badge">排课</span></div>
+        <div class="body">
+          <div class="title">排课排考</div>
+          <div class="desc">开班排课、考试申请</div>
+          <span class="tag">培训</span>
+        </div>
+      </a>
+      <a class="card s" href="lvju-service-provider-detail.html">
+        <div class="thumb">📖<span class="badge">详解</span></div>
+        <div class="body">
+          <div class="title">服务者体系详解</div>
+          <div class="desc">演讲扩展页：L0-L7、入驻流程</div>
+          <span class="tag">说明</span>
+        </div>
+      </a>
+    </div>
   </div>
 
-  <div id="tab-bar" data-series="c" data-active="home" data-base="screens/"></div>
+  <!-- ===== 政府监管 ===== -->
+  <div class="story-section" data-category="g">
+    <div class="sec-head g">
+      <span class="icon">🏛</span>
+      <h2>政府监管（G 端）</h2>
+      <span class="desc">驾驶舱 · 白名单 · 投诉处置</span>
+    </div>
+    <div class="card-grid">
+      <a class="card g" href="lvju-gov-dashboard-map.html">
+        <div class="thumb">🗺<span class="badge">大屏</span></div>
+        <div class="body">
+          <div class="title">监管大屏 · 交互地图</div>
+          <div class="desc">贵州省地图热力、房源分布、实时数据</div>
+          <span class="tag">驾驶舱</span>
+        </div>
+      </a>
+      <a class="card g" href="lvju-gov-dashboard.html">
+        <div class="thumb">📊<span class="badge">大屏</span></div>
+        <div class="body">
+          <div class="title">监管大屏 · 静态版</div>
+          <div class="desc">KPI总览、彩贝分布、待审事项</div>
+          <span class="tag">驾驶舱</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-dashboard.html">
+        <div class="thumb">📈<span class="badge">政务</span></div>
+        <div class="body">
+          <div class="title">政务仪表盘</div>
+          <div class="desc">区域数据、统计报表</div>
+          <span class="tag">政务</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-whitelist-operator.html">
+        <div class="thumb">📋<span class="badge">白名单</span></div>
+        <div class="body">
+          <div class="title">运营商白名单</div>
+          <div class="desc">运营商资质审核、白名单管理</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-whitelist-service.html">
+        <div class="thumb">🧑‍🔧<span class="badge">白名单</span></div>
+        <div class="body">
+          <div class="title">服务者白名单</div>
+          <div class="desc">服务者认证审定、资质核验</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-whitelist-vendor.html">
+        <div class="thumb">🏢<span class="badge">白名单</span></div>
+        <div class="body">
+          <div class="title">服务商白名单</div>
+          <div class="desc">服务商准入审核</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-whitelist-training.html">
+        <div class="thumb">🎓<span class="badge">白名单</span></div>
+        <div class="body">
+          <div class="title">培训机构白名单</div>
+          <div class="desc">培训机构资质审定</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-whitelist-supplier.html">
+        <div class="thumb">🏪<span class="badge">白名单</span></div>
+        <div class="body">
+          <div class="title">供应商白名单</div>
+          <div class="desc">供应商准入管理</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-complaint.html">
+        <div class="thumb">⚠️<span class="badge">投诉</span></div>
+        <div class="body">
+          <div class="title">投诉处置</div>
+          <div class="desc">客诉受理、处置跟踪</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-inspection.html">
+        <div class="thumb">🔍<span class="badge">巡检</span></div>
+        <div class="body">
+          <div class="title">巡检管理</div>
+          <div class="desc">现场检查、整改跟踪</div>
+          <span class="tag">监管</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-policy.html">
+        <div class="thumb">📜<span class="badge">政策</span></div>
+        <div class="body">
+          <div class="title">政策发布</div>
+          <div class="desc">政策文件、通知公告</div>
+          <span class="tag">政务</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/g-export.html">
+        <div class="thumb">📥<span class="badge">导出</span></div>
+        <div class="body">
+          <div class="title">数据导出</div>
+          <div class="desc">报表导出、数据下载</div>
+          <span class="tag">政务</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/portal-index.html">
+        <div class="thumb">🌐<span class="badge">公示</span></div>
+        <div class="body">
+          <div class="title">公示门户</div>
+          <div class="desc">公众查询、验真入口</div>
+          <span class="tag">公示</span>
+        </div>
+      </a>
+      <a class="card g" href="screens/portal-verify.html">
+        <div class="thumb">🔍<span class="badge">验真</span></div>
+        <div class="body">
+          <div class="title">扫码验真</div>
+          <div class="desc">房源/服务者/机构验真</div>
+          <span class="tag">公示</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- ===== 平台 & 全局 ===== -->
+  <div class="story-section" data-category="platform">
+    <div class="sec-head">
+      <span class="icon">🐚</span>
+      <h2>平台 & 全局</h2>
+      <span class="desc">总览 · 中台 · 标准 · 支撑</span>
+    </div>
+    <div class="card-grid">
+      <a class="card" href="lvju-overview.html">
+        <div class="thumb">🗺<span class="badge">总览</span></div>
+        <div class="body">
+          <div class="title">平台总览蓝图</div>
+          <div class="desc">四大支柱 · 五端协同 · 流·留逻辑</div>
+          <span class="tag">全局</span>
+        </div>
+      </a>
+      <a class="card" href="lvju-overview-speech.html">
+        <div class="thumb">🎤<span class="badge">演讲</span></div>
+        <div class="body">
+          <div class="title">演讲稿</div>
+          <div class="desc">15分钟完整演讲 · 逻辑主线</div>
+          <span class="tag">全局</span>
+        </div>
+      </a>
+      <a class="card" href="lvju-rating-standard.html">
+        <div class="thumb">🐚<span class="badge">标准</span></div>
+        <div class="body">
+          <div class="title">五彩贝评级标准</div>
+          <div class="desc">AI引擎初评 · 五维评定 · 照片要求</div>
+          <span class="tag">标准</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-console.html">
+        <div class="thumb">⚙️<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">平台中台控制台</div>
+          <div class="desc">全局配置、权限管理</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-training-center.html">
+        <div class="thumb">🎓<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">培训中心管理</div>
+          <div class="desc">课程管理、学习监控</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-question-bank.html">
+        <div class="thumb">❓<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">题库管理</div>
+          <div class="desc">1200+题库、组卷排考</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-exam-admin.html">
+        <div class="thumb">📝<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">考务管理</div>
+          <div class="desc">排考审批、成绩核发</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-standards.html">
+        <div class="thumb">📏<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">分级标准</div>
+          <div class="desc">L0-L7 标准定义、晋级规则</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-credit-engine.html">
+        <div class="thumb">⭐<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">信用引擎</div>
+          <div class="desc">信用分计算、评价回流</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-insurance.html">
+        <div class="thumb">🛡<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">保险管理</div>
+          <div class="desc">责任险、安心险配置</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-data-hub.html">
+        <div class="thumb">💾<span class="badge">中台</span></div>
+        <div class="body">
+          <div class="title">数据中心</div>
+          <div class="desc">房源库、数据沉淀</div>
+          <span class="tag">中台</span>
+        </div>
+      </a>
+      <a class="card" href="screens/p-api-gateway.html">
+        <div class="thumb">🔌<span class="badge">技术</span></div>
+        <div class="body">
+          <div class="title">API 网关</div>
+          <div class="desc">接口文档、Key 管理</div>
+          <span class="tag">技术</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>贵州旅居 · 贝壳旅居平台 · 原型导航故事板</p>
+    <p>共 80+ 个原型页面 · 按角色旅程分类</p>
+  </div>
 </div>
 
-<!-- 跨系列总入口（开发预览） -->
-<a href="overview.html" style="position:fixed; top:8px; right:8px; padding:5px 10px; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; border-radius:14px; z-index:200; text-decoration:none;">📋 全站导航</a>
-
-<script src="screens/_region.js"></script>
 <script>
-document.querySelectorAll('.tab-item').forEach(tab => {
-  tab.addEventListener('click', e => {
-    const href = tab.getAttribute('href');
-    if (href && href !== '#' && !href.startsWith('http')) {
-      e.preventDefault();
-      window.location.href = href;
-    }
+// 筛选功能
+document.querySelectorAll('.nav-pill').forEach(pill => {
+  pill.addEventListener('click', function() {
+    document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    const filter = this.dataset.filter;
+    document.querySelectorAll('.story-section').forEach(section => {
+      if (filter === 'all' || section.dataset.category === filter) {
+        section.classList.remove('hidden');
+      } else {
+        section.classList.add('hidden');
+      }
+    });
   });
 });
-document.querySelectorAll('.filter-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-  });
-});
-document.querySelectorAll('.collapse-trigger').forEach(btn => {
-  btn.addEventListener('click', () => btn.parentNode.classList.toggle('open'));
-});
-// city switcher — 城市列表来自 _region.js 配置（省/市可换）
-(function(){
-  const grid = document.getElementById('cityGrid');
-  const label = document.getElementById('cityLabel');
-  const sheet = document.getElementById('citySheet');
-  const title = document.getElementById('citySheetTitle');
-  if (!grid) return;
-  const R = window.BZF_REGION || { prov: { full:'江苏省', capital:'南京',
-    cities:['南京','苏州','无锡','常州','镇江','扬州','泰州','南通','盐城','徐州','淮安','宿迁','连云港'] } };
-  const cities = R.prov.cities;
-  // 切省后清掉不属于本省的旧选择
-  let saved = localStorage.getItem('bzf.city');
-  if (!saved || cities.indexOf(saved) === -1) saved = R.prov.capital;
-  if (title) title.textContent = '切换城市 · ' + R.prov.full + ' ' + cities.length + ' 设区市';
-  label.textContent = saved;
-  grid.innerHTML = cities.map(c =>
-    '<button class="city-pill' + (c === saved ? ' active' : '') + '" data-city="' + c + '">' + c + '</button>'
-  ).join('');
-  grid.addEventListener('click', e => {
-    const pill = e.target.closest('.city-pill');
-    if (!pill) return;
-    const city = pill.dataset.city;
-    label.textContent = city;
-    localStorage.setItem('bzf.city', city);
-    grid.querySelectorAll('.city-pill').forEach(p => p.classList.toggle('active', p === pill));
-    setTimeout(() => sheet.classList.remove('open'), 180);
-  });
-})();
-// header carousel — 3 slides auto-loop every 3.5s
-(function(){
-  const root = document.getElementById('homeCarousel');
-  if (!root) return;
-  const track = root.querySelector('.carousel-track');
-  const dots = root.querySelectorAll('.carousel-dots span');
-  let i = 0;
-  const total = dots.length;
-  function go(n){
-    i = (n + total) % total;
-    track.style.transform = 'translateX(-' + (i * 100) + '%)';
-    dots.forEach((d, k) => d.classList.toggle('active', k === i));
-  }
-  let timer = setInterval(() => go(i + 1), 3500);
-  dots.forEach(d => d.addEventListener('click', () => {
-    clearInterval(timer);
-    go(parseInt(d.dataset.i, 10));
-    timer = setInterval(() => go(i + 1), 3500);
-  }));
-})();
 </script>
-<script src="screens/_navmobile.js"></script>
 </body>
 </html>

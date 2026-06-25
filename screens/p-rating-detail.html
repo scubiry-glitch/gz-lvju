@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>房源评级复核详情 · AI打分引擎</title>
+  <style>
+    :root {
+      --bg: #f5f7fa; --surface: #fff; --fg: #0f172a; --muted: #64748b;
+      --border: #e2e8f0; --accent: #0f766e; --accent-2: #14b8a6;
+      --gold: #b45309; --gold-soft: #fef3c7;
+      --ok: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --dim1: #10b981; --dim2: #f59e0b; --dim3: #3b82f6; --dim4: #8b5cf6; --dim5: #ec4899;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13px; line-height:1.5;}
+    a{color:var(--accent); text-decoration:none;}
+    
+    .main-wrap{padding:24px 28px 100px;}
+    
+    /* page header */
+    .page-header{
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+      padding:18px 22px; margin-bottom:18px;
+      display:flex; align-items:center; gap:14px;
+    }
+    .page-header h1{font-size:20px; margin:0; font-weight:700;}
+    .page-header .sub{color:var(--muted); font-size:12px; margin-top:2px;}
+    .page-header .right{margin-left:auto; display:flex; gap:8px; align-items:center;}
+    .page-header .breadcrumb{font-size:11px; color:var(--muted); margin-bottom:4px;}
+    .page-header .breadcrumb a{color:var(--accent);}
+    
+    /* layout */
+    .layout{display:grid; grid-template-columns:1fr 420px; gap:18px;}
+    
+    /* panels */
+    .panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;}
+    .panel-head{padding:14px 18px; background:#fafafa; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;}
+    .panel-head h3{margin:0; font-size:14px; font-weight:700;}
+    .panel-head .badge{font-size:10px; padding:2px 8px; border-radius:4px; background:var(--gold-soft); color:var(--gold);}
+    .panel-body{padding:18px;}
+    
+    /* house info */
+    .house-hero{display:grid; grid-template-columns:120px 1fr; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:16px;}
+    .house-hero .img{width:120px; height:90px; border-radius:var(--radius-md); background:linear-gradient(135deg,#e0e7ff,#c7d2fe); display:grid; place-items:center; color:#6366f1; font-size:32px;}
+    .house-hero .info h4{margin:0 0 6px; font-size:18px;}
+    .house-hero .info .meta{font-size:12px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap;}
+    .house-hero .info .meta b{color:var(--fg);}
+    
+    .info-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+    .info-cell{padding:10px 12px; background:#f8fafc; border-radius:var(--radius-sm);}
+    .info-cell .l{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;}
+    .info-cell .v{font-size:14px; font-weight:600; margin-top:2px;}
+    
+    /* submitted materials */
+    .material-list{display:grid; gap:8px;}
+    .material-item{display:flex; align-items:center; gap:10px; padding:10px 12px; background:#f8fafc; border-radius:var(--radius-sm); border:1px solid var(--border);}
+    .material-item .icon{width:36px; height:36px; border-radius:6px; background:#e0f2fe; display:grid; place-items:center; color:#0284c7;}
+    .material-item .txt{flex:1;}
+    .material-item .txt .nm{font-weight:600; font-size:12px;}
+    .material-item .txt .desc{font-size:11px; color:var(--muted);}
+    .material-item .status{font-size:11px; padding:3px 8px; border-radius:4px;}
+    .material-item .status.ok{background:#dcfce7; color:#166534;}
+    .material-item .status.warn{background:#fef3c7; color:#92400e;}
+    
+    /* AI Engine Panel */
+    .ai-panel{background:linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f766e 100%); color:#fff; border:none;}
+    .ai-panel .panel-head{background:rgba(255,255,255,0.08); border-bottom:rgba(255,255,255,0.1);}
+    .ai-panel .panel-head h3{color:#fff;}
+    .ai-panel .panel-head .badge{background:rgba(255,255,255,0.15); color:#fef3c7;}
+    
+    .ai-result{text-align:center; padding:20px; background:rgba(255,255,255,0.06); border-radius:var(--radius-md); margin-bottom:18px;}
+    .ai-result .stars{font-size:32px; letter-spacing:4px; margin-bottom:8px;}
+    .ai-result .stars .off{opacity:0.25;}
+    .ai-result .score{font-size:42px; font-weight:800;}
+    .ai-result .score small{font-size:16px; font-weight:400; opacity:0.7;}
+    .ai-result .rec{font-size:14px; margin-top:6px; opacity:0.9;}
+    .ai-result .conf{display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:4px 12px; background:rgba(255,255,255,0.1); border-radius:999px; font-size:11px;}
+    .ai-result .conf .bar{width:60px; height:4px; background:rgba(255,255,255,0.2); border-radius:2px; overflow:hidden;}
+    .ai-result .conf .bar i{display:block; height:100%; background:#fef3c7;}
+    
+    /* radar chart */
+    .radar-wrap{display:flex; justify-content:center; padding:16px 0;}
+    .radar{position:relative; width:220px; height:220px;}
+    .radar-bg{position:absolute; inset:0;}
+    .radar-bg polygon{fill:none; stroke:rgba(255,255,255,0.15); stroke-width:1;}
+    .radar-data{position:absolute; inset:0;}
+    .radar-data polygon{fill:rgba(20,184,166,0.4); stroke:#14b8a6; stroke-width:2;}
+    .radar-labels{position:absolute; inset:-30px;}
+    .radar-label{position:absolute; font-size:11px; font-weight:600; white-space:nowrap; text-align:center;}
+    .radar-label .val{display:block; font-size:14px; font-weight:800; color:#fef3c7;}
+    .radar-label .w{font-size:9px; opacity:0.7;}
+    
+    /* dimension breakdown */
+    .dim-breakdown{margin-top:16px;}
+    .dim-item{margin-bottom:12px; padding:12px; background:rgba(255,255,255,0.06); border-radius:var(--radius-sm); cursor:pointer;}
+    .dim-item:hover{background:rgba(255,255,255,0.1);}
+    .dim-item .head{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+    .dim-item .head .icon{font-size:16px;}
+    .dim-item .head .nm{flex:1; font-weight:600;}
+    .dim-item .head .score{font-weight:800; color:#fef3c7;}
+    .dim-item .head .toggle{font-size:10px; opacity:0.6;}
+    .dim-item .bar{height:4px; background:rgba(255,255,255,0.15); border-radius:2px; overflow:hidden;}
+    .dim-item .bar i{display:block; height:100%;}
+    .dim-item .sub-items{display:none; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);}
+    .dim-item.open .sub-items{display:block;}
+    .sub-item{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:11px;}
+    .sub-item .nm{flex:1; opacity:0.9;}
+    .sub-item .val{font-weight:600;}
+    .sub-item .chk{color:#fef3c7;}
+    .sub-item .warn{color:#fb923c;}
+    
+    /* human review section */
+    .review-section{margin-top:18px; padding:16px; background:rgba(255,255,255,0.04); border-radius:var(--radius-md); border:1px solid rgba(255,255,255,0.1);}
+    .review-section h4{margin:0 0 12px; font-size:13px; display:flex; align-items:center; gap:6px;}
+    .review-section textarea{width:100%; height:80px; padding:10px; border:1px solid rgba(255,255,255,0.2); border-radius:var(--radius-sm); background:rgba(0,0,0,0.2); color:#fff; font-family:inherit; font-size:12px; resize:none;}
+    .review-section textarea::placeholder{color:rgba(255,255,255,0.4);}
+    .score-adjust{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:12px;}
+    .score-adjust .adj-item{text-align:center;}
+    .score-adjust .adj-item label{font-size:10px; opacity:0.7; display:block; margin-bottom:4px;}
+    .score-adjust .adj-item input{width:100%; padding:6px; border:1px solid rgba(255,255,255,0.2); border-radius:4px; background:rgba(0,0,0,0.2); color:#fff; text-align:center; font-size:14px; font-weight:700;}
+    
+    /* submit bar */
+    .submit-bar{
+      position:fixed; bottom:0; left:0; right:0;
+      background:var(--surface); border-top:1px solid var(--border);
+      padding:14px 28px; display:flex; gap:10px; align-items:center;
+      box-shadow:0 -4px 20px rgba(0,0,0,0.08);
+    }
+    .submit-bar .info{font-size:12px; color:var(--muted);}
+    .submit-bar .info b{color:var(--fg);}
+    .submit-bar .actions{margin-left:auto; display:flex; gap:8px;}
+    .btn{padding:10px 22px; border-radius:var(--radius-sm); font-size:13px; font-weight:600; cursor:pointer; border:0;}
+    .btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#fff;}
+    .btn-danger{background:var(--danger); color:#fff;}
+    .btn-ghost{background:var(--surface); color:var(--fg); border:1px solid var(--border);}
+    
+    @media(max-width:1100px){
+      .layout{grid-template-columns:1fr;}
+    }
+    @media(max-width:620px){
+      .main-wrap{padding:16px 12px 100px;}
+      .info-grid{grid-template-columns:1fr 1fr;}
+    }
+  </style>
+</head>
+<body class="nv-with-side">
+  <div id="side-nav" data-series="p" data-active="rating-review"></div>
+
+  <div class="main-wrap">
+    <div class="page-header">
+      <div>
+        <div class="breadcrumb"><a href="p-rating-review.html">← 房源评级复核</a></div>
+        <h1>🤖 AI 打分引擎 · 复核详情</h1>
+        <div class="sub">GZ-LJ-00891 · 梧桐公馆 · 参考 <a href="../lvju-rating-standard.html" style="color:var(--accent);">旅居星级评价标准</a></div>
+      </div>
+      <div class="right">
+        <button class="btn btn-ghost">导出 PDF</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- LEFT: House Info & Materials -->
+      <div>
+        <!-- 房源基本信息 -->
+        <div class="panel" style="margin-bottom:18px;">
+          <div class="panel-head">
+            <h3>🏠 房源基本信息</h3>
+            <span class="badge">申请五彩贝</span>
+          </div>
+          <div class="panel-body">
+            <div class="house-hero">
+              <div class="img">🏨</div>
+              <div class="info">
+                <h4>梧桐公馆 3号楼</h4>
+                <div class="meta">
+                  <span>编号: <b>GZ-LJ-00891</b></span>
+                  <span>地区: <b>贵阳市 · 观山湖区</b></span>
+                  <span>户型: <b>1室1厅 · 42㎡</b></span>
+                </div>
+              </div>
+            </div>
+            <div class="info-grid">
+              <div class="info-cell"><div class="l">运营主体</div><div class="v">贵州安居旅居</div></div>
+              <div class="info-cell"><div class="l">房源总数</div><div class="v">86 间</div></div>
+              <div class="info-cell"><div class="l">入住率</div><div class="v">92%</div></div>
+              <div class="info-cell"><div class="l">距景区距离</div><div class="v">2.3 km</div></div>
+              <div class="info-cell"><div class="l">信用分</div><div class="v">4.6</div></div>
+              <div class="info-cell"><div class="l">申请时间</div><div class="v">2024-06-24</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提交材料 -->
+        <div class="panel">
+          <div class="panel-head">
+            <h3>📎 申请人提交材料</h3>
+            <span class="badge">12 项已上传</span>
+          </div>
+          <div class="panel-body">
+            <div class="material-list">
+              <div class="material-item">
+                <div class="icon">📷</div>
+                <div class="txt"><div class="nm">房源照片集</div><div class="desc">外观/公区/客房共 68 张</div></div>
+                <span class="status ok">✓ 符合</span>
+              </div>
+              <div class="material-item">
+                <div class="icon">📋</div>
+                <div class="txt"><div class="nm">设施配套清单</div><div class="desc">智能门锁、家电、家具等</div></div>
+                <span class="status ok">✓ 符合</span>
+              </div>
+              <div class="material-item">
+                <div class="icon">🛡</div>
+                <div class="txt"><div class="nm">安心保险保单</div><div class="desc">加强型家财险 + 客房安心险</div></div>
+                <span class="status ok">✓ 符合</span>
+              </div>
+              <div class="material-item">
+                <div class="icon">🏥</div>
+                <div class="txt"><div class="nm">甲醛检测报告</div><div class="desc">第三方检测机构出具</div></div>
+                <span class="status ok">✓ 符合</span>
+              </div>
+              <div class="material-item">
+                <div class="icon">👔</div>
+                <div class="txt"><div class="nm">旅居管家资质</div><div class="desc">24H持证管家 2 名</div></div>
+                <span class="status ok">✓ 符合</span>
+              </div>
+              <div class="material-item">
+                <div class="icon">🚗</div>
+                <div class="txt"><div class="nm">景区联动协议</div><div class="desc">自营接送 + 景区直通</div></div>
+                <span class="status warn">待核实</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: AI Engine -->
+      <div class="panel ai-panel">
+        <div class="panel-head">
+          <h3>🤖 AI 打分引擎</h3>
+          <span class="badge">v2.0 Demo</span>
+        </div>
+        <div class="panel-body" style="color:#fff;">
+          
+          <!-- AI Result Summary -->
+          <div class="ai-result">
+            <div class="stars">🐚🐚🐚🐚🐚</div>
+            <div class="score">85 <small>/ 100</small></div>
+            <div class="rec">推荐: 五彩贝 · 豪华特色旅居</div>
+            <div class="conf">
+              <span>置信度 92%</span>
+              <div class="bar"><i style="width:92%"></i></div>
+            </div>
+          </div>
+
+          <!-- Radar Chart -->
+          <div class="radar-wrap">
+            <div class="radar">
+              <!-- Background hexagons -->
+              <svg class="radar-bg" viewBox="0 0 200 200">
+                <polygon points="100,10 180,50 180,150 100,190 20,150 20,50"/>
+                <polygon points="100,35 160,62 160,138 100,165 40,138 40,62"/>
+                <polygon points="100,60 140,75 140,125 100,140 60,125 60,75"/>
+                <polygon points="100,85 120,88 120,112 100,115 80,112 80,88"/>
+              </svg>
+              <!-- Data polygon -->
+              <svg class="radar-data" viewBox="0 0 200 200">
+                <polygon points="100,25 165,55 155,145 100,170 35,130 40,60"/>
+              </svg>
+              <!-- Labels -->
+              <div class="radar-labels">
+                <div class="radar-label" style="top:0;left:50%;transform:translateX(-50%);">
+                  <span class="val">18/22</span>
+                  <span class="w">🏞 环境景观</span>
+                </div>
+                <div class="radar-label" style="top:25%;right:-10px;">
+                  <span class="val">20/22</span>
+                  <span class="w">🛎 服务品质</span>
+                </div>
+                <div class="radar-label" style="bottom:25%;right:-10px;">
+                  <span class="val">22/24</span>
+                  <span class="w">🛏 设施配套</span>
+                </div>
+                <div class="radar-label" style="bottom:0;left:50%;transform:translateX(-50%);">
+                  <span class="val">12/14</span>
+                  <span class="w">🚏 交通区位</span>
+                </div>
+                <div class="radar-label" style="bottom:25%;left:-20px;">
+                  <span class="val">13/18</span>
+                  <span class="w">🪔 特色体验</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dimension Breakdown -->
+          <div class="dim-breakdown">
+            <div class="dim-item open" onclick="this.classList.toggle('open')">
+              <div class="head">
+                <span class="icon">🏞</span>
+                <span class="nm">环境景观</span>
+                <span class="score">18 / 22</span>
+                <span class="toggle">▼ 展开</span>
+              </div>
+              <div class="bar"><i style="width:82%;background:var(--dim1);"></i></div>
+              <div class="sub-items">
+                <div class="sub-item"><span class="nm">自然景观位</span><span class="val">8/10</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">公区与庭院环境</span><span class="val">6/8</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">信息图片真实度</span><span class="val">4/4</span><span class="chk">✓</span></div>
+              </div>
+            </div>
+            
+            <div class="dim-item" onclick="this.classList.toggle('open')">
+              <div class="head">
+                <span class="icon">🛎</span>
+                <span class="nm">服务品质</span>
+                <span class="score">20 / 22</span>
+                <span class="toggle">▶ 展开</span>
+              </div>
+              <div class="bar"><i style="width:91%;background:var(--dim2);"></i></div>
+              <div class="sub-items">
+                <div class="sub-item"><span class="nm">旅居管家（24H+持证）</span><span class="val">5/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">24H客服/每日清洁</span><span class="val">4/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">安心保险</span><span class="val">5/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">信用分 > 4.4</span><span class="val">6/7</span><span class="chk">✓</span></div>
+              </div>
+            </div>
+            
+            <div class="dim-item" onclick="this.classList.toggle('open')">
+              <div class="head">
+                <span class="icon">🛏</span>
+                <span class="nm">设施配套</span>
+                <span class="score">22 / 24</span>
+                <span class="toggle">▶ 展开</span>
+              </div>
+              <div class="bar"><i style="width:92%;background:var(--dim3);"></i></div>
+              <div class="sub-items">
+                <div class="sub-item"><span class="nm">客房面积 > 30㎡</span><span class="val">5/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">智能门锁/水电表</span><span class="val">4/4</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">智能马桶+安全组件</span><span class="val">4/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">基础设施（电梯/监控）</span><span class="val">5/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">交付标准+甲醛检测</span><span class="val">4/5</span><span class="chk">✓</span></div>
+              </div>
+            </div>
+            
+            <div class="dim-item" onclick="this.classList.toggle('open')">
+              <div class="head">
+                <span class="icon">🚏</span>
+                <span class="nm">交通区位</span>
+                <span class="score">12 / 14</span>
+                <span class="toggle">▶ 展开</span>
+              </div>
+              <div class="bar"><i style="width:86%;background:var(--dim4);"></i></div>
+              <div class="sub-items">
+                <div class="sub-item"><span class="nm">距核心景区 ≤ 3km</span><span class="val">5/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">交通接驳/停车</span><span class="val">4/5</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">价格合理性</span><span class="val">3/4</span><span class="warn">~</span></div>
+              </div>
+            </div>
+            
+            <div class="dim-item" onclick="this.classList.toggle('open')">
+              <div class="head">
+                <span class="icon">🪔</span>
+                <span class="nm">特色体验</span>
+                <span class="score">13 / 18</span>
+                <span class="toggle">▶ 展开</span>
+              </div>
+              <div class="bar"><i style="width:72%;background:var(--dim5);"></i></div>
+              <div class="sub-items">
+                <div class="sub-item"><span class="nm">在地文化主题</span><span class="val">3/4</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">民俗/研学活动</span><span class="val">2/3</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">康养配套</span><span class="val">2/4</span><span class="warn">~</span></div>
+                <div class="sub-item"><span class="nm">休闲娱乐设施</span><span class="val">3/3</span><span class="chk">✓</span></div>
+                <div class="sub-item"><span class="nm">景区联动/接送</span><span class="val">3/4</span><span class="chk">✓</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Human Review -->
+          <div class="review-section">
+            <h4>✏️ 人工复核调整</h4>
+            <textarea placeholder="填写复核意见..."></textarea>
+            <div class="score-adjust">
+              <div class="adj-item"><label>环境景观</label><input type="number" value="18" max="22"></div>
+              <div class="adj-item"><label>服务品质</label><input type="number" value="20" max="22"></div>
+              <div class="adj-item"><label>设施配套</label><input type="number" value="22" max="24"></div>
+              <div class="adj-item"><label>交通区位</label><input type="number" value="12" max="14"></div>
+              <div class="adj-item"><label>特色体验</label><input type="number" value="13" max="18"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit Bar -->
+  <div class="submit-bar">
+    <div class="info">
+      当前总分: <b>85</b> 分 → 推荐等级: <b style="color:var(--gold);">五彩贝 🐚🐚🐚🐚🐚</b>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost">暂存</button>
+      <button class="btn btn-danger">驳回</button>
+      <button class="btn btn-primary">✓ 通过复核</button>
+    </div>
+  </div>
+
+  <script src="_nav.js"></script>
+  <script>
+    // Score adjustment calculation
+    document.querySelectorAll('.score-adjust input').forEach(input => {
+      input.addEventListener('change', () => {
+        const inputs = document.querySelectorAll('.score-adjust input');
+        let total = 0;
+        inputs.forEach(i => total += parseInt(i.value) || 0);
+        document.querySelector('.submit-bar .info b').textContent = total;
+      });
+    });
+  </script>
+</body>
+</html>
