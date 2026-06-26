@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>生活方式 · 玩在贵州 · 贝壳旅居·内容服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* 生活方式专属页内样式 */
+  .hero-sm .bg.s-lifestyle{
+    background:
+      linear-gradient(180deg,rgba(8,18,16,.55) 0%,rgba(8,18,16,.05) 40%,rgba(8,18,16,.0) 60%,rgba(245,247,246,.0) 85%,#f5f7f6 100%),
+      url(assets/lvju/xijiang-night.jpg) center/cover;
+  }
+
+  /* 四大内容服务入口 */
+  .svc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 16px;margin-top:6px;}
+  .svc-card{
+    position:relative;background:#fff;border:1px solid var(--border);border-radius:16px;
+    padding:16px 14px;text-align:left;box-shadow:0 4px 14px rgba(15,42,38,.05);
+    transition:.15s;display:flex;flex-direction:column;gap:10px;
+  }
+  .svc-card:active{transform:scale(.97);}
+  .svc-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(15,42,38,.1);}
+  .svc-card .ic{
+    width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;
+    background:linear-gradient(135deg,var(--brand-soft),#fff);flex-shrink:0;
+  }
+  .svc-card:nth-child(1) .ic{background:linear-gradient(135deg,#1f6f5f,#0b5d56);color:#fff;box-shadow:0 4px 12px rgba(11,93,86,.25);}
+  .svc-card:nth-child(2) .ic{background:linear-gradient(135deg,#7a5a23,#caa45e);color:#fff;box-shadow:0 4px 12px rgba(122,90,35,.25);}
+  .svc-card:nth-child(3) .ic{background:linear-gradient(135deg,#9a3412,#fdba74);color:#fff;box-shadow:0 4px 12px rgba(154,52,18,.25);}
+  .svc-card:nth-child(4) .ic{background:linear-gradient(135deg,#0e7490,#67e8f9);color:#fff;box-shadow:0 4px 12px rgba(14,116,144,.25);}
+  .svc-card .t{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
+  .svc-card .d{font-size:11px;color:var(--muted);line-height:1.45;}
+  .svc-card .ar{margin-left:auto;font-size:18px;color:var(--brand);opacity:.6;}
+
+  /* 精选推荐 */
+  .rec-h{display:flex;align-items:center;gap:9px;padding:0 16px;margin:22px 0 10px;}
+  .rec-h .bar{width:3px;height:15px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
+  .rec-h h2{font-size:15px;font-weight:700;color:var(--ink);font-family:var(--serif);}
+  .rec-h .more{margin-left:auto;font-size:11px;color:var(--muted);}
+
+  .rec-list{padding:0 16px;}
+  .rec-item{
+    display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);
+    border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(15,42,38,.04);
+  }
+  .rec-item .thumb{
+    width:72px;height:72px;border-radius:10px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--brand-soft),#e8f5f3);display:grid;place-items:center;font-size:28px;
+  }
+  .rec-item .info{flex:1;min-width:0;}
+  .rec-item .info .nm{font-weight:700;font-size:14px;color:var(--ink);margin-bottom:2px;}
+  .rec-item .info .meta{font-size:11px;color:var(--muted);}
+  .rec-item .info .tags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
+  .rec-item .info .tags span{font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 7px;border-radius:6px;}
+  .rec-item .arr{font-size:18px;color:var(--muted);}
+
+  /* 当季主题 */
+  .season-card{
+    margin:0 16px 14px;border-radius:16px;overflow:hidden;position:relative;height:130px;color:#fff;
+    box-shadow:0 8px 22px rgba(10,40,36,.15);display:block;
+  }
+  .season-card .bg{position:absolute;inset:0;
+    background:linear-gradient(110deg,rgba(8,22,20,.78) 0%,rgba(8,22,20,.25) 60%,rgba(8,22,20,.05) 100%),
+      url(assets/lvju/stilt-miao.jpg) center/cover;
+  }
+  .season-card .in{position:relative;z-index:2;padding:14px 16px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
+  .season-card .tag{font-size:9px;font-weight:700;letter-spacing:.1em;opacity:.9;margin-bottom:4px;text-transform:uppercase;}
+  .season-card h3{font-family:var(--serif);font-size:17px;font-weight:700;}
+  .season-card p{font-size:11px;opacity:.88;margin-top:3px;}
+
+  /* slogan banner */
+  .slogan-bar{
+    margin:6px 16px 16px;background:linear-gradient(135deg,var(--brand-deep),var(--brand));
+    border-radius:14px;padding:14px 16px;color:#fff;text-align:center;
+    box-shadow:0 6px 18px rgba(11,93,86,.2);
+  }
+  .slogan-bar p{font-family:var(--serif);font-size:15px;font-weight:700;letter-spacing:.04em;}
+  .slogan-bar small{display:block;font-size:10px;opacity:.8;margin-top:3px;letter-spacing:.02em;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="appbar ghost">
+      <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
+      <div class="ttl">生活方式<small>玩在贵州 · 精彩无限</small></div>
+      <div class="act"><span>🔍</span><span>♡</span></div>
+    </div>
+
+    <div class="hero-sm">
+      <div class="bg s-lifestyle"></div>
+      <div class="in">
+        <div class="ek">Travel to Guizhou, Live More</div>
+        <h1>旅居到贵州<br>生活更精彩</h1>
+        <p>景点、美食、路线、便民，一站式探索贵州的精彩生活</p>
+      </div>
+    </div>
+
+    <!-- slogan banner -->
+    <div class="slogan-bar">
+      <p>旅居到贵州，生活更精彩</p>
+      <small>贝壳旅居 · 内容服务 · 让每一段旅程都值得期待</small>
+    </div>
+
+    <!-- 四大内容服务 -->
+    <div class="sec-h"><span class="bar"></span><h2>内容服务 · 玩在贵州</h2></div>
+    <div class="svc-grid">
+      <a class="svc-card" href="lvju-app-spots.html">
+        <div class="ic">⛰</div>
+        <div>
+          <div class="t">旅游景点</div>
+          <div class="d">必打卡 · 世界遗产 · 民族村寨</div>
+        </div>
+        <span class="ar">›</span>
+      </a>
+      <a class="svc-card" href="lvju-app-routes.html">
+        <div class="ic">🧭</div>
+        <div>
+          <div class="t">旅游路线</div>
+          <div class="d">精选行程 · 主题游 · 深度体验</div>
+        </div>
+        <span class="ar">›</span>
+      </a>
+      <a class="svc-card" href="lvju-app-food.html">
+        <div class="ic">🍲</div>
+        <div>
+          <div class="t">旅游美食</div>
+          <div class="d">本地味道 · 酸汤 · 小吃</div>
+        </div>
+        <span class="ar">›</span>
+      </a>
+      <a class="svc-card" href="lvju-app-convenience.html">
+        <div class="ic">🛎</div>
+        <div>
+          <div class="t">旅游便民</div>
+          <div class="d">出行 · 向导 · 急救 · 寄存</div>
+        </div>
+        <span class="ar">›</span>
+      </a>
+    </div>
+
+    <!-- 当季主题 -->
+    <div class="rec-h"><span class="bar"></span><h2>当季精选</h2><span class="more">更多 ›</span></div>
+    <a class="season-card" href="lvju-app-routes.html">
+      <div class="bg" style="background:linear-gradient(110deg,rgba(8,22,20,.78) 0%,rgba(8,22,20,.25) 60%,rgba(8,22,20,.05) 100%),url(assets/lvju/xijiang-night.jpg) center/cover;"></div>
+      <div class="in">
+        <div class="tag">Editor's Pick · 06月</div>
+        <h3>黔东南避暑秘境</h3>
+        <p>千户苗寨夜景 + 荔波小七孔溯溪，7天6晚深度玩法</p>
+      </div>
+    </a>
+    <a class="season-card" href="lvju-app-food.html">
+      <div class="bg" style="background:linear-gradient(110deg,rgba(8,22,20,.78) 0%,rgba(8,22,20,.25) 60%,rgba(8,22,20,.05) 100%),url(assets/lvju/stilt-miao.jpg) center/cover;"></div>
+      <div class="in">
+        <div class="tag">Food Guide · 06月</div>
+        <h3>贵州酸辣季</h3>
+        <p>从凯里酸汤鱼到丝娃娃，本地人带你吃遍贵州味道</p>
+      </div>
+    </a>
+
+    <!-- 热门推荐 -->
+    <div class="rec-h"><span class="bar"></span><h2>热门推荐</h2></div>
+    <div class="rec-list">
+      <a class="rec-item" href="lvju-app-spot-detail.html?spot=xijiang">
+        <div class="thumb g1">🏔</div>
+        <div class="info">
+          <div class="nm">西江千户苗寨</div>
+          <div class="meta">📍 黔东南 · 雷山 · ★ 5A</div>
+          <div class="tags"><span>民族村寨</span><span>夜景</span><span>旅居推荐</span></div>
+        </div>
+        <span class="arr">›</span>
+      </a>
+      <a class="rec-item" href="lvju-app-spot-detail.html?spot=xiaoqikong">
+        <div class="thumb g2">💧</div>
+        <div class="info">
+          <div class="nm">荔波小七孔</div>
+          <div class="meta">📍 黔南 · 荔波 · 世界遗产</div>
+          <div class="tags"><span>避暑</span><span>森林康养</span></div>
+        </div>
+        <span class="arr">›</span>
+      </a>
+      <a class="rec-item" href="lvju-app-food.html">
+        <div class="thumb g4">🍲</div>
+        <div class="info">
+          <div class="nm">苗家长桌宴</div>
+          <div class="meta">📍 黔东南 · 西江 · 人均 ¥120</div>
+          <div class="tags"><span>民俗体验</span><span>必吃榜</span></div>
+        </div>
+        <span class="arr">›</span>
+      </a>
+      <a class="rec-item" href="lvju-app-convenience.html">
+        <div class="thumb g5">🚗</div>
+        <div class="info">
+          <div class="nm">贵州旅居出行指南</div>
+          <div class="meta">租车 · 包车 · 高铁 · 机场接送</div>
+          <div class="tags"><span>便民</span><span>出行攻略</span></div>
+        </div>
+        <span class="arr">›</span>
+      </a>
+    </div>
+
+    <div style="height:20px;"></div>
+
+  </div>
+
+  <div class="tabbar">
+    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
+    <a href="lvju-app-lvju.html"><span class="ti">🔎</span>找房</a>
+    <a class="on" href="lvju-app-lifestyle.html"><span class="ti">🌿</span>生活</a>
+    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+</body>
+</html>
