@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>贵州住建厅 · 旅居监管大屏</title>
+<title>驾驶舱</title>
+  <script src="screens/_region.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
   :root{
@@ -108,10 +109,11 @@
 <div class="dashboard">
   <div class="header">
     <div class="header-left">
-      <h1>🏛 贵州省住建厅 · 旅居监管大屏</h1>
-      <span class="badge">🐚 贝壳旅居平台</span>
+      <h1 id="pageTitle">🏛 贵州省住建厅 · 旅居驾驶舱</h1>
+      <span class="badge" id="pageBadge">🐚 贝壳旅居平台</span>
     </div>
     <div class="header-right">
+      <select id="regionSwitch" style="padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;cursor:pointer;"></select>
       <div class="date" id="date">2026年6月25日 星期四</div>
       <div class="time" id="time">01:28:00</div>
     </div>
@@ -216,7 +218,7 @@
     <div class="panel map-panel">
       <div class="panel-head">
         <span class="icon">🗺</span>
-        <h3>贵州省房源分布 · 9 个地级行政区</h3>
+        <h3 id="mapTitle">贵州省房源分布 · 9 个地级行政区</h3>
       </div>
       <div class="map-container">
         <div class="map-loading" id="mapLoading">
@@ -343,6 +345,35 @@
 </div>
 
 <script>
+// ============ 预设系统 ============
+(function(){
+  const sel = document.getElementById('regionSwitch');
+  if (!sel || !window.BZF_PRESETS) return;
+  const cur = (window.BZF_REGION && window.BZF_REGION.key) || 'js';
+  sel.innerHTML = Object.keys(window.BZF_PRESETS).map(k =>
+    '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + window.BZF_PRESETS[k].label + '</option>'
+  ).join('');
+  sel.addEventListener('change', function(){
+    const u = new URL(location.href);
+    u.searchParams.set('region', this.value);
+    location.href = u.toString();
+  });
+})();
+
+// 预设配置
+const PRESET = window.BZF_REGION || { key: 'gz_zj' };
+const isGuizhou = PRESET.key === 'gz_zj';
+const isShenyang = PRESET.key === 'sy_zj';
+
+// 更新标题
+const P = window.BZF_PRESETS && window.BZF_PRESETS[PRESET.key];
+if (P) {
+  document.getElementById('pageTitle').textContent = '🏛 ' + P.prov.full + P.dept.short + ' · 旅居驾驶舱';
+  document.getElementById('pageBadge').textContent = '🐚 贝壳' + P.biz.term + '平台';
+  document.getElementById('mapTitle').textContent = P.prov.full + '房源分布 · ' + (isShenyang ? '13' : '9') + '个' + (isShenyang ? '区县' : '地级行政区');
+  document.title = P.prov.short + P.dept.short + ' · 旅居驾驶舱';
+}
+
 // 实时时钟
 function updateTime() {
   const now = new Date();
@@ -358,28 +389,92 @@ function updateTime() {
 updateTime();
 setInterval(updateTime, 1000);
 
-// 贵州省各地市数据
-const regionData = {
-  '贵阳市': { count: 3200, rate: 96.2, value: '2.6亿', avgPrice: 328, wu: 156, si: 298, san: 312, er: 98, yi: 28 },
-  '黔东南苗族侗族自治州': { count: 2400, rate: 94.8, value: '1.8亿', avgPrice: 256, wu: 128, si: 245, san: 221, er: 98, yi: 32 },
-  '黔南布依族苗族自治州': { count: 1600, rate: 89.6, value: '1.2亿', avgPrice: 198, wu: 42, si: 98, san: 156, er: 86, yi: 30 },
-  '遵义市': { count: 2100, rate: 87.3, value: '1.1亿', avgPrice: 186, wu: 38, si: 86, san: 132, er: 72, yi: 28 },
-  '黔西南布依族苗族自治州': { count: 400, rate: 85.7, value: '0.6亿', avgPrice: 168, wu: 22, si: 48, san: 72, er: 38, yi: 18 },
-  '安顺市': { count: 800, rate: 92.1, value: '0.5亿', avgPrice: 218, wu: 28, si: 52, san: 58, er: 22, yi: 7 },
-  '铜仁市': { count: 1100, rate: 84.2, value: '0.3亿', avgPrice: 152, wu: 12, si: 28, san: 36, er: 16, yi: 6 },
-  '毕节市': { count: 700, rate: 82.5, value: '0.3亿', avgPrice: 142, wu: 10, si: 24, san: 32, er: 14, yi: 5 },
-  '六盘水市': { count: 500, rate: 80.3, value: '0.2亿', avgPrice: 138, wu: 8, si: 18, san: 22, er: 10, yi: 4 }
+// 地区数据配置
+const REGION_CONFIG = {
+  gz_zj: {
+    mapFile: 'guizhou-map.json',
+    mapName: 'guizhou',
+    center: [106.7, 26.6],
+    zoom: 1.2,
+    visualMax: 3500,
+    data: {
+      '贵阳市': { count: 3200, rate: 96.2, value: '2.6亿', avgPrice: 328, wu: 156, si: 298, san: 312, er: 98, yi: 28 },
+      '黔东南苗族侗族自治州': { count: 2400, rate: 94.8, value: '1.8亿', avgPrice: 256, wu: 128, si: 245, san: 221, er: 98, yi: 32 },
+      '黔南布依族苗族自治州': { count: 1600, rate: 89.6, value: '1.2亿', avgPrice: 198, wu: 42, si: 98, san: 156, er: 86, yi: 30 },
+      '遵义市': { count: 2100, rate: 87.3, value: '1.1亿', avgPrice: 186, wu: 38, si: 86, san: 132, er: 72, yi: 28 },
+      '黔西南布依族苗族自治州': { count: 400, rate: 85.7, value: '0.6亿', avgPrice: 168, wu: 22, si: 48, san: 72, er: 38, yi: 18 },
+      '安顺市': { count: 800, rate: 92.1, value: '0.5亿', avgPrice: 218, wu: 28, si: 52, san: 58, er: 22, yi: 7 },
+      '铜仁市': { count: 1100, rate: 84.2, value: '0.3亿', avgPrice: 152, wu: 12, si: 28, san: 36, er: 16, yi: 6 },
+      '毕节市': { count: 700, rate: 82.5, value: '0.3亿', avgPrice: 142, wu: 10, si: 24, san: 32, er: 14, yi: 5 },
+      '六盘水市': { count: 500, rate: 80.3, value: '0.2亿', avgPrice: 138, wu: 8, si: 18, san: 22, er: 10, yi: 4 }
+    },
+    ranks: [
+      { name: '贵阳市', value: '96.2%' },
+      { name: '黔东南州', value: '94.8%' },
+      { name: '安顺市', value: '92.1%' },
+      { name: '黔南州', value: '89.6%' },
+      { name: '遵义市', value: '87.3%' },
+      { name: '黔西南州', value: '85.7%' }
+    ]
+  },
+  sy_zj: {
+    mapFile: 'shenyang-map.json',
+    mapName: 'shenyang',
+    center: [123.42, 41.80],
+    zoom: 0.9,
+    visualMax: 1500,
+    data: {
+      '和平区': { count: 1200, rate: 95.2, value: '1.2亿', avgPrice: 268, wu: 68, si: 128, san: 156, er: 48, yi: 12 },
+      '沈河区': { count: 980, rate: 93.8, value: '0.9亿', avgPrice: 245, wu: 52, si: 98, san: 128, er: 42, yi: 10 },
+      '皇姑区': { count: 850, rate: 91.5, value: '0.8亿', avgPrice: 228, wu: 42, si: 82, san: 112, er: 38, yi: 9 },
+      '大东区': { count: 720, rate: 89.2, value: '0.6亿', avgPrice: 198, wu: 32, si: 68, san: 92, er: 32, yi: 8 },
+      '铁西区': { count: 680, rate: 88.6, value: '0.6亿', avgPrice: 186, wu: 28, si: 62, san: 88, er: 28, yi: 6 },
+      '浑南区': { count: 520, rate: 86.8, value: '0.5亿', avgPrice: 175, wu: 22, si: 48, san: 72, er: 24, yi: 5 },
+      '于洪区': { count: 450, rate: 85.2, value: '0.4亿', avgPrice: 162, wu: 18, si: 42, san: 62, er: 20, yi: 4 },
+      '沈北新区': { count: 380, rate: 84.5, value: '0.3亿', avgPrice: 148, wu: 15, si: 35, san: 52, er: 18, yi: 4 },
+      '苏家屯区': { count: 320, rate: 82.8, value: '0.3亿', avgPrice: 138, wu: 12, si: 28, san: 42, er: 15, yi: 3 },
+      '辽中区': { count: 180, rate: 80.5, value: '0.2亿', avgPrice: 125, wu: 8, si: 18, san: 28, er: 10, yi: 2 },
+      '新民市': { count: 150, rate: 78.6, value: '0.1亿', avgPrice: 115, wu: 6, si: 15, san: 22, er: 8, yi: 2 },
+      '法库县': { count: 80, rate: 76.2, value: '0.08亿', avgPrice: 98, wu: 3, si: 8, san: 12, er: 5, yi: 1 },
+      '康平县': { count: 60, rate: 74.8, value: '0.05亿', avgPrice: 88, wu: 2, si: 6, san: 10, er: 4, yi: 1 }
+    },
+    ranks: [
+      { name: '和平区', value: '95.2%' },
+      { name: '沈河区', value: '93.8%' },
+      { name: '皇姑区', value: '91.5%' },
+      { name: '大东区', value: '89.2%' },
+      { name: '铁西区', value: '88.6%' },
+      { name: '浑南区', value: '86.8%' }
+    ]
+  }
 };
+
+const cfg = REGION_CONFIG[PRESET.key] || REGION_CONFIG['gz_zj'];
+const regionData = cfg.data;
+
+// 更新排名列表
+function updateRankList() {
+  const container = document.querySelector('.rank-list');
+  if (!container) return;
+  container.innerHTML = cfg.ranks.map((r, i) => `
+    <div class="rank-item">
+      <span class="rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+      <span class="name">${r.name}</span>
+      <span class="value">${r.value}</span>
+    </div>
+  `).join('');
+}
+updateRankList();
 
 // 初始化地图
 async function initMap() {
   const chartDom = document.getElementById('mapChart');
   const loading = document.getElementById('mapLoading');
   try {
-    const response = await fetch('guizhou-map.json');
+    const response = await fetch(cfg.mapFile);
     if (!response.ok) throw new Error('加载失败');
     const geoJson = await response.json();
-    echarts.registerMap('guizhou', geoJson);
+    echarts.registerMap(cfg.mapName, geoJson);
     loading.style.display = 'none';
     const chart = echarts.init(chartDom, 'dark', { renderer: 'canvas' });
     const mapData = Object.entries(regionData).map(([name, data]) => ({
@@ -404,13 +499,13 @@ async function initMap() {
         }
       },
       visualMap: {
-        min: 0, max: 3500, left: 'left', bottom: 'bottom',
+        min: 0, max: cfg.visualMax, left: 'left', bottom: 'bottom',
         text: ['多', '少'], textStyle: { color: '#94a3b8' },
         inRange: { color: ['#0f766e', '#14b8a6', '#34d399', '#a3e635', '#f59e0b'] },
         calculable: true, itemWidth: 12, itemHeight: 100
       },
       series: [{
-        name: '房源数量', type: 'map', map: 'guizhou', roam: true, zoom: 1.2, center: [106.7, 26.6],
+        name: '房源数量', type: 'map', map: cfg.mapName, roam: true, zoom: cfg.zoom, center: cfg.center,
         label: { show: true, color: '#fff', fontSize: 11, fontWeight: 600 },
         emphasis: {
           label: { show: true, color: '#fff', fontSize: 13, fontWeight: 700 },
