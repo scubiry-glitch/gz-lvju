@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>贝壳 APP · 首页 · 沈阳</title>
+<style>
+  :root{
+    --bg:#f5f5f5; --surface:#fff; --fg:#222; --muted:#999; --muted2:#666;
+    --blue:#3072f6; --blue-deep:#1a66ff; --red:#fa5741; --red2:#e62222;
+    --orange:#ff8c00; --border:#eee;
+    --font:system-ui,-apple-system,'PingFang SC','Helvetica Neue',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:#e8e8e8;font-family:var(--font);-webkit-font-smoothing:antialiased;
+    display:flex;justify-content:center;}
+  a{color:inherit;text-decoration:none;}
+  img{display:block;max-width:100%;}
+
+  .app{width:100%;max-width:430px;height:100dvh;background:var(--bg);color:var(--fg);
+    display:flex;flex-direction:column;overflow:hidden;position:relative;
+    box-shadow:0 0 60px rgba(0,0,0,.12);}
+  .scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .scr::-webkit-scrollbar{width:0;}
+
+  /* status bar */
+  .sbar{display:flex;justify-content:space-between;align-items:center;
+    padding:max(10px,env(safe-area-inset-top)) 20px 2px;font-size:15px;font-weight:600;
+    background:var(--surface);color:var(--fg);}
+  .sbar .r{display:flex;gap:4px;align-items:center;font-size:12px;font-weight:500;}
+
+  /* top nav */
+  .topnav{background:var(--surface);padding:4px 16px 10px;display:flex;align-items:center;justify-content:space-between;}
+  .loc{display:flex;align-items:center;gap:2px;font-size:17px;font-weight:600;}
+  .loc .arrow{font-size:10px;color:var(--muted);margin-left:1px;}
+  .tabs{display:flex;align-items:baseline;gap:18px;}
+  .tabs a{font-size:16px;color:var(--muted2);font-weight:400;}
+  .tabs a.on{font-size:20px;font-weight:700;color:var(--fg);}
+  .map-link{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--muted2);}
+  .map-link .ic{font-size:16px;}
+
+  /* search */
+  .search-wrap{background:var(--surface);padding:0 16px 12px;}
+  .search{display:flex;align-items:center;background:#f8f8f8;border-radius:8px;
+    padding:0 0 0 12px;height:40px;border:1px solid #f0f0f0;}
+  .search .ic{color:var(--muted);font-size:15px;flex-shrink:0;}
+  .search .ph{flex:1;font-size:14px;color:#bbb;margin-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .search .btn{background:var(--blue);color:#fff;font-size:14px;font-weight:600;
+    padding:0 16px;height:100%;display:flex;align-items:center;border-radius:0 8px 8px 0;
+    margin-left:8px;flex-shrink:0;}
+
+  /* icon grid */
+  .grid-wrap{background:var(--surface);padding:4px 8px 10px;}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:2px 0;}
+  .grid a{display:flex;flex-direction:column;align-items:center;padding:8px 4px;}
+  .grid .ic{width:44px;height:44px;display:grid;place-items:center;line-height:1;}
+  .grid .ic svg{width:36px;height:36px;}
+  .grid span{font-size:12px;color:var(--fg);margin-top:4px;white-space:nowrap;}
+  .grid .new-live .ic svg{width:38px;height:38px;}
+  .pager{display:flex;justify-content:center;gap:4px;padding:6px 0 2px;}
+  .pager i{display:block;width:14px;height:3px;border-radius:2px;background:#ddd;}
+  .pager i.on{background:#aaa;width:6px;}
+
+  /* promo row */
+  .promo{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px;background:var(--bg);}
+  .promo-card{background:var(--surface);border-radius:8px;overflow:hidden;position:relative;min-height:118px;}
+  .promo-card .hd{display:flex;align-items:center;gap:6px;padding:10px 10px 0;font-size:15px;font-weight:700;}
+  .promo-card .tag{font-size:10px;font-weight:600;color:#fff;background:linear-gradient(90deg,#ff6b4a,#ff3b30);
+    padding:1px 5px;border-radius:3px;}
+  .promo-card .date{margin-left:auto;font-size:10px;color:var(--muted);font-weight:400;}
+  .live-body{margin:6px 10px 10px;border-radius:6px;height:72px;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#1a3a5c 0%,#2d6a9f 50%,#4a90c2 100%);}
+  .live-body::before{content:"";position:absolute;inset:0;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30h60M30 0v60' stroke='rgba(255,255,255,.08)'/%3E%3C/svg%3E");}
+  .live-btn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#fff;font-size:13px;font-weight:600;}
+  .live-btn small{font-size:10px;font-weight:400;margin-top:4px;opacity:.85;
+    background:rgba(0,0,0,.35);padding:2px 8px;border-radius:10px;}
+  .live-btn .pill{background:rgba(255,255,255,.25);backdrop-filter:blur(4px);padding:5px 14px;border-radius:16px;font-size:12px;}
+  .market-body{padding:4px 10px 8px;}
+  .market-body .lbl{font-size:12px;color:var(--muted2);}
+  .market-body .num{font-size:26px;font-weight:800;color:var(--fg);line-height:1.2;}
+  .market-body .num em{font-style:normal;font-size:14px;font-weight:600;}
+  .market-body .trend{font-size:11px;color:var(--red);margin-top:2px;}
+  .market-body .spark{position:absolute;right:10px;bottom:28px;width:56px;height:28px;opacity:.7;}
+  .market-foot{font-size:11px;color:var(--muted);padding:0 10px 10px;display:flex;align-items:center;gap:2px;}
+  .market-foot::after{content:"›";font-size:14px;}
+
+  /* feed tabs */
+  .feed-tabs{display:flex;gap:20px;padding:12px 16px 8px;background:var(--bg);position:sticky;top:0;z-index:10;}
+  .feed-tabs a{font-size:16px;color:var(--muted2);font-weight:400;position:relative;padding-bottom:6px;}
+  .feed-tabs a.on{font-size:18px;font-weight:700;color:var(--fg);}
+  .feed-tabs a.on::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    width:18px;height:3px;background:var(--blue);border-radius:2px;}
+
+  /* listing grid */
+  .listings{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 16px;}
+  .card{background:var(--surface);border-radius:8px;overflow:hidden;}
+  .card .thumb{aspect-ratio:4/3;position:relative;background:#ddd;overflow:hidden;}
+  .card .thumb .img{width:100%;height:100%;object-fit:cover;}
+  .card .thumb .loc-bar{position:absolute;left:0;right:0;bottom:0;padding:16px 8px 6px;
+    background:linear-gradient(transparent,rgba(0,0,0,.55));color:#fff;font-size:11px;
+    display:flex;align-items:center;gap:3px;}
+  .card .body{padding:8px;}
+  .card .tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;}
+  .card .tags span{font-size:10px;padding:1px 4px;border-radius:2px;font-weight:500;}
+  .card .tags .must{background:#fff0f0;color:var(--red2);border:1px solid #ffd0d0;}
+  .card .tags .type{background:#fff5f5;color:#ff6b6b;border:1px solid #ffe0e0;}
+  .card .title{font-size:14px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .card .spec{font-size:11px;color:var(--muted);margin-top:4px;}
+  .card .price{font-size:18px;font-weight:800;color:var(--red);margin-top:6px;line-height:1;}
+  .card .price em{font-style:normal;font-size:12px;font-weight:600;}
+  .card .hint{font-size:11px;color:var(--orange);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* tabbar */
+  .tabbar{flex-shrink:0;display:flex;background:var(--surface);border-top:1px solid var(--border);
+    padding:6px 0 max(8px,env(safe-area-inset-bottom));z-index:20;}
+  .tabbar a{flex:1;text-align:center;font-size:10px;color:var(--muted);position:relative;}
+  .tabbar a .ti{font-size:22px;display:block;line-height:1.1;margin-bottom:2px;}
+  .tabbar a.on{color:var(--blue);font-weight:600;}
+  .tabbar .badge{position:absolute;top:-2px;left:calc(50% + 8px);min-width:16px;height:16px;
+    background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;padding:0 4px;line-height:1;}
+  .tabbar .dot{position:absolute;top:2px;left:calc(50% + 10px);width:7px;height:7px;
+    background:var(--red);border-radius:50%;border:1.5px solid #fff;}
+  .home-ind{height:max(4px,env(safe-area-inset-bottom));background:var(--surface);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+
+    <div class="sbar">
+      <span>17:27</span>
+      <span class="r">5G&nbsp;📶&nbsp;🔋 71%</span>
+    </div>
+
+    <div class="topnav">
+      <div class="loc">沈阳 <span class="arrow">▼</span></div>
+      <div class="tabs">
+        <a href="#">看点</a>
+        <a class="on" href="#">首页</a>
+      </div>
+      <a class="map-link" href="lvju-app-map.html"><span class="ic">🗺</span>地图找房</a>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search">
+        <span class="ic">🔍</span>
+        <span class="ph">碧桂园大城印象锦园二期</span>
+        <span class="btn">搜索</span>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid">
+        <a href="lvju-app-newhouse.html"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#fff5eb" width="36" height="36" rx="10"/><path fill="#ff8c42" d="M18 8l-9 7v11h6v-7h6v7h6V15z"/></svg></div><span>新房</span></a>
+        <a href="lvju-app-resale.html"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eef4ff" width="36" height="36" rx="10"/><path fill="#3072f6" d="M18 8l-9 7v11h6v-7h6v7h6V15z"/><rect fill="#3072f6" x="15" y="19" width="6" height="7" rx="1"/></svg></div><span>二手房</span></a>
+        <a href="screens/home.html"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eef8ff" width="36" height="36" rx="10"/><rect fill="#5bbcff" x="8" y="18" width="20" height="8" rx="2"/><rect fill="#5bbcff" x="10" y="12" width="6" height="8" rx="1"/><rect fill="#5bbcff" x="20" y="12" width="6" height="8" rx="1"/></svg></div><span>租房</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eef4ff" width="36" height="36" rx="10"/><path fill="#3072f6" d="M18 8l-9 7v11h6v-7h6v7h6V15z"/><circle fill="#ff8c42" cx="26" cy="12" r="5" fill-opacity=".9"/><text x="26" y="14.5" text-anchor="middle" fill="#fff" font-size="7" font-weight="700">卖</text></svg></div><span>卖房</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#fff8eb" width="36" height="36" rx="10"/><rect fill="#ffb020" x="9" y="14" width="18" height="12" rx="2"/><rect fill="#ffb020" x="14" y="10" width="8" height="6" rx="1"/></svg></div><span>商铺办公</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eef4ff" width="36" height="36" rx="10"/><rect fill="#3072f6" x="10" y="10" width="16" height="18" rx="3"/><rect fill="#fff" x="13" y="13" width="4" height="3" rx=".5"/><rect fill="#fff" x="19" y="13" width="4" height="3" rx=".5"/><rect fill="#fff" x="13" y="18" width="4" height="3" rx=".5"/><rect fill="#fff" x="19" y="18" width="4" height="3" rx=".5"/><rect fill="#fff" x="15" y="23" width="6" height="3" rx=".5"/></svg></div><span>房贷计算</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eefbf3" width="36" height="36" rx="10"/><circle fill="#22c55e" cx="18" cy="18" r="10"/><path fill="#fff" d="M14 18l3 3 6-6" stroke="#fff" stroke-width="2" fill="none"/></svg></div><span>查成交</span></a>
+        <a class="new-live" href="juzhu-channel-schemes.html"><div class="ic"><svg viewBox="0 0 36 36"><circle fill="#22c55e" cx="18" cy="18" r="16"/><path fill="#fff" d="M12 16c0-2 1.5-3 3-3h6c1.5 0 3 1 3 3v1c0 1-.5 2-1.5 2.5L18 22l-4.5-2.5C13 19 12 18 12 17v-1z"/><circle fill="#22c55e" cx="14" cy="15" r="1.2"/><circle fill="#22c55e" cx="22" cy="15" r="1.2"/><path fill="#fff" d="M15 19.5c1 1 2.5 1.5 3 1.5s2-.5 3-1.5" stroke="#fff" stroke-width="1" fill="none"/></svg></div><span>新居住</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eefbf3" width="36" height="36" rx="10"/><path fill="#22c55e" d="M18 10c-3 0-5 2-5 4v2h10v-2c0-2-2-4-5-4z"/><path fill="#22c55e" d="M11 18h14v10H11z"/><path fill="#fff" d="M16 14h4v3h-4z"/></svg></div><span>找经纪人</span></a>
+        <a href="#"><div class="ic"><svg viewBox="0 0 36 36"><rect fill="#eef4ff" width="36" height="36" rx="10"/><rect fill="#3072f6" x="9" y="9" width="7" height="7" rx="1.5" opacity=".8"/><rect fill="#3072f6" x="20" y="9" width="7" height="7" rx="1.5"/><rect fill="#3072f6" x="9" y="20" width="7" height="7" rx="1.5"/><rect fill="#3072f6" x="20" y="20" width="7" height="7" rx="1.5" opacity=".6"/></svg></div><span>板块找房</span></a>
+      </div>
+      <div class="pager"><i class="on"></i><i></i></div>
+    </div>
+
+    <div class="promo">
+      <div class="promo-card">
+        <div class="hd">好房直播 <span class="tag">回放</span></div>
+        <div class="live-body">
+          <div class="live-btn">
+            <span class="pill">进入直播间</span>
+            <small>沈阳楼市深度剖析</small>
+          </div>
+        </div>
+      </div>
+      <div class="promo-card" style="position:relative;">
+        <div class="hd">行情播报 <span class="date">06.28 更新</span></div>
+        <div class="market-body">
+          <div class="lbl">二手成交量</div>
+          <div class="num">196<em>套</em></div>
+          <div class="trend">比上日 ↑ 21%</div>
+          <svg class="spark" viewBox="0 0 56 28" fill="none"><path d="M0 22 L8 18 L16 20 L24 12 L32 14 L40 8 L48 10 L56 4" stroke="#3072f6" stroke-width="2" fill="none"/></svg>
+        </div>
+        <div class="market-foot">看更多沈阳行情</div>
+      </div>
+    </div>
+
+    <div class="feed-tabs">
+      <a class="on" href="#">推荐</a>
+      <a href="lvju-app-resale.html">二手房</a>
+      <a href="lvju-app-newhouse.html">新房</a>
+      <a href="screens/home.html">租房</a>
+    </div>
+
+    <div class="listings">
+      <a class="card" href="screens/detail.html">
+        <div class="thumb">
+          <div class="img" style="background:linear-gradient(160deg,#c4a882 0%,#8b7355 40%,#6b5344 100%);"></div>
+          <div class="loc-bar">📍 五爱·永顺社区</div>
+        </div>
+        <div class="body">
+          <div class="tags"><span class="must">必看好房</span><span class="type">二手</span></div>
+          <div class="title">中街商圈 南北通透 采光好 近地铁</div>
+          <div class="spec">2室1厅 | 53平 | 南 北</div>
+          <div class="price">19.5<em>万</em></div>
+          <div class="hint">业主诚心出售，性价比高</div>
+        </div>
+      </a>
+      <a class="card" href="screens/detail.html">
+        <div class="thumb">
+          <div class="img" style="background:linear-gradient(160deg,#e8dcc8 0%,#b8a088 50%,#907860 100%);"></div>
+          <div class="loc-bar">📍 长白·格林生活坊</div>
+        </div>
+        <div class="body">
+          <div class="tags"><span class="must">必看好房</span><span class="type">二手</span></div>
+          <div class="title">长白岛 精装两居 满五唯一 学区近</div>
+          <div class="spec">2室2厅 | 89平 | 南</div>
+          <div class="price">86<em>万</em></div>
+          <div class="hint">近期降价，随时可看</div>
+        </div>
+      </a>
+      <a class="card" href="screens/detail.html">
+        <div class="thumb">
+          <div class="img" style="background:linear-gradient(160deg,#d4c4b0 0%,#a89078 50%,#786050 100%);"></div>
+          <div class="loc-bar">📍 奥体·万达公馆</div>
+        </div>
+        <div class="body">
+          <div class="tags"><span class="type">二手</span></div>
+          <div class="title">奥体中心 三室两厅 视野开阔 配套全</div>
+          <div class="spec">3室2厅 | 118平 | 南北</div>
+          <div class="price">125<em>万</em></div>
+          <div class="hint">地铁直达，商圈成熟</div>
+        </div>
+      </a>
+      <a class="card" href="screens/detail.html">
+        <div class="thumb">
+          <div class="img" style="background:linear-gradient(160deg,#bcc8d4 0%,#8898a8 50%,#607080 100%);"></div>
+          <div class="loc-bar">📍 铁西·华润二十四城</div>
+        </div>
+        <div class="body">
+          <div class="tags"><span class="must">必看好房</span><span class="type">二手</span></div>
+          <div class="title">铁西核心 两室精装 拎包入住 近公园</div>
+          <div class="spec">2室1厅 | 76平 | 南</div>
+          <div class="price">52<em>万</em></div>
+          <div class="hint">首付低，适合刚需</div>
+        </div>
+      </a>
+    </div>
+
+  </div>
+
+  <div class="tabbar">
+    <a class="on" href="#"><span class="ti">🏠</span>首页</a>
+    <a href="#"><span class="ti">🏘</span>我家</a>
+    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息<span class="badge">58</span></a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的<span class="dot"></span></a>
+  </div>
+</div>
+</body>
+</html>

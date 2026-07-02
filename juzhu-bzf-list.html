@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>保租房 · 区级房源列表</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .dist-hd{padding:8px 18px 0;display:flex;align-items:baseline;gap:10px;}
+  .dist-hd .no{font-family:var(--serif);font-size:32px;font-weight:700;color:var(--brand-deep);opacity:.35;line-height:1;}
+  .dist-hd h2{font-family:var(--serif);font-size:20px;color:var(--ink);}
+  .dist-hd .sub{font-size:11px;color:var(--muted);margin-left:auto;}
+  .mini-stat{display:flex;gap:16px;padding:10px 18px 4px;font-size:11px;color:var(--muted);}
+  .mini-stat b{color:var(--ink);font-family:var(--serif);font-size:15px;display:block;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="javascript:history.back()">‹</a>
+      <div class="ttl" id="ttl">保租房<small>区级房源</small></div>
+      <div class="act"><span>🔍</span><span>♡</span></div>
+    </div>
+
+    <div class="dist-hd">
+      <span class="no" id="dno">01</span>
+      <h2 id="dname">建邺区</h2>
+      <span class="sub" id="dsub">12 项目 · 156 套可租</span>
+    </div>
+    <div class="mini-stat">
+      <div><b id="s1">12</b>在营项目</div>
+      <div><b id="s2">156</b>可租套数</div>
+      <div><b id="s3">¥1,680</b>参考均价</div>
+    </div>
+
+    <div class="filt">
+      <a class="on">综合</a><a>租金↑</a><a>面积</a><a>近地铁</a><a>人才优先</a>
+    </div>
+
+    <div class="sec-h"><span class="bar"></span><h2>在租房源</h2><span class="more">筛选 ›</span></div>
+    <div class="wrap" id="list"></div>
+
+    <div class="banner gold">
+      <span class="bi">🏛</span>
+      <div class="bt"><b>什么是保租房？</b><p>政府认定 · 租金管控 · 安居集团持有 · 白名单运营商服务</p></div>
+      <a class="go" href="screens/home.html">了解 ›</a>
+    </div>
+  </div>
+  <div class="tabbar">
+    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
+    <a class="on"><span class="ti">🏡</span>新居住</a>
+    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+<script>
+const DATA={
+  '建邺区':{no:'01',projects:12,vacant:156,avg:1680,list:[
+    {nm:'河西新城人才公寓',lo:'建邺区 · 奥体大街',tags:['近地铁','人才优先','整租'],pr:1580,img:'g1'},
+    {nm:'江心洲保租社区',lo:'建邺区 · 江心洲',tags:['生态宜居','新交付'],pr:1420,img:'g3'},
+    {nm:'兴隆大街合租苑',lo:'建邺区 · 兴隆',tags:['合租','拎包入住'],pr:980,img:'g5'},
+  ]},
+  '江宁区':{no:'02',projects:18,vacant:289,avg:1420,list:[
+    {nm:'百家湖保租房',lo:'江宁区 · 百家湖',tags:['地铁1号线','整租'],pr:1350,img:'g2'},
+    {nm:'九龙湖人才社区',lo:'江宁区 · 九龙湖',tags:['人才公寓','三室'],pr:1680,img:'g4'},
+  ]},
+  '鼓楼区':{no:'03',projects:8,vacant:92,avg:1920,list:[
+    {nm:'湖南路保租苑',lo:'鼓楼区 · 湖南路',tags:['市中心','整租'],pr:1850,img:'g6'},
+  ]},
+};
+const q=new URLSearchParams(location.search);
+const dist=q.get('district')||'建邺区';
+const d=DATA[dist]||DATA['建邺区'];
+document.getElementById('dname').textContent=dist;
+document.getElementById('dno').textContent=d.no;
+document.getElementById('dsub').textContent=d.projects+' 项目 · '+d.vacant+' 套可租';
+document.getElementById('s1').textContent=d.projects;
+document.getElementById('s2').textContent=d.vacant;
+document.getElementById('s3').textContent='¥'+d.avg.toLocaleString();
+document.getElementById('ttl').innerHTML='保租房<small>'+dist+'</small>';
+document.getElementById('list').innerHTML=d.list.map(x=>`
+  <a class="mcard" href="screens/detail.html">
+    <div class="img ${x.img}"><span class="star">保租房认证</span><span class="like">♡</span>
+      <div class="cap"><div class="nm">${x.nm}</div><div class="lo">${x.lo}</div></div></div>
+    <div class="ci"><div class="tags">${x.tags.map(t=>'<span>'+t+'</span>').join('')}</div>
+      <div class="pr"><b>¥${x.pr}<small>/月起</small></b><span class="bk">预约看房</span></div></div>
+  </a>`).join('');
+</script>
+</body>
+</html>

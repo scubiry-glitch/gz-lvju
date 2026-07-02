@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>新居住 · 方案A 区域图册 · 贝壳</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* scheme switcher */
+  .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);}
+  .scheme-bar a{color:var(--brand);font-weight:600;}
+  /* core tabs */
+  .core-tabs{display:flex;gap:0;padding:8px 18px 0;position:relative;z-index:5;}
+  .core-tabs a{flex:1;text-align:center;padding:11px 0;font-family:var(--serif);font-size:16px;font-weight:700;
+    color:var(--muted);border-bottom:2px solid transparent;transition:.15s;}
+  .core-tabs a.on{color:var(--ink);border-bottom-color:var(--brand);}
+  .core-tabs a.on::before{content:"";display:block;width:6px;height:6px;border-radius:50%;
+    background:linear-gradient(var(--brand),var(--gold));margin:0 auto 4px;}
+  .pane{display:none;}
+  .pane.on{display:block;}
+  /* atlas carousel */
+  .atlas-wrap{padding:14px 0 6px;}
+  .atlas-scroll{display:flex;gap:14px;overflow-x:auto;padding:0 18px 12px;scroll-snap-type:x mandatory;}
+  .atlas-scroll::-webkit-scrollbar{height:0;}
+  .atlas-card{flex:0 0 78%;scroll-snap-align:center;border-radius:18px;overflow:hidden;position:relative;
+    height:220px;color:#fff;box-shadow:0 16px 36px rgba(8,18,16,.22);}
+  .atlas-card::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(0deg,rgba(8,18,16,.72) 0%,rgba(8,18,16,.15) 55%,transparent 100%);}
+  .atlas-card .bg{position:absolute;inset:0;}
+  .atlas-card .in{position:absolute;left:18px;right:18px;bottom:16px;z-index:2;}
+  .atlas-card .ek{font-size:9px;letter-spacing:.32em;opacity:.85;}
+  .atlas-card h3{font-family:var(--serif);font-size:26px;font-weight:700;margin-top:4px;line-height:1.1;}
+  .atlas-card .nums{display:flex;gap:18px;margin-top:12px;}
+  .atlas-card .nums div b{font-family:var(--serif);font-size:17px;display:block;}
+  .atlas-card .nums div span{font-size:9px;opacity:.85;}
+  .atlas-card .tag{position:absolute;top:14px;left:14px;z-index:2;font-size:10px;font-weight:700;
+    background:rgba(255,217,138,.2);color:#ffd98a;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .atlas-card .go{position:absolute;top:14px;right:14px;z-index:2;width:32px;height:32px;border-radius:50%;
+    background:rgba(255,255,255,.2);backdrop-filter:blur(4px);display:grid;place-items:center;font-size:14px;}
+  .atlas-hint{text-align:center;font-size:11px;color:var(--muted);padding:0 18px 8px;}
+  /* district list compact */
+  .dlist{padding:0 18px 8px;}
+  .drow{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid var(--border);
+    border-radius:14px;margin-bottom:9px;box-shadow:0 4px 12px rgba(15,42,38,.04);}
+  .drow .idx{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--brand-deep);opacity:.35;width:28px;}
+  .drow .mid{flex:1;min-width:0;}
+  .drow .mid b{font-size:14px;color:var(--ink);}
+  .drow .mid small{display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+  .drow .stats{display:flex;gap:12px;text-align:right;font-size:10px;color:var(--muted);}
+  .drow .stats b{display:block;font-family:var(--serif);font-size:14px;color:var(--gold-deep);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost">
+      <a class="bk" href="beike-app-home.html">‹</a>
+      <div class="ttl">新居住<small>保租房 · 卖旧买新</small></div>
+      <div class="act"><a href="juzhu-channel-schemes.html">≡</a><span>♡</span></div>
+    </div>
+
+    <div class="hero-sm" style="padding-bottom:8px;">
+      <div class="bg s-city"></div>
+      <div class="in">
+        <div class="ek">New Living · Atlas</div>
+        <h1>在南京<br>找到新居住</h1>
+        <p>政府保租房按区浏览 · 卖旧买新一站置换</p>
+        <div class="stat">
+          <div><b>46</b><span>试点项目</span></div>
+          <div><b>11</b><span>行政区</span></div>
+          <div><b>2.1万</b><span>在租套数</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scheme-bar"><span>方案 A · 区域图册</span><a href="juzhu-channel-schemes.html">切换方案 ›</a></div>
+
+    <div class="core-tabs" id="tabs">
+      <a class="on" data-tab="bzf">保租房</a>
+      <a data-tab="trade">卖旧买新</a>
+    </div>
+
+    <!-- 保租房：横滑封面 + 列表 -->
+    <div class="pane on" id="pane-bzf">
+      <div class="sec-h" style="margin-top:12px;"><span class="bar"></span><h2>按区选租</h2><span class="more">地图 ›</span></div>
+      <div class="atlas-wrap">
+        <div class="atlas-scroll" id="atlas"></div>
+        <div class="atlas-hint">← 横滑浏览各区封面 · 点击卡片进入房源 →</div>
+      </div>
+      <div class="sec-h"><span class="bar"></span><h2>全部行政区</h2></div>
+      <div class="dlist" id="dlist"></div>
+    </div>
+
+    <!-- 卖旧买新：直达列表 -->
+    <div class="pane" id="pane-trade">
+      <div class="filt" style="padding-top:14px;">
+        <a class="on">全部</a><a>河西</a><a>江宁</a><a>鼓楼</a><a>置换补贴</a>
+      </div>
+      <div class="sec-h"><span class="bar"></span><h2>置换推荐</h2><span class="more">综合排序 ›</span></div>
+      <div class="wrap" id="trade-list"></div>
+      <div class="banner">
+        <span class="bi">🔄</span>
+        <div class="bt"><b>卖旧买新怎么算？</b><p>旧房估价 + 新房优惠 + 税费测算，一站看清</p></div>
+        <a class="go" href="#">测算 ›</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
+    <a class="on"><span class="ti">🏡</span>新居住</a>
+    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+<script>
+const DIST=[
+  {name:'建邺区',no:'01',projects:12,units:3840,vacant:156,avg:1680,tag:'热门',bg:'g1'},
+  {name:'江宁区',no:'02',projects:18,units:5620,vacant:289,avg:1420,bg:'g2'},
+  {name:'鼓楼区',no:'03',projects:8,units:2100,vacant:92,avg:1920,bg:'g3'},
+  {name:'玄武区',no:'04',projects:6,units:1680,vacant:68,avg:1850,bg:'g4'},
+  {name:'秦淮区',no:'05',projects:7,units:1920,vacant:74,avg:1780,bg:'g5'},
+  {name:'雨花台区',no:'06',projects:9,units:2450,vacant:118,avg:1520,bg:'g6'},
+  {name:'栖霞区',no:'07',projects:11,units:3100,vacant:142,avg:1380,bg:'g7'},
+  {name:'浦口区',no:'08',projects:10,units:2800,vacant:131,avg:1280,bg:'g8'},
+  {name:'六合区',no:'09',projects:5,units:1200,vacant:56,avg:980,bg:'g1'},
+  {name:'溧水区',no:'10',projects:4,units:860,vacant:38,avg:880,bg:'g2'},
+  {name:'高淳区',no:'11',projects:3,units:620,vacant:24,avg:820,bg:'g3'},
+];
+const TRADE=[
+  {nm:'河西新城 · 置换优选',lo:'建邺区 · 河西南',old:'旧房估价 320万',tags:['以旧换新','补贴2万','近地铁'],pr:480,img:'g4',unit:'万'},
+  {nm:'百家湖地铁口三房',lo:'江宁区 · 百家湖',old:'旧房估价 180万',tags:['满五唯一','学区'],pr:268,img:'g5',unit:'万'},
+  {nm:'湖南路商圈两居',lo:'鼓楼区 · 湖南路',old:'旧房估价 220万',tags:['市中心','置换补贴'],pr:295,img:'g6',unit:'万'},
+  {nm:'仙林大学城改善盘',lo:'栖霞区 · 仙林',old:'旧房估价 260万',tags:['以旧换新','三房'],pr:358,img:'g7',unit:'万'},
+];
+document.getElementById('atlas').innerHTML=DIST.slice(0,6).map(d=>`
+  <a class="atlas-card" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}">
+    <div class="bg ${d.bg}"></div>
+    ${d.tag?'<span class="tag">'+d.tag+'</span>':''}
+    <span class="go">›</span>
+    <div class="in">
+      <div class="ek">District ${d.no}</div>
+      <h3>${d.name}</h3>
+      <div class="nums">
+        <div><b>${d.projects}</b><span>在营项目</span></div>
+        <div><b>${d.vacant}</b><span>可租套数</span></div>
+        <div><b>¥${d.avg}</b><span>参考均价</span></div>
+      </div>
+    </div>
+  </a>`).join('');
+document.getElementById('dlist').innerHTML=DIST.map(d=>`
+  <a class="drow" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}">
+    <span class="idx">${d.no}</span>
+    <div class="mid"><b>${d.name}</b><small>${d.projects} 项目 · ${d.units.toLocaleString()} 套在租</small></div>
+    <div class="stats">
+      <div><b>${d.vacant}</b>可租</div>
+      <div><b>¥${d.avg}</b>均价</div>
+    </div>
+  </a>`).join('');
+document.getElementById('trade-list').innerHTML=TRADE.map(x=>`
+  <a class="mcard" href="lvju-app-resale-detail.html">
+    <div class="img ${x.img}"><span class="star">卖旧买新</span><span class="like">♡</span>
+      <div class="cap"><div class="nm">${x.nm}</div><div class="lo">${x.lo}</div></div></div>
+    <div class="ci"><div class="tags">${x.tags.map(t=>'<span>'+t+'</span>').join('')}</div>
+      <div class="pr"><b>${x.pr}<small>${x.unit}起</small></b><span class="bk">${x.old}</span></div></div>
+  </a>`).join('');
+document.getElementById('tabs').addEventListener('click',e=>{
+  const t=e.target.closest('[data-tab]');if(!t)return;
+  document.querySelectorAll('.core-tabs a').forEach(a=>a.classList.toggle('on',a===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t.dataset.tab));
+});
+</script>
+</body>
+</html>

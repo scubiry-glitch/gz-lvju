@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>新居住 · 方案C 封面拼贴 · 贝壳</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);position:relative;z-index:5;}
+  .scheme-bar a{color:var(--brand);font-weight:600;}
+  /* split header tabs */
+  .split-hd{position:relative;padding:52px 18px 20px;color:#fff;overflow:hidden;}
+  .split-hd .bg{position:absolute;inset:0;background:linear-gradient(135deg,#0b5d56,#1a4038 50%,#8c6224);}
+  .split-hd .bg::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(85deg,rgba(255,255,255,.04) 0 2px,transparent 2px 18px);opacity:.6;}
+  .split-hd .in{position:relative;z-index:2;}
+  .split-hd .ek{font-size:9px;letter-spacing:.36em;opacity:.9;}
+  .split-hd h1{font-family:var(--serif);font-size:24px;margin-top:6px;line-height:1.2;}
+  .seg-switch{display:flex;margin-top:16px;background:rgba(255,255,255,.12);border-radius:12px;padding:3px;backdrop-filter:blur(8px);}
+  .seg-switch a{flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;border-radius:10px;color:rgba(255,255,255,.75);}
+  .seg-switch a.on{background:#fff;color:var(--brand-deep);box-shadow:0 4px 12px rgba(0,0,0,.15);}
+  .pane{display:none;}
+  .pane.on{display:block;}
+  /* collage grid */
+  .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
+  .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;
+    box-shadow:0 8px 20px rgba(15,42,38,.12);}
+  .ctile .bg{position:absolute;inset:0;}
+  .ctile .bg::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(0deg,rgba(8,18,16,.65),transparent 50%);}
+  .ctile .in{position:relative;z-index:2;padding:12px;display:flex;flex-direction:column;justify-content:flex-end;height:100%;}
+  .ctile.tall{grid-row:span 2;min-height:200px;}
+  .ctile.wide{grid-column:span 2;min-height:120px;}
+  .ctile .no{font-family:var(--serif);font-size:28px;font-weight:700;opacity:.35;line-height:1;}
+  .ctile h3{font-family:var(--serif);font-size:17px;margin-top:4px;line-height:1.15;}
+  .ctile .nums{display:flex;gap:10px;margin-top:8px;font-size:9px;opacity:.9;}
+  .ctile .nums b{font-family:var(--serif);font-size:13px;display:block;}
+  .ctile .hot{position:absolute;top:10px;right:10px;z-index:3;font-size:9px;font-weight:700;
+    background:rgba(255,217,138,.25);color:#ffd98a;padding:2px 8px;border-radius:999px;}
+  /* magazine spread for trade */
+  .spread{padding:14px 18px 24px;}
+  .spread-hero{display:block;border-radius:18px;overflow:hidden;margin-bottom:10px;color:#fff;
+    box-shadow:0 12px 28px rgba(15,42,38,.14);}
+  .spread-hero .img{height:180px;position:relative;}
+  .spread-hero .img::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent 55%);}
+  .spread-hero .cap{position:absolute;left:16px;bottom:14px;right:16px;}
+  .spread-hero .cap .ek{font-size:9px;letter-spacing:.2em;opacity:.85;}
+  .spread-hero .cap h3{font-family:var(--serif);font-size:22px;margin-top:4px;}
+  .spread-hero .cap p{font-size:11px;opacity:.9;margin-top:4px;}
+  .spread-hero .body{background:#fff;color:var(--ink);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .spread-hero .body b{font-family:var(--serif);font-size:20px;color:var(--gold-deep);}
+  .spread-hero .body .bk{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 14px;border-radius:999px;}
+  .spread-duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .mini-card{display:block;background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;
+    box-shadow:0 6px 16px rgba(15,42,38,.06);}
+  .mini-card .th{height:90px;position:relative;}
+  .mini-card .th::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.35),transparent);}
+  .mini-card .bd{padding:10px 11px 12px;}
+  .mini-card .bd b{font-size:13px;color:var(--ink);display:block;line-height:1.3;}
+  .mini-card .bd .pr{font-family:var(--serif);font-size:16px;color:var(--gold-deep);margin-top:6px;}
+  .mini-card .bd .pr small{font-size:10px;font-family:var(--font);color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost" style="position:absolute;">
+      <a class="bk" href="beike-app-home.html">‹</a>
+      <div class="ttl">新居住</div>
+      <div class="act"><a href="juzhu-channel-schemes.html">≡</a></div>
+    </div>
+
+    <div class="split-hd">
+      <div class="bg"></div>
+      <div class="in">
+        <div class="ek">Cover Collage · Nanjing</div>
+        <h1>新居住频道</h1>
+        <div class="seg-switch" id="tabs">
+          <a class="on" data-tab="bzf">保租房</a>
+          <a data-tab="trade">卖旧买新</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="scheme-bar"><span>方案 C · 封面拼贴</span><a href="juzhu-channel-schemes.html">切换方案 ›</a></div>
+
+    <div class="pane on" id="pane-bzf">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选区租房</h2><span class="more">全部 11 区 ›</span></div>
+      <div class="collage" id="collage"></div>
+      <div class="banner">
+        <span class="bi">🏛</span>
+        <div class="bt"><b>安居集团 × 白名单运营商</b><p>政府认定保租房 · 租金受控 · 试点验证中</p></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-trade">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>本周推荐</h2><span class="more">更多 ›</span></div>
+      <div class="spread" id="spread"></div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
+    <a class="on"><span class="ti">🏡</span>新居住</a>
+    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+<script>
+const DIST=[
+  {name:'建邺区',no:'01',projects:12,vacant:156,avg:1680,bg:'g1',hot:true,tall:true},
+  {name:'江宁区',no:'02',projects:18,vacant:289,avg:1420,bg:'g2'},
+  {name:'鼓楼区',no:'03',projects:8,vacant:92,avg:1920,bg:'g3'},
+  {name:'玄武区',no:'04',projects:6,vacant:68,avg:1850,bg:'g4'},
+  {name:'秦淮区',no:'05',projects:7,vacant:74,avg:1780,bg:'g5',wide:true},
+  {name:'雨花台区',no:'06',projects:9,vacant:118,avg:1520,bg:'g6'},
+  {name:'栖霞区',no:'07',projects:11,vacant:142,avg:1380,bg:'g7'},
+  {name:'浦口区',no:'08',projects:10,vacant:131,avg:1280,bg:'g8'},
+  {name:'六合区',no:'09',projects:5,vacant:56,avg:980,bg:'g1'},
+  {name:'溧水区',no:'10',projects:4,vacant:38,avg:880,bg:'g2'},
+  {name:'高淳区',no:'11',projects:3,vacant:24,avg:820,bg:'g3'},
+];
+const TRADE={
+  hero:{nm:'河西南 · 以旧换新',lo:'建邺区 · 河西南 · 地铁S3',pr:480,old:'旧房估价 320万',img:'g4',tags:'补贴2万 · 三房'},
+  duo:[
+    {nm:'百家湖两居',pr:268,img:'g5',sub:'江宁 · 76㎡'},
+    {nm:'湖南路三房',pr:295,img:'g6',sub:'鼓楼 · 92㎡'},
+  ],
+  list:[
+    {nm:'仙林改善四房',lo:'栖霞区 · 118㎡',pr:358,img:'g7',old:'旧房260万'},
+    {nm:'江北次新房',lo:'浦口区 · 105㎡',pr:198,img:'g8',old:'旧房150万'},
+  ]
+};
+document.getElementById('collage').innerHTML=DIST.map(d=>{
+  const cls='ctile'+(d.tall?' tall':'')+(d.wide?' wide':'');
+  return `<a class="${cls}" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}">
+    <div class="bg ${d.bg}"></div>
+    ${d.hot?'<span class="hot">热门</span>':''}
+    <div class="in">
+      <span class="no">${d.no}</span>
+      <h3>${d.name}</h3>
+      <div class="nums">
+        <div><b>${d.projects}</b>项目</div>
+        <div><b>${d.vacant}</b>可租</div>
+        <div><b>¥${d.avg}</b>均价</div>
+      </div>
+    </div>
+  </a>`;
+}).join('');
+const h=TRADE.hero;
+document.getElementById('spread').innerHTML=`
+  <a class="spread-hero" href="lvju-app-resale-detail.html">
+    <div class="img ${h.img}">
+      <div class="cap"><div class="ek">FEATURED</div><h3>${h.nm}</h3><p>${h.lo} · ${h.tags}</p></div>
+    </div>
+    <div class="body"><div><b>${h.pr}<small style="font-size:12px;color:var(--muted)"> 万起</small></b><div style="font-size:10px;color:var(--muted);margin-top:2px;">${h.old}</div></div><span class="bk">立即咨询</span></div>
+  </a>
+  <div class="spread-duo">${TRADE.duo.map(x=>`
+    <a class="mini-card" href="lvju-app-resale-detail.html">
+      <div class="th ${x.img}"></div>
+      <div class="bd"><b>${x.nm}</b><div style="font-size:10px;color:var(--muted);margin-top:2px;">${x.sub}</div>
+        <div class="pr">${x.pr}<small> 万起</small></div></div>
+    </a>`).join('')}
+  </div>
+  <div class="sec-h" style="padding-left:0;margin-top:18px;"><span class="bar"></span><h2>更多置换</h2></div>
+  ${TRADE.list.map(x=>`
+  <a class="lrow" href="lvju-app-resale-detail.html">
+    <div class="th ${x.img}"><span class="star">置换</span></div>
+    <div class="info"><div class="nm">${x.nm}</div><div class="meta">${x.lo}</div>
+      <div class="pr"><b>${x.pr}<small>万起</small></b><span class="unit">${x.old}</span></div>
+    </div>
+  </a>`).join('')}`;
+document.getElementById('tabs').addEventListener('click',e=>{
+  const t=e.target.closest('[data-tab]');if(!t)return;
+  document.querySelectorAll('.seg-switch a').forEach(a=>a.classList.toggle('on',a===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t.dataset.tab));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>新居住频道 · 三套方案总览</title>
+<style>
+  :root{--brand:#0f766e;--gold:#b48a3f;--ink:#10171c;--muted:#6b7785;--border:#e7ece9;
+    --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    --serif:'Noto Serif SC','Songti SC',Georgia,serif;}
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;font-family:var(--font);background:#0b0f12;color:#e8ecea;padding:32px 20px 60px;
+    -webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+  .wrap{max-width:920px;margin:0 auto;}
+  .ek{font-size:11px;letter-spacing:.35em;text-transform:uppercase;color:var(--gold);opacity:.9;}
+  h1{font-family:var(--serif);font-size:clamp(28px,5vw,38px);margin:10px 0 8px;line-height:1.2;}
+  .lead{color:#a8b4b0;font-size:15px;line-height:1.65;max-width:52ch;margin-bottom:28px;}
+  .back{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--brand);margin-bottom:20px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;}
+  .card{background:linear-gradient(145deg,#141a18,#0f1513);border:1px solid #243028;border-radius:18px;
+    overflow:hidden;transition:.2s;}
+  .card:hover{border-color:color-mix(in oklab,var(--brand) 40%,#243028);transform:translateY(-3px);
+    box-shadow:0 20px 40px rgba(0,0,0,.35);}
+  .card .thumb{height:140px;position:relative;display:flex;align-items:flex-end;padding:16px;}
+  .card .thumb.v1{background:linear-gradient(135deg,#0b5d56 0%,#1a4038 50%,#8c6224 100%);}
+  .card .thumb.v2{background:linear-gradient(160deg,#10171c,#0f766e 70%);}
+  .card .thumb.v3{background:linear-gradient(120deg,#8c6224,#0f766e 45%,#14b8a6);}
+  .card .thumb .num{font-family:var(--serif);font-size:42px;font-weight:700;opacity:.25;position:absolute;top:12px;right:16px;}
+  .card .thumb h2{font-family:var(--serif);font-size:22px;margin:0;color:#fff;}
+  .card .thumb p{font-size:11px;opacity:.85;margin:4px 0 0;}
+  .card .body{padding:16px 18px 20px;}
+  .card .body h3{font-size:16px;margin:0 0 8px;color:#fff;}
+  .card .body p{font-size:13px;color:#8a9692;line-height:1.6;margin:0 0 14px;}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .tags span{font-size:10px;padding:3px 9px;border-radius:6px;background:rgba(15,118,110,.2);color:#7dd3c8;}
+  .go{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;
+    background:linear-gradient(90deg,var(--brand),#14b8a6);color:#fff;padding:9px 18px;border-radius:999px;}
+  .spec{margin-top:36px;padding:20px 22px;background:#121816;border:1px solid #243028;border-radius:14px;}
+  .spec h3{font-family:var(--serif);font-size:17px;margin:0 0 12px;color:#fff;}
+  .spec ul{margin:0;padding-left:18px;color:#9aa6a2;font-size:13px;line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="beike-app-home.html">← 返回贝壳首页</a>
+  <div class="ek">New Living Channel</div>
+  <h1>新居住频道 · 三套杂志风方案</h1>
+  <p class="lead">双核心 Tab：<strong style="color:#fff;">保租房</strong>（区级二级列表 + 数字指标 → 房源列表）与 <strong style="color:#fff;">卖旧买新</strong>（直达房源列表）。样式基准参考 <code style="color:#7dd3c8;">lvju-app-lvju.html</code> 杂志感。</p>
+
+  <div class="grid">
+    <a class="card" href="juzhu-channel-v1-atlas.html">
+      <div class="thumb v1"><span class="num">01</span><div><h2>区域图册</h2><p>Atlas Edition</p></div></div>
+      <div class="body">
+        <h3>方案 A · 横滑封面册</h3>
+        <p>每个区一张全幅「杂志封面」，横滑浏览；大标题 + 三项核心数字（项目数 / 在租套数 / 均价）。点击进入区级房源列表。</p>
+        <div class="tags"><span>横滑封面</span><span>大字号衬线</span><span>沉浸 Hero</span></div>
+        <span class="go">预览方案 A ›</span>
+      </div>
+    </a>
+    <a class="card" href="juzhu-channel-v2-index.html">
+      <div class="thumb v2"><span class="num">02</span><div><h2>编辑部索引</h2><p>Editorial Index</p></div></div>
+      <div class="body">
+        <h3>方案 B · 目录式列表</h3>
+        <p>像杂志目录页：01–11 编号 + 区名 + 右侧数字栏；信息密度高、扫读快。卖旧买新用紧凑行卡列表。</p>
+        <div class="tags"><span>编号索引</span><span>高密度</span><span>政务可信</span></div>
+        <span class="go">预览方案 B ›</span>
+      </div>
+    </a>
+    <a class="card" href="juzhu-channel-v3-grid.html">
+      <div class="thumb v3"><span class="num">03</span><div><h2>封面拼贴</h2><p>Cover Collage</p></div></div>
+      <div class="body">
+        <h3>方案 C · 双栏拼贴网格</h3>
+        <p>双列不等高拼贴，首屏大卡 + 小卡混排；卖旧买新采用「一大两小」杂志 spread 布局，视觉冲击力最强。</p>
+        <div class="tags"><span>拼贴网格</span><span>不对称</span><span>视觉冲击</span></div>
+        <span class="go">预览方案 C ›</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="spec">
+    <h3>交互规格（三方案一致）</h3>
+    <ul>
+      <li><strong style="color:#fff;">保租房 Tab</strong>：南京 11 区二级列表，展示项目数、在租套数、参考均价；点击任意区 → <code>juzhu-bzf-list.html</code></li>
+      <li><strong style="color:#fff;">卖旧买新 Tab</strong>：跳过区级，直接展示置换房源列表（旧房估价 + 新房推荐组合）</li>
+      <li><strong style="color:#fff;">杂志感元素</strong>：衬线标题、英文刊头 ek、青绿+金色品牌、大图卡片、数据 stat 条</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
