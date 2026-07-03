@@ -13,6 +13,11 @@
   .proj-hero .ek{font-size:9px;letter-spacing:.3em;opacity:.85;}
   .proj-hero h1{font-family:var(--serif);font-size:22px;margin-top:6px;line-height:1.2;}
   .proj-hero p{font-size:11px;opacity:.9;margin-top:5px;}
+  .sec-rating{display:flex;align-items:center;gap:8px;padding:0 18px 4px;margin-top:-4px;}
+  .sec-rating .stars{font-size:13px;color:#eab308;letter-spacing:.4px;line-height:1;}
+  .sec-rating .stars .dim{color:var(--border);}
+  .sec-rating .lbl{font-size:12px;font-weight:600;color:var(--brand-deep);}
+  .sec-rating .tag{font-size:10px;color:var(--muted);}
   .unit-grid{padding:12px 18px 24px;}
   .ucard{display:block;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px;
     box-shadow:0 8px 20px rgba(15,42,38,.06);}
@@ -45,6 +50,7 @@
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2 id="listTitle">在租房型</h2><span class="more" id="unitN">—</span></div>
+    <div class="sec-rating" id="secRating" hidden></div>
     <div class="unit-grid" id="list"></div>
   </div>
 </div>
@@ -69,6 +75,16 @@
     document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租房型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';
     if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+p.cover_image+')';
+
+    var hr = !isTrade ? JUZHU.houseRating(p) : null;
+    if (hr) {
+      var lbl = (hr.star_label || '').replace(/ · 待中台确认$/, '');
+      var sec = document.getElementById('secRating');
+      sec.hidden = false;
+      sec.innerHTML = '<span class="stars">'+JUZHU.starsHtml(hr.stars)+'</span>'+
+        '<span class="lbl">'+hr.stars+'星 · '+lbl+'</span>'+
+        '<span class="tag">好房子</span>';
+    }
 
     var units = JUZHU.units(p.id);
     document.getElementById('list').innerHTML = units.map(function(u){
