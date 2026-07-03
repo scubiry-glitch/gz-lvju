@@ -100,8 +100,16 @@
   .chart-container{height:100px;margin-top:10px;}
   #trendChart,#pieChart{width:100%;height:100%;}
   
+  /* 沈阳：收窄侧栏，让地图横向占满中间区域 */
+  body.region-sy .main{grid-template-columns:220px 1fr 220px;gap:12px;padding:12px 14px;}
+  body.region-sy .map-panel{min-width:0;}
+  body.region-sy .map-container{min-height:0;}
+  body.region-sy .panel-head{padding:10px 14px;}
+  body.region-sy .visual-map-compact .echarts-visual-map{transform:scale(.9);transform-origin:left bottom;}
+
   @media(max-width:1024px){
     .main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
+    body.region-sy .main{grid-template-columns:1fr;}
   }
 </style>
 </head>
@@ -109,7 +117,7 @@
 <div class="dashboard">
   <div class="header">
     <div class="header-left">
-      <h1 id="pageTitle">🏛 贵州省住建厅 · 旅居驾驶舱</h1>
+      <h1 id="pageTitle">🏛 贵州省住建厅 · 驾驶舱</h1>
       <span class="badge" id="pageBadge">🐚 贝壳旅居平台</span>
     </div>
     <div class="header-right">
@@ -223,7 +231,7 @@
       <div class="map-container">
         <div class="map-loading" id="mapLoading">
           <div class="spinner"></div>
-          <div>正在加载贵州地图数据...</div>
+          <div id="mapLoadingText">正在加载地图数据...</div>
         </div>
         <div id="mapChart"></div>
         <div class="region-popup" id="regionPopup">
@@ -364,14 +372,19 @@
 const PRESET = window.BZF_REGION || { key: 'gz_zj' };
 const isGuizhou = PRESET.key === 'gz_zj';
 const isShenyang = PRESET.key === 'sy_zj';
+const SY_EXCLUDED_DISTRICTS = ['辽中区', '新民市', '法库县', '康平县'];
+
+if (isShenyang) document.body.classList.add('region-sy');
 
 // 更新标题
 const P = window.BZF_PRESETS && window.BZF_PRESETS[PRESET.key];
 if (P) {
-  document.getElementById('pageTitle').textContent = '🏛 ' + P.prov.full + P.dept.short + ' · 旅居驾驶舱';
+  document.getElementById('pageTitle').textContent = '🏛 ' + P.prov.full + P.dept.short + ' · 驾驶舱';
   document.getElementById('pageBadge').textContent = '🐚 贝壳' + P.biz.term + '平台';
-  document.getElementById('mapTitle').textContent = P.prov.full + '房源分布 · ' + (isShenyang ? '13' : '9') + '个' + (isShenyang ? '区县' : '地级行政区');
-  document.title = P.prov.short + P.dept.short + ' · 旅居驾驶舱';
+  document.getElementById('mapTitle').textContent = P.prov.full + '房源分布 · ' + (isShenyang ? '9 个区县' : '9 个地级行政区');
+  const loadingText = document.getElementById('mapLoadingText');
+  if (loadingText) loadingText.textContent = '正在加载' + (isShenyang ? '沈阳' : '贵州') + '地图数据...';
+  document.title = P.prov.short + P.dept.short + ' · 驾驶舱';
 }
 
 // 实时时钟
@@ -420,8 +433,6 @@ const REGION_CONFIG = {
   sy_zj: {
     mapFile: 'shenyang-map.json',
     mapName: 'shenyang',
-    center: [123.42, 41.80],
-    zoom: 0.9,
     visualMax: 1500,
     data: {
       '和平区': { count: 1200, rate: 95.2, value: '1.2亿', avgPrice: 268, wu: 68, si: 128, san: 156, er: 48, yi: 12 },
@@ -432,11 +443,7 @@ const REGION_CONFIG = {
       '浑南区': { count: 520, rate: 86.8, value: '0.5亿', avgPrice: 175, wu: 22, si: 48, san: 72, er: 24, yi: 5 },
       '于洪区': { count: 450, rate: 85.2, value: '0.4亿', avgPrice: 162, wu: 18, si: 42, san: 62, er: 20, yi: 4 },
       '沈北新区': { count: 380, rate: 84.5, value: '0.3亿', avgPrice: 148, wu: 15, si: 35, san: 52, er: 18, yi: 4 },
-      '苏家屯区': { count: 320, rate: 82.8, value: '0.3亿', avgPrice: 138, wu: 12, si: 28, san: 42, er: 15, yi: 3 },
-      '辽中区': { count: 180, rate: 80.5, value: '0.2亿', avgPrice: 125, wu: 8, si: 18, san: 28, er: 10, yi: 2 },
-      '新民市': { count: 150, rate: 78.6, value: '0.1亿', avgPrice: 115, wu: 6, si: 15, san: 22, er: 8, yi: 2 },
-      '法库县': { count: 80, rate: 76.2, value: '0.08亿', avgPrice: 98, wu: 3, si: 8, san: 12, er: 5, yi: 1 },
-      '康平县': { count: 60, rate: 74.8, value: '0.05亿', avgPrice: 88, wu: 2, si: 6, san: 10, er: 4, yi: 1 }
+      '苏家屯区': { count: 320, rate: 82.8, value: '0.3亿', avgPrice: 138, wu: 12, si: 28, san: 42, er: 15, yi: 3 }
     },
     ranks: [
       { name: '和平区', value: '95.2%' },
@@ -466,6 +473,51 @@ function updateRankList() {
 }
 updateRankList();
 
+function walkCoords(coords, bbox) {
+  if (typeof coords[0] === 'number') {
+    const [lng, lat] = coords;
+    bbox.minLng = Math.min(bbox.minLng, lng);
+    bbox.maxLng = Math.max(bbox.maxLng, lng);
+    bbox.minLat = Math.min(bbox.minLat, lat);
+    bbox.maxLat = Math.max(bbox.maxLat, lat);
+  } else {
+    coords.forEach(c => walkCoords(c, bbox));
+  }
+}
+
+function getGeoBounds(geoJson) {
+  const bbox = { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity };
+  geoJson.features.forEach(f => walkCoords(f.geometry.coordinates, bbox));
+  const padLng = (bbox.maxLng - bbox.minLng) * 0.06;
+  const padLat = (bbox.maxLat - bbox.minLat) * 0.06;
+  return {
+    sw: [bbox.minLng - padLng, bbox.minLat - padLat],
+    ne: [bbox.maxLng + padLng, bbox.maxLat + padLat],
+    center: [(bbox.minLng + bbox.maxLng) / 2, (bbox.minLat + bbox.maxLat) / 2]
+  };
+}
+
+function fitMapView(chart, chartDom, bounds) {
+  const cw = chartDom.clientWidth;
+  const ch = chartDom.clientHeight;
+  const aspectScale = 0.62;
+  let bestZoom = 1;
+  chart.setOption({ series: [{ center: bounds.center, zoom: 1, aspectScale }] });
+  for (let z = 0.5; z <= 12; z += 0.05) {
+    chart.setOption({ series: [{ zoom: z }] });
+    const a = chart.convertToPixel({ seriesIndex: 0 }, bounds.sw);
+    const b = chart.convertToPixel({ seriesIndex: 0 }, bounds.ne);
+    const xSpan = Math.abs(b[0] - a[0]);
+    const ySpan = Math.abs(b[1] - a[1]);
+    const inView = xSpan <= cw * 0.96 && ySpan <= ch * 0.96;
+    if (inView) bestZoom = z;
+    else if (xSpan > cw * 0.96) break;
+    else bestZoom = z;
+  }
+  chart.setOption({ series: [{ center: bounds.center, zoom: bestZoom, aspectScale }] });
+  return { center: bounds.center, zoom: bestZoom, aspectScale };
+}
+
 // 初始化地图
 async function initMap() {
   const chartDom = document.getElementById('mapChart');
@@ -473,13 +525,23 @@ async function initMap() {
   try {
     const response = await fetch(cfg.mapFile);
     if (!response.ok) throw new Error('加载失败');
-    const geoJson = await response.json();
+    let geoJson = await response.json();
+    if (isShenyang && geoJson.features) {
+      geoJson = {
+        ...geoJson,
+        features: geoJson.features.filter(f => !SY_EXCLUDED_DISTRICTS.includes(f.properties?.name))
+      };
+    }
     echarts.registerMap(cfg.mapName, geoJson);
     loading.style.display = 'none';
     const chart = echarts.init(chartDom, 'dark', { renderer: 'canvas' });
     const mapData = Object.entries(regionData).map(([name, data]) => ({
       name, value: data.count, rate: data.rate, totalValue: data.value, ...data
     }));
+    let mapCenter = cfg.center;
+    let mapZoom = cfg.zoom;
+    let syBounds = null;
+    if (isShenyang) syBounds = getGeoBounds(geoJson);
     const option = {
       backgroundColor: 'transparent',
       tooltip: {
@@ -499,14 +561,19 @@ async function initMap() {
         }
       },
       visualMap: {
-        min: 0, max: cfg.visualMax, left: 'left', bottom: 'bottom',
-        text: ['多', '少'], textStyle: { color: '#94a3b8' },
+        min: 0, max: cfg.visualMax,
+        left: isShenyang ? 8 : 'left', bottom: isShenyang ? 8 : 'bottom',
+        text: ['多', '少'], textStyle: { color: '#94a3b8', fontSize: isShenyang ? 10 : 12 },
         inRange: { color: ['#0f766e', '#14b8a6', '#34d399', '#a3e635', '#f59e0b'] },
-        calculable: true, itemWidth: 12, itemHeight: 100
+        calculable: true, itemWidth: 10, itemHeight: isShenyang ? 80 : 100,
+        padding: isShenyang ? 0 : undefined
       },
       series: [{
-        name: '房源数量', type: 'map', map: cfg.mapName, roam: true, zoom: cfg.zoom, center: cfg.center,
-        label: { show: true, color: '#fff', fontSize: 11, fontWeight: 600 },
+        name: '房源数量', type: 'map', map: cfg.mapName, roam: true,
+        center: isShenyang ? syBounds.center : mapCenter,
+        zoom: isShenyang ? 1 : mapZoom,
+        ...(isShenyang ? { aspectScale: 0.62 } : {}),
+        label: { show: true, color: '#fff', fontSize: isShenyang ? 11 : 11, fontWeight: 600 },
         emphasis: {
           label: { show: true, color: '#fff', fontSize: 13, fontWeight: 700 },
           itemStyle: { areaColor: '#f59e0b', shadowBlur: 20, shadowColor: 'rgba(245,158,11,0.5)' }
@@ -517,10 +584,17 @@ async function initMap() {
       animation: true, animationDuration: 1000, animationEasing: 'cubicOut'
     };
     chart.setOption(option);
+    requestAnimationFrame(() => {
+      chart.resize();
+      if (isShenyang && syBounds) fitMapView(chart, chartDom, syBounds);
+    });
     chart.on('click', function(params) {
       if (params.data) showPopup(params.name, params.data);
     });
-    window.addEventListener('resize', () => chart.resize());
+    window.addEventListener('resize', () => {
+      chart.resize();
+      if (isShenyang && syBounds) fitMapView(chart, chartDom, syBounds);
+    });
   } catch (error) {
     loading.innerHTML = `<div style="text-align:center;"><div style="font-size:24px;margin-bottom:8px;">⚠️</div><div>地图加载失败</div><div style="font-size:11px;opacity:.6;margin-top:8px;">${error.message}</div></div>`;
   }

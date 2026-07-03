@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>户型详情</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .gal{position:relative;background:#0c4d44;}
+  .gal .track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;height:240px;}
+  .gal .track::-webkit-scrollbar{height:0;}
+  .gal .slide{flex:0 0 100%;scroll-snap-align:start;background-size:cover;background-position:center;height:240px;}
+  .gal .dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px;}
+  .gal .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);}
+  .gal .dots i.on{background:#fff;width:16px;border-radius:3px;}
+  .gal .cnt{position:absolute;top:12px;right:12px;font-size:10px;color:#fff;background:rgba(0,0,0,.4);padding:3px 9px;border-radius:999px;}
+  .detail{padding:16px 18px 100px;}
+  .detail h1{font-family:var(--serif);font-size:22px;color:var(--ink);margin:0;}
+  .detail .sub{font-size:12px;color:var(--muted);margin-top:5px;}
+  .detail .tags{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+  .detail .tags span{font-size:10px;color:var(--brand-deep);background:var(--brand-soft);padding:3px 9px;border-radius:6px;}
+  .kv{margin-top:16px;background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="javascript:history.back()">‹</a>
+      <div class="ttl" id="ttl">户型详情</div>
+      <div class="act"><span>♡</span><span>⤴</span></div>
+    </div>
+
+    <div class="gal">
+      <div class="track" id="track"></div>
+      <div class="cnt" id="cnt">1/1</div>
+      <div class="dots" id="dots"></div>
+    </div>
+
+    <div class="detail">
+      <h1 id="uname">—</h1>
+      <div class="sub" id="usub"></div>
+      <div class="tags" id="utags"></div>
+      <div class="kv" id="kv"></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="p"><b id="price">—</b><span id="plab">参考价格</span></div>
+    <div class="heart">♡</div>
+    <a class="btn" href="#" id="ctaBtn">预约看房</a>
+  </div>
+</div>
+<script src="juzhu/app.js?v=2"></script>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var pslug = q.get('project');
+  var uslug = q.get('unit');
+  var channel = q.get('channel') || 'bzf';
+  var isTrade = channel === 'trade';
+
+  JUZHU.load().then(function(){
+    var p = JUZHU.projectBySlug(pslug);
+    if (!p) return;
+    var u = JUZHU.unitBySlug(p.id, uslug);
+    if (!u) return;
+
+    document.title = u.name + ' · ' + p.name;
+    document.getElementById('uname').textContent = u.name;
+    document.getElementById('usub').textContent = p.name + ' · ' + (p.address || '');
+    document.getElementById('ttl').innerHTML = u.name + '<small>'+p.name+'</small>';
+
+    var tags = (p.tags || []).concat(isTrade ? ['卖旧买新'] : ['保租房认证']);
+    if (u.area_sqm) tags.unshift(u.area_sqm + '㎡');
+    document.getElementById('utags').innerHTML = tags.map(function(t){ return '<span>'+t+'</span>'; }).join('');
+
+    if (isTrade) {
+      document.getElementById('price').innerHTML = u.price_total + '<small> 万起</small>';
+      document.getElementById('plab').textContent = '参考总价 · ' + (p.old_house_hint || '');
+      document.getElementById('ctaBtn').textContent = '咨询置换';
+    } else {
+      document.getElementById('price').innerHTML = JUZHU.fmtRent(u.rent_monthly) + '<small>/月</small>';
+      document.getElementById('plab').textContent = '租金受控 · 试点房源';
+      document.getElementById('ctaBtn').textContent = '预约看房';
+    }
+
+    var photos = JUZHU.photos('unit', u.id).map(function(p){ return p.file_path; });
+    if (!photos.length && u.cover_image) photos = [u.cover_image];
+
+    document.getElementById('track').innerHTML = photos.map(function(src){
+      return '<div class="slide" style="background-image:url('+src+')"></div>';
+    }).join('') || '<div class="slide g3"></div>';
+
+    document.getElementById('dots').innerHTML = photos.map(function(_,i){
+      return '<i class="'+(i===0?'on':'')+'"></i>';
+    }).join('');
+    document.getElementById('cnt').textContent = '1/' + Math.max(photos.length, 1);
+
+    var track = document.getElementById('track');
+    track.addEventListener('scroll', function(){
+      var idx = Math.round(track.scrollLeft / track.clientWidth);
+      document.getElementById('cnt').textContent = (idx+1) + '/' + photos.length;
+      document.querySelectorAll('#dots i').forEach(function(d,i){ d.classList.toggle('on', i===idx); });
+    });
+
+    document.getElementById('kv').innerHTML =
+      '<div class="kv"><span class="k">所属项目</span><span class="v">'+p.name+'</span></div>'+
+      '<div class="kv"><span class="k">面积</span><span class="v">'+(u.area_sqm ? u.area_sqm+'㎡' : '—')+'</span></div>'+
+      '<div class="kv"><span class="k">类型</span><span class="v">'+(isTrade?'卖旧买新':'保租房')+'</span></div>';
+  });
+})();
+</script>
+</body>
+</html>
