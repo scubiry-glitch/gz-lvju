@@ -269,6 +269,33 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"ok": True, "stats": data["stats"]})
 
+        if path == f"{ADMIN_PREFIX}/settings" and method == "GET":
+            return self._get_settings()
+
+        if path == f"{ADMIN_PREFIX}/settings" and method == "PUT":
+            return self._update_settings()
+
+        if path == f"{ADMIN_PREFIX}/dictionary" and method == "GET":
+            return self._get_dictionary()
+
+        if path == f"{ADMIN_PREFIX}/city" and method == "PUT":
+            return self._update_city()
+
+        if path == f"{ADMIN_PREFIX}/districts" and method == "POST":
+            return self._create_district()
+
+        m = re.match(rf"^{ADMIN_PREFIX}/districts/(\d+)$", path)
+        if m:
+            did = int(m.group(1))
+            if method == "PUT":
+                return self._update_district(did)
+            if method == "DELETE":
+                return self._delete_district(did)
+
+        m = re.match(rf"^{ADMIN_PREFIX}/channels/([^/]+)$", path)
+        if m and method == "PUT":
+            return self._update_channel(m.group(1))
+
         if path == f"{ADMIN_PREFIX}/upload" and method == "POST":
             return self._upload_file()
 
@@ -580,20 +607,30 @@ class Handler(SimpleHTTPRequestHandler):
                 rating_sql = ", rating=?"
                 rating_params.append(rating_to_db(rating))
 
+        managed_sql = ""
+        managed_params = []
+        if "managed_unit_count" in b:
+            val = b.get("managed_unit_count")
+            managed_sql = ", managed_unit_count=?"
+            managed_params.append(int(val) if val is not None and val != "" else None)
+
         conn.execute(
             f"""UPDATE projects SET
                name=COALESCE(?, name), slug=COALESCE(?, slug),
                address=?, cover_image=?, tags=?,
                sort_order=COALESCE(?, sort_order), price_from=?,
                is_featured=COALESCE(?, is_featured), featured_rank=?, old_house_hint=?
-               {rating_sql}
+               {managed_sql}{rating_sql}
                WHERE id=?""",
             (name, slug, b.get("address"), b.get("cover_image"), tags,
              b.get("sort_order"), b.get("price_from"), b.get("is_featured"),
-             b.get("featured_rank"), b.get("old_house_hint"), *rating_params, pid),
+             b.get("featured_rank"), b.get("old_house_hint"), *managed_params, *rating_params, pid),
         )
         conn.commit()
         sync_project_unit_count(conn, pid)
+        row = conn.execute("SELECT district_id FROM projects WHERE id=?", (pid,)).fetchone()
+        if row and row[0]:
+            sync_district_stats(conn, row[0])
         export_json(conn)
         proj = normalize_project_row(conn.execute(
             """SELECT p.*, d.name AS district_name FROM projects p
@@ -951,6 +988,181 @@ class Handler(SimpleHTTPRequestHandler):
         export_json(conn)
         conn.close()
         return self._json({"ok": True})
+
+    def _get_settings(self):
+        conn = connect()
+        row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+        conn.close()
+        return self._json({"booking_phone": row[0] if row else None})
+
+    def _update_settings(self):
+        body = self._body()
+        phone = (body.get("booking_phone") or "").strip() or None
+        conn = connect()
+        conn.execute(
+            "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
+            (phone,),
+        )
+        conn.commit()
+        export_json(conn)
+        conn.close()
+        return self._json({"ok": True, "booking_phone": phone})
+
+    def _get_dictionary(self):
+        conn = connect()
+        city = row_to_dict(conn.execute("SELECT * FROM cities ORDER BY id LIMIT 1").fetchone())
+        districts = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order, id"))
+        channels = rows_to_list(conn.execute("SELECT * FROM channels ORDER BY sort_order, id"))
+        conn.close()
+        return self._json({"city": city, "districts": districts, "channels": channels})
+
+    def _update_city(self):
+        body = self._body()
+        name = (body.get("name") or "").strip()
+        slug = (body.get("slug") or "").strip()
+        if not name:
+            return self._json({"error": "城市名称不能为空"}, 400)
+        conn = connect()
+        row = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "未找到城市"}, 404)
+        cid = row[0]
+        if not slug:
+            slug = slugify(name)
+        conn.execute("UPDATE cities SET name=?, slug=? WHERE id=?", (name, slug, cid))
+        conn.commit()
+        export_json(conn)
+        city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "city": city})
+
+    def _update_district(self, did):
+        body = self._body()
+        conn = connect()
+        if not conn.execute("SELECT id FROM districts WHERE id=?", (did,)).fetchone():
+            conn.close()
+            return self._json({"error": "行政区不存在"}, 404)
+        fields = []
+        params = []
+        mapping = {
+            "name": "name",
+            "slug": "slug",
+            "note": "note",
+            "sort_order": "sort_order",
+            "cover_image": "cover_image",
+            "is_hot": "is_hot",
+            "layout_tall": "layout_tall",
+            "layout_wide": "layout_wide",
+            "bg_class": "bg_class",
+            "has_projects": "has_projects",
+        }
+        for key, col in mapping.items():
+            if key in body:
+                val = body[key]
+                if key in ("sort_order", "is_hot", "layout_tall", "layout_wide", "has_projects"):
+                    val = int(val) if val is not None and val != "" else 0
+                elif isinstance(val, str):
+                    val = val.strip() or None
+                fields.append(f"{col}=?")
+                params.append(val)
+        if not fields:
+            conn.close()
+            return self._json({"error": "无更新字段"}, 400)
+        params.append(did)
+        conn.execute(f"UPDATE districts SET {', '.join(fields)} WHERE id=?", params)
+        sync_district_stats(conn, did)
+        conn.commit()
+        export_json(conn)
+        district = row_to_dict(conn.execute("SELECT * FROM districts WHERE id=?", (did,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "district": district})
+
+    def _create_district(self):
+        body = self._body()
+        name = (body.get("name") or "").strip()
+        if not name:
+            return self._json({"error": "行政区名称不能为空"}, 400)
+        conn = connect()
+        city = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
+        if not city:
+            conn.close()
+            return self._json({"error": "请先配置城市"}, 400)
+        slug = (body.get("slug") or name).strip() or name
+        if conn.execute("SELECT id FROM districts WHERE city_id=? AND slug=?", (city[0], slug)).fetchone():
+            conn.close()
+            return self._json({"error": "slug 已存在"}, 400)
+        conn.execute(
+            """INSERT INTO districts(city_id,name,slug,note,sort_order,cover_image,has_projects)
+               VALUES (?,?,?,?,?,?,?)""",
+            (
+                city[0],
+                name,
+                slug,
+                (body.get("note") or "").strip() or None,
+                int(body.get("sort_order") or 999),
+                (body.get("cover_image") or "").strip() or None,
+                int(body.get("has_projects") or 0),
+            ),
+        )
+        did = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        sync_district_stats(conn, did)
+        conn.commit()
+        export_json(conn)
+        district = row_to_dict(conn.execute("SELECT * FROM districts WHERE id=?", (did,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "district": district})
+
+    def _delete_district(self, did):
+        conn = connect()
+        n = conn.execute("SELECT COUNT(*) FROM projects WHERE district_id=?", (did,)).fetchone()[0]
+        if n:
+            conn.close()
+            return self._json({"error": f"该区仍有 {n} 个项目，无法删除"}, 400)
+        if not conn.execute("SELECT id FROM districts WHERE id=?", (did,)).fetchone():
+            conn.close()
+            return self._json({"error": "行政区不存在"}, 404)
+        conn.execute("DELETE FROM districts WHERE id=?", (did,))
+        conn.commit()
+        export_json(conn)
+        conn.close()
+        return self._json({"ok": True})
+
+    def _update_channel(self, channel_id):
+        body = self._body()
+        conn = connect()
+        if not conn.execute("SELECT id FROM channels WHERE id=?", (channel_id,)).fetchone():
+            conn.close()
+            return self._json({"error": "频道不存在"}, 404)
+        fields = []
+        params = []
+        if "label" in body:
+            label = (body.get("label") or "").strip()
+            if not label:
+                conn.close()
+                return self._json({"error": "频道名称不能为空"}, 400)
+            fields.append("label=?")
+            params.append(label)
+        if "sort_order" in body:
+            fields.append("sort_order=?")
+            params.append(int(body.get("sort_order") or 0))
+        if "enabled" in body:
+            fields.append("enabled=?")
+            params.append(1 if body.get("enabled") else 0)
+        if "note" in body:
+            note = (body.get("note") or "").strip() or None
+            fields.append("note=?")
+            params.append(note)
+        if not fields:
+            conn.close()
+            return self._json({"error": "无更新字段"}, 400)
+        params.append(channel_id)
+        conn.execute(f"UPDATE channels SET {', '.join(fields)} WHERE id=?", params)
+        conn.commit()
+        export_json(conn)
+        channel = row_to_dict(conn.execute("SELECT * FROM channels WHERE id=?", (channel_id,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "channel": channel})
 
 
 def main():

@@ -27,8 +27,17 @@ window.JUZHU = (function () {
     });
   }
 
+  function sortDistricts(list) {
+    return (list || []).slice().sort(function (a, b) {
+      var ah = a.has_projects ? 1 : 0;
+      var bh = b.has_projects ? 1 : 0;
+      if (ah !== bh) return bh - ah;
+      return (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
+    });
+  }
+
   function districts() {
-    return (cache.districts || []).slice().sort(function (a, b) { return a.sort_order - b.sort_order; });
+    return sortDistricts(cache.districts);
   }
 
   function districtBySlug(slug) {
@@ -247,6 +256,51 @@ window.JUZHU = (function () {
       '</div></div>';
   }
 
+  function enabledChannels() {
+    var list = (cache && cache.channels) ? cache.channels.slice() : [];
+    if (!list.length) {
+      return [
+        { id: 'bzf', label: '保租房', sort_order: 1, enabled: 1 },
+        { id: 'trade', label: '卖旧买新', sort_order: 2, enabled: 1 }
+      ];
+    }
+    return list.filter(function(c) { return c.enabled !== 0; })
+      .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+  }
+
+  function channelLabel(id) {
+    var c = (cache && cache.channels || []).find(function(x) { return x.id === id; });
+    if (c) return c.label;
+    return id === 'trade' ? '卖旧买新' : '保租房';
+  }
+
+  function managedUnits(project) {
+    if (!project) return 0;
+    if (project.managed_unit_count != null && project.managed_unit_count !== '') {
+      return Number(project.managed_unit_count) || 0;
+    }
+    return Number(project.unit_count) || 0;
+  }
+
+  function districtManagedUnits(district) {
+    if (!district) return 0;
+    if (district.managed_unit_count != null && district.managed_unit_count !== '') {
+      return Number(district.managed_unit_count) || 0;
+    }
+    return projects({ channel: 'bzf', district_id: district.id })
+      .reduce(function(sum, p) { return sum + managedUnits(p); }, 0);
+  }
+
+  function bookingPhone() {
+    return cache && cache.city && cache.city.booking_phone ? String(cache.city.booking_phone).trim() : '';
+  }
+
+  function telHref(phone) {
+    if (!phone) return '';
+    var digits = phone.replace(/[^\d+]/g, '');
+    return digits ? 'tel:' + digits : '';
+  }
+
   return {
     load: load,
     get data() { return cache; },
@@ -269,6 +323,12 @@ window.JUZHU = (function () {
     cleanDisplayName: cleanDisplayName,
     houseRating: houseRating,
     houseRatingHtml: houseRatingHtml,
-    starsHtml: starsHtml
+    starsHtml: starsHtml,
+    enabledChannels: enabledChannels,
+    channelLabel: channelLabel,
+    managedUnits: managedUnits,
+    districtManagedUnits: districtManagedUnits,
+    bookingPhone: bookingPhone,
+    telHref: telHref
   };
 })();

@@ -100,7 +100,7 @@
     <div class="load-err" id="err" hidden></div>
   </div>
 </div>
-<script src="juzhu/app.js?v=2"></script>
+<script src="juzhu/app.js?v=10"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -114,9 +114,19 @@
     document.getElementById('distCount').textContent = d.stats.district_count + ' 区 ›';
   }
 
+  function collageLayout(d, list) {
+    if (!d.has_projects) return { tall: false, wide: false };
+    var active = list.filter(function(x) { return x.has_projects; });
+    var ai = active.findIndex(function(x) { return x.id === d.id; });
+    if (ai < 0) return { tall: false, wide: false };
+    var phase = ai % 5;
+    return { tall: phase === 3, wide: phase === 2 };
+  }
+
   function renderCollage(list){
     document.getElementById('collage').innerHTML = list.map(function(d,i){
-      var cls = 'ctile'+(d.layout_tall?' tall':'')+(d.layout_wide?' wide':'')+(d.has_projects? '':' empty');
+      var lay = collageLayout(d, list);
+      var cls = 'ctile'+(lay.tall?' tall':'')+(lay.wide?' wide':'')+(d.has_projects? '':' empty');
       var href = d.has_projects
         ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name)
         : '#';
@@ -129,8 +139,8 @@
         '<div class="bg '+(bg?'':' '+d.bg_class)+'" style="'+bg+'"></div>'+tag+
         '<div class="in"><span class="no">'+pad(i+1)+'</span><h3>'+d.name+'</h3>'+
         '<div class="nums">'+
+          '<div><b>'+JUZHU.districtManagedUnits(d)+'</b>在管</div>'+
           '<div><b>'+d.project_count+'</b>项目</div>'+
-          '<div><b>'+(d.vacant_count||0)+'</b>可租</div>'+
           '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b>均价</div>'+
         '</div></div></a>';
     }).join('');
@@ -179,6 +189,13 @@
   });
 
   JUZHU.load().then(function(d){
+    var tabs = document.getElementById('tabs');
+    var chs = JUZHU.enabledChannels();
+    if (chs.length) {
+      tabs.innerHTML = chs.map(function(c, i) {
+        return '<a class="' + (i === 0 ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
+      }).join('');
+    }
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());

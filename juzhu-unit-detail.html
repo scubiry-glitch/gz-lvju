@@ -110,7 +110,7 @@
     <a class="btn" href="#" id="ctaBtn">预约看房</a>
   </div>
 </div>
-<script src="juzhu/app.js?v=5"></script>
+<script src="juzhu/app.js?v=6"></script>
 <script src="screens/_qr.js"></script>
 <script>
 (function(){
@@ -214,6 +214,18 @@
       document.getElementById('plab').textContent = '租金受控 · 试点房源';
       document.getElementById('ctaBtn').textContent = '预约看房';
       mountRating(p);
+    }
+
+    var tel = JUZHU.telHref(JUZHU.bookingPhone());
+    var cta = document.getElementById('ctaBtn');
+    if (tel) {
+      cta.href = tel;
+    } else {
+      cta.href = '#';
+      cta.onclick = function(e) {
+        e.preventDefault();
+        alert('暂未配置咨询电话，请在内容编辑后台设置');
+      };
     }
 
     photos = JUZHU.photos('unit', u.id).map(function(ph){ return ph.file_path; });

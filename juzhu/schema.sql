@@ -4,9 +4,10 @@
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS cities (
-  id          INTEGER PRIMARY KEY,
-  name        TEXT NOT NULL UNIQUE,          -- 沈阳
-  slug        TEXT NOT NULL UNIQUE           -- shenyang
+  id              INTEGER PRIMARY KEY,
+  name            TEXT NOT NULL UNIQUE,          -- 沈阳
+  slug            TEXT NOT NULL UNIQUE,          -- shenyang
+  booking_phone   TEXT                           -- 预约看房 / 咨询置换电话
 );
 
 CREATE TABLE IF NOT EXISTS districts (
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS districts (
   project_count INTEGER NOT NULL DEFAULT 0,
   unit_count    INTEGER NOT NULL DEFAULT 0,
   vacant_count  INTEGER,                     -- 可租/可售套数（演示可估算）
+  managed_unit_count INTEGER,                -- 在管房源量（区级加总）
   avg_price     INTEGER,                     -- 保租=月均租金；置换=万起价
   is_hot        INTEGER NOT NULL DEFAULT 0,
   layout_tall   INTEGER NOT NULL DEFAULT 0,
@@ -41,6 +43,7 @@ CREATE TABLE IF NOT EXISTS projects (
   tags          TEXT,                        -- JSON array
   sort_order    INTEGER NOT NULL DEFAULT 0,
   unit_count    INTEGER NOT NULL DEFAULT 0,
+  managed_unit_count INTEGER,                -- 在管房源量（保租项目，可后台编辑）
   price_from    INTEGER,                     -- 最低租金/售价
   is_featured   INTEGER NOT NULL DEFAULT 0,
   featured_rank INTEGER,
@@ -81,3 +84,14 @@ CREATE TABLE IF NOT EXISTS photos (
 CREATE INDEX IF NOT EXISTS idx_projects_district ON projects(district_id, channel);
 CREATE INDEX IF NOT EXISTS idx_units_project ON units(project_id);
 CREATE INDEX IF NOT EXISTS idx_photos_entity ON photos(entity_type, entity_id);
+
+CREATE TABLE IF NOT EXISTS channels (
+  id          TEXT PRIMARY KEY,                -- bzf / trade
+  label       TEXT NOT NULL,                   -- 保租房
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  note        TEXT
+);
+
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房', 1, 1);
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新', 2, 1);

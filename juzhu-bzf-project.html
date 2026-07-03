@@ -47,14 +47,8 @@
     <div class="sec-h"><span class="bar"></span><h2 id="listTitle">在租房型</h2><span class="more" id="unitN">—</span></div>
     <div class="unit-grid" id="list"></div>
   </div>
-  <div class="tabbar">
-    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
-    <a class="on" href="juzhu-channel-v3-grid.html"><span class="ti">🏡</span>新居住</a>
-    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
 </div>
-<script src="juzhu/app.js?v=5"></script>
+<script src="juzhu/app.js?v=9"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -68,7 +62,9 @@
 
     document.getElementById('pEk').textContent = isTrade ? 'TRADE · 卖旧买新' : 'BZF · 保租房';
     document.getElementById('pname').textContent = p.name;
-    document.getElementById('pmeta').textContent = (p.address || '') + ' · ' + p.unit_count + ' 户型';
+    document.getElementById('pmeta').textContent = (isTrade
+      ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')
+      : ('在管 ' + JUZHU.managedUnits(p) + ' 套 · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
     document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
     document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租房型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';

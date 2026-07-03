@@ -17,18 +17,58 @@ def connect():
 
 
 def ensure_schema(conn):
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
-    migrations = [
-        ("rating_status", "ALTER TABLE projects ADD COLUMN rating_status TEXT NOT NULL DEFAULT 'draft'"),
-        ("rating", "ALTER TABLE projects ADD COLUMN rating TEXT"),
-        ("rating_submitted_at", "ALTER TABLE projects ADD COLUMN rating_submitted_at TEXT"),
-        ("rating_reviewed_at", "ALTER TABLE projects ADD COLUMN rating_reviewed_at TEXT"),
-        ("rating_note", "ALTER TABLE projects ADD COLUMN rating_note TEXT"),
-    ]
-    for col, sql in migrations:
-        if col not in cols:
-            conn.execute(sql)
+    project_cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    if project_cols:
+        migrations = [
+            ("rating_status", "ALTER TABLE projects ADD COLUMN rating_status TEXT NOT NULL DEFAULT 'draft'"),
+            ("rating", "ALTER TABLE projects ADD COLUMN rating TEXT"),
+            ("rating_submitted_at", "ALTER TABLE projects ADD COLUMN rating_submitted_at TEXT"),
+            ("rating_reviewed_at", "ALTER TABLE projects ADD COLUMN rating_reviewed_at TEXT"),
+            ("rating_note", "ALTER TABLE projects ADD COLUMN rating_note TEXT"),
+        ]
+        for col, sql in migrations:
+            if col not in project_cols:
+                conn.execute(sql)
+    city_cols = {r[1] for r in conn.execute("PRAGMA table_info(cities)").fetchall()}
+    if city_cols and "booking_phone" not in city_cols:
+        conn.execute("ALTER TABLE cities ADD COLUMN booking_phone TEXT")
+    district_cols = {r[1] for r in conn.execute("PRAGMA table_info(districts)").fetchall()}
+    if district_cols and "managed_unit_count" not in district_cols:
+        conn.execute("ALTER TABLE districts ADD COLUMN managed_unit_count INTEGER")
+    if project_cols and "managed_unit_count" not in project_cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN managed_unit_count INTEGER")
+        conn.execute(
+            """UPDATE projects SET managed_unit_count=unit_count
+               WHERE channel='bzf' AND managed_unit_count IS NULL"""
+        )
+    ensure_channels(conn)
     conn.commit()
+
+
+def ensure_channels(conn):
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "channels" not in tables:
+        conn.executescript(
+            """
+            CREATE TABLE channels (
+              id TEXT PRIMARY KEY,
+              label TEXT NOT NULL,
+              sort_order INTEGER NOT NULL DEFAULT 0,
+              enabled INTEGER NOT NULL DEFAULT 1,
+              note TEXT
+            );
+            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房', 1, 1);
+            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新', 2, 1);
+            """
+        )
+    else:
+        defaults = [("bzf", "保租房", 1), ("trade", "卖旧买新", 2)]
+        for cid, label, order in defaults:
+            if not conn.execute("SELECT 1 FROM channels WHERE id=?", (cid,)).fetchone():
+                conn.execute(
+                    "INSERT INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
+                    (cid, label, order),
+                )
 
 
 def rating_code(project_id):
@@ -140,10 +180,15 @@ def sync_district_stats(conn, district_id=None):
                WHERE p.district_id=? AND p.channel='bzf' AND u.rent_monthly IS NOT NULL""",
             (did,),
         ).fetchone()[0]
+        managed = conn.execute(
+            """SELECT COALESCE(SUM(COALESCE(managed_unit_count, unit_count)), 0)
+               FROM projects WHERE district_id=? AND channel='bzf'""",
+            (did,),
+        ).fetchone()[0]
         conn.execute(
             """UPDATE districts SET project_count=?, unit_count=?, vacant_count=?,
-               avg_price=?, has_projects=? WHERE id=?""",
-            (pc, uc, uc, int(avg) if avg else None, 1 if pc else 0, did),
+               managed_unit_count=?, avg_price=?, has_projects=? WHERE id=?""",
+            (pc, uc, uc, int(managed), int(avg) if avg else None, 1 if pc else 0, did),
         )
     conn.commit()
 
@@ -185,6 +230,7 @@ def export_json(conn=None):
 
         data = {
             "city": rows("SELECT * FROM cities")[0],
+            "channels": rows("SELECT * FROM channels ORDER BY sort_order, id"),
             "stats": {
                 "district_count": conn.execute("SELECT COUNT(*) FROM districts").fetchone()[0],
                 "project_count_bzf": conn.execute(

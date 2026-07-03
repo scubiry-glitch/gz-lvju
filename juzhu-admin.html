@@ -91,6 +91,16 @@
   .img-field-row input{flex:1;}
   .upload-btn{position:relative;overflow:hidden;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;}
   .upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .subnav{display:flex;gap:6px;padding:10px 20px;background:#fff;border-bottom:1px solid var(--border);}
+  .subnav button{padding:8px 18px;border-radius:999px;border:1px solid var(--border);background:#fff;
+    font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .subnav button.on{background:linear-gradient(90deg,var(--brand),var(--brand2));color:#fff;border-color:transparent;}
+  .pane-main{min-height:calc(100vh - 96px);}
+  .pane-phone{padding:24px;}
+  .pane-phone .card{max-width:560px;margin:0 auto;}
+  .pane-dict .main{max-width:1100px;margin:0 auto;}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
+  body.api-off .subnav button:not(.on){opacity:.45;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -105,15 +115,36 @@
 
 <div class="warn" id="apiWarn" hidden>请使用 <code>python3 juzhu/server.py</code> 启动服务后再编辑（纯静态 http.server 不支持保存）。</div>
 
+<nav class="subnav" id="subnav">
+  <button type="button" data-tab="phone">预约电话</button>
+  <button type="button" data-tab="dict">字典</button>
+  <button type="button" class="on" data-tab="content">内容</button>
+</nav>
+
+<div id="panePhone" class="pane-main pane-phone" hidden>
+  <div class="card">
+    <h2>预约看房电话</h2>
+    <p class="hint">用于户型详情页底部「预约看房 / 咨询置换」按钮，保存后自动同步至 data.json。</p>
+    <div class="fld" style="margin-top:14px;">
+      <label>咨询电话</label>
+      <input type="tel" id="bookingPhone" placeholder="如 400-888-8888 或 024-12345678" />
+    </div>
+    <div class="bar">
+      <button type="button" class="btn primary" id="btnSaveSettings">保存电话</button>
+    </div>
+  </div>
+</div>
+
+<div id="paneDict" class="pane-main pane-dict" hidden>
+  <div class="main" id="dictRoot"></div>
+</div>
+
+<div id="paneContent" class="pane-main">
 <div class="layout">
   <aside class="side">
     <div>
       <label>频道</label>
-      <select id="fChannel">
-        <option value="">全部</option>
-        <option value="bzf">保租房</option>
-        <option value="trade">卖旧买新</option>
-      </select>
+      <select id="fChannel"><option value="">全部</option></select>
     </div>
     <div>
       <label>行政区</label>
@@ -133,12 +164,58 @@
     <div class="empty">← 从左侧选择项目，编辑信息与房源</div>
   </main>
 </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
 var API = '/api/juzhu/admin';
-var state = { projects: [], districts: [], current: null, units: [], photos: [], expandedUnit: null };
+var state = { projects: [], districts: [], channels: [], city: null, current: null, units: [], photos: [], expandedUnit: null, tab: 'content', apiOk: false };
+
+function channelLabel(id) {
+  var c = (state.channels || []).find(function(x){ return x.id === id; });
+  if (c) return c.label;
+  return id === 'trade' ? '卖旧买新' : '保租房';
+}
+
+function channelOptions(selected, includeAll) {
+  var html = includeAll ? '<option value="">全部</option>' : '';
+  (state.channels || []).slice().sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); }).forEach(function(c) {
+    if (c.enabled === 0 && selected !== c.id) return;
+    html += '<option value="'+c.id+'"'+(selected===c.id?' selected':'')+'>'+esc(c.label)+'</option>';
+  });
+  if (!state.channels || !state.channels.length) {
+    html += '<option value="bzf"'+(selected==='bzf'?' selected':'')+'>保租房</option>';
+    html += '<option value="trade"'+(selected==='trade'?' selected':'')+'>卖旧买新</option>';
+  }
+  return html;
+}
+
+function refreshChannelSelects() {
+  var ch = document.getElementById('fChannel');
+  if (ch) {
+    var cur = ch.value;
+    ch.innerHTML = channelOptions(cur, true);
+  }
+}
+
+function switchTab(tab) {
+  state.tab = tab;
+  document.querySelectorAll('.subnav button').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.tab === tab);
+  });
+  document.getElementById('panePhone').hidden = tab !== 'phone';
+  document.getElementById('paneDict').hidden = tab !== 'dict';
+  document.getElementById('paneContent').hidden = tab !== 'content';
+  if (tab === 'dict') renderDictionary();
+}
+
+document.getElementById('subnav').onclick = function(e) {
+  var btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  if (!state.apiOk) { toast('请先启动 python3 juzhu/server.py'); return; }
+  switchTab(btn.dataset.tab);
+};
 
 function toast(msg) {
   var el = document.getElementById('toast');
@@ -218,13 +295,154 @@ function tagsStr(tags) {
 }
 
 function loadDistricts() {
-  return api('/districts').then(function(list) {
-    state.districts = list;
-    var sel = document.getElementById('fDistrict');
-    sel.innerHTML = '<option value="">全部</option>' + list.map(function(d) {
-      return '<option value="'+d.id+'">'+d.name+'</option>';
-    }).join('');
+  return Promise.resolve(state.districts);
+}
+
+function sortDistrictsList(list) {
+  return (list || []).slice().sort(function(a, b) {
+    var ah = a.has_projects ? 1 : 0;
+    var bh = b.has_projects ? 1 : 0;
+    if (ah !== bh) return bh - ah;
+    return (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
   });
+}
+
+function populateDistrictFilter() {
+  var sel = document.getElementById('fDistrict');
+  sel.innerHTML = '<option value="">全部</option>' + sortDistrictsList(state.districts).map(function(d) {
+    return '<option value="'+d.id+'">'+esc(d.name)+'</option>';
+  }).join('');
+}
+
+function loadDictionary() {
+  return api('/dictionary').then(function(d) {
+    state.apiOk = true;
+    state.city = d.city || null;
+    state.districts = d.districts || [];
+    state.channels = d.channels || [];
+    document.body.classList.remove('api-off');
+    document.getElementById('apiWarn').hidden = true;
+    document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
+    refreshChannelSelects();
+    populateDistrictFilter();
+  });
+}
+
+function renderDictionary() {
+  var root = document.getElementById('dictRoot');
+  if (!state.apiOk) {
+    root.innerHTML = '<div class="empty">请先启动 <code>python3 juzhu/server.py</code></div>';
+    return;
+  }
+  var city = state.city || {};
+  var chRows = (state.channels || []).map(function(c) {
+    return '<tr data-ch="'+c.id+'">'+
+      '<td><code>'+esc(c.id)+'</code></td>'+
+      '<td><input class="ch_label" value="'+esc(c.label)+'"/></td>'+
+      '<td><input class="ch_sort" type="number" value="'+(c.sort_order||0)+'"/></td>'+
+      '<td><input class="ch_en" type="checkbox"'+(c.enabled!==0?' checked':'')+'/></td>'+
+      '<td><input class="ch_note" value="'+esc(c.note||'')+'"/></td>'+
+      '<td class="acts"><button type="button" class="btn primary ch_save">保存</button></td></tr>';
+  }).join('');
+  var distRows = sortDistrictsList(state.districts).map(function(d) {
+    return '<tr data-did="'+d.id+'">'+
+      '<td><input class="d_name" value="'+esc(d.name)+'"/></td>'+
+      '<td><input class="d_slug" value="'+esc(d.slug)+'"/></td>'+
+      '<td><input class="d_note" value="'+esc(d.note||'')+'"/></td>'+
+      '<td><input class="d_sort" type="number" value="'+(d.sort_order||0)+'"/></td>'+
+      '<td><input class="d_cover" value="'+esc(d.cover_image||'')+'"/></td>'+
+      '<td>'+(d.project_count||0)+' / '+(d.unit_count||0)+' / '+(d.managed_unit_count||0)+'</td>'+
+      '<td class="acts"><button type="button" class="btn primary d_save">保存</button>'+
+      '<button type="button" class="btn danger d_del">删</button></td></tr>';
+  }).join('');
+
+  root.innerHTML =
+    '<div class="card"><h2>城市</h2>'+
+      '<div class="grid">'+
+        '<div class="fld"><label>城市名称</label><input id="cityName" value="'+esc(city.name||'')+'"/></div>'+
+        '<div class="fld"><label>Slug</label><input id="citySlug" value="'+esc(city.slug||'')+'"/></div>'+
+      '</div>'+
+      '<div class="bar"><button type="button" class="btn primary" id="saveCity">保存城市</button></div>'+
+    '</div>'+
+    '<div class="card"><h2>频道 <span class="badge">'+state.channels.length+'</span></h2>'+
+      '<p class="hint">频道 ID（bzf / trade）不可改，可调整展示名称与排序。前台 Tab 与筛选器读取此处配置。</p>'+
+      '<table class="tbl"><thead><tr><th>ID</th><th>名称</th><th>排序</th><th>启用</th><th>备注</th><th>操作</th></tr></thead>'+
+      '<tbody>'+chRows+'</tbody></table>'+
+    '</div>'+
+    '<div class="card"><h2>行政区 <span class="badge" style="background:var(--gold)">'+state.districts.length+'</span></h2>'+
+      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>备注</th><th>排序</th><th>封面路径</th><th>项目/户型/在管</th><th>操作</th></tr></thead>'+
+      '<tbody id="distRows">'+distRows+'</tbody></table>'+
+      '<div class="bar"><button type="button" class="btn ghost" id="addDistrict">+ 新增行政区</button></div>'+
+    '</div>';
+
+  document.getElementById('saveCity').onclick = function() {
+    api('/city', { method:'PUT', body: {
+      name: document.getElementById('cityName').value.trim(),
+      slug: document.getElementById('citySlug').value.trim()
+    }}).then(function(res) {
+      state.city = res.city;
+      toast('城市已保存');
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+
+  root.querySelectorAll('.ch_save').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      var id = tr.dataset.ch;
+      api('/channels/'+encodeURIComponent(id), { method:'PUT', body: {
+        label: tr.querySelector('.ch_label').value.trim(),
+        sort_order: +tr.querySelector('.ch_sort').value,
+        enabled: tr.querySelector('.ch_en').checked,
+        note: tr.querySelector('.ch_note').value.trim()
+      }}).then(function() {
+        toast('频道已保存');
+        return loadDictionary();
+      }).then(renderDictionary).catch(function(e){ toast('保存失败：'+e.message); });
+    };
+  });
+
+  root.querySelectorAll('.d_save').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      saveDistrictRow(tr);
+    };
+  });
+  root.querySelectorAll('.d_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      if (!confirm('确定删除行政区「'+tr.querySelector('.d_name').value+'」？')) return;
+      api('/districts/'+tr.dataset.did, { method:'DELETE' }).then(function() {
+        toast('行政区已删除');
+        return loadDictionary();
+      }).then(function(){ populateDistrictFilter(); renderDictionary(); })
+        .catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
+  document.getElementById('addDistrict').onclick = function() {
+    var name = prompt('新行政区名称');
+    if (!name || !name.trim()) return;
+    api('/districts', { method:'POST', body: { name: name.trim() } }).then(function() {
+      toast('行政区已添加');
+      return loadDictionary();
+    }).then(function(){ populateDistrictFilter(); renderDictionary(); })
+      .catch(function(e){ toast('添加失败：'+e.message); });
+  };
+}
+
+function saveDistrictRow(tr) {
+  var id = tr.dataset.did;
+  return api('/districts/'+id, { method:'PUT', body: {
+    name: tr.querySelector('.d_name').value.trim(),
+    slug: tr.querySelector('.d_slug').value.trim(),
+    note: tr.querySelector('.d_note').value.trim(),
+    sort_order: +tr.querySelector('.d_sort').value,
+    cover_image: tr.querySelector('.d_cover').value.trim()
+  }}).then(function(res) {
+    var idx = state.districts.findIndex(function(d){ return d.id === +id; });
+    if (idx >= 0) state.districts[idx] = res.district;
+    populateDistrictFilter();
+    toast('行政区已保存');
+  }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 
 function loadProjects() {
@@ -249,10 +467,11 @@ function renderProjectList() {
   }
   box.innerHTML = state.projects.map(function(p) {
     var on = state.current && state.current.id === p.id ? ' on' : '';
-    var ch = p.channel === 'trade' ? '卖旧买新' : '保租房';
+    var ch = channelLabel(p.channel);
+    var managed = p.channel === 'bzf' ? (' · 在管 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
     return '<button type="button" class="'+on.trim()+'" data-id="'+p.id+'">'+
       '<div class="nm">'+p.name+'</div>'+
-      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型</div></button>';
+      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+'</div></button>';
   }).join('');
   box.querySelectorAll('button[data-id]').forEach(function(btn) {
     btn.onclick = function(){ openProject(+btn.dataset.id); };
@@ -285,7 +504,7 @@ function renderNewProjectForm() {
   state.mode = 'new';
   state.current = null;
   renderProjectList();
-  var distOpts = state.districts.map(function(d) {
+  var distOpts = sortDistrictsList(state.districts).map(function(d) {
     return '<option value="'+d.id+'">'+d.name+(d.note ? '（'+d.note+'）' : '')+'</option>';
   }).join('');
   document.getElementById('main').innerHTML =
@@ -293,7 +512,7 @@ function renderNewProjectForm() {
       '<h2>新建项目 <span class="badge" style="background:var(--gold)">NEW</span></h2>'+
       '<div class="grid">'+
         '<div class="fld"><label>项目名称 *</label><input id="n_name" placeholder="如：逸居XX店" autofocus/></div>'+
-        '<div class="fld"><label>频道 *</label><select id="n_channel"><option value="bzf">保租房</option><option value="trade">卖旧买新</option></select></div>'+
+        '<div class="fld"><label>频道 *</label><select id="n_channel">'+channelOptions('bzf', false)+'</select></div>'+
         '<div class="fld" id="n_dist_wrap"><label>所属行政区 *</label><select id="n_district"><option value="">请选择</option>'+distOpts+'</select></div>'+
         '<div class="fld"><label>排序</label><input id="n_sort" type="number" value="999"/></div>'+
         '<div class="fld grid full"><label>地址 / 副标题</label><input id="n_addr" placeholder="留空则自动生成"/></div>'+
@@ -423,7 +642,7 @@ function renderEditor() {
   var p = state.current;
   if (!p) return;
   var isTrade = p.channel === 'trade';
-  var chLabel = isTrade ? '卖旧买新' : '保租房';
+  var chLabel = channelLabel(p.channel);
   var cover = p.cover_image ? "background-image:url('/"+p.cover_image.replace(/^\//,'')+"')" : '';
   var rs = p.rating_status || 'draft';
   var rating = parseRating(p);
@@ -464,6 +683,7 @@ function renderEditor() {
         '<div class="fld grid full"><label>地址 / 副标题</label><input id="p_addr" value="'+esc(p.address||'')+'"/></div>'+
         '<div class="fld"><label>标签（逗号分隔）</label><input id="p_tags" value="'+esc(tagsStr(p.tags))+'"/></div>'+
         '<div class="fld"><label>'+(isTrade?'起价（万）':'起租（元/月）')+'</label><input id="p_price" type="number" value="'+(p.price_from||'')+'"/></div>'+
+        (isTrade?'':('<div class="fld"><label>在管房源量</label><input id="p_managed" type="number" min="0" value="'+(p.managed_unit_count!=null?p.managed_unit_count:'')+'"/><p class="hint" style="margin-top:4px;">实际在管套数，区级会自动加总</p></div>'))+
         (isTrade?'<div class="fld"><label>旧房估价提示</label><input id="p_old" value="'+esc(p.old_house_hint||'')+'"/></div>':'')+
         '<div class="fld grid full img-field"><label>封面图</label>'+
           '<div class="img-field-row">'+
@@ -682,6 +902,7 @@ function saveProject() {
     cover_image: document.getElementById('p_cover').value.trim()
   };
   if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
+  else body.managed_unit_count = numVal('p_managed');
 
   api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
     state.current = res.project;
@@ -740,6 +961,20 @@ function numVal(id) {
   return v === '' ? null : +v;
 }
 
+function loadSettings() {
+  document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
+  return Promise.resolve();
+}
+
+document.getElementById('btnSaveSettings').onclick = function() {
+  if (!state.apiOk) { toast('请先启动 python3 juzhu/server.py'); return; }
+  var phone = document.getElementById('bookingPhone').value.trim();
+  api('/settings', { method: 'PUT', body: { booking_phone: phone || null } }).then(function(res) {
+    if (state.city) state.city.booking_phone = res.booking_phone;
+    toast('咨询电话已保存');
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+};
+
 document.getElementById('btnNewProject').onclick = renderNewProjectForm;
 document.getElementById('fChannel').onchange = loadProjects;
 document.getElementById('fDistrict').onchange = loadProjects;
@@ -755,8 +990,12 @@ function debounce(fn, ms) {
   return function() { clearTimeout(t); t = setTimeout(fn, ms); };
 }
 
-Promise.all([loadDistricts(), loadProjects()]).catch(function() {
+loadDictionary().then(function() {
+  return Promise.all([loadProjects(), loadSettings()]);
+}).catch(function() {
+  document.body.classList.add('api-off');
   document.getElementById('apiWarn').hidden = false;
+  switchTab('phone');
 });
 </script>
 </body>
