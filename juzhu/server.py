@@ -839,11 +839,22 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"error": "图片记录不存在"}, 404)
                 rel = Path(row["file_path"])
                 ext = rel.suffix.lower() or ext
+            elif scope == "city_hero":
+                rel = Path(ASSETS_PREFIX) / "city" / f"hero{ext}"
             else:
                 conn.close()
                 return self._json({"error": "未知 scope"}, 400)
             conn.close()
             file_path = write_image_file(rel, upload["data"])
+            if scope == "city_hero":
+                conn = connect()
+                conn.execute(
+                    "UPDATE cities SET hero_bg_image=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
+                    (file_path,),
+                )
+                conn.commit()
+                export_json(conn)
+                conn.close()
             return self._json({"ok": True, "file_path": file_path})
         except ValueError as e:
             return self._json({"error": str(e)}, 400)
@@ -1030,7 +1041,14 @@ class Handler(SimpleHTTPRequestHandler):
         cid = row[0]
         if not slug:
             slug = slugify(name)
-        conn.execute("UPDATE cities SET name=?, slug=? WHERE id=?", (name, slug, cid))
+        fields = ["name=?", "slug=?"]
+        params = [name, slug]
+        if "hero_bg_image" in body:
+            val = (body.get("hero_bg_image") or "").strip() or None
+            fields.append("hero_bg_image=?")
+            params.append(val)
+        params.append(cid)
+        conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
         conn.commit()
         export_json(conn)
         city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())

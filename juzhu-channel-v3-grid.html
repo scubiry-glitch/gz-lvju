@@ -10,6 +10,8 @@
   .scheme-bar a{color:var(--brand);font-weight:600;}
   .split-hd{position:relative;padding:52px 18px 20px;color:#fff;overflow:hidden;}
   .split-hd .bg{position:absolute;inset:0;background:linear-gradient(135deg,#0b5d56,#1a4038 50%,#8c6224);}
+  .split-hd .bg.has-img{background-size:cover;background-position:center;}
+  .split-hd .bg.has-img::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(11,93,86,.82),rgba(26,64,56,.75) 50%,rgba(140,98,36,.55));z-index:0;}
   .split-hd .bg::after{content:"";position:absolute;inset:0;
     background:repeating-linear-gradient(85deg,rgba(255,255,255,.04) 0 2px,transparent 2px 18px);opacity:.6;}
   .split-hd .in{position:relative;z-index:2;}
@@ -100,7 +102,7 @@
     <div class="load-err" id="err" hidden></div>
   </div>
 </div>
-<script src="juzhu/app.js?v=10"></script>
+<script src="juzhu/app.js?v=11"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -112,6 +114,14 @@
       '<div><b>'+d.stats.project_count_trade+'</b>置换项目</div>'+
       '<div><b>'+d.stats.unit_count+'</b>在租房型</div>';
     document.getElementById('distCount').textContent = d.stats.district_count + ' 区 ›';
+    var bgEl = document.querySelector('.split-hd .bg');
+    if (d.city.hero_bg_image) {
+      bgEl.style.backgroundImage = 'url(' + d.city.hero_bg_image + ')';
+      bgEl.classList.add('has-img');
+    } else {
+      bgEl.style.backgroundImage = '';
+      bgEl.classList.remove('has-img');
+    }
   }
 
   function collageLayout(d, list) {
@@ -139,7 +149,7 @@
         '<div class="bg '+(bg?'':' '+d.bg_class)+'" style="'+bg+'"></div>'+tag+
         '<div class="in"><span class="no">'+pad(i+1)+'</span><h3>'+d.name+'</h3>'+
         '<div class="nums">'+
-          '<div><b>'+JUZHU.districtManagedUnits(d)+'</b>在管</div>'+
+          '<div><b>'+JUZHU.districtManagedUnits(d)+'</b>房源量</div>'+
           '<div><b>'+d.project_count+'</b>项目</div>'+
           '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b>均价</div>'+
         '</div></div></a>';

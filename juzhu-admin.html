@@ -356,11 +356,22 @@ function renderDictionary() {
       '<button type="button" class="btn danger d_del">删</button></td></tr>';
   }).join('');
 
+  var heroBg = city.hero_bg_image || '';
+  var heroPreview = heroBg ? "background-image:url('/"+heroBg.replace(/^\//,'')+"')" : '';
+
   root.innerHTML =
     '<div class="card"><h2>城市</h2>'+
       '<div class="grid">'+
         '<div class="fld"><label>城市名称</label><input id="cityName" value="'+esc(city.name||'')+'"/></div>'+
         '<div class="fld"><label>Slug</label><input id="citySlug" value="'+esc(city.slug||'')+'"/></div>'+
+        '<div class="fld grid full img-field"><label>频道首页头图（方案 C · '+esc(city.name||'城市')+' · 新居住）</label>'+
+          '<div class="img-field-row">'+
+            '<input id="cityHeroBg" value="'+esc(heroBg)+'" placeholder="assets/juzhu/sy/city/hero.jpg"/>'+
+            '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="upload-input"/></label>'+
+          '</div>'+
+          '<div class="cover-preview" id="cityHeroPreview" style="'+heroPreview+'"></div>'+
+          '<p class="hint">用于 juzhu-channel-v3-grid.html 顶部「城市 · 新居住」背景，上传后自动保存</p>'+
+        '</div>'+
       '</div>'+
       '<div class="bar"><button type="button" class="btn primary" id="saveCity">保存城市</button></div>'+
     '</div>'+
@@ -370,7 +381,7 @@ function renderDictionary() {
       '<tbody>'+chRows+'</tbody></table>'+
     '</div>'+
     '<div class="card"><h2>行政区 <span class="badge" style="background:var(--gold)">'+state.districts.length+'</span></h2>'+
-      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>备注</th><th>排序</th><th>封面路径</th><th>项目/户型/在管</th><th>操作</th></tr></thead>'+
+      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>备注</th><th>排序</th><th>封面路径</th><th>项目/户型/房源量</th><th>操作</th></tr></thead>'+
       '<tbody id="distRows">'+distRows+'</tbody></table>'+
       '<div class="bar"><button type="button" class="btn ghost" id="addDistrict">+ 新增行政区</button></div>'+
     '</div>';
@@ -378,12 +389,37 @@ function renderDictionary() {
   document.getElementById('saveCity').onclick = function() {
     api('/city', { method:'PUT', body: {
       name: document.getElementById('cityName').value.trim(),
-      slug: document.getElementById('citySlug').value.trim()
+      slug: document.getElementById('citySlug').value.trim(),
+      hero_bg_image: document.getElementById('cityHeroBg').value.trim() || null
     }}).then(function(res) {
       state.city = res.city;
       toast('城市已保存');
     }).catch(function(e){ toast('保存失败：'+e.message); });
   };
+
+  var heroInput = document.getElementById('cityHeroBg');
+  if (heroInput) {
+    heroInput.oninput = function() {
+      document.getElementById('cityHeroPreview').style.backgroundImage =
+        this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    };
+    var heroUpload = heroInput.closest('.img-field').querySelector('.upload-input');
+    if (heroUpload) {
+      heroUpload.onchange = function() {
+        var file = heroUpload.files && heroUpload.files[0];
+        if (!file) return;
+        toast('上传中…');
+        uploadImage(file, { scope: 'city_hero' }).then(function(res) {
+          heroInput.value = res.file_path;
+          document.getElementById('cityHeroPreview').style.backgroundImage =
+            "url('/"+res.file_path.replace(/^\//,'')+"')";
+          if (state.city) state.city.hero_bg_image = res.file_path;
+          toast('头图已上传并保存');
+          heroUpload.value = '';
+        }).catch(function(e){ toast('上传失败：'+e.message); heroUpload.value = ''; });
+      };
+    }
+  }
 
   root.querySelectorAll('.ch_save').forEach(function(btn) {
     btn.onclick = function() {
@@ -468,7 +504,7 @@ function renderProjectList() {
   box.innerHTML = state.projects.map(function(p) {
     var on = state.current && state.current.id === p.id ? ' on' : '';
     var ch = channelLabel(p.channel);
-    var managed = p.channel === 'bzf' ? (' · 在管 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
+    var managed = p.channel === 'bzf' ? (' · 房源量 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
     return '<button type="button" class="'+on.trim()+'" data-id="'+p.id+'">'+
       '<div class="nm">'+p.name+'</div>'+
       '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+'</div></button>';
@@ -683,7 +719,7 @@ function renderEditor() {
         '<div class="fld grid full"><label>地址 / 副标题</label><input id="p_addr" value="'+esc(p.address||'')+'"/></div>'+
         '<div class="fld"><label>标签（逗号分隔）</label><input id="p_tags" value="'+esc(tagsStr(p.tags))+'"/></div>'+
         '<div class="fld"><label>'+(isTrade?'起价（万）':'起租（元/月）')+'</label><input id="p_price" type="number" value="'+(p.price_from||'')+'"/></div>'+
-        (isTrade?'':('<div class="fld"><label>在管房源量</label><input id="p_managed" type="number" min="0" value="'+(p.managed_unit_count!=null?p.managed_unit_count:'')+'"/><p class="hint" style="margin-top:4px;">实际在管套数，区级会自动加总</p></div>'))+
+        (isTrade?'':('<div class="fld"><label>房源量</label><input id="p_managed" type="number" min="0" value="'+(p.managed_unit_count!=null?p.managed_unit_count:'')+'"/><p class="hint" style="margin-top:4px;">项目实际房源套数，区级会自动加总</p></div>'))+
         (isTrade?'<div class="fld"><label>旧房估价提示</label><input id="p_old" value="'+esc(p.old_house_hint||'')+'"/></div>':'')+
         '<div class="fld grid full img-field"><label>封面图</label>'+
           '<div class="img-field-row">'+

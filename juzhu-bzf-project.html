@@ -67,7 +67,7 @@
     document.getElementById('pname').textContent = p.name;
     document.getElementById('pmeta').textContent = (isTrade
       ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')
-      : ('在管 ' + JUZHU.managedUnits(p) + ' 套 · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
+      : ('房源量 ' + JUZHU.managedUnits(p) + ' · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
     document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
     document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租房型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';

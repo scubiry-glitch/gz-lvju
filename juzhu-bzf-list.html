@@ -50,7 +50,7 @@
 
     <div class="mini-stat">
       <div><b id="s1">—</b>项目</div>
-      <div><b id="s2">—</b>在管房源</div>
+      <div><b id="s2">—</b>房源量</div>
       <div><b id="s3">—</b>户型</div>
       <div><b id="s4">—</b>参考均价</div>
     </div>
@@ -76,7 +76,7 @@
 
     document.getElementById('dname').textContent = d.name;
     document.getElementById('dno').textContent = String(d.sort_order).padStart(2,'0');
-    document.getElementById('dsub').textContent = (d.note || (d.project_count + ' 项目 · 在管 ' + JUZHU.districtManagedUnits(d) + ' 套 · ' + d.unit_count + ' 户型'));
+    document.getElementById('dsub').textContent = (d.note || (d.project_count + ' 项目 · 房源量 ' + JUZHU.districtManagedUnits(d) + ' · ' + d.unit_count + ' 户型'));
     document.getElementById('s1').textContent = d.project_count;
     document.getElementById('s2').textContent = JUZHU.districtManagedUnits(d);
     document.getElementById('s3').textContent = d.unit_count;
@@ -96,7 +96,7 @@
       return '<a class="pcard" href="juzhu-bzf-project.html?project='+encodeURIComponent(p.slug)+'">'+
         '<div class="th" style="'+th+'"></div>'+
         '<div class="info"><div class="nm">'+p.name+'</div>'+
-        '<div class="meta">在管 '+JUZHU.managedUnits(p)+' 套 · '+p.unit_count+' 个户型 · '+(p.address||'')+'</div>'+
+        '<div class="meta">房源量 '+JUZHU.managedUnits(p)+' · '+p.unit_count+' 个户型 · '+(p.address||'')+'</div>'+
         '<div class="tags">'+tags+'</div>'+
         '<div class="pr"><b>'+JUZHU.fmtRent(p.price_from)+'<small style="font-size:10px;color:var(--muted)">/月起</small></b>'+
         '<span class="n">查看户型 ›</span></div></div></a>';

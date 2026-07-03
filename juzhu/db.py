@@ -32,6 +32,8 @@ def ensure_schema(conn):
     city_cols = {r[1] for r in conn.execute("PRAGMA table_info(cities)").fetchall()}
     if city_cols and "booking_phone" not in city_cols:
         conn.execute("ALTER TABLE cities ADD COLUMN booking_phone TEXT")
+    if city_cols and "hero_bg_image" not in city_cols:
+        conn.execute("ALTER TABLE cities ADD COLUMN hero_bg_image TEXT")
     district_cols = {r[1] for r in conn.execute("PRAGMA table_info(districts)").fetchall()}
     if district_cols and "managed_unit_count" not in district_cols:
         conn.execute("ALTER TABLE districts ADD COLUMN managed_unit_count INTEGER")

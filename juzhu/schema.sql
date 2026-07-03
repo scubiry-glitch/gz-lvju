@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS cities (
   id              INTEGER PRIMARY KEY,
   name            TEXT NOT NULL UNIQUE,          -- 沈阳
   slug            TEXT NOT NULL UNIQUE,          -- shenyang
-  booking_phone   TEXT                           -- 预约看房 / 咨询置换电话
+  booking_phone   TEXT,                          -- 预约看房 / 咨询置换电话
+  hero_bg_image   TEXT                           -- 频道首页头图（方案 C split-hd）
 );
 
 CREATE TABLE IF NOT EXISTS districts (
