@@ -332,10 +332,75 @@ window.JUZHU = (function () {
     return bookingPhone();
   }
 
-  function unitDisplayTags(u, project) {
-    var tags = asTags(u && u.tags);
-    if (!tags.length && project) tags = asTags(project.tags);
+  function uniqTags(list) {
+    var seen = {};
+    var out = [];
+    (list || []).forEach(function(t) {
+      var s = String(t).trim();
+      if (s && !seen[s]) { seen[s] = true; out.push(s); }
+    });
+    return out;
+  }
+
+  function inferBrandTag(project) {
+    var n = (project && project.name) || '';
+    var rules = [
+      [/建融|CCB/i, '建融家园'], [/逸居/, '逸居'], [/人才/, '人才公寓'],
+      [/龙湖/, '龙湖'], [/中海/, '中海'], [/华润/, '华润'], [/惠民/, '惠民保租'], [/地铁云杉/, '地铁上盖']
+    ];
+    for (var i = 0; i < rules.length; i++) {
+      if (rules[i][0].test(n)) return rules[i][1];
+    }
+    return null;
+  }
+
+  function inferAutoUnitTags(u, project) {
+    if (!project || project.channel === 'trade') {
+      return ['卖旧买新', '以旧换新', '试点房源'];
+    }
+    var tags = ['政府保租房'];
+    var brand = inferBrandTag(project);
+    if (brand) tags.push(brand);
+    asTags(project.tags).forEach(function(t) { tags.push(t); });
+
+    var addr = ((project.address || '') + ' ' + (project.name || '')).trim();
+    if (/地铁|青年大街|中街|奥体|北站|沈阳站|新市府|工业展览|怀远门|铁西广场/.test(addr)) {
+      tags.push('近地铁');
+    }
+    if (u.layout_label) tags.push(u.layout_label);
+    else if (u.area_sqm != null) {
+      if (u.area_sqm <= 35) tags.push('精致小户型');
+      else if (u.area_sqm >= 80) tags.push('宽敞大户型');
+    }
+    var am = unitAmenityIds(u);
+    if (am.indexOf('washer') >= 0 && am.indexOf('fridge') >= 0) tags.push('拎包入住');
+    tags.push('押一付一', '租金受控');
+    var hr = houseRating(project);
+    if (hr && hr.stars >= 4 && !hr.pending) tags.push('好房子' + hr.stars + '星');
+    if (u.promo_price) tags.push('首月特惠');
     return tags;
+  }
+
+  function unitDisplayTags(u, project) {
+    var explicit = asTags(u && u.tags);
+    if (explicit.length >= 4) {
+      if (u && u.promo_price && explicit.indexOf('首月特惠') < 0) explicit.push('首月特惠');
+      return uniqTags(explicit).slice(0, 8);
+    }
+    return uniqTags(explicit.concat(inferAutoUnitTags(u, project))).slice(0, 8);
+  }
+
+  function unitTagClass(tag, index) {
+    if (index === 0 || /政府|保租/.test(tag)) return 'tag primary';
+    if (/好房子|特惠|星/.test(tag)) return 'tag gold';
+    if (/近地铁|拎包|押一/.test(tag)) return 'tag accent';
+    return 'tag';
+  }
+
+  function unitTagsHtml(tags) {
+    return (tags || []).map(function(t, i) {
+      return '<span class="' + unitTagClass(t, i) + '">' + t + '</span>';
+    }).join('');
   }
 
   function unitSpecLine(u) {
@@ -448,6 +513,7 @@ window.JUZHU = (function () {
     AMENITY_CATALOG: AMENITY_CATALOG,
     unitKeeperPhone: unitKeeperPhone,
     unitDisplayTags: unitDisplayTags,
+    unitTagsHtml: unitTagsHtml,
     unitSpecLine: unitSpecLine,
     amenityItems: amenityItems,
     effectiveRentDetail: effectiveRentDetail,

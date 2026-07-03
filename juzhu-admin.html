@@ -882,7 +882,7 @@ function renderUnitDetailPanel(u) {
   return '<div class="unit-detail-panel" data-unit-detail="'+u.id+'">'+
     '<div class="sec"><div class="sec-h">房源信息标签</div>'+
       '<div class="detail-grid">'+
-        '<div class="full"><label>标签（逗号分隔，首条可设为主标签）</label><input class="ud_tags" value="'+esc(tagsStr(u.tags))+'" placeholder="保租房, 近地铁, 押一付一"/></div>'+
+        '<div class="full"><label>标签（逗号分隔，首条为主标签；留空则自动生成）</label><input class="ud_tags" value="'+esc(tagsStr(u.tags))+'" placeholder="政府保租房, 建融家园, 近地铁, 押一付一, 拎包入住"/></div>'+
         '<div class="full"><label>规格说明</label><input class="ud_spec" value="'+esc(u.unit_spec||'')+'" placeholder="1室1厅1厨1卫 | 100㎡ | 南/北 | 立即入住"/></div>'+
         '<div><label>券后价（元/月，可选）</label><input class="ud_promo" type="number" value="'+(u.promo_price!=null?u.promo_price:'')+'"/></div>'+
       '</div></div>'+

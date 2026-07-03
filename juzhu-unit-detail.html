@@ -26,71 +26,88 @@
   .gal-ctrl .cnt{font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
   .gal-thumbs{display:flex;gap:8px;padding:10px 16px 0;overflow-x:auto;scrollbar-width:none;}
   .gal-thumbs::-webkit-scrollbar{display:none;}
-  .gal-thumbs button{flex:0 0 auto;width:56px;height:56px;border-radius:10px;border:2px solid transparent;
-    padding:0;overflow:hidden;background:#e8ece9;cursor:pointer;}
-  .gal-thumbs button.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand);}
+  .gal-thumbs button{flex:0 0 auto;width:56px;height:56px;border-radius:12px;border:2px solid transparent;
+    padding:0;overflow:hidden;background:#e8ece9;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  .gal-thumbs button.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),0 2px 8px rgba(15,118,110,.15);}
   .gal-thumbs button img{width:100%;height:100%;object-fit:cover;display:block;}
   .gal-sheet{padding:14px 16px 8px;}
-  .gal-sheet .sheet-h{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;}
-  .gal-sheet .sheet-h span{font-family:var(--font);font-size:11px;font-weight:500;color:var(--muted);margin-left:6px;}
+  .gal-sheet .sheet-h{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;
+    display:flex;align-items:center;gap:6px;}
+  .gal-sheet .sheet-h::before{content:'';width:3px;height:14px;border-radius:2px;background:var(--brand);}
+  .gal-sheet .sheet-h span{font-family:var(--font);font-size:11px;font-weight:500;color:var(--muted);margin-left:4px;}
   .gal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .gal-grid .cell{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:4/3;background:#0c4d44;
-    border:0;padding:0;cursor:pointer;display:block;width:100%;}
+    border:0;padding:0;cursor:pointer;display:block;width:100%;
+    box-shadow:0 1px 6px rgba(0,0,0,.08);}
   .gal-grid .cell img{width:100%;height:100%;object-fit:cover;display:block;}
   .gal-grid .cell.on{outline:2px solid var(--brand);outline-offset:2px;}
   .gal-grid .cell.wide{grid-column:span 2;aspect-ratio:16/9;}
   /* 好房子评级 */
-  .rating-wrap{padding:8px 0 0;}
-  .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
-  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
-  .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
-  .rating-sum{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;
-    padding:14px;margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:12px;}
-  .stars-side{text-align:center;min-width:88px;}
-  .stars-side .ek{font-size:10px;color:var(--muted);letter-spacing:.08em;}
-  .stars-side .stars{font-size:18px;color:#eab308;letter-spacing:1px;line-height:1.2;margin:4px 0;}
+  .rating-wrap{padding:10px 0 0;}
+  .block{background:#fff;margin:8px 12px 0;padding:16px 18px;border-radius:14px;
+    box-shadow:0 1px 8px rgba(0,0,0,.04);}
+  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);
+    display:flex;align-items:center;gap:6px;}
+  .block .bt::before{content:'';width:3px;height:16px;border-radius:2px;background:var(--brand);}
+  .block .bs{font-size:11px;color:var(--muted);margin-top:4px;}
+  .rating-sum{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;
+    padding:16px;margin-top:14px;background:linear-gradient(135deg,#fafcfb,#f3f6f5);border:1px solid var(--border);border-radius:14px;}
+  .stars-side{text-align:center;min-width:92px;}
+  .stars-side .ek{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+  .stars-side .stars{font-size:20px;color:#eab308;letter-spacing:2px;line-height:1.2;margin:6px 0;}
   .stars-side .stars .dim{color:var(--border);}
-  .stars-side .lbl{font-size:11px;color:var(--muted);}
-  .stars-side .sc{font-size:11px;color:var(--muted);margin-top:4px;}
-  .stars-side .sc b{font-size:14px;color:var(--ink);}
-  .hdim{display:grid;grid-template-columns:52px 1fr 32px;gap:6px;align-items:center;font-size:11px;margin-bottom:5px;}
+  .stars-side .lbl{font-size:12px;color:var(--brand);font-weight:600;}
+  .stars-side .sc{font-size:11px;color:var(--muted);margin-top:5px;}
+  .stars-side .sc b{font-size:16px;color:var(--ink);}
+  .hdim{display:grid;grid-template-columns:56px 1fr 34px;gap:6px;align-items:center;font-size:11.5px;margin-bottom:7px;}
   .hdim:last-child{margin-bottom:0;}
-  .hdim .k{color:var(--muted);white-space:nowrap;}
-  .hdim .bar{height:6px;background:#eef2f1;border-radius:3px;overflow:hidden;}
-  .hdim .bar i{display:block;height:100%;border-radius:3px;}
-  .hdim .v{font-weight:700;text-align:right;}
-  .verify{margin-top:12px;border:1px dashed var(--gold);background:var(--gold-soft);border-radius:12px;
-    padding:11px 13px;display:flex;align-items:center;gap:11px;}
+  .hdim .k{color:var(--ink);white-space:nowrap;font-weight:500;}
+  .hdim .bar{height:8px;background:#eef2f1;border-radius:4px;overflow:hidden;position:relative;}
+  .hdim .bar i{display:block;height:100%;border-radius:4px;transition:width .6s ease;}
+  .hdim .v{font-weight:700;text-align:right;font-size:12px;}
+  .verify{margin-top:14px;border:1px solid rgba(180,138,63,.2);background:linear-gradient(135deg,var(--gold-soft),rgba(180,138,63,.08));border-radius:14px;
+    padding:13px 14px;display:flex;align-items:center;gap:12px;}
   .verify .no{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:var(--gold-deep);}
-  .verify .vb{font-size:10.5px;color:var(--ink);margin-top:3px;}
+  .verify .vb{font-size:11px;color:var(--ink);margin-top:3px;line-height:1.5;}
   .verify .vb b{color:var(--brand);}
-  .verify .vb a{color:var(--brand);}
+  .verify .vb a{color:var(--brand);font-weight:500;}
   .verify a.qrlink{flex-shrink:0;line-height:0;}
-  .verify .qrimg{width:48px;height:48px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+  .verify .qrimg{width:50px;height:50px;border-radius:10px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);}
   /* 房源信息 */
-  .info-block{background:#fff;padding:14px 16px 12px;margin-top:0;}
+  .info-block{background:#fff;padding:16px 18px 14px;margin:-10px 12px 0;border-radius:14px;
+    box-shadow:0 2px 12px rgba(0,0,0,.06);position:relative;z-index:5;}
   .info-block .title-row{display:flex;align-items:flex-start;gap:10px;}
-  .info-block .title-row h2{flex:1;font-family:var(--serif);font-size:17px;font-weight:700;line-height:1.35;margin:0;color:var(--ink);}
-  .info-block .rent-link{flex-shrink:0;font-size:12px;color:var(--brand);font-weight:600;white-space:nowrap;padding-top:2px;}
-  .info-block .spec{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
-  .tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
-  .tag-row .tag{font-size:11px;padding:4px 10px;border-radius:6px;background:#f1f5f4;color:var(--ink);}
-  .tag-row .tag.primary{background:var(--brand);color:#fff;font-weight:600;}
+  .info-block .title-row h2{flex:1;font-family:var(--serif);font-size:18px;font-weight:700;line-height:1.35;margin:0;color:var(--ink);}
+  .info-block .rent-link{flex-shrink:0;font-size:12px;color:var(--brand);font-weight:600;white-space:nowrap;
+    padding:5px 12px;border-radius:8px;background:var(--brand-soft);border:1px solid rgba(15,118,110,.15);}
+  .info-block .spec{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.6;letter-spacing:.01em;}
+  .tag-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+  .tag-row .tag{font-size:11px;padding:4px 11px;border-radius:8px;background:#f1f5f4;color:var(--ink);font-weight:500;letter-spacing:.02em;}
+  .tag-row .tag.primary{background:var(--brand);color:#fff;font-weight:600;letter-spacing:.04em;}
+  .tag-row .tag.accent{background:var(--brand-soft);color:var(--brand);font-weight:600;}
+  .tag-row .tag.gold{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-weight:600;}
   /* 房型介绍 */
-  .amen-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px 8px;margin-top:12px;}
-  .amen-grid .item{text-align:center;font-size:10px;color:var(--muted);}
-  .amen-grid .ico{width:36px;height:36px;margin:0 auto 5px;border-radius:10px;background:#f3f6f5;
-    display:grid;place-items:center;font-size:16px;color:#8a9692;}
+  .amen-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px 6px;margin-top:12px;}
+  .amen-grid .item{text-align:center;font-size:10.5px;color:var(--ink);font-weight:500;}
+  .amen-grid .ico{width:34px;height:34px;margin:0 auto 4px;border-radius:10px;
+    background:linear-gradient(135deg,var(--brand-soft),rgba(15,118,110,.06));
+    display:grid;place-items:center;font-size:15px;color:var(--brand);
+    box-shadow:0 1px 3px rgba(15,118,110,.06);}
   /* 咨询管家 */
-  .keeper-row{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px;background:#fafcfb;border-radius:12px;border:1px solid var(--border);}
-  .keeper-row .av{width:48px;height:48px;border-radius:50%;background:#e8eeec center/cover no-repeat;flex-shrink:0;border:1px solid var(--border);}
-  .keeper-row .av.placeholder{display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,#fff5eb,#ffe8d6);color:#ea580c;}
+  .keeper-row{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px;
+    background:linear-gradient(135deg,#fafcfb 0%,var(--brand-soft) 100%);border-radius:14px;
+    border:1px solid rgba(15,118,110,.1);}
+  .keeper-row .av{width:50px;height:50px;border-radius:50%;background:#e8eeec center/cover no-repeat;flex-shrink:0;
+    border:2px solid rgba(255,255,255,.8);box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  .keeper-row .av.placeholder{display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,#fff5eb,#ffe8d6);color:#ea580c;}
   .keeper-row .nm{font-size:15px;font-weight:700;color:var(--ink);}
-  .keeper-row .hint{font-size:11px;color:var(--muted);margin-top:2px;}
-  .keeper-row .acts{margin-left:auto;display:flex;gap:8px;}
-  .keeper-row .ic{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:#fff;
-    display:grid;place-items:center;font-size:18px;color:var(--brand);text-decoration:none;}
-  .keeper-row .ic.tel{background:color-mix(in oklab,var(--brand) 12%,#fff);}
+  .keeper-row .hint{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .keeper-row .acts{margin-left:auto;display:flex;gap:10px;}
+  .keeper-row .ic{width:44px;height:44px;border-radius:50%;border:1px solid rgba(15,118,110,.15);background:#fff;
+    display:grid;place-items:center;font-size:18px;color:var(--brand);text-decoration:none;
+    box-shadow:0 2px 8px rgba(15,118,110,.1);}
+  .keeper-row .ic.tel{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 2px 10px rgba(15,118,110,.2);}
   /* 租金弹层 */
   .rent-modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;}
   .rent-modal[hidden]{display:none!important;}
@@ -120,7 +137,8 @@
   .fee-note{font-size:11px;color:var(--muted);margin-top:16px;text-align:center;}
   .rent-cta{margin:0 16px 16px;padding:14px;border:0;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--brand-2));
     color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
-  .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;}
+  .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;font-weight:600;}
+  .cta .btn-call:active{background:var(--brand-soft);}
   .promo-bar{background:linear-gradient(90deg,#ff8a3d,#0c4d44);color:#fff;padding:10px 16px;display:flex;align-items:baseline;gap:8px;}
   .promo-bar .big{font-family:var(--serif);font-size:22px;font-weight:700;}
   .promo-bar .orig{font-size:11px;opacity:.85;text-decoration:line-through;}
@@ -190,7 +208,7 @@
   </div>
 </div>
 <div id="rentModalWrap"></div>
-<script src="juzhu/app.js?v=8"></script>
+<script src="juzhu/app.js?v=9"></script>
 <script src="screens/_qr.js"></script>
 <script>
 (function(){
@@ -257,11 +275,7 @@
     document.getElementById('infoSpec').textContent = JUZHU.unitSpecLine(u);
     document.getElementById('infoBlock').hidden = false;
 
-    var tagHtml = '';
-    tags.forEach(function(t, i) {
-      tagHtml += '<span class="tag' + (i === 0 ? ' primary' : '') + '">' + t + '</span>';
-    });
-    document.getElementById('infoTags').innerHTML = tagHtml || '';
+    document.getElementById('infoTags').innerHTML = JUZHU.unitTagsHtml(tags);
 
     if (u.promo_price && u.rent_monthly) {
       document.getElementById('promoBar').hidden = false;

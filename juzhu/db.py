@@ -56,6 +56,7 @@ def ensure_schema(conn):
             if col not in unit_cols:
                 conn.execute(sql)
         ensure_unit_amenities(conn)
+        ensure_unit_tags(conn)
     ensure_channels(conn)
     conn.commit()
 
@@ -103,6 +104,121 @@ def ensure_unit_amenities(conn):
            WHERE amenities IS NULL OR TRIM(amenities)='' OR amenities='[]'""",
         (default,),
     )
+
+
+def _tags_list(raw):
+    if raw is None or raw == "":
+        return []
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, str):
+        try:
+            val = json.loads(raw)
+            return _tags_list(val)
+        except json.JSONDecodeError:
+            return [raw.strip()] if raw.strip() else []
+    return []
+
+
+def build_default_unit_tags(unit, project):
+    """按项目/户型生成默认房源标签（保租房演示）"""
+    tags = ["政府保租房"]
+    pname = (project.get("name") or project.get("project_name") or "").strip()
+    addr = ((project.get("address") or "") + " " + pname).strip()
+
+    for t in _tags_list(project.get("project_tags") or project.get("tags")):
+        if t not in tags:
+            tags.append(t)
+
+    brand_rules = [
+        ("建融", "建融家园"), ("CCB", "建融家园"), ("逸居", "逸居"),
+        ("人才", "人才公寓"), ("龙湖", "龙湖"), ("中海", "中海"),
+        ("华润", "华润"), ("惠民", "惠民保租"), ("地铁", "地铁上盖"),
+    ]
+    for key, label in brand_rules:
+        if key in pname and label not in tags:
+            tags.append(label)
+            break
+
+    subway_keys = ("地铁", "青年大街", "中街", "奥体", "北站", "沈阳站", "新市府", "工业展览", "怀远门", "铁西广场")
+    if any(k in addr for k in subway_keys) and "近地铁" not in tags:
+        tags.append("近地铁")
+
+    layout = unit.get("layout_label")
+    if layout and layout not in tags:
+        tags.append(layout)
+    else:
+        area = unit.get("area_sqm")
+        if area is not None:
+            if area <= 35 and "精致小户型" not in tags:
+                tags.append("精致小户型")
+            elif area >= 80 and "宽敞大户型" not in tags:
+                tags.append("宽敞大户型")
+
+    for t in ("押一付一", "租金受控", "拎包入住"):
+        if t not in tags:
+            tags.append(t)
+
+    rating = parse_rating_value(project.get("rating"))
+    if project.get("rating_status") == "passed" and rating and rating.get("stars"):
+        star_tag = f"好房子{rating['stars']}星"
+        if star_tag not in tags:
+            tags.append(star_tag)
+    elif project.get("rating_status") in ("passed", "pending") and rating and rating.get("stars", 0) >= 4:
+        star_tag = f"好房子{rating['stars']}星"
+        if star_tag not in tags:
+            tags.append(star_tag)
+
+    if unit.get("promo_price") and "首月特惠" not in tags:
+        tags.append("首月特惠")
+
+    seen = set()
+    out = []
+    for t in tags:
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out[:8]
+
+
+def _needs_tag_refresh(existing, project_row):
+    if not existing:
+        return True
+    if len(existing) < 4:
+        return True
+    pname = (project_row.get("project_name") or project_row.get("name") or "")
+    if "建融" in pname and "建融家园" not in existing:
+        return True
+    if "逸居" in pname and not any("逸居" in t for t in existing):
+        return True
+    if "人才" in pname and "人才公寓" not in existing:
+        return True
+    return False
+
+
+def ensure_unit_tags(conn):
+    """保租房房源写入/刷新默认标签"""
+    rows = conn.execute(
+        """SELECT u.id, u.layout_label, u.area_sqm, u.promo_price, u.tags,
+                  p.name AS project_name, p.address, p.tags AS project_tags,
+                  p.channel, p.rating, p.rating_status
+           FROM units u JOIN projects p ON p.id=u.project_id"""
+    ).fetchall()
+    for row in rows:
+        d = dict(row)
+        existing = _tags_list(d.get("tags"))
+        if d.get("channel") == "trade":
+            if existing:
+                continue
+            tags = ["卖旧买新", "以旧换新", "试点房源"]
+        else:
+            if not _needs_tag_refresh(existing, d):
+                continue
+            tags = build_default_unit_tags(d, d)
+        conn.execute(
+            "UPDATE units SET tags=? WHERE id=?",
+            (json.dumps(tags, ensure_ascii=False), d["id"]),
+        )
 
 
 def rating_code(project_id):

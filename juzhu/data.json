@@ -843,7 +843,15 @@
       "layout_label": null,
       "rent_monthly": 1440,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
+      ],
       "sort_order": 1,
       "cover_image": null,
       "unit_spec": null,
@@ -872,7 +880,14 @@
       "layout_label": null,
       "rent_monthly": 1550,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
+      ],
       "sort_order": 2,
       "cover_image": null,
       "unit_spec": null,
@@ -901,7 +916,14 @@
       "layout_label": null,
       "rent_monthly": 1708,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平.jpg",
       "unit_spec": null,
@@ -930,7 +952,14 @@
       "layout_label": null,
       "rent_monthly": 1384,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg",
       "unit_spec": null,
@@ -959,7 +988,14 @@
       "layout_label": null,
       "rent_monthly": 1486,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg",
       "unit_spec": null,
@@ -988,7 +1024,14 @@
       "layout_label": null,
       "rent_monthly": 2048,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/106平.jpg",
       "unit_spec": null,
@@ -1017,7 +1060,13 @@
       "layout_label": null,
       "rent_monthly": 1726,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/62平.jpg",
       "unit_spec": null,
@@ -1046,7 +1095,13 @@
       "layout_label": null,
       "rent_monthly": 1772,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/64平.jpg",
       "unit_spec": null,
@@ -1075,7 +1130,14 @@
       "layout_label": null,
       "rent_monthly": 1970,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/85平.jpg",
       "unit_spec": null,
@@ -1104,7 +1166,14 @@
       "layout_label": null,
       "rent_monthly": 2096,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 5,
       "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/97平.jpg",
       "unit_spec": null,
@@ -1133,7 +1202,13 @@
       "layout_label": null,
       "rent_monthly": 1464,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/观泉店/33平.jpg",
       "unit_spec": null,
@@ -1162,7 +1237,12 @@
       "layout_label": null,
       "rent_monthly": 1622,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/观泉店/49平.jpg",
       "unit_spec": null,
@@ -1191,7 +1271,13 @@
       "layout_label": null,
       "rent_monthly": 1600,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平.jpg",
       "unit_spec": null,
@@ -1220,7 +1306,13 @@
       "layout_label": null,
       "rent_monthly": 1710,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平.jpg",
       "unit_spec": null,
@@ -1249,7 +1341,15 @@
       "layout_label": null,
       "rent_monthly": 1384,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg",
       "unit_spec": null,
@@ -1278,7 +1378,15 @@
       "layout_label": null,
       "rent_monthly": 1486,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg",
       "unit_spec": null,
@@ -1307,7 +1415,12 @@
       "layout_label": null,
       "rent_monthly": 1568,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/中金启城/46_副本.jpg",
       "unit_spec": null,
@@ -1336,7 +1449,12 @@
       "layout_label": null,
       "rent_monthly": 1734,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/中金启城/63_副本.jpg",
       "unit_spec": null,
@@ -1365,7 +1483,12 @@
       "layout_label": null,
       "rent_monthly": 1651,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.43双西中间客厅_副本.jpg",
       "unit_spec": null,
@@ -1394,7 +1517,12 @@
       "layout_label": null,
       "rent_monthly": 1682,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.59双西_副本.jpg",
       "unit_spec": null,
@@ -1423,7 +1551,12 @@
       "layout_label": null,
       "rent_monthly": 1708,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56。21东北_副本.jpg",
       "unit_spec": null,
@@ -1452,7 +1585,12 @@
       "layout_label": null,
       "rent_monthly": 1600,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民50_副本.jpg",
       "unit_spec": null,
@@ -1481,7 +1619,12 @@
       "layout_label": null,
       "rent_monthly": 1694,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民58_副本.jpg",
       "unit_spec": null,
@@ -1510,7 +1653,12 @@
       "layout_label": null,
       "rent_monthly": 1828,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民71_副本.jpg",
       "unit_spec": null,
@@ -1539,7 +1687,13 @@
       "layout_label": null,
       "rent_monthly": 2002,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民89_副本.jpg",
       "unit_spec": null,
@@ -1568,7 +1722,13 @@
       "layout_label": null,
       "rent_monthly": 1464,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/33平.jpg",
       "unit_spec": null,
@@ -1597,7 +1757,12 @@
       "layout_label": null,
       "rent_monthly": 1662,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/54平.jpg",
       "unit_spec": null,
@@ -1626,7 +1791,12 @@
       "layout_label": null,
       "rent_monthly": 1700,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/55平.jpg",
       "unit_spec": null,
@@ -1655,7 +1825,15 @@
       "layout_label": null,
       "rent_monthly": 1480,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg",
       "unit_spec": null,
@@ -1684,7 +1862,14 @@
       "layout_label": null,
       "rent_monthly": 1710,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "近地铁",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg",
       "unit_spec": null,
@@ -1713,7 +1898,13 @@
       "layout_label": null,
       "rent_monthly": 2016,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/102_副本.jpg",
       "unit_spec": null,
@@ -1742,7 +1933,13 @@
       "layout_label": null,
       "rent_monthly": 2110,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/110_副本.jpg",
       "unit_spec": null,
@@ -1771,7 +1968,13 @@
       "layout_label": null,
       "rent_monthly": 2364,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/138_副本.jpg",
       "unit_spec": null,
@@ -1800,7 +2003,13 @@
       "layout_label": null,
       "rent_monthly": 2458,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/146_副本.jpg",
       "unit_spec": null,
@@ -1829,7 +2038,13 @@
       "layout_label": null,
       "rent_monthly": 2504,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 5,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/148_副本.jpg",
       "unit_spec": null,
@@ -1858,7 +2073,13 @@
       "layout_label": null,
       "rent_monthly": 2670,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 6,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/165_副本.jpg",
       "unit_spec": null,
@@ -1887,7 +2108,13 @@
       "layout_label": null,
       "rent_monthly": 2060,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 7,
       "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/85_副本.jpg",
       "unit_spec": null,
@@ -1916,7 +2143,13 @@
       "layout_label": null,
       "rent_monthly": 1592,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/49平.jpg",
       "unit_spec": null,
@@ -1945,7 +2178,13 @@
       "layout_label": null,
       "rent_monthly": 1686,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/57平.jpg",
       "unit_spec": null,
@@ -1974,7 +2213,13 @@
       "layout_label": null,
       "rent_monthly": 1748,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/61平.jpg",
       "unit_spec": null,
@@ -2003,7 +2248,13 @@
       "layout_label": null,
       "rent_monthly": 1890,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "人才公寓",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/75平.jpg",
       "unit_spec": null,
@@ -2032,7 +2283,15 @@
       "layout_label": null,
       "rent_monthly": 1480,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png",
       "unit_spec": null,
@@ -2061,7 +2320,14 @@
       "layout_label": null,
       "rent_monthly": 1590,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "近地铁",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png",
       "unit_spec": null,
@@ -2090,7 +2356,14 @@
       "layout_label": null,
       "rent_monthly": 1860,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "近地铁",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg",
       "unit_spec": null,
@@ -2119,7 +2392,13 @@
       "layout_label": null,
       "rent_monthly": 2128,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/116_副本.jpg",
       "unit_spec": null,
@@ -2148,7 +2427,13 @@
       "layout_label": null,
       "rent_monthly": 1974,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/93平_副本.jpg",
       "unit_spec": null,
@@ -2177,7 +2462,13 @@
       "layout_label": null,
       "rent_monthly": 1552,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png",
       "unit_spec": null,
@@ -2206,7 +2497,13 @@
       "layout_label": null,
       "rent_monthly": 1552,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店C座/44.png",
       "unit_spec": null,
@@ -2235,7 +2532,13 @@
       "layout_label": null,
       "rent_monthly": 1520,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平.png",
       "unit_spec": null,
@@ -2264,7 +2567,13 @@
       "layout_label": null,
       "rent_monthly": 1702,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg",
       "unit_spec": null,
@@ -2293,7 +2602,13 @@
       "layout_label": null,
       "rent_monthly": 1748,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平.jpg",
       "unit_spec": null,
@@ -2322,7 +2637,14 @@
       "layout_label": null,
       "rent_monthly": 1408,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/26平.jpg",
       "unit_spec": null,
@@ -2351,7 +2673,14 @@
       "layout_label": null,
       "rent_monthly": 1510,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/35平.jpg",
       "unit_spec": null,
@@ -2380,7 +2709,13 @@
       "layout_label": null,
       "rent_monthly": 1520,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png",
       "unit_spec": null,
@@ -2409,7 +2744,13 @@
       "layout_label": null,
       "rent_monthly": 1678,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/56平.png",
       "unit_spec": null,
@@ -2438,7 +2779,13 @@
       "layout_label": null,
       "rent_monthly": 1828,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/71平.png",
       "unit_spec": null,
@@ -2467,7 +2814,14 @@
       "layout_label": null,
       "rent_monthly": 2056,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "逸居",
+        "宽敞大户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg",
       "unit_spec": null,
@@ -2496,7 +2850,12 @@
       "layout_label": null,
       "rent_monthly": 1536,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/九里店/42平.jpg",
       "unit_spec": null,
@@ -2525,7 +2884,13 @@
       "layout_label": null,
       "rent_monthly": 1640,
       "price_total": null,
-      "tags": [],
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/地铁云杉里/55平.jpg",
       "unit_spec": null,
@@ -2554,7 +2919,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 119,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg",
       "unit_spec": null,
@@ -2583,7 +2952,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 123,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg",
       "unit_spec": null,
@@ -2612,7 +2985,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 124,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg",
       "unit_spec": null,
@@ -2641,7 +3018,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 126,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg",
       "unit_spec": null,
@@ -2670,7 +3051,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 206,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg",
       "unit_spec": null,
@@ -2699,7 +3084,11 @@
       "layout_label": null,
       "rent_monthly": null,
       "price_total": 216,
-      "tags": [],
+      "tags": [
+        "卖旧买新",
+        "以旧换新",
+        "试点房源"
+      ],
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg",
       "unit_spec": null,
