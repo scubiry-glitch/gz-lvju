@@ -7,8 +7,7 @@
 <link rel="stylesheet" href="lvju-app.css?v=6">
 <style>
   .scr{padding-bottom:88px;}
-  .appbar.abs{position:absolute;top:0;left:0;right:0;z-index:20;background:transparent;border:0;}
-  .appbar.abs .ttl,.appbar.abs .bk,.appbar.abs .act span{color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35);}
+  .appbar.ghost .ttl small{color:rgba(255,255,255,.82);}
   .gal-hero{position:relative;background:#0c4d44;color:#fff;}
   .gal-hero .track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;height:min(56vh,420px);}
   .gal-hero .track::-webkit-scrollbar{display:none;}
@@ -73,7 +72,7 @@
 <body>
 <div class="app">
   <div class="scr" id="scr">
-    <div class="appbar abs">
+    <div class="appbar ghost" style="position:absolute;z-index:20;">
       <a class="bk" href="javascript:history.back()">‹</a>
       <div class="ttl" id="ttl">户型详情</div>
       <div class="act"><span>♡</span><span>⤴</span></div>
