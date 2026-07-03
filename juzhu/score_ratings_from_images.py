@@ -119,7 +119,7 @@ def build_rating(project: dict, units: list, photos: list, root: Path) -> dict:
     if not stats:
         return {
             "quality": 0.08,
-            "dims_hint": {"comfort": 2.8, "green": 2.6, "tech": 2.5, "safety": 3.0},
+            "signals": {"comfort": 0.35, "green": 0.30, "tech": 0.28, "safety": 0.42},
             "checked": 38,
             "confidence": 0.55,
             "photo_count": 0,
@@ -151,11 +151,11 @@ def build_rating(project: dict, units: list, photos: list, root: Path) -> dict:
 
     return {
         "quality": quality,
-        "dims_hint": {
-            "comfort": score_to_dim(2.0 + quality * 2.8, bright_s * 0.3 - 0.1),
-            "green": score_to_dim(2.0 + quality * 2.8, green_s * 0.35 - 0.08),
-            "tech": score_to_dim(2.0 + quality * 2.8, res_s * 0.25 + size_s * 0.1 - 0.15),
-            "safety": score_to_dim(2.0 + quality * 2.8, cover_s * 0.15),
+        "signals": {
+            "comfort": clamp(bright_s * 0.55 + sharp_s * 0.45, 0.0, 1.0),
+            "green": green_s,
+            "tech": clamp(res_s * 0.55 + size_s * 0.45, 0.0, 1.0),
+            "safety": clamp(cover_s * 0.55 + count_s * 0.45, 0.0, 1.0),
         },
         "checked": int(36 + quality * 16),
         "confidence": round(0.52 + quality * 0.38, 2),
@@ -175,13 +175,28 @@ def quality_to_stars(quality: float, rank: float) -> int:
 
 
 def finalize_rating(project: dict, meta: dict, stars: int) -> dict:
-    hint = meta.get("dims_hint") or {}
-    center = {2: 2.7, 3: 3.4, 4: 4.0, 5: 4.6}[stars]
-    lo, hi = {2: (2.4, 3.1), 3: (3.1, 3.9), 4: (3.8, 4.4), 5: (4.3, 5.0)}[stars]
+    """四维度围绕目标星级上下拉开，强弱项差异明显。"""
+    keys = ("comfort", "green", "tech", "safety")
+    center = {2: 2.8, 3: 3.5, 4: 4.0, 5: 4.5}[stars]
+    half_spread = {2: 0.45, 3: 0.60, 4: 0.70, 5: 0.80}[stars]
+    signals = meta.get("signals") or {k: 0.5 for k in keys}
+
+    vals = [float(signals.get(k, 0.5)) for k in keys]
+    mn, mx = min(vals), max(vals)
+    if mx - mn < 0.12:
+        pid = int(project.get("id") or 1)
+        vals = [0.22 + ((pid * (i + 3) * 7) % 13) / 10.0 for i in range(4)]
+
+    mean_v = sum(vals) / len(vals)
+    denom = max(mx - mn, 0.05)
+    offsets = [(v - mean_v) / denom for v in vals]
+    max_abs = max(abs(o) for o in offsets) or 1.0
+    offsets = [o / max_abs for o in offsets]
+
     dims = {}
-    for k, v in hint.items():
-        blended = v * 0.35 + center * 0.65
-        dims[k] = round(clamp(blended, lo, hi), 1)
+    for k, off in zip(keys, offsets):
+        dims[k] = round(clamp(center + off * half_spread, 2.0, 5.0), 1)
+
     return _pack(
         project,
         dims,
@@ -226,10 +241,10 @@ def apply(data: dict, root: Path, channel: str = "bzf", dry_run: bool = False) -
         rank = (i + 0.5) / n if n else 0.5
         stars = quality_to_stars(meta["quality"], rank)
         rating = finalize_rating(p, meta, stars)
+        p["rating"] = rating
         summary.append((p["id"], p["name"], rating["stars"], rating["score"], meta["photo_count"]))
         if dry_run:
             continue
-        p["rating"] = rating
         p["rating_status"] = "passed"
         p["rating_submitted_at"] = p.get("rating_submitted_at") or now
         p["rating_reviewed_at"] = now
@@ -275,7 +290,13 @@ def main() -> int:
     dist = Counter(r[2] for r in rows)
     print("项目数:", len(rows), "星级分布:", dict(sorted(dist.items())))
     for rid, name, stars, score, photos in sorted(rows, key=lambda x: (-x[2], x[0])):
-        print(f"  {rid:3} ★{stars} ({score:3}) {photos:2}图 {name}")
+        p = next(x for x in data["projects"] if x["id"] == rid)
+        d = p.get("rating", {}).get("dims", {})
+        spread = max(d.values()) - min(d.values()) if d else 0
+        print(
+            f"  {rid:3} ★{stars} ({score:3}) {photos:2}图 Δ{spread:.1f} "
+            f"C{d.get('comfort','?')} G{d.get('green','?')} T{d.get('tech','?')} S{d.get('safety','?')} {name}"
+        )
 
     if dry_run:
         print("(dry-run, 未写入)")

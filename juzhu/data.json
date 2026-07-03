@@ -229,13 +229,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.1,
-          "green": 4.1,
-          "tech": 4.2,
-          "safety": 4.1
+          "comfort": 4.4,
+          "green": 3.4,
+          "tech": 4.7,
+          "safety": 3.4
         },
         "stars": 4,
-        "score": 82,
+        "score": 80,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00001",
@@ -243,7 +243,7 @@
         "confidence": 0.83
       },
       "rating_submitted_at": "2026-07-03T03:15:56Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -268,13 +268,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.6,
-          "green": 3.6,
-          "tech": 3.6,
-          "safety": 3.7
+          "comfort": 3.7,
+          "green": 3.1,
+          "tech": 3.1,
+          "safety": 4.1
         },
         "stars": 3,
-        "score": 72,
+        "score": 70,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00011",
@@ -282,7 +282,7 @@
         "confidence": 0.8
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -308,12 +308,12 @@
       "rating": {
         "dims": {
           "comfort": 4.7,
-          "green": 4.6,
-          "tech": 4.7,
-          "safety": 4.7
+          "green": 3.7,
+          "tech": 4.8,
+          "safety": 4.8
         },
         "stars": 5,
-        "score": 94,
+        "score": 90,
         "checked": 51,
         "total": 55,
         "code": "SY-BZF-00006",
@@ -321,7 +321,7 @@
         "confidence": 0.88
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -345,12 +345,12 @@
       "rating": {
         "dims": {
           "comfort": 4.2,
-          "green": 4.2,
-          "tech": 4.2,
-          "safety": 4.2
+          "green": 3.3,
+          "tech": 4.4,
+          "safety": 4.1
         },
         "stars": 4,
-        "score": 84,
+        "score": 80,
         "checked": 50,
         "total": 55,
         "code": "SY-BZF-00022",
@@ -358,7 +358,7 @@
         "confidence": 0.86
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 1
     },
@@ -383,13 +383,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.2,
-          "green": 4.2,
-          "tech": 4.2,
-          "safety": 4.2
+          "comfort": 4.4,
+          "green": 3.3,
+          "tech": 3.9,
+          "safety": 4.4
         },
         "stars": 4,
-        "score": 84,
+        "score": 80,
         "checked": 50,
         "total": 55,
         "code": "SY-BZF-00003",
@@ -397,7 +397,7 @@
         "confidence": 0.86
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 5
     },
@@ -422,13 +422,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.7,
-          "green": 3.6,
-          "tech": 3.6,
-          "safety": 3.7
+          "comfort": 3.9,
+          "green": 2.9,
+          "tech": 3.5,
+          "safety": 3.8
         },
         "stars": 3,
-        "score": 73,
+        "score": 70,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00016",
@@ -436,7 +436,7 @@
         "confidence": 0.8
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 1
     },
@@ -459,13 +459,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.8,
-          "green": 3.7,
+          "comfort": 3.4,
+          "green": 2.9,
           "tech": 3.8,
           "safety": 3.8
         },
         "stars": 3,
-        "score": 76,
+        "score": 70,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00012",
@@ -473,7 +473,7 @@
         "confidence": 0.82
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 7
     },
@@ -496,13 +496,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.1,
-          "green": 4.1,
-          "tech": 4.1,
-          "safety": 4.1
+          "comfort": 4.0,
+          "green": 3.3,
+          "tech": 4.2,
+          "safety": 4.5
         },
         "stars": 4,
-        "score": 82,
+        "score": 80,
         "checked": 49,
         "total": 55,
         "code": "SY-BZF-00007",
@@ -510,7 +510,7 @@
         "confidence": 0.83
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -533,13 +533,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.7,
-          "green": 3.6,
-          "tech": 3.6,
-          "safety": 3.7
+          "comfort": 4.1,
+          "green": 3.0,
+          "tech": 3.1,
+          "safety": 3.8
         },
         "stars": 3,
-        "score": 73,
+        "score": 70,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00023",
@@ -547,7 +547,7 @@
         "confidence": 0.79
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 1
     },
@@ -571,12 +571,12 @@
       "rating": {
         "dims": {
           "comfort": 4.7,
-          "green": 4.6,
-          "tech": 4.7,
-          "safety": 4.7
+          "green": 3.7,
+          "tech": 4.8,
+          "safety": 4.8
         },
         "stars": 5,
-        "score": 94,
+        "score": 90,
         "checked": 51,
         "total": 55,
         "code": "SY-BZF-00004",
@@ -584,7 +584,7 @@
         "confidence": 0.88
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -609,13 +609,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.7,
-          "green": 3.6,
-          "tech": 3.6,
-          "safety": 3.7
+          "comfort": 3.9,
+          "green": 2.9,
+          "tech": 3.5,
+          "safety": 3.8
         },
         "stars": 3,
-        "score": 73,
+        "score": 70,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00017",
@@ -623,7 +623,7 @@
         "confidence": 0.8
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 1
     },
@@ -649,12 +649,12 @@
       "rating": {
         "dims": {
           "comfort": 4.2,
-          "green": 4.2,
-          "tech": 4.2,
-          "safety": 4.2
+          "green": 3.3,
+          "tech": 4.3,
+          "safety": 4.1
         },
         "stars": 4,
-        "score": 84,
+        "score": 80,
         "checked": 50,
         "total": 55,
         "code": "SY-BZF-00002",
@@ -662,7 +662,7 @@
         "confidence": 0.86
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -687,13 +687,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.1,
-          "green": 4.1,
-          "tech": 4.1,
-          "safety": 4.1
+          "comfort": 4.2,
+          "green": 3.3,
+          "tech": 3.9,
+          "safety": 4.6
         },
         "stars": 4,
-        "score": 82,
+        "score": 80,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00013",
@@ -701,7 +701,7 @@
         "confidence": 0.83
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 4
     },
@@ -724,13 +724,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.1,
-          "green": 4.1,
-          "tech": 4.1,
-          "safety": 4.1
+          "comfort": 4.2,
+          "green": 3.3,
+          "tech": 3.9,
+          "safety": 4.6
         },
         "stars": 4,
-        "score": 82,
+        "score": 80,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00008",
@@ -738,7 +738,7 @@
         "confidence": 0.82
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -763,13 +763,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.2,
-          "green": 4.2,
-          "tech": 4.2,
-          "safety": 4.2
+          "comfort": 4.4,
+          "green": 3.3,
+          "tech": 4.0,
+          "safety": 4.4
         },
         "stars": 4,
-        "score": 84,
+        "score": 80,
         "checked": 50,
         "total": 55,
         "code": "SY-BZF-00018",
@@ -777,7 +777,7 @@
         "confidence": 0.86
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -802,13 +802,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.0,
-          "green": 3.0,
-          "tech": 3.0,
-          "safety": 3.0
+          "comfort": 2.8,
+          "green": 2.6,
+          "tech": 2.6,
+          "safety": 3.2
         },
         "stars": 2,
-        "score": 60,
+        "score": 56,
         "checked": 44,
         "total": 55,
         "code": "SY-BZF-00005",
@@ -816,7 +816,7 @@
         "confidence": 0.72
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -839,13 +839,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.8,
-          "green": 3.7,
-          "tech": 3.7,
-          "safety": 3.8
+          "comfort": 3.7,
+          "green": 2.9,
+          "tech": 3.4,
+          "safety": 4.0
         },
         "stars": 3,
-        "score": 75,
+        "score": 70,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00009",
@@ -853,7 +853,7 @@
         "confidence": 0.82
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 4
     },
@@ -878,13 +878,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.2,
-          "green": 4.1,
-          "tech": 4.1,
-          "safety": 4.2
+          "comfort": 4.3,
+          "green": 3.3,
+          "tech": 3.9,
+          "safety": 4.5
         },
         "stars": 4,
-        "score": 83,
+        "score": 80,
         "checked": 49,
         "total": 55,
         "code": "SY-BZF-00014",
@@ -892,7 +892,7 @@
         "confidence": 0.83
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -917,13 +917,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.7,
-          "green": 3.6,
-          "tech": 3.6,
-          "safety": 3.7
+          "comfort": 3.9,
+          "green": 3.1,
+          "tech": 2.9,
+          "safety": 4.1
         },
         "stars": 3,
-        "score": 73,
+        "score": 70,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00019",
@@ -931,7 +931,7 @@
         "confidence": 0.79
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -954,13 +954,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.1,
-          "green": 3.1,
-          "tech": 3.1,
-          "safety": 3.1
+          "comfort": 2.7,
+          "green": 2.3,
+          "tech": 3.0,
+          "safety": 3.2
         },
         "stars": 2,
-        "score": 62,
+        "score": 56,
         "checked": 47,
         "total": 55,
         "code": "SY-BZF-00010",
@@ -968,7 +968,7 @@
         "confidence": 0.79
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -993,13 +993,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 3.1,
-          "green": 3.1,
-          "tech": 3.1,
-          "safety": 3.1
+          "comfort": 2.9,
+          "green": 2.4,
+          "tech": 2.6,
+          "safety": 3.2
         },
         "stars": 2,
-        "score": 62,
+        "score": 55,
         "checked": 46,
         "total": 55,
         "code": "SY-BZF-00020",
@@ -1007,7 +1007,7 @@
         "confidence": 0.78
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 3
     },
@@ -1030,13 +1030,13 @@
       "rating_status": "passed",
       "rating": {
         "dims": {
-          "comfort": 4.6,
-          "green": 4.6,
-          "tech": 4.6,
-          "safety": 4.6
+          "comfort": 4.7,
+          "green": 3.7,
+          "tech": 4.8,
+          "safety": 4.8
         },
         "stars": 5,
-        "score": 92,
+        "score": 90,
         "checked": 50,
         "total": 55,
         "code": "SY-BZF-00015",
@@ -1044,7 +1044,7 @@
         "confidence": 0.87
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 2
     },
@@ -1070,12 +1070,12 @@
       "rating": {
         "dims": {
           "comfort": 3.7,
-          "green": 3.7,
-          "tech": 3.7,
-          "safety": 3.7
+          "green": 2.9,
+          "tech": 3.6,
+          "safety": 3.8
         },
         "stars": 3,
-        "score": 74,
+        "score": 70,
         "checked": 48,
         "total": 55,
         "code": "SY-BZF-00021",
@@ -1083,7 +1083,7 @@
         "confidence": 0.81
       },
       "rating_submitted_at": "2026-07-03T04:29:38Z",
-      "rating_reviewed_at": "2026-07-03T04:29:38Z",
+      "rating_reviewed_at": "2026-07-03T04:33:59Z",
       "rating_note": "图片质量自动评分",
       "managed_unit_count": 1
     },
