@@ -410,7 +410,7 @@
 
   <script src="_nav.js"></script>
   <script>
-    // Score adjustment calculation
+    // Score adjustment calculation (旅居演示)
     document.querySelectorAll('.score-adjust input').forEach(input => {
       input.addEventListener('change', () => {
         const inputs = document.querySelectorAll('.score-adjust input');
@@ -419,6 +419,124 @@
         document.querySelector('.submit-bar .info b').textContent = total;
       });
     });
+  </script>
+  <script>
+  /* 新居住保租房 · SY-BZF-xxxxx 走 juzhu API 复核 */
+  (function(){
+    var q = new URLSearchParams(location.search);
+    var id = q.get('id');
+    if (!id || id.indexOf('SY-BZF-') !== 0) return;
+
+    var DIMS = [
+      { key:'comfort', label:'舒适', icon:'🛋', color:'#f59e0b' },
+      { key:'green', label:'绿色', icon:'🌿', color:'#10b981' },
+      { key:'tech', label:'科技', icon:'📡', color:'#3b82f6' },
+      { key:'safety', label:'安全', icon:'🛡', color:'#ef4444' }
+    ];
+
+    fetch('/api/juzhu/ratings/'+encodeURIComponent(id)).then(function(r){
+      if (!r.ok) throw new Error('not found');
+      return r.json();
+    }).then(function(data){
+      var p = data.project;
+      var rating = p.rating || {};
+      var dims = rating.dims || {};
+      document.title = '好房子复核 · '+p.name;
+      document.querySelector('.page-header h1').textContent = '🏠 好房子复核 · '+p.name;
+      document.querySelector('.page-header .sub').innerHTML =
+        id+' · '+p.name+' · '+ (p.district_name||'沈阳') +' · 参考 <a href="../screens/c-house-rating.html" style="color:var(--accent);">好房子标准</a>';
+
+      var hero = document.querySelector('.house-hero');
+      if (hero && p.cover_image) {
+        hero.querySelector('.img').innerHTML = '<img src="/'+p.cover_image.replace(/^\//,'')+'" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" alt=""/>';
+      }
+      if (hero) {
+        hero.querySelector('h4').textContent = p.name;
+        hero.querySelector('.meta').innerHTML =
+          '<span>编号: <b>'+id+'</b></span>'+
+          '<span>行政区: <b>'+(p.district_name||'—')+'</b></span>'+
+          '<span>户型: <b>'+p.unit_count+' 套</b></span>';
+      }
+
+      var grid = document.querySelector('.info-grid');
+      if (grid) {
+        grid.innerHTML =
+          '<div class="info-cell"><div class="l">频道</div><div class="v">保租房</div></div>'+
+          '<div class="info-cell"><div class="l">起租</div><div class="v">'+(p.price_from?'¥'+p.price_from:'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">状态</div><div class="v">'+({pending:'待复核',passed:'已通过',rejected:'已驳回'}[p.rating_status]||p.rating_status)+'</div></div>'+
+          '<div class="info-cell"><div class="l">自查达标</div><div class="v">'+(rating.checked||'—')+' / '+(rating.total||55)+'</div></div>'+
+          '<div class="info-cell"><div class="l">提交时间</div><div class="v">'+((p.rating_submitted_at||'').slice(0,10)||'—')+'</div></div>'+
+          '<div class="info-cell"><div class="l">地址</div><div class="v">'+(p.address||'—')+'</div></div>';
+      }
+
+      var ai = document.querySelector('.ai-result');
+      if (ai) {
+        var stars = rating.stars || 4;
+        var starTxt = '';
+        for (var i=0;i<5;i++) starTxt += i<stars ? '★' : '<span class="off">★</span>';
+        ai.querySelector('.stars').innerHTML = starTxt;
+        ai.querySelector('.score').innerHTML = (rating.score||'—')+' <small>/ 100</small>';
+        ai.querySelector('.rec').textContent = '推荐: '+stars+'星 · '+(rating.star_label||'优质型');
+        var conf = Math.round((rating.confidence||0.9)*100);
+        ai.querySelector('.conf span').textContent = '置信度 '+conf+'%';
+        var bar = ai.querySelector('.conf .bar i');
+        if (bar) bar.style.width = conf+'%';
+      }
+
+      var dimWrap = document.querySelector('.dim-list');
+      if (dimWrap) {
+        dimWrap.innerHTML = DIMS.map(function(d){
+          var v = dims[d.key] || 4;
+          var pct = Math.round(v/5*100);
+          return '<div class="dim-item"><div class="head"><span class="icon">'+d.icon+'</span><span class="nm">'+d.label+'</span><span class="score">'+v.toFixed(1)+' / 5</span></div><div class="bar"><i style="width:'+pct+'%;background:'+d.color+';"></i></div></div>';
+        }).join('');
+      }
+
+      var adj = document.querySelector('.score-adjust');
+      if (adj) {
+        adj.innerHTML = DIMS.map(function(d){
+          return '<div class="adj-item"><label>'+d.label+'</label><input type="number" id="adj_'+d.key+'" step="0.1" min="1" max="5" value="'+(dims[d.key]||4)+'"></div>';
+        }).join('');
+      }
+
+      var bar = document.querySelector('.submit-bar');
+      if (!bar) return;
+      bar.querySelector('.info').innerHTML = '当前总分: <b>'+(rating.score||'—')+'</b> 分 → 推荐等级: <b style="color:var(--gold);">'+ (rating.stars||4) +' 星</b>';
+      var noteEl = document.querySelector('.review-section textarea');
+      if (p.rating_note && noteEl) noteEl.value = p.rating_note;
+
+      if (p.rating_status !== 'pending') {
+        bar.querySelector('.actions').innerHTML = '<a href="p-rating-review.html" class="btn btn-ghost">← 返回列表</a>';
+        return;
+      }
+
+      bar.querySelector('.btn-danger').onclick = function(){
+        var note = noteEl ? noteEl.value.trim() : '';
+        fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'reject', note: note })
+        }).then(function(r){ return r.json(); }).then(function(){
+          alert('已驳回'); location.href = 'p-rating-review.html';
+        });
+      };
+      bar.querySelector('.btn-primary').onclick = function(){
+        var fd = {};
+        DIMS.forEach(function(d){
+          var el = document.getElementById('adj_'+d.key);
+          fd[d.key] = el ? parseFloat(el.value) : dims[d.key];
+        });
+        var note = noteEl ? noteEl.value.trim() : '';
+        fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action:'pass', dims: fd, note: note, checked: rating.checked, total: rating.total })
+        }).then(function(r){ return r.json(); }).then(function(){
+          alert('复核通过，前台详情页将展示正式评级'); location.href = 'p-rating-review.html';
+        });
+      };
+    }).catch(function(){
+      document.querySelector('.page-header .sub').textContent = '未找到 '+id+' · 请确认 juzhu-admin 已提交且 server.py 在运行';
+    });
+  })();
   </script>
 </body>
 </html>

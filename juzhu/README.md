@@ -48,4 +48,16 @@ python3 juzhu/server.py
 | 房源 | 改名称、面积、户型、月租/总价、排序；新增/删除 |
 | 同步 | 每次保存自动写 SQLite + 重导 `data.json` |
 
-API：`/api/juzhu/admin/projects`、`/units/{id}`、`POST /export`
+## 好房子评级复核（连 p-rating-review）
+
+| 步骤 | 页面 / API |
+|------|------------|
+| 1 运营自评 | `juzhu-admin.html` → 保租项目 → **好房子评级** 卡片 → 保存自评 |
+| 2 提交复核 | 同页 **提交复核** → `POST /api/juzhu/admin/projects/{id}/rating/submit` |
+| 3 中台队列 | `screens/p-rating-review.html` 顶部「新居住保租房」表 ← `GET /api/juzhu/ratings?status=pending` |
+| 4 复核详情 | `screens/p-rating-detail.html?id=SY-BZF-00008` → 通过/驳回 → `POST /api/juzhu/admin/ratings/{code}/review` |
+| 5 前台展示 | `juzhu-unit-detail.html` 仅 `rating_status=passed` 时展示库内正式星级 |
+
+编号规则：`SY-BZF-` + 项目 id 五位补零（如项目 8 → `SY-BZF-00008`）。
+
+API：`/api/juzhu/admin/projects`、`/units/{id}`、`POST /export`、`/api/juzhu/ratings`

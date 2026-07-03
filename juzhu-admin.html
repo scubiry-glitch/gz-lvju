@@ -62,12 +62,22 @@
   .warn{background:#fff8eb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;}
   .side .side-actions{display:flex;gap:6px;}
   .side .side-actions .btn{flex:1;padding:8px;font-size:12px;}
+  .rating-status{display:inline-block;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;margin-left:8px;}
+  .rating-status.draft{background:#f1f5f9;color:#64748b;}
+  .rating-status.pending{background:#fef3c7;color:#92400e;}
+  .rating-status.passed{background:#dcfce7;color:#166534;}
+  .rating-status.rejected{background:#fee2e2;color:#991b1b;}
+  .dim-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
+  .dim-grid label{font-size:10px;color:var(--muted);display:block;margin-bottom:4px;}
+  .rating-preview{margin-top:12px;padding:10px 12px;background:#f5faf9;border-radius:10px;font-size:12px;}
+  .rating-preview b{font-family:var(--serif);color:var(--gold);font-size:18px;}
 </style>
 </head>
 <body>
 <header class="top">
   <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
   <div class="acts">
+    <a href="screens/p-rating-review.html" target="_blank">评级复核队列</a>
     <a href="juzhu-channel-v3-grid.html" target="_blank">预览前台</a>
     <button type="button" id="btnExport">导出 JSON</button>
   </div>
@@ -261,12 +271,93 @@ function numValFrom(id) {
   return v === '' ? null : +v;
 }
 
+function ratingCode(id) {
+  return 'SY-BZF-' + String(id).padStart(5, '0');
+}
+
+var RATING_STATUS = { draft:'草稿', pending:'待复核', passed:'已通过', rejected:'已驳回' };
+var RATING_DIMS = [
+  { key:'comfort', label:'舒适' },
+  { key:'green', label:'绿色' },
+  { key:'tech', label:'科技' },
+  { key:'safety', label:'安全' }
+];
+
+function parseRating(p) {
+  var r = p.rating;
+  if (!r) return { dims:{ comfort:4, green:4, tech:4, safety:4 }, checked:47, total:55 };
+  if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
+  r.dims = r.dims || { comfort:4, green:4, tech:4, safety:4 };
+  r.checked = r.checked != null ? r.checked : 47;
+  r.total = r.total != null ? r.total : 55;
+  return r;
+}
+
+function summarizeDims(dims) {
+  var vals = RATING_DIMS.map(function(d){ return +dims[d.key]; }).filter(function(v){ return !isNaN(v); });
+  var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 3;
+  var stars = Math.min(5, Math.max(1, Math.round(avg)));
+  return { stars: stars, score: Math.round(avg/5*100) };
+}
+
+function collectRatingFromForm() {
+  var dims = {};
+  RATING_DIMS.forEach(function(d){
+    dims[d.key] = parseFloat(document.getElementById('r_'+d.key).value) || 0;
+  });
+  var sum = summarizeDims(dims);
+  return {
+    dims: dims,
+    stars: sum.stars,
+    score: sum.score,
+    checked: +document.getElementById('r_checked').value || 47,
+    total: +document.getElementById('r_total').value || 55,
+    code: ratingCode(state.current.id)
+  };
+}
+
+function updateRatingPreview() {
+  var el = document.getElementById('ratingPreview');
+  if (!el) return;
+  var r = collectRatingFromForm();
+  el.innerHTML = '预估 <b>★'+r.stars+'</b> · '+r.score+' 分 · 编号 '+r.code;
+}
+
 function renderEditor() {
   var p = state.current;
   if (!p) return;
   var isTrade = p.channel === 'trade';
   var chLabel = isTrade ? '卖旧买新' : '保租房';
   var cover = p.cover_image ? "background-image:url('/"+p.cover_image.replace(/^\//,'')+"')" : '';
+  var rs = p.rating_status || 'draft';
+  var rating = parseRating(p);
+  var ratingCard = '';
+
+  if (!isTrade) {
+    var locked = rs === 'pending' || rs === 'passed';
+    var dimInputs = RATING_DIMS.map(function(d){
+      return '<div><label>'+d.label+'</label><input id="r_'+d.key+'" type="number" step="0.1" min="1" max="5" value="'+(rating.dims[d.key]||4)+'" '+(locked?'disabled':'')+'/></div>';
+    }).join('');
+    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id));
+    ratingCard =
+      '<div class="card" id="ratingCard">'+
+        '<h2>好房子评级 <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">运营自评 → 提交中台复核 → 通过后前台详情页展示。复核入口：<a href="'+reviewLink+'" target="_blank">p-rating-review</a></p>'+
+        '<div class="dim-grid">'+dimInputs+'</div>'+
+        '<div class="grid" style="margin-top:12px;">'+
+          '<div class="fld"><label>自查达标项</label><input id="r_checked" type="number" value="'+rating.checked+'" '+(locked?'disabled':'')+'/></div>'+
+          '<div class="fld"><label>自查总项</label><input id="r_total" type="number" value="'+rating.total+'" '+(locked?'disabled':'')+'/></div>'+
+        '</div>'+
+        '<div class="rating-preview" id="ratingPreview"></div>'+
+        '<div class="bar">'+
+          (locked ? '' : '<button class="btn primary" type="button" id="saveRating">保存自评</button>')+
+          (rs === 'draft' || rs === 'rejected' ? '<button class="btn ghost" type="button" id="submitRating">提交复核</button>' : '')+
+          (rs === 'pending' ? '<a class="btn ghost" href="'+reviewLink+'" target="_blank">打开复核详情 ›</a>' : '')+
+          (rs === 'passed' ? '<a class="btn ghost" href="'+reviewLink+'" target="_blank">查看复核记录 ›</a>' : '')+
+        '</div>'+
+        (p.rating_note ? '<p style="font-size:11px;color:#991b1b;margin:10px 0 0;">复核意见：'+esc(p.rating_note)+'</p>' : '')+
+      '</div>';
+  }
 
   document.getElementById('main').innerHTML =
     '<div class="card">'+
@@ -286,6 +377,7 @@ function renderEditor() {
         '<button class="btn danger" type="button" id="delProj">删除项目</button>'+
       '</div>'+
     '</div>'+
+    ratingCard+
     '<div class="card">'+
       '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
       '<table class="tbl"><thead><tr>'+
@@ -303,6 +395,45 @@ function renderEditor() {
   document.getElementById('delProj').onclick = deleteProject;
   document.getElementById('addUnit').onclick = addUnit;
   renderUnits(isTrade);
+
+  if (!isTrade) {
+    RATING_DIMS.forEach(function(d){
+      var el = document.getElementById('r_'+d.key);
+      if (el) el.oninput = updateRatingPreview;
+    });
+    var rc = document.getElementById('r_checked');
+    if (rc) rc.oninput = updateRatingPreview;
+    updateRatingPreview();
+    var sr = document.getElementById('saveRating');
+    if (sr) sr.onclick = saveRating;
+    var sub = document.getElementById('submitRating');
+    if (sub) sub.onclick = submitRating;
+  }
+}
+
+function saveRatingPromise() {
+  var body = collectRatingFromForm();
+  return api('/projects/'+state.current.id, { method:'PUT', body: { rating: body } }).then(function(res) {
+    state.current = res.project;
+    return res;
+  });
+}
+
+function saveRating() {
+  saveRatingPromise().then(function(){
+    toast('好房子自评已保存');
+    renderEditor();
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+}
+
+function submitRating() {
+  saveRatingPromise().then(function(){
+    return api('/projects/'+state.current.id+'/rating/submit', { method:'POST' });
+  }).then(function(res) {
+    state.current = res.project;
+    toast('已提交中台复核 · '+ratingCode(res.project.id));
+    renderEditor();
+  }).catch(function(e){ toast('提交失败：'+e.message); });
 }
 
 function esc(s) {

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>新居住 · 方案A 区域图册 · 贝壳</title>
-<link rel="stylesheet" href="lvju-app.css?v=5">
+<link rel="stylesheet" href="lvju-app.css?v=6">
 <style>
   /* scheme switcher */
   .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);}
@@ -63,12 +63,12 @@
       <div class="bg s-city"></div>
       <div class="in">
         <div class="ek">New Living · Atlas</div>
-        <h1>在南京<br>找到新居住</h1>
+        <h1 id="heroTitle">在沈阳<br>找到新居住</h1>
         <p>政府保租房按区浏览 · 卖旧买新一站置换</p>
-        <div class="stat">
-          <div><b>46</b><span>试点项目</span></div>
-          <div><b>11</b><span>行政区</span></div>
-          <div><b>2.1万</b><span>在租套数</span></div>
+        <div class="stat" id="heroStat">
+          <div><b>—</b><span>保租项目</span></div>
+          <div><b>—</b><span>行政区</span></div>
+          <div><b>—</b><span>在租房型</span></div>
         </div>
       </div>
     </div>
@@ -94,81 +94,91 @@
     <!-- 卖旧买新：直达列表 -->
     <div class="pane" id="pane-trade">
       <div class="filt" style="padding-top:14px;">
-        <a class="on">全部</a><a>河西</a><a>江宁</a><a>鼓楼</a><a>置换补贴</a>
+        <a class="on">全部</a><a>置换补贴</a><a>以旧换新</a>
       </div>
       <div class="sec-h"><span class="bar"></span><h2>置换推荐</h2><span class="more">综合排序 ›</span></div>
       <div class="wrap" id="trade-list"></div>
       <div class="banner">
         <span class="bi">🔄</span>
         <div class="bt"><b>卖旧买新怎么算？</b><p>旧房估价 + 新房优惠 + 税费测算，一站看清</p></div>
-        <a class="go" href="#">测算 ›</a>
       </div>
     </div>
-  </div>
-
-  <div class="tabbar">
-    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🏡</span>新居住</a>
-    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+    <div class="load-err" id="err" hidden style="padding:20px;text-align:center;color:var(--muted);font-size:12px;"></div>
   </div>
 </div>
+<script src="juzhu/app.js?v=2"></script>
 <script>
-const DIST=[
-  {name:'建邺区',no:'01',projects:12,units:3840,vacant:156,avg:1680,tag:'热门',bg:'g1'},
-  {name:'江宁区',no:'02',projects:18,units:5620,vacant:289,avg:1420,bg:'g2'},
-  {name:'鼓楼区',no:'03',projects:8,units:2100,vacant:92,avg:1920,bg:'g3'},
-  {name:'玄武区',no:'04',projects:6,units:1680,vacant:68,avg:1850,bg:'g4'},
-  {name:'秦淮区',no:'05',projects:7,units:1920,vacant:74,avg:1780,bg:'g5'},
-  {name:'雨花台区',no:'06',projects:9,units:2450,vacant:118,avg:1520,bg:'g6'},
-  {name:'栖霞区',no:'07',projects:11,units:3100,vacant:142,avg:1380,bg:'g7'},
-  {name:'浦口区',no:'08',projects:10,units:2800,vacant:131,avg:1280,bg:'g8'},
-  {name:'六合区',no:'09',projects:5,units:1200,vacant:56,avg:980,bg:'g1'},
-  {name:'溧水区',no:'10',projects:4,units:860,vacant:38,avg:880,bg:'g2'},
-  {name:'高淳区',no:'11',projects:3,units:620,vacant:24,avg:820,bg:'g3'},
-];
-const TRADE=[
-  {nm:'河西新城 · 置换优选',lo:'建邺区 · 河西南',old:'旧房估价 320万',tags:['以旧换新','补贴2万','近地铁'],pr:480,img:'g4',unit:'万'},
-  {nm:'百家湖地铁口三房',lo:'江宁区 · 百家湖',old:'旧房估价 180万',tags:['满五唯一','学区'],pr:268,img:'g5',unit:'万'},
-  {nm:'湖南路商圈两居',lo:'鼓楼区 · 湖南路',old:'旧房估价 220万',tags:['市中心','置换补贴'],pr:295,img:'g6',unit:'万'},
-  {nm:'仙林大学城改善盘',lo:'栖霞区 · 仙林',old:'旧房估价 260万',tags:['以旧换新','三房'],pr:358,img:'g7',unit:'万'},
-];
-document.getElementById('atlas').innerHTML=DIST.slice(0,6).map(d=>`
-  <a class="atlas-card" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}">
-    <div class="bg ${d.bg}"></div>
-    ${d.tag?'<span class="tag">'+d.tag+'</span>':''}
-    <span class="go">›</span>
-    <div class="in">
-      <div class="ek">District ${d.no}</div>
-      <h3>${d.name}</h3>
-      <div class="nums">
-        <div><b>${d.projects}</b><span>在营项目</span></div>
-        <div><b>${d.vacant}</b><span>可租套数</span></div>
-        <div><b>¥${d.avg}</b><span>参考均价</span></div>
-      </div>
-    </div>
-  </a>`).join('');
-document.getElementById('dlist').innerHTML=DIST.map(d=>`
-  <a class="drow" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}">
-    <span class="idx">${d.no}</span>
-    <div class="mid"><b>${d.name}</b><small>${d.projects} 项目 · ${d.units.toLocaleString()} 套在租</small></div>
-    <div class="stats">
-      <div><b>${d.vacant}</b>可租</div>
-      <div><b>¥${d.avg}</b>均价</div>
-    </div>
-  </a>`).join('');
-document.getElementById('trade-list').innerHTML=TRADE.map(x=>`
-  <a class="mcard" href="lvju-app-resale-detail.html">
-    <div class="img ${x.img}"><span class="star">卖旧买新</span><span class="like">♡</span>
-      <div class="cap"><div class="nm">${x.nm}</div><div class="lo">${x.lo}</div></div></div>
-    <div class="ci"><div class="tags">${x.tags.map(t=>'<span>'+t+'</span>').join('')}</div>
-      <div class="pr"><b>${x.pr}<small>${x.unit}起</small></b><span class="bk">${x.old}</span></div></div>
-  </a>`).join('');
-document.getElementById('tabs').addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab]');if(!t)return;
-  document.querySelectorAll('.core-tabs a').forEach(a=>a.classList.toggle('on',a===t));
-  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t.dataset.tab));
-});
+(function(){
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+
+  function renderHero(d){
+    document.getElementById('heroTitle').innerHTML = '在'+d.city.name+'<br>找到新居住';
+    document.getElementById('heroStat').innerHTML =
+      '<div><b>'+d.stats.project_count_bzf+'</b><span>保租项目</span></div>'+
+      '<div><b>'+d.stats.district_count+'</b><span>行政区</span></div>'+
+      '<div><b>'+d.stats.unit_count+'</b><span>在租房型</span></div>';
+  }
+
+  function renderAtlas(list){
+    var cards = list.filter(function(d){ return d.has_projects; }).slice(0,6);
+    if (!cards.length) cards = list.slice(0,6);
+    document.getElementById('atlas').innerHTML = cards.map(function(d){
+      var bg = d.cover_image ? 'background-image:url('+d.cover_image+');background-size:cover;background-position:center;' : '';
+      var href = d.has_projects ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name) : '#';
+      return '<a class="atlas-card" href="'+href+'"'+(d.has_projects?'':' onclick="return false"')+'>'+
+        '<div class="bg '+(bg?'':' '+d.bg_class)+'" style="'+bg+'"></div>'+
+        (d.is_hot?'<span class="tag">热门</span>':'')+
+        (d.note?'<span class="tag">'+d.note+'</span>':'')+
+        '<span class="go">›</span><div class="in">'+
+        '<div class="ek">District '+pad(d.sort_order)+'</div><h3>'+d.name+'</h3>'+
+        '<div class="nums"><div><b>'+d.project_count+'</b><span>在营项目</span></div>'+
+        '<div><b>'+(d.vacant_count||0)+'</b><span>可租套数</span></div>'+
+        '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b><span>参考均价</span></div></div></div></a>';
+    }).join('');
+  }
+
+  function renderDlist(list){
+    document.getElementById('dlist').innerHTML = list.map(function(d){
+      var href = d.has_projects ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name) : '#';
+      return '<a class="drow" href="'+href+'"'+(d.has_projects?'':' onclick="return false" style="opacity:.7"')+'>'+
+        '<span class="idx">'+pad(d.sort_order)+'</span>'+
+        '<div class="mid"><b>'+d.name+'</b><small>'+d.project_count+' 项目 · '+(d.unit_count||0)+' 户型'+(d.note?' · '+d.note:'')+'</small></div>'+
+        '<div class="stats"><div><b>'+(d.vacant_count||0)+'</b>可租</div>'+
+        '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b>均价</div></div></a>';
+    }).join('');
+  }
+
+  function renderTrade(list){
+    document.getElementById('trade-list').innerHTML = list.map(function(p){
+      var style = p.cover_image ? 'background-image:url('+p.cover_image+');background-size:cover;background-position:center;' : '';
+      var cls = p.cover_image ? '' : ' g4';
+      var tags = JUZHU.asTags(p.tags);
+      return '<a class="mcard" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(p.slug)+'">'+
+        '<div class="img'+cls+'" style="'+style+'"><span class="star">卖旧买新</span><span class="like">♡</span>'+
+        '<div class="cap"><div class="nm">'+p.name+'</div><div class="lo">'+(p.address||'')+'</div></div></div>'+
+        '<div class="ci"><div class="tags">'+tags.map(function(t){return '<span>'+t+'</span>';}).join('')+'</div>'+
+        '<div class="pr"><b>'+(p.price_from||'—')+'<small>万起</small></b>'+
+        '<span class="bk">'+(p.old_house_hint||'立即咨询')+'</span></div></div></a>';
+    }).join('');
+  }
+
+  document.getElementById('tabs').addEventListener('click',function(e){
+    var t=e.target.closest('[data-tab]');if(!t)return;
+    document.querySelectorAll('.core-tabs a').forEach(function(a){ a.classList.toggle('on',a===t); });
+    document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('on',p.id==='pane-'+t.dataset.tab); });
+  });
+
+  JUZHU.load().then(function(d){
+    renderHero(d);
+    var dists = JUZHU.districts();
+    renderAtlas(dists);
+    renderDlist(dists);
+    renderTrade(JUZHU.tradeListings());
+  }).catch(function(err){
+    document.getElementById('err').hidden = false;
+    document.getElementById('err').textContent = '数据加载失败：'+err.message;
+  });
+})();
 </script>
 </body>
 </html>

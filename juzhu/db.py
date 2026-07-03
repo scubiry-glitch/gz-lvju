@@ -12,7 +12,73 @@ def connect():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    ensure_schema(conn)
     return conn
+
+
+def ensure_schema(conn):
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
+    migrations = [
+        ("rating_status", "ALTER TABLE projects ADD COLUMN rating_status TEXT NOT NULL DEFAULT 'draft'"),
+        ("rating", "ALTER TABLE projects ADD COLUMN rating TEXT"),
+        ("rating_submitted_at", "ALTER TABLE projects ADD COLUMN rating_submitted_at TEXT"),
+        ("rating_reviewed_at", "ALTER TABLE projects ADD COLUMN rating_reviewed_at TEXT"),
+        ("rating_note", "ALTER TABLE projects ADD COLUMN rating_note TEXT"),
+    ]
+    for col, sql in migrations:
+        if col not in cols:
+            conn.execute(sql)
+    conn.commit()
+
+
+def rating_code(project_id):
+    return "SY-BZF-" + str(project_id).zfill(5)
+
+
+STAR_LABELS = ["", "基础型", "达标型", "优质型", "精品型", "示范型"]
+
+
+def parse_rating_value(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def rating_to_db(rating):
+    if rating is None:
+        return None
+    if isinstance(rating, str):
+        return rating
+    return json.dumps(rating, ensure_ascii=False)
+
+
+def summarize_rating(dims):
+    vals = [dims.get(k) for k in ("comfort", "green", "tech", "safety") if dims.get(k) is not None]
+    if not vals:
+        return {"stars": 3, "star_label": "达标型", "score": 60}
+    avg = sum(float(v) for v in vals) / len(vals)
+    stars = min(5, max(1, round(avg)))
+    return {
+        "stars": stars,
+        "star_label": STAR_LABELS[stars],
+        "score": int(round(avg / 5 * 100)),
+    }
+
+
+def normalize_project_row(d):
+    if not d:
+        return d
+    d = row_to_dict(d) if not isinstance(d, dict) else dict(d)
+    d["rating"] = parse_rating_value(d.get("rating"))
+    d.setdefault("rating_status", "draft")
+    return d
 
 
 def row_to_dict(row):
@@ -120,7 +186,7 @@ def export_json(conn=None):
                 "unit_count": conn.execute("SELECT COUNT(*) FROM units").fetchone()[0],
             },
             "districts": parse_tags(rows("SELECT * FROM districts ORDER BY sort_order")),
-            "projects": parse_tags(rows("SELECT * FROM projects ORDER BY channel, sort_order")),
+            "projects": [normalize_project_row(p) for p in parse_tags(rows("SELECT * FROM projects ORDER BY channel, sort_order"))],
             "units": parse_tags(rows("SELECT * FROM units ORDER BY project_id, sort_order")),
             "photos": rows(
                 "SELECT * FROM photos ORDER BY entity_type, entity_id, sort_order"

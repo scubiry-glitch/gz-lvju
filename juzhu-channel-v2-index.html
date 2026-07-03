@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>新居住 · 方案B 编辑部索引 · 贝壳</title>
-<link rel="stylesheet" href="lvju-app.css?v=5">
+<link rel="stylesheet" href="lvju-app.css?v=6">
 <style>
   .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);}
   .scheme-bar a{color:var(--brand);font-weight:600;}
@@ -52,16 +52,16 @@
     <div class="masthead">
       <div class="row">
         <div>
-          <div class="ek">NANJING · NEW LIVING</div>
+          <div class="ek" id="mastEk">SHENYANG · NEW LIVING</div>
           <h2>保租房区划目录</h2>
         </div>
         <div class="vol">Vol. 2026<br>试点期</div>
       </div>
-      <div class="sum">
-        <div><b>11</b>行政区</div>
-        <div><b>93</b>在营项目</div>
-        <div><b>2.1万</b>在租套数</div>
-        <div><b>¥1,420</b>全市均价</div>
+      <div class="sum" id="mastSum">
+        <div><b>—</b>行政区</div>
+        <div><b>—</b>在营项目</div>
+        <div><b>—</b>在租房型</div>
+        <div><b>—</b>全市均价</div>
       </div>
     </div>
 
@@ -90,59 +90,68 @@
       <div class="sec-h" style="margin-top:14px;"><span class="bar"></span><h2>置换房源</h2><span class="more">筛选 ›</span></div>
       <div class="trade-wrap" id="trade-list"></div>
     </div>
-  </div>
-
-  <div class="tabbar">
-    <a href="beike-app-home.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🏡</span>新居住</a>
-    <a href="lvju-app-messages.html"><span class="ti">💬</span>消息</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+    <div class="load-err" id="err" hidden style="padding:20px;text-align:center;color:var(--muted);font-size:12px;"></div>
   </div>
 </div>
+<script src="juzhu/app.js?v=2"></script>
 <script>
-const DIST=[
-  {name:'建邺区',no:'01',projects:12,vacant:156,avg:1680,sub:'河西 · 奥体 · 江心洲'},
-  {name:'江宁区',no:'02',projects:18,vacant:289,avg:1420,sub:'百家湖 · 九龙湖 · 禄口'},
-  {name:'鼓楼区',no:'03',projects:8,vacant:92,avg:1920,sub:'湖南路 · 中央门'},
-  {name:'玄武区',no:'04',projects:6,vacant:68,avg:1850,sub:'新街口 · 徐庄'},
-  {name:'秦淮区',no:'05',projects:7,vacant:74,avg:1780,sub:'夫子庙 · 南部新城'},
-  {name:'雨花台区',no:'06',projects:9,vacant:118,avg:1520,sub:'软件谷 · 铁心桥'},
-  {name:'栖霞区',no:'07',projects:11,vacant:142,avg:1380,sub:'仙林 · 迈皋桥'},
-  {name:'浦口区',no:'08',projects:10,vacant:131,avg:1280,sub:'江北新区 · 桥北'},
-  {name:'六合区',no:'09',projects:5,vacant:56,avg:980,sub:'龙池 · 雄州'},
-  {name:'溧水区',no:'10',projects:4,vacant:38,avg:880,sub:'永阳 · 空港'},
-  {name:'高淳区',no:'11',projects:3,vacant:24,avg:820,sub:'淳溪 · 慢城'},
-];
-const TRADE=[
-  {nm:'河西南置换三房',meta:'建邺区 · 89㎡ · 南北',tags:['以旧换新','补贴'],pr:480,img:'g4',old:'旧房320万'},
-  {nm:'百家湖地铁两居',meta:'江宁区 · 76㎡ · 南',tags:['满五','近地铁'],pr:268,img:'g5',old:'旧房180万'},
-  {nm:'湖南路精装三房',meta:'鼓楼区 · 92㎡ · 南',tags:['置换补贴'],pr:295,img:'g6',old:'旧房220万'},
-  {nm:'仙林改善四房',meta:'栖霞区 · 118㎡ · 南北',tags:['以旧换新'],pr:358,img:'g7',old:'旧房260万'},
-  {nm:'江北新区次新房',meta:'浦口区 · 105㎡ · 南',tags:['低总价'],pr:198,img:'g8',old:'旧房150万'},
-];
-document.getElementById('index-list').innerHTML=DIST.map(d=>`
-  <a class="irow" href="juzhu-bzf-list.html?district=${encodeURIComponent(d.name)}" style="display:grid;text-decoration:none;">
-    <span class="no">${d.no}</span>
-    <span class="nm">${d.name}<small>${d.sub}</small></span>
-    <span class="n">${d.projects}<small>项</small></span>
-    <span class="n">${d.vacant}<small>套</small></span>
-    <span class="n gold">${d.avg}<small>元/月</small></span>
-  </a>`).join('');
-document.getElementById('trade-list').innerHTML=TRADE.map(x=>`
-  <a class="lrow" href="lvju-app-resale-detail.html">
-    <div class="th ${x.img}"><span class="star">置换</span></div>
-    <div class="info">
-      <div class="nm">${x.nm}</div>
-      <div class="meta">${x.meta}</div>
-      <div class="tags">${x.tags.map(t=>'<span>'+t+'</span>').join('')}</div>
-      <div class="pr"><b>${x.pr}<small>万起</small></b><span class="unit">${x.old}</span></div>
-    </div>
-  </a>`).join('');
-document.getElementById('tabs').addEventListener('click',e=>{
-  const t=e.target.closest('[data-tab]');if(!t)return;
-  document.querySelectorAll('.pill-tabs a').forEach(a=>a.classList.toggle('on',a===t));
-  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+t.dataset.tab));
-});
+(function(){
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+
+  function renderMasthead(d, dists){
+    document.getElementById('mastEk').textContent = d.city.name.toUpperCase() + ' · NEW LIVING';
+    var avgList = dists.filter(function(x){ return x.avg_price; }).map(function(x){ return x.avg_price; });
+    var cityAvg = avgList.length ? Math.round(avgList.reduce(function(a,b){return a+b;},0)/avgList.length) : '—';
+    document.getElementById('mastSum').innerHTML =
+      '<div><b>'+d.stats.district_count+'</b>行政区</div>'+
+      '<div><b>'+d.stats.project_count_bzf+'</b>在营项目</div>'+
+      '<div><b>'+d.stats.unit_count+'</b>在租房型</div>'+
+      '<div><b>'+(cityAvg==='—'?'—':'¥'+cityAvg)+'</b>全市均价</div>';
+  }
+
+  function renderIndex(list){
+    document.getElementById('index-list').innerHTML = list.map(function(d){
+      var sub = d.note || (d.project_count+' 项目 · '+d.unit_count+' 户型');
+      var href = d.has_projects ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name) : '#';
+      return '<a class="irow" href="'+href+'"'+(d.has_projects?'':' onclick="return false" style="opacity:.7;text-decoration:none"')+'>'+
+        '<span class="no">'+pad(d.sort_order)+'</span>'+
+        '<span class="nm">'+d.name+'<small>'+sub+'</small></span>'+
+        '<span class="n">'+d.project_count+'<small>项</small></span>'+
+        '<span class="n">'+(d.vacant_count||0)+'<small>套</small></span>'+
+        '<span class="n gold">'+(d.avg_price||'—')+'<small>元/月</small></span></a>';
+    }).join('');
+  }
+
+  function renderTrade(list){
+    document.getElementById('trade-list').innerHTML = list.map(function(p){
+      var style = p.cover_image ? 'background-image:url('+p.cover_image+');background-size:cover;background-position:center;' : '';
+      var tags = JUZHU.asTags(p.tags);
+      return '<a class="lrow" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(p.slug)+'">'+
+        '<div class="th" style="'+style+'"><span class="star">置换</span></div>'+
+        '<div class="info"><div class="nm">'+p.name+'</div>'+
+        '<div class="meta">'+(p.address||'')+' · '+p.unit_count+' 户型</div>'+
+        '<div class="tags">'+tags.map(function(t){return '<span>'+t+'</span>';}).join('')+'</div>'+
+        '<div class="pr"><b>'+(p.price_from||'—')+'<small>万起</small></b>'+
+        '<span class="unit">'+(p.old_house_hint||'')+'</span></div></div></a>';
+    }).join('');
+  }
+
+  document.getElementById('tabs').addEventListener('click',function(e){
+    var t=e.target.closest('[data-tab]');if(!t)return;
+    document.querySelectorAll('.pill-tabs a').forEach(function(a){ a.classList.toggle('on',a===t); });
+    document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('on',p.id==='pane-'+t.dataset.tab); });
+  });
+
+  JUZHU.load().then(function(d){
+    var dists = JUZHU.districts();
+    renderMasthead(d, dists);
+    renderIndex(dists);
+    renderTrade(JUZHU.tradeListings());
+  }).catch(function(err){
+    document.getElementById('err').hidden = false;
+    document.getElementById('err').textContent = '数据加载失败：'+err.message;
+  });
+})();
 </script>
 </body>
 </html>

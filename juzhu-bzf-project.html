@@ -54,7 +54,7 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
-<script src="juzhu/app.js?v=2"></script>
+<script src="juzhu/app.js?v=5"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -77,13 +77,15 @@
     var units = JUZHU.units(p.id);
     document.getElementById('list').innerHTML = units.map(function(u){
       var img = u.cover_image ? 'background-image:url('+u.cover_image+')' : '';
-      var meta = u.area_sqm ? (u.area_sqm + '㎡ · '+u.name) : u.name;
+      var title = JUZHU.unitTitle(u);
+      var meta = JUZHU.unitMeta(u);
+      var metaHtml = meta ? '<div class="meta">'+meta+'</div>' : '';
       var price = isTrade
         ? ('<b>'+u.price_total+'<small style="font-size:10px;color:var(--muted)"> 万起</small></b>')
         : ('<b>'+JUZHU.fmtRent(u.rent_monthly)+'<small style="font-size:10px;color:var(--muted)">/月</small></b>');
       return '<a class="ucard" href="juzhu-unit-detail.html?project='+encodeURIComponent(p.slug)+'&unit='+encodeURIComponent(u.slug)+'&channel='+channel+'">'+
         '<div class="img" style="'+img+'"></div>'+
-        '<div class="bd"><div class="nm">'+u.name+'</div><div class="meta">'+meta+'</div>'+
+        '<div class="bd"><div class="nm">'+title+'</div>'+metaHtml+
         '<div class="pr">'+price+'<span class="go">查看详情</span></div></div></a>';
     }).join('');
   });

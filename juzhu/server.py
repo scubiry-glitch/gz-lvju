@@ -10,11 +10,17 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from datetime import datetime, timezone
+
 from db import (  # noqa: E402
     connect,
     export_json,
+    normalize_project_row,
+    rating_code,
+    rating_to_db,
     row_to_dict,
     rows_to_list,
+    summarize_rating,
     sync_district_stats,
     sync_project_unit_count,
     tags_to_db,
@@ -123,6 +129,14 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"ok": True, "stats": data["stats"]})
 
+        m = re.match(rf"^{ADMIN_PREFIX}/projects/(\d+)/rating/submit$", path)
+        if m and method == "POST":
+            return self._submit_rating(int(m.group(1)))
+
+        m = re.match(rf"^{ADMIN_PREFIX}/ratings/([^/]+)/review$", path)
+        if m and method == "POST":
+            return self._review_rating(m.group(1))
+
         m = re.match(rf"^{ADMIN_PREFIX}/projects/(\d+)$", path)
         if m:
             pid = int(m.group(1))
@@ -161,6 +175,15 @@ class Handler(SimpleHTTPRequestHandler):
             data = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order"))
             conn.close()
             return self._json(data)
+
+        if path == "/api/juzhu/ratings":
+            conn.close()
+            return self._list_ratings(qs)
+
+        m = re.match(r"^/api/juzhu/ratings/([^/]+)$", path)
+        if m:
+            conn.close()
+            return self._get_rating(m.group(1))
 
         if path.startswith("/api/juzhu/districts/") and path.endswith("/projects"):
             slug = path.split("/")[4]
@@ -210,7 +233,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _get_project(self, pid):
         conn = connect()
-        proj = row_to_dict(conn.execute(
+        proj = normalize_project_row(conn.execute(
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
@@ -224,6 +247,150 @@ class Handler(SimpleHTTPRequestHandler):
         conn.close()
         return self._json({"project": proj, "units": units})
 
+    def _project_by_rating_code(self, conn, code):
+        pid = None
+        if code.startswith("SY-BZF-"):
+            try:
+                pid = int(code.rsplit("-", 1)[-1])
+            except ValueError:
+                pid = None
+        if pid is not None:
+            row = conn.execute(
+                """SELECT p.*, d.name AS district_name FROM projects p
+                   LEFT JOIN districts d ON d.id=p.district_id
+                   WHERE p.id=? AND p.channel='bzf'""",
+                (pid,),
+            ).fetchone()
+            if row:
+                return normalize_project_row(row)
+        rows = conn.execute(
+            """SELECT p.*, d.name AS district_name FROM projects p
+               LEFT JOIN districts d ON d.id=p.district_id
+               WHERE p.channel='bzf'"""
+        ).fetchall()
+        for row in rows:
+            proj = normalize_project_row(row)
+            if (proj.get("rating") or {}).get("code") == code:
+                return proj
+        return None
+
+    def _list_ratings(self, qs):
+        conn = connect()
+        status = (qs.get("status") or [None])[0]
+        sql = """SELECT p.*, d.name AS district_name FROM projects p
+                 LEFT JOIN districts d ON d.id=p.district_id
+                 WHERE p.channel='bzf'"""
+        params = []
+        if status:
+            sql += " AND p.rating_status=?"
+            params.append(status)
+        else:
+            sql += " AND p.rating_status IN ('pending','passed','rejected')"
+        sql += " ORDER BY COALESCE(p.rating_submitted_at, '') DESC, p.id"
+        rows = [normalize_project_row(r) for r in conn.execute(sql, params).fetchall()]
+        conn.close()
+        return self._json({"items": rows})
+
+    def _get_rating(self, code):
+        conn = connect()
+        proj = self._project_by_rating_code(conn, code)
+        conn.close()
+        if not proj:
+            return self._json({"error": "not found"}, 404)
+        return self._json({"project": proj})
+
+    def _submit_rating(self, pid):
+        conn = connect()
+        row = conn.execute("SELECT * FROM projects WHERE id=?", (pid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        proj = dict(row)
+        if proj["channel"] != "bzf":
+            conn.close()
+            return self._json({"error": "仅保租房项目可提交好房子评级"}, 400)
+        if proj.get("rating_status") == "pending":
+            conn.close()
+            return self._json({"error": "已在复核队列中"}, 400)
+
+        rating = {}
+        existing = proj.get("rating")
+        if existing:
+            try:
+                rating = json.loads(existing) if isinstance(existing, str) else dict(existing)
+            except json.JSONDecodeError:
+                rating = {}
+        dims = rating.get("dims") or {}
+        if not all(dims.get(k) is not None for k in ("comfort", "green", "tech", "safety")):
+            conn.close()
+            return self._json({"error": "请先保存四维度自评分"}, 400)
+
+        summary = summarize_rating(dims)
+        rating.update(summary)
+        rating["code"] = rating_code(pid)
+        rating.setdefault("checked", rating.get("checked") or 47)
+        rating.setdefault("total", rating.get("total") or 55)
+        rating["confidence"] = rating.get("confidence") or 0.9
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        conn.execute(
+            """UPDATE projects SET rating=?, rating_status='pending',
+               rating_submitted_at=?, rating_note=NULL WHERE id=?""",
+            (rating_to_db(rating), now, pid),
+        )
+        conn.commit()
+        export_json(conn)
+        proj = normalize_project_row(conn.execute(
+            """SELECT p.*, d.name AS district_name FROM projects p
+               LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
+            (pid,),
+        ).fetchone())
+        conn.close()
+        return self._json({"ok": True, "project": proj})
+
+    def _review_rating(self, code):
+        b = self._body()
+        action = b.get("action")
+        if action not in ("pass", "reject"):
+            return self._json({"error": "action 须为 pass 或 reject"}, 400)
+
+        conn = connect()
+        proj = self._project_by_rating_code(conn, code)
+        if not proj:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        if proj.get("rating_status") != "pending":
+            conn.close()
+            return self._json({"error": "当前状态不可复核"}, 400)
+
+        rating = proj.get("rating") or {}
+        dims = b.get("dims") or rating.get("dims") or {}
+        if action == "pass" and dims:
+            rating["dims"] = dims
+            rating.update(summarize_rating(dims))
+        if b.get("checked") is not None:
+            rating["checked"] = b.get("checked")
+        if b.get("total") is not None:
+            rating["total"] = b.get("total")
+        rating["code"] = rating_code(proj["id"])
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        status = "passed" if action == "pass" else "rejected"
+
+        conn.execute(
+            """UPDATE projects SET rating=?, rating_status=?, rating_reviewed_at=?, rating_note=?
+               WHERE id=?""",
+            (rating_to_db(rating), status, now, b.get("note"), proj["id"]),
+        )
+        conn.commit()
+        export_json(conn)
+        proj = normalize_project_row(conn.execute(
+            """SELECT p.*, d.name AS district_name FROM projects p
+               LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
+            (proj["id"],),
+        ).fetchone())
+        conn.close()
+        return self._json({"ok": True, "project": proj})
+
     def _update_project(self, pid):
         b = self._body()
         conn = connect()
@@ -235,21 +402,35 @@ class Handler(SimpleHTTPRequestHandler):
         slug = b.get("slug") or (slugify(name) if name else None)
         tags = tags_to_db(b.get("tags"))
 
+        rating_sql = ""
+        rating_params = []
+        if "rating" in b:
+            row = conn.execute("SELECT rating_status FROM projects WHERE id=?", (pid,)).fetchone()
+            if row and row[0] in ("draft", "rejected", None):
+                rating = b.get("rating") or {}
+                dims = rating.get("dims") or {}
+                if dims:
+                    rating.update(summarize_rating(dims))
+                rating["code"] = rating_code(pid)
+                rating_sql = ", rating=?"
+                rating_params.append(rating_to_db(rating))
+
         conn.execute(
-            """UPDATE projects SET
+            f"""UPDATE projects SET
                name=COALESCE(?, name), slug=COALESCE(?, slug),
                address=?, cover_image=?, tags=?,
                sort_order=COALESCE(?, sort_order), price_from=?,
                is_featured=COALESCE(?, is_featured), featured_rank=?, old_house_hint=?
+               {rating_sql}
                WHERE id=?""",
             (name, slug, b.get("address"), b.get("cover_image"), tags,
              b.get("sort_order"), b.get("price_from"), b.get("is_featured"),
-             b.get("featured_rank"), b.get("old_house_hint"), pid),
+             b.get("featured_rank"), b.get("old_house_hint"), *rating_params, pid),
         )
         conn.commit()
         sync_project_unit_count(conn, pid)
         export_json(conn)
-        proj = row_to_dict(conn.execute(
+        proj = normalize_project_row(conn.execute(
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
@@ -410,7 +591,7 @@ def main():
     print(f"新居住服务  http://localhost:{port}")
     print(f"  前台  /juzhu-channel-v3-grid.html")
     print(f"  后台  /juzhu-admin.html")
-    print(f"  API   /api/juzhu/admin/*")
+    print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/ratings")
     HTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 

@@ -142,6 +142,37 @@
       </div>
     </div>
 
+    <!-- 新居住 · 保租房好房子复核（juzhu-admin 提交） -->
+    <div class="filter-bar" style="margin-top:8px;background:linear-gradient(90deg,#ecfdf5,#fff);">
+      <span class="lbl">新居住保租房</span>
+      <span style="font-size:11px;color:var(--muted);">数据来自 <code>juzhu-admin</code> → <code>/api/juzhu/ratings</code></span>
+      <div class="spacer"></div>
+      <a href="../juzhu-admin.html" class="btn btn-ghost" style="text-decoration:none;">内容后台 ↗</a>
+    </div>
+    <div class="table-wrap" style="margin-bottom:18px;">
+      <table>
+        <thead>
+          <tr>
+            <th>房源编号</th>
+            <th>项目名称</th>
+            <th>行政区</th>
+            <th>申请星级</th>
+            <th>AI 初评</th>
+            <th>提交时间</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="juzhuRatings">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="page-header" style="margin-bottom:12px;padding:12px 18px;">
+      <h1 style="font-size:16px;margin:0;">旅居房源复核（演示样例）</h1>
+    </div>
+
     <!-- filters -->
     <div class="filter-bar">
       <span class="lbl">筛选：</span>
@@ -290,5 +321,40 @@
   </div>
 
   <script src="_nav.js"></script>
+  <script>
+  (function(){
+    var STATUS = { pending:'待复核', passed:'已通过', rejected:'已驳回', draft:'草稿' };
+    var STAR = ['','一','二','三','四','五'];
+    fetch('/api/juzhu/ratings?status=pending').then(function(r){ return r.json(); }).then(function(data){
+      var items = data.items || [];
+      var tbody = document.getElementById('juzhuRatings');
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无待复核保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(function(p){
+        var r = p.rating || {};
+        var code = r.code || ('SY-BZF-'+String(p.id).padStart(5,'0'));
+        var stars = r.stars || 3;
+        var score = r.score || '—';
+        var st = p.rating_status || 'pending';
+        var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
+        return '<tr>'+
+          '<td><span class="house-id">'+code+'</span></td>'+
+          '<td><b>'+p.name+'</b><br><small style="color:var(--muted);">沈阳 · 保租房</small></td>'+
+          '<td>'+(p.district_name||'—')+'</td>'+
+          '<td><span class="star-badge s'+stars+'">★ '+STAR[stars]+'星</span></td>'+
+          '<td><div class="score-cell"><div class="score-bar"><i style="width:'+score+'%;background:var(--accent);"></i></div><span class="score-num">'+score+'</span></div></td>'+
+          '<td>'+dt+'</td>'+
+          '<td><span class="status-tag '+st+'">'+(STATUS[st]||st)+'</span></td>'+
+          '<td class="action-btns"><a href="p-rating-detail.html?id='+encodeURIComponent(code)+'" class="btn btn-primary">复核</a></td>'+
+        '</tr>';
+      }).join('');
+    }).catch(function(){
+      document.getElementById('juzhuRatings').innerHTML =
+        '<tr><td colspan="8" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API · 请运行 python3 juzhu/server.py</td></tr>';
+    });
+  })();
+  </script>
 </body>
 </html>

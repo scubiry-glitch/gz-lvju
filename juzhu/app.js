@@ -89,6 +89,164 @@ window.JUZHU = (function () {
     return [];
   }
 
+  function parseAreaFromName(name) {
+    if (!name) return null;
+    var m = String(name).trim().match(/^(\d+(?:\.\d+)?)\s*(?:平|㎡|m²|平米)?$/);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  function areasMatch(a, b) {
+    if (a == null || b == null) return false;
+    return Math.abs(Number(a) - Number(b)) < 0.05;
+  }
+
+  /** 名称是否仅为面积数字（70 / 70平 / 70㎡） */
+  function nameIsAreaOnly(name, areaSqm) {
+    var parsed = parseAreaFromName(name);
+    if (parsed == null) return false;
+    if (areaSqm != null) return areasMatch(parsed, areaSqm);
+    return true;
+  }
+
+  function fmtArea(area) {
+    if (area == null) return '';
+    var n = Number(area);
+    var s = n % 1 === 0 ? String(Math.round(n)) : String(n);
+    return s + '㎡';
+  }
+
+  /** 展示用名称：去掉素材文件夹遗留的「_副本」「副本」后缀 */
+  function cleanDisplayName(name) {
+    if (!name) return '';
+    var s = String(name).trim();
+    while (/_?副本$/.test(s)) s = s.replace(/_?副本$/, '');
+    return s.trim();
+  }
+
+  /** 列表/详情主标题：名称与面积重复时只展示面积 */
+  function unitTitle(u) {
+    if (!u) return '—';
+    var name = cleanDisplayName(u.name);
+    if (nameIsAreaOnly(name, u.area_sqm) && u.area_sqm != null) return fmtArea(u.area_sqm);
+    return name || '—';
+  }
+
+  /** 副标题：不重复面积，可补户型标签 */
+  function unitMeta(u) {
+    if (!u) return '';
+    var name = cleanDisplayName(u.name);
+    var parts = [];
+    if (!nameIsAreaOnly(name, u.area_sqm) && u.area_sqm != null) parts.push(fmtArea(u.area_sqm));
+    if (u.layout_label) parts.push(u.layout_label);
+    return parts.join(' · ');
+  }
+
+  var HOUSE_DIMS = [
+    { key: 'comfort', label: '舒适', icon: '🛋', color: '#f59e0b' },
+    { key: 'green', label: '绿色', icon: '🌿', color: '#10b981' },
+    { key: 'tech', label: '科技', icon: '📡', color: '#3b82f6' },
+    { key: 'safety', label: '安全', icon: '🛡', color: '#ef4444' }
+  ];
+
+  var STAR_LABELS = ['', '基础型', '达标型', '优质型', '精品型', '示范型'];
+
+  function hashSeed(s) {
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return Math.abs(h);
+  }
+
+  function starsHtml(n) {
+    var out = '';
+    for (var i = 1; i <= 5; i++) {
+      out += i <= n ? '★' : '<span class="dim">★</span>';
+    }
+    return out;
+  }
+
+  function mockHouseRating(project) {
+    var seed = hashSeed((project.slug || '') + String(project.id));
+    function dim(off) {
+      return Math.round((3.1 + ((seed + off * 7) % 18) / 10) * 10) / 10;
+    }
+    var dims = { comfort: dim(0), green: dim(1), tech: dim(2), safety: dim(3) };
+    var avg = (dims.comfort + dims.green + dims.tech + dims.safety) / 4;
+    var stars = Math.min(5, Math.max(1, Math.round(avg)));
+    return {
+      stars: stars,
+      star_label: STAR_LABELS[stars] || '优质型',
+      score: Math.round(avg / 5 * 100),
+      dims: dims,
+      code: 'SY-BZF-' + String(project.id).padStart(5, '0'),
+      checked: 42 + (seed % 11),
+      total: 55
+    };
+  }
+
+  /** 好房子四维度评级（项目级；已通过复核用库内数据，否则 mock） */
+  function houseRating(project) {
+    if (!project) return null;
+    var r = project.rating;
+    if (typeof r === 'string') {
+      try { r = JSON.parse(r); } catch (e) { r = null; }
+    }
+    if (project.rating_status === 'passed' && r && typeof r === 'object') {
+      return {
+        stars: r.stars || 4,
+        star_label: r.star_label || STAR_LABELS[r.stars] || '优质型',
+        score: r.score || 80,
+        dims: r.dims || r.dimensions || {},
+        code: r.code || ('SY-BZF-' + String(project.id).padStart(5, '0')),
+        checked: r.checked || 47,
+        total: r.total || 55
+      };
+    }
+    if (project.rating_status === 'pending' && r && typeof r === 'object') {
+      return {
+        stars: r.stars || 4,
+        star_label: (r.star_label || '复核中') + ' · 待中台确认',
+        score: r.score || 80,
+        dims: r.dims || {},
+        code: r.code || ('SY-BZF-' + String(project.id).padStart(5, '0')),
+        checked: r.checked || 47,
+        total: r.total || 55,
+        pending: true
+      };
+    }
+    return mockHouseRating(project);
+  }
+
+  function houseRatingHtml(project) {
+    var r = houseRating(project);
+    if (!r) return '';
+    var dimRows = HOUSE_DIMS.map(function(d) {
+      var v = r.dims[d.key];
+      if (v == null) v = 4.0;
+      var pct = Math.round(v / 5 * 100);
+      return '<div class="hdim"><span class="k">' + d.icon + ' ' + d.label + '</span>' +
+        '<span class="bar"><i style="width:' + pct + '%;background:' + d.color + '"></i></span>' +
+        '<span class="v" style="color:' + d.color + '">' + v.toFixed(1) + '</span></div>';
+    }).join('');
+
+    return '<div class="block rating-block">' +
+      '<div class="bt">好房子评级 · 四维度</div>' +
+      '<div class="bs">江苏保租房标准 · 运营商自评 + 中台复核</div>' +
+      '<div class="rating-sum">' +
+        '<div class="stars-side"><div class="ek">综合星级</div>' +
+        '<div class="stars">' + starsHtml(r.stars) + '</div>' +
+        '<div class="lbl">' + r.star_label + '</div>' +
+        '<div class="sc"><b>' + r.score + '</b> / 100 分</div></div>' +
+        '<div class="dims">' + dimRows + '</div>' +
+      '</div>' +
+      '<div class="verify">' +
+        '<a class="qrlink" href="screens/c-house-rating.html" title="扫码了解好房子标准">' +
+          '<img class="qrimg" alt="好房子标准二维码"></a>' +
+        '<div><div class="no">' + r.code + '</div>' +
+        '<div class="vb"><b>✓</b> 四维度达标 · <b>✓</b> ' + r.checked + '/' + r.total + ' 项自查 · <b>✓</b> 住建备案</div>' +
+        '<div class="vb"><a href="screens/c-house-rating.html">什么是好房子？ ↗</a></div></div>' +
+      '</div></div>';
+  }
+
   return {
     load: load,
     get data() { return cache; },
@@ -103,6 +261,14 @@ window.JUZHU = (function () {
     fmtRent: fmtRent,
     fmtPriceWan: fmtPriceWan,
     imgBg: imgBg,
-    asTags: asTags
+    asTags: asTags,
+    unitTitle: unitTitle,
+    unitMeta: unitMeta,
+    fmtArea: fmtArea,
+    nameIsAreaOnly: nameIsAreaOnly,
+    cleanDisplayName: cleanDisplayName,
+    houseRating: houseRating,
+    houseRatingHtml: houseRatingHtml,
+    starsHtml: starsHtml
   };
 })();

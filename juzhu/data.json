@@ -6,7 +6,7 @@
   },
   "stats": {
     "district_count": 9,
-    "project_count_bzf": 24,
+    "project_count_bzf": 23,
     "project_count_trade": 2,
     "unit_count": 65
   },
@@ -96,7 +96,7 @@
       "has_projects": 1,
       "sort_order": 6,
       "cover_image": "assets/juzhu/sy/districts/沈河区.jpeg",
-      "project_count": 6,
+      "project_count": 5,
       "unit_count": 14,
       "vacant_count": 14,
       "avg_price": 1654,
@@ -201,7 +201,25 @@
       "price_from": 1440,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": {
+        "dims": {
+          "comfort": 4.2,
+          "green": 3.8,
+          "tech": 4.5,
+          "safety": 4.1
+        },
+        "checked": 48,
+        "total": 55,
+        "stars": 4,
+        "star_label": "精品型",
+        "score": 83,
+        "code": "SY-BZF-00001"
+      },
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 11,
@@ -220,7 +238,12 @@
       "price_from": 1480,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 6,
@@ -239,7 +262,12 @@
       "price_from": 1384,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 22,
@@ -256,7 +284,12 @@
       "price_from": 1536,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 3,
@@ -275,7 +308,12 @@
       "price_from": 1726,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 16,
@@ -294,7 +332,12 @@
       "price_from": 1552,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 12,
@@ -311,7 +354,12 @@
       "price_from": 2016,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 7,
@@ -328,7 +376,12 @@
       "price_from": 1568,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 23,
@@ -345,7 +398,12 @@
       "price_from": 1640,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 4,
@@ -362,7 +420,12 @@
       "price_from": 1464,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 17,
@@ -381,7 +444,12 @@
       "price_from": 1552,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 2,
@@ -400,7 +468,12 @@
       "price_from": 1384,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 13,
@@ -419,7 +492,12 @@
       "price_from": 1592,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 8,
@@ -436,7 +514,12 @@
       "price_from": 1651,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 18,
@@ -455,7 +538,12 @@
       "price_from": 1520,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 5,
@@ -474,7 +562,12 @@
       "price_from": 1600,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 9,
@@ -491,7 +584,12 @@
       "price_from": 1600,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 14,
@@ -510,7 +608,12 @@
       "price_from": 1480,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 19,
@@ -529,7 +632,12 @@
       "price_from": 1408,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 10,
@@ -546,7 +654,12 @@
       "price_from": 1464,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 20,
@@ -565,7 +678,12 @@
       "price_from": 1520,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 15,
@@ -582,7 +700,12 @@
       "price_from": 1974,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 21,
@@ -601,27 +724,12 @@
       "price_from": 2056,
       "is_featured": 0,
       "featured_rank": null,
-      "old_house_hint": null
-    },
-    {
-      "id": 26,
-      "city_id": 1,
-      "district_id": 5,
-      "channel": "bzf",
-      "name": "测试新店",
-      "slug": "测试新店",
-      "cover_image": null,
-      "address": "沈河区 · 测试新店",
-      "tags": [
-        "逸居",
-        "测试"
-      ],
-      "sort_order": 999,
-      "unit_count": 0,
-      "price_from": null,
-      "is_featured": 0,
-      "featured_rank": null,
-      "old_house_hint": null
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 24,
@@ -641,7 +749,12 @@
       "price_from": 95,
       "is_featured": 0,
       "featured_rank": 2,
-      "old_house_hint": "旧房估价参考 55万起"
+      "old_house_hint": "旧房估价参考 55万起",
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     },
     {
       "id": 25,
@@ -661,7 +774,12 @@
       "price_from": 168,
       "is_featured": 0,
       "featured_rank": 3,
-      "old_house_hint": "旧房估价参考 128万起"
+      "old_house_hint": "旧房估价参考 128万起",
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
     }
   ],
   "units": [
