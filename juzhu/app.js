@@ -176,7 +176,7 @@ window.JUZHU = (function () {
   function mockHouseRating(project) {
     var seed = hashSeed((project.slug || '') + String(project.id));
     function dim(off) {
-      return Math.round((3.1 + ((seed + off * 7) % 18) / 10) * 10) / 10;
+      return Math.round((2.3 + ((seed + off * 13) % 23) / 10) * 10) / 10;
     }
     var dims = { comfort: dim(0), green: dim(1), tech: dim(2), safety: dim(3) };
     var avg = (dims.comfort + dims.green + dims.tech + dims.safety) / 4;
