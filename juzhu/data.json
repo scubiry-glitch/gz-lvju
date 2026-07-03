@@ -6,7 +6,7 @@
   },
   "stats": {
     "district_count": 9,
-    "project_count_bzf": 23,
+    "project_count_bzf": 24,
     "project_count_trade": 2,
     "unit_count": 65
   },
@@ -96,10 +96,10 @@
       "has_projects": 1,
       "sort_order": 6,
       "cover_image": "assets/juzhu/sy/districts/沈河区.jpeg",
-      "project_count": 5,
+      "project_count": 6,
       "unit_count": 14,
       "vacant_count": 14,
-      "avg_price": 1680,
+      "avg_price": 1654,
       "is_hot": 1,
       "layout_tall": 1,
       "layout_wide": 0,
@@ -599,6 +599,26 @@
       "sort_order": 6,
       "unit_count": 1,
       "price_from": 2056,
+      "is_featured": 0,
+      "featured_rank": null,
+      "old_house_hint": null
+    },
+    {
+      "id": 26,
+      "city_id": 1,
+      "district_id": 5,
+      "channel": "bzf",
+      "name": "测试新店",
+      "slug": "测试新店",
+      "cover_image": null,
+      "address": "沈河区 · 测试新店",
+      "tags": [
+        "逸居",
+        "测试"
+      ],
+      "sort_order": 999,
+      "unit_count": 0,
+      "price_from": null,
       "is_featured": 0,
       "featured_rank": null,
       "old_house_hint": null

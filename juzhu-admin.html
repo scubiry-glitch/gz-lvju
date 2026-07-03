@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>新居住 · 内容编辑后台</title>
+<style>
+  :root{
+    --bg:#f0f4f3; --surface:#fff; --fg:#10171c; --muted:#6b7785; --border:#e0e8e5;
+    --brand:#0f766e; --brand2:#14b8a6; --danger:#dc2626; --gold:#b48a3f;
+    --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    --serif:'Noto Serif SC',Georgia,serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;}
+  a{color:var(--brand);text-decoration:none;}
+  .top{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(90deg,#0b5d56,#0f766e);color:#fff;}
+  .top h1{font-family:var(--serif);font-size:18px;margin:0;flex:1;}
+  .top .sub{font-size:11px;opacity:.85;font-weight:400;}
+  .top .acts{display:flex;gap:8px;}
+  .top .acts a,.top .acts button{font-size:12px;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-family:inherit;}
+  .top .acts a:hover,.top .acts button:hover{background:rgba(255,255,255,.22);}
+  .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 52px);}
+  .side{background:var(--surface);border-right:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:10px;}
+  .side label{font-size:11px;color:var(--muted);font-weight:600;}
+  .side select,.side input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
+  .plist{flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-top:4px;}
+  .plist button{display:block;width:100%;text-align:left;padding:10px 12px;border:0;border-bottom:1px solid var(--border);
+    background:#fff;cursor:pointer;font-family:inherit;}
+  .plist button:hover{background:#f5faf9;}
+  .plist button.on{background:color-mix(in oklab,var(--brand) 10%,#fff);border-left:3px solid var(--brand);}
+  .plist .nm{font-size:13px;font-weight:600;color:var(--fg);}
+  .plist .meta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .main{padding:20px 24px 40px;overflow-y:auto;}
+  .empty{color:var(--muted);padding:40px;text-align:center;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;
+    box-shadow:0 4px 14px rgba(15,42,38,.04);}
+  .card h2{font-family:var(--serif);font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px;}
+  .card h2 .badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--brand);color:#fff;font-family:var(--font);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
+  .grid.full{grid-template-columns:1fr;}
+  .fld label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;}
+  .fld input,.fld textarea,.fld select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;}
+  .fld textarea{min-height:56px;resize:vertical;}
+  .cover-preview{width:120px;height:80px;border-radius:8px;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);margin-top:6px;}
+  .bar{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .btn{padding:8px 16px;border-radius:8px;border:0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.primary{background:linear-gradient(90deg,var(--brand),var(--brand2));color:#fff;}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .btn.danger{background:#fff;border:1px solid #fecaca;color:var(--danger);}
+  .tbl{width:100%;border-collapse:collapse;font-size:12px;}
+  .tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle;}
+  .tbl th{font-size:10px;color:var(--muted);font-weight:600;background:#fafcfb;}
+  .tbl input{width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;}
+  .tbl .thumb{width:48px;height:36px;border-radius:6px;background:#e8eeec center/cover no-repeat;}
+  .tbl .acts{white-space:nowrap;}
+  .tbl .acts button{padding:4px 8px;font-size:11px;margin-left:4px;}
+  .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
+    font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
+  .toast.show{opacity:1;}
+  .warn{background:#fff8eb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:14px;}
+  .side .side-actions{display:flex;gap:6px;}
+  .side .side-actions .btn{flex:1;padding:8px;font-size:12px;}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
+  <div class="acts">
+    <a href="juzhu-channel-v3-grid.html" target="_blank">预览前台</a>
+    <button type="button" id="btnExport">导出 JSON</button>
+  </div>
+</header>
+
+<div class="warn" id="apiWarn" hidden>请使用 <code>python3 juzhu/server.py</code> 启动服务后再编辑（纯静态 http.server 不支持保存）。</div>
+
+<div class="layout">
+  <aside class="side">
+    <div>
+      <label>频道</label>
+      <select id="fChannel">
+        <option value="">全部</option>
+        <option value="bzf">保租房</option>
+        <option value="trade">卖旧买新</option>
+      </select>
+    </div>
+    <div>
+      <label>行政区</label>
+      <select id="fDistrict"><option value="">全部</option></select>
+    </div>
+    <div>
+      <label>搜索项目</label>
+      <input id="fSearch" placeholder="项目名…" />
+    </div>
+    <div class="side-actions">
+      <button type="button" class="btn primary" id="btnNewProject">+ 新建项目</button>
+    </div>
+    <div class="plist" id="plist"></div>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="empty">← 从左侧选择项目，编辑信息与房源</div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = '/api/juzhu/admin';
+var state = { projects: [], districts: [], current: null, units: [] };
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(function(){ el.classList.remove('show'); }, 2400);
+}
+
+function api(path, opts) {
+  opts = opts || {};
+  return fetch(API + path, {
+    method: opts.method || 'GET',
+    headers: opts.body ? {'Content-Type':'application/json'} : {},
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
+    return r.json();
+  });
+}
+
+function tagsStr(tags) {
+  if (!tags) return '';
+  if (Array.isArray(tags)) return tags.join(', ');
+  return String(tags);
+}
+
+function loadDistricts() {
+  return api('/districts').then(function(list) {
+    state.districts = list;
+    var sel = document.getElementById('fDistrict');
+    sel.innerHTML = '<option value="">全部</option>' + list.map(function(d) {
+      return '<option value="'+d.id+'">'+d.name+'</option>';
+    }).join('');
+  });
+}
+
+function loadProjects() {
+  var ch = document.getElementById('fChannel').value;
+  var did = document.getElementById('fDistrict').value;
+  var q = document.getElementById('fSearch').value.trim();
+  var qs = '?';
+  if (ch) qs += 'channel='+ch+'&';
+  if (did) qs += 'district_id='+did+'&';
+  if (q) qs += 'q='+encodeURIComponent(q)+'&';
+  return api('/projects'+qs).then(function(list) {
+    state.projects = list;
+    renderProjectList();
+  });
+}
+
+function renderProjectList() {
+  var box = document.getElementById('plist');
+  if (!state.projects.length) {
+    box.innerHTML = '<div class="empty" style="padding:20px">无项目</div>';
+    return;
+  }
+  box.innerHTML = state.projects.map(function(p) {
+    var on = state.current && state.current.id === p.id ? ' on' : '';
+    var ch = p.channel === 'trade' ? '卖旧买新' : '保租房';
+    return '<button type="button" class="'+on.trim()+'" data-id="'+p.id+'">'+
+      '<div class="nm">'+p.name+'</div>'+
+      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型</div></button>';
+  }).join('');
+  box.querySelectorAll('button[data-id]').forEach(function(btn) {
+    btn.onclick = function(){ openProject(+btn.dataset.id); };
+  });
+}
+
+function openProject(id) {
+  state.mode = 'edit';
+  api('/projects/'+id).then(function(res) {
+    state.current = res.project;
+    state.units = res.units || [];
+    renderProjectList();
+    renderEditor();
+  }).catch(function(e){ toast('加载失败：'+e.message); });
+}
+
+function renderNewProjectForm() {
+  state.mode = 'new';
+  state.current = null;
+  renderProjectList();
+  var distOpts = state.districts.map(function(d) {
+    return '<option value="'+d.id+'">'+d.name+(d.note ? '（'+d.note+'）' : '')+'</option>';
+  }).join('');
+  document.getElementById('main').innerHTML =
+    '<div class="card">'+
+      '<h2>新建项目 <span class="badge" style="background:var(--gold)">NEW</span></h2>'+
+      '<div class="grid">'+
+        '<div class="fld"><label>项目名称 *</label><input id="n_name" placeholder="如：逸居XX店" autofocus/></div>'+
+        '<div class="fld"><label>频道 *</label><select id="n_channel"><option value="bzf">保租房</option><option value="trade">卖旧买新</option></select></div>'+
+        '<div class="fld" id="n_dist_wrap"><label>所属行政区 *</label><select id="n_district"><option value="">请选择</option>'+distOpts+'</select></div>'+
+        '<div class="fld"><label>排序</label><input id="n_sort" type="number" value="999"/></div>'+
+        '<div class="fld grid full"><label>地址 / 副标题</label><input id="n_addr" placeholder="留空则自动生成"/></div>'+
+        '<div class="fld"><label>标签（逗号分隔）</label><input id="n_tags" placeholder="逸居, 近地铁"/></div>'+
+        '<div class="fld"><label>起价 / 起租</label><input id="n_price" type="number" placeholder="保租=元/月，置换=万"/></div>'+
+        '<div class="fld" id="n_old_wrap" hidden><label>旧房估价提示</label><input id="n_old" placeholder="旧房估价参考 180万起"/></div>'+
+        '<div class="fld grid full"><label>封面图路径</label><input id="n_cover" placeholder="assets/juzhu/sy/projects/..."/></div>'+
+      '</div>'+
+      '<div class="bar">'+
+        '<button class="btn primary" type="button" id="submitNew">创建项目</button>'+
+        '<button class="btn ghost" type="button" id="cancelNew">取消</button>'+
+      '</div>'+
+    '</div>';
+
+  var chSel = document.getElementById('n_channel');
+  function syncChannel() {
+    var isTrade = chSel.value === 'trade';
+    document.getElementById('n_dist_wrap').hidden = isTrade;
+    document.getElementById('n_old_wrap').hidden = !isTrade;
+  }
+  chSel.onchange = syncChannel;
+  syncChannel();
+  document.getElementById('submitNew').onclick = createProject;
+  document.getElementById('cancelNew').onclick = function() {
+    document.getElementById('main').innerHTML = '<div class="empty">← 从左侧选择项目，或点击「新建项目」</div>';
+    state.mode = null;
+  };
+}
+
+function createProject() {
+  var name = document.getElementById('n_name').value.trim();
+  if (!name) { toast('请填写项目名称'); return; }
+  var channel = document.getElementById('n_channel').value;
+  var district_id = document.getElementById('n_district').value;
+  if (channel === 'bzf' && !district_id) { toast('保租房须选择行政区'); return; }
+
+  var body = {
+    name: name,
+    channel: channel,
+    district_id: district_id ? +district_id : null,
+    sort_order: +document.getElementById('n_sort').value || 999,
+    address: document.getElementById('n_addr').value.trim() || undefined,
+    tags: document.getElementById('n_tags').value,
+    price_from: numValFrom('n_price'),
+    cover_image: document.getElementById('n_cover').value.trim() || undefined
+  };
+  if (channel === 'trade') body.old_house_hint = document.getElementById('n_old').value.trim() || undefined;
+
+  api('/projects', { method:'POST', body: body }).then(function(res) {
+    toast('项目「'+res.project.name+'」已创建');
+    loadProjects().then(function(){ openProject(res.project.id); });
+  }).catch(function(e){ toast('创建失败：'+e.message); });
+}
+
+function numValFrom(id) {
+  var el = document.getElementById(id);
+  if (!el) return null;
+  var v = el.value;
+  return v === '' ? null : +v;
+}
+
+function renderEditor() {
+  var p = state.current;
+  if (!p) return;
+  var isTrade = p.channel === 'trade';
+  var chLabel = isTrade ? '卖旧买新' : '保租房';
+  var cover = p.cover_image ? "background-image:url('/"+p.cover_image.replace(/^\//,'')+"')" : '';
+
+  document.getElementById('main').innerHTML =
+    '<div class="card">'+
+      '<h2>'+p.name+' <span class="badge">'+chLabel+'</span></h2>'+
+      '<div class="grid">'+
+        '<div class="fld"><label>项目名称</label><input id="p_name" value="'+esc(p.name)+'"/></div>'+
+        '<div class="fld"><label>排序</label><input id="p_sort" type="number" value="'+(p.sort_order||0)+'"/></div>'+
+        '<div class="fld grid full"><label>地址 / 副标题</label><input id="p_addr" value="'+esc(p.address||'')+'"/></div>'+
+        '<div class="fld"><label>标签（逗号分隔）</label><input id="p_tags" value="'+esc(tagsStr(p.tags))+'"/></div>'+
+        '<div class="fld"><label>'+(isTrade?'起价（万）':'起租（元/月）')+'</label><input id="p_price" type="number" value="'+(p.price_from||'')+'"/></div>'+
+        (isTrade?'<div class="fld"><label>旧房估价提示</label><input id="p_old" value="'+esc(p.old_house_hint||'')+'"/></div>':'')+
+        '<div class="fld grid full"><label>封面图路径</label><input id="p_cover" value="'+esc(p.cover_image||'')+'"/>'+
+          '<div class="cover-preview" id="p_cover_prev" style="'+cover+'"></div></div>'+
+      '</div>'+
+      '<div class="bar">'+
+        '<button class="btn primary" type="button" id="saveProj">保存项目</button>'+
+        '<button class="btn danger" type="button" id="delProj">删除项目</button>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
+      '<table class="tbl"><thead><tr>'+
+        '<th>图</th><th>名称</th><th>面积㎡</th><th>户型</th>'+
+        '<th>'+(isTrade?'总价(万)':'月租')+'</th><th>排序</th><th>操作</th>'+
+      '</tr></thead><tbody id="unitRows"></tbody></table>'+
+      '<div class="bar"><button class="btn ghost" type="button" id="addUnit">+ 新增房源</button></div>'+
+    '</div>';
+
+  document.getElementById('p_cover').oninput = function() {
+    document.getElementById('p_cover_prev').style.backgroundImage =
+      this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+  };
+  document.getElementById('saveProj').onclick = saveProject;
+  document.getElementById('delProj').onclick = deleteProject;
+  document.getElementById('addUnit').onclick = addUnit;
+  renderUnits(isTrade);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+function renderUnits(isTrade) {
+  var tbody = document.getElementById('unitRows');
+  tbody.innerHTML = state.units.map(function(u) {
+    var th = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
+    var priceVal = isTrade ? (u.price_total||'') : (u.rent_monthly||'');
+    return '<tr data-id="'+u.id+'">'+
+      '<td><div class="thumb" style="'+th+'"></div></td>'+
+      '<td><input class="u_name" value="'+esc(u.name)+'"/></td>'+
+      '<td><input class="u_area" type="number" step="0.1" value="'+(u.area_sqm||'')+'"/></td>'+
+      '<td><input class="u_layout" value="'+esc(u.layout_label||'')+'"/></td>'+
+      '<td><input class="u_price" type="number" value="'+priceVal+'"/></td>'+
+      '<td><input class="u_sort" type="number" value="'+(u.sort_order||0)+'"/></td>'+
+      '<td class="acts"><button class="btn primary u_save">保存</button><button class="btn danger u_del">删</button></td>'+
+    '</tr>';
+  }).join('');
+
+  tbody.querySelectorAll('tr').forEach(function(tr) {
+    var id = +tr.dataset.id;
+    tr.querySelector('.u_save').onclick = function(){ saveUnit(tr, id, isTrade); };
+    tr.querySelector('.u_del').onclick = function(){ deleteUnit(id); };
+  });
+}
+
+function saveProject() {
+  var p = state.current;
+  var body = {
+    name: document.getElementById('p_name').value.trim(),
+    address: document.getElementById('p_addr').value.trim(),
+    tags: document.getElementById('p_tags').value,
+    sort_order: +document.getElementById('p_sort').value,
+    price_from: numVal('p_price'),
+    cover_image: document.getElementById('p_cover').value.trim()
+  };
+  if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
+
+  api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
+    state.current = res.project;
+    toast('项目已保存，data.json 已更新');
+    loadProjects().then(function(){ state.current = res.project; renderProjectList(); });
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+}
+
+function deleteProject() {
+  if (!confirm('确定删除项目「'+state.current.name+'」及全部房源？')) return;
+  api('/projects/'+state.current.id, { method:'DELETE' }).then(function() {
+    toast('项目已删除');
+    state.current = null;
+    document.getElementById('main').innerHTML = '<div class="empty">← 从左侧选择项目</div>';
+    loadProjects();
+  }).catch(function(e){ toast('删除失败：'+e.message); });
+}
+
+function saveUnit(tr, id, isTrade) {
+  var body = {
+    name: tr.querySelector('.u_name').value.trim(),
+    area_sqm: parseFloat(tr.querySelector('.u_area').value) || null,
+    layout_label: tr.querySelector('.u_layout').value.trim() || null,
+    sort_order: +tr.querySelector('.u_sort').value
+  };
+  var pv = tr.querySelector('.u_price').value;
+  if (isTrade) body.price_total = pv ? +pv : null;
+  else body.rent_monthly = pv ? +pv : null;
+
+  api('/units/'+id, { method:'PUT', body: body }).then(function() {
+    toast('房源已保存');
+    openProject(state.current.id);
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+}
+
+function deleteUnit(id) {
+  if (!confirm('确定删除该房源？')) return;
+  api('/units/'+id, { method:'DELETE' }).then(function() {
+    toast('房源已删除');
+    openProject(state.current.id);
+  }).catch(function(e){ toast('删除失败：'+e.message); });
+}
+
+function addUnit() {
+  api('/projects/'+state.current.id+'/units', {
+    method:'POST',
+    body: { name: '新房源', sort_order: 999 }
+  }).then(function() {
+    toast('已新增房源');
+    openProject(state.current.id);
+  }).catch(function(e){ toast('新增失败：'+e.message); });
+}
+
+function numVal(id) {
+  var v = document.getElementById(id).value;
+  return v === '' ? null : +v;
+}
+
+document.getElementById('btnNewProject').onclick = renderNewProjectForm;
+document.getElementById('fChannel').onchange = loadProjects;
+document.getElementById('fDistrict').onchange = loadProjects;
+document.getElementById('fSearch').oninput = debounce(loadProjects, 300);
+document.getElementById('btnExport').onclick = function() {
+  api('/export', { method:'POST' }).then(function(r) {
+    toast('已导出 JSON · 户型 '+r.stats.unit_count);
+  }).catch(function(e){ toast('导出失败：'+e.message); });
+};
+
+function debounce(fn, ms) {
+  var t;
+  return function() { clearTimeout(t); t = setTimeout(fn, ms); };
+}
+
+Promise.all([loadDistricts(), loadProjects()]).catch(function() {
+  document.getElementById('apiWarn').hidden = false;
+});
+</script>
+</body>
+</html>
