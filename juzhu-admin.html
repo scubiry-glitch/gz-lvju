@@ -71,6 +71,26 @@
   .dim-grid label{font-size:10px;color:var(--muted);display:block;margin-bottom:4px;}
   .rating-preview{margin-top:12px;padding:10px 12px;background:#f5faf9;border-radius:10px;font-size:12px;}
   .rating-preview b{font-family:var(--serif);color:var(--gold);font-size:18px;}
+  .unit-photos-row td{background:#f8fbfa;padding:0!important;border-bottom:1px solid var(--border);}
+  .photo-panel{padding:12px 14px 14px;}
+  .photo-panel-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .photo-panel-hd b{font-size:13px;}
+  .photo-panel-hd span{font-size:11px;color:var(--muted);}
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+  .photo-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px;}
+  .photo-card.cover{border-color:var(--brand);box-shadow:0 0 0 1px color-mix(in oklab,var(--brand) 35%,#fff);}
+  .photo-card .pv{height:88px;border-radius:8px;background:#e8eeec center/cover no-repeat;margin-bottom:8px;}
+  .photo-card label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;}
+  .photo-card input{width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;margin-bottom:6px;}
+  .photo-card .prow{display:flex;gap:4px;flex-wrap:wrap;}
+  .photo-card .prow .btn{padding:4px 8px;font-size:10px;}
+  .photo-add{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);}
+  .photo-add input{flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;}
+  .btn.link{background:none;border:0;color:var(--brand);padding:0;font-size:11px;font-weight:600;cursor:pointer;}
+  .img-field-row{display:flex;gap:8px;align-items:center;}
+  .img-field-row input{flex:1;}
+  .upload-btn{position:relative;overflow:hidden;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;}
+  .upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
 </style>
 </head>
 <body>
@@ -118,7 +138,7 @@
 
 <script>
 var API = '/api/juzhu/admin';
-var state = { projects: [], districts: [], current: null, units: [] };
+var state = { projects: [], districts: [], current: null, units: [], photos: [], expandedUnit: null };
 
 function toast(msg) {
   var el = document.getElementById('toast');
@@ -137,6 +157,58 @@ function api(path, opts) {
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
+}
+
+function uploadForm(path, formData) {
+  return fetch(API + path, { method: 'POST', body: formData }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
+    return r.json();
+  });
+}
+
+function uploadImage(file, fields) {
+  var fd = new FormData();
+  fd.append('file', file);
+  Object.keys(fields).forEach(function(k){ fd.append(k, fields[k]); });
+  return uploadForm('/upload', fd);
+}
+
+function uploadUnitPhotos(unitId, files) {
+  var chain = Promise.resolve();
+  files.forEach(function(file) {
+    chain = chain.then(function() {
+      var fd = new FormData();
+      fd.append('file', file);
+      return uploadForm('/units/'+unitId+'/photos', fd);
+    });
+  });
+  return chain;
+}
+
+function bindCoverUpload(inputId, previewId, getMeta) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  var wrap = input.closest('.img-field');
+  if (!wrap) return;
+  var fileInput = wrap.querySelector('.upload-input');
+  if (!fileInput) return;
+  fileInput.onchange = function() {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    toast('上传中…');
+    uploadImage(file, getMeta()).then(function(res) {
+      input.value = res.file_path;
+      if (previewId) {
+        document.getElementById(previewId).style.backgroundImage =
+          "url('/"+res.file_path.replace(/^\//,'')+"')";
+      }
+      toast('上传成功');
+      fileInput.value = '';
+    }).catch(function(e) {
+      toast('上传失败：'+e.message);
+      fileInput.value = '';
+    });
+  };
 }
 
 function tagsStr(tags) {
@@ -187,14 +259,26 @@ function renderProjectList() {
   });
 }
 
-function openProject(id) {
+function openProject(id, expandedAfter) {
   state.mode = 'edit';
+  if (expandedAfter !== undefined) state.expandedUnit = expandedAfter;
+  else state.expandedUnit = null;
   api('/projects/'+id).then(function(res) {
     state.current = res.project;
     state.units = res.units || [];
+    state.photos = res.photos || [];
     renderProjectList();
     renderEditor();
   }).catch(function(e){ toast('加载失败：'+e.message); });
+}
+
+function photosOf(unitId) {
+  return (state.photos || []).filter(function(p){ return p.entity_id === unitId; })
+    .sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0) || a.id - b.id; });
+}
+
+function imgStyle(path) {
+  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
 }
 
 function renderNewProjectForm() {
@@ -216,7 +300,11 @@ function renderNewProjectForm() {
         '<div class="fld"><label>标签（逗号分隔）</label><input id="n_tags" placeholder="逸居, 近地铁"/></div>'+
         '<div class="fld"><label>起价 / 起租</label><input id="n_price" type="number" placeholder="保租=元/月，置换=万"/></div>'+
         '<div class="fld" id="n_old_wrap" hidden><label>旧房估价提示</label><input id="n_old" placeholder="旧房估价参考 180万起"/></div>'+
-        '<div class="fld grid full"><label>封面图路径</label><input id="n_cover" placeholder="assets/juzhu/sy/projects/..."/></div>'+
+        '<div class="fld grid full img-field"><label>封面图</label>'+
+          '<div class="img-field-row">'+
+            '<input id="n_cover" placeholder="assets/juzhu/sy/projects/..."/>'+
+            '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="upload-input"/></label>'+
+          '</div></div>'+
       '</div>'+
       '<div class="bar">'+
         '<button class="btn primary" type="button" id="submitNew">创建项目</button>'+
@@ -237,6 +325,14 @@ function renderNewProjectForm() {
     document.getElementById('main').innerHTML = '<div class="empty">← 从左侧选择项目，或点击「新建项目」</div>';
     state.mode = null;
   };
+  bindCoverUpload('n_cover', null, function() {
+    return {
+      scope: 'project_cover_new',
+      channel: document.getElementById('n_channel').value,
+      district_id: document.getElementById('n_district').value,
+      project_name: document.getElementById('n_name').value.trim() || '新项目'
+    };
+  });
 }
 
 function createProject() {
@@ -369,7 +465,11 @@ function renderEditor() {
         '<div class="fld"><label>标签（逗号分隔）</label><input id="p_tags" value="'+esc(tagsStr(p.tags))+'"/></div>'+
         '<div class="fld"><label>'+(isTrade?'起价（万）':'起租（元/月）')+'</label><input id="p_price" type="number" value="'+(p.price_from||'')+'"/></div>'+
         (isTrade?'<div class="fld"><label>旧房估价提示</label><input id="p_old" value="'+esc(p.old_house_hint||'')+'"/></div>':'')+
-        '<div class="fld grid full"><label>封面图路径</label><input id="p_cover" value="'+esc(p.cover_image||'')+'"/>'+
+        '<div class="fld grid full img-field"><label>封面图</label>'+
+          '<div class="img-field-row">'+
+            '<input id="p_cover" value="'+esc(p.cover_image||'')+'"/>'+
+            '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="upload-input"/></label>'+
+          '</div>'+
           '<div class="cover-preview" id="p_cover_prev" style="'+cover+'"></div></div>'+
       '</div>'+
       '<div class="bar">'+
@@ -382,7 +482,7 @@ function renderEditor() {
       '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
       '<table class="tbl"><thead><tr>'+
         '<th>图</th><th>名称</th><th>面积㎡</th><th>户型</th>'+
-        '<th>'+(isTrade?'总价(万)':'月租')+'</th><th>排序</th><th>操作</th>'+
+        '<th>'+(isTrade?'总价(万)':'月租')+'</th><th>排序</th><th>图集</th><th>操作</th>'+
       '</tr></thead><tbody id="unitRows"></tbody></table>'+
       '<div class="bar"><button class="btn ghost" type="button" id="addUnit">+ 新增房源</button></div>'+
     '</div>';
@@ -391,6 +491,9 @@ function renderEditor() {
     document.getElementById('p_cover_prev').style.backgroundImage =
       this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
   };
+  bindCoverUpload('p_cover', 'p_cover_prev', function() {
+    return { scope: 'project_cover', project_id: state.current.id };
+  });
   document.getElementById('saveProj').onclick = saveProject;
   document.getElementById('delProj').onclick = deleteProject;
   document.getElementById('addUnit').onclick = addUnit;
@@ -440,27 +543,132 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 }
 
+function renderPhotoPanel(unitId) {
+  var list = photosOf(unitId);
+  var cards = list.map(function(ph){
+    var cls = ph.is_cover ? ' photo-card cover' : ' photo-card';
+    return '<div class="'+cls.trim()+'" data-photo="'+ph.id+'">'+
+      '<div class="pv" style="'+imgStyle(ph.file_path)+'"></div>'+
+      '<label>路径</label><input class="ph_path" value="'+esc(ph.file_path)+'"/>'+
+      '<label>排序</label><input class="ph_sort" type="number" value="'+(ph.sort_order||0)+'"/>'+
+      '<div class="prow">'+
+        '<button type="button" class="btn ghost ph_save">保存</button>'+
+        '<label class="btn ghost upload-btn ph_replace">换图<input type="file" accept="image/*" class="upload-input"/></label>'+
+        '<button type="button" class="btn ghost ph_cover"'+(ph.is_cover?' disabled':'')+'>封面</button>'+
+        '<button type="button" class="btn danger ph_del">删</button>'+
+      '</div></div>';
+  }).join('');
+  if (!cards) cards = '<p style="font-size:12px;color:var(--muted);margin:0;">暂无图片，可在下方添加路径</p>';
+  return '<div class="photo-panel" data-unit-panel="'+unitId+'">'+
+    '<div class="photo-panel-hd"><b>户型图集</b><span>'+list.length+' 张 · 保存后同步 data.json</span></div>'+
+    '<div class="photo-grid">'+cards+'</div>'+
+    '<div class="photo-add">'+
+      '<input class="ph_new_path" placeholder="或填写路径…"/>'+
+      '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" multiple class="ph_upload_input"/></label>'+
+      '<button type="button" class="btn primary ph_add">+ 添加路径</button>'+
+    '</div></div>';
+}
+
+function bindPhotoPanel(unitId) {
+  var panel = document.querySelector('[data-unit-panel="'+unitId+'"]');
+  if (!panel) return;
+  panel.querySelectorAll('.photo-card').forEach(function(card){
+    var pid = +card.dataset.photo;
+    card.querySelector('.ph_path').oninput = function(){
+      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    };
+    card.querySelector('.ph_save').onclick = function(){
+      api('/photos/'+pid, { method:'PUT', body: {
+        file_path: card.querySelector('.ph_path').value.trim(),
+        sort_order: +card.querySelector('.ph_sort').value
+      }}).then(function(){ toast('图片已保存'); openProject(state.current.id, unitId); })
+        .catch(function(e){ toast('保存失败：'+e.message); });
+    };
+    card.querySelector('.ph_cover').onclick = function(){
+      api('/photos/'+pid, { method:'PUT', body: { is_cover: true } }).then(function(){
+        toast('已设为封面'); openProject(state.current.id, unitId);
+      }).catch(function(e){ toast('操作失败：'+e.message); });
+    };
+    card.querySelector('.ph_del').onclick = function(){
+      if (!confirm('删除该图片？')) return;
+      api('/photos/'+pid, { method:'DELETE' }).then(function(){
+        toast('图片已删除'); openProject(state.current.id, unitId);
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+    var replaceInput = card.querySelector('.ph_replace .upload-input');
+    if (replaceInput) {
+      replaceInput.onchange = function() {
+        var file = replaceInput.files && replaceInput.files[0];
+        if (!file) return;
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('scope', 'unit_photo');
+        fd.append('photo_id', pid);
+        toast('上传中…');
+        uploadForm('/upload', fd).then(function() {
+          toast('图片已更换');
+          openProject(state.current.id, unitId);
+        }).catch(function(e){ toast('更换失败：'+e.message); });
+        replaceInput.value = '';
+      };
+    }
+  });
+  var bulkInput = panel.querySelector('.ph_upload_input');
+  if (bulkInput) {
+    bulkInput.onchange = function() {
+      var files = Array.prototype.slice.call(bulkInput.files || []);
+      if (!files.length) return;
+      toast('上传 '+files.length+' 张…');
+      uploadUnitPhotos(unitId, files).then(function() {
+        toast('上传完成');
+        openProject(state.current.id, unitId);
+      }).catch(function(e){ toast('上传失败：'+e.message); });
+      bulkInput.value = '';
+    };
+  }
+  panel.querySelector('.ph_add').onclick = function(){
+    var path = panel.querySelector('.ph_new_path').value.trim();
+    if (!path) { toast('请填写图片路径'); return; }
+    api('/units/'+unitId+'/photos', { method:'POST', body: { file_path: path } }).then(function(){
+      toast('图片已添加'); openProject(state.current.id, unitId);
+    }).catch(function(e){ toast('添加失败：'+e.message); });
+  };
+}
+
 function renderUnits(isTrade) {
   var tbody = document.getElementById('unitRows');
-  tbody.innerHTML = state.units.map(function(u) {
+  var html = '';
+  state.units.forEach(function(u) {
     var th = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
     var priceVal = isTrade ? (u.price_total||'') : (u.rent_monthly||'');
-    return '<tr data-id="'+u.id+'">'+
+    var pc = photosOf(u.id).length;
+    html += '<tr class="unit-main" data-id="'+u.id+'">'+
       '<td><div class="thumb" style="'+th+'"></div></td>'+
       '<td><input class="u_name" value="'+esc(u.name)+'"/></td>'+
       '<td><input class="u_area" type="number" step="0.1" value="'+(u.area_sqm||'')+'"/></td>'+
       '<td><input class="u_layout" value="'+esc(u.layout_label||'')+'"/></td>'+
       '<td><input class="u_price" type="number" value="'+priceVal+'"/></td>'+
       '<td><input class="u_sort" type="number" value="'+(u.sort_order||0)+'"/></td>'+
+      '<td><button type="button" class="btn link u_photos">'+pc+' 张 ›</button></td>'+
       '<td class="acts"><button class="btn primary u_save">保存</button><button class="btn danger u_del">删</button></td>'+
     '</tr>';
-  }).join('');
+    if (state.expandedUnit === u.id) {
+      html += '<tr class="unit-photos-row"><td colspan="8">'+renderPhotoPanel(u.id)+'</td></tr>';
+    }
+  });
+  tbody.innerHTML = html;
 
-  tbody.querySelectorAll('tr').forEach(function(tr) {
+  tbody.querySelectorAll('tr.unit-main').forEach(function(tr) {
     var id = +tr.dataset.id;
     tr.querySelector('.u_save').onclick = function(){ saveUnit(tr, id, isTrade); };
     tr.querySelector('.u_del').onclick = function(){ deleteUnit(id); };
+    tr.querySelector('.u_photos').onclick = function(){
+      state.expandedUnit = state.expandedUnit === id ? null : id;
+      renderUnits(isTrade);
+      if (state.expandedUnit === id) bindPhotoPanel(id);
+    };
   });
+  if (state.expandedUnit) bindPhotoPanel(state.expandedUnit);
 }
 
 function saveProject() {

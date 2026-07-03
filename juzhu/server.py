@@ -23,15 +23,142 @@ from db import (  # noqa: E402
     summarize_rating,
     sync_district_stats,
     sync_project_unit_count,
+    sync_unit_cover,
     tags_to_db,
 )
 
 ADMIN_PREFIX = "/api/juzhu/admin"
+ASSETS_PREFIX = "assets/juzhu/sy"
+ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
 def slugify(name):
     name = re.sub(r"[（(].*?[）)]", "", name or "").strip()
     return re.sub(r"\s+", "-", name) or "item"
+
+
+def safe_path_name(name):
+    name = re.sub(r'[<>:"/\\|?*\x00]', "", (name or "").strip())
+    name = re.sub(r"\s+", "", name)
+    return (name[:80] or "unnamed")
+
+
+def ext_from_upload(filename, content_type):
+    ext = Path(filename or "").suffix.lower()
+    if ext in ALLOWED_IMAGE_EXT:
+        return ext
+    mapping = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+    }
+    return mapping.get((content_type or "").split(";")[0].strip().lower(), ".jpg")
+
+
+def parse_multipart(body, boundary):
+    delim = ("--" + boundary).encode()
+    fields = {}
+    files = {}
+    for part in body.split(delim)[1:]:
+        if not part or part in (b"--", b"--\r\n"):
+            continue
+        chunk = part.lstrip(b"\r\n")
+        if chunk.endswith(b"--"):
+            chunk = chunk[:-2].rstrip(b"\r\n")
+        if chunk.endswith(b"\r\n"):
+            chunk = chunk[:-2]
+        header_block, _, content = chunk.partition(b"\r\n\r\n")
+        if content.endswith(b"\r\n"):
+            content = content[:-2]
+        headers = {}
+        for line in header_block.decode("utf-8", errors="replace").split("\r\n"):
+            if ":" in line:
+                key, val = line.split(":", 1)
+                headers[key.lower().strip()] = val.strip()
+        cd = headers.get("content-disposition", "")
+        name_m = re.search(r'name="([^"]+)"', cd)
+        if not name_m:
+            continue
+        field = name_m.group(1)
+        file_m = re.search(r'filename="([^"]*)"', cd)
+        if file_m and file_m.group(1):
+            files[field] = {
+                "filename": file_m.group(1),
+                "content_type": headers.get("content-type", "application/octet-stream"),
+                "data": content,
+            }
+        else:
+            fields[field] = content.decode("utf-8", errors="replace")
+    return fields, files
+
+
+def write_image_file(rel_path, data):
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError(f"文件超过 {MAX_UPLOAD_BYTES // (1024 * 1024)}MB 限制")
+    ext = Path(rel_path).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        raise ValueError("不支持的图片格式")
+    full = ROOT / rel_path
+    full.parent.mkdir(parents=True, exist_ok=True)
+    full.write_bytes(data)
+    return rel_path.as_posix() if isinstance(rel_path, Path) else str(rel_path).replace("\\", "/")
+
+
+def project_cover_rel(conn, project_id, ext):
+    row = conn.execute(
+        """SELECT p.name, p.channel, d.name AS district_name
+           FROM projects p LEFT JOIN districts d ON d.id=p.district_id
+           WHERE p.id=?""",
+        (project_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError("项目不存在")
+    pname = safe_path_name(row["name"])
+    channel = row["channel"] or "bzf"
+    if channel == "bzf" and row["district_name"]:
+        rel = Path(ASSETS_PREFIX) / "projects" / channel / safe_path_name(row["district_name"]) / f"{pname}{ext}"
+    else:
+        rel = Path(ASSETS_PREFIX) / "projects" / channel / f"{pname}{ext}"
+    return rel
+
+
+def project_cover_rel_draft(channel, district_name, project_name, ext):
+    pname = safe_path_name(project_name)
+    channel = channel or "bzf"
+    if channel == "bzf" and district_name:
+        rel = Path(ASSETS_PREFIX) / "projects" / channel / safe_path_name(district_name) / f"{pname}{ext}"
+    else:
+        rel = Path(ASSETS_PREFIX) / "projects" / channel / f"{pname}{ext}"
+    return rel
+
+
+def unit_gallery_rel(conn, unit_id, ext):
+    row = conn.execute(
+        """SELECT u.name AS unit_name, p.name AS project_name, p.channel
+           FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?""",
+        (unit_id,),
+    ).fetchone()
+    if not row:
+        raise ValueError("户型不存在")
+    unit_name = safe_path_name(row["unit_name"])
+    project_name = safe_path_name(row["project_name"])
+    channel = row["channel"] or "bzf"
+    prefix = unit_name + "_"
+    max_n = -1
+    for (fp,) in conn.execute(
+        "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id=?",
+        (unit_id,),
+    ):
+        stem = Path(fp or "").stem
+        if stem.startswith(prefix):
+            try:
+                max_n = max(max_n, int(stem[len(prefix):]))
+            except ValueError:
+                pass
+    rel = Path(ASSETS_PREFIX) / "units" / channel / project_name / f"{unit_name}_{max_n + 1}{ext}"
+    return rel
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -71,6 +198,19 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def _multipart(self):
+        ct = self.headers.get("Content-Type", "")
+        if "multipart/form-data" not in ct:
+            return None
+        m = re.search(r"boundary=(?P<b>[^\s;]+)", ct)
+        if not m:
+            return None
+        boundary = m.group("b").strip('"')
+        n = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(n)
+        fields, files = parse_multipart(body, boundary)
+        return {"fields": fields, "files": files}
 
     def _json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode()
@@ -129,6 +269,9 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"ok": True, "stats": data["stats"]})
 
+        if path == f"{ADMIN_PREFIX}/upload" and method == "POST":
+            return self._upload_file()
+
         m = re.match(rf"^{ADMIN_PREFIX}/projects/(\d+)/rating/submit$", path)
         if m and method == "POST":
             return self._submit_rating(int(m.group(1)))
@@ -150,6 +293,22 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(rf"^{ADMIN_PREFIX}/projects/(\d+)/units$", path)
         if m and method == "POST":
             return self._create_unit(int(m.group(1)))
+
+        m = re.match(rf"^{ADMIN_PREFIX}/units/(\d+)/photos$", path)
+        if m:
+            uid = int(m.group(1))
+            if method == "GET":
+                return self._list_unit_photos(uid)
+            if method == "POST":
+                return self._create_photo(uid)
+
+        m = re.match(rf"^{ADMIN_PREFIX}/photos/(\d+)$", path)
+        if m:
+            photo_id = int(m.group(1))
+            if method == "PUT":
+                return self._update_photo(photo_id)
+            if method == "DELETE":
+                return self._delete_photo(photo_id)
 
         m = re.match(rf"^{ADMIN_PREFIX}/units/(\d+)$", path)
         if m:
@@ -244,8 +403,14 @@ class Handler(SimpleHTTPRequestHandler):
         units = rows_to_list(conn.execute(
             "SELECT * FROM units WHERE project_id=? ORDER BY sort_order", (pid,)
         ))
+        photos = rows_to_list(conn.execute(
+            """SELECT * FROM photos WHERE entity_type='unit'
+               AND entity_id IN (SELECT id FROM units WHERE project_id=?)
+               ORDER BY entity_id, sort_order, id""",
+            (pid,),
+        ))
         conn.close()
-        return self._json({"project": proj, "units": units})
+        return self._json({"project": proj, "units": units, "photos": photos})
 
     def _project_by_rating_code(self, conn, code):
         pid = None
@@ -578,9 +743,211 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"error": "not found"}, 404)
         pid = row[0]
+        conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", (uid,))
         conn.execute("DELETE FROM units WHERE id=?", (uid,))
         conn.commit()
         sync_project_unit_count(conn, pid)
+        export_json(conn)
+        conn.close()
+        return self._json({"ok": True})
+
+    def _list_unit_photos(self, uid):
+        conn = connect()
+        if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+            conn.close()
+            return self._json({"error": "unit not found"}, 404)
+        photos = rows_to_list(conn.execute(
+            "SELECT * FROM photos WHERE entity_type='unit' AND entity_id=? ORDER BY sort_order, id",
+            (uid,),
+        ))
+        conn.close()
+        return self._json({"photos": photos})
+
+    def _upload_file(self):
+        mp = self._multipart()
+        if not mp:
+            return self._json({"error": "需要 multipart/form-data 上传"}, 400)
+        upload = mp["files"].get("file")
+        if not upload or not upload["data"]:
+            return self._json({"error": "缺少 file 字段"}, 400)
+        scope = (mp["fields"].get("scope") or "").strip()
+        ext = ext_from_upload(upload["filename"], upload["content_type"])
+        try:
+            conn = connect()
+            if scope == "project_cover":
+                pid = int(mp["fields"].get("project_id") or 0)
+                rel = project_cover_rel(conn, pid, ext)
+            elif scope == "project_cover_new":
+                channel = mp["fields"].get("channel") or "bzf"
+                district_name = ""
+                district_id = mp["fields"].get("district_id")
+                if district_id:
+                    row = conn.execute(
+                        "SELECT name FROM districts WHERE id=?", (int(district_id),)
+                    ).fetchone()
+                    district_name = row["name"] if row else ""
+                project_name = mp["fields"].get("project_name") or "新项目"
+                rel = project_cover_rel_draft(channel, district_name, project_name, ext)
+            elif scope == "unit_gallery":
+                uid = int(mp["fields"].get("unit_id") or 0)
+                rel = unit_gallery_rel(conn, uid, ext)
+            elif scope == "unit_photo":
+                photo_id = int(mp["fields"].get("photo_id") or 0)
+                row = conn.execute(
+                    "SELECT file_path FROM photos WHERE id=? AND entity_type='unit'",
+                    (photo_id,),
+                ).fetchone()
+                if not row or not row["file_path"]:
+                    conn.close()
+                    return self._json({"error": "图片记录不存在"}, 404)
+                rel = Path(row["file_path"])
+                ext = rel.suffix.lower() or ext
+            else:
+                conn.close()
+                return self._json({"error": "未知 scope"}, 400)
+            conn.close()
+            file_path = write_image_file(rel, upload["data"])
+            return self._json({"ok": True, "file_path": file_path})
+        except ValueError as e:
+            return self._json({"error": str(e)}, 400)
+        except (TypeError, ValueError):
+            return self._json({"error": "参数无效"}, 400)
+
+    def _create_photo(self, uid):
+        mp = self._multipart()
+        if mp:
+            return self._create_photo_multipart(uid, mp)
+        b = self._body()
+        conn = connect()
+        if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+            conn.close()
+            return self._json({"error": "unit not found"}, 404)
+        path = (b.get("file_path") or "").strip()
+        if not path:
+            conn.close()
+            return self._json({"error": "file_path 不能为空"}, 400)
+        is_cover = 1 if b.get("is_cover") else 0
+        sort_order = b.get("sort_order")
+        if sort_order is None:
+            sort_order = conn.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM photos WHERE entity_type='unit' AND entity_id=?",
+                (uid,),
+            ).fetchone()[0]
+        if is_cover:
+            conn.execute(
+                "UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?",
+                (uid,),
+            )
+        conn.execute(
+            """INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+               VALUES ('unit', ?, ?, ?, ?, ?)""",
+            (uid, path, b.get("source_path"), is_cover, sort_order),
+        )
+        photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.commit()
+        sync_unit_cover(conn, uid)
+        export_json(conn)
+        photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "photo": photo}, 201)
+
+    def _create_photo_multipart(self, uid, mp):
+        upload = mp["files"].get("file")
+        if not upload or not upload["data"]:
+            return self._json({"error": "缺少 file 字段"}, 400)
+        conn = connect()
+        if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+            conn.close()
+            return self._json({"error": "unit not found"}, 404)
+        try:
+            ext = ext_from_upload(upload["filename"], upload["content_type"])
+            rel = unit_gallery_rel(conn, uid, ext)
+            path = write_image_file(rel, upload["data"])
+        except ValueError as e:
+            conn.close()
+            return self._json({"error": str(e)}, 400)
+        is_cover = 1 if mp["fields"].get("is_cover") in ("1", "true", "yes") else 0
+        sort_order = mp["fields"].get("sort_order")
+        if sort_order is None or sort_order == "":
+            sort_order = conn.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM photos WHERE entity_type='unit' AND entity_id=?",
+                (uid,),
+            ).fetchone()[0]
+        else:
+            sort_order = int(sort_order)
+        if is_cover:
+            conn.execute(
+                "UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?",
+                (uid,),
+            )
+        conn.execute(
+            """INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+               VALUES ('unit', ?, ?, ?, ?, ?)""",
+            (uid, path, upload["filename"], is_cover, sort_order),
+        )
+        photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.commit()
+        sync_unit_cover(conn, uid)
+        export_json(conn)
+        photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "photo": photo, "file_path": path}, 201)
+
+    def _update_photo(self, photo_id):
+        b = self._body()
+        conn = connect()
+        row = conn.execute(
+            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'",
+            (photo_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        uid = row[0]
+        path = b.get("file_path")
+        if path is not None:
+            path = path.strip()
+            if not path:
+                conn.close()
+                return self._json({"error": "file_path 不能为空"}, 400)
+        if b.get("is_cover"):
+            conn.execute(
+                "UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?",
+                (uid,),
+            )
+        conn.execute(
+            """UPDATE photos SET
+               file_path=COALESCE(?, file_path),
+               sort_order=COALESCE(?, sort_order),
+               is_cover=COALESCE(?, is_cover)
+               WHERE id=?""",
+            (
+                path,
+                b.get("sort_order"),
+                1 if b.get("is_cover") else (0 if "is_cover" in b else None),
+                photo_id,
+            ),
+        )
+        conn.commit()
+        sync_unit_cover(conn, uid)
+        export_json(conn)
+        photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "photo": photo})
+
+    def _delete_photo(self, photo_id):
+        conn = connect()
+        row = conn.execute(
+            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'",
+            (photo_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        uid = row[0]
+        conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
+        conn.commit()
+        sync_unit_cover(conn, uid)
         export_json(conn)
         conn.close()
         return self._json({"ok": True})

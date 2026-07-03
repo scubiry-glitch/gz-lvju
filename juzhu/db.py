@@ -148,6 +148,16 @@ def sync_district_stats(conn, district_id=None):
     conn.commit()
 
 
+def sync_unit_cover(conn, unit_id):
+    row = conn.execute(
+        """SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id=?
+           ORDER BY is_cover DESC, sort_order, id LIMIT 1""",
+        (unit_id,),
+    ).fetchone()
+    cover = row[0] if row else None
+    conn.execute("UPDATE units SET cover_image=? WHERE id=?", (cover, unit_id))
+
+
 def sync_project_unit_count(conn, project_id):
     n = conn.execute("SELECT COUNT(*) FROM units WHERE project_id=?", (project_id,)).fetchone()[0]
     rents = conn.execute(

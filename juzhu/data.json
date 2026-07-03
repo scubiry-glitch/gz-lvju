@@ -42,7 +42,7 @@
       "project_count": 2,
       "unit_count": 5,
       "vacant_count": 5,
-      "avg_price": 1750,
+      "avg_price": 1513,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
@@ -191,18 +191,16 @@
       "channel": "bzf",
       "name": "CCB建融家园中华路店",
       "slug": "CCB建融家园中华路店",
-      "cover_image": "assets/juzhu/sy/projects/bzf/和平区/CCB建融家园中华路店.jpg",
-      "address": "和平区 · CCB建融家园中华路店",
-      "tags": [
-        "建融家园"
-      ],
+      "cover_image": null,
+      "address": null,
+      "tags": [],
       "sort_order": 1,
       "unit_count": 3,
       "price_from": 1440,
       "is_featured": 0,
       "featured_rank": null,
       "old_house_hint": null,
-      "rating_status": "draft",
+      "rating_status": "passed",
       "rating": {
         "dims": {
           "comfort": 4.2,
@@ -210,16 +208,17 @@
           "tech": 4.5,
           "safety": 4.1
         },
+        "stars": 4,
+        "score": 83,
         "checked": 48,
         "total": 55,
-        "stars": 4,
+        "code": "SY-BZF-00001",
         "star_label": "精品型",
-        "score": 83,
-        "code": "SY-BZF-00001"
+        "confidence": 0.9
       },
-      "rating_submitted_at": null,
-      "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_submitted_at": "2026-07-03T03:15:56Z",
+      "rating_reviewed_at": "2026-07-03T03:16:13Z",
+      "rating_note": ""
     },
     {
       "id": 11,
@@ -3177,6 +3176,15 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/中海润山府/102_副本/76911769581916_.pic_hd.jpg",
       "is_cover": 0,
       "sort_order": 7
+    },
+    {
+      "id": 337,
+      "entity_type": "unit",
+      "entity_id": 31,
+      "file_path": "assets/juzhu/sy/units/bzf/中海润山府/102_副本_8.png",
+      "source_path": "x.png",
+      "is_cover": 0,
+      "sort_order": 8
     },
     {
       "id": 160,
