@@ -845,7 +845,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": null
+      "cover_image": null,
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 2,
@@ -858,7 +874,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": null
+      "cover_image": null,
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 3,
@@ -871,7 +903,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 4,
@@ -884,7 +932,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 5,
@@ -897,7 +961,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 6,
@@ -910,7 +990,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/106平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/106平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 7,
@@ -923,7 +1019,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/62平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/62平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 8,
@@ -936,7 +1048,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/64平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/64平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 9,
@@ -949,7 +1077,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/85平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/85平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 10,
@@ -962,7 +1106,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 5,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/97平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/97平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 11,
@@ -975,7 +1135,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/33平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/33平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 12,
@@ -988,7 +1164,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/49平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/49平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 13,
@@ -1001,7 +1193,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 14,
@@ -1014,7 +1222,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 15,
@@ -1027,7 +1251,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 16,
@@ -1040,7 +1280,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 17,
@@ -1053,7 +1309,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/46_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/46_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 18,
@@ -1066,7 +1338,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/63_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/63_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 19,
@@ -1079,7 +1367,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.43双西中间客厅_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.43双西中间客厅_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 20,
@@ -1092,7 +1396,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.59双西_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.59双西_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 21,
@@ -1105,7 +1425,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56。21东北_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56。21东北_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 22,
@@ -1118,7 +1454,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民50_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民50_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 23,
@@ -1131,7 +1483,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民58_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民58_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 24,
@@ -1144,7 +1512,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民71_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民71_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 25,
@@ -1157,7 +1541,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民89_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民89_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 26,
@@ -1170,7 +1570,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/33平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/33平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 27,
@@ -1183,7 +1599,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/54平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/54平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 28,
@@ -1196,7 +1628,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/55平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/55平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 29,
@@ -1209,7 +1657,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 30,
@@ -1222,7 +1686,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 31,
@@ -1235,7 +1715,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/102_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/102_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 32,
@@ -1248,7 +1744,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/110_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/110_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 33,
@@ -1261,7 +1773,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/138_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/138_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 34,
@@ -1274,7 +1802,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/146_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/146_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 35,
@@ -1287,7 +1831,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 5,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/148_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/148_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 36,
@@ -1300,7 +1860,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 6,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/165_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/165_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 37,
@@ -1313,7 +1889,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 7,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/85_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/85_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 38,
@@ -1326,7 +1918,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/49平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/49平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 39,
@@ -1339,7 +1947,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/57平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/57平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 40,
@@ -1352,7 +1976,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/61平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/61平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 41,
@@ -1365,7 +2005,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/75平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/75平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 42,
@@ -1378,7 +2034,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 43,
@@ -1391,7 +2063,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 44,
@@ -1404,7 +2092,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 45,
@@ -1417,7 +2121,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/116_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/116_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 46,
@@ -1430,7 +2150,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/93平_副本.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/93平_副本.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 47,
@@ -1443,7 +2179,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 48,
@@ -1456,7 +2208,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店C座/44.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店C座/44.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 49,
@@ -1469,7 +2237,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 50,
@@ -1482,7 +2266,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 51,
@@ -1495,7 +2295,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 52,
@@ -1508,7 +2324,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/26平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/26平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 53,
@@ -1521,7 +2353,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/35平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/35平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 54,
@@ -1534,7 +2382,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 55,
@@ -1547,7 +2411,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/56平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/56平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 56,
@@ -1560,7 +2440,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/71平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/71平.png",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 57,
@@ -1573,7 +2469,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 58,
@@ -1586,7 +2498,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/九里店/42平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/九里店/42平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 59,
@@ -1599,7 +2527,23 @@
       "price_total": null,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/地铁云杉里/55平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/地铁云杉里/55平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 60,
@@ -1612,7 +2556,23 @@
       "price_total": 119,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg"
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 61,
@@ -1625,7 +2585,23 @@
       "price_total": 123,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg"
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 62,
@@ -1638,7 +2614,23 @@
       "price_total": 124,
       "tags": [],
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg"
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 63,
@@ -1651,7 +2643,23 @@
       "price_total": 126,
       "tags": [],
       "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg"
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 64,
@@ -1664,7 +2672,23 @@
       "price_total": 206,
       "tags": [],
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg"
+      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 65,
@@ -1677,7 +2701,23 @@
       "price_total": 216,
       "tags": [],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg"
+      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     }
   ],
   "photos": [

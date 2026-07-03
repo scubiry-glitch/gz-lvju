@@ -43,6 +43,19 @@ def ensure_schema(conn):
             """UPDATE projects SET managed_unit_count=unit_count
                WHERE channel='bzf' AND managed_unit_count IS NULL"""
         )
+    unit_cols = {r[1] for r in conn.execute("PRAGMA table_info(units)").fetchall()}
+    if unit_cols:
+        unit_migrations = [
+            ("unit_spec", "ALTER TABLE units ADD COLUMN unit_spec TEXT"),
+            ("promo_price", "ALTER TABLE units ADD COLUMN promo_price INTEGER"),
+            ("amenities", "ALTER TABLE units ADD COLUMN amenities TEXT"),
+            ("keeper", "ALTER TABLE units ADD COLUMN keeper TEXT"),
+            ("rent_detail", "ALTER TABLE units ADD COLUMN rent_detail TEXT"),
+        ]
+        for col, sql in unit_migrations:
+            if col not in unit_cols:
+                conn.execute(sql)
+        ensure_unit_amenities(conn)
     ensure_channels(conn)
     conn.commit()
 
@@ -71,6 +84,25 @@ def ensure_channels(conn):
                     "INSERT INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
                     (cid, label, order),
                 )
+
+
+DEFAULT_AMENITY_IDS = [
+    "ac", "washer", "fridge", "heater", "lock", "wifi", "tv", "hood", "microwave", "induction"
+]
+
+
+def default_amenities_db():
+    return json.dumps(DEFAULT_AMENITY_IDS, ensure_ascii=False)
+
+
+def ensure_unit_amenities(conn):
+    """空设施列表的房源默认勾选全部设施"""
+    default = default_amenities_db()
+    conn.execute(
+        """UPDATE units SET amenities=?
+           WHERE amenities IS NULL OR TRIM(amenities)='' OR amenities='[]'""",
+        (default,),
+    )
 
 
 def rating_code(project_id):
@@ -139,7 +171,35 @@ def rows_to_list(rows):
     return [row_to_dict(r) for r in rows]
 
 
-def parse_tags(items):
+def parse_json_field(val, default=None):
+    if default is None:
+        default = None
+    if val is None or val == "":
+        return default
+    if isinstance(val, (dict, list)):
+        return val
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            return default
+    return default
+
+
+def normalize_unit_row(d):
+    if not d:
+        return d
+    d = row_to_dict(d) if not isinstance(d, dict) else dict(d)
+    d["amenities"] = parse_json_field(d.get("amenities"), []) or []
+    if not d["amenities"]:
+        d["amenities"] = DEFAULT_AMENITY_IDS.copy()
+    d["keeper"] = parse_json_field(d.get("keeper"), None)
+    d["rent_detail"] = parse_json_field(d.get("rent_detail"), None)
+    return d
+
+
+def parse_tags(items, json_keys=None):
+    json_keys = json_keys or ()
     for r in items:
         t = r.get("tags")
         if t is None:
@@ -151,6 +211,11 @@ def parse_tags(items):
                 r["tags"] = [t] if t else []
         elif not isinstance(t, list):
             r["tags"] = []
+        for key in json_keys:
+            default = DEFAULT_AMENITY_IDS.copy() if key == "amenities" else None
+            r[key] = parse_json_field(r.get(key), default if key == "amenities" else None)
+            if key == "amenities" and not r[key]:
+                r[key] = DEFAULT_AMENITY_IDS.copy()
     return items
 
 
@@ -160,6 +225,14 @@ def tags_to_db(tags):
     if isinstance(tags, str):
         tags = [x.strip() for x in tags.split(",") if x.strip()]
     return json.dumps(list(tags), ensure_ascii=False)
+
+
+def json_to_db(val):
+    if val is None:
+        return None
+    if isinstance(val, str):
+        return val
+    return json.dumps(val, ensure_ascii=False)
 
 
 def sync_district_stats(conn, district_id=None):
@@ -245,7 +318,10 @@ def export_json(conn=None):
             },
             "districts": parse_tags(rows("SELECT * FROM districts ORDER BY sort_order")),
             "projects": [normalize_project_row(p) for p in parse_tags(rows("SELECT * FROM projects ORDER BY channel, sort_order"))],
-            "units": parse_tags(rows("SELECT * FROM units ORDER BY project_id, sort_order")),
+            "units": parse_tags(
+                rows("SELECT * FROM units ORDER BY project_id, sort_order"),
+                json_keys=("amenities", "keeper", "rent_detail"),
+            ),
             "photos": rows(
                 "SELECT * FROM photos ORDER BY entity_type, entity_id, sort_order"
             ),

@@ -14,8 +14,11 @@ from datetime import datetime, timezone
 
 from db import (  # noqa: E402
     connect,
+    default_amenities_db,
     export_json,
+    json_to_db,
     normalize_project_row,
+    normalize_unit_row,
     rating_code,
     rating_to_db,
     row_to_dict,
@@ -730,17 +733,21 @@ class Handler(SimpleHTTPRequestHandler):
         name = b.get("name") or "新户型"
         slug = b.get("slug") or slugify(name)
         conn.execute(
-            """INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,tags,sort_order,cover_image)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,
+               tags,unit_spec,promo_price,amenities,keeper,rent_detail,sort_order,cover_image)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (pid, name, slug, b.get("area_sqm"), b.get("layout_label"),
              b.get("rent_monthly"), b.get("price_total"), tags_to_db(b.get("tags")),
+             b.get("unit_spec"), b.get("promo_price"),
+             json_to_db(b.get("amenities") if b.get("amenities") is not None else json.loads(default_amenities_db())), json_to_db(b.get("keeper")),
+             json_to_db(b.get("rent_detail")),
              b.get("sort_order") or 999, b.get("cover_image")),
         )
         uid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         sync_project_unit_count(conn, pid)
         export_json(conn)
-        unit = row_to_dict(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
+        unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
         conn.close()
         return self._json({"ok": True, "unit": unit}, 201)
 
@@ -755,21 +762,29 @@ class Handler(SimpleHTTPRequestHandler):
         name = b.get("name")
         slug = b.get("slug") or (slugify(name) if name else None)
         tags = tags_to_db(b.get("tags")) if "tags" in b else None
+        amenities = json_to_db(b.get("amenities")) if "amenities" in b else None
+        keeper = json_to_db(b.get("keeper")) if "keeper" in b else None
+        rent_detail = json_to_db(b.get("rent_detail")) if "rent_detail" in b else None
 
         conn.execute(
             """UPDATE units SET
                name=COALESCE(?, name), slug=COALESCE(?, slug),
                area_sqm=?, layout_label=?, rent_monthly=?, price_total=?,
-               tags=COALESCE(?, tags), sort_order=COALESCE(?, sort_order), cover_image=?
+               tags=COALESCE(?, tags), unit_spec=?, promo_price=?,
+               amenities=COALESCE(?, amenities), keeper=COALESCE(?, keeper),
+               rent_detail=COALESCE(?, rent_detail),
+               sort_order=COALESCE(?, sort_order), cover_image=?
                WHERE id=?""",
             (name, slug, b.get("area_sqm"), b.get("layout_label"),
              b.get("rent_monthly"), b.get("price_total"), tags,
+             b.get("unit_spec"), b.get("promo_price"),
+             amenities, keeper, rent_detail,
              b.get("sort_order"), b.get("cover_image"), uid),
         )
         conn.commit()
         sync_project_unit_count(conn, pid)
         export_json(conn)
-        unit = row_to_dict(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
+        unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
         conn.close()
         return self._json({"ok": True, "unit": unit})
 
@@ -839,6 +854,12 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"error": "图片记录不存在"}, 404)
                 rel = Path(row["file_path"])
                 ext = rel.suffix.lower() or ext
+            elif scope == "unit_keeper":
+                uid = int(mp["fields"].get("unit_id") or 0)
+                if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+                    conn.close()
+                    return self._json({"error": "unit not found"}, 404)
+                rel = Path(ASSETS_PREFIX) / "keepers" / f"unit_{uid}{ext}"
             elif scope == "city_hero":
                 rel = Path(ASSETS_PREFIX) / "city" / f"hero{ext}"
             else:

@@ -66,7 +66,12 @@ CREATE TABLE IF NOT EXISTS units (
   layout_label  TEXT,                        -- 一居/两居等（可后续补）
   rent_monthly  INTEGER,
   price_total   INTEGER,                     -- 卖旧买新总价（万）
-  tags          TEXT,
+  tags          TEXT,                        -- JSON array 房源标签
+  unit_spec     TEXT,                        -- 1室1厅 | 100㎡ | 南/北 | 立即入住
+  promo_price   INTEGER,                     -- 券后价/特惠价（元/月）
+  amenities     TEXT,                        -- JSON array 房型设施 id
+  keeper        TEXT,                        -- JSON {name, avatar, phone}
+  rent_detail   TEXT,                        -- JSON 租金详情（房间费用+其他费用）
   sort_order    INTEGER NOT NULL DEFAULT 0,
   cover_image   TEXT,
   UNIQUE(project_id, slug)

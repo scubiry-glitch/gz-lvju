@@ -22,6 +22,18 @@ window.JUZHU = (function () {
       normTags(d.districts);
       normTags(d.projects);
       normTags(d.units);
+      (d.units || []).forEach(function(u) {
+        if (u.amenities == null) u.amenities = [];
+        else if (typeof u.amenities === 'string') {
+          try { u.amenities = JSON.parse(u.amenities); } catch (e) { u.amenities = []; }
+        }
+        if (u.keeper && typeof u.keeper === 'string') {
+          try { u.keeper = JSON.parse(u.keeper); } catch (e) { u.keeper = null; }
+        }
+        if (u.rent_detail && typeof u.rent_detail === 'string') {
+          try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
+        }
+      });
       cache = d;
       return d;
     });
@@ -301,6 +313,109 @@ window.JUZHU = (function () {
     return digits ? 'tel:' + digits : '';
   }
 
+  var AMENITY_CATALOG = [
+    { id: 'ac', label: '空调', sym: '❄' },
+    { id: 'washer', label: '洗衣机', sym: '◫' },
+    { id: 'fridge', label: '冰箱', sym: '▣' },
+    { id: 'heater', label: '热水器', sym: '♨' },
+    { id: 'lock', label: '智能锁', sym: '⛊' },
+    { id: 'wifi', label: '宽带', sym: '⌁' },
+    { id: 'tv', label: '电视', sym: '▭' },
+    { id: 'hood', label: '油烟机', sym: '◠' },
+    { id: 'microwave', label: '微波炉', sym: '▢' },
+    { id: 'induction', label: '电磁炉', sym: '◎' }
+  ];
+
+  function unitKeeperPhone(u) {
+    var k = u && u.keeper;
+    if (k && k.phone) return String(k.phone).trim();
+    return bookingPhone();
+  }
+
+  function unitDisplayTags(u, project) {
+    var tags = asTags(u && u.tags);
+    if (!tags.length && project) tags = asTags(project.tags);
+    return tags;
+  }
+
+  function unitSpecLine(u) {
+    if (u && u.unit_spec) return u.unit_spec;
+    return unitMeta(u);
+  }
+
+  function unitAmenityIds(u) {
+    var ids = Array.isArray(u && u.amenities) ? u.amenities : [];
+    if (!ids.length) {
+      return AMENITY_CATALOG.map(function(a) { return a.id; });
+    }
+    return ids;
+  }
+
+  function amenityItems(u) {
+    var ids = unitAmenityIds(u);
+    return AMENITY_CATALOG.filter(function(a) { return ids.indexOf(a.id) >= 0; });
+  }
+
+  function rentPlanCard(label, range, plan) {
+    if (!plan) return '';
+    var rent = plan.rent != null ? fmtRent(plan.rent).replace('¥', '') + '元/月' : '—';
+    var svc = plan.service_fee != null ? plan.service_fee + '元' + (plan.service_note ? '（' + plan.service_note + '）' : '') : '—';
+    var dep = plan.deposit != null ? plan.deposit + '元' : '—';
+    return '<div class="rent-plan">' +
+      '<div class="rp-hd"><b>' + label + '</b><span>' + (range || '') + '</span></div>' +
+      '<div class="rp-card">' +
+        '<div class="rp-pay">' + (plan.pay || '—') + '</div>' +
+        '<div class="rp-row"><span>租金</span><b>' + rent + '</b></div>' +
+        '<div class="rp-row"><span>服务费</span><b>' + svc + '</b></div>' +
+        '<div class="rp-row"><span>押金</span><b>' + dep + '</b></div>' +
+      '</div></div>';
+  }
+
+  function effectiveRentDetail(u) {
+    if (u && u.rent_detail) return u.rent_detail;
+    if (!u || u.rent_monthly == null) return null;
+    return {
+      room_label: unitTitle(u) + (u.area_sqm ? ' ' + u.area_sqm + '㎡' : ''),
+      long_term: {
+        range: '可租4个月-1年',
+        plan: { pay: '季付', rent: u.rent_monthly, service_fee: null, service_note: '一次收取', deposit: u.rent_monthly }
+      },
+      short_term: {
+        range: '可租1个月-3个月',
+        plan: { pay: '月付', rent: u.rent_monthly, service_fee: null, service_note: '一次收取', deposit: u.rent_monthly }
+      },
+      other_fees: []
+    };
+  }
+
+  function rentDetailModalHtml(u) {
+    var rd = effectiveRentDetail(u);
+    if (!rd) return '';
+    var room = rd.room_label || unitTitle(u);
+    var longH = rentPlanCard('长租价', rd.long_term && rd.long_term.range, rd.long_term && rd.long_term.plan);
+    var shortH = rentPlanCard('短租价', rd.short_term && rd.short_term.range, rd.short_term && rd.short_term.plan);
+    var fees = (rd.other_fees || []).map(function(f) {
+      return '<div class="fee-line"><span>' + f.name + '</span><b>' + (f.value || '—') + '</b></div>';
+    }).join('');
+    return '<div class="rent-modal" id="rentModal" hidden>' +
+      '<div class="rent-backdrop" data-close="1"></div>' +
+      '<div class="rent-sheet">' +
+        '<div class="rent-hd"><button type="button" class="rent-back" data-close="1">‹</button><b>租金详情</b></div>' +
+        '<div class="rent-tabs">' +
+          '<button type="button" class="on" data-tab="room">房间费用</button>' +
+          '<button type="button" data-tab="other">其他费用</button>' +
+        '</div>' +
+        '<div class="rent-body">' +
+          '<div class="rent-pane on" data-pane="room">' +
+            '<div class="room-label">' + room + '</div>' + longH + shortH +
+          '</div>' +
+          '<div class="rent-pane" data-pane="other">' + (fees || '<p class="muted">暂无其他费用配置</p>') +
+            '<p class="fee-note">具体产生费用以公寓实际情况为准</p></div>' +
+        '</div>' +
+        '<button type="button" class="rent-cta" id="rentConsult">咨询租金优惠</button>' +
+      '</div></div>';
+  }
+
   return {
     load: load,
     get data() { return cache; },
@@ -329,6 +444,13 @@ window.JUZHU = (function () {
     managedUnits: managedUnits,
     districtManagedUnits: districtManagedUnits,
     bookingPhone: bookingPhone,
-    telHref: telHref
+    telHref: telHref,
+    AMENITY_CATALOG: AMENITY_CATALOG,
+    unitKeeperPhone: unitKeeperPhone,
+    unitDisplayTags: unitDisplayTags,
+    unitSpecLine: unitSpecLine,
+    amenityItems: amenityItems,
+    effectiveRentDetail: effectiveRentDetail,
+    rentDetailModalHtml: rentDetailModalHtml
   };
 })();

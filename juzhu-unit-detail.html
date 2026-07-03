@@ -67,6 +67,64 @@
   .verify .vb a{color:var(--brand);}
   .verify a.qrlink{flex-shrink:0;line-height:0;}
   .verify .qrimg{width:48px;height:48px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
+  /* 房源信息 */
+  .info-block{background:#fff;padding:14px 16px 12px;margin-top:0;}
+  .info-block .title-row{display:flex;align-items:flex-start;gap:10px;}
+  .info-block .title-row h2{flex:1;font-family:var(--serif);font-size:17px;font-weight:700;line-height:1.35;margin:0;color:var(--ink);}
+  .info-block .rent-link{flex-shrink:0;font-size:12px;color:var(--brand);font-weight:600;white-space:nowrap;padding-top:2px;}
+  .info-block .spec{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .tag-row .tag{font-size:11px;padding:4px 10px;border-radius:6px;background:#f1f5f4;color:var(--ink);}
+  .tag-row .tag.primary{background:var(--brand);color:#fff;font-weight:600;}
+  /* 房型介绍 */
+  .amen-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px 8px;margin-top:12px;}
+  .amen-grid .item{text-align:center;font-size:10px;color:var(--muted);}
+  .amen-grid .ico{width:36px;height:36px;margin:0 auto 5px;border-radius:10px;background:#f3f6f5;
+    display:grid;place-items:center;font-size:16px;color:#8a9692;}
+  /* 咨询管家 */
+  .keeper-row{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px;background:#fafcfb;border-radius:12px;border:1px solid var(--border);}
+  .keeper-row .av{width:48px;height:48px;border-radius:50%;background:#e8eeec center/cover no-repeat;flex-shrink:0;border:1px solid var(--border);}
+  .keeper-row .av.placeholder{display:grid;place-items:center;font-size:22px;background:linear-gradient(135deg,#fff5eb,#ffe8d6);color:#ea580c;}
+  .keeper-row .nm{font-size:15px;font-weight:700;color:var(--ink);}
+  .keeper-row .hint{font-size:11px;color:var(--muted);margin-top:2px;}
+  .keeper-row .acts{margin-left:auto;display:flex;gap:8px;}
+  .keeper-row .ic{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:#fff;
+    display:grid;place-items:center;font-size:18px;color:var(--brand);text-decoration:none;}
+  .keeper-row .ic.tel{background:color-mix(in oklab,var(--brand) 12%,#fff);}
+  /* 租金弹层 */
+  .rent-modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;}
+  .rent-modal[hidden]{display:none!important;}
+  .rent-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.45);}
+  .rent-sheet{position:relative;width:100%;max-width:480px;max-height:88vh;background:#fff;border-radius:16px 16px 0 0;
+    display:flex;flex-direction:column;animation:slideUp .25s ease;}
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .rent-hd{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .rent-hd b{flex:1;text-align:center;font-size:16px;}
+  .rent-back{border:0;background:none;font-size:24px;color:var(--ink);cursor:pointer;padding:0 4px;}
+  .rent-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .rent-tabs button{flex:1;border:0;background:#fff;padding:12px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .rent-tabs button.on{color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand);}
+  .rent-body{flex:1;overflow-y:auto;padding:14px 16px;}
+  .rent-pane{display:none;}
+  .rent-pane.on{display:block;}
+  .room-label{font-size:15px;font-weight:700;margin-bottom:14px;line-height:1.4;}
+  .rent-plan{margin-bottom:16px;}
+  .rent-plan .rp-hd{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;}
+  .rent-plan .rp-hd span{color:var(--muted);font-size:11px;}
+  .rp-card{background:#f5f8f7;border-radius:12px;padding:12px 14px;}
+  .rp-pay{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .rp-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);}
+  .rp-row:last-child{border-bottom:0;}
+  .fee-line{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .fee-line span{color:var(--muted);}
+  .fee-note{font-size:11px;color:var(--muted);margin-top:16px;text-align:center;}
+  .rent-cta{margin:0 16px 16px;padding:14px;border:0;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--brand-2));
+    color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;}
+  .promo-bar{background:linear-gradient(90deg,#ff8a3d,#0c4d44);color:#fff;padding:10px 16px;display:flex;align-items:baseline;gap:8px;}
+  .promo-bar .big{font-family:var(--serif);font-size:22px;font-weight:700;}
+  .promo-bar .orig{font-size:11px;opacity:.85;text-decoration:line-through;}
+  .promo-bar .badge{margin-left:auto;font-size:10px;background:rgba(255,255,255,.2);padding:4px 8px;border-radius:6px;}
 </style>
 </head>
 <body>
@@ -95,6 +153,27 @@
 
     <div class="gal-thumbs" id="thumbs" hidden></div>
 
+    <div class="promo-bar" id="promoBar" hidden></div>
+
+    <div class="info-block" id="infoBlock" hidden>
+      <div class="title-row">
+        <h2 id="infoTitle">—</h2>
+        <button type="button" class="rent-link" id="openRent">租金详情 ›</button>
+      </div>
+      <div class="spec" id="infoSpec"></div>
+      <div class="tag-row" id="infoTags"></div>
+    </div>
+
+    <div class="block" id="amenBlock" hidden>
+      <div class="bt">房型介绍</div>
+      <div class="amen-grid" id="amenGrid"></div>
+    </div>
+
+    <div class="block" id="keeperBlock" hidden>
+      <div class="bt">咨询管家</div>
+      <div class="keeper-row" id="keeperRow"></div>
+    </div>
+
     <div class="rating-wrap" id="ratingBlock" hidden></div>
 
     <div class="gal-sheet" id="galSheet" hidden>
@@ -106,10 +185,12 @@
   <div class="cta">
     <div class="p"><b id="price">—</b><span id="plab">参考价格</span></div>
     <div class="heart">♡</div>
+    <a class="btn btn-call" href="#" id="callBtn">打电话</a>
     <a class="btn" href="#" id="ctaBtn">预约看房</a>
   </div>
 </div>
-<script src="juzhu/app.js?v=6"></script>
+<div id="rentModalWrap"></div>
+<script src="juzhu/app.js?v=8"></script>
 <script src="screens/_qr.js"></script>
 <script>
 (function(){
@@ -170,6 +251,94 @@
     };
   }
 
+  function mountInfo(u, p) {
+    var tags = JUZHU.unitDisplayTags(u, p);
+    document.getElementById('infoTitle').textContent = JUZHU.unitTitle(u);
+    document.getElementById('infoSpec').textContent = JUZHU.unitSpecLine(u);
+    document.getElementById('infoBlock').hidden = false;
+
+    var tagHtml = '';
+    tags.forEach(function(t, i) {
+      tagHtml += '<span class="tag' + (i === 0 ? ' primary' : '') + '">' + t + '</span>';
+    });
+    document.getElementById('infoTags').innerHTML = tagHtml || '';
+
+    if (u.promo_price && u.rent_monthly) {
+      document.getElementById('promoBar').hidden = false;
+      document.getElementById('promoBar').innerHTML =
+        '<span class="big">' + u.promo_price + '元</span><span>(券后价)</span>' +
+        '<span class="orig">' + u.rent_monthly + '元/月</span>' +
+        '<span class="badge">保租特惠</span>';
+    }
+
+    var amens = JUZHU.amenityItems(u);
+    document.getElementById('amenBlock').hidden = false;
+    document.getElementById('amenGrid').innerHTML = amens.map(function(a) {
+      return '<div class="item"><div class="ico">' + a.sym + '</div>' + a.label + '</div>';
+    }).join('');
+
+    var k = u.keeper || {};
+    var kName = k.name || p.name + ' · 管家';
+    var kPhone = JUZHU.unitKeeperPhone(u);
+    var tel = JUZHU.telHref(kPhone);
+    document.getElementById('keeperBlock').hidden = false;
+    var avCls = k.avatar ? 'av' : 'av placeholder';
+    var avStyle = k.avatar ? 'background-image:url(' + k.avatar + ')' : '';
+    var avInner = k.avatar ? '' : '🏠';
+    document.getElementById('keeperRow').innerHTML =
+      '<div class="' + avCls + '" style="' + avStyle + '">' + avInner + '</div>' +
+      '<div><div class="nm">' + kName + '</div><div class="hint">联系我了解更多信息</div></div>' +
+      '<div class="acts">' +
+        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话">📞</a>' : '') +
+      '</div>';
+
+    if (JUZHU.effectiveRentDetail(u)) {
+      document.getElementById('rentModalWrap').innerHTML = JUZHU.rentDetailModalHtml(u);
+      bindRentModal(kPhone);
+      document.getElementById('openRent').hidden = false;
+    } else {
+      document.getElementById('openRent').hidden = true;
+    }
+  }
+
+  function bindRentModal(phone) {
+    var modal = document.getElementById('rentModal');
+    if (!modal) return;
+    var tel = JUZHU.telHref(phone);
+    function close() { modal.hidden = true; document.body.style.overflow = ''; }
+    function open() { modal.hidden = false; document.body.style.overflow = 'hidden'; }
+    document.getElementById('openRent').onclick = open;
+    modal.querySelectorAll('[data-close]').forEach(function(el) { el.onclick = close; });
+    modal.querySelectorAll('.rent-tabs button').forEach(function(btn) {
+      btn.onclick = function() {
+        modal.querySelectorAll('.rent-tabs button').forEach(function(b) { b.classList.toggle('on', b === btn); });
+        var tab = btn.dataset.tab;
+        modal.querySelectorAll('.rent-pane').forEach(function(p) { p.classList.toggle('on', p.dataset.pane === tab); });
+      };
+    });
+    var consult = document.getElementById('rentConsult');
+    if (consult) {
+      consult.onclick = function() {
+        if (tel) location.href = tel;
+        else alert('暂未配置咨询电话');
+      };
+    }
+  }
+
+  function bindTelLinks(phone) {
+    var tel = JUZHU.telHref(phone);
+    var callBtn = document.getElementById('callBtn');
+    var cta = document.getElementById('ctaBtn');
+    if (tel) {
+      callBtn.href = tel;
+      cta.href = tel;
+    } else {
+      callBtn.href = cta.href = '#';
+      var warn = function(e) { e.preventDefault(); alert('暂未配置咨询电话，请在内容编辑后台设置'); };
+      callBtn.onclick = cta.onclick = warn;
+    }
+  }
+
   function mountRating(p) {
     var hr = JUZHU.houseRating(p);
     document.getElementById('typeChip').textContent = '★ ' + hr.stars + '星 · 好房子';
@@ -210,22 +379,14 @@
       document.getElementById('ctaBtn').textContent = '咨询置换';
     } else {
       document.getElementById('price').innerHTML = JUZHU.fmtRent(u.rent_monthly) + '<small>/月</small>';
-      document.getElementById('plab').textContent = '租金受控 · 试点房源';
+      document.getElementById('plab').textContent = u.promo_price ? '券后参考价' : '租金受控 · 试点房源';
       document.getElementById('ctaBtn').textContent = '预约看房';
+      mountInfo(u, p);
       mountRating(p);
     }
 
-    var tel = JUZHU.telHref(JUZHU.bookingPhone());
-    var cta = document.getElementById('ctaBtn');
-    if (tel) {
-      cta.href = tel;
-    } else {
-      cta.href = '#';
-      cta.onclick = function(e) {
-        e.preventDefault();
-        alert('暂未配置咨询电话，请在内容编辑后台设置');
-      };
-    }
+    var phone = isTrade ? JUZHU.bookingPhone() : JUZHU.unitKeeperPhone(u);
+    bindTelLinks(phone);
 
     photos = JUZHU.photos('unit', u.id).map(function(ph){ return ph.file_path; });
     if (!photos.length && u.cover_image) photos = [u.cover_image];
