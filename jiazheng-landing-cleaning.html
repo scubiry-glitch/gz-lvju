@@ -8,71 +8,150 @@
 </head>
 <body>
 <div class="jz-wrap">
-  <!-- 顶栏 -->
   <div class="jz-top">
     <a class="jz-back" href="javascript:history.back()"></a>
     <span class="jz-title">保洁</span>
-    <div class="jz-actions">
-      <a href="javascript:;">🔍</a>
-      <a href="javascript:;">💬</a>
-    </div>
   </div>
 
   <!-- Hero -->
   <div class="jz-hero cleaning">
+    <div class="jz-illust">🧹</div>
     <div class="jz-slogan">随叫随到 · 不满意重做</div>
-    <div class="jz-sub">杭州 5km 内 30 分钟极速上门</div>
+    <div class="jz-sub">杭州 5km 内 · 30 分钟极速上门</div>
     <div class="jz-loc">杭州·保利香槟国际 <a href="javascript:;">更换地址</a></div>
+    <div class="jz-live">今日已有 <b id="liveCount" style="margin:0 3px;">127</b> 位业主预订服务</div>
+    <div class="jz-badges">
+      <span class="bd">🛡 百万保障</span>
+      <span class="bd">✓ 白名单商家</span>
+      <span class="bd">⚡ 不满意重做</span>
+    </div>
   </div>
 
-  <!-- 子类目网格（6 类） -->
+  <!-- 子类目 -->
   <div class="jz-cat-grid cleaning">
-    <a href="jiazheng-list.html?type=cleaning&sub=日常保洁"><div class="ic">🧹</div><div class="nm">日常保洁</div></a>
-    <a href="jiazheng-list.html?type=cleaning&sub=深度清洁"><div class="ic">✨</div><div class="nm">深度清洁</div></a>
-    <a href="jiazheng-list.html?type=cleaning&sub=开荒保洁"><div class="ic">🏠</div><div class="nm">开荒保洁</div></a>
-    <a href="jiazheng-list.html?type=cleaning&sub=玻璃清洗"><div class="ic">🪟</div><div class="nm">玻璃清洗</div></a>
-    <a href="jiazheng-list.html?type=cleaning&sub=油烟机清洗"><div class="ic">💨</div><div class="nm">油烟机清洗</div></a>
-    <a href="jiazheng-list.html?type=cleaning&sub=收纳整理"><div class="ic">📦</div><div class="nm">收纳整理</div></a>
+    <a href="jiazheng-list.html?type=cleaning&sub=日常保洁">
+      <div class="ic">🧹</div>
+      <div class="nm">日常保洁</div>
+      <div class="pr">¥45/小时起</div>
+    </a>
+    <a href="jiazheng-list.html?type=cleaning&sub=深度清洁">
+      <div class="ic">✨</div>
+      <div class="nm">深度清洁</div>
+      <div class="pr">¥268/次起</div>
+    </a>
+    <a href="jiazheng-list.html?type=cleaning&sub=开荒保洁">
+      <div class="ic">🏠</div>
+      <div class="nm">开荒保洁</div>
+      <div class="pr">¥198/次起</div>
+    </a>
+    <a href="jiazheng-list.html?type=cleaning&sub=玻璃清洗">
+      <div class="ic">🪟</div>
+      <div class="nm">玻璃清洗</div>
+      <div class="pr">¥15/㎡起</div>
+    </a>
+    <a href="jiazheng-list.html?type=cleaning&sub=油烟机清洗">
+      <div class="ic">💨</div>
+      <div class="nm">油烟机清洗</div>
+      <div class="pr">¥89/台起</div>
+    </a>
+    <a href="jiazheng-list.html?type=cleaning&sub=收纳整理">
+      <div class="ic">📦</div>
+      <div class="nm">收纳整理</div>
+      <div class="pr">¥99/小时起</div>
+    </a>
   </div>
 
-  <!-- 信任保障 -->
+  <!-- 服务保障 -->
   <div class="jz-section">
     <h2>服务保障</h2>
     <div class="jz-trust">
-      <div class="it">✓ 平台背调</div>
-      <div class="it">✓ 持证认证</div>
-      <div class="it">✓ 价格透明</div>
-      <div class="it">✓ 不满意重做</div>
+      <div class="it">
+        <div class="ic">🔍</div>
+        <span class="nm">平台背调</span>
+        <span class="sub">全员持证</span>
+      </div>
+      <div class="it">
+        <div class="ic">💎</div>
+        <span class="nm">百万保障</span>
+        <span class="sub">中国人保承保</span>
+      </div>
+      <div class="it">
+        <div class="ic">🏷</div>
+        <span class="nm">价格透明</span>
+        <span class="sub">无隐形消费</span>
+      </div>
+      <div class="it">
+        <div class="ic">🔁</div>
+        <span class="nm">不满意重做</span>
+        <span class="sub">7天无理由</span>
+      </div>
     </div>
   </div>
 
   <!-- 近期热销 -->
   <div class="jz-section">
-    <h2>近期热销 <small>· 6 大类目爆款</small><a href="jiazheng-list.html?type=cleaning">全部 ›</a></h2>
+    <h2>近期热销 <small>· 业主最爱</small><a href="jiazheng-list.html?type=cleaning">查看全部 ›</a></h2>
     <div class="jz-hot-list">
       <a href="jiazheng-list.html?type=cleaning&sub=日常保洁">
-        <div><b>日常保洁 2小时</b><div class="meta">上门除尘 · 死无死角</div></div>
-        <div style="display:flex;align-items:center;gap:8px;"><div class="pr">¥45/小时起</div><div class="go">查看 ›</div></div>
+        <div class="top-row">
+          <div class="pic">🧹</div>
+          <span class="tag-hot">热销 TOP1</span>
+        </div>
+        <b>日常保洁 2小时</b>
+        <div class="meta">上门除尘 · 死无死角</div>
+        <div class="rate"><span class="star">★</span>4.7 · 已订 5.3万</div>
+        <div class="row">
+          <div class="pr">¥45<b style="font-size:11px;">/小时起</b><s>¥80</s></div>
+          <div class="go">预订 ›</div>
+        </div>
       </a>
       <a href="jiazheng-list.html?type=cleaning&sub=深度清洁">
-        <div><b>深度清洁 4小时</b><div class="meta">3人团队 · 含厨卫去污</div></div>
-        <div style="display:flex;align-items:center;gap:8px;"><div class="pr">¥268起</div><div class="go">查看 ›</div></div>
+        <div class="top-row">
+          <div class="pic">✨</div>
+          <span class="tag-hot" style="background:var(--success)">超值</span>
+        </div>
+        <b>深度清洁 4小时</b>
+        <div class="meta">3人团队 · 含厨卫去污</div>
+        <div class="rate"><span class="star">★</span>4.8 · 已订 1.6万</div>
+        <div class="row">
+          <div class="pr">¥268<b style="font-size:11px;">/次起</b><s>¥580</s></div>
+          <div class="go">预订 ›</div>
+        </div>
       </a>
       <a href="jiazheng-list.html?type=cleaning&sub=油烟机清洗">
-        <div><b>油烟机清洗</b><div class="meta">拆装深度 · 高温蒸汽</div></div>
-        <div style="display:flex;align-items:center;gap:8px;"><div class="pr">¥89/台起</div><div class="go">查看 ›</div></div>
+        <div class="top-row">
+          <div class="pic">💨</div>
+        </div>
+        <b>油烟机深度清洗</b>
+        <div class="meta">拆装深度 · 高温蒸汽</div>
+        <div class="rate"><span class="star">★</span>4.9 · 已订 8.2万</div>
+        <div class="row">
+          <div class="pr">¥89<b style="font-size:11px;">/台起</b><s>¥180</s></div>
+          <div class="go">预订 ›</div>
+        </div>
       </a>
       <a href="jiazheng-list.html?type=cleaning&sub=开荒保洁">
-        <div><b>开荒保洁</b><div class="meta">新房 · 含甲醛检测</div></div>
-        <div style="display:flex;align-items:center;gap:8px;"><div class="pr">¥198/次起</div><div class="go">查看 ›</div></div>
+        <div class="top-row">
+          <div class="pic">🏠</div>
+        </div>
+        <b>新房开荒保洁</b>
+        <div class="meta">含甲醛检测 · 入住无忧</div>
+        <div class="rate"><span class="star">★</span>4.6 · 已订 1.2万</div>
+        <div class="row">
+          <div class="pr">¥198<b style="font-size:11px;">/次起</b><s>¥380</s></div>
+          <div class="go">预订 ›</div>
+        </div>
       </a>
     </div>
   </div>
 
   <!-- 浮动 CTA -->
   <div class="jz-cta-bar">
-    <a class="sec" href="javascript:;">咨询客服</a>
-    <a class="pri" href="jiazheng-list.html?type=cleaning">获取多家精准报价</a>
+    <div class="hint">今日 127 位业主已预订</div>
+    <div class="row">
+      <a class="sec" href="javascript:;">💬 客服</a>
+      <a class="pri" href="jiazheng-list.html?type=cleaning">立即匹配 3 家报价</a>
+    </div>
   </div>
 </div>
 </body>
