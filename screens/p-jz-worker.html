@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务者管理 · 运营商工作台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#0f766e;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;}
+  .kpi b{font-size:20px;display:block;}
+  .kpi span{font-size:11px;color:var(--muted);}
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .filter-row select,.filter-row input{padding:6px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;font-size:12px;background:#fff;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;background:var(--bg);position:sticky;top:0;}
+  .badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:600;cursor:pointer;}
+  .b-active{background:#dcfce7;color:#15803d;}
+  .b-paused{background:#fee2e2;color:#b91c1c;}
+  .lvl{font-weight:700;font-size:11px;}
+  .L7{color:#7c3aed;} .L6{color:#2563eb;} .L5{color:#0891b2;} .L4{color:#16a34a;} .L3{color:#ea580c;} .L2{color:#737373;} .L1{color:#a3a3a3;}
+  .cert{display:inline-block;font-size:9px;padding:1px 5px;margin:1px;border-radius:3px;background:var(--accent-soft);color:var(--accent);}
+  .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.danger{color:var(--danger);border-color:#fecaca;}
+  .btn.sm{padding:3px 8px;font-size:11px;}
+  .actions{display:flex;gap:6px;}
+  .modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:100;align-items:center;justify-content:center;}
+  .modal.show{display:flex;}
+  .modal .box{background:#fff;border-radius:14px;padding:20px;width:min(540px,94vw);max-height:90vh;overflow-y:auto;}
+  .modal h4{margin:0 0 14px;font-size:15px;}
+  .modal .fld{margin-bottom:10px;}
+  .modal .fld label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .modal .fld input,.modal .fld select{width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:13px;}
+  .modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+  .toast.show{display:block;}
+  .toast.err{background:var(--danger);}
+  .toast.ok{background:var(--ok);}
+  .vendor-link{color:var(--accent);font-weight:500;}
+  .group{margin-bottom:18px;}
+  .group h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+  .av{font-size:24px;}
+  .online{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}
+  .online.yes{background:var(--ok);}
+  .online.no{background:var(--muted);}
+  .cert-row{display:flex;flex-wrap:wrap;gap:4px;}
+  .cert-row label{font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="b" data-active="jz-worker"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × B 运营商工作台 / <b>服务者管理</b></div>
+      <div class="top-actions">
+        <button class="btn pri" id="btnNew">+ 新增服务者</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>服务者概览 <span class="pill">B 端</span></h3>
+        <div class="kpis" id="kpis"></div>
+      </div>
+
+      <div class="card">
+        <h3>服务者列表 <span class="pill" id="count">0</span></h3>
+        <div class="filter-row">
+          <select id="f_vendor">
+            <option value="">全部商家</option>
+          </select>
+          <select id="f_status">
+            <option value="">全部状态</option>
+            <option value="active">在职</option>
+            <option value="paused">暂停</option>
+            <option value="offline">离职</option>
+          </select>
+          <select id="f_level">
+            <option value="">全部等级</option>
+            <option value="L7">L7 示范</option>
+            <option value="L6">L6 旗舰</option>
+            <option value="L5">L5 商业</option>
+            <option value="L4">L4 精品</option>
+            <option value="L3">L3 优质</option>
+            <option value="L2">L2 达标</option>
+            <option value="L1">L1 基础</option>
+          </select>
+          <input type="text" id="f_q" placeholder="搜索服务者..." style="flex:1;min-width:160px;" />
+          <span class="muted" style="font-size:11px;">共 <b id="matched">0</b> 条</span>
+        </div>
+        <div id="list" style="max-height:60vh;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h4 id="modalTitle">新增服务者</h4>
+    <input type="hidden" id="m_id" />
+    <div class="grid">
+      <div class="fld">
+        <label>姓名 *</label>
+        <input type="text" id="m_name" maxlength="20" />
+      </div>
+      <div class="fld">
+        <label>头像（emoji）</label>
+        <input type="text" id="m_avatar" maxlength="4" placeholder="👨" />
+      </div>
+    </div>
+    <div class="grid">
+      <div class="fld">
+        <label>所属商家 *</label>
+        <select id="m_vendor"></select>
+      </div>
+      <div class="fld">
+        <label>等级</label>
+        <select id="m_level">
+          <option value="L1">L1 基础型</option>
+          <option value="L2">L2 达标型</option>
+          <option value="L3" selected>L3 优质型</option>
+          <option value="L4">L4 精品型</option>
+          <option value="L5">L5 商业认证</option>
+          <option value="L6">L6 旗舰</option>
+          <option value="L7">L7 示范</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="fld">
+        <label>信用分（0-100）</label>
+        <input type="number" id="m_credit" min="0" max="100" value="70" />
+      </div>
+      <div class="fld">
+        <label>评分（0-5）</label>
+        <input type="number" id="m_rating" step="0.1" min="0" max="5" value="4.7" />
+      </div>
+    </div>
+    <div class="grid">
+      <div class="fld">
+        <label>完成订单数</label>
+        <input type="number" id="m_orders" min="0" value="0" />
+      </div>
+      <div class="fld">
+        <label>从业年限</label>
+        <input type="number" id="m_years" min="0" value="1" />
+      </div>
+    </div>
+    <div class="fld">
+      <label>资质证书（可多选）</label>
+      <div class="cert-row" id="m_certs">
+        <label><input type="checkbox" value="id_card" checked /> 身份证</label>
+        <label><input type="checkbox" value="health" /> 健康证</label>
+        <label><input type="checkbox" value="skill" /> 技能证</label>
+        <label><input type="checkbox" value="insurance" /> 责任险</label>
+        <label><input type="checkbox" value="backcheck" /> 背调</label>
+        <label><input type="checkbox" value="whitelist" /> 白名单</label>
+      </div>
+    </div>
+    <div class="fld">
+      <label>状态</label>
+      <select id="m_status">
+        <option value="active">在职</option>
+        <option value="paused">暂停</option>
+        <option value="offline">离职</option>
+      </select>
+    </div>
+    <div class="btns">
+      <button class="btn" id="mCancel">取消</button>
+      <button class="btn pri" id="mSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+(function(){
+  const STATUS_LABELS = {active:'在职', paused:'暂停', offline:'离职'};
+  const CERT_LABELS = {id_card:'身份证', health:'健康证', skill:'技能证', insurance:'责任险', backcheck:'背调', whitelist:'白名单'};
+  const $ = id => document.getElementById(id);
+  const toast = (msg, kind) => {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'toast show ' + (kind||'');
+    setTimeout(()=>t.className='toast', 1800);
+  };
+
+  let allWorkers = [];
+  let allVendors = [];
+
+  async function load() {
+    const [wr, vr] = await Promise.all([
+      fetch('/api/juzhu/jz/workers?all=1').then(r=>r.json()),
+      fetch('/api/juzhu/jz/vendors').then(r=>r.json()),
+    ]);
+    allWorkers = wr.list;
+    allVendors = vr.list;
+    $('f_vendor').innerHTML = '<option value="">全部商家</option>' +
+      allVendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+    $('m_vendor').innerHTML = '<option value="">-- 选择商家 --</option>' +
+      allVendors.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+    applyFilter();
+  }
+
+  function applyFilter() {
+    const v = $('f_vendor').value;
+    const s = $('f_status').value;
+    const lv = $('f_level').value;
+    const q = $('f_q').value.trim().toLowerCase();
+    let list = allWorkers.filter(w => {
+      if (v && w.vendor_id != v) return false;
+      if (s && w.status !== s) return false;
+      if (lv && w.level !== lv) return false;
+      if (q && !w.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    render(list);
+  }
+
+  function render(list) {
+    $('count').textContent = allWorkers.length;
+    $('matched').textContent = list.length;
+    // KPI
+    const active = list.filter(w => w.status === 'active').length;
+    const online = list.filter(w => w.online).length;
+    const L4plus = list.filter(w => ['L4','L5','L6','L7'].includes(w.level)).length;
+    const certRate = list.length ? Math.round(list.filter(w => (w.certs||[]).length >= 3).length / list.length * 100) : 0;
+    $('kpis').innerHTML = `
+      <div class="kpi"><b>${list.length}</b><span>总数</span></div>
+      <div class="kpi"><b>${active}</b><span>在职</span></div>
+      <div class="kpi"><b>${online}</b><span>在线</span></div>
+      <div class="kpi"><b>${L4plus}</b><span>L4+ 高阶</span></div>
+      <div class="kpi"><b>${certRate}%</b><span>3 证齐</span></div>
+    `;
+
+    if (!list.length) { $('list').innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px;">无匹配服务者</p>'; return; }
+    // 按商家分组
+    const groups = {};
+    list.forEach(w => { (groups[w.vendor_name||'未分配'] = groups[w.vendor_name||'未分配']||[]).push(w); });
+    let html = '';
+    Object.keys(groups).sort().forEach(name => {
+      html += `<div class="group"><h4>${name}（${groups[name].length}）</h4><table>`;
+      html += '<thead><tr><th>服务者</th><th>等级</th><th>信用</th><th>评分/订单</th><th>资质</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      groups[name].forEach(w => {
+        const certs = (w.certs||[]).map(c => `<span class="cert">${CERT_LABELS[c]||c}</span>`).join('');
+        html += `<tr>
+          <td><span class="av">${w.avatar||'👤'}</span> <b>${w.name}</b> <span class="online ${w.online?'yes':'no'}" title="${w.online?'在线':'离线'}"></span></td>
+          <td><span class="lvl ${w.level}">${w.level}</span></td>
+          <td>${w.credit_score||0}</td>
+          <td>★${(w.rating||0).toFixed(1)} · ${w.completed_orders||0}单 · ${w.years_experience||0}年</td>
+          <td>${certs||'—'}</td>
+          <td><span class="badge ${w.status==='active'?'b-active':'b-paused'}" data-id="${w.id}" data-status="${w.status}">${STATUS_LABELS[w.status]||w.status}</span></td>
+          <td class="actions">
+            <button class="btn sm" data-edit='${JSON.stringify(w).replace(/'/g,"&#39;")}'>编辑</button>
+            <button class="btn sm danger" data-del="${w.id}" data-name="${w.name}">删除</button>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+    });
+    $('list').innerHTML = html;
+
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(JSON.parse(b.dataset.edit)));
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => del(b.dataset.del, b.dataset.name));
+    document.querySelectorAll('.badge[data-id]').forEach(b => b.onclick = () => toggle(b.dataset.id, b.dataset.status));
+  }
+
+  function openModal(w) {
+    $('m_id').value = w ? w.id : '';
+    $('modalTitle').textContent = w ? '编辑服务者' : '新增服务者';
+    $('m_name').value = w ? w.name : '';
+    $('m_avatar').value = w ? (w.avatar||'') : '👨';
+    $('m_vendor').value = w ? (w.vendor_id||'') : '';
+    $('m_level').value = w ? w.level : 'L3';
+    $('m_credit').value = w ? (w.credit_score||70) : 70;
+    $('m_rating').value = w ? (w.rating||0) : 4.7;
+    $('m_orders').value = w ? (w.completed_orders||0) : 0;
+    $('m_years').value = w ? (w.years_experience||0) : 1;
+    $('m_status').value = w ? w.status : 'active';
+    // 资质
+    const certs = w ? (w.certs||[]) : ['id_card'];
+    document.querySelectorAll('#m_certs input').forEach(cb => cb.checked = certs.includes(cb.value));
+    $('modal').classList.add('show');
+  }
+  function closeModal() { $('modal').classList.remove('show'); }
+  $('btnNew').onclick = () => openModal(null);
+  $('mCancel').onclick = closeModal;
+  $('modal').onclick = e => { if (e.target.id==='modal') closeModal(); };
+
+  ['f_vendor','f_status','f_level'].forEach(id => $(id).onchange = applyFilter);
+  $('f_q').oninput = applyFilter;
+
+  $('mSave').onclick = async () => {
+    const certs = Array.from(document.querySelectorAll('#m_certs input:checked')).map(cb => cb.value);
+    const body = {
+      name: $('m_name').value.trim(),
+      avatar: $('m_avatar').value || '👤',
+      vendor_id: parseInt($('m_vendor').value) || null,
+      level: $('m_level').value,
+      credit_score: parseInt($('m_credit').value)||0,
+      rating: parseFloat($('m_rating').value)||0,
+      completed_orders: parseInt($('m_orders').value)||0,
+      years_experience: parseInt($('m_years').value)||0,
+      certs: certs,
+      status: $('m_status').value,
+    };
+    if (!body.name) { toast('请输入姓名', 'err'); return; }
+    if (!body.vendor_id) { toast('请选择商家', 'err'); return; }
+    const id = $('m_id').value;
+    const url = id ? '/api/juzhu/jz/workers/'+id : '/api/juzhu/jz/workers';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { toast(id?'已更新':'已新增', 'ok'); closeModal(); load(); }
+    else toast(d.error||'保存失败', 'err');
+  };
+
+  async function del(id, name) {
+    if (!confirm('确认删除服务者「'+name+'」？')) return;
+    const r = await fetch('/api/juzhu/jz/workers/'+id, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { toast('已删除', 'ok'); load(); }
+    else toast(d.error||'删除失败', 'err');
+  }
+
+  async function toggle(id, cur) {
+    const next = cur === 'active' ? 'paused' : 'active';
+    const r = await fetch('/api/juzhu/jz/workers/'+id, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: next})
+    });
+    const d = await r.json();
+    if (d.ok) { toast(next==='active'?'已恢复':'已暂停', 'ok'); load(); }
+    else toast('操作失败', 'err');
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

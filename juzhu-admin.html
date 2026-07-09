@@ -1271,7 +1271,7 @@ document.getElementById('fDistrict').onchange = loadProjects;
 document.getElementById('fSearch').oninput = debounce(loadProjects, 300);
 document.getElementById('btnExport').onclick = function() {
   api('/export', { method:'POST' }).then(function(r) {
-    toast('已导出 JSON · 户型 '+r.stats.unit_count);
+    toast('已导出 JSON · 房源量 '+r.stats.unit_count);
   }).catch(function(e){ toast('导出失败：'+e.message); });
 };
 

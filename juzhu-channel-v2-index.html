@@ -60,7 +60,7 @@
       <div class="sum" id="mastSum">
         <div><b>—</b>行政区</div>
         <div><b>—</b>在营项目</div>
-        <div><b>—</b>在租房型</div>
+        <div><b>—</b>房源量</div>
         <div><b>—</b>全市均价</div>
       </div>
     </div>
@@ -105,7 +105,7 @@
     document.getElementById('mastSum').innerHTML =
       '<div><b>'+d.stats.district_count+'</b>行政区</div>'+
       '<div><b>'+d.stats.project_count_bzf+'</b>在营项目</div>'+
-      '<div><b>'+d.stats.unit_count+'</b>在租房型</div>'+
+      '<div><b>'+d.stats.unit_count+'</b>房源量</div>'+
       '<div><b>'+(cityAvg==='—'?'—':'¥'+cityAvg)+'</b>全市均价</div>';
   }
 

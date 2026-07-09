@@ -247,3 +247,201 @@ def rate_order(conn, order_id, score, tags, text, credit_delta=0.0):
 def _now():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+# ====== Categories CRUD (P 端·类目管理) ======
+def list_categories_all(conn):
+    """所有子类目（不区分 status）— 管理端用"""
+    rows = conn.execute(
+        "SELECT * FROM jz_categories ORDER BY parent_type, sort_order, id"
+    ).fetchall()
+    return _rows_to_list(rows)
+
+
+def create_category(conn, data):
+    """新增子类目"""
+    cur = conn.execute(
+        "INSERT INTO jz_categories (parent_type, name, icon, sort_order, status) VALUES (?,?,?,?,?)",
+        (data.get("parent_type", "cleaning"),
+         data.get("name", ""),
+         data.get("icon", "📦"),
+         int(data.get("sort_order", 99)),
+         data.get("status", "on")),
+    )
+    return cur.lastrowid
+
+
+def update_category(conn, cat_id, data):
+    """更新子类目"""
+    fields = []
+    params = []
+    for k in ("parent_type", "name", "icon", "sort_order", "status"):
+        if k in data:
+            fields.append(f"{k}=?")
+            params.append(data[k])
+    if not fields:
+        return False
+    params.append(cat_id)
+    cur = conn.execute(f"UPDATE jz_categories SET {', '.join(fields)} WHERE id=?", params)
+    return cur.rowcount > 0
+
+
+def delete_category(conn, cat_id):
+    """删除子类目（有产品引用则不允许）"""
+    used = conn.execute(
+        "SELECT COUNT(*) c FROM jz_products WHERE category=(SELECT name FROM jz_categories WHERE id=?)",
+        (cat_id,),
+    ).fetchone()[0]
+    if used > 0:
+        return {"ok": False, "error": f"该子类目有 {used} 个产品引用，无法删除"}
+    conn.execute("DELETE FROM jz_categories WHERE id=?", (cat_id,))
+    return {"ok": True}
+
+
+# ====== Products CRUD (B 端·产品管理) ======
+def list_products(conn, vendor_id=None, type_=None, status=None, limit=200):
+    """产品列表（支持 vendor_id / type / status 过滤）"""
+    sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type
+             FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+             WHERE 1=1"""
+    params = []
+    if vendor_id is not None:
+        sql += " AND p.vendor_id=?"
+        params.append(int(vendor_id))
+    if type_:
+        sql += " AND v.type=?"
+        params.append(type_)
+    if status:
+        sql += " AND p.status=?"
+        params.append(status)
+    sql += " ORDER BY p.vendor_id, p.sort_order, p.id LIMIT ?"
+    params.append(int(limit))
+    rows = conn.execute(sql, params).fetchall()
+    return _rows_to_list(rows)
+
+
+def create_product(conn, data):
+    """新增产品"""
+    import json as _json
+    cur = conn.execute(
+        """INSERT INTO jz_products
+           (vendor_id, title, subtitle, category, duration_hours, area_range, unit,
+            price, original_price, discount_label, earliest_time, advance_booking_hours,
+            sales_count, rating, service_tags, status, sort_order)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (int(data.get("vendor_id", 0)),
+         data.get("title", ""),
+         data.get("subtitle", ""),
+         data.get("category", ""),
+         float(data.get("duration_hours", 0)),
+         data.get("area_range", ""),
+         data.get("unit", "次"),
+         float(data.get("price", 0)),
+         float(data.get("original_price", 0)) if data.get("original_price") else None,
+         data.get("discount_label", ""),
+         data.get("earliest_time", ""),
+         int(data.get("advance_booking_hours", 0)),
+         int(data.get("sales_count", 0)),
+         float(data.get("rating", 0)),
+         _json.dumps(data.get("service_tags", []), ensure_ascii=False),
+         data.get("status", "on"),
+         int(data.get("sort_order", 99))),
+    )
+    return cur.lastrowid
+
+
+def update_product(conn, pid, data):
+    """更新产品"""
+    import json as _json
+    fields = []
+    params = []
+    for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
+              "unit", "price", "original_price", "discount_label", "earliest_time",
+              "advance_booking_hours", "sales_count", "rating", "status", "sort_order"):
+        if k in data:
+            v = data[k]
+            if k == "service_tags":
+                v = _json.dumps(v, ensure_ascii=False)
+            fields.append(f"{k}=?")
+            params.append(v)
+    if not fields:
+        return False
+    params.append(pid)
+    cur = conn.execute(f"UPDATE jz_products SET {', '.join(fields)} WHERE id=?", params)
+    return cur.rowcount > 0
+
+
+def delete_product(conn, pid):
+    conn.execute("DELETE FROM jz_products WHERE id=?", (pid,))
+    return {"ok": True}
+
+
+# ====== Workers CRUD (B 端·服务者管理) ======
+def list_workers(conn, vendor_id=None, status=None, limit=200):
+    """服务者列表（支持 vendor_id / status 过滤）"""
+    sql = """SELECT w.*, v.name AS vendor_name, v.type AS vendor_type
+             FROM jz_workers w LEFT JOIN jz_vendors v ON v.id=w.vendor_id
+             WHERE 1=1"""
+    params = []
+    if vendor_id is not None:
+        sql += " AND w.vendor_id=?"
+        params.append(int(vendor_id))
+    if status:
+        sql += " AND w.status=?"
+        params.append(status)
+    sql += " ORDER BY w.vendor_id, w.level DESC, w.rating DESC LIMIT ?"
+    params.append(int(limit))
+    rows = conn.execute(sql, params).fetchall()
+    return _rows_to_list(rows)
+
+
+def create_worker(conn, data):
+    """新增服务者"""
+    import json as _json
+    cur = conn.execute(
+        """INSERT INTO jz_workers
+           (name, avatar, level, credit_score, tags, certs, is_whitelisted, rating,
+            completed_orders, years_experience, online, distance_km, vendor_id, status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (data.get("name", ""),
+         data.get("avatar", "👤"),
+         data.get("level", "L3"),
+         int(data.get("credit_score", 70)),
+         _json.dumps(data.get("tags", []), ensure_ascii=False),
+         _json.dumps(data.get("certs", []), ensure_ascii=False),
+         int(data.get("is_whitelisted", 0)),
+         float(data.get("rating", 0)),
+         int(data.get("completed_orders", 0)),
+         int(data.get("years_experience", 0)),
+         int(data.get("online", 0)),
+         float(data.get("distance_km", 0)) if data.get("distance_km") else None,
+         int(data.get("vendor_id", 0)) if data.get("vendor_id") else None,
+         data.get("status", "active")),
+    )
+    return cur.lastrowid
+
+
+def update_worker(conn, wid, data):
+    """更新服务者"""
+    import json as _json
+    fields = []
+    params = []
+    for k in ("name", "avatar", "level", "credit_score", "certs", "is_whitelisted",
+              "rating", "completed_orders", "years_experience", "online",
+              "distance_km", "vendor_id", "status"):
+        if k in data:
+            v = data[k]
+            if k in ("tags", "certs"):
+                v = _json.dumps(v, ensure_ascii=False)
+            fields.append(f"{k}=?")
+            params.append(v)
+    if not fields:
+        return False
+    params.append(wid)
+    cur = conn.execute(f"UPDATE jz_workers SET {', '.join(fields)} WHERE id=?", params)
+    return cur.rowcount > 0
+
+
+def delete_worker(conn, wid):
+    conn.execute("DELETE FROM jz_workers WHERE id=?", (wid,))
+    return {"ok": True}

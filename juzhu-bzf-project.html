@@ -47,7 +47,7 @@
       </div>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2 id="listTitle">在租房型</h2><span class="more" id="unitN">—</span></div>
+    <div class="sec-h"><span class="bar"></span><h2 id="listTitle">在租户型</h2><span class="more" id="unitN">—</span></div>
     <div class="unit-grid" id="list"></div>
   </div>
 </div>
@@ -69,7 +69,7 @@
       ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')
       : ('房源量 ' + JUZHU.managedUnits(p) + ' · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
     document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
-    document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租房型';
+    document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租户型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';
     if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+p.cover_image+')';
 

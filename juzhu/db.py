@@ -430,7 +430,9 @@ def export_json(conn=None):
                 "project_count_trade": conn.execute(
                     "SELECT COUNT(*) FROM projects WHERE channel='trade'"
                 ).fetchone()[0],
-                "unit_count": conn.execute("SELECT COUNT(*) FROM units").fetchone()[0],
+                "unit_count": conn.execute(
+                    "SELECT COALESCE(SUM(managed_unit_count), 0) FROM projects WHERE channel='bzf'"
+                ).fetchone()[0],
             },
             "districts": parse_tags(rows("SELECT * FROM districts ORDER BY sort_order")),
             "projects": [normalize_project_row(p) for p in parse_tags(rows("SELECT * FROM projects ORDER BY channel, sort_order"))],

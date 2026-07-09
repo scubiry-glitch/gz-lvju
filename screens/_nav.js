@@ -115,6 +115,10 @@
           { id: 'pconsole', label: '服务认证中台 ↗', href: 'p-console.html',  icon: 'star' },
           { id: 'gov',      label: R.deptName + '监管 ↗',   href: 'gov-admin.html',  icon: 'award' },
         ]},
+        { name: '🏠 居住服务 · 家政频道', items: [
+          { id: 'jz-product',  label: '★ 服务产品管理',     href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-worker',   label: '★ 服务者管理',       href: 'p-jz-worker.html',   icon: 'user' },
+        ]},
       ],
     },
 
@@ -198,6 +202,9 @@
         { name: '🌐 生态联动', items: [
           { id: 'gov',  label: R.deptName + '监管 ↗',     href: 'gov-admin.html',        icon: 'award' },
           { id: 'portal', label: '公示门户 ↗',     href: 'portal-index.html',     icon: 'star' },
+        ]},
+        { name: '🏠 居住服务 · 家政频道', items: [
+          { id: 'jz-category', label: '★ 服务子类目管理',     href: 'p-jz-category.html', icon: 'list' },
         ]},
       ],
     },

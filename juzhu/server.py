@@ -189,13 +189,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_PUT(self):
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX):
+        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
             return self._route(p, "PUT")
         self._json({"error": "not found"}, 404)
 
     def do_DELETE(self):
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX):
+        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
             return self._route(p, "DELETE")
         self._json({"error": "not found"}, 404)
 
@@ -237,8 +237,8 @@ class Handler(SimpleHTTPRequestHandler):
         qs = parse_qs(p.query)
 
         # === 家政频道 POST 端点（非 admin 路径） ===
-        if method == "POST" and path.startswith("/api/juzhu/jz"):
-            return self._jiazheng_post(path, qs)
+        if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):
+            return self._jiazheng_post(path, qs, method)
 
         if method == "GET" and not path.startswith(ADMIN_PREFIX):
             return self._public_get(path, qs)
@@ -362,7 +362,7 @@ class Handler(SimpleHTTPRequestHandler):
             d = conn.execute("SELECT COUNT(*) c FROM districts").fetchone()[0]
             pb = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='bzf'").fetchone()[0]
             pt = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='trade'").fetchone()[0]
-            u = conn.execute("SELECT COUNT(*) c FROM units").fetchone()[0]
+            u = conn.execute("SELECT COALESCE(SUM(managed_unit_count), 0) c FROM projects WHERE channel='bzf'").fetchone()[0]
             conn.close()
             return self._json({"districts": d, "projects_bzf": pb, "projects_trade": pt, "units": u})
 
@@ -426,7 +426,10 @@ class Handler(SimpleHTTPRequestHandler):
         # === 居住服务·家政频道 /api/juzhu/jz/* ===
         if path == "/api/juzhu/jz/categories":
             type_ = qs.get("type", [None])[0]
-            data = jzdb.list_categories(conn, type_)
+            if qs.get("all", ["0"])[0] == "1":
+                data = jzdb.list_categories_all(conn)
+            else:
+                data = jzdb.list_categories(conn, type_)
             conn.close()
             return self._json({"list": data})
 
@@ -448,9 +451,20 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json(data if data else {"error": "not found"}, 404 if not data else 200)
 
+        if path == "/api/juzhu/jz/products":
+            vendor_id = qs.get("vendor_id", [None])[0]
+            type_ = qs.get("type", [None])[0]
+            status = qs.get("status", [None])[0]
+            data = jzdb.list_products(conn, vendor_id=int(vendor_id) if vendor_id else None,
+                                       type_=type_, status=status)
+            conn.close()
+            return self._json({"list": data})
+
         if path == "/api/juzhu/jz/workers":
             vendor_id = qs.get("vendor_id", [None])[0]
-            if vendor_id:
+            if qs.get("all", ["0"])[0] == "1":
+                data = jzdb.list_workers(conn, vendor_id=int(vendor_id) if vendor_id else None)
+            elif vendor_id:
                 data = jzdb.list_workers_by_vendor(conn, int(vendor_id))
             else:
                 data = jzdb.list_workers_online(conn)
@@ -536,8 +550,8 @@ class Handler(SimpleHTTPRequestHandler):
         return None
 
     # ====== 居住服务·家政频道 ======
-    def _jiazheng_post(self, path, qs):
-        """处理 /api/juzhu/jz/* POST 请求"""
+    def _jiazheng_post(self, path, qs, method_alt="POST"):
+        """处理 /api/juzhu/jz/* POST/PUT/DELETE 请求"""
         conn = connect()
         try:
             body = self._body()
@@ -618,6 +632,51 @@ class Handler(SimpleHTTPRequestHandler):
                 jzdb.rate_order(conn, oid, score, tags, text, credit_delta)
                 conn.commit()
                 return self._json({"ok": True, "credit_delta": credit_delta})
+
+            # === P 端·类目管理 CRUD ===
+            if path == "/api/juzhu/jz/categories" and method_alt == "POST":
+                cid = jzdb.create_category(conn, body)
+                conn.commit()
+                return self._json({"ok": True, "id": cid})
+            m = re.match(r"^/api/juzhu/jz/categories/(\d+)$", path)
+            if m and method_alt == "PUT":
+                ok = jzdb.update_category(conn, int(m.group(1)), body)
+                conn.commit()
+                return self._json({"ok": ok})
+            if m and method_alt == "DELETE":
+                result = jzdb.delete_category(conn, int(m.group(1)))
+                conn.commit()
+                return self._json(result, 200 if result.get("ok") else 400)
+
+            # === B 端·产品管理 CRUD ===
+            if path == "/api/juzhu/jz/products" and method_alt == "POST":
+                pid = jzdb.create_product(conn, body)
+                conn.commit()
+                return self._json({"ok": True, "id": pid})
+            m = re.match(r"^/api/juzhu/jz/products/(\d+)$", path)
+            if m and method_alt == "PUT":
+                ok = jzdb.update_product(conn, int(m.group(1)), body)
+                conn.commit()
+                return self._json({"ok": ok})
+            if m and method_alt == "DELETE":
+                result = jzdb.delete_product(conn, int(m.group(1)))
+                conn.commit()
+                return self._json(result)
+
+            # === B 端·服务者管理 CRUD ===
+            if path == "/api/juzhu/jz/workers" and method_alt == "POST":
+                wid = jzdb.create_worker(conn, body)
+                conn.commit()
+                return self._json({"ok": True, "id": wid})
+            m = re.match(r"^/api/juzhu/jz/workers/(\d+)$", path)
+            if m and method_alt == "PUT":
+                ok = jzdb.update_worker(conn, int(m.group(1)), body)
+                conn.commit()
+                return self._json({"ok": ok})
+            if m and method_alt == "DELETE":
+                result = jzdb.delete_worker(conn, int(m.group(1)))
+                conn.commit()
+                return self._json(result)
 
             return self._json({"error": "unknown route"}, 404)
         finally:
