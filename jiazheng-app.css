@@ -57,14 +57,16 @@ input, textarea, select { font: inherit; }
   border-bottom: 1px solid var(--line);
 }
 .jz-top .jz-back {
-  width: 32px; height: 32px; display: grid; place-items: center;
-  border-radius: 50%; background: var(--line); font-size: 18px; color: var(--fg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--fg); padding: 4px 8px; margin-left: -8px;
+  line-height: 1; min-width: 32px;
 }
 .jz-top .jz-title { font-size: 16px; font-weight: 600; color: var(--fg); }
-.jz-top .jz-actions { display: flex; gap: 8px; }
+.jz-top .jz-actions { display: flex; gap: 14px; }
 .jz-top .jz-actions a {
-  width: 32px; height: 32px; display: grid; place-items: center;
-  border-radius: 50%; background: var(--line); font-size: 14px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--muted); padding: 4px 0;
+  line-height: 1; min-width: 24px;
 }
 
 /* Hero Banner */
