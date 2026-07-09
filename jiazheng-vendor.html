@@ -56,6 +56,7 @@ var v = JZ_DATA.getVendor(type, vendorId);
 if (!v) {
   document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">商家不存在</div>';
 } else {
+  var cat = JZ_DATA.getCat(type);
   document.getElementById('pageTitle').textContent = v.name;
 
   // 商家头部
