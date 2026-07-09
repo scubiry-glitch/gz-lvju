@@ -17,17 +17,11 @@
     </div>
   </div>
 
-  <!-- 子类目筛选 -->
   <div class="jz-filter" id="subFilter">
     <a class="on" href="javascript:;" data-sub="all">全部</a>
-    <a href="javascript:;" data-sub="神券">神券</a>
-    <a href="javascript:;" data-sub="日常">日常</a>
-    <a href="javascript:;" data-sub="深度">深度</a>
-    <a href="javascript:;" data-sub="开荒">开荒</a>
   </div>
 
-  <!-- 商家列表 -->
-  <div id="vendorList"></div>
+  <div id="vendorList"><div style="padding:40px;text-align:center;color:var(--muted);">加载中…</div></div>
 
   <div class="jz-cta-bar">
     <a class="sec" href="javascript:;">综合排序 ▼</a>
@@ -46,73 +40,67 @@ var cat = JZ_DATA.getCat(type);
 document.getElementById('pageTitle').textContent = (sub || cat.name) + ' · 商家';
 
 // 渲染子筛选
-(function(){
-  var subs = [{id:'all', name:'全部'}];
-  if (cat && cat.subs) cat.subs.forEach(function(s){ subs.push(s); });
-  document.getElementById('subFilter').innerHTML = subs.map(function(s){
-    var label = s.name || s;
-    var key = s.id || label;
-    return '<a href="javascript:;" data-sub="'+key+'"'+(key==='all'?' class="on"':'')+'>'+label+'</a>';
+JZ_DATA.getCategories(type).then(function(subs){
+  var all = [{name:'全部'}].concat(subs);
+  document.getElementById('subFilter').innerHTML = all.map(function(s,i){
+    return '<a href="javascript:;" data-sub="'+(s.name||'all')+'"'+(i===0?' class="on"':'')+'>'+s.name+'</a>';
   }).join('');
+});
+document.getElementById('subFilter').addEventListener('click', function(e){
+  var t = e.target.closest('[data-sub]');
+  if (!t) return;
+  document.querySelectorAll('#subFilter a').forEach(function(a){ a.classList.toggle('on', a===t); });
+});
 
-  document.getElementById('subFilter').addEventListener('click', function(e){
-    var t = e.target.closest('[data-sub]');
-    if (!t) return;
-    document.querySelectorAll('#subFilter a').forEach(function(a){ a.classList.toggle('on', a===t); });
-    render(t.dataset.sub);
+function badgeHtml(v){
+  var html = '';
+  if (v.live) html += '<span class="bd bd-r" style="font-size:9px;">直播中</span>';
+  if (v.rank) html += '<span class="bd bd-p">'+v.rank.label+'</span>';
+  (v.badges||[]).slice(0,3).forEach(function(b){
+    var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
+    var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
+    html += '<span class="bd '+(m[b]||'bd-t')+'">'+(t[b]||b)+'</span>';
   });
-})();
-
-function badgeHtml(b){
-  var map = {
-    whitelist: ['bd-g', '白名单'],
-    backcheck: ['bd-b', '背调'],
-    insurance: ['bd-b', '保险'],
-    top10:     ['bd-p', '销量榜'],
-    commitment:['bd-r', '不满意重做'],
-    live:      ['bd-r', '直播中']
-  };
-  return (map[b]||['bd-t',b]).map(function(_,i){return i===0?' class="'+_[0]+'"':''}).join('') + '';
+  return html;
 }
-function render(filterSub){
-  var list = JZ_DATA.getVendors(type) || [];
-  var html = list.map(function(v){
-    var liveTag = v.live ? '<span class="live">直播中</span>' : '';
-    var rankTag = v.rank ? '<span class="bd bd-p">'+v.rank.label+'</span>' : '';
-    var badges = (v.badges||[]).slice(0,3).map(function(b){
-      var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
-      var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
-      return '<span class="bd '+(m[b]||'bd-t')+'">'+(t[b]||b)+'</span>';
-    }).join('');
-    var skus = (v.products||[]).slice(0,2).map(function(p){
-      return '<a class="sku" href="jiazheng-vendor.html?type='+type+'&vendor='+v.id+'">'+
-        '<div class="sku-l">'+
-          '<div class="ttl"><span class="tg">'+p.discount+'</span>'+p.title+'</div>'+
-          '<div class="sub">'+p.sub+(p.area?' · '+p.area:'')+' · '+p.earliest+'</div>'+
-          '<div class="pr">¥<b>'+p.price+'</b> <s>¥'+p.original+'</s></div>'+
-          '<div class="ct">已订 '+(p.sales>=10000?(p.sales/10000).toFixed(1)+'万':p.sales)+' · ★'+p.rating+'</div>'+
-        '</div>'+
-        '<span class="bk">预订</span>'+
-      '</a>';
-    }).join('');
 
-    return '<div class="jz-vendor">'+
-      '<a class="head" href="jiazheng-vendor.html?type='+type+'&vendor='+v.id+'">'+
-        '<div class="lg">'+v.logo+'</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div class="nm">'+v.name+' '+liveTag+'</div>'+
-          '<div class="rate">★ <b>'+v.rating+'</b><span class="ct">'+v.review_count+'条评论</span></div>'+
-          '<div class="badges">'+rankTag+badges+'</div>'+
-          '<div class="meta">主营：'+(v.products||[]).slice(0,2).map(function(p){return p.title.split(' ')[0]}).join(' / ')+' · '+v.hours+'</div>'+
-        '</div>'+
-      '</a>'+
-      '<div class="div"></div>'+
-      skus+
-    '</div>';
-  }).join('');
-  document.getElementById('vendorList').innerHTML = html;
+function render(){
+  JZ_DATA.getVendors(type).then(function(list){
+    if (!list || !list.length) {
+      document.getElementById('vendorList').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">暂无可预订商家</div>';
+      return;
+    }
+    var html = list.map(function(v){
+      var skus = (v.products||[]).slice(0,2).map(function(p){
+        return '<a class="sku" href="jiazheng-vendor.html?type='+type+'&vendor='+v.id+'">'+
+          '<div class="sku-l">'+
+            '<div class="ttl"><span class="tg">'+p.discount_label+'</span>'+p.title+'</div>'+
+            '<div class="sub">'+p.subtitle+(p.area_range?' · '+p.area_range:'')+' · '+p.earliest_time+'</div>'+
+            '<div class="pr">¥<b>'+p.price+'</b> <s>¥'+p.original_price+'</s></div>'+
+            '<div class="ct">已订 '+(p.sales_count>=10000?(p.sales_count/10000).toFixed(1)+'万':p.sales_count)+' · ★'+p.rating+'</div>'+
+          '</div>'+
+          '<span class="bk">预订</span>'+
+        '</a>';
+      }).join('');
+
+      return '<div class="jz-vendor">'+
+        '<a class="head" href="jiazheng-vendor.html?type='+type+'&vendor='+v.id+'">'+
+          '<div class="lg">'+v.logo+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div class="nm">'+v.name+'</div>'+
+            '<div class="rate">★ <b>'+v.rating+'</b><span class="ct">'+v.review_count+'条评论</span></div>'+
+            '<div class="badges">'+badgeHtml(v)+'</div>'+
+            '<div class="meta">主营：'+(v.products||[]).slice(0,2).map(function(p){return p.title.split(' ')[0]}).join(' / ')+' · '+v.hours+'</div>'+
+          '</div>'+
+        '</a>'+
+        '<div class="div"></div>'+
+        skus+
+      '</div>';
+    }).join('');
+    document.getElementById('vendorList').innerHTML = html;
+  });
 }
-render('all');
+render();
 </script>
 </body>
 </html>

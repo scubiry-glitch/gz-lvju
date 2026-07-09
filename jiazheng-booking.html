@@ -14,10 +14,10 @@
     <div></div>
   </div>
 
-  <!-- 选择的商品 -->
-  <div id="productSummary" style="background:var(--surface);padding:14px 16px;border-bottom:1px solid var(--line);"></div>
+  <div id="productSummary" style="background:var(--surface);padding:14px 16px;border-bottom:1px solid var(--line);">
+    <div style="text-align:center;color:var(--muted);padding:20px;">加载中…</div>
+  </div>
 
-  <!-- 表单 -->
   <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
     <div class="jz-form-row" id="addrRow">
       <span class="lb">服务地址</span>
@@ -26,10 +26,6 @@
     <div class="jz-form-row" id="timeRow">
       <span class="lb">服务时间</span>
       <span class="vl" id="timeVal">今天 18:00</span>
-    </div>
-    <div class="jz-form-row" id="areaRow" style="display:none;">
-      <span class="lb">服务面积</span>
-      <span class="vl" id="areaVal">≤50㎡</span>
     </div>
     <div class="jz-form-row">
       <span class="lb">联系电话</span>
@@ -41,16 +37,13 @@
     </div>
   </div>
 
-  <!-- 时间选择器 -->
-  <div style="background:var(--surface);padding:0 16px;margin-top:8px;" id="timePicker">
+  <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
     <div style="font-size:14px;font-weight:500;padding:14px 0 8px;">选择服务时间</div>
     <div id="timeSlots" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-bottom:14px;"></div>
   </div>
 
-  <!-- 价格预览 -->
   <div class="jz-price" id="priceBox"></div>
 
-  <!-- 协议 -->
   <div style="padding:14px 16px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
     <input type="checkbox" id="agree" checked />
     <label for="agree">我已阅读并同意 <a href="javascript:;" style="color:var(--brand);">《服务协议》</a></label>
@@ -68,23 +61,26 @@ var qs = new URLSearchParams(location.search);
 var type = qs.get('type') || 'cleaning';
 var vendorId = parseInt(qs.get('vendor') || '0', 10);
 var productId = parseInt(qs.get('product') || '0', 10);
-var v = JZ_DATA.getVendor(type, vendorId);
-var p = JZ_DATA.getProduct(type, vendorId, productId);
+var v, p;
 
-if (!v || !p) {
-  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息缺失</div>';
-} else {
-  // 商品摘要
+JZ_DATA.getVendor(type, vendorId).then(function(vendor){
+  v = vendor;
+  p = vendor.products.find(function(x){ return x.id == productId; });
+  if (!v || !p) {
+    document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息缺失</div>';
+    return;
+  }
+
   document.getElementById('productSummary').innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;">'+
       '<div>'+
         '<div style="font-size:15px;font-weight:600;">'+p.title+'</div>'+
-        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+v.name+' · '+p.sub+'</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+v.name+' · '+p.subtitle+'</div>'+
       '</div>'+
       '<div style="color:var(--brand);font-size:18px;font-weight:700;">¥'+p.price+'</div>'+
     '</div>';
 
-  // 时间选择（4 列）
+  // 时间选择
   var slots = [
     {h:'今天 18:00', v:'今天 18:00'},
     {h:'今天 19:00', v:'今天 19:00'},
@@ -96,8 +92,8 @@ if (!v || !p) {
     {h:'明天 19:00', v:'明天 19:00'}
   ];
   document.getElementById('timeSlots').innerHTML = slots.map(function(s,i){
-    return '<a href="javascript:;" data-v="'+s.v+'" '+(i===0?'style="border-color:var(--brand);background:var(--brand-soft);color:var(--brand);"':'')+' '+
-      'style="padding:8px;text-align:center;font-size:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);">'+s.h+'</a>';
+    var active = i === 0;
+    return '<a href="javascript:;" data-v="'+s.v+'" style="padding:8px;text-align:center;font-size:12px;border:1px solid '+(active?'var(--brand)':'var(--line)')+';border-radius:8px;background:'+(active?'var(--brand-soft)':'var(--surface)')+';color:'+(active?'var(--brand)':'var(--fg)')+';">'+s.h+'</a>';
   }).join('');
   document.getElementById('timeSlots').addEventListener('click', function(e){
     e.preventDefault();
@@ -115,17 +111,11 @@ if (!v || !p) {
   });
 
   // 价格预览
-  function renderPrice(){
-    var base = p.price;
-    var disc = (p.original - p.price).toFixed(1);
-    var total = base;
-    document.getElementById('priceBox').innerHTML =
-      '<div class="row"><span>基础服务费</span><b>¥'+base.toFixed(1)+'</b></div>'+
-      '<div class="row disc"><span>立减优惠（4折）</span><b>-¥'+disc+'</b></div>'+
-      '<div class="row"><span>已选优惠券</span><b>神券立减 ¥10.0</b></div>'+
-      '<div class="row total"><span>实付</span><b>¥'+(total-10).toFixed(1)+'</b></div>';
-  }
-  renderPrice();
+  document.getElementById('priceBox').innerHTML =
+    '<div class="row"><span>基础服务费</span><b>¥'+p.price.toFixed(1)+'</b></div>'+
+    '<div class="row disc"><span>立减优惠（'+(p.discount_label||'4折')+'）</span><b>-¥'+(p.original_price - p.price).toFixed(1)+'</b></div>'+
+    '<div class="row"><span>已选优惠券</span><b>神券立减 ¥10.0</b></div>'+
+    '<div class="row total"><span>实付</span><b>¥'+(p.price - 10).toFixed(1)+'</b></div>';
 
   // 提交
   document.getElementById('submitBtn').addEventListener('click', function(){
@@ -133,32 +123,32 @@ if (!v || !p) {
       alert('请先同意服务协议');
       return;
     }
-    var oid = JZ_DATA.newOrderId();
-    var list = JZ_DATA.getOrders();
-    var now = new Date().toISOString();
-    list.unshift({
-      id: oid,
+    var btn = this;
+    btn.textContent = '提交中…';
+    btn.style.opacity = 0.7;
+    JZ_DATA.createOrder({
       type: type,
       vendor_id: v.id,
-      vendor_name: v.name,
-      vendor_logo: v.logo,
       product_id: p.id,
-      product_title: p.title,
-      product_sub: p.sub,
-      product_price: p.price,
       address: '保利香槟国际 · 3栋1单元1801',
-      phone: '138 0013 8000',
+      phone: '13800138000',
       scheduled_at: document.getElementById('timeVal').textContent,
       fee: p.price - 10,
-      status: 'pending',
-      created_at: now,
-      worker: null,
-      rating: null
+    }).then(function(r){
+      if (r.order && r.order.id) {
+        location.href = 'jiazheng-payment.html?oid=' + r.order.id;
+      } else {
+        btn.textContent = '确认下单';
+        btn.style.opacity = 1;
+        alert('下单失败：' + (r.error || '未知错误'));
+      }
+    }).catch(function(e){
+      btn.textContent = '确认下单';
+      btn.style.opacity = 1;
+      alert('下单失败：' + e.message);
     });
-    JZ_DATA.saveOrders(list);
-    location.href = 'jiazheng-payment.html?oid=' + oid;
   });
-}
+});
 </script>
 </body>
 </html>

@@ -30,6 +30,8 @@ from db import (  # noqa: E402
     tags_to_db,
 )
 
+import jiazheng_db as jzdb  # noqa: E402
+
 ADMIN_PREFIX = "/api/juzhu/admin"
 ASSETS_PREFIX = "assets/juzhu/sy"
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
@@ -234,6 +236,10 @@ class Handler(SimpleHTTPRequestHandler):
         path = p.path.rstrip("/")
         qs = parse_qs(p.query)
 
+        # === 家政频道 POST 端点（非 admin 路径） ===
+        if method == "POST" and path.startswith("/api/juzhu/jz"):
+            return self._jiazheng_post(path, qs)
+
         if method == "GET" and not path.startswith(ADMIN_PREFIX):
             return self._public_get(path, qs)
 
@@ -417,6 +423,66 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"listings": data})
 
+        # === 居住服务·家政频道 /api/juzhu/jz/* ===
+        if path == "/api/juzhu/jz/categories":
+            type_ = qs.get("type", [None])[0]
+            data = jzdb.list_categories(conn, type_)
+            conn.close()
+            return self._json({"list": data})
+
+        if path == "/api/juzhu/jz/vendors":
+            type_ = qs.get("type", [None])[0]
+            data = jzdb.list_vendors(conn, type_)
+            conn.close()
+            return self._json({"list": data})
+
+        m = re.match(r"^/api/juzhu/jz/vendors/(\d+)$", path)
+        if m:
+            data = jzdb.get_vendor(conn, int(m.group(1)))
+            conn.close()
+            return self._json(data if data else {"error": "not found"}, 404 if not data else 200)
+
+        m = re.match(r"^/api/juzhu/jz/products/(\d+)$", path)
+        if m:
+            data = jzdb.get_product(conn, int(m.group(1)))
+            conn.close()
+            return self._json(data if data else {"error": "not found"}, 404 if not data else 200)
+
+        if path == "/api/juzhu/jz/workers":
+            vendor_id = qs.get("vendor_id", [None])[0]
+            if vendor_id:
+                data = jzdb.list_workers_by_vendor(conn, int(vendor_id))
+            else:
+                data = jzdb.list_workers_online(conn)
+            conn.close()
+            return self._json({"list": data})
+
+        m = re.match(r"^/api/juzhu/jz/workers/(\d+)$", path)
+        if m:
+            data = jzdb.get_worker(conn, int(m.group(1)))
+            conn.close()
+            return self._json(data if data else {"error": "not found"}, 404 if not data else 200)
+
+        if path == "/api/juzhu/jz/orders":
+            status = qs.get("status", [None])[0]
+            limit = int(qs.get("limit", ["50"])[0])
+            data = jzdb.list_orders(conn, status=status, limit=limit)
+            conn.close()
+            return self._json({"list": data})
+
+        m = re.match(r"^/api/juzhu/jz/orders/([^/]+)$", path)
+        if m:
+            data = jzdb.get_order(conn, m.group(1))
+            conn.close()
+            return self._json(data if data else {"error": "not found"}, 404 if not data else 200)
+
+        if path == "/api/juzhu/jz/activities":
+            tag_id = qs.get("tag_id", [None])[0]
+            tag_id = int(tag_id) if tag_id else None
+            data = jzdb.list_activities(conn, tag_id=tag_id)
+            conn.close()
+            return self._json({"list": data})
+
         conn.close()
         return self._json({"error": "unknown route"}, 404)
 
@@ -468,6 +534,94 @@ class Handler(SimpleHTTPRequestHandler):
             if (proj.get("rating") or {}).get("code") == code:
                 return proj
         return None
+
+    # ====== 居住服务·家政频道 ======
+    def _jiazheng_post(self, path, qs):
+        """处理 /api/juzhu/jz/* POST 请求"""
+        conn = connect()
+        try:
+            body = self._body()
+
+            if path == "/api/juzhu/jz/orders":
+                # 创建订单
+                vendor = jzdb.get_vendor(conn, body.get("vendor_id"))
+                product = jzdb.get_product(conn, body.get("product_id"))
+                if not vendor or not product:
+                    return self._json({"error": "vendor or product not found"}, 404)
+                # 生成订单号
+                from datetime import datetime, timezone
+                seq_row = conn.execute("SELECT seq FROM jz_order_seq WHERE id=1").fetchone()
+                seq = (seq_row["seq"] if seq_row else 0) + 1
+                conn.execute(
+                    "INSERT OR REPLACE INTO jz_order_seq(id, seq) VALUES (1, ?)",
+                    (seq,),
+                )
+                oid = "WO-2026-" + str(80000 + seq)
+                now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                order = {
+                    "id": oid,
+                    "type": body.get("type", vendor["type"]),
+                    "vendor_id": vendor["id"],
+                    "product_id": product["id"],
+                    "vendor_name": vendor["name"],
+                    "vendor_logo": vendor["logo"],
+                    "product_title": product["title"],
+                    "product_sub": product["subtitle"],
+                    "product_price": product["price"],
+                    "address": body.get("address", ""),
+                    "phone": body.get("phone", ""),
+                    "scheduled_at": body.get("scheduled_at", ""),
+                    "fee": body.get("fee", product["price"]),
+                    "status": "pending",
+                    "source": "jz",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                jzdb.create_order(conn, order)
+                conn.commit()
+                # 返回完整订单（包含 worker=null）
+                created = jzdb.get_order(conn, oid)
+                return self._json({"ok": True, "order": created})
+
+            m = re.match(r"^/api/juzhu/jz/orders/([^/]+)/dispatch$", path)
+            if m:
+                # 派单（手动传 worker_id 或自动选第一名在线）
+                oid = m.group(1)
+                worker_id = body.get("worker_id")
+                if not worker_id:
+                    online = jzdb.list_workers_online(conn)
+                    if online:
+                        worker_id = online[0]["id"]
+                jzdb.update_order_status(conn, oid, "dispatched", worker_id)
+                conn.commit()
+                return self._json({"ok": True, "worker_id": worker_id})
+
+            m = re.match(r"^/api/juzhu/jz/orders/([^/]+)/status$", path)
+            if m:
+                # 状态推进
+                oid = m.group(1)
+                status = body.get("status")
+                if status not in ("pending", "dispatched", "accepted", "serving", "done", "rated", "cancelled"):
+                    return self._json({"error": "invalid status"}, 400)
+                jzdb.update_order_status(conn, oid, status)
+                conn.commit()
+                return self._json({"ok": True})
+
+            m = re.match(r"^/api/juzhu/jz/orders/([^/]+)/rate$", path)
+            if m:
+                # 评价
+                oid = m.group(1)
+                score = int(body.get("score", 5))
+                tags = body.get("tags", [])
+                text = body.get("text", "")
+                credit_delta = 2.4 if score >= 5 else (1.2 if score >= 4 else (-1.5 if score >= 2 else -3.0))
+                jzdb.rate_order(conn, oid, score, tags, text, credit_delta)
+                conn.commit()
+                return self._json({"ok": True, "credit_delta": credit_delta})
+
+            return self._json({"error": "unknown route"}, 404)
+        finally:
+            conn.close()
 
     def _list_ratings(self, qs):
         conn = connect()

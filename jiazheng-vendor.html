@@ -17,10 +17,10 @@
     </div>
   </div>
 
-  <!-- 商家头部 -->
-  <div id="vendorHead" style="padding:20px 16px;background:var(--surface);border-bottom:1px solid var(--line);"></div>
+  <div id="vendorHead" style="padding:20px 16px;background:var(--surface);border-bottom:1px solid var(--line);">
+    <div style="text-align:center;color:var(--muted);padding:20px;">加载中…</div>
+  </div>
 
-  <!-- Tab 切换 -->
   <div class="jz-tabs">
     <a class="on" href="javascript:;" data-tab="sku">服务列表</a>
     <a href="javascript:;" data-tab="worker">服务者</a>
@@ -28,16 +28,9 @@
     <a href="javascript:;" data-tab="intro">商家介绍</a>
   </div>
 
-  <!-- SKU 列表 -->
   <div id="tab-sku" class="tab-pane" style="padding:12px 0;"></div>
-
-  <!-- 服务者 -->
   <div id="tab-worker" class="tab-pane" style="display:none;padding:12px 16px;"></div>
-
-  <!-- 评价 -->
   <div id="tab-rating" class="tab-pane" style="display:none;"></div>
-
-  <!-- 介绍 -->
   <div id="tab-intro" class="tab-pane" style="display:none;padding:16px;"></div>
 
   <div class="jz-cta-bar">
@@ -51,18 +44,18 @@
 var qs = new URLSearchParams(location.search);
 var type = qs.get('type') || 'cleaning';
 var vendorId = parseInt(qs.get('vendor') || '0', 10);
-var v = JZ_DATA.getVendor(type, vendorId);
+var cat = JZ_DATA.getCat(type);
 
-if (!v) {
-  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">商家不存在</div>';
-} else {
-  var cat = JZ_DATA.getCat(type);
+JZ_DATA.getVendor(type, vendorId).then(function(v){
+  if (!v) {
+    document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">商家不存在</div>';
+    return;
+  }
   document.getElementById('pageTitle').textContent = v.name;
 
-  // 商家头部
   var liveTag = v.live ? '<span class="live">直播中</span>' : '';
   var rankTag = v.rank ? '<span class="bd bd-p">'+v.rank.label+'</span>' : '';
-  var badges = (v.badges||[]).map(function(b){
+  var badgeHtml = (v.badges||[]).map(function(b){
     var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
     var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
     return '<span class="bd '+(m[b]||'bd-t')+'">'+(t[b]||b)+'</span>';
@@ -74,64 +67,67 @@ if (!v) {
         '<div style="font-size:17px;font-weight:600;display:flex;align-items:center;gap:6px;">'+v.name+' '+liveTag+'</div>'+
         '<div style="font-size:13px;color:#ea580c;margin-top:2px;">★ '+v.rating+' · '+v.review_count+'条评论</div>'+
         '<div style="font-size:12px;color:#64748b;margin-top:4px;">'+(v.dist||'')+' · '+v.hours+'</div>'+
-        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+rankTag+badges+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+rankTag+badgeHtml+'</div>'+
       '</div>'+
     '</div>';
 
   // SKU
-  document.getElementById('tab-sku').innerHTML = v.products.map(function(p){
+  document.getElementById('tab-sku').innerHTML = (v.products||[]).map(function(p){
     return '<div style="background:var(--surface);border-radius:12px;padding:14px 16px;margin:8px 12px;border:1px solid var(--line);">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
         '<div style="flex:1;min-width:0;">'+
           '<div style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;">'+
-            '<span class="bd bd-r">'+p.discount+'</span>'+p.title+
+            '<span class="bd bd-r">'+p.discount_label+'</span>'+p.title+
           '</div>'+
-          '<div style="font-size:12px;color:#64748b;margin-top:4px;">'+p.sub+'</div>'+
-          '<div style="font-size:11px;color:#64748b;margin-top:2px;">'+(p.area||'')+(p.area?' · ':'')+p.earliest+'</div>'+
+          '<div style="font-size:12px;color:#64748b;margin-top:4px;">'+p.subtitle+'</div>'+
+          '<div style="font-size:11px;color:#64748b;margin-top:2px;">'+(p.area_range||'')+(p.area_range?' · ':'')+p.earliest_time+'</div>'+
         '</div>'+
         '<div style="text-align:right;flex-shrink:0;margin-left:12px;">'+
           '<div style="color:var(--brand);font-size:18px;font-weight:700;">¥<b>'+p.price+'</b></div>'+
-          '<div style="color:#94a3b8;font-size:11px;text-decoration:line-through;">¥'+p.original+'</div>'+
+          '<div style="color:#94a3b8;font-size:11px;text-decoration:line-through;">¥'+p.original_price+'</div>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+
-        (p.tags||[]).map(function(t){return '<span class="bd bd-t">'+t+'</span>'}).join('')+
+        (p.service_tags||[]).map(function(t){return '<span class="bd bd-t">'+t+'</span>'}).join('')+
       '</div>'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);">'+
-        '<div style="font-size:11px;color:#64748b;">已订 '+(p.sales>=10000?(p.sales/10000).toFixed(1)+'万':p.sales)+' · ★'+p.rating+'</div>'+
+        '<div style="font-size:11px;color:#64748b;">已订 '+(p.sales_count>=10000?(p.sales_count/10000).toFixed(1)+'万':p.sales_count)+' · ★'+p.rating+'</div>'+
         '<a class="bk" style="padding:6px 16px;background:var(--brand);color:#fff;font-size:13px;border-radius:8px;font-weight:600;" href="jiazheng-booking.html?type='+type+'&vendor='+v.id+'&product='+p.id+'">立即预订</a>'+
       '</div>'+
     '</div>';
   }).join('');
 
   // 服务者
-  var workers = JZ_DATA.getWorkers().filter(function(w){ return w.vendor_id == v.id; });
-  if (!workers.length) workers = JZ_DATA.getWorkers().slice(0,3);
-  document.getElementById('tab-worker').innerHTML = workers.map(function(w){
-    var certHtml = [
-      w.certs.indexOf('id_card')>-1?'<span class="bd bd-g">身份证</span>':'',
-      w.certs.indexOf('health')>-1?'<span class="bd bd-g">健康证</span>':'',
-      w.certs.indexOf('skill')>-1?'<span class="bd bd-g">技能证</span>':'',
-      w.certs.indexOf('insurance')>-1?'<span class="bd bd-b">保险</span>':''
-    ].join('');
-    return '<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;">'+
-      '<div style="display:flex;gap:12px;">'+
-        '<div style="width:54px;height:54px;border-radius:50%;background:var(--brand-soft);display:grid;place-items:center;font-size:24px;flex-shrink:0;">'+w.avatar+'</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;">'+
-            w.name+'<span class="bd bd-b">'+w.level+'</span>'+
-            (w.online?'<span class="bd bd-g" style="font-size:9px;">在线</span>':'')+
+  var workers = v.workers || [];
+  if (!workers.length) {
+    document.getElementById('tab-worker').innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">暂无服务者信息</div>';
+  } else {
+    document.getElementById('tab-worker').innerHTML = workers.map(function(w){
+      var certHtml = [
+        w.certs && w.certs.indexOf('id_card')>-1?'<span class="bd bd-g">身份证</span>':'',
+        w.certs && w.certs.indexOf('health')>-1?'<span class="bd bd-g">健康证</span>':'',
+        w.certs && w.certs.indexOf('skill')>-1?'<span class="bd bd-g">技能证</span>':'',
+        w.certs && w.certs.indexOf('insurance')>-1?'<span class="bd bd-b">保险</span>':''
+      ].join('');
+      return '<div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;">'+
+        '<div style="display:flex;gap:12px;">'+
+          '<div style="width:54px;height:54px;border-radius:50%;background:var(--brand-soft);display:grid;place-items:center;font-size:24px;flex-shrink:0;">'+w.avatar+'</div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;">'+
+              w.name+'<span class="bd bd-b">'+w.level+'</span>'+
+              (w.online?'<span class="bd bd-g" style="font-size:9px;">在线</span>':'')+
+            '</div>'+
+            '<div style="font-size:12px;color:#ea580c;margin-top:2px;">★ '+w.rating+' · '+w.completed_orders+'单 · '+w.years_experience+'年经验</div>'+
+            '<div style="font-size:11px;color:#64748b;margin-top:2px;">距您 '+(w.distance_km||'--')+'km · 信用分 '+w.credit_score+'</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+
+              (w.tags||[]).map(function(t){return '<span class="bd bd-t">'+t+'</span>'}).join('')+
+            '</div>'+
+            '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+certHtml+'</div>'+
           '</div>'+
-          '<div style="font-size:12px;color:#ea580c;margin-top:2px;">★ '+w.rating+' · '+w.completed+'单 · '+w.years+'年经验</div>'+
-          '<div style="font-size:11px;color:#64748b;margin-top:2px;">距您 '+w.distance+'km</div>'+
-          '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+
-            (w.tags||[]).map(function(t){return '<span class="bd bd-t">'+t+'</span>'}).join('')+
-          '</div>'+
-          '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'+certHtml+'</div>'+
         '</div>'+
-      '</div>'+
-    '</div>';
-  }).join('');
+      '</div>';
+    }).join('');
+  }
 
   // 评价
   var reviews = [
@@ -192,7 +188,7 @@ if (!v) {
     document.querySelectorAll('.jz-tabs a').forEach(function(a){ a.classList.toggle('on', a===t); });
     document.querySelectorAll('.tab-pane').forEach(function(p){ p.style.display = p.id === 'tab-'+t.dataset.tab ? 'block' : 'none'; });
   });
-}
+});
 </script>
 </body>
 </html>

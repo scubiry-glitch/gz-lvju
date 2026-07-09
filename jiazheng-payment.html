@@ -20,7 +20,6 @@
     <div style="font-size:11px;opacity:.7;margin-top:6px;" id="orderNo">订单号 --</div>
   </div>
 
-  <!-- 支付方式 -->
   <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
     <div style="font-size:14px;font-weight:500;padding:14px 0 8px;border-bottom:1px solid var(--line);">选择支付方式</div>
     <label class="jz-form-row" style="cursor:pointer;">
@@ -45,7 +44,6 @@
     </label>
   </div>
 
-  <!-- 优惠券 -->
   <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
     <div class="jz-form-row" style="cursor:pointer;">
       <span class="lb">使用优惠券</span>
@@ -67,23 +65,24 @@
 <script>
 var qs = new URLSearchParams(location.search);
 var oid = qs.get('oid') || '';
-var list = JZ_DATA.getOrders();
-var order = list.find(function(o){ return o.id === oid; });
-if (!order) {
-  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单不存在</div>';
-} else {
+JZ_DATA.getOrder(oid).then(function(order){
+  if (!order || order.error) {
+    document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单不存在</div>';
+    return;
+  }
   document.getElementById('amount').textContent = '¥' + order.fee.toFixed(1);
   document.getElementById('orderNo').textContent = '订单号 ' + order.id;
 
   document.getElementById('payBtn').addEventListener('click', function(){
-    // 模拟支付成功 → 订单状态保持 pending（中台接下来派单）
     this.textContent = '支付中…';
     this.style.opacity = 0.7;
     setTimeout(function(){
       location.href = 'jiazheng-order.html?oid=' + oid;
     }, 800);
   });
-}
+}).catch(function(){
+  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单加载失败</div>';
+});
 </script>
 </body>
 </html>
