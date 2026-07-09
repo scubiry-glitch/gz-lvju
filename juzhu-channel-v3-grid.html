@@ -23,6 +23,47 @@
   .seg-switch a{flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;border-radius:10px;color:rgba(255,255,255,.75);}
   .seg-switch a.on{background:#fff;color:var(--brand-deep);box-shadow:0 4px 12px rgba(0,0,0,.15);}
   .pane{display:none;}.pane.on{display:block;}
+
+  /* === 家政 tab === */
+  .jz-quick{padding:14px 18px 4px;}
+  .jz-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .jz-cat{position:relative;display:block;border-radius:18px;overflow:hidden;color:#fff;min-height:140px;
+    box-shadow:0 10px 24px rgba(15,42,38,.10);transition:transform .15s ease;}
+  .jz-cat:active{transform:scale(.98);}
+  .jz-cat .bg{position:absolute;inset:0;}
+  .jz-cat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.12),rgba(0,0,0,.42));}
+  .jz-cat .in{position:relative;z-index:2;padding:16px 16px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:140px;}
+  .jz-cat .ico{font-size:34px;line-height:1;}
+  .jz-cat h3{font-family:var(--serif);font-size:20px;margin-top:8px;letter-spacing:.5px;}
+  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;}
+  .jz-cat .sub span{font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
+  .jz-cat .arrow{position:absolute;right:14px;top:14px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:11px;backdrop-filter:blur(4px);}
+  /* 4色: 保洁(青)/ 维修(蓝)/ 搬家(橙)/ 保姆(紫) */
+  .jz-cat.cleaning .bg{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
+  .jz-cat.repair  .bg{background:linear-gradient(135deg,#3a7bd5,#1a3a6b);}
+  .jz-cat.moving  .bg{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
+  .jz-cat.nanny   .bg{background:linear-gradient(135deg,#9a6bd1,#4d2a78);}
+
+  /* 热门子类 */
+  .jz-sub-list{padding:6px 18px 4px;}
+  .jz-sub-list .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+  .jz-sub-list .row:last-child{border-bottom:none;}
+  .jz-sub-list .row b{font-size:13px;color:var(--ink);font-weight:600;}
+  .jz-sub-list .row .meta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .jz-sub-list .row .pr{font-family:var(--serif);font-size:14px;color:var(--gold-deep);}
+  .jz-sub-list .row .go{font-size:11px;color:var(--brand);font-weight:600;}
+
+  /* 营销栏 */
+  .jz-promo{padding:8px 18px 24px;}
+  .jz-promo-card{display:block;border-radius:16px;overflow:hidden;color:#fff;padding:16px 18px;position:relative;min-height:96px;margin-bottom:10px;
+    box-shadow:0 8px 20px rgba(15,42,38,.10);}
+  .jz-promo-card .tag{position:absolute;right:14px;top:14px;font-size:9px;letter-spacing:.16em;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
+  .jz-promo-card h3{font-family:var(--serif);font-size:18px;margin-top:4px;}
+  .jz-promo-card p{font-size:11px;opacity:.92;margin-top:4px;}
+  .jz-promo-card .ck{position:absolute;right:14px;bottom:14px;font-size:10px;font-weight:600;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--brand-deep);}
+  .jz-promo-card.warm{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
+  .jz-promo-card.fresh{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
+  .jz-promo-card.deep{background:linear-gradient(135deg,#1a3a6b,#0b1d3a);}
   .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
   .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;min-height:108px;
     box-shadow:0 8px 20px rgba(15,42,38,.12);}
@@ -98,6 +139,19 @@
     <div class="pane" id="pane-trade">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>置换推荐</h2><span class="more">综合排序 ›</span></div>
       <div class="spread" id="spread"></div>
+    </div>
+
+    <div class="pane" id="pane-jiazheng">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more">4 大类目</span></div>
+      <div class="jz-quick">
+        <div class="jz-cat-grid" id="jzCats"></div>
+      </div>
+
+      <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
+      <div class="jz-sub-list" id="jzSubs"></div>
+
+      <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
+      <div class="jz-promo" id="jzPromo"></div>
     </div>
     <div class="load-err" id="err" hidden></div>
   </div>
@@ -192,6 +246,64 @@
     document.getElementById('spread').innerHTML = html;
   }
 
+  // === 家政 tab ===
+  // 4 大类 + 子类（先内置，后续从后端拉取）
+  var JZ_CATS = [
+    { id: 'cleaning', name: '保洁', icon: '🧹', subs: ['日常保洁','深度清洁','搬家保洁','开荒保洁','擦玻璃','油烟机清洗'] },
+    { id: 'repair',   name: '维修', icon: '🔧', subs: ['家电维修','管道疏通','灯具安装','门窗维修','防水补漏','空调清洗'] },
+    { id: 'moving',   name: '搬家', icon: '📦', subs: ['居民搬家','长途搬家','钢琴搬运','企业搬迁','日式搬家','搬货上下楼'] },
+    { id: 'nanny',    name: '保姆', icon: '👶', subs: ['住家保姆','育儿嫂','月嫂','钟点工','养老护理','医院陪护'] }
+  ];
+
+  function renderJiazhengCats(){
+    document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c){
+      var subHtml = c.subs.slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+      return '<a class="jz-cat '+c.id+'" href="juzhu-jiazheng-list.html?type='+c.id+'">'+
+        '<div class="bg"></div><div class="arrow">›</div>'+
+        '<div class="in"><div>'+
+          '<div class="ico">'+c.icon+'</div>'+
+          '<h3>'+c.name+'</h3>'+
+          '<div class="sub">'+subHtml+'</div>'+
+        '</div></div></a>';
+    }).join('');
+  }
+
+  // 热门子类（示例数据，6条）
+  function renderJiazhengSubs(){
+    var rows = [
+      { name: '深度清洁 · 4小时', sub: '3人团队 · 含厨卫去污', price: '¥268起', type: 'cleaning' },
+      { name: '空调清洗 · 挂机', sub: '高温蒸汽 · 拆装深度', price: '¥89/台', type: 'repair' },
+      { name: '居民搬家 · 同城', sub: '金杯车 · 2名师傅', price: '¥398起', type: 'moving' },
+      { name: '育儿嫂 · 住家', sub: '3年以上经验 · 持证', price: '¥8,800/月', type: 'nanny' },
+      { name: '管道疏通 · 当天', sub: '30分钟上门 · 不通不收费', price: '¥99起', type: 'repair' },
+      { name: '钟点工 · 3小时', sub: '做饭保洁 · 灵活预约', price: '¥128/次', type: 'nanny' }
+    ];
+    document.getElementById('jzSubs').innerHTML = rows.map(function(r){
+      return '<a class="row" href="juzhu-jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'">'+
+        '<div><b>'+r.name+'</b><div class="meta">'+r.sub+'</div></div>'+
+        '<div style="display:flex;align-items:center;gap:12px;">'+
+          '<div class="pr">'+r.price+'</div>'+
+          '<div class="go">查看 ›</div>'+
+        '</div></a>';
+    }).join('');
+  }
+
+  // 营销栏（运营位）
+  function renderJiazhengPromo(){
+    var cards = [
+      { cls: 'warm', tag: 'HOT',   title: '新用户立减 50',  desc: '首单保洁·维修·搬家通用',  cta: '立即领取' },
+      { cls: 'fresh', tag: 'GRAD',  title: '金牌服务者认证',  desc: '评级 · 背调 · 持证上岗', cta: '了解中台' },
+      { cls: 'deep', tag: 'PRO',    title: '企业月付套餐',    desc: '中小企业办公保洁定制',    cta: '联系顾问' }
+    ];
+    document.getElementById('jzPromo').innerHTML = cards.map(function(c){
+      return '<a class="jz-promo-card '+c.cls+'" href="juzhu-jiazheng-list.html?type=promo&tag='+c.cls+'">'+
+        '<span class="tag">'+c.tag+'</span>'+
+        '<h3>'+c.title+'</h3>'+
+        '<p>'+c.desc+'</p>'+
+        '<span class="ck">'+c.cta+'</span></a>';
+    }).join('');
+  }
+
   document.getElementById('tabs').addEventListener('click',function(e){
     var t = e.target.closest('[data-tab]'); if(!t) return;
     document.querySelectorAll('.seg-switch a').forEach(function(a){ a.classList.toggle('on', a===t); });
@@ -209,6 +321,9 @@
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());
+    renderJiazhengCats();
+    renderJiazhengSubs();
+    renderJiazhengPromo();
   }).catch(function(err){
     document.getElementById('err').hidden = false;
     document.getElementById('err').textContent = '数据加载失败：'+err.message+'（请先运行 python3 juzhu/seed_from_folder.py）';

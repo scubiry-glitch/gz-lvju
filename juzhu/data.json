@@ -6143,5 +6143,14 @@
       "is_cover": 0,
       "sort_order": 4
     }
+  ],
+  "channels": [
+    {
+      "id": "jiazheng",
+      "label": "家政",
+      "sort_order": 3,
+      "enabled": 1,
+      "note": null
+    }
   ]
 }
