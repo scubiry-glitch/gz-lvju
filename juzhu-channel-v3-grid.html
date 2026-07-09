@@ -258,7 +258,7 @@
   function renderJiazhengCats(){
     document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c){
       var subHtml = c.subs.slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
-      return '<a class="jz-cat '+c.id+'" href="juzhu-jiazheng-list.html?type='+c.id+'">'+
+      return '<a class="jz-cat '+c.id+'" href="jiazheng-landing-'+c.id+'.html">'+
         '<div class="bg"></div><div class="arrow">›</div>'+
         '<div class="in"><div>'+
           '<div class="ico">'+c.icon+'</div>'+
@@ -279,7 +279,7 @@
       { name: '钟点工 · 3小时', sub: '做饭保洁 · 灵活预约', price: '¥128/次', type: 'nanny' }
     ];
     document.getElementById('jzSubs').innerHTML = rows.map(function(r){
-      return '<a class="row" href="juzhu-jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'">'+
+      return '<a class="row" href="jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'">'+
         '<div><b>'+r.name+'</b><div class="meta">'+r.sub+'</div></div>'+
         '<div style="display:flex;align-items:center;gap:12px;">'+
           '<div class="pr">'+r.price+'</div>'+
@@ -296,7 +296,7 @@
       { cls: 'deep', tag: 'PRO',    title: '企业月付套餐',    desc: '中小企业办公保洁定制',    cta: '联系顾问' }
     ];
     document.getElementById('jzPromo').innerHTML = cards.map(function(c){
-      return '<a class="jz-promo-card '+c.cls+'" href="juzhu-jiazheng-list.html?type=promo&tag='+c.cls+'">'+
+      return '<a class="jz-promo-card '+c.cls+'" href="jiazheng-list.html?type=promo&tag='+c.cls+'">'+
         '<span class="tag">'+c.tag+'</span>'+
         '<h3>'+c.title+'</h3>'+
         '<p>'+c.desc+'</p>'+
