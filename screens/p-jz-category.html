@@ -7,6 +7,8 @@
 <style>
   :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
   .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
   .full{grid-column:1/-1;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
