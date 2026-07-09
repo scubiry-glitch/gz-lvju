@@ -20,6 +20,13 @@
       "sort_order": 2,
       "enabled": 1,
       "note": null
+    },
+    {
+      "id": "jiazheng",
+      "label": "家政",
+      "sort_order": 3,
+      "enabled": 1,
+      "note": null
     }
   ],
   "stats": {
@@ -6142,15 +6149,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/逸居锦城/139平/ed0e7fcfcea0b13c8f70433ab6fda8dd.jpg",
       "is_cover": 0,
       "sort_order": 4
-    }
-  ],
-  "channels": [
-    {
-      "id": "jiazheng",
-      "label": "家政",
-      "sort_order": 3,
-      "enabled": 1,
-      "note": null
     }
   ]
 }
