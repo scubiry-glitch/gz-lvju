@@ -49,7 +49,11 @@ def list_vendors(conn, type_=None, status="active"):
             "SELECT * FROM jz_vendors WHERE status=? ORDER BY type, sort_order, id",
             (status,),
         ).fetchall()
-    return _rows_to_list(rows)
+    vendors = _rows_to_list(rows)
+    # 为每个商家附加前 2 个 SKU
+    for v in vendors:
+        v["products"] = list_products_by_vendor(conn, v["id"])[:2]
+    return vendors
 
 
 def get_vendor(conn, vendor_id):
