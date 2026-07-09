@@ -190,8 +190,18 @@ input, textarea, select { font: inherit; }
 .jz-vendor .sku .bk { padding: 6px 12px; background: var(--brand); color: #fff; font-size: 12px; border-radius: var(--r-sm); font-weight: 600; margin-left: 12px; flex-shrink: 0; }
 
 /* 筛选条 */
-.jz-filter { display: flex; gap: 8px; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
-.jz-filter a { padding: 6px 12px; background: var(--line); border-radius: 999px; font-size: 12px; color: var(--muted); }
+.jz-filter {
+  display: flex; gap: 8px; padding: 10px 16px; background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.jz-filter::-webkit-scrollbar { display: none; }
+.jz-filter a {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: 6px 14px; background: var(--line); border-radius: 999px;
+  font-size: 13px; color: var(--muted); text-decoration: none;
+}
 .jz-filter a.on { background: var(--brand); color: #fff; }
 
 /* 浮动 CTA */
