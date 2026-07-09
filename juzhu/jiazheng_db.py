@@ -15,6 +15,12 @@ def _row_to_dict(row):
                 d[key] = json.loads(d[key])
             except (json.JSONDecodeError, TypeError):
                 d[key] = []
+    # 把 rank_type + rank_label 组合成嵌套对象
+    if "rank_type" in d or "rank_label" in d:
+        if d.get("rank_type") and d.get("rank_label"):
+            d["rank"] = {"type": d["rank_type"], "label": d["rank_label"]}
+        else:
+            d["rank"] = None
     return d
 
 

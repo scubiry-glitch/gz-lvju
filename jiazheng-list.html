@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>商家列表 · 家政服务</title>
-<link rel="stylesheet" href="jiazheng-app.css" />
+<link rel="stylesheet" href="jiazheng-app.css?v=2" />
 </head>
 <body>
 <div class="jz-wrap">
@@ -55,7 +55,7 @@ document.getElementById('subFilter').addEventListener('click', function(e){
 function badgeHtml(v){
   var html = '';
   if (v.live) html += '<span class="bd bd-r" style="font-size:9px;">直播中</span>';
-  if (v.rank) html += '<span class="bd bd-p">'+v.rank.label+'</span>';
+  if (v.rank && v.rank.label) html += '<span class="bd bd-p">'+v.rank.label+'</span>';
   (v.badges||[]).slice(0,3).forEach(function(b){
     var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
     var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
