@@ -24,46 +24,148 @@
   .seg-switch a.on{background:#fff;color:var(--brand-deep);box-shadow:0 4px 12px rgba(0,0,0,.15);}
   .pane{display:none;}.pane.on{display:block;}
 
-  /* === 家政 tab === */
-  .jz-quick{padding:14px 18px 4px;}
-  .jz-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .jz-cat{position:relative;display:block;border-radius:18px;overflow:hidden;color:#fff;min-height:140px;
-    box-shadow:0 10px 24px rgba(15,42,38,.10);transition:transform .15s ease;}
-  .jz-cat:active{transform:scale(.98);}
-  .jz-cat .bg{position:absolute;inset:0;}
-  .jz-cat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.12),rgba(0,0,0,.42));}
-  .jz-cat .in{position:relative;z-index:2;padding:16px 16px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:140px;}
-  .jz-cat .ico{font-size:34px;line-height:1;}
-  .jz-cat h3{font-family:var(--serif);font-size:20px;margin-top:8px;letter-spacing:.5px;}
-  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;}
-  .jz-cat .sub span{font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
-  .jz-cat .arrow{position:absolute;right:14px;top:14px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:11px;backdrop-filter:blur(4px);}
-  /* 4色: 保洁(青)/ 维修(蓝)/ 搬家(橙)/ 保姆(紫) */
+  /* === 家政 tab · Bento === */
+  @keyframes jzIn{
+    from{opacity:0;transform:translateY(12px) scale(.96);}
+    to{opacity:1;transform:none;}
+  }
+  .jz-strip{
+    display:flex;gap:8px;padding:10px 18px 2px;overflow-x:auto;
+  }
+  .jz-strip::-webkit-scrollbar{height:0;}
+  .jz-strip span{
+    flex:0 0 auto;font-size:10px;padding:6px 12px;border-radius:999px;
+    background:#fff;border:1px solid var(--border);color:var(--muted);white-space:nowrap;
+  }
+  .jz-strip span b{font-family:var(--serif);color:var(--brand-deep);margin-right:3px;}
+  .jz-quick{padding:10px 16px 6px;}
+  .jz-cat-grid{
+    display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:88px;
+    grid-auto-flow:dense;gap:9px;
+  }
+  .jz-cat{
+    position:relative;display:block;border-radius:20px;overflow:hidden;color:#fff;
+    box-shadow:0 10px 28px rgba(8,18,16,.16),inset 0 1px 0 rgba(255,255,255,.12);
+    transition:transform .2s cubic-bezier(.2,.8,.2,1);
+    animation:jzIn .45s cubic-bezier(.2,.8,.2,1) backwards;
+    isolation:isolate;
+  }
+  .jz-cat:active{transform:scale(.97);}
+  .jz-cat .bg{position:absolute;inset:0;transform:scale(1.03);transition:transform .35s ease;}
+  .jz-cat:active .bg{transform:scale(1.08);}
+  .jz-cat .bg::before{
+    content:"";position:absolute;inset:0;z-index:1;
+    background:linear-gradient(145deg,rgba(255,255,255,.16) 0%,transparent 45%,rgba(0,0,0,.06) 100%);
+  }
+  .jz-cat .bg::after{content:"";position:absolute;inset:0;z-index:2;
+    background:linear-gradient(0deg,rgba(6,12,11,.78) 0%,rgba(6,12,11,.22) 55%,rgba(6,12,11,.04) 100%);}
+  .jz-cat::after{
+    content:"";position:absolute;inset:0;border-radius:20px;pointer-events:none;z-index:4;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+  }
+  .jz-cat.hero{grid-column:span 2;grid-row:span 2;min-height:196px;}
+  .jz-cat.tall{grid-row:span 2;min-height:185px;}
+  .jz-cat.wide{grid-column:span 2;min-height:96px;}
+  .jz-cat .in{
+    position:relative;z-index:3;padding:14px;display:flex;flex-direction:column;
+    justify-content:flex-end;height:100%;min-height:88px;
+  }
+  .jz-cat.hero .in{min-height:196px;padding:16px;}
+  .jz-cat.tall .in{min-height:185px;}
+  .jz-cat.wide .in{
+    min-height:96px;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;
+  }
+  .jz-cat .no{
+    position:absolute;top:8px;left:12px;z-index:3;
+    font-family:var(--serif);font-size:36px;font-weight:700;line-height:1;
+    color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.2);pointer-events:none;
+  }
+  .jz-cat.hero .no{font-size:64px;-webkit-text-stroke-width:1.5px;}
+  .jz-cat .ico{font-size:28px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.25));}
+  .jz-cat.hero .ico{font-size:40px;}
+  .jz-cat.wide .ico{font-size:32px;}
+  .jz-cat h3{
+    font-family:var(--serif);font-size:18px;margin-top:6px;letter-spacing:.02em;
+    text-shadow:0 2px 10px rgba(0,0,0,.3);
+  }
+  .jz-cat.hero h3{font-size:24px;margin-top:8px;}
+  .jz-cat.wide h3{margin-top:0;font-size:20px;}
+  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .jz-cat.wide .sub{margin-top:0;justify-content:flex-end;}
+  .jz-cat .sub span{
+    font-size:9px;padding:3px 8px;border-radius:999px;
+    background:rgba(255,255,255,.16);backdrop-filter:blur(8px);
+    border:1px solid rgba(255,255,255,.12);
+  }
+  .jz-cat .arrow{
+    position:absolute;top:11px;right:11px;z-index:5;width:28px;height:28px;border-radius:50%;
+    background:rgba(255,255,255,.18);backdrop-filter:blur(10px);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;
+    border:1px solid rgba(255,255,255,.2);
+  }
+  .jz-cat.hero .arrow{width:34px;height:34px;font-size:15px;}
   .jz-cat.cleaning .bg{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
   .jz-cat.repair  .bg{background:linear-gradient(135deg,#3a7bd5,#1a3a6b);}
   .jz-cat.moving  .bg{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
   .jz-cat.nanny   .bg{background:linear-gradient(135deg,#9a6bd1,#4d2a78);}
 
-  /* 热门子类 */
-  .jz-sub-list{padding:6px 18px 4px;}
-  .jz-sub-list .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
-  .jz-sub-list .row:last-child{border-bottom:none;}
-  .jz-sub-list .row b{font-size:13px;color:var(--ink);font-weight:600;}
-  .jz-sub-list .row .meta{font-size:10px;color:var(--muted);margin-top:2px;}
-  .jz-sub-list .row .pr{font-family:var(--serif);font-size:14px;color:var(--gold-deep);}
-  .jz-sub-list .row .go{font-size:11px;color:var(--brand);font-weight:600;}
+  /* 热门子类 · 横滑卡片 */
+  .jz-sub-scroll{
+    display:flex;gap:10px;overflow-x:auto;padding:4px 18px 10px;
+    scroll-snap-type:x mandatory;
+  }
+  .jz-sub-scroll::-webkit-scrollbar{height:0;}
+  .jz-sub-card{
+    flex:0 0 72%;scroll-snap-align:start;
+    display:block;background:#fff;border:1px solid var(--border);border-radius:18px;
+    padding:14px 14px 13px;box-shadow:0 8px 22px rgba(15,42,38,.07);
+    animation:jzIn .45s cubic-bezier(.2,.8,.2,1) backwards;
+  }
+  .jz-sub-card .top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .jz-sub-card .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .jz-sub-card .dot.cleaning{background:#1aa39a;}
+  .jz-sub-card .dot.repair{background:#3a7bd5;}
+  .jz-sub-card .dot.moving{background:#ff8a3d;}
+  .jz-sub-card .dot.nanny{background:#9a6bd1;}
+  .jz-sub-card b{font-size:14px;color:var(--ink);line-height:1.3;display:block;}
+  .jz-sub-card .meta{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  .jz-sub-card .foot{
+    display:flex;align-items:center;justify-content:space-between;margin-top:12px;
+    padding-top:10px;border-top:1px solid var(--border);
+  }
+  .jz-sub-card .pr{font-family:var(--serif);font-size:17px;color:var(--gold-deep);}
+  .jz-sub-card .go{
+    font-size:10px;font-weight:700;color:#fff;padding:5px 11px;border-radius:999px;
+    background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  }
 
-  /* 营销栏 */
-  .jz-promo{padding:8px 18px 24px;}
-  .jz-promo-card{display:block;border-radius:16px;overflow:hidden;color:#fff;padding:16px 18px;position:relative;min-height:96px;margin-bottom:10px;
-    box-shadow:0 8px 20px rgba(15,42,38,.10);}
-  .jz-promo-card .tag{position:absolute;right:14px;top:14px;font-size:9px;letter-spacing:.16em;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
-  .jz-promo-card h3{font-family:var(--serif);font-size:18px;margin-top:4px;}
-  .jz-promo-card p{font-size:11px;opacity:.92;margin-top:4px;}
-  .jz-promo-card .ck{position:absolute;right:14px;bottom:14px;font-size:10px;font-weight:600;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--brand-deep);}
-  .jz-promo-card.warm{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
-  .jz-promo-card.fresh{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
-  .jz-promo-card.deep{background:linear-gradient(135deg,#1a3a6b,#0b1d3a);}
+  /* 营销栏 · Bento 双列 */
+  .jz-promo{
+    display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(88px,auto);
+    grid-auto-flow:dense;gap:9px;padding:4px 16px 24px;
+  }
+  .jz-promo-card{
+    display:block;border-radius:18px;overflow:hidden;color:#fff;padding:14px 14px 13px;
+    position:relative;min-height:88px;
+    box-shadow:0 10px 24px rgba(15,42,38,.12),inset 0 1px 0 rgba(255,255,255,.1);
+    animation:jzIn .45s cubic-bezier(.2,.8,.2,1) backwards;
+  }
+  .jz-promo-card.hero{grid-row:span 2;min-height:186px;padding:16px;}
+  .jz-promo-card .tag{
+    font-size:8px;font-weight:800;letter-spacing:.14em;padding:3px 8px;border-radius:999px;
+    background:rgba(255,255,255,.18);backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,.15);display:inline-block;
+  }
+  .jz-promo-card h3{font-family:var(--serif);font-size:16px;margin-top:8px;line-height:1.2;}
+  .jz-promo-card.hero h3{font-size:20px;margin-top:10px;}
+  .jz-promo-card p{font-size:10px;opacity:.9;margin-top:5px;line-height:1.45;max-width:22ch;}
+  .jz-promo-card .ck{
+    position:absolute;right:12px;bottom:12px;font-size:10px;font-weight:700;
+    padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--brand-deep);
+  }
+  .jz-promo-card.warm{background:linear-gradient(145deg,#ff8a3d,#c44a14);}
+  .jz-promo-card.fresh{background:linear-gradient(145deg,#1aa39a,#0c4d44);}
+  .jz-promo-card.deep{background:linear-gradient(145deg,#1a3a6b,#0b1d3a);}
   .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
   .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;min-height:108px;
     box-shadow:0 8px 20px rgba(15,42,38,.12);}
@@ -143,12 +245,18 @@
 
     <div class="pane" id="pane-jiazheng">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more">4 大类目</span></div>
+      <div class="jz-strip">
+        <span><b>30min</b>极速上门</span>
+        <span><b>4.9</b>服务评分</span>
+        <span><b>金牌</b>认证服务者</span>
+        <span><b>7×12</b>客服在线</span>
+      </div>
       <div class="jz-quick">
         <div class="jz-cat-grid" id="jzCats"></div>
       </div>
 
-      <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
-      <div class="jz-sub-list" id="jzSubs"></div>
+      <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">左滑更多 ›</span></div>
+      <div class="jz-sub-scroll" id="jzSubs"></div>
 
       <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
       <div class="jz-promo" id="jzPromo"></div>
@@ -255,20 +363,21 @@
     { id: 'nanny',    name: '保姆', icon: '👶', subs: ['住家保姆','育儿嫂','月嫂','钟点工','养老护理','医院陪护'] }
   ];
 
+  var JZ_LAYOUT = { cleaning: 'hero', repair: 'tall', moving: 'tall', nanny: 'wide' };
+
   function renderJiazhengCats(){
-    document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c){
-      var subHtml = c.subs.slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
-      return '<a class="jz-cat '+c.id+'" href="jiazheng-landing-'+c.id+'.html">'+
-        '<div class="bg"></div><div class="arrow">›</div>'+
-        '<div class="in"><div>'+
-          '<div class="ico">'+c.icon+'</div>'+
-          '<h3>'+c.name+'</h3>'+
-          '<div class="sub">'+subHtml+'</div>'+
-        '</div></div></a>';
+    document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c,i){
+      var lay = JZ_LAYOUT[c.id] || '';
+      var subHtml = c.subs.slice(0, lay === 'wide' ? 4 : 3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+      var body = lay === 'wide'
+        ? '<div><div class="ico">'+c.icon+'</div><h3>'+c.name+'</h3></div><div class="sub">'+subHtml+'</div>'
+        : '<div class="ico">'+c.icon+'</div><h3>'+c.name+'</h3><div class="sub">'+subHtml+'</div>';
+      return '<a class="jz-cat '+c.id+(lay?' '+lay:'')+'" href="jiazheng-landing-'+c.id+'.html" style="animation-delay:'+(i*0.06)+'s">'+
+        '<div class="bg"></div><span class="no">'+pad(i+1)+'</span><div class="arrow">›</div>'+
+        '<div class="in">'+body+'</div></a>';
     }).join('');
   }
 
-  // 热门子类（示例数据，6条）
   function renderJiazhengSubs(){
     var rows = [
       { name: '深度清洁 · 4小时', sub: '3人团队 · 含厨卫去污', price: '¥268起', type: 'cleaning' },
@@ -278,25 +387,22 @@
       { name: '管道疏通 · 当天', sub: '30分钟上门 · 不通不收费', price: '¥99起', type: 'repair' },
       { name: '钟点工 · 3小时', sub: '做饭保洁 · 灵活预约', price: '¥128/次', type: 'nanny' }
     ];
-    document.getElementById('jzSubs').innerHTML = rows.map(function(r){
-      return '<a class="row" href="jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'">'+
-        '<div><b>'+r.name+'</b><div class="meta">'+r.sub+'</div></div>'+
-        '<div style="display:flex;align-items:center;gap:12px;">'+
-          '<div class="pr">'+r.price+'</div>'+
-          '<div class="go">查看 ›</div>'+
-        '</div></a>';
+    document.getElementById('jzSubs').innerHTML = rows.map(function(r,i){
+      return '<a class="jz-sub-card" href="juzhu-jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'" style="animation-delay:'+(0.2+i*0.05)+'s">'+
+        '<div class="top"><span class="dot '+r.type+'"></span><b>'+r.name+'</b></div>'+
+        '<div class="meta">'+r.sub+'</div>'+
+        '<div class="foot"><div class="pr">'+r.price+'</div><span class="go">预约</span></div></a>';
     }).join('');
   }
 
-  // 营销栏（运营位）
   function renderJiazhengPromo(){
     var cards = [
-      { cls: 'warm', tag: 'HOT',   title: '新用户立减 50',  desc: '首单保洁·维修·搬家通用',  cta: '立即领取' },
-      { cls: 'fresh', tag: 'GRAD',  title: '金牌服务者认证',  desc: '评级 · 背调 · 持证上岗', cta: '了解中台' },
-      { cls: 'deep', tag: 'PRO',    title: '企业月付套餐',    desc: '中小企业办公保洁定制',    cta: '联系顾问' }
+      { cls: 'warm', hero: true,  tag: 'HOT',  title: '新用户立减 50', desc: '首单保洁·维修·搬家通用', cta: '立即领取' },
+      { cls: 'fresh', hero: false, tag: 'GRAD', title: '金牌服务者',   desc: '评级 · 背调 · 持证上岗', cta: '了解' },
+      { cls: 'deep',  hero: false, tag: 'PRO',  title: '企业月付',     desc: '中小企业办公保洁定制',   cta: '咨询' }
     ];
-    document.getElementById('jzPromo').innerHTML = cards.map(function(c){
-      return '<a class="jz-promo-card '+c.cls+'" href="jiazheng-list.html?type=promo&tag='+c.cls+'">'+
+    document.getElementById('jzPromo').innerHTML = cards.map(function(c,i){
+      return '<a class="jz-promo-card '+c.cls+(c.hero?' hero':'')+'" href="juzhu-jiazheng-list.html?type=promo&tag='+c.cls+'" style="animation-delay:'+(0.35+i*0.06)+'s">'+
         '<span class="tag">'+c.tag+'</span>'+
         '<h3>'+c.title+'</h3>'+
         '<p>'+c.desc+'</p>'+
