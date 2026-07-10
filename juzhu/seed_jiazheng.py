@@ -19,6 +19,80 @@ def jdump(x):
     return json.dumps(x, ensure_ascii=False)
 
 
+CERT_LABELS = {
+    "id_card": "身份核验", "health": "健康证核验", "skill": "技能考核认证",
+    "insurance": "责任险承保", "backcheck": "平台背调",
+}
+CERT_PREFIX = {
+    "id_card": "JZ-ID", "health": "JZ-HC", "skill": "JZ-SK",
+    "insurance": "JZ-IN", "backcheck": "JZ-BC",
+}
+VENDOR_BADGE_CERTS = {
+    "whitelist": ("JZ-V-WL", "白名单商家认证"),
+    "backcheck": ("JZ-V-BC", "平台背调认证"),
+    "insurance": ("JZ-V-IN", "百万保障认证"),
+    "commitment": ("JZ-V-CM", "服务承诺认证"),
+    "top10": ("JZ-V-T10", "销量榜认证"),
+}
+
+
+def worker_platform_certs(wid, level, certs, whitelist_id, is_whitelisted):
+    out = []
+    if whitelist_id or is_whitelisted:
+        wl = whitelist_id or f"S{wid}"
+        out.append({
+            "code": f"JZ-S-{wl}",
+            "name": f"{level} 服务者持证",
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30",
+            "status": "valid",
+        })
+    for c in certs:
+        if c == "whitelist":
+            continue
+        prefix = CERT_PREFIX.get(c, f"JZ-{c.upper()}")
+        out.append({
+            "code": f"{prefix}-{wid}",
+            "name": CERT_LABELS.get(c, c),
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30" if c == "insurance" else "2026-12-31",
+            "status": "valid",
+        })
+    return out
+
+
+def vendor_platform_certs(vid, badges, vendor_no=None):
+    vno = vendor_no or f"V{vid:04d}"
+    out = [{
+        "code": f"JZ-B-{vno}",
+        "name": "家政商家主体认证",
+        "issuer": "P 服务认证中台",
+        "valid_until": "2027-12-31",
+        "status": "valid",
+    }]
+    for b in badges:
+        spec = VENDOR_BADGE_CERTS.get(b)
+        if not spec:
+            continue
+        prefix, name = spec
+        out.append({
+            "code": f"{prefix}-{vid}",
+            "name": name,
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30",
+            "status": "valid",
+        })
+    return out
+
+
+def ensure_cert_columns(conn):
+    for tbl, col in [("jz_vendors", "vendor_no"), ("jz_vendors", "platform_certs"), ("jz_workers", "platform_certs")]:
+        try:
+            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+
 def main():
     if not DB_PATH.exists():
         print(f"❌ DB 不存在: {DB_PATH}")
@@ -33,6 +107,7 @@ def main():
     print("📋 建表...")
     schema_sql = SCHEMA.read_text(encoding="utf-8")
     conn.executescript(schema_sql)
+    ensure_cert_columns(conn)
 
     # 2. 子类目（4 类 × 6 子 = 24 个）
     print("📂 子类目...")
@@ -99,13 +174,15 @@ def main():
     for v in VENDORS:
         (vid, vtype, name, logo, addr, rating, review_count, rank_type, rank_label,
          badges, live, start_price, unit, hours, dist) = v
+        vendor_no = f"V{vid:04d}"
+        pcerts = vendor_platform_certs(vid, badges, vendor_no)
         conn.execute(
             """INSERT INTO jz_vendors(id, type, name, logo, address, rating, review_count,
                rank_type, rank_label, badges, live, start_price, unit, hours, status,
-               sort_order, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)""",
+               sort_order, vendor_no, platform_certs, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)""",
             (vid, vtype, name, logo, addr, rating, review_count, rank_type, rank_label,
-             jdump(badges), live, start_price, unit, hours, vid, NOW, NOW),
+             jdump(badges), live, start_price, unit, hours, vid, vendor_no, jdump(pcerts), NOW, NOW),
         )
 
     # 4. 商品 SKU
@@ -279,14 +356,16 @@ def main():
     for w in WORKERS:
         (wid, vid, name, avatar, level, credit, tags, rating, completed, years, online, dist,
          certs, whitelist_id, status) = w
+        is_wl = 1 if whitelist_id else 0
+        pcerts = worker_platform_certs(wid, level, certs, whitelist_id, is_wl)
         conn.execute(
             """INSERT INTO jz_workers(id, name, avatar, level, credit_score, tags,
                certs, is_whitelisted, rating, completed_orders, years_experience,
-               online, distance_km, vendor_id, whitelist_id, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               online, distance_km, vendor_id, whitelist_id, platform_certs, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (wid, name, avatar, level, credit, jdump(tags), jdump(certs),
-             1 if whitelist_id else 0, rating, completed, years, online, dist, vid,
-             whitelist_id, status),
+             is_wl, rating, completed, years, online, dist, vid,
+             whitelist_id, jdump(pcerts), status),
         )
 
     # 6. 示例订单（含服务者派单，便于演示工单闭环）

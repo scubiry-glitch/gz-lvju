@@ -42,6 +42,20 @@
   .wcard .tags span{font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 7px;border-radius:5px;}
   .wcard .certs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
   .wcard .certs span{font-size:9px;color:var(--gold-deep);background:var(--gold-soft);padding:2px 7px;border-radius:5px;}
+  .jz-cert-section{margin:0 18px 14px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 14px 10px;box-shadow:0 6px 16px rgba(15,42,38,.05);}
+  .jz-cert-section h3{font-family:var(--serif);font-size:14px;color:var(--ink);margin:0 0 4px;display:flex;align-items:center;gap:6px;}
+  .jz-cert-section h3 small{font-size:10px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:2px 8px;border-radius:999px;}
+  .jz-cert-section .hint{font-size:11px;color:var(--muted);margin:0 0 10px;}
+  .jz-cert{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:12px;text-decoration:none;color:inherit;background:#fafcfb;}
+  .jz-cert.compact{padding:8px 10px;margin-bottom:6px;}
+  .jz-cert .ck{width:28px;height:28px;border-radius:50%;background:var(--brand-soft);color:var(--brand-deep);display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;}
+  .jz-cert .bd{flex:1;min-width:0;}
+  .jz-cert .bd b{display:block;font-size:12px;color:var(--ink);}
+  .jz-cert .meta,.jz-cert .exp{display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+  .jz-cert .go{font-size:11px;color:var(--brand);font-weight:600;flex-shrink:0;}
+  .jz-cert.expired{opacity:.75;}
+  .jz-cert-empty{font-size:12px;color:var(--muted);padding:8px 0;}
+  .wcard .jz-cert-wrap{margin-top:8px;}
   .rating-sum{text-align:center;padding:18px 18px 8px;}
   .rating-sum b{font-family:var(--serif);font-size:36px;color:var(--brand-deep);}
   .rating-sum small{display:block;font-size:11px;color:var(--muted);margin-top:4px;}
@@ -99,7 +113,8 @@
   </div>
 </div>
 
-<script src="jiazheng-data.js?v=4"></script>
+<script src="jiazheng-certs.js?v=1"></script>
+<script src="jiazheng-data.js?v=5"></script>
 <script>
 (function(){
   var qs = new URLSearchParams(location.search);
@@ -138,9 +153,12 @@
       document.querySelector('.app').innerHTML = '<div class="empty" style="padding:60px 24px;">商家不存在</div>';
       return;
     }
+    v = JZ_CERTS.enrichVendor(v);
+    if (v.workers) v.workers = v.workers.map(JZ_CERTS.enrichWorker);
 
     document.getElementById('pageTitle').textContent = v.name;
     var live = v.live ? '<span class="live">直播中</span>' : '';
+    var certN = (v.platform_certs || []).length;
     document.getElementById('vendorHead').innerHTML =
       '<div class="v-hero"><div class="bg"></div><div class="in">'+
         '<div class="logo">'+v.logo+'</div>'+
@@ -150,7 +168,12 @@
           '<div class="meta">'+(v.dist || v.address || '')+(v.hours ? ' · '+v.hours : '')+'</div>'+
           '<div class="tags">'+badgeTags(v)+'</div>'+
         '</div>'+
-      '</div></div>';
+      '</div></div>'+
+      (certN ? '<div class="jz-cert-section" id="vendorCerts">'+
+        '<h3>P 服务认证中台 <small>'+certN+' 项认证</small></h3>'+
+        '<p class="hint">商家主体及白名单/背调/保障等证书，可点击验真</p>'+
+        JZ_CERTS.renderCertCards(v.platform_certs)+
+      '</div>' : '');
 
     var products = (v.products || []).map(pnorm);
     if (products.length) {
@@ -182,11 +205,15 @@
 
     var workers = v.workers || [];
     document.getElementById('tab-worker').innerHTML = workers.length ? workers.map(function(w){
+      w = JZ_CERTS.enrichWorker(w);
       var certs = [];
       if (w.certs && w.certs.indexOf('id_card') > -1) certs.push('身份证');
       if (w.certs && w.certs.indexOf('health') > -1) certs.push('健康证');
       if (w.certs && w.certs.indexOf('skill') > -1) certs.push('技能证');
       if (w.certs && w.certs.indexOf('insurance') > -1) certs.push('保险');
+      var certBlock = (w.platform_certs && w.platform_certs.length)
+        ? '<div class="jz-cert-wrap">'+JZ_CERTS.renderCertCards(w.platform_certs, { compact: true })+'</div>'
+        : '';
       return '<div class="wcard"><div class="top">'+
         '<div class="av">'+w.avatar+'</div>'+
         '<div style="flex:1;min-width:0;">'+
@@ -195,7 +222,7 @@
           '<div class="meta">距您 '+(w.distance_km || w.distance || '—')+'km · 信用分 '+(w.credit_score || w.credit || '—')+'</div>'+
           '<div class="tags">'+(w.tags || []).map(function(t){ return '<span>'+t+'</span>'; }).join('')+'</div>'+
           '<div class="certs">'+certs.map(function(c){ return '<span>'+c+'</span>'; }).join('')+'</div>'+
-        '</div></div></div>';
+        '</div></div>'+certBlock+'</div>';
     }).join('') : '<div class="empty">暂无服务者信息</div>';
 
     var reviews = [

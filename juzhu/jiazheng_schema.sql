@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   hours TEXT,                            -- 营业时间
   vendor_no TEXT,                        -- 中台商家编号
   whitelist_id INTEGER,                  -- 关联 G 端白名单 vendor
+  platform_certs TEXT,                   -- JSON: [{code,name,issuer,valid_until,status}]
   status TEXT DEFAULT 'active',          -- active/paused/offline
   sort_order INTEGER DEFAULT 0,
   created_at TEXT, updated_at TEXT
@@ -66,6 +67,7 @@ CREATE TABLE IF NOT EXISTS jz_workers (
   distance_km REAL,                      -- 距离用户（动态）
   vendor_id INTEGER,
   whitelist_id INTEGER,                  -- 关联 G 端白名单 service
+  platform_certs TEXT,                   -- JSON: [{code,name,issuer,valid_until,status}]
   status TEXT DEFAULT 'active',
   FOREIGN KEY (vendor_id) REFERENCES jz_vendors(id)
 );

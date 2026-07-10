@@ -99,19 +99,19 @@ window.JZ_DATA = (function(){
     };
 
     var WORKERS = [
-      { id:101, vendor_id:1, name:'陈建国', avatar:'👨', level:'L4', credit:88, tags:['细致','主动','准时','日常保洁'], rating:4.9, completed:2317, years:5, certs:['id_card','health','skill','insurance'], online:true, distance:2.4 },
-      { id:102, vendor_id:1, name:'杨秀芳', avatar:'👩', level:'L4', credit:92, tags:['周到','经验丰富','深度清洁'], rating:4.8, completed:1820, years:6, certs:['id_card','health','skill','insurance'], online:true, distance:3.1 },
+      { id:101, vendor_id:1, name:'陈建国', avatar:'👨', level:'L4', credit:88, tags:['细致','主动','准时','日常保洁'], rating:4.9, completed:2317, years:5, certs:['id_card','health','skill','insurance'], whitelist_id:2401, online:true, distance:2.4 },
+      { id:102, vendor_id:1, name:'杨秀芳', avatar:'👩', level:'L4', credit:92, tags:['周到','经验丰富','深度清洁'], rating:4.8, completed:1820, years:6, certs:['id_card','health','skill','insurance'], whitelist_id:2402, online:true, distance:3.1 },
       { id:103, vendor_id:1, name:'李明', avatar:'👨', level:'L3', credit:78, tags:['稳重','开荒保洁'], rating:4.6, completed:920, years:3, certs:['id_card','health','skill'], online:false, distance:4.2 },
-      { id:201, vendor_id:2, name:'张美玲', avatar:'👩', level:'L5', credit:95, tags:['平台金牌','极速上门'], rating:4.9, completed:4102, years:7, certs:['id_card','health','skill','insurance'], online:true, distance:0.8 },
+      { id:201, vendor_id:2, name:'张美玲', avatar:'👩', level:'L5', credit:95, tags:['平台金牌','极速上门'], rating:4.9, completed:4102, years:7, certs:['id_card','health','skill','insurance'], whitelist_id:2403, online:true, distance:0.8 },
       { id:202, vendor_id:2, name:'赵丽', avatar:'👩', level:'L4', credit:90, tags:['专业工具','玻璃清洗'], rating:4.8, completed:2680, years:5, certs:['id_card','health','skill','insurance'], online:true, distance:1.2 },
       { id:501, vendor_id:5, name:'周洁', avatar:'👩', level:'L5', credit:94, tags:['金牌服务者','深度清洁','团队长'], rating:4.9, completed:3560, years:8, certs:['id_card','health','skill','insurance'], online:true, distance:4.6 },
       { id:502, vendor_id:5, name:'吴敏', avatar:'👩', level:'L4', credit:86, tags:['专业工具','细致'], rating:4.7, completed:1980, years:5, certs:['id_card','health','skill','insurance'], online:true, distance:3.9 },
-      { id:1101, vendor_id:11, name:'赵德明', avatar:'👨', level:'L5', credit:91, tags:['持证电工','30分钟响应','灯具电路'], rating:4.8, completed:1680, years:9, certs:['id_card','health','skill','insurance'], online:true, distance:1.8 },
-      { id:1102, vendor_id:11, name:'孙海波', avatar:'👨', level:'L4', credit:85, tags:['管道疏通','不通不收费'], rating:4.7, completed:1420, years:6, certs:['id_card','health','skill','insurance'], online:true, distance:2.2 },
+      { id:1101, vendor_id:11, name:'赵德明', avatar:'👨', level:'L5', credit:91, tags:['持证电工','30分钟响应','灯具电路'], rating:4.8, completed:1680, years:9, certs:['id_card','health','skill','insurance'], whitelist_id:2411, online:true, distance:1.8 },
+      { id:1102, vendor_id:11, name:'孙海波', avatar:'👨', level:'L4', credit:85, tags:['管道疏通','不通不收费'], rating:4.7, completed:1420, years:6, certs:['id_card','health','skill','insurance'], whitelist_id:2412, online:true, distance:2.2 },
       { id:1103, vendor_id:11, name:'李建军', avatar:'👨', level:'L4', credit:83, tags:['家电维修','空调清洗'], rating:4.6, completed:980, years:5, certs:['id_card','health','skill'], online:false, distance:3.0 },
       { id:2101, vendor_id:21, name:'刘师傅', avatar:'👨', level:'L4', credit:87, tags:['居民搬家','队长','准时到达'], rating:4.8, completed:1260, years:8, certs:['id_card','health','skill','insurance'], online:true, distance:3.5 },
       { id:2103, vendor_id:21, name:'王师傅', avatar:'👨', level:'L5', credit:93, tags:['钢琴搬运','专业团队'], rating:4.9, completed:380, years:10, certs:['id_card','health','skill','insurance'], online:false, distance:5.2 },
-      { id:3101, vendor_id:31, name:'王淑芬', avatar:'👩', level:'L6', credit:96, tags:['金牌月嫂','医护背景','26天套餐'], rating:4.9, completed:286, years:12, certs:['id_card','health','skill','insurance'], online:true, distance:0 },
+      { id:3101, vendor_id:31, name:'王淑芬', avatar:'👩', level:'L6', credit:96, tags:['金牌月嫂','医护背景','26天套餐'], rating:4.9, completed:286, years:12, certs:['id_card','health','skill','insurance'], whitelist_id:2431, online:true, distance:0 },
       { id:3102, vendor_id:31, name:'李春华', avatar:'👩', level:'L5', credit:92, tags:['住家育儿嫂','辅食早教'], rating:4.8, completed:412, years:8, certs:['id_card','health','skill','insurance'], online:true, distance:0 },
       { id:3103, vendor_id:31, name:'张桂英', avatar:'👩', level:'L5', credit:90, tags:['月嫂','催乳师','42天套餐'], rating:4.9, completed:198, years:10, certs:['id_card','health','skill','insurance'], online:false, distance:0 },
       { id:3104, vendor_id:31, name:'陈阿姨', avatar:'👩', level:'L4', credit:85, tags:['钟点工','做饭保洁'], rating:4.7, completed:860, years:6, certs:['id_card','health','skill'], online:true, distance:0 }
@@ -165,7 +165,11 @@ window.JZ_DATA = (function(){
     getVendors: function(type){
       return fallback(
         function(){ return getJson(API + '/vendors?type=' + type).then(function(d){ return d.list; }); },
-        function(){ return MOCK.VENDORS[type] || []; }
+        function(){
+          return (MOCK.VENDORS[type] || []).map(function(v){
+            return window.JZ_CERTS ? JZ_CERTS.enrichVendor(JSON.parse(JSON.stringify(v))) : v;
+          });
+        }
       );
     },
     getVendor: function(type, id){
@@ -177,6 +181,10 @@ window.JZ_DATA = (function(){
             if (list[i].id == id) {
               var v = JSON.parse(JSON.stringify(list[i]));
               v.workers = MOCK.WORKERS.filter(function(w){ return w.vendor_id == id; });
+              if (window.JZ_CERTS) {
+                v = JZ_CERTS.enrichVendor(v);
+                v.workers = v.workers.map(JZ_CERTS.enrichWorker);
+              }
               return v;
             }
           }
@@ -198,7 +206,8 @@ window.JZ_DATA = (function(){
       return fallback(
         function(){ return getJson(API + '/workers?vendor_id=' + vendorId).then(function(d){ return d.list; }); },
         function(){
-          return MOCK.WORKERS.filter(function(w){return w.vendor_id == vendorId;});
+          var list = MOCK.WORKERS.filter(function(w){return w.vendor_id == vendorId;});
+          return window.JZ_CERTS ? list.map(JZ_CERTS.enrichWorker) : list;
         }
       );
     },

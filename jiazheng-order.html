@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>订单详情 · 家政服务</title>
 <link rel="stylesheet" href="jiazheng-app.css?v=2" />
+<style>
+  .jz-cert{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-top:8px;border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit;background:var(--bg);}
+  .jz-cert.compact{padding:8px 10px;}
+  .jz-cert .ck{width:26px;height:26px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  .jz-cert .bd{flex:1;min-width:0;}
+  .jz-cert .bd b{display:block;font-size:12px;}
+  .jz-cert .meta,.jz-cert .exp{display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+  .jz-cert .go{font-size:11px;color:var(--brand);font-weight:600;}
+  .cert-block{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);}
+  .cert-block h4{font-size:12px;color:var(--muted);font-weight:500;margin:0 0 6px;}
+</style>
 </head>
 <body>
 <div class="jz-wrap">
@@ -23,6 +34,8 @@
   <div id="statusHint" style="background:var(--surface);padding:0 16px;"></div>
 
   <div id="workerBox" style="background:var(--surface);padding:16px;margin-top:8px;display:none;"></div>
+
+  <div id="vendorCertBox" style="background:var(--surface);padding:16px;margin-top:8px;display:none;"></div>
 
   <div style="background:var(--surface);padding:16px;margin-top:8px;">
     <h3 style="font-size:14px;margin:0 0 12px;color:var(--muted);font-weight:500;">服务信息</h3>
@@ -55,7 +68,8 @@
   </div>
 </div>
 
-<script src="jiazheng-data.js?v=2"></script>
+<script src="jiazheng-certs.js?v=1"></script>
+<script src="jiazheng-data.js?v=5"></script>
 <script>
 var qs = new URLSearchParams(location.search);
 var oid = qs.get('oid') || '';
@@ -111,7 +125,7 @@ JZ_DATA.getOrder(oid).then(function(order){
         (cur === 'pending' ? '⏳ 正在为您匹配...<br><small>通常 1-2 分钟内完成</small>' : '⏳ 等待服务者确认...')+
       '</div>';
   } else if (order.worker) {
-    var w = order.worker;
+    var w = JZ_CERTS.enrichWorker(order.worker);
     document.getElementById('workerBox').style.display = 'block';
     document.getElementById('workerBox').innerHTML =
       '<h3 style="font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:500;">服务者</h3>'+
@@ -121,11 +135,32 @@ JZ_DATA.getOrder(oid).then(function(order){
           '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;">'+
             w.name+'<span class="bd bd-b">'+w.level+'</span>'+
           '</div>'+
-          '<div style="font-size:12px;color:#ea580c;margin-top:2px;">★ '+w.rating+' · '+w.completed_orders+'单</div>'+
-          '<div style="font-size:11px;color:var(--muted);margin-top:2px;">距您 '+(w.distance_km||'--')+'km</div>'+
+          '<div style="font-size:12px;color:#ea580c;margin-top:2px;">★ '+w.rating+' · '+(w.completed_orders||w.completed||0)+'单</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px;">距您 '+(w.distance_km||w.distance||'--')+'km</div>'+
         '</div>'+
         '<a href="javascript:;" style="width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-size:18px;">📞</a>'+
-      '</div>';
+      '</div>'+
+      ((w.platform_certs && w.platform_certs.length) ?
+        '<div class="cert-block"><h4>P 服务认证中台 · 服务者证书</h4>'+
+          JZ_CERTS.renderCertCards(w.platform_certs, { compact: true })+'</div>' : '');
+  }
+
+  var vcerts = order.vendor_platform_certs;
+  if (vcerts && vcerts.length) {
+    document.getElementById('vendorCertBox').style.display = 'block';
+    document.getElementById('vendorCertBox').innerHTML =
+      '<h3 style="font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:500;">商家中台认证</h3>'+
+      JZ_CERTS.renderCertCards(vcerts, { compact: true });
+  } else if (order.vendor_id && typeof JZ_DATA !== 'undefined') {
+    JZ_DATA.getVendor(order.type, order.vendor_id).then(function(v){
+      if (!v) return;
+      v = JZ_CERTS.enrichVendor(v);
+      if (!v.platform_certs || !v.platform_certs.length) return;
+      document.getElementById('vendorCertBox').style.display = 'block';
+      document.getElementById('vendorCertBox').innerHTML =
+        '<h3 style="font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:500;">商家中台认证</h3>'+
+        JZ_CERTS.renderCertCards(v.platform_certs, { compact: true });
+    }).catch(function(){});
   }
 
   // 服务信息

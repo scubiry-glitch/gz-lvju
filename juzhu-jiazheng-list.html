@@ -33,6 +33,7 @@
   .vcard .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
   .vcard .tags span{font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 7px;border-radius:5px;font-weight:600;}
   .vcard .meta{font-size:11px;color:var(--muted);margin-top:5px;}
+  .vcard .cert-pill{font-size:9px;color:var(--gold-deep);background:var(--gold-soft);padding:2px 7px;border-radius:5px;font-weight:600;margin-left:4px;}
   .vcard .div{height:1px;background:var(--border);margin:12px 0 8px;}
   .vcard .sku{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-top:1px dashed var(--border);}
   .vcard .sku:first-of-type{border-top:0;}
@@ -87,7 +88,8 @@
   </div>
 </div>
 
-<script src="jiazheng-data.js?v=4"></script>
+<script src="jiazheng-certs.js?v=1"></script>
+<script src="jiazheng-data.js?v=5"></script>
 <script>
 (function(){
   var qs = new URLSearchParams(location.search);
@@ -162,6 +164,8 @@
       }
       document.getElementById('vendorCount').textContent = list.length + ' 家商家';
       document.getElementById('vendorList').innerHTML = list.map(function(v){
+        v = JZ_CERTS.enrichVendor(v);
+        var certLbl = JZ_CERTS.countLabel((v.platform_certs || []).length);
         var skus = (v.products || []).slice(0, 2).map(function(raw){
           var p = pnorm(raw);
           return '<a class="sku" href="'+detailUrl(v.id)+'">'+
@@ -181,7 +185,8 @@
             '<div style="flex:1;min-width:0;">'+
               '<div class="nm">'+v.name+' '+badgeHtml(v)+'</div>'+
               '<div class="rate">★ '+v.rating+'<span>'+v.review_count+'条评论</span></div>'+
-              '<div class="meta">主营：'+(v.products || []).slice(0, 2).map(function(p){ return (p.title || '').split(' ')[0]; }).join(' / ')+' · '+v.hours+'</div>'+
+              '<div class="meta">主营：'+(v.products || []).slice(0, 2).map(function(p){ return (p.title || '').split(' ')[0]; }).join(' / ')+' · '+v.hours+
+                (certLbl ? ' · <span class="cert-pill">'+certLbl+'</span>' : '')+'</div>'+
             '</div>'+
           '</a>'+
           '<div class="div"></div>'+skus+
