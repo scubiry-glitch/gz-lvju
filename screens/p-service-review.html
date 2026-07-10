@@ -99,9 +99,9 @@
   </main>
 </div>
 <script src="_region.js?v=2"></script>
-<script src="_orderbus.js"></script>
+<script src="_jzapi.js"></script>
 <script>
-const BO = window.BZF_ORDERS;
+const JZ = window.BZF_JZ;
 
 function maskName(n){
   n = String(n || '');
@@ -112,31 +112,30 @@ function stars(s){ return '★ ' + Number(s || 5).toFixed(1); }
 
 function render(){
   const rows = document.getElementById('liveRows');
-  const list = BO.byStatus('rated');
-  rows.innerHTML = list.map(o => {
-    const r = o.rating || {};
-    const w = o.worker || { name: '—', level: 'L1' };
-    const score = r.score || 5;
-    const bad = score <= 3;
-    const tagTxt = (r.tags && r.tags.length) ? r.tags.join(' / ') : (o.category || o.type);
-    const statusBadge = bad
-      ? '<span class="badge b-bad">差评处置</span>'
-      : '<span class="badge b-ok">已计分</span>';
-    const delta = bad ? '-3.0' : '+' + (score >= 5 ? '2.4' : '1.2');
-    return '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
-      '<td>' + maskName(w.name) + ' · ' + BO.esc(w.level) + '</td>' +
-      '<td>' + BO.esc(o.id.replace('WO-2026-', 'WO-')) + '</td>' +
-      '<td>' + stars(score) + '</td>' +
-      '<td>' + BO.esc(tagTxt) + '</td>' +
-      '<td>' + statusBadge + '</td>' +
-      '<td><a class="lnk" href="p-credit-engine.html">' + delta + ' →</a></td></tr>';
-  }).join('');
-
-  const n = list.length;
-  document.getElementById('kpiCount').textContent = (3860 + n).toLocaleString();
+  JZ.list({ status: 'rated', limit: 30 }).then(function(list) {
+    rows.innerHTML = list.map(o => {
+      const r = o.rating || {};
+      const w = o.worker || { name: '—', level: 'L1' };
+      const score = r.score || 5;
+      const bad = score <= 3;
+      const tagTxt = (r.tags && r.tags.length) ? r.tags.join(' / ') : (o.category || o.type);
+      const statusBadge = bad
+        ? '<span class="badge b-bad">差评处置</span>'
+        : '<span class="badge b-ok">已计分</span>';
+      const delta = bad ? '-3.0' : '+' + (score >= 5 ? '2.4' : '1.2');
+      return '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
+        '<td>' + maskName(w.name) + ' · ' + JZ.esc(w.level) + '</td>' +
+        '<td>' + JZ.esc(o.id) + ' <span class="badge b-live" style="background:var(--accent-soft);color:var(--accent);">API</span></td>' +
+        '<td>' + stars(score) + '</td>' +
+        '<td>' + JZ.esc(tagTxt) + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td><a class="lnk" href="p-credit-engine.html">' + delta + ' →</a></td></tr>';
+    }).join('');
+    document.getElementById('kpiCount').textContent = (3860 + list.length).toLocaleString();
+  }).catch(function(){});
 }
 
-BO.onChange(render);
+JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
 </script>

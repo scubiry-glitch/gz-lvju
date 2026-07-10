@@ -52,7 +52,8 @@
     </div>
     <div class="content">
       <div class="crosslink">📐 居住服务派单链路起点：旅居客 / 房源端<b>发起需求</b> → 汇入工单池 → 中台<b>按规则派单</b> → 服务者接单。配套：
-        <a href="p-traffic-policy.html">流量倾斜策略</a> · <a href="p-transaction.html">派单交易 + 分账</a> · <a href="s-orders.html">服务者 · 我的工单</a></div>
+        <a href="p-traffic-policy.html">流量倾斜策略</a> · <a href="p-transaction.html">派单交易 + 分账</a> · <a href="s-orders.html">服务者 · 我的工单</a> ·
+        <a href="p-jz-category.html">子类目</a> · <a href="p-jz-product.html">B 产品</a> · <a href="../juzhu-jiazheng-flow.html">C 端全流程 ↗</a></div>
 
       <div class="card full">
         <h3>派单闭环 <span class="pill">三段链</span></h3>
@@ -78,7 +79,7 @@
       <div class="card">
         <h3>需求来源</h3>
         <div class="src">
-          <div class="s"><span class="e">📱</span>旅居客 App 下单 / 报修</div>
+          <div class="s"><span class="e">🏠</span>新居住频道 · 家政下单</div>
           <div class="s"><span class="e">🏠</span>房源运营方派工</div>
           <div class="s"><span class="e">🪪</span>管家巡检上报</div>
           <div class="s"><span class="e">🛰</span>系统巡检 / SLA 触发</div>
@@ -105,11 +106,11 @@
 </div>
 <div class="toast" id="toast"></div>
 <script src="_region.js?v=2"></script>
-<script src="_orderbus.js"></script>
+<script src="_jzapi.js"></script>
 <script>
-const BO = window.BZF_ORDERS;
-const PRIO = { '报修': 'b-go', '保洁': 'b-hi', '管家': 'b-go', '送物': '', '其他': '' };
-const PRIO_TXT = { '报修': '中', '保洁': '高', '管家': '中', '送物': '低', '其他': '低' };
+const JZ = window.BZF_JZ;
+const PRIO = { '保洁': 'b-hi', '维修': 'b-go', '搬家': 'b-go', '保姆': 'b-hi', '家政': '' };
+const PRIO_TXT = { '保洁': '高', '维修': '中', '搬家': '中', '保姆': '高', '家政': '低' };
 
 let toastTimer = null;
 function toast(msg) {
@@ -119,7 +120,7 @@ function toast(msg) {
 }
 
 function statusBadge(o) {
-  const st = BO.STATUS[o.status];
+  const st = JZ.STATUS[o.status];
   let cls = 'b-wait';
   if (o.status === 'pending') cls = 'b-wait';
   else if (o.status === 'dispatched') cls = 'b-go';
@@ -132,40 +133,44 @@ function actionCell(o) {
     return '<a class="lnk" onclick="doDispatch(\'' + o.id + '\')">派单 →</a>';
   }
   if (o.status === 'dispatched') {
-    return '<a class="lnk done">已派 ' + BO.esc(o.worker ? o.worker.name : '') + '</a>';
+    return '<a class="lnk done">已派 ' + JZ.esc(o.worker ? o.worker.name : '') + '</a>';
   }
   return '<a class="lnk" href="s-orders.html">查看 →</a>';
 }
 
 function render() {
   const rows = document.getElementById('liveRows');
-  // 工单池里展示：待派 + 已派单 + 进行中（已接单/服务中），已完成/已评价不再占池
-  const list = BO.byStatus(['pending', 'dispatched', 'accepted', 'serving']);
-  rows.innerHTML = list.map(o =>
-    '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
-    '<td>' + BO.esc(o.id) + '</td>' +
-    '<td>' + (BO.ICON[o.type] || '') + ' ' + BO.esc(o.category || o.type) + '</td>' +
-    '<td>' + BO.esc(o.source) + ' <span class="badge b-live">实时</span></td>' +
-    '<td>' + BO.esc(o.house) + '</td>' +
-    '<td><span class="badge ' + (PRIO[o.type] || '') + '">' + (PRIO_TXT[o.type] || '低') + '</span></td>' +
-    '<td>' + statusBadge(o) + '</td>' +
-    '<td>' + actionCell(o) + '</td></tr>'
-  ).join('');
+  JZ.list({ pay_status: 'paid', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
+    rows.innerHTML = list.map(o =>
+      '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
+      '<td>' + JZ.esc(o.id) + '</td>' +
+      '<td>' + (o.icon || '') + ' ' + JZ.esc(o.category) + '</td>' +
+      '<td>' + JZ.esc(o.source) + ' <span class="badge b-live">API</span></td>' +
+      '<td>' + JZ.esc(o.house) + '</td>' +
+      '<td><span class="badge ' + (PRIO[o.type] || '') + '">' + (PRIO_TXT[o.type] || '低') + '</span></td>' +
+      '<td>' + statusBadge(o) + '</td>' +
+      '<td>' + actionCell(o) + '</td></tr>'
+    ).join('');
 
-  // KPI：实时待派 / 进行中 叠加到基准
-  document.getElementById('kpiWait').textContent = 26 + BO.byStatus('pending').length;
-  document.getElementById('kpiDoing').textContent = 184 + BO.byStatus(['dispatched', 'accepted', 'serving']).length;
+    JZ.stats().then(function(s) {
+      document.getElementById('kpiWait').textContent = (s.pending || 0);
+      document.getElementById('kpiDoing').textContent = (s.pool || 0) - (s.pending || 0);
+    }).catch(function(){});
+  }).catch(function(err) {
+    rows.innerHTML = '<tr><td colspan="7" style="color:var(--danger);">API 加载失败：' + JZ.esc(err.message) + '</td></tr>';
+  });
 }
 
 function doDispatch(id) {
-  const o = BO.dispatch(id);
-  if (o && o.worker) {
-    toast('已按规则派单 → ' + o.worker.name + ' · ' + o.worker.level + '，服务者 App 已收到');
-  }
-  render();
+  JZ.dispatch(id).then(function(o) {
+    if (o && o.worker) {
+      toast('已按规则派单 → ' + o.worker.name + ' · ' + o.worker.level + '，服务者 App 已收到');
+    }
+    render();
+  }).catch(function(err) { toast(err.message); });
 }
 
-BO.onChange(render);
+JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
 </script>

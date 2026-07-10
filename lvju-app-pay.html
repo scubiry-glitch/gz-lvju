@@ -28,9 +28,9 @@
     </div>
 
     <div class="payhead">
-      <div class="amt">¥1,176</div>
-      <div class="on">订单号 LJ20260614-8821 · 云上观景惠居 · 2 晚</div>
-      <div class="cd">⏱ 请在 14:59 内完成支付</div>
+      <div class="amt" id="payAmt">¥1,176</div>
+      <div class="on" id="paySub">订单号 LJ20260614-8821 · 云上观景惠居 · 2 晚</div>
+      <div class="cd" id="payCd">⏱ 请在 14:59 内完成支付</div>
     </div>
 
     <div class="seg">选择支付方式</div>
@@ -40,7 +40,7 @@
       <div class="payopt"><div class="pi" style="background:#dcfce7">💚</div>
         <div class="nm">微信支付</div><div class="rd"></div></div>
       <div class="payopt"><div class="pi" style="background:#dbeafe">🏦</div>
-        <div class="nm">贵州银行 APP<small>可分期 · 积分抵扣</small></div><div class="rd"></div></div>
+        <div class="nm" id="bankPayName">江苏银行 APP<small>可分期 · 积分抵扣</small></div><div class="rd"></div></div>
       <div class="payopt"><div class="pi" style="background:#fef9c3">🧳</div>
         <div class="nm">同程支付</div><div class="rd"></div></div>
       <div class="payopt"><div class="pi" style="background:#ffedd5">🍔</div>
@@ -53,8 +53,55 @@
   </div>
 
   <div class="cta">
-    <a class="btn" href="lvju-app-paid.html" style="flex:1;text-align:center;">确认支付 ¥1,176</a>
+    <a class="btn" href="lvju-app-paid.html" id="payBtn" style="flex:1;text-align:center;">确认支付 ¥1,176</a>
   </div>
 </div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var bankNm = document.getElementById('bankPayName');
+  if (bankNm) bankNm.firstChild.textContent = JZ.regionBankName() + ' APP';
+
+  var q = new URLSearchParams(location.search);
+  var oid = q.get('order');
+  var channel = q.get('channel');
+  if (!oid || channel !== 'jiazheng') return;
+
+  var JZ = window.BZF_JZ;
+  var order = null;
+  var method = '贝壳支付';
+
+  document.querySelectorAll('.payopt').forEach(function(el){
+    el.addEventListener('click', function(){
+      document.querySelectorAll('.payopt').forEach(function(x){ x.classList.remove('sel'); });
+      el.classList.add('sel');
+      method = el.querySelector('.nm').textContent.trim();
+    });
+  });
+
+  JZ.get(oid).then(function(o){
+    order = o;
+    if (o.pay_status === 'paid') {
+      location.replace('lvju-app-paid.html?order=' + encodeURIComponent(oid) + '&channel=jiazheng');
+      return;
+    }
+    document.querySelector('.ttl').innerHTML = '收银台<small>家政服务 · ' + JZ.esc(o.category) + '</small>';
+    document.getElementById('payAmt').textContent = '¥' + Number(o.fee).toLocaleString();
+    document.getElementById('paySub').textContent = '订单号 ' + o.id + ' · ' + o.house + ' · ' + o.expectTime;
+    document.getElementById('payBtn').textContent = '确认支付 ¥' + Number(o.fee).toLocaleString();
+    document.getElementById('payBtn').href = '#';
+    document.getElementById('payBtn').addEventListener('click', function(e){
+      e.preventDefault();
+      JZ.pay(oid, method).then(function(){
+        location.href = 'lvju-app-paid.html?order=' + encodeURIComponent(oid) + '&channel=jiazheng';
+      }).catch(function(err){ alert(err.message); });
+    });
+  }).catch(function(err){
+    document.getElementById('paySub').textContent = '订单加载失败：' + err.message;
+  });
+})();
+</script>
 </body>
 </html>

@@ -7,9 +7,123 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = Path(__file__).resolve().parent / "juzhu.db"
 JSON_PATH = Path(__file__).resolve().parent / "data.json"
 
+JZ_WORKERS = [
+    {"name": "陈建国", "level": "L4", "tags": ["细致", "主动"]},
+    {"name": "杨秀芳", "level": "L4", "tags": ["准时", "周到"]},
+    {"name": "王志强", "level": "L3", "tags": ["专业", "稳重"]},
+    {"name": "刘海燕", "level": "L3", "tags": ["热情", "耐心"]},
+]
+
+JZ_CATEGORY_LABELS = {
+    "cleaning": "保洁",
+    "repair": "维修",
+    "moving": "搬家",
+    "nanny": "保姆",
+}
+
+JZ_CATEGORY_ICONS = {
+    "cleaning": "🧹",
+    "repair": "🔧",
+    "moving": "📦",
+    "nanny": "👶",
+}
+
+JZ_STATUS_ORDER = ["pending", "dispatched", "accepted", "serving", "done", "rated"]
+
+JZ_DEFAULT_CATEGORIES = [
+    ("cleaning", "保洁", "🧹", 1, "日常清洁、深度清洁、家电清洗"),
+    ("repair", "维修", "🔧", 2, "家电维修、管道疏通、门窗灯具"),
+    ("moving", "搬家", "📦", 3, "居民搬家、长途搬家、企业搬迁"),
+    ("nanny", "保姆", "👶", 4, "住家保姆、育儿嫂、月嫂、护理"),
+]
+
+JZ_DEFAULT_SKUS = [
+    {
+        "id": 1, "category_id": "cleaning", "name": "日常保洁 · 2小时", "slug": "cleaning-daily-2h",
+        "spec": "1人上门 · 全屋除尘整理", "price_from": 128, "price_unit": "/次", "duration_min": 120,
+        "tags": ["热门", "最快2小时上门"], "badges": ["神券", "全程保"], "sales_text": "已订 5.3万+",
+        "rating_score": 4.8, "worker_min_level": "L2", "cover_image": None,
+        "gallery": [], "includes": ["客厅卧室除尘", "地面清洁", "台面整理", "基础厨卫擦拭"],
+        "service_flow": ["确认地址与面积", "匹配保洁员", "按约上门", "完工验收"],
+        "service_notice": ["服务前2小时可免费取消", "标准耗材已含", "超时按30分钟补差价"], "sort_order": 1,
+    },
+    {
+        "id": 2, "category_id": "cleaning", "name": "深度清洁 · 4小时", "slug": "deep-clean-4h",
+        "spec": "3人团队 · 含厨卫去污", "price_from": 268, "price_unit": "起", "duration_min": 240,
+        "tags": ["爆款", "死角焕新"], "badges": ["团购爆品", "立减10"], "sales_text": "已订 1.6万+",
+        "rating_score": 4.9, "worker_min_level": "L3", "cover_image": None,
+        "gallery": [], "includes": ["厨房油污处理", "卫生间除垢", "踢脚线与缝隙除尘", "家具表面深擦"],
+        "service_flow": ["客服确认房型", "分配L3保洁员", "上门深度清洁", "拍照回传与验收"],
+        "service_notice": ["50㎡以内标准价", "特殊药剂需二次确认", "完工后可申请复洁"], "sort_order": 2,
+    },
+    {
+        "id": 3, "category_id": "cleaning", "name": "空调清洗 · 挂机", "slug": "ac-clean-wall",
+        "spec": "高温蒸汽 · 拆装深度", "price_from": 89, "price_unit": "/台", "duration_min": 90,
+        "tags": ["当天上门", "除菌除味"], "badges": ["会员价", "平台保障"], "sales_text": "近期好评 1000+",
+        "rating_score": 4.7, "worker_min_level": "L2", "cover_image": None,
+        "gallery": [], "includes": ["滤网拆洗", "蒸汽除菌", "出风口清洁", "基础功能检测"],
+        "service_flow": ["确认机型", "预约时段", "工程师上门", "清洗验收"],
+        "service_notice": ["柜机另计", "高空外机不含", "服务后24小时内可追评"], "sort_order": 3,
+    },
+    {
+        "id": 4, "category_id": "repair", "name": "管道疏通 · 当天", "slug": "pipe-unclog-fast",
+        "spec": "30分钟响应 · 不通不收费", "price_from": 99, "price_unit": "起", "duration_min": 60,
+        "tags": ["应急维修", "最快30分钟"], "badges": ["应急", "全天候"], "sales_text": "年售 2.4万+",
+        "rating_score": 4.8, "worker_min_level": "L3", "cover_image": None,
+        "gallery": [], "includes": ["厨房下水疏通", "卫生间地漏疏通", "基础堵点判断", "作业区清洁恢复"],
+        "service_flow": ["提交故障", "派发就近技师", "上门检测疏通", "完工确认"],
+        "service_notice": ["超技能范围可重派", "配件费另计", "30天同故障质保"], "sort_order": 1,
+    },
+    {
+        "id": 5, "category_id": "repair", "name": "灯具安装 · 吸顶灯", "slug": "light-install-ceiling",
+        "spec": "电工持证 · 高空作业规范", "price_from": 59, "price_unit": "/盏", "duration_min": 45,
+        "tags": ["持证上岗"], "badges": ["全程保"], "sales_text": "年售 6000+",
+        "rating_score": 4.6, "worker_min_level": "L2", "cover_image": None,
+        "gallery": [], "includes": ["拆旧装新", "电路检测", "基础调试", "现场清理"],
+        "service_flow": ["确认灯型", "预约上门", "安装调试", "拍照回传"],
+        "service_notice": ["复杂吊灯另报价", "不含灯具材料", "电路改造需二次确认"], "sort_order": 2,
+    },
+    {
+        "id": 6, "category_id": "moving", "name": "居民搬家 · 同城", "slug": "moving-city-standard",
+        "spec": "金杯车 · 2名师傅", "price_from": 398, "price_unit": "起", "duration_min": 180,
+        "tags": ["同城精选", "可加购打包"], "badges": ["省心搬", "平台保障"], "sales_text": "已搬 7800+",
+        "rating_score": 4.7, "worker_min_level": "L2", "cover_image": None,
+        "gallery": [], "includes": ["基础搬运", "车辆运输", "大件保护包裹", "楼道清运"],
+        "service_flow": ["提交清单", "客服估价", "确认车辆与人员", "按时搬运"],
+        "service_notice": ["楼层费按现场核算", "超距单独计费", "贵重物品建议保价"], "sort_order": 1,
+    },
+    {
+        "id": 7, "category_id": "moving", "name": "日式搬家 · 全包", "slug": "moving-japanese-full",
+        "spec": "打包收纳 + 还原归位", "price_from": 1680, "price_unit": "起", "duration_min": 480,
+        "tags": ["高端服务", "全程无忧"], "badges": ["PRO"], "sales_text": "企业家庭双适用",
+        "rating_score": 4.9, "worker_min_level": "L4", "cover_image": None,
+        "gallery": [], "includes": ["分类打包", "上门收纳", "新居归位", "垃圾清运"],
+        "service_flow": ["顾问勘察", "确认方案", "分工搬运", "到家复原"],
+        "service_notice": ["需提前1天预约", "贵重柜体单独报价", "默认含基础耗材"], "sort_order": 2,
+    },
+    {
+        "id": 8, "category_id": "nanny", "name": "钟点工 · 3小时", "slug": "nanny-hourly-3h",
+        "spec": "做饭保洁 · 灵活预约", "price_from": 128, "price_unit": "/次", "duration_min": 180,
+        "tags": ["灵活用工", "做饭保洁"], "badges": ["热门"], "sales_text": "年售 1.2万+",
+        "rating_score": 4.8, "worker_min_level": "L2", "cover_image": None,
+        "gallery": [], "includes": ["一餐制作", "基础保洁", "衣物整理", "简单采购代办"],
+        "service_flow": ["选时段", "匹配阿姨", "上门服务", "结束评价"],
+        "service_notice": ["食材默认用户提供", "需提前确认菜谱", "节假日价格浮动"], "sort_order": 1,
+    },
+    {
+        "id": 9, "category_id": "nanny", "name": "育儿嫂 · 住家", "slug": "nanny-livein-babycare",
+        "spec": "3年以上经验 · 持证", "price_from": 8800, "price_unit": "/月", "duration_min": 43200,
+        "tags": ["住家服务", "持证育儿"], "badges": ["严选"], "sales_text": "月签 300+",
+        "rating_score": 4.9, "worker_min_level": "L4", "cover_image": None,
+        "gallery": [], "includes": ["婴幼儿照护", "喂养作息", "辅食制作", "成长记录"],
+        "service_flow": ["顾问面谈", "筛选候选人", "试工确认", "月度服务"],
+        "service_notice": ["支持视频面试", "可加购体检背调", "签约后7天可换人"], "sort_order": 2,
+    },
+]
+
 
 def connect():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     ensure_schema(conn)
@@ -58,7 +172,19 @@ def ensure_schema(conn):
         ensure_unit_amenities(conn)
         ensure_unit_tags(conn)
     ensure_channels(conn)
+    ensure_jiazheng_schema(conn)
+    ensure_jz_vendor_schema(conn)
     conn.commit()
+
+
+def ensure_jz_vendor_schema(conn):
+    """P/B 管理台：商家/产品/服务者/子类目（与 C 端四大类 jz_categories 分离）。"""
+    schema_path = Path(__file__).resolve().parent / "jiazheng_schema.sql"
+    if schema_path.exists():
+        conn.executescript(schema_path.read_text(encoding="utf-8"))
+    product_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_products)").fetchall()}
+    if product_cols and "channel_sku_id" not in product_cols:
+        conn.execute("ALTER TABLE jz_products ADD COLUMN channel_sku_id INTEGER")
 
 
 def ensure_channels(conn):
@@ -78,13 +204,124 @@ def ensure_channels(conn):
             """
         )
     else:
-        defaults = [("bzf", "保租房", 1), ("trade", "卖旧买新", 2)]
+        defaults = [("bzf", "保租房", 1), ("trade", "卖旧买新", 2), ("jiazheng", "家政", 3)]
         for cid, label, order in defaults:
             if not conn.execute("SELECT 1 FROM channels WHERE id=?", (cid,)).fetchone():
                 conn.execute(
                     "INSERT INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
                     (cid, label, order),
                 )
+
+
+def ensure_jiazheng_schema(conn):
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS jz_categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          icon TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          note TEXT
+        );
+        CREATE TABLE IF NOT EXISTS jz_skus (
+          id INTEGER PRIMARY KEY,
+          category_id TEXT NOT NULL REFERENCES jz_categories(id),
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL UNIQUE,
+          spec TEXT,
+          price_from INTEGER,
+          price_unit TEXT,
+          duration_min INTEGER,
+          tags TEXT,
+          badges TEXT,
+          sales_text TEXT,
+          rating_score REAL,
+          worker_min_level TEXT,
+          cover_image TEXT,
+          gallery TEXT,
+          includes TEXT,
+          service_flow TEXT,
+          service_notice TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS jz_orders (
+          id TEXT PRIMARY KEY,
+          sku_id INTEGER REFERENCES jz_skus(id),
+          category_id TEXT NOT NULL REFERENCES jz_categories(id),
+          type TEXT NOT NULL,
+          house TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          expect_time TEXT NOT NULL,
+          desc TEXT,
+          fee INTEGER NOT NULL,
+          pay_status TEXT NOT NULL DEFAULT 'unpaid',
+          pay_method TEXT,
+          pay_at TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          worker_json TEXT,
+          rating_json TEXT,
+          source TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          log_json TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_jz_skus_category ON jz_skus(category_id, enabled, sort_order);
+        CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status, created_at);
+        """
+    )
+    for cid, name, icon, order, note in JZ_DEFAULT_CATEGORIES:
+        conn.execute(
+            """INSERT INTO jz_categories(id, name, icon, sort_order, enabled, note)
+               VALUES (?, ?, ?, ?, 1, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                 name=excluded.name,
+                 icon=excluded.icon,
+                 sort_order=excluded.sort_order,
+                 note=excluded.note""",
+            (cid, name, icon, order, note),
+        )
+    for sku in JZ_DEFAULT_SKUS:
+        conn.execute(
+            """INSERT INTO jz_skus(
+                 id, category_id, name, slug, spec, price_from, price_unit, duration_min,
+                 tags, badges, sales_text, rating_score, worker_min_level, cover_image,
+                 gallery, includes, service_flow, service_notice, sort_order, enabled
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET
+                 category_id=excluded.category_id,
+                 name=excluded.name,
+                 slug=excluded.slug,
+                 spec=excluded.spec,
+                 price_from=excluded.price_from,
+                 price_unit=excluded.price_unit,
+                 duration_min=excluded.duration_min,
+                 tags=excluded.tags,
+                 badges=excluded.badges,
+                 sales_text=excluded.sales_text,
+                 rating_score=excluded.rating_score,
+                 worker_min_level=excluded.worker_min_level,
+                 cover_image=excluded.cover_image,
+                 gallery=excluded.gallery,
+                 includes=excluded.includes,
+                 service_flow=excluded.service_flow,
+                 service_notice=excluded.service_notice,
+                 sort_order=excluded.sort_order"""
+            ,
+            (
+                sku["id"], sku["category_id"], sku["name"], sku["slug"], sku["spec"],
+                sku["price_from"], sku["price_unit"], sku["duration_min"],
+                json.dumps(sku["tags"], ensure_ascii=False),
+                json.dumps(sku["badges"], ensure_ascii=False),
+                sku["sales_text"], sku["rating_score"], sku["worker_min_level"], sku["cover_image"],
+                json.dumps(sku["gallery"], ensure_ascii=False),
+                json.dumps(sku["includes"], ensure_ascii=False),
+                json.dumps(sku["service_flow"], ensure_ascii=False),
+                json.dumps(sku["service_notice"], ensure_ascii=False),
+                sku["sort_order"],
+            ),
+        )
 
 
 DEFAULT_AMENITY_IDS = [
@@ -335,6 +572,64 @@ def parse_tags(items, json_keys=None):
     return items
 
 
+def normalize_jz_sku_row(d):
+    if not d:
+        return d
+    d = row_to_dict(d) if not isinstance(d, dict) else dict(d)
+    for key in ("tags", "badges", "gallery", "includes", "service_flow", "service_notice"):
+        d[key] = parse_json_field(d.get(key), []) or []
+    return d
+
+
+def normalize_jz_order_row(d):
+    if not d:
+        return d
+    d = row_to_dict(d) if not isinstance(d, dict) else dict(d)
+    for key in ("worker_json", "rating_json", "log_json"):
+        d[key] = parse_json_field(d.get(key), [] if key == "log_json" else None)
+    return d
+
+
+def jz_order_view(row, sku_name=None):
+    """API / 前端统一视图（前后端分离 JSON 契约）。"""
+    d = normalize_jz_order_row(row)
+    if not d:
+        return d
+    cat_id = d.get("category_id") or ""
+    worker = d.get("worker_json")
+    rating = d.get("rating_json")
+    name = sku_name or d.get("sku_name") or d.get("type") or "家政服务"
+    created = d.get("created_at") or ""
+    created_label = created.replace("T", " ").replace("Z", "")[:16] if created else ""
+    return {
+        "id": d["id"],
+        "sku_id": d.get("sku_id"),
+        "category_id": cat_id,
+        "category": name,
+        "type": JZ_CATEGORY_LABELS.get(cat_id, d.get("type") or "家政"),
+        "icon": JZ_CATEGORY_ICONS.get(cat_id, "✨"),
+        "house": d.get("house") or "",
+        "phone": d.get("phone") or "",
+        "expect_time": d.get("expect_time") or "",
+        "expectTime": d.get("expect_time") or "",
+        "desc": d.get("desc") or "",
+        "fee": int(d.get("fee") or 0),
+        "pay_status": d.get("pay_status") or "unpaid",
+        "pay_method": d.get("pay_method"),
+        "pay_at": d.get("pay_at"),
+        "status": d.get("status") or "pending",
+        "worker": worker,
+        "rating": rating,
+        "source": d.get("source") or "新居住频道",
+        "created_at": created,
+        "createdAt": created,
+        "createdLabel": created_label,
+        "updated_at": d.get("updated_at"),
+        "log": d.get("log_json") or [],
+        "live": True,
+    }
+
+
 def tags_to_db(tags):
     if tags is None:
         return json.dumps([], ensure_ascii=False)
@@ -443,6 +738,11 @@ def export_json(conn=None):
             "photos": rows(
                 "SELECT * FROM photos ORDER BY entity_type, entity_id, sort_order"
             ),
+            "jiazheng_categories": rows("SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"),
+            "jiazheng_skus": [
+                normalize_jz_sku_row(r)
+                for r in rows("SELECT * FROM jz_skus WHERE enabled=1 ORDER BY category_id, sort_order, id")
+            ],
         }
         JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         return data

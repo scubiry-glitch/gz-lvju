@@ -166,6 +166,7 @@
           { id: 'standards',       label: 'L0-L7 等级标准',      href: 'p-standards.html',      icon: 'layers',  badge: 'v3.0' },
           { id: 'question-bank',   label: '考题题库 + 试卷',     href: 'p-question-bank.html',  icon: 'list',    badge: '1.2k' },
           { id: 'service-demand',  label: '服务需求 · 工单池',   href: 'p-service-demand.html', icon: 'list' },
+          { id: 'jiazheng-api',    label: '新居住 · 家政频道 ↗', href: '../juzhu-channel-v3-grid.html', icon: 'home', badge: 'API' },
           { id: 'traffic-policy',  label: '派单流量策略 + 扶持', href: 'p-traffic-policy.html', icon: 'radio',   badge: '7' },
           { id: 'transaction',     label: '派单分账 + 结算',     href: 'p-transaction.html',    icon: 'coin',    badge: 'T+7' },
           { id: 'service-review',  label: '服务评价 · 口碑回流', href: 'p-service-review.html', icon: 'star' },
@@ -205,6 +206,9 @@
         ]},
         { name: '🏠 居住服务 · 家政频道', items: [
           { id: 'jz-category', label: '★ 服务子类目管理',     href: 'p-jz-category.html', icon: 'list' },
+          { id: 'jz-product',  label: '★ 服务产品管理 ↗',     href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-worker',   label: '★ 服务者管理 ↗',       href: 'p-jz-worker.html',   icon: 'user' },
+          { id: 'jiazheng-flow', label: '四大品类全流程 ↗',   href: '../juzhu-jiazheng-flow.html', icon: 'truck', badge: 'E2E' },
         ]},
       ],
     },

@@ -25,14 +25,9 @@ def main():
         sys.exit(1)
 
     print(f"📦 连接数据库: {DB_PATH}")
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-
-    # 1. 建表
-    print("📋 建表...")
-    schema_sql = SCHEMA.read_text(encoding="utf-8")
-    conn.executescript(schema_sql)
+    sys.path.insert(0, str(ROOT))
+    from db import connect  # noqa: E402
+    conn = connect()
 
     # 2. 子类目（4 类 × 6 子 = 24 个）
     print("📂 子类目...")
@@ -54,14 +49,13 @@ def main():
         ("nanny", "钟点工", "⏱"), ("nanny", "月嫂", "🤱"),
         ("nanny", "住家育儿嫂", "👶"), ("nanny", "养老护理", "🧓"),
     ]
-    conn.execute("DELETE FROM jz_orders")
     conn.execute("DELETE FROM jz_workers")
     conn.execute("DELETE FROM jz_products")
     conn.execute("DELETE FROM jz_vendors")
-    conn.execute("DELETE FROM jz_categories")
+    conn.execute("DELETE FROM jz_subcategories")
     for i, (ptype, name, icon) in enumerate(CATS):
         conn.execute(
-            "INSERT INTO jz_categories(parent_type, name, icon, sort_order, status) VALUES (?, ?, ?, ?, 'on')",
+            "INSERT INTO jz_subcategories(parent_type, name, icon, sort_order, status) VALUES (?, ?, ?, ?, 'on')",
             (ptype, name, icon, i + 1),
         )
 
@@ -105,7 +99,7 @@ def main():
     # 4. 商品 SKU
     print("🛍 商品...")
     PRODUCTS = [
-        # cleaning - 8 个
+        # cleaning - channel_sku_id 对齐 C 端 jz_skus（2=深度清洁）
         (101, 1, "日常保洁 2小时", "上门除尘 · 死无死角", "日常保洁",
          2, "≤50㎡", "2小时", 79.8, 200, "4折", "今天 18:00", 2,
          53000, 4.7, ["每个角落都仔细清洁", "死无死角", "专业工具"]),
@@ -173,6 +167,7 @@ def main():
          3, "", "次", 128, 220, "5.8折", "今天 18:00", 4,
          12800, 4.7, ["做饭保洁", "灵活预约", "3小时"]),
     ]
+    CHANNEL_SKU = {102: 2, 1102: 4, 2101: 6, 3103: 8}
     conn.execute("DELETE FROM jz_products")  # noqa 上面已清
     for p in PRODUCTS:
         (pid, vid, title, sub, cat, dur, area, unit, price, orig, disc_label,
@@ -181,10 +176,10 @@ def main():
             """INSERT INTO jz_products(id, vendor_id, title, subtitle, category,
                duration_hours, area_range, unit, price, original_price, discount_label,
                earliest_time, advance_booking_hours, sales_count, rating, service_tags,
-               status, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'on', ?)""",
+               channel_sku_id, status, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'on', ?)""",
             (pid, vid, title, sub, cat, dur, area, unit, price, orig, disc_label,
-             earliest, adv, sales, rating, jdump(tags), pid),
+             earliest, adv, sales, rating, jdump(tags), CHANNEL_SKU.get(pid), pid),
         )
 
     # 5. 服务者

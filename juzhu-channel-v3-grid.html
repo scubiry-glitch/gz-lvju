@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>新居住 · 沈阳 · 贝壳</title>
+<title>新居住 · 南京 · 贝壳</title>
 <link rel="stylesheet" href="lvju-app.css?v=6">
 <style>
   .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);position:relative;z-index:5;}
@@ -108,14 +108,14 @@
   <div class="scr">
     <div class="appbar ghost" style="position:absolute;">
       <a class="bk" href="beike-app-home.html">‹</a>
-      <div class="ttl">新居住<small>沈阳 · 东博专区</small></div>
+      <div class="ttl">新居住<small id="navCitySub">南京 · 东博专区</small></div>
       <div class="act"><a href="juzhu-channel-schemes.html">≡</a></div>
     </div>
 
     <div class="split-hd">
       <div class="bg"></div>
       <div class="in">
-        <div class="ek">Cover Collage · Shenyang</div>
+        <div class="ek" id="heroEk">Cover Collage · Nanjing</div>
         <h1 id="heroTitle">新居住频道</h1>
         <div class="stat" id="heroStat"></div>
         <div class="seg-switch" id="tabs">
@@ -125,14 +125,14 @@
       </div>
     </div>
 
-    <div class="scheme-bar"><span>方案 C · 沈阳真实数据</span><a href="juzhu-channel-schemes.html">切换方案 ›</a></div>
+    <div class="scheme-bar"><span id="schemeLabel">方案 C · 南京真实数据</span><a href="juzhu-channel-schemes.html">切换方案 ›</a></div>
 
     <div class="pane on" id="pane-bzf">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选区租房</h2><span class="more" id="distCount">—</span></div>
       <div class="collage" id="collage"></div>
       <div class="banner">
         <span class="bi">🏛</span>
-        <div class="bt"><b>沈阳保租房 · 东博试点专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
+        <div class="bt"><b id="bzfBannerTitle">南京保租房 · 东博试点专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
       </div>
     </div>
 
@@ -142,7 +142,7 @@
     </div>
 
     <div class="pane" id="pane-jiazheng">
-      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more">4 大类目</span></div>
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
       <div class="jz-quick">
         <div class="jz-cat-grid" id="jzCats"></div>
       </div>
@@ -156,12 +156,34 @@
     <div class="load-err" id="err" hidden></div>
   </div>
 </div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js"></script>
 <script src="juzhu/app.js?v=11"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
 
+  function applyChannelChrome(d) {
+    var city = (d && d.city && d.city.name) || (window.BZF_JZ && BZF_JZ.regionCity()) || '南京';
+    var op = (window.BZF_JZ && BZF_JZ.regionOperator()) || '贝壳';
+    document.getElementById('navCitySub').textContent = city + ' · 东博专区';
+    document.getElementById('schemeLabel').textContent = '方案 C · ' + city + '真实数据';
+    document.getElementById('bzfBannerTitle').textContent = city + '保租房 · 东博试点专区';
+    document.getElementById('heroEk').textContent = 'Cover Collage · ' + city;
+    document.title = '新居住 · ' + city + ' · ' + op;
+  }
+
+  function activateTab(tabId) {
+    document.querySelectorAll('.seg-switch a').forEach(function(a) {
+      a.classList.toggle('on', a.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.pane').forEach(function(p) {
+      p.classList.toggle('on', p.id === 'pane-' + tabId);
+    });
+  }
+
   function renderHero(d){
+    applyChannelChrome(d);
     document.getElementById('heroTitle').textContent = d.city.name + ' · 新居住';
     document.getElementById('heroStat').innerHTML =
       '<div><b>'+d.stats.project_count_bzf+'</b>保租项目</div>'+
@@ -258,7 +280,7 @@
   function renderJiazhengCats(){
     document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c){
       var subHtml = c.subs.slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
-      return '<a class="jz-cat '+c.id+'" href="jiazheng-landing-'+c.id+'.html">'+
+      return '<a class="jz-cat '+c.id+'" href="juzhu-jiazheng-list.html?type='+c.id+'">'+
         '<div class="bg"></div><div class="arrow">›</div>'+
         '<div class="in"><div>'+
           '<div class="ico">'+c.icon+'</div>'+
@@ -268,22 +290,25 @@
     }).join('');
   }
 
-  // 热门子类（示例数据，6条）
-  function renderJiazhengSubs(){
+  // 热门子类（接 API SKU，链到详情页）
+  function renderJiazhengSubs(skus) {
+    var pick = function(cat, fallback) {
+      var row = (skus || []).filter(function(s) { return s.category_id === cat; })[0];
+      return row || fallback;
+    };
     var rows = [
-      { name: '深度清洁 · 4小时', sub: '3人团队 · 含厨卫去污', price: '¥268起', type: 'cleaning' },
-      { name: '空调清洗 · 挂机', sub: '高温蒸汽 · 拆装深度', price: '¥89/台', type: 'repair' },
-      { name: '居民搬家 · 同城', sub: '金杯车 · 2名师傅', price: '¥398起', type: 'moving' },
-      { name: '育儿嫂 · 住家', sub: '3年以上经验 · 持证', price: '¥8,800/月', type: 'nanny' },
-      { name: '管道疏通 · 当天', sub: '30分钟上门 · 不通不收费', price: '¥99起', type: 'repair' },
-      { name: '钟点工 · 3小时', sub: '做饭保洁 · 灵活预约', price: '¥128/次', type: 'nanny' }
+      pick('cleaning', { name: '深度清洁 · 4小时', spec: '3人团队 · 含厨卫去污', price_from: 268, price_unit: '起', slug: 'deep-clean-4h', category_id: 'cleaning' }),
+      pick('repair', { name: '管道疏通 · 当天', spec: '30分钟上门 · 不通不收费', price_from: 99, price_unit: '起', slug: 'pipe-unclog-fast', category_id: 'repair' }),
+      pick('moving', { name: '居民搬家 · 同城', spec: '金杯车 · 2名师傅', price_from: 398, price_unit: '起', slug: 'moving-city-standard', category_id: 'moving' }),
+      pick('nanny', { name: '钟点工 · 3小时', spec: '做饭保洁 · 灵活预约', price_from: 128, price_unit: '/次', slug: 'nanny-hourly-3h', category_id: 'nanny' })
     ];
-    document.getElementById('jzSubs').innerHTML = rows.map(function(r){
-      return '<a class="row" href="jiazheng-list.html?type='+r.type+'&sub='+encodeURIComponent(r.name)+'">'+
-        '<div><b>'+r.name+'</b><div class="meta">'+r.sub+'</div></div>'+
-        '<div style="display:flex;align-items:center;gap:12px;">'+
-          '<div class="pr">'+r.price+'</div>'+
-          '<div class="go">查看 ›</div>'+
+    document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
+      var price = '¥' + Number(r.price_from || 0).toLocaleString() + (r.price_unit || '起');
+      return '<a class="row" href="juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug) + '">' +
+        '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+          '<div class="pr">' + price + '</div>' +
+          '<div class="go">预约 ›</div>' +
         '</div></a>';
     }).join('');
   }
@@ -296,7 +321,7 @@
       { cls: 'deep', tag: 'PRO',    title: '企业月付套餐',    desc: '中小企业办公保洁定制',    cta: '联系顾问' }
     ];
     document.getElementById('jzPromo').innerHTML = cards.map(function(c){
-      return '<a class="jz-promo-card '+c.cls+'" href="jiazheng-list.html?type=promo&tag='+c.cls+'">'+
+      return '<a class="jz-promo-card '+c.cls+'" href="juzhu-jiazheng-list.html?type=cleaning">'+
         '<span class="tag">'+c.tag+'</span>'+
         '<h3>'+c.title+'</h3>'+
         '<p>'+c.desc+'</p>'+
@@ -306,23 +331,28 @@
 
   document.getElementById('tabs').addEventListener('click',function(e){
     var t = e.target.closest('[data-tab]'); if(!t) return;
-    document.querySelectorAll('.seg-switch a').forEach(function(a){ a.classList.toggle('on', a===t); });
-    document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('on', p.id==='pane-'+t.dataset.tab); });
+    activateTab(t.dataset.tab);
   });
 
-  JUZHU.load().then(function(d){
+  var initTab = new URLSearchParams(location.search).get('tab') || (location.hash || '').replace('#', '');
+
+  Promise.all([JUZHU.load(), window.BZF_JZ ? BZF_JZ.skus() : Promise.resolve([])]).then(function(res){
+    var d = res[0];
+    var skus = res[1] || [];
     var tabs = document.getElementById('tabs');
     var chs = JUZHU.enabledChannels();
     if (chs.length) {
       tabs.innerHTML = chs.map(function(c, i) {
-        return '<a class="' + (i === 0 ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
+        var on = initTab ? (c.id === initTab) : (i === 0);
+        return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
       }).join('');
+      activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
     }
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());
     renderJiazhengCats();
-    renderJiazhengSubs();
+    renderJiazhengSubs(skus);
     renderJiazhengPromo();
   }).catch(function(err){
     document.getElementById('err').hidden = false;

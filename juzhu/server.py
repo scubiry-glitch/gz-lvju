@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """新居住频道 API + 静态文件 + 编辑后台接口。启动：python3 juzhu/server.py"""
 import json
+import os
+import posixpath
 import re
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -13,10 +15,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from datetime import datetime, timezone
 
 from db import (  # noqa: E402
+    JZ_CATEGORY_ICONS,
+    JZ_CATEGORY_LABELS,
+    JZ_STATUS_ORDER,
+    JZ_WORKERS,
     connect,
     default_amenities_db,
     export_json,
     json_to_db,
+    jz_order_view,
+    normalize_jz_order_row,
+    normalize_jz_sku_row,
     normalize_project_row,
     normalize_unit_row,
     rating_code,
@@ -36,6 +45,8 @@ ADMIN_PREFIX = "/api/juzhu/admin"
 ASSETS_PREFIX = "assets/juzhu/sy"
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+API_KEY_ENV = "JUZHU_API_KEY"
+DEFAULT_API_KEY = "dev-juzhu-key"
 
 
 def slugify(name):
@@ -60,6 +71,15 @@ def ext_from_upload(filename, content_type):
         "image/gif": ".gif",
     }
     return mapping.get((content_type or "").split(";")[0].strip().lower(), ".jpg")
+
+
+def now_iso():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def order_id():
+    stamp = datetime.now(timezone.utc).strftime("%y%m%d%H%M%S%f")[-12:]
+    return f"WO-{stamp}"
 
 
 def parse_multipart(body, boundary):
@@ -167,8 +187,16 @@ def unit_gallery_rel(conn, unit_id, ext):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *a, **kw):
-        super().__init__(*a, directory=str(ROOT), **kw)
+    def translate_path(self, path):
+        """Python 3.6 无 directory 参数，自定义静态根目录为仓库 ROOT。"""
+        path = path.split("?", 1)[0]
+        path = path.split("#", 1)[0]
+        path = posixpath.normpath(unquote(path))
+        parts = [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
+        out = str(ROOT)
+        for part in parts:
+            out = os.path.join(out, part)
+        return out
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -232,6 +260,27 @@ class Handler(SimpleHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(n).decode("utf-8"))
 
+    def _expected_api_key(self):
+        return (os.environ.get(API_KEY_ENV) or DEFAULT_API_KEY).strip()
+
+    def _provided_api_key(self):
+        auth = self.headers.get("Authorization", "").strip()
+        if auth.lower().startswith("bearer "):
+            return auth[7:].strip()
+        return (self.headers.get("X-API-Key") or "").strip()
+
+    def _require_api_key(self):
+        if self._provided_api_key() == self._expected_api_key():
+            return True
+        self._json(
+            {
+                "error": "unauthorized",
+                "message": f"请通过 Authorization: Bearer <{API_KEY_ENV}> 或 X-API-Key 传入有效 API Key",
+            },
+            401,
+        )
+        return False
+
     def _route(self, p, method):
         path = p.path.rstrip("/")
         qs = parse_qs(p.query)
@@ -242,6 +291,14 @@ class Handler(SimpleHTTPRequestHandler):
 
         if method == "GET" and not path.startswith(ADMIN_PREFIX):
             return self._public_get(path, qs)
+
+        if method != "GET" and (
+            path.startswith(ADMIN_PREFIX)
+            or path == "/api/juzhu/jiazheng/orders"
+            or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
+        ):
+            if not self._require_api_key():
+                return
 
         if path == f"{ADMIN_PREFIX}/districts" and method == "GET":
             conn = connect()
@@ -354,6 +411,29 @@ class Handler(SimpleHTTPRequestHandler):
             if method == "DELETE":
                 return self._delete_unit(uid)
 
+        if path == "/api/juzhu/jiazheng/orders" and method == "POST":
+            return self._create_jz_order()
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/pay$", path)
+        if m and method == "POST":
+            return self._pay_jz_order(m.group(1))
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/quote$", path)
+        if m and method == "POST":
+            return self._quote_jz_order(m.group(1))
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/dispatch$", path)
+        if m and method == "POST":
+            return self._dispatch_jz_order(m.group(1))
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/advance$", path)
+        if m and method == "POST":
+            return self._advance_jz_order(m.group(1))
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/rate$", path)
+        if m and method == "POST":
+            return self._rate_jz_order(m.group(1))
+
         return self._json({"error": "unknown route", "path": path}, 404)
 
     def _public_get(self, path, qs):
@@ -423,7 +503,7 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"listings": data})
 
-        # === 居住服务·家政频道 /api/juzhu/jz/* ===
+        # === 居住服务·家政频道 /api/juzhu/jz/*（P/B 管理台：商家/产品/服务者） ===
         if path == "/api/juzhu/jz/categories":
             type_ = qs.get("type", [None])[0]
             if qs.get("all", ["0"])[0] == "1":
@@ -497,8 +577,373 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"list": data})
 
+        # === 家政 C 端工单流 /api/juzhu/jiazheng/*（SKU + 订单闭环） ===
+        if path == "/api/juzhu/jiazheng/categories":
+            rows = rows_to_list(conn.execute(
+                "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
+            ))
+            conn.close()
+            return self._json({"items": rows})
+
+        if path == "/api/juzhu/jiazheng/workers":
+            conn.close()
+            return self._json({"items": JZ_WORKERS})
+
+        if path == "/api/juzhu/jiazheng/orders/stats":
+            if self._provided_api_key() != self._expected_api_key():
+                conn.close()
+                return self._json({"error": "unauthorized"}, 401)
+            return self._jz_order_stats(conn)
+
+        if path == "/api/juzhu/jiazheng/orders":
+            if qs.get("phone"):
+                return self._list_jz_orders(qs, conn=conn)
+            if self._provided_api_key() == self._expected_api_key():
+                return self._list_jz_orders(qs, conn=conn)
+            conn.close()
+            return self._json({"error": "需要 phone 查询参数或有效 API Key"}, 401)
+
+        m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)$", path)
+        if m:
+            row = conn.execute(
+                """SELECT o.*, s.name AS sku_name
+                   FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id
+                   WHERE o.id=?""",
+                (m.group(1),),
+            ).fetchone()
+            if not row:
+                conn.close()
+                return self._json({"error": "not found"}, 404)
+            order = jz_order_view(row, row["sku_name"] if row else None)
+            conn.close()
+            return self._json({"order": order})
+
+        if path == "/api/juzhu/jiazheng/skus":
+            sql = """SELECT s.*, c.name AS category_name, c.icon AS category_icon
+                     FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                     WHERE s.enabled=1 AND c.enabled=1"""
+            params = []
+            if qs.get("category"):
+                sql += " AND s.category_id=?"
+                params.append(qs["category"][0])
+            if qs.get("q"):
+                q = "%" + qs["q"][0] + "%"
+                sql += " AND (s.name LIKE ? OR s.spec LIKE ?)"
+                params.extend([q, q])
+            sql += " ORDER BY s.category_id, s.sort_order, s.id"
+            rows = [normalize_jz_sku_row(r) for r in conn.execute(sql, params).fetchall()]
+            conn.close()
+            return self._json({"items": rows})
+
+        m = re.match(r"^/api/juzhu/jiazheng/skus/([^/]+)$", path)
+        if m:
+            row = conn.execute(
+                """SELECT s.*, c.name AS category_name, c.icon AS category_icon
+                   FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                   WHERE s.slug=? AND s.enabled=1 AND c.enabled=1""",
+                (m.group(1),),
+            ).fetchone()
+            if not row:
+                conn.close()
+                return self._json({"error": "not found"}, 404)
+            item = normalize_jz_sku_row(row)
+            related = [
+                normalize_jz_sku_row(r)
+                for r in conn.execute(
+                    """SELECT * FROM jz_skus
+                       WHERE enabled=1 AND category_id=? AND slug<>?
+                       ORDER BY sort_order, id LIMIT 4""",
+                    (item["category_id"], item["slug"]),
+                ).fetchall()
+            ]
+            conn.close()
+            return self._json({"item": item, "related": related})
+
         conn.close()
         return self._json({"error": "unknown route"}, 404)
+
+    def _create_jz_order(self):
+        b = self._body()
+        sku_id = b.get("sku_id")
+        expect_time = (b.get("expectTime") or b.get("expect_time") or "").strip()
+        house = (b.get("house") or "").strip()
+        phone = (b.get("phone") or "").strip()
+        if not sku_id or not house or not phone or not expect_time:
+            return self._json({"error": "sku_id / house / phone / expectTime 为必填"}, 400)
+
+        conn = connect()
+        row = conn.execute(
+            """SELECT s.*, c.name AS category_name
+               FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+               WHERE s.id=? AND s.enabled=1 AND c.enabled=1""",
+            (int(sku_id),),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "sku not found"}, 404)
+        sku = normalize_jz_sku_row(row)
+        oid = order_id()
+        now = now_iso()
+        fee = int(b.get("fee") or sku.get("price_from") or 0)
+        log = [{"s": "pending", "at": now, "by": "user"}]
+        conn.execute(
+            """INSERT INTO jz_orders(
+                 id, sku_id, category_id, type, house, phone, expect_time, desc, fee,
+                 pay_status, status, source, created_at, updated_at, log_json
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?)""",
+            (
+                oid,
+                sku["id"],
+                sku["category_id"],
+                sku["category_name"],
+                house,
+                phone,
+                expect_time,
+                b.get("desc"),
+                fee,
+                b.get("source") or "新居住频道",
+                now,
+                now,
+                json_to_db(log),
+            ),
+        )
+        conn.commit()
+        order = jz_order_view(
+            conn.execute(
+                """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                (oid,),
+            ).fetchone()
+        )
+        conn.close()
+        return self._json({"ok": True, "order": order, "sku": sku}, 201)
+
+    def _list_jz_orders(self, qs, conn=None):
+        close = conn is None
+        if close:
+            conn = connect()
+        sql = """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                 LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1"""
+        params = []
+        if qs.get("phone"):
+            sql += " AND o.phone=?"
+            params.append(qs["phone"][0].strip())
+        if qs.get("pay_status"):
+            sql += " AND o.pay_status=?"
+            params.append(qs["pay_status"][0])
+        if qs.get("status"):
+            statuses = [s.strip() for s in qs["status"][0].split(",") if s.strip()]
+            if statuses:
+                sql += " AND o.status IN (" + ",".join("?" * len(statuses)) + ")"
+                params.extend(statuses)
+        sql += " ORDER BY o.created_at DESC"
+        limit = min(int(qs["limit"][0]), 200) if qs.get("limit") else 100
+        sql += " LIMIT ?"
+        params.append(limit)
+        items = [
+            jz_order_view(r, r["sku_name"] if "sku_name" in r.keys() else None)
+            for r in conn.execute(sql, params).fetchall()
+        ]
+        conn.close()
+        return self._json({"items": items})
+
+    def _jz_order_stats(self, conn):
+        def cnt(where, params=()):
+            return conn.execute(f"SELECT COUNT(*) FROM jz_orders WHERE {where}", params).fetchone()[0]
+
+        stats = {
+            "pending": cnt("pay_status='paid' AND status='pending'"),
+            "dispatched": cnt("status='dispatched'"),
+            "accepted": cnt("status='accepted'"),
+            "serving": cnt("status='serving'"),
+            "done": cnt("status='done'"),
+            "rated": cnt("status='rated'"),
+            "unpaid": cnt("pay_status='unpaid'"),
+            "pool": cnt("pay_status='paid' AND status IN ('pending','dispatched','accepted','serving')"),
+            "today_done": cnt("status IN ('done','rated')"),
+        }
+        conn.close()
+        return self._json({"stats": stats})
+
+    def _dispatch_jz_order(self, oid):
+        b = self._body()
+        conn = connect()
+        row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "order not found"}, 404)
+        order = normalize_jz_order_row(row)
+        if order["pay_status"] != "paid":
+            conn.close()
+            return self._json({"error": "订单未支付，不可派单"}, 400)
+        if order["status"] != "pending":
+            conn.close()
+            return self._json({"error": "仅待派单状态可派单"}, 400)
+        worker = b.get("worker")
+        if not worker:
+            assigned = conn.execute(
+                "SELECT COUNT(*) FROM jz_orders WHERE status IN ('dispatched','accepted','serving','done','rated')"
+            ).fetchone()[0]
+            worker = dict(JZ_WORKERS[assigned % len(JZ_WORKERS)])
+        now = now_iso()
+        log = order.get("log_json") or []
+        log.append({"s": "dispatched", "at": now, "by": "platform", "worker": worker.get("name")})
+        conn.execute(
+            """UPDATE jz_orders
+               SET status='dispatched', worker_json=?, updated_at=?, log_json=?
+               WHERE id=?""",
+            (json_to_db(worker), now, json_to_db(log), oid),
+        )
+        conn.commit()
+        view = jz_order_view(
+            conn.execute(
+                """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                (oid,),
+            ).fetchone()
+        )
+        conn.close()
+        return self._json({"ok": True, "order": view})
+
+    def _advance_jz_order(self, oid):
+        conn = connect()
+        row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "order not found"}, 404)
+        order = normalize_jz_order_row(row)
+        try:
+            idx = JZ_STATUS_ORDER.index(order["status"])
+        except ValueError:
+            conn.close()
+            return self._json({"error": "invalid status"}, 400)
+        if idx < 0 or idx >= len(JZ_STATUS_ORDER) - 1:
+            conn.close()
+            return self._json({"ok": True, "order": jz_order_view(row)})
+        nxt = JZ_STATUS_ORDER[idx + 1]
+        if nxt == "rated":
+            conn.close()
+            return self._json({"error": "评价只能由客户提交"}, 400)
+        if order["status"] == "pending":
+            conn.close()
+            return self._json({"error": "请先由中台派单"}, 400)
+        now = now_iso()
+        log = order.get("log_json") or []
+        log.append({"s": nxt, "at": now, "by": "worker"})
+        conn.execute(
+            "UPDATE jz_orders SET status=?, updated_at=?, log_json=? WHERE id=?",
+            (nxt, now, json_to_db(log), oid),
+        )
+        conn.commit()
+        view = jz_order_view(
+            conn.execute(
+                """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                (oid,),
+            ).fetchone()
+        )
+        conn.close()
+        return self._json({"ok": True, "order": view})
+
+    def _rate_jz_order(self, oid):
+        b = self._body()
+        score = int(b.get("score") or 0)
+        if score < 1 or score > 5:
+            return self._json({"error": "score 须为 1-5"}, 400)
+        conn = connect()
+        row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "order not found"}, 404)
+        order = normalize_jz_order_row(row)
+        if order["status"] != "done":
+            conn.close()
+            return self._json({"error": "仅已完成待评价订单可评价"}, 400)
+        rating = {
+            "score": score,
+            "tags": b.get("tags") or [],
+            "text": (b.get("text") or "").strip(),
+        }
+        now = now_iso()
+        log = order.get("log_json") or []
+        log.append({"s": "rated", "at": now, "by": "user", "score": score})
+        conn.execute(
+            """UPDATE jz_orders
+               SET status='rated', rating_json=?, updated_at=?, log_json=?
+               WHERE id=?""",
+            (json_to_db(rating), now, json_to_db(log), oid),
+        )
+        conn.commit()
+        view = jz_order_view(
+            conn.execute(
+                """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                (oid,),
+            ).fetchone()
+        )
+        conn.close()
+        return self._json({"ok": True, "order": view})
+
+    def _pay_jz_order(self, oid):
+        b = self._body()
+        conn = connect()
+        row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "order not found"}, 404)
+        order = normalize_jz_order_row(row)
+        if order["pay_status"] == "paid":
+            conn.close()
+            return self._json({"ok": True, "order": order})
+        now = now_iso()
+        log = order.get("log_json") or []
+        log.append({"s": "paid", "at": now, "by": "user"})
+        conn.execute(
+            """UPDATE jz_orders
+               SET pay_status='paid', pay_method=?, pay_at=?, updated_at=?, log_json=?
+               WHERE id=?""",
+            (b.get("pay_method") or "贝壳支付", now, now, json_to_db(log), oid),
+        )
+        conn.commit()
+        order = jz_order_view(
+            conn.execute(
+                """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                (oid,),
+            ).fetchone()
+        )
+        conn.close()
+        return self._json({"ok": True, "order": order})
+
+    def _quote_jz_order(self, oid):
+        b = self._body()
+        conn = connect()
+        row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone()
+        if not row:
+            conn.close()
+            return self._json({"error": "order not found"}, 404)
+        order = normalize_jz_order_row(row)
+        if order["category_id"] != "repair":
+            conn.close()
+            return self._json({"error": "仅维修单支持报价"}, 400)
+        quote_items = b.get("quote_items") or []
+        extra_fee = sum(int(item.get("price") or 0) for item in quote_items)
+        now = now_iso()
+        log = order.get("log_json") or []
+        log.append({"s": "quoted", "at": now, "by": "platform", "extra_fee": extra_fee})
+        desc = (order.get("desc") or "").strip()
+        if b.get("quote_note"):
+            desc = (desc + "\n\n报价说明：" + str(b["quote_note"]).strip()).strip()
+        conn.execute(
+            """UPDATE jz_orders
+               SET fee=?, desc=?, updated_at=?, log_json=?
+               WHERE id=?""",
+            (int(order["fee"] or 0) + extra_fee, desc, now, json_to_db(log), oid),
+        )
+        conn.commit()
+        order = normalize_jz_order_row(conn.execute("SELECT * FROM jz_orders WHERE id=?", (oid,)).fetchone())
+        conn.close()
+        return self._json({"ok": True, "order": order, "quote_items": quote_items})
 
     def _get_project(self, pid):
         conn = connect()
@@ -557,45 +1002,60 @@ class Handler(SimpleHTTPRequestHandler):
             body = self._body()
 
             if path == "/api/juzhu/jz/orders":
-                # 创建订单
-                vendor = jzdb.get_vendor(conn, body.get("vendor_id"))
-                product = jzdb.get_product(conn, body.get("product_id"))
-                if not vendor or not product:
-                    return self._json({"error": "vendor or product not found"}, 404)
-                # 生成订单号
-                from datetime import datetime, timezone
-                seq_row = conn.execute("SELECT seq FROM jz_order_seq WHERE id=1").fetchone()
-                seq = (seq_row["seq"] if seq_row else 0) + 1
+                sku_id = body.get("sku_id")
+                if not sku_id and body.get("product_id"):
+                    prow = conn.execute(
+                        "SELECT channel_sku_id FROM jz_products WHERE id=?",
+                        (int(body["product_id"]),),
+                    ).fetchone()
+                    sku_id = prow["channel_sku_id"] if prow else None
+                if not sku_id:
+                    return self._json(
+                        {"error": "需要 sku_id 或带 channel_sku_id 的 product_id"},
+                        400,
+                    )
+                house = (body.get("address") or body.get("house") or "").strip()
+                phone = (body.get("phone") or "").strip()
+                expect_time = (body.get("scheduled_at") or body.get("expectTime") or "").strip()
+                if not house or not phone or not expect_time:
+                    return self._json({"error": "address / phone / scheduled_at 为必填"}, 400)
+                row = conn.execute(
+                    """SELECT s.*, c.name AS category_name
+                       FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                       WHERE s.id=? AND s.enabled=1 AND c.enabled=1""",
+                    (int(sku_id),),
+                ).fetchone()
+                if not row:
+                    return self._json({"error": "sku not found"}, 404)
+                sku = normalize_jz_sku_row(row)
+                oid = order_id()
+                now = now_iso()
+                fee = int(body.get("fee") or sku.get("price_from") or 0)
+                log = [{"s": "pending", "at": now, "by": "user"}]
                 conn.execute(
-                    "INSERT OR REPLACE INTO jz_order_seq(id, seq) VALUES (1, ?)",
-                    (seq,),
+                    """INSERT INTO jz_orders(
+                         id, sku_id, category_id, type, house, phone, expect_time, desc, fee,
+                         pay_status, status, source, created_at, updated_at, log_json
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?)""",
+                    (
+                        oid,
+                        sku["id"],
+                        sku["category_id"],
+                        sku["category_name"],
+                        house,
+                        phone,
+                        expect_time,
+                        body.get("desc") or body.get("product_title"),
+                        fee,
+                        body.get("source") or "B端产品",
+                        now,
+                        now,
+                        json_to_db(log),
+                    ),
                 )
-                oid = "WO-2026-" + str(80000 + seq)
-                now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-                order = {
-                    "id": oid,
-                    "type": body.get("type", vendor["type"]),
-                    "vendor_id": vendor["id"],
-                    "product_id": product["id"],
-                    "vendor_name": vendor["name"],
-                    "vendor_logo": vendor["logo"],
-                    "product_title": product["title"],
-                    "product_sub": product["subtitle"],
-                    "product_price": product["price"],
-                    "address": body.get("address", ""),
-                    "phone": body.get("phone", ""),
-                    "scheduled_at": body.get("scheduled_at", ""),
-                    "fee": body.get("fee", product["price"]),
-                    "status": "pending",
-                    "source": "jz",
-                    "created_at": now,
-                    "updated_at": now,
-                }
-                jzdb.create_order(conn, order)
                 conn.commit()
-                # 返回完整订单（包含 worker=null）
                 created = jzdb.get_order(conn, oid)
-                return self._json({"ok": True, "order": created})
+                return self._json({"ok": True, "order": created}, 201)
 
             m = re.match(r"^/api/juzhu/jz/orders/([^/]+)/dispatch$", path)
             if m:
@@ -1422,7 +1882,7 @@ def main():
     print(f"新居住服务  http://localhost:{port}")
     print(f"  前台  /juzhu-channel-v3-grid.html")
     print(f"  后台  /juzhu-admin.html")
-    print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/ratings")
+    print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/jiazheng/*")
     HTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 

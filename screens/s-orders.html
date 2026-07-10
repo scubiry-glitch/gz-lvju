@@ -239,9 +239,9 @@
   }));
 </script>
 <script src="_region.js?v=2"></script>
-<script src="_orderbus.js"></script>
+<script src="_jzapi.js"></script>
 <script>
-const BO = window.BZF_ORDERS;
+const JZ = window.BZF_JZ;
 let toastTimer = null;
 function toast(msg){
   const t = document.getElementById('toast');
@@ -275,7 +275,7 @@ function timeline(status){
 }
 
 function orderCard(o){
-  const st = BO.STATUS[o.status];
+  const st = JZ.STATUS[o.status];
   const statCls = o.status === 'done' || o.status === 'rated' ? 'done'
     : o.status === 'dispatched' ? 'todo' : 'doing';
   let actions = '';
@@ -283,7 +283,7 @@ function orderCard(o){
     actions = '<div class="actions"><a onclick="toast(\'已为您拨号\')">呼叫</a>' +
       '<a class="p" onclick="step(\'' + o.id + '\')">' + NEXT_BTN[o.status] + '</a></div>';
   } else if (o.status === 'done') {
-    actions = '<div class="actions"><a onclick="toast(\'等待客户在租客端评价\')">待客户评价</a></div>';
+    actions = '<div class="actions"><a href="../juzhu-order-progress.html?order='+encodeURIComponent(o.id)+'">待客户评价</a></div>';
   } else if (o.status === 'rated') {
     const r = o.rating || {};
     actions = '<div class="actions"><a onclick="toast(\'客评 ' + (r.score||5) + ' 星\')">查看评价</a></div>';
@@ -291,14 +291,14 @@ function orderCard(o){
   let extraRow = '';
   if (o.status === 'rated' && o.rating) {
     extraRow = '<div class="row"><span class="l">客户评分</span><span class="v" style="color:var(--success);">' +
-      o.rating.score + '.0 ★</span></div>';
+      o.rating.score + ' ★</span></div>';
   }
   return '<div class="order active">' +
-    '<div class="top"><span class="id">' + BO.esc(o.id) + '</span>' +
+    '<div class="top"><span class="id">' + JZ.esc(o.id) + ' <span style="font-size:9px;color:var(--accent);">API</span></span>' +
     '<span class="stat ' + statCls + '">' + st.worker + '</span></div>' +
-    '<div class="ttl">' + BO.esc(o.house) + ' · ' + BO.esc(o.category || o.type) + '</div>' +
-    '<div class="meta"><span class="p">' + (BO.ICON[o.type] || '') + ' ' + BO.esc(o.type) + '</span>' +
-    '<span class="p">' + BO.esc(o.expectTime || '尽快') + '</span></div>' +
+    '<div class="ttl">' + JZ.esc(o.house) + ' · ' + JZ.esc(o.category) + '</div>' +
+    '<div class="meta"><span class="p">' + (o.icon || '') + ' ' + JZ.esc(o.type) + '</span>' +
+    '<span class="p">' + JZ.esc(o.expectTime || '尽快') + '</span></div>' +
     '<div class="info-row">' +
     '<div class="row"><span class="l">服务费</span><span class="v">¥' + o.fee + '</span></div>' +
     '<div class="row"><span class="l">来源</span><span class="v">中台派单</span></div>' +
@@ -308,22 +308,23 @@ function orderCard(o){
 
 function render(){
   const box = document.getElementById('liveOrders');
-  const list = BO.byStatus(['dispatched','accepted','serving','done','rated']);
-  box.innerHTML = list.map(orderCard).join('');
-  document.getElementById('tsWait').textContent = 3 + BO.byStatus('dispatched').length;
-  document.getElementById('tsDoing').textContent = 2 + BO.byStatus(['accepted','serving']).length;
-  document.getElementById('tsDone').textContent = 7 + BO.byStatus(['done','rated']).length;
+  JZ.list({ pay_status: 'paid', status: 'dispatched,accepted,serving,done,rated', limit: 20 }).then(function(list) {
+    box.innerHTML = list.map(orderCard).join('');
+    document.getElementById('tsWait').textContent = list.filter(function(o){ return o.status==='dispatched'; }).length;
+    document.getElementById('tsDoing').textContent = list.filter(function(o){ return o.status==='accepted'||o.status==='serving'; }).length;
+    document.getElementById('tsDone').textContent = list.filter(function(o){ return o.status==='done'||o.status==='rated'; }).length;
+  });
 }
 
 function step(id){
-  const before = BO.get(id);
-  const o = BO.advance(id);
-  const msg = { dispatched: '已接单，请尽快出发', accepted: '已出发，路上注意安全', serving: '服务已完成，等待客户评价' };
-  if (before) toast(msg[before.status] || '已更新');
-  render();
+  JZ.advance(id).then(function(o) {
+    const msg = { dispatched: '已接单，请尽快出发', accepted: '已出发，路上注意安全', serving: '服务已完成，等待客户评价' };
+    if (o) toast(msg[o.status] || '已更新');
+    render();
+  }).catch(function(err){ toast(err.message); });
 }
 
-BO.onChange(render);
+JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
 </script>

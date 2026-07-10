@@ -133,8 +133,8 @@
 
       <!-- col 1: 待派 -->
       <div class="col">
-        <div class="col-head todo"><span class="dot"></span><span class="nm">待派</span><span class="cnt">38</span><span class="menu">⋮</span></div>
-        <div class="col-body">
+        <div class="col-head todo"><span class="dot"></span><span class="nm">待派</span><span class="cnt" id="cntPending">38</span><span class="menu">⋮</span></div>
+        <div class="col-body" id="colPending">
           <div class="tk urgent">
             <div class="head">
               <span class="id">WO-1284</span>
@@ -269,8 +269,8 @@
 
       <!-- col 4: 进行中 -->
       <div class="col">
-        <div class="col-head doing"><span class="dot"></span><span class="nm">进行中</span><span class="cnt">62</span><span class="menu">⋮</span></div>
-        <div class="col-body">
+        <div class="col-head doing"><span class="dot"></span><span class="nm">进行中</span><span class="cnt" id="cntDoing">62</span><span class="menu">⋮</span></div>
+        <div class="col-body" id="colDoing">
           <div class="tk normal">
             <div class="head">
               <span class="id">WO-1276</span>
@@ -324,8 +324,8 @@
 
       <!-- col 5: 今完结 -->
       <div class="col">
-        <div class="col-head done"><span class="dot"></span><span class="nm">今完结</span><span class="cnt">186</span><span class="menu">⋮</span></div>
-        <div class="col-body">
+        <div class="col-head done"><span class="dot"></span><span class="nm">今完结</span><span class="cnt" id="cntDone">186</span><span class="menu">⋮</span></div>
+        <div class="col-body" id="colDone">
           <div class="tk normal done-card">
             <div class="head">
               <span class="id">WO-1264</span>
@@ -384,6 +384,61 @@
   </main>
 </div>
 <script src="_region.js?v=2"></script>
+<script src="_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  function tkCard(o, extra) {
+    var pri = o.type === '保洁' ? 'high' : o.type === '维修' ? 'urgent' : 'normal';
+    var html = '<div class="tk '+pri+'" data-live-api="1" style="border:2px dashed var(--accent);margin-bottom:8px;">' +
+      '<div class="head"><span class="id">'+JZ.esc(o.id)+'</span><span class="role-tag">'+JZ.esc(o.type)+'</span>' +
+      '<span class="time-tag">API 实时</span></div>' +
+      '<div class="title">'+JZ.esc(o.house)+' · '+JZ.esc(o.category)+'</div>' +
+      '<div class="where">📍 '+JZ.esc(o.expectTime)+' · ¥'+o.fee+'</div>';
+    if (o.worker) {
+      html += '<div class="assignee"><span class="av">'+JZ.esc(o.worker.name.slice(0,1))+'</span>' +
+        '<span class="nm">'+JZ.esc(o.worker.name)+'</span><span class="lv '+JZ.esc(o.worker.level)+'">'+JZ.esc(o.worker.level)+'</span></div>';
+    }
+    html += (extra || '') + '</div>';
+    return html;
+  }
+  function renderLive() {
+    JZ.list({ pay_status: 'paid', limit: 40 }).then(function(all) {
+      document.querySelectorAll('.tk[data-live-api]').forEach(function(el){ el.remove(); });
+      var pending = all.filter(function(o){ return o.status==='pending'; });
+      var doing = all.filter(function(o){ return ['dispatched','accepted','serving'].indexOf(o.status)>-1; });
+      var done = all.filter(function(o){ return o.status==='done'||o.status==='rated'; });
+      document.getElementById('cntPending').textContent = pending.length;
+      document.getElementById('cntDoing').textContent = doing.length;
+      document.getElementById('cntDone').textContent = done.length;
+      var pBox = document.getElementById('colPending');
+      var livePending = pending.map(function(o){
+        return tkCard(o, '<div class="actions"><a href="p-service-demand.html">去中台派单</a><a class="pri" href="#" data-dispatch="'+JZ.esc(o.id)+'">快速派</a></div>');
+      }).join('');
+      if (livePending) {
+        pBox.insertAdjacentHTML('afterbegin', livePending);
+        pBox.querySelectorAll('[data-dispatch]').forEach(function(a){
+          a.addEventListener('click', function(e){
+            e.preventDefault();
+            JZ.dispatch(a.getAttribute('data-dispatch')).then(function(){ renderLive(); });
+          });
+        });
+      }
+      var dBox = document.getElementById('colDoing');
+      doing.slice(0,3).forEach(function(o){
+        dBox.insertAdjacentHTML('afterbegin', tkCard(o, '<div class="prog">'+JZ.STATUS[o.status].worker+'<div class="prog-bar"><div class="fl" style="width:'+JZ.STATUS[o.status].pct+'%"></div></div></div>'));
+      });
+      var doneBox = document.getElementById('colDone');
+      done.slice(0,2).forEach(function(o){
+        var star = o.rating ? '★'.repeat(Math.round(o.rating.score)) : '—';
+        doneBox.insertAdjacentHTML('afterbegin', tkCard(o, '<div class="done-row"><span class="star">'+star+'</span><span>'+JZ.esc(JZ.STATUS[o.status].admin)+'</span></div>'));
+      });
+    });
+  }
+  JZ.onChange(renderLive);
+  renderLive();
+})();
+</script>
 <script src="_nav.js"></script>
 </body>
 </html>

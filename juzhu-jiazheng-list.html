@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>家政服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:24px;}
+  .appbar{position:sticky;}
+  .search-wrap{padding:10px 16px 0;background:#fff;position:sticky;top:62px;z-index:20;}
+  .search{display:flex;align-items:center;gap:10px;background:#f3f5f4;border:1px solid #eef2f1;border-radius:18px;padding:12px 14px;}
+  .search input{border:0;outline:0;background:transparent;flex:1;font-size:14px;color:var(--ink);font-family:inherit;}
+  .search .loc{font-size:12px;color:var(--brand);font-weight:600;}
+  .top-tabs{display:flex;gap:10px;overflow-x:auto;padding:14px 16px 6px;background:#fff;scrollbar-width:none;}
+  .top-tabs::-webkit-scrollbar{display:none;}
+  .top-tabs a{flex:0 0 auto;display:grid;place-items:center;gap:8px;width:72px;color:var(--muted);}
+  .top-tabs .ico{width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#f6faf9,#edf4f1);border:1px solid #edf2ef;
+    display:grid;place-items:center;font-size:26px;box-shadow:0 8px 18px rgba(15,42,38,.04);}
+  .top-tabs a.on .ico{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border-color:transparent;}
+  .top-tabs b{font-size:12px;font-weight:600;color:var(--ink);}
+  .top-tabs a.on b{color:var(--brand-deep);}
+  .sub-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 8px;background:#fff;border-top:1px solid #f0f3f1;scrollbar-width:none;}
+  .sub-tabs::-webkit-scrollbar{display:none;}
+  .sub-tabs a{flex:0 0 auto;padding:8px 14px;border-radius:999px;background:#f5f7f6;color:var(--muted);font-size:12px;border:1px solid transparent;}
+  .sub-tabs a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;}
+  .hero-card{margin:10px 16px 0;border-radius:20px;padding:18px;color:#fff;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#0b5d56,#1b4f47 48%,#c58d36);box-shadow:0 14px 32px rgba(15,42,38,.14);}
+  .hero-card.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 52%,#8bb8ff);}
+  .hero-card.moving{background:linear-gradient(135deg,#f97316,#bf4b13 50%,#f7b267);}
+  .hero-card.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 52%,#d6bcfa);}
+  .hero-card::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 86% 22%,rgba(255,255,255,.22),transparent 22%),
+    repeating-linear-gradient(100deg,rgba(255,255,255,.05) 0 2px,transparent 2px 16px);opacity:.8;}
+  .hero-card .in{position:relative;z-index:2;}
+  .hero-card .eyebrow{font-size:10px;letter-spacing:.24em;opacity:.88;}
+  .hero-card h1{font-family:var(--serif);font-size:26px;line-height:1.18;margin-top:6px;}
+  .hero-card p{font-size:12px;opacity:.92;margin-top:6px;max-width:28ch;line-height:1.55;}
+  .hero-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  .hero-meta span{font-size:10px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);}
+  .hero-cta{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
+  .hero-cta .price{font-family:var(--serif);font-size:22px;}
+  .hero-cta .price small{font-family:var(--font);font-size:11px;opacity:.86;margin-left:4px;}
+  .hero-cta .btn{padding:9px 16px;border-radius:999px;background:#fff;color:var(--brand-deep);font-size:12px;font-weight:700;}
+  .toolbar{display:flex;gap:8px;align-items:center;padding:12px 16px 6px;color:var(--muted);font-size:12px;}
+  .toolbar .tag{padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--border);}
+  .toolbar .tag.hot{color:#ef4444;border-color:#fee2e2;background:#fff5f5;}
+  .toolbar .sep{margin-left:auto;}
+  .list{padding:4px 16px 24px;}
+  .svc-card{display:flex;gap:12px;background:#fff;border:1px solid var(--border);border-radius:18px;padding:10px;margin-bottom:12px;
+    box-shadow:0 8px 20px rgba(15,42,38,.06);}
+  .svc-poster{width:106px;min-height:126px;border-radius:14px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+    background:linear-gradient(135deg,#0f766e,#14b8a6);}
+  .svc-poster.repair{background:linear-gradient(135deg,#2563eb,#60a5fa);}
+  .svc-poster.moving{background:linear-gradient(135deg,#ea580c,#fb923c);}
+  .svc-poster.nanny{background:linear-gradient(135deg,#7c3aed,#a78bfa);}
+  .svc-poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.18));}
+  .svc-poster .t1,.svc-poster .t2,.svc-poster .t3{position:relative;z-index:2;}
+  .svc-poster .t1{font-size:10px;padding:8px 10px 0;opacity:.9;letter-spacing:.08em;}
+  .svc-poster .t2{font-family:var(--serif);font-size:28px;line-height:1.05;padding:10px 10px 0;font-weight:700;}
+  .svc-poster .t3{position:absolute;left:10px;right:10px;bottom:10px;font-size:10px;opacity:.95;}
+  .svc-main{flex:1;min-width:0;}
+  .svc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .svc-top h3{font-size:15px;font-weight:800;line-height:1.45;color:var(--ink);}
+  .svc-top .state{font-size:11px;color:#ea580c;background:#fff7ed;border:1px solid #fed7aa;padding:4px 8px;border-radius:999px;white-space:nowrap;}
+  .svc-meta{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
+  .svc-rank{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .svc-rank span{font-size:10px;padding:3px 8px;border-radius:999px;background:#faf5e8;color:var(--gold-deep);}
+  .svc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .svc-tags span{font-size:10px;padding:3px 8px;border-radius:999px;background:#eef6f4;color:var(--brand-deep);}
+  .svc-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;}
+  .svc-price{color:#ef5a2a;}
+  .svc-price b{font-family:var(--serif);font-size:28px;line-height:1;}
+  .svc-price small{font-size:11px;color:var(--muted);}
+  .svc-book{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:14px;
+    background:linear-gradient(90deg,#ff7a18,#ff5f6d);color:#fff;font-size:13px;font-weight:800;box-shadow:0 10px 18px rgba(255,95,109,.18);}
+  .empty{padding:48px 24px;text-align:center;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="juzhu-channel-v3-grid.html">‹</a>
+      <div class="ttl" id="ttl">家政服务<small id="ttlSub">南京 · 新居住频道</small></div>
+      <div class="act"><span>⌕</span><span>⌖</span></div>
+    </div>
+
+    <div class="search-wrap">
+      <div class="search">
+        <span style="font-size:16px;color:#96a39f;">⌕</span>
+        <input id="searchInput" placeholder="搜索服务，如深度清洁、空调清洗、育儿嫂" />
+        <span class="loc" id="cityLoc">南京</span>
+      </div>
+    </div>
+
+    <div class="top-tabs" id="catTabs"></div>
+    <div class="sub-tabs" id="subTabs"></div>
+
+    <div class="hero-card" id="hero"></div>
+
+    <div class="toolbar">
+      <span class="tag hot">神券立减</span>
+      <span class="tag">品牌严选</span>
+      <span class="tag">最快上门</span>
+      <span class="sep" id="countLabel">0 个服务</span>
+    </div>
+
+    <div class="list" id="list"></div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var q = new URLSearchParams(location.search);
+  var currentType = q.get('type') || 'cleaning';
+  if (currentType === 'promo') {
+    location.replace('juzhu-jiazheng-list.html?type=cleaning');
+    return;
+  }
+  var currentSub = q.get('sub') || '';
+  var searchText = '';
+  var categories = [];
+  var skus = [];
+
+  JZ.applyRegionChrome({ titleSub: '#ttlSub', loc: '#cityLoc' });
+  document.title = '家政服务 · ' + JZ.regionCity();
+
+  var CAT_UI = {
+    cleaning: { heroEyebrow: 'HOUSEKEEPING SELECT', desc: '参考保洁频道的高密度卡片，保留新居住青绿品牌和持证服务者信息。', price: '¥128', unit: '起', cls: 'cleaning' },
+    repair:   { heroEyebrow: 'REPAIR EXPRESS', desc: '紧急故障优先响应，30 分钟内派发就近持证技师。', price: '¥59', unit: '起', cls: 'repair' },
+    moving:   { heroEyebrow: 'MOVING SERVICE', desc: '同城搬家、企业搬迁、日式全包一页筛选，先做服务 SKU 原型。', price: '¥398', unit: '起', cls: 'moving' },
+    nanny:    { heroEyebrow: 'HOME CARE', desc: '阿姨、育儿嫂、钟点工统一归类，强调筛选、签约与持证信息。', price: '¥128', unit: '起', cls: 'nanny' }
+  };
+
+  function priceText(item){
+    return '¥' + Number(item.price_from || 0).toLocaleString();
+  }
+
+  function renderCats(){
+    document.getElementById('catTabs').innerHTML = categories.map(function(c){
+      return '<a class="'+(c.id===currentType?'on':'')+'" href="?type='+c.id+'">'+
+        '<span class="ico">'+(c.icon||'•')+'</span><b>'+c.name+'</b></a>';
+    }).join('');
+  }
+
+  function renderSubs(){
+    var list = skus.filter(function(x){ return x.category_id === currentType; });
+    var names = ['全部'].concat(list.map(function(x){ return x.name.split('·')[0].trim(); }));
+    var uniq = Array.from(new Set(names));
+    document.getElementById('subTabs').innerHTML = uniq.map(function(name){
+      var on = (!currentSub && name === '全部') || currentSub === name;
+      var href = name === '全部' ? '?type=' + currentType : '?type=' + currentType + '&sub=' + encodeURIComponent(name);
+      return '<a class="'+(on?'on':'')+'" href="'+href+'">'+name+'</a>';
+    }).join('');
+  }
+
+  function renderHero(){
+    var cat = categories.find(function(x){ return x.id === currentType; }) || { name: '家政', icon: '✨' };
+    var ui = CAT_UI[currentType] || CAT_UI.cleaning;
+    var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.price_from||0)-(b.price_from||0); })[0];
+    var el = document.getElementById('hero');
+    el.className = 'hero-card ' + ui.cls;
+    el.innerHTML = '<div class="in">'+
+      '<div class="eyebrow">'+ui.heroEyebrow+'</div>'+
+      '<h1>'+cat.icon+' '+cat.name+'服务</h1>'+
+      '<p>'+ui.desc+'</p>'+
+      '<div class="hero-meta"><span>'+JZ.regionDeptStem()+'白名单服务者</span><span>L2-L4 持证上岗</span><span>全流程 API</span></div>'+
+      '<div class="hero-cta"><div class="price">'+(top?priceText(top):ui.price)+'<small>'+(top?(top.price_unit||'起'):ui.unit)+'</small></div>'+
+      '<a class="btn" href="#list">查看热门服务</a></div>'+
+    '</div>';
+    document.getElementById('ttl').firstChild.textContent = cat.name + '服务';
+  }
+
+  function filtered(){
+    return skus.filter(function(item){
+      if (item.category_id !== currentType) return false;
+      if (currentSub && currentSub !== '全部' && item.name.indexOf(currentSub) === -1) return false;
+      if (searchText) {
+        var txt = (item.name + ' ' + (item.spec || '') + ' ' + (item.tags || []).join(' ')).toLowerCase();
+        if (txt.indexOf(searchText.toLowerCase()) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderList(){
+    var items = filtered();
+    document.getElementById('countLabel').textContent = items.length + ' 个服务';
+    if(!items.length){
+      document.getElementById('list').innerHTML = '<div class="empty">未找到匹配服务</div>';
+      return;
+    }
+    document.getElementById('list').innerHTML = items.map(function(item){
+      var head = item.name.split('·')[0].trim();
+      var tail = item.name.split('·')[1] ? item.name.split('·')[1].trim() : item.spec || '';
+      var cls = item.category_id;
+      var rank = [];
+      if (item.rating_score) rank.push('★ ' + Number(item.rating_score).toFixed(1));
+      if (item.sales_text) rank.push(item.sales_text);
+      if (item.worker_min_level) rank.push(item.worker_min_level + '+');
+      return '<a class="svc-card" href="juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)+'">'+
+        '<div class="svc-poster '+cls+'">'+
+          '<div class="t1">'+(item.badges && item.badges[0] ? item.badges[0] : '精选服务')+'</div>'+
+          '<div class="t2">'+head+'</div>'+
+          '<div class="t3">'+tail+'</div>'+
+        '</div>'+
+        '<div class="svc-main">'+
+          '<div class="svc-top"><h3>'+item.name+'</h3><span class="state">可预约</span></div>'+
+          '<div class="svc-meta">'+(item.spec||'')+' · 最快可约 今天18:00</div>'+
+          '<div class="svc-rank">'+rank.map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>'+
+          '<div class="svc-tags">'+(item.tags||[]).map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>'+
+          '<div class="svc-bottom"><div class="svc-price"><b>'+priceText(item).replace('¥','')+'</b><small> '+(item.price_unit||'起')+'</small></div>'+
+          '<span class="svc-book">去预约</span></div>'+
+        '</div></a>';
+    }).join('');
+  }
+
+  document.getElementById('searchInput').addEventListener('input', function(e){
+    searchText = e.target.value.trim();
+    renderList();
+  });
+
+  Promise.all([
+    JZ.categories(),
+    JZ.skus()
+  ]).then(function(res){
+    categories = res[0] || [];
+    skus = res[1] || [];
+    renderCats();
+    renderSubs();
+    renderHero();
+    renderList();
+  }).catch(function(err){
+    document.getElementById('list').innerHTML = '<div class="empty">家政数据加载失败：'+err.message+'</div>';
+  });
+})();
+</script>
+</body>
+</html>

@@ -32,12 +32,12 @@ def _rows_to_list(rows):
 def list_categories(conn, parent_type=None, status="on"):
     if parent_type:
         rows = conn.execute(
-            "SELECT * FROM jz_categories WHERE parent_type=? AND status=? ORDER BY sort_order",
+            "SELECT * FROM jz_subcategories WHERE parent_type=? AND status=? ORDER BY sort_order",
             (parent_type, status),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM jz_categories WHERE status=? ORDER BY parent_type, sort_order",
+            "SELECT * FROM jz_subcategories WHERE status=? ORDER BY parent_type, sort_order",
             (status,),
         ).fetchall()
     return _rows_to_list(rows)
@@ -155,74 +155,88 @@ def list_activities(conn, tag_id=None, limit=100):
     return _rows_to_list(rows)
 
 
-# ====== Orders ======
-def create_order(conn, order):
-    """order: {id, type, vendor_id, product_id, vendor_name, vendor_logo, product_title,
-                product_sub, product_price, address, phone, scheduled_at, fee, status, source}
-    Returns the created order id."""
-    conn.execute(
-        """INSERT INTO jz_orders(id, type, vendor_id, product_id, vendor_name, vendor_logo,
-           product_title, product_sub, product_price, address, phone, scheduled_at,
-           fee, status, source, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            order["id"],
-            order["type"],
-            order["vendor_id"],
-            order["product_id"],
-            order.get("vendor_name"),
-            order.get("vendor_logo"),
-            order.get("product_title"),
-            order.get("product_sub"),
-            order.get("product_price"),
-            order.get("address"),
-            order.get("phone"),
-            order.get("scheduled_at"),
-            order.get("fee"),
-            order.get("status", "pending"),
-            order.get("source", "jz"),
-            order.get("created_at"),
-            order.get("updated_at"),
-        ),
-    )
-    return order["id"]
-
-
-def get_order(conn, order_id):
-    row = conn.execute("SELECT * FROM jz_orders WHERE id=?", (order_id,)).fetchone()
+# ====== Orders（读统一 C 端 jz_orders · SKU 工单表） ======
+def _order_row_to_legacy(row):
     if not row:
         return None
     d = dict(row)
-    if d.get("worker_id"):
-        d["worker"] = get_worker(conn, d["worker_id"])
-    if d.get("rating"):
+    worker = None
+    if d.get("worker_json"):
         try:
-            d["rating"] = json.loads(d["rating"])
+            worker = json.loads(d["worker_json"])
         except (json.JSONDecodeError, TypeError):
             pass
-    return d
+    rating = None
+    if d.get("rating_json"):
+        try:
+            rating = json.loads(d["rating_json"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {
+        "id": d["id"],
+        "type": d.get("category_id") or d.get("type"),
+        "vendor_id": None,
+        "product_id": d.get("sku_id"),
+        "vendor_name": d.get("source"),
+        "vendor_logo": None,
+        "product_title": d.get("sku_name") or d.get("type"),
+        "product_sub": d.get("desc"),
+        "product_price": d.get("fee"),
+        "address": d.get("house"),
+        "phone": d.get("phone"),
+        "scheduled_at": d.get("expect_time"),
+        "fee": d.get("fee"),
+        "status": d.get("status"),
+        "pay_status": d.get("pay_status"),
+        "worker_id": worker.get("id") if worker else None,
+        "worker": worker,
+        "rating": rating,
+        "source": d.get("source"),
+        "created_at": d.get("created_at"),
+        "updated_at": d.get("updated_at"),
+    }
+
+
+def get_order(conn, order_id):
+    row = conn.execute(
+        """SELECT o.*, s.name AS sku_name FROM jz_orders o
+           LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+        (order_id,),
+    ).fetchone()
+    return _order_row_to_legacy(row)
 
 
 def list_orders(conn, status=None, limit=50):
+    sql = """SELECT o.*, s.name AS sku_name FROM jz_orders o
+             LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1"""
+    params = []
     if status:
-        rows = conn.execute(
-            "SELECT * FROM jz_orders WHERE status=? ORDER BY created_at DESC LIMIT ?",
-            (status, limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM jz_orders ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in rows]
+        sql += " AND o.status=?"
+        params.append(status)
+    sql += " ORDER BY o.created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
+    return [_order_row_to_legacy(r) for r in rows]
 
 
 def update_order_status(conn, order_id, status, worker_id=None):
-    """更新订单状态。worker_id 可选（dispatched 时绑定）"""
+    worker_json = None
     if worker_id is not None:
+        w = get_worker(conn, worker_id)
+        if w:
+            worker_json = json.dumps(
+                {
+                    "id": worker_id,
+                    "name": w.get("name"),
+                    "level": w.get("level"),
+                    "avatar": w.get("avatar"),
+                },
+                ensure_ascii=False,
+            )
+    if worker_json is not None:
         conn.execute(
-            "UPDATE jz_orders SET status=?, worker_id=?, updated_at=? WHERE id=?",
-            (status, worker_id, _now(), order_id),
+            "UPDATE jz_orders SET status=?, worker_json=?, updated_at=? WHERE id=?",
+            (status, worker_json, _now(), order_id),
         )
     else:
         conn.execute(
@@ -234,14 +248,9 @@ def update_order_status(conn, order_id, status, worker_id=None):
 def rate_order(conn, order_id, score, tags, text, credit_delta=0.0):
     rating = {"score": score, "tags": tags, "text": text, "created_at": _now()}
     conn.execute(
-        "UPDATE jz_orders SET status='rated', rating=?, updated_at=? WHERE id=?",
+        "UPDATE jz_orders SET status='rated', rating_json=?, updated_at=? WHERE id=?",
         (json.dumps(rating, ensure_ascii=False), _now(), order_id),
     )
-    # 信用引擎预留：可在此调用 G 端白名单接口更新 worker 信用分
-    # （目前 mock：写入到 worker.credit_score）
-    # row = conn.execute("SELECT worker_id FROM jz_orders WHERE id=?", (order_id,)).fetchone()
-    # if row and row["worker_id"]:
-    #     conn.execute("UPDATE jz_workers SET credit_score=MIN(100,MAX(0,credit_score+?)) WHERE id=?", (credit_delta, row["worker_id"]))
 
 
 def _now():
@@ -253,7 +262,7 @@ def _now():
 def list_categories_all(conn):
     """所有子类目（不区分 status）— 管理端用"""
     rows = conn.execute(
-        "SELECT * FROM jz_categories ORDER BY parent_type, sort_order, id"
+        "SELECT * FROM jz_subcategories ORDER BY parent_type, sort_order, id"
     ).fetchall()
     return _rows_to_list(rows)
 
@@ -261,7 +270,7 @@ def list_categories_all(conn):
 def create_category(conn, data):
     """新增子类目"""
     cur = conn.execute(
-        "INSERT INTO jz_categories (parent_type, name, icon, sort_order, status) VALUES (?,?,?,?,?)",
+        "INSERT INTO jz_subcategories (parent_type, name, icon, sort_order, status) VALUES (?,?,?,?,?)",
         (data.get("parent_type", "cleaning"),
          data.get("name", ""),
          data.get("icon", "📦"),
@@ -282,19 +291,19 @@ def update_category(conn, cat_id, data):
     if not fields:
         return False
     params.append(cat_id)
-    cur = conn.execute(f"UPDATE jz_categories SET {', '.join(fields)} WHERE id=?", params)
+    cur = conn.execute(f"UPDATE jz_subcategories SET {', '.join(fields)} WHERE id=?", params)
     return cur.rowcount > 0
 
 
 def delete_category(conn, cat_id):
     """删除子类目（有产品引用则不允许）"""
     used = conn.execute(
-        "SELECT COUNT(*) c FROM jz_products WHERE category=(SELECT name FROM jz_categories WHERE id=?)",
+        "SELECT COUNT(*) c FROM jz_products WHERE category=(SELECT name FROM jz_subcategories WHERE id=?)",
         (cat_id,),
     ).fetchone()[0]
     if used > 0:
         return {"ok": False, "error": f"该子类目有 {used} 个产品引用，无法删除"}
-    conn.execute("DELETE FROM jz_categories WHERE id=?", (cat_id,))
+    conn.execute("DELETE FROM jz_subcategories WHERE id=?", (cat_id,))
     return {"ok": True}
 
 

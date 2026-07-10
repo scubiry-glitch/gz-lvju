@@ -97,3 +97,12 @@
 - **API**：`BZF_ORDERS.create / dispatch / advance / rate / byStatus / get / reset / onChange`。`advance` 封顶到 `done`（评价只能由客户 `rate` 触发）；`onChange` 监听跨页 storage 变更自动重渲染。
 - **复用而非新造**：再接入任何端（如 B 端运营商工单视图、G 端投诉关联）时，引 `<script src="_orderbus.js"></script>`（在 region 脚本之后、nav 脚本前后均可，只要在使用 `BZF_ORDERS` 的内联脚本之前），从 `byStatus()` 取数据渲染，**不要再 new 一套 localStorage key**。
 - **与 region 解耦**：本总线只产数据，服务者姓名/房源等为样例字面量，不参与 relabel；如某态文案需随省份变，改读 `BZF_REGION`，勿写死。
+
+## 规则 9 · 家政工单 API 总线（`screens/_jzapi.js`）
+
+**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，SQLite 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
+
+- **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
+- **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
+- **鉴权**：写接口与中台列表读接口用 `localStorage JUZHU_API_KEY`（默认 `dev-juzhu-key`）；C 端单订单查询与评价可匿名
+- **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。

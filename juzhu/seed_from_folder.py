@@ -79,7 +79,7 @@ def main():
         shutil.rmtree(ASSETS)
     ASSETS.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.executescript((ROOT / "schema.sql").read_text())
 

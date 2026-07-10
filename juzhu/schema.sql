@@ -101,3 +101,61 @@ CREATE TABLE IF NOT EXISTS channels (
 
 INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房', 1, 1);
 INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新', 2, 1);
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('jiazheng', '家政', 3, 1);
+
+CREATE TABLE IF NOT EXISTS jz_categories (
+  id          TEXT PRIMARY KEY,                -- cleaning|repair|moving|nanny
+  name        TEXT NOT NULL,
+  icon        TEXT,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  note        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS jz_skus (
+  id                INTEGER PRIMARY KEY,
+  category_id       TEXT NOT NULL REFERENCES jz_categories(id),
+  name              TEXT NOT NULL,
+  slug              TEXT NOT NULL UNIQUE,
+  spec              TEXT,
+  price_from        INTEGER,
+  price_unit        TEXT,
+  duration_min      INTEGER,
+  tags              TEXT,
+  badges            TEXT,
+  sales_text        TEXT,
+  rating_score      REAL,
+  worker_min_level  TEXT,
+  cover_image       TEXT,
+  gallery           TEXT,
+  includes          TEXT,
+  service_flow      TEXT,
+  service_notice    TEXT,
+  sort_order        INTEGER NOT NULL DEFAULT 0,
+  enabled           INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS jz_orders (
+  id            TEXT PRIMARY KEY,              -- WO-2026-xxxxx
+  sku_id        INTEGER REFERENCES jz_skus(id),
+  category_id   TEXT NOT NULL REFERENCES jz_categories(id),
+  type          TEXT NOT NULL,
+  house         TEXT NOT NULL,
+  phone         TEXT NOT NULL,
+  expect_time   TEXT NOT NULL,
+  desc          TEXT,
+  fee           INTEGER NOT NULL,
+  pay_status    TEXT NOT NULL DEFAULT 'unpaid',
+  pay_method    TEXT,
+  pay_at        TEXT,
+  status        TEXT NOT NULL DEFAULT 'pending',
+  worker_json   TEXT,
+  rating_json   TEXT,
+  source        TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  log_json      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_jz_skus_category ON jz_skus(category_id, enabled, sort_order);
+CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status, created_at);
