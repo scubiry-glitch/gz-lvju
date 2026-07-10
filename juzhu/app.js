@@ -273,7 +273,8 @@ window.JUZHU = (function () {
     if (!list.length) {
       return [
         { id: 'bzf', label: '保租房', sort_order: 1, enabled: 1 },
-        { id: 'trade', label: '卖旧买新', sort_order: 2, enabled: 1 }
+        { id: 'trade', label: '卖旧买新', sort_order: 2, enabled: 1 },
+        { id: 'jiazheng', label: '家政', sort_order: 3, enabled: 1 }
       ];
     }
     return list.filter(function(c) { return c.enabled !== 0; })

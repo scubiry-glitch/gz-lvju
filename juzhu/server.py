@@ -656,8 +656,17 @@ class Handler(SimpleHTTPRequestHandler):
                     (item["category_id"], item["slug"]),
                 ).fetchall()
             ]
+            detail_context = jzdb.get_detail_context_by_channel_sku(conn, item["id"], item.get("category_id")) or {}
             conn.close()
-            return self._json({"item": item, "related": related})
+            return self._json({
+                "item": item,
+                "related": related,
+                "product": detail_context.get("product"),
+                "vendor": detail_context.get("vendor"),
+                "workers": detail_context.get("workers") or [],
+                "reviews": detail_context.get("reviews") or [],
+                "merchant_intro": detail_context.get("merchant_intro"),
+            })
 
         conn.close()
         return self._json({"error": "unknown route"}, 404)

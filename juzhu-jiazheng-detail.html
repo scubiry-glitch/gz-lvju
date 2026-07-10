@@ -46,12 +46,9 @@
   .worker-card .nm{font-size:15px;font-weight:700;color:var(--ink);}
   .worker-card .meta{font-size:11px;color:var(--muted);margin-top:4px;}
   .worker-card .cta{margin-left:auto;padding:9px 14px;border-radius:999px;background:#fff;border:1px solid var(--border);font-size:12px;color:var(--brand);font-weight:700;}
-  .form{display:grid;gap:10px;margin-top:12px;}
-  .field{display:block;padding:0;border:0;background:transparent;}
-  .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:6px;}
-  .field input,.field textarea{width:100%;border:1px solid var(--border);border-radius:14px;padding:13px 14px;background:#f8fbfa;font:inherit;color:var(--ink);}
-  .field textarea{min-height:92px;resize:vertical;}
-  .dual{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .time-slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
+  .time-slots a{display:block;text-align:center;padding:10px 6px;font-size:12px;border:1px solid var(--border);border-radius:12px;background:#f8fbfa;color:var(--ink);}
+  .time-slots a.on{border-color:var(--brand);background:#eef6f4;color:var(--brand-deep);font-weight:700;}
   .related{display:grid;gap:10px;margin-top:12px;}
   .r-card{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#f8fbfa;border:1px solid var(--border);}
   .r-card b{font-size:14px;color:var(--ink);}
@@ -66,7 +63,7 @@
   <div class="scr">
     <div class="appbar ghost" style="position:absolute;z-index:20;">
       <a class="bk" href="javascript:history.back()">‹</a>
-      <div class="ttl" id="ttl">家政详情<small>服务介绍与预约</small></div>
+      <div class="ttl" id="ttl">家政详情<small>服务介绍 · 选择时间</small></div>
       <div class="act"><span>♡</span><span>⤴</span></div>
     </div>
 
@@ -101,27 +98,9 @@
     </div>
 
     <div class="block">
-      <h3>预约信息</h3>
-      <div class="form">
-        <div class="field">
-          <label>服务地址</label>
-          <input id="house" placeholder="例：东博人才公寓 2-1503" />
-        </div>
-        <div class="dual">
-          <div class="field">
-            <label>联系电话</label>
-            <input id="phone" placeholder="13800138000" />
-          </div>
-          <div class="field">
-            <label>上门时间</label>
-            <input id="expectTime" placeholder="2026-07-10 14:00" />
-          </div>
-        </div>
-        <div class="field">
-          <label>备注</label>
-          <textarea id="desc" placeholder="补充房型面积、故障现象或照护需求"></textarea>
-        </div>
-      </div>
+      <h3>选择上门时间</h3>
+      <p class="spec" style="margin-top:8px;font-size:12px;color:var(--muted);">选定时间后进入确认页填写地址与联系方式</p>
+      <div class="time-slots" id="timeSlots"></div>
     </div>
 
     <div class="block">
@@ -131,10 +110,10 @@
   </div>
 
   <div class="cta">
-    <div class="p"><b id="ctaPrice">¥0</b><span>提交后跳转收银台完成支付</span></div>
+    <div class="p"><b id="ctaPrice">¥0</b><span>下一步填写预约信息</span></div>
     <div class="heart">⚑</div>
     <a class="btn btn-call" href="screens/p-service-demand.html">看中台工单池</a>
-    <a class="btn" href="#" id="submitBtn">立即预约</a>
+    <a class="btn" href="#" id="submitBtn">下一步</a>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -147,6 +126,28 @@
   var slug = q.get('sku') || 'deep-clean-4h';
   var item = null;
   var related = [];
+  var selectedTime = '';
+
+  var TIME_SLOTS = [
+    '今天 18:00', '今天 19:00', '今天 20:00', '明天 09:00',
+    '明天 10:00', '明天 14:00', '明天 16:00', '明天 19:00'
+  ];
+
+  function renderTimeSlots(){
+    selectedTime = TIME_SLOTS[0];
+    document.getElementById('timeSlots').innerHTML = TIME_SLOTS.map(function(t, i){
+      return '<a href="#" class="'+(i===0?'on':'')+'" data-time="'+t+'">'+t+'</a>';
+    }).join('');
+    document.getElementById('timeSlots').addEventListener('click', function(e){
+      var a = e.target.closest('[data-time]');
+      if (!a) return;
+      e.preventDefault();
+      selectedTime = a.getAttribute('data-time');
+      document.querySelectorAll('#timeSlots a').forEach(function(x){
+        x.classList.toggle('on', x === a);
+      });
+    });
+  }
 
   function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
 
@@ -192,38 +193,15 @@
     }).join('');
   }
 
-  function ensureKey(){
-    if (!JZ.apiKey()) JZ.setApiKey('dev-juzhu-key');
-    return JZ.apiKey();
-  }
-
   document.title = '家政详情 · ' + JZ.regionCity();
+  renderTimeSlots();
 
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
-    if (!ensureKey()) return toast('未提供 API Key');
-    var house = document.getElementById('house').value.trim();
-    var phone = document.getElementById('phone').value.trim();
-    var expectTime = document.getElementById('expectTime').value.trim();
-    if (!house || !phone || !expectTime) return toast('请先填写地址、电话和时间');
-
-    JZ.create({
-      sku_id: item.id,
-      category: item.category_id,
-      house: house,
-      phone: phone,
-      expectTime: expectTime,
-      desc: document.getElementById('desc').value.trim(),
-      source: '新居住频道'
-    }).then(function(o){
-      toast('订单已创建');
-      setTimeout(function(){
-        location.href = 'lvju-app-pay.html?order=' + encodeURIComponent(o.id) + '&channel=jiazheng';
-      }, 500);
-    }).catch(function(err){
-      toast('提交失败：' + err.message);
-    });
+    if (!selectedTime) return toast('请先选择上门时间');
+    location.href = 'jiazheng-booking.html?sku=' + encodeURIComponent(slug) +
+      '&time=' + encodeURIComponent(selectedTime);
   });
 
   JZ.sku(slug).then(function(res){

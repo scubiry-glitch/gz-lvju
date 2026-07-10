@@ -25,24 +25,56 @@
   .pane{display:none;}.pane.on{display:block;}
 
   /* === 家政 tab === */
-  .jz-quick{padding:14px 18px 4px;}
-  .jz-cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .jz-cat{position:relative;display:block;border-radius:18px;overflow:hidden;color:#fff;min-height:140px;
-    box-shadow:0 10px 24px rgba(15,42,38,.10);transition:transform .15s ease;}
-  .jz-cat:active{transform:scale(.98);}
+  .jz-quick{padding:16px 18px 8px;}
+  .jz-quick-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:17px 18px;margin-bottom:12px;border-radius:22px;
+    background:linear-gradient(135deg,#f7f4ee,#f3efe6);color:#17352f;box-shadow:0 10px 28px rgba(15,42,38,.08);position:relative;overflow:hidden;border:1px solid rgba(15,42,38,.08);}
+  .jz-quick-intro::before,.jz-quick-intro::after{content:"";position:absolute;border-radius:50%;pointer-events:none;}
+  .jz-quick-intro::before{width:124px;height:124px;right:-28px;top:-44px;background:radial-gradient(circle,rgba(15,118,110,.08),rgba(15,118,110,0) 72%);}
+  .jz-quick-intro::after{width:148px;height:148px;left:-44px;bottom:-96px;background:radial-gradient(circle,rgba(180,83,9,.08),rgba(180,83,9,0) 72%);}
+  .jz-quick-intro .copy,.jz-quick-intro .meta{position:relative;z-index:2;}
+  .jz-quick-intro .eyebrow{font-size:10px;letter-spacing:.18em;opacity:.58;color:#5d726c;}
+  .jz-quick-intro h3{font-family:var(--serif);font-size:22px;line-height:1.18;margin-top:6px;color:#102924;}
+  .jz-quick-intro p{font-size:11px;line-height:1.6;color:#5c6f69;margin-top:6px;max-width:220px;}
+  .jz-quick-intro .meta{text-align:right;min-width:90px;}
+  .jz-quick-intro .meta b{display:block;font-family:var(--serif);font-size:18px;color:#102924;}
+  .jz-quick-intro .meta span{display:block;font-size:10px;color:#6f827c;margin-top:2px;}
+  .jz-cat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:88px;grid-auto-flow:dense;gap:12px;}
+  .jz-cat{position:relative;display:block;border-radius:24px;overflow:hidden;color:#f8f7f4;min-height:100%;
+    box-shadow:0 14px 30px rgba(15,42,38,.10);transition:transform .18s ease,box-shadow .18s ease;isolation:isolate;border:1px solid rgba(255,255,255,.06);}
+  .jz-cat:active{transform:scale(.988) translateY(1px);}
+  .jz-cat::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 34%);pointer-events:none;z-index:1;}
+  .jz-cat::after{content:"";position:absolute;inset:12px;border-radius:18px;border:1px solid rgba(255,255,255,.08);opacity:.85;pointer-events:none;z-index:1;}
   .jz-cat .bg{position:absolute;inset:0;}
-  .jz-cat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.12),rgba(0,0,0,.42));}
-  .jz-cat .in{position:relative;z-index:2;padding:16px 16px 14px;display:flex;flex-direction:column;justify-content:space-between;min-height:140px;}
-  .jz-cat .ico{font-size:34px;line-height:1;}
-  .jz-cat h3{font-family:var(--serif);font-size:20px;margin-top:8px;letter-spacing:.5px;}
-  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;}
-  .jz-cat .sub span{font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
-  .jz-cat .arrow{position:absolute;right:14px;top:14px;z-index:2;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:11px;backdrop-filter:blur(4px);}
-  /* 4色: 保洁(青)/ 维修(蓝)/ 搬家(橙)/ 保姆(紫) */
-  .jz-cat.cleaning .bg{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
-  .jz-cat.repair  .bg{background:linear-gradient(135deg,#3a7bd5,#1a3a6b);}
-  .jz-cat.moving  .bg{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
-  .jz-cat.nanny   .bg{background:linear-gradient(135deg,#9a6bd1,#4d2a78);}
+  .jz-cat .bg::before{content:"";position:absolute;right:-10%;top:-14%;width:128px;height:128px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.16),rgba(255,255,255,0) 70%);opacity:.75;}
+  .jz-cat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18) 52%,rgba(0,0,0,.26));}
+  .jz-cat .in{position:relative;z-index:2;padding:16px 16px 14px;display:grid;grid-template-rows:auto auto 1fr auto;min-height:100%;}
+  .jz-cat .top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .jz-cat .pill{display:inline-flex;align-items:center;max-width:70%;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.10);font-size:10px;letter-spacing:.04em;color:rgba(255,255,255,.84);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,.08);}
+  .jz-cat .arrow{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.9);}
+  .jz-cat .hero{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .jz-cat .orb{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;line-height:1;
+    background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.28),rgba(255,255,255,.06) 58%,rgba(255,255,255,0) 100%);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 10px 18px rgba(0,0,0,.14);flex:0 0 auto;border:1px solid rgba(255,255,255,.06);}
+  .jz-cat .title-wrap{min-width:0;}
+  .jz-cat h3{font-family:var(--serif);font-size:22px;line-height:1.12;letter-spacing:.3px;color:#fffdf9;}
+  .jz-cat .desc{font-size:11px;line-height:1.52;color:rgba(255,250,244,.76);margin-top:5px;max-width:220px;}
+  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-self:end;}
+  .jz-cat .sub span{font-size:10px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.06);color:rgba(255,252,247,.82);}
+  .jz-cat .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .jz-cat .stats span{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(7,15,14,.20);font-size:10px;letter-spacing:.02em;color:rgba(255,251,245,.72);}
+  .jz-cat-grid .jz-cat:nth-child(1){grid-column:span 2;grid-row:span 2;}
+  .jz-cat-grid .jz-cat:nth-child(1) .orb{width:64px;height:64px;font-size:31px;}
+  .jz-cat-grid .jz-cat:nth-child(1) h3{font-size:28px;}
+  .jz-cat-grid .jz-cat:nth-child(1) .desc{font-size:12px;max-width:250px;}
+  .jz-cat-grid .jz-cat:nth-child(2){grid-row:span 2;}
+  .jz-cat-grid .jz-cat:nth-child(2) .hero,.jz-cat-grid .jz-cat:nth-child(3) .hero,.jz-cat-grid .jz-cat:nth-child(4) .hero{align-items:flex-start;}
+  .jz-cat-grid .jz-cat:nth-child(3),.jz-cat-grid .jz-cat:nth-child(4){min-height:88px;}
+  /* 4色: 保洁(青灰)/ 维修(深蓝)/ 搬家(茶棕)/ 保姆(灰紫) */
+  .jz-cat.cleaning .bg{background:linear-gradient(145deg,#214842,#15352f 58%,#0d221f);}
+  .jz-cat.repair  .bg{background:linear-gradient(145deg,#2a4260,#1b2f48 58%,#101d31);}
+  .jz-cat.moving  .bg{background:linear-gradient(145deg,#6d5544,#4d372a 58%,#2a1d15);}
+  .jz-cat.nanny   .bg{background:linear-gradient(145deg,#5e5566,#453c4d 58%,#2a222f);}
 
   /* 热门子类 */
   .jz-sub-list{padding:6px 18px 4px;}
@@ -121,6 +153,7 @@
         <div class="seg-switch" id="tabs">
           <a class="on" data-tab="bzf">保租房</a>
           <a data-tab="trade">卖旧买新</a>
+          <a data-tab="jiazheng">家政</a>
         </div>
       </div>
     </div>
@@ -144,7 +177,20 @@
     <div class="pane" id="pane-jiazheng">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
       <div class="jz-quick">
-        <div class="jz-cat-grid" id="jzCats"></div>
+        <div class="jz-quick-intro">
+          <div class="copy">
+            <div class="eyebrow">HOME SERVICE CURATION</div>
+            <h3>四大生活服务球区</h3>
+            <p>把保洁、维修、搬家、保姆整理成一张更克制的精选入口页，进入频道即可直达高频服务。</p>
+          </div>
+          <div class="meta"><b>4 大</b><span>高频专区</span><b style="margin-top:10px;">180 分钟</b><span>最快完成响应</span></div>
+        </div>
+        <div class="jz-cat-grid" id="jzCats">
+          <a class="jz-cat cleaning" href="juzhu-jiazheng-list.html?type=cleaning"><div class="bg"></div><div class="in"><div class="top"><span class="pill">高频刚需</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🧹</div><div class="title-wrap"><h3>保洁</h3><div class="desc">日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。</div></div></div><div class="sub"><span>日常保洁</span><span>深度清洁</span><span>搬家保洁</span></div><div class="stats"><span>最快 2h 上门</span><span>金牌阿姨</span></div></div></a>
+          <a class="jz-cat repair" href="juzhu-jiazheng-list.html?type=repair"><div class="bg"></div><div class="in"><div class="top"><span class="pill">即时修复</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🔧</div><div class="title-wrap"><h3>维修</h3><div class="desc">灯具、家电、管道类问题集中入口，适合突发故障快速派单。</div></div></div><div class="sub"><span>家电维修</span><span>管道疏通</span><span>灯具安装</span></div><div class="stats"><span>当日排单</span><span>可视化进度</span></div></div></a>
+          <a class="jz-cat moving" href="juzhu-jiazheng-list.html?type=moving"><div class="bg"></div><div class="in"><div class="top"><span class="pill">大件服务</span><div class="arrow">›</div></div><div class="hero"><div class="orb">📦</div><div class="title-wrap"><h3>搬家</h3><div class="desc">同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。</div></div></div><div class="sub"><span>居民搬家</span><span>长途搬家</span><span>钢琴搬运</span></div><div class="stats"><span>车型可选</span><span>明码报价</span></div></div></a>
+          <a class="jz-cat nanny" href="juzhu-jiazheng-list.html?type=nanny"><div class="bg"></div><div class="in"><div class="top"><span class="pill">长期陪伴</span><div class="arrow">›</div></div><div class="hero"><div class="orb">👶</div><div class="title-wrap"><h3>保姆</h3><div class="desc">住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。</div></div></div><div class="sub"><span>住家保姆</span><span>育儿嫂</span><span>钟点工</span></div><div class="stats"><span>背景核验</span><span>支持续约</span></div></div></a>
+        </div>
       </div>
 
       <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
@@ -271,22 +317,72 @@
   // === 家政 tab ===
   // 4 大类 + 子类（先内置，后续从后端拉取）
   var JZ_CATS = [
-    { id: 'cleaning', name: '保洁', icon: '🧹', subs: ['日常保洁','深度清洁','搬家保洁','开荒保洁','擦玻璃','油烟机清洗'] },
-    { id: 'repair',   name: '维修', icon: '🔧', subs: ['家电维修','管道疏通','灯具安装','门窗维修','防水补漏','空调清洗'] },
-    { id: 'moving',   name: '搬家', icon: '📦', subs: ['居民搬家','长途搬家','钢琴搬运','企业搬迁','日式搬家','搬货上下楼'] },
-    { id: 'nanny',    name: '保姆', icon: '👶', subs: ['住家保姆','育儿嫂','月嫂','钟点工','养老护理','医院陪护'] }
+    {
+      id: 'cleaning',
+      name: '保洁',
+      icon: '🧹',
+      pill: '高频刚需',
+      desc: '日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。',
+      stats: ['最快 2h 上门', '金牌阿姨'],
+      subs: ['日常保洁','深度清洁','搬家保洁','开荒保洁','擦玻璃','油烟机清洗']
+    },
+    {
+      id: 'repair',
+      name: '维修',
+      icon: '🔧',
+      pill: '即时修复',
+      desc: '灯具、家电、管道类问题集中入口，适合突发故障快速派单。',
+      stats: ['当日排单', '可视化进度'],
+      subs: ['家电维修','管道疏通','灯具安装','门窗维修','防水补漏','空调清洗']
+    },
+    {
+      id: 'moving',
+      name: '搬家',
+      icon: '📦',
+      pill: '大件服务',
+      desc: '同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。',
+      stats: ['车型可选', '明码报价'],
+      subs: ['居民搬家','长途搬家','钢琴搬运','企业搬迁','日式搬家','搬货上下楼']
+    },
+    {
+      id: 'nanny',
+      name: '保姆',
+      icon: '👶',
+      pill: '长期陪伴',
+      desc: '住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。',
+      stats: ['背景核验', '支持续约'],
+      subs: ['住家保姆','育儿嫂','月嫂','钟点工','养老护理','医院陪护']
+    }
   ];
 
-  function renderJiazhengCats(){
-    document.getElementById('jzCats').innerHTML = JZ_CATS.map(function(c){
-      var subHtml = c.subs.slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+  function renderJiazhengCats(apiCats){
+    var byId = {};
+    JZ_CATS.forEach(function(c) { byId[c.id] = c; });
+    var list = (apiCats && apiCats.length)
+      ? apiCats.map(function(c) {
+          var base = byId[c.id] || {};
+          return {
+            id: c.id,
+            name: c.name || base.name,
+            icon: c.icon || base.icon,
+            pill: c.pill || base.pill || '精选专区',
+            desc: c.desc || base.desc || '高频生活服务入口，支持预约、派单与进度追踪。',
+            stats: c.stats || base.stats || ['快速预约', '进度可见'],
+            subs: base.subs || []
+          };
+        })
+      : JZ_CATS;
+    document.getElementById('jzCats').innerHTML = list.map(function(c){
+      var subHtml = (c.subs || []).slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+      var statHtml = (c.stats || []).slice(0,2).map(function(s){ return '<span>'+s+'</span>'; }).join('');
       return '<a class="jz-cat '+c.id+'" href="juzhu-jiazheng-list.html?type='+c.id+'">'+
-        '<div class="bg"></div><div class="arrow">›</div>'+
-        '<div class="in"><div>'+
-          '<div class="ico">'+c.icon+'</div>'+
-          '<h3>'+c.name+'</h3>'+
+        '<div class="bg"></div>'+
+        '<div class="in">'+
+          '<div class="top"><span class="pill">'+(c.pill || '精选专区')+'</span><div class="arrow">›</div></div>'+
+          '<div class="hero"><div class="orb">'+(c.icon || '•')+'</div><div class="title-wrap"><h3>'+c.name+'</h3><div class="desc">'+(c.desc || '')+'</div></div></div>'+
           '<div class="sub">'+subHtml+'</div>'+
-        '</div></div></a>';
+          '<div class="stats">'+statHtml+'</div>'+
+        '</div></a>';
     }).join('');
   }
 
@@ -336,27 +432,37 @@
 
   var initTab = new URLSearchParams(location.search).get('tab') || (location.hash || '').replace('#', '');
 
-  Promise.all([JUZHU.load(), window.BZF_JZ ? BZF_JZ.skus() : Promise.resolve([])]).then(function(res){
-    var d = res[0];
-    var skus = res[1] || [];
+  function paintTabs() {
     var tabs = document.getElementById('tabs');
     var chs = JUZHU.enabledChannels();
-    if (chs.length) {
-      tabs.innerHTML = chs.map(function(c, i) {
-        var on = initTab ? (c.id === initTab) : (i === 0);
-        return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
-      }).join('');
-      activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
-    }
+    if (!chs.length) return;
+    tabs.innerHTML = chs.map(function(c, i) {
+      var on = initTab ? (c.id === initTab) : (i === 0);
+      return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
+    }).join('');
+    activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
+  }
+
+  renderJiazhengPromo();
+
+  if (window.BZF_JZ && BZF_JZ.categories) {
+    BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
+  }
+
+  var skusP = window.BZF_JZ
+    ? BZF_JZ.skus().catch(function() { return []; })
+    : Promise.resolve([]);
+  skusP.then(renderJiazhengSubs);
+
+  JUZHU.load().then(function(d) {
+    paintTabs();
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());
-    renderJiazhengCats();
-    renderJiazhengSubs(skus);
-    renderJiazhengPromo();
-  }).catch(function(err){
+  }).catch(function(err) {
     document.getElementById('err').hidden = false;
     document.getElementById('err').textContent = '数据加载失败：'+err.message+'（请先运行 python3 juzhu/seed_from_folder.py）';
+    paintTabs();
   });
 })();
 </script>

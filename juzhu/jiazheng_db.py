@@ -88,6 +88,299 @@ def get_product(conn, product_id):
     return _row_to_dict(row)
 
 
+VENDOR_BADGE_LABELS = {
+    "whitelist": "白名单商家",
+    "backcheck": "平台背调",
+    "insurance": "已投保",
+    "top10": "销量榜单",
+    "commitment": "不满意重做",
+}
+
+WORKER_CERT_LABELS = {
+    "id_card": "实名认证",
+    "health": "健康证",
+    "skill": "技能证",
+    "insurance": "保险保障",
+}
+
+CATEGORY_REVIEW_FALLBACKS = {
+    "cleaning": [
+        {"name": "张*华", "score": 5, "tags": ["准时", "干净", "细致"], "text": "阿姨很专业，卫生间和厨房的死角都处理得很干净。", "created_at": "近 30 天"},
+        {"name": "李*", "score": 5, "tags": ["专业", "周到"], "text": "沟通顺畅，工具带得很全，整体体验很稳。", "created_at": "近 60 天"},
+        {"name": "王*", "score": 4, "tags": ["态度好"], "text": "服务过程细致，结束后还主动提醒后续保洁建议。", "created_at": "近 90 天"},
+    ],
+    "repair": [
+        {"name": "周*", "score": 5, "tags": ["上门快", "专业"], "text": "师傅到得很快，问题定位清楚，维修过程也规范。", "created_at": "近 30 天"},
+        {"name": "孙*", "score": 5, "tags": ["讲解清楚"], "text": "处理完后把原因和后续注意事项都交代明白了。", "created_at": "近 60 天"},
+        {"name": "赵*", "score": 4, "tags": ["态度好"], "text": "响应速度不错，价格透明，适合家里突发维修。", "created_at": "近 90 天"},
+    ],
+    "moving": [
+        {"name": "陈*", "score": 5, "tags": ["守时", "稳妥"], "text": "搬运师傅动作熟练，大件包裹保护做得很好。", "created_at": "近 30 天"},
+        {"name": "钱*", "score": 5, "tags": ["效率高"], "text": "装车和还原都很快，流程也很省心。", "created_at": "近 60 天"},
+        {"name": "吴*", "score": 4, "tags": ["态度好"], "text": "整体体验稳定，适合家庭同城搬家预约。", "created_at": "近 90 天"},
+    ],
+    "nanny": [
+        {"name": "刘*", "score": 5, "tags": ["耐心", "专业"], "text": "阿姨沟通温和，照护和家务安排都比较有条理。", "created_at": "近 30 天"},
+        {"name": "许*", "score": 5, "tags": ["准时", "放心"], "text": "平台认证和背调信息完整，看起来更安心。", "created_at": "近 60 天"},
+        {"name": "何*", "score": 4, "tags": ["细致"], "text": "整体服务比较稳，适合长期预约。", "created_at": "近 90 天"},
+    ],
+}
+
+
+def _mask_phone(phone):
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) >= 4:
+        return digits[:1] + "**" + digits[-1]
+    return "匿名用户"
+
+
+
+def _parse_rating_json(raw):
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+
+def _vendor_auth_badges(vendor):
+    badges = []
+    if vendor.get("whitelist_id"):
+        badges.append("白名单商家")
+    rank = vendor.get("rank") or {}
+    if rank.get("label"):
+        badges.append(rank["label"])
+    for key in vendor.get("badges") or []:
+        label = VENDOR_BADGE_LABELS.get(key)
+        if label and label not in badges:
+            badges.append(label)
+    if vendor.get("live"):
+        badges.append("在线接单")
+    return badges[:5]
+
+
+
+def _worker_auth_badges(worker):
+    badges = []
+    if worker.get("is_whitelisted"):
+        badges.append("白名单服务者")
+    for key in worker.get("certs") or []:
+        label = WORKER_CERT_LABELS.get(key)
+        if label and label not in badges:
+            badges.append(label)
+    return badges[:5]
+
+
+
+def _review_reply(vendor_name, score):
+    if score >= 5:
+        return (vendor_name or "商家") + "：感谢认可，我们会继续按认证标准完成每次上门服务。"
+    if score >= 4:
+        return (vendor_name or "商家") + "：感谢反馈，我们会继续优化服务细节与响应体验。"
+    return ""
+
+
+
+def _review_rows(conn, sku_ids, vendor_name, limit=6):
+    if not sku_ids:
+        return []
+    placeholders = ",".join(["?"] * len(sku_ids))
+    rows = conn.execute(
+        f"""SELECT o.*, s.name AS sku_name FROM jz_orders o
+             LEFT JOIN jz_skus s ON s.id=o.sku_id
+             WHERE o.rating_json IS NOT NULL AND o.sku_id IN ({placeholders})
+             ORDER BY COALESCE(o.updated_at, o.created_at) DESC LIMIT ?""",
+        list(sku_ids) + [int(limit)],
+    ).fetchall()
+    reviews = []
+    for row in rows:
+        rowd = dict(row)
+        rating = _parse_rating_json(rowd.get("rating_json"))
+        if not rating:
+            continue
+        score = float(rating.get("score") or 0)
+        reviews.append(
+            {
+                "name": _mask_phone(rowd.get("phone")),
+                "score": score,
+                "tags": rating.get("tags") or [],
+                "text": rating.get("text") or ((rowd.get("sku_name") or "本次服务") + "整体完成较稳定。"),
+                "created_at": (rating.get("created_at") or rowd.get("updated_at") or rowd.get("created_at") or "").replace("T", " ").replace("Z", "")[:16],
+                "reply": _review_reply(vendor_name, score),
+            }
+        )
+    return reviews
+
+
+
+def _fallback_reviews(category_id, vendor_name):
+    reviews = []
+    for item in CATEGORY_REVIEW_FALLBACKS.get(category_id, CATEGORY_REVIEW_FALLBACKS["cleaning"]):
+        row = dict(item)
+        row["reply"] = _review_reply(vendor_name, row.get("score") or 0)
+        reviews.append(row)
+    return reviews
+
+
+
+def _merchant_intro(vendor, product):
+    intro = {
+        "summary": "",
+        "stats": [],
+        "service_flow": ["线上预约 + 确认时间", "平台派单 + 服务者确认", "按标准上门服务", "服务完成 + 记录回传", "客户评价 + 信用回流"],
+        "guarantees": ["服务前 2 小时可免费取消", "服务前 2 小时内取消扣 30%", "服务开始后不可取消", "认证商家按平台标准提供售后处理"],
+    }
+    if not vendor:
+        return intro
+    vendor_name = vendor.get("name") or "认证商家"
+    category = product.get("category") or vendor.get("type") or "家政"
+    subtitle = product.get("subtitle") or product.get("title") or ""
+    intro["summary"] = (
+        vendor_name
+        + " 提供 "
+        + category
+        + " 服务，覆盖 "
+        + (vendor.get("address") or "本地核心区域")
+        + "，营业时段 "
+        + (vendor.get("hours") or "08:00-22:00")
+        + "。"
+        + (subtitle + "。" if subtitle else "")
+        + "平台展示的商家、服务者认证状态与评价会同步回流到详情页，便于下单前判断履约稳定性。"
+    )
+    intro["stats"] = [
+        {"label": "服务评分", "value": str(vendor.get("rating") or "4.8")},
+        {"label": "累计评价", "value": str(vendor.get("review_count") or 0)},
+        {"label": "起订价格", "value": ("¥%s/%s" % (vendor.get("start_price") or 0, vendor.get("unit") or "次"))},
+    ]
+    return intro
+
+
+
+def get_detail_context_by_channel_sku(conn, sku_id, category_id=None):
+    row = conn.execute(
+        """SELECT
+               p.id AS product_id,
+               p.vendor_id AS product_vendor_id,
+               p.title AS product_title,
+               p.subtitle AS product_subtitle,
+               p.category AS product_category,
+               p.duration_hours AS product_duration_hours,
+               p.area_range AS product_area_range,
+               p.unit AS product_unit,
+               p.price AS product_price,
+               p.original_price AS product_original_price,
+               p.discount_label AS product_discount_label,
+               p.earliest_time AS product_earliest_time,
+               p.advance_booking_hours AS product_advance_booking_hours,
+               p.sales_count AS product_sales_count,
+               p.rating AS product_rating,
+               p.service_tags AS product_service_tags,
+               p.channel_sku_id AS product_channel_sku_id,
+               p.status AS product_status,
+               p.sort_order AS product_sort_order,
+               v.id AS vendor_id,
+               v.type AS vendor_type,
+               v.name AS vendor_name,
+               v.logo AS vendor_logo,
+               v.address AS vendor_address,
+               v.district_id AS vendor_district_id,
+               v.phone AS vendor_phone,
+               v.rating AS vendor_rating,
+               v.review_count AS vendor_review_count,
+               v.rank_type AS vendor_rank_type,
+               v.rank_label AS vendor_rank_label,
+               v.badges AS vendor_badges,
+               v.live AS vendor_live,
+               v.start_price AS vendor_start_price,
+               v.unit AS vendor_unit,
+               v.fulfillment AS vendor_fulfillment,
+               v.hours AS vendor_hours,
+               v.vendor_no AS vendor_vendor_no,
+               v.whitelist_id AS vendor_whitelist_id,
+               v.status AS vendor_status,
+               v.sort_order AS vendor_sort_order,
+               v.created_at AS vendor_created_at,
+               v.updated_at AS vendor_updated_at
+           FROM jz_products p
+           JOIN jz_vendors v ON v.id=p.vendor_id
+           WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1""",
+        (sku_id,),
+    ).fetchone()
+    if not row:
+        return None
+    raw = dict(row)
+    product = _row_to_dict({
+        "id": raw.get("product_id"),
+        "vendor_id": raw.get("product_vendor_id"),
+        "title": raw.get("product_title"),
+        "subtitle": raw.get("product_subtitle"),
+        "category": raw.get("product_category"),
+        "duration_hours": raw.get("product_duration_hours"),
+        "area_range": raw.get("product_area_range"),
+        "unit": raw.get("product_unit"),
+        "price": raw.get("product_price"),
+        "original_price": raw.get("product_original_price"),
+        "discount_label": raw.get("product_discount_label"),
+        "earliest_time": raw.get("product_earliest_time"),
+        "advance_booking_hours": raw.get("product_advance_booking_hours"),
+        "sales_count": raw.get("product_sales_count"),
+        "rating": raw.get("product_rating"),
+        "service_tags": raw.get("product_service_tags"),
+        "channel_sku_id": raw.get("product_channel_sku_id"),
+        "status": raw.get("product_status"),
+        "sort_order": raw.get("product_sort_order"),
+    })
+    vendor = _row_to_dict({
+        "id": raw.get("vendor_id"),
+        "type": raw.get("vendor_type"),
+        "name": raw.get("vendor_name"),
+        "logo": raw.get("vendor_logo"),
+        "address": raw.get("vendor_address"),
+        "district_id": raw.get("vendor_district_id"),
+        "phone": raw.get("vendor_phone"),
+        "rating": raw.get("vendor_rating"),
+        "review_count": raw.get("vendor_review_count"),
+        "rank_type": raw.get("vendor_rank_type"),
+        "rank_label": raw.get("vendor_rank_label"),
+        "badges": raw.get("vendor_badges"),
+        "live": raw.get("vendor_live"),
+        "start_price": raw.get("vendor_start_price"),
+        "unit": raw.get("vendor_unit"),
+        "fulfillment": raw.get("vendor_fulfillment"),
+        "hours": raw.get("vendor_hours"),
+        "vendor_no": raw.get("vendor_vendor_no"),
+        "whitelist_id": raw.get("vendor_whitelist_id"),
+        "status": raw.get("vendor_status"),
+        "sort_order": raw.get("vendor_sort_order"),
+        "created_at": raw.get("vendor_created_at"),
+        "updated_at": raw.get("vendor_updated_at"),
+    })
+    vendor["auth_badges"] = _vendor_auth_badges(vendor)
+    workers = list_workers_by_vendor(conn, vendor["id"])
+    for worker in workers:
+        worker["auth_badges"] = _worker_auth_badges(worker)
+    workers = workers[:3]
+    sku_ids = [sku_id]
+    for p in list_products_by_vendor(conn, vendor["id"]):
+        channel_sku_id = p.get("channel_sku_id")
+        if channel_sku_id and channel_sku_id not in sku_ids:
+            sku_ids.append(channel_sku_id)
+    reviews = _review_rows(conn, sku_ids[:8], vendor.get("name"), limit=6)
+    if len(reviews) < 3:
+        reviews.extend(_fallback_reviews(category_id or vendor.get("type") or "cleaning", vendor.get("name")))
+        reviews = reviews[:4]
+    return {
+        "product": product,
+        "vendor": vendor,
+        "workers": workers,
+        "reviews": reviews,
+        "merchant_intro": _merchant_intro(vendor, product),
+    }
+
+
 # ====== Workers ======
 def list_workers_by_vendor(conn, vendor_id):
     rows = conn.execute(

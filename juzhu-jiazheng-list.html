@@ -8,18 +8,11 @@
 <style>
   .scr{padding-bottom:24px;}
   .appbar{position:sticky;}
-  .search-wrap{padding:10px 16px 0;background:#fff;position:sticky;top:62px;z-index:20;}
+  .search-wrap{padding:10px 16px 0;background:#fff;}
+  .list-sticky{position:sticky;top:58px;z-index:20;background:#fff;border-bottom:1px solid #f0f3f1;padding-bottom:10px;}
   .search{display:flex;align-items:center;gap:10px;background:#f3f5f4;border:1px solid #eef2f1;border-radius:18px;padding:12px 14px;}
   .search input{border:0;outline:0;background:transparent;flex:1;font-size:14px;color:var(--ink);font-family:inherit;}
   .search .loc{font-size:12px;color:var(--brand);font-weight:600;}
-  .top-tabs{display:flex;gap:10px;overflow-x:auto;padding:14px 16px 6px;background:#fff;scrollbar-width:none;}
-  .top-tabs::-webkit-scrollbar{display:none;}
-  .top-tabs a{flex:0 0 auto;display:grid;place-items:center;gap:8px;width:72px;color:var(--muted);}
-  .top-tabs .ico{width:58px;height:58px;border-radius:18px;background:linear-gradient(135deg,#f6faf9,#edf4f1);border:1px solid #edf2ef;
-    display:grid;place-items:center;font-size:26px;box-shadow:0 8px 18px rgba(15,42,38,.04);}
-  .top-tabs a.on .ico{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border-color:transparent;}
-  .top-tabs b{font-size:12px;font-weight:600;color:var(--ink);}
-  .top-tabs a.on b{color:var(--brand-deep);}
   .sub-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 8px;background:#fff;border-top:1px solid #f0f3f1;scrollbar-width:none;}
   .sub-tabs::-webkit-scrollbar{display:none;}
   .sub-tabs a{flex:0 0 auto;padding:8px 14px;border-radius:999px;background:#f5f7f6;color:var(--muted);font-size:12px;border:1px solid transparent;}
@@ -85,15 +78,15 @@
       <div class="act"><span>⌕</span><span>⌖</span></div>
     </div>
 
-    <div class="search-wrap">
-      <div class="search">
-        <span style="font-size:16px;color:#96a39f;">⌕</span>
-        <input id="searchInput" placeholder="搜索服务，如深度清洁、空调清洗、育儿嫂" />
-        <span class="loc" id="cityLoc">南京</span>
+    <div class="list-sticky">
+      <div class="search-wrap">
+        <div class="search">
+          <span style="font-size:16px;color:#96a39f;">⌕</span>
+          <input id="searchInput" placeholder="搜索服务，如深度清洁、空调清洗、育儿嫂" />
+          <span class="loc" id="cityLoc">南京</span>
+        </div>
       </div>
     </div>
-
-    <div class="top-tabs" id="catTabs"></div>
     <div class="sub-tabs" id="subTabs"></div>
 
     <div class="hero-card" id="hero"></div>
@@ -121,7 +114,13 @@
   }
   var currentSub = q.get('sub') || '';
   var searchText = '';
-  var categories = [];
+  var DEFAULT_CATS = [
+    { id: 'cleaning', name: '保洁', icon: '🧹' },
+    { id: 'repair', name: '维修', icon: '🔧' },
+    { id: 'moving', name: '搬家', icon: '📦' },
+    { id: 'nanny', name: '保姆', icon: '👶' }
+  ];
+  var categories = DEFAULT_CATS.slice();
   var skus = [];
 
   JZ.applyRegionChrome({ titleSub: '#ttlSub', loc: '#cityLoc' });
@@ -136,13 +135,6 @@
 
   function priceText(item){
     return '¥' + Number(item.price_from || 0).toLocaleString();
-  }
-
-  function renderCats(){
-    document.getElementById('catTabs').innerHTML = categories.map(function(c){
-      return '<a class="'+(c.id===currentType?'on':'')+'" href="?type='+c.id+'">'+
-        '<span class="ico">'+(c.icon||'•')+'</span><b>'+c.name+'</b></a>';
-    }).join('');
   }
 
   function renderSubs(){
@@ -222,18 +214,22 @@
     renderList();
   });
 
-  Promise.all([
-    JZ.categories(),
-    JZ.skus()
-  ]).then(function(res){
-    categories = res[0] || [];
-    skus = res[1] || [];
-    renderCats();
+  renderHero();
+
+  JZ.categories().then(function(items) {
+    if (items && items.length) categories = items;
+    renderHero();
+  }).catch(function() {});
+
+  JZ.skus().then(function(items) {
+    skus = items || [];
     renderSubs();
     renderHero();
     renderList();
-  }).catch(function(err){
+  }).catch(function(err) {
     document.getElementById('list').innerHTML = '<div class="empty">家政数据加载失败：'+err.message+'</div>';
+    renderSubs();
+    renderHero();
   });
 })();
 </script>
