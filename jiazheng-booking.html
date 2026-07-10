@@ -55,7 +55,7 @@
   </div>
 </div>
 
-<script src="jiazheng-data.js?v=2"></script>
+<script src="jiazheng-data.js?v=6"></script>
 <script>
 var qs = new URLSearchParams(location.search);
 var type = qs.get('type') || 'cleaning';
@@ -63,9 +63,21 @@ var vendorId = parseInt(qs.get('vendor') || '0', 10);
 var productId = parseInt(qs.get('product') || '0', 10);
 var v, p;
 
+function pnorm(raw){
+  return {
+    id: raw.id,
+    title: raw.title,
+    subtitle: raw.subtitle || raw.sub || '',
+    price: Number(raw.price) || 0,
+    original_price: raw.original_price != null ? raw.original_price : (raw.original != null ? raw.original : raw.price),
+    discount_label: raw.discount_label || raw.discount || '优惠'
+  };
+}
+
 JZ_DATA.getVendor(type, vendorId).then(function(vendor){
   v = vendor;
-  p = vendor.products.find(function(x){ return x.id == productId; });
+  var raw = (vendor.products || []).find(function(x){ return x.id == productId; });
+  p = raw ? pnorm(raw) : null;
   if (!v || !p) {
     document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息缺失</div>';
     return;
@@ -113,7 +125,7 @@ JZ_DATA.getVendor(type, vendorId).then(function(vendor){
   // 价格预览
   document.getElementById('priceBox').innerHTML =
     '<div class="row"><span>基础服务费</span><b>¥'+p.price.toFixed(1)+'</b></div>'+
-    '<div class="row disc"><span>立减优惠（'+(p.discount_label||'4折')+'）</span><b>-¥'+(p.original_price - p.price).toFixed(1)+'</b></div>'+
+    '<div class="row disc"><span>立减优惠（'+p.discount_label+'）</span><b>-¥'+Math.max(0, p.original_price - p.price).toFixed(1)+'</b></div>'+
     '<div class="row"><span>已选优惠券</span><b>神券立减 ¥10.0</b></div>'+
     '<div class="row total"><span>实付</span><b>¥'+(p.price - 10).toFixed(1)+'</b></div>';
 

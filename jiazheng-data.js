@@ -139,6 +139,94 @@ window.JZ_DATA = (function(){
     });
   }
 
+  // ===== 本地订单 mock（静态 http.server 无 POST API 时使用） ======
+  var ORDER_KEY = 'jz_orders';
+  var ORDER_SEQ_KEY = 'jz_order_seq';
+
+  function loadOrders(){
+    try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveOrders(list){
+    localStorage.setItem(ORDER_KEY, JSON.stringify(list));
+  }
+  function findMockVendor(vendorId){
+    var found = null;
+    Object.keys(MOCK.VENDORS).forEach(function(t){
+      (MOCK.VENDORS[t] || []).forEach(function(v){
+        if (v.id == vendorId) found = v;
+      });
+    });
+    return found;
+  }
+  function enrichMockOrder(order){
+    if (!order) return order;
+    if (order.worker_id && !order.worker) {
+      var w = MOCK.WORKERS.find(function(x){ return x.id == order.worker_id; });
+      if (w) {
+        order.worker = window.JZ_CERTS ? JZ_CERTS.enrichWorker(Object.assign({}, w)) : Object.assign({}, w);
+      }
+    }
+    if (order.vendor_id && !order.vendor_platform_certs) {
+      var v = findMockVendor(order.vendor_id);
+      if (v && window.JZ_CERTS) {
+        v = JZ_CERTS.enrichVendor(JSON.parse(JSON.stringify(v)));
+        order.vendor_platform_certs = v.platform_certs;
+        order.vendor_no = v.vendor_no;
+      }
+    }
+    return order;
+  }
+  function mockCreateOrder(data){
+    var seq = parseInt(localStorage.getItem(ORDER_SEQ_KEY) || '80000', 10) + 1;
+    localStorage.setItem(ORDER_SEQ_KEY, String(seq));
+    var vendor = findMockVendor(data.vendor_id);
+    var product = vendor ? (vendor.products || []).find(function(p){ return p.id == data.product_id; }) : null;
+    var now = new Date().toISOString();
+    var order = {
+      id: 'WO-2026-' + seq,
+      type: data.type || (vendor && vendor.type) || 'cleaning',
+      vendor_id: data.vendor_id,
+      product_id: data.product_id,
+      vendor_name: vendor ? vendor.name : '',
+      vendor_logo: vendor ? vendor.logo : '',
+      product_title: product ? product.title : '',
+      product_sub: product ? (product.subtitle || product.sub || '') : '',
+      product_price: product ? product.price : data.fee,
+      address: data.address || '',
+      phone: data.phone || '',
+      scheduled_at: data.scheduled_at || '',
+      fee: data.fee != null ? data.fee : (product ? product.price : 0),
+      status: 'pending',
+      source: 'jz',
+      created_at: now,
+      updated_at: now
+    };
+    var list = loadOrders();
+    list.unshift(order);
+    saveOrders(list);
+    return { ok: true, order: order };
+  }
+  function mockGetOrder(oid){
+    var order = loadOrders().find(function(o){ return o.id === oid; });
+    return enrichMockOrder(order ? Object.assign({}, order) : null);
+  }
+  function mockPatchOrder(oid, patch){
+    var list = loadOrders();
+    var i = list.findIndex(function(o){ return o.id === oid; });
+    if (i < 0) return { error: 'order not found' };
+    Object.assign(list[i], patch, { updated_at: new Date().toISOString() });
+    saveOrders(list);
+    return { ok: true, order: enrichMockOrder(Object.assign({}, list[i])) };
+  }
+
+  function orderFallback(apiFn, mockFn){
+    return apiFn().catch(function(err){
+      console.warn('JZ_DATA: order API failed, using localStorage mock', err && err.message);
+      return mockFn();
+    });
+  }
+
   // ====== 公开方法（异步） ======
   // 失败时返回 mock
   function fallback(fn, mockFn){
@@ -212,23 +300,51 @@ window.JZ_DATA = (function(){
       );
     },
 
-    // ====== 订单（落服务器） ======
+    // ====== 订单（优先 API，静态预览回落 localStorage） ======
     createOrder: function(data){
-      return postJson(API + '/orders', data);
+      return orderFallback(
+        function(){ return postJson(API + '/orders', data); },
+        function(){ return mockCreateOrder(data); }
+      );
     },
     getOrder: function(oid){
-      return getJson(API + '/orders/' + oid);
+      return orderFallback(
+        function(){ return getJson(API + '/orders/' + oid); },
+        function(){ return mockGetOrder(oid); }
+      );
     },
     dispatchOrder: function(oid, workerId){
-      return postJson(API + '/orders/' + oid + '/dispatch', {worker_id: workerId});
+      return orderFallback(
+        function(){ return postJson(API + '/orders/' + oid + '/dispatch', { worker_id: workerId }); },
+        function(){
+          var patch = { status: 'dispatched' };
+          if (workerId) patch.worker_id = workerId;
+          else {
+            var online = MOCK.WORKERS.filter(function(w){ return w.online; });
+            if (online.length) patch.worker_id = online[0].id;
+          }
+          return mockPatchOrder(oid, patch);
+        }
+      );
     },
     updateOrderStatus: function(oid, status){
-      return postJson(API + '/orders/' + oid + '/status', {status: status});
+      return orderFallback(
+        function(){ return postJson(API + '/orders/' + oid + '/status', { status: status }); },
+        function(){ return mockPatchOrder(oid, { status: status }); }
+      );
     },
     rateOrder: function(oid, score, tags, text){
-      return postJson(API + '/orders/' + oid + '/rate', {
-        score: score, tags: tags, text: text
-      });
+      return orderFallback(
+        function(){
+          return postJson(API + '/orders/' + oid + '/rate', { score: score, tags: tags, text: text });
+        },
+        function(){
+          return mockPatchOrder(oid, {
+            status: 'rated',
+            rating: { score: score, tags: tags, text: text, created_at: new Date().toISOString() }
+          });
+        }
+      );
     }
   };
 })();

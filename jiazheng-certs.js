@@ -76,6 +76,43 @@ window.JZ_CERTS = (function(){
     return v;
   }
 
+  var SEAL_SVG = '<svg class="seal-ic" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.1l.95 1.92 2.12.31-1.53 1.49.36 2.11L6 6.77 3.1 7.93l.36-2.11L1.93 3.33l2.12-.31L6 1.1z" fill="currentColor"/></svg>';
+
+  function shortCertName(name){
+    var map = {
+      '身份核验': '身份', '健康证核验': '健康', '技能考核认证': '技能',
+      '责任险承保': '保险', '平台背调': '背调', '白名单审定': '白名单',
+      '家政商家主体认证': '主体', '白名单商家认证': '白名单',
+      '平台背调认证': '背调', '百万保障认证': '保障', '服务承诺认证': '承诺', '销量榜认证': '榜单'
+    };
+    if (map[name]) return map[name];
+    if (/服务者持证/.test(name)) return (name.match(/L\d+/) || ['持证'])[0] + '证';
+    return (name || '').replace(/商家|认证|核验/g, '').slice(0, 4) || name;
+  }
+
+  function renderCertStrip(certs, opts){
+    opts = opts || {};
+    if (!certs || !certs.length) return '';
+    if (opts.mode === 'seal') {
+      var micro = opts.micro;
+      var lbl = opts.label !== false
+        ? '<span class="seal-lbl">' + (opts.label || 'P·认证') + '</span>'
+        : '';
+      var items = certs.map(function(c){
+        var ok = !c.status || c.status === 'valid';
+        return '<a class="jz-cert-seal' + (ok ? '' : ' expired') + '" href="' + verifyUrl(c.code) + '" title="' + c.name + ' · ' + c.code + '">' +
+          SEAL_SVG + '<span class="seal-t">' + shortCertName(c.name) + '</span></a>';
+      }).join('');
+      return '<div class="jz-cert-seals' + (micro ? ' micro' : '') + '">' + lbl + items + '</div>';
+    }
+    return certs.map(function(c){
+      var ok = !c.status || c.status === 'valid';
+      return '<a class="jz-cert-chip' + (opts.micro ? ' micro' : '') + (ok ? '' : ' expired') + '" href="' + verifyUrl(c.code) + '" title="' + c.name + ' · ' + c.code + '">' +
+        '<span class="ck">' + (ok ? '✓' : '!') + '</span>' +
+        '<span class="nm">' + shortCertName(c.name) + '</span></a>';
+    }).join('');
+  }
+
   function renderCertCards(certs, opts){
     opts = opts || {};
     if (!certs || !certs.length) {
@@ -105,6 +142,7 @@ window.JZ_CERTS = (function(){
     enrichWorker: enrichWorker,
     enrichVendor: enrichVendor,
     renderCertCards: renderCertCards,
+    renderCertStrip: renderCertStrip,
     countLabel: countLabel
   };
 })();
