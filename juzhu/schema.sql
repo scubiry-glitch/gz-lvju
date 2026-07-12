@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS jz_orders (
   pay_method    TEXT,
   pay_at        TEXT,
   status        TEXT NOT NULL DEFAULT 'pending',
+  slot_id       INTEGER,
   worker_json   TEXT,
   rating_json   TEXT,
   source        TEXT,

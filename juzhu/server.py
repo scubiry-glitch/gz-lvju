@@ -733,14 +733,28 @@ class Handler(SimpleHTTPRequestHandler):
         slot_meta = None
         slot_id = b.get("slot_id")
         if slot_id:
-            booked = jzdb.book_slot(conn, int(slot_id))
-            if not booked.get("ok"):
+            # 下单只「记录档期意向」并做软校验，不占名额——名额在支付时才占用
+            # （见 _pay_jz_order 的 book_slot），避免弃单/未支付订单永久泄漏档期座位。
+            slot_id = int(slot_id)
+            srow = conn.execute(
+                """SELECT s.slot_date, s.start_time, s.end_time, s.status, s.booked, s.capacity,
+                          w.id AS wid, w.name AS wname, w.level AS wlevel, w.avatar AS wavatar
+                   FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id
+                   WHERE s.id=?""",
+                (slot_id,),
+            ).fetchone()
+            if not srow:
                 conn.close()
-                return self._json({"error": booked.get("error") or "档期已约满"}, 409)
-            slot_meta = booked.get("slot")
-            if booked.get("worker"):
-                worker_json = json_to_db({"preferred": booked["worker"], "slot": slot_meta})
-            elif slot_meta:
+                return self._json({"error": "档期不存在"}, 404)
+            if srow["status"] != "open" or (srow["booked"] or 0) >= (srow["capacity"] or 0):
+                conn.close()
+                return self._json({"error": "该档期已约满，请重选时间"}, 409)
+            slot_meta = {"date": srow["slot_date"], "start": srow["start_time"], "end": srow["end_time"]}
+            if srow["wid"]:
+                worker = {"id": srow["wid"], "name": srow["wname"],
+                          "level": srow["wlevel"], "avatar": srow["wavatar"]}
+                worker_json = json_to_db({"preferred": worker, "slot": slot_meta})
+            else:
                 worker_json = json_to_db({"slot": slot_meta})
         if worker_json is None:
             pref_id = b.get("worker_id") or b.get("preferred_worker_id")
@@ -754,8 +768,8 @@ class Handler(SimpleHTTPRequestHandler):
         conn.execute(
             """INSERT INTO jz_orders(
                  id, sku_id, category_id, type, house, phone, expect_time, desc, fee,
-                 pay_status, status, source, created_at, updated_at, log_json, worker_json
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?, ?)""",
+                 pay_status, status, slot_id, source, created_at, updated_at, log_json, worker_json
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?, ?, ?)""",
             (
                 oid,
                 sku["id"],
@@ -766,6 +780,7 @@ class Handler(SimpleHTTPRequestHandler):
                 expect_time,
                 b.get("desc"),
                 fee,
+                slot_id,
                 b.get("source") or "新居住频道",
                 now,
                 now,
@@ -985,6 +1000,14 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"ok": True, "order": view})
         now = now_iso()
+        # 名额在支付时才占用：占不到（档期已满/已关）则支付失败，订单保持 unpaid，
+        # 让用户改期——避免下单即占、弃单不释放导致的档期座位永久泄漏。
+        slot_id = row["slot_id"]
+        if slot_id:
+            booked = jzdb.book_slot(conn, int(slot_id))
+            if not booked.get("ok"):
+                conn.close()
+                return self._json({"error": booked.get("error") or "该档期已约满，请重选时间"}, 409)
         log = order.get("log_json") or []
         log.append({"s": "paid", "at": now, "by": "user"})
         conn.execute(

@@ -403,6 +403,7 @@ def ensure_jiazheng_schema(conn):
           pay_method TEXT,
           pay_at TEXT,
           status TEXT NOT NULL DEFAULT 'pending',
+          slot_id INTEGER,
           worker_json TEXT,
           rating_json TEXT,
           source TEXT,
@@ -414,6 +415,10 @@ def ensure_jiazheng_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status, created_at);
         """
     )
+    # 迁移：老库 jz_orders 无 slot_id 列（下单只记录档期意向、支付时才占名额需要它）。
+    order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
+    if "slot_id" not in order_cols:
+        conn.execute("ALTER TABLE jz_orders ADD COLUMN slot_id INTEGER")
     for cid, name, icon, order, note in JZ_DEFAULT_CATEGORIES:
         conn.execute(
             """INSERT INTO jz_categories(id, name, icon, sort_order, enabled, note)
