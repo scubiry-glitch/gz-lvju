@@ -27,6 +27,7 @@
       <span class="lb">服务时间</span>
       <span class="vl" id="timeVal">今天 18:00</span>
     </div>
+    <div id="timeMode" style="display:none;font-size:11px;line-height:1.5;padding:6px 0 0;"></div>
     <div class="jz-form-row">
       <span class="lb">联系电话</span>
       <input type="tel" id="phoneInput" value="13800138000" style="flex:1;border:0;outline:0;text-align:right;background:transparent;font:inherit;color:var(--fg);" />
@@ -37,7 +38,7 @@
     </div>
   </div>
 
-  <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
+  <div style="background:var(--surface);padding:0 16px;margin-top:8px;" id="timeAdjust">
     <div style="font-size:14px;font-weight:500;padding:14px 0 8px;">调整上门时间</div>
     <div id="timeSlots" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-bottom:14px;"></div>
   </div>
@@ -56,8 +57,9 @@
 </div>
 
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=2"></script>
 <script src="jiazheng-data.js?v=2"></script>
+<script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
   var qs = new URLSearchParams(location.search);
@@ -72,21 +74,33 @@
 
   function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
 
+  // 调整上门时间 = 万能日期+时间选择器（锁定档期时不显示，见 renderTimeMode）
   function paintTimeSlots(){
     document.getElementById('timeVal').textContent = selectedTime;
-    document.getElementById('timeSlots').innerHTML = TIME_SLOTS.map(function(t){
+    var box = document.getElementById('timeSlots');
+    if (!box) return;
+    if (qs.get('slot')) { box.innerHTML = ''; return; } // 已锁定真实档期，无需再选
+    if (window.JZ_DATEPICK){
+      box.style.cssText = '';  // 清掉内联 grid，交给 .jz-datepick 布局
+      JZ_DATEPICK.mount(box, { value: selectedTime, onChange: function(v){
+        selectedTime = v;
+        document.getElementById('timeVal').textContent = v;
+      }});
+      return;
+    }
+    // 兜底：组件未加载时退回静态时段
+    box.innerHTML = TIME_SLOTS.map(function(t){
       var active = t === selectedTime;
       return '<a href="javascript:;" data-v="'+t+'" style="padding:8px;text-align:center;font-size:12px;border:1px solid '+(active?'var(--brand)':'var(--line)')+';border-radius:8px;background:'+(active?'var(--brand-soft)':'var(--surface)')+';color:'+(active?'var(--brand)':'var(--fg)')+';">'+t+'</a>';
     }).join('');
+    box.addEventListener('click', function(e){
+      e.preventDefault();
+      var t = e.target.closest('[data-v]');
+      if (!t) return;
+      selectedTime = t.dataset.v;
+      paintTimeSlots();
+    });
   }
-
-  document.getElementById('timeSlots').addEventListener('click', function(e){
-    e.preventDefault();
-    var t = e.target.closest('[data-v]');
-    if (!t) return;
-    selectedTime = t.dataset.v;
-    paintTimeSlots();
-  });
 
   function renderSkuSummary(){
     document.getElementById('productSummary').innerHTML =
@@ -130,6 +144,8 @@
       phone: phone,
       expectTime: selectedTime,
       desc: document.getElementById('descInput').value.trim(),
+      worker_id: qs.get('worker') || undefined,
+      slot_id: qs.get('slot') || undefined,
       source: '新居住频道'
     }).then(function(o){
       location.href = 'lvju-app-pay.html?order=' + encodeURIComponent(o.id) + '&channel=jiazheng';
@@ -194,7 +210,23 @@
     });
   }
 
+  function renderTimeMode(){
+    var hasSlot = !!qs.get('slot');
+    var mode = document.getElementById('timeMode');
+    var adjust = document.getElementById('timeAdjust');
+    if (!mode) return;
+    mode.style.display = 'block';
+    if (hasSlot) {
+      mode.innerHTML = '<span style="color:var(--brand);">✓ 已为你锁定该档期，名额已保留，无需调整</span>';
+      if (adjust) adjust.style.display = 'none';
+    } else {
+      mode.innerHTML = '<span style="color:#ea580c;">⚠️ 意向时段：实际上门时间由平台派单后与你电话确认</span>';
+      if (adjust) adjust.style.display = 'block';
+    }
+  }
+
   paintTimeSlots();
+  renderTimeMode();
 
   if (skuSlug) {
     BZF_JZ.sku(skuSlug).then(function(res){

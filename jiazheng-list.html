@@ -58,7 +58,7 @@ function badgeHtml(v){
   if (v.rank && v.rank.label) html += '<span class="bd bd-p">'+v.rank.label+'</span>';
   (v.badges||[]).slice(0,3).forEach(function(b){
     var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
-    var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
+    var t = {whitelist:'行业认证', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
     html += '<span class="bd '+(m[b]||'bd-t')+'">'+(t[b]||b)+'</span>';
   });
   return html;

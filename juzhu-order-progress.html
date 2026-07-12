@@ -117,19 +117,37 @@
     if (!order) return;
     var st = JZ.STATUS[order.status] || JZ.STATUS.pending;
     document.getElementById('subTtl').textContent = order.id;
-    var worker = order.worker;
+    var wraw = order.worker || null;
+    // 兼容：下单后未派单为 {preferred, slot}；派单后为 {name, level, slot, from_customer}
+    var worker = wraw ? (wraw.preferred || wraw) : null;
+    var wslot = wraw ? wraw.slot : null;
+    var customerPicked = !!(wraw && (wraw.preferred || wraw.from_customer));
     var html = '<div class="hero"><div class="eyebrow" style="font-size:10px;letter-spacing:.2em;opacity:.88;">'+JZ.esc(order.type)+' · '+st.c+'</div>'+
       '<h1>'+JZ.esc(order.category)+'</h1>'+
       '<p>'+JZ.esc(order.house)+' · '+JZ.esc(order.expectTime)+'</p></div>'+
       '<div class="steps-wrap"><h3>进度跟踪</h3><div class="track">'+stepRows(order.status)+'</div></div>'+
       '<div class="block"><h3>订单信息</h3>'+
         '<div class="kv"><span class="k">工单号</span><span>'+JZ.esc(order.id)+'</span></div>'+
+        '<div class="kv"><span class="k">上门时间</span><span>'+JZ.esc(order.expectTime||'—')+
+          (wslot && wslot.date
+            ? ' <span style="font-size:10px;color:#0f766e;background:#eafaf3;border:1px solid #b9e7d7;border-radius:999px;padding:1px 7px;">已约档期</span>'
+            : ((order.status==='pending'||order.status==='dispatched')
+                ? ' <span style="font-size:10px;color:#ea580c;background:#fff7ed;border:1px solid #fed7aa;border-radius:999px;padding:1px 7px;">意向·待确认</span>'
+                : ''))+
+        '</span></div>'+
         '<div class="kv"><span class="k">费用</span><span>'+fmtPrice(order.fee)+'</span></div>'+
         '<div class="kv"><span class="k">支付</span><span>'+(order.pay_status==='paid'?'已支付 · '+JZ.esc(order.pay_method||'贝壳支付'):'待支付')+'</span></div>'+
         '<div class="kv"><span class="k">来源</span><span>'+JZ.esc(order.source)+'</span></div>'+
       '</div>';
-    if (worker) {
-      html += '<div class="block"><h3>服务者</h3><div class="worker"><div class="av">'+JZ.esc((worker.name||'师').slice(0,1))+'</div><div><b>'+JZ.esc(worker.name)+'</b><div style="font-size:11px;color:var(--muted);">'+JZ.esc(worker.level)+' · '+JZ.regionDeptStem()+'白名单 · <a href="screens/s-cert.html" style="color:var(--brand);">查看证书</a></div></div></div></div>';
+    if (worker && worker.name) {
+      var pickedBadge = customerPicked
+        ? '<span style="font-size:9px;font-weight:700;color:#0f766e;background:#eafaf3;border:1px solid #b9e7d7;border-radius:999px;padding:1px 7px;margin-left:6px;">您指定</span>'
+        : (order.status==='pending' ? '' : '');
+      var slotLine = wslot && wslot.date
+        ? '<div style="font-size:11px;color:var(--brand);margin-top:3px;">预约档期：'+JZ.esc(wslot.date)+' '+JZ.esc(wslot.start||'')+(wslot.end?'–'+JZ.esc(wslot.end):'')+'</div>'
+        : '';
+      var wtitle = order.status==='pending' ? '首选服务者' : '服务者';
+      html += '<div class="block"><h3>'+wtitle+'</h3><div class="worker"><div class="av">'+JZ.esc((worker.name||'师').slice(0,1))+'</div><div><b>'+JZ.esc(worker.name)+pickedBadge+'</b><div style="font-size:11px;color:var(--muted);">'+JZ.esc(worker.level||'')+' · 行业认证 · <a href="screens/s-cert.html" style="color:var(--brand);">查看证书</a></div>'+slotLine+'</div></div></div>';
     }
     if (order.status === 'done') html += renderRate();
     if (order.status === 'rated' && order.rating) {

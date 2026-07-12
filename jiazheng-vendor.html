@@ -57,7 +57,7 @@ JZ_DATA.getVendor(type, vendorId).then(function(v){
   var rankTag = v.rank ? '<span class="bd bd-p">'+v.rank.label+'</span>' : '';
   var badgeHtml = (v.badges||[]).map(function(b){
     var m = {whitelist:'bd-g', backcheck:'bd-b', insurance:'bd-b', top10:'bd-p', commitment:'bd-r'};
-    var t = {whitelist:'白名单', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
+    var t = {whitelist:'行业认证', backcheck:'背调', insurance:'百万保障', top10:'销量榜', commitment:'不满意重做'};
     return '<span class="bd '+(m[b]||'bd-t')+'">'+(t[b]||b)+'</span>';
   }).join('');
   document.getElementById('vendorHead').innerHTML =

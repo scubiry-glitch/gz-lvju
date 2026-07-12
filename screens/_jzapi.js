@@ -1,5 +1,11 @@
 /* _jzapi.js · 家政工单 API 总线（前后端分离，SQLite 为唯一数据源）
  * 页面通过本模块读写 /api/juzhu/jiazheng/*，不再使用 localStorage 造数。
+ *
+ * 【数据源边界 · 参见 CLAUDE.md 规则 8/9】
+ *   权威数据源 = SQLite（juzhu/juzhu.db），经 juzhu/server.py 暴露。
+ *   本总线（家政工单闭环）与 screens/_orderbus.js（报修 · localStorage `bzf_orders`）
+ *   并行、不混用：报修走 _orderbus.js，家政走本文件，二者不共享 key、不合并。
+ *   家政"目录/SKU 配置"的前端适配 + 离线 mock 见根目录 jiazheng-data.js。
  */
 (function () {
   'use strict';
@@ -171,8 +177,10 @@
     return fetchJSON(url).then(function (r) { return r.items || []; });
   }
 
-  function sku(slug) {
-    return fetchJSON('/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug));
+  function sku(slug, vendorId) {
+    var u = '/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug);
+    if (vendorId) u += '?vendor=' + encodeURIComponent(vendorId);
+    return fetchJSON(u);
   }
 
   function workers() {
@@ -187,9 +195,89 @@
     }
   }
 
-  function regionCity() {
+  var CITY_KEY = 'bzf_jz_city';
+  var CITY_EVT = 'bzf-jz-city';
+
+  // 家政频道 · 展示用「省 / 市」位置模型（多省市演示）。
+  // 规则 7 边界：此处是频道展示地名（省级/市级两档可选），非 _region.js 的 relabel
+  // 换皮主体名词；不参与换皮，仅决定"X · 新居住频道"里的 X。
+  // 一个"位置"可以是省名（省级）或市名（市级）；regionCity() 存/取任一档。
+  var CITY_TREE = [
+    { prov: '辽宁', cities: ['沈阳', '大连', '鞍山', '抚顺', '本溪', '丹东', '锦州', '营口'] },
+    { prov: '江苏', cities: ['南京', '苏州', '无锡', '常州', '镇江', '扬州', '泰州', '南通', '盐城', '徐州'] },
+    { prov: '四川', cities: ['成都', '绵阳', '德阳', '南充', '宜宾', '自贡', '泸州', '乐山'] },
+    { prov: '贵州', cities: ['贵阳', '遵义', '六盘水', '安顺', '毕节', '铜仁'] }
+  ];
+  var DEFAULT_CITY = '沈阳';
+
+  function regionCapital() {
     var R = window.BZF_REGION;
     return (R && R.prov && R.prov.capital) ? R.prov.capital : '南京';
+  }
+
+  // 省/市树（只读副本），供切换器渲染级联
+  function regionCityTree() {
+    return CITY_TREE.map(function (n) { return { prov: n.prov, cities: n.cities.slice() }; });
+  }
+  function regionProvinces() {
+    return CITY_TREE.map(function (n) { return n.prov; });
+  }
+  function citiesOf(prov) {
+    for (var i = 0; i < CITY_TREE.length; i++) {
+      if (CITY_TREE[i].prov === prov) return CITY_TREE[i].cities.slice();
+    }
+    return [];
+  }
+  // 位置所属省：loc 为省名则返回自身，为市名则返回其省，未知返回 null
+  function provinceOf(loc) {
+    for (var i = 0; i < CITY_TREE.length; i++) {
+      if (CITY_TREE[i].prov === loc) return CITY_TREE[i].prov;
+      if (CITY_TREE[i].cities.indexOf(loc) >= 0) return CITY_TREE[i].prov;
+    }
+    return null;
+  }
+  function isProvince(loc) {
+    return regionProvinces().indexOf(loc) >= 0;
+  }
+  // 所有可选位置（省级 + 市级）扁平表，用于校验存储值
+  function regionCities() {
+    var out = [];
+    CITY_TREE.forEach(function (n) {
+      out.push(n.prov);
+      n.cities.forEach(function (c) { out.push(c); });
+    });
+    return out;
+  }
+
+  // 默认位置：优先 DEFAULT_CITY（沈阳），不在树内则退回首个省会/省
+  function defaultCity() {
+    if (regionCities().indexOf(DEFAULT_CITY) >= 0) return DEFAULT_CITY;
+    return regionProvinces()[0] || regionCapital();
+  }
+
+  function regionCity() {
+    var stored = null;
+    try { stored = localStorage.getItem(CITY_KEY); } catch (e) {}
+    if (stored && regionCities().indexOf(stored) >= 0) return stored;
+    return defaultCity();
+  }
+
+  // 接受省级或市级位置；回默认位置时清空存储
+  function setRegionCity(loc) {
+    if (!loc || regionCities().indexOf(loc) < 0) return regionCity();
+    try {
+      if (loc === defaultCity()) localStorage.removeItem(CITY_KEY);
+      else localStorage.setItem(CITY_KEY, loc);
+    } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent(CITY_EVT, { detail: { city: loc } })); } catch (e) {}
+    return loc;
+  }
+
+  function onCityChange(fn) {
+    window.addEventListener(CITY_EVT, function (e) { fn((e.detail && e.detail.city) || regionCity()); });
+    window.addEventListener('storage', function (e) {
+      if (e.key === CITY_KEY) fn(regionCity());
+    });
   }
 
   function regionOperator() {
@@ -222,6 +310,35 @@
     }
   }
 
+  // ===== 演示模式开关 =====
+  // 跨角色/开发导线（如"看中台工单池"）标记 class="demo-only"，仅在演示模式下可见，
+  // 与首页"方案切换/预设切换"同属演示态内容，避免污染顾客视角。
+  // 开关：?demo=1/0 或 localStorage bzf_demo；默认关闭（顾客视角）。
+  var DEMO_KEY = 'bzf_demo';
+  function isDemo() {
+    try {
+      var q = new URLSearchParams(location.search).get('demo');
+      if (q != null) localStorage.setItem(DEMO_KEY, (q === '1' || q === 'on') ? '1' : '0');
+      return localStorage.getItem(DEMO_KEY) === '1';
+    } catch (e) { return false; }
+  }
+  function setDemo(on) {
+    try { localStorage.setItem(DEMO_KEY, on ? '1' : '0'); } catch (e) {}
+    applyDemoMode();
+  }
+  function applyDemoMode() {
+    try {
+      if (!document.getElementById('bzf-demo-css')) {
+        var s = document.createElement('style');
+        s.id = 'bzf-demo-css';
+        s.textContent = 'html:not(.demo-on) .demo-only{display:none !important;}';
+        (document.head || document.documentElement).appendChild(s);
+      }
+      document.documentElement.classList.toggle('demo-on', isDemo());
+    } catch (e) {}
+  }
+  applyDemoMode();
+
   window.BZF_JZ = {
     STATUS: STATUS,
     ICON: ICON,
@@ -242,9 +359,21 @@
     skus: skus,
     sku: sku,
     workers: workers,
+    isDemo: isDemo,
+    setDemo: setDemo,
+    applyDemoMode: applyDemoMode,
     onChange: onChange,
     notify: notify,
     regionCity: regionCity,
+    regionCapital: regionCapital,
+    regionCities: regionCities,
+    regionCityTree: regionCityTree,
+    regionProvinces: regionProvinces,
+    citiesOf: citiesOf,
+    provinceOf: provinceOf,
+    isProvince: isProvince,
+    setRegionCity: setRegionCity,
+    onCityChange: onCityChange,
     regionOperator: regionOperator,
     regionDeptStem: regionDeptStem,
     regionBankName: regionBankName,

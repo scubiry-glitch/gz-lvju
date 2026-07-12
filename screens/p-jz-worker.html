@@ -164,7 +164,7 @@
         <label><input type="checkbox" value="skill" /> 技能证</label>
         <label><input type="checkbox" value="insurance" /> 责任险</label>
         <label><input type="checkbox" value="backcheck" /> 背调</label>
-        <label><input type="checkbox" value="whitelist" /> 白名单</label>
+        <label><input type="checkbox" value="whitelist" /> 行业认证</label>
       </div>
     </div>
     <div class="fld">
@@ -189,7 +189,7 @@
 <script>
 (function(){
   const STATUS_LABELS = {active:'在职', paused:'暂停', offline:'离职'};
-  const CERT_LABELS = {id_card:'身份证', health:'健康证', skill:'技能证', insurance:'责任险', backcheck:'背调', whitelist:'白名单'};
+  const CERT_LABELS = {id_card:'身份证', health:'健康证', skill:'技能证', insurance:'责任险', backcheck:'背调', whitelist:'行业认证'};
   const $ = id => document.getElementById(id);
   const toast = (msg, kind) => {
     const t = $('toast');
