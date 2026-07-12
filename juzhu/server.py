@@ -973,8 +973,17 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "order not found"}, 404)
         order = normalize_jz_order_row(row)
         if order["pay_status"] == "paid":
+            # 幂等：已支付也返回与正常分支一致的 jz_order_view 形状（含 worker/expectTime/
+            # icon/type 等前端契约字段），避免消费者拿到缺字段的原始行。
+            view = jz_order_view(
+                conn.execute(
+                    """SELECT o.*, s.name AS sku_name FROM jz_orders o
+                       LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                    (oid,),
+                ).fetchone()
+            )
             conn.close()
-            return self._json({"ok": True, "order": order})
+            return self._json({"ok": True, "order": view})
         now = now_iso()
         log = order.get("log_json") or []
         log.append({"s": "paid", "at": now, "by": "user"})
@@ -1165,7 +1174,12 @@ class Handler(SimpleHTTPRequestHandler):
             if m:
                 # 评价
                 oid = m.group(1)
-                score = int(body.get("score", 5))
+                try:
+                    score = int(body.get("score", 5))
+                except (TypeError, ValueError):
+                    return self._json({"error": "score 须为 1-5 的整数"}, 400)
+                if not 1 <= score <= 5:
+                    return self._json({"error": "score 须在 1-5 之间"}, 400)
                 tags = body.get("tags", [])
                 text = body.get("text", "")
                 credit_delta = 2.4 if score >= 5 else (1.2 if score >= 4 else (-1.5 if score >= 2 else -3.0))
@@ -1447,6 +1461,20 @@ class Handler(SimpleHTTPRequestHandler):
             n += 1
         return candidate
 
+    def _unique_unit_slug(self, conn, project_id, name, slug=None, exclude_id=None):
+        # 户型 slug 在项目内需唯一：slugify 不转写中文，两个同名（或都用默认名）户型会
+        # 生成相同 slug，详情页 unitBySlug 用 find 命中首个 → 第二个户型不可达/串数据。
+        base = slug or slugify(name) or "unit"
+        candidate = base
+        n = 1
+        while conn.execute(
+            "SELECT id FROM units WHERE project_id=? AND slug=? AND id IS NOT ?",
+            (project_id, candidate, exclude_id),
+        ).fetchone():
+            candidate = f"{base}-{n}"
+            n += 1
+        return candidate
+
     def _create_project(self):
         b = self._body()
         name = (b.get("name") or "").strip()
@@ -1524,7 +1552,7 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"error": "project not found"}, 404)
         name = b.get("name") or "新户型"
-        slug = b.get("slug") or slugify(name)
+        slug = self._unique_unit_slug(conn, pid, name, b.get("slug"))
         conn.execute(
             """INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,
                tags,unit_spec,promo_price,amenities,keeper,rent_detail,sort_order,cover_image)
@@ -1566,9 +1594,9 @@ class Handler(SimpleHTTPRequestHandler):
         if "name" in b:
             name = b.get("name")
             put("name", name)
-            put("slug", b.get("slug") or (slugify(name) if name else None))
+            put("slug", self._unique_unit_slug(conn, pid, name, b.get("slug"), exclude_id=uid))
         elif "slug" in b:
-            put("slug", b.get("slug"))
+            put("slug", self._unique_unit_slug(conn, pid, None, b.get("slug"), exclude_id=uid))
         for col in ("area_sqm", "layout_label", "rent_monthly", "price_total",
                     "unit_spec", "promo_price", "sort_order", "cover_image"):
             if col in b:

@@ -807,6 +807,11 @@ def update_worker(conn, wid, data):
 
 
 def delete_worker(conn, wid):
+    # 先清引用子表再删主表：jz_sku_workers / jz_sku_slots 的 worker_id 有外键且无
+    # ON DELETE CASCADE，connect() 又开了 PRAGMA foreign_keys=ON——直接删已绑定
+    # 服务者会抛 IntegrityError → 500。与 delete_product 的清理方式一致。
+    conn.execute("DELETE FROM jz_sku_workers WHERE worker_id=?", (wid,))
+    conn.execute("DELETE FROM jz_sku_slots WHERE worker_id=?", (wid,))
     conn.execute("DELETE FROM jz_workers WHERE id=?", (wid,))
     return {"ok": True}
 
@@ -1083,9 +1088,16 @@ def book_slot(conn, slot_id):
     if not row:
         return {"ok": False, "error": "档期不存在"}
     d = _row_to_dict(row)
-    if d.get("status") != "open" or (d.get("booked") or 0) >= (d.get("capacity") or 0):
+    # 条件更新占名额：把「判满」和「+1」合成一条原子语句，避免先 SELECT 再 UPDATE 的
+    # TOCTOU——并发/重试下两个请求都读到 booked<capacity 各自 +1 会超卖。rowcount==0
+    # 即表示已满/已关，未占到名额。
+    cur = conn.execute(
+        "UPDATE jz_sku_slots SET booked = booked + 1 "
+        "WHERE id=? AND status='open' AND booked < capacity",
+        (slot_id,),
+    )
+    if cur.rowcount == 0:
         return {"ok": False, "error": "该档期已约满"}
-    conn.execute("UPDATE jz_sku_slots SET booked = booked + 1 WHERE id=?", (slot_id,))
     return {
         "ok": True,
         "worker_id": d.get("worker_id"),

@@ -838,9 +838,12 @@ def sync_project_unit_count(conn, project_id):
         "SELECT MIN(rent_monthly), MIN(price_total) FROM units WHERE project_id=?",
         (project_id,),
     ).fetchone()
-    price_from = rents[0] or rents[1]
+    # 取最低租金（保租）否则最低总价（置换）。用 is None 判断而非 or，避免 MIN==0 误落到
+    # price_total；直接赋值而非 COALESCE，使删掉最便宜/删光户型后 price_from 能回落/清空
+    # （旧逻辑 COALESCE(NULL, price_from) 会保留已不存在户型的陈旧最低价）。
+    price_from = rents[0] if rents[0] is not None else rents[1]
     conn.execute(
-        "UPDATE projects SET unit_count=?, price_from=COALESCE(?, price_from) WHERE id=?",
+        "UPDATE projects SET unit_count=?, price_from=? WHERE id=?",
         (n, price_from, project_id),
     )
     proj = conn.execute("SELECT district_id FROM projects WHERE id=?", (project_id,)).fetchone()
