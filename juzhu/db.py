@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = Path(__file__).resolve().parent / "juzhu.db"
 JSON_PATH = Path(__file__).resolve().parent / "data.json"
+SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 
 JZ_WORKERS = [
     {"name": "陈建国", "level": "L4", "tags": ["细致", "主动"]},
@@ -267,6 +268,12 @@ def connect():
 
 
 def ensure_schema(conn):
+    # 基表自愈：schema.sql 全为 CREATE TABLE IF NOT EXISTS，幂等。
+    # 修复「重置后的 juzhu.db 只有 jz_* 家政表、缺 projects/units/districts，
+    # 导致 juzhu-admin 房源后台整链路 500」的隐患——旧版 ensure_schema 只迁移
+    # 「已存在」的表，从不建房源基表。
+    if SCHEMA_PATH.exists():
+        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     project_cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
     if project_cols:
         migrations = [

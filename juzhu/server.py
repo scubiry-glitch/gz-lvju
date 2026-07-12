@@ -1550,29 +1550,40 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"error": "not found"}, 404)
         pid = row[0]
-        name = b.get("name")
-        slug = b.get("slug") or (slugify(name) if name else None)
-        tags = tags_to_db(b.get("tags")) if "tags" in b else None
-        amenities = json_to_db(b.get("amenities")) if "amenities" in b else None
-        keeper = json_to_db(b.get("keeper")) if "keeper" in b else None
-        rent_detail = json_to_db(b.get("rent_detail")) if "rent_detail" in b else None
 
-        conn.execute(
-            """UPDATE units SET
-               name=COALESCE(?, name), slug=COALESCE(?, slug),
-               area_sqm=?, layout_label=?, rent_monthly=?, price_total=?,
-               tags=COALESCE(?, tags), unit_spec=?, promo_price=?,
-               amenities=COALESCE(?, amenities), keeper=COALESCE(?, keeper),
-               rent_detail=COALESCE(?, rent_detail),
-               sort_order=COALESCE(?, sort_order), cover_image=?
-               WHERE id=?""",
-            (name, slug, b.get("area_sqm"), b.get("layout_label"),
-             b.get("rent_monthly"), b.get("price_total"), tags,
-             b.get("unit_spec"), b.get("promo_price"),
-             amenities, keeper, rent_detail,
-             b.get("sort_order"), b.get("cover_image"), uid),
-        )
-        conn.commit()
+        # 局部更新：只写「请求体里出现过的字段」，缺失字段保持原值不动。
+        # 关键修复：主行「快速保存」只发 name/area/layout/price/sort，不含
+        # cover_image / unit_spec / promo_price；旧逻辑用「=?」硬写会把这些字段
+        # 抹成 NULL，导致房源封面、规格、促销价被清空（多条分别保存后看似「失效」）。
+        sets, vals = [], []
+
+        def put(col, val):
+            sets.append(col + "=?")
+            vals.append(val)
+
+        if "name" in b:
+            name = b.get("name")
+            put("name", name)
+            put("slug", b.get("slug") or (slugify(name) if name else None))
+        elif "slug" in b:
+            put("slug", b.get("slug"))
+        for col in ("area_sqm", "layout_label", "rent_monthly", "price_total",
+                    "unit_spec", "promo_price", "sort_order", "cover_image"):
+            if col in b:
+                put(col, b.get(col))
+        if "tags" in b:
+            put("tags", tags_to_db(b.get("tags")))
+        if "amenities" in b:
+            put("amenities", json_to_db(b.get("amenities")))
+        if "keeper" in b:
+            put("keeper", json_to_db(b.get("keeper")))
+        if "rent_detail" in b:
+            put("rent_detail", json_to_db(b.get("rent_detail")))
+
+        if sets:
+            vals.append(uid)
+            conn.execute("UPDATE units SET " + ", ".join(sets) + " WHERE id=?", vals)
+            conn.commit()
         sync_project_unit_count(conn, pid)
         export_json(conn)
         unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
