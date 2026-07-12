@@ -230,7 +230,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
 
     def _multipart(self):
         ct = self.headers.get("Content-Type", "")
@@ -1086,6 +1086,10 @@ class Handler(SimpleHTTPRequestHandler):
     # ====== 居住服务·家政频道 ======
     def _jiazheng_post(self, path, qs, method_alt="POST"):
         """处理 /api/juzhu/jz/* POST/PUT/DELETE 请求"""
+        # 家政 P/B 管理台的全部写接口（类目/SPU/档期/商家 SKU/服务者/订单状态）均需
+        # API Key——此前路由在鉴权块之前就 return，导致这些接口可匿名调用（CLAUDE.md 规则 9）。
+        if not self._require_api_key():
+            return
         conn = connect()
         try:
             body = self._body()

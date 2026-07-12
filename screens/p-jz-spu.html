@@ -166,6 +166,24 @@
 <script src="_region.js?v=2"></script>
 <script src="_nav.js"></script>
 <script>
+// 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
+// （默认 dev-juzhu-key，可用 localStorage.JUZHU_API_KEY 覆盖）。
+(function(){
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || 'dev-juzhu-key';
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/juzhu/jz') !== -1) {
+      var h = Object.assign({}, init.headers);
+      if (!h['X-API-Key']) h['X-API-Key'] = KEY;
+      init.headers = h;
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+<script>
 (function(){
   const TYPE_LABELS = {cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'保姆'};
   const $ = id => document.getElementById(id);
