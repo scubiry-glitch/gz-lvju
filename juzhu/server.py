@@ -513,6 +513,19 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"list": data})
 
+        # SPU（平台标准品 = jz_skus）全量列表，供 P 端 SPU 管理台
+        if path == "/api/juzhu/jz/spu":
+            data = jzdb.list_skus_admin(conn)
+            conn.close()
+            return self._json({"list": data})
+
+        # 排班档期列表（B 端排班台，按商家 SKU/product 查）
+        if path == "/api/juzhu/jz/slots":
+            product_id = qs.get("product_id", [None])[0]
+            data = jzdb.list_slots_by_product(conn, int(product_id)) if product_id else []
+            conn.close()
+            return self._json({"list": data})
+
         if path == "/api/juzhu/jz/vendors":
             type_ = qs.get("type", [None])[0]
             data = jzdb.list_vendors(conn, type_)
@@ -635,6 +648,22 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"items": rows})
 
+        # C 端：某 SKU 的可约档期（按日期分组由前端处理）
+        m = re.match(r"^/api/juzhu/jiazheng/skus/([^/]+)/slots$", path)
+        if m:
+            srow = conn.execute(
+                "SELECT id FROM jz_skus WHERE slug=? AND enabled=1", (m.group(1),)
+            ).fetchone()
+            vendor_id = qs.get("vendor", [None])[0]
+            slots = []
+            if srow:
+                pid = jzdb.resolve_channel_sku_product_id(conn, srow[0], vendor_id)
+                if pid:
+                    jzdb.ensure_rolling_slots(conn, pid)  # 滚动排期：始终保有未来 5 天
+                    slots = jzdb.list_available_slots_for_product(conn, pid)
+            conn.close()
+            return self._json({"slots": slots})
+
         m = re.match(r"^/api/juzhu/jiazheng/skus/([^/]+)$", path)
         if m:
             row = conn.execute(
@@ -656,13 +685,17 @@ class Handler(SimpleHTTPRequestHandler):
                     (item["category_id"], item["slug"]),
                 ).fetchall()
             ]
-            detail_context = jzdb.get_detail_context_by_channel_sku(conn, item["id"], item.get("category_id")) or {}
+            vendor_id = qs.get("vendor", [None])[0]
+            detail_context = jzdb.get_detail_context_by_channel_sku(
+                conn, item["id"], item.get("category_id"), vendor_id) or {}
+            vendors = jzdb.list_channel_sku_vendors(conn, item["id"])
             conn.close()
             return self._json({
                 "item": item,
                 "related": related,
                 "product": detail_context.get("product"),
                 "vendor": detail_context.get("vendor"),
+                "vendors": vendors,          # 多商家同款（比价/切换）
                 "workers": detail_context.get("workers") or [],
                 "reviews": detail_context.get("reviews") or [],
                 "merchant_intro": detail_context.get("merchant_intro"),
@@ -695,11 +728,34 @@ class Handler(SimpleHTTPRequestHandler):
         now = now_iso()
         fee = int(b.get("fee") or sku.get("price_from") or 0)
         log = [{"s": "pending", "at": now, "by": "user"}]
+        # 客户下单时的档期/首选服务者（来自 SKU 排班或绑定的服务者）
+        worker_json = None
+        slot_meta = None
+        slot_id = b.get("slot_id")
+        if slot_id:
+            booked = jzdb.book_slot(conn, int(slot_id))
+            if not booked.get("ok"):
+                conn.close()
+                return self._json({"error": booked.get("error") or "档期已约满"}, 409)
+            slot_meta = booked.get("slot")
+            if booked.get("worker"):
+                worker_json = json_to_db({"preferred": booked["worker"], "slot": slot_meta})
+            elif slot_meta:
+                worker_json = json_to_db({"slot": slot_meta})
+        if worker_json is None:
+            pref_id = b.get("worker_id") or b.get("preferred_worker_id")
+            if pref_id:
+                wrow = conn.execute(
+                    "SELECT id, name, level, avatar FROM jz_workers WHERE id=?",
+                    (int(pref_id),),
+                ).fetchone()
+                if wrow:
+                    worker_json = json_to_db({"preferred": dict(wrow)})
         conn.execute(
             """INSERT INTO jz_orders(
                  id, sku_id, category_id, type, house, phone, expect_time, desc, fee,
-                 pay_status, status, source, created_at, updated_at, log_json
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?)""",
+                 pay_status, status, source, created_at, updated_at, log_json, worker_json
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?, ?)""",
             (
                 oid,
                 sku["id"],
@@ -714,6 +770,7 @@ class Handler(SimpleHTTPRequestHandler):
                 now,
                 now,
                 json_to_db(log),
+                worker_json,
             ),
         )
         conn.commit()
@@ -788,15 +845,29 @@ class Handler(SimpleHTTPRequestHandler):
         if order["status"] != "pending":
             conn.close()
             return self._json({"error": "仅待派单状态可派单"}, 400)
+        # 客户在档位/详情已选定的首选服务者与档期
+        existing = order.get("worker_json") if isinstance(order.get("worker_json"), dict) else {}
+        pref = existing.get("preferred") if existing else None
+        slot = existing.get("slot") if existing else None
         worker = b.get("worker")
         if not worker:
-            assigned = conn.execute(
-                "SELECT COUNT(*) FROM jz_orders WHERE status IN ('dispatched','accepted','serving','done','rated')"
-            ).fetchone()[0]
-            worker = dict(JZ_WORKERS[assigned % len(JZ_WORKERS)])
+            if pref and pref.get("name"):
+                # 尊重客户选择：直接指派其在档位选定的服务者
+                worker = dict(pref)
+                worker["from_customer"] = True
+            else:
+                assigned = conn.execute(
+                    "SELECT COUNT(*) FROM jz_orders WHERE status IN ('dispatched','accepted','serving','done','rated')"
+                ).fetchone()[0]
+                worker = dict(JZ_WORKERS[assigned % len(JZ_WORKERS)])
+        # 保留客户预约的档期，便于进度页与服务者履约展示
+        if slot and "slot" not in worker:
+            worker["slot"] = slot
         now = now_iso()
         log = order.get("log_json") or []
-        log.append({"s": "dispatched", "at": now, "by": "platform", "worker": worker.get("name")})
+        log.append({"s": "dispatched", "at": now, "by": "platform",
+                    "worker": worker.get("name"),
+                    "honored": bool(worker.get("from_customer"))})
         conn.execute(
             """UPDATE jz_orders
                SET status='dispatched', worker_json=?, updated_at=?, log_json=?
@@ -1114,6 +1185,44 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": ok})
             if m and method_alt == "DELETE":
                 result = jzdb.delete_category(conn, int(m.group(1)))
+                conn.commit()
+                return self._json(result, 200 if result.get("ok") else 400)
+
+            # === P 端·SPU 管理 CRUD（平台标准品，操作 jz_skus）===
+            if path == "/api/juzhu/jz/spu" and method_alt == "POST":
+                sid = jzdb.create_sku(conn, body)
+                conn.commit()
+                return self._json({"ok": True, "id": sid})
+            m = re.match(r"^/api/juzhu/jz/spu/(\d+)$", path)
+            if m and method_alt == "PUT":
+                ok = jzdb.update_sku(conn, int(m.group(1)), body)
+                conn.commit()
+                return self._json({"ok": ok})
+            if m and method_alt == "DELETE":
+                result = jzdb.delete_sku(conn, int(m.group(1)))
+                conn.commit()
+                return self._json(result, 200 if result.get("ok") else 400)
+
+            # === B 端·排班档期 CRUD ===
+            if path == "/api/juzhu/jz/slots/generate" and method_alt == "POST":
+                n = jzdb.generate_slots(
+                    conn, int(body["product_id"]), body.get("worker_ids") or [],
+                    body.get("dates") or [], body.get("times") or [],
+                    int(body.get("capacity", 1) or 1),
+                )
+                conn.commit()
+                return self._json({"ok": True, "created": n})
+            if path == "/api/juzhu/jz/slots" and method_alt == "POST":
+                sid = jzdb.create_slot(conn, body)
+                conn.commit()
+                return self._json({"ok": True, "id": sid})
+            m = re.match(r"^/api/juzhu/jz/slots/(\d+)$", path)
+            if m and method_alt == "PUT":
+                result = jzdb.set_slot_status(conn, int(m.group(1)), body.get("status"))
+                conn.commit()
+                return self._json(result)
+            if m and method_alt == "DELETE":
+                result = jzdb.delete_slot(conn, int(m.group(1)))
                 conn.commit()
                 return self._json(result, 200 if result.get("ok") else 400)
 

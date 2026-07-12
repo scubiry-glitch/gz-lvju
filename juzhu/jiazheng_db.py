@@ -85,7 +85,11 @@ def list_products_by_vendor(conn, vendor_id, status="on"):
 
 def get_product(conn, product_id):
     row = conn.execute("SELECT * FROM jz_products WHERE id=?", (product_id,)).fetchone()
-    return _row_to_dict(row)
+    d = _row_to_dict(row)
+    if d:
+        d["worker_ids"] = list_product_worker_ids(conn, product_id)
+        d["workers"] = list_product_workers(conn, product_id)
+    return d
 
 
 VENDOR_BADGE_LABELS = {
@@ -258,7 +262,7 @@ def _merchant_intro(vendor, product):
 
 
 
-def get_detail_context_by_channel_sku(conn, sku_id, category_id=None):
+def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=None):
     row = conn.execute(
         """SELECT
                p.id AS product_id,
@@ -306,8 +310,9 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None):
            FROM jz_products p
            JOIN jz_vendors v ON v.id=p.vendor_id
            WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           """ + ("AND p.vendor_id=? " if vendor_id else "") + """
            ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1""",
-        (sku_id,),
+        ((sku_id, vendor_id) if vendor_id else (sku_id,)),
     ).fetchone()
     if not row:
         return None
@@ -359,10 +364,13 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None):
         "updated_at": raw.get("vendor_updated_at"),
     })
     vendor["auth_badges"] = _vendor_auth_badges(vendor)
-    workers = list_workers_by_vendor(conn, vendor["id"])
+    # 优先取该 SKU 绑定的服务者（P2：SKU=SPU+服务者+时间）；无绑定回退到商家全员
+    workers = list_product_workers(conn, product["id"])
+    if not workers:
+        workers = list_workers_by_vendor(conn, vendor["id"])
     for worker in workers:
         worker["auth_badges"] = _worker_auth_badges(worker)
-    workers = workers[:3]
+    workers = workers[:4]
     sku_ids = [sku_id]
     for p in list_products_by_vendor(conn, vendor["id"]):
         channel_sku_id = p.get("channel_sku_id")
@@ -619,18 +627,29 @@ def list_products(conn, vendor_id=None, type_=None, status=None, limit=200):
     sql += " ORDER BY p.vendor_id, p.sort_order, p.id LIMIT ?"
     params.append(int(limit))
     rows = conn.execute(sql, params).fetchall()
-    return _rows_to_list(rows)
+    items = _rows_to_list(rows)
+    # 附加：引用的 SPU 名 + 绑定服务者 id 列表
+    for it in items:
+        it["worker_ids"] = list_product_worker_ids(conn, it["id"])
+        if it.get("channel_sku_id"):
+            srow = conn.execute(
+                "SELECT name FROM jz_skus WHERE id=?", (it["channel_sku_id"],)
+            ).fetchone()
+            it["spu_name"] = srow[0] if srow else None
+        else:
+            it["spu_name"] = None
+    return items
 
 
 def create_product(conn, data):
-    """新增产品"""
+    """新增商家 SKU（引用 SPU=channel_sku_id，可绑本店服务者 worker_ids）"""
     import json as _json
     cur = conn.execute(
         """INSERT INTO jz_products
            (vendor_id, title, subtitle, category, duration_hours, area_range, unit,
             price, original_price, discount_label, earliest_time, advance_booking_hours,
-            sales_count, rating, service_tags, status, sort_order)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            sales_count, rating, service_tags, channel_sku_id, status, sort_order)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (int(data.get("vendor_id", 0)),
          data.get("title", ""),
          data.get("subtitle", ""),
@@ -646,36 +665,79 @@ def create_product(conn, data):
          int(data.get("sales_count", 0)),
          float(data.get("rating", 0)),
          _json.dumps(data.get("service_tags", []), ensure_ascii=False),
+         int(data["channel_sku_id"]) if data.get("channel_sku_id") else None,
          data.get("status", "on"),
          int(data.get("sort_order", 99))),
     )
-    return cur.lastrowid
+    pid = cur.lastrowid
+    if "worker_ids" in data:
+        set_product_workers(conn, pid, data.get("worker_ids") or [])
+    return pid
 
 
 def update_product(conn, pid, data):
-    """更新产品"""
+    """更新商家 SKU"""
     import json as _json
     fields = []
     params = []
     for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
               "unit", "price", "original_price", "discount_label", "earliest_time",
-              "advance_booking_hours", "sales_count", "rating", "status", "sort_order"):
+              "advance_booking_hours", "sales_count", "rating", "channel_sku_id",
+              "status", "sort_order"):
         if k in data:
             v = data[k]
             if k == "service_tags":
                 v = _json.dumps(v, ensure_ascii=False)
+            elif k == "channel_sku_id":
+                v = int(v) if v else None
             fields.append(f"{k}=?")
             params.append(v)
-    if not fields:
-        return False
-    params.append(pid)
-    cur = conn.execute(f"UPDATE jz_products SET {', '.join(fields)} WHERE id=?", params)
-    return cur.rowcount > 0
+    ok = True
+    if fields:
+        params.append(pid)
+        cur = conn.execute(f"UPDATE jz_products SET {', '.join(fields)} WHERE id=?", params)
+        ok = cur.rowcount > 0
+    if "worker_ids" in data:
+        set_product_workers(conn, pid, data.get("worker_ids") or [])
+        ok = True
+    return ok
 
 
 def delete_product(conn, pid):
+    conn.execute("DELETE FROM jz_sku_workers WHERE product_id=?", (pid,))
     conn.execute("DELETE FROM jz_products WHERE id=?", (pid,))
     return {"ok": True}
+
+
+def set_product_workers(conn, product_id, worker_ids):
+    """全量重置某 SKU 绑定的服务者。"""
+    conn.execute("DELETE FROM jz_sku_workers WHERE product_id=?", (product_id,))
+    for wid in worker_ids:
+        try:
+            conn.execute(
+                "INSERT OR IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?,?)",
+                (int(product_id), int(wid)),
+            )
+        except (ValueError, TypeError):
+            continue
+
+
+def list_product_worker_ids(conn, product_id):
+    rows = conn.execute(
+        "SELECT worker_id FROM jz_sku_workers WHERE product_id=?", (product_id,)
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
+def list_product_workers(conn, product_id):
+    """SKU 绑定的服务者明细（带认证信息）。"""
+    rows = conn.execute(
+        """SELECT w.* FROM jz_sku_workers sw
+           JOIN jz_workers w ON w.id=sw.worker_id
+           WHERE sw.product_id=? ORDER BY w.level DESC, w.rating DESC""",
+        (product_id,),
+    ).fetchall()
+    return _rows_to_list(rows)
 
 
 # ====== Workers CRUD (B 端·服务者管理) ======
@@ -747,3 +809,286 @@ def update_worker(conn, wid, data):
 def delete_worker(conn, wid):
     conn.execute("DELETE FROM jz_workers WHERE id=?", (wid,))
     return {"ok": True}
+
+
+# ====== SPU CRUD (P 端·平台标准品，操作 jz_skus) ======
+# 语义：jz_skus = SPU（平台统一标准服务品）；jz_products = 商家 SKU（引用 SPU）。
+_SPU_JSON_FIELDS = ("tags", "badges", "gallery", "includes", "service_flow", "service_notice")
+
+
+def _spu_json(v):
+    """接受 list 或逗号/换行分隔字符串，统一存 JSON 数组。"""
+    if isinstance(v, str):
+        v = [s.strip() for s in v.replace("\n", ",").split(",") if s.strip()]
+    return json.dumps(v or [], ensure_ascii=False)
+
+
+def list_skus_admin(conn):
+    """SPU 全量列表（含下架），带类目名，用于 P 端管理台。"""
+    rows = conn.execute(
+        """SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                  (SELECT COUNT(*) FROM jz_products p WHERE p.channel_sku_id=s.id) AS sku_count
+           FROM jz_skus s LEFT JOIN jz_categories c ON c.id=s.category_id
+           ORDER BY s.category_id, s.sort_order, s.id"""
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = _row_to_dict(r)
+        for k in _SPU_JSON_FIELDS:
+            raw = d.get(k)
+            if isinstance(raw, str):
+                try:
+                    d[k] = json.loads(raw) if raw else []
+                except (ValueError, TypeError):
+                    d[k] = []
+            elif raw is None:
+                d[k] = []
+        out.append(d)
+    return out
+
+
+def create_sku(conn, data):
+    """新增 SPU（平台标准品）。"""
+    cur = conn.execute(
+        """INSERT INTO jz_skus
+           (category_id, name, slug, spec, price_from, price_unit, duration_min,
+            tags, badges, sales_text, rating_score, worker_min_level,
+            includes, service_flow, sort_order, enabled)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (data.get("category_id", "cleaning"),
+         data.get("name", ""),
+         data.get("slug", ""),
+         data.get("spec", ""),
+         int(data.get("price_from", 0) or 0),
+         data.get("price_unit", "起"),
+         int(data.get("duration_min", 0) or 0),
+         _spu_json(data.get("tags", [])),
+         _spu_json(data.get("badges", [])),
+         data.get("sales_text", ""),
+         float(data.get("rating_score", 0) or 0),
+         data.get("worker_min_level", "L3"),
+         _spu_json(data.get("includes", [])),
+         _spu_json(data.get("service_flow", [])),
+         int(data.get("sort_order", 99) or 99),
+         1 if str(data.get("enabled", 1)) not in ("0", "false", "False", "") else 0),
+    )
+    return cur.lastrowid
+
+
+def update_sku(conn, sku_id, data):
+    """更新 SPU。"""
+    fields = []
+    params = []
+    for k in ("category_id", "name", "slug", "spec", "price_from", "price_unit",
+              "duration_min", "tags", "badges", "sales_text", "rating_score",
+              "worker_min_level", "includes", "service_flow", "sort_order", "enabled"):
+        if k in data:
+            v = data[k]
+            if k in _SPU_JSON_FIELDS:
+                v = _spu_json(v)
+            elif k == "enabled":
+                v = 1 if str(v) not in ("0", "false", "False", "") else 0
+            fields.append(f"{k}=?")
+            params.append(v)
+    if not fields:
+        return False
+    params.append(sku_id)
+    cur = conn.execute(f"UPDATE jz_skus SET {', '.join(fields)} WHERE id=?", params)
+    return cur.rowcount > 0
+
+
+def delete_sku(conn, sku_id):
+    """删除 SPU（被商家 SKU 引用或有历史工单则禁止）。"""
+    used = conn.execute(
+        "SELECT COUNT(*) FROM jz_products WHERE channel_sku_id=?", (sku_id,)
+    ).fetchone()[0]
+    if used > 0:
+        return {"ok": False, "error": f"该 SPU 已被 {used} 个商家 SKU 引用，无法删除"}
+    ordered = conn.execute(
+        "SELECT COUNT(*) FROM jz_orders WHERE sku_id=?", (sku_id,)
+    ).fetchone()[0]
+    if ordered > 0:
+        return {"ok": False, "error": f"该 SPU 有 {ordered} 条历史工单，建议下架而非删除"}
+    conn.execute("DELETE FROM jz_skus WHERE id=?", (sku_id,))
+    return {"ok": True}
+
+
+# ====== 排班档期 CRUD (jz_sku_slots) — SKU 的"时间"维度 ======
+def _slot_row(r):
+    d = _row_to_dict(r)
+    if d:
+        d["remaining"] = max(0, (d.get("capacity") or 0) - (d.get("booked") or 0))
+    return d
+
+
+def resolve_channel_sku_product_id(conn, sku_id, vendor_id=None):
+    """给定 C 端 SKU(=SPU) id，取承接它的商家 SKU(product) id（评分优先，与详情页一致）。
+    指定 vendor_id 则锁定该商家（多商家同款切换用）。"""
+    row = conn.execute(
+        """SELECT p.id FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
+           WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           """ + ("AND p.vendor_id=? " if vendor_id else "") + """
+           ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1""",
+        ((sku_id, vendor_id) if vendor_id else (sku_id,)),
+    ).fetchone()
+    return row[0] if row else None
+
+
+ROLLING_SLOT_TIMES = [("09:00", "11:00"), ("14:00", "16:00"), ("19:00", "21:00")]
+
+
+def ensure_rolling_slots(conn, product_id, days=5):
+    """滚动排期：确保该商家 SKU 未来 days 天都有可约档期，随日期推进自动补齐。
+    仅对已绑定服务者的 SKU 生成；已有该日期档期则跳过（幂等，读接口前调用）。"""
+    from datetime import date, timedelta
+    wids = [r[0] for r in conn.execute(
+        "SELECT worker_id FROM jz_sku_workers WHERE product_id=?", (product_id,)
+    ).fetchall()]
+    if not wids:
+        return 0
+    today = date.today()
+    made = 0
+    for i in range(1, days + 1):
+        d = (today + timedelta(days=i)).isoformat()
+        if conn.execute(
+            "SELECT 1 FROM jz_sku_slots WHERE product_id=? AND slot_date=? LIMIT 1",
+            (product_id, d),
+        ).fetchone():
+            continue
+        for wid in wids:
+            for (st, et) in ROLLING_SLOT_TIMES:
+                conn.execute(
+                    """INSERT INTO jz_sku_slots(product_id, worker_id, slot_date, start_time, end_time, capacity, booked, status)
+                       VALUES (?, ?, ?, ?, ?, 2, 0, 'open')""",
+                    (product_id, wid, d, st, et),
+                )
+                made += 1
+    if made:
+        conn.commit()
+    return made
+
+
+def list_channel_sku_vendors(conn, sku_id):
+    """某 SPU 下所有上架商家（多商家同款 / 比价用），按评分-销量排序。"""
+    rows = conn.execute(
+        """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,
+                  p.rating AS product_rating, p.sales_count,
+                  v.id AS vendor_id, v.name AS vendor_name, v.logo AS vendor_logo,
+                  v.rating AS vendor_rating, v.review_count, v.rank_label, v.badges
+           FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
+           WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           ORDER BY p.rating DESC, p.sales_count DESC, p.id""",
+        (sku_id,),
+    ).fetchall()
+    out, seen = [], set()
+    for r in rows:
+        d = dict(r)
+        if d["vendor_id"] in seen:   # 一商家一行：同 vendor 多 product 取评分最高的
+            continue
+        seen.add(d["vendor_id"])
+        d["auth_badges"] = _vendor_auth_badges({"badges": d.get("badges")})
+        out.append(d)
+    return out
+
+
+def list_slots_by_product(conn, product_id):
+    """某商家 SKU 的全部档期（B 端排班台），带服务者名。"""
+    rows = conn.execute(
+        """SELECT s.*, w.name AS worker_name, w.level AS worker_level, w.avatar AS worker_avatar
+           FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id
+           WHERE s.product_id=? ORDER BY s.slot_date, s.start_time, s.id""",
+        (product_id,),
+    ).fetchall()
+    return [_slot_row(r) for r in rows]
+
+
+def list_available_slots_for_product(conn, product_id, from_date=None):
+    """C 端可约档期：open 且未满且日期≥今天，带服务者名与剩余容量。"""
+    if from_date is None:
+        from datetime import date
+        from_date = date.today().isoformat()
+    rows = conn.execute(
+        """SELECT s.*, w.name AS worker_name, w.level AS worker_level, w.avatar AS worker_avatar
+           FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id
+           WHERE s.product_id=? AND s.status='open' AND s.booked < s.capacity
+                 AND s.slot_date >= ?
+           ORDER BY s.slot_date, s.start_time, s.id""",
+        (product_id, from_date),
+    ).fetchall()
+    return [_slot_row(r) for r in rows]
+
+
+def create_slot(conn, data):
+    cur = conn.execute(
+        """INSERT INTO jz_sku_slots(product_id, worker_id, slot_date, start_time, end_time, capacity, booked, status)
+           VALUES (?,?,?,?,?,?,0,'open')""",
+        (int(data["product_id"]),
+         int(data["worker_id"]) if data.get("worker_id") else None,
+         data.get("slot_date", ""),
+         data.get("start_time", ""),
+         data.get("end_time", ""),
+         int(data.get("capacity", 1) or 1)),
+    )
+    return cur.lastrowid
+
+
+def delete_slot(conn, slot_id):
+    row = conn.execute("SELECT booked FROM jz_sku_slots WHERE id=?", (slot_id,)).fetchone()
+    if row and (row[0] or 0) > 0:
+        return {"ok": False, "error": "该档期已有预约，无法删除（可改为关闭）"}
+    conn.execute("DELETE FROM jz_sku_slots WHERE id=?", (slot_id,))
+    return {"ok": True}
+
+
+def set_slot_status(conn, slot_id, status):
+    """开/关档期：closed 的档期不再对 C 端开放。"""
+    status = "closed" if status == "closed" else "open"
+    cur = conn.execute("UPDATE jz_sku_slots SET status=? WHERE id=?", (status, slot_id))
+    return {"ok": cur.rowcount > 0, "status": status}
+
+
+def generate_slots(conn, product_id, worker_ids, dates, times, capacity=1):
+    """批量生成档期：worker × date × time 笛卡尔积，跳过重复。"""
+    n = 0
+    workers = worker_ids or [None]
+    for wid in workers:
+        for d in dates:
+            for t in times:
+                start = t.get("start") if isinstance(t, dict) else t
+                end = t.get("end") if isinstance(t, dict) else None
+                dup = conn.execute(
+                    """SELECT 1 FROM jz_sku_slots WHERE product_id=? AND slot_date=?
+                       AND start_time=? AND IFNULL(worker_id,0)=IFNULL(?,0)""",
+                    (product_id, d, start, wid),
+                ).fetchone()
+                if dup:
+                    continue
+                conn.execute(
+                    """INSERT INTO jz_sku_slots(product_id, worker_id, slot_date, start_time, end_time, capacity, booked, status)
+                       VALUES (?,?,?,?,?,?,0,'open')""",
+                    (int(product_id), int(wid) if wid else None, d, start, end, int(capacity or 1)),
+                )
+                n += 1
+    return n
+
+
+def book_slot(conn, slot_id):
+    """占用一个档期名额：未满则 booked+1，返回该档服务者信息。"""
+    row = conn.execute(
+        """SELECT s.*, w.name AS worker_name, w.level AS worker_level, w.avatar AS worker_avatar
+           FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id WHERE s.id=?""",
+        (slot_id,),
+    ).fetchone()
+    if not row:
+        return {"ok": False, "error": "档期不存在"}
+    d = _row_to_dict(row)
+    if d.get("status") != "open" or (d.get("booked") or 0) >= (d.get("capacity") or 0):
+        return {"ok": False, "error": "该档期已约满"}
+    conn.execute("UPDATE jz_sku_slots SET booked = booked + 1 WHERE id=?", (slot_id,))
+    return {
+        "ok": True,
+        "worker_id": d.get("worker_id"),
+        "worker": {"id": d.get("worker_id"), "name": d.get("worker_name"),
+                   "level": d.get("worker_level"), "avatar": d.get("worker_avatar")} if d.get("worker_id") else None,
+        "slot": {"date": d.get("slot_date"), "start": d.get("start_time"), "end": d.get("end_time")},
+    }
