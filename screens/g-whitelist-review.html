@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>白名单审核 · 江苏保租房 G 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb;
+      --accent: #1e40af; --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    /* sidebar styles 由 _nav.js 提供 */
+
+    .main { padding: 22px 28px 40px; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; flex: 1; }
+    .topbar .sub { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+
+    /* summary row */
+    .sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+    .sc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }
+    .sc .l { font-size: 12px; color: var(--muted); }
+    .sc .n { font-size: 24px; font-weight: 700; margin-top: 4px; }
+    .sc.urg { border-color: color-mix(in oklab, var(--danger) 30%, transparent); }
+    .sc.urg .n { color: var(--danger); }
+
+    /* section title */
+    .sec-h { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 1px; margin: 0 0 12px; }
+
+    /* category grid */
+    .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+    .cat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;
+      transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    }
+    .cat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.07); border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
+    .cat-card .row1 { display: flex; align-items: center; gap: 12px; }
+    .cat-card .ico { width: 44px; height: 44px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex-shrink: 0; }
+    .cat-card .ico svg { width: 22px; height: 22px; }
+    .cat-card .tt { flex: 1; }
+    .cat-card .nm { font-size: 16px; font-weight: 600; }
+    .cat-card .cat { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .cat-card .pending { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 600; flex-shrink: 0; background: color-mix(in oklab, var(--warn) 14%, transparent); color: var(--warn); }
+    .cat-card .pending.zero { background: color-mix(in oklab, var(--success) 14%, transparent); color: var(--success); }
+    .cat-card .desc { font-size: 13px; color: var(--muted); }
+    .cat-card .stats { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+    .cat-card .stats strong { color: var(--fg); font-weight: 600; }
+    .cat-card .go { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--accent); margin-top: 2px; }
+    .cat-card .go svg { width: 14px; height: 14px; }
+
+    /* related links */
+    .rel { margin-top: 28px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
+    .rel h4 { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin: 0 0 10px; }
+    .rel .links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .rel .links a { padding: 7px 12px; font-size: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; color: var(--fg); }
+    .rel .links a:hover { border-color: var(--accent); color: var(--accent); }
+
+    @media (max-width: 1100px) {
+      .console { grid-template-columns: 1fr; }
+      .nv-side { display: none; }
+      .sum { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ========== 移动版 ========== */
+    .m-shell{display:none;}
+    @media (max-width: 1023px) {
+      body{background:#f3f4f6;}
+      .console{display:none !important;}
+      .m-shell{display:block; max-width:430px; margin:0 auto; min-height:100vh; padding-bottom:96px; background:#f3f4f6;}
+      .m-sum{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; padding:12px;}
+      .m-sb{background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:10px; text-align:center;}
+      .m-sb .l{font-size:10px; color:#6b7280;}
+      .m-sb .n{font-size:18px; font-weight:700; margin-top:2px;}
+      .m-sb.urg .n{color:#dc2626;}
+      .m-list{padding:8px 12px 12px;}
+      .m-card{display:flex; align-items:center; gap:12px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:10px;}
+      .m-card .ico-box{width:40px; height:40px; border-radius:9px; background:color-mix(in oklab,#1e40af 12%,transparent); color:#1e40af; display:grid; place-items:center; flex-shrink:0;}
+      .m-card .ico-box svg{width:20px; height:20px;}
+      .m-card .info{flex:1; min-width:0;}
+      .m-card .nm{font-size:15px; font-weight:600;}
+      .m-card .mt{font-size:11px; color:#6b7280; margin-top:2px;}
+      .m-card .bdg{font-size:10px; padding:2px 8px; border-radius:999px; font-weight:600; flex-shrink:0; background:#ea580c; color:#fff;}
+      .m-card .bdg.zero{background:#16a34a;}
+    }
+  </style>
+</head>
+<body>
+<!-- ========== 移动视图（≤1023px） ========== -->
+<div class="m-shell">
+  <div id="m-header" data-series="g" data-active="whitelist-review" data-title="白名单审核" data-icon="✓" data-ttl="5 类机构主体准入" data-sub="按品类分流至各审核台 · 共 25 件待办" data-right="共 25"></div>
+  <div class="m-sum">
+    <div class="m-sb urg"><div class="l">待审合计</div><div class="n">25</div></div>
+    <div class="m-sb"><div class="l">已通过·本月</div><div class="n">131</div></div>
+    <div class="m-sb"><div class="l">驳回·本月</div><div class="n">11</div></div>
+  </div>
+  <div class="m-list">
+    <a class="m-card" href="g-whitelist-service.html">
+      <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <div class="info"><div class="nm">S 服务者白名单</div><div class="mt">个人持证轨道 · 维修/管家/保洁等</div></div>
+      <span class="bdg">11</span>
+    </a>
+    <a class="m-card" href="g-whitelist-operator.html">
+      <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+      <div class="info"><div class="nm">B 运营商白名单</div><div class="mt">持有方委托的日常运营机构</div></div>
+      <span class="bdg">5</span>
+    </a>
+    <a class="m-card" href="g-whitelist-vendor.html">
+      <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+      <div class="info"><div class="nm">V 人力服务商白名单</div><div class="mt">派遣/装修/团队型服务商</div></div>
+      <span class="bdg">3</span>
+    </a>
+    <a class="m-card" href="g-whitelist-supplier.html">
+      <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+      <div class="info"><div class="nm">M 物资供应商白名单</div><div class="mt">家电/家具/装修等 6 品类集采</div></div>
+      <span class="bdg">3</span>
+    </a>
+    <a class="m-card" href="g-whitelist-training.html">
+      <div class="ico-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></div>
+      <div class="info"><div class="nm">T 培训机构白名单</div><div class="mt">合作培训方 · 讲师持证核验</div></div>
+      <span class="bdg">3</span>
+    </a>
+  </div>
+  <div id="m-tabbar" data-series="g" data-active="cockpit"></div>
+</div>
+
+<div class="console">
+
+  <div id="side-nav" data-series="g" data-active="whitelist-review"></div>
+
+  <main class="main">
+
+    <div class="topbar">
+      <h1>白名单审核</h1>
+    </div>
+    <p class="sub">主体准入 · 5 类机构生态（S 服务者 / B 运营商 / V 人力服务商 / M 物资供应商 / T 培训机构）统一入口，按品类分流至各审核台。</p>
+
+    <div class="sum">
+      <div class="sc urg"><div class="l">待审合计</div><div class="n">25</div></div>
+      <div class="sc"><div class="l">已通过 · 本月</div><div class="n">131</div></div>
+      <div class="sc"><div class="l">驳回 / 补正 · 本月</div><div class="n">11</div></div>
+      <div class="sc"><div class="l">平均审结时长</div><div class="n">3.2 <span style="font-size:13px;font-weight:400;color:var(--muted)">天</span></div></div>
+    </div>
+
+    <h3 class="sec-h">分品类审核台</h3>
+    <div class="cat-grid">
+
+      <a class="cat-card" href="g-whitelist-service.html">
+        <div class="row1">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+          <div class="tt"><div class="nm">S 服务者白名单</div><div class="cat">个人持证轨道</div></div>
+          <span class="pending">11 待审</span>
+        </div>
+        <div class="desc">维修技师、运营管家、保洁、客服等一线服务者的资质核验与持证认证。</div>
+        <div class="stats"><span>本月已通过 <strong>36</strong></span><span>驳回 <strong>4</strong></span></div>
+        <span class="go">进入审核台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+
+      <a class="cat-card" href="g-whitelist-operator.html">
+        <div class="row1">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+          <div class="tt"><div class="nm">B 运营商白名单</div><div class="cat">日常运营机构</div></div>
+          <span class="pending">5 待审</span>
+        </div>
+        <div class="desc">持有方委托的日常运营机构（自如/龙湖/华润/招商/贝壳省心租等）资质审定与分级。</div>
+        <div class="stats"><span>本月已通过 <strong>18</strong></span><span>驳回 <strong>2</strong></span></div>
+        <span class="go">进入审核台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+
+      <a class="cat-card" href="g-whitelist-vendor.html">
+        <div class="row1">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+          <div class="tt"><div class="nm">V 人力服务商白名单</div><div class="cat">团队型服务商</div></div>
+          <span class="pending">3 待审</span>
+        </div>
+        <div class="desc">派遣、装修施工、软装等团队型人力服务商的入驻审定与持证率核验。</div>
+        <div class="stats"><span>本月已通过 <strong>9</strong></span><span>驳回 <strong>1</strong></span></div>
+        <span class="go">进入审核台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+
+      <a class="cat-card" href="g-whitelist-supplier.html">
+        <div class="row1">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+          <div class="tt"><div class="nm">M 物资供应商白名单</div><div class="cat">6 品类集采</div></div>
+          <span class="pending">3 待审</span>
+        </div>
+        <div class="desc">家电、家具、装修材料等 6 品类物资供应商的商品认证与集采底价审核。</div>
+        <div class="stats"><span>本月已通过 <strong>7</strong></span><span>驳回 <strong>2</strong></span></div>
+        <span class="go">进入审核台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+
+      <a class="cat-card" href="g-whitelist-training.html">
+        <div class="row1">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></div>
+          <div class="tt"><div class="nm">T 培训机构白名单</div><div class="cat">合作培训方</div></div>
+          <span class="pending">3 待审</span>
+        </div>
+        <div class="desc">合作培训机构的合作伙伴认证、课程资质与讲师持证核验。</div>
+        <div class="stats"><span>本月已通过 <strong>5</strong></span><span>驳回 <strong>0</strong></span></div>
+        <span class="go">进入审核台 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+
+    </div>
+
+    <div class="rel">
+      <h4>关联入口</h4>
+      <div class="links">
+        <a href="g-approval.html">✍ 待批 · 白名单复审签批</a>
+        <a href="p-console.html">服务认证中台 ↗</a>
+        <a href="d-org-standard.html">机构的标准 · 五类机构生态 ↗</a>
+        <a href="portal-index.html">合格主体公示门户 ↗</a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="_region.js?v=2"></script>
+<script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
+<script src="_navmobile.js"></script>
+</body>
+</html>

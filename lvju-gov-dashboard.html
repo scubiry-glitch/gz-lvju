@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贵州住建厅 · 旅居监管大屏</title>
+<style>
+  :root{
+    --bg:#0a0f14; --card:#111827; --card-hover:#1a2332; --fg:#e2e8f0; --muted:#94a3b8;
+    --brand:#10b981; --brand-soft:rgba(16,185,129,.15); --gold:#f59e0b; --gold-soft:rgba(245,158,11,.15);
+    --danger:#ef4444; --warn:#f59e0b; --ok:#10b981; --info:#3b82f6;
+    --r-sm:6px; --r-md:10px; --r-lg:14px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden;}
+  
+  .dashboard{display:grid;grid-template-rows:auto 1fr;height:100vh;}
+  
+  /* header */
+  .header{background:linear-gradient(90deg,#0b5d56,#0f766e);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;}
+  .header-left{display:flex;align-items:center;gap:16px;}
+  .header h1{font-size:20px;font-weight:700;margin:0;color:#fff;}
+  .header .badge{background:rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:600;padding:4px 12px;border-radius:999px;}
+  .header-right{display:flex;align-items:center;gap:20px;color:#fff;font-size:13px;}
+  .header-right .time{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .header-right .date{opacity:.8;}
+  
+  /* main */
+  .main{display:grid;grid-template-columns:280px 1fr 320px;gap:16px;padding:16px;overflow:hidden;}
+  
+  /* panel */
+  .panel{background:var(--card);border-radius:var(--r-lg);display:flex;flex-direction:column;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .panel-head h3{font-size:14px;font-weight:600;margin:0;}
+  .panel-head .icon{font-size:16px;}
+  .panel-body{flex:1;overflow-y:auto;padding:14px 18px;}
+  .panel-body::-webkit-scrollbar{width:4px;}
+  .panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px;}
+  
+  /* kpi cards */
+  .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:16px;}
+  .kpi-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-md);padding:14px;text-align:center;}
+  .kpi-card .value{font-size:28px;font-weight:700;color:var(--brand);}
+  .kpi-card .value.gold{color:var(--gold);}
+  .kpi-card .label{font-size:11px;color:var(--muted);margin-top:4px;}
+  .kpi-card .trend{font-size:11px;color:var(--ok);margin-top:4px;}
+  .kpi-card .trend.down{color:var(--danger);}
+  
+  /* alert list */
+  .alert-list{display:flex;flex-direction:column;gap:8px;}
+  .alert-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;}
+  .alert-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .alert-item .dot.warn{background:var(--warn);}
+  .alert-item .dot.danger{background:var(--danger);}
+  .alert-item .dot.ok{background:var(--ok);}
+  .alert-item .content{flex:1;}
+  .alert-item .count{font-weight:600;color:var(--fg);}
+  
+  /* map area */
+  .map-panel{display:flex;flex-direction:column;}
+  .map-container{flex:1;position:relative;background:linear-gradient(135deg,#0a1628,#0f1f35);border-radius:0 0 var(--r-lg) var(--r-lg);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .map-placeholder{color:var(--muted);font-size:14px;text-align:center;}
+  .map-placeholder .icon{font-size:48px;margin-bottom:12px;opacity:.3;}
+  
+  /* region dots */
+  .region-dots{position:absolute;inset:0;}
+  .region-dot{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--brand);cursor:pointer;transition:transform .2s;}
+  .region-dot:hover{transform:scale(1.5);}
+  .region-dot::after{content:attr(data-name);position:absolute;bottom:18px;left:50%;transform:translateX(-50%);font-size:10px;color:#fff;white-space:nowrap;opacity:0;transition:opacity .2s;}
+  .region-dot:hover::after{opacity:1;}
+  .region-dot.hot{background:var(--gold);box-shadow:0 0 12px var(--gold);}
+  .region-dot .pulse{position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--brand);animation:pulse 2s infinite;}
+  @keyframes pulse{0%{transform:scale(1);opacity:1;}100%{transform:scale(2);opacity:0;}}
+  
+  /* stats bar */
+  .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,.08);border-radius:var(--r-md);overflow:hidden;margin-top:12px;}
+  .stat-item{background:var(--card);padding:12px;text-align:center;}
+  .stat-item .value{font-size:16px;font-weight:600;}
+  .stat-item .label{font-size:10px;color:var(--muted);margin-top:2px;}
+  
+  /* ranking */
+  .rank-list{display:flex;flex-direction:column;gap:8px;}
+  .rank-item{display:flex;align-items:center;gap:10px;font-size:12px;}
+  .rank-item .rank{width:20px;height:20px;border-radius:4px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:11px;flex-shrink:0;}
+  .rank-item .rank.top{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;}
+  .rank-item .name{flex:1;}
+  .rank-item .value{color:var(--brand);font-weight:600;}
+  
+  /* progress bar */
+  .progress-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .progress-row .label{width:60px;font-size:11px;color:var(--muted);flex-shrink:0;}
+  .progress-row .bar{flex:1;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
+  .progress-row .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand));border-radius:3px;}
+  .progress-row .value{width:40px;font-size:11px;color:var(--fg);text-align:right;}
+  
+  /* quick actions */
+  .action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;}
+  .action-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:10px;text-align:center;font-size:11px;color:var(--fg);cursor:pointer;transition:all .15s;}
+  .action-btn:hover{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);}
+  .action-btn .icon{font-size:18px;margin-bottom:4px;display:block;}
+  
+  /* shell badge */
+  .shell-badge{display:inline-flex;align-items:center;gap:4px;background:var(--brand-soft);color:var(--brand);font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;}
+  
+  /* status indicator */
+  .status-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;}
+  .status-row:last-child{border-bottom:0;}
+  .status-row .label{color:var(--muted);}
+  .status-row .value{font-weight:500;}
+  .status-row .value.ok{color:var(--ok);}
+  .status-row .value.warn{color:var(--warn);}
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <!-- header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>🏛 贵州省住建厅 · 旅居监管大屏</h1>
+      <span class="badge">🐚 贝壳旅居平台</span>
+    </div>
+    <div class="header-right">
+      <div class="date" id="date">2026年6月25日 星期四</div>
+      <div class="time" id="time">01:28:00</div>
+    </div>
+  </div>
+  
+  <!-- main -->
+  <div class="main">
+    <!-- left panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="icon">📊</span>
+        <h3>实时数据概览</h3>
+      </div>
+      <div class="panel-body">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="value">2,847</div>
+            <div class="label">接入房源总数</div>
+            <div class="trend">↑ 12.3%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value gold">¥8.2亿</div>
+            <div class="label">资产总估值</div>
+            <div class="trend">↑ 8.7%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">91%</div>
+            <div class="label">彩贝达标率</div>
+            <div class="trend">↑ 2.1%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">98.2%</div>
+            <div class="label">验真覆盖率</div>
+            <div class="trend">↑ 0.8%</div>
+          </div>
+        </div>
+        
+        <h4 style="font-size:12px;color:var(--muted);margin:16px 0 10px;">彩贝分布</h4>
+        <div class="progress-row">
+          <span class="label">五彩贝</span>
+          <div class="bar"><i style="width:12%"></i></div>
+          <span class="value">342</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">四彩贝</span>
+          <div class="bar"><i style="width:28%"></i></div>
+          <span class="value">797</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">三彩贝</span>
+          <div class="bar"><i style="width:45%"></i></div>
+          <span class="value">1,281</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">二彩贝</span>
+          <div class="bar"><i style="width:12%"></i></div>
+          <span class="value">342</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">一彩贝</span>
+          <div class="bar"><i style="width:3%"></i></div>
+          <span class="value">85</span>
+        </div>
+        
+        <h4 style="font-size:12px;color:var(--muted);margin:16px 0 10px;">核验状态</h4>
+        <div class="status-row">
+          <span class="label">公安实名备案</span>
+          <span class="value ok">✓ 2,801 (98.4%)</span>
+        </div>
+        <div class="status-row">
+          <span class="label">住建产权/租赁备案</span>
+          <span class="value ok">✓ 2,756 (96.8%)</span>
+        </div>
+        <div class="status-row">
+          <span class="label">保险投保</span>
+          <span class="value ok">✓ 2,698 (94.7%)</span>
+        </div>
+        <div class="status-row">
+          <span class="label">待核验</span>
+          <span class="value warn">46 (1.6%)</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- center: map -->
+    <div class="panel map-panel">
+      <div class="panel-head">
+        <span class="icon">🗺</span>
+        <h3>贵州省房源分布 · 地市州热力</h3>
+      </div>
+      <div class="map-container">
+        <div class="map-placeholder">
+          <div class="icon">🗺️</div>
+          <div>贵州省地图热力图</div>
+          <div style="font-size:11px;opacity:.6;margin-top:8px;">交互式地图加载中...</div>
+        </div>
+        <!-- region dots (模拟位置) -->
+        <div class="region-dots">
+          <div class="region-dot hot" style="left:45%;top:35%" data-name="贵阳市 · 892套">
+            <span class="pulse"></span>
+          </div>
+          <div class="region-dot hot" style="left:58%;top:55%" data-name="黔东南 · 724套">
+            <span class="pulse"></span>
+          </div>
+          <div class="region-dot" style="left:25%;top:70%" data-name="黔南 · 412套"></div>
+          <div class="region-dot" style="left:35%;top:25%" data-name="遵义市 · 356套"></div>
+          <div class="region-dot" style="left:70%;top:40%" data-name="黔西南 · 198套"></div>
+          <div class="region-dot" style="left:15%;top:50%" data-name="安顺市 · 167套"></div>
+          <div class="region-dot" style="left:55%;top:20%" data-name="铜仁市 · 98套"></div>
+        </div>
+      </div>
+      <div class="stats-bar">
+        <div class="stat-item">
+          <div class="value" style="color:var(--brand)">892</div>
+          <div class="label">贵阳</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" style="color:var(--gold)">724</div>
+          <div class="label">黔东南</div>
+        </div>
+        <div class="stat-item">
+          <div class="value">412</div>
+          <div class="label">黔南</div>
+        </div>
+        <div class="stat-item">
+          <div class="value">356</div>
+          <div class="label">遵义</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- right panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="icon">⚠️</span>
+        <h3>待处理事项</h3>
+      </div>
+      <div class="panel-body">
+        <div class="alert-list">
+          <div class="alert-item">
+            <span class="dot danger"></span>
+            <span class="content">彩贝复核待审</span>
+            <span class="count">5</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot warn"></span>
+            <span class="content">房源信息待补全</span>
+            <span class="count">23</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot warn"></span>
+            <span class="content">保险即将到期</span>
+            <span class="count">8</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot ok"></span>
+            <span class="content">今日新增房源</span>
+            <span class="count">12</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot ok"></span>
+            <span class="content">本周验真通过</span>
+            <span class="count">47</span>
+          </div>
+        </div>
+        
+        <h4 style="font-size:12px;color:var(--muted);margin:20px 0 10px;">地市州彩贝达标排名</h4>
+        <div class="rank-list">
+          <div class="rank-item">
+            <span class="rank top">1</span>
+            <span class="name">贵阳市</span>
+            <span class="value">96.2%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank top">2</span>
+            <span class="name">黔东南州</span>
+            <span class="value">94.8%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank top">3</span>
+            <span class="name">安顺市</span>
+            <span class="value">92.1%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">4</span>
+            <span class="name">黔南州</span>
+            <span class="value">89.6%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">5</span>
+            <span class="name">遵义市</span>
+            <span class="value">87.3%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">6</span>
+            <span class="name">黔西南州</span>
+            <span class="value">85.7%</span>
+          </div>
+        </div>
+        
+        <h4 style="font-size:12px;color:var(--muted);margin:20px 0 10px;">快捷操作</h4>
+        <div class="action-grid">
+          <div class="action-btn">
+            <span class="icon">📋</span>
+            导出日报
+          </div>
+          <div class="action-btn">
+            <span class="icon">🔍</span>
+            房源查询
+          </div>
+          <div class="action-btn">
+            <span class="icon">📊</span>
+            数据分析
+          </div>
+          <div class="action-btn">
+            <span class="icon">⚙️</span>
+            系统设置
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 实时时钟
+function updateTime() {
+  const now = new Date();
+  const timeEl = document.getElementById('time');
+  const dateEl = document.getElementById('date');
+  
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  timeEl.textContent = `${hours}:${minutes}:${seconds}`;
+  
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const weekday = weekdays[now.getDay()];
+  dateEl.textContent = `${year}年${month}月${day}日 ${weekday}`;
+}
+updateTime();
+setInterval(updateTime, 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# 运行时生成，可本地重建
+juzhu.db
+__pycache__/
+server.log
+*.log

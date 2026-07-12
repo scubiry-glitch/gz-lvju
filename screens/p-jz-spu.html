@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务标准品 SPU 管理 · 服务认证中台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .crumb{font-size:13px;color:var(--muted);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .full{grid-column:1/-1;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .note{font-size:11px;color:var(--muted);}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:center;}
+  .row:last-child{border-bottom:0;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;}
+  .kpi b{font-size:20px;display:block;}
+  .kpi span{font-size:11px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;background:var(--bg);}
+  .badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:600;cursor:pointer;}
+  .b-on{background:#dcfce7;color:#15803d;}
+  .b-off{background:#fee2e2;color:#b91c1c;}
+  .ref{font-size:10px;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600;}
+  .ref.zero{background:var(--line);color:var(--muted);}
+  .tag{font-size:10px;padding:1px 6px;border-radius:5px;background:var(--line);color:var(--muted);margin-right:3px;}
+  .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.danger{color:var(--danger);border-color:#fecaca;}
+  .btn.sm{padding:3px 8px;font-size:11px;}
+  .actions{display:flex;gap:6px;}
+  .price{color:#dc2626;font-weight:700;}
+  .modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:100;align-items:center;justify-content:center;}
+  .modal.show{display:flex;}
+  .modal .box{background:#fff;border-radius:14px;padding:20px;width:min(480px,94vw);max-height:92vh;overflow:auto;}
+  .modal h4{margin:0 0 14px;font-size:15px;}
+  .modal .fld{margin-bottom:12px;}
+  .modal .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .modal .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .modal .fld input,.modal .fld select,.modal .fld textarea{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;font-size:13px;}
+  .modal .fld textarea{resize:vertical;min-height:52px;}
+  .modal .hint{font-size:10px;color:var(--muted);margin-top:3px;}
+  .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+  .toast.show{display:block;}
+  .toast.err{background:var(--danger);}
+  .toast.ok{background:var(--ok);}
+  .group{margin-bottom:18px;}
+  .group h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="jz-spu"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × P 服务认证中台 / <b>服务标准品 SPU</b></div>
+      <div class="top-actions">
+        <button class="btn pri" id="btnNew">+ 新增 SPU</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>SPU 概览 <span class="pill">P 端 · 平台标准品</span></h3>
+        <div class="kpis" id="kpis"></div>
+        <div class="row" style="border-bottom:1px solid var(--border);padding-bottom:6px;">
+          <span class="note">SPU = 平台统一定义的<b>标准服务品</b>（工序/时长/参考价），商家在自己后台引用 SPU 组成可售 SKU（=SPU+服务者+时间）。被商家 SKU 引用的 SPU 建议下架而非删除。</span>
+        </div>
+      </div>
+
+      <div class="card full">
+        <h3>SPU 列表 <span class="pill" id="count">0</span></h3>
+        <div id="list"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h4 id="modalTitle">新增 SPU</h4>
+    <input type="hidden" id="m_id" />
+    <div class="grid2">
+      <div class="fld">
+        <label>所属类目</label>
+        <select id="m_category">
+          <option value="cleaning">🧹 保洁 (cleaning)</option>
+          <option value="repair">🔧 维修 (repair)</option>
+          <option value="moving">🚚 搬家 (moving)</option>
+          <option value="nanny">🤱 保姆 (nanny)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>slug（英文唯一标识）</label>
+        <input type="text" id="m_slug" placeholder="deep-clean-4h" maxlength="40" />
+      </div>
+    </div>
+    <div class="fld">
+      <label>SPU 名称</label>
+      <input type="text" id="m_name" placeholder="如：深度清洁 · 4小时" maxlength="30" />
+    </div>
+    <div class="fld">
+      <label>规格说明 spec</label>
+      <input type="text" id="m_spec" placeholder="如：3人团队 · 含厨卫去污" maxlength="60" />
+    </div>
+    <div class="grid2">
+      <div class="fld">
+        <label>参考价 price_from</label>
+        <input type="number" id="m_price" min="0" value="128" />
+      </div>
+      <div class="fld">
+        <label>价格单位</label>
+        <input type="text" id="m_unit" value="起" maxlength="8" />
+      </div>
+      <div class="fld">
+        <label>参考时长（分钟）</label>
+        <input type="number" id="m_duration" min="0" value="120" />
+      </div>
+      <div class="fld">
+        <label>最低服务者等级</label>
+        <select id="m_level">
+          <option>L1</option><option>L2</option><option selected>L3</option><option>L4</option><option>L5</option>
+        </select>
+      </div>
+    </div>
+    <div class="fld">
+      <label>标签 tags</label>
+      <input type="text" id="m_tags" placeholder="逗号分隔，如：热门,最快2小时上门" />
+      <div class="hint">逗号分隔</div>
+    </div>
+    <div class="fld">
+      <label>标准工序 service_flow</label>
+      <textarea id="m_flow" placeholder="逗号或换行分隔，如：上门核对,标准工序作业,完工验收,记录回传"></textarea>
+      <div class="hint">平台统一的标准工序，商家不可改</div>
+    </div>
+    <div class="grid2">
+      <div class="fld">
+        <label>排序（越小越前）</label>
+        <input type="number" id="m_sort" value="99" min="0" />
+      </div>
+      <div class="fld">
+        <label>状态</label>
+        <select id="m_enabled">
+          <option value="1">上架 (enabled)</option>
+          <option value="0">下架 (disabled)</option>
+        </select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="mCancel">取消</button>
+      <button class="btn pri" id="mSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+// 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
+// （默认 dev-juzhu-key，可用 localStorage.JUZHU_API_KEY 覆盖）。
+(function(){
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || 'dev-juzhu-key';
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/juzhu/jz') !== -1) {
+      var h = Object.assign({}, init.headers);
+      if (!h['X-API-Key']) h['X-API-Key'] = KEY;
+      init.headers = h;
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+<script>
+(function(){
+  const TYPE_LABELS = {cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'保姆'};
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toast = (msg, kind) => {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'toast show ' + (kind||'');
+    setTimeout(()=>t.className='toast', 1800);
+  };
+
+  async function load() {
+    const r = await fetch('/api/juzhu/jz/spu');
+    const d = await r.json();
+    render(d.list || []);
+  }
+
+  function render(list) {
+    $('count').textContent = list.length;
+    const byType = {};
+    list.forEach(s => byType[s.category_id] = (byType[s.category_id]||0) + 1);
+    $('kpis').innerHTML = Object.keys(TYPE_LABELS).map(t =>
+      `<div class="kpi"><b>${byType[t]||0}</b><span>${TYPE_LABELS[t]} SPU</span></div>`
+    ).join('');
+
+    const groups = {};
+    list.forEach(s => { (groups[s.category_id] = groups[s.category_id]||[]).push(s); });
+    let html = '';
+    ['cleaning','repair','moving','nanny'].forEach(t => {
+      if (!groups[t] || !groups[t].length) return;
+      html += `<div class="group"><h4>${TYPE_LABELS[t]}（${groups[t].length}）</h4><table>`;
+      html += '<thead><tr><th>排序</th><th>SPU 名称 / 标签</th><th>规格</th><th>参考价</th><th>时长</th><th>最低等级</th><th>被 SKU 引用</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      groups[t].forEach(s => {
+        const tags = (s.tags||[]).slice(0,3).map(x=>`<span class="tag">${esc(x)}</span>`).join('');
+        html += `<tr>
+          <td>${s.sort_order}</td>
+          <td><b>${esc(s.name)}</b><div style="margin-top:3px;">${tags}</div></td>
+          <td class="note">${esc(s.spec||'—')}</td>
+          <td><span class="price">¥${s.price_from||0}</span><span class="note">${esc(s.price_unit||'')}</span></td>
+          <td>${s.duration_min||0}′</td>
+          <td>${esc(s.worker_min_level||'L3')}</td>
+          <td><span class="ref ${s.sku_count?'':'zero'}">${s.sku_count||0} 个 SKU</span></td>
+          <td><span class="badge ${s.enabled?'b-on':'b-off'}" data-id="${s.id}" data-enabled="${s.enabled}">${s.enabled?'上架':'下架'}</span></td>
+          <td class="actions">
+            <button class="btn sm" data-edit='${esc(JSON.stringify(s))}'>编辑</button>
+            <button class="btn sm danger" data-del="${s.id}" data-name="${esc(s.name)}">删除</button>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+    });
+    $('list').innerHTML = html;
+
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(JSON.parse(b.dataset.edit)));
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => del(b.dataset.del, b.dataset.name));
+    document.querySelectorAll('.badge[data-id]').forEach(b => b.onclick = () => toggle(b.dataset.id, b.dataset.enabled));
+  }
+
+  function openModal(s) {
+    $('m_id').value = s ? s.id : '';
+    $('modalTitle').textContent = s ? '编辑 SPU' : '新增 SPU';
+    $('m_category').value = s ? s.category_id : 'cleaning';
+    $('m_slug').value = s ? (s.slug||'') : '';
+    $('m_name').value = s ? s.name : '';
+    $('m_spec').value = s ? (s.spec||'') : '';
+    $('m_price').value = s ? (s.price_from||0) : 128;
+    $('m_unit').value = s ? (s.price_unit||'起') : '起';
+    $('m_duration').value = s ? (s.duration_min||0) : 120;
+    $('m_level').value = s ? (s.worker_min_level||'L3') : 'L3';
+    $('m_tags').value = s ? (s.tags||[]).join(',') : '';
+    $('m_flow').value = s ? (s.service_flow||[]).join(',') : '';
+    $('m_sort').value = s ? s.sort_order : 99;
+    $('m_enabled').value = s ? String(s.enabled) : '1';
+    $('modal').classList.add('show');
+  }
+  function closeModal() { $('modal').classList.remove('show'); }
+  $('btnNew').onclick = () => openModal(null);
+  $('mCancel').onclick = closeModal;
+  $('modal').onclick = e => { if (e.target.id==='modal') closeModal(); };
+
+  $('mSave').onclick = async () => {
+    const body = {
+      category_id: $('m_category').value,
+      slug: $('m_slug').value.trim(),
+      name: $('m_name').value.trim(),
+      spec: $('m_spec').value.trim(),
+      price_from: parseInt($('m_price').value)||0,
+      price_unit: $('m_unit').value.trim()||'起',
+      duration_min: parseInt($('m_duration').value)||0,
+      worker_min_level: $('m_level').value,
+      tags: $('m_tags').value,
+      service_flow: $('m_flow').value,
+      sort_order: parseInt($('m_sort').value)||99,
+      enabled: $('m_enabled').value,
+    };
+    if (!body.name) { toast('请输入 SPU 名称', 'err'); return; }
+    if (!body.slug) { toast('请输入 slug', 'err'); return; }
+    const id = $('m_id').value;
+    const url = id ? '/api/juzhu/jz/spu/'+id : '/api/juzhu/jz/spu';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { toast(id?'已更新':'已新增', 'ok'); closeModal(); load(); }
+    else toast(d.error||'保存失败', 'err');
+  };
+
+  async function del(id, name) {
+    if (!confirm('确认删除 SPU「'+name+'」？被商家 SKU 引用将无法删除')) return;
+    const r = await fetch('/api/juzhu/jz/spu/'+id, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { toast('已删除', 'ok'); load(); }
+    else toast(d.error||'删除失败', 'err');
+  }
+
+  async function toggle(id, cur) {
+    const next = String(cur) === '1' ? 0 : 1;
+    const r = await fetch('/api/juzhu/jz/spu/'+id, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({enabled: next})
+    });
+    const d = await r.json();
+    if (d.ok) { toast(next?'已上架':'已下架', 'ok'); load(); }
+    else toast('操作失败', 'err');
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

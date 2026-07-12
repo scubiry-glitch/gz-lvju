@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>订单详情 · 家政服务</title>
+<link rel="stylesheet" href="jiazheng-app.css?v=2" />
+</head>
+<body>
+<div class="jz-wrap">
+  <div class="jz-top">
+    <a class="jz-back" href="javascript:history.back()"></a>
+    <span class="jz-title">订单详情</span>
+    <div class="jz-actions">
+      <a href="javascript:;">💬</a>
+    </div>
+  </div>
+
+  <div class="jz-status" id="statusBox" style="background:linear-gradient(135deg,#0f766e 0%,#0b5d56 100%);color:#fff;padding:20px 16px;">
+    <div style="text-align:center;opacity:.8;padding:20px;">加载中…</div>
+  </div>
+
+  <div id="statusHint" style="background:var(--surface);padding:0 16px;"></div>
+
+  <div id="workerBox" style="background:var(--surface);padding:16px;margin-top:8px;display:none;"></div>
+
+  <div style="background:var(--surface);padding:16px;margin-top:8px;">
+    <h3 style="font-size:14px;margin:0 0 12px;color:var(--muted);font-weight:500;">服务信息</h3>
+    <div id="infoBox"></div>
+  </div>
+
+  <div style="background:var(--surface);padding:16px;margin-top:8px;display:flex;gap:10px;">
+    <a class="bd bd-t" style="flex:1;padding:10px;text-align:center;border-radius:8px;font-size:13px;color:var(--brand);" href="javascript:;">📞 电话客服</a>
+    <a class="bd bd-t" style="flex:1;padding:10px;text-align:center;border-radius:8px;font-size:13px;color:var(--brand);" href="javascript:;">💬 在线客服</a>
+  </div>
+
+  <div id="cancelBox" style="padding:16px;text-align:center;display:none;">
+    <a href="javascript:;" id="cancelBtn" style="font-size:13px;color:var(--muted);">取消订单</a>
+  </div>
+
+  <div id="rateBox" style="padding:0 16px 16px;display:none;"></div>
+</div>
+
+<div id="rateMask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:flex-end;justify-content:center;">
+  <div style="background:var(--surface);width:100%;max-width:430px;border-radius:18px 18px 0 0;padding:20px 16px;max-height:80vh;overflow-y:auto;">
+    <div style="text-align:center;font-size:16px;font-weight:600;margin-bottom:14px;">服务评价</div>
+    <div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px;">您对本次服务满意吗？</div>
+    <div id="rateStars" style="display:flex;justify-content:center;gap:14px;margin-bottom:16px;font-size:32px;color:#cbd5e1;cursor:pointer;">
+      <span data-s="1">☆</span><span data-s="2">☆</span><span data-s="3">☆</span><span data-s="4">☆</span><span data-s="5">☆</span>
+    </div>
+    <div id="rateTags" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:14px;"></div>
+    <textarea id="rateText" placeholder="说说您对本次服务的感受" style="width:100%;min-height:80px;padding:10px;border:1px solid var(--line);border-radius:8px;font:inherit;resize:none;margin-bottom:14px;"></textarea>
+    <button id="rateSubmit" style="width:100%;padding:14px;background:var(--brand);color:#fff;border:0;border-radius:12px;font-size:15px;font-weight:600;">提交评价</button>
+    <a href="javascript:;" id="rateClose" style="display:block;text-align:center;padding:12px;font-size:13px;color:var(--muted);">稍后再说</a>
+  </div>
+</div>
+
+<script src="jiazheng-data.js?v=2"></script>
+<script>
+var qs = new URLSearchParams(location.search);
+var oid = qs.get('oid') || '';
+
+var STEPS = [
+  {k:'pending', l:'待派'},
+  {k:'dispatched', l:'已派单'},
+  {k:'accepted', l:'已接单'},
+  {k:'serving', l:'服务中'},
+  {k:'done', l:'已完工'},
+  {k:'rated', l:'已评价'}
+];
+var STATUS_HINTS = {
+  pending:   { t:'订单已提交', d:'中台正在为您匹配附近最合适的家政服务者，约需 1-2 分钟' },
+  dispatched:{ t:'已为您派单', d:'服务者正在确认订单，请稍候' },
+  accepted:  { t:'服务者已接单', d:'服务者将按约定时间上门服务' },
+  serving:   { t:'服务进行中', d:'服务者已到达现场，请保持电话畅通' },
+  done:      { t:'服务已完成', d:'请对本次服务进行评价' },
+  rated:     { t:'已完成评价', d:'感谢您的反馈，已记入服务者信用分' }
+};
+
+JZ_DATA.getOrder(oid).then(function(order){
+  if (!order || order.error) {
+    document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单不存在</div>';
+    return;
+  }
+  var cur = order.status;
+  var curIdx = STEPS.findIndex(function(s){ return s.k === cur; });
+
+  // 状态机
+  var html = '<div style="font-size:13px;opacity:.85;margin-bottom:6px;" id="curStatusT">'+STATUS_HINTS[cur].t+'</div>';
+  html += '<div class="timeline">';
+  for (var i=0; i<STEPS.length; i++) {
+    var s = STEPS[i];
+    var cls = i < curIdx ? 'done' : (i === curIdx ? 'now' : '');
+    html += '<div class="step '+cls+'">';
+    html += '<div class="dot">'+(i < curIdx ? '✓' : (i+1))+'</div>';
+    html += '<div class="lbl">'+s.l+'</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('statusBox').innerHTML = html;
+
+  document.getElementById('statusHint').innerHTML =
+    '<div style="padding:14px 0;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);">'+STATUS_HINTS[cur].d+'</div>';
+
+  // 服务者
+  if (cur === 'pending' || cur === 'dispatched') {
+    document.getElementById('workerBox').style.display = 'block';
+    document.getElementById('workerBox').innerHTML =
+      '<h3 style="font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:500;">服务者</h3>'+
+      '<div style="background:var(--bg);border-radius:10px;padding:14px;text-align:center;color:var(--muted);font-size:13px;">'+
+        (cur === 'pending' ? '⏳ 正在为您匹配...<br><small>通常 1-2 分钟内完成</small>' : '⏳ 等待服务者确认...')+
+      '</div>';
+  } else if (order.worker) {
+    var w = order.worker;
+    document.getElementById('workerBox').style.display = 'block';
+    document.getElementById('workerBox').innerHTML =
+      '<h3 style="font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:500;">服务者</h3>'+
+      '<div style="display:flex;gap:12px;align-items:center;">'+
+        '<div style="width:54px;height:54px;border-radius:50%;background:var(--brand-soft);display:grid;place-items:center;font-size:26px;flex-shrink:0;">'+(w.avatar||'👤')+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;">'+
+            w.name+'<span class="bd bd-b">'+w.level+'</span>'+
+          '</div>'+
+          '<div style="font-size:12px;color:#ea580c;margin-top:2px;">★ '+w.rating+' · '+w.completed_orders+'单</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:2px;">距您 '+(w.distance_km||'--')+'km</div>'+
+        '</div>'+
+        '<a href="javascript:;" style="width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-size:18px;">📞</a>'+
+      '</div>';
+  }
+
+  // 服务信息
+  document.getElementById('infoBox').innerHTML =
+    '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;"><span style="color:var(--muted);">商家</span><b>'+order.vendor_name+'</b></div>'+
+    '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;"><span style="color:var(--muted);">服务</span><b>'+order.product_title+'</b></div>'+
+    '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;"><span style="color:var(--muted);">时间</span><b>'+order.scheduled_at+'</b></div>'+
+    '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;"><span style="color:var(--muted);">地址</span><b style="text-align:right;max-width:60%;">'+order.address+'</b></div>'+
+    '<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;"><span style="color:var(--muted);">实付</span><b style="color:var(--brand);font-size:16px;">¥'+order.fee.toFixed(1)+'</b></div>';
+
+  if (cur === 'pending') {
+    document.getElementById('cancelBox').style.display = 'block';
+    document.getElementById('cancelBtn').addEventListener('click', function(){
+      if (confirm('确定取消订单？')) {
+        JZ_DATA.updateOrderStatus(oid, 'cancelled').then(function(){
+          alert('订单已取消');
+          location.href = 'juzhu-channel-v3-grid.html?tab=jiazheng';
+        });
+      }
+    });
+  }
+  if (cur === 'done') {
+    document.getElementById('rateBox').style.display = 'block';
+    document.getElementById('rateBox').innerHTML =
+      '<a href="javascript:;" id="rateBtn" style="display:block;background:var(--brand);color:#fff;padding:14px;text-align:center;border-radius:12px;font-weight:600;">⭐ 去评价</a>';
+    document.getElementById('rateBtn').addEventListener('click', openRate);
+  }
+  if (cur === 'rated' && order.rating) {
+    var r = order.rating;
+    var stars = '★'.repeat(r.score) + '☆'.repeat(5-r.score);
+    document.getElementById('rateBox').style.display = 'block';
+    document.getElementById('rateBox').innerHTML =
+      '<div style="background:var(--surface);border-radius:12px;padding:16px;">'+
+        '<div style="text-align:center;color:#ea580c;font-size:24px;">'+stars+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:8px 0;">'+
+          (r.tags||[]).map(function(t){return '<span class="bd bd-t">'+t+'</span>'}).join('')+
+        '</div>'+
+        (r.text ? '<div style="font-size:13px;color:var(--muted);text-align:center;margin-top:8px;">'+r.text+'</div>' : '')+
+      '</div>';
+  }
+
+  // 演示模式：手动切换状态
+  if (location.search.indexOf('demo=1') > -1) {
+    var bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:8px 14px;border-radius:8px;font-size:11px;z-index:99;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:400px;';
+    bar.innerHTML = '<span>演示：</span>';
+    ['pending','dispatched','accepted','serving','done'].forEach(function(s){
+      var b = document.createElement('a');
+      b.href = 'javascript:;';
+      b.textContent = s;
+      b.style.cssText = 'color:#fff;background:rgba(255,255,255,.15);padding:3px 6px;border-radius:4px;cursor:pointer;';
+      b.onclick = function(){
+        if (s === 'dispatched') {
+          JZ_DATA.dispatchOrder(oid).then(function(){ location.reload(); });
+        } else {
+          JZ_DATA.updateOrderStatus(oid, s).then(function(){ location.reload(); });
+        }
+      };
+      bar.appendChild(b);
+    });
+    document.body.appendChild(bar);
+  }
+});
+
+var chosenScore = 5;
+var chosenTags = [];
+function openRate(){
+  document.getElementById('rateMask').style.display = 'flex';
+  renderStars(5);
+  renderTags([]);
+  document.getElementById('rateText').value = '';
+}
+function renderStars(n){
+  chosenScore = n;
+  var s = document.querySelectorAll('#rateStars span');
+  s.forEach(function(sp,i){
+    sp.textContent = (i < n) ? '★' : '☆';
+    sp.style.color = (i < n) ? '#ea580c' : '#cbd5e1';
+  });
+}
+function renderTags(selected){
+  chosenTags = selected;
+  var tagPool = ['准时','干净','细致','专业','周到','热情','工具齐全','态度好','经验丰富','守时'];
+  document.getElementById('rateTags').innerHTML = tagPool.map(function(t){
+    var on = selected.indexOf(t) > -1;
+    return '<span data-t="'+t+'" style="padding:6px 12px;font-size:12px;border-radius:999px;cursor:pointer;border:1px solid '+(on?'var(--brand)':'var(--line)')+';background:'+(on?'var(--brand-soft)':'transparent')+';color:'+(on?'var(--brand-deep)':'var(--muted)')+';">'+t+'</span>';
+  }).join('');
+}
+
+document.getElementById('rateStars').addEventListener('click', function(e){
+  var t = e.target.closest('[data-s]');
+  if (t) renderStars(parseInt(t.dataset.s, 10));
+});
+document.getElementById('rateTags').addEventListener('click', function(e){
+  var t = e.target.closest('[data-t]');
+  if (!t) return;
+  var sel = chosenTags.slice();
+  var i = sel.indexOf(t.dataset.t);
+  if (i > -1) sel.splice(i, 1); else sel.push(t.dataset.t);
+  if (sel.length > 5) return;
+  renderTags(sel);
+});
+document.getElementById('rateClose').addEventListener('click', function(){
+  document.getElementById('rateMask').style.display = 'none';
+});
+document.getElementById('rateSubmit').addEventListener('click', function(){
+  if (chosenTags.length === 0) {
+    alert('请至少选择 1 个标签');
+    return;
+  }
+  JZ_DATA.rateOrder(oid, chosenScore, chosenTags, document.getElementById('rateText').value.trim()).then(function(){
+    document.getElementById('rateMask').style.display = 'none';
+    location.reload();
+  });
+});
+</script>
+</body>
+</html>
