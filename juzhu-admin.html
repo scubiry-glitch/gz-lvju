@@ -486,10 +486,14 @@ function renderDictionary() {
         sort_order: +tr.querySelector('.ch_sort').value,
         enabled: tr.querySelector('.ch_en').checked,
         note: tr.querySelector('.ch_note').value.trim()
-      }}).then(function() {
+      }}).then(function(res) {
+        // 局部更新：只改 state 对应频道 + 刷新下拉，避免整表 renderDictionary
+        // 把其他正在编辑的频道行输入清掉（多条一起编辑、分别保存后失效）。
+        var idx = (state.channels || []).findIndex(function(c){ return c.id === id; });
+        if (idx >= 0 && res && res.channel) state.channels[idx] = res.channel;
+        refreshChannelSelects();
         toast('频道已保存');
-        return loadDictionary();
-      }).then(renderDictionary).catch(function(e){ toast('保存失败：'+e.message); });
+      }).catch(function(e){ toast('保存失败：'+e.message); });
     };
   });
 
