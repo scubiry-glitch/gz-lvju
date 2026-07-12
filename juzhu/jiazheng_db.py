@@ -709,17 +709,38 @@ def delete_product(conn, pid):
     return {"ok": True}
 
 
+def _level_num(lv):
+    """'L4' → 4；无法解析按 0。按数字比较，避免 'L10' < 'L3' 的字符串序错误。"""
+    try:
+        return int(str(lv).lstrip("Ll") or 0)
+    except (ValueError, TypeError):
+        return 0
+
+
 def set_product_workers(conn, product_id, worker_ids):
-    """全量重置某 SKU 绑定的服务者。"""
-    conn.execute("DELETE FROM jz_sku_workers WHERE product_id=?", (product_id,))
+    """全量重置某 SKU 绑定的服务者；过滤掉等级低于该商家 SKU 对应 SPU
+    worker_min_level 的服务者——之前 worker_min_level 从不参与接单资格校验，
+    低于门槛的服务者也能被绑上接单。"""
+    conn.execute("DELETE FROM jz_sku_workers WHERE product_id=?", (int(product_id),))
+    minrow = conn.execute(
+        """SELECT sk.worker_min_level FROM jz_products p
+           LEFT JOIN jz_skus sk ON sk.id=p.channel_sku_id WHERE p.id=?""",
+        (int(product_id),),
+    ).fetchone()
+    min_lv = _level_num(minrow[0]) if minrow and minrow[0] else 0
     for wid in worker_ids:
         try:
-            conn.execute(
-                "INSERT OR IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?,?)",
-                (int(product_id), int(wid)),
-            )
+            wid = int(wid)
         except (ValueError, TypeError):
             continue
+        if min_lv:
+            wl = conn.execute("SELECT level FROM jz_workers WHERE id=?", (wid,)).fetchone()
+            if not wl or _level_num(wl[0]) < min_lv:
+                continue  # 低于 SPU 门槛，跳过绑定
+        conn.execute(
+            "INSERT OR IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?,?)",
+            (int(product_id), wid),
+        )
 
 
 def list_product_worker_ids(conn, product_id):

@@ -168,6 +168,10 @@
       </div>
     </div>
     <div class="fld">
+      <label>白名单运营商</label>
+      <label style="font-size:13px;font-weight:400;"><input type="checkbox" id="m_whitelist" style="width:auto;margin-right:6px;vertical-align:middle;" /> 纳入白名单运营商（认证通过、可接单）</label>
+    </div>
+    <div class="fld">
       <label>状态</label>
       <select id="m_status">
         <option value="active">在职</option>
@@ -307,6 +311,7 @@
     $('m_orders').value = w ? (w.completed_orders||0) : 0;
     $('m_years').value = w ? (w.years_experience||0) : 1;
     $('m_status').value = w ? w.status : 'active';
+    $('m_whitelist').checked = !!(w && w.is_whitelisted);
     // 资质
     const certs = w ? (w.certs||[]) : ['id_card'];
     document.querySelectorAll('#m_certs input').forEach(cb => cb.checked = certs.includes(cb.value));
@@ -332,6 +337,7 @@
       completed_orders: parseInt($('m_orders').value)||0,
       years_experience: parseInt($('m_years').value)||0,
       certs: certs,
+      is_whitelisted: $('m_whitelist').checked ? 1 : 0,
       status: $('m_status').value,
     };
     if (!body.name) { toast('请输入姓名', 'err'); return; }
