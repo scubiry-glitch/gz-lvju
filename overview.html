@@ -150,7 +150,9 @@
       <a class="page-card" href="screens/p-service-demand.html"><span class="name">P · 工单池派单<span class="file">screens/p-service-demand.html</span></span></a>
       <a class="page-card" href="screens/p-service-review.html"><span class="name">P · 评价回流<span class="file">screens/p-service-review.html</span></span></a>
       <a class="page-card" href="screens/p-jz-category.html"><span class="name">P · 子类目管理<span class="file">screens/p-jz-category.html</span></span></a>
-      <a class="page-card" href="screens/p-jz-product.html"><span class="name">B · 服务产品管理<span class="file">screens/p-jz-product.html</span></span></a>
+      <a class="page-card" href="screens/p-jz-spu.html"><span class="name">P · 服务标准品 SPU<span class="file">screens/p-jz-spu.html</span></span></a>
+      <a class="page-card" href="screens/p-jz-product.html"><span class="name">B · 商家 SKU（产品）<span class="file">screens/p-jz-product.html</span></span></a>
+      <a class="page-card" href="screens/p-jz-schedule.html"><span class="name">B · SKU 排班（档期）<span class="file">screens/p-jz-schedule.html</span></span></a>
       <a class="page-card" href="screens/b-dispatch-board.html"><span class="name">B · 派单看板<span class="file">screens/b-dispatch-board.html</span></span></a>
     </div>
   </section>
@@ -206,10 +208,12 @@
   // 平台方 · 贝壳承建 = 中台(p) + 培训(t) + 供应链(V 服务商 + M 物资供应商)
   // 运营机构 = B 系列拆 2 个二级分类（国企持有方·资管视角 / 白名单运营商·日常动作）
   // 系列条目可以是字符串（直接渲染整个系列），或对象 {source, filterGroups, name, icon, primary, primaryDeep, short}
+  // 地域主体名词读 _region.js 单一数据源（不硬编码第二套省份映射；缺省回退江苏基准）
+  const RG = window.BZF_REGION || { prov: { short: '江苏' }, deptName: '住建厅', bank: { name: '江苏银行' } };
   const REPORT_GROUPS = [
     { key: 'doc',  label: '📐 方案与标准',         desc: '对外发布物 · 总图谱 + 三大标准 + 三档方案',           series: ['d'],          color: '#0f172a' },
-    { key: 'gov',  label: '🏛 政府方 · 江苏住建厅', desc: '出规则：政策制定、标准制定、监管管理（不直接参与运营）', series: ['g', 'portal'], color: '#1e40af' },
-    { key: 'bank', label: '🏦 金融方 · 江苏银行',  desc: '出金融：监管账户、公积金直付、信用体系、资金流大盘',  series: ['f'],          color: '#0f1a4d' },
+    { key: 'gov',  label: '🏛 政府方 · ' + RG.prov.short + RG.deptName, desc: '出规则：政策制定、标准制定、监管管理（不直接参与运营）', series: ['g', 'portal'], color: '#1e40af' },
+    { key: 'bank', label: '🏦 金融方 · ' + RG.bank.name,  desc: '出金融：监管账户、公积金直付、信用体系、资金流大盘',  series: ['f'],          color: '#0f1a4d' },
     { key: 'plat', label: '⭐ 平台方 · 贝壳承建',
       desc: '出能力：中台/培训/数据 + 承建供应链生态（V 服务商门户 + M 物资供应商门户）',
       series: ['p', 't', 'v', 'm'],

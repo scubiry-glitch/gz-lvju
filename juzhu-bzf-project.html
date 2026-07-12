@@ -51,6 +51,7 @@
     <div class="unit-grid" id="list"></div>
   </div>
 </div>
+<script src="screens/_region.js"></script>
 <script src="juzhu/app.js?v=9"></script>
 <script>
 (function(){
@@ -63,7 +64,7 @@
     var p = JUZHU.projectBySlug(slug);
     if (!p) { document.getElementById('list').innerHTML = '<p style="padding:24px;color:#999;text-align:center">项目不存在</p>'; return; }
 
-    document.getElementById('pEk').textContent = isTrade ? 'TRADE · 卖旧买新' : 'BZF · 保租房';
+    document.getElementById('pEk').textContent = isTrade ? 'TRADE · 卖旧买新' : ('BZF · ' + ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房'));
     document.getElementById('pname').textContent = p.name;
     document.getElementById('pmeta').textContent = (isTrade
       ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')

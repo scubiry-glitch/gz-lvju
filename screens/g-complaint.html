@@ -91,7 +91,9 @@
     <div class="t">已驳回 <span class="cnt">2</span></div>
   </div>
 
-  <div class="list">
+  <div class="list" id="cxList">
+
+    <!-- 家政投诉（新居住频道 · API 实时低分工单，SQLite 单一数据源 via _jzapi.js，监管只读） -->
 
     <div class="card">
       <div class="head">
@@ -213,6 +215,54 @@
   <div id="m-tabbar" data-series="g" data-active="complaint"></div>
 </div>
 <script src="_region.js?v=2"></script>
+<!-- 家政投诉读自 _jzapi.js（SQLite 家政链），非 localStorage；监管只读，不做处置写操作。见 CLAUDE.md 规则 9。 -->
+<script src="_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var list = document.getElementById('cxList');
+  function sevClass(score){ return score <= 2 ? 'h' : 'm'; }
+  function sevLabel(score){ return score <= 2 ? '高' : '中'; }
+  function card(o){
+    var r = o.rating || {};
+    var tags = (r.tags && r.tags.length) ? r.tags.join(' · ') : '';
+    var stars = '★'.repeat(Math.round(r.score||0)) + '☆'.repeat(5 - Math.round(r.score||0));
+    return '<div class="card" data-jz-live="1" style="border-color:var(--accent);">' +
+      '<div class="head">' +
+        '<span class="sev '+sevClass(r.score)+'">'+sevLabel(r.score)+'</span>' +
+        '<div class="ttl2">'+JZ.esc(o.house || '家政订单')+' · '+JZ.esc(o.category)+' 差评 '+(r.score||0)+' 星</div>' +
+        '<div class="time">'+JZ.esc(o.createdLabel || '')+'</div>' +
+      '</div>' +
+      '<div class="who">' +
+        '<span class="pill">工单 '+JZ.esc(o.id)+'</span>' +
+        (o.worker ? '<span class="pill">服务者：'+JZ.esc(o.worker.name)+'</span>' : '') +
+        '<span class="pill">渠道：新居住·家政</span>' +
+        '<span class="pill">运营方：'+JZ.esc(JZ.regionOperator())+'</span>' +
+      '</div>' +
+      '<div class="desc">'+JZ.esc(r.text || ('客户评价 '+stars+(tags ? '（'+tags+'）' : '')))+'</div>' +
+      '<div class="progress">' +
+        '<span class="step done">评价回流</span>' +
+        '<span class="step now">监管识别（只读）</span>' +
+        '<span class="step">运营方处置</span>' +
+        '<span class="step">回访</span>' +
+      '</div>' +
+      '<div class="acts"><a>查看服务档案</a><a class="pri">转运营方督办</a></div>' +
+    '</div>';
+  }
+  function render(){
+    // 家政差评（score ≤ 3 的已评价工单）= 监管口径投诉，读自 SQLite，只读呈现
+    JZ.byStatus('rated').then(function(rated){
+      list.querySelectorAll('[data-jz-live]').forEach(function(el){ el.remove(); });
+      var complaints = rated.filter(function(o){ return o.rating && o.rating.score <= 3; });
+      if (complaints.length) {
+        list.insertAdjacentHTML('afterbegin', complaints.map(card).join(''));
+      }
+    }).catch(function(){ /* server 未运行时保留静态样例 */ });
+  }
+  JZ.onChange(render);
+  render();
+})();
+</script>
 <script>if(matchMedia("(min-width:1024px)").matches){const s=document.createElement("script");s.src="_nav.js";document.head.appendChild(s);}</script>
 <script src="_navmobile.js"></script>
 </body>

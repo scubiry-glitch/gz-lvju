@@ -64,6 +64,7 @@
     </div>
   </div>
 </div>
+<script src="screens/_region.js"></script>
 <script src="juzhu/app.js?v=9"></script>
 <script>
 (function(){
@@ -81,7 +82,8 @@
     document.getElementById('s2').textContent = JUZHU.districtManagedUnits(d);
     document.getElementById('s3').textContent = d.unit_count;
     document.getElementById('s4').textContent = d.avg_price ? ('¥'+d.avg_price) : '—';
-    document.getElementById('ttl').innerHTML = '保租房<small>'+d.name+'</small>';
+    var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
+    document.getElementById('ttl').innerHTML = bizTerm+'<small>'+d.name+'</small>';
     if (d.cover_image) document.getElementById('dBg').style.backgroundImage = 'url('+d.cover_image+')';
 
     var projs = JUZHU.projects({ channel: 'bzf', district_id: d.id });

@@ -352,12 +352,14 @@
   function renderHeader(el){
     const series = el.dataset.series;
     const cfg = MOBILE[series] || MOBILE.g;
-    const title = el.dataset.title || '';
-    const meta  = el.dataset.meta  || cfg.stamp || '';
+    // data-* 属性值 relabel() 不触及（只处理文本节点/title），此处按同一词典字符串换皮（单一数据源）
+    const rs = (window.BZF_REGION && BZF_REGION.relabelStr) || function (s) { return s; };
+    const title = rs(el.dataset.title || '');
+    const meta  = rs(el.dataset.meta  || cfg.stamp || '');
     const icon  = el.dataset.icon  || '⚖';
-    const sub   = el.dataset.sub   || '';
-    const rightSlot = el.dataset.right || '';
-    const ttl   = el.dataset.ttl   || title;
+    const sub   = rs(el.dataset.sub   || '');
+    const rightSlot = rs(el.dataset.right || '');
+    const ttl   = rs(el.dataset.ttl   || el.dataset.title || '') || title;
     const showBack = el.dataset.back !== 'false';
 
     // 默认行为：有 drawer 配置就显示汉堡，否则显示返回；可被 data-back / data-menu 覆写

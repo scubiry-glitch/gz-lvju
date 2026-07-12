@@ -262,9 +262,91 @@
       </table>
     </div>
 
+    <!-- 家政工单池（新居住频道 · API 实时，SQLite 单一数据源 via _jzapi.js） -->
+    <div class="card" style="margin-top:16px;">
+      <div class="card-head">
+        <h3>家政工单池 <span style="font-size:11px; color:var(--success); font-weight:600; margin-left:6px;">● 实时</span></h3>
+        <span class="meta">新居住·家政频道 · 数据源：SQLite via _jzapi.js（与上方报修工单分属两条链）</span>
+      </div>
+      <div class="pool-head">
+        <div class="pool-tab on">待派 <strong id="jzcPending" style="color:var(--danger); margin-left:4px;">0</strong></div>
+        <div class="pool-tab">处理中 <strong id="jzcDoing" style="margin-left:4px;">0</strong></div>
+        <div class="pool-tab">今完结 <strong id="jzcDone" style="margin-left:4px;">0</strong></div>
+      </div>
+      <table class="wo">
+        <thead>
+          <tr>
+            <th>编号</th>
+            <th>房源</th>
+            <th>类目</th>
+            <th>期望时间</th>
+            <th>金额</th>
+            <th>状态</th>
+            <th>处理人</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="jzWoBody">
+          <tr><td colspan="8" style="color:var(--muted); text-align:center; padding:18px;">加载家政工单中…（需 juzhu/server.py 运行）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
   </main>
 </div>
 <script src="_region.js?v=2"></script>
+<!-- 家政工单走 _jzapi.js（SQLite）；报修工单演示走 _orderbus.js（localStorage）。两条链不合并，见 CLAUDE.md 规则 8/9。 -->
+<script src="_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var body = document.getElementById('jzWoBody');
+  function sevOf(o){ return o.type === '维修' ? 'h' : (o.type === '保洁' ? 'm' : 'l'); }
+  function row(o){
+    var st = JZ.STATUS[o.status] || { admin: o.status };
+    var who = o.worker
+      ? '<div class="assignee"><div class="av">'+JZ.esc(o.worker.name.slice(0,1))+'</div>'+JZ.esc(o.worker.name)+'</div>'
+      : '<div class="assignee"><div class="av un">?</div>未分派</div>';
+    var act = o.status === 'pending'
+      ? '<a href="p-service-demand.html">去中台派单</a> · <a href="#" data-jz-dispatch="'+JZ.esc(o.id)+'">快速派</a>'
+      : '<a href="b-dispatch-board.html">看板跟踪</a>';
+    return '<tr>' +
+      '<td>'+JZ.esc(o.id)+'</td>' +
+      '<td>'+JZ.esc(o.house || '—')+'</td>' +
+      '<td><span class="sev '+sevOf(o)+'">'+JZ.esc(o.type)+'</span></td>' +
+      '<td>'+JZ.esc(o.expectTime || '—')+'</td>' +
+      '<td>¥'+(o.fee||0)+'</td>' +
+      '<td>'+JZ.esc(st.admin)+'</td>' +
+      '<td>'+who+'</td>' +
+      '<td class="row-act">'+act+'</td>' +
+    '</tr>';
+  }
+  function render(){
+    JZ.list({ pay_status: 'paid', limit: 60 }).then(function(all){
+      var pending = all.filter(function(o){ return o.status==='pending'; });
+      var doing = all.filter(function(o){ return ['dispatched','accepted','serving'].indexOf(o.status)>-1; });
+      var done = all.filter(function(o){ return o.status==='done'||o.status==='rated'; });
+      document.getElementById('jzcPending').textContent = pending.length;
+      document.getElementById('jzcDoing').textContent = doing.length;
+      document.getElementById('jzcDone').textContent = done.length;
+      var ordered = pending.concat(doing, done);
+      body.innerHTML = ordered.length
+        ? ordered.map(row).join('')
+        : '<tr><td colspan="8" style="color:var(--muted); text-align:center; padding:18px;">暂无家政工单</td></tr>';
+      body.querySelectorAll('[data-jz-dispatch]').forEach(function(a){
+        a.addEventListener('click', function(e){
+          e.preventDefault();
+          JZ.dispatch(a.getAttribute('data-jz-dispatch')).then(render);
+        });
+      });
+    }).catch(function(){
+      body.innerHTML = '<tr><td colspan="8" style="color:var(--muted); text-align:center; padding:18px;">家政工单接口未就绪（启动 juzhu/server.py 后自动加载）</td></tr>';
+    });
+  }
+  JZ.onChange(render);
+  render();
+})();
+</script>
 <script src="_nav.js"></script>
 </body>
 </html>

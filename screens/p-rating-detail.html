@@ -408,6 +408,7 @@
     </div>
   </div>
 
+  <script src="_region.js"></script>
   <script src="_nav.js"></script>
   <script>
     // Score adjustment calculation (旅居演示)
@@ -461,7 +462,7 @@
       var grid = document.querySelector('.info-grid');
       if (grid) {
         grid.innerHTML =
-          '<div class="info-cell"><div class="l">频道</div><div class="v">保租房</div></div>'+
+          '<div class="info-cell"><div class="l">频道</div><div class="v">'+((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房')+'</div></div>'+
           '<div class="info-cell"><div class="l">起租</div><div class="v">'+(p.price_from?'¥'+p.price_from:'—')+'</div></div>'+
           '<div class="info-cell"><div class="l">状态</div><div class="v">'+({pending:'待复核',passed:'已通过',rejected:'已驳回'}[p.rating_status]||p.rating_status)+'</div></div>'+
           '<div class="info-cell"><div class="l">自查达标</div><div class="v">'+(rating.checked||'—')+' / '+(rating.total||55)+'</div></div>'+

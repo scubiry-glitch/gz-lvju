@@ -320,6 +320,7 @@
     </div>
   </div>
 
+  <script src="_region.js"></script>
   <script src="_nav.js"></script>
   <script>
   (function(){
@@ -332,6 +333,8 @@
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无待复核保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
         return;
       }
+      var RGCITY = (window.BZF_REGION && BZF_REGION.prov && BZF_REGION.prov.capital) || '沈阳';
+      var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
       tbody.innerHTML = items.map(function(p){
         var r = p.rating || {};
         var code = r.code || ('SY-BZF-'+String(p.id).padStart(5,'0'));
@@ -341,7 +344,7 @@
         var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
         return '<tr>'+
           '<td><span class="house-id">'+code+'</span></td>'+
-          '<td><b>'+p.name+'</b><br><small style="color:var(--muted);">沈阳 · 保租房</small></td>'+
+          '<td><b>'+p.name+'</b><br><small style="color:var(--muted);">'+RGCITY+' · '+RGBIZ+'</small></td>'+
           '<td>'+(p.district_name||'—')+'</td>'+
           '<td><span class="star-badge s'+stars+'">★ '+STAR[stars]+'星</span></td>'+
           '<td><div class="score-cell"><div class="score-bar"><i style="width:'+score+'%;background:var(--accent);"></i></div><span class="score-num">'+score+'</span></div></td>'+

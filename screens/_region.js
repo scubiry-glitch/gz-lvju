@@ -156,6 +156,21 @@
     return pairs.sort((a, b) => b[0].length - a[0].length);
   }
 
+  // 缓存词典（首次用时构建）；js 基准下为空数组
+  let _dict = null;
+  function dict() { if (_dict === null) _dict = (KEY === 'js') ? [] : buildDict(); return _dict; }
+
+  // 字符串换皮：供 nav/navmobile 等对 data-* 属性值（relabel 不触及属性）按同一词典替换。
+  // 单一数据源——复用 buildDict()，不引入第二套映射。
+  function relabelStr(s) {
+    if (typeof s !== 'string' || !s) return s;
+    const d = dict();
+    for (let i = 0; i < d.length; i++) {
+      if (s.indexOf(d[i][0]) !== -1) s = s.split(d[i][0]).join(d[i][1]);
+    }
+    return s;
+  }
+
   function relabel() {
     if (KEY === 'js') return;               // 默认基准：零操作
     const dict = buildDict();
@@ -196,4 +211,5 @@
   }
 
   window.BZF_REGION.relabel = relabel;
+  window.BZF_REGION.relabelStr = relabelStr;
 })();

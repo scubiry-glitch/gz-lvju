@@ -19,6 +19,14 @@
  *
  * 所有"主体名词"沿用江苏基准字面量（房源/服务者姓名等为样例数据），
  * 与 _region.js 解耦：本总线只产数据，不参与 relabel。
+ *
+ * 【数据源边界 · 参见 CLAUDE.md 规则 8/9】
+ *   本总线 = localStorage（key `bzf_orders`），是【居住服务·报修】演示总线，
+ *   纯前端造数，无后端依赖，刻意保持"零后端也能贯通演示"。
+ *   与之【并行、不混用】的是家政频道的 SQLite 后端总线 screens/_jzapi.js
+ *   （REST /api/juzhu/jiazheng/*，juzhu/server.py + juzhu/juzhu.db 为唯一数据源）。
+ *   —— 报修走本文件；家政工单走 _jzapi.js。二者不共享 key、不迁移、不合并。
+ *   接入新端时复用对应总线，不要再 new 一套 localStorage key。
  */
 (function () {
   'use strict';

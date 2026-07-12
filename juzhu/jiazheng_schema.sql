@@ -89,8 +89,34 @@ CREATE TABLE IF NOT EXISTS jz_activities (
   fetched_at TEXT
 );
 
+-- 商家 SKU ↔ 服务者 绑定（一个 SKU 可指派多名本店服务者）
+CREATE TABLE IF NOT EXISTS jz_sku_workers (
+  product_id INTEGER NOT NULL,
+  worker_id  INTEGER NOT NULL,
+  PRIMARY KEY (product_id, worker_id),
+  FOREIGN KEY (product_id) REFERENCES jz_products(id),
+  FOREIGN KEY (worker_id)  REFERENCES jz_workers(id)
+);
+
+-- 商家 SKU 排班档期（SKU=SPU+服务者+时间 的"时间"维度）
+CREATE TABLE IF NOT EXISTS jz_sku_slots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  worker_id  INTEGER,
+  slot_date  TEXT NOT NULL,           -- YYYY-MM-DD
+  start_time TEXT NOT NULL,           -- HH:MM
+  end_time   TEXT,
+  capacity   INTEGER NOT NULL DEFAULT 1,
+  booked     INTEGER NOT NULL DEFAULT 0,
+  status     TEXT NOT NULL DEFAULT 'open',  -- open / closed
+  FOREIGN KEY (product_id) REFERENCES jz_products(id),
+  FOREIGN KEY (worker_id)  REFERENCES jz_workers(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_jz_vendors_type ON jz_vendors(type, status);
 CREATE INDEX IF NOT EXISTS idx_jz_products_vendor ON jz_products(vendor_id, status);
 CREATE INDEX IF NOT EXISTS idx_jz_workers_vendor ON jz_workers(vendor_id, status);
 CREATE INDEX IF NOT EXISTS idx_jz_workers_online ON jz_workers(online, status);
 CREATE INDEX IF NOT EXISTS idx_jz_subcategories_parent ON jz_subcategories(parent_type, status);
+CREATE INDEX IF NOT EXISTS idx_jz_sku_workers_product ON jz_sku_workers(product_id);
+CREATE INDEX IF NOT EXISTS idx_jz_sku_slots_product ON jz_sku_slots(product_id, slot_date, start_time);

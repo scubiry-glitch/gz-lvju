@@ -73,6 +73,7 @@
           { id: 'inspection', label: '抽查记录',     href: 'g-inspection.html', icon: 'search' },
         ]},
         { name: '主体准入 · 5 类机构', items: [
+          { id: 'whitelist-review',   label: '白名单审核总览',  href: 'g-whitelist-review.html',   icon: 'check', badge: 25, badgeKind: 'warn' },
           { id: 'whitelist-service',  label: 'S 服务者白名单',  href: 'g-whitelist-service.html',  icon: 'user',  badge: 11 },
           { id: 'whitelist-operator', label: 'B 运营商白名单',  href: 'g-whitelist-operator.html', icon: 'check', badge: 5,  badgeKind: 'warn' },
           { id: 'whitelist-vendor',   label: 'V 人力服务商白名单', href: 'g-whitelist-vendor.html', icon: 'box',  badge: 3,  badgeKind: 'warn' },
@@ -116,7 +117,8 @@
           { id: 'gov',      label: R.deptName + '监管 ↗',   href: 'gov-admin.html',  icon: 'award' },
         ]},
         { name: '🏠 居住服务 · 家政频道', items: [
-          { id: 'jz-product',  label: '★ 服务产品管理',     href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-product',  label: '★ 商家 SKU（产品）',  href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-schedule', label: '★ SKU 排班',          href: 'p-jz-schedule.html', icon: 'pulse' },
           { id: 'jz-worker',   label: '★ 服务者管理',       href: 'p-jz-worker.html',   icon: 'user' },
         ]},
       ],
@@ -206,7 +208,9 @@
         ]},
         { name: '🏠 居住服务 · 家政频道', items: [
           { id: 'jz-category', label: '★ 服务子类目管理',     href: 'p-jz-category.html', icon: 'list' },
-          { id: 'jz-product',  label: '★ 服务产品管理 ↗',     href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-spu',      label: '★ 服务标准品 SPU',     href: 'p-jz-spu.html',      icon: 'box' },
+          { id: 'jz-product',  label: '★ 商家 SKU（产品）↗',  href: 'p-jz-product.html',  icon: 'box' },
+          { id: 'jz-schedule', label: '★ SKU 排班 ↗',         href: 'p-jz-schedule.html', icon: 'pulse' },
           { id: 'jz-worker',   label: '★ 服务者管理 ↗',       href: 'p-jz-worker.html',   icon: 'user' },
           { id: 'jiazheng-flow', label: '四大品类全流程 ↗',   href: '../juzhu-jiazheng-flow.html', icon: 'truck', badge: 'E2E' },
         ]},

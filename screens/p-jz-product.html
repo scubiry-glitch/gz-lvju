@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>服务产品管理 · 运营商工作台</title>
+<title>商家 SKU（服务产品）· 运营商工作台</title>
 <style>
   :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#0f766e;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
   *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
@@ -50,6 +50,16 @@
   .vendor-link{color:var(--accent);font-weight:500;}
   .group{margin-bottom:18px;}
   .group h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+  .spu-tag{font-size:10px;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600;}
+  .spu-tag.none{background:var(--line);color:var(--muted);}
+  .wk-mini{display:inline-flex;align-items:center;gap:2px;font-size:11px;color:var(--muted);}
+  .wk-mini b{color:var(--accent);}
+  .spu-hint{font-size:11px;color:var(--muted);background:var(--accent-soft);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+  .wk-picker{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;}
+  .wk-picker label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fg);cursor:pointer;padding:3px 4px;border-radius:6px;}
+  .wk-picker label:hover{background:var(--line);}
+  .wk-picker .lvl{font-size:9px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:4px;padding:0 4px;}
+  .wk-picker .empty{grid-column:1/-1;color:var(--muted);font-size:12px;text-align:center;padding:8px;}
 </style>
 </head>
 <body>
@@ -57,9 +67,9 @@
   <div id="side-nav" data-series="b" data-active="jz-product"></div>
   <main class="main">
     <div class="top">
-      <div class="crumb">控制台 / × B 运营商工作台 / <b>服务产品管理</b></div>
+      <div class="crumb">控制台 / × B 运营商工作台 / <b>商家 SKU（服务产品）</b></div>
       <div class="top-actions">
-        <button class="btn pri" id="btnNew">+ 新增产品</button>
+        <button class="btn pri" id="btnNew">+ 新增 SKU</button>
       </div>
     </div>
     <div class="content">
@@ -98,17 +108,22 @@
 
 <div class="modal" id="modal">
   <div class="box">
-    <h4 id="modalTitle">新增产品</h4>
+    <h4 id="modalTitle">新增 SKU</h4>
     <input type="hidden" id="m_id" />
+    <div class="spu-hint">SKU = 平台 <b>SPU</b> + 本店<b>服务者</b> + 价格。先选商家和引用的 SPU，再勾选上门服务者。</div>
     <div class="grid">
       <div class="fld">
         <label>所属商家 *</label>
         <select id="m_vendor" required></select>
       </div>
       <div class="fld">
-        <label>服务子类目</label>
-        <input type="text" id="m_category" placeholder="如：日常保洁" />
+        <label>引用 SPU（平台标准品）</label>
+        <select id="m_spu"><option value="">-- 不关联 SPU --</option></select>
       </div>
+    </div>
+    <div class="fld">
+      <label>服务子类目</label>
+      <input type="text" id="m_category" placeholder="如：日常保洁" />
     </div>
     <div class="fld">
       <label>产品标题 *</label>
@@ -162,6 +177,10 @@
         </select>
       </div>
     </div>
+    <div class="fld">
+      <label>本店服务者（勾选可上门此 SKU 的服务者）</label>
+      <div class="wk-picker" id="m_workers"><div class="empty">请先选择商家</div></div>
+    </div>
     <div class="btns">
       <button class="btn" id="mCancel">取消</button>
       <button class="btn pri" id="mSave">保存</button>
@@ -186,20 +205,45 @@
 
   let allProducts = [];
   let allVendors = [];
+  let allSpu = [];
+  let allWorkers = [];
 
   async function load() {
-    const [pr, vr] = await Promise.all([
+    const [pr, vr, sr, wr] = await Promise.all([
       fetch('/api/juzhu/jz/products').then(r=>r.json()),
       fetch('/api/juzhu/jz/vendors').then(r=>r.json()),
+      fetch('/api/juzhu/jz/spu').then(r=>r.json()),
+      fetch('/api/juzhu/jz/workers?all=1').then(r=>r.json()),
     ]);
     allProducts = pr.list;
     allVendors = vr.list;
+    allSpu = sr.list || [];
+    allWorkers = wr.list || [];
     // 商家下拉
     $('f_vendor').innerHTML = '<option value="">全部商家</option>' +
       allVendors.map(v => `<option value="${v.id}">${v.name}（${TYPE_LABELS[v.type]||v.type}）</option>`).join('');
     $('m_vendor').innerHTML = '<option value="">-- 选择商家 --</option>' +
       allVendors.map(v => `<option value="${v.id}">${v.name}（${TYPE_LABELS[v.type]||v.type}）</option>`).join('');
     applyFilter();
+  }
+
+  // 按商家类目过滤 SPU 下拉
+  function fillSpuOptions(catType) {
+    const list = allSpu.filter(s => !catType || s.category_id === catType);
+    $('m_spu').innerHTML = '<option value="">-- 不关联 SPU --</option>' +
+      list.map(s => `<option value="${s.id}" data-name="${s.name}" data-cat="${s.category_name||''}" data-price="${s.price_from||0}" data-dur="${s.duration_min||0}">${s.name}（¥${s.price_from||0}）</option>`).join('');
+  }
+
+  // 渲染本店服务者勾选框
+  function renderWorkerPicker(vendorId, checkedIds) {
+    const wrap = $('m_workers');
+    const ws = allWorkers.filter(w => String(w.vendor_id) === String(vendorId));
+    if (!vendorId) { wrap.innerHTML = '<div class="empty">请先选择商家</div>'; return; }
+    if (!ws.length) { wrap.innerHTML = '<div class="empty">该商家暂无服务者，请先在「服务者管理」添加</div>'; return; }
+    const set = new Set((checkedIds||[]).map(String));
+    wrap.innerHTML = ws.map(w =>
+      `<label><input type="checkbox" value="${w.id}" ${set.has(String(w.id))?'checked':''}/> ${w.name} <span class="lvl">${w.level||'L3'}</span></label>`
+    ).join('');
   }
 
   function applyFilter() {
@@ -235,9 +279,10 @@
     ['cleaning','repair','moving','nanny'].forEach(t => {
       if (!groups[t] || !groups[t].length) return;
       html += `<div class="group"><h4>${TYPE_LABELS[t]}（${groups[t].length}）</h4><table>`;
-      html += '<thead><tr><th>产品</th><th>商家</th><th>价格</th><th>销量</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      html += '<thead><tr><th>SKU</th><th>商家</th><th>引用 SPU</th><th>服务者</th><th>价格</th><th>状态</th><th>操作</th></tr></thead><tbody>';
       groups[t].forEach(p => {
         const badgeClass = p.status==='on'?'b-on':(p.status==='sold_out'?'b-sold':'b-off');
+        const wkCount = (p.worker_ids||[]).length;
         html += `<tr>
           <td>
             <b>${p.title}</b>
@@ -245,8 +290,9 @@
             ${p.category?`<span class="muted" style="font-size:10px;">[${p.category}]</span>`:''}
           </td>
           <td><span class="vendor-link">${p.vendor_name||'—'}</span></td>
+          <td>${p.spu_name?`<span class="spu-tag">${p.spu_name}</span>`:'<span class="spu-tag none">未关联</span>'}</td>
+          <td><span class="wk-mini">👤 <b>${wkCount}</b> 人</span></td>
           <td><span class="price">¥${p.price}</span>${p.original_price?` <span class="muted" style="text-decoration:line-through;font-size:10px;">¥${p.original_price}</span>`:''}</td>
-          <td>${p.sales_count||0}</td>
           <td><span class="badge ${badgeClass}" data-id="${p.id}" data-status="${p.status}">${STATUS_LABELS[p.status]||p.status}</span></td>
           <td class="actions">
             <button class="btn sm" data-edit='${JSON.stringify(p).replace(/'/g,"&#39;")}'>编辑</button>
@@ -263,9 +309,14 @@
     document.querySelectorAll('.badge[data-id]').forEach(b => b.onclick = () => toggle(b.dataset.id, b.dataset.status));
   }
 
+  function vendorType(vid) {
+    const v = allVendors.find(x => String(x.id) === String(vid));
+    return v ? v.type : '';
+  }
+
   function openModal(p) {
     $('m_id').value = p ? p.id : '';
-    $('modalTitle').textContent = p ? '编辑产品' : '新增产品';
+    $('modalTitle').textContent = p ? '编辑 SKU' : '新增 SKU';
     $('m_vendor').value = p ? p.vendor_id : '';
     $('m_category').value = p ? (p.category||'') : '';
     $('m_title').value = p ? p.title : '';
@@ -278,12 +329,33 @@
     $('m_rating').value = p ? (p.rating||0) : 4.7;
     $('m_sort').value = p ? (p.sort_order||99) : 99;
     $('m_status').value = p ? p.status : 'on';
+    // SPU + 服务者
+    fillSpuOptions(p ? p.vendor_type : '');
+    $('m_spu').value = p && p.channel_sku_id ? String(p.channel_sku_id) : '';
+    renderWorkerPicker(p ? p.vendor_id : '', p ? (p.worker_ids||[]) : []);
     $('modal').classList.add('show');
   }
   function closeModal() { $('modal').classList.remove('show'); }
   $('btnNew').onclick = () => openModal(null);
   $('mCancel').onclick = closeModal;
   $('modal').onclick = e => { if (e.target.id==='modal') closeModal(); };
+
+  // 选商家 → 过滤 SPU + 刷新本店服务者
+  $('m_vendor').onchange = () => {
+    const vid = $('m_vendor').value;
+    fillSpuOptions(vendorType(vid));
+    $('m_spu').value = '';
+    renderWorkerPicker(vid, []);
+  };
+  // 选 SPU → 回填 类目 / 价格 / 时长（标题为空时也带入）
+  $('m_spu').onchange = () => {
+    const opt = $('m_spu').selectedOptions[0];
+    if (!opt || !opt.value) return;
+    if (opt.dataset.cat) $('m_category').value = opt.dataset.cat;
+    if (opt.dataset.price && !$('m_price').value) $('m_price').value = opt.dataset.price;
+    if (!$('m_title').value) $('m_title').value = opt.dataset.name || '';
+    if (opt.dataset.dur) $('m_duration').value = (parseInt(opt.dataset.dur)/60).toFixed(1).replace(/\.0$/,'');
+  };
 
   ['f_type','f_status','f_vendor'].forEach(id => $(id).onchange = applyFilter);
   $('f_q').oninput = applyFilter;
@@ -302,9 +374,11 @@
       rating: parseFloat($('m_rating').value)||0,
       sort_order: parseInt($('m_sort').value)||99,
       status: $('m_status').value,
+      channel_sku_id: $('m_spu').value ? parseInt($('m_spu').value) : null,
+      worker_ids: [...document.querySelectorAll('#m_workers input:checked')].map(x => parseInt(x.value)),
     };
     if (!body.vendor_id) { toast('请选择商家', 'err'); return; }
-    if (!body.title) { toast('请输入产品标题', 'err'); return; }
+    if (!body.title) { toast('请输入 SKU 标题', 'err'); return; }
     const id = $('m_id').value;
     const url = id ? '/api/juzhu/jz/products/'+id : '/api/juzhu/jz/products';
     const method = id ? 'PUT' : 'POST';

@@ -208,6 +208,7 @@
   </div>
 </div>
 <div id="rentModalWrap"></div>
+<script src="screens/_region.js"></script>
 <script src="juzhu/app.js?v=9"></script>
 <script src="screens/_qr.js"></script>
 <script>
@@ -384,7 +385,7 @@
     document.title = title + ' · ' + p.name;
     document.getElementById('heroTitle').textContent = title;
     document.getElementById('heroSub').textContent = p.name + (p.address ? ' · ' + p.address : '');
-    document.getElementById('typeChip').textContent = isTrade ? '卖旧买新' : '保租房';
+    document.getElementById('typeChip').textContent = isTrade ? '卖旧买新' : ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房');
     document.getElementById('ttl').innerHTML = title + '<small>' + p.name + '</small>';
 
     if (isTrade) {

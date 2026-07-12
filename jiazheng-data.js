@@ -1,6 +1,20 @@
 /* ===========================================
    居住服务·家政频道 共享数据 + API 适配层
    优先从后端 /api/juzhu/jz/* 拉取，失败时回落到本地 mock
+   -------------------------------------------
+   【数据源边界 · 参见 CLAUDE.md 规则 9】
+   · 权威数据源 = SQLite（juzhu/juzhu.db），经 juzhu/server.py 的
+     /api/juzhu/jz/*（jz_subcategories / jz_vendors / jz_products / jz_workers）
+     与 /api/juzhu/jiazheng/*（jz_skus + jz_orders）暴露。
+   · 本文件的 window.JZ_DATA 只是【家政「目录/SKU 配置」的前端适配层 + 离线 mock 回落】：
+     线上优先 fetch /api/juzhu/jz/*，仅在后端不可达时用下方 MOCK 兜底，
+     保证纯静态原型脱离后端也能演示。请勿把它当作真数据源来写业务逻辑。
+   · 工单闭环（下单/派单/推进/评价）不走本文件，走 screens/_jzapi.js
+     （/api/juzhu/jiazheng/*，SQLite 唯一数据源）。
+   · 消费页（仅家政营销/下单前的目录展示）：jiazheng-list / jiazheng-order /
+     jiazheng-vendor / jiazheng-payment / jiazheng-booking。
+   · 单一数据源原则：不要在此处新造与 SQLite 重叠的"真数据"，
+     mock 仅作离线兜底；改业务字段应改 juzhu/server.py + schema，再让本层适配。
    =========================================== */
 window.JZ_DATA = (function(){
   var API = '/api/juzhu/jz';

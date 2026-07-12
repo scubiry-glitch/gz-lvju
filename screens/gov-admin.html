@@ -1559,9 +1559,16 @@ function applyRole(role) {
   const crumb = document.querySelector('.gt-crumb .cur');
   const pageTtl = document.querySelector('.pc-pagehead h2');
   const pageDesc = document.querySelector('.pc-pagehead .desc');
+  // 地域主体名词读 _region.js 单一数据源（不硬编码第二套省份映射；缺省回退江苏基准）
+  const RG = window.BZF_REGION || {
+    prov: { full: '江苏省', short: '江苏', capital: '南京', cities: new Array(13) },
+    deptName: '住建厅', biz: { term: '保租房' }, operator: '贝壳',
+    bureau: function (m) { return m + '市住建局'; }
+  };
+  const cap = RG.prov.capital, cityBureau = RG.bureau(cap), nCities = RG.prov.cities.length;
   const map = {
-    prov: ['全省运行监管视图', '江苏省住建厅 × 贝壳保租房频道 · 数据每日 02:00 同步', '监管总览 · 省厅视角', '全省 13 市保租房运行态势 · 实时风险预警 · 待办处置'],
-    city: ['南京市运行监管视图', '南京市住建局 · 视角已切换 · 仅展示南京数据', '监管总览 · 南京市局视角', '南京 11 区保租房运行态势 · 仅本市数据'],
+    prov: ['全省运行监管视图', RG.prov.full + RG.deptName + ' × ' + RG.operator + RG.biz.term + '频道 · 数据每日 02:00 同步', '监管总览 · 省厅视角', '全省 ' + nCities + ' 市' + RG.biz.term + '运行态势 · 实时风险预警 · 待办处置'],
+    city: [cap + '市运行监管视图', cityBureau + ' · 视角已切换 · 仅展示' + cap + '数据', '监管总览 · ' + cap + '市局视角', cap + ' 11 区' + RG.biz.term + '运行态势 · 仅本市数据'],
     dist: ['建邺区分局督查视图', '建邺区监管员 · 待我处理工单优先', '监管总览 · 建邺区分局视角', '建邺区现场督查任务 + 待办工单优先']
   };
   const [t, s, c, d] = map[role] || map.prov;
