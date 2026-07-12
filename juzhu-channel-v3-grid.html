@@ -105,12 +105,16 @@
   .jz-cat-grid .jz-cat:nth-child(4) .in{padding:12px 15px;grid-template-rows:auto 1fr;}
   .jz-cat-grid .jz-cat:nth-child(3) .top,
   .jz-cat-grid .jz-cat:nth-child(4) .top{min-height:0;}
+  /* 单行 80px：pill(24)+球(32)+padding(24)=80，球会顶穿 ::after inset:12 边框 →
+     压扁 pill、缩球到 28，让「pill+球」整体落在内嵌边框内 */
+  .jz-cat-grid .jz-cat:nth-child(3) .pill,
+  .jz-cat-grid .jz-cat:nth-child(4) .pill{font-size:9px;padding:3px 8px;}
   .jz-cat-grid .jz-cat:nth-child(3) .hero,
   .jz-cat-grid .jz-cat:nth-child(4) .hero{margin-top:0;align-items:center;align-self:center;gap:10px;}
   .jz-cat-grid .jz-cat:nth-child(3) .orb,
-  .jz-cat-grid .jz-cat:nth-child(4) .orb{width:32px;height:32px;font-size:17px;box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 5px 10px rgba(0,0,0,.14);}
+  .jz-cat-grid .jz-cat:nth-child(4) .orb{width:28px;height:28px;font-size:15px;box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 4px 8px rgba(0,0,0,.14);}
   .jz-cat-grid .jz-cat:nth-child(3) h3,
-  .jz-cat-grid .jz-cat:nth-child(4) h3{font-size:19px;}
+  .jz-cat-grid .jz-cat:nth-child(4) h3{font-size:18px;}
   .jz-cat-grid .jz-cat:nth-child(3) .desc,
   .jz-cat-grid .jz-cat:nth-child(4) .desc,
   .jz-cat-grid .jz-cat:nth-child(3) .sub,
@@ -224,19 +228,19 @@
     <div class="pane" id="pane-jiazheng">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
       <div class="jz-quick">
-        <div class="jz-quick-intro">
+        <div class="jz-cat-grid" id="jzCats">
+          <a class="jz-cat cleaning" href="juzhu-jiazheng-list.html?type=cleaning"><div class="bg"></div><div class="in"><div class="top"><span class="pill">高频刚需</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🧹</div><div class="title-wrap"><h3>保洁</h3><div class="desc">日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。</div></div></div><div class="sub"><span>日常保洁</span><span>深度清洁</span><span>搬家保洁</span></div><div class="stats"><span>最快 2h 上门</span><span>金牌阿姨</span></div></div></a>
+          <a class="jz-cat repair" href="juzhu-jiazheng-list.html?type=repair"><div class="bg"></div><div class="in"><div class="top"><span class="pill">即时修复</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🔧</div><div class="title-wrap"><h3>维修</h3><div class="desc">灯具、家电、管道类问题集中入口，适合突发故障快速派单。</div></div></div><div class="sub"><span>家电维修</span><span>管道疏通</span><span>灯具安装</span></div><div class="stats"><span>当日排单</span><span>可视化进度</span></div></div></a>
+          <a class="jz-cat moving" href="juzhu-jiazheng-list.html?type=moving"><div class="bg"></div><div class="in"><div class="top"><span class="pill">大件服务</span><div class="arrow">›</div></div><div class="hero"><div class="orb">📦</div><div class="title-wrap"><h3>搬家</h3><div class="desc">同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。</div></div></div><div class="sub"><span>居民搬家</span><span>长途搬家</span><span>钢琴搬运</span></div><div class="stats"><span>车型可选</span><span>明码报价</span></div></div></a>
+          <a class="jz-cat nanny" href="juzhu-jiazheng-list.html?type=nanny"><div class="bg"></div><div class="in"><div class="top"><span class="pill">长期陪伴</span><div class="arrow">›</div></div><div class="hero"><div class="orb">👶</div><div class="title-wrap"><h3>保姆</h3><div class="desc">住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。</div></div></div><div class="sub"><span>住家保姆</span><span>育儿嫂</span><span>钟点工</span></div><div class="stats"><span>背景核验</span><span>支持续约</span></div></div></a>
+        </div>
+        <div class="jz-quick-intro" style="margin-top:10px;margin-bottom:0;">
           <div class="copy">
             <div class="eyebrow">ONE-STOP HOME SERVICE</div>
             <h3>四大到家服务</h3>
             <p>保洁、维修、搬家、保姆，一个入口直接约——就近派单、明码标价，最快当天上门。</p>
           </div>
           <div class="meta"><b>4 大</b><span>到家服务</span><b style="margin-top:5px;">180 分钟</b><span>最快上门</span></div>
-        </div>
-        <div class="jz-cat-grid" id="jzCats">
-          <a class="jz-cat cleaning" href="juzhu-jiazheng-list.html?type=cleaning"><div class="bg"></div><div class="in"><div class="top"><span class="pill">高频刚需</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🧹</div><div class="title-wrap"><h3>保洁</h3><div class="desc">日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。</div></div></div><div class="sub"><span>日常保洁</span><span>深度清洁</span><span>搬家保洁</span></div><div class="stats"><span>最快 2h 上门</span><span>金牌阿姨</span></div></div></a>
-          <a class="jz-cat repair" href="juzhu-jiazheng-list.html?type=repair"><div class="bg"></div><div class="in"><div class="top"><span class="pill">即时修复</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🔧</div><div class="title-wrap"><h3>维修</h3><div class="desc">灯具、家电、管道类问题集中入口，适合突发故障快速派单。</div></div></div><div class="sub"><span>家电维修</span><span>管道疏通</span><span>灯具安装</span></div><div class="stats"><span>当日排单</span><span>可视化进度</span></div></div></a>
-          <a class="jz-cat moving" href="juzhu-jiazheng-list.html?type=moving"><div class="bg"></div><div class="in"><div class="top"><span class="pill">大件服务</span><div class="arrow">›</div></div><div class="hero"><div class="orb">📦</div><div class="title-wrap"><h3>搬家</h3><div class="desc">同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。</div></div></div><div class="sub"><span>居民搬家</span><span>长途搬家</span><span>钢琴搬运</span></div><div class="stats"><span>车型可选</span><span>明码报价</span></div></div></a>
-          <a class="jz-cat nanny" href="juzhu-jiazheng-list.html?type=nanny"><div class="bg"></div><div class="in"><div class="top"><span class="pill">长期陪伴</span><div class="arrow">›</div></div><div class="hero"><div class="orb">👶</div><div class="title-wrap"><h3>保姆</h3><div class="desc">住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。</div></div></div><div class="sub"><span>住家保姆</span><span>育儿嫂</span><span>钟点工</span></div><div class="stats"><span>背景核验</span><span>支持续约</span></div></div></a>
         </div>
       </div>
 
