@@ -1,3 +1,6 @@
 .DS_Store
 *.tmp
 .tmp/
+
+# 静态资源（图片等体积大，不纳入版本库）
+assets/

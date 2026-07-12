@@ -1,0 +1,35 @@
+/* 家政 · P 服务认证中台 · 证章样式 */
+.jz-cert-seals{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.jz-cert-seals::-webkit-scrollbar{display:none;}
+.jz-cert-seals .seal-lbl{flex:0 0 auto;font-size:8px;font-weight:600;letter-spacing:.06em;color:#94a3b8;text-transform:uppercase;padding-right:2px;}
+.jz-cert-seal{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:2px;height:14px;padding:0 5px 0 3px;
+  border:1px solid rgba(180,83,9,.35);border-radius:2px;
+  background:linear-gradient(180deg,#fffdf7 0%,#fef9ee 100%);
+  color:#92400e;font-size:8px;font-weight:600;line-height:1;text-decoration:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(180,83,9,.08);
+  font-variant-numeric:tabular-nums;
+}
+.jz-cert-seal .seal-ic{width:9px;height:9px;flex-shrink:0;color:#b45309;opacity:.92;}
+.jz-cert-seal .seal-t{white-space:nowrap;}
+.jz-cert-seal.expired{opacity:.5;filter:grayscale(.4);}
+.jz-cert-seals.micro .seal-lbl{font-size:7px;letter-spacing:.04em;}
+.jz-cert-seals.micro .jz-cert-seal{height:12px;padding:0 3px 0 2px;font-size:7px;border-radius:1px;}
+.jz-cert-seals.micro .jz-cert-seal .seal-ic{width:7px;height:7px;}
+
+.wcard .jz-cert-wrap{margin-top:4px;padding-top:4px;border-top:1px dashed rgba(15,42,38,.05);}
+.jz-cert-section{margin:6px 18px 8px;background:#fff;border:1px solid var(--border);border-radius:10px;padding:7px 10px;box-shadow:0 2px 8px rgba(15,42,38,.03);}
+.jz-cert-section .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.jz-cert-section .hd b{font-size:10px;font-weight:600;color:var(--ink);}
+.jz-cert-section .hd small{font-size:9px;color:var(--muted);}
+
+/* 详情 Tab 内完整证书记录 */
+.jz-cert{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:12px;text-decoration:none;color:inherit;background:#fafcfb;}
+.jz-cert.compact{padding:8px 10px;margin-bottom:6px;}
+.jz-cert .ck{width:28px;height:28px;border-radius:50%;background:var(--brand-soft);color:var(--brand-deep);display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.jz-cert .bd{flex:1;min-width:0;}
+.jz-cert .bd b{display:block;font-size:12px;color:var(--ink);}
+.jz-cert .meta,.jz-cert .exp{display:block;font-size:10px;color:var(--muted);margin-top:2px;}
+.jz-cert .go{font-size:11px;color:var(--brand);font-weight:600;flex-shrink:0;}
+.jz-cert.expired{opacity:.75;}
+.jz-cert-empty{font-size:12px;color:var(--muted);padding:8px 0;}

@@ -1,15 +1,101 @@
 """居住服务·家政频道 · jz_* 表的 CRUD
-所有 vendor/product/worker JSON 输出都解析 badges/tags/certs 字段
+所有 vendor/product/worker JSON 输出都解析 badges/tags/certs/platform_certs 字段
 """
 import json
 import sqlite3
+
+CERT_LABELS = {
+    "id_card": "身份核验",
+    "health": "健康证核验",
+    "skill": "技能考核认证",
+    "insurance": "责任险承保",
+    "backcheck": "平台背调",
+}
+CERT_PREFIX = {
+    "id_card": "JZ-ID",
+    "health": "JZ-HC",
+    "skill": "JZ-SK",
+    "insurance": "JZ-IN",
+    "backcheck": "JZ-BC",
+}
+VENDOR_BADGE_CERTS = {
+    "whitelist": ("JZ-V-WL", "白名单商家认证"),
+    "backcheck": ("JZ-V-BC", "平台背调认证"),
+    "insurance": ("JZ-V-IN", "百万保障认证"),
+    "commitment": ("JZ-V-CM", "服务承诺认证"),
+    "top10": ("JZ-V-T10", "销量榜认证"),
+}
+
+
+def _ensure_worker_certs(w):
+    if not w:
+        return w
+    if w.get("platform_certs"):
+        return w
+    out = []
+    wid = w.get("id") or 0
+    level = w.get("level") or "L3"
+    if w.get("whitelist_id") or w.get("is_whitelisted"):
+        wl = w.get("whitelist_id") or f"S{wid}"
+        out.append({
+            "code": f"JZ-S-{wl}",
+            "name": f"{level} 服务者持证",
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30",
+            "status": "valid",
+        })
+    for c in w.get("certs") or []:
+        if c == "whitelist":
+            continue
+        prefix = CERT_PREFIX.get(c, f"JZ-{c.upper()}")
+        out.append({
+            "code": f"{prefix}-{wid}",
+            "name": CERT_LABELS.get(c, c),
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30" if c == "insurance" else "2026-12-31",
+            "status": "valid",
+        })
+    w["platform_certs"] = out
+    return w
+
+
+def _ensure_vendor_certs(v):
+    if not v:
+        return v
+    if v.get("platform_certs"):
+        return v
+    out = []
+    vid = v.get("id") or 0
+    vno = v.get("vendor_no") or f"V{vid:04d}"
+    v["vendor_no"] = vno
+    out.append({
+        "code": f"JZ-B-{vno}",
+        "name": "家政商家主体认证",
+        "issuer": "P 服务认证中台",
+        "valid_until": "2027-12-31",
+        "status": "valid",
+    })
+    for b in v.get("badges") or []:
+        spec = VENDOR_BADGE_CERTS.get(b)
+        if not spec:
+            continue
+        prefix, name = spec
+        out.append({
+            "code": f"{prefix}-{vid}",
+            "name": name,
+            "issuer": "P 服务认证中台",
+            "valid_until": "2027-06-30",
+            "status": "valid",
+        })
+    v["platform_certs"] = out
+    return v
 
 
 def _row_to_dict(row):
     if row is None:
         return None
     d = dict(row)
-    for key in ("badges", "tags", "service_tags", "certs"):
+    for key in ("badges", "tags", "service_tags", "certs", "platform_certs"):
         if key in d and isinstance(d[key], str):
             try:
                 d[key] = json.loads(d[key])
@@ -56,8 +142,9 @@ def list_vendors(conn, type_=None, status="active"):
             (status,),
         ).fetchall()
     vendors = _rows_to_list(rows)
-    # 为每个商家附加前 2 个 SKU
+    # 为每个商家附加前 2 个 SKU + 中台证书
     for v in vendors:
+        _ensure_vendor_certs(v)
         v["products"] = list_products_by_vendor(conn, v["id"])[:2]
     return vendors
 
@@ -67,10 +154,11 @@ def get_vendor(conn, vendor_id):
     if not row:
         return None
     v = _row_to_dict(row)
+    _ensure_vendor_certs(v)
     # 关联产品
     v["products"] = list_products_by_vendor(conn, vendor_id)
     # 关联服务者
-    v["workers"] = list_workers_by_vendor(conn, vendor_id)
+    v["workers"] = [_ensure_worker_certs(w) for w in list_workers_by_vendor(conn, vendor_id)]
     return v
 
 
@@ -387,19 +475,19 @@ def list_workers_by_vendor(conn, vendor_id):
         "SELECT * FROM jz_workers WHERE vendor_id=? AND status='active' ORDER BY level DESC, rating DESC",
         (vendor_id,),
     ).fetchall()
-    return _rows_to_list(rows)
+    return [_ensure_worker_certs(w) for w in _rows_to_list(rows)]
 
 
 def list_workers_online(conn):
     rows = conn.execute(
         "SELECT * FROM jz_workers WHERE online=1 AND status='active' ORDER BY level DESC, credit_score DESC"
     ).fetchall()
-    return _rows_to_list(rows)
+    return [_ensure_worker_certs(w) for w in _rows_to_list(rows)]
 
 
 def get_worker(conn, worker_id):
     row = conn.execute("SELECT * FROM jz_workers WHERE id=?", (worker_id,)).fetchone()
-    return _row_to_dict(row)
+    return _ensure_worker_certs(_row_to_dict(row))
 
 
 # ====== Activities (贝壳缓存) ======
@@ -694,7 +782,7 @@ def list_workers(conn, vendor_id=None, status=None, limit=200):
     sql += " ORDER BY w.vendor_id, w.level DESC, w.rating DESC LIMIT ?"
     params.append(int(limit))
     rows = conn.execute(sql, params).fetchall()
-    return _rows_to_list(rows)
+    return [_ensure_worker_certs(w) for w in _rows_to_list(rows)]
 
 
 def create_worker(conn, data):

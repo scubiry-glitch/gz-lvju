@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   hours TEXT,
   vendor_no TEXT,
   whitelist_id INTEGER,
+  platform_certs TEXT,
   status TEXT DEFAULT 'active',
   sort_order INTEGER DEFAULT 0,
   created_at TEXT, updated_at TEXT
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS jz_workers (
   distance_km REAL,
   vendor_id INTEGER,
   whitelist_id INTEGER,
+  platform_certs TEXT,
   status TEXT DEFAULT 'active',
   FOREIGN KEY (vendor_id) REFERENCES jz_vendors(id)
 );
