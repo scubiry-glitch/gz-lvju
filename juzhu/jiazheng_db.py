@@ -682,8 +682,8 @@ def update_product(conn, pid, data):
     params = []
     for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
               "unit", "price", "original_price", "discount_label", "earliest_time",
-              "advance_booking_hours", "sales_count", "rating", "channel_sku_id",
-              "status", "sort_order"):
+              "advance_booking_hours", "sales_count", "rating", "service_tags",
+              "channel_sku_id", "status", "sort_order"):
         if k in data:
             v = data[k]
             if k == "service_tags":
@@ -790,7 +790,7 @@ def update_worker(conn, wid, data):
     import json as _json
     fields = []
     params = []
-    for k in ("name", "avatar", "level", "credit_score", "certs", "is_whitelisted",
+    for k in ("name", "avatar", "level", "credit_score", "tags", "certs", "is_whitelisted",
               "rating", "completed_orders", "years_experience", "online",
               "distance_km", "vendor_id", "status"):
         if k in data:
@@ -880,8 +880,9 @@ def update_sku(conn, sku_id, data):
     fields = []
     params = []
     for k in ("category_id", "name", "slug", "spec", "price_from", "price_unit",
-              "duration_min", "tags", "badges", "sales_text", "rating_score",
-              "worker_min_level", "includes", "service_flow", "sort_order", "enabled"):
+              "duration_min", "tags", "badges", "gallery", "sales_text", "rating_score",
+              "worker_min_level", "includes", "service_flow", "service_notice",
+              "cover_image", "sort_order", "enabled"):
         if k in data:
             v = data[k]
             if k in _SPU_JSON_FIELDS:

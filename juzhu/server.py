@@ -1384,12 +1384,31 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"error": "not found"}, 404)
 
-        name = b.get("name")
-        slug = b.get("slug") or (slugify(name) if name else None)
-        tags = tags_to_db(b.get("tags"))
+        # 局部更新：只写「请求体里出现过的字段」，缺失字段保持原值不动。
+        # 修复：前端项目表单只发 name/address/tags/sort/price/cover 与 old_house_hint
+        # 或 managed_unit_count，从不发 is_featured/featured_rank；旧逻辑用「=?」硬写
+        # featured_rank，会把精选排序抹成 NULL（is_featured 却因 COALESCE 保留，精选态错位）。
+        sets, vals = [], []
 
-        rating_sql = ""
-        rating_params = []
+        def put(col, val):
+            sets.append(col + "=?")
+            vals.append(val)
+
+        if "name" in b:
+            name = b.get("name")
+            put("name", name)
+            put("slug", b.get("slug") or (slugify(name) if name else None))
+        elif "slug" in b:
+            put("slug", b.get("slug"))
+        for col in ("address", "cover_image", "sort_order", "price_from",
+                    "is_featured", "featured_rank", "old_house_hint"):
+            if col in b:
+                put(col, b.get(col))
+        if "tags" in b:
+            put("tags", tags_to_db(b.get("tags")))
+        if "managed_unit_count" in b:
+            val = b.get("managed_unit_count")
+            put("managed_unit_count", int(val) if val is not None and val != "" else None)
         if "rating" in b:
             row = conn.execute("SELECT rating_status FROM projects WHERE id=?", (pid,)).fetchone()
             if row and row[0] in ("draft", "rejected", None):
@@ -1398,28 +1417,11 @@ class Handler(SimpleHTTPRequestHandler):
                 if dims:
                     rating.update(summarize_rating(dims))
                 rating["code"] = rating_code(pid)
-                rating_sql = ", rating=?"
-                rating_params.append(rating_to_db(rating))
+                put("rating", rating_to_db(rating))
 
-        managed_sql = ""
-        managed_params = []
-        if "managed_unit_count" in b:
-            val = b.get("managed_unit_count")
-            managed_sql = ", managed_unit_count=?"
-            managed_params.append(int(val) if val is not None and val != "" else None)
-
-        conn.execute(
-            f"""UPDATE projects SET
-               name=COALESCE(?, name), slug=COALESCE(?, slug),
-               address=?, cover_image=?, tags=?,
-               sort_order=COALESCE(?, sort_order), price_from=?,
-               is_featured=COALESCE(?, is_featured), featured_rank=?, old_house_hint=?
-               {managed_sql}{rating_sql}
-               WHERE id=?""",
-            (name, slug, b.get("address"), b.get("cover_image"), tags,
-             b.get("sort_order"), b.get("price_from"), b.get("is_featured"),
-             b.get("featured_rank"), b.get("old_house_hint"), *managed_params, *rating_params, pid),
-        )
+        if sets:
+            vals.append(pid)
+            conn.execute("UPDATE projects SET " + ", ".join(sets) + " WHERE id=?", vals)
         conn.commit()
         sync_project_unit_count(conn, pid)
         row = conn.execute("SELECT district_id FROM projects WHERE id=?", (pid,)).fetchone()
