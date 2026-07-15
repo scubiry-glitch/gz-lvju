@@ -844,8 +844,8 @@
     {
       "id": 1,
       "project_id": 1,
-      "name": "测试户型2",
-      "slug": "测试户型2",
+      "name": "测试户2型2",
+      "slug": "测试户2型2",
       "area_sqm": 30.0,
       "layout_label": null,
       "rent_monthly": 1440,
@@ -870,8 +870,7 @@
         "wifi",
         "tv",
         "hood",
-        "microwave",
-        "induction"
+        "microwave"
       ],
       "keeper": {
         "name": "",
