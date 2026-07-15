@@ -233,7 +233,7 @@
 
   function mountGallery() {
     document.getElementById('track').innerHTML = photos.map(function(src){
-      return '<div class="slide" style="background-image:url(' + src + ')"></div>';
+      return '<div class="slide" style="background-image:url(' + JUZHU.thumbUrl(src) + ')"></div>';
     }).join('') || '<div class="slide g3"></div>';
 
     document.getElementById('dots').innerHTML = photos.map(function(_, i){
@@ -246,7 +246,7 @@
     document.getElementById('thumbs').hidden = false;
     document.getElementById('thumbs').innerHTML = photos.map(function(src, i){
       return '<button type="button" class="' + (i === 0 ? 'on' : '') + '" data-i="' + i + '">' +
-        '<img src="' + src + '" alt=""/>' +
+        '<img src="' + JUZHU.thumbUrl(src) + '" alt=""/>' +
       '</button>';
     }).join('');
     document.getElementById('thumbs').onclick = function(e){
@@ -260,7 +260,7 @@
     document.getElementById('grid').innerHTML = photos.map(function(src, i){
       var wide = i === 0 && photos.length >= 3 ? ' wide' : '';
       return '<button type="button" class="cell' + wide + (i === 0 ? ' on' : '') + '" data-i="' + i + '">' +
-        '<img src="' + src + '" alt=""/>' +
+        '<img src="' + JUZHU.thumbUrl(src) + '" alt=""/>' +
       '</button>';
     }).join('');
     document.getElementById('grid').onclick = function(e){

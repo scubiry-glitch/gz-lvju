@@ -72,14 +72,14 @@
     document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
     document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租户型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';
-    if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+p.cover_image+')';
+    if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(p.cover_image)+')';
 
     var hr = !isTrade ? JUZHU.houseRating(p) : null;
     var hrChip = hr ? ('<span class="hr-chip">★ '+hr.stars+'星 · 好房子</span>') : '';
 
     var units = JUZHU.units(p.id);
     document.getElementById('list').innerHTML = units.map(function(u){
-      var img = u.cover_image ? 'background-image:url('+u.cover_image+')' : '';
+      var img = u.cover_image ? 'background-image:url('+JUZHU.thumbUrl(u.cover_image)+')' : '';
       var title = JUZHU.unitTitle(u);
       var meta = JUZHU.unitMeta(u);
       var metaHtml = meta ? '<div class="meta">'+meta+'</div>' : '';

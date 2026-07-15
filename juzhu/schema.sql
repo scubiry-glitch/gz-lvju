@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS channels (
   note        TEXT
 );
 
-INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房', 1, 1);
-INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新', 2, 1);
-INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('jiazheng', '家政', 3, 1);
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房专区', 1, 1);
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新专区', 2, 1);
+INSERT OR IGNORE INTO channels(id, label, sort_order, enabled) VALUES ('jiazheng', '生活服务专区', 3, 1);
 
 CREATE TABLE IF NOT EXISTS jz_categories (
   id          TEXT PRIMARY KEY,                -- cleaning|repair|moving|nanny

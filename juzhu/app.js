@@ -272,13 +272,28 @@ window.JUZHU = (function () {
     var list = (cache && cache.channels) ? cache.channels.slice() : [];
     if (!list.length) {
       return [
-        { id: 'bzf', label: '保租房', sort_order: 1, enabled: 1 },
-        { id: 'trade', label: '卖旧买新', sort_order: 2, enabled: 1 },
-        { id: 'jiazheng', label: '家政', sort_order: 3, enabled: 1 }
+        { id: 'bzf', label: '保租房专区', sort_order: 1, enabled: 1 },
+        { id: 'trade', label: '卖旧买新专区', sort_order: 2, enabled: 1 },
+        { id: 'jiazheng', label: '生活服务专区', sort_order: 3, enabled: 1 }
       ];
     }
     return list.filter(function(c) { return c.enabled !== 0; })
       .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+  }
+
+  /** Convert an image path to its thumbnail counterpart.
+   *  e.g. assets/juzhu/sy/districts/和平区.jpg → assets/juzhu/sy/thumbs/districts/和平区.webp
+   *  Falls back to original if the path doesn't match the expected pattern.
+   */
+  function thumbUrl(src) {
+    if (!src) return src;
+    // Only thumbnail images under assets/juzhu/{city}/
+    var m = src.match(/^(assets\/juzhu\/[^/]+\/)(.*)/);
+    if (!m) return src;
+    var base = m[1];               // e.g. assets/juzhu/sy/
+    var rest = m[2];               // e.g. districts/和平区.jpg
+    var webp = rest.replace(/\.(jpg|jpeg|png|JPG|JPEG|PNG)$/i, '.webp');
+    return base + 'thumbs/' + webp;
   }
 
   function channelLabel(id) {
@@ -496,6 +511,7 @@ window.JUZHU = (function () {
     fmtRent: fmtRent,
     fmtPriceWan: fmtPriceWan,
     imgBg: imgBg,
+    thumbUrl: thumbUrl,
     asTags: asTags,
     unitTitle: unitTitle,
     unitMeta: unitMeta,

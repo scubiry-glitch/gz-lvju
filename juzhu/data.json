@@ -9,21 +9,21 @@
   "channels": [
     {
       "id": "bzf",
-      "label": "保租房",
+      "label": "保租房专区",
       "sort_order": 1,
       "enabled": 1,
       "note": null
     },
     {
       "id": "trade",
-      "label": "卖旧买新",
+      "label": "卖旧买新专区",
       "sort_order": 2,
       "enabled": 1,
       "note": null
     },
     {
       "id": "jiazheng",
-      "label": "家政",
+      "label": "生活服务专区",
       "sort_order": 3,
       "enabled": 1,
       "note": null

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>新居住 · 南京 · 贝壳</title>
+<title>新居住 · 沈阳 · 贝壳</title>
 <link rel="stylesheet" href="lvju-app.css?v=6">
 <style>
   #navCitySub.city-tap{cursor:pointer;}
@@ -191,7 +191,7 @@
   <div class="scr">
     <div class="appbar ghost" style="position:absolute;">
       <a class="bk" href="beike-app-home.html">‹</a>
-      <div class="ttl">新居住<small id="navCitySub" class="city-tap">南京 · 东博专区</small></div>
+      <div class="ttl">新居住<small id="navCitySub" class="city-tap">沈阳 · 东博专区</small></div>
       <div class="act"><a href="juzhu-channel-schemes.html">≡</a></div>
     </div>
 
@@ -202,21 +202,21 @@
         <h1 id="heroTitle">新居住频道</h1>
         <div class="stat" id="heroStat"></div>
         <div class="seg-switch" id="tabs">
-          <a class="on" data-tab="bzf">保租房</a>
-          <a data-tab="trade">卖旧买新</a>
-          <a data-tab="jiazheng">家政</a>
+          <a class="on" data-tab="bzf">保租房专区</a>
+          <a data-tab="trade">卖旧买新专区</a>
+          <a data-tab="jiazheng">生活服务专区</a>
         </div>
       </div>
     </div>
 
-    <div class="scheme-bar"><span id="schemeLabel">方案 C · 南京真实数据</span><span><a href="javascript:;" id="demoToggle">演示模式：关</a> · <a href="juzhu-channel-schemes.html">切换方案 ›</a></span></div>
+    <div class="scheme-bar"><span id="schemeLabel">方案 C · 沈阳真实数据</span><span><a href="javascript:;" id="demoToggle">演示模式：关</a> · <a href="juzhu-channel-schemes.html">切换方案 ›</a></span></div>
 
     <div class="pane on" id="pane-bzf">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选区租房</h2><span class="more" id="distCount">—</span></div>
       <div class="collage" id="collage"></div>
       <div class="banner">
         <span class="bi">🏛</span>
-        <div class="bt"><b id="bzfBannerTitle">南京保租房 · 东博试点专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
+        <div class="bt"><b id="bzfBannerTitle">沈阳保租房 · 东博试点专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
       </div>
     </div>
 
@@ -271,7 +271,7 @@
   var pad = function(n){ return String(n).padStart(2,'0'); };
 
   function cityOf(d) {
-    return (window.BZF_JZ && BZF_JZ.regionCity()) || (d && d.city && d.city.name) || '南京';
+    return (window.BZF_JZ && BZF_JZ.regionCity()) || (d && d.city && d.city.name) || '沈阳';
   }
 
   function applyChannelChrome(d) {
@@ -304,7 +304,7 @@
     document.getElementById('distCount').textContent = d.stats.district_count + ' 区 ›';
     var bgEl = document.querySelector('.split-hd .bg');
     if (d.city.hero_bg_image) {
-      bgEl.style.backgroundImage = 'url(' + d.city.hero_bg_image + ')';
+      bgEl.style.backgroundImage = 'url(' + JUZHU.thumbUrl(d.city.hero_bg_image) + ')';
       bgEl.classList.add('has-img');
     } else {
       bgEl.style.backgroundImage = '';
@@ -329,7 +329,7 @@
         ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name)
         : '#';
       var bg = d.cover_image
-        ? 'background-image:url('+d.cover_image+');background-size:cover;background-position:center;'
+        ? 'background-image:url('+JUZHU.thumbUrl(d.cover_image)+');background-size:cover;background-position:center;'
         : '';
       var tag = d.is_hot ? '<span class="hot">热门</span>' :
         (!d.has_projects ? '<span class="empty-tag">暂无项目</span>' : '');
@@ -349,7 +349,7 @@
     var hero = list[0];
     var duo = list.slice(1,3);
     var rest = list.slice(3);
-    var hStyle = hero.cover_image ? 'background-image:url('+hero.cover_image+')' : '';
+    var hStyle = hero.cover_image ? 'background-image:url('+JUZHU.thumbUrl(hero.cover_image)+')' : '';
     var html = '<a class="spread-hero" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(hero.slug)+'">'+
       '<div class="img" style="'+hStyle+'">'+
         '<div class="cap"><div class="ek">FEATURED</div><h3>'+hero.name+'</h3>'+
@@ -359,7 +359,7 @@
         '<span class="bk">立即咨询</span></div></a>';
     if (duo.length){
       html += '<div class="spread-duo">'+duo.map(function(x){
-        var st = x.cover_image ? 'background-image:url('+x.cover_image+')' : '';
+        var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : '';
         return '<a class="mini-card" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+'">'+
           '<div class="th" style="'+st+'"></div><div class="bd"><b>'+x.name+'</b>'+
           '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+x.unit_count+' 户型</div>'+
@@ -369,9 +369,9 @@
     if (rest.length){
       html += '<div class="sec-h" style="padding-left:0;margin-top:18px;"><span class="bar"></span><h2>更多置换</h2></div>';
       html += rest.map(function(x){
-        var st = x.cover_image ? 'background-image:url('+x.cover_image+')' : 'class="'+x.slug+'"';
+        var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : 'class="'+x.slug+'"';
         return '<a class="lrow" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+'">'+
-          '<div class="th" style="'+(x.cover_image?'background-image:url('+x.cover_image+');background-size:cover;background-position:center;':'')+'">'+
+          '<div class="th" style="'+(x.cover_image?'background-image:url('+JUZHU.thumbUrl(x.cover_image)+');background-size:cover;background-position:center;':'')+'">'+
           '<span class="star">置换</span></div><div class="info"><div class="nm">'+x.name+'</div>'+
           '<div class="meta">'+(x.address||'')+' · '+x.unit_count+' 户型</div>'+
           '<div class="pr"><b>'+x.price_from+'<small>万起</small></b><span class="unit">'+(x.old_house_hint||'')+'</span></div></div></a>';
@@ -571,6 +571,13 @@
 
   JUZHU.load().then(function(d) {
     lastData = d;
+    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准
+    if (window.BZF_JZ && d.city && d.city.name) {
+      var storedCity = BZF_JZ.regionCity();
+      if (storedCity !== d.city.name) {
+        BZF_JZ.setRegionCity(d.city.name);
+      }
+    }
     paintTabs();
     renderHero(d);
     renderCollage(JUZHU.districts());

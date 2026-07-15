@@ -342,12 +342,12 @@ def ensure_channels(conn):
               enabled INTEGER NOT NULL DEFAULT 1,
               note TEXT
             );
-            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房', 1, 1);
-            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新', 2, 1);
+            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房专区', 1, 1);
+            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新专区', 2, 1);
             """
         )
     else:
-        defaults = [("bzf", "保租房", 1), ("trade", "卖旧买新", 2), ("jiazheng", "家政", 3)]
+        defaults = [("bzf", "保租房专区", 1), ("trade", "卖旧买新专区", 2), ("jiazheng", "生活服务专区", 3)]
         for cid, label, order in defaults:
             if not conn.execute("SELECT 1 FROM channels WHERE id=?", (cid,)).fetchone():
                 conn.execute(
