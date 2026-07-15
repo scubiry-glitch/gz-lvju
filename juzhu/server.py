@@ -406,6 +406,8 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(rf"^{ADMIN_PREFIX}/units/(\d+)$", path)
         if m:
             uid = int(m.group(1))
+            if method == "GET":
+                return self._get_unit(uid)
             if method == "PUT":
                 return self._update_unit(uid)
             if method == "DELETE":
@@ -1598,6 +1600,19 @@ class Handler(SimpleHTTPRequestHandler):
         unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
         conn.close()
         return self._json({"ok": True, "unit": unit}, 201)
+
+    def _get_unit(self, uid):
+        conn = connect()
+        unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
+        if not unit:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        photos = rows_to_list(conn.execute(
+            "SELECT * FROM photos WHERE entity_type='unit' AND entity_id=? ORDER BY sort_order",
+            (uid,),
+        ))
+        conn.close()
+        return self._json({"unit": unit, "photos": photos})
 
     def _update_unit(self, uid):
         b = self._body()

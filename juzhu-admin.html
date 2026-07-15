@@ -592,14 +592,12 @@ function renderProjectList() {
   });
 }
 
-function openProject(id, expandedAfter, detailAfter) {
+function openProject(id, expandedAfter) {
   state.mode = 'edit';
   if (expandedAfter !== undefined) {
     state.expandedUnit = expandedAfter;
-    state.expandedDetail = detailAfter != null ? detailAfter : null;
   } else {
     state.expandedUnit = null;
-    state.expandedDetail = null;
   }
   api('/projects/'+id).then(function(res) {
     state.current = res.project;
@@ -1147,14 +1145,11 @@ function renderUnits(isTrade) {
       '<td><input class="u_price" type="number" value="'+priceVal+'"/></td>'+
       '<td><input class="u_sort" type="number" value="'+(u.sort_order||0)+'"/></td>'+
       '<td><button type="button" class="btn link u_photos">'+pc+' 张 ›</button></td>'+
-      '<td><button type="button" class="btn link u_detail">编辑 ›</button></td>'+
+      '<td><a class="btn link u_detail" href="juzhu-admin-unit.html?unit_id='+u.id+'" target="_blank">编辑 ›</a></td>'+
       '<td class="acts"><button class="btn primary u_save">保存</button><button class="btn danger u_del">删</button></td>'+
     '</tr>';
     if (state.expandedUnit === u.id) {
       html += '<tr class="unit-photos-row"><td colspan="9">'+renderPhotoPanel(u.id)+'</td></tr>';
-    }
-    if (state.expandedDetail === u.id) {
-      html += '<tr class="unit-detail-row"><td colspan="9">'+renderUnitDetailPanel(u)+'</td></tr>';
     }
   });
   tbody.innerHTML = html;
@@ -1165,19 +1160,11 @@ function renderUnits(isTrade) {
     tr.querySelector('.u_del').onclick = function(){ deleteUnit(id); };
     tr.querySelector('.u_photos').onclick = function(){
       state.expandedUnit = state.expandedUnit === id ? null : id;
-      if (state.expandedUnit === id) state.expandedDetail = null;
       renderUnits(isTrade);
       if (state.expandedUnit === id) bindPhotoPanel(id);
     };
-    tr.querySelector('.u_detail').onclick = function(){
-      state.expandedDetail = state.expandedDetail === id ? null : id;
-      if (state.expandedDetail === id) state.expandedUnit = null;
-      renderUnits(isTrade);
-      if (state.expandedDetail === id) bindUnitDetailPanel(id);
-    };
   });
   if (state.expandedUnit) bindPhotoPanel(state.expandedUnit);
-  if (state.expandedDetail) bindUnitDetailPanel(state.expandedDetail);
 }
 
 function saveProject() {
@@ -1210,7 +1197,7 @@ function deleteProject() {
   }).catch(function(e){ toast('删除失败：'+e.message); });
 }
 
-function saveUnit(tr, id, isTrade, fromDetail) {
+function saveUnit(tr, id, isTrade) {
   var body = {
     name: tr.querySelector('.u_name').value.trim(),
     area_sqm: parseFloat(tr.querySelector('.u_area').value) || null,
@@ -1221,23 +1208,10 @@ function saveUnit(tr, id, isTrade, fromDetail) {
   if (isTrade) body.price_total = pv ? +pv : null;
   else body.rent_monthly = pv ? +pv : null;
 
-  var panel = document.querySelector('[data-unit-detail="'+id+'"]');
-  if (panel && (fromDetail || state.expandedDetail === id)) {
-    var extra = collectUnitDetail(panel);
-    body.tags = extra.tags;
-    body.unit_spec = extra.unit_spec;
-    body.promo_price = extra.promo_price;
-    body.amenities = extra.amenities;
-    body.keeper = extra.keeper;
-    body.rent_detail = extra.rent_detail;
-  }
-
   api('/units/'+id, { method:'PUT', body: body }).then(function(res) {
-    toast(fromDetail ? '详情已保存' : '房源已保存');
-    // 重新加载项目数据以确保 state 和 DOM 完全同步
-    // 保留当前展开状态
-    var keepU = state.expandedUnit, keepD = state.expandedDetail;
-    openProject(state.current.id, keepU, keepD);
+    toast('房源已保存');
+    var keepU = state.expandedUnit;
+    openProject(state.current.id, keepU);
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 
