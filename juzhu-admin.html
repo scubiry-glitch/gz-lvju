@@ -1234,19 +1234,10 @@ function saveUnit(tr, id, isTrade, fromDetail) {
 
   api('/units/'+id, { method:'PUT', body: body }).then(function(res) {
     toast(fromDetail ? '详情已保存' : '房源已保存');
-    // 局部更新 state.units 中该行，避免全量 openProject 引起其他正在编辑行的本地修改被覆盖
-    if (res && res.unit) {
-      for (var i = 0; i < state.units.length; i++) {
-        if (state.units[i].id === id) {
-          state.units[i] = res.unit;
-          break;
-        }
-      }
-    } else {
-      // 后端没返回 unit，降级为 reload（但要保留 expanded 状态）
-      var keepU = state.expandedUnit, keepD = state.expandedDetail;
-      openProject(state.current.id, keepU, keepD);
-    }
+    // 重新加载项目数据以确保 state 和 DOM 完全同步
+    // 保留当前展开状态
+    var keepU = state.expandedUnit, keepD = state.expandedDetail;
+    openProject(state.current.id, keepU, keepD);
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
 

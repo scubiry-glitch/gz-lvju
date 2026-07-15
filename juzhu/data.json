@@ -69,7 +69,7 @@
       "unit_count": 5,
       "vacant_count": 5,
       "managed_unit_count": 287,
-      "avg_price": 1513,
+      "avg_price": 1539,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
@@ -852,7 +852,7 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "近地铁",
+        "建融家园",
         "精致小户型",
         "押一付一",
         "租金受控",
@@ -928,11 +928,11 @@
     {
       "id": 2,
       "project_id": 1,
-      "name": "40平",
-      "slug": "40平",
+      "name": "40 平",
+      "slug": "40-平",
       "area_sqm": 40.0,
       "layout_label": null,
-      "rent_monthly": 1550,
+      "rent_monthly": 1680,
       "price_total": null,
       "tags": [
         "政府保租房",
