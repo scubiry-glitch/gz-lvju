@@ -231,7 +231,7 @@
       "sort_order": 1,
       "unit_count": 3,
       "managed_unit_count": 175,
-      "price_from": 1440,
+      "price_from": 1500,
       "is_featured": 0,
       "featured_rank": null,
       "old_house_hint": null,
@@ -844,8 +844,8 @@
     {
       "id": 1,
       "project_id": 1,
-      "name": "测试户2型2",
-      "slug": "测试户2型2",
+      "name": "30 平",
+      "slug": "30-平",
       "area_sqm": 30.0,
       "layout_label": null,
       "rent_monthly": 1440,
@@ -3644,7 +3644,7 @@
       "entity_id": 3,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/和平区/CCB建融家园中华路店/56平/43e0a33ebc3f1c8fcbeff213799c54a8.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 0
     },
     {
@@ -3671,7 +3671,7 @@
       "entity_id": 3,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_3.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/和平区/CCB建融家园中华路店/56平/d30e816aa02fb1c7f757eaf5165eed42.jpg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 3
     },
     {

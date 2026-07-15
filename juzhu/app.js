@@ -6,6 +6,8 @@ window.JUZHU = (function () {
     if (cache) return Promise.resolve(cache);
     var url = 'juzhu/data.json';
     if (location.pathname.indexOf('/juzhu/') !== -1) url = 'data.json';
+    // Cache-bust: append last-modified timestamp from the server to avoid stale JSON
+    url += '?t=' + Math.floor(Date.now() / 60000); // per-minute granularity
     return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('data load failed');
       return r.json();
