@@ -280,20 +280,38 @@ function toast(msg) {
   setTimeout(function(){ el.classList.remove('show'); }, 2400);
 }
 
+function getApiKey() {
+  try { return localStorage.getItem('JUZHU_API_KEY') || 'dev-juzhu-key'; } catch(e) { return 'dev-juzhu-key'; }
+}
+
 function api(path, opts) {
   opts = opts || {};
+  var headers = opts.body ? {'Content-Type':'application/json'} : {};
+  var key = getApiKey();
+  if (key) headers['X-API-Key'] = key;
   return fetch(API + path, {
     method: opts.method || 'GET',
-    headers: opts.body ? {'Content-Type':'application/json'} : {},
+    headers: headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function(r) {
+    if (r.status === 401) {
+      // API key 失效，提示输入新 key
+      var newKey = prompt('API Key 无效，请输入新的 Key（留空用默认值）：');
+      if (newKey !== null) {
+        try { localStorage.setItem('JUZHU_API_KEY', newKey || 'dev-juzhu-key'); } catch(e) {}
+      }
+      throw new Error('认证失败，已更新 Key，请重试');
+    }
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
 }
 
 function uploadForm(path, formData) {
-  return fetch(API + path, { method: 'POST', body: formData }).then(function(r) {
+  var headers = {};
+  var key = getApiKey();
+  if (key) headers['X-API-Key'] = key;
+  return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
