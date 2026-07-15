@@ -851,13 +851,8 @@
       "rent_monthly": 1440,
       "price_total": null,
       "tags": [
-        "政府保租房",
-        "建融家园",
-        "精致小户型",
-        "押一付一",
-        "租金受控",
-        "拎包入住",
-        "好房子4星"
+        "AAA",
+        "政府保租房"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -935,12 +930,8 @@
       "rent_monthly": 1680,
       "price_total": null,
       "tags": [
-        "政府保租房",
-        "建融家园",
-        "押一付一",
-        "租金受控",
-        "拎包入住",
-        "好房子4星"
+        "BBB",
+        "政府保租房"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -953,7 +944,6 @@
         "wifi",
         "tv",
         "hood",
-        "microwave",
         "induction"
       ],
       "keeper": {

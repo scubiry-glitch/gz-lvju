@@ -313,7 +313,9 @@ def ensure_schema(conn):
             if col not in unit_cols:
                 conn.execute(sql)
         ensure_unit_amenities(conn)
-        ensure_unit_tags(conn)
+        # NOTE: ensure_unit_tags removed from here - it was overwriting
+        # user-edited tags on every connect(). Tags are now only set during
+        # initial seed or explicit admin edit.
     ensure_channels(conn)
     ensure_jiazheng_schema(conn)
     ensure_jz_vendor_schema(conn)

@@ -1624,9 +1624,6 @@ class Handler(SimpleHTTPRequestHandler):
         pid = row[0]
 
         # 局部更新：只写「请求体里出现过的字段」，缺失字段保持原值不动。
-        # 关键修复：主行「快速保存」只发 name/area/layout/price/sort，不含
-        # cover_image / unit_spec / promo_price；旧逻辑用「=?」硬写会把这些字段
-        # 抹成 NULL，导致房源封面、规格、促销价被清空（多条分别保存后看似「失效」）。
         sets, vals = [], []
 
         def put(col, val):
