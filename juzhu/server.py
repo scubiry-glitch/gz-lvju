@@ -1067,9 +1067,9 @@ class Handler(SimpleHTTPRequestHandler):
         if not proj:
             conn.close()
             return self._json({"error": "not found"}, 404)
-        units = rows_to_list(conn.execute(
+        units = [normalize_unit_row(u) for u in rows_to_list(conn.execute(
             "SELECT * FROM units WHERE project_id=? ORDER BY sort_order", (pid,)
-        ))
+        ))]
         photos = rows_to_list(conn.execute(
             """SELECT * FROM photos WHERE entity_type='unit'
                AND entity_id IN (SELECT id FROM units WHERE project_id=?)

@@ -65,7 +65,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="juzhu/app.js?v=9"></script>
+<script src="juzhu/app.js?v=13"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -84,7 +84,7 @@
     document.getElementById('s4').textContent = d.avg_price ? ('¥'+d.avg_price) : '—';
     var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
     document.getElementById('ttl').innerHTML = bizTerm+'<small>'+d.name+'</small>';
-    if (d.cover_image) document.getElementById('dBg').style.backgroundImage = 'url('+d.cover_image+')';
+    if (d.cover_image) document.getElementById('dBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(d.cover_image)+')';
 
     var projs = JUZHU.projects({ channel: 'bzf', district_id: d.id });
     if (!projs.length) {
@@ -94,7 +94,7 @@
 
     document.getElementById('list').innerHTML = projs.map(function(p){
       var tags = (p.tags || []).map(function(t){ return '<span>'+t+'</span>'; }).join('');
-      var th = p.cover_image ? 'background-image:url('+p.cover_image+')' : '';
+      var th = p.cover_image ? 'background-image:url('+JUZHU.thumbUrl(p.cover_image)+')' : '';
       return '<a class="pcard" href="juzhu-bzf-project.html?project='+encodeURIComponent(p.slug)+'">'+
         '<div class="th" style="'+th+'"></div>'+
         '<div class="info"><div class="nm">'+p.name+'</div>'+
