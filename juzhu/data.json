@@ -851,8 +851,13 @@
       "rent_monthly": 1440,
       "price_total": null,
       "tags": [
-        "AAA",
-        "政府保租房"
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -865,7 +870,7 @@
         "wifi",
         "tv",
         "hood",
-        "microwave"
+        "induction"
       ],
       "keeper": {
         "name": "",
@@ -918,7 +923,7 @@
         ]
       },
       "sort_order": 1,
-      "cover_image": null
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg"
     },
     {
       "id": 2,
@@ -930,8 +935,12 @@
       "rent_monthly": 1680,
       "price_total": null,
       "tags": [
-        "BBB",
-        "政府保租房"
+        "政府保租房",
+        "近地铁",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -944,6 +953,7 @@
         "wifi",
         "tv",
         "hood",
+        "microwave",
         "induction"
       ],
       "keeper": {
@@ -997,7 +1007,7 @@
         ]
       },
       "sort_order": 2,
-      "cover_image": null
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg"
     },
     {
       "id": 3,
@@ -1010,7 +1020,7 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "建融家园",
+        "近地铁",
         "押一付一",
         "租金受控",
         "拎包入住",
@@ -1081,7 +1091,7 @@
         ]
       },
       "sort_order": 3,
-      "cover_image": null
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_3.jpg"
     },
     {
       "id": 4,
@@ -1094,7 +1104,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "精致小户型",
         "押一付一",
         "租金受控",
@@ -1114,8 +1123,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "23平 23㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1384,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1384
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1384,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1384
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg"
     },
@@ -1130,7 +1187,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "精致小户型",
         "押一付一",
         "租金受控",
@@ -1150,8 +1206,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "32平 32㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1486,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1486
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1486,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1486
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg"
     },
@@ -1435,7 +1539,7 @@
       "keeper": null,
       "rent_detail": null,
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平_0.jpg"
     },
     {
       "id": 14,
@@ -1470,7 +1574,7 @@
       "keeper": null,
       "rent_detail": null,
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_3.jpg"
     },
     {
       "id": 15,
@@ -1483,7 +1587,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
@@ -1504,8 +1607,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "23平 23㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1384,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1384
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1384,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1384
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg"
     },
@@ -1520,7 +1671,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
@@ -1541,8 +1691,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "32平 32㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1486,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1486
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1486,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1486
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg"
     },
@@ -1967,7 +2165,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
@@ -1988,8 +2185,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "35平 35㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1480,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1480
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1480,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1480
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg"
     },
@@ -2004,7 +2249,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "建融家园",
         "近地铁",
         "押一付一",
         "租金受控",
@@ -2024,8 +2268,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "60平 60㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1710,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1710
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1710,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1710
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg"
     },
@@ -2604,7 +2896,7 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
+        "近地铁",
         "押一付一",
         "租金受控",
         "拎包入住"
@@ -2623,8 +2915,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "44 44㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1552,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1552
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1552,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1552
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png"
     },
@@ -3598,7 +3938,7 @@
       "entity_id": 2,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_2.jpeg",
       "source_path": "90d81d86986f5026761aa6ec6af7ea59.jpeg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 2
     },
     {
@@ -3625,7 +3965,7 @@
       "entity_id": 2,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": "8fab138479e64c744604017c9403fda4.jpeg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 5
     },
     {
@@ -4039,7 +4379,7 @@
       "entity_id": 14,
       "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_3.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/e152e3ec2659bf42050489a56117afad.jpg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -4066,7 +4406,7 @@
       "entity_id": 14,
       "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_0.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/425016016f88c558a12acc14514d079e.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 3
     },
     {

@@ -1711,6 +1711,18 @@ class Handler(SimpleHTTPRequestHandler):
                     district_name = row["name"] if row else ""
                 project_name = mp["fields"].get("project_name") or "新项目"
                 rel = project_cover_rel_draft(channel, district_name, project_name, ext)
+            elif scope == "unit_cover":
+                uid = int(mp["fields"].get("unit_id") or 0)
+                if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+                    conn.close()
+                    return self._json({"error": "unit not found"}, 404)
+                row = conn.execute(
+                    "SELECT u.name AS unit_name, p.name AS project_name, p.channel "
+                    "FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?",
+                    (uid,),
+                ).fetchone()
+                unit_name = safe_path_name(row["unit_name"]) if row else f"unit_{uid}"
+                rel = Path(ASSETS_PREFIX) / "units" / (row["channel"] or "bzf") / safe_path_name(row["project_name"] or "project") / f"{unit_name}{ext}"
             elif scope == "unit_gallery":
                 uid = int(mp["fields"].get("unit_id") or 0)
                 rel = unit_gallery_rel(conn, uid, ext)
@@ -1786,6 +1798,7 @@ class Handler(SimpleHTTPRequestHandler):
         photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1828,6 +1841,7 @@ class Handler(SimpleHTTPRequestHandler):
         photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1870,6 +1884,7 @@ class Handler(SimpleHTTPRequestHandler):
         )
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1888,6 +1903,7 @@ class Handler(SimpleHTTPRequestHandler):
         conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         conn.close()
         return self._json({"ok": True})

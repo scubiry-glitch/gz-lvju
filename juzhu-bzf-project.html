@@ -24,6 +24,11 @@
   .ucard .bd{padding:11px 13px 13px;}
   .ucard .bd .nm{font-weight:700;font-size:14px;color:var(--ink);}
   .ucard .bd .meta{font-size:11px;color:var(--muted);margin-top:3px;}
+  .ucard .bd .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .ucard .bd .tags span{font-size:10px;padding:3px 8px;border-radius:6px;background:#f1f5f4;color:var(--ink);font-weight:500;}
+  .ucard .bd .tags span.primary{background:var(--brand);color:#fff;font-weight:600;}
+  .ucard .bd .tags span.accent{background:var(--brand-soft);color:var(--brand);font-weight:600;}
+  .ucard .bd .tags span.gold{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-weight:600;}
   .ucard .bd .pr{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
   .ucard .bd .pr b{font-family:var(--serif);font-size:18px;color:var(--gold-deep);}
   .ucard .bd .pr .go{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:6px 14px;border-radius:999px;}
@@ -83,12 +88,14 @@
       var title = JUZHU.unitTitle(u);
       var meta = JUZHU.unitMeta(u);
       var metaHtml = meta ? '<div class="meta">'+meta+'</div>' : '';
+      var tags = JUZHU.unitDisplayTags(u, p);
+      var tagsHtml = tags.length ? '<div class="tags">'+JUZHU.unitTagsHtml(tags)+'</div>' : '';
       var price = isTrade
         ? ('<b>'+u.price_total+'<small style="font-size:10px;color:var(--muted)"> 万起</small></b>')
         : ('<b>'+JUZHU.fmtRent(u.rent_monthly)+'<small style="font-size:10px;color:var(--muted)">/月</small></b>');
       return '<a class="ucard" href="juzhu-unit-detail.html?project='+encodeURIComponent(p.slug)+'&unit='+encodeURIComponent(u.slug)+'&channel='+channel+'">'+
         '<div class="img" style="'+img+'">'+hrChip+'</div>'+
-        '<div class="bd"><div class="nm">'+title+'</div>'+metaHtml+
+        '<div class="bd"><div class="nm">'+title+'</div>'+metaHtml+tagsHtml+
         '<div class="pr">'+price+'<span class="go">查看详情</span></div></div></a>';
     }).join('');
   });
