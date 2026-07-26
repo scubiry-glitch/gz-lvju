@@ -803,7 +803,7 @@
       "sort_order": 2,
       "unit_count": 4,
       "managed_unit_count": null,
-      "price_from": 95,
+      "price_from": 119,
       "is_featured": 0,
       "featured_rank": 2,
       "old_house_hint": "旧房估价参考 55万起",
@@ -2717,7 +2717,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "近地铁",
         "精致小户型",
         "押一付一",
@@ -2738,8 +2737,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "35平 35㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1480,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1480
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1480,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1480
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png"
     },
@@ -2754,7 +2801,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "近地铁",
         "押一付一",
         "租金受控",
@@ -2774,8 +2820,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "45平 45㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1590,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1590
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1590,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1590
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png"
     },
@@ -2790,7 +2884,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "近地铁",
         "押一付一",
         "租金受控",
@@ -2810,8 +2903,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "75平 75㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1860,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1860
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1860,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1860
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg"
     },
@@ -3014,7 +3155,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
@@ -3033,10 +3173,58 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "40平 40㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1520,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1520
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1520,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1520
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平.png"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_3.png"
     },
     {
       "id": 50,
@@ -3049,7 +3237,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
@@ -3068,8 +3255,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "59平 59㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1702,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1702
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1702,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1702
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg"
     },
@@ -3084,7 +3319,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
@@ -3103,10 +3337,58 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "61平 61㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1748,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1748
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1748,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1748
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平.jpg"
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_4.jpg"
     },
     {
       "id": 52,
@@ -3191,7 +3473,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
@@ -3210,8 +3491,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "40平 40㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1520,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1520
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1520,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1520
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png"
     },
@@ -3296,7 +3625,6 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "逸居",
         "宽敞大户型",
         "押一付一",
         "租金受控",
@@ -3316,8 +3644,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "107 107㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 2056,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2056
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 2056,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2056
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg"
     },
@@ -3401,8 +3777,8 @@
       "price_total": 119,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "近地铁",
+        "近公园"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3418,8 +3794,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "70 70㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg"
     },
@@ -3434,8 +3858,8 @@
       "price_total": 123,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "近地铁",
+        "近公园"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3451,8 +3875,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "80 80㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg"
     },
@@ -3467,8 +3939,8 @@
       "price_total": 124,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "近地铁",
+        "近公园"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3484,8 +3956,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "85 85㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 3,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg"
     },
@@ -3500,8 +4020,8 @@
       "price_total": 126,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "近地铁",
+        "近公园"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3517,8 +4037,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "90 90㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 4,
       "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg"
     },
@@ -3533,8 +4101,10 @@
       "price_total": 206,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "精装修",
+        "一环",
+        "双地铁",
+        "双学校"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3550,8 +4120,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "110平 110㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 1,
       "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg"
     },
@@ -3566,8 +4184,10 @@
       "price_total": 216,
       "tags": [
         "卖旧买新",
-        "以旧换新",
-        "试点房源"
+        "精装修",
+        "一环",
+        "双地铁",
+        "双学校"
       ],
       "unit_spec": null,
       "promo_price": null,
@@ -3583,8 +4203,56 @@
         "microwave",
         "induction"
       ],
-      "keeper": null,
-      "rent_detail": null,
+      "keeper": {
+        "name": "",
+        "avatar": "",
+        "phone": ""
+      },
+      "rent_detail": {
+        "room_label": "139平 139㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": null,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": null
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
       "sort_order": 2,
       "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg"
     }
@@ -6107,7 +6775,7 @@
       "entity_id": 49,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_0.png",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/40平/2.png",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 0
     },
     {
@@ -6134,7 +6802,7 @@
       "entity_id": 49,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_3.png",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/40平/ebd0504f206a7411a514d2ac6f8b3924.jpg.png",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 3
     },
     {
@@ -6188,7 +6856,7 @@
       "entity_id": 51,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_0.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/61平/280a5dfb389d7c5188387ff74f874c05.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 0
     },
     {
@@ -6224,7 +6892,7 @@
       "entity_id": 51,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_4.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/61平/cd1e8649155a8397bf2048e6498f18fe.jpg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 4
     },
     {
