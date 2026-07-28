@@ -24,7 +24,7 @@
   .city-sheet .grid a{padding:11px 6px;border-radius:12px;background:#f5f7f6;border:1px solid transparent;text-align:center;font-size:13px;color:var(--ink);cursor:pointer;}
   .city-sheet .grid a.allp{grid-column:1 / -1;background:#fff;border:1px dashed #cbd5cf;color:var(--brand);font-weight:600;}
   .city-sheet .grid a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;border-color:transparent;}
-  .scheme-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0;font-size:10px;color:var(--muted);position:relative;z-index:5;}
+  .scheme-bar{display:none !important;}
   .scheme-bar a{color:var(--brand);font-weight:600;}
   .split-hd{position:relative;padding:52px 18px 20px;color:#fff;overflow:hidden;}
   .split-hd .bg{position:absolute;inset:0;background:linear-gradient(135deg,#0b5d56,#1a4038 50%,#8c6224);}
@@ -191,7 +191,7 @@
   <div class="scr">
     <div class="appbar ghost" style="position:absolute;">
       <a class="bk" href="beike-app-home.html">‹</a>
-      <div class="ttl">新居住<small id="navCitySub" class="city-tap">沈阳 · 东博专区</small></div>
+      <div class="ttl">新居住<small id="navCitySub" class="city-tap">沈阳 · 新居住专区</small></div>
       <div class="act"><a href="juzhu-channel-schemes.html">≡</a></div>
     </div>
 
@@ -216,7 +216,7 @@
       <div class="collage" id="collage"></div>
       <div class="banner">
         <span class="bi">🏛</span>
-        <div class="bt"><b id="bzfBannerTitle">沈阳保租房 · 东博试点专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
+        <div class="bt"><b id="bzfBannerTitle">沈阳保租房 · 新居住专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
       </div>
     </div>
 
@@ -278,9 +278,9 @@
     var city = cityOf(d);
     var op = (window.BZF_JZ && BZF_JZ.regionOperator()) || '贝壳';
     var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
-    document.getElementById('navCitySub').textContent = city + ' · 东博专区';
+    document.getElementById('navCitySub').textContent = city + ' · 新居住专区';
     document.getElementById('schemeLabel').textContent = '方案 C · ' + city + '真实数据';
-    document.getElementById('bzfBannerTitle').textContent = city + bizTerm + ' · 东博试点专区';
+    document.getElementById('bzfBannerTitle').textContent = city + bizTerm + ' · 新居住专区';
     document.getElementById('heroEk').textContent = 'Cover Collage · ' + city;
     document.title = '新居住 · ' + city + ' · ' + op;
   }
@@ -557,6 +557,20 @@
     document.getElementById('citySheet').classList.remove('on');
   }
   document.getElementById('navCitySub').addEventListener('click', openCitySheet);
+  // —— 后端配置：读取 settings 控制城市切换器显隐 ——
+  (function(){
+    fetch('/api/juzhu/settings').then(function(r){ return r.json(); }).then(function(s){
+      if (!s.show_city_switcher) {
+        var sub = document.getElementById('navCitySub');
+        if (sub) { sub.classList.remove('city-tap'); sub.style.cursor = 'default'; }
+        var sheet = document.getElementById('citySheet');
+        if (sheet) {
+          sheet.style.display = 'none';
+          sheet.classList.remove('on');
+        }
+      }
+    }).catch(function(){});
+  })();
   document.getElementById('citySheet').addEventListener('click', function(e) {
     if (e.target.hasAttribute('data-close')) { closeCitySheet(); return; }
     var prov = e.target.closest('[data-prov]');
@@ -569,7 +583,8 @@
     closeCitySheet();
   });
 
-  JUZHU.load().then(function(d) {
+  Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
+    var d = results[0];
     lastData = d;
     // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准
     if (window.BZF_JZ && d.city && d.city.name) {

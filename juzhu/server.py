@@ -448,6 +448,16 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"districts": d, "projects_bzf": pb, "projects_trade": pt, "units": u})
 
+        if path == "/api/juzhu/settings":
+            settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings").fetchall()}
+            row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+            conn.close()
+            return self._json({
+                "booking_phone": row[0] if row else None,
+                "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
+                "show_life_service": settings.get("show_life_service", "1") == "1",
+            })
+
         if path == "/api/juzhu/districts":
             data = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order"))
             conn.close()
@@ -1911,17 +1921,31 @@ class Handler(SimpleHTTPRequestHandler):
     def _get_settings(self):
         conn = connect()
         row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+        settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings").fetchall()}
         conn.close()
-        return self._json({"booking_phone": row[0] if row else None})
+        return self._json({
+            "booking_phone": row[0] if row else None,
+            "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
+            "show_life_service": settings.get("show_life_service", "1") == "1",
+        })
 
     def _update_settings(self):
         body = self._body()
         phone = (body.get("booking_phone") or "").strip() or None
         conn = connect()
-        conn.execute(
-            "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
-            (phone,),
-        )
+        if phone is not None:
+            conn.execute(
+                "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
+                (phone,),
+            )
+        bool_keys = ["show_city_switcher", "show_life_service"]
+        for k in bool_keys:
+            if k in body:
+                v = "1" if body.get(k) else "0"
+                conn.execute(
+                    "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (k, v),
+                )
         conn.commit()
         export_json(conn)
         conn.close()

@@ -319,6 +319,7 @@ def ensure_schema(conn):
     ensure_channels(conn)
     ensure_jiazheng_schema(conn)
     ensure_jz_vendor_schema(conn)
+    ensure_settings(conn)
     conn.commit()
 
 
@@ -330,6 +331,29 @@ def ensure_jz_vendor_schema(conn):
     product_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_products)").fetchall()}
     if product_cols and "channel_sku_id" not in product_cols:
         conn.execute("ALTER TABLE jz_products ADD COLUMN channel_sku_id INTEGER")
+
+
+def ensure_settings(conn):
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "settings" not in tables:
+        conn.executescript(
+            """
+            CREATE TABLE settings (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            );
+            INSERT INTO settings(key, value) VALUES ('show_city_switcher', '1');
+            INSERT INTO settings(key, value) VALUES ('show_life_service', '1');
+            """
+        )
+    else:
+        defaults = {
+            'show_city_switcher': '1',
+            'show_life_service': '1',
+        }
+        for k, v in defaults.items():
+            if not conn.execute("SELECT 1 FROM settings WHERE key=?", (k,)).fetchone():
+                conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)", (k, v))
 
 
 def ensure_channels(conn):
@@ -896,6 +920,7 @@ def export_json(conn=None):
                 normalize_jz_sku_row(r)
                 for r in rows("SELECT * FROM jz_skus WHERE enabled=1 ORDER BY category_id, sort_order, id")
             ],
+            "settings": {r["key"]: r["value"] for r in rows("SELECT key, value FROM settings")},
         }
         JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         return data
