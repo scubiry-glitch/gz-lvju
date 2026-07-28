@@ -147,7 +147,24 @@
       <input type="tel" id="bookingPhone" placeholder="如 400-888-8888 或 024-12345678" />
     </div>
     <div class="bar">
-      <button type="button" class="btn primary" id="btnSaveSettings">保存电话</button>
+      <button type="button" class="btn primary" id="btnSaveSettings">保存设置</button>
+    </div>
+    <h2 style="margin-top:24px;">前端开关</h2>
+    <p class="hint">控制首页各模块显隐，保存后立即生效。</p>
+    <div class="fld" style="margin-top:14px;">
+      <label style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="toggleCitySwitcher" />
+        <span>显示城市切换器（左上角）</span>
+      </label>
+    </div>
+    <div class="fld" style="margin-top:8px;">
+      <label style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="toggleLifeService" />
+        <span>显示生活服务专区</span>
+      </label>
+    </div>
+    <div class="bar">
+      <button type="button" class="btn primary" id="btnSaveToggles">保存开关</button>
     </div>
   </div>
 </div>
@@ -1240,6 +1257,16 @@ function numVal(id) {
 
 function loadSettings() {
   document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
+  // 加载前端开关
+  if (state.apiOk) {
+    api('/settings').then(function(s) {
+      document.getElementById('toggleCitySwitcher').checked = s.show_city_switcher !== false;
+      document.getElementById('toggleLifeService').checked = s.show_life_service !== false;
+    }).catch(function(){});
+  } else {
+    document.getElementById('toggleCitySwitcher').checked = true;
+    document.getElementById('toggleLifeService').checked = true;
+  }
   return Promise.resolve();
 }
 
@@ -1249,6 +1276,15 @@ document.getElementById('btnSaveSettings').onclick = function() {
   api('/settings', { method: 'PUT', body: { booking_phone: phone || null } }).then(function(res) {
     if (state.city) state.city.booking_phone = res.booking_phone;
     toast('咨询电话已保存');
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+};
+
+document.getElementById('btnSaveToggles').onclick = function() {
+  if (!state.apiOk) { toast('请先启动后端服务'); return; }
+  var cityOn = document.getElementById('toggleCitySwitcher').checked;
+  var lifeOn = document.getElementById('toggleLifeService').checked;
+  api('/settings', { method: 'PUT', body: { show_city_switcher: cityOn, show_life_service: lifeOn } }).then(function() {
+    toast('开关已保存：城市切换器 ' + (cityOn ? '显示' : '隐藏') + '，生活服务 ' + (lifeOn ? '显示' : '隐藏'));
   }).catch(function(e){ toast('保存失败：'+e.message); });
 };
 
