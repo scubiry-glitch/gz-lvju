@@ -65,7 +65,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="juzhu/app.js?v=13"></script>
+<script src="juzhu/app.js?v=15"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -95,7 +95,7 @@
     document.getElementById('list').innerHTML = projs.map(function(p){
       var tags = (p.tags || []).map(function(t){ return '<span>'+t+'</span>'; }).join('');
       var th = p.cover_image ? 'background-image:url('+JUZHU.thumbUrl(p.cover_image)+')' : '';
-      return '<a class="pcard" href="juzhu-bzf-project.html?project='+encodeURIComponent(p.slug)+'">'+
+      return '<a class="pcard" href="juzhu-bzf-project.html?project='+encodeURIComponent(p.slug)+JUZHU.chainQS()+'"'>+
         '<div class="th" style="'+th+'"></div>'+
         '<div class="info"><div class="nm">'+p.name+'</div>'+
         '<div class="meta">房源量 '+JUZHU.managedUnits(p)+' · '+p.unit_count+' 个户型 · '+(p.address||'')+'</div>'+

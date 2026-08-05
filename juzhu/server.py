@@ -438,19 +438,35 @@ class Handler(SimpleHTTPRequestHandler):
 
         return self._json({"error": "unknown route", "path": path}, 404)
 
+    def _city_id(self, conn, qs):
+        """可选 ?city= 参数（城市名或 slug）→ city_id；未传或未匹配返回 None（= 全部城市）"""
+        vals = qs.get("city") or []
+        if not vals or not vals[0]:
+            return None
+        row = conn.execute("SELECT id FROM cities WHERE name=? OR slug=?", (vals[0], vals[0])).fetchone()
+        return row[0] if row else None
+
     def _public_get(self, path, qs):
         conn = connect()
+        city_id = self._city_id(conn, qs)
+        def city_filter(col="city_id"):
+            return f" AND {col}=?" if city_id else ""
+        def city_params():
+            return (city_id,) if city_id else ()
         if path == "/api/juzhu/stats":
-            d = conn.execute("SELECT COUNT(*) c FROM districts").fetchone()[0]
-            pb = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='bzf'").fetchone()[0]
-            pt = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='trade'").fetchone()[0]
-            u = conn.execute("SELECT COALESCE(SUM(managed_unit_count), 0) c FROM projects WHERE channel='bzf'").fetchone()[0]
+            d = conn.execute("SELECT COUNT(*) c FROM districts" + (" WHERE city_id=?" if city_id else ""), city_params()).fetchone()[0]
+            pb = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='bzf'" + city_filter(), city_params()).fetchone()[0]
+            pt = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='trade'" + city_filter(), city_params()).fetchone()[0]
+            u = conn.execute("SELECT COALESCE(SUM(managed_unit_count), 0) c FROM projects WHERE channel='bzf'" + city_filter(), city_params()).fetchone()[0]
             conn.close()
             return self._json({"districts": d, "projects_bzf": pb, "projects_trade": pt, "units": u})
 
         if path == "/api/juzhu/settings":
             settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings").fetchall()}
-            row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+            if city_id:
+                row = conn.execute("SELECT booking_phone FROM cities WHERE id=?", (city_id,)).fetchone()
+            else:
+                row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
             conn.close()
             return self._json({
                 "booking_phone": row[0] if row else None,
@@ -459,7 +475,7 @@ class Handler(SimpleHTTPRequestHandler):
             })
 
         if path == "/api/juzhu/districts":
-            data = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order"))
+            data = rows_to_list(conn.execute("SELECT * FROM districts" + (" WHERE city_id=?" if city_id else "") + " ORDER BY sort_order", city_params()))
             conn.close()
             return self._json(data)
 
@@ -474,7 +490,7 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path.startswith("/api/juzhu/districts/") and path.endswith("/projects"):
             slug = path.split("/")[4]
-            dist = row_to_dict(conn.execute("SELECT * FROM districts WHERE slug=?", (slug,)).fetchone())
+            dist = row_to_dict(conn.execute("SELECT * FROM districts WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
             if not dist:
                 conn.close()
                 return self._json({"error": "not found"}, 404)
@@ -489,7 +505,7 @@ class Handler(SimpleHTTPRequestHandler):
             parts = path.split("/")
             slug = parts[4] if len(parts) > 4 else ""
             if len(parts) > 5 and parts[5] == "units":
-                proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?", (slug,)).fetchone())
+                proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
                 if not proj:
                     conn.close()
                     return self._json({"error": "not found"}, 404)
@@ -504,13 +520,14 @@ class Handler(SimpleHTTPRequestHandler):
                 ))
                 conn.close()
                 return self._json({"project": proj, "units": units, "photos": photos})
-            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?", (slug,)).fetchone())
+            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
             conn.close()
             return self._json(proj if proj else {"error": "not found"}, 404 if not proj else 200)
 
         if path == "/api/juzhu/trade":
             data = rows_to_list(conn.execute(
-                "SELECT * FROM projects WHERE channel='trade' ORDER BY is_featured DESC, featured_rank, sort_order"
+                "SELECT * FROM projects WHERE channel='trade'" + city_filter() + " ORDER BY is_featured DESC, featured_rank, sort_order",
+                city_params(),
             ))
             conn.close()
             return self._json({"listings": data})

@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "name": "沈阳",
+    "slug": "shenyang",
+    "booking_phone": "13897971552",
+    "hero_bg_image": "assets/juzhu/sy/city/hero.jpg"
+  }
+]
