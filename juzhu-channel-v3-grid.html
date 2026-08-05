@@ -263,7 +263,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=2"></script>
 <script src="juzhu/app.js?v=14"></script>
 <script>
 (function(){
@@ -585,8 +585,9 @@
   Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
     var d = results[0];
     lastData = d;
-    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准
-    if (window.BZF_JZ && d.city && d.city.name) {
+    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准；
+    // 但 URL 带 ?city= 直链参数时不强制改回（直链优先，只读展示）
+    if (window.BZF_JZ && d.city && d.city.name && !(BZF_JZ.urlCity && BZF_JZ.urlCity())) {
       var storedCity = BZF_JZ.regionCity();
       if (storedCity !== d.city.name) {
         BZF_JZ.setRegionCity(d.city.name);

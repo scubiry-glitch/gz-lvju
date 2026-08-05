@@ -255,7 +255,18 @@
     return regionProvinces()[0] || regionCapital();
   }
 
+  // URL ?city= 参数优先（多城市直链：regionCity() 只读，不写存储；无参数时行为不变）
+  function urlCity() {
+    try {
+      var c = new URLSearchParams(location.search).get('city');
+      if (c && regionCities().indexOf(c) >= 0) return c;
+    } catch (e) {}
+    return null;
+  }
+
   function regionCity() {
+    var u = urlCity();
+    if (u) return u;
     var stored = null;
     try { stored = localStorage.getItem(CITY_KEY); } catch (e) {}
     if (stored && regionCities().indexOf(stored) >= 0) return stored;
@@ -365,6 +376,7 @@
     onChange: onChange,
     notify: notify,
     regionCity: regionCity,
+    urlCity: urlCity,
     regionCapital: regionCapital,
     regionCities: regionCities,
     regionCityTree: regionCityTree,
