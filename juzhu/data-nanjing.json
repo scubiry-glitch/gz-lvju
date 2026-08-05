@@ -1067,14 +1067,14 @@
     "hero_bg_image": "assets/juzhu/sy/city/hero.jpg"
   },
   "stats": {
-    "district_count": 8,
-    "project_count_bzf": 7,
+    "district_count": 11,
+    "project_count_bzf": 10,
     "project_count_trade": 1,
-    "unit_count": 800
+    "unit_count": 1080
   },
   "districts": [
     {
-      "id": 38,
+      "id": 52,
       "city_id": 2,
       "name": "鼓楼区",
       "slug": "鼓楼区",
@@ -1094,7 +1094,7 @@
       "tags": []
     },
     {
-      "id": 39,
+      "id": 53,
       "city_id": 2,
       "name": "玄武区",
       "slug": "玄武区",
@@ -1114,7 +1114,7 @@
       "tags": []
     },
     {
-      "id": 40,
+      "id": 54,
       "city_id": 2,
       "name": "秦淮区",
       "slug": "秦淮区",
@@ -1134,7 +1134,7 @@
       "tags": []
     },
     {
-      "id": 41,
+      "id": 55,
       "city_id": 2,
       "name": "建邺区",
       "slug": "建邺区",
@@ -1154,7 +1154,7 @@
       "tags": []
     },
     {
-      "id": 42,
+      "id": 56,
       "city_id": 2,
       "name": "栖霞区",
       "slug": "栖霞区",
@@ -1174,7 +1174,7 @@
       "tags": []
     },
     {
-      "id": 43,
+      "id": 57,
       "city_id": 2,
       "name": "雨花台区",
       "slug": "雨花台区",
@@ -1194,7 +1194,7 @@
       "tags": []
     },
     {
-      "id": 44,
+      "id": 58,
       "city_id": 2,
       "name": "江宁区",
       "slug": "江宁区",
@@ -1214,7 +1214,7 @@
       "tags": []
     },
     {
-      "id": 45,
+      "id": 59,
       "city_id": 2,
       "name": "浦口区",
       "slug": "浦口区",
@@ -1232,13 +1232,73 @@
       "layout_wide": 0,
       "bg_class": "g2",
       "tags": []
+    },
+    {
+      "id": 60,
+      "city_id": 2,
+      "name": "六合区",
+      "slug": "六合区",
+      "note": null,
+      "has_projects": 0,
+      "sort_order": 9,
+      "cover_image": "assets/juzhu/sy/districts/沈河区.jpeg",
+      "project_count": 0,
+      "unit_count": 0,
+      "vacant_count": null,
+      "managed_unit_count": null,
+      "avg_price": null,
+      "is_hot": 0,
+      "layout_tall": 0,
+      "layout_wide": 0,
+      "bg_class": "g3",
+      "tags": []
+    },
+    {
+      "id": 61,
+      "city_id": 2,
+      "name": "溧水区",
+      "slug": "溧水区",
+      "note": null,
+      "has_projects": 0,
+      "sort_order": 10,
+      "cover_image": "assets/juzhu/sy/districts/浑南区.jpeg",
+      "project_count": 0,
+      "unit_count": 0,
+      "vacant_count": null,
+      "managed_unit_count": null,
+      "avg_price": null,
+      "is_hot": 0,
+      "layout_tall": 0,
+      "layout_wide": 0,
+      "bg_class": "g1",
+      "tags": []
+    },
+    {
+      "id": 62,
+      "city_id": 2,
+      "name": "高淳区",
+      "slug": "高淳区",
+      "note": null,
+      "has_projects": 0,
+      "sort_order": 11,
+      "cover_image": "assets/juzhu/sy/districts/皇姑区.jpeg",
+      "project_count": 0,
+      "unit_count": 0,
+      "vacant_count": null,
+      "managed_unit_count": null,
+      "avg_price": null,
+      "is_hot": 0,
+      "layout_tall": 0,
+      "layout_wide": 0,
+      "bg_class": "g2",
+      "tags": []
     }
   ],
   "projects": [
     {
-      "id": 56,
+      "id": 71,
       "city_id": 2,
-      "district_id": 41,
+      "district_id": 55,
       "channel": "bzf",
       "name": "CCB建融家园河西店",
       "slug": "CCB建融家园河西店",
@@ -1259,9 +1319,9 @@
       "rating_note": null
     },
     {
-      "id": 62,
+      "id": 77,
       "city_id": 2,
-      "district_id": 42,
+      "district_id": 56,
       "channel": "bzf",
       "name": "宁慧·仙林学仕里",
       "slug": "宁慧·仙林学仕里",
@@ -1282,9 +1342,32 @@
       "rating_note": null
     },
     {
-      "id": 60,
+      "id": 79,
       "city_id": 2,
-      "district_id": 39,
+      "district_id": 61,
+      "channel": "bzf",
+      "name": "宁慧·溧水空港寓",
+      "slug": "宁慧·溧水空港寓",
+      "cover_image": "assets/juzhu/sy/projects/bzf/沈河区/惠民馨苑.jpg",
+      "address": "溧水区柘塘街道",
+      "tags": [],
+      "sort_order": 1,
+      "unit_count": 2,
+      "managed_unit_count": 80,
+      "price_from": 1200,
+      "is_featured": 0,
+      "featured_rank": null,
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
+    },
+    {
+      "id": 75,
+      "city_id": 2,
+      "district_id": 53,
       "channel": "bzf",
       "name": "宁慧·玄武湖畔寓",
       "slug": "宁慧·玄武湖畔寓",
@@ -1305,9 +1388,9 @@
       "rating_note": null
     },
     {
-      "id": 58,
+      "id": 73,
       "city_id": 2,
-      "district_id": 38,
+      "district_id": 52,
       "channel": "bzf",
       "name": "宁慧·石头城青年社区",
       "slug": "宁慧·石头城青年社区",
@@ -1328,9 +1411,55 @@
       "rating_note": null
     },
     {
-      "id": 61,
+      "id": 80,
       "city_id": 2,
-      "district_id": 44,
+      "district_id": 62,
+      "channel": "bzf",
+      "name": "宁慧·高淳慢城寓",
+      "slug": "宁慧·高淳慢城寓",
+      "cover_image": "assets/juzhu/sy/projects/bzf/浑南区/CCB建融家园新市府店.jpg",
+      "address": "高淳区淳溪街道",
+      "tags": [],
+      "sort_order": 1,
+      "unit_count": 2,
+      "managed_unit_count": 80,
+      "price_from": 1100,
+      "is_featured": 0,
+      "featured_rank": null,
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
+    },
+    {
+      "id": 78,
+      "city_id": 2,
+      "district_id": 60,
+      "channel": "bzf",
+      "name": "安居·江北人才公寓",
+      "slug": "安居·江北人才公寓",
+      "cover_image": "assets/juzhu/sy/projects/bzf/沈河区/庆余家园.jpg",
+      "address": "六合区江北大道",
+      "tags": [],
+      "sort_order": 1,
+      "unit_count": 3,
+      "managed_unit_count": 120,
+      "price_from": 1500,
+      "is_featured": 0,
+      "featured_rank": null,
+      "old_house_hint": null,
+      "rating_status": "draft",
+      "rating": null,
+      "rating_submitted_at": null,
+      "rating_reviewed_at": null,
+      "rating_note": null
+    },
+    {
+      "id": 76,
+      "city_id": 2,
+      "district_id": 58,
       "channel": "bzf",
       "name": "安居·百家湖青年家",
       "slug": "安居·百家湖青年家",
@@ -1351,9 +1480,9 @@
       "rating_note": null
     },
     {
-      "id": 57,
+      "id": 72,
       "city_id": 2,
-      "district_id": 38,
+      "district_id": 52,
       "channel": "bzf",
       "name": "安居·紫金公馆",
       "slug": "安居·紫金公馆",
@@ -1374,9 +1503,9 @@
       "rating_note": null
     },
     {
-      "id": 59,
+      "id": 74,
       "city_id": 2,
-      "district_id": 40,
+      "district_id": 54,
       "channel": "bzf",
       "name": "安居·老门东里",
       "slug": "安居·老门东里",
@@ -1397,7 +1526,7 @@
       "rating_note": null
     },
     {
-      "id": 63,
+      "id": 81,
       "city_id": 2,
       "district_id": null,
       "channel": "trade",
@@ -1422,8 +1551,8 @@
   ],
   "units": [
     {
-      "id": 150,
-      "project_id": 56,
+      "id": 192,
+      "project_id": 71,
       "name": "30 平",
       "slug": "30-平",
       "area_sqm": 30.0,
@@ -1505,8 +1634,8 @@
       "cover_image": null
     },
     {
-      "id": 151,
-      "project_id": 56,
+      "id": 193,
+      "project_id": 71,
       "name": "45 平",
       "slug": "45-平",
       "area_sqm": 45.0,
@@ -1588,8 +1717,8 @@
       "cover_image": null
     },
     {
-      "id": 152,
-      "project_id": 56,
+      "id": 194,
+      "project_id": 71,
       "name": "60 平",
       "slug": "60-平",
       "area_sqm": 60.0,
@@ -1671,8 +1800,8 @@
       "cover_image": null
     },
     {
-      "id": 153,
-      "project_id": 56,
+      "id": 195,
+      "project_id": 71,
       "name": "70 平",
       "slug": "70-平",
       "area_sqm": 70.0,
@@ -1754,8 +1883,8 @@
       "cover_image": null
     },
     {
-      "id": 154,
-      "project_id": 57,
+      "id": 196,
+      "project_id": 72,
       "name": "35 平",
       "slug": "35-平",
       "area_sqm": 35.0,
@@ -1837,8 +1966,8 @@
       "cover_image": null
     },
     {
-      "id": 155,
-      "project_id": 57,
+      "id": 197,
+      "project_id": 72,
       "name": "50 平",
       "slug": "50-平",
       "area_sqm": 50.0,
@@ -1920,8 +2049,8 @@
       "cover_image": null
     },
     {
-      "id": 156,
-      "project_id": 57,
+      "id": 198,
+      "project_id": 72,
       "name": "65 平",
       "slug": "65-平",
       "area_sqm": 65.0,
@@ -2003,8 +2132,8 @@
       "cover_image": null
     },
     {
-      "id": 157,
-      "project_id": 58,
+      "id": 199,
+      "project_id": 73,
       "name": "28 平",
       "slug": "28-平",
       "area_sqm": 28.0,
@@ -2086,8 +2215,8 @@
       "cover_image": null
     },
     {
-      "id": 158,
-      "project_id": 58,
+      "id": 200,
+      "project_id": 73,
       "name": "40 平",
       "slug": "40-平",
       "area_sqm": 40.0,
@@ -2169,8 +2298,8 @@
       "cover_image": null
     },
     {
-      "id": 159,
-      "project_id": 58,
+      "id": 201,
+      "project_id": 73,
       "name": "55 平",
       "slug": "55-平",
       "area_sqm": 55.0,
@@ -2252,8 +2381,8 @@
       "cover_image": null
     },
     {
-      "id": 160,
-      "project_id": 59,
+      "id": 202,
+      "project_id": 74,
       "name": "32 平",
       "slug": "32-平",
       "area_sqm": 32.0,
@@ -2335,8 +2464,8 @@
       "cover_image": null
     },
     {
-      "id": 161,
-      "project_id": 59,
+      "id": 203,
+      "project_id": 74,
       "name": "46 平",
       "slug": "46-平",
       "area_sqm": 46.0,
@@ -2418,8 +2547,8 @@
       "cover_image": null
     },
     {
-      "id": 162,
-      "project_id": 59,
+      "id": 204,
+      "project_id": 74,
       "name": "58 平",
       "slug": "58-平",
       "area_sqm": 58.0,
@@ -2501,8 +2630,8 @@
       "cover_image": null
     },
     {
-      "id": 163,
-      "project_id": 60,
+      "id": 205,
+      "project_id": 75,
       "name": "30 平",
       "slug": "30-平",
       "area_sqm": 30.0,
@@ -2584,8 +2713,8 @@
       "cover_image": null
     },
     {
-      "id": 164,
-      "project_id": 60,
+      "id": 206,
+      "project_id": 75,
       "name": "44 平",
       "slug": "44-平",
       "area_sqm": 44.0,
@@ -2667,8 +2796,8 @@
       "cover_image": null
     },
     {
-      "id": 165,
-      "project_id": 61,
+      "id": 207,
+      "project_id": 76,
       "name": "35 平",
       "slug": "35-平",
       "area_sqm": 35.0,
@@ -2750,8 +2879,8 @@
       "cover_image": null
     },
     {
-      "id": 166,
-      "project_id": 61,
+      "id": 208,
+      "project_id": 76,
       "name": "52 平",
       "slug": "52-平",
       "area_sqm": 52.0,
@@ -2833,8 +2962,8 @@
       "cover_image": null
     },
     {
-      "id": 167,
-      "project_id": 61,
+      "id": 209,
+      "project_id": 76,
       "name": "68 平",
       "slug": "68-平",
       "area_sqm": 68.0,
@@ -2916,8 +3045,8 @@
       "cover_image": null
     },
     {
-      "id": 168,
-      "project_id": 62,
+      "id": 210,
+      "project_id": 77,
       "name": "28 平",
       "slug": "28-平",
       "area_sqm": 28.0,
@@ -2999,8 +3128,8 @@
       "cover_image": null
     },
     {
-      "id": 169,
-      "project_id": 62,
+      "id": 211,
+      "project_id": 77,
       "name": "42 平",
       "slug": "42-平",
       "area_sqm": 42.0,
@@ -3082,8 +3211,589 @@
       "cover_image": null
     },
     {
-      "id": 170,
-      "project_id": 63,
+      "id": 212,
+      "project_id": 78,
+      "name": "30 平",
+      "slug": "30-平",
+      "area_sqm": 30.0,
+      "layout_label": "3居",
+      "rent_monthly": 1500,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "3室1厅 | 30㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "30 平 30㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1500,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1500
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1500,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1500
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 1,
+      "cover_image": null
+    },
+    {
+      "id": 213,
+      "project_id": 78,
+      "name": "45 平",
+      "slug": "45-平",
+      "area_sqm": 45.0,
+      "layout_label": "4居",
+      "rent_monthly": 2100,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "4室1厅 | 45㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "45 平 45㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 2100,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2100
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 2100,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2100
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 2,
+      "cover_image": null
+    },
+    {
+      "id": 214,
+      "project_id": 78,
+      "name": "60 平",
+      "slug": "60-平",
+      "area_sqm": 60.0,
+      "layout_label": "5居",
+      "rent_monthly": 2800,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "5室1厅 | 60㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "60 平 60㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 2800,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2800
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 2800,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 2800
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 3,
+      "cover_image": null
+    },
+    {
+      "id": 215,
+      "project_id": 79,
+      "name": "32 平",
+      "slug": "32-平",
+      "area_sqm": 32.0,
+      "layout_label": "3居",
+      "rent_monthly": 1200,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "3室1厅 | 32㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "32 平 32㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1200,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1200
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1200,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1200
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 1,
+      "cover_image": null
+    },
+    {
+      "id": 216,
+      "project_id": 79,
+      "name": "48 平",
+      "slug": "48-平",
+      "area_sqm": 48.0,
+      "layout_label": "4居",
+      "rent_monthly": 1800,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "4室1厅 | 48㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "48 平 48㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1800,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1800
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1800,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1800
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 2,
+      "cover_image": null
+    },
+    {
+      "id": 217,
+      "project_id": 80,
+      "name": "35 平",
+      "slug": "35-平",
+      "area_sqm": 35.0,
+      "layout_label": "3居",
+      "rent_monthly": 1100,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "3室1厅 | 35㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "35 平 35㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1100,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1100
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1100,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1100
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 1,
+      "cover_image": null
+    },
+    {
+      "id": 218,
+      "project_id": 80,
+      "name": "50 平",
+      "slug": "50-平",
+      "area_sqm": 50.0,
+      "layout_label": "4居",
+      "rent_monthly": 1650,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "近地铁",
+        "精致小户型",
+        "押一付一",
+        "租金受控",
+        "拎包入住"
+      ],
+      "unit_spec": "4室1厅 | 50㎡ | 南/北 | 立即入住",
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "induction"
+      ],
+      "keeper": {
+        "name": "管家小宁",
+        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
+        "phone": "13951880001"
+      },
+      "rent_detail": {
+        "room_label": "50 平 50㎡",
+        "long_term": {
+          "range": "可租4个月-1年",
+          "plan": {
+            "pay": "季付",
+            "rent": 1650,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1650
+          }
+        },
+        "short_term": {
+          "range": "可租1个月-3个月",
+          "plan": {
+            "pay": "月付",
+            "rent": 1650,
+            "service_fee": null,
+            "service_note": "一次收取",
+            "deposit": 1650
+          }
+        },
+        "other_fees": [
+          {
+            "name": "水费",
+            "value": "—元/吨"
+          },
+          {
+            "name": "电费",
+            "value": "—元/度"
+          },
+          {
+            "name": "宽带费",
+            "value": "—元/月"
+          },
+          {
+            "name": "物业费",
+            "value": "—元/月"
+          },
+          {
+            "name": "供暖费",
+            "value": "—元/方"
+          }
+        ]
+      },
+      "sort_order": 2,
+      "cover_image": null
+    },
+    {
+      "id": 219,
+      "project_id": 81,
       "name": "85 平",
       "slug": "85-平",
       "area_sqm": 85.0,
@@ -3118,8 +3828,8 @@
       "cover_image": null
     },
     {
-      "id": 171,
-      "project_id": 63,
+      "id": 220,
+      "project_id": 81,
       "name": "105 平",
       "slug": "105-平",
       "area_sqm": 105.0,
@@ -3154,8 +3864,8 @@
       "cover_image": null
     },
     {
-      "id": 172,
-      "project_id": 63,
+      "id": 221,
+      "project_id": 81,
       "name": "130 平",
       "slug": "130-平",
       "area_sqm": 130.0,
@@ -3192,352 +3902,469 @@
   ],
   "photos": [
     {
-      "id": 496,
+      "id": 570,
       "entity_type": "project",
-      "entity_id": 56,
+      "entity_id": 71,
       "file_path": "assets/juzhu/sy/projects/bzf/和平区/CCB建融家园中华路店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 501,
+      "id": 575,
       "entity_type": "project",
-      "entity_id": 57,
+      "entity_id": 72,
       "file_path": "assets/juzhu/sy/projects/bzf/和平区/逸居雪莲店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 505,
+      "id": 579,
       "entity_type": "project",
-      "entity_id": 58,
+      "entity_id": 73,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/新东人才住房.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 509,
+      "id": 583,
       "entity_type": "project",
-      "entity_id": 59,
+      "entity_id": 74,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/观泉店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 513,
+      "id": 587,
       "entity_type": "project",
-      "entity_id": 60,
+      "entity_id": 75,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/逸居望花丽景店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 516,
+      "id": 590,
       "entity_type": "project",
-      "entity_id": 61,
+      "entity_id": 76,
       "file_path": "assets/juzhu/sy/projects/bzf/沈河区/CCB建融家园青年大街店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 520,
+      "id": 594,
       "entity_type": "project",
-      "entity_id": 62,
+      "entity_id": 77,
       "file_path": "assets/juzhu/sy/projects/bzf/沈河区/中金启城.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 523,
+      "id": 597,
       "entity_type": "project",
-      "entity_id": 63,
+      "entity_id": 78,
+      "file_path": "assets/juzhu/sy/projects/bzf/沈河区/庆余家园.jpg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 601,
+      "entity_type": "project",
+      "entity_id": 79,
+      "file_path": "assets/juzhu/sy/projects/bzf/沈河区/惠民馨苑.jpg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 604,
+      "entity_type": "project",
+      "entity_id": 80,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/CCB建融家园新市府店.jpg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 607,
+      "entity_type": "project",
+      "entity_id": 81,
       "file_path": "assets/juzhu/sy/projects/trade/中德人才社区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 488,
+      "id": 559,
       "entity_type": "district",
-      "entity_id": 38,
+      "entity_id": 52,
       "file_path": "assets/juzhu/sy/districts/和平区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 489,
+      "id": 560,
       "entity_type": "district",
-      "entity_id": 39,
+      "entity_id": 53,
       "file_path": "assets/juzhu/sy/districts/沈河区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 490,
+      "id": 561,
       "entity_type": "district",
-      "entity_id": 40,
+      "entity_id": 54,
       "file_path": "assets/juzhu/sy/districts/浑南区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 491,
+      "id": 562,
       "entity_type": "district",
-      "entity_id": 41,
+      "entity_id": 55,
       "file_path": "assets/juzhu/sy/districts/皇姑区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 492,
+      "id": 563,
       "entity_type": "district",
-      "entity_id": 42,
+      "entity_id": 56,
       "file_path": "assets/juzhu/sy/districts/铁西区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 493,
+      "id": 564,
       "entity_type": "district",
-      "entity_id": 43,
+      "entity_id": 57,
       "file_path": "assets/juzhu/sy/districts/大东区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 494,
+      "id": 565,
       "entity_type": "district",
-      "entity_id": 44,
+      "entity_id": 58,
       "file_path": "assets/juzhu/sy/districts/于洪区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 495,
+      "id": 566,
       "entity_type": "district",
-      "entity_id": 45,
+      "entity_id": 59,
       "file_path": "assets/juzhu/sy/districts/和平区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 497,
+      "id": 567,
+      "entity_type": "district",
+      "entity_id": 60,
+      "file_path": "assets/juzhu/sy/districts/沈河区.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 568,
+      "entity_type": "district",
+      "entity_id": 61,
+      "file_path": "assets/juzhu/sy/districts/浑南区.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 569,
+      "entity_type": "district",
+      "entity_id": 62,
+      "file_path": "assets/juzhu/sy/districts/皇姑区.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 571,
       "entity_type": "unit",
-      "entity_id": 150,
+      "entity_id": 192,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 498,
+      "id": 572,
       "entity_type": "unit",
-      "entity_id": 151,
+      "entity_id": 193,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 499,
+      "id": 573,
       "entity_type": "unit",
-      "entity_id": 152,
+      "entity_id": 194,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 500,
+      "id": 574,
       "entity_type": "unit",
-      "entity_id": 153,
+      "entity_id": 195,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 502,
+      "id": 576,
       "entity_type": "unit",
-      "entity_id": 154,
+      "entity_id": 196,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 503,
+      "id": 577,
       "entity_type": "unit",
-      "entity_id": 155,
+      "entity_id": 197,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 504,
+      "id": 578,
       "entity_type": "unit",
-      "entity_id": 156,
+      "entity_id": 198,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 506,
+      "id": 580,
       "entity_type": "unit",
-      "entity_id": 157,
+      "entity_id": 199,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 507,
+      "id": 581,
       "entity_type": "unit",
-      "entity_id": 158,
+      "entity_id": 200,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 508,
+      "id": 582,
       "entity_type": "unit",
-      "entity_id": 159,
+      "entity_id": 201,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 510,
+      "id": 584,
       "entity_type": "unit",
-      "entity_id": 160,
+      "entity_id": 202,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 511,
+      "id": 585,
       "entity_type": "unit",
-      "entity_id": 161,
+      "entity_id": 203,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 512,
+      "id": 586,
       "entity_type": "unit",
-      "entity_id": 162,
+      "entity_id": 204,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 514,
+      "id": 588,
       "entity_type": "unit",
-      "entity_id": 163,
+      "entity_id": 205,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 515,
+      "id": 589,
       "entity_type": "unit",
-      "entity_id": 164,
+      "entity_id": 206,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 517,
+      "id": 591,
       "entity_type": "unit",
-      "entity_id": 165,
+      "entity_id": 207,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 518,
+      "id": 592,
       "entity_type": "unit",
-      "entity_id": 166,
+      "entity_id": 208,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 519,
+      "id": 593,
       "entity_type": "unit",
-      "entity_id": 167,
+      "entity_id": 209,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 521,
+      "id": 595,
       "entity_type": "unit",
-      "entity_id": 168,
+      "entity_id": 210,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 522,
+      "id": 596,
       "entity_type": "unit",
-      "entity_id": 169,
+      "entity_id": 211,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 524,
+      "id": 598,
       "entity_type": "unit",
-      "entity_id": 170,
+      "entity_id": 212,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 525,
+      "id": 599,
       "entity_type": "unit",
-      "entity_id": 171,
+      "entity_id": 213,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 526,
+      "id": 600,
       "entity_type": "unit",
-      "entity_id": 172,
+      "entity_id": 214,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 602,
+      "entity_type": "unit",
+      "entity_id": 215,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 603,
+      "entity_type": "unit",
+      "entity_id": 216,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 605,
+      "entity_type": "unit",
+      "entity_id": 217,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 606,
+      "entity_type": "unit",
+      "entity_id": 218,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 608,
+      "entity_type": "unit",
+      "entity_id": 219,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 609,
+      "entity_type": "unit",
+      "entity_id": 220,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 0
+    },
+    {
+      "id": 610,
+      "entity_type": "unit",
+      "entity_id": 221,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
