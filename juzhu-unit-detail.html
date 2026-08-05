@@ -140,20 +140,24 @@
   .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;font-weight:600;}
   .cta .btn-call:active{background:var(--brand-soft);}
   /* 隐私保护提醒 */
-  .privacy-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:32px;}
+  .privacy-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end;justify-content:center;}
   .privacy-modal[hidden]{display:none!important;}
-  .privacy-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.55);}
-  .privacy-sheet{position:relative;width:100%;max-width:330px;background:#fff;border-radius:20px;padding:28px 24px 18px;text-align:center;
-    animation:popIn .22s ease;box-shadow:0 12px 40px rgba(8,18,16,.25);}
-  @keyframes popIn{from{transform:scale(.92);opacity:0;}to{transform:scale(1);opacity:1;}}
-  .privacy-ico{width:56px;height:56px;margin:0 auto 12px;border-radius:50%;background:var(--brand-soft);
-    display:grid;place-items:center;font-size:26px;}
-  .privacy-ttl{font-size:17px;font-weight:700;color:var(--ink);}
-  .privacy-desc{font-size:12.5px;color:var(--muted);line-height:1.7;margin:10px 0 18px;}
-  .privacy-ok{width:100%;border:0;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--brand-2));
+  .privacy-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.5);}
+  .privacy-sheet{position:relative;width:100%;max-width:520px;background:#fff;border-radius:16px 16px 0 0;
+    padding:34px 24px max(26px,env(safe-area-inset-bottom));text-align:center;
+    animation:slideUp .25s ease;}
+  .privacy-close{position:absolute;top:14px;right:16px;border:0;background:none;font-size:18px;color:#a8a8a8;
+    cursor:pointer;padding:6px;line-height:1;font-family:inherit;}
+  .privacy-ttl{font-size:18px;font-weight:700;color:var(--ink);}
+  .privacy-desc{font-size:13px;color:var(--muted);line-height:1.6;margin:14px 0 6px;}
+  .privacy-vnum{font-size:19px;font-weight:700;color:#6b6b6b;letter-spacing:.04em;margin-bottom:24px;}
+  .privacy-acts{display:flex;gap:12px;}
+  .privacy-cancel{flex:1;border:0;background:#f2f3f5;color:#333;font-size:15px;font-weight:600;
+    padding:13px;border-radius:999px;cursor:pointer;font-family:inherit;}
+  .privacy-cancel:active{background:#e8eaed;}
+  .privacy-ok{flex:1.4;border:0;border-radius:999px;background:linear-gradient(90deg,#3a6fd8,#2f5fb8);
     color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;}
   .privacy-ok:active{opacity:.9;}
-  .privacy-cancel{width:100%;border:0;background:none;color:var(--muted);font-size:13px;padding:12px 0 4px;cursor:pointer;font-family:inherit;}
   .promo-bar{background:linear-gradient(90deg,#ff8a3d,#0c4d44);color:#fff;padding:10px 16px;display:flex;align-items:baseline;gap:8px;}
   .promo-bar .big{font-family:var(--serif);font-size:22px;font-weight:700;}
   .promo-bar .orig{font-size:11px;opacity:.85;text-decoration:line-through;}
@@ -225,11 +229,14 @@
 <div class="privacy-modal" id="privacyModal" hidden>
   <div class="privacy-backdrop" id="privacyBackdrop"></div>
   <div class="privacy-sheet">
-    <div class="privacy-ico">🔒</div>
+    <button type="button" class="privacy-close" id="privacyClose" aria-label="关闭">✕</button>
     <div class="privacy-ttl">隐私保护中</div>
-    <div class="privacy-desc">本次通话将隐藏您的真实号码，通话内容全程加密录音，平台严格保护您的个人信息，请放心沟通。</div>
-    <button type="button" class="privacy-ok" id="privacyOk">确认拨打</button>
-    <button type="button" class="privacy-cancel" id="privacyCancel">暂不咨询</button>
+    <div class="privacy-desc">您的号码将会被加密后呼出，对方看到的是</div>
+    <div class="privacy-vnum">虚拟号码</div>
+    <div class="privacy-acts">
+      <button type="button" class="privacy-cancel" id="privacyCancel">取消</button>
+      <button type="button" class="privacy-ok" id="privacyOk">立即呼叫</button>
+    </div>
   </div>
 </div>
 <script src="screens/_region.js"></script>
@@ -381,6 +388,7 @@
         location.href = tel;
       };
       document.getElementById('privacyCancel').onclick = closePrivacy;
+      document.getElementById('privacyClose').onclick = closePrivacy;
       document.getElementById('privacyBackdrop').onclick = closePrivacy;
     } else {
       callBtn.href = '#';
