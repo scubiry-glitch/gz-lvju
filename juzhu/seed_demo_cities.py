@@ -47,7 +47,15 @@ TRADE_COVERS = [
     "assets/juzhu/sy/projects/trade/中德人才社区.jpg",
     "assets/juzhu/sy/projects/trade/逸居锦城.jpg",
 ]
-SY_DIST_COVER = "assets/juzhu/sy/districts/{}.jpg"
+SY_DIST_COVERS = [  # 沈阳真实区封面，轮换给演示城市用
+    "assets/juzhu/sy/districts/和平区.jpg",
+    "assets/juzhu/sy/districts/沈河区.jpeg",
+    "assets/juzhu/sy/districts/浑南区.jpeg",
+    "assets/juzhu/sy/districts/皇姑区.jpeg",
+    "assets/juzhu/sy/districts/铁西区.jpeg",
+    "assets/juzhu/sy/districts/大东区.jpeg",
+    "assets/juzhu/sy/districts/于洪区.jpg",
+]
 
 AMENITIES = ["ac", "washer", "fridge", "heater", "lock", "wifi", "tv", "hood", "induction"]
 TAGS = ["政府保租房", "近地铁", "精致小户型", "押一付一", "租金受控", "拎包入住"]
@@ -185,14 +193,15 @@ def main():
         # 行政区
         dist_ids = {}
         for i, dname in enumerate(city["districts"]):
+            cover = SY_DIST_COVERS[i % len(SY_DIST_COVERS)]
             cur.execute(
                 "INSERT INTO districts(city_id,name,slug,note,sort_order,cover_image,has_projects,is_hot,bg_class) "
                 "VALUES (?,?,?,?,?,?,?,?,?)",
-                (cid, dname, dname, None, i + 1, SY_DIST_COVER.format(dname), 0, 0, f"g{i % 3 + 1}"),
+                (cid, dname, dname, None, i + 1, cover, 0, 0, f"g{i % 3 + 1}"),
             )
             dist_ids[dname] = cur.lastrowid
             cur.execute("INSERT INTO photos(entity_type,entity_id,file_path,is_cover,sort_order) VALUES ('district',?,?,1,0)",
-                        (dist_ids[dname], SY_DIST_COVER.format(dname)))
+                        (dist_ids[dname], cover))
 
         # 保租项目 + 户型
         photo_idx = 0
