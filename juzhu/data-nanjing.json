@@ -1074,7 +1074,7 @@
   },
   "districts": [
     {
-      "id": 24,
+      "id": 38,
       "city_id": 2,
       "name": "鼓楼区",
       "slug": "鼓楼区",
@@ -1094,7 +1094,7 @@
       "tags": []
     },
     {
-      "id": 25,
+      "id": 39,
       "city_id": 2,
       "name": "玄武区",
       "slug": "玄武区",
@@ -1114,7 +1114,7 @@
       "tags": []
     },
     {
-      "id": 26,
+      "id": 40,
       "city_id": 2,
       "name": "秦淮区",
       "slug": "秦淮区",
@@ -1134,7 +1134,7 @@
       "tags": []
     },
     {
-      "id": 27,
+      "id": 41,
       "city_id": 2,
       "name": "建邺区",
       "slug": "建邺区",
@@ -1154,7 +1154,7 @@
       "tags": []
     },
     {
-      "id": 28,
+      "id": 42,
       "city_id": 2,
       "name": "栖霞区",
       "slug": "栖霞区",
@@ -1174,7 +1174,7 @@
       "tags": []
     },
     {
-      "id": 29,
+      "id": 43,
       "city_id": 2,
       "name": "雨花台区",
       "slug": "雨花台区",
@@ -1194,7 +1194,7 @@
       "tags": []
     },
     {
-      "id": 30,
+      "id": 44,
       "city_id": 2,
       "name": "江宁区",
       "slug": "江宁区",
@@ -1214,7 +1214,7 @@
       "tags": []
     },
     {
-      "id": 31,
+      "id": 45,
       "city_id": 2,
       "name": "浦口区",
       "slug": "浦口区",
@@ -1236,9 +1236,9 @@
   ],
   "projects": [
     {
-      "id": 41,
+      "id": 56,
       "city_id": 2,
-      "district_id": 27,
+      "district_id": 41,
       "channel": "bzf",
       "name": "CCB建融家园河西店",
       "slug": "CCB建融家园河西店",
@@ -1259,9 +1259,9 @@
       "rating_note": null
     },
     {
-      "id": 47,
+      "id": 62,
       "city_id": 2,
-      "district_id": 28,
+      "district_id": 42,
       "channel": "bzf",
       "name": "宁慧·仙林学仕里",
       "slug": "宁慧·仙林学仕里",
@@ -1282,9 +1282,9 @@
       "rating_note": null
     },
     {
-      "id": 45,
+      "id": 60,
       "city_id": 2,
-      "district_id": 25,
+      "district_id": 39,
       "channel": "bzf",
       "name": "宁慧·玄武湖畔寓",
       "slug": "宁慧·玄武湖畔寓",
@@ -1305,9 +1305,9 @@
       "rating_note": null
     },
     {
-      "id": 43,
+      "id": 58,
       "city_id": 2,
-      "district_id": 24,
+      "district_id": 38,
       "channel": "bzf",
       "name": "宁慧·石头城青年社区",
       "slug": "宁慧·石头城青年社区",
@@ -1328,9 +1328,9 @@
       "rating_note": null
     },
     {
-      "id": 46,
+      "id": 61,
       "city_id": 2,
-      "district_id": 30,
+      "district_id": 44,
       "channel": "bzf",
       "name": "安居·百家湖青年家",
       "slug": "安居·百家湖青年家",
@@ -1351,9 +1351,9 @@
       "rating_note": null
     },
     {
-      "id": 42,
+      "id": 57,
       "city_id": 2,
-      "district_id": 24,
+      "district_id": 38,
       "channel": "bzf",
       "name": "安居·紫金公馆",
       "slug": "安居·紫金公馆",
@@ -1374,9 +1374,9 @@
       "rating_note": null
     },
     {
-      "id": 44,
+      "id": 59,
       "city_id": 2,
-      "district_id": 26,
+      "district_id": 40,
       "channel": "bzf",
       "name": "安居·老门东里",
       "slug": "安居·老门东里",
@@ -1397,7 +1397,7 @@
       "rating_note": null
     },
     {
-      "id": 48,
+      "id": 63,
       "city_id": 2,
       "district_id": null,
       "channel": "trade",
@@ -1422,8 +1422,8 @@
   ],
   "units": [
     {
-      "id": 108,
-      "project_id": 41,
+      "id": 150,
+      "project_id": 56,
       "name": "30 平",
       "slug": "30-平",
       "area_sqm": 30.0,
@@ -1505,8 +1505,8 @@
       "cover_image": null
     },
     {
-      "id": 109,
-      "project_id": 41,
+      "id": 151,
+      "project_id": 56,
       "name": "45 平",
       "slug": "45-平",
       "area_sqm": 45.0,
@@ -1588,8 +1588,8 @@
       "cover_image": null
     },
     {
-      "id": 110,
-      "project_id": 41,
+      "id": 152,
+      "project_id": 56,
       "name": "60 平",
       "slug": "60-平",
       "area_sqm": 60.0,
@@ -1671,8 +1671,8 @@
       "cover_image": null
     },
     {
-      "id": 111,
-      "project_id": 41,
+      "id": 153,
+      "project_id": 56,
       "name": "70 平",
       "slug": "70-平",
       "area_sqm": 70.0,
@@ -1754,8 +1754,8 @@
       "cover_image": null
     },
     {
-      "id": 112,
-      "project_id": 42,
+      "id": 154,
+      "project_id": 57,
       "name": "35 平",
       "slug": "35-平",
       "area_sqm": 35.0,
@@ -1837,8 +1837,8 @@
       "cover_image": null
     },
     {
-      "id": 113,
-      "project_id": 42,
+      "id": 155,
+      "project_id": 57,
       "name": "50 平",
       "slug": "50-平",
       "area_sqm": 50.0,
@@ -1920,8 +1920,8 @@
       "cover_image": null
     },
     {
-      "id": 114,
-      "project_id": 42,
+      "id": 156,
+      "project_id": 57,
       "name": "65 平",
       "slug": "65-平",
       "area_sqm": 65.0,
@@ -2003,8 +2003,8 @@
       "cover_image": null
     },
     {
-      "id": 115,
-      "project_id": 43,
+      "id": 157,
+      "project_id": 58,
       "name": "28 平",
       "slug": "28-平",
       "area_sqm": 28.0,
@@ -2086,8 +2086,8 @@
       "cover_image": null
     },
     {
-      "id": 116,
-      "project_id": 43,
+      "id": 158,
+      "project_id": 58,
       "name": "40 平",
       "slug": "40-平",
       "area_sqm": 40.0,
@@ -2169,8 +2169,8 @@
       "cover_image": null
     },
     {
-      "id": 117,
-      "project_id": 43,
+      "id": 159,
+      "project_id": 58,
       "name": "55 平",
       "slug": "55-平",
       "area_sqm": 55.0,
@@ -2252,8 +2252,8 @@
       "cover_image": null
     },
     {
-      "id": 118,
-      "project_id": 44,
+      "id": 160,
+      "project_id": 59,
       "name": "32 平",
       "slug": "32-平",
       "area_sqm": 32.0,
@@ -2335,8 +2335,8 @@
       "cover_image": null
     },
     {
-      "id": 119,
-      "project_id": 44,
+      "id": 161,
+      "project_id": 59,
       "name": "46 平",
       "slug": "46-平",
       "area_sqm": 46.0,
@@ -2418,8 +2418,8 @@
       "cover_image": null
     },
     {
-      "id": 120,
-      "project_id": 44,
+      "id": 162,
+      "project_id": 59,
       "name": "58 平",
       "slug": "58-平",
       "area_sqm": 58.0,
@@ -2501,8 +2501,8 @@
       "cover_image": null
     },
     {
-      "id": 121,
-      "project_id": 45,
+      "id": 163,
+      "project_id": 60,
       "name": "30 平",
       "slug": "30-平",
       "area_sqm": 30.0,
@@ -2584,8 +2584,8 @@
       "cover_image": null
     },
     {
-      "id": 122,
-      "project_id": 45,
+      "id": 164,
+      "project_id": 60,
       "name": "44 平",
       "slug": "44-平",
       "area_sqm": 44.0,
@@ -2667,8 +2667,8 @@
       "cover_image": null
     },
     {
-      "id": 123,
-      "project_id": 46,
+      "id": 165,
+      "project_id": 61,
       "name": "35 平",
       "slug": "35-平",
       "area_sqm": 35.0,
@@ -2750,8 +2750,8 @@
       "cover_image": null
     },
     {
-      "id": 124,
-      "project_id": 46,
+      "id": 166,
+      "project_id": 61,
       "name": "52 平",
       "slug": "52-平",
       "area_sqm": 52.0,
@@ -2833,8 +2833,8 @@
       "cover_image": null
     },
     {
-      "id": 125,
-      "project_id": 46,
+      "id": 167,
+      "project_id": 61,
       "name": "68 平",
       "slug": "68-平",
       "area_sqm": 68.0,
@@ -2916,8 +2916,8 @@
       "cover_image": null
     },
     {
-      "id": 126,
-      "project_id": 47,
+      "id": 168,
+      "project_id": 62,
       "name": "28 平",
       "slug": "28-平",
       "area_sqm": 28.0,
@@ -2999,8 +2999,8 @@
       "cover_image": null
     },
     {
-      "id": 127,
-      "project_id": 47,
+      "id": 169,
+      "project_id": 62,
       "name": "42 平",
       "slug": "42-平",
       "area_sqm": 42.0,
@@ -3082,8 +3082,8 @@
       "cover_image": null
     },
     {
-      "id": 128,
-      "project_id": 48,
+      "id": 170,
+      "project_id": 63,
       "name": "85 平",
       "slug": "85-平",
       "area_sqm": 85.0,
@@ -3118,8 +3118,8 @@
       "cover_image": null
     },
     {
-      "id": 129,
-      "project_id": 48,
+      "id": 171,
+      "project_id": 63,
       "name": "105 平",
       "slug": "105-平",
       "area_sqm": 105.0,
@@ -3154,8 +3154,8 @@
       "cover_image": null
     },
     {
-      "id": 130,
-      "project_id": 48,
+      "id": 172,
+      "project_id": 63,
       "name": "130 平",
       "slug": "130-平",
       "area_sqm": 130.0,
@@ -3192,351 +3192,351 @@
   ],
   "photos": [
     {
-      "id": 425,
+      "id": 496,
       "entity_type": "project",
-      "entity_id": 41,
+      "entity_id": 56,
       "file_path": "assets/juzhu/sy/projects/bzf/和平区/CCB建融家园中华路店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 430,
+      "id": 501,
       "entity_type": "project",
-      "entity_id": 42,
+      "entity_id": 57,
       "file_path": "assets/juzhu/sy/projects/bzf/和平区/逸居雪莲店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 434,
+      "id": 505,
       "entity_type": "project",
-      "entity_id": 43,
+      "entity_id": 58,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/新东人才住房.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 438,
+      "id": 509,
       "entity_type": "project",
-      "entity_id": 44,
+      "entity_id": 59,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/观泉店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 442,
+      "id": 513,
       "entity_type": "project",
-      "entity_id": 45,
+      "entity_id": 60,
       "file_path": "assets/juzhu/sy/projects/bzf/大东区/逸居望花丽景店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 445,
+      "id": 516,
       "entity_type": "project",
-      "entity_id": 46,
+      "entity_id": 61,
       "file_path": "assets/juzhu/sy/projects/bzf/沈河区/CCB建融家园青年大街店.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 449,
+      "id": 520,
       "entity_type": "project",
-      "entity_id": 47,
+      "entity_id": 62,
       "file_path": "assets/juzhu/sy/projects/bzf/沈河区/中金启城.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 452,
+      "id": 523,
       "entity_type": "project",
-      "entity_id": 48,
+      "entity_id": 63,
       "file_path": "assets/juzhu/sy/projects/trade/中德人才社区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 417,
+      "id": 488,
       "entity_type": "district",
-      "entity_id": 24,
+      "entity_id": 38,
       "file_path": "assets/juzhu/sy/districts/和平区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 418,
+      "id": 489,
       "entity_type": "district",
-      "entity_id": 25,
+      "entity_id": 39,
       "file_path": "assets/juzhu/sy/districts/沈河区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 419,
+      "id": 490,
       "entity_type": "district",
-      "entity_id": 26,
+      "entity_id": 40,
       "file_path": "assets/juzhu/sy/districts/浑南区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 420,
+      "id": 491,
       "entity_type": "district",
-      "entity_id": 27,
+      "entity_id": 41,
       "file_path": "assets/juzhu/sy/districts/皇姑区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 421,
+      "id": 492,
       "entity_type": "district",
-      "entity_id": 28,
+      "entity_id": 42,
       "file_path": "assets/juzhu/sy/districts/铁西区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 422,
+      "id": 493,
       "entity_type": "district",
-      "entity_id": 29,
+      "entity_id": 43,
       "file_path": "assets/juzhu/sy/districts/大东区.jpeg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 423,
+      "id": 494,
       "entity_type": "district",
-      "entity_id": 30,
+      "entity_id": 44,
       "file_path": "assets/juzhu/sy/districts/于洪区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 424,
+      "id": 495,
       "entity_type": "district",
-      "entity_id": 31,
+      "entity_id": 45,
       "file_path": "assets/juzhu/sy/districts/和平区.jpg",
       "source_path": null,
       "is_cover": 1,
       "sort_order": 0
     },
     {
-      "id": 426,
+      "id": 497,
       "entity_type": "unit",
-      "entity_id": 108,
+      "entity_id": 150,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 427,
+      "id": 498,
       "entity_type": "unit",
-      "entity_id": 109,
+      "entity_id": 151,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 428,
+      "id": 499,
       "entity_type": "unit",
-      "entity_id": 110,
+      "entity_id": 152,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 429,
+      "id": 500,
       "entity_type": "unit",
-      "entity_id": 111,
+      "entity_id": 153,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 431,
+      "id": 502,
       "entity_type": "unit",
-      "entity_id": 112,
+      "entity_id": 154,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 432,
+      "id": 503,
       "entity_type": "unit",
-      "entity_id": 113,
+      "entity_id": 155,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 433,
+      "id": 504,
       "entity_type": "unit",
-      "entity_id": 114,
+      "entity_id": 156,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 435,
+      "id": 506,
       "entity_type": "unit",
-      "entity_id": 115,
+      "entity_id": 157,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 436,
+      "id": 507,
       "entity_type": "unit",
-      "entity_id": 116,
+      "entity_id": 158,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 437,
+      "id": 508,
       "entity_type": "unit",
-      "entity_id": 117,
+      "entity_id": 159,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 439,
+      "id": 510,
       "entity_type": "unit",
-      "entity_id": 118,
+      "entity_id": 160,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 440,
+      "id": 511,
       "entity_type": "unit",
-      "entity_id": 119,
+      "entity_id": 161,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 441,
+      "id": 512,
       "entity_type": "unit",
-      "entity_id": 120,
+      "entity_id": 162,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 443,
+      "id": 514,
       "entity_type": "unit",
-      "entity_id": 121,
+      "entity_id": 163,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 444,
+      "id": 515,
       "entity_type": "unit",
-      "entity_id": 122,
+      "entity_id": 164,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 446,
+      "id": 517,
       "entity_type": "unit",
-      "entity_id": 123,
+      "entity_id": 165,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 447,
+      "id": 518,
       "entity_type": "unit",
-      "entity_id": 124,
+      "entity_id": 166,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 448,
+      "id": 519,
       "entity_type": "unit",
-      "entity_id": 125,
+      "entity_id": 167,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_1.jpg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 450,
+      "id": 521,
       "entity_type": "unit",
-      "entity_id": 126,
+      "entity_id": 168,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 451,
+      "id": 522,
       "entity_type": "unit",
-      "entity_id": 127,
+      "entity_id": 169,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 453,
+      "id": 524,
       "entity_type": "unit",
-      "entity_id": 128,
+      "entity_id": 170,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 454,
+      "id": 525,
       "entity_type": "unit",
-      "entity_id": 129,
+      "entity_id": 171,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
       "source_path": null,
       "is_cover": 0,
       "sort_order": 0
     },
     {
-      "id": 455,
+      "id": 526,
       "entity_type": "unit",
-      "entity_id": 130,
+      "entity_id": 172,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": null,
       "is_cover": 0,

@@ -25,7 +25,7 @@ window.JUZHU = (function () {
     }).then(function (list) {
       if (!Array.isArray(list)) return '';
       for (var i = 0; i < list.length; i++) {
-        if (list[i].name === city && list[i].slug) return 'data-' + list[i].slug + '.json';
+        if ((list[i].slug === city || list[i].name === city) && list[i].slug) return 'data-' + list[i].slug + '.json';
       }
       return '';
     }).catch(function () { return ''; });

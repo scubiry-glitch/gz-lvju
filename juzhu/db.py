@@ -943,7 +943,7 @@ def export_json(conn=None):
         CITIES_PATH = JSON_PATH.with_name("cities.json")
         CITIES_PATH.write_text(json.dumps(cities, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        # 每城一文件：data.json = 第一个城市（向后兼容），其余 data-<slug>.json
+        # 每城一文件：data.json = 第一个城市（向后兼容），同时每个城市都写 data-<slug>.json
         # 空城市（无区/无项目）不写数据文件，仅保留在 cities.json（前端会回退到默认数据）
         first = None
         for idx, city in enumerate(cities):
@@ -951,7 +951,7 @@ def export_json(conn=None):
             if idx == 0:
                 first = data
                 JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-            elif data["districts"] or data["projects"]:
+            if data["districts"] or data["projects"]:
                 JSON_PATH.with_name(f"data-{city['slug']}.json").write_text(
                     json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
                 )
