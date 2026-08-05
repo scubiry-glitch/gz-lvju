@@ -335,8 +335,12 @@
       '<div class="' + avCls + '" style="' + avStyle + '">' + avInner + '</div>' +
       '<div><div class="nm">' + kName + '</div><div class="hint">联系我了解更多信息</div></div>' +
       '<div class="acts">' +
-        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话">📞</a>' : '') +
+        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话" id="keeperTel">📞</a>' : '') +
       '</div>';
+    var keeperTel = document.getElementById('keeperTel');
+    if (keeperTel) {
+      keeperTel.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
+    }
 
     if (JUZHU.effectiveRentDetail(u)) {
       document.getElementById('rentModalWrap').innerHTML = JUZHU.rentDetailModalHtml(u);
@@ -365,31 +369,34 @@
     var consult = document.getElementById('rentConsult');
     if (consult) {
       consult.onclick = function() {
-        if (tel) location.href = tel;
+        if (tel) callWithPrivacy(tel);
         else alert('暂未配置咨询电话');
       };
     }
   }
 
+  // 统一拨号入口：先弹隐私保护提示，确认后拨打
+  function callWithPrivacy(tel) {
+    var modal = document.getElementById('privacyModal');
+    if (!modal || !tel) return;
+    function closePrivacy() { modal.hidden = true; document.body.style.overflow = ''; }
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('privacyOk').onclick = function() {
+      closePrivacy();
+      location.href = tel;
+    };
+    document.getElementById('privacyCancel').onclick = closePrivacy;
+    document.getElementById('privacyClose').onclick = closePrivacy;
+    document.getElementById('privacyBackdrop').onclick = closePrivacy;
+  }
+
   function bindTelLinks(phone) {
     var tel = JUZHU.telHref(phone);
     var callBtn = document.getElementById('callBtn');
-    var modal = document.getElementById('privacyModal');
     if (tel) {
       callBtn.href = tel;
-      callBtn.onclick = function(e) {
-        e.preventDefault();
-        modal.hidden = false;
-        document.body.style.overflow = 'hidden';
-      };
-      function closePrivacy() { modal.hidden = true; document.body.style.overflow = ''; }
-      document.getElementById('privacyOk').onclick = function() {
-        closePrivacy();
-        location.href = tel;
-      };
-      document.getElementById('privacyCancel').onclick = closePrivacy;
-      document.getElementById('privacyClose').onclick = closePrivacy;
-      document.getElementById('privacyBackdrop').onclick = closePrivacy;
+      callBtn.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
     } else {
       callBtn.href = '#';
       callBtn.onclick = function(e) { e.preventDefault(); alert('暂未配置咨询电话，请在内容编辑后台设置'); };
