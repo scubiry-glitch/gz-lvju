@@ -5,5 +5,19 @@
     "slug": "shenyang",
     "booking_phone": "13897971552",
     "hero_bg_image": "assets/juzhu/sy/city/hero.jpg"
+  },
+  {
+    "id": 2,
+    "name": "南京",
+    "slug": "nanjing",
+    "booking_phone": "13951880001",
+    "hero_bg_image": "assets/juzhu/sy/city/hero.jpg"
+  },
+  {
+    "id": 3,
+    "name": "贵阳",
+    "slug": "guiyang",
+    "booking_phone": "13985120001",
+    "hero_bg_image": "assets/juzhu/sy/city/hero.jpg"
   }
 ]

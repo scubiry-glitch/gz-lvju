@@ -317,6 +317,9 @@ class Handler(SimpleHTTPRequestHandler):
             if qs.get("district_id"):
                 sql += " AND p.district_id=?"
                 params.append(int(qs["district_id"][0]))
+            if qs.get("city_id"):
+                sql += " AND p.city_id=?"
+                params.append(int(qs["city_id"][0]))
             if qs.get("q"):
                 sql += " AND p.name LIKE ?"
                 params.append("%" + qs["q"][0] + "%")
@@ -342,7 +345,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self._update_settings()
 
         if path == f"{ADMIN_PREFIX}/dictionary" and method == "GET":
-            return self._get_dictionary()
+            return self._get_dictionary(qs)
 
         if path == f"{ADMIN_PREFIX}/city" and method == "PUT":
             return self._update_city()
@@ -453,6 +456,11 @@ class Handler(SimpleHTTPRequestHandler):
             return f" AND {col}=?" if city_id else ""
         def city_params():
             return (city_id,) if city_id else ()
+        if path == "/api/juzhu/cities":
+            data = rows_to_list(conn.execute("SELECT * FROM cities ORDER BY id"))
+            conn.close()
+            return self._json(data)
+
         if path == "/api/juzhu/stats":
             d = conn.execute("SELECT COUNT(*) c FROM districts" + (" WHERE city_id=?" if city_id else ""), city_params()).fetchone()[0]
             pb = conn.execute("SELECT COUNT(*) c FROM projects WHERE channel='bzf'" + city_filter(), city_params()).fetchone()[0]
@@ -1541,20 +1549,22 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"error": "channel 须为 bzf 或 trade"}, 400)
 
         conn = connect()
-        city = conn.execute("SELECT id FROM cities LIMIT 1").fetchone()
-        if not city:
+        city_id = b.get("city_id")
+        if not city_id:
+            city = conn.execute("SELECT id FROM cities LIMIT 1").fetchone()
+            city_id = city[0] if city else None
+        if not city_id:
             conn.close()
             return self._json({"error": "未配置城市"}, 500)
-        city_id = city[0]
 
         district_id = b.get("district_id")
         if channel == "bzf":
             if not district_id:
                 conn.close()
                 return self._json({"error": "保租房项目须选择行政区"}, 400)
-            if not conn.execute("SELECT id FROM districts WHERE id=?", (district_id,)).fetchone():
+            if not conn.execute("SELECT id FROM districts WHERE id=? AND city_id=?", (district_id, city_id)).fetchone():
                 conn.close()
-                return self._json({"error": "行政区不存在"}, 400)
+                return self._json({"error": "行政区不存在或不属于当前城市"}, 400)
         else:
             district_id = None
 
@@ -1951,10 +1961,14 @@ class Handler(SimpleHTTPRequestHandler):
         phone = (body.get("booking_phone") or "").strip() or None
         conn = connect()
         if phone is not None:
-            conn.execute(
-                "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
-                (phone,),
-            )
+            cid = body.get("city_id")
+            if cid:
+                conn.execute("UPDATE cities SET booking_phone=? WHERE id=?", (phone, cid))
+            else:
+                conn.execute(
+                    "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
+                    (phone,),
+                )
         bool_keys = ["show_city_switcher", "show_life_service"]
         for k in bool_keys:
             if k in body:
@@ -1968,10 +1982,16 @@ class Handler(SimpleHTTPRequestHandler):
         conn.close()
         return self._json({"ok": True, "booking_phone": phone})
 
-    def _get_dictionary(self):
+    def _get_dictionary(self, qs=None):
         conn = connect()
-        city = row_to_dict(conn.execute("SELECT * FROM cities ORDER BY id LIMIT 1").fetchone())
-        districts = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order, id"))
+        qs = qs or {}
+        city_id = self._city_id(conn, qs)
+        if city_id:
+            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (city_id,)).fetchone())
+            districts = rows_to_list(conn.execute("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id", (city_id,)))
+        else:
+            city = row_to_dict(conn.execute("SELECT * FROM cities ORDER BY id LIMIT 1").fetchone())
+            districts = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order, id"))
         channels = rows_to_list(conn.execute("SELECT * FROM channels ORDER BY sort_order, id"))
         conn.close()
         return self._json({"city": city, "districts": districts, "channels": channels})
@@ -1983,11 +2003,13 @@ class Handler(SimpleHTTPRequestHandler):
         if not name:
             return self._json({"error": "城市名称不能为空"}, 400)
         conn = connect()
-        row = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
-        if not row:
+        cid = body.get("city_id")
+        if not cid:
+            row = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
+            cid = row[0] if row else None
+        if not cid:
             conn.close()
             return self._json({"error": "未找到城市"}, 404)
-        cid = row[0]
         if not slug:
             slug = slugify(name)
         fields = ["name=?", "slug=?"]
@@ -2051,19 +2073,22 @@ class Handler(SimpleHTTPRequestHandler):
         if not name:
             return self._json({"error": "行政区名称不能为空"}, 400)
         conn = connect()
-        city = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
-        if not city:
+        city_id = body.get("city_id")
+        if not city_id:
+            city = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
+            city_id = city[0] if city else None
+        if not city_id:
             conn.close()
             return self._json({"error": "请先配置城市"}, 400)
         slug = (body.get("slug") or name).strip() or name
-        if conn.execute("SELECT id FROM districts WHERE city_id=? AND slug=?", (city[0], slug)).fetchone():
+        if conn.execute("SELECT id FROM districts WHERE city_id=? AND slug=?", (city_id, slug)).fetchone():
             conn.close()
             return self._json({"error": "slug 已存在"}, 400)
         conn.execute(
             """INSERT INTO districts(city_id,name,slug,note,sort_order,cover_image,has_projects)
                VALUES (?,?,?,?,?,?,?)""",
             (
-                city[0],
+                city_id,
                 name,
                 slug,
                 (body.get("note") or "").strip() or None,
