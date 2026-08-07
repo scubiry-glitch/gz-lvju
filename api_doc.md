@@ -4,13 +4,13 @@
 
 第三方商家通过本接口管理产品（SKU）和接收订单状态回调。
 
-- **测试环境**：`http://localhost:8765`
+- **测试环境**：`http://49.232.103.71:8765`
 - **生产环境**：`https://your-domain`
 - **Content-Type**：`application/json`
 - **认证方式**：HMAC-SHA256 签名（见第 2 章）
 - **测试密钥**
   - VENDOR_ID = 41
-  - SECRET = "7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d"
+  - SECRET = 7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d
 
 ### 接口一览
 
@@ -673,7 +673,7 @@ POST /api/juzhu/jiazheng/vendor/products/delete
 |------|-----------|-----------|
 | 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` |
 
-测试环境接口地址：`http://localhost:8765`
+测试环境接口地址：`http://49.232.103.71:8765`
 
 ### 密钥文件格式
 
@@ -754,7 +754,7 @@ class HmacAuth:
 
 VENDOR_ID = 41
 SECRET = "7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d"
-BASE = "http://localhost:8765"
+BASE = "http://49.232.103.71:8765"
 auth = HmacAuth(SECRET)
 
 # 查询产品列表
