@@ -247,8 +247,10 @@
       <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
       <div class="jz-sub-list" id="jzSubs"></div>
 
+      <!-- 本月精选 暂时隐藏
       <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
       <div class="jz-promo" id="jzPromo"></div>
+      -->
     </div>
     <div class="load-err" id="err" hidden></div>
   </div>
@@ -452,20 +454,15 @@
     }).join('');
   }
 
-  // 热门子类（接 API SKU，链到详情页）
+  // 热门子类（接 API SKU，链到详情页；只展示 API 实际返回的品类，不做兜底）
   function renderJiazhengSubs(skus) {
-    var pick = function(cat, fallback) {
-      var row = (skus || []).filter(function(s) { return s.category_id === cat; })[0];
-      return row || fallback;
-    };
-    var rows = [
-      pick('cleaning', { name: '深度清洁 · 4小时', spec: '3人团队 · 含厨卫去污', price_from: 268, price_unit: '起', slug: 'deep-clean-4h', category_id: 'cleaning' }),
-      pick('repair', { name: '管道疏通 · 当天', spec: '30分钟上门 · 不通不收费', price_from: 99, price_unit: '起', slug: 'pipe-unclog-fast', category_id: 'repair' }),
-      pick('moving', { name: '居民搬家 · 同城', spec: '金杯车 · 2名师傅', price_from: 398, price_unit: '起', slug: 'moving-city-standard', category_id: 'moving' }),
-      pick('nanny', { name: '钟点工 · 3小时', spec: '做饭保洁 · 灵活预约', price_from: 128, price_unit: '/次', slug: 'nanny-hourly-3h', category_id: 'nanny' })
-    ];
+    var cats = ['cleaning', 'repair', 'moving', 'nanny'];
+    var rows = cats.map(function(cat) {
+      return (skus || []).filter(function(s) { return s.category_id === cat; })[0] || null;
+    }).filter(Boolean);
     document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
-      var price = '¥' + Number(r.price_from || 0).toLocaleString() + (r.price_unit || '起');
+      var displayPrice = r.product_min_price || r.price_from || 0;
+      var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
       return '<a class="row" href="juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug) + '">' +
         '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:12px;">' +
@@ -509,7 +506,7 @@
     activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
   }
 
-  renderJiazhengPromo();
+  // renderJiazhengPromo();  // 本月精选暂时隐藏
 
   if (window.BZF_JZ && BZF_JZ.categories) {
     BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});

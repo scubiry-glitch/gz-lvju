@@ -117,8 +117,18 @@
         <select id="m_vendor" required></select>
       </div>
       <div class="fld">
-        <label>引用 SPU（平台标准品）</label>
-        <select id="m_spu"><option value="">-- 不关联 SPU --</option></select>
+        <label>引用 SPU（平台标准品）*</label>
+        <select id="m_spu" required><option value="">-- 选择 SPU --</option></select>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="fld">
+        <label>小程序路径 path *</label>
+        <input type="text" id="m_path" placeholder="如：pages/service/detail" maxlength="200" required />
+      </div>
+      <div class="fld">
+        <label>小程序参数 query *</label>
+        <input type="text" id="m_query" placeholder="如：id=123&type=clean" maxlength="200" required />
       </div>
     </div>
     <div class="fld">
@@ -350,6 +360,8 @@
     // SPU + 服务者
     fillSpuOptions(p ? p.vendor_type : '');
     $('m_spu').value = p && p.channel_sku_id ? String(p.channel_sku_id) : '';
+    $('m_path').value = p ? (p.path||'') : '';
+    $('m_query').value = p ? (p.query||'') : '';
     renderWorkerPicker(p ? p.vendor_id : '', p ? (p.worker_ids||[]) : []);
     $('modal').classList.add('show');
   }
@@ -393,10 +405,15 @@
       sort_order: parseInt($('m_sort').value)||99,
       status: $('m_status').value,
       channel_sku_id: $('m_spu').value ? parseInt($('m_spu').value) : null,
+      path: $('m_path').value.trim(),
+      query: $('m_query').value.trim(),
       worker_ids: [...document.querySelectorAll('#m_workers input:checked')].map(x => parseInt(x.value)),
     };
     if (!body.vendor_id) { toast('请选择商家', 'err'); return; }
     if (!body.title) { toast('请输入 SKU 标题', 'err'); return; }
+    if (!body.channel_sku_id) { toast('请选择引用 SPU', 'err'); return; }
+    if (!body.path) { toast('请输入小程序路径 path', 'err'); return; }
+    if (!body.query) { toast('请输入小程序参数 query', 'err'); return; }
     const id = $('m_id').value;
     const url = id ? '/api/juzhu/jz/products/'+id : '/api/juzhu/jz/products';
     const method = id ? 'PUT' : 'POST';

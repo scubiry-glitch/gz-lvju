@@ -92,9 +92,11 @@
     <div class="hero-card" id="hero"></div>
 
     <div class="toolbar">
+      <!-- 运营标签暂隐藏
       <span class="tag hot">神券立减</span>
       <span class="tag">品牌严选</span>
       <span class="tag">最快上门</span>
+      -->
       <span class="sep" id="countLabel">0 个服务</span>
     </div>
 
@@ -134,7 +136,8 @@
   };
 
   function priceText(item){
-    return '¥' + Number(item.price_from || 0).toLocaleString();
+    var p = item.product_min_price || item.price_from || 0;
+    return '¥' + Number(p).toLocaleString();
   }
 
   function renderSubs(){
@@ -151,7 +154,7 @@
   function renderHero(){
     var cat = categories.find(function(x){ return x.id === currentType; }) || { name: '家政', icon: '✨' };
     var ui = CAT_UI[currentType] || CAT_UI.cleaning;
-    var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.price_from||0)-(b.price_from||0); })[0];
+    var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.product_min_price||a.price_from||0)-(b.product_min_price||b.price_from||0); })[0];
     var el = document.getElementById('hero');
     el.className = 'hero-card ' + ui.cls;
     el.innerHTML = '<div class="in">'+

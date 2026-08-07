@@ -187,16 +187,17 @@ def _review_reply(vendor_name, score):
 
 
 
-def _review_rows(conn, sku_ids, vendor_name, limit=6):
-    if not sku_ids:
+def _review_rows(conn, product_ids, vendor_name, limit=6):
+    if not product_ids:
         return []
-    placeholders = ",".join(["?"] * len(sku_ids))
+    placeholders = ",".join(["?"] * len(product_ids))
     rows = conn.execute(
         f"""SELECT o.*, s.name AS sku_name FROM jz_orders o
-             LEFT JOIN jz_skus s ON s.id=o.sku_id
+             LEFT JOIN jz_products p ON p.id=o.sku_id
+             LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
              WHERE o.rating_json IS NOT NULL AND o.sku_id IN ({placeholders})
              ORDER BY COALESCE(o.updated_at, o.created_at) DESC LIMIT ?""",
-        list(sku_ids) + [int(limit)],
+        list(product_ids) + [int(limit)],
     ).fetchall()
     reviews = []
     for row in rows:
@@ -282,6 +283,8 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
                p.rating AS product_rating,
                p.service_tags AS product_service_tags,
                p.channel_sku_id AS product_channel_sku_id,
+               p.path AS product_path,
+               p.query AS product_query,
                p.status AS product_status,
                p.sort_order AS product_sort_order,
                v.id AS vendor_id,
@@ -335,6 +338,8 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
         "rating": raw.get("product_rating"),
         "service_tags": raw.get("product_service_tags"),
         "channel_sku_id": raw.get("product_channel_sku_id"),
+        "path": raw.get("product_path"),
+        "query": raw.get("product_query"),
         "status": raw.get("product_status"),
         "sort_order": raw.get("product_sort_order"),
     })
@@ -371,12 +376,11 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
     for worker in workers:
         worker["auth_badges"] = _worker_auth_badges(worker)
     workers = workers[:4]
-    sku_ids = [sku_id]
+    product_ids = [product["id"]]
     for p in list_products_by_vendor(conn, vendor["id"]):
-        channel_sku_id = p.get("channel_sku_id")
-        if channel_sku_id and channel_sku_id not in sku_ids:
-            sku_ids.append(channel_sku_id)
-    reviews = _review_rows(conn, sku_ids[:8], vendor.get("name"), limit=6)
+        if p.get("id") and p["id"] not in product_ids:
+            product_ids.append(p["id"])
+    reviews = _review_rows(conn, product_ids[:8], vendor.get("name"), limit=6)
     if len(reviews) < 3:
         reviews.extend(_fallback_reviews(category_id or vendor.get("type") or "cleaning", vendor.get("name")))
         reviews = reviews[:4]
@@ -648,8 +652,8 @@ def create_product(conn, data):
         """INSERT INTO jz_products
            (vendor_id, title, subtitle, category, duration_hours, area_range, unit,
             price, original_price, discount_label, earliest_time, advance_booking_hours,
-            sales_count, rating, service_tags, channel_sku_id, status, sort_order)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            sales_count, rating, service_tags, channel_sku_id, path, query, status, sort_order)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (int(data.get("vendor_id", 0)),
          data.get("title", ""),
          data.get("subtitle", ""),
@@ -666,6 +670,8 @@ def create_product(conn, data):
          float(data.get("rating", 0)),
          _json.dumps(data.get("service_tags", []), ensure_ascii=False),
          int(data["channel_sku_id"]) if data.get("channel_sku_id") else None,
+         data.get("path", ""),
+         data.get("query", ""),
          data.get("status", "on"),
          int(data.get("sort_order", 99))),
     )
@@ -683,7 +689,7 @@ def update_product(conn, pid, data):
     for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
               "unit", "price", "original_price", "discount_label", "earliest_time",
               "advance_booking_hours", "sales_count", "rating", "service_tags",
-              "channel_sku_id", "status", "sort_order"):
+              "channel_sku_id", "path", "query", "status", "sort_order"):
         if k in data:
             v = data[k]
             if k == "service_tags":

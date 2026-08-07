@@ -135,6 +135,12 @@
   .cta .btn-call{margin-left:auto;padding:11px 14px;font-size:12px;background:#fff;
     color:var(--brand);border:1px solid var(--border);font-weight:600;}
   .cta #submitBtn{margin-left:0;padding:12px 22px;font-size:14px;}
+  /* loading 遮罩 */
+  .loading-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  .loading-overlay.on{display:flex;}
+  .loading-overlay .spinner{width:42px;height:42px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-overlay .text{color:#fff;font-size:14px;font-weight:600;letter-spacing:.04em;}
 </style>
 </head>
 <body>
@@ -143,7 +149,7 @@
     <div class="appbar ghost" style="position:absolute;z-index:20;">
       <a class="bk" href="javascript:history.back()">‹</a>
       <div class="ttl" id="ttl">家政详情<small>服务介绍 · 选择时间</small></div>
-      <div class="act"><span>♡</span><span>⤴</span></div>
+      <!-- 收藏/分享暂隐藏 <div class="act"><span>♡</span><span>⤴</span></div> -->
     </div>
 
     <div class="hero" id="hero"></div>
@@ -199,26 +205,34 @@
       <div class="reviews" id="reviews"></div>
     </div>
 
+    <!-- 选择上门时间 暂时隐藏
     <div class="block">
       <h3 id="timeTitle">选择上门时间</h3>
       <p class="spec" id="timeHint" style="margin-top:8px;font-size:12px;color:var(--muted);">选定时间后进入确认页填写地址与联系方式</p>
       <div class="time-slots" id="timeSlots"></div>
     </div>
+    -->
 
+    <!-- 更多推荐 暂时隐藏
     <div class="block">
       <h3>更多推荐</h3>
       <div class="related" id="related"></div>
     </div>
+    -->
   </div>
 
   <div class="cta">
     <div class="p"><b id="ctaPrice">¥0</b><span>下一步填写预约信息</span></div>
-    <div class="heart">⚑</div>
+    <!-- 收藏图标暂隐藏 <div class="heart">⚑</div> -->
     <a class="btn btn-call demo-only" href="screens/p-service-demand.html">看中台工单池</a>
     <a class="btn" href="#" id="submitBtn">下一步</a>
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="text">正在生成预约链接…</div>
+</div>
 <script src="screens/_region.js"></script>
 <script src="screens/_jzapi.js?v=2"></script>
 <script src="jz-datepick.js?v=2"></script>
@@ -230,6 +244,7 @@
   var slug = q.get('sku') || TYPE_SKU[q.get('type')] || 'deep-clean-4h';
   var curVendor = q.get('vendor') || null;   // 多商家同款：锁定某商家
   var item = null;
+  var product = null;
   var related = [];
   var vendor = null;
   var vendors = [];
@@ -396,8 +411,9 @@
       '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后进入中台工单池统一派单。</p>'+
       '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span><span>'+(item.duration_min || 0)+' 分钟</span><span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
     '</div>';
-    document.getElementById('price').textContent = fmtPrice(item.price_from);
-    document.getElementById('ctaPrice').textContent = fmtPrice(item.price_from);
+    var displayPrice = (product && product.price != null) ? product.price : item.price_from;
+    document.getElementById('price').textContent = fmtPrice(displayPrice);
+    document.getElementById('ctaPrice').textContent = fmtPrice(displayPrice);
     document.getElementById('priceUnit').textContent = item.price_unit || '起';
     document.getElementById('sales').textContent = item.sales_text || '最近好评稳定';
     document.getElementById('spec').textContent = item.spec || '';
@@ -410,9 +426,10 @@
     document.getElementById('flow').innerHTML = (item.service_flow || []).map(function(x, i){
       return '<div class="item"><span class="dot">'+(i+1)+'</span><div><b>'+x+'</b><p>'+(item.service_notice && item.service_notice[i] ? item.service_notice[i] : '符合中台认证与工单流转要求')+'</p></div></div>';
     }).join('');
-    document.getElementById('related').innerHTML = related.map(function(x){
-      return '<a class="r-card" href="?sku='+encodeURIComponent(x.slug)+'"><div><b>'+x.name+'</b><p>'+(x.spec||'')+'</p></div><span>'+fmtPrice(x.price_from)+'</span></a>';
-    }).join('');
+    // 更多推荐暂时隐藏
+    // document.getElementById('related').innerHTML = related.map(function(x){
+    //   return '<a class="r-card" href="?sku='+encodeURIComponent(x.slug)+'"><div><b>'+x.name+'</b><p>'+(x.spec||'')+'</p></div><span>'+fmtPrice(x.price_from)+'</span></a>';
+    // }).join('');
     renderMerchant();
     renderWorkers();
     renderReviews();
@@ -514,22 +531,38 @@
   }
 
   document.title = '家政详情 · ' + JZ.regionCity();
-  renderTimeSlots();
-  loadSlots();
+  // 选择上门时间暂时隐藏
+  // renderTimeSlots();
+  // loadSlots();
 
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
-    if (!selectedTime) return toast('请先选择上门时间');
-    location.href = 'jiazheng-booking.html?sku=' + encodeURIComponent(slug) +
-      '&time=' + encodeURIComponent(selectedTime) +
-      (selectedSlot ? '&slot=' + encodeURIComponent(selectedSlot.id) : '') +
-      (selectedWorker ? '&worker=' + encodeURIComponent(selectedWorker) : '');
+    // 显示 loading
+    var overlay = document.getElementById('loadingOverlay');
+    overlay.classList.add('on');
+
+    // 调用后端生成微信小程序 URL Link
+    fetch('/api/juzhu/jiazheng/wechat-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (JZ.apiKey()) },
+      body: JSON.stringify({ product_id: product.id })
+    }).then(function(r){ return r.json(); })
+      .then(function(res){
+        overlay.classList.remove('on');
+        if (!res.ok) return toast(res.error || '生成预约链接失败');
+        // 跳转第三方小程序
+        window.location.href = res.url_link;
+      }).catch(function(err){
+        overlay.classList.remove('on');
+        toast('网络异常：' + (err.message || '请稍后重试'));
+      });
   });
 
   JZ.sku(slug, curVendor).then(function(res){
     item = res.item;
     related = res.related || [];
+    product = res.product || null;
     vendor = res.vendor || null;
     vendors = res.vendors || [];
     merchantIntro = res.merchant_intro || null;
@@ -537,8 +570,8 @@
     reviews = res.reviews || [];
     render();
     renderVendors();
-    // item 就位后，若仍是意向态则用类目专属时段重挂选择器
-    if (timeMode !== 'real') renderTimeSlots();
+    // 选择上门时间暂时隐藏
+    // if (timeMode !== 'real') renderTimeSlots();
   }).catch(function(err){
     document.querySelector('.scr').innerHTML = '<div class="empty" style="padding:72px 24px;text-align:center;color:var(--muted);">家政详情加载失败：' + JZ.esc(err.message) + '</div>';
   });

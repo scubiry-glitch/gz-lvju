@@ -3,3 +3,4 @@ juzhu.db
 __pycache__/
 server.log
 *.log
+*.key

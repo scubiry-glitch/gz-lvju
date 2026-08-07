@@ -160,3 +160,24 @@ CREATE TABLE IF NOT EXISTS jz_orders (
 
 CREATE INDEX IF NOT EXISTS idx_jz_skus_category ON jz_skus(category_id, enabled, sort_order);
 CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status, created_at);
+
+-- GR 侧预约订单（跳转第三方小程序时生成）
+CREATE TABLE IF NOT EXISTS gr_orders (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_ref       TEXT UNIQUE NOT NULL,       -- GR侧订单参考号
+  lailai_oid      TEXT,                       -- 来来订单号
+  sku             TEXT,                       -- 服务SKU
+  city            TEXT DEFAULT '沈阳',
+  status          TEXT DEFAULT 'pending',     -- pending/paid/assigned/serving/completed/cancelled
+  fee             INTEGER,                    -- 金额（分）
+  worker_name     TEXT,                       -- 服务者姓名
+  worker_phone    TEXT,                       -- 服务者电话
+  eta             TEXT,                       -- 预计到达时间
+  cancel_reason   TEXT,                       -- 取消原因
+  paid_at         TEXT,                       -- 支付时间
+  completed_at    TEXT,                       -- 完成时间
+  created_at      TEXT DEFAULT (datetime('now','localtime')),
+  updated_at      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_gr_orders_ref ON gr_orders(order_ref);

@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import markdown
 from datetime import datetime, timezone
 
 from db import (  # noqa: E402
@@ -40,6 +41,7 @@ from db import (  # noqa: E402
 )
 
 import jiazheng_db as jzdb  # noqa: E402
+import jiazheng_api           # noqa: E402
 
 ADMIN_PREFIX = "/api/juzhu/admin"
 ASSETS_PREFIX = "assets/juzhu/sy"
@@ -207,7 +209,71 @@ class Handler(SimpleHTTPRequestHandler):
         p = urlparse(self.path)
         if p.path.startswith("/api/juzhu"):
             return self._route(p, "GET")
+        if p.path.endswith(".md"):
+            return self._serve_markdown()
         return super().do_GET()
+
+    def _serve_markdown(self):
+        """将 .md 文件渲染为 HTML 返回，让浏览器直接展示格式化的文档。"""
+        fs_path = self.translate_path(self.path)
+        if not os.path.isfile(fs_path):
+            self.send_error(404, "File not found")
+            return
+        try:
+            with open(fs_path, "r", encoding="utf-8") as f:
+                md_text = f.read()
+        except Exception:
+            self.send_error(500, "Failed to read file")
+            return
+
+        html_body = markdown.markdown(
+            md_text,
+            extensions=["fenced_code", "tables", "codehilite", "toc"],
+        )
+
+        html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{os.path.basename(fs_path)}</title>
+<style>
+  body {{
+    max-width: 900px; margin: 40px auto; padding: 0 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.7; color: #24292e; background: #fff;
+  }}
+  h1, h2, h3, h4 {{ margin-top: 28px; margin-bottom: 16px; font-weight: 600; line-height: 1.3; }}
+  h1 {{ font-size: 2em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }}
+  h2 {{ font-size: 1.5em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }}
+  h3 {{ font-size: 1.25em; }}
+  code {{ font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+          background: #f6f8fa; padding: .2em .4em; border-radius: 3px; font-size: 85%; }}
+  pre {{ background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; line-height: 1.45; }}
+  pre code {{ background: none; padding: 0; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
+  th, td {{ border: 1px solid #dfe2e5; padding: 8px 12px; text-align: left; }}
+  th {{ background: #f6f8fa; font-weight: 600; }}
+  blockquote {{ border-left: 4px solid #dfe2e5; padding: 0 15px; color: #6a737d; margin: 16px 0; }}
+  a {{ color: #0366d6; text-decoration: none; }}
+  a:hover {{ text-decoration: underline; }}
+  hr {{ border: 0; border-top: 1px solid #e1e4e8; margin: 24px 0; }}
+  ul, ol {{ padding-left: 2em; }}
+  img {{ max-width: 100%; }}
+</style>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+
+        data = html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
         p = urlparse(self.path)
@@ -295,6 +361,7 @@ class Handler(SimpleHTTPRequestHandler):
         if method != "GET" and (
             path.startswith(ADMIN_PREFIX)
             or path == "/api/juzhu/jiazheng/orders"
+            or path == "/api/juzhu/jiazheng/wechat-link"
             or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
         ):
             if not self._require_api_key():
@@ -433,6 +500,17 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)/rate$", path)
         if m and method == "POST":
             return self._rate_jz_order(m.group(1))
+
+        # === 生成微信小程序 URL Link（需 API Key） ===
+        if path == "/api/juzhu/jiazheng/wechat-link" and method == "POST":
+            body = self._body()
+            return jiazheng_api.handle_wechat_link(self, body)
+
+        # === 生活服务 API 桥接 /api/juzhu/life/* + /api/juzhu/callback + /api/juzhu/jiazheng/vendor/* ===
+        if path.startswith("/api/juzhu/life/") or path == "/api/juzhu/callback" or path.startswith("/api/juzhu/jiazheng/vendor/"):
+            body = self._body() if method in ("POST", "PUT") else {}
+            if jiazheng_api.handle_request(self, method, path, qs, body):
+                return
 
         return self._json({"error": "unknown route", "path": path}, 404)
 
@@ -620,7 +698,8 @@ class Handler(SimpleHTTPRequestHandler):
         if m:
             row = conn.execute(
                 """SELECT o.*, s.name AS sku_name
-                   FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id
+                   FROM jz_orders o LEFT JOIN jz_products p ON p.id=o.sku_id
+                   LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
                    WHERE o.id=?""",
                 (m.group(1),),
             ).fetchone()
@@ -632,9 +711,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"order": order})
 
         if path == "/api/juzhu/jiazheng/skus":
-            sql = """SELECT s.*, c.name AS category_name, c.icon AS category_icon
+            sql = """SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                            (SELECT MIN(p.price) FROM jz_products p
+                             WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
                      FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
-                     WHERE s.enabled=1 AND c.enabled=1"""
+                     WHERE s.enabled=1 AND c.enabled=1
+                       AND EXISTS (SELECT 1 FROM jz_products p
+                                   WHERE p.channel_sku_id=s.id AND p.status='on')"""
             params = []
             if qs.get("category"):
                 sql += " AND s.category_id=?"
@@ -667,7 +750,9 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(r"^/api/juzhu/jiazheng/skus/([^/]+)$", path)
         if m:
             row = conn.execute(
-                """SELECT s.*, c.name AS category_name, c.icon AS category_icon
+                """SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                          (SELECT MIN(p.price) FROM jz_products p
+                           WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
                    FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
                    WHERE s.slug=? AND s.enabled=1 AND c.enabled=1""",
                 (m.group(1),),
@@ -701,29 +786,39 @@ class Handler(SimpleHTTPRequestHandler):
                 "merchant_intro": detail_context.get("merchant_intro"),
             })
 
+        # === 生活服务 API 桥接 /api/juzhu/life/*（GET 请求） ===
+        if path.startswith("/api/juzhu/life/"):
+            if jiazheng_api.handle_request(self, "GET", path, qs, {}):
+                return
+
         conn.close()
         return self._json({"error": "unknown route"}, 404)
 
     def _create_jz_order(self):
         b = self._body()
-        sku_id = b.get("sku_id")
+        product_id = b.get("product_id") or b.get("sku_id")  # 兼容旧字段名
         expect_time = (b.get("expectTime") or b.get("expect_time") or "").strip()
         house = (b.get("house") or "").strip()
         phone = (b.get("phone") or "").strip()
-        if not sku_id or not house or not phone or not expect_time:
-            return self._json({"error": "sku_id / house / phone / expectTime 为必填"}, 400)
+        if not product_id or not house or not phone or not expect_time:
+            return self._json({"error": "product_id / house / phone / expectTime 为必填"}, 400)
 
         conn = connect()
         row = conn.execute(
-            """SELECT s.*, c.name AS category_name
-               FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
-               WHERE s.id=? AND s.enabled=1 AND c.enabled=1""",
-            (int(sku_id),),
+            """SELECT p.*, s.category_id, s.name AS sku_name, c.name AS category_name
+               FROM jz_products p
+               JOIN jz_skus s ON s.id=p.channel_sku_id
+               JOIN jz_categories c ON c.id=s.category_id
+               WHERE p.id=? AND p.status='on' AND s.enabled=1 AND c.enabled=1""",
+            (int(product_id),),
         ).fetchone()
         if not row:
             conn.close()
-            return self._json({"error": "sku not found"}, 404)
-        sku = normalize_jz_sku_row(row)
+            return self._json({"error": "product not found"}, 404)
+        product = dict(row)
+        # 兼容旧代码：sku 变量用于 fee 兜底
+        sku = {"id": product["id"], "price_from": product.get("price"),
+               "category_id": product["category_id"], "category_name": product["category_name"]}
         oid = order_id()
         now = now_iso()
         fee = int(b.get("fee") or sku.get("price_from") or 0)
@@ -792,7 +887,8 @@ class Handler(SimpleHTTPRequestHandler):
         order = jz_order_view(
             conn.execute(
                 """SELECT o.*, s.name AS sku_name FROM jz_orders o
-                   LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?""",
+                   LEFT JOIN jz_products p ON p.id=o.sku_id
+                   LEFT JOIN jz_skus s ON s.id=p.channel_sku_id WHERE o.id=?""",
                 (oid,),
             ).fetchone()
         )
@@ -804,7 +900,8 @@ class Handler(SimpleHTTPRequestHandler):
         if close:
             conn = connect()
         sql = """SELECT o.*, s.name AS sku_name FROM jz_orders o
-                 LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1"""
+                 LEFT JOIN jz_products p ON p.id=o.sku_id
+                 LEFT JOIN jz_skus s ON s.id=p.channel_sku_id WHERE 1=1"""
         params = []
         if qs.get("phone"):
             sql += " AND o.phone=?"
@@ -1118,16 +1215,10 @@ class Handler(SimpleHTTPRequestHandler):
             body = self._body()
 
             if path == "/api/juzhu/jz/orders":
-                sku_id = body.get("sku_id")
-                if not sku_id and body.get("product_id"):
-                    prow = conn.execute(
-                        "SELECT channel_sku_id FROM jz_products WHERE id=?",
-                        (int(body["product_id"]),),
-                    ).fetchone()
-                    sku_id = prow["channel_sku_id"] if prow else None
-                if not sku_id:
+                product_id = body.get("product_id") or body.get("sku_id")  # 兼容旧字段名
+                if not product_id:
                     return self._json(
-                        {"error": "需要 sku_id 或带 channel_sku_id 的 product_id"},
+                        {"error": "需要 product_id"},
                         400,
                     )
                 house = (body.get("address") or body.get("house") or "").strip()
@@ -1136,17 +1227,19 @@ class Handler(SimpleHTTPRequestHandler):
                 if not house or not phone or not expect_time:
                     return self._json({"error": "address / phone / scheduled_at 为必填"}, 400)
                 row = conn.execute(
-                    """SELECT s.*, c.name AS category_name
-                       FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
-                       WHERE s.id=? AND s.enabled=1 AND c.enabled=1""",
-                    (int(sku_id),),
+                    """SELECT p.*, s.category_id, c.name AS category_name
+                       FROM jz_products p
+                       JOIN jz_skus s ON s.id=p.channel_sku_id
+                       JOIN jz_categories c ON c.id=s.category_id
+                       WHERE p.id=? AND p.status='on' AND s.enabled=1 AND c.enabled=1""",
+                    (int(product_id),),
                 ).fetchone()
                 if not row:
-                    return self._json({"error": "sku not found"}, 404)
-                sku = normalize_jz_sku_row(row)
+                    return self._json({"error": "product not found"}, 404)
+                product = dict(row)
                 oid = order_id()
                 now = now_iso()
-                fee = int(body.get("fee") or sku.get("price_from") or 0)
+                fee = int(body.get("fee") or product.get("price") or 0)
                 log = [{"s": "pending", "at": now, "by": "user"}]
                 conn.execute(
                     """INSERT INTO jz_orders(
@@ -1155,9 +1248,9 @@ class Handler(SimpleHTTPRequestHandler):
                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', 'pending', ?, ?, ?, ?)""",
                     (
                         oid,
-                        sku["id"],
-                        sku["category_id"],
-                        sku["category_name"],
+                        product["id"],
+                        product["category_id"],
+                        product["category_name"],
                         house,
                         phone,
                         expect_time,
@@ -2069,7 +2162,7 @@ def main():
     print(f"  前台  /juzhu-channel-v3-grid.html")
     print(f"  后台  /juzhu-admin.html")
     print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/jiazheng/*")
-    HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
 if __name__ == "__main__":

@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS jz_products (
   rating REAL DEFAULT 0,
   service_tags TEXT,
   channel_sku_id INTEGER,
+  path TEXT,
+  query TEXT,
   status TEXT DEFAULT 'on',
   sort_order INTEGER DEFAULT 0,
   FOREIGN KEY (vendor_id) REFERENCES jz_vendors(id)
