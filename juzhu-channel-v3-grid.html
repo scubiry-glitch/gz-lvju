@@ -265,8 +265,8 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
-<script src="juzhu/app.js?v=14"></script>
+<script src="screens/_jzapi.js?v=2"></script>
+<script src="juzhu/app.js?v=16"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -327,7 +327,7 @@
       var lay = collageLayout(d, list);
       var cls = 'ctile'+(lay.tall?' tall':'')+(lay.wide?' wide':'')+(d.has_projects? '':' empty');
       var href = d.has_projects
-        ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name)
+        ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name)+JUZHU.chainQS()
         : '#';
       var bg = d.cover_image
         ? 'background-image:url('+JUZHU.thumbUrl(d.cover_image)+');background-size:cover;background-position:center;'
@@ -351,7 +351,7 @@
     var duo = list.slice(1,3);
     var rest = list.slice(3);
     var hStyle = hero.cover_image ? 'background-image:url('+JUZHU.thumbUrl(hero.cover_image)+')' : '';
-    var html = '<a class="spread-hero" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(hero.slug)+'">'+
+    var html = '<a class="spread-hero" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(hero.slug)+JUZHU.chainQS()+'"">'+
       '<div class="img" style="'+hStyle+'">'+
         '<div class="cap"><div class="ek">FEATURED</div><h3>'+hero.name+'</h3>'+
         '<p>'+(hero.address||'')+' · '+JUZHU.asTags(hero.tags).join(' · ')+'</p></div></div>'+
@@ -361,7 +361,7 @@
     if (duo.length){
       html += '<div class="spread-duo">'+duo.map(function(x){
         var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : '';
-        return '<a class="mini-card" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+'">'+
+        return '<a class="mini-card" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+JUZHU.chainQS()+'"">'+
           '<div class="th" style="'+st+'"></div><div class="bd"><b>'+x.name+'</b>'+
           '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+x.unit_count+' 户型</div>'+
           '<div class="pr">'+x.price_from+'<small> 万起</small></div></div></a>';
@@ -371,7 +371,7 @@
       html += '<div class="sec-h" style="padding-left:0;margin-top:18px;"><span class="bar"></span><h2>更多置换</h2></div>';
       html += rest.map(function(x){
         var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : 'class="'+x.slug+'"';
-        return '<a class="lrow" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+'">'+
+        return '<a class="lrow" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+JUZHU.chainQS()+'"">'+
           '<div class="th" style="'+(x.cover_image?'background-image:url('+JUZHU.thumbUrl(x.cover_image)+');background-size:cover;background-position:center;':'')+'">'+
           '<span class="star">置换</span></div><div class="info"><div class="nm">'+x.name+'</div>'+
           '<div class="meta">'+(x.address||'')+' · '+x.unit_count+' 户型</div>'+
@@ -582,8 +582,9 @@
   Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
     var d = results[0];
     lastData = d;
-    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准
-    if (window.BZF_JZ && d.city && d.city.name) {
+    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准；
+    // 但 URL 带 ?city= 直链参数时不强制改回（直链优先，只读展示）
+    if (window.BZF_JZ && d.city && d.city.name && !(BZF_JZ.urlCity && BZF_JZ.urlCity())) {
       var storedCity = BZF_JZ.regionCity();
       if (storedCity !== d.city.name) {
         BZF_JZ.setRegionCity(d.city.name);

@@ -139,6 +139,25 @@
     color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
   .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;font-weight:600;}
   .cta .btn-call:active{background:var(--brand-soft);}
+  /* 隐私保护提醒 */
+  .privacy-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+  .privacy-modal[hidden]{display:none!important;}
+  .privacy-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.5);}
+  .privacy-sheet{position:relative;width:100%;max-width:520px;background:#fff;border-radius:16px 16px 0 0;
+    padding:34px 24px max(26px,env(safe-area-inset-bottom));text-align:center;
+    animation:slideUp .25s ease;}
+  .privacy-close{position:absolute;top:14px;right:16px;border:0;background:none;font-size:18px;color:#a8a8a8;
+    cursor:pointer;padding:6px;line-height:1;font-family:inherit;}
+  .privacy-ttl{font-size:18px;font-weight:700;color:var(--ink);}
+  .privacy-desc{font-size:13px;color:var(--muted);line-height:1.6;margin:14px 0 6px;}
+  .privacy-vnum{font-size:19px;font-weight:700;color:#6b6b6b;letter-spacing:.04em;margin-bottom:24px;}
+  .privacy-acts{display:flex;gap:12px;}
+  .privacy-cancel{flex:1;border:0;background:#f2f3f5;color:#333;font-size:15px;font-weight:600;
+    padding:13px;border-radius:999px;cursor:pointer;font-family:inherit;}
+  .privacy-cancel:active{background:#e8eaed;}
+  .privacy-ok{flex:1.4;border:0;border-radius:999px;background:linear-gradient(90deg,#3a6fd8,#2f5fb8);
+    color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;}
+  .privacy-ok:active{opacity:.9;}
   .promo-bar{background:linear-gradient(90deg,#ff8a3d,#0c4d44);color:#fff;padding:10px 16px;display:flex;align-items:baseline;gap:8px;}
   .promo-bar .big{font-family:var(--serif);font-size:22px;font-weight:700;}
   .promo-bar .orig{font-size:11px;opacity:.85;text-decoration:line-through;}
@@ -202,14 +221,26 @@
 
   <div class="cta">
     <div class="p"><b id="price">—</b><span id="plab">参考价格</span></div>
-    <div class="heart">♡</div>
-    <a class="btn btn-call" href="#" id="callBtn">打电话</a>
-    <a class="btn" href="#" id="ctaBtn">预约看房</a>
+    <a class="btn" href="#" id="callBtn">预约咨询</a>
   </div>
 </div>
 <div id="rentModalWrap"></div>
+
+<div class="privacy-modal" id="privacyModal" hidden>
+  <div class="privacy-backdrop" id="privacyBackdrop"></div>
+  <div class="privacy-sheet">
+    <button type="button" class="privacy-close" id="privacyClose" aria-label="关闭">✕</button>
+    <div class="privacy-ttl">隐私保护中</div>
+    <div class="privacy-desc">您的号码将会被加密后呼出，对方看到的是</div>
+    <div class="privacy-vnum">虚拟号码</div>
+    <div class="privacy-acts">
+      <button type="button" class="privacy-cancel" id="privacyCancel">取消</button>
+      <button type="button" class="privacy-ok" id="privacyOk">立即呼叫</button>
+    </div>
+  </div>
+</div>
 <script src="screens/_region.js"></script>
-<script src="juzhu/app.js?v=13"></script>
+<script src="juzhu/app.js?v=16"></script>
 <script src="screens/_qr.js"></script>
 <script>
 (function(){
@@ -304,8 +335,12 @@
       '<div class="' + avCls + '" style="' + avStyle + '">' + avInner + '</div>' +
       '<div><div class="nm">' + kName + '</div><div class="hint">联系我了解更多信息</div></div>' +
       '<div class="acts">' +
-        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话">📞</a>' : '') +
+        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话" id="keeperTel">📞</a>' : '') +
       '</div>';
+    var keeperTel = document.getElementById('keeperTel');
+    if (keeperTel) {
+      keeperTel.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
+    }
 
     if (JUZHU.effectiveRentDetail(u)) {
       document.getElementById('rentModalWrap').innerHTML = JUZHU.rentDetailModalHtml(u);
@@ -334,23 +369,37 @@
     var consult = document.getElementById('rentConsult');
     if (consult) {
       consult.onclick = function() {
-        if (tel) location.href = tel;
+        if (tel) callWithPrivacy(tel);
         else alert('暂未配置咨询电话');
       };
     }
   }
 
+  // 统一拨号入口：先弹隐私保护提示，确认后拨打
+  function callWithPrivacy(tel) {
+    var modal = document.getElementById('privacyModal');
+    if (!modal || !tel) return;
+    function closePrivacy() { modal.hidden = true; document.body.style.overflow = ''; }
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    document.getElementById('privacyOk').onclick = function() {
+      closePrivacy();
+      location.href = tel;
+    };
+    document.getElementById('privacyCancel').onclick = closePrivacy;
+    document.getElementById('privacyClose').onclick = closePrivacy;
+    document.getElementById('privacyBackdrop').onclick = closePrivacy;
+  }
+
   function bindTelLinks(phone) {
     var tel = JUZHU.telHref(phone);
     var callBtn = document.getElementById('callBtn');
-    var cta = document.getElementById('ctaBtn');
     if (tel) {
       callBtn.href = tel;
-      cta.href = tel;
+      callBtn.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
     } else {
-      callBtn.href = cta.href = '#';
-      var warn = function(e) { e.preventDefault(); alert('暂未配置咨询电话，请在内容编辑后台设置'); };
-      callBtn.onclick = cta.onclick = warn;
+      callBtn.href = '#';
+      callBtn.onclick = function(e) { e.preventDefault(); alert('暂未配置咨询电话，请在内容编辑后台设置'); };
     }
   }
 
@@ -391,11 +440,9 @@
     if (isTrade) {
       document.getElementById('price').innerHTML = u.price_total + '<small> 万起</small>';
       document.getElementById('plab').textContent = '参考总价 · ' + (p.old_house_hint || '以旧换新');
-      document.getElementById('ctaBtn').textContent = '咨询置换';
     } else {
       document.getElementById('price').innerHTML = JUZHU.fmtRent(u.rent_monthly) + '<small>/月</small>';
       document.getElementById('plab').textContent = u.promo_price ? '券后参考价' : '租金受控 · 试点房源';
-      document.getElementById('ctaBtn').textContent = '预约看房';
       mountInfo(u, p);
       mountRating(p);
     }

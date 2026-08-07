@@ -124,8 +124,9 @@
 <header class="top">
   <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
   <div class="acts">
+    <select id="citySwitch" title="切换编辑城市" style="height:32px;border:1px solid var(--border,#dde);border-radius:8px;padding:0 8px;font-size:13px;background:#fff;"></select>
     <a href="screens/p-rating-review.html" target="_blank">评级复核队列</a>
-    <a href="juzhu-channel-v3-grid.html" target="_blank">预览前台</a>
+    <a href="juzhu-channel-v3-grid.html" target="_blank" id="previewLink">预览前台</a>
     <button type="button" id="btnExport">导出 JSON</button>
   </div>
 </header>
@@ -204,7 +205,30 @@
 
 <script>
 var API = '/api/juzhu/admin';
-var state = { projects: [], districts: [], channels: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
+var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
+
+// 当前编辑城市：URL ?city=（slug 或名称）优先，缺省为 cities[0]
+function adminCityParam() {
+  try { return new URLSearchParams(location.search).get('city') || ''; } catch (e) { return ''; }
+}
+
+function loadCities() {
+  return fetch('/api/juzhu/cities').then(function(r) { return r.json(); }).then(function(list) {
+    state.cities = list || [];
+    var sel = document.getElementById('citySwitch');
+    var cur = adminCityParam();
+    sel.innerHTML = (list || []).map(function(c) {
+      var selected = (!cur && c === list[0]) || c.slug === cur || c.name === cur ? ' selected' : '';
+      return '<option value="'+c.slug+'"'+selected+'>'+esc(c.name)+'</option>';
+    }).join('');
+    sel.onchange = function() {
+      location.href = 'juzhu-admin.html?city=' + encodeURIComponent(sel.value);
+    };
+    var preview = document.getElementById('previewLink');
+    if (preview) preview.href = 'juzhu-channel-v3-grid.html' + (cur ? '?city=' + encodeURIComponent(cur) : '');
+    return list;
+  }).catch(function() { state.cities = []; return []; });
+}
 
 var AMENITY_CATALOG = [
   { id: 'ac', label: '空调' }, { id: 'washer', label: '洗衣机' }, { id: 'fridge', label: '冰箱' },
@@ -406,7 +430,8 @@ function populateDistrictFilter() {
 }
 
 function loadDictionary() {
-  return api('/dictionary').then(function(d) {
+  var city = adminCityParam();
+  return api('/dictionary' + (city ? '?city=' + encodeURIComponent(city) : '')).then(function(d) {
     state.apiOk = true;
     state.city = d.city || null;
     state.districts = d.districts || [];
@@ -479,6 +504,7 @@ function renderDictionary() {
 
   document.getElementById('saveCity').onclick = function() {
     api('/city', { method:'PUT', body: {
+      city_id: state.city ? state.city.id : undefined,
       name: document.getElementById('cityName').value.trim(),
       slug: document.getElementById('citySlug').value.trim(),
       hero_bg_image: document.getElementById('cityHeroBg').value.trim() || null
@@ -581,6 +607,7 @@ function loadProjects() {
   var did = document.getElementById('fDistrict').value;
   var q = document.getElementById('fSearch').value.trim();
   var qs = '?';
+  if (state.city && state.city.id) qs += 'city_id='+state.city.id+'&';
   if (ch) qs += 'channel='+ch+'&';
   if (did) qs += 'district_id='+did+'&';
   if (q) qs += 'q='+encodeURIComponent(q)+'&';
@@ -1303,7 +1330,9 @@ function debounce(fn, ms) {
   return function() { clearTimeout(t); t = setTimeout(fn, ms); };
 }
 
-loadDictionary().then(function() {
+loadCities().then(function() {
+  return loadDictionary();
+}).then(function() {
   return Promise.all([loadProjects(), loadSettings()]);
 }).catch(function() {
   document.body.classList.add('api-off');

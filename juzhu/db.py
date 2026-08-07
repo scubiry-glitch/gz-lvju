@@ -891,30 +891,10 @@ def export_json(conn=None):
         def rows(q, params=()):
             return [dict(r) for r in conn.execute(q, params).fetchall()]
 
-        data = {
-            "city": rows("SELECT * FROM cities")[0],
+        cities = rows("SELECT * FROM cities ORDER BY id")
+        # 非城市维度的通用数据（频道 / 家政目录 / 全局设置）
+        common = {
             "channels": rows("SELECT * FROM channels ORDER BY sort_order, id"),
-            "stats": {
-                "district_count": conn.execute("SELECT COUNT(*) FROM districts").fetchone()[0],
-                "project_count_bzf": conn.execute(
-                    "SELECT COUNT(*) FROM projects WHERE channel='bzf'"
-                ).fetchone()[0],
-                "project_count_trade": conn.execute(
-                    "SELECT COUNT(*) FROM projects WHERE channel='trade'"
-                ).fetchone()[0],
-                "unit_count": conn.execute(
-                    "SELECT COALESCE(SUM(managed_unit_count), 0) FROM projects WHERE channel='bzf'"
-                ).fetchone()[0],
-            },
-            "districts": parse_tags(rows("SELECT * FROM districts ORDER BY sort_order")),
-            "projects": [normalize_project_row(p) for p in parse_tags(rows("SELECT * FROM projects ORDER BY channel, sort_order"))],
-            "units": parse_tags(
-                rows("SELECT * FROM units ORDER BY project_id, sort_order"),
-                json_keys=("amenities", "keeper", "rent_detail"),
-            ),
-            "photos": rows(
-                "SELECT * FROM photos ORDER BY entity_type, entity_id, sort_order"
-            ),
             "jiazheng_categories": rows("SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"),
             "jiazheng_skus": [
                 normalize_jz_sku_row(r)
@@ -922,8 +902,60 @@ def export_json(conn=None):
             ],
             "settings": {r["key"]: r["value"] for r in rows("SELECT key, value FROM settings")},
         }
-        JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        return data
+
+        def export_city(city):
+            """导出单个城市的完整数据集（区/项目/户型/图片均按城市过滤）"""
+            cid = city["id"]
+            districts = parse_tags(rows("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order", (cid,)))
+            projects = parse_tags(rows("SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order", (cid,)))
+            pids = [p["id"] for p in projects]
+            units, photos = [], []
+            if pids:
+                ph = ",".join("?" * len(pids))
+                units = parse_tags(
+                    rows(f"SELECT * FROM units WHERE project_id IN ({ph}) ORDER BY project_id, sort_order", pids),
+                    json_keys=("amenities", "keeper", "rent_detail"),
+                )
+                photos += rows(f"SELECT * FROM photos WHERE entity_type='project' AND entity_id IN ({ph}) ORDER BY entity_id, sort_order", pids)
+                dids = [d["id"] for d in districts]
+                if dids:
+                    dh = ",".join("?" * len(dids))
+                    photos += rows(f"SELECT * FROM photos WHERE entity_type='district' AND entity_id IN ({dh}) ORDER BY entity_id, sort_order", dids)
+                uids = [u["id"] for u in units]
+                if uids:
+                    uh = ",".join("?" * len(uids))
+                    photos += rows(f"SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN ({uh}) ORDER BY entity_id, sort_order", uids)
+            data = dict(common)
+            data["city"] = city
+            data["stats"] = {
+                "district_count": len(districts),
+                "project_count_bzf": sum(1 for p in projects if p["channel"] == "bzf"),
+                "project_count_trade": sum(1 for p in projects if p["channel"] == "trade"),
+                "unit_count": sum(p["managed_unit_count"] or 0 for p in projects if p["channel"] == "bzf"),
+            }
+            data["districts"] = districts
+            data["projects"] = [normalize_project_row(p) for p in projects]
+            data["units"] = units
+            data["photos"] = photos
+            return data
+
+        # 城市清单（前端按 ?city= 城市名解析 slug → data-<slug>.json）
+        CITIES_PATH = JSON_PATH.with_name("cities.json")
+        CITIES_PATH.write_text(json.dumps(cities, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # 每城一文件：data.json = 第一个城市（向后兼容），同时每个城市都写 data-<slug>.json
+        # 空城市（无区/无项目）不写数据文件，仅保留在 cities.json（前端会回退到默认数据）
+        first = None
+        for idx, city in enumerate(cities):
+            data = export_city(city)
+            if idx == 0:
+                first = data
+                JSON_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            if data["districts"] or data["projects"]:
+                JSON_PATH.with_name(f"data-{city['slug']}.json").write_text(
+                    json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+        return first
     finally:
         if close:
             conn.close()

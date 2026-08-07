@@ -14,13 +14,35 @@ window.JUZHU = (function () {
     });
   }
 
+  // 按 URL ?city=（城市名）解析对应城市的数据文件；无城市或解析失败 → 默认 data.json
+  function dataUrlForCity() {
+    var city = urlCityName();
+    if (!city) return Promise.resolve('');
+    var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
+    return fetch(base + 'cities.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) {
+      if (!r.ok) return '';
+      return r.json();
+    }).then(function (list) {
+      if (!Array.isArray(list)) return '';
+      for (var i = 0; i < list.length; i++) {
+        if ((list[i].slug === city || list[i].name === city) && list[i].slug) return 'data-' + list[i].slug + '.json';
+      }
+      return '';
+    }).catch(function () { return ''; });
+  }
+
   function load() {
     if (cache) return Promise.resolve(cache);
-    var url = 'juzhu/data.json';
-    if (location.pathname.indexOf('/juzhu/') !== -1) url = 'data.json';
-    // Cache-bust: append last-modified timestamp from the server to avoid stale JSON
-    url += '?t=' + Math.floor(Date.now() / 60000); // per-minute granularity
-    return fetch(url).then(function (r) {
+    var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
+    var url = base + 'data.json';
+    return dataUrlForCity().then(function (cityFile) {
+      return fetch((cityFile ? base + cityFile : url) + '?t=' + Math.floor(Date.now() / 60000)).then(function (r) {
+        if (r.ok) return r;
+        throw new Error('city data missing');
+      });
+    }).catch(function () {
+      return fetch(url + '?t=' + Math.floor(Date.now() / 60000));
+    }).then(function (r) {
       if (!r.ok) throw new Error('data load failed');
       return r.json();
     }).then(function (d) {
@@ -347,6 +369,24 @@ window.JUZHU = (function () {
     return digits ? 'tel:' + digits : '';
   }
 
+  // 全链路城市/地域透传：把当前 URL 的 ?city= / ?region= 参数拼到站内链接上
+  function chainQS() {
+    var out = '';
+    try {
+      var sp = new URLSearchParams(location.search);
+      var c = sp.get('city');
+      if (c) out += '&city=' + encodeURIComponent(c);
+      var r = sp.get('region');
+      if (r) out += '&region=' + encodeURIComponent(r);
+    } catch (e) {}
+    return out;
+  }
+
+  // 当前 URL 里的城市名（用于按城市加载数据）
+  function urlCityName() {
+    try { return new URLSearchParams(location.search).get('city') || ''; } catch (e) { return ''; }
+  }
+
   var AMENITY_CATALOG = [
     { id: 'ac', label: '空调', sym: '❄' },
     { id: 'washer', label: '洗衣机', sym: '◫' },
@@ -547,6 +587,8 @@ window.JUZHU = (function () {
     districtManagedUnits: districtManagedUnits,
     bookingPhone: bookingPhone,
     telHref: telHref,
+    chainQS: chainQS,
+    urlCityName: urlCityName,
     AMENITY_CATALOG: AMENITY_CATALOG,
     unitKeeperPhone: unitKeeperPhone,
     unitDisplayTags: unitDisplayTags,
