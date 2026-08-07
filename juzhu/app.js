@@ -1,6 +1,18 @@
 /** 新居住频道 · 共享数据层（读 juzhu/data.json 或 /api/juzhu/*） */
 window.JUZHU = (function () {
   var cache = null;
+  var _settings = null;
+
+  function loadSettings() {
+    if (_settings) return Promise.resolve(_settings);
+    return fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
+      _settings = s;
+      return s;
+    }).catch(function() {
+      _settings = { show_city_switcher: true, show_life_service: true };
+      return _settings;
+    });
+  }
 
   function load() {
     if (cache) return Promise.resolve(cache);
@@ -279,6 +291,10 @@ window.JUZHU = (function () {
         { id: 'jiazheng', label: '生活服务专区', sort_order: 3, enabled: 1 }
       ];
     }
+    // 后端配置：show_life_service 关闭时过滤掉生活服务专区
+    if (_settings && !_settings.show_life_service) {
+      list = list.filter(function(c) { return c.id !== 'jiazheng'; });
+    }
     return list.filter(function(c) { return c.enabled !== 0; })
       .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
   }
@@ -501,6 +517,8 @@ window.JUZHU = (function () {
 
   return {
     load: load,
+    loadSettings: loadSettings,
+    getSettings: function() { return _settings; },
     get data() { return cache; },
     districts: districts,
     districtBySlug: districtBySlug,

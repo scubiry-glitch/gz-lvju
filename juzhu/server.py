@@ -408,6 +408,8 @@ class Handler(SimpleHTTPRequestHandler):
         m = re.match(rf"^{ADMIN_PREFIX}/units/(\d+)$", path)
         if m:
             uid = int(m.group(1))
+            if method == "GET":
+                return self._get_unit(uid)
             if method == "PUT":
                 return self._update_unit(uid)
             if method == "DELETE":
@@ -458,6 +460,16 @@ class Handler(SimpleHTTPRequestHandler):
             u = conn.execute("SELECT COALESCE(SUM(managed_unit_count), 0) c FROM projects WHERE channel='bzf'").fetchone()[0]
             conn.close()
             return self._json({"districts": d, "projects_bzf": pb, "projects_trade": pt, "units": u})
+
+        if path == "/api/juzhu/settings":
+            settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings").fetchall()}
+            row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+            conn.close()
+            return self._json({
+                "booking_phone": row[0] if row else None,
+                "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
+                "show_life_service": settings.get("show_life_service", "1") == "1",
+            })
 
         if path == "/api/juzhu/districts":
             data = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order"))
@@ -1627,6 +1639,19 @@ class Handler(SimpleHTTPRequestHandler):
         conn.close()
         return self._json({"ok": True, "unit": unit}, 201)
 
+    def _get_unit(self, uid):
+        conn = connect()
+        unit = normalize_unit_row(conn.execute("SELECT * FROM units WHERE id=?", (uid,)).fetchone())
+        if not unit:
+            conn.close()
+            return self._json({"error": "not found"}, 404)
+        photos = rows_to_list(conn.execute(
+            "SELECT * FROM photos WHERE entity_type='unit' AND entity_id=? ORDER BY sort_order",
+            (uid,),
+        ))
+        conn.close()
+        return self._json({"unit": unit, "photos": photos})
+
     def _update_unit(self, uid):
         b = self._body()
         conn = connect()
@@ -1637,9 +1662,6 @@ class Handler(SimpleHTTPRequestHandler):
         pid = row[0]
 
         # 局部更新：只写「请求体里出现过的字段」，缺失字段保持原值不动。
-        # 关键修复：主行「快速保存」只发 name/area/layout/price/sort，不含
-        # cover_image / unit_spec / promo_price；旧逻辑用「=?」硬写会把这些字段
-        # 抹成 NULL，导致房源封面、规格、促销价被清空（多条分别保存后看似「失效」）。
         sets, vals = [], []
 
         def put(col, val):
@@ -1727,6 +1749,18 @@ class Handler(SimpleHTTPRequestHandler):
                     district_name = row["name"] if row else ""
                 project_name = mp["fields"].get("project_name") or "新项目"
                 rel = project_cover_rel_draft(channel, district_name, project_name, ext)
+            elif scope == "unit_cover":
+                uid = int(mp["fields"].get("unit_id") or 0)
+                if not conn.execute("SELECT id FROM units WHERE id=?", (uid,)).fetchone():
+                    conn.close()
+                    return self._json({"error": "unit not found"}, 404)
+                row = conn.execute(
+                    "SELECT u.name AS unit_name, p.name AS project_name, p.channel "
+                    "FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?",
+                    (uid,),
+                ).fetchone()
+                unit_name = safe_path_name(row["unit_name"]) if row else f"unit_{uid}"
+                rel = Path(ASSETS_PREFIX) / "units" / (row["channel"] or "bzf") / safe_path_name(row["project_name"] or "project") / f"{unit_name}{ext}"
             elif scope == "unit_gallery":
                 uid = int(mp["fields"].get("unit_id") or 0)
                 rel = unit_gallery_rel(conn, uid, ext)
@@ -1802,6 +1836,7 @@ class Handler(SimpleHTTPRequestHandler):
         photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1844,6 +1879,7 @@ class Handler(SimpleHTTPRequestHandler):
         photo_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1886,6 +1922,7 @@ class Handler(SimpleHTTPRequestHandler):
         )
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         photo = row_to_dict(conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone())
         conn.close()
@@ -1904,6 +1941,7 @@ class Handler(SimpleHTTPRequestHandler):
         conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
         conn.commit()
         sync_unit_cover(conn, uid)
+        conn.commit()  # 关键：确保 cover_image 同步被提交，避免连接关闭时回滚
         export_json(conn)
         conn.close()
         return self._json({"ok": True})
@@ -1911,17 +1949,31 @@ class Handler(SimpleHTTPRequestHandler):
     def _get_settings(self):
         conn = connect()
         row = conn.execute("SELECT booking_phone FROM cities ORDER BY id LIMIT 1").fetchone()
+        settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings").fetchall()}
         conn.close()
-        return self._json({"booking_phone": row[0] if row else None})
+        return self._json({
+            "booking_phone": row[0] if row else None,
+            "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
+            "show_life_service": settings.get("show_life_service", "1") == "1",
+        })
 
     def _update_settings(self):
         body = self._body()
         phone = (body.get("booking_phone") or "").strip() or None
         conn = connect()
-        conn.execute(
-            "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
-            (phone,),
-        )
+        if phone is not None:
+            conn.execute(
+                "UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)",
+                (phone,),
+            )
+        bool_keys = ["show_city_switcher", "show_life_service"]
+        for k in bool_keys:
+            if k in body:
+                v = "1" if body.get(k) else "0"
+                conn.execute(
+                    "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (k, v),
+                )
         conn.commit()
         export_json(conn)
         conn.close()

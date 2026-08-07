@@ -1,6 +1,3 @@
 .DS_Store
 *.tmp
 .tmp/
-
-# 空壳/运行时 SQLite（真库为 juzhu/juzhu.db，源数据为 juzhu/data.json）
-*.db

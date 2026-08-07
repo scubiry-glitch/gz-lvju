@@ -212,7 +212,7 @@
 
   function regionCapital() {
     var R = window.BZF_REGION;
-    return (R && R.prov && R.prov.capital) ? R.prov.capital : '南京';
+    return (R && R.prov && R.prov.capital) ? R.prov.capital : '沈阳';
   }
 
   // 省/市树（只读副本），供切换器渲染级联

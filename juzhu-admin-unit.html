@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>房源详情编辑</title>
+<style>
+  :root{
+    --bg:#f0f4f3; --surface:#fff; --fg:#10171c; --muted:#6b7785; --border:#e0e8e5;
+    --brand:#0f766e; --brand2:#14b8a6; --danger:#dc2626; --gold:#b48a3f;
+    --font:system-ui,-apple-system,'PingFang SC',sans-serif;
+    --serif:'Noto Serif SC',Georgia,serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;}
+  a{color:var(--brand);text-decoration:none;}
+  .top{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(90deg,#0b5d56,#0f766e);color:#fff;}
+  .top h1{font-family:var(--serif);font-size:18px;margin:0;flex:1;}
+  .top .sub{font-size:11px;opacity:.85;font-weight:400;}
+  .top .acts{display:flex;gap:8px;}
+  .top .acts a,.top .acts button{font-size:12px;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-family:inherit;}
+  .top .acts a:hover,.top .acts button:hover{background:rgba(255,255,255,.22);}
+  .wrap{max-width:900px;margin:0 auto;padding:20px 24px 40px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;
+    box-shadow:0 4px 14px rgba(15,42,38,.04);}
+  .card h2{font-family:var(--serif);font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px;}
+  .card h2 .badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--brand);color:#fff;font-family:var(--font);}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
+  .grid.full{grid-template-columns:1fr;}
+  .fld label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;}
+  .fld input,.fld textarea,.fld select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;}
+  .fld textarea{min-height:56px;resize:vertical;}
+  .bar{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .btn{padding:8px 16px;border-radius:8px;border:0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.primary{background:linear-gradient(90deg,var(--brand),var(--brand2));color:#fff;}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .btn.danger{background:#fff;border:1px solid #fecaca;color:var(--danger);}
+  .btn.link{background:none;border:0;color:var(--brand);padding:0;font-size:11px;font-weight:600;cursor:pointer;}
+  .cover-preview{width:120px;height:80px;border-radius:8px;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);margin-top:6px;}
+  .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
+    font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
+  .toast.show{opacity:1;}
+  .sec{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);}
+  .sec:first-child{margin-top:0;padding-top:0;border-top:0;}
+  .sec-h{font-size:13px;font-weight:700;margin-bottom:10px;color:var(--fg);}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
+  .detail-grid .full{grid-column:1/-1;}
+  .detail-grid label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;font-weight:600;}
+  .detail-grid input,.detail-grid textarea{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;}
+  .detail-grid textarea{min-height:48px;resize:vertical;}
+  .amenity-chks{display:flex;flex-wrap:wrap;gap:6px;}
+  .amenity-chks label{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;cursor:pointer;}
+  .amenity-chks label.on{border-color:var(--brand);background:color-mix(in oklab,var(--brand) 8%,#fff);}
+  .amenity-chks input{margin:0;}
+  .fee-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;}
+  .fee-row input{padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;}
+  .keeper-preview{width:40px;height:40px;border-radius:50%;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);display:inline-block;vertical-align:middle;}
+  .img-field-row{display:flex;gap:8px;align-items:center;}
+  .img-field-row input{flex:1;}
+  .upload-btn{position:relative;overflow:hidden;white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center;}
+  .upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+  .photo-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px;}
+  .photo-card.cover{border-color:var(--brand);box-shadow:0 0 0 1px color-mix(in oklab,var(--brand) 35%,#fff);}
+  .photo-card .pv{height:88px;border-radius:8px;background:#e8eeec center/cover no-repeat;margin-bottom:8px;}
+  .photo-card label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;}
+  .photo-card input{width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;margin-bottom:6px;}
+  .photo-card .prow{display:flex;gap:4px;flex-wrap:wrap;}
+  .photo-card .prow .btn{padding:4px 8px;font-size:10px;}
+  .photo-add{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);}
+  .photo-add input{flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
+  .saved-indicator{display:inline-block;font-size:11px;color:var(--brand);font-weight:600;margin-left:8px;opacity:0;transition:opacity .3s;}
+  .saved-indicator.show{opacity:1;}
+  .loading{text-align:center;padding:40px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1 id="pageTitle">房源详情编辑 <span class="sub">保存后自动同步 data.json</span></h1>
+  <div class="acts">
+    <a href="juzhu-admin.html" id="backLink">← 返回列表</a>
+    <a id="previewLink" href="#" target="_blank">预览前台</a>
+  </div>
+</header>
+
+<div class="wrap" id="content">
+  <div class="loading">加载中…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = '/api/juzhu/admin';
+var unitId = null;
+var unit = null;
+var project = null;
+var photos = [];
+
+var AMENITY_CATALOG = [
+  { id: 'ac', label: '空调' }, { id: 'washer', label: '洗衣机' }, { id: 'fridge', label: '冰箱' },
+  { id: 'heater', label: '热水器' }, { id: 'lock', label: '智能锁' }, { id: 'wifi', label: '宽带' },
+  { id: 'tv', label: '电视' }, { id: 'hood', label: '油烟机' }, { id: 'microwave', label: '微波炉' },
+  { id: 'induction', label: '电磁炉' }
+];
+
+/* ── API helpers ── */
+function getApiKey() {
+  try { return localStorage.getItem('JUZHU_API_KEY') || 'dev-juzhu-key'; } catch(e) { return 'dev-juzhu-key'; }
+}
+
+function api(path, opts) {
+  opts = opts || {};
+  var headers = opts.body ? {'Content-Type':'application/json'} : {};
+  var key = getApiKey();
+  if (key) headers['X-API-Key'] = key;
+  return fetch(API + path, {
+    method: opts.method || 'GET',
+    headers: headers,
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
+    return r.json();
+  });
+}
+
+function uploadForm(path, formData) {
+  var headers = {};
+  var key = getApiKey();
+  if (key) headers['X-API-Key'] = key;
+  return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
+    if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
+    return r.json();
+  });
+}
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove('show'); }, 2200);
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function numOrNull(v) {
+  if (v === '' || v == null) return null;
+  var n = +v;
+  return isNaN(n) ? null : n;
+}
+
+function parseJsonField(v, fallback) {
+  if (!v) return fallback;
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch(e) { return fallback; }
+}
+
+function parseKeeper(u) {
+  var k = u.keeper;
+  if (!k) return { name: '', avatar: '', phone: '' };
+  if (typeof k === 'string') { try { k = JSON.parse(k); } catch (e) { k = {}; } }
+  return { name: k.name || '', avatar: k.avatar || '', phone: k.phone || '' };
+}
+
+function defaultRentDetail(u) {
+  return {
+    room_label: (u && u.name ? u.name + ' ' : '') + (u && u.area_sqm ? u.area_sqm + '㎡' : ''),
+    long_term: { range: '可租4个月-1年', plan: { pay: '季付', rent: u && u.rent_monthly, service_fee: null, service_note: '一次收取', deposit: u && u.rent_monthly } },
+    short_term: { range: '可租1个月-3个月', plan: { pay: '月付', rent: u && u.rent_monthly, service_fee: null, service_note: '一次收取', deposit: u && u.rent_monthly } },
+    other_fees: [
+      { name: '水费', value: '—元/吨' }, { name: '电费', value: '—元/度' }, { name: '宽带费', value: '—元/月' },
+      { name: '物业费', value: '—元/月' }, { name: '供暖费', value: '—元/方' }
+    ]
+  };
+}
+
+function parseRentDetail(u) {
+  var rd = u.rent_detail;
+  if (!rd) return defaultRentDetail(u);
+  if (typeof rd === 'string') { try { rd = JSON.parse(rd); } catch (e) { rd = null; } }
+  if (!rd || typeof rd !== 'object') return defaultRentDetail(u);
+  var base = defaultRentDetail(u);
+  if (rd.room_label) base.room_label = rd.room_label;
+  if (rd.long_term) base.long_term = Object.assign({}, base.long_term, rd.long_term);
+  if (rd.short_term) base.short_term = Object.assign({}, base.short_term, rd.short_term);
+  if (Array.isArray(rd.other_fees)) base.other_fees = rd.other_fees;
+  return base;
+}
+
+function tagsStr(tags) {
+  if (!tags) return '';
+  if (typeof tags === 'string') return tags;
+  if (Array.isArray(tags)) return tags.join(', ');
+  return '';
+}
+
+function imgStyle(path) {
+  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
+}
+
+/* ── Load data ── */
+function loadUnit() {
+  var params = new URLSearchParams(location.search);
+  unitId = +params.get('unit_id');
+  if (!unitId) {
+    document.getElementById('content').innerHTML = '<div class="loading">缺少 unit_id 参数</div>';
+    return;
+  }
+
+  api('/units/'+unitId).then(function(res) {
+    unit = res.unit;
+    photos = res.photos || [];
+    // Also load project info for context
+    return api('/projects/' + unit.project_id);
+  }).then(function(res) {
+    project = res.project;
+    render();
+  }).catch(function(e) {
+    document.getElementById('content').innerHTML = '<div class="loading">加载失败：'+esc(e.message)+'</div>';
+  });
+}
+
+/* ── Render ── */
+function render() {
+  var u = unit;
+  var isTrade = project && project.channel === 'trade';
+  var k = parseKeeper(u);
+  var rd = parseRentDetail(u);
+  var lt = rd.long_term && rd.long_term.plan ? rd.long_term.plan : {};
+  var st = rd.short_term && rd.short_term.plan ? rd.short_term.plan : {};
+  var am = Array.isArray(u.amenities) ? u.amenities : [];
+  if (typeof u.amenities === 'string') { try { am = JSON.parse(u.amenities); } catch(e) { am = []; } }
+  if (!am.length) am = AMENITY_CATALOG.map(function(a){ return a.id; });
+
+  // Preview link
+  var previewEl = document.getElementById('previewLink');
+  if (project && u.slug) {
+    var ch = project.channel || 'bzf';
+    previewEl.href = 'juzhu-unit-detail.html?project=' + encodeURIComponent(project.name) + '&unit=' + encodeURIComponent(u.slug) + '&channel=' + ch;
+  }
+
+  // Title
+  document.getElementById('pageTitle').innerHTML = esc(u.name || '房源编辑') +
+    ' <span class="sub">' + esc(project ? project.name : '') + (isTrade ? ' · 卖旧买新' : ' · 保租房') + '</span>';
+
+  var amenHtml = AMENITY_CATALOG.map(function(a) {
+    var on = am.indexOf(a.id) >= 0;
+    return '<label class="'+(on?'on':'')+'"><input type="checkbox" class="ud_am" value="'+a.id+'"'+(on?' checked':'')+'/>'+esc(a.label)+'</label>';
+  }).join('');
+
+  var feeHtml = (rd.other_fees || []).map(function(f, i) {
+    return '<div class="fee-row" data-i="'+i+'">'+
+      '<input class="fee_name" value="'+esc(f.name||'')+'" placeholder="费用名"/>'+
+      '<input class="fee_val" value="'+esc(f.value||'')+'" placeholder="金额/单位"/>'+
+      '<button type="button" class="btn danger fee_del">删</button></div>';
+  }).join('');
+
+  var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
+  var coverBg = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
+
+  var html = '';
+
+  // ── Basic info card ──
+  html += '<div class="card">';
+  html += '<h2>基本信息</h2>';
+  html += '<div class="grid">';
+  html += '<div class="fld"><label>房源名称</label><input id="u_name" value="'+esc(u.name)+'"/></div>';
+  html += '<div class="fld"><label>面积 ㎡</label><input id="u_area" type="number" step="0.1" value="'+(u.area_sqm||'')+'"/></div>';
+  html += '<div class="fld"><label>户型</label><input id="u_layout" value="'+esc(u.layout_label||'')+'"/></div>';
+  html += '<div class="fld"><label>'+(isTrade?'总价（万）':'月租（元）')+'</label><input id="u_price" type="number" value="'+(isTrade?(u.price_total||''):(u.rent_monthly||''))+'"/></div>';
+  html += '<div class="fld"><label>排序</label><input id="u_sort" type="number" value="'+(u.sort_order||0)+'"/></div>';
+  html += '<div class="fld"><label>封面图</label>'+
+    '<div class="img-field-row"><input id="u_cover" value="'+esc(u.cover_image||'')+'"/>'+
+    '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" id="coverUpload"/></label></div>'+
+    '<div class="cover-preview" id="coverPrev" style="'+coverBg+'"></div></div>';
+  html += '</div>';
+  html += '<div class="bar"><button class="btn primary" id="saveBasic">保存基本信息</button></div>';
+  html += '</div>';
+
+  // ── Tags & spec card ──
+  html += '<div class="card">';
+  html += '<h2>房源信息标签</h2>';
+  html += '<div class="detail-grid">';
+  html += '<div class="full"><label>标签（逗号分隔，首条为主标签；留空则自动生成）</label><input class="ud_tags" value="'+esc(tagsStr(u.tags))+'" placeholder="政府保租房, 建融家园, 近地铁, 押一付一, 拎包入住"/></div>';
+  html += '<div class="full"><label>规格说明</label><input class="ud_spec" value="'+esc(u.unit_spec||'')+'" placeholder="1室1厅1厨1卫 | 100㎡ | 南/北 | 立即入住"/></div>';
+  html += '<div><label>券后价（元/月，可选）</label><input class="ud_promo" type="number" value="'+(u.promo_price!=null?u.promo_price:'')+'"/></div>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── Amenities card ──
+  html += '<div class="card">';
+  html += '<h2>房型介绍 · 设施勾选</h2>';
+  html += '<div class="amenity-chks">'+amenHtml+'</div>';
+  html += '</div>';
+
+  // ── Keeper card ──
+  html += '<div class="card">';
+  html += '<h2>咨询管家</h2>';
+  html += '<div class="detail-grid">';
+  html += '<div><label>昵称</label><input class="ud_k_name" value="'+esc(k.name)+'" placeholder="张雪"/></div>';
+  html += '<div><label>联系电话</label><input class="ud_k_phone" value="'+esc(k.phone)+'" placeholder="留空则用城市预约电话"/></div>';
+  html += '<div class="full"><label>头像路径</label>'+
+    '<div class="img-field-row"><input class="ud_k_avatar" value="'+esc(k.avatar)+'"/>'+
+    '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="ud_k_upload"/></label></div>'+
+    '<div class="keeper-preview ud_k_prev" style="'+avBg+'"></div></div>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── Rent detail card ──
+  html += '<div class="card">';
+  html += '<h2>租金详情</h2>';
+  html += '<div class="detail-grid">';
+  html += '<div class="full"><label>房间标注</label><input class="ud_rd_label" value="'+esc(rd.room_label||'')+'"/></div>';
+  html += '<div class="full"><label>长租 '+esc(rd.long_term.range||'')+'</label></div>';
+  html += '<div><label>季付 · 租金/月</label><input class="ud_lt_rent" type="number" value="'+(lt.rent!=null?lt.rent:'')+'"/></div>';
+  html += '<div><label>季付 · 服务费</label><input class="ud_lt_svc" type="number" value="'+(lt.service_fee!=null?lt.service_fee:'')+'"/></div>';
+  html += '<div><label>季付 · 押金</label><input class="ud_lt_dep" type="number" value="'+(lt.deposit!=null?lt.deposit:'')+'"/></div>';
+  html += '<div class="full"><label>短租 '+esc(rd.short_term.range||'')+'</label></div>';
+  html += '<div><label>月付 · 租金/月</label><input class="ud_st_rent" type="number" value="'+(st.rent!=null?st.rent:'')+'"/></div>';
+  html += '<div><label>月付 · 服务费</label><input class="ud_st_svc" type="number" value="'+(st.service_fee!=null?st.service_fee:'')+'"/></div>';
+  html += '<div><label>月付 · 押金</label><input class="ud_st_dep" type="number" value="'+(st.deposit!=null?st.deposit:'')+'"/></div>';
+  html += '</div>';
+  html += '<div class="sec-h" style="margin-top:12px;">其他费用</div>';
+  html += '<div class="fee-rows ud_fees">'+feeHtml+'</div>';
+  html += '<button type="button" class="btn ghost ud_fee_add" style="margin-top:6px;">+ 添加费用项</button>';
+  html += '</div>';
+
+  // ── Save all detail ──
+  html += '<div class="card">';
+  html += '<div class="bar" style="margin-top:0;">';
+  html += '<button class="btn primary" id="saveDetail">保存全部详情</button>';
+  html += '<button class="btn danger" id="deleteUnit">删除此房源</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── Photos card ──
+  html += '<div class="card">';
+  html += '<h2>户型图集 <span class="badge" style="background:var(--gold)">'+photos.length+' 张</span></h2>';
+  html += renderPhotoGrid();
+  html += '</div>';
+
+  document.getElementById('content').innerHTML = html;
+  bindEvents();
+}
+
+function renderPhotoGrid() {
+  var cards = photos.map(function(ph) {
+    var cls = ph.is_cover ? ' photo-card cover' : ' photo-card';
+    return '<div class="'+cls.trim()+'" data-photo="'+ph.id+'">'+
+      '<div class="pv" style="'+imgStyle(ph.file_path)+'"></div>'+
+      '<label>路径</label><input class="ph_path" value="'+esc(ph.file_path)+'"/>'+
+      '<label>排序</label><input class="ph_sort" type="number" value="'+(ph.sort_order||0)+'"/>'+
+      '<div class="prow">'+
+        '<button type="button" class="btn ghost ph_save">保存</button>'+
+        '<label class="btn ghost upload-btn ph_replace">换图<input type="file" accept="image/*" class="upload-input"/></label>'+
+        '<button type="button" class="btn ghost ph_cover"'+(ph.is_cover?' disabled':'')+'>封面</button>'+
+        '<button type="button" class="btn danger ph_del">删</button>'+
+      '</div></div>';
+  }).join('');
+  if (!cards) cards = '<p style="font-size:12px;color:var(--muted);margin:0;">暂无图片</p>';
+  return '<div class="photo-grid">'+cards+'</div>'+
+    '<div class="photo-add">'+
+      '<input class="ph_new_path" placeholder="或填写路径…"/>'+
+      '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" multiple class="ph_upload_input"/></label>'+
+      '<button type="button" class="btn primary ph_add">+ 添加</button>'+
+    '</div>';
+}
+
+/* ── Bind events ── */
+function bindEvents() {
+  var isTrade = project && project.channel === 'trade';
+
+  // Cover image
+  var coverInput = document.getElementById('u_cover');
+  if (coverInput) coverInput.oninput = function() {
+    document.getElementById('coverPrev').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+  };
+  var coverUpload = document.getElementById('coverUpload');
+  if (coverUpload) coverUpload.onchange = function() {
+    var f = coverUpload.files && coverUpload.files[0];
+    if (!f) return;
+    var fd = new FormData();
+    fd.append('file', f);
+    fd.append('scope', 'unit_cover');
+    fd.append('unit_id', unitId);
+    toast('上传中…');
+    uploadForm('/upload', fd).then(function(res) {
+      document.getElementById('u_cover').value = res.file_path;
+      document.getElementById('coverPrev').style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
+      toast('封面已上传');
+    }).catch(function(e){ toast('上传失败：'+e.message); });
+    coverUpload.value = '';
+  };
+
+  // Keeper avatar
+  var avIn = document.querySelector('.ud_k_avatar');
+  var avPrev = document.querySelector('.ud_k_prev');
+  if (avIn) avIn.oninput = function() {
+    avPrev.style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+  };
+  var avatarUpload = document.querySelector('.ud_k_upload');
+  if (avatarUpload) avatarUpload.onchange = function() {
+    var f = avatarUpload.files && avatarUpload.files[0];
+    if (!f) return;
+    var fd = new FormData();
+    fd.append('file', f);
+    fd.append('scope', 'unit_keeper');
+    fd.append('unit_id', unitId);
+    toast('上传中…');
+    uploadForm('/upload', fd).then(function(res) {
+      avIn.value = res.file_path;
+      avPrev.style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
+      toast('头像已上传');
+    }).catch(function(e){ toast('上传失败：'+e.message); });
+    avatarUpload.value = '';
+  };
+
+  // Amenity checkboxes
+  document.querySelectorAll('.amenity-chks label').forEach(function(lbl) {
+    lbl.querySelector('input').onchange = function() { lbl.classList.toggle('on', this.checked); };
+  });
+
+  // Fee rows
+  document.querySelector('.ud_fee_add').onclick = function() {
+    var box = document.querySelector('.ud_fees');
+    var i = box.querySelectorAll('.fee-row').length;
+    var div = document.createElement('div');
+    div.className = 'fee-row';
+    div.dataset.i = i;
+    div.innerHTML = '<input class="fee_name" placeholder="费用名"/><input class="fee_val" placeholder="金额/单位"/><button type="button" class="btn danger fee_del">删</button>';
+    box.appendChild(div);
+    div.querySelector('.fee_del').onclick = function(){ div.remove(); };
+  };
+  document.querySelectorAll('.fee_del').forEach(function(btn) {
+    btn.onclick = function(){ btn.closest('.fee-row').remove(); };
+  });
+
+  // Save basic info
+  document.getElementById('saveBasic').onclick = function() {
+    var body = {
+      name: document.getElementById('u_name').value.trim(),
+      area_sqm: parseFloat(document.getElementById('u_area').value) || null,
+      layout_label: document.getElementById('u_layout').value.trim() || null,
+      sort_order: +document.getElementById('u_sort').value,
+      cover_image: document.getElementById('u_cover').value.trim() || null
+    };
+    var pv = document.getElementById('u_price').value;
+    if (isTrade) body.price_total = pv ? +pv : null;
+    else body.rent_monthly = pv ? +pv : null;
+
+    api('/units/'+unitId, { method:'PUT', body: body }).then(function(res) {
+      unit = res.unit;
+      toast('基本信息已保存');
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+
+  // Save detail
+  document.getElementById('saveDetail').onclick = function() {
+    var body = collectDetail();
+    api('/units/'+unitId, { method:'PUT', body: body }).then(function(res) {
+      unit = res.unit;
+      toast('详情已保存');
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+
+  // Delete
+  document.getElementById('deleteUnit').onclick = function() {
+    if (!confirm('确定删除房源「'+unit.name+'」？')) return;
+    api('/units/'+unitId, { method:'DELETE' }).then(function() {
+      toast('已删除，返回列表…');
+      setTimeout(function(){ location.href = 'juzhu-admin.html'; }, 1200);
+    }).catch(function(e){ toast('删除失败：'+e.message); });
+  };
+
+  // Photo events
+  bindPhotoEvents();
+}
+
+function collectDetail() {
+  var amenities = [];
+  document.querySelectorAll('.ud_am:checked').forEach(function(cb){ amenities.push(cb.value); });
+  var fees = [];
+  document.querySelectorAll('.fee-row').forEach(function(row) {
+    var n = row.querySelector('.fee_name').value.trim();
+    var v = row.querySelector('.fee_val').value.trim();
+    if (n) fees.push({ name: n, value: v || '—' });
+  });
+  var rd = {
+    room_label: document.querySelector('.ud_rd_label').value.trim(),
+    long_term: {
+      range: '可租4个月-1年',
+      plan: {
+        pay: '季付',
+        rent: numOrNull(document.querySelector('.ud_lt_rent').value),
+        service_fee: numOrNull(document.querySelector('.ud_lt_svc').value),
+        service_note: '一次收取',
+        deposit: numOrNull(document.querySelector('.ud_lt_dep').value)
+      }
+    },
+    short_term: {
+      range: '可租1个月-3个月',
+      plan: {
+        pay: '月付',
+        rent: numOrNull(document.querySelector('.ud_st_rent').value),
+        service_fee: numOrNull(document.querySelector('.ud_st_svc').value),
+        service_note: '一次收取',
+        deposit: numOrNull(document.querySelector('.ud_st_dep').value)
+      }
+    },
+    other_fees: fees
+  };
+  return {
+    name: document.getElementById('u_name').value.trim(),
+    area_sqm: parseFloat(document.getElementById('u_area').value) || null,
+    layout_label: document.getElementById('u_layout').value.trim() || null,
+    sort_order: +document.getElementById('u_sort').value,
+    tags: document.querySelector('.ud_tags').value,
+    unit_spec: document.querySelector('.ud_spec').value.trim() || null,
+    promo_price: numOrNull(document.querySelector('.ud_promo').value),
+    amenities: amenities,
+    keeper: {
+      name: document.querySelector('.ud_k_name').value.trim(),
+      avatar: document.querySelector('.ud_k_avatar').value.trim(),
+      phone: document.querySelector('.ud_k_phone').value.trim()
+    },
+    rent_detail: rd,
+    cover_image: document.getElementById('u_cover').value.trim() || null
+  };
+}
+
+function bindPhotoEvents() {
+  document.querySelectorAll('.photo-card').forEach(function(card) {
+    var pid = +card.dataset.photo;
+    card.querySelector('.ph_path').oninput = function() {
+      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    };
+    card.querySelector('.ph_save').onclick = function() {
+      api('/photos/'+pid, { method:'PUT', body: {
+        file_path: card.querySelector('.ph_path').value.trim(),
+        sort_order: +card.querySelector('.ph_sort').value
+      }}).then(function(){ toast('图片已保存'); reloadPhotos(); })
+        .catch(function(e){ toast('保存失败：'+e.message); });
+    };
+    card.querySelector('.ph_cover').onclick = function() {
+      api('/photos/'+pid, { method:'PUT', body: { is_cover: true } }).then(function(){
+        toast('已设为封面'); reloadPhotos();
+      }).catch(function(e){ toast('操作失败：'+e.message); });
+    };
+    card.querySelector('.ph_del').onclick = function() {
+      if (!confirm('删除该图片？')) return;
+      api('/photos/'+pid, { method:'DELETE' }).then(function(){
+        toast('图片已删除'); reloadPhotos();
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+    var replaceInput = card.querySelector('.ph_replace .upload-input');
+    if (replaceInput) {
+      replaceInput.onchange = function() {
+        var file = replaceInput.files && replaceInput.files[0];
+        if (!file) return;
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('scope', 'unit_photo');
+        fd.append('photo_id', pid);
+        toast('上传中…');
+        uploadForm('/upload', fd).then(function() {
+          toast('图片已更换'); reloadPhotos();
+        }).catch(function(e){ toast('更换失败：'+e.message); });
+        replaceInput.value = '';
+      };
+    }
+  });
+
+  // Bulk upload
+  var bulkInput = document.querySelector('.ph_upload_input');
+  if (bulkInput) {
+    bulkInput.onchange = function() {
+      var files = Array.prototype.slice.call(bulkInput.files || []);
+      if (!files.length) return;
+      toast('上传 '+files.length+' 张…');
+      var chain = Promise.resolve();
+      files.forEach(function(file) {
+        chain = chain.then(function() {
+          var fd = new FormData();
+          fd.append('file', file);
+          return uploadForm('/units/'+unitId+'/photos', fd);
+        });
+      });
+      chain.then(function() {
+        toast('上传完成'); reloadPhotos();
+      }).catch(function(e){ toast('上传失败：'+e.message); });
+      bulkInput.value = '';
+    };
+  }
+
+  // Add by path
+  var addBtn = document.querySelector('.ph_add');
+  if (addBtn) {
+    addBtn.onclick = function() {
+      var path = document.querySelector('.ph_new_path').value.trim();
+      if (!path) { toast('请填写图片路径'); return; }
+      api('/units/'+unitId+'/photos', { method:'POST', body: { file_path: path } }).then(function(){
+        toast('图片已添加'); reloadPhotos();
+      }).catch(function(e){ toast('添加失败：'+e.message); });
+    };
+  }
+}
+
+function reloadPhotos() {
+  api('/units/'+unitId).then(function(res) {
+    unit = res.unit;
+    photos = res.photos || [];
+    // Only re-render the photo section
+    var photoCard = document.querySelectorAll('.card');
+    var lastCard = photoCard[photoCard.length - 1];
+    if (lastCard) {
+      lastCard.innerHTML = '<h2>户型图集 <span class="badge" style="background:var(--gold)">'+photos.length+' 张</span></h2>' + renderPhotoGrid();
+      bindPhotoEvents();
+    }
+  });
+}
+
+// Go!
+loadUnit();
+</script>
+</body>
+</html>
