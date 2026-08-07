@@ -12,7 +12,6 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import markdown
 from datetime import datetime, timezone
 
 from db import (  # noqa: E402
@@ -209,71 +208,7 @@ class Handler(SimpleHTTPRequestHandler):
         p = urlparse(self.path)
         if p.path.startswith("/api/juzhu"):
             return self._route(p, "GET")
-        if p.path.endswith(".md"):
-            return self._serve_markdown()
         return super().do_GET()
-
-    def _serve_markdown(self):
-        """将 .md 文件渲染为 HTML 返回，让浏览器直接展示格式化的文档。"""
-        fs_path = self.translate_path(self.path)
-        if not os.path.isfile(fs_path):
-            self.send_error(404, "File not found")
-            return
-        try:
-            with open(fs_path, "r", encoding="utf-8") as f:
-                md_text = f.read()
-        except Exception:
-            self.send_error(500, "Failed to read file")
-            return
-
-        html_body = markdown.markdown(
-            md_text,
-            extensions=["fenced_code", "tables", "codehilite", "toc"],
-        )
-
-        html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{os.path.basename(fs_path)}</title>
-<style>
-  body {{
-    max-width: 900px; margin: 40px auto; padding: 0 20px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    font-size: 16px; line-height: 1.7; color: #24292e; background: #fff;
-  }}
-  h1, h2, h3, h4 {{ margin-top: 28px; margin-bottom: 16px; font-weight: 600; line-height: 1.3; }}
-  h1 {{ font-size: 2em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }}
-  h2 {{ font-size: 1.5em; border-bottom: 1px solid #e1e4e8; padding-bottom: .3em; }}
-  h3 {{ font-size: 1.25em; }}
-  code {{ font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-          background: #f6f8fa; padding: .2em .4em; border-radius: 3px; font-size: 85%; }}
-  pre {{ background: #f6f8fa; padding: 16px; border-radius: 6px; overflow-x: auto; line-height: 1.45; }}
-  pre code {{ background: none; padding: 0; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
-  th, td {{ border: 1px solid #dfe2e5; padding: 8px 12px; text-align: left; }}
-  th {{ background: #f6f8fa; font-weight: 600; }}
-  blockquote {{ border-left: 4px solid #dfe2e5; padding: 0 15px; color: #6a737d; margin: 16px 0; }}
-  a {{ color: #0366d6; text-decoration: none; }}
-  a:hover {{ text-decoration: underline; }}
-  hr {{ border: 0; border-top: 1px solid #e1e4e8; margin: 24px 0; }}
-  ul, ol {{ padding-left: 2em; }}
-  img {{ max-width: 100%; }}
-</style>
-</head>
-<body>
-{html_body}
-</body>
-</html>"""
-
-        data = html.encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self._cors()
-        self.end_headers()
-        self.wfile.write(data)
 
     def do_POST(self):
         p = urlparse(self.path)
