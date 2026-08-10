@@ -627,6 +627,9 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"list": data})
 
+        if path == "/api/juzhu/jz/orders/overview":
+            return self._jz_order_overview(conn)
+
         m = re.match(r"^/api/juzhu/jz/orders/([^/]+)$", path)
         if m:
             data = jzdb.get_order(conn, m.group(1))
@@ -914,6 +917,50 @@ class Handler(SimpleHTTPRequestHandler):
         }
         conn.close()
         return self._json({"stats": stats})
+
+    def _jz_order_overview(self, conn):
+        """订单概览：今日漏斗 + 近15天按日 + 近12月按月（gr_orders 表）"""
+        statuses = ["pending", "paid", "assigned", "serving", "completed", "cancelled"]
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # 今日各状态漏斗
+        funnel = {}
+        for s in statuses:
+            funnel[s] = conn.execute(
+                "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                (s, today),
+            ).fetchone()[0]
+
+        # 近15天按日统计
+        daily = []
+        for i in range(14, -1, -1):
+            day = conn.execute(
+                "SELECT date('now','localtime','-' || ? || ' days')", (i,)
+            ).fetchone()[0]
+            row = {"date": day}
+            for s in statuses:
+                row[s] = conn.execute(
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                    (s, day),
+                ).fetchone()[0]
+            daily.append(row)
+
+        # 近12个月按月统计
+        monthly = []
+        for i in range(11, -1, -1):
+            month_label = conn.execute(
+                "SELECT strftime('%Y-%m', 'now','localtime','-' || ? || ' months')", (i,)
+            ).fetchone()[0]
+            row = {"month": month_label}
+            for s in statuses:
+                row[s] = conn.execute(
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND strftime('%Y-%m', created_at)=?",
+                    (s, month_label),
+                ).fetchone()[0]
+            monthly.append(row)
+
+        conn.close()
+        return self._json({"funnel": funnel, "daily": daily, "monthly": monthly})
 
     def _dispatch_jz_order(self, oid):
         b = self._body()

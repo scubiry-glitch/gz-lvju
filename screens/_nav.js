@@ -212,6 +212,7 @@
           { id: 'jz-product',  label: '★ 商家 SKU（产品）↗',  href: 'p-jz-product.html',  icon: 'box' },
           { id: 'jz-schedule', label: '★ SKU 排班 ↗',         href: 'p-jz-schedule.html', icon: 'pulse' },
           { id: 'jz-worker',   label: '★ 服务者管理 ↗',       href: 'p-jz-worker.html',   icon: 'user' },
+          { id: 'jz-order-overview', label: '服务订单概览',    href: 'p-jz-order-overview.html', icon: 'chart' },
           { id: 'jiazheng-flow', label: '四大品类全流程 ↗',   href: '../juzhu-jiazheng-flow.html', icon: 'truck', badge: 'E2E' },
         ]},
       ],

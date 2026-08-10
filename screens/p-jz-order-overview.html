@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务订单概览 · 服务认证中台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* funnel */
+  .funnel{margin-top:12px;}
+  .funnel-row{display:flex;align-items:center;margin-bottom:8px;gap:10px;}
+  .funnel-label{width:72px;font-size:12px;font-weight:600;text-align:right;flex-shrink:0;}
+  .funnel-bar{height:28px;border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:600;color:#fff;min-width:36px;transition:width .3s;}
+  .funnel-count{font-size:12px;color:var(--muted);width:40px;flex-shrink:0;}
+  .funnel-total{font-size:12px;color:var(--muted);margin-top:4px;text-align:center;}
+
+  /* chart controls */
+  .chart-ctl{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .chart-ctl .dim-group{display:flex;gap:4px;}
+  .chart-ctl .dim-group .btn{font-size:11px;padding:4px 10px;}
+  .chart-ctl .dim-group .btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .chart-ctl .status-group{display:flex;gap:4px;flex-wrap:wrap;}
+  .chart-ctl .status-group .btn{font-size:11px;padding:4px 10px;}
+  .chart-ctl .status-group .btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .chart-ctl .sep{width:1px;height:20px;background:var(--border);}
+
+  /* canvas */
+  .chart-wrap{position:relative;width:100%;}
+  .chart-wrap canvas{display:block;width:100%;}
+
+  .loading{text-align:center;padding:40px;color:var(--muted);font-size:14px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+  .toast.show{display:block;}
+  .toast.err{background:var(--danger);}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="jz-order-overview"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × P 服务认证中台 / 居住服务 · 家政频道 / <b>服务订单概览</b></div>
+    </div>
+    <div class="content">
+
+      <div class="card">
+        <h3>今日订单状态漏斗 <span class="pill">实时</span></h3>
+        <div id="funnelDate" style="font-size:12px;color:var(--muted);margin-bottom:4px;"></div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+
+      <div class="card">
+        <h3>订单趋势 <span class="pill">折线图</span></h3>
+        <div class="chart-ctl">
+          <span style="font-size:12px;color:var(--muted);">维度</span>
+          <div class="dim-group">
+            <button class="btn on" data-dim="daily">按日</button>
+            <button class="btn" data-dim="monthly">按月</button>
+          </div>
+          <span class="sep"></span>
+          <span style="font-size:12px;color:var(--muted);">状态</span>
+          <div class="status-group" id="statusBtns"></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart" height="300"></canvas></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_nav.js"></script>
+<script>
+(function(){
+  const STATUS_MAP = {
+    pending:'待支付', paid:'已支付', assigned:'已派单',
+    serving:'服务中', completed:'已完成', cancelled:'已取消'
+  };
+  const STATUS_ORDER = ['pending','paid','assigned','serving','completed','cancelled'];
+  const FUNNEL_COLORS = ['#6366f1','#818cf8','#a5b4fc','#93c5fd','#6ee7b7','#fca5a5'];
+
+  const $ = id => document.getElementById(id);
+  const toast = (msg, kind) => {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'toast show ' + (kind||'');
+    setTimeout(()=>t.className='toast', 1800);
+  };
+
+  let data = null;
+  let curDim = 'daily';
+  let curStatus = 'pending';
+
+  async function load() {
+    try {
+      const r = await fetch('/api/juzhu/jz/orders/overview');
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      data = await r.json();
+      renderFunnel(data.funnel);
+      renderChart();
+    } catch(e) {
+      $('funnel').innerHTML = '<div class="loading">加载失败：'+e.message+'</div>';
+    }
+  }
+
+  function renderFunnel(funnel) {
+    const today = new Date().toISOString().slice(0,10);
+    $('funnelDate').textContent = '日期：' + today;
+
+    const vals = STATUS_ORDER.map(s => funnel[s]||0);
+    const max = Math.max(...vals, 1);
+    const total = vals.reduce((a,b)=>a+b,0);
+
+    let html = '';
+    STATUS_ORDER.forEach((s, i) => {
+      const v = vals[i];
+      const pct = max > 0 ? Math.max((v/max)*100, 4) : 0;
+      html += `<div class="funnel-row">
+        <span class="funnel-label">${STATUS_MAP[s]}</span>
+        <div class="funnel-bar" style="width:${pct}%;background:${FUNNEL_COLORS[i]}">${v>0?v:''}</div>
+        <span class="funnel-count">${v}</span>
+      </div>`;
+    });
+    html += `<div class="funnel-total">今日共 ${total} 单</div>`;
+    $('funnel').innerHTML = html;
+  }
+
+  function renderChart() {
+    if (!data) return;
+    const list = curDim === 'daily' ? data.daily : data.monthly;
+    const key = curDim === 'daily' ? 'date' : 'month';
+    const labels = list.map(r => {
+      const v = r[key];
+      return curDim === 'daily' ? v.slice(5) : v; // MM-DD or YYYY-MM
+    });
+    const values = list.map(r => r[curStatus]||0);
+
+    const canvas = $('chart');
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.parentElement.clientWidth;
+    const H = 300;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const pad = {top:20, right:20, bottom:40, left:44};
+    const pw = W - pad.left - pad.right;
+    const ph = H - pad.top - pad.bottom;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // grid & Y axis
+    const maxY = Math.max(...values, 1);
+    const ySteps = 5;
+    const yStep = Math.ceil(maxY / ySteps) || 1;
+    const yMax = yStep * ySteps;
+
+    ctx.strokeStyle = '#f1f5f9';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#64748b';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= ySteps; i++) {
+      const y = pad.top + ph - (i / ySteps) * ph;
+      const val = i * yStep;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(W - pad.right, y);
+      ctx.stroke();
+      ctx.fillText(val, pad.left - 8, y + 4);
+    }
+
+    // X labels
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#64748b';
+    const xStep = pw / Math.max(labels.length - 1, 1);
+    labels.forEach((l, i) => {
+      const x = pad.left + i * xStep;
+      ctx.fillText(l, x, H - pad.bottom + 16);
+    });
+
+    // line
+    if (values.length < 2) return;
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = pad.left + i * xStep;
+      const y = pad.top + ph - (v / yMax) * ph;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // dots
+    ctx.fillStyle = '#6366f1';
+    values.forEach((v, i) => {
+      if (v === 0) return;
+      const x = pad.left + i * xStep;
+      const y = pad.top + ph - (v / yMax) * ph;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#6366f1';
+    });
+  }
+
+  // init status buttons
+  (function(){
+    let html = '';
+    STATUS_ORDER.forEach((s,i) => {
+      html += `<button class="btn${s===curStatus?' on':''}" data-status="${s}">${STATUS_MAP[s]}</button>`;
+    });
+    $('statusBtns').innerHTML = html;
+
+    // bind dimension toggle
+    document.querySelectorAll('.dim-group .btn').forEach(b => {
+      b.onclick = function(){
+        document.querySelectorAll('.dim-group .btn').forEach(x=>x.classList.remove('on'));
+        this.classList.add('on');
+        curDim = this.dataset.dim;
+        renderChart();
+      };
+    });
+
+    // bind status toggle
+    document.querySelectorAll('.status-group .btn').forEach(b => {
+      b.onclick = function(){
+        document.querySelectorAll('.status-group .btn').forEach(x=>x.classList.remove('on'));
+        this.classList.add('on');
+        curStatus = this.dataset.status;
+        renderChart();
+      };
+    });
+
+    window.addEventListener('resize', renderChart);
+  })();
+
+  load();
+})();
+</script>
+</body>
+</html>
