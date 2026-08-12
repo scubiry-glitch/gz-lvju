@@ -52,7 +52,7 @@ ASSETS_PREFIX = "assets/juzhu/sy"
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 API_KEY_ENV = "JUZHU_API_KEY"
-DEFAULT_API_KEY = "dev-juzhu-key"  # 可在 .env 配置的开发示例；生产禁止使用
+DEFAULT_API_KEY = "dev-juzhu-key"  # 历史默认值：任何环境均不得再当作有效密钥
 ADMIN_PASSWORD_ENV = "JUZHU_ADMIN_PASSWORD"
 DEFAULT_ADMIN_PASSWORD = "dongbo2026"
 ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
@@ -2579,13 +2579,11 @@ def main():
     admin_pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
     api_set = bool(api_key)
     admin_set = bool(admin_pwd)
-    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已从 .env 加载' if api_set else '未配置'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
-    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）；密钥只读环境变量")
+    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已配置' if api_set and api_key != DEFAULT_API_KEY else '未配置/无效'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
+    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）；禁止历史默认密钥")
     print("  static 已拦截 .env / *.py / *.db / *.md / api 文档页；生产禁用 /docs/")
-    if not api_set:
-        print(f"  WARN  未在 .env 配置 {API_KEY_ENV} — admin API 将全部 401")
-    elif env_name not in ("prod", "production") and api_key == DEFAULT_API_KEY:
-        print(f"  note  开发使用示例密钥 {DEFAULT_API_KEY}（来自 .env）；生产必须换成强随机值")
+    if not api_set or api_key == DEFAULT_API_KEY:
+        print(f"  WARN  未配置有效 {API_KEY_ENV}（禁止 {DEFAULT_API_KEY}）— admin API 将全部 401")
     if env_name in ("prod", "production"):
         bad = []
         if not api_set or api_key == DEFAULT_API_KEY:
