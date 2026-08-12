@@ -52,17 +52,20 @@ ASSETS_PREFIX = "assets/juzhu/sy"
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 API_KEY_ENV = "JUZHU_API_KEY"
-DEFAULT_API_KEY = "dev-juzhu-key"
+DEFAULT_API_KEY = "dev-juzhu-key"  # 可在 .env 配置的开发示例；生产禁止使用
 ADMIN_PASSWORD_ENV = "JUZHU_ADMIN_PASSWORD"
 DEFAULT_ADMIN_PASSWORD = "dongbo2026"
 ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
 ADMIN_TOKEN_SALT = b"juzhu-admin-session-v1"
 
 # 静态文件：默认不暴露源码/密钥/数据库。/juzhu/ 仅白名单（前端 data 层依赖）。
+# 与仓库根 app.js 的 isPublicStatic 保持同口径（Node 为线上入口）。
 _SENSITIVE_NAMES = {
     ".env",
     ".env.local",
     ".env.example",
+    ".env.prod",
+    ".env.test",
     ".git",
     ".gitignore",
     ".DS_Store",
@@ -72,6 +75,16 @@ _SENSITIVE_NAMES = {
     "api_doc.md",
     "api-document.html",
     "hmac_secret.key",
+    "package.json",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "scf_bootstrap",
+    "moma_build.sh",
+    "moma_deploy.js",
+    "CLAUDE.md",
+    "README.md",
+    "VERIFICATION.md",
 }
 _SENSITIVE_SUFFIXES = (
     ".py",
@@ -88,7 +101,27 @@ _SENSITIVE_SUFFIXES = (
     ".crt",
     ".p12",
     ".pfx",
+    ".sh",
+    ".md",
 )
+_API_DOC_BASENAMES = {
+    "api-document.html",
+    "xjz-api.html",
+    "prd-document.html",
+    "xjz-prd.html",
+}
+_ROOT_BLOCKED_FILES = {
+    "app.js",
+    "server.js",
+    "package.json",
+    "package-lock.json",
+    "scf_bootstrap",
+    "moma_build.sh",
+    "moma_deploy.js",
+    "api_doc.md",
+    "README.md",
+    "CLAUDE.md",
+}
 _JUZHU_PUBLIC_FILES = {
     "app.js",
     "cities.json",
@@ -96,6 +129,7 @@ _JUZHU_PUBLIC_FILES = {
 }
 _JUZHU_PUBLIC_PREFIXES = ("data-",)
 _JUZHU_PUBLIC_SUFFIXES = (".json",)
+_BLOCKED_TOP_DIRS = {"node_modules", "scripts", ".git"}
 
 
 def slugify(name):
@@ -252,11 +286,20 @@ def _url_parts(url_path):
     return [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
 
 
+_SENSITIVE_NAMES_LOWER = {n.lower() for n in _SENSITIVE_NAMES}
+_ROOT_BLOCKED_LOWER = {n.lower() for n in _ROOT_BLOCKED_FILES}
+
+
 def _is_sensitive_part(name):
     lower = (name or "").lower()
-    if lower in _SENSITIVE_NAMES or name in _SENSITIVE_NAMES:
+    if lower in _SENSITIVE_NAMES_LOWER or name in _SENSITIVE_NAMES:
+        return True
+    if lower in _API_DOC_BASENAMES:
         return True
     if lower.startswith(".env"):
+        return True
+    # 隐藏文件 / 目录（.git、.env*、.DS_Store 等）一律不对外
+    if lower.startswith(".") and lower not in (".", ".."):
         return True
     if lower.endswith(_SENSITIVE_SUFFIXES):
         return True
@@ -268,8 +311,11 @@ def is_public_static(url_path):
     parts = _url_parts(url_path)
     if not parts:
         return True  # / → index；目录列表另由 list_directory 关掉
-    if any(_is_sensitive_part(p) for p in parts):
+    # 生产禁用 /docs/ 整目录（含历史 API 文档入口）
+    env = (os.environ.get("JUZHU_ENV") or "").strip().lower()
+    if parts[0] == "docs" and env in ("prod", "production"):
         return False
+    # /juzhu/ 白名单优先（其中 app.js 是前端脚本，与根目录 Node 入口同名）
     if parts[0] == "juzhu":
         if len(parts) != 2:
             return False
@@ -279,7 +325,13 @@ def is_public_static(url_path):
         if name.startswith(_JUZHU_PUBLIC_PREFIXES) and name.endswith(_JUZHU_PUBLIC_SUFFIXES):
             return True
         return False
-    # 仓库根其它路径：禁止隐藏文件 / 源码型扩展（已在 parts 检查）；允许 html/css/js/图片/docs 静态页等
+    if parts[0] in _BLOCKED_TOP_DIRS:
+        return False
+    if any(_is_sensitive_part(p) for p in parts):
+        return False
+    if len(parts) == 1 and parts[0].lower() in _ROOT_BLOCKED_LOWER:
+        return False
+    # 仓库根其它路径：允许 html/css/js/图片等业务静态页
     return True
 
 
@@ -376,13 +428,12 @@ class Handler(SimpleHTTPRequestHandler):
         return (os.environ.get("JUZHU_ENV") or "").strip().lower() in ("prod", "production")
 
     def _expected_api_key(self):
+        # 唯一来源：环境变量 / .env.local（load_dotenv）；代码内不再写死有效密钥
         key = (os.environ.get(API_KEY_ENV) or "").strip()
-        # 生产禁止空密钥 / 开发默认密钥（文档泄露即等于未授权）
-        if self._is_production():
-            if not key or key == DEFAULT_API_KEY:
-                return ""
-            return key
-        return key or DEFAULT_API_KEY
+        # 空密钥 / 历史开发默认密钥一律无效（文档泄露不再等于未授权）
+        if not key or key == DEFAULT_API_KEY:
+            return ""
+        return key
 
     def _expected_admin_password(self):
         pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
@@ -390,6 +441,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not pwd or pwd == DEFAULT_ADMIN_PASSWORD:
                 return ""
             return pwd
+        # 开发允许默认密码仅用于本地门禁；API Key 仍须显式配置
         return pwd or DEFAULT_ADMIN_PASSWORD
 
     def _admin_token_secret(self):
@@ -2527,13 +2579,17 @@ def main():
     admin_pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
     api_set = bool(api_key)
     admin_set = bool(admin_pwd)
-    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已配置' if api_set else '使用开发默认'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
-    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）")
-    print("  static 已拦截 .env / *.py / *.db / api 文档密钥页 / juzhu 非白名单文件")
+    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已从 .env 加载' if api_set else '未配置'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
+    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）；密钥只读环境变量")
+    print("  static 已拦截 .env / *.py / *.db / *.md / api 文档页；生产禁用 /docs/")
+    if not api_set:
+        print(f"  WARN  未在 .env 配置 {API_KEY_ENV} — admin API 将全部 401")
+    elif env_name not in ("prod", "production") and api_key == DEFAULT_API_KEY:
+        print(f"  note  开发使用示例密钥 {DEFAULT_API_KEY}（来自 .env）；生产必须换成强随机值")
     if env_name in ("prod", "production"):
         bad = []
         if not api_set or api_key == DEFAULT_API_KEY:
-            bad.append(f"{API_KEY_ENV}（须显式配置且不得为开发默认值）")
+            bad.append(f"{API_KEY_ENV}（须显式配置且不得为开发示例 {DEFAULT_API_KEY}）")
         if not admin_set or admin_pwd == DEFAULT_ADMIN_PASSWORD:
             bad.append(f"{ADMIN_PASSWORD_ENV}（须显式配置且不得为开发默认值）")
         if bad:

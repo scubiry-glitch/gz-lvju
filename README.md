@@ -95,7 +95,7 @@
 | `data.json` | 前端静态数据源（可提交，`server.py` 保存时重导） |
 | `seed_from_folder.py` / `seed_jiazheng.py` | 入库 / 播种脚本 |
 
-REST 双轨：C 端工单 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。鉴权用 `localStorage JUZHU_API_KEY`（默认 `dev-juzhu-key`）。
+REST 双轨：C 端工单 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。鉴权密钥只从 `.env` 的 `JUZHU_API_KEY` 读取（本地可用 `dev-juzhu-key`）；前端用 `localStorage JUZHU_API_KEY` 对齐，勿硬编码。
 
 ---
 

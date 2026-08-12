@@ -104,7 +104,7 @@
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
-- **鉴权**：写接口与中台列表读接口用 `localStorage JUZHU_API_KEY`（默认 `dev-juzhu-key`）；C 端单订单查询与评价可匿名
+- **鉴权**：写接口与中台列表读接口用 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端经 `localStorage JUZHU_API_KEY` 与之对齐，勿在页面硬编码；C 端单订单查询与评价可匿名
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
 
 ## 规则 10 · 话务虚拟号（TP）只走服务端
@@ -115,4 +115,4 @@
 
 ## 规则 11 · 静态服务不得暴露源码与密钥
 
-`juzhu/server.py` 用仓库根做静态根目录时，**必须**拦截敏感路径：`.env*`、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。
+`juzhu/server.py` 与线上 Node 入口 `app.js` 用仓库根做静态根时，**必须**拦截敏感路径：`.env*`、隐藏文件、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`package.json`、`README.md`、根目录 `app.js`/`scf_bootstrap`/`moma_*`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。MySQL 账号只进运行时环境变量 / 本地 `.env.*`（gitignore），**禁止**写进 `app.js` 源码默认值。

@@ -1,0 +1,9 @@
+{
+  "name": "sy2-full",
+  "version": "1.0.0",
+  "description": "新居住服务平台",
+  "main": "app.js",
+  "dependencies": {
+    "mysql2": "^3.9.0"
+  }
+}

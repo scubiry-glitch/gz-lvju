@@ -204,9 +204,9 @@
 <script src="_nav.js"></script>
 <script>
 // 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
-// （默认 dev-juzhu-key，可用 localStorage.JUZHU_API_KEY 覆盖）。
+// （须事先 localStorage.setItem('JUZHU_API_KEY', '<密钥>')；禁止内嵌历史默认密钥）。
 (function(){
-  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || 'dev-juzhu-key';
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || '';
   var _fetch = window.fetch.bind(window);
   window.fetch = function(input, init){
     init = init || {};
