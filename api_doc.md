@@ -8,7 +8,7 @@
 - **生产环境**：`https://your-domain`
 - **Content-Type**：`application/json`
 - **认证方式**：HMAC-SHA256 签名（见第 2 章）
-- **测试密钥**：见文档下方‘测试商家’部分
+- **测试密钥**：密钥线下同步
 
 ### 接口一览
 
@@ -723,34 +723,7 @@ curl -X POST https://uat.doorslink.net/mall/beike/juzhu/generate/urllink \
 
 ---
 
-## 6. 密钥管理
-
-`hmac_secret.key` 文件格式（每行一个商家）：
-
-```
-vendor_id|hmac_key|url_link
-```
-
-| 列 | 说明 |
-|----|------|
-| `vendor_id` | 商家 ID（整数） |
-| `hmac_key` | HMAC-SHA256 签名密钥（64 位 hex） |
-| `url_link` | 小程序链接生成接口完整地址（可选，留空则不可生成链接） |
-
-> 支持 `#` 开头注释行和空行。
-
-### 测试商家
-
-| 商家 | vendor_id | HMAC 密钥 | url_link |
-|------|-----------|-----------|----------|
-| 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
-| 蓝犀牛 | 42 | `c54d268446c9bd8956309480fdd12c4673661d02f12c7ea6596818692cf38efb` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
-
-测试环境接口地址：`http://49.232.103.71:8765`
-
----
-
-## 7. 参考实现（Python）
+## 6. 参考实现（Python）
 
 ```python
 import hashlib
