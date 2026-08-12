@@ -8,9 +8,7 @@
 - **生产环境**：`https://your-domain`
 - **Content-Type**：`application/json`
 - **认证方式**：HMAC-SHA256 签名（见第 2 章）
-- **测试密钥**
-  - VENDOR_ID = 41
-  - SECRET = 7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d
+- **测试密钥**：见文档下方‘测试商家’部分
 
 ### 接口一览
 
@@ -659,35 +657,14 @@ POST /api/juzhu/jiazheng/vendor/products/delete
 ---
 
 ## 5. 密钥管理
-
-### 分配流程
-
-1. GR 运营在管理后台创建商家 → 获得 `vendor_id`（如 41）
-2. 为商家生成 HMAC 密钥（64 位 hex，推荐 `python3 -c "import secrets; print(secrets.token_hex(32))"`）
-3. 在服务器 `hmac_secret.key` 文件中追加一行：`41|<密钥>`
-4. 将 `vendor_id` + 密钥线下交付给第三方商家
-
 ### 测试商家
 
 | 商家 | vendor_id | HMAC 密钥 |
 |------|-----------|-----------|
 | 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` |
+| 蓝犀牛 | 42 | `c54d268446c9bd8956309480fdd12c4673661d02f12c7ea6596818692cf38efb` |
 
 测试环境接口地址：`http://49.232.103.71:8765`
-
-### 密钥文件格式
-
-```
-# 注释行以 # 开头，空行忽略
-41|cbaa8192be7933a6900274c0bb5a6cdd295a44046ac3a6ec65862b3692051217
-42|a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
-```
-
-### 注意事项
-
-- 密钥仅保存在服务端 `hmac_secret.key`，不落库
-- 密钥泄露后需立即更换对应行，旧密钥即刻失效
-- 签名防重放窗口为 **5 分钟**（±300000ms）
 
 ---
 

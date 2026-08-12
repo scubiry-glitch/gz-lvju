@@ -207,12 +207,12 @@
           { id: 'portal', label: '公示门户 ↗',     href: 'portal-index.html',     icon: 'star' },
         ]},
         { name: '🏠 居住服务 · 家政频道', items: [
+          { id: 'jz-order-overview', label: '服务订单概览',    href: 'p-jz-order-overview.html', icon: 'chart' },
           { id: 'jz-category', label: '★ 服务子类目管理',     href: 'p-jz-category.html', icon: 'list' },
           { id: 'jz-spu',      label: '★ 服务标准品 SPU',     href: 'p-jz-spu.html',      icon: 'box' },
           { id: 'jz-product',  label: '★ 商家 SKU（产品）↗',  href: 'p-jz-product.html',  icon: 'box' },
           { id: 'jz-schedule', label: '★ SKU 排班 ↗',         href: 'p-jz-schedule.html', icon: 'pulse' },
           { id: 'jz-worker',   label: '★ 服务者管理 ↗',       href: 'p-jz-worker.html',   icon: 'user' },
-          { id: 'jz-order-overview', label: '服务订单概览',    href: 'p-jz-order-overview.html', icon: 'chart' },
           { id: 'jiazheng-flow', label: '四大品类全流程 ↗',   href: '../juzhu-jiazheng-flow.html', icon: 'truck', badge: 'E2E' },
         ]},
       ],

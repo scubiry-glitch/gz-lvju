@@ -2,11 +2,604 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="refresh" content="0;url=index.html" />
-<title>新居住频道已迁至首页</title>
-<script>location.replace('index.html' + location.search + location.hash);</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>新居住 · 沈阳 · 贝壳</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  #navCitySub.city-tap{cursor:pointer;}
+  #navCitySub.city-tap::after{content:" ▾";opacity:.85;font-size:.85em;}
+  .city-sheet{position:fixed;inset:0;z-index:80;display:none;}
+  .city-sheet.on{display:block;}
+  .city-sheet .backdrop{position:absolute;inset:0;background:rgba(15,23,42,.45);}
+  .city-sheet .panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;
+    box-shadow:0 -12px 32px rgba(15,42,38,.18);}
+  .city-sheet .ph{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+  .city-sheet .ph .x{font-size:22px;color:var(--muted);line-height:1;cursor:pointer;}
+  .city-sheet .cascade{display:grid;grid-template-columns:88px 1fr;gap:12px;}
+  .city-sheet .provs{display:flex;flex-direction:column;gap:4px;max-height:46vh;overflow:auto;}
+  .city-sheet .provs a{padding:11px 6px;border-radius:10px;text-align:center;font-size:13px;color:var(--muted);cursor:pointer;}
+  .city-sheet .provs a.on{background:#eef4f2;color:var(--ink);font-weight:700;}
+  .city-sheet .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start;max-height:46vh;overflow:auto;}
+  .city-sheet .grid a{padding:11px 6px;border-radius:12px;background:#f5f7f6;border:1px solid transparent;text-align:center;font-size:13px;color:var(--ink);cursor:pointer;}
+  .city-sheet .grid a.allp{grid-column:1 / -1;background:#fff;border:1px dashed #cbd5cf;color:var(--brand);font-weight:600;}
+  .city-sheet .grid a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;border-color:transparent;}
+  .scheme-bar{display:none !important;}
+  .scheme-bar a{color:var(--brand);font-weight:600;}
+  .split-hd{position:relative;padding:52px 18px 20px;color:#fff;overflow:hidden;}
+  .split-hd .bg{position:absolute;inset:0;background:linear-gradient(135deg,#0b5d56,#1a4038 50%,#8c6224);}
+  .split-hd .bg.has-img{background-size:cover;background-position:center;}
+  .split-hd .bg.has-img::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(11,93,86,.82),rgba(26,64,56,.75) 50%,rgba(140,98,36,.55));z-index:0;}
+  .split-hd .bg::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(85deg,rgba(255,255,255,.04) 0 2px,transparent 2px 18px);opacity:.6;}
+  .split-hd .in{position:relative;z-index:2;}
+  .split-hd .ek{font-size:9px;letter-spacing:.36em;opacity:.9;}
+  .split-hd h1{font-family:var(--serif);font-size:24px;margin-top:6px;line-height:1.2;}
+  .split-hd .stat{display:flex;gap:18px;margin-top:12px;font-size:10px;opacity:.92;}
+  .split-hd .stat b{font-family:var(--serif);font-size:16px;display:block;}
+  .seg-switch{display:flex;margin-top:14px;background:rgba(255,255,255,.12);border-radius:12px;padding:3px;backdrop-filter:blur(8px);}
+  .seg-switch a{flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;border-radius:10px;color:rgba(255,255,255,.75);}
+  .seg-switch a.on{background:#fff;color:var(--brand-deep);box-shadow:0 4px 12px rgba(0,0,0,.15);}
+  .pane{display:none;}.pane.on{display:block;}
+
+  /* === 家政 tab === */
+  .jz-quick{padding:10px 18px 6px;}
+  .jz-quick-intro{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 15px;margin-bottom:10px;border-radius:18px;
+    background:linear-gradient(135deg,#f7f4ee,#f3efe6);color:#17352f;box-shadow:0 10px 28px rgba(15,42,38,.08);position:relative;overflow:hidden;border:1px solid rgba(15,42,38,.08);}
+  .jz-quick-intro::before,.jz-quick-intro::after{content:"";position:absolute;border-radius:50%;pointer-events:none;}
+  .jz-quick-intro::before{width:124px;height:124px;right:-28px;top:-44px;background:radial-gradient(circle,rgba(15,118,110,.08),rgba(15,118,110,0) 72%);}
+  .jz-quick-intro::after{width:148px;height:148px;left:-44px;bottom:-96px;background:radial-gradient(circle,rgba(180,83,9,.08),rgba(180,83,9,0) 72%);}
+  .jz-quick-intro .copy,.jz-quick-intro .meta{position:relative;z-index:2;}
+  .jz-quick-intro .eyebrow{font-size:9px;letter-spacing:.16em;opacity:.55;color:#5d726c;}
+  .jz-quick-intro h3{font-family:var(--serif);font-size:17px;line-height:1.12;margin-top:2px;color:#102924;}
+  .jz-quick-intro p{font-size:10.5px;line-height:1.4;color:#5c6f69;margin-top:3px;max-width:220px;}
+  .jz-quick-intro .meta{text-align:right;min-width:82px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0 12px;}
+  .jz-quick-intro .meta b{font-family:var(--serif);font-size:14px;color:#102924;line-height:1.1;}
+  .jz-quick-intro .meta span{font-size:9px;color:#6f827c;width:100%;text-align:right;margin-top:1px;}
+  .jz-cat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:80px;grid-auto-flow:dense;gap:10px;}
+  .jz-cat{position:relative;display:block;border-radius:24px;overflow:hidden;color:#f8f7f4;min-height:100%;
+    box-shadow:0 14px 30px rgba(15,42,38,.10);transition:transform .18s ease,box-shadow .18s ease;isolation:isolate;border:1px solid rgba(255,255,255,.06);}
+  .jz-cat:active{transform:scale(.988) translateY(1px);}
+  .jz-cat::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 34%);pointer-events:none;z-index:1;}
+  .jz-cat::after{content:"";position:absolute;inset:12px;border-radius:18px;border:1px solid rgba(255,255,255,.08);opacity:.85;pointer-events:none;z-index:1;}
+  .jz-cat .bg{position:absolute;inset:0;}
+  .jz-cat .bg::before{content:"";position:absolute;right:-10%;top:-14%;width:128px;height:128px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.16),rgba(255,255,255,0) 70%);opacity:.75;}
+  .jz-cat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.18) 52%,rgba(0,0,0,.26));}
+  .jz-cat .in{position:relative;z-index:2;padding:16px 16px 14px;display:grid;grid-template-rows:auto auto 1fr auto;min-height:100%;}
+  .jz-cat .top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .jz-cat .pill{display:inline-flex;align-items:center;max-width:70%;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.10);font-size:10px;letter-spacing:.04em;color:rgba(255,255,255,.84);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,.08);}
+  .jz-cat .arrow{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgba(255,255,255,.9);}
+  .jz-cat .hero{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .jz-cat .orb{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;line-height:1;
+    background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.28),rgba(255,255,255,.06) 58%,rgba(255,255,255,0) 100%);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 10px 18px rgba(0,0,0,.14);flex:0 0 auto;border:1px solid rgba(255,255,255,.06);}
+  .jz-cat .title-wrap{min-width:0;}
+  .jz-cat h3{font-family:var(--serif);font-size:22px;line-height:1.12;letter-spacing:.3px;color:#fffdf9;}
+  .jz-cat .desc{font-size:11px;line-height:1.52;color:rgba(255,250,244,.76);margin-top:5px;max-width:220px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .jz-cat .sub{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;align-self:end;}
+  .jz-cat .sub span{font-size:10px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.06);color:rgba(255,252,247,.82);}
+  .jz-cat .stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .jz-cat .stats span{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(7,15,14,.20);font-size:10px;letter-spacing:.02em;color:rgba(255,251,245,.72);}
+  .jz-cat-grid .jz-cat:nth-child(1){grid-column:span 2;grid-row:span 2;}
+  .jz-cat-grid .jz-cat:nth-child(1) .orb{width:64px;height:64px;font-size:31px;}
+  .jz-cat-grid .jz-cat:nth-child(1) h3{font-size:28px;}
+  .jz-cat-grid .jz-cat:nth-child(1) .desc{font-size:12px;max-width:250px;}
+  .jz-cat-grid .jz-cat:nth-child(2){grid-row:span 2;}
+  .jz-cat-grid .jz-cat:nth-child(2) .hero{align-items:flex-start;}
+  /* 大卡(保洁)+高卡(维修)：全量内容超 188px 被裁 → 去掉会换行撑高的 sub 标签，
+     只保留 标签+球+标题+2行描述+单行数据条，数据条贴底且不换行 */
+  .jz-cat-grid .jz-cat:nth-child(1) .in,
+  .jz-cat-grid .jz-cat:nth-child(2) .in{grid-template-rows:auto auto 1fr;}
+  .jz-cat-grid .jz-cat:nth-child(1) .sub,
+  .jz-cat-grid .jz-cat:nth-child(2) .sub{display:none;}
+  .jz-cat-grid .jz-cat:nth-child(1) .stats,
+  .jz-cat-grid .jz-cat:nth-child(2) .stats{align-self:end;flex-wrap:nowrap;overflow:hidden;margin-top:8px;}
+  .jz-cat-grid .jz-cat:nth-child(3),.jz-cat-grid .jz-cat:nth-child(4){min-height:80px;}
+  /* 小卡（搬家/保姆）：单行 80px 放不下全量内容，精简为「标签+球+标题」，避免裁切错位 */
+  /* 隐藏右上箭头，去掉高行；padding 对齐 ::after 的 inset:12px 边框，防止球体跑出边框 */
+  .jz-cat-grid .jz-cat:nth-child(3) .arrow,
+  .jz-cat-grid .jz-cat:nth-child(4) .arrow{display:none;}
+  .jz-cat-grid .jz-cat:nth-child(3) .in,
+  .jz-cat-grid .jz-cat:nth-child(4) .in{padding:12px 15px;grid-template-rows:auto 1fr;}
+  .jz-cat-grid .jz-cat:nth-child(3) .top,
+  .jz-cat-grid .jz-cat:nth-child(4) .top{min-height:0;}
+  /* 单行 80px：pill(24)+球(32)+padding(24)=80，球会顶穿 ::after inset:12 边框 →
+     压扁 pill、缩球到 28，让「pill+球」整体落在内嵌边框内 */
+  .jz-cat-grid .jz-cat:nth-child(3) .pill,
+  .jz-cat-grid .jz-cat:nth-child(4) .pill{font-size:9px;padding:3px 8px;}
+  .jz-cat-grid .jz-cat:nth-child(3) .hero,
+  .jz-cat-grid .jz-cat:nth-child(4) .hero{margin-top:0;align-items:center;align-self:center;gap:10px;}
+  .jz-cat-grid .jz-cat:nth-child(3) .orb,
+  .jz-cat-grid .jz-cat:nth-child(4) .orb{width:28px;height:28px;font-size:15px;box-shadow:inset 0 1px 1px rgba(255,255,255,.14),0 4px 8px rgba(0,0,0,.14);}
+  .jz-cat-grid .jz-cat:nth-child(3) h3,
+  .jz-cat-grid .jz-cat:nth-child(4) h3{font-size:18px;}
+  .jz-cat-grid .jz-cat:nth-child(3) .desc,
+  .jz-cat-grid .jz-cat:nth-child(4) .desc,
+  .jz-cat-grid .jz-cat:nth-child(3) .sub,
+  .jz-cat-grid .jz-cat:nth-child(4) .sub,
+  .jz-cat-grid .jz-cat:nth-child(3) .stats,
+  .jz-cat-grid .jz-cat:nth-child(4) .stats{display:none;}
+  /* 4色: 保洁(青灰)/ 维修(深蓝)/ 搬家(茶棕)/ 保姆(灰紫) */
+  .jz-cat.cleaning .bg{background:linear-gradient(145deg,#214842,#15352f 58%,#0d221f);}
+  .jz-cat.repair  .bg{background:linear-gradient(145deg,#2a4260,#1b2f48 58%,#101d31);}
+  .jz-cat.moving  .bg{background:linear-gradient(145deg,#6d5544,#4d372a 58%,#2a1d15);}
+  .jz-cat.nanny   .bg{background:linear-gradient(145deg,#5e5566,#453c4d 58%,#2a222f);}
+
+  /* 热门子类 */
+  .jz-sub-list{padding:6px 18px 4px;}
+  .jz-sub-list .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+  .jz-sub-list .row:last-child{border-bottom:none;}
+  .jz-sub-list .row b{font-size:13px;color:var(--ink);font-weight:600;}
+  .jz-sub-list .row .meta{font-size:10px;color:var(--muted);margin-top:2px;}
+  .jz-sub-list .row .pr{font-family:var(--serif);font-size:14px;color:var(--gold-deep);}
+  .jz-sub-list .row .go{font-size:11px;color:var(--brand);font-weight:600;}
+
+  /* 营销栏 */
+  .jz-promo{padding:8px 18px 24px;}
+  .jz-promo-card{display:block;border-radius:16px;overflow:hidden;color:#fff;padding:16px 18px;position:relative;min-height:96px;margin-bottom:10px;
+    box-shadow:0 8px 20px rgba(15,42,38,.10);}
+  .jz-promo-card .tag{position:absolute;right:14px;top:14px;font-size:9px;letter-spacing:.16em;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);}
+  .jz-promo-card h3{font-family:var(--serif);font-size:18px;margin-top:4px;}
+  .jz-promo-card p{font-size:11px;opacity:.92;margin-top:4px;}
+  .jz-promo-card .ck{position:absolute;right:14px;bottom:14px;font-size:10px;font-weight:600;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--brand-deep);}
+  .jz-promo-card.warm{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
+  .jz-promo-card.fresh{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
+  .jz-promo-card.deep{background:linear-gradient(135deg,#1a3a6b,#0b1d3a);}
+  .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
+  .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;min-height:108px;
+    box-shadow:0 8px 20px rgba(15,42,38,.12);}
+  .ctile .bg{position:absolute;inset:0;background-color:#0c4d44;}
+  .ctile .bg::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(0deg,rgba(8,18,16,.72),rgba(8,18,16,.12) 55%);}
+  .ctile.empty{opacity:.72;}
+  .ctile .in{position:relative;z-index:2;padding:12px;display:flex;flex-direction:column;justify-content:flex-end;min-height:108px;}
+  .ctile.tall{grid-row:span 2;min-height:200px;}
+  .ctile.tall .in{min-height:200px;}
+  .ctile.wide{grid-column:span 2;min-height:120px;}
+  .ctile .no{font-family:var(--serif);font-size:28px;font-weight:700;opacity:.35;line-height:1;}
+  .ctile h3{font-family:var(--serif);font-size:17px;margin-top:4px;line-height:1.15;}
+  .ctile .nums{display:flex;gap:10px;margin-top:8px;font-size:9px;opacity:.9;flex-wrap:wrap;}
+  .ctile .nums b{font-family:var(--serif);font-size:13px;display:block;}
+  .ctile .hot,.ctile .empty-tag{position:absolute;top:10px;right:10px;z-index:3;font-size:9px;font-weight:700;
+    background:rgba(255,217,138,.25);color:#ffd98a;padding:2px 8px;border-radius:999px;}
+  .ctile .empty-tag{background:rgba(255,255,255,.2);color:#fff;}
+  .spread{padding:14px 18px 24px;}
+  .spread-hero{display:block;border-radius:18px;overflow:hidden;margin-bottom:10px;color:#fff;box-shadow:0 12px 28px rgba(15,42,38,.14);}
+  .spread-hero .img{height:180px;position:relative;background-color:#0c4d44;background-size:cover;background-position:center;}
+  .spread-hero .img::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.5),transparent 55%);}
+  .spread-hero .cap{position:absolute;left:16px;bottom:14px;right:16px;z-index:2;}
+  .spread-hero .cap .ek{font-size:9px;letter-spacing:.2em;opacity:.85;}
+  .spread-hero .cap h3{font-family:var(--serif);font-size:22px;margin-top:4px;}
+  .spread-hero .cap p{font-size:11px;opacity:.9;margin-top:4px;}
+  .spread-hero .body{background:#fff;color:var(--ink);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .spread-hero .body b{font-family:var(--serif);font-size:20px;color:var(--gold-deep);}
+  .spread-hero .body .bk{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 14px;border-radius:999px;}
+  .spread-duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+  .mini-card{display:block;background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 6px 16px rgba(15,42,38,.06);}
+  .mini-card .th{height:90px;background-size:cover;background-position:center;background-color:#0c4d44;}
+  .mini-card .bd{padding:10px 11px 12px;}
+  .mini-card .bd b{font-size:13px;color:var(--ink);display:block;line-height:1.3;}
+  .mini-card .bd .pr{font-family:var(--serif);font-size:16px;color:var(--gold-deep);margin-top:6px;}
+  .mini-card .bd .pr small{font-size:10px;font-family:var(--font);color:var(--muted);}
+  .load-err{padding:24px 18px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
 </head>
 <body>
-  <p>频道首页已迁至 <a href="index.html">index.html</a>。</p>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost" style="position:absolute;">
+      <a class="bk" href="beike-app-home.html">‹</a>
+      <div class="ttl">新居住<small id="navCitySub" class="city-tap">沈阳 · 新居住专区</small></div>
+    </div>
+
+    <div class="split-hd">
+      <div class="bg"></div>
+      <div class="in">
+        <div class="ek" id="heroEk">Cover Collage · Nanjing</div>
+        <h1 id="heroTitle">新居住频道</h1>
+        <div class="stat" id="heroStat"></div>
+        <div class="seg-switch" id="tabs">
+          <a class="on" data-tab="bzf">保租房专区</a>
+          <a data-tab="trade">卖旧买新专区</a>
+          <a data-tab="jiazheng">生活服务专区</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="scheme-bar"><span id="schemeLabel">方案 C · 沈阳真实数据</span><span><a href="javascript:;" id="demoToggle">演示模式：关</a> · <a href="juzhu-channel-schemes.html">切换方案 ›</a></span></div>
+
+    <div class="pane on" id="pane-bzf">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选区租房</h2><span class="more" id="distCount">—</span></div>
+      <div class="collage" id="collage"></div>
+      <div class="banner">
+        <span class="bi">🏛</span>
+        <div class="bt"><b id="bzfBannerTitle">沈阳保租房 · 新居住专区</b><p>区级浏览 → 项目门店 → 户型房源 · 点击咨询</p></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-trade">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>置换推荐</h2><span class="more">综合排序 ›</span></div>
+      <div class="spread" id="spread"></div>
+    </div>
+
+    <div class="pane" id="pane-jiazheng">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
+      <div class="jz-quick">
+        <div class="jz-cat-grid" id="jzCats">
+          <a class="jz-cat cleaning" href="juzhu-jiazheng-list.html?type=cleaning"><div class="bg"></div><div class="in"><div class="top"><span class="pill">高频刚需</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🧹</div><div class="title-wrap"><h3>保洁</h3><div class="desc">日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。</div></div></div><div class="sub"><span>日常保洁</span><span>深度清洁</span><span>搬家保洁</span></div><div class="stats"><span>最快 2h 上门</span><span>金牌阿姨</span></div></div></a>
+          <a class="jz-cat repair" href="juzhu-jiazheng-list.html?type=repair"><div class="bg"></div><div class="in"><div class="top"><span class="pill">即时修复</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🔧</div><div class="title-wrap"><h3>维修</h3><div class="desc">灯具、家电、管道类问题集中入口，适合突发故障快速派单。</div></div></div><div class="sub"><span>家电维修</span><span>管道疏通</span><span>灯具安装</span></div><div class="stats"><span>当日排单</span><span>可视化进度</span></div></div></a>
+          <a class="jz-cat moving" href="juzhu-jiazheng-list.html?type=moving"><div class="bg"></div><div class="in"><div class="top"><span class="pill">大件服务</span><div class="arrow">›</div></div><div class="hero"><div class="orb">📦</div><div class="title-wrap"><h3>搬家</h3><div class="desc">同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。</div></div></div><div class="sub"><span>居民搬家</span><span>长途搬家</span><span>钢琴搬运</span></div><div class="stats"><span>车型可选</span><span>明码报价</span></div></div></a>
+          <a class="jz-cat nanny" href="juzhu-jiazheng-list.html?type=nanny"><div class="bg"></div><div class="in"><div class="top"><span class="pill">长期陪伴</span><div class="arrow">›</div></div><div class="hero"><div class="orb">👶</div><div class="title-wrap"><h3>保姆</h3><div class="desc">住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。</div></div></div><div class="sub"><span>住家保姆</span><span>育儿嫂</span><span>钟点工</span></div><div class="stats"><span>背景核验</span><span>支持续约</span></div></div></a>
+        </div>
+        <div class="jz-quick-intro" style="margin-top:10px;margin-bottom:0;">
+          <div class="copy">
+            <div class="eyebrow">ONE-STOP HOME SERVICE</div>
+            <h3>四大到家服务</h3>
+            <p>保洁、维修、搬家、保姆，一个入口直接约——就近派单、明码标价，最快当天上门。</p>
+          </div>
+          <div class="meta"><b>4 大</b><span>到家服务</span><b style="margin-top:5px;">180 分钟</b><span>最快上门</span></div>
+        </div>
+      </div>
+
+      <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
+      <div class="jz-sub-list" id="jzSubs"></div>
+
+      <!-- 本月精选 暂时隐藏
+      <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
+      <div class="jz-promo" id="jzPromo"></div>
+      -->
+    </div>
+    <div class="load-err" id="err" hidden></div>
+  </div>
+</div>
+<div class="city-sheet" id="citySheet">
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <div class="ph">选择省 / 市<span class="x" data-close>×</span></div>
+    <div class="cascade">
+      <div class="provs" id="provCol"></div>
+      <div class="grid" id="cityGrid"></div>
+    </div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js?v=2"></script>
+<script src="juzhu/app.js?v=16"></script>
+<script>
+(function(){
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+
+  function cityOf(d) {
+    return (window.BZF_JZ && BZF_JZ.regionCity()) || (d && d.city && d.city.name) || '沈阳';
+  }
+
+  function applyChannelChrome(d) {
+    var city = cityOf(d);
+    var op = (window.BZF_JZ && BZF_JZ.regionOperator()) || '贝壳';
+    var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
+    document.getElementById('navCitySub').textContent = city + ' · 新居住专区';
+    document.getElementById('schemeLabel').textContent = '方案 C · ' + city + '真实数据';
+    document.getElementById('bzfBannerTitle').textContent = city + bizTerm + ' · 新居住专区';
+    document.getElementById('heroEk').textContent = 'Cover Collage · ' + city;
+    document.title = '新居住 · ' + city + ' · ' + op;
+  }
+
+  function activateTab(tabId) {
+    document.querySelectorAll('.seg-switch a').forEach(function(a) {
+      a.classList.toggle('on', a.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.pane').forEach(function(p) {
+      p.classList.toggle('on', p.id === 'pane-' + tabId);
+    });
+  }
+
+  function renderHero(d){
+    applyChannelChrome(d);
+    document.getElementById('heroTitle').textContent = cityOf(d) + ' · 新居住';
+    document.getElementById('heroStat').innerHTML =
+      '<div><b>'+d.stats.project_count_bzf+'</b>保租项目</div>'+
+      '<div><b>'+d.stats.project_count_trade+'</b>置换项目</div>'+
+      '<div><b>'+d.stats.unit_count+'</b>房源量</div>';
+    document.getElementById('distCount').textContent = d.stats.district_count + ' 区 ›';
+    var bgEl = document.querySelector('.split-hd .bg');
+    if (d.city.hero_bg_image) {
+      bgEl.style.backgroundImage = 'url(' + JUZHU.thumbUrl(d.city.hero_bg_image) + ')';
+      bgEl.classList.add('has-img');
+    } else {
+      bgEl.style.backgroundImage = '';
+      bgEl.classList.remove('has-img');
+    }
+  }
+
+  function collageLayout(d, list) {
+    if (!d.has_projects) return { tall: false, wide: false };
+    var active = list.filter(function(x) { return x.has_projects; });
+    var ai = active.findIndex(function(x) { return x.id === d.id; });
+    if (ai < 0) return { tall: false, wide: false };
+    var phase = ai % 5;
+    return { tall: phase === 3, wide: phase === 2 };
+  }
+
+  function renderCollage(list){
+    document.getElementById('collage').innerHTML = list.map(function(d,i){
+      var lay = collageLayout(d, list);
+      var cls = 'ctile'+(lay.tall?' tall':'')+(lay.wide?' wide':'')+(d.has_projects? '':' empty');
+      var href = d.has_projects
+        ? 'juzhu-bzf-list.html?district='+encodeURIComponent(d.name)+JUZHU.chainQS()
+        : '#';
+      var bg = d.cover_image
+        ? 'background-image:url('+JUZHU.thumbUrl(d.cover_image)+');background-size:cover;background-position:center;'
+        : '';
+      var tag = d.is_hot ? '<span class="hot">热门</span>' :
+        (!d.has_projects ? '<span class="empty-tag">暂无项目</span>' : '');
+      return '<a class="'+cls+'" href="'+href+'"'+(d.has_projects?'':' onclick="return false"')+'>'+
+        '<div class="bg '+(bg?'':' '+d.bg_class)+'" style="'+bg+'"></div>'+tag+
+        '<div class="in"><span class="no">'+pad(i+1)+'</span><h3>'+d.name+'</h3>'+
+        '<div class="nums">'+
+          '<div><b>'+JUZHU.districtManagedUnits(d)+'</b>房源量</div>'+
+          '<div><b>'+d.project_count+'</b>项目</div>'+
+          '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b>均价</div>'+
+        '</div></div></a>';
+    }).join('');
+  }
+
+  function renderTrade(list){
+    if (!list.length){ document.getElementById('spread').innerHTML='<p class="load-err">暂无置换项目</p>'; return; }
+    var hero = list[0];
+    var duo = list.slice(1,3);
+    var rest = list.slice(3);
+    var hStyle = hero.cover_image ? 'background-image:url('+JUZHU.thumbUrl(hero.cover_image)+')' : '';
+    var html = '<a class="spread-hero" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(hero.slug)+JUZHU.chainQS()+'"">'+
+      '<div class="img" style="'+hStyle+'">'+
+        '<div class="cap"><div class="ek">FEATURED</div><h3>'+hero.name+'</h3>'+
+        '<p>'+(hero.address||'')+' · '+JUZHU.asTags(hero.tags).join(' · ')+'</p></div></div>'+
+      '<div class="body"><div><b>'+hero.price_from+'<small style="font-size:12px;color:var(--muted)"> 万起</small></b>'+
+        '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+(hero.old_house_hint||'')+'</div></div>'+
+        '<span class="bk">立即咨询</span></div></a>';
+    if (duo.length){
+      html += '<div class="spread-duo">'+duo.map(function(x){
+        var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : '';
+        return '<a class="mini-card" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+JUZHU.chainQS()+'"">'+
+          '<div class="th" style="'+st+'"></div><div class="bd"><b>'+x.name+'</b>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+x.unit_count+' 户型</div>'+
+          '<div class="pr">'+x.price_from+'<small> 万起</small></div></div></a>';
+      }).join('')+'</div>';
+    }
+    if (rest.length){
+      html += '<div class="sec-h" style="padding-left:0;margin-top:18px;"><span class="bar"></span><h2>更多置换</h2></div>';
+      html += rest.map(function(x){
+        var st = x.cover_image ? 'background-image:url('+JUZHU.thumbUrl(x.cover_image)+')' : 'class="'+x.slug+'"';
+        return '<a class="lrow" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(x.slug)+JUZHU.chainQS()+'"">'+
+          '<div class="th" style="'+(x.cover_image?'background-image:url('+JUZHU.thumbUrl(x.cover_image)+');background-size:cover;background-position:center;':'')+'">'+
+          '<span class="star">置换</span></div><div class="info"><div class="nm">'+x.name+'</div>'+
+          '<div class="meta">'+(x.address||'')+' · '+x.unit_count+' 户型</div>'+
+          '<div class="pr"><b>'+x.price_from+'<small>万起</small></b><span class="unit">'+(x.old_house_hint||'')+'</span></div></div></a>';
+      }).join('');
+    }
+    document.getElementById('spread').innerHTML = html;
+  }
+
+  // === 家政 tab ===
+  // 4 大类 + 子类（先内置，后续从后端拉取）
+  var JZ_CATS = [
+    {
+      id: 'cleaning',
+      name: '保洁',
+      icon: '🧹',
+      pill: '高频刚需',
+      desc: '日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。',
+      stats: ['最快 2h 上门', '金牌阿姨'],
+      subs: ['日常保洁','深度清洁','搬家保洁','开荒保洁','擦玻璃','油烟机清洗']
+    },
+    {
+      id: 'repair',
+      name: '维修',
+      icon: '🔧',
+      pill: '即时修复',
+      desc: '灯具、家电、管道类问题集中入口，适合突发故障快速派单。',
+      stats: ['当日排单', '可视化进度'],
+      subs: ['家电维修','管道疏通','灯具安装','门窗维修','防水补漏','空调清洗']
+    },
+    {
+      id: 'moving',
+      name: '搬家',
+      icon: '📦',
+      pill: '大件服务',
+      desc: '同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。',
+      stats: ['车型可选', '明码报价'],
+      subs: ['居民搬家','长途搬家','钢琴搬运','企业搬迁','日式搬家','搬货上下楼']
+    },
+    {
+      id: 'nanny',
+      name: '保姆',
+      icon: '👶',
+      pill: '长期陪伴',
+      desc: '住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。',
+      stats: ['背景核验', '支持续约'],
+      subs: ['住家保姆','育儿嫂','月嫂','钟点工','养老护理','医院陪护']
+    }
+  ];
+
+  function renderJiazhengCats(apiCats){
+    var byId = {};
+    JZ_CATS.forEach(function(c) { byId[c.id] = c; });
+    var list = (apiCats && apiCats.length)
+      ? apiCats.map(function(c) {
+          var base = byId[c.id] || {};
+          return {
+            id: c.id,
+            name: c.name || base.name,
+            icon: c.icon || base.icon,
+            pill: c.pill || base.pill || '精选专区',
+            desc: c.desc || base.desc || '高频生活服务入口，支持预约、派单与进度追踪。',
+            stats: c.stats || base.stats || ['快速预约', '进度可见'],
+            subs: base.subs || []
+          };
+        })
+      : JZ_CATS;
+    document.getElementById('jzCats').innerHTML = list.map(function(c){
+      var subHtml = (c.subs || []).slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+      var statHtml = (c.stats || []).slice(0,2).map(function(s){ return '<span>'+s+'</span>'; }).join('');
+      return '<a class="jz-cat '+c.id+'" href="'+BZF_JZ.chainCity('juzhu-jiazheng-list.html?type='+c.id)+'">'+
+        '<div class="bg"></div>'+
+        '<div class="in">'+
+          '<div class="top"><span class="pill">'+(c.pill || '精选专区')+'</span><div class="arrow">›</div></div>'+
+          '<div class="hero"><div class="orb">'+(c.icon || '•')+'</div><div class="title-wrap"><h3>'+c.name+'</h3><div class="desc">'+(c.desc || '')+'</div></div></div>'+
+          '<div class="sub">'+subHtml+'</div>'+
+          '<div class="stats">'+statHtml+'</div>'+
+        '</div></a>';
+    }).join('');
+  }
+
+  // 热门子类（接 API SKU，链到详情页；只展示 API 实际返回的品类，不做兜底）
+  function renderJiazhengSubs(skus) {
+    var cats = ['cleaning', 'repair', 'moving', 'nanny'];
+    var rows = cats.map(function(cat) {
+      return (skus || []).filter(function(s) { return s.category_id === cat; })[0] || null;
+    }).filter(Boolean);
+    document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
+      var displayPrice = r.product_min_price || r.price_from || 0;
+      var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
+      return '<a class="row" href="' + BZF_JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug)) + '">' +
+        '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
+        '<div style="display:flex;align-items:center;gap:12px;">' +
+          '<div class="pr">' + price + '</div>' +
+          '<div class="go">预约 ›</div>' +
+        '</div></a>';
+    }).join('');
+  }
+
+  // 营销栏（运营位）
+  function renderJiazhengPromo(){
+    var cards = [
+      { cls: 'warm', tag: 'HOT',   title: '新用户立减 50',  desc: '首单保洁·维修·搬家通用',  cta: '立即领取' },
+      { cls: 'fresh', tag: 'GRAD',  title: '金牌服务者认证',  desc: '评级 · 背调 · 持证上岗', cta: '了解中台' },
+      { cls: 'deep', tag: 'PRO',    title: '企业月付套餐',    desc: '中小企业办公保洁定制',    cta: '联系顾问' }
+    ];
+    document.getElementById('jzPromo').innerHTML = cards.map(function(c){
+      return '<a class="jz-promo-card '+c.cls+'" href="juzhu-jiazheng-list.html?type=cleaning">'+
+        '<span class="tag">'+c.tag+'</span>'+
+        '<h3>'+c.title+'</h3>'+
+        '<p>'+c.desc+'</p>'+
+        '<span class="ck">'+c.cta+'</span></a>';
+    }).join('');
+  }
+
+  document.getElementById('tabs').addEventListener('click',function(e){
+    var t = e.target.closest('[data-tab]'); if(!t) return;
+    activateTab(t.dataset.tab);
+  });
+
+  var initTab = new URLSearchParams(location.search).get('tab') || (location.hash || '').replace('#', '');
+
+  function paintTabs() {
+    var tabs = document.getElementById('tabs');
+    var chs = JUZHU.enabledChannels();
+    if (!chs.length) return;
+    tabs.innerHTML = chs.map(function(c, i) {
+      var on = initTab ? (c.id === initTab) : (i === 0);
+      return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
+    }).join('');
+    activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
+  }
+
+  // renderJiazhengPromo();  // 本月精选暂时隐藏
+
+  if (window.BZF_JZ && BZF_JZ.categories) {
+    BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
+  }
+
+  var skusP = window.BZF_JZ
+    ? BZF_JZ.skus().catch(function() { return []; })
+    : Promise.resolve([]);
+  skusP.then(renderJiazhengSubs);
+
+  // —— 演示模式开关（与"切换方案"同属演示态；开则显示跨角色/开发导线 .demo-only）——
+  (function(){
+    var dt = document.getElementById('demoToggle');
+    if (!dt || !window.BZF_JZ) return;
+    function paint(){ dt.textContent = '演示模式：' + (BZF_JZ.isDemo() ? '开' : '关'); }
+    dt.addEventListener('click', function(){ BZF_JZ.setDemo(!BZF_JZ.isDemo()); paint(); });
+    paint();
+  })();
+
+  // —— 省/市 切换器（省级 = 选「全省」，市级 = 选具体市）——
+  var lastData = null;
+  var sheetProv = null; // 面板当前展开的省
+  function renderProvCol() {
+    var provs = BZF_JZ.regionProvinces();
+    document.getElementById('provCol').innerHTML = provs.map(function(p) {
+      return '<a data-prov="' + p + '"' + (p === sheetProv ? ' class="on"' : '') + '>' + p + '</a>';
+    }).join('');
+  }
+  function renderCityCol() {
+    var cur = BZF_JZ.regionCity();
+    var html = '<a data-city="' + sheetProv + '" class="allp' + (cur === sheetProv ? ' on' : '') + '">' + sheetProv + '全省</a>';
+    html += BZF_JZ.citiesOf(sheetProv).map(function(c) {
+      return '<a data-city="' + c + '"' + (c === cur ? ' class="on"' : '') + '>' + c + '</a>';
+    }).join('');
+    document.getElementById('cityGrid').innerHTML = html;
+  }
+  function openCitySheet() {
+    if (!window.BZF_JZ) return;
+    sheetProv = BZF_JZ.provinceOf(BZF_JZ.regionCity()) || BZF_JZ.regionProvinces()[0];
+    renderProvCol();
+    renderCityCol();
+    document.getElementById('citySheet').classList.add('on');
+  }
+  function closeCitySheet() {
+    document.getElementById('citySheet').classList.remove('on');
+  }
+  document.getElementById('navCitySub').addEventListener('click', openCitySheet);
+  // —— 后端配置：读取 settings 控制城市切换器显隐 ——
+  (function(){
+    fetch('/api/juzhu/settings').then(function(r){ return r.json(); }).then(function(s){
+      if (!s.show_city_switcher) {
+        var sub = document.getElementById('navCitySub');
+        if (sub) { sub.classList.remove('city-tap'); sub.style.cursor = 'default'; }
+        var sheet = document.getElementById('citySheet');
+        if (sheet) {
+          sheet.style.display = 'none';
+          sheet.classList.remove('on');
+        }
+      }
+    }).catch(function(){});
+  })();
+  document.getElementById('citySheet').addEventListener('click', function(e) {
+    if (e.target.hasAttribute('data-close')) { closeCitySheet(); return; }
+    var prov = e.target.closest('[data-prov]');
+    if (prov) { sheetProv = prov.getAttribute('data-prov'); renderProvCol(); renderCityCol(); return; }
+    var pick = e.target.closest('[data-city]');
+    if (!pick) return;
+    BZF_JZ.setRegionCity(pick.getAttribute('data-city'));
+    applyChannelChrome(lastData);
+    if (lastData) document.getElementById('heroTitle').textContent = cityOf(lastData) + ' · 新居住';
+    closeCitySheet();
+  });
+
+  Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
+    var d = results[0];
+    lastData = d;
+    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准；
+    // 但 URL 带 ?city= 直链参数时不强制改回（直链优先，只读展示）
+    if (window.BZF_JZ && d.city && d.city.name && !(BZF_JZ.urlCity && BZF_JZ.urlCity())) {
+      var storedCity = BZF_JZ.regionCity();
+      if (storedCity !== d.city.name) {
+        BZF_JZ.setRegionCity(d.city.name);
+      }
+    }
+    paintTabs();
+    renderHero(d);
+    renderCollage(JUZHU.districts());
+    renderTrade(JUZHU.tradeListings());
+  }).catch(function(err) {
+    document.getElementById('err').hidden = false;
+    document.getElementById('err').textContent = '数据加载失败：'+err.message+'（请先运行 python3 juzhu/seed_from_folder.py）';
+    paintTabs();
+  });
+})();
+</script>
 </body>
 </html>

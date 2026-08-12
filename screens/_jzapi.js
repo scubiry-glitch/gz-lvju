@@ -173,13 +173,19 @@
     var qs = new URLSearchParams();
     if (params.category) qs.set('category', params.category);
     if (params.q) qs.set('q', params.q);
+    var city = regionCity();
+    if (city) qs.set('city', city);
     var url = '/api/juzhu/jiazheng/skus' + (qs.toString() ? '?' + qs : '');
     return fetchJSON(url).then(function (r) { return r.items || []; });
   }
 
   function sku(slug, vendorId) {
     var u = '/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug);
-    if (vendorId) u += '?vendor=' + encodeURIComponent(vendorId);
+    var qs = new URLSearchParams();
+    if (vendorId) qs.set('vendor', vendorId);
+    var city = regionCity();
+    if (city) qs.set('city', city);
+    if (qs.toString()) u += '?' + qs.toString();
     return fetchJSON(u);
   }
 
@@ -291,6 +297,14 @@
     });
   }
 
+  // 为 URL 添加 city 查询参数（链式传递城市）
+  function chainCity(url) {
+    var city = regionCity();
+    if (!city) return url;
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+    return url + sep + 'city=' + encodeURIComponent(city);
+  }
+
   function regionOperator() {
     var R = window.BZF_REGION;
     return (R && R.operator) ? R.operator : '贝壳';
@@ -386,6 +400,7 @@
     isProvince: isProvince,
     setRegionCity: setRegionCity,
     onCityChange: onCityChange,
+    chainCity: chainCity,
     regionOperator: regionOperator,
     regionDeptStem: regionDeptStem,
     regionBankName: regionBankName,

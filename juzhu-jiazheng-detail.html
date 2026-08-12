@@ -448,7 +448,7 @@
       var badges = (v.auth_badges || []).slice(0,2).map(function(b){
         return '<span class="vb">'+esc(b.label || b)+'</span>';
       }).join('');
-      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="?sku='+encodeURIComponent(slug)+'&vendor='+v.vendor_id+'">'+
+      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="' + JZ.chainCity('?sku='+encodeURIComponent(slug)+'&vendor='+v.vendor_id) + '">'+
         '<span class="vlogo">'+esc(v.vendor_logo || '🏠')+'</span>'+
         '<span class="vmi"><b>'+esc(v.vendor_name)+(cur ? ' <em>当前</em>' : '')+'</b>'+
           '<span class="vsub">★'+Number(v.vendor_rating||0).toFixed(1)+' · '+num(v.review_count)+'评价'+(v.rank_label ? ' · '+esc(v.rank_label) : '')+'</span>'+

@@ -146,7 +146,7 @@
     var uniq = Array.from(new Set(names));
     document.getElementById('subTabs').innerHTML = uniq.map(function(name){
       var on = (!currentSub && name === '全部') || currentSub === name;
-      var href = name === '全部' ? '?type=' + currentType : '?type=' + currentType + '&sub=' + encodeURIComponent(name);
+      var href = name === '全部' ? JZ.chainCity('?type=' + currentType) : JZ.chainCity('?type=' + currentType + '&sub=' + encodeURIComponent(name));
       return '<a class="'+(on?'on':'')+'" href="'+href+'">'+name+'</a>';
     }).join('');
   }
@@ -195,7 +195,7 @@
       if (item.rating_score) rank.push('★ ' + Number(item.rating_score).toFixed(1));
       if (item.sales_text) rank.push(item.sales_text);
       if (item.worker_min_level) rank.push(item.worker_min_level + '+');
-      return '<a class="svc-card" href="juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)+'">'+
+      return '<a class="svc-card" href="' + JZ.chainCity('juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)) + '">'+
         '<div class="svc-poster '+cls+'">'+
           '<div class="t1">'+(item.badges && item.badges[0] ? item.badges[0] : '精选服务')+'</div>'+
           '<div class="t2">'+head+'</div>'+
