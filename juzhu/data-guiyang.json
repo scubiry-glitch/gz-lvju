@@ -2,14 +2,14 @@
   "channels": [
     {
       "id": "bzf",
-      "label": "保租房专区",
+      "label": "保租房",
       "sort_order": 1,
       "enabled": 1,
       "note": null
     },
     {
       "id": "trade",
-      "label": "卖旧买新专区",
+      "label": "卖旧买新",
       "sort_order": 2,
       "enabled": 1,
       "note": null

@@ -110,7 +110,7 @@
     </table>
     <div class="formula">可售 SKU（服务产品）= 平台标准品 <b>SPU</b> + 本店<b>服务者</b> + <b>价格</b><br/>
     服务单闭环 = 建 SKU → 排班 → 客户下单支付 → 派单 → 履约 → 评价 → <b>结算</b></div>
-    <p><b>⚠️ 权限提示：</b>管理台写接口已启用鉴权，页面自动携带 API Key（默认 <code>dev-juzhu-key</code>，可在浏览器 localStorage 的 <code>JUZHU_API_KEY</code> 覆盖），更换密钥需同步给各操作人员。</p>
+    <p><b>⚠️ 权限提示：</b>管理台接口（含读/写）均需 API Key；页面从浏览器 localStorage 的 <code>JUZHU_API_KEY</code> 读取，密钥由管理员下发，勿写入公开文档。</p>
   </div>
 
   <div class="link-row">
@@ -351,7 +351,7 @@
     <p class="faq"><b>Q3：客户下单后为什么不能直接推进状态？</b><br/>订单必须先「派单」（dispatched）后才能由服务者推进；未派单订单只能在派单看板处理。</p>
     <p class="faq"><b>Q4：服务者被暂停了，已有档期怎么办？</b><br/>建议同步关闭该服务者相关档期或替换服务者；已产生订单的档期关闭后不影响已约订单履约。</p>
     <p class="faq"><b>Q5：结算被锁付是什么原因？</b><br/>通常为对账不符、订单异常或账户问题。请先核对结算清单与订单流水，处理后等待下一窗口。</p>
-    <p class="faq"><b>Q6：API Key 是什么？</b><br/>管理台写接口的鉴权密钥，默认 <code>dev-juzhu-key</code>，可通过 localStorage 的 <code>JUZHU_API_KEY</code> 覆盖。正式环境请使用分配的生产密钥并妥善保管。</p>
+    <p class="faq"><b>Q6：API Key 是什么？</b><br/>管理台接口鉴权密钥，写入浏览器 localStorage 的 <code>JUZHU_API_KEY</code>。正式环境必须使用管理员分配的生产密钥，禁止使用开发默认值。</p>
   </div>
 
   <h2 class="sec" id="s7">7. 附录：接口与页面清单</h2>
