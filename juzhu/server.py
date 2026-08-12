@@ -737,9 +737,25 @@ class Handler(SimpleHTTPRequestHandler):
 
         # === 家政 C 端工单流 /api/juzhu/jiazheng/*（SKU + 订单闭环） ===
         if path == "/api/juzhu/jiazheng/categories":
-            rows = rows_to_list(conn.execute(
-                "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
-            ))
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
+            if city_id is not None:
+                rows = rows_to_list(conn.execute(
+                    """SELECT DISTINCT c.* FROM jz_categories c
+WHERE c.enabled=1
+  AND EXISTS (
+    SELECT 1 FROM jz_skus s
+    JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
+    JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
+    WHERE s.category_id=c.id
+      AND v.city_ids IS NOT NULL
+      AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'
+  )
+ORDER BY c.sort_order, c.id""", (str(city_id),)
+                ))
+            else:
+                rows = rows_to_list(conn.execute(
+                    "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
+                ))
             conn.close()
             return self._json({"items": rows})
 

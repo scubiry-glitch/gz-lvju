@@ -165,7 +165,11 @@
   }
 
   function categories() {
-    return fetchJSON('/api/juzhu/jiazheng/categories').then(function (r) { return r.items || []; });
+    var qs = new URLSearchParams();
+    var city = regionCity();
+    if (city) qs.set('city', city);
+    var url = '/api/juzhu/jiazheng/categories' + (qs.toString() ? '?' + qs : '');
+    return fetchJSON(url).then(function (r) { return r.items || []; });
   }
 
   function skus(params) {
