@@ -9,7 +9,6 @@
 认证: HMAC-SHA256（sign_util.HmacAuth），vendor_id → hmac_secret.key 查密钥
 """
 
-import configparser
 import json
 import sqlite3
 import urllib.request
@@ -18,29 +17,32 @@ from pathlib import Path
 from sign_util import HmacAuth  # noqa: E402
 
 _MODULE_DIR = Path(__file__).resolve().parent
-_CONFIG_PATH = _MODULE_DIR / "config.ini"
 _KEY_PATH = _MODULE_DIR / "hmac_secret.key"
 _DB_PATH = _MODULE_DIR / "juzhu.db"
 
 
 # ── 密钥加载 ──────────────────────────────────────────────────
 
-def _load_vendor_keys():
-    """从 hmac_secret.key 加载 vendor_id → HMAC 密钥映射。
-    格式: vendor_id|key（每行一个；忽略空行、# 注释行）。
-    返回: {"1": "abc...", "2": "def..."}
+def _load_vendor_config():
+    """从 hmac_secret.key 加载 vendor 配置。
+    格式: vendor_id|hmac_key|url_link（url_link 可选）
+    返回: {"1": {"key": "abc...", "url_link": "https://..."}, ...}
     """
-    keys = {}
+    vendors = {}
     if not _KEY_PATH.exists():
-        return keys
+        return vendors
     for line in _KEY_PATH.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split("|", 1)
-        if len(parts) == 2:
-            keys[parts[0].strip()] = parts[1].strip()
-    return keys
+        parts = line.split("|")
+        if len(parts) >= 2:
+            vid = parts[0].strip()
+            vendors[vid] = {
+                "key": parts[1].strip(),
+                "url_link": parts[2].strip() if len(parts) >= 3 else "",
+            }
+    return vendors
 
 
 # ── 数据库 ────────────────────────────────────────────────────
@@ -56,12 +58,6 @@ def _connect_db():
 
 
 # ── 工具 ──────────────────────────────────────────────────────
-
-def _load_config():
-    cfg = configparser.ConfigParser()
-    cfg.read(_CONFIG_PATH, encoding="utf-8")
-    return cfg
-
 
 def _respond_json(handler, data, code=200):
     handler._json(data, code)
@@ -80,15 +76,15 @@ def _verify_vendor_auth(body):
     if not vendor_id_str:
         return None, "缺少 vendor_id 参数"
 
-    keys = _load_vendor_keys()
-    if not keys:
+    vendors = _load_vendor_config()
+    if not vendors:
         return None, "服务端未配置任何 vendor 密钥"
 
-    key = keys.get(vendor_id_str)
-    if not key:
+    vendor = vendors.get(vendor_id_str)
+    if not vendor:
         return None, f"vendor_id={vendor_id_str} 的密钥未配置"
 
-    auth = HmacAuth(key)
+    auth = HmacAuth(vendor["key"])
     passed, msg = auth.verify_signature(body)
     if not passed:
         return None, f"签名校验失败: {msg}"
@@ -440,10 +436,17 @@ def _vendor_products_delete(handler, body, vendor_id):
 # ═══════════════════════════════════════════════════════════════
 
 def handle_wechat_link(handler, body):
-    """生成微信小程序 URL Link 并创建 GR 订单。
+    """生成小程序 URL Link 并创建 GR 订单。
 
     请求体: { "product_id": 123 }
     成功响应: { "ok": true, "url_link": "...", "order_ref": "GR..." }
+
+    流程：
+    1. 查产品 → 获取 path / query / vendor_id
+    2. 查 vendor 的 url_link（来自 hmac_secret.key 第三列）
+    3. 生成 order_ref
+    4. 调用商家 URL Link 接口
+    5. 创建 GR 订单
     """
     product_id = body.get("product_id")
     if not product_id:
@@ -463,23 +466,30 @@ def handle_wechat_link(handler, body):
             return True
 
         product = dict(row)
-        path = product.get("path") or ""
-        query = product.get("query") or ""
-        sku_slug = product.get("sku_slug") or ""
-        vendor_id = product.get("vendor_id")
+        path = product.get("path") or "pages-sub/goods/goods"
+        product_query = product.get("query") or ""
+        vendor_id = str(product.get("vendor_id", ""))
+
+        # 获取 vendor 的 url_link
+        vendors = _load_vendor_config()
+        vendor = vendors.get(vendor_id)
+        if not vendor or not vendor.get("url_link"):
+            _respond_json(
+                handler,
+                {"ok": False, "error": f"vendor_id={vendor_id} 未配置 url_link，请检查 hmac_secret.key"},
+                500,
+            )
+            return True
+        api_url = vendor["url_link"]
+
+        # 拼接 query: 产品级参数
+        query = product_query or ""
 
         from gr_orders import generate_order_ref, create_order
 
         order_ref = generate_order_ref(conn)
 
-        cfg = _load_config()
-        api_url = cfg.get("wechat", "url_link_api", fallback="")
-        api_token = cfg.get("wechat", "token", fallback="")
-        if not api_url:
-            _respond_json(handler, {"ok": False, "error": "config.ini 未配置 url_link_api"}, 500)
-            return True
-
-        url_link = _call_third_party_url_link(api_url, api_token, order_ref)
+        url_link = _call_gen_url_link(api_url, path=path, query=query, order_ref=order_ref)
 
         create_order(conn, order_ref, str(product_id))
 
@@ -497,25 +507,31 @@ def handle_wechat_link(handler, body):
     return True
 
 
-def _call_third_party_url_link(api_url, api_token, order_ref):
-    """调用第三方小程序链接生成接口。
+def _call_gen_url_link(api_url, *, path, query, order_ref):
+    """调用商家小程序 URL Link 生成接口。
 
-    请求 POST {api_url}
-    返回生成的 scheme/url_link 字符串。
+    统一请求格式（POST JSON）：
+    - path: 小程序页面路径（不含 / 开头），默认 pages-sub/goods/goods
+    - query: 原始查询字符串
+    - order_ref: GR 侧订单参考号
+
+    鉴权方式由各商家接口自行定义（IP 白名单 / Token 等）。
+    返回生成的 url_link 字符串。
     """
     payload = json.dumps({
-        "channel": 6,
-        "param": f"code={order_ref}&type=1",
-        "path": None,
-        "cacheFlag": True,
+        "path": path,
+        "query": query,
+        "order_ref": order_ref,
     }).encode("utf-8")
 
     req = urllib.request.Request(api_url, data=payload, headers={
         "Content-Type": "application/json",
-        "Token": api_token,
     })
 
     with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    # 返回格式: {"code":1,"msg":"成功","data":"weixin://...","success":true}
-    return data.get("data") or ""
+        result = json.loads(resp.read().decode("utf-8"))
+
+    if result.get("code") != 200:
+        raise RuntimeError(result.get("msg") or "URL Link 生成失败")
+
+    return result.get("data") or ""

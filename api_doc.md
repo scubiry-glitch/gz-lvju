@@ -656,19 +656,101 @@ POST /api/juzhu/jiazheng/vendor/products/delete
 
 ---
 
-## 5. 密钥管理
+## 5. 小程序 URL Link 接口协议
+
+商家需提供一个 URL Link 生成接口，GR 侧在用户下单时会调用该接口获取小程序链接。
+
+### 请求（GR → 商家）
+
+GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `path` | string | 否 | 小程序页面路径 |
+| `query` | string | 否 | 小程序页面原始查询参数（如 `activityId=xxx`） |
+| `order_ref` | string | ✅ | GR 侧订单参考号（如 `GR202608121430120001`） |
+
+### 响应（商家 → GR）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `code` | integer | `200` 表示成功，`-1` 表示失败 |
+| `msg` | string/null | 提示信息 |
+| `data` | string/null | 成功时为小程序 URL Link，失败时为 `null` |
+
+> **重要**：GR 侧仅当 `code = 200` 时视为成功。。
+
+### 成功响应示例
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": "weixin://dl/business/?t=E8iVw9ME0Yc&cq=code%3DF2C202608070001"
+}
+```
+
+### 来来接口参考
+
+| 项目 | 说明 |
+|------|------|
+| 测试环境地址 | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
+| 请求方式 | `POST` |
+| Content-Type | `application/json` |
+| 认证方式 | 调用方出口公网 IP 白名单 |
+
+#### 调用示例
+
+```bash
+curl -X POST https://uat.doorslink.net/mall/beike/juzhu/generate/urllink \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "pages-sub/goods/goods",
+    "query": "activityId=2031123456789012345",
+    "order_ref": "GR202608071429360148"
+  }'
+```
+
+#### 常见错误
+
+| 场景 | code | msg 示例 |
+|------|------|----------|
+| IP 不在白名单 | `-1` | `IP无权访问-203.0.113.10` |
+| `query` 为空 | `-1` | `参数不能为空` |
+| `order_ref` 为空 | `-1` | `GR侧订单参考号不能为空` |
+| `activityId` 缺失或非法 | `-1` | `数字格式错误` |
+| 链接生成失败 | `-1` | `生成小程序链接失败` |
+
+---
+
+## 6. 密钥管理
+
+`hmac_secret.key` 文件格式（每行一个商家）：
+
+```
+vendor_id|hmac_key|url_link
+```
+
+| 列 | 说明 |
+|----|------|
+| `vendor_id` | 商家 ID（整数） |
+| `hmac_key` | HMAC-SHA256 签名密钥（64 位 hex） |
+| `url_link` | 小程序链接生成接口完整地址（可选，留空则不可生成链接） |
+
+> 支持 `#` 开头注释行和空行。
+
 ### 测试商家
 
-| 商家 | vendor_id | HMAC 密钥 |
-|------|-----------|-----------|
-| 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` |
-| 蓝犀牛 | 42 | `c54d268446c9bd8956309480fdd12c4673661d02f12c7ea6596818692cf38efb` |
+| 商家 | vendor_id | HMAC 密钥 | url_link |
+|------|-----------|-----------|----------|
+| 来来 | 41 | `7d993c...066d` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
+| 蓝犀牛 | 42 | `c54d26...8efb` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
 
 测试环境接口地址：`http://49.232.103.71:8765`
 
 ---
 
-## 6. 参考实现（Python）
+## 7. 参考实现（Python）
 
 ```python
 import hashlib
