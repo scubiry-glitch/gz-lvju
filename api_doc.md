@@ -743,8 +743,8 @@ vendor_id|hmac_key|url_link
 
 | 商家 | vendor_id | HMAC 密钥 | url_link |
 |------|-----------|-----------|----------|
-| 来来 | 41 | `7d993c...066d` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
-| 蓝犀牛 | 42 | `c54d26...8efb` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
+| 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
+| 蓝犀牛 | 42 | `c54d268446c9bd8956309480fdd12c4673661d02f12c7ea6596818692cf38efb` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
 
 测试环境接口地址：`http://49.232.103.71:8765`
 
