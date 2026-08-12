@@ -19,6 +19,20 @@ python3 juzhu/server.py
 # 后台 http://localhost:8765/juzhu-admin.html
 ```
 
+## 静态安全（必读）
+
+`server.py` 以仓库根为静态根，但会拦截敏感路径：`.env*`、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`hmac_secret.key` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`；禁止目录列表。
+
+生产务必：
+
+```bash
+export JUZHU_ENV=production
+export JUZHU_API_KEY='<生产密钥>'
+export JUZHU_ADMIN_PASSWORD='<生产密码>'
+```
+
+微信 URL Link：`cp juzhu/config.ini.example juzhu/config.ini`（已 gitignore，勿提交真实 token）。
+
 ## 产出物
 
 | 文件 | 说明 |

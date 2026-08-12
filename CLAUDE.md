@@ -112,3 +112,7 @@
 绑定虚拟号走话务 `/bundling/alloc`，`app_id` / `app_key` **涉及号池成本，禁止明文写到端上或对公网静态资源**。端只消费服务端下发的虚拟号；签名与密钥仅服务端。规范见 `docs/tp-sign-and-call.md`，联调脚本 `scripts/tp_bundling_alloc.py`。本业务约定**不传 `port`**；线上 Base 为内网 `http://i.tp.lianjia.com`，测试 `http://tp-test.lianjia.com`，外网不可直连线上。
 
 **新居住项目电话（保租房 + 卖旧买新）**：真实号存 `projects.contact_phone`（仅 DB + 管理 API，**不进 data.json**）；C 端户型详情拨号走 `GET /api/juzhu/projects/{id}/virtual-phone`，每次实时绑号、禁止缓存。密钥放 `juzhu/.env.local`（模板 `juzhu/.env.example`），`server.py` 启动时自动加载。
+
+## 规则 11 · 静态服务不得暴露源码与密钥
+
+`juzhu/server.py` 用仓库根做静态根目录时，**必须**拦截敏感路径：`.env*`、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。

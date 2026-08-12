@@ -4,3 +4,11 @@ __pycache__/
 server.log
 *.log
 *.key
+# 密钥与本地配置（禁止入库 / 禁止被静态服务暴露）
+.env
+.env.*
+!.env.example
+config.ini
+*.db
+*.sqlite
+*.sqlite3

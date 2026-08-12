@@ -4,11 +4,15 @@
 
 第三方商家通过本接口管理产品（SKU）和接收订单状态回调。
 
-- **测试环境**：`http://49.232.103.71:8765`
+- **测试环境**：`<向管理员索取 Base URL>`
 - **生产环境**：`https://your-domain`
 - **Content-Type**：`application/json`
 - **认证方式**：HMAC-SHA256 签名（见第 2 章）
-- **测试密钥**：见文档下方‘测试商家’部分
+- **测试密钥**（勿把真实值写进仓库或公网静态页；向平台管理员索取）
+  - VENDOR_ID = `<向管理员索取>`
+  - SECRET = `<向管理员索取>`
+  - 详见下方「测试商家」部分（仅占位，不含真实密钥）
+
 
 ### 接口一览
 
@@ -678,7 +682,7 @@ GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
 | `msg` | string/null | 提示信息 |
 | `data` | string/null | 成功时为小程序 URL Link，失败时为 `null` |
 
-> **重要**：GR 侧仅当 `code = 200` 时视为成功。。
+> **重要**：GR 侧仅当 `code = 200` 时视为成功。
 
 ### 成功响应示例
 
@@ -743,10 +747,10 @@ vendor_id|hmac_key|url_link
 
 | 商家 | vendor_id | HMAC 密钥 | url_link |
 |------|-----------|-----------|----------|
-| 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
-| 蓝犀牛 | 42 | `c54d268446c9bd8956309480fdd12c4673661d02f12c7ea6596818692cf38efb` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
+| 来来 | 41 | `<向管理员索取>` | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
+| 蓝犀牛 | 42 | `<向管理员索取>` | `https://api.sskuaixiu.com/cust/applet/link/scheme/generate` |
 
-测试环境接口地址：`http://49.232.103.71:8765`
+测试环境接口地址：向管理员索取（勿把内网 IP / 真实密钥写进仓库）
 
 ---
 
@@ -812,8 +816,8 @@ class HmacAuth:
 # ── 使用示例（测试环境） ──
 
 VENDOR_ID = 41
-SECRET = "7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d"
-BASE = "http://49.232.103.71:8765"
+SECRET = "<向管理员索取>"
+BASE = "<测试环境 Base URL>"
 auth = HmacAuth(SECRET)
 
 # 查询产品列表

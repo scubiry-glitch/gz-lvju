@@ -10,7 +10,7 @@
 |---|---|
 | 校验位置 | 服务端（`juzhu/server.py`） |
 | 密码配置 | 环境变量 `JUZHU_ADMIN_PASSWORD`，默认 `dongbo2026` |
-| 门禁范围 | **仅页面门禁**；`/api/juzhu/admin/*` 业务接口仍用 `JUZHU_API_KEY` |
+| 门禁范围 | 页面门禁 + `/api/juzhu/admin/*` **全方法**（含 GET）均需 `JUZHU_API_KEY`；生产禁止开发默认密钥 |
 | 会话 | 无状态 HMAC token，本地 `localStorage` 保留 **30 天** |
 | 非目标 | 多用户、角色、改密、用 token 替代 API Key |
 

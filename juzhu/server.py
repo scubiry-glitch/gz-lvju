@@ -58,6 +58,45 @@ DEFAULT_ADMIN_PASSWORD = "dongbo2026"
 ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
 ADMIN_TOKEN_SALT = b"juzhu-admin-session-v1"
 
+# 静态文件：默认不暴露源码/密钥/数据库。/juzhu/ 仅白名单（前端 data 层依赖）。
+_SENSITIVE_NAMES = {
+    ".env",
+    ".env.local",
+    ".env.example",
+    ".git",
+    ".gitignore",
+    ".DS_Store",
+    "__pycache__",
+    "config.ini",
+    "server.log",
+    "api_doc.md",
+    "api-document.html",
+    "hmac_secret.key",
+}
+_SENSITIVE_SUFFIXES = (
+    ".py",
+    ".pyc",
+    ".pyo",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".sql",
+    ".ini",
+    ".log",
+    ".key",
+    ".pem",
+    ".crt",
+    ".p12",
+    ".pfx",
+)
+_JUZHU_PUBLIC_FILES = {
+    "app.js",
+    "cities.json",
+    "data.json",
+}
+_JUZHU_PUBLIC_PREFIXES = ("data-",)
+_JUZHU_PUBLIC_SUFFIXES = (".json",)
+
 
 def slugify(name):
     name = re.sub(r"[（(].*?[）)]", "", name or "").strip()
@@ -207,17 +246,57 @@ def _resolve_city_id(conn, city_name):
     return row[0] if row else None
 
 
+def _url_parts(url_path):
+    path = url_path.split("?", 1)[0].split("#", 1)[0]
+    path = posixpath.normpath(unquote(path))
+    return [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
+
+
+def _is_sensitive_part(name):
+    lower = (name or "").lower()
+    if lower in _SENSITIVE_NAMES or name in _SENSITIVE_NAMES:
+        return True
+    if lower.startswith(".env"):
+        return True
+    if lower.endswith(_SENSITIVE_SUFFIXES):
+        return True
+    return False
+
+
+def is_public_static(url_path):
+    """是否允许作为静态资源对外提供。API 路由不走此函数。"""
+    parts = _url_parts(url_path)
+    if not parts:
+        return True  # / → index；目录列表另由 list_directory 关掉
+    if any(_is_sensitive_part(p) for p in parts):
+        return False
+    if parts[0] == "juzhu":
+        if len(parts) != 2:
+            return False
+        name = parts[1]
+        if name in _JUZHU_PUBLIC_FILES:
+            return True
+        if name.startswith(_JUZHU_PUBLIC_PREFIXES) and name.endswith(_JUZHU_PUBLIC_SUFFIXES):
+            return True
+        return False
+    # 仓库根其它路径：禁止隐藏文件 / 源码型扩展（已在 parts 检查）；允许 html/css/js/图片/docs 静态页等
+    return True
+
+
+
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         """Python 3.6 无 directory 参数，自定义静态根目录为仓库 ROOT。"""
-        path = path.split("?", 1)[0]
-        path = path.split("#", 1)[0]
-        path = posixpath.normpath(unquote(path))
-        parts = [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
+        parts = _url_parts(path)
         out = str(ROOT)
         for part in parts:
             out = os.path.join(out, part)
         return out
+
+    def list_directory(self, path):
+        """禁止目录浏览，避免枚举源码与数据文件。"""
+        self.send_error(404, "Not found")
+        return None
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -228,7 +307,19 @@ class Handler(SimpleHTTPRequestHandler):
         p = urlparse(self.path)
         if p.path.startswith("/api/juzhu"):
             return self._route(p, "GET")
+        if not is_public_static(p.path):
+            self.send_error(404, "Not found")
+            return
         return super().do_GET()
+
+    def do_HEAD(self):
+        p = urlparse(self.path)
+        if p.path.startswith("/api/juzhu"):
+            return self._route(p, "GET")
+        if not is_public_static(p.path):
+            self.send_error(404, "Not found")
+            return
+        return super().do_HEAD()
 
     def do_POST(self):
         p = urlparse(self.path)
@@ -281,11 +372,25 @@ class Handler(SimpleHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(n).decode("utf-8"))
 
+    def _is_production(self):
+        return (os.environ.get("JUZHU_ENV") or "").strip().lower() in ("prod", "production")
+
     def _expected_api_key(self):
-        return (os.environ.get(API_KEY_ENV) or DEFAULT_API_KEY).strip()
+        key = (os.environ.get(API_KEY_ENV) or "").strip()
+        # 生产禁止空密钥 / 开发默认密钥（文档泄露即等于未授权）
+        if self._is_production():
+            if not key or key == DEFAULT_API_KEY:
+                return ""
+            return key
+        return key or DEFAULT_API_KEY
 
     def _expected_admin_password(self):
-        return (os.environ.get(ADMIN_PASSWORD_ENV) or DEFAULT_ADMIN_PASSWORD).strip()
+        pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
+        if self._is_production():
+            if not pwd or pwd == DEFAULT_ADMIN_PASSWORD:
+                return ""
+            return pwd
+        return pwd or DEFAULT_ADMIN_PASSWORD
 
     def _admin_token_secret(self):
         pwd = self._expected_admin_password().encode("utf-8")
@@ -325,7 +430,14 @@ class Handler(SimpleHTTPRequestHandler):
         return (self.headers.get("X-API-Key") or "").strip()
 
     def _require_api_key(self):
-        if self._provided_api_key() == self._expected_api_key():
+        expected = self._expected_api_key()
+        provided = self._provided_api_key()
+        # 空 expected / 空 provided 一律拒绝，避免 "" == "" 旁路
+        ok = bool(expected) and bool(provided) and hmac.compare_digest(
+            hashlib.sha256(provided.encode("utf-8")).digest(),
+            hashlib.sha256(expected.encode("utf-8")).digest(),
+        )
+        if ok:
             return True
         self._json(
             {
@@ -340,12 +452,12 @@ class Handler(SimpleHTTPRequestHandler):
         body = self._body() or {}
         password = (body.get("password") or "").strip()
         expected = self._expected_admin_password()
-        # 先哈希再 compare，避免不同长度触发 ValueError / 时序旁路
-        ok = hmac.compare_digest(
+        # 生产未配置密码时拒绝登录；先哈希再 compare，避免不同长度触发 ValueError / 时序旁路
+        ok = bool(expected) and bool(password) and hmac.compare_digest(
             hashlib.sha256(password.encode("utf-8")).digest(),
             hashlib.sha256(expected.encode("utf-8")).digest(),
         )
-        if not password or not ok:
+        if not ok:
             return self._json({"error": "unauthorized", "message": "密码错误"}, 401)
         token, expires_at = self._issue_admin_token()
         return self._json({"token": token, "expires_at": expires_at})
@@ -370,17 +482,20 @@ class Handler(SimpleHTTPRequestHandler):
         if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):
             return self._jiazheng_post(path, qs, method)
 
-        if method == "GET" and not path.startswith(ADMIN_PREFIX):
-            return self._public_get(path, qs)
-
-        if method != "GET" and (
-            path.startswith(ADMIN_PREFIX)
-            or path == "/api/juzhu/jiazheng/orders"
+        # /api/juzhu/admin/* 全方法（含 GET）均需 API Key；此前仅写接口鉴权 → 读接口未授权
+        if path.startswith(ADMIN_PREFIX):
+            if not self._require_api_key():
+                return
+        elif method != "GET" and (
+            path == "/api/juzhu/jiazheng/orders"
             or path == "/api/juzhu/jiazheng/wechat-link"
             or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
         ):
             if not self._require_api_key():
                 return
+
+        if method == "GET" and not path.startswith(ADMIN_PREFIX):
+            return self._public_get(path, qs)
 
         if path == f"{ADMIN_PREFIX}/districts" and method == "GET":
             conn = connect()
@@ -2407,6 +2522,23 @@ def main():
         print("  env   （未找到 .env.local / .env；TP_* 需已 export）")
     tp_ready = bool(os.environ.get("TP_APP_ID") and os.environ.get("TP_APP_KEY"))
     print(f"  TP    {'已配置' if tp_ready else '未配置（拨号虚拟号不可用）'}  BASE={os.environ.get('TP_BASE') or 'http://tp-test.lianjia.com'}")
+    env_name = (os.environ.get("JUZHU_ENV") or "dev").strip().lower()
+    api_key = (os.environ.get(API_KEY_ENV) or "").strip()
+    admin_pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
+    api_set = bool(api_key)
+    admin_set = bool(admin_pwd)
+    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已配置' if api_set else '使用开发默认'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
+    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）")
+    print("  static 已拦截 .env / *.py / *.db / api 文档密钥页 / juzhu 非白名单文件")
+    if env_name in ("prod", "production"):
+        bad = []
+        if not api_set or api_key == DEFAULT_API_KEY:
+            bad.append(f"{API_KEY_ENV}（须显式配置且不得为开发默认值）")
+        if not admin_set or admin_pwd == DEFAULT_ADMIN_PASSWORD:
+            bad.append(f"{ADMIN_PASSWORD_ENV}（须显式配置且不得为开发默认值）")
+        if bad:
+            print("  FATAL 生产环境拒绝启动：" + "；".join(bad))
+            sys.exit(1)
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
