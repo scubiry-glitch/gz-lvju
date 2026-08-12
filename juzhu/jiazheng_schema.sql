@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   type TEXT NOT NULL,
   name TEXT NOT NULL,
   logo TEXT,
-  address TEXT, district_id INTEGER, phone TEXT,
+  address TEXT, district_id INTEGER, city_ids TEXT, phone TEXT,
   rating REAL DEFAULT 0,
   review_count INTEGER DEFAULT 0,
   rank_type TEXT,

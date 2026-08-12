@@ -263,7 +263,12 @@ def _merchant_intro(vendor, product):
 
 
 
-def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=None):
+def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=None, city_id=None):
+    city_filter = ""
+    city_params = []
+    if city_id is not None:
+        city_filter = " AND v.city_ids IS NOT NULL AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'"
+        city_params = [str(city_id)]
     row = conn.execute(
         """SELECT
                p.id AS product_id,
@@ -313,9 +318,9 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
            FROM jz_products p
            JOIN jz_vendors v ON v.id=p.vendor_id
            WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
-           """ + ("AND p.vendor_id=? " if vendor_id else "") + """
+           """ + ("AND p.vendor_id=? " if vendor_id else "") + city_filter + """
            ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1""",
-        ((sku_id, vendor_id) if vendor_id else (sku_id,)),
+        ((sku_id, vendor_id) if vendor_id else (sku_id,)) + tuple(city_params),
     ).fetchone()
     if not row:
         return None
@@ -1001,8 +1006,13 @@ def ensure_rolling_slots(conn, product_id, days=5):
     return made
 
 
-def list_channel_sku_vendors(conn, sku_id):
+def list_channel_sku_vendors(conn, sku_id, city_id=None):
     """某 SPU 下所有上架商家（多商家同款 / 比价用），按评分-销量排序。"""
+    city_filter = ""
+    city_params = []
+    if city_id is not None:
+        city_filter = " AND v.city_ids IS NOT NULL AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'"
+        city_params = [str(city_id)]
     rows = conn.execute(
         """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,
                   p.rating AS product_rating, p.sales_count,
@@ -1010,8 +1020,9 @@ def list_channel_sku_vendors(conn, sku_id):
                   v.rating AS vendor_rating, v.review_count, v.rank_label, v.badges
            FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
            WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           """ + city_filter + """
            ORDER BY p.rating DESC, p.sales_count DESC, p.id""",
-        (sku_id,),
+        (sku_id,) + tuple(city_params),
     ).fetchall()
     out, seen = [], set()
     for r in rows:

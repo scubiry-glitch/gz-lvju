@@ -196,6 +196,17 @@ def unit_gallery_rel(conn, unit_id, ext):
     return rel
 
 
+# ====== 家政频道 城市解析辅助 ======
+def _resolve_city_id(conn, city_name):
+    """城市名 → city_id；不存在返回 None，city_name 为空返回 None"""
+    if not city_name:
+        return None
+    row = conn.execute(
+        "SELECT id FROM cities WHERE name=?", (city_name,)
+    ).fetchone()
+    return row[0] if row else None
+
+
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         """Python 3.6 无 directory 参数，自定义静态根目录为仓库 ROOT。"""
@@ -775,6 +786,18 @@ class Handler(SimpleHTTPRequestHandler):
                        AND EXISTS (SELECT 1 FROM jz_products p
                                    WHERE p.channel_sku_id=s.id AND p.status='on')"""
             params = []
+            # 城市过滤：仅展示在该城市有上架商家的 SPU
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
+            if city_id is not None:
+                sql += """ AND EXISTS (
+                        SELECT 1 FROM jz_products p2
+                        JOIN jz_vendors v2 ON v2.id=p2.vendor_id
+                        WHERE p2.channel_sku_id=s.id AND p2.status='on'
+                          AND v2.status='active'
+                          AND v2.city_ids IS NOT NULL
+                          AND (',' || v2.city_ids || ',') LIKE '%,' || ? || ',%'
+                    )"""
+                params.append(str(city_id))
             if qs.get("category"):
                 sql += " AND s.category_id=?"
                 params.append(qs["category"][0])
@@ -827,9 +850,10 @@ class Handler(SimpleHTTPRequestHandler):
                 ).fetchall()
             ]
             vendor_id = qs.get("vendor", [None])[0]
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
             detail_context = jzdb.get_detail_context_by_channel_sku(
-                conn, item["id"], item.get("category_id"), vendor_id) or {}
-            vendors = jzdb.list_channel_sku_vendors(conn, item["id"])
+                conn, item["id"], item.get("category_id"), vendor_id, city_id) or {}
+            vendors = jzdb.list_channel_sku_vendors(conn, item["id"], city_id)
             conn.close()
             return self._json({
                 "item": item,
