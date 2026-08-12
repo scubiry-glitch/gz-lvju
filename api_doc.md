@@ -784,7 +784,7 @@ class HmacAuth:
 
 # ── 使用示例（测试环境） ──
 
-VENDOR_ID = 41
+VENDOR_ID = "<向管理员索取>"
 SECRET = "<向管理员索取>"
 BASE = "<测试环境 Base URL>"
 auth = HmacAuth(SECRET)
