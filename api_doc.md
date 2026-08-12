@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-第三方商家通过本接口管理产品（SKU）和接收订单状态回调。
+第三方商家通过本接口管理产品（SKU）、接收订单状态回调，以及提供小程序 URL Link 生成接口。
 
 - **测试环境**：`http://49.232.103.71:8765`
 - **生产环境**：-
@@ -23,6 +23,7 @@
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/update` | 编辑产品 |
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/status` | 状态变更（上架/下架/售罄）|
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/delete` | 删除产品（软删） |
+| 链接 | `POST` | （商家提供） | 小程序 URL Link 生成（见第 5 章） |
 
 ---
 
@@ -110,7 +111,7 @@
 {
   "vendor_id": 41,
   "order_ref": "GR202608071429360148",
-  "lailai_oid": "LL_88888",
+  "vendor_oid": "SP_88888",
   "status": "assigned",
   "worker": {
     "name": "李师傅",
@@ -123,7 +124,7 @@
 展平后排序：
 
 ```
-lailai_oid=LL_88888
+vendor_oid=SP_88888
 order_ref=GR202608071429360148
 status=assigned
 timestamp=1785998316159
@@ -136,7 +137,7 @@ worker.phone=139****5678
 拼接待签名字符串：
 
 ```
-lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07T14:00:00+08:00&worker.name=李师傅&worker.phone=139****5678
+vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07T14:00:00+08:00&worker.name=李师傅&worker.phone=139****5678
 ```
 
 ---
@@ -153,7 +154,7 @@ lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID，由 GR 侧分配 |
 | `order_ref` | string | ✅ | GR 侧订单参考号（如 `GR202608071429360148`） |
-| `lailai_oid` | string | ✅ | 来来订单号 |
+| `vendor_oid` | string | ✅ | 商家订单号 |
 | `status` | string | ✅ | 订单状态，可选值见下方状态表 |
 | `fee` | integer | 条件 | `paid` 时必填，金额（分） |
 | `worker` | object | 条件 | `assigned` 时必填，服务者信息 |
@@ -164,7 +165,7 @@ lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 | `timestamp` | integer | ✅ | 当前时间戳（毫秒），用于防重放 |
 | `sign` | string | ✅ | HMAC-SHA256 签名 |
 
-> **`vendor_id` 来源**：URL Link 生成时，GR 侧将 `vendor_id` 写入 query string（`...&vendor_id=41`），小程序从 URL 参数中提取后回传。
+> **`vendor_id` 来源**：`vendor_id` 由 GR 侧分配，商家在每次回调请求体中携带，与 HMAC 签名配合完成身份校验。
 
 ### 状态枚举
 
@@ -176,7 +177,7 @@ lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 | `completed` | 已完成 | — |
 | `cancelled` | 已取消 | `cancel_reason` |
 
-> **注意**：首次回调 `paid` 时，GR 侧仅用 `order_ref` 查找订单并写入 `lailai_oid`；后续状态变更需同时提供 `order_ref` + `lailai_oid` 联合匹配。
+> **注意**：首次回调 `paid` 时，GR 侧仅用 `order_ref` 查找订单并写入 `vendor_oid`；后续状态变更需同时提供 `order_ref` + `vendor_oid` 联合匹配。
 
 ### 响应参数
 
@@ -205,7 +206,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "paid",
     "fee": 12800,
     "timestamp": 1785998316159,
@@ -227,7 +228,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "assigned",
     "worker": {
       "name": "李师傅",
@@ -247,7 +248,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "completed",
     "timestamp": 1785998316159,
     "sign": "..."
@@ -262,7 +263,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "cancelled",
     "cancel_reason": "用户主动取消",
     "timestamp": 1785998316159,
@@ -370,7 +371,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | integer | SPU ID（创建产品时填入 `channel_sku_id`） |
-| `category_id` | string | 所属类目 ID |
+| `category_id` | string | 所属类目标识（slug，如 `cleaning-daily`），非数字 ID |
 | `name` | string | SPU 名称 |
 | `slug` | string | URL 友好标识 |
 | `spec` | string | 规格描述 |
@@ -435,7 +436,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
       "query": "id=123123",
       "status": "on",
       "sort_order": 1,
-      "vendor_name": "来来",
+      "vendor_name": "示例商家",
       "vendor_type": "cleaning",
       "spu_name": "深度清洁4小时",
       "worker_ids": [101, 102]
@@ -466,6 +467,9 @@ POST /api/juzhu/jiazheng/vendor/products/list
 | `path` | string | 小程序页面路径 |
 | `query` | string | 小程序页面参数 |
 | `status` | string | 状态：`on` / `off` / `sold_out` |
+| `sort_order` | integer | 排序 |
+| `vendor_name` | string | 商家名称（只读） |
+| `vendor_type` | string | 商家类型（只读） |
 | `spu_name` | string | 引用的 SPU 名称（只读） |
 | `worker_ids` | []integer | 绑定的服务者 ID 列表（只读） |
 
@@ -525,8 +529,8 @@ POST /api/juzhu/jiazheng/vendor/products/create
 | `duration_hours` | float | 否 | 服务时长（小时） |
 | `area_range` | string | 否 | 适用面积范围 |
 | `unit` | string | 否 | 计价单位（默认"次"） |
-| `price` | float | 否 | 售价（元），默认 0 |
-| `original_price` | float | 否 | 原价（元） |
+| `price` | integer | 否 | 售价（分），默认 0 |
+| `original_price` | integer | 否 | 原价（分） |
 | `discount_label` | string | 否 | 折扣标签 |
 | `earliest_time` | string | 否 | 最早可约时间 |
 | `advance_booking_hours` | integer | 否 | 需提前预约小时数 |
@@ -546,7 +550,7 @@ POST /api/juzhu/jiazheng/vendor/products/create
   "title": "日常保洁2小时",
   "subtitle": "基础日常清洁",
   "category": "日常保洁",
-  "price": 99,
+  "price": 9900,
   "unit": "次",
   "channel_sku_id": 1,
   "worker_ids": [101]
@@ -584,7 +588,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
   "vendor_id": 41,
   "id": 10,
   "title": "日常保洁2小时（特惠）",
-  "price": 79,
+  "price": 7900,
   "status": "on"
 }
 ```
@@ -680,7 +684,19 @@ GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
 
 > **重要**：GR 侧仅当 `code = 200` 时视为成功。
 
-### 成功响应示例
+### 调用示例
+
+```bash
+curl -X POST https://test-domain/urllink \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "pages-sub/goods/goods",
+    "query": "activityId=2031123456789012345",
+    "order_ref": "GR202608071429360148"
+  }'
+```
+
+成功响应：
 
 ```json
 {
@@ -690,32 +706,10 @@ GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
 }
 ```
 
-### 来来接口参考
-
-| 项目 | 说明 |
-|------|------|
-| 测试环境地址 | `https://uat.doorslink.net/mall/beike/juzhu/generate/urllink` |
-| 请求方式 | `POST` |
-| Content-Type | `application/json` |
-| 认证方式 | 调用方出口公网 IP 白名单 |
-
-#### 调用示例
-
-```bash
-curl -X POST https://uat.doorslink.net/mall/beike/juzhu/generate/urllink \
-  -H "Content-Type: application/json" \
-  -d '{
-    "path": "pages-sub/goods/goods",
-    "query": "activityId=2031123456789012345",
-    "order_ref": "GR202608071429360148"
-  }'
-```
-
-#### 常见错误
+### 常见错误
 
 | 场景 | code | msg 示例 |
 |------|------|----------|
-| IP 不在白名单 | `-1` | `IP无权访问-203.0.113.10` |
 | `query` 为空 | `-1` | `参数不能为空` |
 | `order_ref` 为空 | `-1` | `GR侧订单参考号不能为空` |
 | `activityId` 缺失或非法 | `-1` | `数字格式错误` |
@@ -801,7 +795,7 @@ resp = auth.post(f"{BASE}/api/juzhu/jiazheng/vendor/products/create", {
     "vendor_id": VENDOR_ID,
     "title": "新服务产品",
     "category": "日常保洁",
-    "price": 99,
+    "price": 9900,
     "unit": "次",
     "channel_sku_id": 1,
 })
@@ -811,9 +805,9 @@ print(resp)
 resp = auth.post(f"{BASE}/api/juzhu/callback", {
     "vendor_id": VENDOR_ID,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "paid",
-    "fee": 12800,
+    "fee": 12800,  # 128.00 元（单位：分）
 })
 print(resp)
 ```

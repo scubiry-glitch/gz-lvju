@@ -29,7 +29,7 @@ def generate_order_ref(conn):
 
 def create_order(conn, order_ref, sku, city="沈阳"):
     """创建一条 gr_orders 记录。
-    lailai_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
+    vendor_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
     返回 order_ref。
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -53,23 +53,23 @@ def get_order_by_ref(conn, order_ref):
     return dict(row)
 
 
-def get_order_by_ref_and_lailai(conn, order_ref, lailai_oid):
-    """按 order_ref + lailai_oid 联合查询订单。"""
+def get_order_by_ref_and_vendor(conn, order_ref, vendor_oid):
+    """按 order_ref + vendor_oid 联合查询订单。"""
     row = conn.execute(
-        "SELECT * FROM gr_orders WHERE order_ref = ? AND lailai_oid = ?",
-        (order_ref, lailai_oid),
+        "SELECT * FROM gr_orders WHERE order_ref = ? AND vendor_oid = ?",
+        (order_ref, vendor_oid),
     ).fetchone()
     if row is None:
         return None
     return dict(row)
 
 
-def update_order_callback(conn, order_ref, lailai_oid, status,
+def update_order_callback(conn, order_ref, vendor_oid, status,
                            fee=None, worker_name=None, worker_phone=None,
                            eta=None, cancel_reason=None):
     """回调更新 gr_orders 订单信息。
 
-    - paid 时写入 lailai_oid / status / fee / paid_at
+    - paid 时写入 vendor_oid / status / fee / paid_at
     - 其他状态更新 status 及对应字段
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -77,44 +77,44 @@ def update_order_callback(conn, order_ref, lailai_oid, status,
     if status == "paid":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?, fee = ?,
+               SET vendor_oid = ?, status = ?, fee = ?,
                    paid_at = ?, updated_at = ?
                WHERE order_ref = ?""",
-            (lailai_oid, status, fee, now, now, order_ref),
+            (vendor_oid, status, fee, now, now, order_ref),
         )
     elif status == "assigned":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_oid = ?, status = ?,
                    worker_name = ?, worker_phone = ?, eta = ?,
                    updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, worker_name, worker_phone, eta,
-             now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_oid, status, worker_name, worker_phone, eta,
+             now, order_ref, vendor_oid),
         )
     elif status == "completed":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_oid = ?, status = ?,
                    completed_at = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, now, now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_oid, status, now, now, order_ref, vendor_oid),
         )
     elif status == "cancelled":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_oid = ?, status = ?,
                    cancel_reason = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, cancel_reason, now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_oid, status, cancel_reason, now, order_ref, vendor_oid),
         )
     else:
         # serving 及其他状态：仅更新 status
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, now, order_ref, lailai_oid),
+               SET vendor_oid = ?, status = ?, updated_at = ?
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_oid, status, now, order_ref, vendor_oid),
         )
 
     conn.commit()

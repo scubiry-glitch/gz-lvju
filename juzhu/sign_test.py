@@ -13,7 +13,7 @@ if __name__ == "__main__":
     # ==========================================
     original_data = {
         "order_ref": "GR20260729xxxx",
-        "lailai_oid": "LL_88888",
+        "vendor_oid": "SP_88888",
         "status": "paid",
         "fee": 12800,
         "worker": {

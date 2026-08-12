@@ -53,7 +53,10 @@ def _connect_db():
     conn.execute("PRAGMA foreign_keys = ON")
     schema_path = _MODULE_DIR / "schema.sql"
     if schema_path.exists():
-        conn.executescript(schema_path.read_text(encoding="utf-8"))
+        try:
+            conn.executescript(schema_path.read_text(encoding="utf-8"))
+        except sqlite3.OperationalError:
+            pass  # 忽略迁移语句在已迁移/新库上的错误
     return conn
 
 
@@ -148,14 +151,14 @@ def _handle_callback(handler, body):
         return True
 
     order_ref = (body.get("order_ref") or "").strip()
-    lailai_oid = (body.get("lailai_oid") or "").strip()
+    vendor_oid = (body.get("vendor_oid") or body.get("lailai_oid") or "").strip()
     status = (body.get("status") or "").strip()
 
     if not order_ref:
         _respond_json(handler, {"code": 400, "message": "缺少 order_ref 参数"}, 400)
         return True
-    if not lailai_oid:
-        _respond_json(handler, {"code": 400, "message": "缺少 lailai_oid 参数"}, 400)
+    if not vendor_oid:
+        _respond_json(handler, {"code": 400, "message": "缺少 vendor_oid 参数"}, 400)
         return True
     if not status:
         _respond_json(handler, {"code": 400, "message": "缺少 status 参数"}, 400)
@@ -180,12 +183,12 @@ def _handle_callback(handler, body):
 
     conn = _connect_db()
     try:
-        from gr_orders import get_order_by_ref, get_order_by_ref_and_lailai, update_order_callback
+        from gr_orders import get_order_by_ref, get_order_by_ref_and_vendor, update_order_callback
 
         if status == "paid":
             order = get_order_by_ref(conn, order_ref)
         else:
-            order = get_order_by_ref_and_lailai(conn, order_ref, lailai_oid)
+            order = get_order_by_ref_and_vendor(conn, order_ref, vendor_oid)
 
         if not order:
             _respond_json(handler, {"code": 404, "message": "订单不存在"}, 404)
@@ -194,7 +197,7 @@ def _handle_callback(handler, body):
         update_order_callback(
             conn,
             order_ref=order_ref,
-            lailai_oid=lailai_oid,
+            vendor_oid=vendor_oid,
             status=status,
             fee=fee,
             worker_name=worker.get("name") if worker else None,

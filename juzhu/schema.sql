@@ -166,7 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status,
 CREATE TABLE IF NOT EXISTS gr_orders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   order_ref       TEXT UNIQUE NOT NULL,       -- GR侧订单参考号
-  lailai_oid      TEXT,                       -- 来来订单号
+  vendor_oid      TEXT,                       -- 商家订单号
   sku             TEXT,                       -- 服务SKU
   city            TEXT DEFAULT '沈阳',
   status          TEXT DEFAULT 'pending',     -- pending/paid/assigned/serving/completed/cancelled
@@ -182,3 +182,7 @@ CREATE TABLE IF NOT EXISTS gr_orders (
 );
 
 CREATE INDEX IF NOT EXISTS idx_gr_orders_ref ON gr_orders(order_ref);
+
+-- 迁移：将 lailai_oid 重命名为 vendor_oid（兼容旧数据库）
+-- 注意：此语句在首次执行后对新数据库会报错，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders RENAME COLUMN lailai_oid TO vendor_oid;

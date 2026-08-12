@@ -273,7 +273,10 @@ def ensure_schema(conn):
     # 导致 juzhu-admin 房源后台整链路 500」的隐患——旧版 ensure_schema 只迁移
     # 「已存在」的表，从不建房源基表。
     if SCHEMA_PATH.exists():
-        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        try:
+            conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        except sqlite3.OperationalError:
+            pass  # 忽略迁移语句（如 RENAME COLUMN）在已迁移/新库上的错误
     project_cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
     if project_cols:
         migrations = [
