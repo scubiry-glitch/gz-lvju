@@ -2,11 +2,14 @@
 *.tmp
 .tmp/
 db.sqlite
+*.sqlite
+*.sqlite3
 publish_test.sh
 # 话务密钥与联调产物（禁止入库）
 .env
 .env.*
 !.env.example
 !**/.env.example
+juzhu/config.ini
 scripts/tp_call_log.json
 *.tp.local.json

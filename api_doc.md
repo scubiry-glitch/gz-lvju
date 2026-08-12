@@ -678,7 +678,7 @@ GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
 | `msg` | string/null | 提示信息 |
 | `data` | string/null | 成功时为小程序 URL Link，失败时为 `null` |
 
-> **重要**：GR 侧仅当 `code = 200` 时视为成功。。
+> **重要**：GR 侧仅当 `code = 200` 时视为成功。
 
 ### 成功响应示例
 
@@ -785,8 +785,8 @@ class HmacAuth:
 # ── 使用示例（测试环境） ──
 
 VENDOR_ID = 41
-SECRET = "7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d"
-BASE = "http://49.232.103.71:8765"
+SECRET = "<向管理员索取>"
+BASE = "<测试环境 Base URL>"
 auth = HmacAuth(SECRET)
 
 # 查询产品列表

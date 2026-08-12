@@ -1,0 +1,6 @@
+# 复制为 config.ini 后填写（config.ini 已 gitignore，勿提交真实 token）
+#   cp juzhu/config.ini.example juzhu/config.ini
+
+[wechat]
+url_link_api = https://api.sskuaixiu.com/cust/applet/link/scheme/generate
+token = Bearer <REPLACE_WITH_TOKEN>
