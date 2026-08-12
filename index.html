@@ -442,7 +442,7 @@
     document.getElementById('jzCats').innerHTML = list.map(function(c){
       var subHtml = (c.subs || []).slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
       var statHtml = (c.stats || []).slice(0,2).map(function(s){ return '<span>'+s+'</span>'; }).join('');
-      return '<a class="jz-cat '+c.id+'" href="juzhu-jiazheng-list.html?type='+c.id+'">'+
+      return '<a class="jz-cat '+c.id+'" href="'+BZF_JZ.chainCity('juzhu-jiazheng-list.html?type='+c.id)+'">'+
         '<div class="bg"></div>'+
         '<div class="in">'+
           '<div class="top"><span class="pill">'+(c.pill || '精选专区')+'</span><div class="arrow">›</div></div>'+
@@ -462,7 +462,7 @@
     document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
       var displayPrice = r.product_min_price || r.price_from || 0;
       var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
-      return '<a class="row" href="juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug) + '">' +
+      return '<a class="row" href="' + BZF_JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug)) + '">' +
         '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:12px;">' +
           '<div class="pr">' + price + '</div>' +
