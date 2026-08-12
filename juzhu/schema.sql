@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS projects (
   is_featured   INTEGER NOT NULL DEFAULT 0,
   featured_rank INTEGER,
   old_house_hint TEXT,                       -- 卖旧买新：旧房估价提示
+  contact_phone TEXT,                        -- 项目联系真实号（仅 DB/管理端；不进 data.json）
   rating_status TEXT NOT NULL DEFAULT 'draft',  -- draft|pending|passed|rejected
   rating        TEXT,                        -- JSON：好房子四维度 + 星级 + 编号
   rating_submitted_at TEXT,

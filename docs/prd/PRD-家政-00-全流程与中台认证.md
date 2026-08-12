@@ -6,7 +6,7 @@
 
 ## 1. 需求背景
 
-新居住频道（`juzhu-channel-v3-grid.html`）在保租房、卖旧买新之外，新增**家政服务** Tab，覆盖保洁、维修、搬家、保姆四大品类。产品要求原型支持完整交易闭环，并与现有**服务认证中台**打通。
+新居住频道（`index.html`）在保租房、卖旧买新之外，新增**家政服务** Tab，覆盖保洁、维修、搬家、保姆四大品类。产品要求原型支持完整交易闭环，并与现有**服务认证中台**打通。
 
 本 PRD 描述跨品类通用流程与中台认证约束；各品类差异见 01–04 分册。
 
@@ -16,7 +16,7 @@
 
 | 角色 | 端 | 代表页面 |
 |------|-----|----------|
-| 租客 / 旅居客 | C | `juzhu-channel-v3-grid.html` |
+| 租客 / 旅居客 | C | `index.html` |
 | 服务者 | S | `s-orders.html`, `s-cert.html` |
 | 平台运营 | P | `p-service-demand.html`, `p-console.html` |
 | 房源运营商 | B | `b-dispatch-board.html` |
@@ -71,7 +71,7 @@ C端                    支付网关              P中台                S端
 ### 4.1 C 端
 
 ```
-juzhu-channel-v3-grid.html#家政
+index.html#家政
   → juzhu-jiazheng-list.html?type={category}
   → juzhu-jiazheng-detail.html?sku={slug}
   → [确认订单] → lvju-app-pay.html?order={id}

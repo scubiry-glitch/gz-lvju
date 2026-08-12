@@ -35,6 +35,7 @@ from db import (  # noqa: E402
     rating_to_db,
     row_to_dict,
     rows_to_list,
+    strip_contact_phone,
     summarize_rating,
     sync_district_stats,
     sync_project_unit_count,
@@ -44,6 +45,7 @@ from db import (  # noqa: E402
 
 import jiazheng_db as jzdb  # noqa: E402
 import jiazheng_api           # noqa: E402
+from tp_client import TpError, alloc_virtual_phone, load_dotenv, mask_phone, validate_real_phone  # noqa: E402
 
 ADMIN_PREFIX = "/api/juzhu/admin"
 ASSETS_PREFIX = "assets/juzhu/sy"
@@ -576,16 +578,25 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._get_rating(m.group(1))
 
+        # 项目虚拟号：每次实时绑号，不做缓存；须在 slug 路由之前匹配
+        m = re.match(r"^/api/juzhu/projects/(\d+)/virtual-phone$", path)
+        if m:
+            conn.close()
+            return self._project_virtual_phone(int(m.group(1)))
+
         if path.startswith("/api/juzhu/districts/") and path.endswith("/projects"):
             slug = path.split("/")[4]
             dist = row_to_dict(conn.execute("SELECT * FROM districts WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
             if not dist:
                 conn.close()
                 return self._json({"error": "not found"}, 404)
-            projs = rows_to_list(conn.execute(
-                "SELECT * FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
-                (dist["id"],),
-            ))
+            projs = [
+                strip_contact_phone(row_to_dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
+                    (dist["id"],),
+                )
+            ]
             conn.close()
             return self._json({"district": dist, "projects": projs})
 
@@ -593,7 +604,7 @@ class Handler(SimpleHTTPRequestHandler):
             parts = path.split("/")
             slug = parts[4] if len(parts) > 4 else ""
             if len(parts) > 5 and parts[5] == "units":
-                proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
+                proj = strip_contact_phone(row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone()))
                 if not proj:
                     conn.close()
                     return self._json({"error": "not found"}, 404)
@@ -608,15 +619,18 @@ class Handler(SimpleHTTPRequestHandler):
                 ))
                 conn.close()
                 return self._json({"project": proj, "units": units, "photos": photos})
-            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
+            proj = strip_contact_phone(row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone()))
             conn.close()
             return self._json(proj if proj else {"error": "not found"}, 404 if not proj else 200)
 
         if path == "/api/juzhu/trade":
-            data = rows_to_list(conn.execute(
-                "SELECT * FROM projects WHERE channel='trade'" + city_filter() + " ORDER BY is_featured DESC, featured_rank, sort_order",
-                city_params(),
-            ))
+            data = [
+                strip_contact_phone(row_to_dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM projects WHERE channel='trade'" + city_filter() + " ORDER BY is_featured DESC, featured_rank, sort_order",
+                    city_params(),
+                )
+            ]
             conn.close()
             return self._json({"listings": data})
 
@@ -1246,7 +1260,7 @@ class Handler(SimpleHTTPRequestHandler):
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         if not proj:
             conn.close()
             return self._json({"error": "not found"}, 404)
@@ -1261,6 +1275,34 @@ class Handler(SimpleHTTPRequestHandler):
         ))
         conn.close()
         return self._json({"project": proj, "units": units, "photos": photos})
+
+    def _project_virtual_phone(self, pid):
+        """C 端实时取虚拟号：查项目真实号 → TP alloc → 只回虚拟号字段。"""
+        conn = connect()
+        row = conn.execute(
+            "SELECT id, contact_phone, name FROM projects WHERE id=?", (pid,)
+        ).fetchone()
+        conn.close()
+        if not row:
+            return self._json({"error": "not found"}, 404)
+        real = (row["contact_phone"] or "").strip()
+        if not real:
+            return self._json({"error": "未配置联系电话"}, 400)
+        try:
+            result = alloc_virtual_phone(real, app_call_id=f"juzhu-project-{pid}")
+        except ValueError as e:
+            return self._json({"error": str(e)}, 400)
+        except TpError as e:
+            print(
+                f"[tp] project={pid} phone={mask_phone(real)} errno={e.errno} err={e}",
+                flush=True,
+            )
+            return self._json({"error": "暂时无法接通，请稍后重试"}, 502)
+        return self._json({
+            "virtual_phone": result["virtual_phone"],
+            "display": result["display"],
+            "tel": result["tel"],
+        })
 
     def _project_by_rating_code(self, conn, code):
         pid = None
@@ -1624,6 +1666,12 @@ class Handler(SimpleHTTPRequestHandler):
                     "is_featured", "featured_rank", "old_house_hint"):
             if col in b:
                 put(col, b.get(col))
+        if "contact_phone" in b:
+            try:
+                put("contact_phone", validate_real_phone(b.get("contact_phone")))
+            except ValueError as e:
+                conn.close()
+                return self._json({"error": str(e)}, 400)
         if "tags" in b:
             put("tags", tags_to_db(b.get("tags")))
         if "managed_unit_count" in b:
@@ -1652,7 +1700,7 @@ class Handler(SimpleHTTPRequestHandler):
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         conn.close()
         return self._json({"ok": True, "project": proj})
 
@@ -1714,15 +1762,22 @@ class Handler(SimpleHTTPRequestHandler):
         dist = conn.execute("SELECT name FROM districts WHERE id=?", (district_id,)).fetchone() if district_id else None
         address = b.get("address") or (f"{dist[0]} · {name}" if dist else f"沈阳 · {name}")
 
+        try:
+            contact_phone = validate_real_phone(b.get("contact_phone")) if "contact_phone" in b else None
+        except ValueError as e:
+            conn.close()
+            return self._json({"error": str(e)}, 400)
+
         conn.execute(
             """INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
-               sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint)
-               VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?)""",
+               sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
+               VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)""",
             (
                 city_id, district_id, channel, name, slug,
                 b.get("cover_image"), address, tags_to_db(b.get("tags")),
                 b.get("sort_order") or 999, b.get("price_from"),
                 b.get("is_featured"), b.get("featured_rank"), b.get("old_house_hint"),
+                contact_phone,
             ),
         )
         pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -1730,11 +1785,11 @@ class Handler(SimpleHTTPRequestHandler):
         if district_id:
             sync_district_stats(conn, district_id)
         export_json(conn)
-        proj = row_to_dict(conn.execute(
+        proj = normalize_project_row(conn.execute(
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         conn.close()
         return self._json({"ok": True, "project": proj}, 201)
 
@@ -2300,11 +2355,18 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
+    loaded = load_dotenv()
     port = 8765
     print(f"新居住服务  http://localhost:{port}")
-    print(f"  前台  /juzhu-channel-v3-grid.html")
+    print(f"  前台  /index.html")
     print(f"  后台  /juzhu-admin.html")
     print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/jiazheng/*")
+    if loaded:
+        print("  env   " + ", ".join(str(p.name) for p in loaded))
+    else:
+        print("  env   （未找到 .env.local / .env；TP_* 需已 export）")
+    tp_ready = bool(os.environ.get("TP_APP_ID") and os.environ.get("TP_APP_KEY"))
+    print(f"  TP    {'已配置' if tp_ready else '未配置（拨号虚拟号不可用）'}  BASE={os.environ.get('TP_BASE') or 'http://tp-test.lianjia.com'}")
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 

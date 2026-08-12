@@ -65,7 +65,7 @@ API 端点：
 
 | 文件 | 职责 |
 |------|------|
-| `juzhu-channel-v3-grid.html` | 频道首页（方案 C，读 data.json） |
+| `index.html` | 频道首页（方案 C，读 data.json） |
 | `juzhu-bzf-list.html` | 区级 → 项目列表 |
 | `juzhu-bzf-project.html` | 项目 → 户型列表 |
 | `juzhu-unit-detail.html` | 户型详情 + 轮播 |

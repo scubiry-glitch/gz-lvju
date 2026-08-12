@@ -168,7 +168,7 @@
           { id: 'standards',       label: 'L0-L7 等级标准',      href: 'p-standards.html',      icon: 'layers',  badge: 'v3.0' },
           { id: 'question-bank',   label: '考题题库 + 试卷',     href: 'p-question-bank.html',  icon: 'list',    badge: '1.2k' },
           { id: 'service-demand',  label: '服务需求 · 工单池',   href: 'p-service-demand.html', icon: 'list' },
-          { id: 'jiazheng-api',    label: '新居住 · 家政频道 ↗', href: '../juzhu-channel-v3-grid.html', icon: 'home', badge: 'API' },
+          { id: 'jiazheng-api',    label: '新居住 · 家政频道 ↗', href: '../index.html', icon: 'home', badge: 'API' },
           { id: 'traffic-policy',  label: '派单流量策略 + 扶持', href: 'p-traffic-policy.html', icon: 'radio',   badge: '7' },
           { id: 'transaction',     label: '派单分账 + 结算',     href: 'p-transaction.html',    icon: 'coin',    badge: 'T+7' },
           { id: 'service-review',  label: '服务评价 · 口碑回流', href: 'p-service-review.html', icon: 'star' },

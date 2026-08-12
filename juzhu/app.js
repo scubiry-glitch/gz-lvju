@@ -369,6 +369,23 @@ window.JUZHU = (function () {
     return digits ? 'tel:' + digits : '';
   }
 
+  /** 实时取项目虚拟号（不缓存；须后端 juzhu/server.py） */
+  function fetchProjectVirtualPhone(projectId) {
+    if (!projectId) {
+      return Promise.reject(new Error('未配置联系电话'));
+    }
+    return fetch('/api/juzhu/projects/' + encodeURIComponent(projectId) + '/virtual-phone', {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' }
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!r.ok) throw new Error((j && j.error) || '暂时无法接通，请稍后重试');
+        if (!j || !j.tel) throw new Error('暂时无法接通，请稍后重试');
+        return j;
+      });
+    });
+  }
+
   // 全链路城市/地域透传：把当前 URL 的 ?city= / ?region= 参数拼到站内链接上
   function chainQS() {
     var out = '';
@@ -587,6 +604,7 @@ window.JUZHU = (function () {
     districtManagedUnits: districtManagedUnits,
     bookingPhone: bookingPhone,
     telHref: telHref,
+    fetchProjectVirtualPhone: fetchProjectVirtualPhone,
     chainQS: chainQS,
     urlCityName: urlCityName,
     AMENITY_CATALOG: AMENITY_CATALOG,

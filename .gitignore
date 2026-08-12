@@ -3,3 +3,10 @@
 .tmp/
 db.sqlite
 publish_test.sh
+# 话务密钥与联调产物（禁止入库）
+.env
+.env.*
+!.env.example
+!**/.env.example
+scripts/tp_call_log.json
+*.tp.local.json

@@ -9,9 +9,13 @@
 # 2. 扫描入库 + 复制图片 + 导出 JSON
 python3 juzhu/seed_from_folder.py
 
-# 3. 启动服务（含编辑后台 API，推荐）
+# 3. （可选）话务虚拟号密钥
+cp juzhu/.env.example juzhu/.env.local   # 填入 TP_APP_ID / TP_APP_KEY
+# TP_BASE 默认测试 http://tp-test.lianjia.com；线上改为 http://i.tp.lianjia.com
+
+# 4. 启动服务（含编辑后台 API，推荐；自动加载 .env.local）
 python3 juzhu/server.py
-# 前台 http://localhost:8765/juzhu-channel-v3-grid.html
+# 前台 http://localhost:8765/index.html
 # 后台 http://localhost:8765/juzhu-admin.html
 ```
 
@@ -34,7 +38,7 @@ python3 juzhu/server.py
 
 ## 页面
 
-- `juzhu-channel-v3-grid.html` — 频道首页（方案 C）
+- `index.html` — 频道首页（方案 C）
 - `juzhu-bzf-list.html` — 区级项目列表
 - `juzhu-bzf-project.html` — 项目户型列表
 - `juzhu-unit-detail.html` — 户型详情

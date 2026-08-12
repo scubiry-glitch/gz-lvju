@@ -282,6 +282,7 @@ def ensure_schema(conn):
             ("rating_submitted_at", "ALTER TABLE projects ADD COLUMN rating_submitted_at TEXT"),
             ("rating_reviewed_at", "ALTER TABLE projects ADD COLUMN rating_reviewed_at TEXT"),
             ("rating_note", "ALTER TABLE projects ADD COLUMN rating_note TEXT"),
+            ("contact_phone", "ALTER TABLE projects ADD COLUMN contact_phone TEXT"),
         ]
         for col, sql in migrations:
             if col not in project_cols:
@@ -445,6 +446,48 @@ def ensure_jiazheng_schema(conn):
     order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
     if "slot_id" not in order_cols:
         conn.execute("ALTER TABLE jz_orders ADD COLUMN slot_id INTEGER")
+
+    # 自愈：若 jz_categories 实为子类目表（INTEGER id + parent_type），迁到 jz_subcategories，
+    # 再重建 C 端四大类 jz_categories（TEXT id）。
+    cat_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall()}
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if cat_cols and "parent_type" in cat_cols:
+        if "jz_subcategories" not in tables:
+            conn.execute("ALTER TABLE jz_categories RENAME TO jz_subcategories")
+        else:
+            conn.execute("DROP TABLE IF EXISTS jz_categories")
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS jz_categories (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              icon TEXT,
+              sort_order INTEGER NOT NULL DEFAULT 0,
+              enabled INTEGER NOT NULL DEFAULT 1,
+              note TEXT
+            );
+            """
+        )
+        cat_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall()}
+
+    if cat_cols and "enabled" not in cat_cols:
+        conn.execute("ALTER TABLE jz_categories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+    if cat_cols and "note" not in cat_cols:
+        conn.execute("ALTER TABLE jz_categories ADD COLUMN note TEXT")
+    sku_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_skus)").fetchall()}
+    if sku_cols and "enabled" not in sku_cols:
+        conn.execute("ALTER TABLE jz_skus ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+
+    # 仅当 id 为 TEXT（C 端四大类）时写入默认类目/SKU
+    cat_id_type = None
+    for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall():
+        if r[1] == "id":
+            cat_id_type = (r[2] or "").upper()
+            break
+    if cat_id_type and "INT" in cat_id_type:
+        conn.commit()
+        return
+
     for cid, name, icon, order, note in JZ_DEFAULT_CATEGORIES:
         conn.execute(
             """INSERT INTO jz_categories(id, name, icon, sort_order, enabled, note)
@@ -673,13 +716,24 @@ def summarize_rating(dims):
     }
 
 
-def normalize_project_row(d):
+def normalize_project_row(d, *, include_contact_phone=False):
     if not d:
         return d
     d = row_to_dict(d) if not isinstance(d, dict) else dict(d)
     d["rating"] = parse_rating_value(d.get("rating"))
     d.setdefault("rating_status", "draft")
+    if not include_contact_phone:
+        d.pop("contact_phone", None)
     return d
+
+
+def strip_contact_phone(d):
+    """公开 API / 静态导出：去掉项目真实号。"""
+    if not d:
+        return d
+    out = dict(d) if isinstance(d, dict) else row_to_dict(d)
+    out.pop("contact_phone", None)
+    return out
 
 
 def row_to_dict(row):
@@ -934,7 +988,8 @@ def export_json(conn=None):
                 "unit_count": sum(p["managed_unit_count"] or 0 for p in projects if p["channel"] == "bzf"),
             }
             data["districts"] = districts
-            data["projects"] = [normalize_project_row(p) for p in projects]
+            # 真实号仅存 DB，不进 data.json / data-<slug>.json
+            data["projects"] = [normalize_project_row(p, include_contact_phone=False) for p in projects]
             data["units"] = units
             data["photos"] = photos
             return data

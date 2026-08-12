@@ -81,7 +81,7 @@
 
 - **预设切换**：`?region=js|gx|gz_wl`（或 localStorage `bzf_region`），默认 `js`（江苏·住建厅，= 现有字面量基准，切到它时 relabel 为空操作）。`overview.html` 顶部有可视化切换下拉。
 - **两条落地路径**：
-  1. **导航/chrome**（`_nav.js` / `_navmobile.js` / `index.html` 城市切换器）→ 直接读 `window.BZF_REGION` 拼装，不走 relabel。改这类文案时改配置字段，别写死。
+  1. **导航/chrome**（`_nav.js` / `_navmobile.js` / `index.html` 新居住首页 / `index2.html` 故事板城市切换器）→ 直接读 `window.BZF_REGION` 拼装，不走 relabel。改这类文案时改配置字段，别写死。
   2. **页面正文**（`screens/*.html` 全量）→ 由 `_region.js` 的 `relabel()` 在 DOMContentLoaded 时按"江苏基准串→激活预设值"词典替换。所以正文里**仍以江苏字面量书写**（保持基准可读），新增页面只需引入 `<script src="_region.js"></script>`（在 nav 脚本之前；根目录页面用 `screens/_region.js`）。
 - **新增省份/厅**：只在 `_region.js` 的 `PRESETS` 加一个 key，不改任何页面。
 - **relabel 词典规则**：源串始终是 `PRESETS.js`（江苏基准），按"长串优先"排序避免子串误伤；运营方品牌 `贝壳` 是跨域常量（仅极少数演示场景换）。
@@ -106,3 +106,9 @@
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
 - **鉴权**：写接口与中台列表读接口用 `localStorage JUZHU_API_KEY`（默认 `dev-juzhu-key`）；C 端单订单查询与评价可匿名
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
+
+## 规则 10 · 话务虚拟号（TP）只走服务端
+
+绑定虚拟号走话务 `/bundling/alloc`，`app_id` / `app_key` **涉及号池成本，禁止明文写到端上或对公网静态资源**。端只消费服务端下发的虚拟号；签名与密钥仅服务端。规范见 `docs/tp-sign-and-call.md`，联调脚本 `scripts/tp_bundling_alloc.py`。本业务约定**不传 `port`**；线上 Base 为内网 `http://i.tp.lianjia.com`，测试 `http://tp-test.lianjia.com`，外网不可直连线上。
+
+**新居住项目电话（保租房 + 卖旧买新）**：真实号存 `projects.contact_phone`（仅 DB + 管理 API，**不进 data.json**）；C 端户型详情拨号走 `GET /api/juzhu/projects/{id}/virtual-phone`，每次实时绑号、禁止缓存。密钥放 `juzhu/.env.local`（模板 `juzhu/.env.example`），`server.py` 启动时自动加载。

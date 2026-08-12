@@ -21,7 +21,7 @@
 | 旅居其它（`lvju-*.html`，政务/总览/评级） | 6 | 政府大屏 / 总览 / 评级标准 |
 | 家政落地页（`jiazheng-*.html`） | 9 | 4 品类落地 + 列表 / 详情 / 下单 / 支付 / 商家 |
 | 保租房三档入口（`baozufang-*.html`） | 4 | 三档总入口 + V1/V2/V3 总览 |
-| 其它根入口 | 3 | `index.html` `overview.html` `beike-app-home.html` |
+| 其它根入口 | 4 | `index.html`（新居住首页）`index2.html`（原型故事板）`overview.html` `beike-app-home.html` |
 
 `screens/` 按前缀分系列（实测）：**P 中台 34 · G 住建厅 14 · S 服务者 9 · B 运营 7 · F 金融 6 · D 蓝图/标准 6 · C 租客 5 · V 人力 3 · T 培训 3 · M 物资 3**，另有若干无前缀 C 端页（`home/detail/policy/profile/apply/...`）。
 
@@ -32,12 +32,12 @@
 | 业务线 | 主入口 | 说明 | 后端依赖 |
 |---|---|---|:-:|
 | **保租房 四方共建** | [`baozufang-channel-overview.html`](baozufang-channel-overview.html) | V1/V2/V3 三档版本选择器 + 能力对照 | 否 |
-| ├ C 端体验 | [`index.html`](index.html) · [`screens/home.html`](screens/home.html) | 租客频道首页 | 否 |
+| ├ C 端体验 | [`index2.html`](index2.html) · [`screens/home.html`](screens/home.html) | 租客原型故事板 / 频道页 | 否 |
 | ├ G 住建厅监管 | [`screens/gov-admin.html`](screens/gov-admin.html) | 监管总览（白名单/合规/大屏入口） | 否 |
 | ├ B 运营机构 | [`screens/b-operator-console.html`](screens/b-operator-console.html) | 国企持有方资管视角 + 运营商工作台 | 否 |
 | ├ F 江苏银行 | [`screens/f-escrow.html`](screens/f-escrow.html) | 监管账户对账 / 结算 / 公积金 | 否 |
 | └ P 服务认证中台 | [`screens/p-console.html`](screens/p-console.html) | 5 类机构（S/B/V/M/T）认证底座 | 部分* |
-| **新居住 juzhu** | [`juzhu-channel-v3-grid.html`](juzhu-channel-v3-grid.html) | 频道首页（方案 C），含家政 Tab | 是（数据/家政） |
+| **新居住 juzhu** | [`index.html`](index.html) | 频道首页（方案 C），含家政 Tab | 是（数据/家政） |
 | ├ 内容编辑后台 | [`juzhu-admin.html`](juzhu-admin.html) | 项目/房源/好房子评级录入 | 是 |
 | **旅居 App** | [`lvju-app-home.html`](lvju-app-home.html) | 旅居 C 端小程序型首页（33 页群） | 否 |
 | ├ 旅居总览/政务 | [`lvju-overview.html`](lvju-overview.html) · [`lvju-gov-dashboard.html`](lvju-gov-dashboard.html) | 演示总览 + 政府大屏 | 否 |
@@ -130,7 +130,7 @@ python3 -m http.server 8000
 cd /proweb/run/sy
 python3 juzhu/server.py
 # 服务：http://localhost:8765/
-# 前台：http://localhost:8765/juzhu-channel-v3-grid.html
+# 前台：http://localhost:8765/index.html
 # 后台：http://localhost:8765/juzhu-admin.html
 ```
 （`server.py` 同时托管静态文件，因此单跑它即可同时访问静态页与 API。）

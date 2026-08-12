@@ -142,7 +142,7 @@ JZ_DATA.getOrder(oid).then(function(order){
       if (confirm('确定取消订单？')) {
         JZ_DATA.updateOrderStatus(oid, 'cancelled').then(function(){
           alert('订单已取消');
-          location.href = 'juzhu-channel-v3-grid.html?tab=jiazheng';
+          location.href = 'index.html?tab=jiazheng';
         });
       }
     });

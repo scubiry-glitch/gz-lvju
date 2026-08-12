@@ -36,7 +36,7 @@
 | `baozufang-overview-v1-basic.html` | 200 |
 | `baozufang-overview-v2-standard.html` | 200 |
 | `baozufang-overview-v3-full.html` | 200 |
-| `juzhu-channel-v3-grid.html` | 200 |
+| `index2.html` | 200 |
 | `lvju-app-home.html` | 200 |
 | `lvju-overview.html` | 200 |
 | `jiazheng-landing-cleaning.html` | 200 |
@@ -58,7 +58,7 @@
 | 业务线 | 主入口 | 状态 |
 |---|---|:-:|
 | 保租房四端 + P 中台 | `baozufang-channel-overview.html` / `screens/*` | ✅ 静态可达 |
-| 新居住 juzhu | `juzhu-channel-v3-grid.html` / `juzhu-admin.html` | ✅ 静态可达（数据需后端） |
+| 新居住 juzhu | `index.html` / `juzhu-admin.html` | ✅ 静态可达（数据需后端） |
 | 旅居 App（33 页） | `lvju-app-home.html` | ✅ 静态可达 |
 | 家政（9 落地页 + 下单闭环） | `jiazheng-landing-*.html` / `juzhu-jiazheng-*.html` | ✅ 静态可达（闭环需后端 API） |
 

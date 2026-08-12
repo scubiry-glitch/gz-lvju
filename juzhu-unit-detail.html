@@ -240,7 +240,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="juzhu/app.js?v=16"></script>
+<script src="juzhu/app.js?v=17"></script>
 <script src="screens/_qr.js"></script>
 <script>
 (function(){
@@ -325,8 +325,6 @@
 
     var k = u.keeper || {};
     var kName = k.name || p.name + ' · 管家';
-    var kPhone = JUZHU.unitKeeperPhone(u);
-    var tel = JUZHU.telHref(kPhone);
     document.getElementById('keeperBlock').hidden = false;
     var avCls = k.avatar ? 'av' : 'av placeholder';
     var avStyle = k.avatar ? 'background-image:url(' + k.avatar + ')' : '';
@@ -335,26 +333,25 @@
       '<div class="' + avCls + '" style="' + avStyle + '">' + avInner + '</div>' +
       '<div><div class="nm">' + kName + '</div><div class="hint">联系我了解更多信息</div></div>' +
       '<div class="acts">' +
-        (tel ? '<a class="ic tel" href="' + tel + '" aria-label="电话" id="keeperTel">📞</a>' : '') +
+        '<a class="ic tel" href="#" aria-label="电话" id="keeperTel">📞</a>' +
       '</div>';
     var keeperTel = document.getElementById('keeperTel');
     if (keeperTel) {
-      keeperTel.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
+      keeperTel.onclick = function(e) { e.preventDefault(); callWithPrivacy(p.id); };
     }
 
     if (JUZHU.effectiveRentDetail(u)) {
       document.getElementById('rentModalWrap').innerHTML = JUZHU.rentDetailModalHtml(u);
-      bindRentModal(kPhone);
+      bindRentModal(p.id);
       document.getElementById('openRent').hidden = false;
     } else {
       document.getElementById('openRent').hidden = true;
     }
   }
 
-  function bindRentModal(phone) {
+  function bindRentModal(projectId) {
     var modal = document.getElementById('rentModal');
     if (!modal) return;
-    var tel = JUZHU.telHref(phone);
     function close() { modal.hidden = true; document.body.style.overflow = ''; }
     function open() { modal.hidden = false; document.body.style.overflow = 'hidden'; }
     document.getElementById('openRent').onclick = open;
@@ -368,39 +365,51 @@
     });
     var consult = document.getElementById('rentConsult');
     if (consult) {
-      consult.onclick = function() {
-        if (tel) callWithPrivacy(tel);
-        else alert('暂未配置咨询电话');
-      };
+      consult.onclick = function() { callWithPrivacy(projectId); };
     }
   }
 
-  // 统一拨号入口：先弹隐私保护提示，确认后拨打
-  function callWithPrivacy(tel) {
+  // 统一拨号：隐私确认 → 实时请求 400 虚拟号 → tel:（不缓存）
+  function callWithPrivacy(projectId) {
     var modal = document.getElementById('privacyModal');
-    if (!modal || !tel) return;
+    if (!modal) return;
     function closePrivacy() { modal.hidden = true; document.body.style.overflow = ''; }
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
-    document.getElementById('privacyOk').onclick = function() {
-      closePrivacy();
-      location.href = tel;
+    var vnum = modal.querySelector('.privacy-vnum');
+    if (vnum) vnum.textContent = '虚拟号码';
+    var okBtn = document.getElementById('privacyOk');
+    okBtn.onclick = function() {
+      if (!projectId) {
+        closePrivacy();
+        alert('暂未配置咨询电话，请在内容编辑后台为该项目填写联系电话');
+        return;
+      }
+      okBtn.disabled = true;
+      if (vnum) vnum.textContent = '正在获取号码…';
+      JUZHU.fetchProjectVirtualPhone(projectId).then(function(res) {
+        if (vnum) vnum.textContent = res.display || res.virtual_phone || '虚拟号码';
+        closePrivacy();
+        location.href = res.tel;
+      }).catch(function(e) {
+        closePrivacy();
+        alert((e && e.message) || '暂时无法接通，请稍后重试');
+      }).finally(function() {
+        okBtn.disabled = false;
+      });
     };
     document.getElementById('privacyCancel').onclick = closePrivacy;
     document.getElementById('privacyClose').onclick = closePrivacy;
     document.getElementById('privacyBackdrop').onclick = closePrivacy;
   }
 
-  function bindTelLinks(phone) {
-    var tel = JUZHU.telHref(phone);
+  function bindTelLinks(projectId) {
     var callBtn = document.getElementById('callBtn');
-    if (tel) {
-      callBtn.href = tel;
-      callBtn.onclick = function(e) { e.preventDefault(); callWithPrivacy(tel); };
-    } else {
-      callBtn.href = '#';
-      callBtn.onclick = function(e) { e.preventDefault(); alert('暂未配置咨询电话，请在内容编辑后台设置'); };
-    }
+    callBtn.href = '#';
+    callBtn.onclick = function(e) {
+      e.preventDefault();
+      callWithPrivacy(projectId);
+    };
   }
 
   function mountRating(p) {
@@ -447,8 +456,7 @@
       mountRating(p);
     }
 
-    var phone = isTrade ? JUZHU.bookingPhone() : JUZHU.unitKeeperPhone(u);
-    bindTelLinks(phone);
+    bindTelLinks(p.id);
 
     photos = JUZHU.photos('unit', u.id).map(function(ph){ return ph.file_path; });
     if (!photos.length && u.cover_image) photos = [u.cover_image];
