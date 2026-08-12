@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """新居住频道 API + 静态文件 + 编辑后台接口。启动：python3 juzhu/server.py"""
+import hashlib
+import hmac
 import json
 import os
 import posixpath
 import re
 import sys
+import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -48,6 +51,10 @@ ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 API_KEY_ENV = "JUZHU_API_KEY"
 DEFAULT_API_KEY = "dev-juzhu-key"
+ADMIN_PASSWORD_ENV = "JUZHU_ADMIN_PASSWORD"
+DEFAULT_ADMIN_PASSWORD = "dongbo2026"
+ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
+ADMIN_TOKEN_SALT = b"juzhu-admin-session-v1"
 
 
 def slugify(name):
@@ -264,10 +271,44 @@ class Handler(SimpleHTTPRequestHandler):
     def _expected_api_key(self):
         return (os.environ.get(API_KEY_ENV) or DEFAULT_API_KEY).strip()
 
-    def _provided_api_key(self):
+    def _expected_admin_password(self):
+        return (os.environ.get(ADMIN_PASSWORD_ENV) or DEFAULT_ADMIN_PASSWORD).strip()
+
+    def _admin_token_secret(self):
+        pwd = self._expected_admin_password().encode("utf-8")
+        return hmac.new(ADMIN_TOKEN_SALT, pwd, hashlib.sha256).digest()
+
+    def _issue_admin_token(self):
+        exp = int(time.time()) + ADMIN_TOKEN_TTL_SEC
+        payload = str(exp)
+        sig = hmac.new(self._admin_token_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return f"{payload}.{sig}", datetime.fromtimestamp(exp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _verify_admin_token(self, token):
+        if not token or "." not in token:
+            return None
+        payload, sig = token.rsplit(".", 1)
+        try:
+            exp = int(payload)
+        except ValueError:
+            return None
+        expect = hmac.new(self._admin_token_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expect, sig):
+            return None
+        if exp < int(time.time()):
+            return None
+        return datetime.fromtimestamp(exp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _provided_bearer(self):
         auth = self.headers.get("Authorization", "").strip()
         if auth.lower().startswith("bearer "):
             return auth[7:].strip()
+        return ""
+
+    def _provided_api_key(self):
+        bearer = self._provided_bearer()
+        if bearer:
+            return bearer
         return (self.headers.get("X-API-Key") or "").strip()
 
     def _require_api_key(self):
@@ -282,9 +323,35 @@ class Handler(SimpleHTTPRequestHandler):
         )
         return False
 
+    def _admin_login(self):
+        body = self._body() or {}
+        password = (body.get("password") or "").strip()
+        expected = self._expected_admin_password()
+        # 先哈希再 compare，避免不同长度触发 ValueError / 时序旁路
+        ok = hmac.compare_digest(
+            hashlib.sha256(password.encode("utf-8")).digest(),
+            hashlib.sha256(expected.encode("utf-8")).digest(),
+        )
+        if not password or not ok:
+            return self._json({"error": "unauthorized", "message": "密码错误"}, 401)
+        token, expires_at = self._issue_admin_token()
+        return self._json({"token": token, "expires_at": expires_at})
+
+    def _admin_auth_check(self):
+        expires_at = self._verify_admin_token(self._provided_bearer())
+        if not expires_at:
+            return self._json({"error": "unauthorized", "message": "登录已失效，请重新登录"}, 401)
+        return self._json({"ok": True, "expires_at": expires_at})
+
     def _route(self, p, method):
         path = p.path.rstrip("/")
         qs = parse_qs(p.query)
+
+        # === 页面登录门禁（无需 API Key） ===
+        if path == f"{ADMIN_PREFIX}/auth/login" and method == "POST":
+            return self._admin_login()
+        if path == f"{ADMIN_PREFIX}/auth/check" and method == "GET":
+            return self._admin_auth_check()
 
         # === 家政频道 POST 端点（非 admin 路径） ===
         if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):

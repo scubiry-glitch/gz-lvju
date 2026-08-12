@@ -118,16 +118,44 @@
   .pane-dict .main{max-width:1100px;margin:0 auto;}
   .hint{font-size:11px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
   body.api-off .subnav button:not(.on){opacity:.45;pointer-events:none;}
+  body.auth-locked .app-shell{visibility:hidden;}
+  .login-mask{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#0b5d56 0%,#0f766e 45%,#134e4a 100%);}
+  .login-mask[hidden]{display:none;}
+  .login-card{width:min(360px,92vw);background:#fff;border-radius:16px;padding:28px 24px 22px;
+    box-shadow:0 20px 50px rgba(0,0,0,.25);}
+  .login-card h2{font-family:var(--serif);font-size:20px;margin:0 0 6px;color:var(--fg);}
+  .login-card .sub{font-size:12px;color:var(--muted);margin:0 0 18px;}
+  .login-card .err{font-size:12px;color:var(--danger);margin:8px 0 0;min-height:1.2em;}
+  .login-card .bar{margin-top:16px;}
+  .login-card .bar .btn{width:100%;padding:10px;}
 </style>
 </head>
-<body>
+<body class="auth-locked">
+<div class="login-mask" id="loginMask">
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <h2>内容编辑后台</h2>
+    <p class="sub">请输入登录密码后继续</p>
+    <div class="fld">
+      <label for="loginPassword">密码</label>
+      <input type="password" id="loginPassword" name="password" required autofocus placeholder="登录密码" />
+    </div>
+    <p class="err" id="loginErr" aria-live="polite"></p>
+    <div class="bar">
+      <button type="submit" class="btn primary" id="btnLogin">登录</button>
+    </div>
+  </form>
+</div>
+
+<div class="app-shell">
 <header class="top">
   <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
   <div class="acts">
     <select id="citySwitch" title="切换编辑城市" style="height:32px;border:1px solid var(--border,#dde);border-radius:8px;padding:0 8px;font-size:13px;background:#fff;"></select>
     <a href="screens/p-rating-review.html" target="_blank">评级复核队列</a>
-    <a href="juzhu-channel-v3-grid.html" target="_blank" id="previewLink">预览前台</a>
+    <a href="index.html" target="_blank" id="previewLink">预览前台</a>
     <button type="button" id="btnExport">导出 JSON</button>
+    <button type="button" id="btnLogout">退出</button>
   </div>
 </header>
 
@@ -142,7 +170,7 @@
 <div id="panePhone" class="pane-main pane-phone" hidden>
   <div class="card">
     <h2>预约看房电话</h2>
-    <p class="hint">用于户型详情页底部「预约看房 / 咨询置换」按钮，保存后自动同步至 data.json。</p>
+    <p class="hint">已降级：户型详情「预约咨询」已改走<strong>项目联系电话</strong>（真实号 → 实时 400 虚拟号）。本页城市级号码仅作遗留配置，详情拨号不再使用。</p>
     <div class="fld" style="margin-top:14px;">
       <label>咨询电话</label>
       <input type="tel" id="bookingPhone" placeholder="如 400-888-8888 或 024-12345678" />
@@ -200,12 +228,98 @@
   </main>
 </div>
 </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
 <script>
 var API = '/api/juzhu/admin';
+var AUTH_TOKEN_KEY = 'JUZHU_ADMIN_TOKEN';
 var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
+
+function getAuthToken() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch (e) { return ''; }
+}
+function setAuthToken(token) {
+  try {
+    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch (e) {}
+}
+function showLogin(msg) {
+  document.body.classList.add('auth-locked');
+  document.getElementById('loginMask').hidden = false;
+  document.getElementById('loginErr').textContent = msg || '';
+  var input = document.getElementById('loginPassword');
+  input.value = '';
+  setTimeout(function(){ input.focus(); }, 50);
+}
+function hideLogin() {
+  document.body.classList.remove('auth-locked');
+  document.getElementById('loginMask').hidden = true;
+  document.getElementById('loginErr').textContent = '';
+}
+function checkAuth() {
+  var token = getAuthToken();
+  if (!token) return Promise.resolve(false);
+  return fetch(API + '/auth/check', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(function(r) {
+    if (!r.ok) {
+      setAuthToken('');
+      return false;
+    }
+    return true;
+  }).catch(function() {
+    return false;
+  });
+}
+function login(password) {
+  return fetch(API + '/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: password })
+  }).then(function(r) {
+    return r.json().then(function(data) {
+      if (!r.ok) throw new Error((data && data.message) || '登录失败');
+      setAuthToken(data.token);
+      return data;
+    });
+  });
+}
+function bootApp() {
+  hideLogin();
+  return loadCities().then(function() {
+    return loadDictionary();
+  }).then(function() {
+    return Promise.all([loadProjects(), loadSettings()]);
+  }).catch(function() {
+    document.body.classList.add('api-off');
+    document.getElementById('apiWarn').hidden = false;
+    switchTab('phone');
+  });
+}
+
+document.getElementById('loginForm').onsubmit = function(e) {
+  e.preventDefault();
+  var pwd = document.getElementById('loginPassword').value;
+  var err = document.getElementById('loginErr');
+  var btn = document.getElementById('btnLogin');
+  err.textContent = '';
+  btn.disabled = true;
+  login(pwd).then(function() {
+    return bootApp();
+  }).catch(function(ex) {
+    err.textContent = ex.message || '密码错误';
+  }).then(function() {
+    btn.disabled = false;
+  });
+};
+
+document.getElementById('btnLogout').onclick = function() {
+  setAuthToken('');
+  showLogin('');
+};
 
 // 当前编辑城市：URL ?city=（slug 或名称）优先，缺省为 cities[0]
 function adminCityParam() {
@@ -225,7 +339,7 @@ function loadCities() {
       location.href = 'juzhu-admin.html?city=' + encodeURIComponent(sel.value);
     };
     var preview = document.getElementById('previewLink');
-    if (preview) preview.href = 'juzhu-channel-v3-grid.html' + (cur ? '?city=' + encodeURIComponent(cur) : '');
+    if (preview) preview.href = 'index.html' + (cur ? '?city=' + encodeURIComponent(cur) : '');
     return list;
   }).catch(function() { state.cities = []; return []; });
 }
@@ -486,7 +600,7 @@ function renderDictionary() {
             '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="upload-input"/></label>'+
           '</div>'+
           '<div class="cover-preview" id="cityHeroPreview" style="'+heroPreview+'"></div>'+
-          '<p class="hint">用于 juzhu-channel-v3-grid.html 顶部「城市 · 新居住」背景，上传后自动保存</p>'+
+          '<p class="hint">用于 index.html 顶部「城市 · 新居住」背景，上传后自动保存</p>'+
         '</div>'+
       '</div>'+
       '<div class="bar"><button type="button" class="btn primary" id="saveCity">保存城市</button></div>'+
@@ -679,6 +793,7 @@ function renderNewProjectForm() {
         '<div class="fld grid full"><label>地址 / 副标题</label><input id="n_addr" placeholder="留空则自动生成"/></div>'+
         '<div class="fld"><label>标签（逗号分隔）</label><input id="n_tags" placeholder="逸居, 近地铁"/></div>'+
         '<div class="fld"><label>起价 / 起租</label><input id="n_price" type="number" placeholder="保租=元/月，置换=万"/></div>'+
+        '<div class="fld"><label>联系电话（真实号）</label><input id="n_phone" type="tel" placeholder="11–13 位手机/固话，勿填 400"/><p class="hint" style="margin-top:4px;">用户拨号时由服务端实时换绑为 400；真实号不写入 data.json</p></div>'+
         '<div class="fld" id="n_old_wrap" hidden><label>旧房估价提示</label><input id="n_old" placeholder="旧房估价参考 180万起"/></div>'+
         '<div class="fld grid full img-field"><label>封面图</label>'+
           '<div class="img-field-row">'+
@@ -730,7 +845,8 @@ function createProject() {
     address: document.getElementById('n_addr').value.trim() || undefined,
     tags: document.getElementById('n_tags').value,
     price_from: numValFrom('n_price'),
-    cover_image: document.getElementById('n_cover').value.trim() || undefined
+    cover_image: document.getElementById('n_cover').value.trim() || undefined,
+    contact_phone: document.getElementById('n_phone').value.trim() || null
   };
   if (channel === 'trade') body.old_house_hint = document.getElementById('n_old').value.trim() || undefined;
 
@@ -844,6 +960,7 @@ function renderEditor() {
         '<div class="fld grid full"><label>地址 / 副标题</label><input id="p_addr" value="'+esc(p.address||'')+'"/></div>'+
         '<div class="fld"><label>标签（逗号分隔）</label><input id="p_tags" value="'+esc(tagsStr(p.tags))+'"/></div>'+
         '<div class="fld"><label>'+(isTrade?'起价（万）':'起租（元/月）')+'</label><input id="p_price" type="number" value="'+(p.price_from||'')+'"/></div>'+
+        '<div class="fld"><label>联系电话（真实号）</label><input id="p_phone" type="tel" value="'+esc(p.contact_phone||'')+'" placeholder="11–13 位，勿填 400"/><p class="hint" style="margin-top:4px;">用户端实时换绑 400；不进 data.json</p></div>'+
         (isTrade?'':('<div class="fld"><label>房源量</label><input id="p_managed" type="number" min="0" value="'+(p.managed_unit_count!=null?p.managed_unit_count:'')+'"/><p class="hint" style="margin-top:4px;">项目实际房源套数，区级会自动加总</p></div>'))+
         (isTrade?'<div class="fld"><label>旧房估价提示</label><input id="p_old" value="'+esc(p.old_house_hint||'')+'"/></div>':'')+
         '<div class="fld grid full img-field"><label>封面图</label>'+
@@ -1219,7 +1336,8 @@ function saveProject() {
     tags: document.getElementById('p_tags').value,
     sort_order: +document.getElementById('p_sort').value,
     price_from: numVal('p_price'),
-    cover_image: document.getElementById('p_cover').value.trim()
+    cover_image: document.getElementById('p_cover').value.trim(),
+    contact_phone: document.getElementById('p_phone').value.trim() || null
   };
   if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
   else body.managed_unit_count = numVal('p_managed');
@@ -1330,14 +1448,9 @@ function debounce(fn, ms) {
   return function() { clearTimeout(t); t = setTimeout(fn, ms); };
 }
 
-loadCities().then(function() {
-  return loadDictionary();
-}).then(function() {
-  return Promise.all([loadProjects(), loadSettings()]);
-}).catch(function() {
-  document.body.classList.add('api-off');
-  document.getElementById('apiWarn').hidden = false;
-  switchTab('phone');
+checkAuth().then(function(ok) {
+  if (ok) return bootApp();
+  showLogin('');
 });
 </script>
 </body>
