@@ -163,3 +163,28 @@ node test_static_guard.js
 应用层修复已在 `cursor` 完成：静态敏感路径不可读、默认 API Key 失效、源码不再携带 DB 默认凭证，并具备单测与生产启动门禁。
 
 **安全闭环条件** = 本报告 §4 运维项全部完成 + §5 验收通过。未轮换已泄露数据库密码前，不得宣称风险已消除。
+
+---
+
+## 9. 执行进度（2026-08-12 22:50）
+
+| 项 | 内容 | 状态 |
+|---|---|---|
+| 代码修复 | `cursor`：`2c4a72c` / `d823ce8` | ✅ 本地已提交 |
+| 2. 去掉入库 `.env.*` | 分支 `security/remove-env-secrets`：`6afe78b`（基于 `lianjia/master` 删除 `.env.prod`/`.env.test`） | ✅ 本地已提交；⏳ 推远程受阻 |
+| 3. 合入 + redeploy | 需 push / moma 发布 + 平台注入 `MYSQL_*` / `JUZHU_*` | ⏳ 未完成（git push 挂起；线上 SCF 仍 443） |
+| 4. §5 验收 | 探测 `xjz.ke.com` 全路径 HTTP **443** + body「python3: not found」 | ⚠️ 站点不可用，无法验收静态拦截是否生效 |
+
+**说明：** 未完成密钥轮换（报告 §4 第 1 项）前，即便拦截上线，已泄露的 DB 凭证仍视为有效风险。
+
+手动补推 / 部署命令：
+
+```bash
+# 推删除密钥提交
+git push -u lianjia security/remove-env-secrets
+# 推修复代码
+git push -u origin cursor
+git push lianjia cursor:cursor-security-fix
+
+# 合并删除提交到 master 后，用 moma 按 prod 发布（须已配置平台 MYSQL_* / JUZHU_ENV / JUZHU_API_KEY）
+```
