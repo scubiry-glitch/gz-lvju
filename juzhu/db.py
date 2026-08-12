@@ -376,11 +376,15 @@ def ensure_channels(conn):
     else:
         defaults = [("bzf", "保租房专区", 1), ("trade", "卖旧买新专区", 2), ("jiazheng", "生活服务专区", 3)]
         for cid, label, order in defaults:
-            if not conn.execute("SELECT 1 FROM channels WHERE id=?", (cid,)).fetchone():
+            row = conn.execute("SELECT label FROM channels WHERE id=?", (cid,)).fetchone()
+            if not row:
                 conn.execute(
                     "INSERT INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
                     (cid, label, order),
                 )
+            elif row[0] in ("保租房", "卖旧买新", "生活服务"):
+                # 旧短 label 统一补「专区」，与首页 tab 文案对齐
+                conn.execute("UPDATE channels SET label=? WHERE id=?", (label, cid))
 
 
 def ensure_jiazheng_schema(conn):
