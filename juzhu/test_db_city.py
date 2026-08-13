@@ -31,7 +31,7 @@ def main():
     try:
         # 1. vendor_city_ids：解析商家 city_ids
         ids41 = jzdb.vendor_city_ids(conn, 41)
-        check("vendor_city_ids(41) == [1]", ids41 == [1], f"got {ids41}")
+        check("vendor_city_ids(41) == [1,2,3]", ids41 == [1, 2, 3], f"got {ids41}")
         ids42 = jzdb.vendor_city_ids(conn, 42)
         check("vendor_city_ids(42) == [1,2]", ids42 == [1, 2], f"got {ids42}")
 
@@ -39,8 +39,8 @@ def main():
         ok, msg = jzdb.validate_product_city(conn, 41, None)
         check("缺 city_id → False", ok is False, f"got {ok}")
         check("缺 city_id → 缺少 city_id", "缺少 city_id" in (msg or ""), f"got {msg}")
-        ok, msg = jzdb.validate_product_city(conn, 41, 2)
-        check("city_id=2 不属于商家41 → False", ok is False, f"got {ok}")
+        ok, msg = jzdb.validate_product_city(conn, 41, 4)
+        check("city_id=4 不属于商家41 → False", ok is False, f"got {ok}")
         check("不属于商家 → 提示归属错误", "不属于" in (msg or ""), f"got {msg}")
         ok, msg = jzdb.validate_product_city(conn, 41, 1)
         check("city_id=1 属于商家41 → True", ok is True, f"got {ok} {msg}")

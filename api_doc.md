@@ -15,6 +15,7 @@
 | 分类 | 方法 | 路径 | 说明 |
 |------|------|------|------|
 | 回调 | `POST` | `/api/juzhu/callback` | 订单状态变更通知 |
+| 城市 | `POST` | `/api/juzhu/jiazheng/vendor/cities/list` | 查询商家关联城市 |
 | 类目 | `POST` | `/api/juzhu/jiazheng/vendor/categories/list` | 查询可用类目 |
 | SPU | `POST` | `/api/juzhu/jiazheng/vendor/skus/list` | 查询平台标准品 |
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/list` | 产品列表（支持筛选）|
@@ -293,7 +294,42 @@ curl -X POST https://your-domain/api/juzhu/callback \
 
 ---
 
-### 4.1 类目列表
+### 4.1 城市列表
+
+```http
+POST /api/juzhu/jiazheng/vendor/cities/list
+```
+
+返回本商家 `city_ids` 关联的城市（id + 名称），用于产品创建/编辑时选择 `city_id`。**仅返回本商家关联的城市**；未关联的城市不可查询，也不能作为产品 `city_id` 提交。
+
+**请求参数**（除 `vendor_id` + 签名外无业务参数）：
+
+```json
+{"vendor_id": 41}
+```
+
+**响应**（按商家 `city_ids` 配置顺序返回）：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "list": [
+    {"id": 1, "name": "沈阳", "slug": "shenyang"},
+    {"id": 2, "name": "贵阳", "slug": "guiyang"}
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | integer | 城市 ID（产品 `city_id` 用此值） |
+| `name` | string | 城市名称 |
+| `slug` | string | 城市拼音标识 |
+
+---
+
+### 4.2 类目列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/categories/list
@@ -330,7 +366,7 @@ POST /api/juzhu/jiazheng/vendor/categories/list
 
 ---
 
-### 4.2 SPU 列表
+### 4.3 SPU 列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/skus/list
@@ -384,7 +420,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 
 ---
 
-### 4.3 产品列表
+### 4.4 产品列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/list
@@ -397,6 +433,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID |
+| `city_id` | integer | 否 | 按城市 ID 筛选 |
 | `category` | string | 否 | 按类目名称筛选（精确匹配） |
 | `status` | string | 否 | 按状态筛选：`on` / `off` / `sold_out` |
 | `name` | string | 否 | 按产品标题模糊搜索 |
@@ -417,6 +454,8 @@ POST /api/juzhu/jiazheng/vendor/products/list
     {
       "id": 3,
       "vendor_id": 41,
+      "city_id": 1,
+      "city_name": "沈阳",
       "title": "深度清洁4小时",
       "subtitle": "适合大面积深度保洁",
       "category": "深度清洁",
@@ -449,6 +488,8 @@ POST /api/juzhu/jiazheng/vendor/products/list
 |------|------|------|
 | `id` | integer | 产品 ID |
 | `vendor_id` | integer | 所属商家 ID |
+| `city_id` | integer | 商品所属城市 ID |
+| `city_name` | string | 城市名称（只读，`cities` 表关联） |
 | `title` | string | 产品标题 |
 | `subtitle` | string | 副标题 |
 | `category` | string | 类目名称 |
@@ -475,7 +516,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
 
 ---
 
-### 4.4 产品详情
+### 4.5 产品详情
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/detail
@@ -510,7 +551,7 @@ POST /api/juzhu/jiazheng/vendor/products/detail
 
 ---
 
-### 4.5 创建产品
+### 4.6 创建产品
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/create
@@ -523,6 +564,7 @@ POST /api/juzhu/jiazheng/vendor/products/create
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID（签名用，不会作为入库值被覆写） |
+| `city_id` | integer | ✅ | 商品所属城市 ID（必须属于商家关联城市，见城市列表接口） |
 | `channel_sku_id` | integer | 否 | 引用的 SPU ID（从 SPU 列表接口获取） |
 | `category` | string | 否 | 类目名称 |
 | `title` | string | ✅ | 产品标题 |
@@ -547,6 +589,7 @@ POST /api/juzhu/jiazheng/vendor/products/create
 ```json
 {
   "vendor_id": 41,
+  "city_id": 1,
   "title": "日常保洁2小时",
   "subtitle": "基础日常清洁",
   "category": "日常保洁",
@@ -565,7 +608,7 @@ POST /api/juzhu/jiazheng/vendor/products/create
 
 ---
 
-### 4.6 编辑产品
+### 4.7 编辑产品
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/update
@@ -579,6 +622,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID |
 | `id` | integer | ✅ | 产品 ID |
+| `city_id` | integer | 否 | 商品城市 ID（须属于商家关联城市；不传保持不变） |
 | （其他） | — | 否 | 同创建接口，按需传入 |
 
 **请求示例**：
@@ -601,7 +645,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
 
 ---
 
-### 4.7 状态变更
+### 4.8 状态变更
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/status
@@ -631,7 +675,7 @@ POST /api/juzhu/jiazheng/vendor/products/status
 
 ---
 
-### 4.8 删除产品（软删）
+### 4.9 删除产品（软删）
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/delete
