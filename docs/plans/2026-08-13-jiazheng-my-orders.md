@@ -846,3 +846,10 @@ Expected: ALL PASS（4 项：列迁移 / 下单落库 / 过滤 pending + counts 
 
 **Step 4: Commit**
 `git add juzhu/test_gr_my_orders.py docs/plans/2026-08-13-jiazheng-my-orders.md && git commit -m "test(juzhu): 我的订单链路冒烟脚本与执行记录"`
+
+## 执行记录
+
+- 2026-08-13 T1-T9 完成，test_gr_my_orders.py 全绿（4 项检查：列迁移 / 下单落库 / 过滤 pending + counts / 接口行为含 400 与跨用户 404）。
+- 提交：9a0aafa（user_id 列迁移）→ 6f25a35（下单链路）→ 01c7083（查询函数）→ a293695（匿名接口）→ 1d15c54（前端 user_id 存取）→ 80de76d（入口区块）→ 3ba9f96（列表页）→ ee12642（详情页）→ 本记录。
+- 实施偏差记录：server.py 的 GET 路由需注册在 `_public_get`（`_route` 中段为死代码，所有非 admin GET 会先转入 `_public_get`）；详情页步骤条"下单"（i=0）步骤始终标记 done（对齐设计文档"当前状态之前的步骤标已完成样式"）。
+- 浏览器验证：index.html 角标正确（paid/assigned/serving/completed 各计数）；新增 paid 单后刷新角标 1→2；file:// 断网模拟下「我的订单」区块整体隐藏；列表页 4 卡仅「查看详情」按钮、tab 筛选正确；详情页 completed 4 步 ✓ + 末步高亮、cancelled 红色提示 + 全灰、缺参数错误态正确。
