@@ -523,9 +523,10 @@ POST /api/juzhu/jiazheng/vendor/products/create
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID（签名用，不会作为入库值被覆写） |
+| `channel_sku_id` | integer | 否 | 引用的 SPU ID（从 SPU 列表接口获取） |
+| `category` | string | 否 | 类目名称 |
 | `title` | string | ✅ | 产品标题 |
 | `subtitle` | string | 否 | 副标题 |
-| `category` | string | 否 | 类目名称 |
 | `duration_hours` | float | 否 | 服务时长（小时） |
 | `area_range` | string | 否 | 适用面积范围 |
 | `unit` | string | 否 | 计价单位（默认"次"） |
@@ -535,7 +536,6 @@ POST /api/juzhu/jiazheng/vendor/products/create
 | `earliest_time` | string | 否 | 最早可约时间 |
 | `advance_booking_hours` | integer | 否 | 需提前预约小时数 |
 | `service_tags` | []string | 否 | 服务标签列表 |
-| `channel_sku_id` | integer | 否 | 引用的 SPU ID（从 SPU 列表接口获取） |
 | `path` | string | 否 | 小程序页面路径 |
 | `query` | string | 否 | 小程序页面参数 |
 | `status` | string | 否 | 状态（默认 `on`） |

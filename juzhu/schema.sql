@@ -166,6 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status,
 CREATE TABLE IF NOT EXISTS gr_orders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   order_ref       TEXT UNIQUE NOT NULL,       -- GR侧订单参考号
+  vendor_id       INTEGER,                    -- 商家ID（关联 jz_vendors.id）
   vendor_oid      TEXT,                       -- 商家订单号
   sku             TEXT,                       -- 服务SKU
   city            TEXT DEFAULT '沈阳',
@@ -182,6 +183,10 @@ CREATE TABLE IF NOT EXISTS gr_orders (
 );
 
 CREATE INDEX IF NOT EXISTS idx_gr_orders_ref ON gr_orders(order_ref);
+
+-- 迁移：老库 gr_orders 增加 vendor_id 列（多商家接入时新增）
+-- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders ADD COLUMN vendor_id INTEGER;
 
 -- 迁移：将 lailai_oid 重命名为 vendor_oid（兼容旧数据库）
 -- 注意：此语句在首次执行后对新数据库会报错，由 _connect_db() 捕获忽略

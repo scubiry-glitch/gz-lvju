@@ -151,6 +151,7 @@ def call_alloc(*, number: str, app_call_id: str | None = None) -> dict:
     params["sign"] = generate_sign(params, cfg["app_key"])
     url = cfg["base"] + "/bundling/alloc?" + urllib.parse.urlencode(params)
 
+    _log(f"    [TP-API] {_log_ts()} GET {url}", force=True)
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     req = urllib.request.Request(
         url,
@@ -160,7 +161,14 @@ def call_alloc(*, number: str, app_call_id: str | None = None) -> dict:
         with opener.open(req, timeout=20) as resp:
             body_text = resp.read().decode("utf-8", errors="replace")
             http_status = getattr(resp, "status", 200)
+        _log(f"      << 返回: {_clip(body_text)}")
     except Exception as e:
+        _log(f"      ! {type(e).__name__}: {e}")
+        if hasattr(e, "read"):  # HTTPError：附带话务返回的错误响应体
+            try:
+                _log(f"      << 返回(错误): {_clip(e.read().decode('utf-8', 'replace'))}")
+            except Exception:
+                pass
         raise TpError(f"话务请求失败: {type(e).__name__}") from e
 
     try:
@@ -197,3 +205,28 @@ def call_alloc(*, number: str, app_call_id: str | None = None) -> dict:
 def alloc_virtual_phone(number: str, *, app_call_id: str | None = None) -> dict:
     """对外别名：每次调用均实时请求话务。"""
     return call_alloc(number=number, app_call_id=app_call_id)
+
+
+# ── 外部调用日志（print 到 stdout，随 server.py 主日志落盘） ──
+
+def _log(line, force=False):
+    """force=True 的行在简洁模式下也打印（出站请求的接口 URI 行）。"""
+    if force or _log_detail():
+        print(line, flush=True)
+
+
+def _log_ts():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_detail():
+    """详细日志开关：JUZHU_LOG_DETAIL=false/0/off 时出站调用只打印请求 URL 一行。"""
+    return os.environ.get("JUZHU_LOG_DETAIL", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _clip(text, limit=2000):
+    """日志打印截断：超长截断并标注总长度；换行转义为单行。"""
+    text = text.replace("\n", "\\n")
+    if len(text) > limit:
+        return text[:limit] + f"…[截断，共 {len(text)} 字符]"
+    return text

@@ -162,6 +162,11 @@
       <div class="coupon"><b>神券已减 10</b><span>支付成功后进入工单池，待派单状态统一进入家政订单 API</span></div>
     </div>
 
+    <div class="block" id="productBlock" hidden>
+      <h3>服务规格<span class="count">同商家多款 · 点击切换</span></h3>
+      <div id="productList"></div>
+    </div>
+
     <div class="block">
       <h3>服务说明</h3>
       <div class="spec" id="spec"></div>
@@ -245,6 +250,7 @@
   var curVendor = q.get('vendor') || null;   // 多商家同款：锁定某商家
   var item = null;
   var product = null;
+  var products = [];
   var related = [];
   var vendor = null;
   var vendors = [];
@@ -315,7 +321,11 @@
 
   // 真实排班档位（有则按档下单占容量；无则降级为意向时段）
   function loadSlots(){
-    fetch('/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug) + '/slots' + (curVendor ? '?vendor=' + encodeURIComponent(curVendor) : ''))
+    var qs2 = new URLSearchParams();
+    if (curVendor) qs2.set('vendor', curVendor);
+    if (product && product.id) qs2.set('product', product.id);
+    var u = '/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug) + '/slots' + (qs2.toString() ? '?' + qs2.toString() : '');
+    fetch(u)
       .then(function(r){ return r.json(); })
       .then(function(d){
         slots = (d && d.slots) || [];
@@ -385,6 +395,44 @@
     });
 
     paint();
+  }
+
+  // 同商家多规格：同一商家在同一 SPU 下的多个商品（套餐/服务者/价格不同），点击切换下单商品
+  function renderProducts(){
+    var blk = document.getElementById('productBlock');
+    if (!blk) return;
+    var curVendorId = String((vendor && vendor.id) || '');
+    var list = (products || []).filter(function(p){ return String(p.vendor_id) === curVendorId; });
+    if (list.length < 2){ blk.hidden = true; return; }
+    blk.hidden = false;
+    var curId = String((product && product.id) || '');
+    document.getElementById('productList').innerHTML = list.map(function(p){
+      var cur = String(p.id) === curId;
+      var tags = (p.service_tags || []).slice(0,3).map(function(t){ return '<span class="vb">'+esc(t)+'</span>'; }).join('');
+      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="javascript:;" data-pid="'+p.id+'">'+
+        '<span class="vmi"><b>'+esc(p.title)+'</b>'+
+          '<span class="vsub">'+(p.subtitle ? esc(p.subtitle)+' · ' : '')+esc(p.unit||'次')+(p.duration_hours ? ' · '+p.duration_hours+'小时' : '')+(p.original_price ? ' · 原价'+fmtPrice(p.original_price) : '')+'</span>'+
+          (tags ? '<span class="vbs">'+tags+'</span>' : '')+
+        '</span>'+
+        '<span class="vprice">'+fmtPrice(p.price)+'</span>'+
+      '</a>';
+    }).join('');
+    document.getElementById('productList').querySelectorAll('[data-pid]').forEach(function(a){
+      a.addEventListener('click', function(){ selectProduct(a.dataset.pid); });
+    });
+  }
+
+  // 切换选中的商品：价格区联动 + 下单 product_id 联动（档期功能启用时同时重载档期）
+  function selectProduct(pid){
+    var p = (products || []).filter(function(x){ return String(x.id) === String(pid); })[0];
+    if (!p) return;
+    product = p;
+    document.getElementById('price').textContent = fmtPrice(p.price);
+    document.getElementById('ctaPrice').textContent = fmtPrice(p.price);
+    document.getElementById('productList').querySelectorAll('.vrow').forEach(function(x){
+      x.classList.toggle('cur', x.dataset.pid === String(p.id));
+    });
+    if (timeMode === 'real') loadSlots();
   }
 
   function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
@@ -563,6 +611,7 @@
     item = res.item;
     related = res.related || [];
     product = res.product || null;
+    products = res.products || [];
     vendor = res.vendor || null;
     vendors = res.vendors || [];
     merchantIntro = res.merchant_intro || null;
@@ -570,6 +619,7 @@
     reviews = res.reviews || [];
     render();
     renderVendors();
+    renderProducts();
     // 选择上门时间暂时隐藏
     // if (timeMode !== 'real') renderTimeSlots();
   }).catch(function(err){
