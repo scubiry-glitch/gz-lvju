@@ -100,6 +100,14 @@ def update_order_callback(conn, order_ref, vendor_oid, status,
                WHERE order_ref = ? AND vendor_oid = ?""",
             (vendor_id, vendor_oid, status, now, now, order_ref, vendor_oid),
         )
+    elif status == "serving":
+        conn.execute(
+            """UPDATE gr_orders
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
+                   serving_at = ?, updated_at = ?
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, now, now, order_ref, vendor_oid),
+        )
     elif status == "cancelled":
         conn.execute(
             """UPDATE gr_orders
@@ -109,7 +117,7 @@ def update_order_callback(conn, order_ref, vendor_oid, status,
             (vendor_id, vendor_oid, status, cancel_reason, now, order_ref, vendor_oid),
         )
     else:
-        # serving 及其他状态：仅更新 status
+        # 其他状态：仅更新 status
         conn.execute(
             """UPDATE gr_orders
                SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?, updated_at = ?

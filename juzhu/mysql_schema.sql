@@ -322,6 +322,7 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   eta             VARCHAR(32),
   cancel_reason   TEXT,
   paid_at         VARCHAR(32),
+  serving_at      VARCHAR(32),
   completed_at    VARCHAR(32),
   created_at      VARCHAR(32) NOT NULL,
   updated_at      VARCHAR(32),

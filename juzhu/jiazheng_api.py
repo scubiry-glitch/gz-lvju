@@ -11,8 +11,10 @@
 
 import json
 import os
+import re
 import time
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import db  # noqa: E402
@@ -20,6 +22,31 @@ from sign_util import HmacAuth  # noqa: E402
 
 _MODULE_DIR = Path(__file__).resolve().parent
 _KEY_PATH = _MODULE_DIR / "hmac_secret.key"
+
+_CST = timezone(timedelta(hours=8))  # 北京时间 UTC+8
+
+
+def _norm_eta_peking(eta):
+    """eta 统一转为北京时间无时区字符串 'YYYY-MM-DD HH:MM:SS'。
+
+    输入示例：
+    - '2026-08-07T14:00:00+08:00' → '2026-08-07 14:00:00'
+    - '2026-08-07T14:00:00Z'      → '2026-08-07 22:00:00'（UTC 转北京时间）
+    - '2026-08-07 14:00:00'       → 原样返回（已是北京时间无时区）
+    - 无法解析的值 → 原样返回，避免误伤业务数据
+    """
+    if not eta:
+        return eta
+    s = str(eta).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$", s):
+        return s
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return s
+        return dt.astimezone(_CST).strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return s
 
 
 # ── 密钥加载 ──────────────────────────────────────────────────
@@ -196,7 +223,7 @@ def _handle_callback(handler, body):
             fee=fee,
             worker_name=worker.get("name") if worker else None,
             worker_phone=worker.get("phone") if worker else None,
-            eta=worker.get("eta") if worker else None,
+            eta=_norm_eta_peking(worker.get("eta")) if worker else None,
             cancel_reason=cancel_reason if status == "cancelled" else None,
             vendor_id=vendor_id,
         )

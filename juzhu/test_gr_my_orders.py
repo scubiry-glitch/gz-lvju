@@ -116,11 +116,40 @@ def check_gr_orders_api():
         conn.commit()
 
 
+def check_serving_at_and_eta():
+    import time as _t
+    from gr_orders import create_order, get_order_by_ref, update_order_callback
+    from jiazheng_api import _norm_eta_peking
+
+    # eta 统一北京时间无时区
+    assert _norm_eta_peking("2026-08-07T14:00:00+08:00") == "2026-08-07 14:00:00", \
+        _norm_eta_peking("2026-08-07T14:00:00+08:00")
+    assert _norm_eta_peking("2026-08-07T14:00:00Z") == "2026-08-07 22:00:00", \
+        _norm_eta_peking("2026-08-07T14:00:00Z")
+    assert _norm_eta_peking("2026-08-07 14:00:00") == "2026-08-07 14:00:00"
+    assert _norm_eta_peking("") == "" and _norm_eta_peking(None) is None
+
+    # serving 回调写入 serving_at；paid 阶段 serving_at 为空
+    conn = jdb.connect()
+    ref = "GRTESTS" + str(int(_t.time() * 1000))
+    create_order(conn, ref, "99", city="沈阳", user_id=TEST_USER)
+    update_order_callback(conn, ref, "oid-s", "paid", fee=12800, vendor_id=1)
+    row = get_order_by_ref(conn, ref)
+    assert not row.get("serving_at"), f"paid 阶段不应有 serving_at: {row}"
+    update_order_callback(conn, ref, "oid-s", "serving", vendor_id=1)
+    row = get_order_by_ref(conn, ref)
+    assert row.get("serving_at"), f"serving_at 未写入: {row}"
+    conn.execute("DELETE FROM gr_orders WHERE order_ref = ?", (ref,))
+    conn.commit()
+    print("[PASS] check_serving_at_and_eta")
+
+
 def main():
     check_user_id_column()
     check_create_order_with_user()
     check_list_user_orders_filters_pending()
     check_gr_orders_api()
+    check_serving_at_and_eta()
     print("ALL PASS")
 
 

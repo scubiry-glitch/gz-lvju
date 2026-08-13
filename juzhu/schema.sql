@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   eta             TEXT,                       -- 预计到达时间
   cancel_reason   TEXT,                       -- 取消原因
   paid_at         TEXT,                       -- 支付时间
+  serving_at      TEXT,                       -- 服务开始时间
   completed_at    TEXT,                       -- 完成时间
   created_at      TEXT DEFAULT (datetime('now','localtime')),
   updated_at      TEXT
@@ -196,3 +197,7 @@ ALTER TABLE gr_orders RENAME COLUMN lailai_oid TO vendor_oid;
 -- 迁移：老库 gr_orders 增加 user_id 列（我的订单用户维度）
 -- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
 ALTER TABLE gr_orders ADD COLUMN user_id TEXT;
+
+-- 迁移：老库 gr_orders 增加 serving_at 列（服务中时间戳）
+-- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders ADD COLUMN serving_at TEXT;
