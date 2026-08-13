@@ -130,7 +130,7 @@ order_ref=GR202608071429360148
 status=assigned
 timestamp=1785998316159
 vendor_id=41
-worker.eta=2026-08-07T14:00:00+08:00
+worker.eta=2026-08-07 14:00:00
 worker.name=李师傅
 worker.phone=139****5678
 ```
@@ -138,7 +138,7 @@ worker.phone=139****5678
 拼接待签名字符串：
 
 ```
-vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07T14:00:00+08:00&worker.name=李师傅&worker.phone=139****5678
+vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07 14:00:00&worker.name=李师傅&worker.phone=139****5678
 ```
 
 ---
@@ -161,7 +161,7 @@ vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 | `worker` | object | 条件 | `assigned` 时必填，服务者信息 |
 | `worker.name` | string | 条件 | 服务者姓名 |
 | `worker.phone` | string | 条件 | 服务者电话 |
-| `worker.eta` | string | 条件 | 预计到达时间（ISO 8601） |
+| `worker.eta` | string | 条件 | 预计到达时间（格式：2026-08-07 14:00:00） |
 | `cancel_reason` | string | 条件 | `cancelled` 时必填，取消原因 |
 | `timestamp` | integer | ✅ | 当前时间戳（毫秒），用于防重放 |
 | `sign` | string | ✅ | HMAC-SHA256 签名 |
