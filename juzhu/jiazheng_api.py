@@ -114,6 +114,7 @@ def _handle_vendor(handler, path, body):
         return True
 
     routes = {
+        "/api/juzhu/jiazheng/vendor/cities/list":      _vendor_cities_list,
         "/api/juzhu/jiazheng/vendor/categories/list":    _vendor_categories_list,
         "/api/juzhu/jiazheng/vendor/skus/list":          _vendor_skus_list,
         "/api/juzhu/jiazheng/vendor/products/list":      _vendor_products_list,
@@ -225,6 +226,28 @@ def _vendor_categories_list(handler, body, vendor_id):
     return True
 
 
+def _vendor_cities_list(handler, body, vendor_id):
+    """城市列表：仅返回本商家 city_ids 关联的城市（id + name + slug，按 city_ids 顺序）。"""
+    from jiazheng_db import vendor_city_ids
+
+    conn = _connect_db()
+    try:
+        ids = vendor_city_ids(conn, vendor_id)
+        cities = []
+        if ids:
+            marks = ",".join("?" for _ in ids)
+            rows = conn.execute(
+                f"SELECT id, name, slug FROM cities WHERE id IN ({marks})",
+                tuple(ids),
+            ).fetchall()
+            order = {cid: i for i, cid in enumerate(ids)}
+            cities = sorted([dict(r) for r in rows], key=lambda c: order.get(c["id"], 99))
+        _respond_json(handler, {"code": 0, "message": "success", "list": cities})
+    finally:
+        conn.close()
+    return True
+
+
 def _vendor_skus_list(handler, body, vendor_id):
     """SPU 列表（不分页）。返回 enabled=1 的平台标准品。"""
     conn = _connect_db()
@@ -242,12 +265,14 @@ def _vendor_skus_list(handler, body, vendor_id):
 
 def _vendor_products_list(handler, body, vendor_id):
     """产品列表（vendor_id 隔离）。
-    筛选: category（精确）/ status（精确）/ name（title 模糊）。
+    筛选: category（精确）/ status（精确）/ name（title 模糊）/ city_id（精确）。
+    每项附带城市名 city_name。
     """
     conn = _connect_db()
     try:
-        sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type
+        sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type, c.name AS city_name
                  FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+                 LEFT JOIN cities c ON c.id=p.city_id
                  WHERE p.vendor_id=?"""
         params = [vendor_id]
 
@@ -260,6 +285,11 @@ def _vendor_products_list(handler, body, vendor_id):
         if status:
             sql += " AND p.status=?"
             params.append(status)
+
+        city_id = body.get("city_id")
+        if city_id not in (None, ""):
+            sql += " AND p.city_id=?"
+            params.append(int(city_id))
 
         name = (body.get("name") or "").strip()
         if name:
@@ -300,7 +330,9 @@ def _vendor_products_detail(handler, body, vendor_id):
     conn = _connect_db()
     try:
         row = conn.execute(
-            "SELECT * FROM jz_products WHERE id=? AND vendor_id=?",
+            """SELECT p.*, c.name AS city_name FROM jz_products p
+               LEFT JOIN cities c ON c.id=p.city_id
+               WHERE p.id=? AND p.vendor_id=?""",
             (int(pid), vendor_id),
         ).fetchone()
         if not row:
@@ -325,11 +357,15 @@ def _vendor_products_detail(handler, body, vendor_id):
 
 
 def _vendor_products_create(handler, body, vendor_id):
-    """创建产品。vendor_id 由鉴权提供，不可在 body 中覆写。"""
-    from jiazheng_db import create_product
+    """创建产品。vendor_id 由鉴权提供，不可在 body 中覆写；city_id 必填且须属于本商家。"""
+    from jiazheng_db import create_product, validate_product_city
 
     conn = _connect_db()
     try:
+        ok, err = validate_product_city(conn, vendor_id, body.get("city_id"))
+        if not ok:
+            _respond_json(handler, {"code": 400, "message": err}, 400)
+            return True
         data = dict(body)
         data["vendor_id"] = vendor_id  # 强制使用鉴权所得的 vendor_id
         pid = create_product(conn, data)
@@ -349,7 +385,7 @@ def _vendor_products_update(handler, body, vendor_id):
         _respond_json(handler, {"code": 400, "message": "缺少 id 参数"}, 400)
         return True
 
-    from jiazheng_db import update_product
+    from jiazheng_db import update_product, validate_product_city
 
     conn = _connect_db()
     try:
@@ -360,6 +396,12 @@ def _vendor_products_update(handler, body, vendor_id):
         if not row:
             _respond_json(handler, {"code": 404, "message": "产品不存在或不属于该商家"}, 404)
             return True
+
+        if body.get("city_id") is not None:
+            ok, err = validate_product_city(conn, vendor_id, body.get("city_id"))
+            if not ok:
+                _respond_json(handler, {"code": 400, "message": err}, 400)
+                return True
 
         data = dict(body)
         data.pop("vendor_id", None)

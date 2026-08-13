@@ -115,16 +115,40 @@ def post(path: str, body: dict, step_no: int, total: int, label: str) -> dict:
         return {"_network_error": str(e)}
 
 
+def post_as(vendor_id: int, path: str, body: dict, step_no: int, total: int, label: str) -> dict:
+    """以指定商家密钥签名发送请求（用于多商家用例）。"""
+    global auth
+    saved = auth
+    auth = HmacAuth(_load_secret(vendor_id))
+    try:
+        return post(path, body, step_no, total, label)
+    finally:
+        auth = saved
+
+
+CHECKS = []  # (名称, 是否通过) 断言汇总
+
+
+def check(name: str, cond: bool, extra: str = ""):
+    CHECKS.append((name, bool(cond)))
+    print(f"  {'PASS' if cond else 'FAIL'}  {name} {extra}")
+
+
 def main() -> int:
-    # 步骤计数：2 个查询 + 5 个列表/详情 + 5 个写操作 + 5 个回调状态 = 17
+    # 步骤计数：cities×2 + 查询×2 + 列表×2 + 写×10 + 回调×5 = 21
     steps = [
+        ("/api/juzhu/jiazheng/vendor/cities/list", {"vendor_id": VENDOR_ID}, "城市列表（商家 41）"),
+        ("/api/juzhu/jiazheng/vendor/cities/list", {"vendor_id": 42}, "城市列表（商家 42·多城）"),
         ("/api/juzhu/jiazheng/vendor/categories/list", {"vendor_id": VENDOR_ID}, "类目列表"),
         ("/api/juzhu/jiazheng/vendor/skus/list", {"vendor_id": VENDOR_ID}, "SPU 列表"),
         ("/api/juzhu/jiazheng/vendor/products/list", {"vendor_id": VENDOR_ID}, "产品列表（无筛选）"),
         ("/api/juzhu/jiazheng/vendor/products/list",
          {"vendor_id": VENDOR_ID, "status": "on"}, "产品列表（status=on 筛选）"),
-        ("/api/juzhu/jiazheng/vendor/products/create", None, "创建产品（占位，稍后填充）"),
+        ("/api/juzhu/jiazheng/vendor/products/create", None, "创建产品·缺 city_id（预期 400）"),
+        ("/api/juzhu/jiazheng/vendor/products/create", None, "创建产品·city_id=4 非本商家（预期 400）"),
+        ("/api/juzhu/jiazheng/vendor/products/create", None, "创建产品（city_id=1 合法）"),
         ("/api/juzhu/jiazheng/vendor/products/detail", None, "产品详情（占位，稍后填充）"),
+        ("/api/juzhu/jiazheng/vendor/products/update", None, "编辑产品·city_id=4 非本商家（预期 400）"),
         ("/api/juzhu/jiazheng/vendor/products/update", None, "编辑产品（占位，稍后填充）"),
         ("/api/juzhu/jiazheng/vendor/products/status", None, "状态变更 sold_out（占位）"),
         ("/api/juzhu/jiazheng/vendor/products/status", None, "状态变更 on（占位）"),
@@ -141,14 +165,27 @@ def main() -> int:
     results: dict = {}
     step = 0
 
-    # ── 1. 类目列表 ──
+    # ── 1/2. 城市列表（商家 41 / 多城商家 42） ──
+    path, body, label = steps[step]
+    step += 1
+    resp = post(path, body, step, total, label)
+    c41 = resp.get("list") or []
+    check("cities/list(41) 与商家 city_ids 一致(1,2,3)", [c.get("id") for c in c41] == [1, 2, 3], f"got {c41}")
+
+    path, body, label = steps[step]
+    step += 1
+    resp = post_as(42, path, body, step, total, label)
+    c42 = resp.get("list") or []
+    check("cities/list(42) 返回沈阳+贵阳且有序", [c.get("id") for c in c42] == [1, 2], f"got {c42}")
+
+    # ── 3. 类目列表 ──
     path, body, label = steps[step]
     step += 1
     resp = post(path, body, step, total, label)
     category = (resp.get("list") or [{}])[0].get("name") or "日常保洁"
     results["category"] = category
 
-    # ── 2. SPU 列表 ──
+    # ── 4. SPU 列表 ──
     path, body, label = steps[step]
     step += 1
     resp = post(path, body, step, total, label)
@@ -156,17 +193,39 @@ def main() -> int:
     channel_sku_id = skus[0]["id"] if skus else None
     results["channel_sku_id"] = channel_sku_id
 
-    # ── 3/4. 产品列表（无筛选 / status 筛选） ──
+    # ── 5/6. 产品列表（无筛选 / status 筛选） ──
     for _ in range(2):
         path, body, label = steps[step]
         step += 1
-        post(path, body, step, total, label)
+        resp = post(path, body, step, total, label)
+        if _ == 0:
+            items = resp.get("list") or []
+            check("products/list 每项含 city_name",
+                  items and all("city_name" in it for it in items), f"got {len(items)} 项")
 
-    # ── 5. 创建产品 ──
+    # ── 7/8. 创建产品负例（缺 city_id / 非本商家城市） ──
+    path, _, label = steps[step]
+    step += 1
+    resp = post(path, {
+        "vendor_id": VENDOR_ID, "title": "负例·缺 city_id",
+        "category": category, "price": 100, "path": "pages/index", "query": "id=x",
+    }, step, total, label)
+    check("create 缺 city_id → 400", resp.get("code") == 400, f"got code={resp.get('code')}")
+
+    path, _, label = steps[step]
+    step += 1
+    resp = post(path, {
+        "vendor_id": VENDOR_ID, "title": "负例·非本商家城市", "city_id": 4,
+        "category": category, "price": 100, "path": "pages/index", "query": "id=x",
+    }, step, total, label)
+    check("create city_id=4（非本商家） → 400", resp.get("code") == 400, f"got code={resp.get('code')}")
+
+    # ── 9. 创建产品（合法） ──
     path, _, label = steps[step]
     step += 1
     create_body = {
         "vendor_id": VENDOR_ID,
+        "city_id": 1,
         "title": "接口测试·日常保洁2小时",
         "subtitle": "全接口覆盖测试自动创建",
         "category": category,
@@ -187,24 +246,34 @@ def main() -> int:
     if channel_sku_id:
         create_body["channel_sku_id"] = channel_sku_id
     resp = post(path, create_body, step, total, label)
+    check("create 合法（city_id=1） → code=0", resp.get("code") == 0, f"got {resp}")
     pid = resp.get("id") or 0
     if not pid:
         print("创建产品未返回 id，后续产品操作将使用 id=0 演示（预期 404）。")
     results["pid"] = pid
 
-    # ── 6. 产品详情 ──
+    # ── 10. 产品详情 ──
     path, _, label = steps[step]
     step += 1
-    post(path, {"vendor_id": VENDOR_ID, "id": pid}, step, total, label)
+    resp = post(path, {"vendor_id": VENDOR_ID, "id": pid}, step, total, label)
+    prod = resp.get("product") or {}
+    check("products/detail 含 city_name=沈阳", prod.get("city_name") == "沈阳", f"got {prod.get('city_name')}")
 
-    # ── 7. 编辑产品 ──
+    # ── 11. 编辑产品负例（city_id=4 非本商家） ──
     path, _, label = steps[step]
     step += 1
-    post(
+    resp = post(path, {"vendor_id": VENDOR_ID, "id": pid, "city_id": 4}, step, total, label)
+    check("update city_id=4（非本商家） → 400", resp.get("code") == 400, f"got code={resp.get('code')}")
+
+    # ── 12. 编辑产品（合法） ──
+    path, _, label = steps[step]
+    step += 1
+    resp = post(
         path,
         {
             "vendor_id": VENDOR_ID,
             "id": pid,
+            "city_id": 1,
             "title": "接口测试·日常保洁2小时（特惠）",
             "price": 7900,
             "status": "on",
@@ -213,8 +282,9 @@ def main() -> int:
         total,
         label,
     )
+    check("update 合法（city_id=1） → code=0", resp.get("code") == 0, f"got {resp}")
 
-    # ── 8/9. 状态变更 sold_out → on ──
+    # ── 13/14. 状态变更 sold_out → on ──
     for status in ("sold_out", "on"):
         path, _, label = steps[step]
         step += 1
@@ -266,7 +336,10 @@ def main() -> int:
 
     print("=" * 78)
     print(f"全覆盖测试完成：{total} 个请求（类目 {results['category']}，SPU {results['channel_sku_id']}）")
-    return 0
+    passed = sum(1 for _, ok in CHECKS if ok)
+    failed = [name for name, ok in CHECKS if not ok]
+    print(f"断言汇总：{passed}/{len(CHECKS)} 通过" + (f"；失败：{failed}" if failed else ""))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
