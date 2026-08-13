@@ -19,6 +19,8 @@ const FORBIDDEN_API_KEY = DEV_EXAMPLE_API_KEY;
 // 禁止在源码中写死账号密码；必须由运行时环境 / .env（仅进程内，不对外 HTTP）注入。
 let mysql2 = null;
 try { mysql2 = require('mysql2/promise'); } catch (_) {}
+let jzSeedAll = null;
+try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
 
 function getDbConfig() {
   const host = (process.env.MYSQL_HOST || '').trim();
@@ -402,6 +404,51 @@ async function ensureSchema() {
         note TEXT,
         KEY idx_product_date (product_id, slot_date, status)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_subcategories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        parent_type VARCHAR(50) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        icon VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL DEFAULT 'on',
+        KEY idx_parent (parent_type, sort_order)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_sku_workers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        worker_id INT NOT NULL,
+        UNIQUE KEY uk_prod_worker (product_id, worker_id)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'coupon',
+        category_id VARCHAR(50),
+        sku_ids TEXT,
+        discount_type VARCHAR(50) DEFAULT 'percent',
+        discount_value DECIMAL(10,2),
+        threshold DECIMAL(10,2) DEFAULT 0,
+        start_at VARCHAR(30),
+        end_at VARCHAR(30),
+        enabled TINYINT NOT NULL DEFAULT 1,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS gr_orders (
+        id VARCHAR(50) PRIMARY KEY,
+        type VARCHAR(50) NOT NULL DEFAULT 'trade',
+        project_id INT,
+        unit_id INT,
+        user_phone VARCHAR(50) NOT NULL,
+        user_name VARCHAR(100),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        amount INT DEFAULT 0,
+        note TEXT,
+        source VARCHAR(100),
+        created_at VARCHAR(30) NOT NULL,
+        updated_at VARCHAR(30) NOT NULL
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
@@ -438,6 +485,10 @@ async function ensureSchema() {
         'INSERT IGNORE INTO settings(`key`, value) VALUES (?, ?)',
         [k, v]
       );
+    }
+    // 家政全量种子数据（subcategories / skus / vendors / workers / products / sku_workers / sku_slots）
+    if (jzSeedAll) {
+      try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
     }
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
@@ -1970,6 +2021,60 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // GET /api/juzhu/jz/subcategories
+    if (urlPath === '/api/juzhu/jz/subcategories' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = "SELECT * FROM jz_subcategories WHERE status='on'";
+      const params = [];
+      if (qp.get('type')) { sql += ' AND parent_type=?'; params.push(qp.get('type')); }
+      sql += ' ORDER BY sort_order, id';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug/detail
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)\/detail$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows(
+          `SELECT s.*, c.name AS category_name FROM jz_skus s
+           JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1`,
+          [slug]
+        );
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, skus[0]);
+      }
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug/vendors
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)\/vendors$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows('SELECT id FROM jz_skus WHERE slug=? AND enabled=1', [slug]);
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const skuId = skus[0].id;
+        const qp = new URLSearchParams(qs);
+        const cityName = (qp.get('city') || '').trim();
+        let sql = `SELECT v.*, p.id AS product_id, p.price, p.original_price,
+                     p.title, p.subtitle, p.sales_count, p.rating AS product_rating,
+                     p.service_tags, p.advance_booking_hours
+                   FROM jz_vendors v
+                   JOIN jz_products p ON p.vendor_id=v.id
+                   WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const params = [skuId];
+        if (cityName) {
+          sql += ` AND (v.city_ids IS NULL OR v.city_ids='' OR FIND_IN_SET(?, REPLACE(v.city_ids,' ','')))`;
+          params.push(cityName);
+        }
+        sql += ' ORDER BY v.sort_order, v.id LIMIT 20';
+        const vendors = await queryRows(sql, params);
+        return jsonReply(res, { vendors });
+      }
+    }
+
     // 未匹配：返回 404
     return jsonReply(res, { error: '接口不存在', path: urlPath, method: req.method }, 404);
   } catch (e) {
@@ -2113,5 +2218,7 @@ if (require.main === module) {
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
     console.log('auth: /api/juzhu/admin/* requires API Key (auth/login|check exempt); forbidden historical default');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
+    // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
+    ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
   });
 }

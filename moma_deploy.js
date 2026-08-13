@@ -125,7 +125,7 @@ const os = require('os');
       'zip -q ../moma.zip .env scf_bootstrap moma_build.sh app.js package.json 2>/dev/null || true',
       'zip -rq ../moma.zip juzhu/ -x "juzhu/__pycache__/*" -x "juzhu/*.pyc" -x "juzhu/*.db" -x "juzhu/.env" -x "juzhu/.env.*" -x "juzhu/*.sqlite*"',
       'for f in *.html; do zip -q ../moma.zip "$f" 2>/dev/null; done',
-      'for f in *.css *.js; do [ -f "$f" ] && zip -q ../moma.zip "$f" 2>/dev/null || true; done',
+      'for f in *.css *.js *.cjs; do [ -f "$f" ] && zip -q ../moma.zip "$f" 2>/dev/null || true; done',
       'zip -rq ../moma.zip screens/ assets/ 2>/dev/null || true',
       // docs/ 含设计稿可打包，但 api_doc / 含密钥 md 必须排除
       'zip -rq ../moma.zip docs/ -x "docs/**/api_doc.md" -x "docs/**/*secret*" 2>/dev/null || true',
@@ -148,9 +148,36 @@ const os = require('os');
     const body = { taskId, serviceId, alias: serviceName, template: 'html-template', envType: deployEnv, runtime: runtime || 'python' };
     fs.writeFileSync(path.join(logDir, 'deploy_step_1'),
       toCurl('POST', `${serviceUrl}/api/btg/agent/serverless/app/create`, jsonHeaders, body));
-    const res = await httpRequest('POST', `${serviceUrl}/api/btg/agent/serverless/app/create`,
+    const createJson = await httpFetch('POST', `${serviceUrl}/api/btg/agent/serverless/app/create`,
       jsonHeaders, body);
-    funcName = res.data.name;
+    if (createJson.errno === 0) {
+      funcName = createJson.data.name;
+      fs.writeFileSync(path.join(logDir, 'func_name_' + taskId + '_' + deployEnv), funcName);
+    } else if ((createJson.error || '').includes('already exists')) {
+      // codelink DB already has an app for this project/envType - read saved funcName from previous logs
+      const dedicatedFile = path.join(logDir, 'func_name_' + taskId + '_' + deployEnv);
+      if (fs.existsSync(dedicatedFile)) {
+        funcName = fs.readFileSync(dedicatedFile, 'utf8').trim();
+        if (funcName) console.log('  Recovered funcName from dedicated file: ' + funcName);
+      }
+      if (!funcName) {
+        for (const stepFile of ['deploy_step_2', 'deploy_step_2b', 'deploy_step_1']) {
+          const savedStep = path.join(logDir, stepFile);
+          if (fs.existsSync(savedStep)) {
+            const savedCurl = fs.readFileSync(savedStep, 'utf8');
+            const fnMatch = savedCurl.match(/"funcName":"([^"]+)"/);
+            if (fnMatch) { funcName = fnMatch[1]; console.log('  Recovered funcName from ' + stepFile + ': ' + funcName); break; }
+          }
+        }
+      }
+      if (!funcName) {
+        console.error('API error: ' + (createJson.error || 'already exists') + '\nPlease pass --func-name manually.');
+        process.exit(1);
+      }
+    } else {
+      console.error('API error: ' + (createJson.msg || createJson.error));
+      process.exit(1);
+    }
     await sleep(3000);
 
     // Step 5 — Wait for application to become active
