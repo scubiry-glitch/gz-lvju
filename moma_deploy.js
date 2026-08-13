@@ -125,6 +125,7 @@ const os = require('os');
       'zip -q ../moma.zip .env scf_bootstrap moma_build.sh app.js package.json 2>/dev/null || true',
       'zip -rq ../moma.zip juzhu/ -x "juzhu/__pycache__/*" -x "juzhu/*.pyc" -x "juzhu/*.db" -x "juzhu/.env" -x "juzhu/.env.*" -x "juzhu/*.sqlite*"',
       'for f in *.html; do zip -q ../moma.zip "$f" 2>/dev/null; done',
+      'for f in *.css *.js; do [ -f "$f" ] && zip -q ../moma.zip "$f" 2>/dev/null || true; done',
       'zip -rq ../moma.zip screens/ assets/ 2>/dev/null || true',
       // docs/ 含设计稿可打包，但 api_doc / 含密钥 md 必须排除
       'zip -rq ../moma.zip docs/ -x "docs/**/api_doc.md" -x "docs/**/*secret*" 2>/dev/null || true',
