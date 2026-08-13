@@ -339,9 +339,71 @@ def ensure_schema(conn):
 def ensure_jz_vendor_schema(conn):
     """P/B 管理台：商家/产品/服务者/子类目（表结构由 mysql_schema.sql 统一建）。"""
     product_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_products)").fetchall()}
-    if product_cols and "channel_sku_id" not in product_cols:
-        conn.execute("ALTER TABLE jz_products ADD COLUMN channel_sku_id INT")
 
+    if product_cols:
+        if "channel_sku_id" not in product_cols:
+            conn.execute("ALTER TABLE jz_products ADD COLUMN channel_sku_id INTEGER")
+        if "path" not in product_cols:
+            conn.execute("ALTER TABLE jz_products ADD COLUMN path TEXT")
+        if "query" not in product_cols:
+            conn.execute("ALTER TABLE jz_products ADD COLUMN query TEXT")
+        # 刷新列集合，供后续逻辑使用
+        product_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_products)").fetchall()}
+    # 旧库 jz_vendors 可能缺 city_ids / platform_certs（CREATE IF NOT EXISTS 不会补列）
+    vendor_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_vendors)").fetchall()}
+    if vendor_cols:
+        if "city_ids" not in vendor_cols:
+            conn.execute("ALTER TABLE jz_vendors ADD COLUMN city_ids TEXT")
+        if "platform_certs" not in vendor_cols:
+            conn.execute("ALTER TABLE jz_vendors ADD COLUMN platform_certs TEXT")
+        # 演示数据：未标注服务城市的商家视为全省可约，避免 C 端带 ?city= 后列表为空
+        city_ids = [
+            str(r[0])
+            for r in conn.execute("SELECT id FROM cities ORDER BY id").fetchall()
+        ]
+        if city_ids:
+            joined = ",".join(city_ids)
+            conn.execute(
+                "UPDATE jz_vendors SET city_ids=? WHERE city_ids IS NULL OR TRIM(city_ids)=''",
+                (joined,),
+            )
+    # 自愈：旧 seed 未写入 channel_sku_id 时，C 端 /jiazheng/skus 会因 EXISTS 过滤得到空列表
+    null_channel = conn.execute(
+        "SELECT COUNT(*) FROM jz_products WHERE status='on' AND channel_sku_id IS NULL"
+    ).fetchone()[0]
+    if null_channel:
+        # product_id → C 端 jz_skus.id（与 seed_jiazheng.CHANNEL_SKU 对齐）
+        channel_sku = {
+            101: 1, 201: 1, 301: 1, 401: 1, 501: 1, 103: 1,
+            102: 2, 202: 2,
+            1105: 3,
+            1102: 4,
+            1103: 5,
+            2101: 6,
+            2104: 7,
+            3103: 8,
+            3101: 9,
+            111: 10, 502: 10,
+            112: 11, 302: 11,
+            203: 12, 402: 12,
+            1107: 13, 1201: 13,
+            1101: 14, 1108: 14, 1301: 14,
+            1104: 15, 1202: 15,
+            1106: 16, 1302: 16, 1109: 16,
+            2102: 17, 2105: 17, 2201: 17,
+            2103: 18, 2202: 18,
+            2301: 19, 2106: 19,
+            2302: 20,
+            3104: 21, 3201: 21,
+            3202: 22,
+            3102: 23, 3105: 23, 3301: 23,
+            3302: 24,
+        }
+        for pid, sku_id in channel_sku.items():
+            conn.execute(
+                "UPDATE jz_products SET channel_sku_id=? WHERE id=? AND channel_sku_id IS NULL",
+                (sku_id, pid),
+            )
 
 def ensure_settings(conn):
     """全局设置默认值（表结构由 mysql_schema.sql 统一建）。"""

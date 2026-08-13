@@ -1,0 +1,57 @@
+#!/bin/bash
+# SCF / 本地双启动入口：注入环境变量后启 Python API（可选）+ Node 静态/代理（前台）
+# 运行时 .env 仅供本脚本 source，禁止通过 HTTP 访问（见 app.js isPublicStatic）
+
+_EXTERNAL_PORT=${PORT}
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$DIR/.env"
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  echo "WARNING: $ENV_FILE not found; relying on platform-injected env vars"
+fi
+
+# 平台注入的 PORT 优先于 .env
+if [ -n "$_EXTERNAL_PORT" ]; then
+  export PORT=$_EXTERNAL_PORT
+fi
+export PORT=${PORT:-9000}
+
+# 生产硬门禁：缺密钥或仍用历史默认值则拒绝启动
+ENV_NAME="$(echo "${JUZHU_ENV:-}" | tr '[:upper:]' '[:lower:]')"
+if [ "$ENV_NAME" = "prod" ] || [ "$ENV_NAME" = "production" ]; then
+  if [ -z "${JUZHU_API_KEY:-}" ] || [ "${JUZHU_API_KEY}" = "dev-juzhu-key" ]; then
+    echo "FATAL: production requires JUZHU_API_KEY (must not be empty or dev-juzhu-key)" >&2
+    exit 1
+  fi
+  if [ -z "${JUZHU_ADMIN_PASSWORD:-}" ] || [ "${JUZHU_ADMIN_PASSWORD}" = "dongbo2026" ]; then
+    echo "FATAL: production requires JUZHU_ADMIN_PASSWORD (must not use dev default)" >&2
+    exit 1
+  fi
+  if [ -z "${MYSQL_HOST:-}" ] || [ -z "${MYSQL_USER:-}" ] || [ -z "${MYSQL_PASSWORD:-}" ] || [ -z "${MYSQL_DB:-}" ]; then
+    echo "FATAL: production requires MYSQL_HOST/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD" >&2
+    exit 1
+  fi
+fi
+
+# 检测 Python（node1815 runtime 可能不含 python3）
+PYTHON=""
+for cmd in python3 python3.10 python3.9 python3.8 python; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    PYTHON="$cmd"
+    break
+  fi
+done
+
+if [ -n "$PYTHON" ]; then
+  PYTHON_PORT=8765 PORT=8765 "$PYTHON" "$DIR/juzhu/server.py" &
+  echo "Python API server started on port 8765 (pid $!)"
+else
+  echo "WARNING: python3 not found, /api/juzhu/* will use Node MySQL fallback only"
+fi
+
+exec node "$DIR/app.js"

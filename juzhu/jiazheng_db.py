@@ -189,6 +189,10 @@ def _review_reply(vendor_name, score):
 def _review_rows(conn, product_ids, vendor_name, limit=6):
     if not product_ids:
         return []
+    # 旧库可能是 P/B 订单表（product_id/rating），无 C 端 rating_json/sku_id —— 评价可选，缺列则跳过
+    order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
+    if "rating_json" not in order_cols or "sku_id" not in order_cols:
+        return []
     placeholders = ",".join(["?"] * len(product_ids))
     rows = conn.execute(
         f"""SELECT o.*, s.name AS sku_name FROM jz_orders o
@@ -269,9 +273,10 @@ def list_channel_sku_products(conn, sku_id, vendor_id=None, city_id=None):
     city_filter = ""
     city_params = []
     if city_id is not None:
-        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城
-        city_filter = (" AND p.city_id=? AND v.city_ids IS NOT NULL "
-                       "AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')")
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
+        city_filter = (" AND p.city_id=? "
+                       "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
+                       "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
         city_params = [int(city_id), str(city_id)]
     rows = conn.execute(
         """SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
@@ -975,9 +980,10 @@ def list_channel_sku_vendors(conn, sku_id, city_id=None):
     city_filter = ""
     city_params = []
     if city_id is not None:
-        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城
-        city_filter = (" AND p.city_id=? AND v.city_ids IS NOT NULL "
-                       "AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')")
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
+        city_filter = (" AND p.city_id=? "
+                       "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
+                       "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
         city_params = [int(city_id), str(city_id)]
     rows = conn.execute(
         """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,

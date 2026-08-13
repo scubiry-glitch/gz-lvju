@@ -11,7 +11,8 @@
   'use strict';
 
   var API_KEY_STORAGE = 'JUZHU_API_KEY';
-  var DEFAULT_KEY = 'dev-juzhu-key';
+  // 禁止内嵌历史默认密钥；须由运维/本地在 localStorage 或部署配置写入
+  var DEFAULT_KEY = '';
   var CHANGE_EVT = 'bzf-jz-orders-change';
   var POLL_MS = 4000;
 

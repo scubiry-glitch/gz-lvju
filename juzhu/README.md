@@ -21,7 +21,9 @@ python3 juzhu/server.py
 
 ## 静态安全（必读）
 
-`server.py` 以仓库根为静态根，但会拦截敏感路径：`.env*`、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`hmac_secret.key` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`；禁止目录列表。
+`server.py` 以仓库根为静态根，但会拦截敏感路径：`.env*`、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`hmac_secret.key`、`package.json`、`README.md`、根目录 `app.js` / `scf_bootstrap` / `moma_*` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`；禁止目录列表。
+
+线上入口是 Node `app.js`（SCF）+ 可选 Python API：`app.js` 的 `isPublicStatic` 与上述口径一致。部署包内的运行时 `.env` **仅供进程读取**，不得通过 HTTP 访问。
 
 生产务必：
 

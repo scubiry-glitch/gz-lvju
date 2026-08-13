@@ -40,7 +40,7 @@
 - 全屏登录遮罩；校验通过后再跑现有 `loadCities` 等初始化  
 - `localStorage` 键：`JUZHU_ADMIN_TOKEN`  
 - 顶栏「退出」：清 token 并重新显示登录框  
-- 业务请求继续带 `X-API-Key`（`JUZHU_API_KEY` / 默认 `dev-juzhu-key`）
+- 业务请求继续带 `X-API-Key`（与 `.env` 中 `JUZHU_API_KEY` 一致；本地示例 `dev-juzhu-key`）
 
 ## 与 API Key 的关系
 

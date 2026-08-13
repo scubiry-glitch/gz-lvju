@@ -133,7 +133,10 @@
       return;
     }
     var JZ = window.BZF_JZ;
-    if (!JZ.apiKey()) JZ.setApiKey('dev-juzhu-key');
+    if (!JZ.apiKey()) {
+      alert('未配置 API Key：请在控制台执行 localStorage.setItem("JUZHU_API_KEY", "<密钥>") 后重试');
+      return;
+    }
     var btn = document.getElementById('submitBtn');
     btn.textContent = '提交中…';
     btn.style.opacity = 0.7;

@@ -108,7 +108,7 @@ var AMENITY_CATALOG = [
 
 /* ── API helpers ── */
 function getApiKey() {
-  try { return localStorage.getItem('JUZHU_API_KEY') || 'dev-juzhu-key'; } catch(e) { return 'dev-juzhu-key'; }
+  try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e) { return ''; }
 }
 
 function api(path, opts) {
