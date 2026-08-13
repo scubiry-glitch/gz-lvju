@@ -13,3 +13,5 @@ publish_test.sh
 juzhu/config.ini
 scripts/tp_call_log.json
 *.tp.local.json
+vendor/
+node_modules/
