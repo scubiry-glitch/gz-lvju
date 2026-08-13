@@ -53,15 +53,22 @@ def connect():
 
 # 切分 token：`?` 占位符 | 单引号字面量（含 '' 转义） | 双引号字面量（含 "" 转义）
 _TOKEN_RE = re.compile(r"(\?|'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\")")
-# 保留字列名（仅小写独立单词；大写 KEY/DESC 属语法关键字，不匹配）
-_RESERVED_COL_RE = re.compile(r"\b(key|desc)\b")
+# 保留字列名（仅小写独立单词；大写 KEY/DESC 属语法关键字，不匹配；
+# 前后已是反引号/单词字符的不重复包裹，避免 `` `key` `` 被二次处理）
+_RESERVED_COL_RE = re.compile(r"(?<![`\w])(key|desc)(?![`\w])")
 
 
 def translate_placeholders(sql, params=()):
-    """`?` 占位符 → pymysql 的 `%s`；引号字面量内的 `?` 保持原样。"""
+    """`?` 占位符 → pymysql 的 `%s`；引号字面量内的 `?` 保持原样、`%` 转义为 `%%`
+    （pymysql mogrify 会把字面量 % 当格式化符，需转义；执行时 %% 还原为 %）。"""
     out = []
     for part in _TOKEN_RE.split(sql):
-        out.append("%s" if part == "?" else part)
+        if part == "?":
+            out.append("%s")
+        elif part and part[0] in ("'", '"'):
+            out.append(part.replace("%", "%%"))
+        else:
+            out.append(part)
     return "".join(out), params
 
 

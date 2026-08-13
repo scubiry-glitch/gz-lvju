@@ -115,6 +115,11 @@ def main():
     cfg = dbconn.load_db_config()
     print("目标: mysql://%s@%s:%s/%s" % (cfg["user"], cfg["host"], cfg["port"], cfg["database"]))
 
+    # 建表（幂等 CREATE TABLE IF NOT EXISTS + 内联索引）
+    schema_path = Path(__file__).resolve().parent / "mysql_schema.sql"
+    mysql.executescript(schema_path.read_text(encoding="utf-8"))
+    mysql.commit()
+
     counts = migrate(mysql, data)
 
     # 行数校验

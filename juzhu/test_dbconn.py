@@ -38,6 +38,9 @@ def t_translate():
     # SQLite 双引号内转义引号（''）不受影响
     sql, _ = translate_placeholders("SELECT * FROM t WHERE a='it''s?' AND b=?")
     assert sql == "SELECT * FROM t WHERE a='it''s?' AND b=%s"
+    # 字面量内 % → %%（pymysql mogrify 还原）
+    sql, _ = translate_placeholders("SELECT DATE_FORMAT(NOW(), '%Y-%m') FROM t WHERE a=? AND b LIKE '%,%'")
+    assert sql == "SELECT DATE_FORMAT(NOW(), '%%Y-%%m') FROM t WHERE a=%s AND b LIKE '%%,%%'"
 
 
 def t_quote():
@@ -63,6 +66,9 @@ def t_quote():
     assert quote_reserved_words("WHERE a='desc'") == "WHERE a='desc'"
     # 单词边界：复合标识符不受影响
     assert quote_reserved_words("UPDATE t SET desc_label=1") == "UPDATE t SET desc_label=1"
+    # 已加反引号的不重复包裹（mysql_schema.sql 中的 `key`/`desc`）
+    assert quote_reserved_words("`key`   VARCHAR(64) PRIMARY KEY") == "`key`   VARCHAR(64) PRIMARY KEY"
+    assert quote_reserved_words("INSERT INTO settings(`key`, `value`)") == "INSERT INTO settings(`key`, `value`)"
 
 
 def t_row():
