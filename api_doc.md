@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-第三方商家通过本接口管理产品（SKU）、接收订单状态回调，以及提供小程序 URL Link 生成接口。
+第三方商家通过本接口管理产品（SKU）、接收订单状态回调，并提供小程序 URL Link 生成接口和订单详情查询接口。
 
 - **测试环境**：`http://49.232.103.71:8765`
 - **生产环境**：-
@@ -25,6 +25,7 @@
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/status` | 状态变更（上架/下架/售罄）|
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/delete` | 删除产品（软删） |
 | 链接 | `POST` | （商家提供） | 小程序 URL Link 生成（见第 5 章） |
+| 查询 | `GET` | （商家提供） | 订单详情查询（见第 5 章） |
 
 ---
 
@@ -130,7 +131,7 @@ order_ref=GR202608071429360148
 status=assigned
 timestamp=1785998316159
 vendor_id=41
-worker.eta=2026-08-07T14:00:00+08:00
+worker.eta=2026-08-07 14:00:00
 worker.name=李师傅
 worker.phone=139****5678
 ```
@@ -138,7 +139,7 @@ worker.phone=139****5678
 拼接待签名字符串：
 
 ```
-vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07T14:00:00+08:00&worker.name=李师傅&worker.phone=139****5678
+vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07 14:00:00&worker.name=李师傅&worker.phone=139****5678
 ```
 
 ---
@@ -161,7 +162,7 @@ vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 | `worker` | object | 条件 | `assigned` 时必填，服务者信息 |
 | `worker.name` | string | 条件 | 服务者姓名 |
 | `worker.phone` | string | 条件 | 服务者电话 |
-| `worker.eta` | string | 条件 | 预计到达时间（ISO 8601） |
+| `worker.eta` | string | 条件 | 预计到达时间（格式：2026-08-07 14:00:00） |
 | `cancel_reason` | string | 条件 | `cancelled` 时必填，取消原因 |
 | `timestamp` | integer | ✅ | 当前时间戳（毫秒），用于防重放 |
 | `sign` | string | ✅ | HMAC-SHA256 签名 |
@@ -704,7 +705,11 @@ POST /api/juzhu/jiazheng/vendor/products/delete
 
 ---
 
-## 5. 小程序 URL Link 接口协议
+## 5. 商家提供的接口协议
+
+商家除接入 GR 侧开放接口外，还需向 GR 侧提供以下两个接口，供 GR 侧在对应业务时机调用。
+
+### 5.1 小程序 URL Link 生成接口
 
 商家需提供一个 URL Link 生成接口，GR 侧在用户下单时会调用该接口获取小程序链接。
 
@@ -758,6 +763,122 @@ curl -X POST https://test-domain/urllink \
 | `order_ref` 为空 | `-1` | `GR侧订单参考号不能为空` |
 | `activityId` 缺失或非法 | `-1` | `数字格式错误` |
 | 链接生成失败 | `-1` | `生成小程序链接失败` |
+
+---
+
+### 5.2 订单详情查询接口
+
+商家需提供一个订单详情查询接口。GR 侧在用户进入订单详情页时调用。
+
+### 请求（GR → 商家）
+
+GR 侧以 `GET` 方式调用，参数通过 Query String 传递：
+
+| 字段 | 位置 | 类型 | 必填 | 说明 |
+|------|------|------|------|------|
+| `order_ref` | Query String | string | ✅ | GR 侧订单参考号（如 `GR202608071429360148`） |
+
+### 响应（商家 → GR）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `code` | integer | ✅ | `200` 表示成功，`-1` 表示失败 |
+| `msg` | string/null | 否 | 提示信息 |
+| `data` | object/null | 条件 | 成功时为订单详情，失败时为 `null` |
+| `data.order_ref` | string | ✅ | GR 侧订单参考号 |
+| `data.lailai_oid` | string | ✅ | 商家订单号 |
+| `data.status` | string | ✅ | 当前订单状态，可选值见下方状态表 |
+| `data.fee` | integer/null | 条件 | `paid` 状态返回，已支付金额（分） |
+| `data.worker` | object/null | 条件 | `assigned` 状态返回，服务者信息 |
+| `data.worker.name` | string | 条件 | 服务者姓名 |
+| `data.worker.phone` | string | 条件 | 服务者电话 |
+| `data.worker.eta` | string | 条件 | 预计到达时间（北京时间，格式：`2026-08-12 09:00:00`；兼容 ISO 8601 带时区格式，GR 侧统一转为北京时间） |
+| `data.cancel_reason` | string/null | 条件 | `cancelled` 状态返回，取消原因 |
+
+> 不适用于当前状态的条件字段返回 `null`。
+
+### 状态枚举（与回调接口一致）
+
+| status | 说明 | 状态专有字段 |
+|--------|------|-------------|
+| `pending` | 未支付 | - |
+| `paid` | 已支付 | `fee` |
+| `assigned` | 已派单 | `worker`（name、phone、eta） |
+| `serving` | 服务中 | — |
+| `completed` | 已完成 | — |
+| `cancelled` | 已取消 | `cancel_reason` |
+
+### 调用示例
+
+```bash
+curl -G https://test-domain/mall/beike/juzhu/order/detail \
+  --data-urlencode "order_ref=GR202608071429360148"
+```
+
+已支付响应（paid）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "paid",
+    "fee": 12800,
+    "cancel_reason": null,
+    "worker": null
+  }
+}
+```
+
+已派单响应（assigned）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "assigned",
+    "fee": null,
+    "cancel_reason": null,
+    "worker": {
+      "name": "李师傅",
+      "phone": "13900005678",
+      "eta": "2026-08-12T09:00:00+08:00"
+    }
+  }
+}
+```
+
+已取消响应（cancelled）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "cancelled",
+    "fee": null,
+    "cancel_reason": "顾客取消订单",
+    "worker": null
+  }
+}
+```
+
+### 常见错误
+
+| 场景 | code | msg 示例 |
+|------|------|----------|
+| 请求来源 IP 不在白名单 | `-1` | `IP无权访问-203.0.113.10` |
+| `order_ref` 为空 | `-1` | `订单参考号不能为空` |
+| `order_ref` 对应的订单不存在 | `-1` | `订单不存在` |
+
+> GR 侧仅当 `code = 200` 且 `data` 非空时覆盖本地展示；商家接口异常或返回失败时，GR 侧保持本地订单数据展示，不影响用户操作。
 
 ---
 

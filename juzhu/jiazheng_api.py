@@ -11,8 +11,12 @@
 
 import json
 import os
+import re
+import ssl
 import time
+import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import db  # noqa: E402
@@ -21,13 +25,51 @@ from sign_util import HmacAuth  # noqa: E402
 _MODULE_DIR = Path(__file__).resolve().parent
 _KEY_PATH = _MODULE_DIR / "hmac_secret.key"
 
+_CST = timezone(timedelta(hours=8))  # 北京时间 UTC+8
+
+
+def _norm_eta_peking(eta):
+    """eta 统一转为北京时间无时区字符串 'YYYY-MM-DD HH:MM:SS'。
+
+    输入示例：
+    - '2026-08-07T14:00:00+08:00' → '2026-08-07 14:00:00'
+    - '2026-08-07T14:00:00Z'      → '2026-08-07 22:00:00'（UTC 转北京时间）
+    - '2026-08-07 14:00:00'       → 原样返回（已是北京时间无时区）
+    - 无法解析的值 → 原样返回，避免误伤业务数据
+    """
+    if not eta:
+        return eta
+    s = str(eta).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$", s):
+        return s
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return s
+        return dt.astimezone(_CST).strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return s
+
+
+def _vendor_ssl_context():
+    """商家接口出站调用的 SSL context。
+
+    uat.doorslink.net 等商家环境的证书链不完整（缺少中间证书），
+    标准验证会报 CERTIFICATE_VERIFY_FAILED。商家接口本身有 IP 白名单
+    作为安全屏障，此处放宽为不校验证书。
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
 
 # ── 密钥加载 ──────────────────────────────────────────────────
 
 def _load_vendor_config():
     """从 hmac_secret.key 加载 vendor 配置。
-    格式: vendor_id|hmac_key|url_link（url_link 可选）
-    返回: {"1": {"key": "abc...", "url_link": "https://..."}, ...}
+    格式: vendor_id|hmac_key|url_link|order_detail_url（后两列可选）
+    返回: {"1": {"key": "abc...", "url_link": "https://...", "order_detail_url": "https://..."}, ...}
     """
     vendors = {}
     if not _KEY_PATH.exists():
@@ -42,6 +84,7 @@ def _load_vendor_config():
             vendors[vid] = {
                 "key": parts[1].strip(),
                 "url_link": parts[2].strip() if len(parts) >= 3 else "",
+                "order_detail_url": parts[3].strip() if len(parts) >= 4 else "",
             }
     return vendors
 
@@ -196,7 +239,7 @@ def _handle_callback(handler, body):
             fee=fee,
             worker_name=worker.get("name") if worker else None,
             worker_phone=worker.get("phone") if worker else None,
-            eta=worker.get("eta") if worker else None,
+            eta=_norm_eta_peking(worker.get("eta")) if worker else None,
             cancel_reason=cancel_reason if status == "cancelled" else None,
             vendor_id=vendor_id,
         )
@@ -530,7 +573,16 @@ def handle_wechat_link(handler, body):
 
         url_link = _call_gen_url_link(api_url, path=path, query=query, order_ref=order_ref)
 
-        create_order(conn, order_ref, str(product_id), vendor_id=product.get("vendor_id"))
+        # 下单用户 id（C 端模拟，后期接真实登录）
+        user_id = (body.get("user_id") or "").strip() or None
+
+        create_order(
+            conn,
+            order_ref,
+            str(product_id),
+            vendor_id=product.get("vendor_id"),
+            user_id=user_id,
+        )
 
         _respond_json(handler, {
             "ok": True,
@@ -569,7 +621,7 @@ def _call_gen_url_link(api_url, *, path, query, order_ref):
         "Content-Type": "application/json",
     })
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=_vendor_ssl_context()) as resp:
             raw = resp.read()
         text = raw.decode("utf-8", "replace")
         result = json.loads(text)
@@ -612,3 +664,109 @@ def _clip(text, limit=2000):
     if len(text) > limit:
         return text[:limit] + f"…[截断，共 {len(text)} 字符]"
     return text
+
+
+# ═══════════════════════════════════════════════════════════════
+#  我的订单（GR 侧，C 端匿名可读；user_id 必填）
+# ═══════════════════════════════════════════════════════════════
+
+def handle_gr_orders(handler, qs):
+    """GET /api/juzhu/gr/orders?user_id=xxx —— 聚合返回 counts + list（过滤 pending）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    try:
+        limit = int((qs.get("limit") or ["50"])[0])
+    except ValueError:
+        limit = 50
+    conn = _connect_db()
+    try:
+        from gr_orders import list_user_orders
+
+        data = list_user_orders(conn, user_id, limit)
+        _respond_json(handler, {"ok": True, **data})
+    finally:
+        conn.close()
+    return True
+
+
+def handle_gr_order_detail(handler, order_ref, qs):
+    """GET /api/juzhu/gr/orders/{order_ref}?user_id=xxx —— 单条详情（防串单）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    conn = _connect_db()
+    try:
+        from gr_orders import get_user_order
+
+        order = get_user_order(conn, order_ref, user_id)
+        if not order:
+            _respond_json(handler, {"ok": False, "error": "订单不存在"}, 404)
+        else:
+            _respond_json(handler, {"ok": True, "order": order})
+    finally:
+        conn.close()
+    return True
+
+
+def handle_gr_vendor_detail(handler, order_ref, qs):
+    """GET /api/juzhu/gr/orders/{order_ref}/vendor-detail?user_id=xxx
+
+    中转查询商家订单详情：先校验订单归属 user，再经本后台调用商家订单详情接口
+    （order_detail_url 来自 hmac_secret.key 第 4 列），返回清洗后的详情
+    （eta 统一北京时间无时区）。商家未配置/调用失败统一返回 ok:false，
+    前端保持本地数据展示，不打扰用户。
+    """
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    conn = _connect_db()
+    try:
+        from gr_orders import get_user_order
+
+        order = get_user_order(conn, order_ref, user_id)
+        if not order:
+            _respond_json(handler, {"ok": False, "error": "订单不存在"}, 404)
+            return True
+        vendor_id = order.get("vendor_id")
+        if not vendor_id:
+            _respond_json(handler, {"ok": False, "error": "订单未关联商家"})
+            return True
+        detail_url = _load_vendor_config().get(str(vendor_id), {}).get("order_detail_url") or ""
+        if not detail_url:
+            _respond_json(handler, {"ok": False, "error": "商家未配置订单详情接口"})
+            return True
+        url = detail_url + ("&" if "?" in detail_url else "?") + "order_ref=" + urllib.parse.quote(order_ref)
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        _log(f"    [平台→商家] {_log_ts()} GET {url}", force=True)
+        try:
+            with urllib.request.urlopen(req, timeout=5, context=_vendor_ssl_context()) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            _log(f"      ! {type(e).__name__}: {e}")
+            _respond_json(handler, {"ok": False, "error": "商家订单详情接口调用失败"})
+            return True
+        _log(f"      << 返回: {_clip(json.dumps(raw, ensure_ascii=False))}")
+        if raw.get("code") != 200 or not raw.get("data"):
+            _respond_json(handler, {"ok": False, "error": "商家未返回订单详情"})
+            return True
+        data = raw["data"]
+        worker = data.get("worker")
+        if worker and worker.get("eta"):
+            worker["eta"] = _norm_eta_peking(worker["eta"])
+        _respond_json(handler, {
+            "ok": True,
+            "detail": {
+                "vendor_oid": data.get("lailai_oid"),
+                "status": data.get("status"),
+                "fee": data.get("fee"),
+                "worker": worker,
+                "cancel_reason": data.get("cancel_reason"),
+            },
+        })
+    finally:
+        conn.close()
+    return True

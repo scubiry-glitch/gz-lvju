@@ -1077,6 +1077,21 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"list": data})
 
+        # === 我的订单（GR 侧，匿名可读；user_id 必填） ===
+        if path == "/api/juzhu/gr/orders":
+            conn.close()
+            return jiazheng_api.handle_gr_orders(self, qs)
+
+        m = re.match(r"^/api/juzhu/gr/orders/([^/]+)/vendor-detail$", path)
+        if m:
+            conn.close()
+            return jiazheng_api.handle_gr_vendor_detail(self, m.group(1), qs)
+
+        m = re.match(r"^/api/juzhu/gr/orders/([^/]+)$", path)
+        if m:
+            conn.close()
+            return jiazheng_api.handle_gr_order_detail(self, m.group(1), qs)
+
         # === 家政 C 端工单流 /api/juzhu/jiazheng/*（SKU + 订单闭环） ===
         if path == "/api/juzhu/jiazheng/categories":
             city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
