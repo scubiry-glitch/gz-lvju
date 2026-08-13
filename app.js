@@ -4,8 +4,6 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 9000;
-// Python server.py 由 scf_bootstrap 启动，监听 8765
-const PYTHON_PORT = process.env.PYTHON_PORT || 8765;
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
 
@@ -2103,37 +2101,6 @@ const mimeTypes = {
   '.pdf': 'application/pdf',
 };
 
-// 反向代理：将请求转发到 Python 服务，失败则 fallback 到 Node.js 直连
-// 先缓冲 body，确保 fallback 时 readBody() 仍可读取
-function proxyToPythonWithFallback(urlPath, qs, req, res) {
-  // 缓冲请求体，以便 fallback 时 handleApiDirect 可以重新解析
-  const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', () => {
-    const rawBody = Buffer.concat(chunks).toString('utf8');
-    req._rawBody = rawBody;
-
-    const options = {
-      hostname: '127.0.0.1',
-      port: PYTHON_PORT,
-      path: req.url,
-      method: req.method,
-      headers: req.headers,
-    };
-    const proxyReq = http.request(options, proxyRes => {
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      proxyRes.pipe(res, { end: true });
-    });
-    proxyReq.on('error', () => {
-      // Python 不可用，尝试 Node.js 直连 MySQL
-      handleApiDirect(urlPath, qs, req, res);
-    });
-    // 将已缓冲的 body 写入代理请求
-    if (rawBody) proxyReq.write(rawBody);
-    proxyReq.end();
-  });
-}
-
 const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
@@ -2149,9 +2116,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // /api/juzhu/* 先代理到 Python，失败则 fallback 到 Node.js
+  // /api/juzhu/* 直接走 Node.js MySQL 实现
   if (rawPath.startsWith('/api/juzhu')) {
-    return proxyToPythonWithFallback(rawPath, qs, req, res);
+    return handleApiDirect(rawPath, qs, req, res);
   }
 
   if (!isPublicStatic(rawPath)) {
