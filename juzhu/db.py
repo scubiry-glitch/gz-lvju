@@ -332,6 +332,8 @@ def ensure_schema(conn):
     gr_order_cols = {r[1] for r in conn.execute("PRAGMA table_info(gr_orders)").fetchall()}
     if gr_order_cols and "vendor_id" not in gr_order_cols:
         conn.execute("ALTER TABLE gr_orders ADD COLUMN vendor_id INT")
+    if gr_order_cols and "user_id" not in gr_order_cols:
+        conn.execute("ALTER TABLE gr_orders ADD COLUMN user_id TEXT")
     ensure_settings(conn)
     conn.commit()
 

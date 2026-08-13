@@ -312,6 +312,7 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   order_ref       VARCHAR(64) NOT NULL UNIQUE,
   vendor_id       INT,
   vendor_oid      VARCHAR(64),
+  user_id         VARCHAR(64),                -- 下单用户 id（C 端模拟，后期接真实登录）
   sku             VARCHAR(128),
   city            VARCHAR(32) DEFAULT '沈阳',
   status          VARCHAR(16) DEFAULT 'pending',
