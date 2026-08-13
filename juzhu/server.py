@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """新居住频道 API + 静态文件 + 编辑后台接口。启动：python3 juzhu/server.py"""
+import gzip
 import hashlib
 import hmac
 import json
@@ -7,8 +8,11 @@ import os
 import posixpath
 import re
 import sys
+import threading
 import time
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import traceback
+from email.utils import parsedate_to_datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -283,8 +287,81 @@ def is_public_static(url_path):
     return True
 
 
+# ====== 请求日志（print 到 stdout；测试环境由 nohup 重定向到 /tmp/beike_server.log） ======
+# 详细模式：每个请求一个分段（编号/时间/类别/方法/路径 + >> 参数 + << 返回）；
+# 多线程并发时各段可能交错，所有行带 #编号，可据此关联同一请求的首尾与内容。
+# 简洁模式（JUZHU_LOG_DETAIL=false）：只打印请求接口 URI，一行/请求。
+_REQ_LOCK = threading.Lock()
+_REQ_SEQ = 0
+_LOG_SEP = "=" * 80
+_REQ_BODY_LIMIT = 2000   # 参数/返回体打印截断长度（字符）
+_REQ_BODY_LINES = 60     # 参数/返回体打印最大行数
+
+
+def _log(line):
+    print(line, flush=True)
+
+
+def _log_ts():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_detail():
+    """详细日志开关：JUZHU_LOG_DETAIL=false/0/off 时只打印请求接口 URI。"""
+    return os.environ.get("JUZHU_LOG_DETAIL", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _req_category(path):
+    """入站请求分类：商家回调/商家 vendor 接口调用我们 → [商家→平台]；其余 → [其它]。"""
+    if path == "/api/juzhu/callback" or path.startswith("/api/juzhu/jiazheng/vendor/"):
+        return "商家→平台"
+    return "其它"
+
 
 class Handler(SimpleHTTPRequestHandler):
+    # HTTP/1.1 keep-alive：复用连接，避免每个资源都重新 TCP 握手（此前默认 HTTP/1.0 每请求断连，
+    # 跨地域 RTT ~100ms/请求，页面刷新几十个资源时握手延迟累加明显）
+    protocol_version = "HTTP/1.1"
+
+    # 可 gzip 的文本资源扩展名；>1MB 的文件不压缩（避免 CPU/内存峰值）
+    _GZIP_EXT = (".html", ".htm", ".css", ".js", ".mjs", ".json", ".svg", ".txt", ".csv", ".map")
+
+    # ---------- 请求日志 ----------
+    def _req_begin(self, method):
+        """请求开始：详细模式打印分段头（编号/时间/类别/方法/路径）；简洁模式只打印接口 URI。"""
+        global _REQ_SEQ
+        with _REQ_LOCK:
+            _REQ_SEQ += 1
+            self._req_no = _REQ_SEQ
+        p = urlparse(self.path)
+        uri = (p.path or "/") + (f"?{p.query}" if p.query else "")
+        if not _log_detail():
+            _log(f"{_log_ts()} {method} {uri}")
+            return
+        _log(_LOG_SEP)
+        _log(f"#{self._req_no} {_log_ts()} [{_req_category(p.path)}] {method} {uri}")
+        if p.query:
+            _log(f"  >> 参数(query): {p.query}")
+        if method in ("POST", "PUT", "DELETE"):
+            cl = self.headers.get("Content-Length") or 0
+            ct = self.headers.get("Content-Type") or "-"
+            _log(f"  >> 参数(headers): content-type={ct}, content-length={cl}")
+
+    def _log_payload(self, text, label):
+        """打印参数/返回内容（首行带 >>/<< 标记，超长截断、限制行数，避免日志爆炸）。"""
+        if not _log_detail():
+            return
+        total = len(text)
+        if total > _REQ_BODY_LIMIT:
+            text = text[:_REQ_BODY_LIMIT] + f"…[截断，共 {total} 字符]"
+        lines = text.split("\n")[:_REQ_BODY_LINES]
+        for i, line in enumerate(lines):
+            prefix = f"  {label}: " if i == 0 else "  | "
+            _log(prefix + line)
+
+    def log_message(self, format, *args):
+        pass  # 请求日志统一由 _req_begin/_log_payload 分段输出，关闭父类默认单行日志
+
     def translate_path(self, path):
         """Python 3.6 无 directory 参数，自定义静态根目录为仓库 ROOT。"""
         parts = _url_parts(path)
@@ -298,46 +375,119 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_error(404, "Not found")
         return None
 
+    def _serve_static(self):
+        """静态文件响应：If-Modified-Since 304 + gzip + no-cache 验证。
+        目录交给父类（301/首页索引）；>1MB 文件不压缩直接发送。
+        """
+        try:
+            path = self.translate_path(self.path)
+        except Exception:
+            return self.send_error(400, "Bad request")
+        if os.path.isdir(path):
+            return super().do_GET()
+        try:
+            st = os.stat(path)
+        except OSError:
+            return self.send_error(404, "File not found")
+        lm = self.date_time_string(st.st_mtime)
+        ims = self.headers.get("If-Modified-Since")
+        if ims:
+            try:
+                if int(parsedate_to_datetime(ims).timestamp()) == int(st.st_mtime):
+                    self.send_response(304)
+                    self.send_header("Last-Modified", lm)
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    return
+            except (TypeError, ValueError):
+                pass
+        with open(path, "rb") as f:
+            body = f.read()
+        enc = ""
+        if (st.st_size <= 1_048_576 and path.lower().endswith(self._GZIP_EXT)
+                and "gzip" in self.headers.get("Accept-Encoding", "")):
+            body = gzip.compress(body)
+            enc = "gzip"
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Last-Modified", lm)
+        self.send_header("Cache-Control", "no-cache")
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _exc(self):
+        """接口异常兜底：记录 traceback 并尝试返回 500，保证日志段完整闭合。"""
+        _log("  ! " + traceback.format_exc().rstrip().replace("\n", "\n  ! "))
+        try:
+            self._json({"error": "server_error", "message": "服务异常，请稍后重试"}, 500)
+        except Exception:
+            pass
+
     def do_OPTIONS(self):
+        self._req_begin("OPTIONS")
         self.send_response(204)
         self._cors()
         self.end_headers()
 
     def do_GET(self):
+        self._req_begin("GET")
         p = urlparse(self.path)
-        if p.path.startswith("/api/juzhu"):
-            return self._route(p, "GET")
-        if not is_public_static(p.path):
-            self.send_error(404, "Not found")
-            return
-        return super().do_GET()
+        try:
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "GET")
+            if not is_public_static(p.path):
+                self.send_error(404, "Not found")
+                return
+            return self._serve_static()
+        except Exception:
+            return self._exc()
 
     def do_HEAD(self):
+        self._req_begin("HEAD")
         p = urlparse(self.path)
-        if p.path.startswith("/api/juzhu"):
-            return self._route(p, "GET")
-        if not is_public_static(p.path):
-            self.send_error(404, "Not found")
-            return
-        return super().do_HEAD()
+        try:
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "GET")
+            if not is_public_static(p.path):
+                self.send_error(404, "Not found")
+                return
+            super().do_HEAD()
+        except Exception:
+            return self._exc()
 
     def do_POST(self):
+        self._req_begin("POST")
         p = urlparse(self.path)
-        if p.path.startswith("/api/juzhu"):
-            return self._route(p, "POST")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "POST")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def do_PUT(self):
+        self._req_begin("PUT")
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
-            return self._route(p, "PUT")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
+                return self._route(p, "PUT")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def do_DELETE(self):
+        self._req_begin("DELETE")
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
-            return self._route(p, "DELETE")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
+                return self._route(p, "DELETE")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -355,22 +505,36 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n)
         fields, files = parse_multipart(body, boundary)
+        self._log_payload("multipart fields=" + str(list(fields.keys()))
+                          + ", files=" + str([(k, v.get("filename")) for k, v in files.items()]),
+                          ">> 参数(multipart)")
         return {"fields": fields, "files": files}
 
     def _json(self, data, code=200):
-        body = json.dumps(data, ensure_ascii=False).encode()
+        text = json.dumps(data, ensure_ascii=False)
+        body = text.encode()
+        enc = ""
+        if len(body) >= 1024 and "gzip" in self.headers.get("Accept-Encoding", ""):
+            body = gzip.compress(body)
+            enc = "gzip"
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self._cors()
         self.send_header("Content-Length", str(len(body)))
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
         self.wfile.write(body)
+        self._log_payload(text, "<< 返回")
 
     def _body(self):
         n = int(self.headers.get("Content-Length", 0))
         if not n:
             return {}
-        return json.loads(self.rfile.read(n).decode("utf-8"))
+        raw = self.rfile.read(n)
+        self._log_payload(raw.decode("utf-8", "replace"), ">> 参数(body)")
+        return json.loads(raw.decode("utf-8"))
 
     def _is_production(self):
         return (os.environ.get("JUZHU_ENV") or "").strip().lower() in ("prod", "production")
@@ -863,7 +1027,7 @@ WHERE c.enabled=1
     JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
     WHERE s.category_id=c.id
       AND v.city_ids IS NOT NULL
-      AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'
+      AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
   )
 ORDER BY c.sort_order, c.id""", (str(city_id),)
                 ))
@@ -926,7 +1090,7 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                         WHERE p2.channel_sku_id=s.id AND p2.status='on'
                           AND v2.status='active'
                           AND v2.city_ids IS NOT NULL
-                          AND (',' || v2.city_ids || ',') LIKE '%,' || ? || ',%'
+                          AND CONCAT(',', v2.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
                     )"""
                 params.append(str(city_id))
             if qs.get("category"):
@@ -948,9 +1112,22 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                 "SELECT id FROM jz_skus WHERE slug=? AND enabled=1", (m.group(1),)
             ).fetchone()
             vendor_id = qs.get("vendor", [None])[0]
+            product_id = qs.get("product", [None])[0]
             slots = []
             if srow:
-                pid = jzdb.resolve_channel_sku_product_id(conn, srow[0], vendor_id)
+                pid = None
+                if product_id:
+                    # 指定商品：须属于该 SPU 且上架（多商品切换后按所选商品查档期）
+                    try:
+                        prow = conn.execute(
+                            "SELECT id FROM jz_products WHERE id=? AND channel_sku_id=? AND status='on'",
+                            (int(product_id), srow[0]),
+                        ).fetchone()
+                        pid = prow[0] if prow else None
+                    except ValueError:
+                        pid = None
+                else:
+                    pid = jzdb.resolve_channel_sku_product_id(conn, srow[0], vendor_id)
                 if pid:
                     jzdb.ensure_rolling_slots(conn, pid)  # 滚动排期：始终保有未来 5 天
                     slots = jzdb.list_available_slots_for_product(conn, pid)
@@ -990,6 +1167,7 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                 "item": item,
                 "related": related,
                 "product": detail_context.get("product"),
+                "products": detail_context.get("products") or [],  # 同 SPU 全部上架商品（同商家多款/多商家）
                 "vendor": detail_context.get("vendor"),
                 "vendors": vendors,          # 多商家同款（比价/切换）
                 "workers": detail_context.get("workers") or [],
@@ -1163,7 +1341,7 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
         funnel = {}
         for s in statuses:
             funnel[s] = conn.execute(
-                "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE(created_at)=?",
                 (s, today),
             ).fetchone()[0]
 
@@ -1171,12 +1349,12 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
         daily = []
         for i in range(14, -1, -1):
             day = conn.execute(
-                "SELECT date('now','localtime','-' || ? || ' days')", (i,)
+                "SELECT DATE(DATE_SUB(NOW(), INTERVAL ? DAY))", (i,)
             ).fetchone()[0]
             row = {"date": day}
             for s in statuses:
                 row[s] = conn.execute(
-                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE(created_at)=?",
                     (s, day),
                 ).fetchone()[0]
             daily.append(row)
@@ -1185,12 +1363,12 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
         monthly = []
         for i in range(11, -1, -1):
             month_label = conn.execute(
-                "SELECT strftime('%Y-%m', 'now','localtime','-' || ? || ' months')", (i,)
+                "SELECT DATE_FORMAT(DATE_SUB(NOW(), INTERVAL ? MONTH), '%Y-%m')", (i,)
             ).fetchone()[0]
             row = {"month": month_label}
             for s in statuses:
                 row[s] = conn.execute(
-                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND strftime('%Y-%m', created_at)=?",
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE_FORMAT(created_at, '%Y-%m')=?",
                     (s, month_label),
                 ).fetchone()[0]
             monthly.append(row)
@@ -2326,7 +2504,7 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
             if k in body:
                 v = "1" if body.get(k) else "0"
                 conn.execute(
-                    "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
                     (k, v),
                 )
         conn.commit()
@@ -2539,7 +2717,7 @@ def main():
         if bad:
             print("  FATAL 生产环境拒绝启动：" + "；".join(bad))
             sys.exit(1)
-    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
 if __name__ == "__main__":
