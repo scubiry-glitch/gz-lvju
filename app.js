@@ -270,9 +270,141 @@ async function ensureSchema() {
         sort_order INT NOT NULL DEFAULT 0,
         KEY idx_entity (entity_type, entity_id)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_categories (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        icon VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        note TEXT
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_skus (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category_id VARCHAR(50) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        slug VARCHAR(200) NOT NULL UNIQUE,
+        spec TEXT,
+        price_from INT,
+        price_unit VARCHAR(50),
+        duration_min INT,
+        tags TEXT,
+        badges TEXT,
+        sales_text VARCHAR(200),
+        rating_score DECIMAL(3,2),
+        worker_min_level VARCHAR(20),
+        cover_image VARCHAR(500),
+        gallery TEXT,
+        includes TEXT,
+        service_flow TEXT,
+        service_notice TEXT,
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_vendors (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type VARCHAR(50) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        logo VARCHAR(500),
+        address TEXT,
+        district_id INT,
+        city_ids TEXT,
+        phone VARCHAR(50),
+        rating DECIMAL(3,2) DEFAULT 0,
+        review_count INT DEFAULT 0,
+        rank_type VARCHAR(50),
+        rank_label VARCHAR(100),
+        badges TEXT,
+        live TINYINT DEFAULT 0,
+        start_price DECIMAL(10,2),
+        unit VARCHAR(50),
+        fulfillment VARCHAR(50) DEFAULT 'to_home',
+        hours VARCHAR(200),
+        vendor_no VARCHAR(100),
+        whitelist_id INT,
+        status VARCHAR(20) DEFAULT 'active',
+        sort_order INT DEFAULT 0,
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id INT NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        subtitle VARCHAR(200),
+        category VARCHAR(50),
+        duration_hours DECIMAL(4,1),
+        area_range VARCHAR(100),
+        unit VARCHAR(50),
+        price DECIMAL(10,2) NOT NULL,
+        original_price DECIMAL(10,2),
+        discount_label VARCHAR(100),
+        earliest_time VARCHAR(100),
+        advance_booking_hours INT DEFAULT 0,
+        sales_count INT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        service_tags TEXT,
+        channel_sku_id INT,
+        path VARCHAR(500),
+        query VARCHAR(500),
+        status VARCHAR(20) DEFAULT 'on',
+        sort_order INT DEFAULT 0
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_workers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        avatar VARCHAR(500),
+        level VARCHAR(20) DEFAULT 'L3',
+        credit_score INT DEFAULT 70,
+        tags TEXT,
+        certs TEXT,
+        is_whitelisted TINYINT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        completed_orders INT DEFAULT 0,
+        years_experience INT DEFAULT 0,
+        online TINYINT DEFAULT 0,
+        distance_km DECIMAL(6,2),
+        vendor_id INT,
+        whitelist_id INT,
+        status VARCHAR(20) DEFAULT 'active'
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_orders (
+        id VARCHAR(50) PRIMARY KEY,
+        sku_id INT,
+        category_id VARCHAR(50) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        house TEXT NOT NULL,
+        phone VARCHAR(50) NOT NULL,
+        expect_time VARCHAR(100) NOT NULL,
+        \`desc\` TEXT,
+        fee INT NOT NULL,
+        pay_status VARCHAR(20) NOT NULL DEFAULT 'unpaid',
+        pay_method VARCHAR(50),
+        pay_at VARCHAR(30),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        slot_id INT,
+        worker_json TEXT,
+        rating_json TEXT,
+        source VARCHAR(100),
+        created_at VARCHAR(30) NOT NULL,
+        updated_at VARCHAR(30) NOT NULL,
+        log_json TEXT
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
+    }
+    // 初始化 jz_categories 种子数据
+    const jzCatSeeds = [
+      ['cleaning', '保洁', null, 1],
+      ['repair',   '维修', null, 2],
+      ['moving',   '搬家', null, 3],
+      ['nanny',    '保姆', null, 4],
+    ];
+    for (const [catId, catName, catIcon, catOrder] of jzCatSeeds) {
+      await conn.execute(
+        'INSERT IGNORE INTO jz_categories(id, name, icon, sort_order, enabled) VALUES (?, ?, ?, ?, 1)',
+        [catId, catName, catIcon, catOrder]
+      );
     }
     // 初始化 channels 种子数据
     const channelSeeds = [
@@ -1083,6 +1215,167 @@ async function handleApiDirect(urlPath, qs, req, res) {
         } finally {
           await conn.end();
         }
+      }
+    }
+
+    // ===== jiazheng 公开 C 端接口（Node.js 直连 MySQL 实现）=====
+
+    // GET /api/juzhu/jiazheng/categories
+    if (urlPath === '/api/juzhu/jiazheng/categories' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityName = (qp.get('city') || '').trim();
+      let rows;
+      if (cityName) {
+        // 有城市：只返回在该城市有上架商家的类目
+        rows = await queryRows(
+          `SELECT DISTINCT c.* FROM jz_categories c
+           WHERE c.enabled=1
+             AND EXISTS (
+               SELECT 1 FROM jz_skus s
+               JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
+               JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
+               WHERE s.category_id=c.id
+                 AND (v.city_ids IS NULL OR v.city_ids=''
+                      OR FIND_IN_SET(?, REPLACE(v.city_ids, ' ', '')))
+             )
+           ORDER BY c.sort_order, c.id`,
+          [cityName]
+        );
+      } else {
+        rows = await queryRows('SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id');
+      }
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus
+    if (urlPath === '/api/juzhu/jiazheng/skus' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityName = (qp.get('city') || '').trim();
+      const categoryId = (qp.get('category') || '').trim();
+      const q = (qp.get('q') || '').trim();
+      let sql = `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                   (SELECT MIN(p.price) FROM jz_products p
+                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+                 FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                 WHERE s.enabled=1 AND c.enabled=1
+                   AND EXISTS (SELECT 1 FROM jz_products p WHERE p.channel_sku_id=s.id AND p.status='on')`;
+      const params = [];
+      if (cityName) {
+        sql += ` AND EXISTS (
+                  SELECT 1 FROM jz_products p2
+                  JOIN jz_vendors v2 ON v2.id=p2.vendor_id
+                  WHERE p2.channel_sku_id=s.id AND p2.status='on'
+                    AND v2.status='active'
+                    AND (v2.city_ids IS NULL OR v2.city_ids=''
+                         OR FIND_IN_SET(?, REPLACE(v2.city_ids, ' ', '')))
+                )`;
+        params.push(cityName);
+      }
+      if (categoryId) { sql += ' AND s.category_id=?'; params.push(categoryId); }
+      if (q) {
+        sql += ' AND (s.name LIKE ? OR s.spec LIKE ?)';
+        params.push('%' + q + '%', '%' + q + '%');
+      }
+      sql += ' ORDER BY s.category_id, s.sort_order, s.id';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows(
+          `SELECT s.*, c.name AS category_name FROM jz_skus s
+           JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1`,
+          [slug]
+        );
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const sku = skus[0];
+        const qp = new URLSearchParams(qs);
+        const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
+        let vendorSql = `SELECT v.*, p.id AS product_id, p.price, p.original_price,
+                           p.title, p.subtitle, p.sales_count, p.rating AS product_rating,
+                           p.service_tags, p.advance_booking_hours
+                         FROM jz_vendors v
+                         JOIN jz_products p ON p.vendor_id=v.id
+                         WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const vParams = [sku.id];
+        if (vendorId) { vendorSql += ' AND v.id=?'; vParams.push(vendorId); }
+        vendorSql += ' ORDER BY v.sort_order, v.id LIMIT 10';
+        const vendors = await queryRows(vendorSql, vParams);
+        const related = await queryRows(
+          `SELECT id, name, slug, cover_image, price_from, price_unit, rating_score, category_id
+           FROM jz_skus WHERE enabled=1 AND id!=? ORDER BY sort_order LIMIT 4`,
+          [sku.id]
+        );
+        return jsonReply(res, { sku, vendors, related });
+      }
+    }
+
+    // GET /api/juzhu/jiazheng/workers
+    if (urlPath === '/api/juzhu/jiazheng/workers' && req.method === 'GET') {
+      const rows = await queryRows(
+        'SELECT * FROM jz_workers WHERE status=? ORDER BY credit_score DESC, completed_orders DESC LIMIT 20',
+        ['active']
+      );
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/orders （需 API Key 或 phone 参数）
+    if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const phone = (qp.get('phone') || '').trim();
+      const expected = expectedApiKey();
+      const provided = providedApiKey(req);
+      if (!phone && !apiKeyMatches(provided, expected)) {
+        return jsonReply(res, { error: 'unauthorized' }, 401);
+      }
+      let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
+                 LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
+      const params = [];
+      if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
+      if (qp.get('status')) {
+        const statuses = qp.get('status').split(',').filter(Boolean);
+        if (statuses.length) {
+          sql += ' AND o.status IN (' + statuses.map(() => '?').join(',') + ')';
+          params.push(...statuses);
+        }
+      }
+      if (qp.get('pay_status')) { sql += ' AND o.pay_status=?'; params.push(qp.get('pay_status')); }
+      const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
+      sql += ' ORDER BY o.created_at DESC LIMIT ?';
+      params.push(limit);
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/orders/stats （需 API Key，必须在 orders/:id 之前）
+    if (urlPath === '/api/juzhu/jiazheng/orders/stats' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const [pendingR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='pending'");
+      const [dispatchedR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='dispatched'");
+      const [doneR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='done' OR status='rated'");
+      const [unpaidR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE pay_status='unpaid'");
+      return jsonReply(res, {
+        pending: pendingR.c, dispatched: dispatchedR.c, done: doneR.c, unpaid: unpaidR.c,
+      });
+    }
+
+    // GET /api/juzhu/jiazheng/orders/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const orderId = m[1];
+        const rows = await queryRows(
+          `SELECT o.*, s.name AS sku_name FROM jz_orders o
+           LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?`,
+          [orderId]
+        );
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, rows[0]);
       }
     }
 
