@@ -303,6 +303,20 @@ function outboundJson(method, urlStr, body, timeoutMs) {
   });
 }
 
+// 将行中指定字段从 JSON 字符串反序列化为数组/对象，缺失或无效时返回默认值
+function parseJsonFields(row, fields, defaultVal) {
+  if (!row) return row;
+  for (const f of fields) {
+    if (row[f] != null && typeof row[f] === 'string') {
+      try { row[f] = JSON.parse(row[f]); }
+      catch (e) { row[f] = defaultVal !== undefined ? defaultVal : []; }
+    } else if (row[f] == null) {
+      row[f] = defaultVal !== undefined ? defaultVal : [];
+    }
+  }
+  return row;
+}
+
 // 确保 MySQL 中存在必要的表（MySQL 语法，CREATE TABLE IF NOT EXISTS）
 let schemaEnsured = false;
 async function ensureSchema() {
@@ -1606,6 +1620,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       sql += ' ORDER BY s.category_id, s.sort_order, s.id';
       const rows = await queryRows(sql, params);
+      const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
+      rows.forEach(r => parseJsonFields(r, SKU_JSON_FIELDS));
       return jsonReply(res, { items: rows });
     }
 
@@ -1639,6 +1655,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
            FROM jz_skus WHERE enabled=1 AND id!=? ORDER BY sort_order LIMIT 4`,
           [sku.id]
         );
+        const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
+        parseJsonFields(sku, SKU_JSON_FIELDS);
+        vendors.forEach(v => parseJsonFields(v, ['service_tags']));
         return jsonReply(res, { sku, vendors, related });
       }
     }
@@ -1649,6 +1668,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         'SELECT * FROM jz_workers WHERE status=? ORDER BY credit_score DESC, completed_orders DESC LIMIT 20',
         ['active']
       );
+      rows.forEach(r => parseJsonFields(r, ['tags']));
       return jsonReply(res, { items: rows });
     }
 
@@ -2307,6 +2327,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
          FROM jz_skus s LEFT JOIN jz_categories c ON c.id=s.category_id
          ORDER BY s.category_id, s.sort_order, s.id`
       );
+      rows.forEach(r => parseJsonFields(r, ['tags', 'badges', 'includes', 'service_flow', 'service_notice']));
       return jsonReply(res, { list: rows });
     }
 
@@ -2323,6 +2344,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order, id LIMIT 2",
           [v.id]
         );
+        v.products.forEach(p => parseJsonFields(p, ['service_tags']));
       }
       return jsonReply(res, { list: vendors });
     }
@@ -2335,6 +2357,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         const v = rows[0];
         v.products = await queryRows("SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order", [v.id]);
+        v.products.forEach(p => parseJsonFields(p, ['service_tags']));
         return jsonReply(res, v);
       }
     }
@@ -2349,6 +2372,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (qp.get('status')) { sql += ' AND p.status=?'; params.push(qp.get('status')); }
       sql += ' ORDER BY p.vendor_id, p.sort_order, p.id LIMIT 200';
       const rows = await queryRows(sql, params);
+      rows.forEach(r => parseJsonFields(r, ['service_tags']));
       return jsonReply(res, { list: rows });
     }
 
@@ -2358,6 +2382,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'GET') {
         const rows = await queryRows('SELECT p.*, v.name AS vendor_name FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id WHERE p.id=?', [parseInt(m[1])]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['service_tags']);
         return jsonReply(res, rows[0]);
       }
     }
@@ -2365,6 +2390,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/jz/workers
     if (urlPath === '/api/juzhu/jz/workers' && req.method === 'GET') {
       const rows = await queryRows("SELECT * FROM jz_workers WHERE status='active' ORDER BY credit_score DESC, completed_orders DESC");
+      rows.forEach(r => parseJsonFields(r, ['tags']));
       return jsonReply(res, { list: rows });
     }
 
@@ -2374,6 +2400,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'GET') {
         const rows = await queryRows('SELECT * FROM jz_workers WHERE id=?', [parseInt(m[1])]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags']);
         return jsonReply(res, rows[0]);
       }
     }

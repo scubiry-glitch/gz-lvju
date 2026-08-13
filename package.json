@@ -4,6 +4,6 @@
   "description": "新居住服务平台",
   "main": "app.js",
   "dependencies": {
-    "mysql2": "^3.9.0"
+    "mysql2": "^3.23.3"
   }
 }
