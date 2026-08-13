@@ -74,6 +74,26 @@ def main():
         conn.execute("DELETE FROM jz_products WHERE id=?", (pid,))
         conn.commit()
         check("测试产品已清理", True, "")
+
+        # 5. C 端双维度过滤：商家服务该城 且 商品 city_id=该城 才返回
+        prods1 = jzdb.list_channel_sku_products(conn, 4, city_id=1)
+        check("C端商品 city_id=1 非空", len(prods1) > 0, f"got {len(prods1)}")
+        prods2 = jzdb.list_channel_sku_products(conn, 4, city_id=2)
+        check("C端商品 city_id=2 为空（当前无贵阳商品）", len(prods2) == 0, f"got {len(prods2)}")
+        vends2 = jzdb.list_channel_sku_vendors(conn, 4, city_id=2)
+        check("C端商家 city_id=2 为空", len(vends2) == 0, f"got {len(vends2)}")
+        pid2 = jzdb.create_product(conn, {
+            "vendor_id": 41, "city_id": 2, "title": "测试·贵阳商品双维度",
+            "channel_sku_id": 4, "price": 1, "status": "on",
+        })
+        conn.commit()
+        prods2_after = jzdb.list_channel_sku_products(conn, 4, city_id=2)
+        check("建贵阳商品后 city_id=2 命中", any(p["id"] == pid2 for p in prods2_after), "")
+        vends2_after = jzdb.list_channel_sku_vendors(conn, 4, city_id=2)
+        check("建贵阳商品后商家命中", any(v["vendor_id"] == 41 for v in vends2_after), "")
+        conn.execute("DELETE FROM jz_products WHERE id=?", (pid2,))
+        conn.commit()
+        check("贵阳测试商品已清理", True, "")
     finally:
         conn.close()
 

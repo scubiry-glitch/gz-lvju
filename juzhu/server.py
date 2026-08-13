@@ -1028,10 +1028,11 @@ WHERE c.enabled=1
     JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
     JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
     WHERE s.category_id=c.id
+      AND p.city_id=?
       AND v.city_ids IS NOT NULL
       AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
   )
-ORDER BY c.sort_order, c.id""", (str(city_id),)
+ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
                 ))
             else:
                 rows = rows_to_list(conn.execute(
@@ -1083,7 +1084,7 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                        AND EXISTS (SELECT 1 FROM jz_products p
                                    WHERE p.channel_sku_id=s.id AND p.status='on')"""
             params = []
-            # 城市过滤：仅展示在该城市有上架商家的 SPU
+            # 城市过滤：双维度——仅展示「商品 city_id 命中该城 且 商家 city_ids 声明该城」的 SPU
             city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
             if city_id is not None:
                 sql += """ AND EXISTS (
@@ -1091,9 +1092,11 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                         JOIN jz_vendors v2 ON v2.id=p2.vendor_id
                         WHERE p2.channel_sku_id=s.id AND p2.status='on'
                           AND v2.status='active'
+                          AND p2.city_id=?
                           AND v2.city_ids IS NOT NULL
                           AND CONCAT(',', v2.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
                     )"""
+                params.append(int(city_id))
                 params.append(str(city_id))
             if qs.get("category"):
                 sql += " AND s.category_id=?"

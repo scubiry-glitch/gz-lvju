@@ -617,6 +617,11 @@
     merchantIntro = res.merchant_intro || null;
     workers = res.workers || [];
     reviews = res.reviews || [];
+    // 该城市无上架商品（双维度过滤后 product 为空）：整页空态，不渲染 SKU 静态信息
+    if (!product) {
+      document.querySelector('.scr').innerHTML = '<div class="empty" style="padding:72px 24px;text-align:center;color:var(--muted);">当前城市暂无该服务，请切换城市或稍后再来</div>';
+      return;
+    }
     render();
     renderVendors();
     renderProducts();

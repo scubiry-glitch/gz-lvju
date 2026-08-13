@@ -489,7 +489,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
 | `id` | integer | 产品 ID |
 | `vendor_id` | integer | 所属商家 ID |
 | `city_id` | integer | 商品所属城市 ID |
-| `city_name` | string | 城市名称（只读，`cities` 表关联） |
+| `city_name` | string | 城市名称 |
 | `title` | string | 产品标题 |
 | `subtitle` | string | 副标题 |
 | `category` | string | 类目名称 |

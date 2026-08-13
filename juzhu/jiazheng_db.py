@@ -269,8 +269,10 @@ def list_channel_sku_products(conn, sku_id, vendor_id=None, city_id=None):
     city_filter = ""
     city_params = []
     if city_id is not None:
-        city_filter = " AND v.city_ids IS NOT NULL AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')"
-        city_params = [str(city_id)]
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城
+        city_filter = (" AND p.city_id=? AND v.city_ids IS NOT NULL "
+                       "AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')")
+        city_params = [int(city_id), str(city_id)]
     rows = conn.execute(
         """SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
                   v.rating AS vendor_rating, v.review_count AS vendor_review_count,
@@ -973,8 +975,10 @@ def list_channel_sku_vendors(conn, sku_id, city_id=None):
     city_filter = ""
     city_params = []
     if city_id is not None:
-        city_filter = " AND v.city_ids IS NOT NULL AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')"
-        city_params = [str(city_id)]
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城
+        city_filter = (" AND p.city_id=? AND v.city_ids IS NOT NULL "
+                       "AND CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')")
+        city_params = [int(city_id), str(city_id)]
     rows = conn.execute(
         """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,
                   p.rating AS product_rating, p.sales_count,
