@@ -299,7 +299,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
 POST /api/juzhu/jiazheng/vendor/categories/list
 ```
 
-返回所有状态为 `on` 的子类目（不分页），用于产品创建/筛选时的类目下拉。
+返回所有 `enabled=1` 的四大类目（不分页），用于产品创建/筛选时的类目下拉。
 
 **请求参数**（除 `vendor_id` + 签名外无业务参数）：
 
@@ -314,15 +314,15 @@ POST /api/juzhu/jiazheng/vendor/categories/list
   "code": 0,
   "message": "success",
   "list": [
-    {"id": 1, "parent_type": "cleaning", "name": "日常保洁", "icon": "🧹", "sort_order": 1},
-    {"id": 2, "parent_type": "cleaning", "name": "深度清洁", "icon": "🧼", "sort_order": 2}
+    {"id": "cleaning", "parent_type": "cleaning", "name": "保洁", "icon": "🧹", "sort_order": 1},
+    {"id": "repair", "parent_type": "repair", "name": "维修", "icon": "🔧", "sort_order": 2}
   ]
 }
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `id` | integer | 类目 ID |
+| `id` | string | 类目 ID（四大类标识，同 `parent_type`） |
 | `parent_type` | string | 父类型（cleaning / repair / moving / nanny） |
 | `name` | string | 类目名称 |
 | `icon` | string | 图标 emoji |

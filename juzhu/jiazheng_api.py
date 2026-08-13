@@ -218,12 +218,12 @@ def _handle_callback(handler, body):
 # ═══════════════════════════════════════════════════════════════
 
 def _vendor_categories_list(handler, body, vendor_id):
-    """类目列表（不分页）。返回 status='on' 的子类目。"""
+    """类目列表（不分页）。返回 C 端四大类 jz_categories 中 enabled=1 的类目。"""
     conn = _connect_db()
     try:
         rows = conn.execute(
-            "SELECT id, parent_type, name, icon, sort_order "
-            "FROM jz_subcategories WHERE status='on' ORDER BY parent_type, sort_order"
+            "SELECT id, id AS parent_type, name, icon, sort_order "
+            "FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
         ).fetchall()
         _respond_json(handler, {"code": 0, "message": "success", "list": [dict(r) for r in rows]})
     finally:
