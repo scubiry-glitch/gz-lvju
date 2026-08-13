@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>juzhu 本地生活服务平台 · API 接口文档 v1.0</title>
+<style>
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:960px;margin:0 auto;padding:24px 20px 80px;color:#1f2937;line-height:1.75;background:#fff}
+h1{font-size:1.9em;border-bottom:3px solid #6366f1;padding-bottom:10px;color:#111827}
+h2{font-size:1.45em;margin-top:2em;border-left:5px solid #6366f1;padding-left:12px;color:#111827}
+h3{font-size:1.15em;margin-top:1.6em;color:#374151}
+h4{font-size:1em;color:#4b5563}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:.92em}
+th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left}
+th{background:#f5f3ff;color:#4338ca;font-weight:600}
+tr:nth-child(even){background:#fafafa}
+code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-family:'SF Mono',Consolas,monospace;font-size:.88em;color:#be185d}
+pre{background:#1e1e2e;color:#e4e4ef;padding:16px;border-radius:8px;overflow-x:auto;font-size:.85em;line-height:1.6}
+pre code{background:none;color:inherit;padding:0}
+blockquote{border-left:4px solid #6366f1;margin:12px 0;padding:8px 16px;background:#f5f3ff;color:#4c1d95;border-radius:0 8px 8px 0}
+a{color:#6366f1;text-decoration:none}
+a:hover{text-decoration:underline}
+ul,ol{padding-left:1.6em}
+li{margin:4px 0}
+hr{border:none;border-top:1px solid #e5e7eb;margin:2em 0}
+strong{color:#111827}
+</style>
+</head>
+<body>
+<h1 id="juzhu-api">juzhu 本地生活服务平台 · API 接口文档</h1>
+<blockquote>
+<p>版本：v1.0 ｜ 更新日期：2026-08-13 ｜ 适用平台：juzhu 本地生活服务（新居住频道 + 家政服务）
+本文档接口全部来自生产代码（server.py / jiazheng_api.py / gr_orders.py / db.py），可直接对接联调。</p>
+</blockquote>
+<hr />
+<h2 id="1">1. 概述</h2>
+<h3 id="11-base-url">1.1 Base URL</h3>
+<table>
+<thead>
+<tr>
+<th>环境</th>
+<th>地址</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>生产环境</td>
+<td><code>https://shenyang.meizu.life/api/juzhu</code></td>
+</tr>
+<tr>
+<td>本地/内网</td>
+<td><code>http://127.0.0.1:8765/api/juzhu</code>（server.py 监听端口）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="12">1.2 内容类型</h3>
+<ul>
+<li>请求/响应均为 <code>application/json; charset=utf-8</code></li>
+<li>支持 CORS（<code>Access-Control-Allow-Origin: *</code>），允许 <code>GET / POST / PUT / DELETE / OPTIONS</code></li>
+</ul>
+<h3 id="13">1.3 鉴权体系（两套并行）</h3>
+<table>
+<thead>
+<tr>
+<th>调用方</th>
+<th>鉴权方式</th>
+<th>适用范围</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>管理台（P/B 端页面）</td>
+<td><strong>API Key</strong>（<code>Authorization: Bearer &lt;key&gt;</code> 或 <code>X-API-Key: &lt;key&gt;</code>）</td>
+<td>管理端写接口 + 订单流接口</td>
+</tr>
+<tr>
+<td>第三方商家（B 端系统对接）</td>
+<td><strong>HMAC-SHA256 签名</strong>（vendor_id + sign）</td>
+<td>商家产品管理 + 订单状态回调</td>
+</tr>
+<tr>
+<td>公开只读</td>
+<td>无</td>
+<td>C 端展示、类目/SPU/产品/服务者查询</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>管理台默认密钥：<code>dev-juzhu-key</code>（正式环境使用分配的生产密钥，通过环境变量 <code>API_KEY</code> 配置）。</p>
+</blockquote>
+<hr />
+<h2 id="2">2. 接口总览</h2>
+<h3 id="21-get">2.1 公开只读接口（GET，无需鉴权）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>GET</td>
+<td><code>/api/juzhu/cities</code></td>
+<td>城市列表</td>
+</tr>
+<tr>
+<td>2</td>
+<td>GET</td>
+<td><code>/api/juzhu/stats</code></td>
+<td>平台统计（区县/保租房/二手房/管理房源数）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>GET</td>
+<td><code>/api/juzhu/settings</code></td>
+<td>平台开关与预订电话</td>
+</tr>
+<tr>
+<td>4</td>
+<td>GET</td>
+<td><code>/api/juzhu/districts</code></td>
+<td>区县列表</td>
+</tr>
+<tr>
+<td>5</td>
+<td>GET</td>
+<td><code>/api/juzhu/ratings</code></td>
+<td>评级公示列表（按状态筛选）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>GET</td>
+<td><code>/api/juzhu/ratings/{code}</code></td>
+<td>评级公示详情</td>
+</tr>
+<tr>
+<td>7</td>
+<td>GET</td>
+<td><code>/api/juzhu/districts/{slug}/projects</code></td>
+<td>区县下保租房项目</td>
+</tr>
+<tr>
+<td>8</td>
+<td>GET</td>
+<td><code>/api/juzhu/projects/{slug}</code></td>
+<td>项目详情</td>
+</tr>
+<tr>
+<td>9</td>
+<td>GET</td>
+<td><code>/api/juzhu/projects/{slug}/units</code></td>
+<td>项目房源（含照片）</td>
+</tr>
+<tr>
+<td>10</td>
+<td>GET</td>
+<td><code>/api/juzhu/trade</code></td>
+<td>二手房/交易列表</td>
+</tr>
+<tr>
+<td>11</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/categories</code></td>
+<td>家政服务子类目（P/B 视角）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/spu</code></td>
+<td>平台标准品 SPU 全量（P 端 SPU 管理台）</td>
+</tr>
+<tr>
+<td>13</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/slots</code></td>
+<td>排班档期列表（按 product_id）</td>
+</tr>
+<tr>
+<td>14</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/vendors</code></td>
+<td>商家列表（人力服务商）</td>
+</tr>
+<tr>
+<td>15</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/vendors/{id}</code></td>
+<td>商家详情</td>
+</tr>
+<tr>
+<td>16</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/products</code></td>
+<td>商家产品列表（按 vendor/type/status 筛选）</td>
+</tr>
+<tr>
+<td>17</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/products/{id}</code></td>
+<td>产品详情</td>
+</tr>
+<tr>
+<td>18</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/workers</code></td>
+<td>服务者列表（在线/按商家/全部）</td>
+</tr>
+<tr>
+<td>19</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/workers/{id}</code></td>
+<td>服务者详情</td>
+</tr>
+<tr>
+<td>20</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/orders</code></td>
+<td>订单列表（status/limit 筛选）</td>
+</tr>
+<tr>
+<td>21</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/orders/overview</code></td>
+<td>订单概览漏斗</td>
+</tr>
+<tr>
+<td>22</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/orders/{id}</code></td>
+<td>订单详情</td>
+</tr>
+<tr>
+<td>23</td>
+<td>GET</td>
+<td><code>/api/juzhu/jz/activities</code></td>
+<td>活动列表（按 tag_id）</td>
+</tr>
+<tr>
+<td>24</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/categories</code></td>
+<td>家政类目（C 端启用项）</td>
+</tr>
+<tr>
+<td>25</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/workers</code></td>
+<td>服务者（C 端展示）</td>
+</tr>
+<tr>
+<td>26</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/orders</code></td>
+<td>订单列表（<code>?phone=</code> 或 API Key）</td>
+</tr>
+<tr>
+<td>27</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}</code></td>
+<td>订单详情（C 端视图）</td>
+</tr>
+<tr>
+<td>28</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/skus</code></td>
+<td>C 端 SKU 列表（可售产品聚合）</td>
+</tr>
+<tr>
+<td>29</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/skus/{slug}</code></td>
+<td>SKU 详情（含比价商家/服务者/评价）</td>
+</tr>
+<tr>
+<td>30</td>
+<td>GET</td>
+<td><code>/api/juzhu/jiazheng/skus/{slug}/slots</code></td>
+<td>SKU 可约档期（滚动 5 天）</td>
+</tr>
+<tr>
+<td>31</td>
+<td>GET</td>
+<td><code>/api/juzhu/life/*</code></td>
+<td>生活服务 API 桥接（第三方）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-api-key-apijuzhuadmin">2.2 管理端写接口（API Key，前缀 <code>/api/juzhu/admin</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>32</td>
+<td>GET/POST</td>
+<td><code>/api/juzhu/admin/districts</code></td>
+<td>区县列表/新增</td>
+</tr>
+<tr>
+<td>33</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/admin/districts/{id}</code></td>
+<td>区县编辑/删除</td>
+</tr>
+<tr>
+<td>34</td>
+<td>GET/POST</td>
+<td><code>/api/juzhu/admin/projects</code></td>
+<td>项目列表（channel/district/city/q 筛选）/新增</td>
+</tr>
+<tr>
+<td>35</td>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/juzhu/admin/projects/{id}</code></td>
+<td>项目详情/编辑/删除</td>
+</tr>
+<tr>
+<td>36</td>
+<td>POST</td>
+<td><code>/api/juzhu/admin/projects/{id}/units</code></td>
+<td>项目下新增房源</td>
+</tr>
+<tr>
+<td>37</td>
+<td>POST</td>
+<td><code>/api/juzhu/admin/projects/{id}/rating/submit</code></td>
+<td>提交项目评级</td>
+</tr>
+<tr>
+<td>38</td>
+<td>POST</td>
+<td><code>/api/juzhu/admin/ratings/{code}/review</code></td>
+<td>评级复核</td>
+</tr>
+<tr>
+<td>39</td>
+<td>GET/PUT/DELETE</td>
+<td><code>/api/juzhu/admin/units/{id}</code></td>
+<td>房源详情/编辑/删除</td>
+</tr>
+<tr>
+<td>40</td>
+<td>GET/POST</td>
+<td><code>/api/juzhu/admin/units/{id}/photos</code></td>
+<td>房源照片列表/上传</td>
+</tr>
+<tr>
+<td>41</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/admin/photos/{id}</code></td>
+<td>照片编辑/删除</td>
+</tr>
+<tr>
+<td>42</td>
+<td>POST</td>
+<td><code>/api/juzhu/admin/export</code></td>
+<td>全量数据导出（刷新统计）</td>
+</tr>
+<tr>
+<td>43</td>
+<td>GET/PUT</td>
+<td><code>/api/juzhu/admin/settings</code></td>
+<td>平台设置读取/更新</td>
+</tr>
+<tr>
+<td>44</td>
+<td>GET</td>
+<td><code>/api/juzhu/admin/dictionary</code></td>
+<td>字典数据（类目/标签等）</td>
+</tr>
+<tr>
+<td>45</td>
+<td>PUT</td>
+<td><code>/api/juzhu/admin/city</code></td>
+<td>城市信息更新</td>
+</tr>
+<tr>
+<td>46</td>
+<td>PUT</td>
+<td><code>/api/juzhu/admin/channels/{slug}</code></td>
+<td>频道开关更新</td>
+</tr>
+<tr>
+<td>47</td>
+<td>POST</td>
+<td><code>/api/juzhu/admin/upload</code></td>
+<td>文件上传（multipart）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-api-key">2.3 家政订单流接口（API Key）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>48</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders</code></td>
+<td>创建订单（C 端下单）</td>
+</tr>
+<tr>
+<td>49</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}/pay</code></td>
+<td>支付（幂等；占用档期名额）</td>
+</tr>
+<tr>
+<td>50</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}/quote</code></td>
+<td>维修单报价</td>
+</tr>
+<tr>
+<td>51</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}/dispatch</code></td>
+<td>派单（自动/指定）</td>
+</tr>
+<tr>
+<td>52</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}/advance</code></td>
+<td>状态推进（服务者侧）</td>
+</tr>
+<tr>
+<td>53</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/{id}/rate</code></td>
+<td>客户评价（1-5 星）</td>
+</tr>
+<tr>
+<td>54</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/orders/stats</code></td>
+<td>订单统计（GET，需 Key）</td>
+</tr>
+<tr>
+<td>55</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/wechat-link</code></td>
+<td>生成微信小程序 URL Link + 创建 GR 订单</td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-api-key-apijuzhujz">2.4 家政管理台写接口（API Key，前缀 <code>/api/juzhu/jz</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>56</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/orders</code></td>
+<td>创建订单（兼容旧字段名）</td>
+</tr>
+<tr>
+<td>57</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/orders/{id}/dispatch</code></td>
+<td>派单（手动 worker_id 或自动选第一名在线）</td>
+</tr>
+<tr>
+<td>58</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/orders/{id}/status</code></td>
+<td>订单状态推进（管理台）</td>
+</tr>
+<tr>
+<td>59</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/orders/{id}/rate</code></td>
+<td>评价（含信用分变动）</td>
+</tr>
+<tr>
+<td>60</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/categories</code></td>
+<td>新增类目</td>
+</tr>
+<tr>
+<td>61</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/jz/categories/{id}</code></td>
+<td>类目编辑/删除</td>
+</tr>
+<tr>
+<td>62</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/spu</code></td>
+<td>新增 SPU（平台标准品）</td>
+</tr>
+<tr>
+<td>63</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/jz/spu/{id}</code></td>
+<td>SPU 编辑/删除</td>
+</tr>
+<tr>
+<td>64</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/slots/generate</code></td>
+<td>批量生成档期</td>
+</tr>
+<tr>
+<td>65</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/slots</code></td>
+<td>新增档期</td>
+</tr>
+<tr>
+<td>66</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/jz/slots/{id}</code></td>
+<td>档期状态/删除</td>
+</tr>
+<tr>
+<td>67</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/products</code></td>
+<td>新增产品（商家 SKU）</td>
+</tr>
+<tr>
+<td>68</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/jz/products/{id}</code></td>
+<td>产品编辑/删除</td>
+</tr>
+<tr>
+<td>69</td>
+<td>POST</td>
+<td><code>/api/juzhu/jz/workers</code></td>
+<td>新增服务者</td>
+</tr>
+<tr>
+<td>70</td>
+<td>PUT/DELETE</td>
+<td><code>/api/juzhu/jz/workers/{id}</code></td>
+<td>服务者编辑/删除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="25-hmac-sha256">2.5 第三方商家接口（HMAC-SHA256 签名）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>方法</th>
+<th>路径</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>71</td>
+<td>POST</td>
+<td><code>/api/juzhu/callback</code></td>
+<td>订单状态回调（支付/派单/服务/完成/取消）</td>
+</tr>
+<tr>
+<td>72</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/categories/list</code></td>
+<td>类目列表</td>
+</tr>
+<tr>
+<td>73</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/skus/list</code></td>
+<td>SPU（平台标准品）列表</td>
+</tr>
+<tr>
+<td>74</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/list</code></td>
+<td>产品列表（筛选）</td>
+</tr>
+<tr>
+<td>75</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/detail</code></td>
+<td>产品详情</td>
+</tr>
+<tr>
+<td>76</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/create</code></td>
+<td>创建产品</td>
+</tr>
+<tr>
+<td>77</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/update</code></td>
+<td>编辑产品</td>
+</tr>
+<tr>
+<td>78</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/status</code></td>
+<td>状态变更（上架/下架/售罄）</td>
+</tr>
+<tr>
+<td>79</td>
+<td>POST</td>
+<td><code>/api/juzhu/jiazheng/vendor/products/delete</code></td>
+<td>删除产品（软删）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3">3. 认证方式</h2>
+<h3 id="31-api-key">3.1 API Key（管理台 / 订单流）</h3>
+<p>请求头二选一：</p>
+<pre><code>Authorization: Bearer dev-juzhu-key
+X-API-Key: dev-juzhu-key
+</code></pre>
+<p>未通过校验返回：</p>
+<pre><code class="language-json">{ &quot;error&quot;: &quot;unauthorized&quot;, &quot;message&quot;: &quot;请通过 Authorization: Bearer &lt;API_KEY&gt; 或 X-API-Key 传入有效 API Key&quot; }
+</code></pre>
+<h3 id="32-hmac-sha256">3.2 HMAC-SHA256 签名（第三方商家）</h3>
+<p>GR 侧为每个商家分配唯一 <code>vendor_id</code> 和密钥，商家在每个请求体中附带签名。</p>
+<p><strong>签名步骤：</strong></p>
+<ol>
+<li>构造业务请求体，确保包含 <code>vendor_id</code></li>
+<li>移除 <code>sign</code> 字段（如存在）</li>
+<li>生成当前时间戳（毫秒），以 <code>timestamp</code> 为键加入</li>
+<li>嵌套对象递归展平：<code>{"worker":{"name":"李"}}</code> → <code>worker.name=李</code></li>
+<li>过滤值为 <code>null</code> 或 <code>""</code> 的字段</li>
+<li>按 Key 字典序排序</li>
+<li>拼接 <code>key1=value1&amp;key2=value2&amp;...</code></li>
+<li>以商家密钥为 key 计算 HMAC-SHA256，取 hex 小写即 <code>sign</code></li>
+<li>将 <code>timestamp</code> 与 <code>sign</code> 一并放入请求 JSON</li>
+</ol>
+<p>服务端校验：时间戳误差窗口 5 分钟（防重放），签名不匹配返回 401。</p>
+<p><strong>测试密钥：</strong></p>
+<pre><code>VENDOR_ID = 41
+SECRET    = 7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d
+</code></pre>
+<p><strong>签名示例（产品列表）：</strong></p>
+<p>原始参数：</p>
+<pre><code class="language-json">{ &quot;vendor_id&quot;: 41, &quot;status&quot;: &quot;on&quot; }
+</code></pre>
+<p>加入 timestamp → 排序 → 拼接：</p>
+<pre><code>status=on&amp;timestamp=1785998316159&amp;vendor_id=41
+</code></pre>
+<p><code>HMAC-SHA256(secret, 上述字符串)</code> 的 hex 摘要即 <code>sign</code>，最终请求体：</p>
+<pre><code class="language-json">{
+  &quot;vendor_id&quot;: 41,
+  &quot;status&quot;: &quot;on&quot;,
+  &quot;timestamp&quot;: 1785998316159,
+  &quot;sign&quot;: &quot;a1b2c3d4...&quot;
+}
+</code></pre>
+<hr />
+<h2 id="4">4. 核心数据模型</h2>
+<h3 id="41-sku-spu">4.1 SKU = SPU + 服务者 + 价格（平台规则）</h3>
+<pre><code>类目 jz_categories（平台标准类目）
+  └── SPU jz_skus（平台标准品：标准工序/参考价/最低等级，商家不可改）
+        └── 商家产品 jz_products（channel_sku_id 指向 SPU + vendor_id 商家 + 自定义价格）
+              └── 排班档期 jz_sku_slots（product_id + 服务者 + 时段 + 容量）
+</code></pre>
+<ul>
+<li><strong>SPU 由平台定义</strong>：标准工序、参考价、所需最低服务等级；商家只能在其上创建自己的产品（SKU），不能修改 SPU 本身</li>
+<li><strong>产品（商家 SKU）= SPU + 服务者 + 价格</strong>：同一 SPU 下不同商家可挂不同价格，C 端比价</li>
+<li>产品状态：<code>on</code>（上架）/ <code>off</code>（下架）/ <code>soldout</code>（售罄）</li>
+</ul>
+<h3 id="42">4.2 订单状态机</h3>
+<pre><code>pending(待派单) → dispatched(已派单) → accepted(已接单) → serving(服务中) → done(待评价) → rated(已评价)
+     │                │
+     └── cancelled(已取消)
+</code></pre>
+<p>支付状态：<code>unpaid</code> → <code>paid</code>（<code>pay_status</code> 独立于业务状态）。</p>
+<h3 id="43">4.3 档期占用规则</h3>
+<ul>
+<li>下单时<strong>只记录档期意向</strong>，不做名额占用（软校验）</li>
+<li><strong>支付时才占用名额</strong>（<code>book_slot</code>）：档期已满/已关则支付失败（409），订单保持 unpaid，用户改期</li>
+<li>滚动排期：SKU 档期查询时自动补足未来 5 天（<code>ensure_rolling_slots</code>）</li>
+</ul>
+<hr />
+<h2 id="5">5. 公开只读接口详解</h2>
+<h3 id="51-get-apijuzhucities">5.1 GET /api/juzhu/cities</h3>
+<p>城市列表。可选参数：<code>?city=</code>（城市名或 slug）。</p>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">[
+  { &quot;id&quot;: 1, &quot;name&quot;: &quot;沈阳&quot;, &quot;slug&quot;: &quot;shenyang&quot;, &quot;booking_phone&quot;: &quot;024-12345678&quot; }
+]
+</code></pre>
+<h3 id="52-get-apijuzhustats">5.2 GET /api/juzhu/stats</h3>
+<p>平台统计。可选 <code>?city=</code>。</p>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;districts&quot;: 11,
+  &quot;projects_bzf&quot;: 23,
+  &quot;projects_trade&quot;: 156,
+  &quot;units&quot;: 4280
+}
+</code></pre>
+<h3 id="53-get-apijuzhusettings">5.3 GET /api/juzhu/settings</h3>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;booking_phone&quot;: &quot;024-12345678&quot;,
+  &quot;show_city_switcher&quot;: true,
+  &quot;show_life_service&quot;: true
+}
+</code></pre>
+<h3 id="54-get-apijuzhudistricts">5.4 GET /api/juzhu/districts</h3>
+<p>区县列表。可选 <code>?city=</code>。</p>
+<h3 id="55-get-apijuzhuratings">5.5 GET /api/juzhu/ratings</h3>
+<p>评级公示列表。可选参数：<code>?status=pending|approved|rejected</code>。</p>
+<h3 id="56-get-apijuzhuratingscode">5.6 GET /api/juzhu/ratings/{code}</h3>
+<p>评级公示详情（code 形如 <code>SY-BZF-{id}</code>）。</p>
+<h3 id="57-get-apijuzhudistrictsslugprojects">5.7 GET /api/juzhu/districts/{slug}/projects</h3>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;district&quot;: { &quot;id&quot;: 1, &quot;name&quot;: &quot;和平区&quot;, &quot;slug&quot;: &quot;heping&quot; },
+  &quot;projects&quot;: [ { &quot;id&quot;: 1, &quot;name&quot;: &quot;...&quot;, &quot;channel&quot;: &quot;bzf&quot; } ]
+}
+</code></pre>
+<h3 id="58-get-apijuzhuprojectsslug">5.8 GET /api/juzhu/projects/{slug}</h3>
+<p>项目详情。</p>
+<h3 id="59-get-apijuzhuprojectsslugunits">5.9 GET /api/juzhu/projects/{slug}/units</h3>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;project&quot;: { &quot;id&quot;: 1, &quot;name&quot;: &quot;...&quot; },
+  &quot;units&quot;: [ { &quot;id&quot;: 1, &quot;name&quot;: &quot;A栋1单元&quot;, &quot;sort_order&quot;: 0 } ],
+  &quot;photos&quot;: [ { &quot;id&quot;: 1, &quot;entity_type&quot;: &quot;unit&quot;, &quot;entity_id&quot;: 1, &quot;url&quot;: &quot;...&quot; } ]
+}
+</code></pre>
+<h3 id="510-get-apijuzhutrade">5.10 GET /api/juzhu/trade</h3>
+<p>二手房/交易列表。可选 <code>?city=</code>。<strong>响应：</strong> <code>{ "listings": [...] }</code></p>
+<h3 id="511-get-apijuzhujzcategories">5.11 GET /api/juzhu/jz/categories</h3>
+<p>家政服务子类目（P/B 视角）。参数：<code>?type=</code>、<code>?all=1</code>（含禁用）。</p>
+<h3 id="512-get-apijuzhujzspu">5.12 GET /api/juzhu/jz/spu</h3>
+<p>平台标准品 SPU 全量（P 端 SPU 管理台数据源）。</p>
+<h3 id="513-get-apijuzhujzslots">5.13 GET /api/juzhu/jz/slots</h3>
+<p>排班档期列表。<strong>必填：</strong> <code>?product_id=123</code>。</p>
+<h3 id="514-get-apijuzhujzvendors">5.14 GET /api/juzhu/jz/vendors</h3>
+<p>商家列表。参数：<code>?type=</code>（如 <code>renli</code> 人力服务商）。</p>
+<h3 id="515-get-apijuzhujzproducts">5.15 GET /api/juzhu/jz/products</h3>
+<p>产品列表。参数：<code>?vendor_id=</code>、<code>?type=</code>、<code>?status=</code>。</p>
+<p><strong>响应：</strong> <code>{ "list": [...] }</code></p>
+<h3 id="516-get-apijuzhujzworkers">5.16 GET /api/juzhu/jz/workers</h3>
+<p>服务者列表。参数：<code>?vendor_id=</code>、<code>?all=1</code>（全部，否则返回在线）。</p>
+<h3 id="517-get-apijuzhujzorders">5.17 GET /api/juzhu/jz/orders</h3>
+<p>订单列表。参数：<code>?status=</code>、<code>?limit=</code>（默认 50）。</p>
+<h3 id="518-get-apijuzhujzordersoverview">5.18 GET /api/juzhu/jz/orders/overview</h3>
+<p>订单概览漏斗（今日各状态计数）。</p>
+<h3 id="519-get-apijuzhujzordersid">5.19 GET /api/juzhu/jz/orders/{id}</h3>
+<p>订单详情。</p>
+<h3 id="520-get-apijuzhujzactivities">5.20 GET /api/juzhu/jz/activities</h3>
+<p>活动列表。参数：<code>?tag_id=</code>。</p>
+<h3 id="521-get-apijuzhujiazhengcategories">5.21 GET /api/juzhu/jiazheng/categories</h3>
+<p>C 端启用的家政类目（<code>enabled=1</code>）。</p>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{ &quot;items&quot;: [ { &quot;id&quot;: 1, &quot;name&quot;: &quot;保洁&quot;, &quot;icon&quot;: &quot;🧹&quot;, &quot;sort_order&quot;: 0 } ] }
+</code></pre>
+<h3 id="522-get-apijuzhujiazhengskus">5.22 GET /api/juzhu/jiazheng/skus</h3>
+<p>C 端可售 SKU 列表（仅含已有上架产品的 SPU）。参数：<code>?category=</code>、<code>?q=</code>（名称/规格模糊）。</p>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;items&quot;: [
+    {
+      &quot;id&quot;: 1, &quot;slug&quot;: &quot;baojie-3h&quot;, &quot;name&quot;: &quot;日常保洁 3 小时&quot;, &quot;spec&quot;: &quot;3h/次&quot;,
+      &quot;category_id&quot;: 1, &quot;category_name&quot;: &quot;保洁&quot;, &quot;category_icon&quot;: &quot;🧹&quot;,
+      &quot;product_min_price&quot;: 12900, &quot;unit&quot;: &quot;次&quot;
+    }
+  ]
+}
+</code></pre>
+<blockquote>
+<p>价格为分（如 12900 = ¥129）。</p>
+</blockquote>
+<h3 id="523-get-apijuzhujiazhengskusslug">5.23 GET /api/juzhu/jiazheng/skus/{slug}</h3>
+<p>SKU 详情。参数：<code>?vendor=</code>（指定商家）。</p>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;item&quot;: { &quot;id&quot;: 1, &quot;slug&quot;: &quot;baojie-3h&quot;, &quot;name&quot;: &quot;...&quot;, &quot;product_min_price&quot;: 12900 },
+  &quot;related&quot;: [ &quot;...同品类其他 SKU（最多 4 个）...&quot; ],
+  &quot;product&quot;: { &quot;商家默认产品详情&quot; },
+  &quot;vendor&quot;: { &quot;商家详情&quot; },
+  &quot;vendors&quot;: [ &quot;同款多商家（比价/切换）&quot; ],
+  &quot;workers&quot;: [ &quot;可提供服务者&quot; ],
+  &quot;reviews&quot;: [ &quot;评价&quot; ],
+  &quot;merchant_intro&quot;: &quot;商家介绍&quot;
+}
+</code></pre>
+<h3 id="524-get-apijuzhujiazhengskusslugslots">5.24 GET /api/juzhu/jiazheng/skus/{slug}/slots</h3>
+<p>SKU 可约档期（自动滚动补足 5 天）。参数：<code>?vendor=</code>。</p>
+<p><strong>响应：</strong> <code>{ "slots": [ { "id": 1, "slot_date": "2026-08-14", "start_time": "09:00", "end_time": "12:00", "status": "open", "capacity": 1, "booked": 0, "worker": { "id": 1, "name": "李师傅", "level": "L3" } } ] }</code></p>
+<h3 id="525-get-apijuzhulife">5.25 GET /api/juzhu/life/*</h3>
+<p>生活服务桥接接口，转发至第三方（见 §8 回调与桥接）。</p>
+<hr />
+<h2 id="6-api-key">6. 管理端接口详解（API Key）</h2>
+<blockquote>
+<p>除特别说明外，均需 <code>Authorization: Bearer &lt;key&gt;</code>。</p>
+</blockquote>
+<h3 id="61">6.1 区县管理</h3>
+<ul>
+<li><code>GET /api/juzhu/admin/districts</code> → 区县数组</li>
+<li><code>POST /api/juzhu/admin/districts</code> → 新增，body：<code>{ "name", "slug", "city_id", "sort_order" }</code> → <code>{ "ok": true, "id": n }</code></li>
+<li><code>PUT /api/juzhu/admin/districts/{id}</code> → 编辑</li>
+<li><code>DELETE /api/juzhu/admin/districts/{id}</code> → 删除（有项目时禁止）</li>
+</ul>
+<h3 id="62">6.2 项目管理</h3>
+<ul>
+<li><code>GET /api/juzhu/admin/projects</code>：筛选 <code>?channel=bzf|trade</code>、<code>?district_id=</code>、<code>?city_id=</code>、<code>?q=</code>（名称模糊）</li>
+<li><code>POST /api/juzhu/admin/projects</code>：新增项目</li>
+<li><code>GET /api/juzhu/admin/projects/{id}</code>：项目 + 房源 + 照片</li>
+<li><code>PUT /api/juzhu/admin/projects/{id}</code>：编辑</li>
+<li><code>DELETE /api/juzhu/admin/projects/{id}</code>：删除</li>
+<li><code>POST /api/juzhu/admin/projects/{id}/units</code>：新增房源</li>
+<li><code>POST /api/juzhu/admin/projects/{id}/rating/submit</code>：提交评级 → <code>{ "ok": true, "code": "SY-BZF-{id}" }</code></li>
+</ul>
+<h3 id="63">6.3 房源与照片</h3>
+<ul>
+<li><code>GET/PUT/DELETE /api/juzhu/admin/units/{id}</code></li>
+<li><code>GET /api/juzhu/admin/units/{id}/photos</code>：照片列表</li>
+<li><code>POST /api/juzhu/admin/units/{id}/photos</code>：上传照片</li>
+<li><code>PUT/DELETE /api/juzhu/admin/photos/{id}</code></li>
+</ul>
+<h3 id="64">6.4 平台设置</h3>
+<ul>
+<li><code>GET /api/juzhu/admin/settings</code> → <code>{ "key": "value" }</code>（settings 表全量）</li>
+<li><code>PUT /api/juzhu/admin/settings</code> → 更新（body 为键值对，含 <code>show_city_switcher</code> / <code>show_life_service</code> 等布尔开关）</li>
+<li><code>GET /api/juzhu/admin/dictionary</code>：字典（评级指标、标签、服务类目等）</li>
+<li><code>PUT /api/juzhu/admin/city</code>：更新城市信息（预订电话等）</li>
+<li><code>PUT /api/juzhu/admin/channels/{slug}</code>：频道开关（bzf / trade / life）</li>
+</ul>
+<h3 id="65">6.5 数据导出与上传</h3>
+<ul>
+<li><code>POST /api/juzhu/admin/export</code>：刷新区县统计并导出全量 → <code>{ "ok": true, "stats": {...} }</code></li>
+<li><code>POST /api/juzhu/admin/upload</code>：multipart 文件上传 → <code>{ "ok": true, "url": "..." }</code></li>
+</ul>
+<hr />
+<h2 id="7-api-key">7. 家政订单流接口详解（API Key）</h2>
+<h3 id="71-post-apijuzhujiazhengorders">7.1 POST /api/juzhu/jiazheng/orders —— 创建订单</h3>
+<p><strong>请求：</strong></p>
+<pre><code class="language-json">{
+  &quot;product_id&quot;: 123,
+  &quot;expectTime&quot;: &quot;2026-08-15T09:00:00&quot;,
+  &quot;house&quot;: &quot;沈阳市和平区XX路1号&quot;,
+  &quot;phone&quot;: &quot;13800000000&quot;,
+  &quot;desc&quot;: &quot;全屋深度保洁&quot;,
+  &quot;slot_id&quot;: 45,
+  &quot;worker_id&quot;: 8,
+  &quot;source&quot;: &quot;新居住频道&quot;
+}
+</code></pre>
+<ul>
+<li><code>product_id</code> / <code>sku_id</code>（兼容旧字段名）必填，且产品须 <code>status='on'</code> 且 SPU/类目启用</li>
+<li><code>house</code> / <code>phone</code> / <code>expectTime</code>（或 <code>expect_time</code> / <code>scheduled_at</code>）必填</li>
+<li><code>slot_id</code> 可选：记录档期意向（软校验，已满返回 409）</li>
+<li><code>worker_id</code> / <code>preferred_worker_id</code> 可选：客户指定服务者</li>
+<li><code>fee</code> 可选，默认取产品价格</li>
+</ul>
+<p><strong>响应（201）：</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;order&quot;: {
+    &quot;id&quot;: &quot;JZ202608131200001234&quot;,
+    &quot;sku_id&quot;: 123, &quot;category_id&quot;: &quot;clean&quot;, &quot;category&quot;: &quot;日常保洁&quot;,
+    &quot;type&quot;: &quot;保洁&quot;, &quot;icon&quot;: &quot;🧹&quot;,
+    &quot;house&quot;: &quot;沈阳市和平区XX路1号&quot;, &quot;phone&quot;: &quot;13800000000&quot;,
+    &quot;expect_time&quot;: &quot;2026-08-15T09:00:00&quot;, &quot;desc&quot;: &quot;全屋深度保洁&quot;,
+    &quot;fee&quot;: 12900, &quot;pay_status&quot;: &quot;unpaid&quot;, &quot;status&quot;: &quot;pending&quot;,
+    &quot;worker&quot;: { &quot;preferred&quot;: {...}, &quot;slot&quot;: {...} },
+    &quot;source&quot;: &quot;新居住频道&quot;, &quot;created_at&quot;: &quot;2026-08-13T12:00:00Z&quot;,
+    &quot;log&quot;: [ { &quot;s&quot;: &quot;pending&quot;, &quot;at&quot;: &quot;2026-08-13T12:00:00Z&quot;, &quot;by&quot;: &quot;user&quot; } ]
+  },
+  &quot;sku&quot;: { &quot;id&quot;: 123, &quot;price_from&quot;: 12900, &quot;category_id&quot;: &quot;clean&quot;, &quot;category_name&quot;: &quot;保洁&quot; }
+}
+</code></pre>
+<h3 id="72-post-apijuzhujiazhengordersidpay">7.2 POST /api/juzhu/jiazheng/orders/{id}/pay —— 支付</h3>
+<p><strong>请求：</strong> <code>{ "pay_method": "贝壳支付" }</code></p>
+<ul>
+<li>幂等：已支付订单重复调用返回当前订单视图</li>
+<li>占用档期名额（若下单时选了档期）；档期已满/已关返回 <strong>409</strong></li>
+</ul>
+<p><strong>响应：</strong> <code>{ "ok": true, "order": {...} }</code>（<code>pay_status: "paid"</code>, <code>pay_at</code> 已写入）</p>
+<h3 id="73-post-apijuzhujiazhengordersidquote">7.3 POST /api/juzhu/jiazheng/orders/{id}/quote —— 维修报价</h3>
+<p><strong>请求：</strong></p>
+<pre><code class="language-json">{
+  &quot;quote_items&quot;: [ { &quot;name&quot;: &quot;更换水龙头&quot;, &quot;price&quot;: 15000 } ],
+  &quot;quote_note&quot;: &quot;包含上门费与辅材&quot;
+}
+</code></pre>
+<ul>
+<li>仅 <code>category_id='repair'</code>（维修单）支持报价，其他类目返回 400</li>
+<li>报价金额累加进订单 <code>fee</code>，报价说明追加到 <code>desc</code></li>
+</ul>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;order&quot;: {...}, &quot;quote_items&quot;: [ { &quot;name&quot;: &quot;更换水龙头&quot;, &quot;price&quot;: 15000 } ] }
+</code></pre>
+<h3 id="74-post-apijuzhujiazhengordersiddispatch">7.4 POST /api/juzhu/jiazheng/orders/{id}/dispatch —— 派单</h3>
+<p><strong>请求：</strong> <code>{ "worker": { "id": 8, "name": "李师傅", "level": "L3" } }</code></p>
+<p><strong>派单逻辑（真实实现）：</strong></p>
+<ol>
+<li>订单须已支付（<code>pay_status='paid'</code>），否则 400「订单未支付，不可派单」</li>
+<li>仅 <code>pending</code>（待派单）状态可派单</li>
+<li>未传 <code>worker</code> 时：优先<strong>尊重客户选择</strong>（下单时选定的服务者，标记 <code>from_customer: true</code>）；无首选则按轮询分配内置服务者池</li>
+<li>保留客户预约档期（写入 worker.slot）</li>
+<li>状态 → <code>dispatched</code>，日志追加派单记录</li>
+</ol>
+<p><strong>响应：</strong> <code>{ "ok": true, "order": {...} }</code>（含 <code>worker</code> 与 <code>log</code>）</p>
+<h3 id="75-post-apijuzhujiazhengordersidadvance">7.5 POST /api/juzhu/jiazheng/orders/{id}/advance —— 状态推进</h3>
+<p><strong>请求：</strong> <code>{}</code>（服务者侧操作）</p>
+<ul>
+<li>按状态机自动推进 <code>dispatched → accepted → serving → done</code></li>
+<li><code>pending</code> 状态不可推进（需先派单）；<code>rated</code> 只能由客户评价产生</li>
+</ul>
+<p><strong>响应：</strong> <code>{ "ok": true, "order": {...} }</code></p>
+<h3 id="76-post-apijuzhujiazhengordersidrate">7.6 POST /api/juzhu/jiazheng/orders/{id}/rate —— 客户评价</h3>
+<p><strong>请求：</strong></p>
+<pre><code class="language-json">{
+  &quot;score&quot;: 5,
+  &quot;tags&quot;: [&quot;准时&quot;, &quot;干净&quot;],
+  &quot;text&quot;: &quot;非常专业&quot;
+}
+</code></pre>
+<ul>
+<li><code>score</code> 须为 1-5 整数，否则 400</li>
+<li>仅 <code>done</code>（待评价）状态可评价，评价后状态 → <code>rated</code></li>
+</ul>
+<p><strong>响应：</strong> <code>{ "ok": true, "order": {...} }</code>（含 <code>rating</code>）</p>
+<h3 id="77-post-apijuzhujiazhengwechat-link-url-link">7.7 POST /api/juzhu/jiazheng/wechat-link —— 生成微信 URL Link</h3>
+<p><strong>请求：</strong> <code>{ "product_id": 123 }</code></p>
+<p><strong>流程（真实实现）：</strong></p>
+<ol>
+<li>校验产品存在且 <code>status='on'</code></li>
+<li>生成 GR 订单号：<code>GR + YYYYMMDDHHmmss + 4位随机数</code>（查重防碰撞，最多重试 10 次）</li>
+<li>调用第三方小程序链接生成接口（config.ini <code>[wechat] url_link_api</code>，携带 <code>Token</code>）</li>
+<li>创建 gr_orders 记录（status=<code>pending</code>，写入 <code>order_ref</code>）</li>
+<li>返回 url_link</li>
+</ol>
+<p><strong>响应：</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;url_link&quot;: &quot;weixin://dl/business/?t=xxxx&quot;,
+  &quot;order_ref&quot;: &quot;GR202608131200001234&quot;
+}
+</code></pre>
+<hr />
+<h2 id="8-hmac-sha256">8. 第三方商家接口详解（HMAC-SHA256）</h2>
+<blockquote>
+<p>所有请求体必须含 <code>vendor_id</code> + <code>timestamp</code> + <code>sign</code>（见 §3.2 签名算法）。</p>
+</blockquote>
+<h3 id="81-post-apijuzhucallback">8.1 POST /api/juzhu/callback —— 订单状态回调</h3>
+<p>第三方小程序在用户下单/订单状态变更后回传 GR 侧。</p>
+<p><strong>请求参数：</strong></p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>必填</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vendor_id</code></td>
+<td>integer</td>
+<td>✅</td>
+<td>商家 ID，由 GR 侧分配</td>
+</tr>
+<tr>
+<td><code>order_ref</code></td>
+<td>string</td>
+<td>✅</td>
+<td>GR 侧订单参考号（如 <code>GR202608071429360148</code>）</td>
+</tr>
+<tr>
+<td><code>lailai_oid</code></td>
+<td>string</td>
+<td>✅</td>
+<td>来来订单号</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>string</td>
+<td>✅</td>
+<td>订单状态（见状态表）</td>
+</tr>
+<tr>
+<td><code>fee</code></td>
+<td>integer</td>
+<td>条件</td>
+<td><code>paid</code> 时必填，金额（分）</td>
+</tr>
+<tr>
+<td><code>worker</code></td>
+<td>object</td>
+<td>条件</td>
+<td><code>assigned</code> 时必填</td>
+</tr>
+<tr>
+<td><code>worker.name</code></td>
+<td>string</td>
+<td>条件</td>
+<td>服务者姓名</td>
+</tr>
+<tr>
+<td><code>worker.phone</code></td>
+<td>string</td>
+<td>条件</td>
+<td>服务者电话</td>
+</tr>
+<tr>
+<td><code>worker.eta</code></td>
+<td>string</td>
+<td>条件</td>
+<td>预计到达时间（ISO 8601）</td>
+</tr>
+<tr>
+<td><code>cancel_reason</code></td>
+<td>string</td>
+<td>条件</td>
+<td><code>cancelled</code> 时必填</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>integer</td>
+<td>✅</td>
+<td>毫秒时间戳（防重放，5 分钟窗口）</td>
+</tr>
+<tr>
+<td><code>sign</code></td>
+<td>string</td>
+<td>✅</td>
+<td>HMAC-SHA256 签名</td>
+</tr>
+</tbody>
+</table>
+<p><strong>状态枚举：</strong></p>
+<table>
+<thead>
+<tr>
+<th>status</th>
+<th>说明</th>
+<th>必填额外字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paid</code></td>
+<td>已支付</td>
+<td><code>fee</code></td>
+</tr>
+<tr>
+<td><code>assigned</code></td>
+<td>已派单</td>
+<td><code>worker</code>（name/phone/eta）</td>
+</tr>
+<tr>
+<td><code>serving</code></td>
+<td>服务中</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>已完成</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>已取消</td>
+<td><code>cancel_reason</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>首次回调 <code>paid</code> 时仅按 <code>order_ref</code> 查找并写入 <code>lailai_oid</code>；后续状态变更需 <code>order_ref</code> + <code>lailai_oid</code> 联合匹配。</p>
+</blockquote>
+<p><strong>响应：</strong> <code>{ "code": 0, "message": "success" }</code></p>
+<p><strong>错误码：</strong></p>
+<table>
+<thead>
+<tr>
+<th>code</th>
+<th>HTTP</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>200</td>
+<td>成功</td>
+</tr>
+<tr>
+<td>400</td>
+<td>400</td>
+<td>缺少必填参数或条件必填不满足</td>
+</tr>
+<tr>
+<td>401</td>
+<td>401</td>
+<td>签名校验失败（密钥未配置/签名缺失/时间戳过期/不匹配）</td>
+</tr>
+<tr>
+<td>404</td>
+<td>404</td>
+<td>订单不存在</td>
+</tr>
+<tr>
+<td>500</td>
+<td>500</td>
+<td>服务端内部错误</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82">8.2 商家产品管理接口</h3>
+<p>统一前缀 <code>/api/juzhu/jiazheng/vendor/</code>，全部 POST + HMAC 签名。</p>
+<p><strong>8.2.1 POST .../categories/list —— 类目列表</strong></p>
+<p><strong>响应：</strong> <code>{ "code": 0, "message": "success", "data": [ { "id", "name", "icon" } ] }</code></p>
+<p><strong>8.2.2 POST .../skus/list —— SPU 列表</strong></p>
+<p>平台标准品（不可修改，商家基于其创建产品）。</p>
+<p><strong>8.2.3 POST .../products/list —— 产品列表</strong></p>
+<p>请求体：<code>{ "vendor_id": 41, "status": "on", "page": 1, "page_size": 20 }</code></p>
+<p><strong>8.2.4 POST .../products/detail —— 产品详情</strong></p>
+<p>请求体：<code>{ "vendor_id": 41, "product_id": 123 }</code></p>
+<p><strong>8.2.5 POST .../products/create —— 创建产品</strong></p>
+<p>请求体：</p>
+<pre><code class="language-json">{
+  &quot;vendor_id&quot;: 41,
+  &quot;sku_id&quot;: 1,
+  &quot;name&quot;: &quot;日常保洁 3 小时（和平店）&quot;,
+  &quot;price&quot;: 12900,
+  &quot;stock&quot;: 100,
+  &quot;spec&quot;: &quot;3h/次&quot;
+}
+</code></pre>
+<p><strong>8.2.6 POST .../products/update —— 编辑产品</strong></p>
+<p><strong>8.2.7 POST .../products/status —— 状态变更</strong></p>
+<p>请求体：<code>{ "vendor_id": 41, "product_id": 123, "status": "on|off|soldout" }</code></p>
+<p><strong>8.2.8 POST .../products/delete —— 删除（软删）</strong></p>
+<p>请求体：<code>{ "vendor_id": 41, "product_id": 123 }</code></p>
+<hr />
+<h2 id="9-apijuzhujzapi-key">9. 管理台写接口详解（/api/juzhu/jz/*，API Key）</h2>
+<blockquote>
+<p>这些接口是 P 端管理台（类目/SPU/档期/产品/服务者）与订单状态推进的数据源，全部需要 API Key（此前曾存在可匿名调用的安全隐患，已修复，见 CLAUDE.md 规则 9）。</p>
+</blockquote>
+<h3 id="91">9.1 类目管理</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/categories</code> → 新增 → <code>{ "ok": true, "id": n }</code></li>
+<li><code>PUT /api/juzhu/jz/categories/{id}</code> → 编辑 → <code>{ "ok": true }</code></li>
+<li><code>DELETE /api/juzhu/jz/categories/{id}</code> → 删除 → <code>{ "ok": true }</code>（有关联数据返回 400）</li>
+</ul>
+<h3 id="92-spu">9.2 SPU 管理（平台标准品）</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/spu</code> → 新增 → <code>{ "ok": true, "id": n }</code></li>
+<li><code>PUT /api/juzhu/jz/spu/{id}</code> → 编辑</li>
+<li><code>DELETE /api/juzhu/jz/spu/{id}</code> → 删除</li>
+</ul>
+<h3 id="93">9.3 档期管理</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/slots/generate</code> → 批量生成</li>
+</ul>
+<pre><code class="language-json">{
+  &quot;product_id&quot;: 123,
+  &quot;worker_ids&quot;: [8, 9],
+  &quot;dates&quot;: [&quot;2026-08-15&quot;],
+  &quot;times&quot;: [&quot;09:00-12:00&quot;],
+  &quot;capacity&quot;: 1
+}
+</code></pre>
+<p>→ <code>{ "ok": true, "created": n }</code></p>
+<ul>
+<li><code>POST /api/juzhu/jz/slots</code> → 新增单档期</li>
+<li><code>PUT /api/juzhu/jz/slots/{id}</code> → <code>{ "status": "open|closed" }</code> → <code>{ "ok": true }</code></li>
+<li><code>DELETE /api/juzhu/jz/slots/{id}</code> → 删除</li>
+</ul>
+<h3 id="94">9.4 产品管理</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/products</code> → 新增 → <code>{ "ok": true, "id": n }</code></li>
+<li><code>PUT /api/juzhu/jz/products/{id}</code> → 编辑</li>
+<li><code>DELETE /api/juzhu/jz/products/{id}</code> → 删除</li>
+</ul>
+<h3 id="95">9.5 服务者管理</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/workers</code> → 新增 → <code>{ "ok": true, "id": n }</code></li>
+<li><code>PUT /api/juzhu/jz/workers/{id}</code> → 编辑</li>
+<li><code>DELETE /api/juzhu/jz/workers/{id}</code> → 删除</li>
+</ul>
+<h3 id="96">9.6 订单状态推进（管理台）</h3>
+<ul>
+<li><code>POST /api/juzhu/jz/orders</code> → 创建订单（字段与 §7.1 一致，兼容 <code>product_id</code>/<code>sku_id</code>、<code>address</code>/<code>house</code>、<code>scheduled_at</code>/<code>expectTime</code>）</li>
+<li><code>POST /api/juzhu/jz/orders/{id}/dispatch</code> → 派单。请求：<code>{ "worker_id": 8 }</code>；不传则自动选第一名在线服务者</li>
+<li><code>POST /api/juzhu/jz/orders/{id}/status</code> → 状态推进。请求：<code>{ "status": "accepted" }</code>（合法值：pending/dispatched/accepted/serving/done/rated/cancelled）</li>
+<li><code>POST /api/juzhu/jz/orders/{id}/rate</code> → 评价（信用分联动）。请求：<code>{ "score": 5, "tags": [], "text": "" }</code></li>
+</ul>
+<p><strong>信用分变动规则（真实实现）：</strong></p>
+<table>
+<thead>
+<tr>
+<th>评分</th>
+<th>信用分变动</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5 星</td>
+<td>+2.4</td>
+</tr>
+<tr>
+<td>4 星</td>
+<td>+1.2</td>
+</tr>
+<tr>
+<td>2-3 星</td>
+<td>−1.5</td>
+</tr>
+<tr>
+<td>1 星</td>
+<td>−3.0</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-gr-gr_orderspy">10. GR 订单模块（gr_orders.py）</h2>
+<p>GR 侧预约订单（来来回调）独立于家政订单表，专用于小程序跳转-回传闭环。</p>
+<h3 id="101">10.1 表结构</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_ref</code></td>
+<td>GR + YYYYMMDDHHmmss + 4 位随机数（唯一，查重防碰撞）</td>
+</tr>
+<tr>
+<td><code>sku</code></td>
+<td>关联产品 ID</td>
+</tr>
+<tr>
+<td><code>city</code></td>
+<td>城市（默认"沈阳"）</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>pending → paid → assigned → serving → completed / cancelled</td>
+</tr>
+<tr>
+<td><code>lailai_oid</code></td>
+<td>来来订单号（paid 回调写入）</td>
+</tr>
+<tr>
+<td><code>fee</code></td>
+<td>金额（分，paid 回调写入）</td>
+</tr>
+<tr>
+<td><code>worker_name</code> / <code>worker_phone</code> / <code>eta</code></td>
+<td>派单信息（assigned 回调写入）</td>
+</tr>
+<tr>
+<td><code>cancel_reason</code></td>
+<td>取消原因</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>创建时间</td>
+</tr>
+</tbody>
+</table>
+<h3 id="102">10.2 闭环流程</h3>
+<pre><code>① 商家小程序 → POST /api/juzhu/jiazheng/wechat-link（product_id）
+② 平台生成 order_ref + 调第三方 URL Link API → 返回 weixin:// 链接
+③ 用户在小程序内下单支付 → 小程序回调 POST /api/juzhu/callback（status=paid, fee）
+④ 派单 → 回调 status=assigned（worker 信息）
+⑤ 服务中/完成/取消 → 回调对应状态
+</code></pre>
+<hr />
+<h2 id="11">11. 错误码约定</h2>
+<h3 id="111-apijuzhu">11.1 平台接口（/api/juzhu/*）</h3>
+<table>
+<thead>
+<tr>
+<th>HTTP</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>成功</td>
+</tr>
+<tr>
+<td>201</td>
+<td>创建成功（订单）</td>
+</tr>
+<tr>
+<td>400</td>
+<td>参数错误 / 状态非法 / 仅维修单可报价 / 未支付不可派单</td>
+</tr>
+<tr>
+<td>401</td>
+<td>API Key 无效 / HMAC 签名校验失败</td>
+</tr>
+<tr>
+<td>404</td>
+<td>资源不存在 / 未知路由</td>
+</tr>
+<tr>
+<td>409</td>
+<td>档期已约满（支付占用冲突）</td>
+</tr>
+<tr>
+<td>500</td>
+<td>服务端内部错误</td>
+</tr>
+</tbody>
+</table>
+<p>错误响应统一格式：<code>{ "error": "错误描述" }</code>（管理端）或 <code>{ "code": 401, "message": "..." }</code>（商家端）。</p>
+<h3 id="112">11.2 通用字段约定</h3>
+<ul>
+<li>金额一律为<strong>分</strong>（整数），如 12900 = ¥129</li>
+<li>时间戳：创建/更新时间 ISO 8601（如 <code>2026-08-13T12:00:00Z</code>）；签名时间戳为毫秒整数</li>
+<li>订单 ID：<code>JZ</code> 前缀；GR 订单号：<code>GR</code> 前缀 + 时间戳 + 4 位随机数</li>
+</ul>
+<hr />
+<h2 id="12-python">12. 参考实现（Python 签名）</h2>
+<pre><code class="language-python">import hashlib, hmac, time
+
+def sign_request(body: dict, secret: str) -&gt; dict:
+    payload = body.copy()
+    payload.pop(&quot;sign&quot;, None)
+    timestamp = int(time.time() * 1000)
+    flat = {}
+    def flatten(d, prefix=&quot;&quot;):
+        for k, v in d.items():
+            if v is None or v == &quot;&quot;:
+                continue
+            key = f&quot;{prefix}.{k}&quot; if prefix else k
+            if isinstance(v, dict):
+                flatten(v, key)
+            else:
+                flat[key] = str(v)
+    flatten(payload)
+    flat[&quot;timestamp&quot;] = str(timestamp)
+    s = &quot;&amp;&quot;.join(f&quot;{k}={flat[k]}&quot; for k in sorted(flat))
+    sign = hmac.new(secret.encode(), s.encode(), hashlib.sha256).hexdigest()
+    payload[&quot;timestamp&quot;] = timestamp
+    payload[&quot;sign&quot;] = sign
+    return payload
+</code></pre>
+<hr />
+<h2 id="a">附录 A：接口数量统计</h2>
+<table>
+<thead>
+<tr>
+<th>分类</th>
+<th>数量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>公开只读（GET）</td>
+<td>31</td>
+</tr>
+<tr>
+<td>管理端（admin，API Key）</td>
+<td>16</td>
+</tr>
+<tr>
+<td>家政订单流（jiazheng，API Key）</td>
+<td>8</td>
+</tr>
+<tr>
+<td>家政管理台（jz，API Key）</td>
+<td>15</td>
+</tr>
+<tr>
+<td>第三方商家（HMAC）</td>
+<td>9</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td><strong>79</strong></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注：另有 API 网关规划接口（/v3/*，如信用分、智能派单、证书签发/吊销等，见《平台运营方操作手册》6.2 节），属二期能力开放范畴，不在本文档范围内。</p>
+</blockquote>
+</body>
+</html>
