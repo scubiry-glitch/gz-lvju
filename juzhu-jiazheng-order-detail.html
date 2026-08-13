@@ -8,20 +8,20 @@
 <style>
   .scr{padding-bottom:24px;}
   .appbar{position:sticky;}
-  .steps{background:#fff;margin:13px 16px 0;border:1px solid var(--border);border-radius:14px;padding:18px 14px 14px;}
-  .steps h3{font-size:14px;color:var(--ink);margin-bottom:14px;}
-  .step{display:flex;gap:11px;position:relative;padding-bottom:18px;}
-  .step:last-child{padding-bottom:4px;}
+  .steps-h{margin:13px 16px 0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink);}
+  .steps-h::before{content:"";width:4px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--brand),var(--brand-2));}
+  .steps{display:flex;background:#fff;margin:10px 16px 0;border:1px solid var(--border);border-radius:14px;padding:14px 6px 12px;}
+  .step{flex:1;text-align:center;position:relative;}
   .step .dot{width:22px;height:22px;border-radius:50%;background:#eef2f1;color:#96a39f;
-    display:grid;place-items:center;font-size:11px;flex-shrink:0;}
-  .step .line{position:absolute;left:10.5px;top:24px;bottom:2px;width:2px;background:#eef2f1;}
+    display:grid;place-items:center;font-size:11px;margin:0 auto 6px;}
+  .step .line{position:absolute;top:11px;left:50%;right:-50%;height:2px;background:#eef2f1;transform:translateX(12px);}
   .step:last-child .line{display:none;}
   .step.done .dot{background:var(--brand-soft);color:var(--brand);}
   .step.done .line{background:var(--brand-soft);}
   .step.cur .dot{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;}
-  .step b{font-size:13px;color:var(--ink);display:block;}
+  .step b{font-size:11px;color:var(--ink);display:block;}
   .step.done b{color:var(--brand-deep);}
-  .step span{font-size:11px;color:var(--muted);margin-top:2px;display:block;}
+  .step span{font-size:9px;color:var(--muted);margin-top:2px;display:block;letter-spacing:-.02em;}
   .cancelled-tip{margin:13px 16px 0;background:#fff7f5;border:1px solid #fecaca;border-radius:14px;
     padding:12px 14px;font-size:12px;color:#dc2626;}
   .info{background:#fff;margin:13px 16px 0;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
@@ -61,6 +61,11 @@
 
   function fmtTime(t){ return t ? String(t).replace('T', ' ').slice(0, 16) : '—'; }
 
+  function fmtStepTime(t){
+    var full = fmtTime(t);
+    return full === '—' ? full : full.slice(5, 16);  // 横向紧凑展示 MM-DD HH:MM
+  }
+
   function render(o){
     var STEPS = [
       { id: 'created',  label: '下单',   time: o.created_at },
@@ -76,7 +81,7 @@
       html += '<div class="cancelled-tip">该订单已取消' +
         (o.cancel_reason ? '：' + esc(o.cancel_reason) : '') + '</div>';
     }
-    html += '<div class="steps"><h3>服务流程</h3>' + STEPS.map(function(s, i){
+    html += '<div class="steps-h">服务流程</div><div class="steps">' + STEPS.map(function(s, i){
       var cls = '';
       if (curIdx >= 0) {
         if (i <= curIdx + 1) cls = 'done';
@@ -84,7 +89,7 @@
       }
       return '<div class="step ' + cls + '"><div class="line"></div>' +
         '<div class="dot">' + (cls === 'done' ? '✓' : (i + 1)) + '</div>' +
-        '<div><b>' + s.label + '</b><span>' + fmtTime(s.time) + '</span></div></div>';
+        '<div><b>' + s.label + '</b><span>' + fmtStepTime(s.time) + '</span></div></div>';
     }).join('') + '</div>';
 
     var rows = [
