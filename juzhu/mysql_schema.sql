@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
 CREATE TABLE IF NOT EXISTS jz_products (
   id INT AUTO_INCREMENT PRIMARY KEY,
   vendor_id INT NOT NULL,
+  city_id INT NULL,
   title VARCHAR(256) NOT NULL,
   subtitle TEXT,
   category VARCHAR(32),
@@ -231,6 +232,7 @@ CREATE TABLE IF NOT EXISTS jz_products (
   status VARCHAR(16) DEFAULT 'on',
   sort_order INT DEFAULT 0,
   KEY idx_jz_products_vendor (vendor_id, status),
+  KEY idx_jz_products_city (city_id),
   CONSTRAINT fk_jz_products_vendor FOREIGN KEY (vendor_id) REFERENCES jz_vendors(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
