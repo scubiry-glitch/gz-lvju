@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""从东博「新居住专区」文件夹扫描并写入 SQLite + 导出 data.json + 复制封面图。"""
-import json, os, re, shutil, sqlite3
+"""从东博「新居住专区」文件夹扫描并写入 MySQL + 导出 data.json + 复制封面图。"""
+import json, os, re, shutil
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 SRC = Path("/Users/scubiry/Downloads/东博项目/新居住专区")
-DB_PATH = ROOT / "juzhu.db"
 JSON_PATH = ROOT / "data.json"
 ASSETS = REPO / "assets" / "juzhu" / "sy"
+
+import db  # noqa: E402
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"}
 COVER_NAMES = {"店封面.jpg", "店封面 .jpg", "项目 封面.jpg", "项目封面.jpg"}
@@ -73,15 +74,14 @@ def main():
     if not SRC.exists():
         raise SystemExit(f"源目录不存在: {SRC}")
 
-    if DB_PATH.exists():
-        DB_PATH.unlink()
     if ASSETS.exists():
         shutil.rmtree(ASSETS)
     ASSETS.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.executescript((ROOT / "schema.sql").read_text())
+    conn = db.connect()  # MySQL：先清空房源相关表，再全量重建
+    conn.executescript((ROOT / "mysql_schema.sql").read_text())
+    for table in ("cities", "districts", "projects", "units", "photos"):
+        conn.execute("DELETE FROM %s" % table)
 
     conn.execute("INSERT INTO cities(name, slug) VALUES (?, ?)", ("沈阳", "shenyang"))
     city_id = conn.execute("SELECT id FROM cities WHERE slug='shenyang'").fetchone()[0]

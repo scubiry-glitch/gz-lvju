@@ -191,6 +191,19 @@ class _EmptyCursor(_MysqlCursor):
     rowcount = -1
 
 
+class _ConnCursor:
+    """sqlite3.Cursor 兼容代理：execute 返回可 fetch 的游标（供 seed 脚本使用）。"""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=()):
+        return self._conn.execute(sql, params)
+
+    def executescript(self, script):
+        return self._conn.executescript(script)
+
+
 class MysqlConn:
     """pymysql 连接包装：对上层暴露 sqlite3.Connection 兼容接口。"""
 
@@ -211,6 +224,8 @@ class MysqlConn:
             mapped = sqlite_master_to_sql(sql_text)
             if mapped is not None:
                 sql_text, params = mapped
+        elif sql_text.lower().startswith("select last_insert_rowid"):
+            sql_text = "SELECT LAST_INSERT_ID()"
         # 占位符翻译 + 保留字加反引号
         sql_text, _ = translate_placeholders(sql_text, params)
         sql_text = quote_reserved_words(sql_text)
@@ -222,6 +237,10 @@ class MysqlConn:
         for stmt in split_script(script):
             self.execute(stmt)
         return self
+
+    def cursor(self):
+        """sqlite3 风格 cursor()：返回代理，execute 转发到本连接。"""
+        return _ConnCursor(self)
 
     def commit(self):
         self._raw.commit()

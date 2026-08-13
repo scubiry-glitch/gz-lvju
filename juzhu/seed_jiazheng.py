@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""居住服务·家政频道 · SQLite 建表 + 初始数据 seed
+"""居住服务·家政频道 · 初始数据 seed（写入 MySQL）
 执行：python3 juzhu/seed_jiazheng.py
 """
 import json
-import sqlite3
 import sys
 from pathlib import Path
 from datetime import datetime, timezone, date, timedelta
 
 ROOT = Path(__file__).resolve().parent
-DB_PATH = ROOT / "juzhu.db"
 SCHEMA = ROOT / "jiazheng_schema.sql"
 
 NOW = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -20,11 +18,7 @@ def jdump(x):
 
 
 def main():
-    if not DB_PATH.exists():
-        print(f"❌ DB 不存在: {DB_PATH}")
-        sys.exit(1)
-
-    print(f"📦 连接数据库: {DB_PATH}")
+    print("📦 连接数据库: MySQL (JUZHU_DB_*)")
     sys.path.insert(0, str(ROOT))
     from db import connect  # noqa: E402
     conn = connect()
@@ -371,7 +365,7 @@ def main():
         for w in WORKERS:
             if w[11] == vid:  # w[11] = 服务者 vendor_id
                 conn.execute(
-                    "INSERT OR IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?, ?)",
+                    "INSERT IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?, ?)",
                     (pid, w[0]),
                 )
                 prod_workers.setdefault(pid, []).append(w[0])
