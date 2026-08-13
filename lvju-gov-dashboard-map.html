@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>驾驶舱</title>
+  <script src="screens/_region.js?v=2"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0f14; --card:#111827; --card-hover:#1a2332; --fg:#e2e8f0; --muted:#94a3b8;
+    --brand:#10b981; --brand-soft:rgba(16,185,129,.15); --gold:#f59e0b; --gold-soft:rgba(245,158,11,.15);
+    --danger:#ef4444; --warn:#f59e0b; --ok:#10b981; --info:#3b82f6;
+    --r-sm:6px; --r-md:10px; --r-lg:14px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden;}
+  .dashboard{display:grid;grid-template-rows:auto 1fr;height:100vh;}
+  .header{background:linear-gradient(90deg,#0b5d56,#0f766e);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;}
+  .header-left{display:flex;align-items:center;gap:16px;}
+  .header h1{font-size:20px;font-weight:700;margin:0;color:#fff;}
+  .header .badge{background:rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:600;padding:4px 12px;border-radius:999px;}
+  .header-right{display:flex;align-items:center;gap:20px;color:#fff;font-size:13px;}
+  .header-right .time{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .header-right .date{opacity:.8;}
+  .main{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;padding:16px;overflow:hidden;}
+  .panel{background:var(--card);border-radius:var(--r-lg);display:flex;flex-direction:column;overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .panel-head h3{font-size:14px;font-weight:600;margin:0;}
+  .panel-head .icon{font-size:16px;}
+  .panel-body{flex:1;overflow-y:auto;padding:14px 18px;}
+  .panel-body::-webkit-scrollbar{width:4px;}
+  .panel-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:2px;}
+  
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .kpi-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-md);padding:12px 10px;text-align:center;}
+  .kpi-card .value{font-size:24px;font-weight:700;color:var(--brand);}
+  .kpi-card .value.gold{color:var(--gold);}
+  .kpi-card .value.danger{color:var(--danger);}
+  .kpi-card .label{font-size:11px;color:var(--muted);margin-top:4px;}
+  .kpi-card .trend{font-size:11px;color:var(--ok);margin-top:4px;}
+  .kpi-card .trend.down{color:var(--danger);}
+  .kpi-card .note{font-size:9px;color:var(--muted);margin-top:4px;opacity:.7;}
+  
+  .section-title{font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.06);}
+  
+  .alert-list{display:flex;flex-direction:column;gap:8px;}
+  .alert-item{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;}
+  .alert-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .alert-item .dot.danger{background:var(--danger);}
+  .alert-item .dot.warn{background:var(--warn);}
+  .alert-item .dot.ok{background:var(--ok);}
+  .alert-item .content{flex:1;}
+  .alert-item .count{font-weight:600;color:var(--fg);}
+  
+  .progress-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .progress-row .label{width:60px;font-size:11px;color:var(--muted);flex-shrink:0;}
+  .progress-row .bar{flex:1;height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;}
+  .progress-row .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand));border-radius:3px;}
+  .progress-row .value{width:40px;font-size:11px;color:var(--fg);text-align:right;}
+  
+  .map-container{flex:1;position:relative;border-radius:0 0 var(--r-lg) var(--r-lg);overflow:hidden;}
+  #mapChart{width:100%;height:100%;}
+  .map-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:14px;}
+  .map-loading .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  
+  .region-popup{position:absolute;right:20px;top:20px;width:260px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-md);padding:16px;transform:translateX(120%);transition:transform .3s ease;z-index:100;}
+  .region-popup.visible{transform:translateX(0);}
+  .region-popup .close{position:absolute;right:8px;top:8px;width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.1);border:0;color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:14px;}
+  .region-popup .close:hover{background:rgba(255,255,255,.2);color:#fff;}
+  .region-popup h4{font-size:14px;margin:0 0 12px;color:#fff;}
+  .region-popup .popup-data{font-size:12px;}
+  .region-popup .popup-data .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);}
+  .region-popup .popup-data .row:last-child{border-bottom:0;}
+  .region-popup .popup-data .label{color:var(--muted);}
+  .region-popup .popup-data .value{color:var(--brand);font-weight:600;}
+  
+  .status-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;}
+  .status-row:last-child{border-bottom:0;}
+  .status-row .label{color:var(--muted);}
+  .status-row .value{font-weight:500;}
+  .status-row .value.ok{color:var(--ok);}
+  .status-row .value.warn{color:var(--warn);}
+  
+  .rank-list{display:flex;flex-direction:column;gap:6px;}
+  .rank-item{display:flex;align-items:center;gap:10px;font-size:12px;}
+  .rank-item .rank{width:20px;height:20px;border-radius:4px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:11px;flex-shrink:0;}
+  .rank-item .rank.top{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;}
+  .rank-item .name{flex:1;}
+  .rank-item .value{color:var(--brand);font-weight:600;}
+  
+  .action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px;}
+  .action-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:10px;text-align:center;font-size:11px;color:var(--fg);cursor:pointer;transition:all .15s;}
+  .action-btn:hover{background:var(--brand-soft);border-color:var(--brand);color:var(--brand);}
+  .action-btn .icon{font-size:18px;margin-bottom:4px;display:block;}
+  
+  .chart-container{height:100px;margin-top:10px;}
+  #trendChart,#pieChart{width:100%;height:100%;}
+  
+  /* 沈阳：收窄侧栏，让地图横向占满中间区域 */
+  body.region-sy .main{grid-template-columns:220px 1fr 220px;gap:12px;padding:12px 14px;}
+  body.region-sy .map-panel{min-width:0;}
+  body.region-sy .map-container{min-height:0;}
+  body.region-sy .panel-head{padding:10px 14px;}
+  body.region-sy .visual-map-compact .echarts-visual-map{transform:scale(.9);transform-origin:left bottom;}
+
+  @media(max-width:1024px){
+    .main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;}
+    body.region-sy .main{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="dashboard">
+  <div class="header">
+    <div class="header-left">
+      <h1 id="pageTitle">🏛 贵州省住建厅 · 驾驶舱</h1>
+      <span class="badge" id="pageBadge">🐚 贝壳旅居平台</span>
+    </div>
+    <div class="header-right">
+      <select id="regionSwitch" style="padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;cursor:pointer;"></select>
+      <div class="date" id="date">2026年6月25日 星期四</div>
+      <div class="time" id="time">01:28:00</div>
+    </div>
+  </div>
+  
+  <div class="main">
+    <!-- left panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="icon">📊</span>
+        <h3>核心指标总览</h3>
+      </div>
+      <div class="panel-body">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="value">12,860</div>
+            <div class="label">在营旅居房源</div>
+            <div class="trend">↑ 860 本月新增</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value gold">91%</div>
+            <div class="label">彩贝达标率</div>
+            <div class="trend">↑ 2.1%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">38万</div>
+            <div class="label">旅居客 MAU</div>
+            <div class="note">※ 政策推动上限</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">98%</div>
+            <div class="label">投诉处置率</div>
+            <div class="trend">↑ 0.5%</div>
+          </div>
+        </div>
+        
+        <div class="section-title">资产估值</div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="value gold">¥8.2亿</div>
+            <div class="label">资产总估值</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">¥6,380</div>
+            <div class="label">平均房源估值</div>
+          </div>
+        </div>
+        
+        <div class="section-title">服务者认证</div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="value">2,468</div>
+            <div class="label">持证服务者</div>
+            <div class="trend">↑ 124 本月</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">312</div>
+            <div class="label">认证服务商</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">4.8</div>
+            <div class="label">平均服务彩贝</div>
+          </div>
+          <div class="kpi-card">
+            <div class="value">86%</div>
+            <div class="label">团队持证率</div>
+          </div>
+        </div>
+        
+        <div class="section-title">本月运营预警</div>
+        <div class="alert-list">
+          <div class="alert-item">
+            <span class="dot danger"></span>
+            <span class="content">运营商 SLA 异常</span>
+            <span class="count">3</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot warn"></span>
+            <span class="content">彩贝复核待审</span>
+            <span class="count">5</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot warn"></span>
+            <span class="content">服务者认证待审</span>
+            <span class="count">8</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot warn"></span>
+            <span class="content">保险即将到期</span>
+            <span class="count">8</span>
+          </div>
+          <div class="alert-item">
+            <span class="dot ok"></span>
+            <span class="content">房源信息待补全</span>
+            <span class="count">23</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- center: map -->
+    <div class="panel map-panel">
+      <div class="panel-head">
+        <span class="icon">🗺</span>
+        <h3 id="mapTitle">贵州省房源分布 · 9 个地级行政区</h3>
+      </div>
+      <div class="map-container">
+        <div class="map-loading" id="mapLoading">
+          <div class="spinner"></div>
+          <div id="mapLoadingText">正在加载地图数据...</div>
+        </div>
+        <div id="mapChart"></div>
+        <div class="region-popup" id="regionPopup">
+          <button class="close" onclick="closePopup()">×</button>
+          <h4 id="popupTitle">区域详情</h4>
+          <div class="popup-data" id="popupData"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- right panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="icon">📈</span>
+        <h3>数据洞察</h3>
+      </div>
+      <div class="panel-body">
+        <div class="section-title">彩贝分布</div>
+        <div class="progress-row">
+          <span class="label">五彩贝</span>
+          <div class="bar"><i style="width:12%"></i></div>
+          <span class="value">342</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">四彩贝</span>
+          <div class="bar"><i style="width:28%"></i></div>
+          <span class="value">797</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">三彩贝</span>
+          <div class="bar"><i style="width:45%"></i></div>
+          <span class="value">1,281</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">二彩贝</span>
+          <div class="bar"><i style="width:12%"></i></div>
+          <span class="value">342</span>
+        </div>
+        <div class="progress-row">
+          <span class="label">一彩贝</span>
+          <div class="bar"><i style="width:3%"></i></div>
+          <span class="value">85</span>
+        </div>
+        
+        <div class="section-title">核验状态</div>
+        <div class="status-row">
+          <span class="label">公安实名备案</span>
+          <span class="value ok">✓ 98.4%</span>
+        </div>
+        <div class="status-row">
+          <span class="label">住建产权/租赁备案</span>
+          <span class="value ok">✓ 96.8%</span>
+        </div>
+        <div class="status-row">
+          <span class="label">保险投保</span>
+          <span class="value ok">✓ 94.7%</span>
+        </div>
+        <div class="status-row">
+          <span class="label">待核验</span>
+          <span class="value warn">46 (1.6%)</span>
+        </div>
+        
+        <div class="section-title">地市州彩贝达标排名</div>
+        <div class="rank-list">
+          <div class="rank-item">
+            <span class="rank top">1</span>
+            <span class="name">贵阳市</span>
+            <span class="value">96.2%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank top">2</span>
+            <span class="name">黔东南州</span>
+            <span class="value">94.8%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank top">3</span>
+            <span class="name">安顺市</span>
+            <span class="value">92.1%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">4</span>
+            <span class="name">黔南州</span>
+            <span class="value">89.6%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">5</span>
+            <span class="name">遵义市</span>
+            <span class="value">87.3%</span>
+          </div>
+          <div class="rank-item">
+            <span class="rank">6</span>
+            <span class="name">黔西南州</span>
+            <span class="value">85.7%</span>
+          </div>
+        </div>
+        
+        <div class="section-title">快捷操作</div>
+        <div class="action-grid">
+          <div class="action-btn" onclick="exportReport()">
+            <span class="icon">📋</span>
+            导出日报
+          </div>
+          <div class="action-btn" onclick="searchHouses()">
+            <span class="icon">🔍</span>
+            房源查询
+          </div>
+          <div class="action-btn" onclick="dataAnalysis()">
+            <span class="icon">📊</span>
+            数据分析
+          </div>
+          <div class="action-btn" onclick="systemSettings()">
+            <span class="icon">⚙️</span>
+            系统设置
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ 预设系统 ============
+(function(){
+  const sel = document.getElementById('regionSwitch');
+  if (!sel || !window.BZF_PRESETS) return;
+  const cur = (window.BZF_REGION && window.BZF_REGION.key) || 'js';
+  sel.innerHTML = Object.keys(window.BZF_PRESETS).map(k =>
+    '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + window.BZF_PRESETS[k].label + '</option>'
+  ).join('');
+  sel.addEventListener('change', function(){
+    const u = new URL(location.href);
+    u.searchParams.set('region', this.value);
+    location.href = u.toString();
+  });
+})();
+
+// 预设配置
+const PRESET = window.BZF_REGION || { key: 'gz_zj' };
+const isGuizhou = PRESET.key === 'gz_zj';
+const isShenyang = PRESET.key === 'sy_zj';
+const SY_EXCLUDED_DISTRICTS = ['辽中区', '新民市', '法库县', '康平县'];
+
+if (isShenyang) document.body.classList.add('region-sy');
+
+// 更新标题
+const P = window.BZF_PRESETS && window.BZF_PRESETS[PRESET.key];
+if (P) {
+  document.getElementById('pageTitle').textContent = '🏛 ' + P.prov.full + P.dept.short + ' · 驾驶舱';
+  document.getElementById('pageBadge').textContent = '🐚 贝壳' + P.biz.term + '平台';
+  document.getElementById('mapTitle').textContent = P.prov.full + '房源分布 · ' + (isShenyang ? '9 个区县' : '9 个地级行政区');
+  const loadingText = document.getElementById('mapLoadingText');
+  if (loadingText) loadingText.textContent = '正在加载' + (isShenyang ? '沈阳' : '贵州') + '地图数据...';
+  document.title = P.prov.short + P.dept.short + ' · 驾驶舱';
+}
+
+// 实时时钟
+function updateTime() {
+  const now = new Date();
+  const timeEl = document.getElementById('time');
+  const dateEl = document.getElementById('date');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  timeEl.textContent = `${hours}:${minutes}:${seconds}`;
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+  dateEl.textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${weekdays[now.getDay()]}`;
+}
+updateTime();
+setInterval(updateTime, 1000);
+
+// 地区数据配置
+const REGION_CONFIG = {
+  gz_zj: {
+    mapFile: 'guizhou-map.json',
+    mapName: 'guizhou',
+    center: [106.7, 26.6],
+    zoom: 1.2,
+    visualMax: 3500,
+    data: {
+      '贵阳市': { count: 3200, rate: 96.2, value: '2.6亿', avgPrice: 328, wu: 156, si: 298, san: 312, er: 98, yi: 28 },
+      '黔东南苗族侗族自治州': { count: 2400, rate: 94.8, value: '1.8亿', avgPrice: 256, wu: 128, si: 245, san: 221, er: 98, yi: 32 },
+      '黔南布依族苗族自治州': { count: 1600, rate: 89.6, value: '1.2亿', avgPrice: 198, wu: 42, si: 98, san: 156, er: 86, yi: 30 },
+      '遵义市': { count: 2100, rate: 87.3, value: '1.1亿', avgPrice: 186, wu: 38, si: 86, san: 132, er: 72, yi: 28 },
+      '黔西南布依族苗族自治州': { count: 400, rate: 85.7, value: '0.6亿', avgPrice: 168, wu: 22, si: 48, san: 72, er: 38, yi: 18 },
+      '安顺市': { count: 800, rate: 92.1, value: '0.5亿', avgPrice: 218, wu: 28, si: 52, san: 58, er: 22, yi: 7 },
+      '铜仁市': { count: 1100, rate: 84.2, value: '0.3亿', avgPrice: 152, wu: 12, si: 28, san: 36, er: 16, yi: 6 },
+      '毕节市': { count: 700, rate: 82.5, value: '0.3亿', avgPrice: 142, wu: 10, si: 24, san: 32, er: 14, yi: 5 },
+      '六盘水市': { count: 500, rate: 80.3, value: '0.2亿', avgPrice: 138, wu: 8, si: 18, san: 22, er: 10, yi: 4 }
+    },
+    ranks: [
+      { name: '贵阳市', value: '96.2%' },
+      { name: '黔东南州', value: '94.8%' },
+      { name: '安顺市', value: '92.1%' },
+      { name: '黔南州', value: '89.6%' },
+      { name: '遵义市', value: '87.3%' },
+      { name: '黔西南州', value: '85.7%' }
+    ]
+  },
+  sy_zj: {
+    mapFile: 'shenyang-map.json',
+    mapName: 'shenyang',
+    visualMax: 1500,
+    data: {
+      '和平区': { count: 1200, rate: 95.2, value: '1.2亿', avgPrice: 268, wu: 68, si: 128, san: 156, er: 48, yi: 12 },
+      '沈河区': { count: 980, rate: 93.8, value: '0.9亿', avgPrice: 245, wu: 52, si: 98, san: 128, er: 42, yi: 10 },
+      '皇姑区': { count: 850, rate: 91.5, value: '0.8亿', avgPrice: 228, wu: 42, si: 82, san: 112, er: 38, yi: 9 },
+      '大东区': { count: 720, rate: 89.2, value: '0.6亿', avgPrice: 198, wu: 32, si: 68, san: 92, er: 32, yi: 8 },
+      '铁西区': { count: 680, rate: 88.6, value: '0.6亿', avgPrice: 186, wu: 28, si: 62, san: 88, er: 28, yi: 6 },
+      '浑南区': { count: 520, rate: 86.8, value: '0.5亿', avgPrice: 175, wu: 22, si: 48, san: 72, er: 24, yi: 5 },
+      '于洪区': { count: 450, rate: 85.2, value: '0.4亿', avgPrice: 162, wu: 18, si: 42, san: 62, er: 20, yi: 4 },
+      '沈北新区': { count: 380, rate: 84.5, value: '0.3亿', avgPrice: 148, wu: 15, si: 35, san: 52, er: 18, yi: 4 },
+      '苏家屯区': { count: 320, rate: 82.8, value: '0.3亿', avgPrice: 138, wu: 12, si: 28, san: 42, er: 15, yi: 3 }
+    },
+    ranks: [
+      { name: '和平区', value: '95.2%' },
+      { name: '沈河区', value: '93.8%' },
+      { name: '皇姑区', value: '91.5%' },
+      { name: '大东区', value: '89.2%' },
+      { name: '铁西区', value: '88.6%' },
+      { name: '浑南区', value: '86.8%' }
+    ]
+  }
+};
+
+const cfg = REGION_CONFIG[PRESET.key] || REGION_CONFIG['gz_zj'];
+const regionData = cfg.data;
+
+// 更新排名列表
+function updateRankList() {
+  const container = document.querySelector('.rank-list');
+  if (!container) return;
+  container.innerHTML = cfg.ranks.map((r, i) => `
+    <div class="rank-item">
+      <span class="rank ${i < 3 ? 'top' : ''}">${i + 1}</span>
+      <span class="name">${r.name}</span>
+      <span class="value">${r.value}</span>
+    </div>
+  `).join('');
+}
+updateRankList();
+
+function walkCoords(coords, bbox) {
+  if (typeof coords[0] === 'number') {
+    const [lng, lat] = coords;
+    bbox.minLng = Math.min(bbox.minLng, lng);
+    bbox.maxLng = Math.max(bbox.maxLng, lng);
+    bbox.minLat = Math.min(bbox.minLat, lat);
+    bbox.maxLat = Math.max(bbox.maxLat, lat);
+  } else {
+    coords.forEach(c => walkCoords(c, bbox));
+  }
+}
+
+function getGeoBounds(geoJson) {
+  const bbox = { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity };
+  geoJson.features.forEach(f => walkCoords(f.geometry.coordinates, bbox));
+  const padLng = (bbox.maxLng - bbox.minLng) * 0.06;
+  const padLat = (bbox.maxLat - bbox.minLat) * 0.06;
+  return {
+    sw: [bbox.minLng - padLng, bbox.minLat - padLat],
+    ne: [bbox.maxLng + padLng, bbox.maxLat + padLat],
+    center: [(bbox.minLng + bbox.maxLng) / 2, (bbox.minLat + bbox.maxLat) / 2]
+  };
+}
+
+function fitMapView(chart, chartDom, bounds) {
+  const cw = chartDom.clientWidth;
+  const ch = chartDom.clientHeight;
+  const aspectScale = 0.62;
+  let bestZoom = 1;
+  chart.setOption({ series: [{ center: bounds.center, zoom: 1, aspectScale }] });
+  for (let z = 0.5; z <= 12; z += 0.05) {
+    chart.setOption({ series: [{ zoom: z }] });
+    const a = chart.convertToPixel({ seriesIndex: 0 }, bounds.sw);
+    const b = chart.convertToPixel({ seriesIndex: 0 }, bounds.ne);
+    const xSpan = Math.abs(b[0] - a[0]);
+    const ySpan = Math.abs(b[1] - a[1]);
+    const inView = xSpan <= cw * 0.96 && ySpan <= ch * 0.96;
+    if (inView) bestZoom = z;
+    else if (xSpan > cw * 0.96) break;
+    else bestZoom = z;
+  }
+  chart.setOption({ series: [{ center: bounds.center, zoom: bestZoom, aspectScale }] });
+  return { center: bounds.center, zoom: bestZoom, aspectScale };
+}
+
+// 初始化地图
+async function initMap() {
+  const chartDom = document.getElementById('mapChart');
+  const loading = document.getElementById('mapLoading');
+  try {
+    const response = await fetch(cfg.mapFile);
+    if (!response.ok) throw new Error('加载失败');
+    let geoJson = await response.json();
+    if (isShenyang && geoJson.features) {
+      geoJson = {
+        ...geoJson,
+        features: geoJson.features.filter(f => !SY_EXCLUDED_DISTRICTS.includes(f.properties?.name))
+      };
+    }
+    echarts.registerMap(cfg.mapName, geoJson);
+    loading.style.display = 'none';
+    const chart = echarts.init(chartDom, 'dark', { renderer: 'canvas' });
+    const mapData = Object.entries(regionData).map(([name, data]) => ({
+      name, value: data.count, rate: data.rate, totalValue: data.value, ...data
+    }));
+    let mapCenter = cfg.center;
+    let mapZoom = cfg.zoom;
+    let syBounds = null;
+    if (isShenyang) syBounds = getGeoBounds(geoJson);
+    const option = {
+      backgroundColor: 'transparent',
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(17,24,39,0.95)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        padding: [12, 16],
+        textStyle: { color: '#e2e8f0', fontSize: 12 },
+        formatter: function(params) {
+          if (!params.data) return params.name;
+          const d = params.data;
+          return `<div style="font-weight:600;color:#fff;margin-bottom:8px;font-size:14px;">${params.name}</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:#94a3b8;">房源数量</span><span style="color:#10b981;font-weight:600;">${d.value} 套</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:#94a3b8;">彩贝达标率</span><span style="color:#f59e0b;font-weight:600;">${d.rate}%</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;"><span style="color:#94a3b8;">资产估值</span><span style="color:#10b981;font-weight:600;">¥${d.totalValue}</span></div>`;
+        }
+      },
+      visualMap: {
+        min: 0, max: cfg.visualMax,
+        left: isShenyang ? 8 : 'left', bottom: isShenyang ? 8 : 'bottom',
+        text: ['多', '少'], textStyle: { color: '#94a3b8', fontSize: isShenyang ? 10 : 12 },
+        inRange: { color: ['#0f766e', '#14b8a6', '#34d399', '#a3e635', '#f59e0b'] },
+        calculable: true, itemWidth: 10, itemHeight: isShenyang ? 80 : 100,
+        padding: isShenyang ? 0 : undefined
+      },
+      series: [{
+        name: '房源数量', type: 'map', map: cfg.mapName, roam: true,
+        center: isShenyang ? syBounds.center : mapCenter,
+        zoom: isShenyang ? 1 : mapZoom,
+        ...(isShenyang ? { aspectScale: 0.62 } : {}),
+        label: { show: true, color: '#fff', fontSize: isShenyang ? 11 : 11, fontWeight: 600 },
+        emphasis: {
+          label: { show: true, color: '#fff', fontSize: 13, fontWeight: 700 },
+          itemStyle: { areaColor: '#f59e0b', shadowBlur: 20, shadowColor: 'rgba(245,158,11,0.5)' }
+        },
+        itemStyle: { areaColor: '#0f766e', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1 },
+        data: mapData
+      }],
+      animation: true, animationDuration: 1000, animationEasing: 'cubicOut'
+    };
+    chart.setOption(option);
+    requestAnimationFrame(() => {
+      chart.resize();
+      if (isShenyang && syBounds) fitMapView(chart, chartDom, syBounds);
+    });
+    chart.on('click', function(params) {
+      if (params.data) showPopup(params.name, params.data);
+    });
+    window.addEventListener('resize', () => {
+      chart.resize();
+      if (isShenyang && syBounds) fitMapView(chart, chartDom, syBounds);
+    });
+  } catch (error) {
+    loading.innerHTML = `<div style="text-align:center;"><div style="font-size:24px;margin-bottom:8px;">⚠️</div><div>地图加载失败</div><div style="font-size:11px;opacity:.6;margin-top:8px;">${error.message}</div></div>`;
+  }
+}
+
+function showPopup(regionName, data) {
+  const popup = document.getElementById('regionPopup');
+  document.getElementById('popupTitle').textContent = regionName + ' · 区域详情';
+  document.getElementById('popupData').innerHTML = `
+    <div class="row"><span class="label">房源总数</span><span class="value">${data.value} 套</span></div>
+    <div class="row"><span class="label">资产估值</span><span class="value">¥${data.totalValue}</span></div>
+    <div class="row"><span class="label">彩贝达标率</span><span class="value" style="color:var(--gold)">${data.rate}%</span></div>
+    <div class="row"><span class="label">平均单价</span><span class="value">¥${data.avgPrice}/晚</span></div>
+    <div class="row" style="margin-top:8px;"><span class="label" style="color:var(--gold)">🐚 五彩贝</span><span class="value" style="color:var(--gold)">${data.wu} 套</span></div>
+    <div class="row"><span class="label">🐚 四彩贝</span><span class="value">${data.si} 套</span></div>
+    <div class="row"><span class="label">🐚 三彩贝</span><span class="value">${data.san} 套</span></div>
+    <div class="row"><span class="label">🐚 二彩贝</span><span class="value">${data.er} 套</span></div>
+    <div class="row"><span class="label">🐚 一彩贝</span><span class="value">${data.yi} 套</span></div>
+  `;
+  popup.classList.add('visible');
+}
+function closePopup() { document.getElementById('regionPopup').classList.remove('visible'); }
+function exportReport() { alert('导出日报（演示）'); }
+function searchHouses() { alert('房源查询（演示）'); }
+function dataAnalysis() { alert('数据分析（演示）'); }
+function systemSettings() { alert('系统设置（演示）'); }
+
+initMap();
+</script>
+</body>
+</html>

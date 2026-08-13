@@ -1,0 +1,14 @@
+# 运行时生成，可本地重建
+juzhu.db
+__pycache__/
+server.log
+*.log
+*.key
+# 密钥与本地配置（禁止入库 / 禁止被静态服务暴露）
+.env
+.env.*
+!.env.example
+config.ini
+*.db
+*.sqlite
+*.sqlite3

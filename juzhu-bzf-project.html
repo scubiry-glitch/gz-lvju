@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>项目 · 户型列表</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .proj-hero{position:relative;padding:56px 18px 18px;color:#fff;overflow:hidden;min-height:160px;}
+  .proj-hero .bg{position:absolute;inset:0;background-size:cover;background-position:center;background-color:#0c4d44;}
+  .proj-hero .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,18,16,.35),rgba(8,18,16,.7));}
+  .proj-hero .in{position:relative;z-index:2;}
+  .proj-hero .ek{font-size:9px;letter-spacing:.3em;opacity:.85;}
+  .proj-hero h1{font-family:var(--serif);font-size:22px;margin-top:6px;line-height:1.2;}
+  .proj-hero p{font-size:11px;opacity:.9;margin-top:5px;}
+  .unit-grid{padding:12px 18px 24px;}
+  .ucard{display:block;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px;
+    box-shadow:0 8px 20px rgba(15,42,38,.06);}
+  .ucard .img{height:130px;background-size:cover;background-position:center;background-color:#0c4d44;position:relative;}
+  .ucard .img::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.25),transparent);}
+  .ucard .img .hr-chip{position:absolute;left:8px;top:8px;z-index:2;font-size:10px;font-weight:700;color:#ffd98a;
+    background:rgba(8,18,16,.55);backdrop-filter:blur(4px);padding:3px 9px;border-radius:999px;
+    border:1px solid rgba(255,217,138,.35);}
+  .ucard .bd{padding:11px 13px 13px;}
+  .ucard .bd .nm{font-weight:700;font-size:14px;color:var(--ink);}
+  .ucard .bd .meta{font-size:11px;color:var(--muted);margin-top:3px;}
+  .ucard .bd .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .ucard .bd .tags span{font-size:10px;padding:3px 8px;border-radius:6px;background:#f1f5f4;color:var(--ink);font-weight:500;}
+  .ucard .bd .tags span.primary{background:var(--brand);color:#fff;font-weight:600;}
+  .ucard .bd .tags span.accent{background:var(--brand-soft);color:var(--brand);font-weight:600;}
+  .ucard .bd .tags span.gold{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-weight:600;}
+  .ucard .bd .pr{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .ucard .bd .pr b{font-family:var(--serif);font-size:18px;color:var(--gold-deep);}
+  .ucard .bd .pr .go{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:6px 14px;border-radius:999px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost" style="position:absolute;z-index:10;">
+      <a class="bk" href="javascript:history.back()">‹</a>
+      <div class="ttl" id="ttl">项目</div>
+      <div class="act"><span>♡</span></div>
+    </div>
+
+    <div class="proj-hero">
+      <div class="bg" id="pBg"></div>
+      <div class="in">
+        <div class="ek" id="pEk">BZF PROJECT</div>
+        <h1 id="pname">—</h1>
+        <p id="pmeta"></p>
+      </div>
+    </div>
+
+    <div class="sec-h"><span class="bar"></span><h2 id="listTitle">在租户型</h2><span class="more" id="unitN">—</span></div>
+    <div class="unit-grid" id="list"></div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="juzhu/app.js?v=16"></script>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var slug = q.get('project');
+  var channel = q.get('channel') || 'bzf';
+  var isTrade = channel === 'trade';
+
+  JUZHU.load().then(function(){
+    var p = JUZHU.projectBySlug(slug);
+    if (!p) { document.getElementById('list').innerHTML = '<p style="padding:24px;color:#999;text-align:center">项目不存在</p>'; return; }
+
+    document.getElementById('pEk').textContent = isTrade ? 'TRADE · 卖旧买新' : ('BZF · ' + ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房'));
+    document.getElementById('pname').textContent = p.name;
+    document.getElementById('pmeta').textContent = (isTrade
+      ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')
+      : ('房源量 ' + JUZHU.managedUnits(p) + ' · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
+    document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
+    document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租户型';
+    document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';
+    if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(p.cover_image)+')';
+
+    var hr = !isTrade ? JUZHU.houseRating(p) : null;
+    var hrChip = hr ? ('<span class="hr-chip">★ '+hr.stars+'星 · 好房子</span>') : '';
+
+    var units = JUZHU.units(p.id);
+    document.getElementById('list').innerHTML = units.map(function(u){
+      var img = u.cover_image ? 'background-image:url('+JUZHU.thumbUrl(u.cover_image)+')' : '';
+      var title = JUZHU.unitTitle(u);
+      var meta = JUZHU.unitMeta(u);
+      var metaHtml = meta ? '<div class="meta">'+meta+'</div>' : '';
+      var tags = JUZHU.unitDisplayTags(u, p);
+      var tagsHtml = tags.length ? '<div class="tags">'+JUZHU.unitTagsHtml(tags)+'</div>' : '';
+      var price = isTrade
+        ? ('<b>'+u.price_total+'<small style="font-size:10px;color:var(--muted)"> 万起</small></b>')
+        : ('<b>'+JUZHU.fmtRent(u.rent_monthly)+'<small style="font-size:10px;color:var(--muted)">/月</small></b>');
+      return '<a class="ucard" href="juzhu-unit-detail.html?project='+encodeURIComponent(p.slug)+'&unit='+encodeURIComponent(u.slug)+'&channel='+channel+JUZHU.chainQS()+'">'+
+        '<div class="img" style="'+img+'">'+hrChip+'</div>'+
+        '<div class="bd"><div class="nm">'+title+'</div>'+metaHtml+tagsHtml+
+        '<div class="pr">'+price+'<span class="go">查看详情</span></div></div></a>';
+    }).join('');
+  });
+})();
+</script>
+</body>
+</html>

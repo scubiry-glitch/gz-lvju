@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>保租房 · 区级项目</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .dist-hero{position:relative;height:140px;color:#fff;overflow:hidden;}
+  .dist-hero .bg{position:absolute;inset:0;background-size:cover;background-position:center;background-color:#0c4d44;}
+  .dist-hero .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(8,18,16,.65),transparent 60%);}
+  .dist-hero .in{position:absolute;left:18px;bottom:14px;z-index:2;}
+  .dist-hero .no{font-family:var(--serif);font-size:36px;font-weight:700;opacity:.35;line-height:1;}
+  .dist-hero h2{font-family:var(--serif);font-size:22px;margin-top:2px;}
+  .dist-hero .sub{font-size:11px;opacity:.9;margin-top:4px;}
+  .mini-stat{display:flex;gap:12px;padding:12px 18px;font-size:11px;color:var(--muted);background:#fff;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .mini-stat b{color:var(--ink);font-family:var(--serif);font-size:15px;display:block;}
+  .proj-grid{padding:12px 18px 24px;}
+  .pcard{display:flex;gap:12px;background:#fff;border:1px solid var(--border);border-radius:16px;padding:10px;margin-bottom:12px;
+    box-shadow:0 6px 16px rgba(15,42,38,.05);}
+  .pcard .th{width:100px;height:88px;border-radius:12px;flex-shrink:0;background-size:cover;background-position:center;background-color:#0c4d44;}
+  .pcard .info{flex:1;min-width:0;}
+  .pcard .info .nm{font-weight:700;font-size:15px;font-family:var(--serif);color:var(--ink);}
+  .pcard .info .meta{font-size:11px;color:var(--muted);margin-top:3px;}
+  .pcard .info .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+  .pcard .info .tags span{font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 7px;border-radius:5px;}
+  .pcard .pr{margin-top:8px;display:flex;justify-content:space-between;align-items:center;}
+  .pcard .pr b{color:var(--gold-deep);font-family:var(--serif);font-size:16px;}
+  .pcard .pr .n{font-size:11px;color:var(--muted);}
+  .empty{padding:40px 24px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost" style="position:absolute;z-index:10;">
+      <a class="bk" href="index.html">‹</a>
+      <div class="ttl" id="ttl">保租房</div>
+      <div class="act"><span>🔍</span></div>
+    </div>
+
+    <div class="dist-hero">
+      <div class="bg" id="dBg"></div>
+      <div class="in">
+        <div class="no" id="dno">01</div>
+        <h2 id="dname">—</h2>
+        <div class="sub" id="dsub"></div>
+      </div>
+    </div>
+
+    <div class="mini-stat">
+      <div><b id="s1">—</b>项目</div>
+      <div><b id="s2">—</b>房源量</div>
+      <div><b id="s3">—</b>户型</div>
+      <div><b id="s4">—</b>参考均价</div>
+    </div>
+
+    <div class="sec-h"><span class="bar"></span><h2>项目 / 门店</h2></div>
+    <div class="proj-grid" id="list"></div>
+
+    <div class="banner gold">
+      <span class="bi">🏛</span>
+      <div class="bt"><b>保租房三级浏览</b><p>行政区 → 项目门店 → 户型房源 · 新居住专区真实图片</p></div>
+    </div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="juzhu/app.js?v=16"></script>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var distName = q.get('district') || '沈河区';
+
+  JUZHU.load().then(function(){
+    var d = JUZHU.districtBySlug(distName);
+    if (!d) { document.getElementById('list').innerHTML = '<div class="empty">未找到该行政区</div>'; return; }
+
+    document.getElementById('dname').textContent = d.name;
+    document.getElementById('dno').textContent = String(d.sort_order).padStart(2,'0');
+    document.getElementById('dsub').textContent = (d.note || (d.project_count + ' 项目 · 房源量 ' + JUZHU.districtManagedUnits(d) + ' · ' + d.unit_count + ' 户型'));
+    document.getElementById('s1').textContent = d.project_count;
+    document.getElementById('s2').textContent = JUZHU.districtManagedUnits(d);
+    document.getElementById('s3').textContent = d.unit_count;
+    document.getElementById('s4').textContent = d.avg_price ? ('¥'+d.avg_price) : '—';
+    var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
+    document.getElementById('ttl').innerHTML = bizTerm+'<small>'+d.name+'</small>';
+    if (d.cover_image) document.getElementById('dBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(d.cover_image)+')';
+
+    var projs = JUZHU.projects({ channel: 'bzf', district_id: d.id });
+    if (!projs.length) {
+      document.getElementById('list').innerHTML = '<div class="empty">该区暂无在营项目<br><small>（文件夹标注：暂无项目）</small></div>';
+      return;
+    }
+
+    document.getElementById('list').innerHTML = projs.map(function(p){
+      var tags = (p.tags || []).map(function(t){ return '<span>'+t+'</span>'; }).join('');
+      var th = p.cover_image ? 'background-image:url('+JUZHU.thumbUrl(p.cover_image)+')' : '';
+      return '<a class="pcard" href="juzhu-bzf-project.html?project='+encodeURIComponent(p.slug)+JUZHU.chainQS()+'"">'+
+        '<div class="th" style="'+th+'"></div>'+
+        '<div class="info"><div class="nm">'+p.name+'</div>'+
+        '<div class="meta">房源量 '+JUZHU.managedUnits(p)+' · '+p.unit_count+' 个户型 · '+(p.address||'')+'</div>'+
+        '<div class="tags">'+tags+'</div>'+
+        '<div class="pr"><b>'+JUZHU.fmtRent(p.price_from)+'<small style="font-size:10px;color:var(--muted)">/月起</small></b>'+
+        '<span class="n">查看户型 ›</span></div></div></a>';
+    }).join('');
+  });
+})();
+</script>
+</body>
+</html>

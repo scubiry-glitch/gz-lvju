@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>家政四大品类 · 全流程演示</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:32px;}
+  .hero{margin:12px;padding:18px 16px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#0b5d56,#11453f 48%,#c58d36);}
+  .hero h1{font-family:var(--serif);font-size:22px;margin:8px 0 0;}
+  .hero p{font-size:12px;opacity:.92;margin-top:8px;line-height:1.6;}
+  .list{padding:8px 16px 24px;display:grid;gap:12px;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 6px 18px rgba(15,42,38,.06);}
+  .card h3{font-size:15px;margin:0 0 6px;}
+  .card p{font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.55;}
+  .steps{font-size:10px;color:var(--ink);line-height:1.7;margin-bottom:10px;}
+  .card a{display:inline-block;padding:9px 14px;border-radius:12px;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-size:12px;font-weight:700;margin-right:8px;}
+  .card a.ghost{background:#f8fbfa;color:var(--brand);border:1px solid var(--border);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="index.html?tab=jiazheng">‹</a>
+      <div class="ttl">全流程演示<small id="citySub">四大品类</small></div>
+    </div>
+    <div class="hero">
+      <div style="font-size:10px;letter-spacing:.2em;opacity:.88;">4 MODULES E2E</div>
+      <h1>保洁 · 维修 · 搬家 · 保姆</h1>
+      <p>每类走通：详情预约 → 收银台 → 支付成功 → 进度页 → P 派单 → S 推进 → 评价回流</p>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  document.getElementById('citySub').textContent = JZ.regionCity() + ' · 新居住';
+  document.title = '家政全流程 · ' + JZ.regionCity();
+
+  var MODS = [
+    { id:'cleaning', name:'保洁', icon:'🧹', slug:'deep-clean-4h', list:'juzhu-jiazheng-list.html?type=cleaning' },
+    { id:'repair', name:'维修', icon:'🔧', slug:'pipe-unclog-fast', list:'juzhu-jiazheng-list.html?type=repair' },
+    { id:'moving', name:'搬家', icon:'📦', slug:'moving-city-standard', list:'juzhu-jiazheng-list.html?type=moving' },
+    { id:'nanny', name:'保姆', icon:'👶', slug:'nanny-hourly-3h', list:'juzhu-jiazheng-list.html?type=nanny' }
+  ];
+
+  document.getElementById('list').innerHTML = MODS.map(function(m){
+    return '<div class="card">'+
+      '<h3>'+m.icon+' '+m.name+'</h3>'+
+      '<p>代表 SKU：<code>'+m.slug+'</code></p>'+
+      '<div class="steps">① 详情填单 → ② lvju-app-pay → ③ lvju-app-paid → ④ juzhu-order-progress<br>'+
+      '⑤ screens/p-service-demand 派单 → ⑥ s-orders 接单/完工 → ⑦ 进度页评价 → ⑧ p-service-review</div>'+
+      '<a href="juzhu-jiazheng-detail.html?sku='+encodeURIComponent(m.slug)+'">开始 '+m.name+'</a>'+
+      '<a class="ghost" href="'+m.list+'">浏览列表</a></div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

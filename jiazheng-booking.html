@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>确认订单 · 家政服务</title>
+<link rel="stylesheet" href="jiazheng-app.css?v=2" />
+</head>
+<body>
+<div class="jz-wrap">
+  <div class="jz-top">
+    <a class="jz-back" id="backBtn" href="javascript:history.back()"></a>
+    <span class="jz-title">确认订单</span>
+    <div></div>
+  </div>
+
+  <div id="productSummary" style="background:var(--surface);padding:14px 16px;border-bottom:1px solid var(--line);">
+    <div style="text-align:center;color:var(--muted);padding:20px;">加载中…</div>
+  </div>
+
+  <div style="background:var(--surface);padding:0 16px;margin-top:8px;">
+    <div class="jz-form-row">
+      <span class="lb">服务地址</span>
+      <input type="text" id="houseInput" value="东博人才公寓 · 2栋1503" style="flex:1;border:0;outline:0;text-align:right;background:transparent;font:inherit;color:var(--fg);" />
+    </div>
+    <div class="jz-form-row">
+      <span class="lb">服务时间</span>
+      <span class="vl" id="timeVal">今天 18:00</span>
+    </div>
+    <div id="timeMode" style="display:none;font-size:11px;line-height:1.5;padding:6px 0 0;"></div>
+    <div class="jz-form-row">
+      <span class="lb">联系电话</span>
+      <input type="tel" id="phoneInput" value="13800138000" style="flex:1;border:0;outline:0;text-align:right;background:transparent;font:inherit;color:var(--fg);" />
+    </div>
+    <div class="jz-form-row" style="display:block;">
+      <span class="lb" style="display:block;margin-bottom:6px;">备注（可选）</span>
+      <textarea id="descInput" placeholder="补充房型面积、故障现象或照护需求" style="width:100%;border:0;outline:0;resize:none;font:inherit;min-height:72px;"></textarea>
+    </div>
+  </div>
+
+  <div style="background:var(--surface);padding:0 16px;margin-top:8px;" id="timeAdjust">
+    <div style="font-size:14px;font-weight:500;padding:14px 0 8px;">调整上门时间</div>
+    <div id="timeSlots" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-bottom:14px;"></div>
+  </div>
+
+  <div class="jz-price" id="priceBox"></div>
+
+  <div style="padding:14px 16px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+    <input type="checkbox" id="agree" checked />
+    <label for="agree">我已阅读并同意 <a href="javascript:;" style="color:var(--brand);">《服务协议》</a></label>
+  </div>
+
+  <div class="jz-cta-bar">
+    <a class="sec" href="javascript:history.back()">返回</a>
+    <a class="pri" href="javascript:;" id="submitBtn">确认下单</a>
+  </div>
+</div>
+
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js?v=2"></script>
+<script src="jiazheng-data.js?v=2"></script>
+<script src="jz-datepick.js?v=2"></script>
+<script>
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var skuSlug = qs.get('sku');
+  var selectedTime = qs.get('time') || '今天 18:00';
+  var item = null;
+
+  var TIME_SLOTS = [
+    '今天 18:00', '今天 19:00', '今天 20:00', '明天 09:00',
+    '明天 10:00', '明天 14:00', '明天 16:00', '明天 19:00'
+  ];
+
+  function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
+
+  // 调整上门时间 = 万能日期+时间选择器（锁定档期时不显示，见 renderTimeMode）
+  function paintTimeSlots(){
+    document.getElementById('timeVal').textContent = selectedTime;
+    var box = document.getElementById('timeSlots');
+    if (!box) return;
+    if (qs.get('slot')) { box.innerHTML = ''; return; } // 已锁定真实档期，无需再选
+    if (window.JZ_DATEPICK){
+      box.style.cssText = '';  // 清掉内联 grid，交给 .jz-datepick 布局
+      JZ_DATEPICK.mount(box, { value: selectedTime, onChange: function(v){
+        selectedTime = v;
+        document.getElementById('timeVal').textContent = v;
+      }});
+      return;
+    }
+    // 兜底：组件未加载时退回静态时段
+    box.innerHTML = TIME_SLOTS.map(function(t){
+      var active = t === selectedTime;
+      return '<a href="javascript:;" data-v="'+t+'" style="padding:8px;text-align:center;font-size:12px;border:1px solid '+(active?'var(--brand)':'var(--line)')+';border-radius:8px;background:'+(active?'var(--brand-soft)':'var(--surface)')+';color:'+(active?'var(--brand)':'var(--fg)')+';">'+t+'</a>';
+    }).join('');
+    box.addEventListener('click', function(e){
+      e.preventDefault();
+      var t = e.target.closest('[data-v]');
+      if (!t) return;
+      selectedTime = t.dataset.v;
+      paintTimeSlots();
+    });
+  }
+
+  function renderSkuSummary(){
+    document.getElementById('productSummary').innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+        '<div>'+
+          '<div style="font-size:15px;font-weight:600;">'+item.name+'</div>'+
+          '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+(item.category_name||'家政')+' · '+(item.spec||'')+'</div>'+
+        '</div>'+
+        '<div style="color:var(--brand);font-size:18px;font-weight:700;">'+fmtPrice(item.price_from)+'</div>'+
+      '</div>';
+    var fee = Number(item.price_from || 0);
+    var discount = 10;
+    document.getElementById('priceBox').innerHTML =
+      '<div class="row"><span>基础服务费</span><b>'+fmtPrice(fee)+'</b></div>'+
+      '<div class="row disc"><span>神券立减</span><b>-'+fmtPrice(discount)+'</b></div>'+
+      '<div class="row total"><span>实付</span><b>'+fmtPrice(Math.max(fee - discount, 0))+'</b></div>';
+    document.getElementById('backBtn').href = 'juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(skuSlug);
+    document.title = '确认订单 · ' + (window.BZF_JZ ? BZF_JZ.regionCity() : '家政');
+  }
+
+  function submitSkuOrder(){
+    if (!document.getElementById('agree').checked) {
+      alert('请先同意服务协议');
+      return;
+    }
+    var house = document.getElementById('houseInput').value.trim();
+    var phone = document.getElementById('phoneInput').value.trim();
+    if (!house || !phone || !selectedTime) {
+      alert('请填写地址、电话并选择时间');
+      return;
+    }
+    var JZ = window.BZF_JZ;
+    if (!JZ.apiKey()) {
+      alert('未配置 API Key：请在控制台执行 localStorage.setItem("JUZHU_API_KEY", "<密钥>") 后重试');
+      return;
+    }
+    var btn = document.getElementById('submitBtn');
+    btn.textContent = '提交中…';
+    btn.style.opacity = 0.7;
+    JZ.create({
+      sku_id: item.id,
+      category: item.category_id,
+      house: house,
+      phone: phone,
+      expectTime: selectedTime,
+      desc: document.getElementById('descInput').value.trim(),
+      worker_id: qs.get('worker') || undefined,
+      slot_id: qs.get('slot') || undefined,
+      source: '新居住频道'
+    }).then(function(o){
+      location.href = 'lvju-app-pay.html?order=' + encodeURIComponent(o.id) + '&channel=jiazheng';
+    }).catch(function(err){
+      btn.textContent = '确认下单';
+      btn.style.opacity = 1;
+      alert('下单失败：' + err.message);
+    });
+  }
+
+  function bootLegacy(){
+    var type = qs.get('type') || 'cleaning';
+    var vendorId = parseInt(qs.get('vendor') || '0', 10);
+    var productId = parseInt(qs.get('product') || '0', 10);
+    var v, p;
+    JZ_DATA.getVendor(type, vendorId).then(function(vendor){
+      v = vendor;
+      p = vendor.products.find(function(x){ return x.id == productId; });
+      if (!v || !p) {
+        document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息缺失</div>';
+        return;
+      }
+      document.getElementById('productSummary').innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+          '<div><div style="font-size:15px;font-weight:600;">'+p.title+'</div>'+
+          '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+v.name+' · '+p.subtitle+'</div></div>'+
+          '<div style="color:var(--brand);font-size:18px;font-weight:700;">¥'+p.price+'</div></div>';
+      selectedTime = qs.get('time') || selectedTime;
+      paintTimeSlots();
+      document.getElementById('priceBox').innerHTML =
+        '<div class="row"><span>基础服务费</span><b>¥'+p.price.toFixed(1)+'</b></div>'+
+        '<div class="row disc"><span>立减优惠（'+(p.discount_label||'4折')+'）</span><b>-¥'+(p.original_price - p.price).toFixed(1)+'</b></div>'+
+        '<div class="row"><span>已选优惠券</span><b>神券立减 ¥10.0</b></div>'+
+        '<div class="row total"><span>实付</span><b>¥'+(p.price - 10).toFixed(1)+'</b></div>';
+      document.getElementById('submitBtn').addEventListener('click', function(){
+        if (!document.getElementById('agree').checked) { alert('请先同意服务协议'); return; }
+        var btn = this;
+        btn.textContent = '提交中…';
+        btn.style.opacity = 0.7;
+        JZ_DATA.createOrder({
+          type: type,
+          vendor_id: v.id,
+          product_id: p.id,
+          address: document.getElementById('houseInput').value.trim(),
+          phone: document.getElementById('phoneInput').value.trim(),
+          scheduled_at: selectedTime,
+          fee: p.price - 10,
+        }).then(function(r){
+          if (r.order && r.order.id) {
+            location.href = 'jiazheng-payment.html?oid=' + r.order.id;
+          } else {
+            btn.textContent = '确认下单';
+            btn.style.opacity = 1;
+            alert('下单失败：' + (r.error || '未知错误'));
+          }
+        }).catch(function(e){
+          btn.textContent = '确认下单';
+          btn.style.opacity = 1;
+          alert('下单失败：' + e.message);
+        });
+      });
+    });
+  }
+
+  function renderTimeMode(){
+    var hasSlot = !!qs.get('slot');
+    var mode = document.getElementById('timeMode');
+    var adjust = document.getElementById('timeAdjust');
+    if (!mode) return;
+    mode.style.display = 'block';
+    if (hasSlot) {
+      mode.innerHTML = '<span style="color:var(--brand);">✓ 已为你锁定该档期，名额已保留，无需调整</span>';
+      if (adjust) adjust.style.display = 'none';
+    } else {
+      mode.innerHTML = '<span style="color:#ea580c;">⚠️ 意向时段：实际上门时间由平台派单后与你电话确认</span>';
+      if (adjust) adjust.style.display = 'block';
+    }
+  }
+
+  paintTimeSlots();
+  renderTimeMode();
+
+  if (skuSlug) {
+    BZF_JZ.sku(skuSlug).then(function(res){
+      item = res.item;
+      if (!item) throw new Error('SKU 不存在');
+      renderSkuSummary();
+      document.getElementById('submitBtn').addEventListener('click', submitSkuOrder);
+    }).catch(function(err){
+      document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">加载失败：'+err.message+'</div>';
+    });
+  } else {
+    bootLegacy();
+  }
+})();
+</script>
+</body>
+</html>

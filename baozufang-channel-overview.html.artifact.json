@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "保租房频道原型总览",
+  "entry": "baozufang-channel-overview.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-06-05T09:06:08.365Z",
+  "updatedAt": "2026-06-05T09:06:08.372Z",
+  "designSystemId": "default",
+  "metadata": {
+    "identifier": "baozufang-channel-overview",
+    "artifactType": "text/html",
+    "inferred": false
+  }
+}

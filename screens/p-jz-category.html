@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务子类目管理 · 服务认证中台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#6366f1;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .full{grid-column:1/-1;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:center;}
+  .row:last-child{border-bottom:0;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;}
+  .kpi b{font-size:20px;display:block;}
+  .kpi span{font-size:11px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;background:var(--bg);}
+  .badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:600;cursor:pointer;}
+  .b-on{background:#dcfce7;color:#15803d;}
+  .b-off{background:#fee2e2;color:#b91c1c;}
+  .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.danger{color:var(--danger);border-color:#fecaca;}
+  .btn.sm{padding:3px 8px;font-size:11px;}
+  .actions{display:flex;gap:6px;}
+  .modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:100;align-items:center;justify-content:center;}
+  .modal.show{display:flex;}
+  .modal .box{background:#fff;border-radius:14px;padding:20px;width:min(420px,92vw);}
+  .modal h4{margin:0 0 14px;font-size:15px;}
+  .modal .fld{margin-bottom:12px;}
+  .modal .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .modal .fld input,.modal .fld select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;font-size:13px;}
+  .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+  .toast.show{display:block;}
+  .toast.err{background:var(--danger);}
+  .toast.ok{background:var(--ok);}
+  .type-label{display:inline-block;width:70px;font-weight:600;color:var(--accent);}
+  .group{margin-bottom:18px;}
+  .group h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+  .ico{font-size:18px;width:24px;display:inline-block;text-align:center;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="jz-category"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × P 服务认证中台 / <b>服务子类目管理</b></div>
+      <div class="top-actions">
+        <button class="btn pri" id="btnNew">+ 新增子类目</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>子类目概览 <span class="pill">P 端</span></h3>
+        <div class="kpis" id="kpis"></div>
+        <div class="row" style="border-bottom:1px solid var(--border);padding-bottom:6px;">
+          <span class="muted" style="font-size:11px;">子类目决定 4 大服务类目下的细分场景，删除前请确认无产品引用</span>
+        </div>
+      </div>
+
+      <div class="card full">
+        <h3>子类目列表 <span class="pill" id="count">0</span></h3>
+        <div id="list"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h4 id="modalTitle">新增子类目</h4>
+    <input type="hidden" id="m_id" />
+    <div class="fld">
+      <label>所属大类目</label>
+      <select id="m_parent">
+        <option value="cleaning">🧹 保洁 (cleaning)</option>
+        <option value="repair">🔧 维修 (repair)</option>
+        <option value="moving">🚚 搬家 (moving)</option>
+        <option value="nanny">🤱 月嫂 (nanny)</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label>名称</label>
+      <input type="text" id="m_name" placeholder="如：日常保洁" maxlength="20" />
+    </div>
+    <div class="fld">
+      <label>图标（emoji）</label>
+      <input type="text" id="m_icon" placeholder="🧹" maxlength="4" />
+    </div>
+    <div class="fld">
+      <label>排序（数字越小越靠前）</label>
+      <input type="number" id="m_sort" value="99" min="0" />
+    </div>
+    <div class="fld">
+      <label>状态</label>
+      <select id="m_status">
+        <option value="on">上架 (on)</option>
+        <option value="off">下架 (off)</option>
+      </select>
+    </div>
+    <div class="btns">
+      <button class="btn" id="mCancel">取消</button>
+      <button class="btn pri" id="mSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+// 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
+// （须事先 localStorage.setItem('JUZHU_API_KEY', '<密钥>')；禁止内嵌历史默认密钥）。
+(function(){
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || '';
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/juzhu/jz') !== -1) {
+      var h = Object.assign({}, init.headers);
+      if (!h['X-API-Key']) h['X-API-Key'] = KEY;
+      init.headers = h;
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+<script>
+(function(){
+  const TYPE_LABELS = {cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'月嫂'};
+  const $ = id => document.getElementById(id);
+  const toast = (msg, kind) => {
+    const t = $('toast');
+    t.textContent = msg; t.className = 'toast show ' + (kind||'');
+    setTimeout(()=>t.className='toast', 1800);
+  };
+
+  async function load() {
+    const r = await fetch('/api/juzhu/jz/categories?all=1');
+    const d = await r.json();
+    render(d.list);
+  }
+
+  function render(list) {
+    $('count').textContent = list.length;
+    // KPI
+    const byType = {};
+    list.forEach(c => byType[c.parent_type] = (byType[c.parent_type]||0) + 1);
+    $('kpis').innerHTML = Object.keys(TYPE_LABELS).map(t =>
+      `<div class="kpi"><b>${byType[t]||0}</b><span>${TYPE_LABELS[t]}</span></div>`
+    ).join('');
+    // 表格按类目分组
+    const groups = {};
+    list.forEach(c => { (groups[c.parent_type] = groups[c.parent_type]||[]).push(c); });
+    let html = '';
+    ['cleaning','repair','moving','nanny'].forEach(t => {
+      if (!groups[t] || !groups[t].length) return;
+      html += `<div class="group"><h4>${TYPE_LABELS[t]}（${groups[t].length}）</h4><table>`;
+      html += '<thead><tr><th>排序</th><th>图标</th><th>名称</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      groups[t].forEach(c => {
+        html += `<tr>
+          <td>${c.sort_order}</td>
+          <td><span class="ico">${c.icon||'📦'}</span></td>
+          <td>${c.name}</td>
+          <td><span class="badge ${c.status==='on'?'b-on':'b-off'}" data-id="${c.id}" data-status="${c.status}">${c.status==='on'?'上架':'下架'}</span></td>
+          <td class="actions">
+            <button class="btn sm" data-edit='${JSON.stringify(c).replace(/'/g,"&#39;")}'>编辑</button>
+            <button class="btn sm danger" data-del="${c.id}" data-name="${c.name}">删除</button>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+    });
+    $('list').innerHTML = html;
+
+    // 绑定
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openModal(JSON.parse(b.dataset.edit)));
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => del(b.dataset.del, b.dataset.name));
+    document.querySelectorAll('.badge[data-id]').forEach(b => b.onclick = () => toggle(b.dataset.id, b.dataset.status));
+  }
+
+  function openModal(c) {
+    $('m_id').value = c ? c.id : '';
+    $('modalTitle').textContent = c ? '编辑子类目' : '新增子类目';
+    $('m_parent').value = c ? c.parent_type : 'cleaning';
+    $('m_name').value = c ? c.name : '';
+    $('m_icon').value = c ? (c.icon||'📦') : '📦';
+    $('m_sort').value = c ? c.sort_order : 99;
+    $('m_status').value = c ? c.status : 'on';
+    $('modal').classList.add('show');
+  }
+  function closeModal() { $('modal').classList.remove('show'); }
+  $('btnNew').onclick = () => openModal(null);
+  $('mCancel').onclick = closeModal;
+  $('modal').onclick = e => { if (e.target.id==='modal') closeModal(); };
+
+  $('mSave').onclick = async () => {
+    const body = {
+      parent_type: $('m_parent').value,
+      name: $('m_name').value.trim(),
+      icon: $('m_icon').value || '📦',
+      sort_order: parseInt($('m_sort').value)||99,
+      status: $('m_status').value,
+    };
+    if (!body.name) { toast('请输入名称', 'err'); return; }
+    const id = $('m_id').value;
+    const url = id ? '/api/juzhu/jz/categories/'+id : '/api/juzhu/jz/categories';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { toast(id?'已更新':'已新增', 'ok'); closeModal(); load(); }
+    else toast(d.error||'保存失败', 'err');
+  };
+
+  async function del(id, name) {
+    if (!confirm('确认删除「'+name+'」？有产品引用将无法删除')) return;
+    const r = await fetch('/api/juzhu/jz/categories/'+id, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { toast('已删除', 'ok'); load(); }
+    else toast(d.error||'删除失败', 'err');
+  }
+
+  async function toggle(id, cur) {
+    const next = cur === 'on' ? 'off' : 'on';
+    const r = await fetch('/api/juzhu/jz/categories/'+id, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: next})
+    });
+    const d = await r.json();
+    if (d.ok) { toast(next==='on'?'已上架':'已下架', 'ok'); load(); }
+    else toast('操作失败', 'err');
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

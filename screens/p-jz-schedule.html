@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SKU 排班（可约档期）· 运营商工作台</title>
+<style>
+  :root{--bg:#f8fafc;--surface:#fff;--fg:#0f172a;--muted:#64748b;--border:#e2e8f0;--line:#f1f5f9;--accent:#0f766e;--accent-soft:color-mix(in oklab,var(--accent) 10%,transparent);--ok:#16a34a;--warn:#ea580c;--danger:#dc2626;}
+  *{box-sizing:border-box;} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,'PingFang SC',sans-serif;line-height:1.5;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .main{min-width:0;}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .crumb{font-size:13px;color:var(--muted);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:999px;}
+  .note{font-size:11px;color:var(--muted);}
+  .picker{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .picker select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13px;background:#fff;min-width:280px;}
+  .btn{font:inherit;font-size:12px;border:1px solid var(--border);background:#fff;border-radius:7px;padding:6px 12px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.danger{color:var(--danger);border-color:#fecaca;}
+  .btn.sm{padding:3px 8px;font-size:11px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+  .kpi{background:var(--line);border-radius:9px;padding:11px;text-align:center;}
+  .kpi b{font-size:20px;display:block;}
+  .kpi span{font-size:11px;color:var(--muted);}
+  .spu-tag{font-size:10px;padding:1px 7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-weight:600;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;background:var(--bg);}
+  .cap{display:inline-flex;align-items:center;gap:6px;}
+  .capbar{width:60px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;}
+  .capbar i{display:block;height:100%;background:var(--accent);}
+  .full{color:var(--danger);font-weight:600;}
+  .group{margin-bottom:16px;}
+  .group h4{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;}
+  .modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:100;align-items:center;justify-content:center;}
+  .modal.show{display:flex;}
+  .modal .box{background:#fff;border-radius:14px;padding:20px;width:min(500px,94vw);max-height:92vh;overflow:auto;}
+  .modal h4{margin:0 0 14px;font-size:15px;}
+  .modal .fld{margin-bottom:12px;}
+  .modal .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;}
+  .modal .fld input,.modal .fld select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font:inherit;font-size:13px;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chips label{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--border);border-radius:999px;padding:5px 11px;cursor:pointer;}
+  .chips label.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600;}
+  .chips input{display:none;}
+  .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;display:none;}
+  .toast.show{display:block;}
+  .toast.err{background:var(--danger);}
+  .toast.ok{background:var(--ok);}
+  .empty{text-align:center;color:var(--muted);padding:26px;font-size:13px;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="b" data-active="jz-schedule"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / × B 运营商工作台 / <b>SKU 排班（可约档期）</b></div>
+    </div>
+    <div class="content">
+      <div class="card">
+        <h3>选择商家 SKU 排班 <span class="pill">B 端 · 时间维度</span></h3>
+        <p class="note" style="margin:0 0 12px;">SKU = 平台 SPU + 本店服务者 + <b>时间</b>。在此给每个 SKU 的服务者排可约档期，客户端按档下单并占用容量。</p>
+        <div class="picker">
+          <select id="skuSel"><option value="">-- 选择商家 SKU --</option></select>
+          <button class="btn pri" id="btnGen" disabled>批量排期</button>
+          <button class="btn" id="btnOne" disabled>+ 单个档期</button>
+        </div>
+      </div>
+
+      <div class="card" id="panel" style="display:none;">
+        <h3 id="skuTitle">档期</h3>
+        <div class="kpis" id="kpis"></div>
+        <div id="slotList"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 批量排期 -->
+<div class="modal" id="genModal">
+  <div class="box">
+    <h4>批量排期</h4>
+    <div class="fld">
+      <label>服务者（该 SKU 已绑定，可多选）</label>
+      <div class="chips" id="genWorkers"></div>
+    </div>
+    <div class="fld">
+      <label>排期天数（从明天起）</label>
+      <select id="genDays"><option value="3">未来 3 天</option><option value="5">未来 5 天</option><option value="7">未来 7 天</option></select>
+    </div>
+    <div class="fld">
+      <label>时段（可多选）</label>
+      <div class="chips" id="genTimes">
+        <label><input type="checkbox" value="09:00|11:00" checked/> 09:00–11:00</label>
+        <label><input type="checkbox" value="14:00|16:00" checked/> 14:00–16:00</label>
+        <label><input type="checkbox" value="19:00|21:00" checked/> 19:00–21:00</label>
+      </div>
+    </div>
+    <div class="fld">
+      <label>每档容量</label>
+      <input type="number" id="genCap" value="2" min="1" max="20" />
+    </div>
+    <div class="btns">
+      <button class="btn" id="genCancel">取消</button>
+      <button class="btn pri" id="genSave">生成档期</button>
+    </div>
+  </div>
+</div>
+
+<!-- 单个档期 -->
+<div class="modal" id="oneModal">
+  <div class="box">
+    <h4>新增单个档期</h4>
+    <div class="fld"><label>服务者</label><select id="oneWorker"></select></div>
+    <div class="fld"><label>日期</label><input type="date" id="oneDate" /></div>
+    <div class="fld"><label>开始时间</label><input type="time" id="oneStart" value="09:00" /></div>
+    <div class="fld"><label>结束时间</label><input type="time" id="oneEnd" value="11:00" /></div>
+    <div class="fld"><label>容量</label><input type="number" id="oneCap" value="2" min="1" max="20" /></div>
+    <div class="btns">
+      <button class="btn" id="oneCancel">取消</button>
+      <button class="btn pri" id="oneSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+// 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
+// （须事先 localStorage.setItem('JUZHU_API_KEY', '<密钥>')；禁止内嵌历史默认密钥）。
+(function(){
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || '';
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/juzhu/jz') !== -1) {
+      var h = Object.assign({}, init.headers);
+      if (!h['X-API-Key']) h['X-API-Key'] = KEY;
+      init.headers = h;
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+<script>
+(function(){
+  const TYPE_LABELS = {cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'保姆'};
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toast = (m,k)=>{const t=$('toast');t.textContent=m;t.className='toast show '+(k||'');setTimeout(()=>t.className='toast',1800);};
+
+  let products = [], workers = [], curProduct = null;
+  const workerName = id => { const w = workers.find(x=>String(x.id)===String(id)); return w?w.name:('#'+id); };
+  const workerLevel = id => { const w = workers.find(x=>String(x.id)===String(id)); return w?w.level:''; };
+
+  async function load() {
+    const [pr, wr] = await Promise.all([
+      fetch('/api/juzhu/jz/products').then(r=>r.json()),
+      fetch('/api/juzhu/jz/workers?all=1').then(r=>r.json()),
+    ]);
+    products = pr.list || [];
+    workers = wr.list || [];
+    $('skuSel').innerHTML = '<option value="">-- 选择商家 SKU --</option>' +
+      products.map(p=>`<option value="${p.id}">${esc(p.vendor_name||'')} · ${esc(p.title)}${p.spu_name?'（'+esc(p.spu_name)+'）':''}</option>`).join('');
+  }
+
+  $('skuSel').onchange = () => {
+    const pid = $('skuSel').value;
+    curProduct = products.find(p=>String(p.id)===String(pid)) || null;
+    $('btnGen').disabled = !curProduct;
+    $('btnOne').disabled = !curProduct;
+    if (curProduct) loadSlots(); else $('panel').style.display='none';
+  };
+
+  async function loadSlots() {
+    const r = await fetch('/api/juzhu/jz/slots?product_id='+curProduct.id);
+    const d = await r.json();
+    renderSlots(d.list || []);
+  }
+
+  function renderSlots(slots) {
+    $('panel').style.display = 'block';
+    $('skuTitle').innerHTML = esc(curProduct.title) +
+      (curProduct.spu_name?` <span class="spu-tag">SPU: ${esc(curProduct.spu_name)}</span>`:'') +
+      ` <span class="note">· ${esc(curProduct.vendor_name||'')}</span>`;
+    const totalCap = slots.reduce((s,x)=>s+(x.capacity||0),0);
+    const booked = slots.reduce((s,x)=>s+(x.booked||0),0);
+    const dates = new Set(slots.map(x=>x.slot_date));
+    $('kpis').innerHTML =
+      `<div class="kpi"><b>${slots.length}</b><span>档期数</span></div>`+
+      `<div class="kpi"><b>${dates.size}</b><span>排期天数</span></div>`+
+      `<div class="kpi"><b>${totalCap}</b><span>总容量</span></div>`+
+      `<div class="kpi"><b>${booked}</b><span>已约</span></div>`;
+    if (!slots.length) { $('slotList').innerHTML = '<div class="empty">该 SKU 暂无档期，点「批量排期」快速生成</div>'; return; }
+    const groups = {};
+    slots.forEach(s => { (groups[s.slot_date]=groups[s.slot_date]||[]).push(s); });
+    let html = '';
+    Object.keys(groups).sort().forEach(d => {
+      html += `<div class="group"><h4>${d}（${groups[d].length} 档）</h4><table>`;
+      html += '<thead><tr><th>时段</th><th>服务者</th><th>容量/已约</th><th>剩余</th><th>操作</th></tr></thead><tbody>';
+      groups[d].forEach(s => {
+        const pct = s.capacity ? Math.round((s.booked||0)/s.capacity*100) : 0;
+        const closed = s.status === 'closed';
+        html += `<tr${closed?' style="opacity:.5"':''}>
+          <td>${esc(s.start_time)}${s.end_time?'–'+esc(s.end_time):''}${closed?' <span class="note">(已关闭)</span>':''}</td>
+          <td>${esc(s.worker_name||workerName(s.worker_id))} <span class="note">${esc(s.worker_level||'')}</span></td>
+          <td><span class="cap"><span class="capbar"><i style="width:${pct}%"></i></span> ${s.booked||0}/${s.capacity}</span></td>
+          <td>${s.remaining>0?s.remaining:'<span class="full">已满</span>'}</td>
+          <td style="white-space:nowrap;">
+            <button class="btn sm" data-toggle="${s.id}" data-status="${s.status||'open'}">${closed?'开启':'关闭'}</button>
+            <button class="btn sm danger" data-del="${s.id}" ${(s.booked||0)>0?'disabled title=已有预约':''}>删除</button>
+          </td>
+        </tr>`;
+      });
+      html += '</tbody></table></div>';
+    });
+    $('slotList').innerHTML = html;
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delSlot(b.dataset.del));
+    document.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => toggleSlot(b.dataset.toggle, b.dataset.status));
+  }
+
+  async function toggleSlot(id, cur) {
+    const next = cur === 'closed' ? 'open' : 'closed';
+    const r = await fetch('/api/juzhu/jz/slots/'+id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next})});
+    const d = await r.json();
+    if (d.ok) { toast(next==='closed'?'已关闭':'已开启','ok'); loadSlots(); } else toast('操作失败','err');
+  }
+
+  async function delSlot(id) {
+    if (!confirm('删除该档期？')) return;
+    const r = await fetch('/api/juzhu/jz/slots/'+id, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { toast('已删除','ok'); loadSlots(); } else toast(d.error||'删除失败','err');
+  }
+
+  // 该 SKU 绑定的服务者
+  const boundWorkerIds = () => (curProduct && curProduct.worker_ids || []);
+
+  // 批量排期
+  $('btnGen').onclick = () => {
+    const ids = boundWorkerIds();
+    $('genWorkers').innerHTML = ids.length
+      ? ids.map(id=>`<label class="on"><input type="checkbox" value="${id}" checked/> ${esc(workerName(id))} ${esc(workerLevel(id))}</label>`).join('')
+      : '<span class="note">该 SKU 未绑定服务者，请先在「商家 SKU」页勾选服务者</span>';
+    $('genWorkers').querySelectorAll('label').forEach(l => l.onclick = e => {
+      if (e.target.tagName!=='INPUT') { const cb=l.querySelector('input'); cb.checked=!cb.checked; }
+      setTimeout(()=>l.classList.toggle('on', l.querySelector('input').checked),0);
+    });
+    $('genModal').classList.add('show');
+  };
+  $('genCancel').onclick = () => $('genModal').classList.remove('show');
+  $('genSave').onclick = async () => {
+    const wids = [...$('genWorkers').querySelectorAll('input:checked')].map(x=>parseInt(x.value));
+    const days = parseInt($('genDays').value);
+    const times = [...$('genTimes').querySelectorAll('input:checked')].map(x=>{const[st,et]=x.value.split('|');return {start:st,end:et};});
+    const cap = parseInt($('genCap').value)||1;
+    if (!times.length) { toast('请至少选一个时段','err'); return; }
+    const dates = []; const base = new Date();
+    for (let i=1;i<=days;i++){ const dt=new Date(base); dt.setDate(base.getDate()+i); dates.push(dt.toISOString().slice(0,10)); }
+    const r = await fetch('/api/juzhu/jz/slots/generate', {method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({product_id:curProduct.id, worker_ids:wids, dates, times, capacity:cap})});
+    const d = await r.json();
+    if (d.ok) { toast('已生成 '+d.created+' 个档期','ok'); $('genModal').classList.remove('show'); loadSlots(); }
+    else toast(d.error||'生成失败','err');
+  };
+
+  // 单个档期
+  $('btnOne').onclick = () => {
+    const ids = boundWorkerIds();
+    $('oneWorker').innerHTML = ids.map(id=>`<option value="${id}">${esc(workerName(id))} ${esc(workerLevel(id))}</option>`).join('') || '<option value="">（无绑定服务者）</option>';
+    const t = new Date(); t.setDate(t.getDate()+1); $('oneDate').value = t.toISOString().slice(0,10);
+    $('oneModal').classList.add('show');
+  };
+  $('oneCancel').onclick = () => $('oneModal').classList.remove('show');
+  $('oneSave').onclick = async () => {
+    const body = {product_id:curProduct.id, worker_id:$('oneWorker').value||null, slot_date:$('oneDate').value,
+      start_time:$('oneStart').value, end_time:$('oneEnd').value, capacity:parseInt($('oneCap').value)||1};
+    if (!body.slot_date || !body.start_time) { toast('请填日期与开始时间','err'); return; }
+    const r = await fetch('/api/juzhu/jz/slots', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { toast('已新增档期','ok'); $('oneModal').classList.remove('show'); loadSlots(); }
+    else toast(d.error||'保存失败','err');
+  };
+  [$('genModal'),$('oneModal')].forEach(m => m.onclick = e => { if (e.target===m) m.classList.remove('show'); });
+
+  load();
+})();
+</script>
+</body>
+</html>

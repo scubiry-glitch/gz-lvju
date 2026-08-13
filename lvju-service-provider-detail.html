@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>服务者体系详解 · 统一认证，持证上岗</title>
+<style>
+  :root{
+    --bg:#f8faf9; --surface:#ffffff; --fg:#0f172a; --muted:#64748b;
+    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
+    --brand-soft:color-mix(in oklab, var(--brand) 12%, transparent);
+    --gold:#b45309; --gold-soft:color-mix(in oklab, var(--gold) 14%, transparent);
+    --r-sm:8px; --r-md:12px; --r-lg:18px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+    --serif:'Noto Serif SC','Songti SC',serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.8;-webkit-font-smoothing:antialiased;}
+  .container{max-width:960px;margin:0 auto;padding:40px 24px 80px;}
+  
+  /* header */
+  .header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:2px solid var(--brand-soft);}
+  .header h1{font-size:clamp(26px,4vw,36px);font-weight:700;color:var(--brand-deep);margin:0 0 12px;}
+  .header .subtitle{font-size:16px;color:var(--muted);}
+  
+  /* section */
+  .section{margin-bottom:56px;}
+  .section-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+  .section-head .idx{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px;flex-shrink:0;}
+  .section-head h2{font-size:22px;font-weight:700;color:var(--brand-deep);margin:0;}
+  
+  .content{background:var(--surface);border:1px solid #e3e8e6;border-radius:var(--r-lg);padding:28px 32px;box-shadow:0 4px 16px rgba(15,23,42,.04);}
+  .content p{margin:0 0 16px;font-size:16px;color:#334155;}
+  .content p:last-child{margin-bottom:0;}
+  .content strong{color:var(--brand-deep);}
+  .content .highlight{background:linear-gradient(135deg,var(--brand-soft),var(--gold-soft));padding:2px 8px;border-radius:4px;font-weight:600;}
+  
+  /* quote */
+  .quote-box{margin:24px 0;padding:20px 24px;background:linear-gradient(135deg,var(--brand-soft),#fff);border-left:4px solid var(--brand);border-radius:0 var(--r-md) var(--r-md) 0;font-size:17px;font-family:var(--serif);color:var(--brand-deep);font-style:italic;}
+  
+  /* list */
+  .point-list{margin:16px 0;padding:0;list-style:none;}
+  .point-list li{display:flex;gap:12px;margin-bottom:12px;font-size:15px;}
+  .point-list li::before{content:"✓";color:var(--brand);font-weight:700;flex-shrink:0;}
+  .point-list li strong{color:var(--brand-deep);}
+  
+  /* capability cards */
+  .capability-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0;}
+  .capability-card{background:#fff;border:1px solid #e3e8e6;border-radius:var(--r-md);padding:20px;text-align:center;transition:all .2s;}
+  .capability-card:hover{border-color:var(--brand);box-shadow:0 8px 24px rgba(15,118,110,.12);}
+  .capability-card .icon{font-size:32px;margin-bottom:10px;}
+  .capability-card h4{font-size:15px;font-weight:600;color:var(--brand-deep);margin:0 0 6px;}
+  .capability-card p{font-size:12px;color:var(--muted);margin:0;}
+  
+  /* ladder */
+  .ladder-wrap{margin:24px 0;padding:24px;background:linear-gradient(180deg,var(--gold-soft),#fff);border:2px solid var(--gold);border-radius:var(--r-md);}
+  .ladder-wrap h4{font-size:15px;font-weight:700;color:var(--gold);margin:0 0 16px;display:flex;align-items:center;gap:8px;}
+  .ladder-wrap h4 .core{font-size:10px;color:#fff;background:var(--gold);padding:2px 8px;border-radius:999px;}
+  .ladder{display:flex;align-items:flex-end;gap:8px;}
+  .ladder .level{flex:1;text-align:center;background:#fff;border:1px solid rgba(180,83,9,.2);border-radius:8px 8px 0 0;padding:10px 4px;}
+  .ladder .level .grade{font-weight:700;color:var(--brand-deep);font-size:14px;}
+  .ladder .level .name{font-size:10px;color:var(--muted);margin-top:2px;}
+  
+  /* flow */
+  .flow-wrap{margin:24px 0;}
+  .flow-step{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;}
+  .flow-step .step-num{width:32px;height:32px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex-shrink:0;}
+  .flow-step .step-content{flex:1;}
+  .flow-step .step-content h5{font-size:15px;font-weight:600;color:var(--brand-deep);margin:0 0 6px;}
+  .flow-step .step-content p{font-size:14px;color:#475569;margin:0;}
+  .flow-step .arrow{width:24px;text-align:center;color:var(--brand);font-size:20px;font-weight:700;margin-left:44px;}
+  
+  /* cert card */
+  .cert-demo{margin:24px 0;background:#fff;border:1px solid #e3e8e6;border-radius:var(--r-md);overflow:hidden;max-width:400px;}
+  .cert-demo .cert-head{background:linear-gradient(120deg,var(--brand-deep),var(--gold));color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .cert-demo .cert-head b{font-size:13px;}
+  .cert-demo .cert-head .status{font-size:10px;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:999px;}
+  .cert-demo .cert-body{padding:16px;}
+  .cert-demo .cert-body .cert-no{font-family:ui-monospace,monospace;font-size:12px;font-weight:700;color:var(--brand-deep);background:var(--brand-soft);padding:4px 8px;border-radius:6px;display:inline-block;margin-bottom:12px;}
+  .cert-demo .cert-body .name{font-weight:700;font-size:15px;}
+  .cert-demo .cert-body .loc{font-size:11px;color:var(--muted);margin-top:2px;}
+  .cert-demo .cert-body .level{color:var(--gold);font-weight:700;margin:10px 0;font-size:13px;}
+  .cert-demo .cert-body .badges{display:flex;flex-direction:column;gap:4px;}
+  .cert-demo .cert-body .badge{font-size:11px;display:flex;align-items:center;gap:6px;}
+  .cert-demo .cert-body .badge .ck{color:var(--brand);font-weight:700;}
+  
+  /* footer */
+  .footer{text-align:center;padding-top:32px;border-top:1px solid #e3e8e6;color:var(--muted);font-size:13px;}
+  
+  @media(max-width:640px){
+    .capability-grid{grid-template-columns:1fr;}
+    .ladder{flex-wrap:wrap;}
+    .ladder .level{flex:1 0 25%;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- header -->
+  <div class="header">
+    <h1>🧑‍🔧 服务者体系详解</h1>
+    <div class="subtitle">统一认证，持证上岗 — 让旅居服务专业、可追溯、有保障</div>
+  </div>
+
+  <!-- 为什么需要服务者体系 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">一</div>
+      <h2>为什么需要服务者体系？</h2>
+    </div>
+    <div class="content">
+      <p>在贵州旅居，游客会遇到各种服务者：入住时的管家、日常的保洁、突发时的维修、出行的向导……</p>
+      <p>但这些服务者<strong>是谁？有什么资质？服务质量如何？出了问题找谁？</strong></p>
+      <p>过去，这些问题没有答案。服务者良莠不齐，游客体验难以保障，投诉无门。</p>
+      <div class="quote-box">
+        贝壳旅居平台的核心思路：把"人"沉淀为基础设施，让每一位服务者都可追溯、可评价、有保障。
+      </div>
+      <p>这就是<strong>统一认证、持证上岗</strong>的价值所在。</p>
+    </div>
+  </div>
+
+  <!-- 六大能力 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">二</div>
+      <h2>开放平台六大能力</h2>
+    </div>
+    <div class="content">
+      <p>贝壳旅居平台向服务者和服务商开放六大能力，形成<strong>培训→认证→上岗→评价→保障</strong>的完整闭环：</p>
+      <div class="capability-grid">
+        <div class="capability-card">
+          <div class="icon">🎓</div>
+          <h4>培训中心</h4>
+          <p>86门专业课程<br>在线学习，随时提升</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon">📝</div>
+          <h4>考试认证</h4>
+          <p>1200+题库<br>机考通过，持证上岗</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon">🪜</div>
+          <h4>分级标准</h4>
+          <p>L0-L7八个等级<br>能力与收入挂钩</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon">📡</div>
+          <h4>派单流量</h4>
+          <p>按级分发<br>T+7结算，公平透明</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon">⭐</div>
+          <h4>评价信用</h4>
+          <p>客户评价回流<br>信用分月度滚动</p>
+        </div>
+        <div class="capability-card">
+          <div class="icon">🛡</div>
+          <h4>安心保障</h4>
+          <p>责任险全程兜底<br>服务有保障</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- L0-L7 分级体系 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">三</div>
+      <h2>L0-L7 八级体系</h2>
+    </div>
+    <div class="content">
+      <p>服务者从入门到专家，分为<strong>八个等级</strong>，每个等级对应不同的能力要求和派单权限：</p>
+      
+      <div class="ladder-wrap">
+        <h4>🪜 服务者等级阶梯 <span class="core">核心</span></h4>
+        <div class="ladder">
+          <div class="level" style="height:40px;"><div class="grade">L1</div><div class="name">新手</div></div>
+          <div class="level" style="height:55px;"><div class="grade">L2</div><div class="name">初级</div></div>
+          <div class="level" style="height:70px;"><div class="grade">L3</div><div class="name">中级</div></div>
+          <div class="level" style="height:85px;"><div class="grade">L4</div><div class="name">高级</div></div>
+          <div class="level" style="height:100px;"><div class="grade">L5</div><div class="name">资深</div></div>
+          <div class="level" style="height:115px;"><div class="grade">L6</div><div class="name">专家</div></div>
+          <div class="level" style="height:130px;"><div class="grade">L7</div><div class="name">大师</div></div>
+        </div>
+      </div>
+      
+      <ul class="point-list">
+        <li><strong>L1-L2</strong>：基础服务能力，可接基础派单</li>
+        <li><strong>L3-L4</strong>：熟练服务者，可接中高端房源</li>
+        <li><strong>L5-L6</strong>：资深专家，可带团队、接高端房源</li>
+        <li><strong>L7</strong>：行业大师，可担任培训讲师、认证考官</li>
+      </ul>
+      
+      <p style="margin-top:20px;">等级越高，派单优先级越高，收入也越高。这形成了<strong>能力→等级→收入</strong>的正向激励。</p>
+    </div>
+  </div>
+
+  <!-- 认证流程 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">四</div>
+      <h2>认证流程：从培训到上岗</h2>
+    </div>
+    <div class="content">
+      <div class="flow-wrap">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h5>培训学习</h5>
+            <p>在开放平台完成规定课时学习，掌握旅居服务规范、安全知识、客户沟通技巧等。</p>
+          </div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h5>考试认证</h5>
+            <p>通过在线机考，获得对应等级的认证资格。考试涵盖理论知识和实操案例。</p>
+          </div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h5>核验发证</h5>
+            <p>平台对接人社系统职业资格、培训机构结业认证，核验通过后发放<strong>持证编号</strong>。</p>
+          </div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h5>持证上岗</h5>
+            <p>获得派单资格，按等级接单。服务过程中客户评价回流信用分，责任险全程兜底。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 验真卡片 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">五</div>
+      <h2>服务者验真卡片</h2>
+    </div>
+    <div class="content">
+      <p>每一位认证服务者都有一张<strong>验真卡片</strong>，游客可以扫码查看：</p>
+      
+      <div class="cert-demo">
+        <div class="cert-head">
+          <b>🐚 贝壳旅居 · 服务者持证验真</b>
+          <span class="status">● 在岗</span>
+        </div>
+        <div class="cert-body">
+          <span class="cert-no">GZ-LJS-2026-0007788</span>
+          <div class="name">杨晓芳 · 旅居管家</div>
+          <div class="loc">黔东南 · 西江服务站 · 派单资格 ✓</div>
+          <div class="level">★ L4 · 金牌管家（L0-L7 八级）</div>
+          <div class="badges">
+            <div class="badge"><span class="ck">✓</span>人社职业资格 · 已核验</div>
+            <div class="badge"><span class="ck">✓</span>培训结业 86 课时 · 考试通过</div>
+            <div class="badge"><span class="ck">✓</span>安心责任险 · 已投保</div>
+          </div>
+        </div>
+      </div>
+      
+      <p style="margin-top:20px;">卡片信息包括：</p>
+      <ul class="point-list">
+        <li><strong>持证编号</strong>：唯一标识，可扫码验真</li>
+        <li><strong>服务者等级</strong>：L0-L7，对应能力水平</li>
+        <li><strong>培训结业</strong>：完成规定课时学习</li>
+        <li><strong>考试成绩</strong>：认证考试通过</li>
+        <li><strong>信用分</strong>：客户评价滚动累计</li>
+        <li><strong>责任险</strong>：服务过程有保障</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 价值总结 -->
+  <div class="section">
+    <div class="section-head">
+      <div class="idx">六</div>
+      <h2>价值总结</h2>
+    </div>
+    <div class="content">
+      <div class="quote-box">
+        服务者体系的核心价值：让游客放心，让服务者成长，让监管有据。
+      </div>
+      <ul class="point-list">
+        <li><strong>对游客</strong>：知道谁来服务、有什么资质、出了问题找谁——<strong>放心</strong></li>
+        <li><strong>对服务者</strong>：清晰的成长路径、公平的派单机制、稳定的收入预期——<strong>成长</strong></li>
+        <li><strong>对政府</strong>：服务者数据一目了然、投诉可追溯、行业规范化——<strong>有据</strong></li>
+      </ul>
+      <p>这就是贝壳旅居平台"统一认证，持证上岗"的完整逻辑。</p>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div class="footer">
+    <p>贵州旅居 · 贝壳旅居平台</p>
+    <p>服务者体系详解 · 演讲扩展页</p>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>户型详情</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:88px;}
+  .appbar.ghost .ttl small{color:rgba(255,255,255,.82);}
+  .gal-hero{position:relative;background:#0c4d44;color:#fff;}
+  .gal-hero .track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;height:min(56vh,420px);}
+  .gal-hero .track::-webkit-scrollbar{display:none;}
+  .gal-hero .slide{flex:0 0 100%;scroll-snap-align:start;background-size:cover;background-position:center;height:min(56vh,420px);position:relative;}
+  .gal-hero .slide::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(0deg,rgba(8,18,16,.72) 0%,rgba(8,18,16,.08) 45%,rgba(8,18,16,.18) 100%);}
+  .gal-overlay{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:0 16px 14px;pointer-events:none;}
+  .gal-badge .chip{display:inline-block;font-size:10px;font-weight:700;color:#ffd98a;
+    background:rgba(255,217,138,.18);border:1px solid rgba(255,217,138,.35);padding:3px 10px;border-radius:999px;}
+  .gal-badge h1{font-family:var(--serif);font-size:24px;font-weight:700;margin:8px 0 0;line-height:1.15;text-shadow:0 2px 12px rgba(0,0,0,.35);}
+  .gal-badge .sub{font-size:12px;opacity:.92;margin-top:4px;}
+  .gal-ctrl{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+  .gal-ctrl .dots{display:flex;gap:5px;}
+  .gal-ctrl .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45);}
+  .gal-ctrl .dots i.on{background:#fff;width:16px;border-radius:3px;}
+  .gal-ctrl .cnt{font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
+  .gal-thumbs{display:flex;gap:8px;padding:10px 16px 0;overflow-x:auto;scrollbar-width:none;}
+  .gal-thumbs::-webkit-scrollbar{display:none;}
+  .gal-thumbs button{flex:0 0 auto;width:56px;height:56px;border-radius:12px;border:2px solid transparent;
+    padding:0;overflow:hidden;background:#e8ece9;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+  .gal-thumbs button.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand),0 2px 8px rgba(15,118,110,.15);}
+  .gal-thumbs button img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gal-sheet{padding:14px 12px 8px;}
+  .gal-sheet .sheet-h{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:10px;
+    display:flex;align-items:center;gap:6px;padding-left:18px;}
+  .gal-sheet .sheet-h::before{content:'';width:3px;height:14px;border-radius:2px;background:var(--brand);flex-shrink:0;}
+  .gal-sheet .sheet-h span{font-family:var(--font);font-size:11px;font-weight:500;color:var(--muted);margin-left:4px;}
+  .gal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .gal-grid .cell{position:relative;border-radius:12px;overflow:hidden;aspect-ratio:4/3;background:#0c4d44;
+    border:0;padding:0;cursor:pointer;display:block;width:100%;
+    box-shadow:0 1px 6px rgba(0,0,0,.08);}
+  .gal-grid .cell img{width:100%;height:100%;object-fit:cover;display:block;}
+  .gal-grid .cell.on{outline:2px solid var(--brand);outline-offset:2px;}
+  .gal-grid .cell.wide{grid-column:span 2;aspect-ratio:16/9;}
+  /* 好房子评级 */
+  .rating-wrap{padding:10px 0 0;}
+  .block{background:#fff;margin:8px 12px 0;padding:16px 18px;border-radius:14px;
+    box-shadow:0 1px 8px rgba(0,0,0,.04);}
+  .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);
+    display:flex;align-items:center;gap:6px;}
+  .block .bt::before{content:'';width:3px;height:16px;border-radius:2px;background:var(--brand);}
+  .block .bs{font-size:11px;color:var(--muted);margin-top:4px;}
+  .rating-sum{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;
+    padding:16px;margin-top:14px;background:linear-gradient(135deg,#fafcfb,#f3f6f5);border:1px solid var(--border);border-radius:14px;}
+  .stars-side{text-align:center;min-width:92px;}
+  .stars-side .ek{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;}
+  .stars-side .stars{font-size:20px;color:#eab308;letter-spacing:2px;line-height:1.2;margin:6px 0;}
+  .stars-side .stars .dim{color:var(--border);}
+  .stars-side .lbl{font-size:12px;color:var(--brand);font-weight:600;}
+  .stars-side .sc{font-size:11px;color:var(--muted);margin-top:5px;}
+  .stars-side .sc b{font-size:16px;color:var(--ink);}
+  .hdim{display:grid;grid-template-columns:56px 1fr 34px;gap:6px;align-items:center;font-size:11.5px;margin-bottom:7px;}
+  .hdim:last-child{margin-bottom:0;}
+  .hdim .k{color:var(--ink);white-space:nowrap;font-weight:500;}
+  .hdim .bar{height:8px;background:#eef2f1;border-radius:4px;overflow:hidden;position:relative;}
+  .hdim .bar i{display:block;height:100%;border-radius:4px;transition:width .6s ease;}
+  .hdim .v{font-weight:700;text-align:right;font-size:12px;}
+  .verify{margin-top:14px;border:1px solid rgba(180,138,63,.2);background:linear-gradient(135deg,var(--gold-soft),rgba(180,138,63,.08));border-radius:14px;
+    padding:13px 14px;display:flex;align-items:center;gap:12px;}
+  .verify .no{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:var(--gold-deep);}
+  .verify .vb{font-size:11px;color:var(--ink);margin-top:3px;line-height:1.5;}
+  .verify .vb b{color:var(--brand);}
+  .verify .vb a{color:var(--brand);font-weight:500;}
+  .verify a.qrlink{flex-shrink:0;line-height:0;}
+  .verify .qrimg{width:50px;height:50px;border-radius:10px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  /* 房源信息 */
+  .info-block{background:#fff;padding:16px 18px 14px;margin:-10px 12px 0;border-radius:14px;
+    box-shadow:0 2px 12px rgba(0,0,0,.06);position:relative;z-index:5;}
+  .info-block .title-row{display:flex;align-items:flex-start;gap:10px;}
+  .info-block .title-row h2{flex:1;font-family:var(--serif);font-size:18px;font-weight:700;line-height:1.35;margin:0;color:var(--ink);}
+  .info-block .rent-link{flex-shrink:0;font-size:12px;color:var(--brand);font-weight:600;white-space:nowrap;
+    padding:5px 12px;border-radius:8px;background:var(--brand-soft);border:1px solid rgba(15,118,110,.15);}
+  .info-block .spec{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.6;letter-spacing:.01em;}
+  .tag-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+  .tag-row .tag{font-size:11px;padding:4px 11px;border-radius:8px;background:#f1f5f4;color:var(--ink);font-weight:500;letter-spacing:.02em;}
+  .tag-row .tag.primary{background:var(--brand);color:#fff;font-weight:600;letter-spacing:.04em;}
+  .tag-row .tag.accent{background:var(--brand-soft);color:var(--brand);font-weight:600;}
+  .tag-row .tag.gold{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;font-weight:600;}
+  /* 房型介绍 */
+  .amen-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px 6px;margin-top:12px;}
+  .amen-grid .item{text-align:center;font-size:10.5px;color:var(--ink);font-weight:500;}
+  .amen-grid .ico{width:34px;height:34px;margin:0 auto 4px;border-radius:10px;
+    background:linear-gradient(135deg,var(--brand-soft),rgba(15,118,110,.06));
+    display:grid;place-items:center;font-size:15px;color:var(--brand);
+    box-shadow:0 1px 3px rgba(15,118,110,.06);}
+  /* 咨询管家 */
+  .keeper-row{display:flex;align-items:center;gap:14px;margin-top:14px;padding:14px;
+    background:linear-gradient(135deg,#fafcfb 0%,var(--brand-soft) 100%);border-radius:14px;
+    border:1px solid rgba(15,118,110,.1);}
+  .keeper-row .av{width:50px;height:50px;border-radius:50%;background:#e8eeec center/cover no-repeat;flex-shrink:0;
+    border:2px solid rgba(255,255,255,.8);box-shadow:0 2px 8px rgba(0,0,0,.08);}
+  .keeper-row .av.placeholder{display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,#fff5eb,#ffe8d6);color:#ea580c;}
+  .keeper-row .nm{font-size:15px;font-weight:700;color:var(--ink);}
+  .keeper-row .hint{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .keeper-row .acts{margin-left:auto;display:flex;gap:10px;}
+  .keeper-row .ic{width:44px;height:44px;border-radius:50%;border:1px solid rgba(15,118,110,.15);background:#fff;
+    display:grid;place-items:center;font-size:18px;color:var(--brand);text-decoration:none;
+    box-shadow:0 2px 8px rgba(15,118,110,.1);}
+  .keeper-row .ic.tel{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 2px 10px rgba(15,118,110,.2);}
+  /* 租金弹层 */
+  .rent-modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;}
+  .rent-modal[hidden]{display:none!important;}
+  .rent-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.45);}
+  .rent-sheet{position:relative;width:100%;max-width:480px;max-height:88vh;background:#fff;border-radius:16px 16px 0 0;
+    display:flex;flex-direction:column;animation:slideUp .25s ease;}
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .rent-hd{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .rent-hd b{flex:1;text-align:center;font-size:16px;}
+  .rent-back{border:0;background:none;font-size:24px;color:var(--ink);cursor:pointer;padding:0 4px;}
+  .rent-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .rent-tabs button{flex:1;border:0;background:#fff;padding:12px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .rent-tabs button.on{color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand);}
+  .rent-body{flex:1;overflow-y:auto;padding:14px 16px;}
+  .rent-pane{display:none;}
+  .rent-pane.on{display:block;}
+  .room-label{font-size:15px;font-weight:700;margin-bottom:14px;line-height:1.4;}
+  .rent-plan{margin-bottom:16px;}
+  .rent-plan .rp-hd{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;}
+  .rent-plan .rp-hd span{color:var(--muted);font-size:11px;}
+  .rp-card{background:#f5f8f7;border-radius:12px;padding:12px 14px;}
+  .rp-pay{font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .rp-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);}
+  .rp-row:last-child{border-bottom:0;}
+  .fee-line{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .fee-line span{color:var(--muted);}
+  .fee-note{font-size:11px;color:var(--muted);margin-top:16px;text-align:center;}
+  .rent-cta{margin:0 16px 16px;padding:14px;border:0;border-radius:999px;background:linear-gradient(90deg,var(--brand),var(--brand-2));
+    color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .cta .btn-call{background:#fff;border:1px solid var(--brand);color:var(--brand);padding:13px 20px;font-weight:600;}
+  .cta .btn-call:active{background:var(--brand-soft);}
+  /* 隐私保护提醒 */
+  .privacy-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end;justify-content:center;}
+  .privacy-modal[hidden]{display:none!important;}
+  .privacy-backdrop{position:absolute;inset:0;background:rgba(8,18,16,.5);}
+  .privacy-sheet{position:relative;width:100%;max-width:520px;background:#fff;border-radius:16px 16px 0 0;
+    padding:34px 24px max(26px,env(safe-area-inset-bottom));text-align:center;
+    animation:slideUp .25s ease;}
+  .privacy-close{position:absolute;top:14px;right:16px;border:0;background:none;font-size:18px;color:#a8a8a8;
+    cursor:pointer;padding:6px;line-height:1;font-family:inherit;}
+  .privacy-ttl{font-size:18px;font-weight:700;color:var(--ink);}
+  .privacy-desc{font-size:13px;color:var(--muted);line-height:1.6;margin:14px 0 6px;}
+  .privacy-vnum{font-size:19px;font-weight:700;color:#6b6b6b;letter-spacing:.04em;margin-bottom:24px;}
+  .privacy-acts{display:flex;gap:12px;}
+  .privacy-cancel{flex:1;border:0;background:#f2f3f5;color:#333;font-size:15px;font-weight:600;
+    padding:13px;border-radius:999px;cursor:pointer;font-family:inherit;}
+  .privacy-cancel:active{background:#e8eaed;}
+  .privacy-ok{flex:1.4;border:0;border-radius:999px;background:linear-gradient(90deg,#3a6fd8,#2f5fb8);
+    color:#fff;font-size:15px;font-weight:700;padding:13px;cursor:pointer;font-family:inherit;}
+  .privacy-ok:active{opacity:.9;}
+  .promo-bar{background:linear-gradient(90deg,#ff8a3d,#0c4d44);color:#fff;padding:10px 16px;display:flex;align-items:baseline;gap:8px;}
+  .promo-bar .big{font-family:var(--serif);font-size:22px;font-weight:700;}
+  .promo-bar .orig{font-size:11px;opacity:.85;text-decoration:line-through;}
+  .promo-bar .badge{margin-left:auto;font-size:10px;background:rgba(255,255,255,.2);padding:4px 8px;border-radius:6px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr" id="scr">
+    <div class="appbar ghost" style="position:absolute;z-index:20;">
+      <a class="bk" href="javascript:history.back()">‹</a>
+      <div class="ttl" id="ttl">户型详情</div>
+      <div class="act"><span>♡</span><span>⤴</span></div>
+    </div>
+
+    <div class="gal-hero">
+      <div class="track" id="track"></div>
+      <div class="gal-overlay">
+        <div class="gal-badge">
+          <span class="chip" id="typeChip">—</span>
+          <h1 id="heroTitle">—</h1>
+          <div class="sub" id="heroSub"></div>
+        </div>
+        <div class="gal-ctrl">
+          <div class="dots" id="dots"></div>
+          <div class="cnt" id="cnt">1/1</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gal-thumbs" id="thumbs" hidden></div>
+
+    <div class="promo-bar" id="promoBar" hidden></div>
+
+    <div class="info-block" id="infoBlock" hidden>
+      <div class="title-row">
+        <h2 id="infoTitle">—</h2>
+        <button type="button" class="rent-link" id="openRent">租金详情 ›</button>
+      </div>
+      <div class="spec" id="infoSpec"></div>
+      <div class="tag-row" id="infoTags"></div>
+    </div>
+
+    <div class="block" id="amenBlock" hidden>
+      <div class="bt">房型介绍</div>
+      <div class="amen-grid" id="amenGrid"></div>
+    </div>
+
+    <div class="block" id="keeperBlock" hidden>
+      <div class="bt">咨询管家</div>
+      <div class="keeper-row" id="keeperRow"></div>
+    </div>
+
+    <div class="rating-wrap" id="ratingBlock" hidden></div>
+
+    <div class="gal-sheet" id="galSheet" hidden>
+      <div class="sheet-h">全部图片<span id="photoN"></span></div>
+      <div class="gal-grid" id="grid"></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <div class="p"><b id="price">—</b><span id="plab">参考价格</span></div>
+    <a class="btn" href="#" id="callBtn">预约咨询</a>
+  </div>
+</div>
+<div id="rentModalWrap"></div>
+
+<div class="privacy-modal" id="privacyModal" hidden>
+  <div class="privacy-backdrop" id="privacyBackdrop"></div>
+  <div class="privacy-sheet">
+    <button type="button" class="privacy-close" id="privacyClose" aria-label="关闭">✕</button>
+    <div class="privacy-ttl">隐私保护中</div>
+    <div class="privacy-desc">您的号码将会被加密后呼出，对方看到的是</div>
+    <div class="privacy-vnum">虚拟号码</div>
+    <div class="privacy-acts">
+      <button type="button" class="privacy-cancel" id="privacyCancel">取消</button>
+      <button type="button" class="privacy-ok" id="privacyOk">立即呼叫</button>
+    </div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="juzhu/app.js?v=17"></script>
+<script src="screens/_qr.js"></script>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var pslug = q.get('project');
+  var uslug = q.get('unit');
+  var channel = q.get('channel') || 'bzf';
+  var isTrade = channel === 'trade';
+  var cur = 0;
+  var photos = [];
+
+  function setIndex(idx) {
+    cur = idx;
+    var track = document.getElementById('track');
+    track.scrollTo({ left: idx * track.clientWidth, behavior: 'smooth' });
+    document.getElementById('cnt').textContent = (idx + 1) + '/' + photos.length;
+    document.querySelectorAll('#dots i').forEach(function(d, i){ d.classList.toggle('on', i === idx); });
+    document.querySelectorAll('#thumbs button').forEach(function(b, i){ b.classList.toggle('on', i === idx); });
+    document.querySelectorAll('#grid .cell').forEach(function(c, i){ c.classList.toggle('on', i === idx); });
+  }
+
+  function mountGallery() {
+    document.getElementById('track').innerHTML = photos.map(function(src){
+      return '<div class="slide" style="background-image:url(' + JUZHU.thumbUrl(src) + ')"></div>';
+    }).join('') || '<div class="slide g3"></div>';
+
+    document.getElementById('dots').innerHTML = photos.map(function(_, i){
+      return '<i class="' + (i === 0 ? 'on' : '') + '"></i>';
+    }).join('');
+    document.getElementById('cnt').textContent = '1/' + Math.max(photos.length, 1);
+
+    if (photos.length <= 1) return;
+
+    document.getElementById('thumbs').hidden = false;
+    document.getElementById('thumbs').innerHTML = photos.map(function(src, i){
+      return '<button type="button" class="' + (i === 0 ? 'on' : '') + '" data-i="' + i + '">' +
+        '<img src="' + JUZHU.thumbUrl(src) + '" alt=""/>' +
+      '</button>';
+    }).join('');
+    document.getElementById('thumbs').onclick = function(e){
+      var btn = e.target.closest('button[data-i]');
+      if (!btn) return;
+      setIndex(parseInt(btn.dataset.i, 10));
+    };
+
+    document.getElementById('galSheet').hidden = false;
+    document.getElementById('photoN').textContent = photos.length + ' 张';
+    document.getElementById('grid').innerHTML = photos.map(function(src, i){
+      var wide = i === 0 && photos.length >= 3 ? ' wide' : '';
+      return '<button type="button" class="cell' + wide + (i === 0 ? ' on' : '') + '" data-i="' + i + '">' +
+        '<img src="' + JUZHU.thumbUrl(src) + '" alt=""/>' +
+      '</button>';
+    }).join('');
+    document.getElementById('grid').onclick = function(e){
+      var cell = e.target.closest('.cell[data-i]');
+      if (!cell) return;
+      setIndex(parseInt(cell.dataset.i, 10));
+    };
+  }
+
+  function mountInfo(u, p) {
+    var tags = JUZHU.unitDisplayTags(u, p);
+    document.getElementById('infoTitle').textContent = JUZHU.unitTitle(u);
+    document.getElementById('infoSpec').textContent = JUZHU.unitSpecLine(u);
+    document.getElementById('infoBlock').hidden = false;
+
+    document.getElementById('infoTags').innerHTML = JUZHU.unitTagsHtml(tags);
+
+    if (u.promo_price && u.rent_monthly) {
+      document.getElementById('promoBar').hidden = false;
+      document.getElementById('promoBar').innerHTML =
+        '<span class="big">' + u.promo_price + '元</span><span>(券后价)</span>' +
+        '<span class="orig">' + u.rent_monthly + '元/月</span>' +
+        '<span class="badge">保租特惠</span>';
+    }
+
+    var amens = JUZHU.amenityItems(u);
+    document.getElementById('amenBlock').hidden = false;
+    document.getElementById('amenGrid').innerHTML = amens.map(function(a) {
+      return '<div class="item"><div class="ico">' + a.sym + '</div>' + a.label + '</div>';
+    }).join('');
+
+    var k = u.keeper || {};
+    var kName = k.name || p.name + ' · 管家';
+    document.getElementById('keeperBlock').hidden = false;
+    var avCls = k.avatar ? 'av' : 'av placeholder';
+    var avStyle = k.avatar ? 'background-image:url(' + k.avatar + ')' : '';
+    var avInner = k.avatar ? '' : '🏠';
+    document.getElementById('keeperRow').innerHTML =
+      '<div class="' + avCls + '" style="' + avStyle + '">' + avInner + '</div>' +
+      '<div><div class="nm">' + kName + '</div><div class="hint">联系我了解更多信息</div></div>' +
+      '<div class="acts">' +
+        '<a class="ic tel" href="#" aria-label="电话" id="keeperTel">📞</a>' +
+      '</div>';
+    var keeperTel = document.getElementById('keeperTel');
+    if (keeperTel) {
+      keeperTel.onclick = function(e) { e.preventDefault(); callWithPrivacy(p.id); };
+    }
+
+    if (JUZHU.effectiveRentDetail(u)) {
+      document.getElementById('rentModalWrap').innerHTML = JUZHU.rentDetailModalHtml(u);
+      bindRentModal(p.id);
+      document.getElementById('openRent').hidden = false;
+    } else {
+      document.getElementById('openRent').hidden = true;
+    }
+  }
+
+  function bindRentModal(projectId) {
+    var modal = document.getElementById('rentModal');
+    if (!modal) return;
+    function close() { modal.hidden = true; document.body.style.overflow = ''; }
+    function open() { modal.hidden = false; document.body.style.overflow = 'hidden'; }
+    document.getElementById('openRent').onclick = open;
+    modal.querySelectorAll('[data-close]').forEach(function(el) { el.onclick = close; });
+    modal.querySelectorAll('.rent-tabs button').forEach(function(btn) {
+      btn.onclick = function() {
+        modal.querySelectorAll('.rent-tabs button').forEach(function(b) { b.classList.toggle('on', b === btn); });
+        var tab = btn.dataset.tab;
+        modal.querySelectorAll('.rent-pane').forEach(function(p) { p.classList.toggle('on', p.dataset.pane === tab); });
+      };
+    });
+    var consult = document.getElementById('rentConsult');
+    if (consult) {
+      consult.onclick = function() { callWithPrivacy(projectId); };
+    }
+  }
+
+  // 统一拨号：隐私确认 → 实时请求 400 虚拟号 → tel:（不缓存）
+  function callWithPrivacy(projectId) {
+    var modal = document.getElementById('privacyModal');
+    if (!modal) return;
+    function closePrivacy() { modal.hidden = true; document.body.style.overflow = ''; }
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    var vnum = modal.querySelector('.privacy-vnum');
+    if (vnum) vnum.textContent = '虚拟号码';
+    var okBtn = document.getElementById('privacyOk');
+    okBtn.onclick = function() {
+      if (!projectId) {
+        closePrivacy();
+        alert('暂未配置咨询电话，请在内容编辑后台为该项目填写联系电话');
+        return;
+      }
+      okBtn.disabled = true;
+      if (vnum) vnum.textContent = '正在获取号码…';
+      JUZHU.fetchProjectVirtualPhone(projectId).then(function(res) {
+        if (vnum) vnum.textContent = res.display || res.virtual_phone || '虚拟号码';
+        closePrivacy();
+        location.href = res.tel;
+      }).catch(function(e) {
+        closePrivacy();
+        alert((e && e.message) || '暂时无法接通，请稍后重试');
+      }).finally(function() {
+        okBtn.disabled = false;
+      });
+    };
+    document.getElementById('privacyCancel').onclick = closePrivacy;
+    document.getElementById('privacyClose').onclick = closePrivacy;
+    document.getElementById('privacyBackdrop').onclick = closePrivacy;
+  }
+
+  function bindTelLinks(projectId) {
+    var callBtn = document.getElementById('callBtn');
+    callBtn.href = '#';
+    callBtn.onclick = function(e) {
+      e.preventDefault();
+      callWithPrivacy(projectId);
+    };
+  }
+
+  function mountRating(p) {
+    var hr = JUZHU.houseRating(p);
+    document.getElementById('typeChip').textContent = '★ ' + hr.stars + '星 · 好房子';
+    document.getElementById('ratingBlock').hidden = false;
+    document.getElementById('ratingBlock').innerHTML = JUZHU.houseRatingHtml(p);
+    document.querySelectorAll('#ratingBlock a.qrlink').forEach(function(a) {
+      var img = a.querySelector('img.qrimg');
+      if (!img) return;
+      var target;
+      try { target = new URL(a.getAttribute('href'), location.href).href; } catch (e) { return; }
+      try {
+        var qr = qrcode(0, 'M');
+        qr.addData(target);
+        qr.make();
+        img.src = qr.createDataURL(3, 0);
+      } catch (e) {
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data=' + encodeURIComponent(target);
+      }
+    });
+  }
+
+  JUZHU.load().then(function(){
+    var p = JUZHU.projectBySlug(pslug);
+    if (!p) return;
+    var u = JUZHU.unitBySlug(p.id, uslug);
+    if (!u) return;
+
+    var title = JUZHU.unitTitle(u);
+    document.title = title + ' · ' + p.name;
+    document.getElementById('heroTitle').textContent = title;
+    document.getElementById('heroSub').textContent = p.name + (p.address ? ' · ' + p.address : '');
+    document.getElementById('typeChip').textContent = isTrade ? '卖旧买新' : ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房');
+    document.getElementById('ttl').innerHTML = title + '<small>' + p.name + '</small>';
+
+    if (isTrade) {
+      document.getElementById('price').innerHTML = u.price_total + '<small> 万起</small>';
+      document.getElementById('plab').textContent = '参考总价 · ' + (p.old_house_hint || '以旧换新');
+    } else {
+      document.getElementById('price').innerHTML = JUZHU.fmtRent(u.rent_monthly) + '<small>/月</small>';
+      document.getElementById('plab').textContent = u.promo_price ? '券后参考价' : '租金受控 · 试点房源';
+      mountInfo(u, p);
+      mountRating(p);
+    }
+
+    bindTelLinks(p.id);
+
+    photos = JUZHU.photos('unit', u.id).map(function(ph){ return ph.file_path; });
+    if (!photos.length && u.cover_image) photos = [u.cover_image];
+    mountGallery();
+
+    var track = document.getElementById('track');
+    track.addEventListener('scroll', function(){
+      var idx = Math.round(track.scrollLeft / track.clientWidth);
+      if (idx !== cur) {
+        cur = idx;
+        document.getElementById('cnt').textContent = (idx + 1) + '/' + photos.length;
+        document.querySelectorAll('#dots i').forEach(function(d, i){ d.classList.toggle('on', i === idx); });
+        document.querySelectorAll('#thumbs button').forEach(function(b, i){ b.classList.toggle('on', i === idx); });
+        document.querySelectorAll('#grid .cell').forEach(function(c, i){ c.classList.toggle('on', i === idx); });
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
