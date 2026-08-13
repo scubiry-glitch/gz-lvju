@@ -426,6 +426,13 @@ async function ensureSchema() {
         [k, v]
       );
     }
+    // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
+    const migrations = [
+      "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+    ];
+    for (const sql of migrations) {
+      try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
+    }
     schemaEnsured = true;
   } finally {
     await conn.end();
@@ -1214,6 +1221,81 @@ async function handleApiDirect(urlPath, qs, req, res) {
           return jsonReply(res, { ok: true, project: updated[0] });
         } finally {
           await conn.end();
+        }
+      }
+    }
+
+    // ===== 项目虚拟号接口 =====
+
+    // GET /api/juzhu/projects/:id/virtual-phone
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/(\d+)\/virtual-phone$/);
+      if (m && req.method === 'GET') {
+        const pid = parseInt(m[1]);
+        const rows = await queryRows('SELECT id, contact_phone, name FROM projects WHERE id=?', [pid]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        const realPhone = (rows[0].contact_phone || '').trim();
+        if (!realPhone) return jsonReply(res, { error: '未配置联系电话' }, 400);
+
+        const tpBase = (process.env.TP_BASE || 'http://tp-test.lianjia.com').replace(/\/$/, '');
+        const tpAppId = (process.env.TP_APP_ID || '').trim();
+        const tpAppKey = (process.env.TP_APP_KEY || '').trim();
+        if (!tpAppId || !tpAppKey) {
+          return jsonReply(res, { error: 'TP_APP_ID/TP_APP_KEY 未配置' }, 400);
+        }
+
+        // MD5 签名（与 tp_client.py generate_sign 对齐）
+        const params = {
+          app_id: tpAppId,
+          ts: String(Math.floor(Date.now() / 1000)),
+          number: realPhone,
+          app_call_id: `juzhu-project-${pid}`,
+        };
+        const signStr = Object.entries(params)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, v]) => `${k}=${v}`)
+          .join('&') + `&app_key=${tpAppKey}`;
+        const sign = crypto.createHash('md5').update(signStr, 'utf8').digest('hex');
+        params.sign = sign;
+
+        const tpQs = new URLSearchParams(params).toString();
+        const tpUrl = `${tpBase}/bundling/alloc?${tpQs}`;
+
+        try {
+          const tpRes = await new Promise((resolve, reject) => {
+            const tpLib = tpUrl.startsWith('https') ? require('https') : require('http');
+            const tpReq = tpLib.get(tpUrl, { headers: { 'Accept': 'application/json' } }, tpResp => {
+              let body = '';
+              tpResp.on('data', d => body += d);
+              tpResp.on('end', () => {
+                try { resolve(JSON.parse(body)); }
+                catch (e) { reject(new Error('TP invalid JSON')); }
+              });
+            });
+            tpReq.on('error', reject);
+            tpReq.setTimeout(20000, () => { tpReq.destroy(); reject(new Error('TP timeout')); });
+          });
+
+          if (tpRes.errno !== 0 && tpRes.errno !== '0' && tpRes.errno != null) {
+            return jsonReply(res, { error: tpRes.errmsg || `话务错误 errno=${tpRes.errno}` }, 502);
+          }
+          const tpData = tpRes.data || [];
+          const tpItem = Array.isArray(tpData) ? tpData[0] : tpData;
+          const rawVirtual = (tpItem && (tpItem.virtual_phone_number || tpItem.virtual_phone)) || '';
+          if (!rawVirtual) return jsonReply(res, { error: '话务未返回虚拟号' }, 502);
+
+          // 格式化虚拟号（与 tp_client.py format_virtual_phone 对齐）
+          const [vMain, vExt] = rawVirtual.split('-');
+          const mainDigits = (vMain || '').replace(/\D/g, '');
+          const extDigits = (vExt || '').replace(/\D/g, '');
+          const displayMain = mainDigits.length >= 10
+            ? `${mainDigits.slice(0,3)} ${mainDigits.slice(3,6)} ${mainDigits.slice(6)}`
+            : (mainDigits || vMain);
+          const display = displayMain + (extDigits ? ` 转 ${extDigits}` : '');
+          const tel = 'tel:' + mainDigits + (extDigits ? `,${extDigits}` : '');
+          return jsonReply(res, { virtual_phone: rawVirtual, display, tel });
+        } catch (e) {
+          return jsonReply(res, { error: '暂时无法接通，请稍后重试' }, 502);
         }
       }
     }
