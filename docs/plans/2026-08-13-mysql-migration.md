@@ -55,3 +55,23 @@
 - 全部 SQL 无 sqlite 专属函数残留（grep strftime/PRAGMA/ON CONFLICT/INSERT OR）
 - 迁移后 MySQL 各表行数 == SQLite 源行数
 - 前端零改动；API 响应形状不变（test_jiazheng_flow.py / test_vendor_api.py 通过）
+
+## 执行状态（2026-08-13）
+
+- [x] T1-T11 全部完成（提交：cfbae0f…15414ef）
+- [x] T12 数据迁移完成：建表 + 全量导入 + 行数校验一致（gr_orders 3241 行等 8 张非空表）
+- [x] T13 本地冒烟通过：
+  - 核心 API（cities / jz/orders/overview 漏斗 / jz/vendors / jiazheng/skus）
+  - 商家 API 17 请求全覆盖（本地指向 MySQL）
+  - 回调全链路：造单 → paid 回调 → 落库校验（vendor_id/vendor_oid/fee/paid_at）
+- [x] 发布测试机：代码同步 + 远端自动安装 pymysql 1.2.0 + 服务启动监听 8765
+- [ ] 远程全链路验证 —— **阻塞：测试机 49.232.103.71 → MySQL 62.234.26.57:3306 TCP 不通（超时）**，
+      需运维在 MySQL 安全组放行测试机 IP；放行后执行：
+      `JUZHU_TEST_BASE=http://49.232.103.71:8765 python3 juzhu/test_vendor_api.py`
+
+### 实施中发现并修复的适配层缺陷
+- dbconn 反引号重复包裹：`mysql_schema.sql` 中 `` `key` `` 被二次包裹 → 负向断言正则修复
+- pymysql mogrify 字面量 `%` 当格式化符（`'%Y-%m'`/`'%,'`）→ 引号段内 `%`→`%%` 转义
+- MySQL DATE 类型返回 date 对象不可 JSON 序列化 → Row 层 `_to_plain` 转文本
+- sqlite3 游标可迭代 vs _MysqlCursor → 补 `__iter__`
+- 远端 pymysql 版本差异（1.2.0 vs 本地 1.4.6）无影响
