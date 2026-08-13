@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>我的订单 · 生活服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:24px;}
+  .appbar{position:sticky;}
+  .stt.paid{color:var(--gold-deep);}
+  .stt.assigned{color:var(--brand);}
+  .stt.serving{color:#ea580c;}
+  .stt.cancelled{color:#94a3b8;}
+  .empty{padding:56px 24px;text-align:center;color:var(--muted);font-size:13px;}
+  .empty .ic{font-size:40px;display:block;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="index.html">‹</a>
+      <div class="ttl">我的订单</div>
+      <div class="act"><span style="visibility:hidden">⚙</span></div>
+    </div>
+
+    <div class="otabs" id="tabs">
+      <a class="on" data-s="">全部</a>
+      <a data-s="paid">已支付</a>
+      <a data-s="assigned">已派单</a>
+      <a data-s="serving">服务中</a>
+      <a data-s="completed">已完成</a>
+    </div>
+
+    <div class="wrap" id="list" style="padding-top:14px;"></div>
+  </div>
+</div>
+<script src="screens/_jzapi.js"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var q = new URLSearchParams(location.search);
+  var curStatus = q.get('status') || '';
+  var CAT_ICON = { cleaning: '🧹', repair: '🔧', moving: '📦', nanny: '👶' };
+  var STATUS_UI = {
+    paid:      { label: '已支付', cls: 'paid' },
+    assigned:  { label: '已派单', cls: 'assigned' },
+    serving:   { label: '服务中', cls: 'serving' },
+    completed: { label: '已完成', cls: 'done' },
+    cancelled: { label: '已取消', cls: 'cancelled' }
+  };
+
+  function fmtYuan(fee){
+    if (fee == null) return '—';
+    return '¥' + Number(fee / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function render(list){
+    if (!list || !list.length) {
+      document.getElementById('list').innerHTML =
+        '<div class="empty"><span class="ic">🧾</span>暂无订单</div>';
+      return;
+    }
+    document.getElementById('list').innerHTML = list.map(function(o){
+      var st = STATUS_UI[o.status] || { label: o.status, cls: 'done' };
+      var name = o.product_name || '服务（已下架）';
+      var icon = CAT_ICON[o.category_id] || '🧰';
+      return '<div class="ordcard">' +
+        '<div class="oh"><span class="shop">🐚 新居住 · 生活服务</span>' +
+        '<span class="stt ' + st.cls + '">' + st.label + '</span></div>' +
+        '<div class="ob">' +
+          '<div class="th" style="display:grid;place-items:center;font-size:30px;' +
+            'background:linear-gradient(135deg,#0f766e,#14b8a6);">' + icon + '</div>' +
+          '<div class="oi">' +
+            '<div class="nm">' + esc(name) + '</div>' +
+            '<div class="meta">' + esc(o.city || '') + ' · 下单 ' + esc((o.created_at || '').slice(0, 16)) + '</div>' +
+            '<div class="amt">实付 <b>' + fmtYuan(o.fee) + '</b> · 订单号 ' + esc((o.order_ref || '').slice(-6)) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="of"><a class="primary" href="juzhu-jiazheng-order-detail.html?order_ref=' +
+          encodeURIComponent(o.order_ref) + '">查看详情</a></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function load(){
+    fetch('/api/juzhu/gr/orders?user_id=' + encodeURIComponent(JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok) return render(null);
+        var list = res.list || [];
+        if (curStatus) list = list.filter(function(o){ return o.status === curStatus; });
+        render(list);
+      })
+      .catch(function(){ render(null); });
+  }
+
+  document.getElementById('tabs').addEventListener('click', function(e){
+    var t = e.target.closest('a'); if (!t) return;
+    curStatus = t.getAttribute('data-s');
+    document.querySelectorAll('#tabs a').forEach(function(a){ a.classList.toggle('on', a === t); });
+    load();
+  });
+
+  // 初始 tab 高亮：URL status 参数对齐
+  if (curStatus) {
+    document.querySelectorAll('#tabs a').forEach(function(a){
+      a.classList.toggle('on', a.getAttribute('data-s') === curStatus);
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
