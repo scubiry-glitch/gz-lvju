@@ -37,9 +37,40 @@ def check_create_order_with_user():
     print("[PASS] check_create_order_with_user")
 
 
+def check_list_user_orders_filters_pending():
+    import time
+    from datetime import datetime
+    from gr_orders import list_user_orders
+
+    conn = jdb.connect()
+    stamp = str(int(time.time() * 1000))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    refs = []
+    for i, status in enumerate(["pending", "paid", "assigned", "serving", "completed"]):
+        ref = f"GRTESTL{stamp}{i}"
+        conn.execute(
+            "INSERT INTO gr_orders (order_ref, user_id, sku, city, status, created_at)"
+            " VALUES (?, ?, '99', '沈阳', ?, ?)",
+            (ref, TEST_USER, status, now),
+        )
+        refs.append(ref)
+    conn.commit()
+    try:
+        data = list_user_orders(conn, TEST_USER)
+        got = {r["order_ref"] for r in data["list"]}
+        assert all(r not in got for r in refs[:1]), "pending 订单被泄露"
+        assert len(got) == 4, f"应返回 4 条，实际 {len(got)}"
+        assert data["counts"] == {"paid": 1, "assigned": 1, "serving": 1, "completed": 1}, data["counts"]
+        print("[PASS] check_list_user_orders_filters_pending")
+    finally:
+        conn.execute("DELETE FROM gr_orders WHERE user_id = ? AND order_ref LIKE 'GRTESTL%'", (TEST_USER,))
+        conn.commit()
+
+
 def main():
     check_user_id_column()
     check_create_order_with_user()
+    check_list_user_orders_filters_pending()
     print("ALL PASS")
 
 
