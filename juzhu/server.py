@@ -969,8 +969,10 @@ class Handler(SimpleHTTPRequestHandler):
             vendor_id = qs.get("vendor_id", [None])[0]
             type_ = qs.get("type", [None])[0]
             status = qs.get("status", [None])[0]
+            city_id = qs.get("city_id", [None])[0]
             data = jzdb.list_products(conn, vendor_id=int(vendor_id) if vendor_id else None,
-                                       type_=type_, status=status)
+                                       type_=type_, status=status,
+                                       city_id=int(city_id) if city_id else None)
             conn.close()
             return self._json({"list": data})
 
@@ -1823,12 +1825,23 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
 
             # === B 端·产品管理 CRUD ===
             if path == "/api/juzhu/jz/products" and method_alt == "POST":
+                ok, err = jzdb.validate_product_city(conn, body.get("vendor_id"), body.get("city_id"))
+                if not ok:
+                    return self._json({"error": err}, 400)
                 pid = jzdb.create_product(conn, body)
                 conn.commit()
                 return self._json({"ok": True, "id": pid})
             m = re.match(r"^/api/juzhu/jz/products/(\d+)$", path)
             if m and method_alt == "PUT":
-                ok = jzdb.update_product(conn, int(m.group(1)), body)
+                pid = int(m.group(1))
+                if "city_id" in body:
+                    row = conn.execute("SELECT vendor_id FROM jz_products WHERE id=?", (pid,)).fetchone()
+                    if not row:
+                        return self._json({"error": "not found"}, 404)
+                    ok, err = jzdb.validate_product_city(conn, row[0], body.get("city_id"))
+                    if not ok:
+                        return self._json({"error": err}, 400)
+                ok = jzdb.update_product(conn, pid, body)
                 conn.commit()
                 return self._json({"ok": ok})
             if m and method_alt == "DELETE":
