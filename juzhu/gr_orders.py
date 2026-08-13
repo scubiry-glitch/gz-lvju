@@ -3,7 +3,6 @@
 - gr_orders 表的读写操作
 """
 import random
-import sqlite3
 from datetime import datetime
 
 
@@ -27,7 +26,7 @@ def generate_order_ref(conn):
     raise RuntimeError("无法生成唯一 order_ref：重试次数已达上限")
 
 
-def create_order(conn, order_ref, sku, city="沈阳"):
+def create_order(conn, order_ref, sku, city="沈阳", vendor_id=None):
     """创建一条 gr_orders 记录。
     vendor_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
     返回 order_ref。
@@ -35,9 +34,9 @@ def create_order(conn, order_ref, sku, city="沈阳"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         """INSERT INTO gr_orders
-           (order_ref, sku, city, status, created_at)
-           VALUES (?, ?, ?, 'pending', ?)""",
-        (order_ref, sku, city, now),
+           (order_ref, vendor_id, sku, city, status, created_at)
+           VALUES (?, ?, ?, ?, 'pending', ?)""",
+        (order_ref, vendor_id, sku, city, now),
     )
     conn.commit()
     return order_ref
@@ -66,55 +65,56 @@ def get_order_by_ref_and_vendor(conn, order_ref, vendor_oid):
 
 def update_order_callback(conn, order_ref, vendor_oid, status,
                            fee=None, worker_name=None, worker_phone=None,
-                           eta=None, cancel_reason=None):
+                           eta=None, cancel_reason=None, vendor_id=None):
     """回调更新 gr_orders 订单信息。
 
-    - paid 时写入 vendor_oid / status / fee / paid_at
-    - 其他状态更新 status 及对应字段
+    - paid 时写入 vendor_id / vendor_oid / status / fee / paid_at
+    - 其他状态更新 vendor_id / status 及对应字段
+    - vendor_id 传入 None 时保留原值（COALESCE 兜底）
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if status == "paid":
         conn.execute(
             """UPDATE gr_orders
-               SET vendor_oid = ?, status = ?, fee = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?, fee = ?,
                    paid_at = ?, updated_at = ?
                WHERE order_ref = ?""",
-            (vendor_oid, status, fee, now, now, order_ref),
+            (vendor_id, vendor_oid, status, fee, now, now, order_ref),
         )
     elif status == "assigned":
         conn.execute(
             """UPDATE gr_orders
-               SET vendor_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    worker_name = ?, worker_phone = ?, eta = ?,
                    updated_at = ?
                WHERE order_ref = ? AND vendor_oid = ?""",
-            (vendor_oid, status, worker_name, worker_phone, eta,
+            (vendor_id, vendor_oid, status, worker_name, worker_phone, eta,
              now, order_ref, vendor_oid),
         )
     elif status == "completed":
         conn.execute(
             """UPDATE gr_orders
-               SET vendor_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    completed_at = ?, updated_at = ?
                WHERE order_ref = ? AND vendor_oid = ?""",
-            (vendor_oid, status, now, now, order_ref, vendor_oid),
+            (vendor_id, vendor_oid, status, now, now, order_ref, vendor_oid),
         )
     elif status == "cancelled":
         conn.execute(
             """UPDATE gr_orders
-               SET vendor_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    cancel_reason = ?, updated_at = ?
                WHERE order_ref = ? AND vendor_oid = ?""",
-            (vendor_oid, status, cancel_reason, now, order_ref, vendor_oid),
+            (vendor_id, vendor_oid, status, cancel_reason, now, order_ref, vendor_oid),
         )
     else:
         # serving 及其他状态：仅更新 status
         conn.execute(
             """UPDATE gr_orders
-               SET vendor_oid = ?, status = ?, updated_at = ?
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?, updated_at = ?
                WHERE order_ref = ? AND vendor_oid = ?""",
-            (vendor_oid, status, now, order_ref, vendor_oid),
+            (vendor_id, vendor_oid, status, now, order_ref, vendor_oid),
         )
 
     conn.commit()

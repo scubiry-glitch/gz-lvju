@@ -10,15 +10,16 @@
 """
 
 import json
-import sqlite3
+import os
+import time
 import urllib.request
 from pathlib import Path
 
+import db  # noqa: E402
 from sign_util import HmacAuth  # noqa: E402
 
 _MODULE_DIR = Path(__file__).resolve().parent
 _KEY_PATH = _MODULE_DIR / "hmac_secret.key"
-_DB_PATH = _MODULE_DIR / "juzhu.db"
 
 
 # ── 密钥加载 ──────────────────────────────────────────────────
@@ -48,16 +49,8 @@ def _load_vendor_config():
 # ── 数据库 ────────────────────────────────────────────────────
 
 def _connect_db():
-    conn = sqlite3.connect(str(_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    schema_path = _MODULE_DIR / "schema.sql"
-    if schema_path.exists():
-        try:
-            conn.executescript(schema_path.read_text(encoding="utf-8"))
-        except sqlite3.OperationalError:
-            pass  # 忽略迁移语句在已迁移/新库上的错误
-    return conn
+    """统一走 db.connect()（MySQL 连接，schema 自愈由 db 模块负责）。"""
+    return db.connect()
 
 
 # ── 工具 ──────────────────────────────────────────────────────
@@ -145,7 +138,7 @@ def _handle_vendor(handler, path, body):
 
 def _handle_callback(handler, body):
     """第三方小程序回调 —— 更新 GR 订单状态（HMAC 鉴权，vendor_id 必填）。"""
-    _, err = _verify_vendor_auth(body)
+    vendor_id, err = _verify_vendor_auth(body)
     if err:
         _respond_json(handler, {"code": 401, "message": err}, 401)
         return True
@@ -204,6 +197,7 @@ def _handle_callback(handler, body):
             worker_phone=worker.get("phone") if worker else None,
             eta=worker.get("eta") if worker else None,
             cancel_reason=cancel_reason if status == "cancelled" else None,
+            vendor_id=vendor_id,
         )
         _respond_json(handler, {"code": 0, "message": "success"})
     except Exception as e:
@@ -494,7 +488,7 @@ def handle_wechat_link(handler, body):
 
         url_link = _call_gen_url_link(api_url, path=path, query=query, order_ref=order_ref)
 
-        create_order(conn, order_ref, str(product_id))
+        create_order(conn, order_ref, str(product_id), vendor_id=product.get("vendor_id"))
 
         _respond_json(handler, {
             "ok": True,
@@ -527,14 +521,52 @@ def _call_gen_url_link(api_url, *, path, query, order_ref):
         "order_ref": order_ref,
     }).encode("utf-8")
 
+    _log(f"    [平台→商家] {_log_ts()} POST {api_url}", force=True)
+    _log(f"      >> 参数: {payload.decode('utf-8')}")
     req = urllib.request.Request(api_url, data=payload, headers={
         "Content-Type": "application/json",
     })
-
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read()
+        text = raw.decode("utf-8", "replace")
+        result = json.loads(text)
+    except Exception as e:
+        _log(f"      ! {type(e).__name__}: {e}")
+        if hasattr(e, "read"):  # HTTPError：附带商家返回的错误响应体
+            try:
+                _log(f"      << 返回(错误): {_clip(e.read().decode('utf-8', 'replace'))}")
+            except Exception:
+                pass
+        raise
+    _log(f"      << 返回: {_clip(text)}")
 
     if result.get("code") != 200:
         raise RuntimeError(result.get("msg") or "URL Link 生成失败")
 
     return result.get("data") or ""
+
+
+# ── 外部调用日志（print 到 stdout，随 server.py 主日志落盘） ──
+
+def _log(line, force=False):
+    """force=True 的行在简洁模式下也打印（出站请求的接口 URI 行）。"""
+    if force or _log_detail():
+        print(line, flush=True)
+
+
+def _log_ts():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_detail():
+    """详细日志开关：JUZHU_LOG_DETAIL=false/0/off 时出站调用只打印请求 URL 一行。"""
+    return os.environ.get("JUZHU_LOG_DETAIL", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _clip(text, limit=2000):
+    """日志打印截断：超长截断并标注总长度；换行转义为单行。"""
+    text = text.replace("\n", "\\n")
+    if len(text) > limit:
+        return text[:limit] + f"…[截断，共 {len(text)} 字符]"
+    return text
