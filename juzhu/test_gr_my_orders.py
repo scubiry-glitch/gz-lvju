@@ -22,8 +22,24 @@ def check_user_id_column():
     print("[PASS] check_user_id_column: user_id 列存在")
 
 
+def check_create_order_with_user():
+    import time
+    from gr_orders import create_order, get_order_by_ref
+
+    conn = jdb.connect()
+    ref = "GRTEST" + str(int(time.time() * 1000))
+    create_order(conn, ref, "99", city="沈阳", vendor_id=None, user_id=TEST_USER)
+    conn.commit()
+    row = get_order_by_ref(conn, ref)
+    assert row and row.get("user_id") == TEST_USER, f"user_id 未落库: {row}"
+    conn.execute("DELETE FROM gr_orders WHERE order_ref = ?", (ref,))
+    conn.commit()
+    print("[PASS] check_create_order_with_user")
+
+
 def main():
     check_user_id_column()
+    check_create_order_with_user()
     print("ALL PASS")
 
 

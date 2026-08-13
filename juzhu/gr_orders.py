@@ -26,7 +26,7 @@ def generate_order_ref(conn):
     raise RuntimeError("无法生成唯一 order_ref：重试次数已达上限")
 
 
-def create_order(conn, order_ref, sku, city="沈阳", vendor_id=None):
+def create_order(conn, order_ref, sku, city="沈阳", vendor_id=None, user_id=None):
     """创建一条 gr_orders 记录。
     vendor_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
     返回 order_ref。
@@ -34,9 +34,9 @@ def create_order(conn, order_ref, sku, city="沈阳", vendor_id=None):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         """INSERT INTO gr_orders
-           (order_ref, vendor_id, sku, city, status, created_at)
-           VALUES (?, ?, ?, ?, 'pending', ?)""",
-        (order_ref, vendor_id, sku, city, now),
+           (order_ref, vendor_id, user_id, sku, city, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'pending', ?)""",
+        (order_ref, vendor_id, user_id, sku, city, now),
     )
     conn.commit()
     return order_ref

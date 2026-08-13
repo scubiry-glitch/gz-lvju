@@ -530,7 +530,16 @@ def handle_wechat_link(handler, body):
 
         url_link = _call_gen_url_link(api_url, path=path, query=query, order_ref=order_ref)
 
-        create_order(conn, order_ref, str(product_id), vendor_id=product.get("vendor_id"))
+        # 下单用户 id（C 端模拟，后期接真实登录）
+        user_id = (body.get("user_id") or "").strip() or None
+
+        create_order(
+            conn,
+            order_ref,
+            str(product_id),
+            vendor_id=product.get("vendor_id"),
+            user_id=user_id,
+        )
 
         _respond_json(handler, {
             "ok": True,
