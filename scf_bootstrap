@@ -1,5 +1,5 @@
 #!/bin/bash
-# SCF / 本地双启动入口：注入环境变量后启 Python API（可选）+ Node 静态/代理（前台）
+# SCF 启动入口：注入环境变量后启动 Node.js 服务（纯 Node 模式，无 Python 依赖）
 # 运行时 .env 仅供本脚本 source，禁止通过 HTTP 访问（见 app.js isPublicStatic）
 
 _EXTERNAL_PORT=${PORT}
@@ -36,22 +36,6 @@ if [ "$ENV_NAME" = "prod" ] || [ "$ENV_NAME" = "production" ]; then
     echo "FATAL: production requires MYSQL_HOST/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD" >&2
     exit 1
   fi
-fi
-
-# 检测 Python（node1815 runtime 可能不含 python3）
-PYTHON=""
-for cmd in python3 python3.10 python3.9 python3.8 python; do
-  if command -v "$cmd" >/dev/null 2>&1; then
-    PYTHON="$cmd"
-    break
-  fi
-done
-
-if [ -n "$PYTHON" ]; then
-  PYTHON_PORT=8765 PORT=8765 "$PYTHON" "$DIR/juzhu/server.py" &
-  echo "Python API server started on port 8765 (pid $!)"
-else
-  echo "WARNING: python3 not found, /api/juzhu/* will use Node MySQL fallback only"
 fi
 
 exec node "$DIR/app.js"
