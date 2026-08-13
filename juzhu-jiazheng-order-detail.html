@@ -109,6 +109,8 @@
     document.getElementById('body').innerHTML = html;
   }
 
+  var curOrder = null;
+
   function load(){
     fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '?user_id=' + encodeURIComponent(JZ.userId()))
       .then(function(r){ return r.json(); })
@@ -118,12 +120,34 @@
             '<div class="err">订单不存在或无权查看</div>';
           return;
         }
-        render(res.order);
+        curOrder = res.order;
+        render(curOrder);
+        loadVendorDetail();
       })
       .catch(function(){
         document.getElementById('body').innerHTML =
           '<div class="err">加载失败，请稍后重试</div>';
       });
+  }
+
+  function loadVendorDetail(){
+    // 静默调用商家订单详情接口覆盖展示；失败保持本地数据，用户无感知
+    fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '/vendor-detail?user_id=' + encodeURIComponent(JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok || !res.detail || !curOrder) return;
+        var d = res.detail;
+        ['status', 'fee', 'vendor_oid', 'cancel_reason'].forEach(function(k){
+          if (d[k] != null) curOrder[k] = d[k];
+        });
+        if (d.worker) {
+          if (d.worker.name) curOrder.worker_name = d.worker.name;
+          if (d.worker.phone) curOrder.worker_phone = d.worker.phone;
+          if (d.worker.eta) curOrder.eta = d.worker.eta;
+        }
+        render(curOrder);
+      })
+      .catch(function(){ /* 静默失败：保持本地数据 */ });
   }
 
   if (!orderRef) {

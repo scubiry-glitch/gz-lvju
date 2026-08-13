@@ -1082,6 +1082,11 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return jiazheng_api.handle_gr_orders(self, qs)
 
+        m = re.match(r"^/api/juzhu/gr/orders/([^/]+)/vendor-detail$", path)
+        if m:
+            conn.close()
+            return jiazheng_api.handle_gr_vendor_detail(self, m.group(1), qs)
+
         m = re.match(r"^/api/juzhu/gr/orders/([^/]+)$", path)
         if m:
             conn.close()

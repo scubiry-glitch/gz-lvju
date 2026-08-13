@@ -144,12 +144,50 @@ def check_serving_at_and_eta():
     print("[PASS] check_serving_at_and_eta")
 
 
+def check_gr_vendor_detail_api():
+    import time as _t
+    from gr_orders import create_order
+
+    conn = jdb.connect()
+    ref = "GRTESTV" + str(int(_t.time() * 1000))
+    # vendor_id=None：未关联商家 → ok:false
+    create_order(conn, ref, "99", city="沈阳", user_id=TEST_USER)
+    conn.commit()
+    try:
+        r = http_get(f"/api/juzhu/gr/orders/{ref}/vendor-detail")
+        assert r.get("__status") == 400, f"缺 user_id 应 400，实际 {r}"
+        r = http_get(f"/api/juzhu/gr/orders/{ref}/vendor-detail?user_id={TEST_USER}")
+        assert r.get("ok") is False, f"未关联商家应 ok:false，实际 {r}"
+        r = http_get(f"/api/juzhu/gr/orders/{ref}/vendor-detail?user_id=other_user")
+        assert r.get("__status") == 404, f"跨用户应 404，实际 {r}"
+    finally:
+        conn.execute("DELETE FROM gr_orders WHERE order_ref = ?", (ref,))
+        conn.commit()
+
+    # vendor_id=41（已配置 order_detail_url）：商家接口白名单限制，
+    # 测试机 IP 不一定在白名单，仅断言响应为合法 JSON 且不崩溃
+    ref2 = "GRTESTV" + str(int(_t.time() * 1000)) + "b"
+    create_order(conn, ref2, "99", city="沈阳", user_id=TEST_USER, vendor_id=41)
+    conn.commit()
+    try:
+        r = http_get(f"/api/juzhu/gr/orders/{ref2}/vendor-detail?user_id={TEST_USER}")
+        assert isinstance(r, dict) and "ok" in r, f"响应结构异常: {r}"
+        if r.get("ok"):
+            assert isinstance(r.get("detail"), dict), r
+    finally:
+        conn.execute("DELETE FROM gr_orders WHERE order_ref = ?", (ref2,))
+        conn.commit()
+    conn.close()
+    print("[PASS] check_gr_vendor_detail_api")
+
+
 def main():
     check_user_id_column()
     check_create_order_with_user()
     check_list_user_orders_filters_pending()
     check_gr_orders_api()
     check_serving_at_and_eta()
+    check_gr_vendor_detail_api()
     print("ALL PASS")
 
 
