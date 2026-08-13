@@ -14,9 +14,13 @@ window.JUZHU = (function () {
     });
   }
 
-  // 按 URL ?city=（城市名）解析对应城市的数据文件；无城市或解析失败 → 默认 data.json
+  // 按 URL ?city=（城市名）解析对应城市的数据文件；URL 无参数时回退 localStorage 城市
+  // （与 _jzapi.js 的 bzf_jz_city 同一键），保证数据文件与展示城市一致；仍无值 → 默认 data.json
   function dataUrlForCity() {
     var city = urlCityName();
+    if (!city) {
+      try { city = localStorage.getItem('bzf_jz_city') || ''; } catch (e) {}
+    }
     if (!city) return Promise.resolve('');
     var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
     return fetch(base + 'cities.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) {

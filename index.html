@@ -610,11 +610,13 @@
   Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
     var d = results[0];
     lastData = d;
-    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准；
-    // 但 URL 带 ?city= 直链参数时不强制改回（直链优先，只读展示）
+    // 城市来源优先级：URL ?city= 直链（只读）> localStorage 用户选择 > 后端数据城市兜底。
+    // 仅当 URL 与 localStorage 都没有城市来源时，才用数据城市初始化；
+    // localStorage 已有用户选择的城市时，尊重它，不强制改回。
     if (window.BZF_JZ && d.city && d.city.name && !(BZF_JZ.urlCity && BZF_JZ.urlCity())) {
-      var storedCity = BZF_JZ.regionCity();
-      if (storedCity !== d.city.name) {
+      var hasStored = false;
+      try { hasStored = !!localStorage.getItem('bzf_jz_city'); } catch (e) {}
+      if (!hasStored) {
         BZF_JZ.setRegionCity(d.city.name);
       }
     }
