@@ -462,13 +462,15 @@
     document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
       var displayPrice = r.product_min_price || r.price_from || 0;
       var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
-      return '<a class="row" href="' + BZF_JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug)) + '">' +
+      // 基础链接不带 city，渲染后由 paintJzLinks 幂等补上当前城市（城市切换时同步更新）
+      return '<a class="row" href="juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug) + '">' +
         '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:12px;">' +
           '<div class="pr">' + price + '</div>' +
           '<div class="go">预约 ›</div>' +
         '</div></a>';
     }).join('');
+    paintJzLinks();
   }
 
   // 营销栏（运营位）
@@ -506,6 +508,24 @@
   }
 
   // renderJiazhengPromo();  // 本月精选暂时隐藏
+
+  // —— 生活服务入口链接携带当前城市（幂等重写：保留既有参数，城市切换后同步更新）——
+  function rewriteJzLinkCity(a) {
+    var parts = a.getAttribute('href').split('?');
+    var qs = new URLSearchParams(parts[1] || '');
+    qs.delete('city');
+    var city = BZF_JZ.regionCity();
+    if (city) qs.set('city', city);
+    a.href = parts[0] + (qs.toString() ? '?' + qs.toString() : '');
+  }
+  function paintJzLinks() {
+    if (!window.BZF_JZ) return;
+    document.querySelectorAll(
+      '.jz-cat-grid a[href*="juzhu-jiazheng-list.html"], #jzSubs a[href*="juzhu-jiazheng-detail.html"]'
+    ).forEach(rewriteJzLinkCity);
+  }
+  paintJzLinks();
+  if (window.BZF_JZ && BZF_JZ.onCityChange) BZF_JZ.onCityChange(paintJzLinks);
 
   if (window.BZF_JZ && BZF_JZ.categories) {
     BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
