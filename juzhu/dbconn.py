@@ -17,6 +17,8 @@
 配置读取环境变量（由 tp_client.load_dotenv 注入）：
     JUZHU_DB_HOST / JUZHU_DB_PORT / JUZHU_DB_USER / JUZHU_DB_PASSWORD / JUZHU_DB_NAME
 """
+import datetime
+import decimal
 import os
 import re
 
@@ -127,6 +129,15 @@ def sqlite_master_to_sql(sql):
 
 # ── 行对象 / 游标 / 连接 ──────────────────────────────────────
 
+def _to_plain(v):
+    """MySQL 原生类型 → 文本（对齐 SQLite 全 TEXT 列语义，json 可序列化）。"""
+    if isinstance(v, (datetime.date, datetime.datetime, datetime.timedelta)):
+        return str(v)
+    if isinstance(v, decimal.Decimal):
+        return float(v)
+    return v
+
+
 class Row:
     """sqlite3.Row 兼容行：int/str 下标、keys()、len/iter/in、dict(row)。"""
 
@@ -136,7 +147,8 @@ class Row:
         if keys and isinstance(keys[0], (tuple, list)):  # pymysql description 形状
             keys = [k[0] for k in keys]
         self._keys = list(keys)
-        self._data = list(data)
+        # MySQL 原生类型 → 文本（对齐 SQLite 全 TEXT 列语义，保证 json 可序列化）
+        self._data = [_to_plain(v) for v in data]
 
     def __getitem__(self, idx):
         if isinstance(idx, (int, slice)):
@@ -164,6 +176,10 @@ class _MysqlCursor:
 
     def __init__(self, raw):
         self._raw = raw
+
+    def __iter__(self):
+        """sqlite3 游标可迭代语义（上层 rows_to_list 直接迭代 execute 结果）。"""
+        return iter(self.fetchall())
 
     def fetchone(self):
         row = self._raw.fetchone()
