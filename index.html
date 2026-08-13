@@ -147,6 +147,14 @@
   .jz-promo-card.warm{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
   .jz-promo-card.fresh{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
   .jz-promo-card.deep{background:linear-gradient(135deg,#1a3a6b,#0b1d3a);}
+
+  /* 我的订单快捷入口 */
+  .jz-ordbar{display:flex;background:#fff;border:1px solid var(--border);border-radius:14px;
+    margin:0 16px 12px;padding:14px 0;box-shadow:0 5px 14px rgba(15,42,38,.05);}
+  .jz-ordbar a{flex:1;text-align:center;font-size:12px;color:var(--ink);position:relative;}
+  .jz-ordbar a .ic{font-size:22px;display:block;margin-bottom:4px;}
+  .jz-ordbar a .bdg{position:absolute;top:-6px;right:24%;background:#dc2626;color:#fff;font-size:9px;
+    min-width:15px;height:15px;border-radius:999px;display:grid;place-items:center;padding:0 3px;font-weight:700;}
   .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
   .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;min-height:108px;
     box-shadow:0 8px 20px rgba(15,42,38,.12);}
@@ -245,6 +253,10 @@
 
       <div class="sec-h" id="jzSecSubs"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
       <div class="jz-sub-list" id="jzSubs"></div>
+
+      <!-- 我的订单（GR 侧） -->
+      <div class="sec-h" id="jzSecOrders"><span class="bar"></span><h2>我的订单</h2><span class="more"><a href="juzhu-jiazheng-orders.html">全部订单 ›</a></span></div>
+      <div class="jz-ordbar" id="jzOrderBar"></div>
 
       <!-- 本月精选 暂时隐藏
       <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
@@ -534,6 +546,37 @@
   }
   paintJzLinks();
   if (window.BZF_JZ && BZF_JZ.onCityChange) BZF_JZ.onCityChange(paintJzLinks);
+
+  // —— 我的订单快捷入口：user_id 为模拟值；接口失败时整块隐藏（禁用硬编码兜底）——
+  (function(){
+    if (!window.BZF_JZ) return;
+    // 模拟用户 id（后期替换为真实获取用户 id 的代码）
+    BZF_JZ.setUserId('demo_user_001');
+    var STATUS_UI = [
+      { id: 'paid',      ic: '💳',   label: '已支付' },
+      { id: 'assigned',  ic: '🧑‍🔧', label: '已派单' },
+      { id: 'serving',   ic: '🛠️',   label: '服务中' },
+      { id: 'completed', ic: '✅',   label: '已完成' }
+    ];
+    fetch('/api/juzhu/gr/orders?user_id=' + encodeURIComponent(BZF_JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok) return;
+        var counts = res.counts || {};
+        document.getElementById('jzOrderBar').innerHTML = STATUS_UI.map(function(s){
+          var n = counts[s.id] || 0;
+          return '<a href="juzhu-jiazheng-orders.html?status=' + s.id + '">' +
+            (n > 0 ? '<span class="bdg">' + n + '</span>' : '') +
+            '<span class="ic">' + s.ic + '</span>' + s.label + '</a>';
+        }).join('');
+      })
+      .catch(function(){
+        var bar = document.getElementById('jzOrderBar');
+        var sec = document.getElementById('jzSecOrders');
+        if (bar) bar.style.display = 'none';
+        if (sec) sec.style.display = 'none';
+      });
+  })();
 
   if (window.BZF_JZ && BZF_JZ.categories) {
     BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
