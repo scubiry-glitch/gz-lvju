@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """我的订单链路冒烟：user_id 迁移 → 下单落库 → 聚合接口过滤 pending → 单条详情。"""
+import json
 import os
 import sys
+import urllib.error
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -12,6 +15,16 @@ load_dotenv()  # 加载 juzhu/.env 的 JUZHU_DB_* 连接配置（同 test_db_cit
 import db as jdb  # noqa: E402
 
 TEST_USER = "test_gr_orders_user"
+HOST = "http://127.0.0.1:8765"
+
+
+def http_get(path):
+    req = urllib.request.Request(HOST + path)
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        return {"__status": e.code, "body": e.read().decode()}
 
 
 def check_user_id_column():
@@ -67,10 +80,47 @@ def check_list_user_orders_filters_pending():
         conn.commit()
 
 
+def check_gr_orders_api():
+    import time
+    from datetime import datetime
+    from gr_orders import list_user_orders
+
+    conn = jdb.connect()
+    stamp = str(int(time.time() * 1000))
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for i, status in enumerate(["pending", "paid", "completed"]):
+        conn.execute(
+            "INSERT INTO gr_orders (order_ref, user_id, sku, city, status, created_at)"
+            " VALUES (?, ?, '99', '沈阳', ?, ?)",
+            (f"GRTESTA{stamp}{i}", TEST_USER, status, now),
+        )
+    conn.commit()
+    try:
+        # 缺 user_id → 400
+        r = http_get("/api/juzhu/gr/orders")
+        assert r.get("__status") == 400, f"缺 user_id 应 400，实际 {r}"
+        # 正常聚合：无 pending、counts 正确
+        r = http_get("/api/juzhu/gr/orders?user_id=" + TEST_USER)
+        assert r.get("ok"), r
+        assert len(r["list"]) == 2, f"list 应 2 条（无 pending），实际 {r['list']}"
+        assert r["counts"]["paid"] == 1 and r["counts"]["completed"] == 1, r["counts"]
+        # 单条详情（防串单：其他 user 查不到 → 404）
+        ref = list_user_orders(conn, TEST_USER)["list"][0]["order_ref"]
+        d = http_get(f"/api/juzhu/gr/orders/{ref}?user_id={TEST_USER}")
+        assert d.get("ok") and d.get("order", {}).get("order_ref") == ref, d
+        d2 = http_get(f"/api/juzhu/gr/orders/{ref}?user_id=other_user")
+        assert d2.get("__status") == 404, f"跨用户应 404，实际 {d2}"
+        print("[PASS] check_gr_orders_api")
+    finally:
+        conn.execute("DELETE FROM gr_orders WHERE user_id = ? AND order_ref LIKE 'GRTESTA%'", (TEST_USER,))
+        conn.commit()
+
+
 def main():
     check_user_id_column()
     check_create_order_with_user()
     check_list_user_orders_filters_pending()
+    check_gr_orders_api()
     print("ALL PASS")
 
 

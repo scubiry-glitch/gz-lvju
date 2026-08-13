@@ -621,3 +621,48 @@ def _clip(text, limit=2000):
     if len(text) > limit:
         return text[:limit] + f"…[截断，共 {len(text)} 字符]"
     return text
+
+
+# ═══════════════════════════════════════════════════════════════
+#  我的订单（GR 侧，C 端匿名可读；user_id 必填）
+# ═══════════════════════════════════════════════════════════════
+
+def handle_gr_orders(handler, qs):
+    """GET /api/juzhu/gr/orders?user_id=xxx —— 聚合返回 counts + list（过滤 pending）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    try:
+        limit = int((qs.get("limit") or ["50"])[0])
+    except ValueError:
+        limit = 50
+    conn = _connect_db()
+    try:
+        from gr_orders import list_user_orders
+
+        data = list_user_orders(conn, user_id, limit)
+        _respond_json(handler, {"ok": True, **data})
+    finally:
+        conn.close()
+    return True
+
+
+def handle_gr_order_detail(handler, order_ref, qs):
+    """GET /api/juzhu/gr/orders/{order_ref}?user_id=xxx —— 单条详情（防串单）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    conn = _connect_db()
+    try:
+        from gr_orders import get_user_order
+
+        order = get_user_order(conn, order_ref, user_id)
+        if not order:
+            _respond_json(handler, {"ok": False, "error": "订单不存在"}, 404)
+        else:
+            _respond_json(handler, {"ok": True, "order": order})
+    finally:
+        conn.close()
+    return True
