@@ -24,7 +24,7 @@ import urllib.error
 import urllib.request
 
 # ── 测试环境（商家：来来 vendor_id=41） ──
-BASE = "http://49.232.103.71:8765"
+BASE = os.environ.get("JUZHU_TEST_BASE", "http://49.232.103.71:8765")
 VENDOR_ID = 41
 # 密钥不硬编码：从 hmac_secret.key（gitignore 屏蔽）按 vendor_id 读取
 _KEY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hmac_secret.key")
