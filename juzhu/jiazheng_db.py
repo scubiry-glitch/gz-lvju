@@ -538,16 +538,46 @@ def delete_category(conn, cat_id):
 
 
 # ====== Products CRUD (B 端·产品管理) ======
-def list_products(conn, vendor_id=None, type_=None, status=None, limit=200):
-    """产品列表（支持 vendor_id / type / status 过滤）
+def vendor_city_ids(conn, vendor_id):
+    """解析商家关联城市 id 列表（city_ids 文本逗号分隔）；无关联返回 []"""
+    row = conn.execute(
+        "SELECT city_ids FROM jz_vendors WHERE id=?", (int(vendor_id),)
+    ).fetchone()
+    raw = (row[0] if row else None) or ""
+    ids = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return ids
+
+
+def validate_product_city(conn, vendor_id, city_id):
+    """商品城市校验：city_id 必填且必须属于商家的 city_ids。
+    返回 (ok, err_msg)，不通过时 err_msg 为中文提示。"""
+    if city_id is None or (isinstance(city_id, str) and not city_id.strip()):
+        return False, "缺少 city_id"
+    try:
+        cid = int(city_id)
+    except (TypeError, ValueError):
+        return False, "city_id 非法"
+    if cid not in vendor_city_ids(conn, vendor_id):
+        return False, "city_id 不属于该商家"
+    return True, ""
+
+
+def list_products(conn, vendor_id=None, type_=None, status=None, city_id=None, limit=200):
+    """产品列表（支持 vendor_id / type / status / city_id 过滤）
     类目维度以商品引用 SPU 的 category_id 为准（product_category），
-    未引用 SPU 时兜底回退商家 type。
+    未引用 SPU 时兜底回退商家 type。附带城市名 city_name。
     """
     sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type,
-                    COALESCE(s.category_id, v.type) AS product_category
+                    COALESCE(s.category_id, v.type) AS product_category,
+                    c.name AS city_name
              FROM jz_products p
              LEFT JOIN jz_vendors v ON v.id=p.vendor_id
              LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+             LEFT JOIN cities c ON c.id=p.city_id
              WHERE 1=1"""
     params = []
     if vendor_id is not None:
@@ -559,6 +589,9 @@ def list_products(conn, vendor_id=None, type_=None, status=None, limit=200):
     if status:
         sql += " AND p.status=?"
         params.append(status)
+    if city_id is not None:
+        sql += " AND p.city_id=?"
+        params.append(int(city_id))
     sql += " ORDER BY p.vendor_id, p.sort_order, p.id LIMIT ?"
     params.append(int(limit))
     rows = conn.execute(sql, params).fetchall()
@@ -581,11 +614,12 @@ def create_product(conn, data):
     import json as _json
     cur = conn.execute(
         """INSERT INTO jz_products
-           (vendor_id, title, subtitle, category, duration_hours, area_range, unit,
+           (vendor_id, city_id, title, subtitle, category, duration_hours, area_range, unit,
             price, original_price, discount_label, earliest_time, advance_booking_hours,
             sales_count, rating, service_tags, channel_sku_id, path, query, status, sort_order)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (int(data.get("vendor_id", 0)),
+         int(data["city_id"]) if data.get("city_id") else None,
          data.get("title", ""),
          data.get("subtitle", ""),
          data.get("category", ""),
@@ -617,7 +651,7 @@ def update_product(conn, pid, data):
     import json as _json
     fields = []
     params = []
-    for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
+    for k in ("vendor_id", "city_id", "title", "subtitle", "category", "duration_hours", "area_range",
               "unit", "price", "original_price", "discount_label", "earliest_time",
               "advance_booking_hours", "sales_count", "rating", "service_tags",
               "channel_sku_id", "path", "query", "status", "sort_order"):
@@ -626,6 +660,8 @@ def update_product(conn, pid, data):
             if k == "service_tags":
                 v = _json.dumps(v, ensure_ascii=False)
             elif k == "channel_sku_id":
+                v = int(v) if v else None
+            elif k == "city_id":
                 v = int(v) if v else None
             fields.append(f"{k}=?")
             params.append(v)
