@@ -104,7 +104,7 @@
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
-- **鉴权**：写接口与中台列表读接口用 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端经 `localStorage JUZHU_API_KEY` 与之对齐，勿在页面硬编码；C 端单订单查询与评价可匿名
+- **鉴权**：写接口与中台列表读接口用 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端经 `localStorage JUZHU_API_KEY` 与之对齐，勿在页面硬编码；C 端单订单查询、评价、以及 `POST /api/juzhu/jiazheng/wechat-link`（预约跳转）可匿名
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
 
 ## 规则 10 · 话务虚拟号（TP）只走服务端

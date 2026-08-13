@@ -190,6 +190,10 @@ def _review_reply(vendor_name, score):
 def _review_rows(conn, product_ids, vendor_name, limit=6):
     if not product_ids:
         return []
+    # 旧库可能是 P/B 订单表（product_id/rating），无 C 端 rating_json/sku_id —— 评价可选，缺列则跳过
+    order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
+    if "rating_json" not in order_cols or "sku_id" not in order_cols:
+        return []
     placeholders = ",".join(["?"] * len(product_ids))
     rows = conn.execute(
         f"""SELECT o.*, s.name AS sku_name FROM jz_orders o
@@ -267,7 +271,7 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
     city_filter = ""
     city_params = []
     if city_id is not None:
-        city_filter = " AND v.city_ids IS NOT NULL AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'"
+        city_filter = " AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' OR (',' || v.city_ids || ',') LIKE '%,' || ? || ',%')"
         city_params = [str(city_id)]
     row = conn.execute(
         """SELECT
@@ -1011,7 +1015,7 @@ def list_channel_sku_vendors(conn, sku_id, city_id=None):
     city_filter = ""
     city_params = []
     if city_id is not None:
-        city_filter = " AND v.city_ids IS NOT NULL AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'"
+        city_filter = " AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' OR (',' || v.city_ids || ',') LIKE '%,' || ? || ',%')"
         city_params = [str(city_id)]
     rows = conn.execute(
         """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,

@@ -357,6 +357,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         p = urlparse(self.path)
+        if p.path in ("/favicon.ico", "/favicon.svg"):
+            # 无专用图标时静默 204，避免控制台 404 噪音
+            self.send_response(204)
+            self.end_headers()
+            return
         if p.path.startswith("/api/juzhu"):
             return self._route(p, "GET")
         if not is_public_static(p.path):
@@ -366,6 +371,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         p = urlparse(self.path)
+        if p.path in ("/favicon.ico", "/favicon.svg"):
+            self.send_response(204)
+            self.end_headers()
+            return
         if p.path.startswith("/api/juzhu"):
             return self._route(p, "GET")
         if not is_public_static(p.path):
@@ -538,9 +547,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith(ADMIN_PREFIX):
             if not self._require_api_key():
                 return
+        # wechat-link 为 C 端预约入口，匿名可调（与评价类似）；写单/派单等仍需 API Key
         elif method != "GET" and (
             path == "/api/juzhu/jiazheng/orders"
-            or path == "/api/juzhu/jiazheng/wechat-link"
             or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
         ):
             if not self._require_api_key():
@@ -914,8 +923,10 @@ WHERE c.enabled=1
     JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
     JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
     WHERE s.category_id=c.id
-      AND v.city_ids IS NOT NULL
-      AND (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'
+      AND (
+        v.city_ids IS NULL OR TRIM(v.city_ids)=''
+        OR (',' || v.city_ids || ',') LIKE '%,' || ? || ',%'
+      )
   )
 ORDER BY c.sort_order, c.id""", (str(city_id),)
                 ))
@@ -977,8 +988,10 @@ ORDER BY c.sort_order, c.id""", (str(city_id),)
                         JOIN jz_vendors v2 ON v2.id=p2.vendor_id
                         WHERE p2.channel_sku_id=s.id AND p2.status='on'
                           AND v2.status='active'
-                          AND v2.city_ids IS NOT NULL
-                          AND (',' || v2.city_ids || ',') LIKE '%,' || ? || ',%'
+                          AND (
+                            v2.city_ids IS NULL OR TRIM(v2.city_ids)=''
+                            OR (',' || v2.city_ids || ',') LIKE '%,' || ? || ',%'
+                          )
                     )"""
                 params.append(str(city_id))
             if qs.get("category"):
