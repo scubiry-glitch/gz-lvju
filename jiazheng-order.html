@@ -188,6 +188,8 @@ JZ_DATA.getOrder(oid).then(function(order){
     });
     document.body.appendChild(bar);
   }
+}).catch(function(){
+  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单加载失败，请稍后重试</div>';
 });
 
 var chosenScore = 5;

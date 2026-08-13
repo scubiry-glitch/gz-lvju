@@ -210,6 +210,8 @@
           alert('下单失败：' + e.message);
         });
       });
+    }).catch(function(){
+      document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息加载失败，请稍后重试</div>';
     });
   }
 
