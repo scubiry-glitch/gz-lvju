@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,6 +20,17 @@ let mysql2 = null;
 try { mysql2 = require('mysql2/promise'); } catch (_) {}
 let jzSeedAll = null;
 try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
+let housingSeedAll = null;
+let housingParseJsonField = null;
+try {
+  const housingSeed = require('./housing_seed.cjs');
+  housingSeedAll = housingSeed.seedAll;
+  housingParseJsonField = housingSeed.parseJsonField;
+} catch (_) {}
+let grOrders = null;
+try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
+let loadVendorConfig = null;
+try { loadVendorConfig = require('./vendor_config.cjs').loadVendorConfig; } catch (_) {}
 
 function getDbConfig() {
   const host = (process.env.MYSQL_HOST || '').trim();
@@ -168,6 +180,95 @@ async function queryRows(sql, params) {
 async function execSql(conn, sql, params) {
   const [result] = await conn.execute(sql, params || []);
   return result;
+}
+
+async function ensureGrOrdersShape(conn) {
+  let cols = [];
+  try {
+    const [rows] = await conn.execute('SHOW COLUMNS FROM gr_orders');
+    cols = rows.map((r) => r.Field);
+  } catch (_) {
+    return;
+  }
+  if (!cols.includes('order_ref')) {
+    await conn.execute('DROP TABLE gr_orders');
+    await conn.execute(`CREATE TABLE gr_orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_ref VARCHAR(64) NOT NULL,
+      vendor_id INT,
+      vendor_oid VARCHAR(64),
+      user_id VARCHAR(64),
+      sku VARCHAR(128),
+      city VARCHAR(32) DEFAULT '沈阳',
+      status VARCHAR(20) DEFAULT 'pending',
+      fee INT,
+      worker_name VARCHAR(128),
+      worker_phone VARCHAR(32),
+      eta VARCHAR(32),
+      cancel_reason TEXT,
+      paid_at VARCHAR(32),
+      serving_at VARCHAR(32),
+      completed_at VARCHAR(32),
+      created_at VARCHAR(32) NOT NULL,
+      updated_at VARCHAR(32),
+      UNIQUE KEY uk_order_ref (order_ref),
+      KEY idx_gr_orders_vendor (vendor_id),
+      KEY idx_gr_orders_user (user_id)
+    ) CHARSET=utf8mb4`);
+    return;
+  }
+  const extra = [
+    ['user_id', 'VARCHAR(64)'],
+    ['vendor_id', 'INT'],
+    ['vendor_oid', 'VARCHAR(64)'],
+    ['sku', 'VARCHAR(128)'],
+    ['city', "VARCHAR(32) DEFAULT '沈阳'"],
+    ['fee', 'INT'],
+    ['worker_name', 'VARCHAR(128)'],
+    ['worker_phone', 'VARCHAR(32)'],
+    ['eta', 'VARCHAR(32)'],
+    ['cancel_reason', 'TEXT'],
+    ['paid_at', 'VARCHAR(32)'],
+    ['serving_at', 'VARCHAR(32)'],
+    ['completed_at', 'VARCHAR(32)'],
+  ];
+  for (const [name, ddl] of extra) {
+    if (!cols.includes(name)) {
+      try { await conn.execute(`ALTER TABLE gr_orders ADD COLUMN ${name} ${ddl}`); } catch (_) { /* ignore */ }
+    }
+  }
+}
+
+function outboundJson(method, urlStr, body, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(urlStr); } catch (e) { reject(e); return; }
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const payload = body != null ? JSON.stringify(body) : undefined;
+    const req = lib.request({
+      protocol: parsed.protocol,
+      hostname: parsed.hostname,
+      port: parsed.port || undefined,
+      path: parsed.pathname + parsed.search,
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        try { resolve({ status: res.statusCode, json: JSON.parse(text), text }); }
+        catch (_) { resolve({ status: res.statusCode, json: null, text }); }
+      });
+    });
+    req.setTimeout(timeoutMs || 10000, () => { req.destroy(new Error('timeout')); });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
 }
 
 // 确保 MySQL 中存在必要的表（MySQL 语法，CREATE TABLE IF NOT EXISTS）
@@ -434,18 +535,27 @@ async function ensureSchema() {
         updated_at VARCHAR(30)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS gr_orders (
-        id VARCHAR(50) PRIMARY KEY,
-        type VARCHAR(50) NOT NULL DEFAULT 'trade',
-        project_id INT,
-        unit_id INT,
-        user_phone VARCHAR(50) NOT NULL,
-        user_name VARCHAR(100),
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
-        amount INT DEFAULT 0,
-        note TEXT,
-        source VARCHAR(100),
-        created_at VARCHAR(30) NOT NULL,
-        updated_at VARCHAR(30) NOT NULL
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_ref VARCHAR(64) NOT NULL,
+        vendor_id INT,
+        vendor_oid VARCHAR(64),
+        user_id VARCHAR(64),
+        sku VARCHAR(128),
+        city VARCHAR(32) DEFAULT '沈阳',
+        status VARCHAR(20) DEFAULT 'pending',
+        fee INT,
+        worker_name VARCHAR(128),
+        worker_phone VARCHAR(32),
+        eta VARCHAR(32),
+        cancel_reason TEXT,
+        paid_at VARCHAR(32),
+        serving_at VARCHAR(32),
+        completed_at VARCHAR(32),
+        created_at VARCHAR(32) NOT NULL,
+        updated_at VARCHAR(32),
+        UNIQUE KEY uk_order_ref (order_ref),
+        KEY idx_gr_orders_vendor (vendor_id),
+        KEY idx_gr_orders_user (user_id)
       ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
@@ -488,6 +598,14 @@ async function ensureSchema() {
     if (jzSeedAll) {
       try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
     }
+    // 保租房/卖旧买新种子（cities 为空时从 juzhu/data*.json 灌入）
+    if (housingSeedAll) {
+      try {
+        const hs = await housingSeedAll(conn);
+        if (hs && !hs.skipped) console.log('housingSeedAll', JSON.stringify(hs.inserted || {}));
+      } catch (e) { console.warn('housingSeedAll warn:', e.message); }
+    }
+    await ensureGrOrdersShape(conn);
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
@@ -678,7 +796,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     if (urlPath === '/api/juzhu/districts' && req.method === 'GET') {
-      const rows = await queryRows('SELECT * FROM districts ORDER BY sort_order');
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let sql = 'SELECT d.* FROM districts d';
+      const params = [];
+      if (cityKey) {
+        sql += ' INNER JOIN cities c ON c.id=d.city_id WHERE (c.slug=? OR c.name=?)';
+        params.push(cityKey, cityKey);
+      }
+      sql += ' ORDER BY d.sort_order, d.id';
+      const rows = await queryRows(sql, params);
       return jsonReply(res, rows);
     }
 
@@ -1531,6 +1658,78 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, rows);
     }
 
+    // GET /api/juzhu/catalog?city=shenyang —— C 端保租房整包（替代 data.json）
+    if (urlPath === '/api/juzhu/catalog' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let cities = [];
+      if (cityKey) {
+        cities = await queryRows('SELECT * FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+      }
+      if (!cities.length) {
+        cities = await queryRows("SELECT * FROM cities WHERE slug='shenyang' ORDER BY id LIMIT 1");
+      }
+      if (!cities.length) {
+        cities = await queryRows('SELECT * FROM cities ORDER BY id LIMIT 1');
+      }
+      if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
+      const city = cities[0];
+      const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
+      const districts = await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]);
+      const projects = await queryRows('SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order, id', [city.id]);
+      const projectIds = projects.map((p) => p.id);
+      let units = [];
+      if (projectIds.length) {
+        units = await queryRows(
+          `SELECT * FROM units WHERE project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY sort_order, id`,
+          projectIds
+        );
+      }
+      const unitIds = units.map((u) => u.id);
+      const districtIds = districts.map((d) => d.id);
+      const photoClauses = [];
+      const photoParams = [];
+      if (districtIds.length) {
+        photoClauses.push(`(entity_type='district' AND entity_id IN (${districtIds.map(() => '?').join(',')}))`);
+        photoParams.push(...districtIds);
+      }
+      if (projectIds.length) {
+        photoClauses.push(`(entity_type='project' AND entity_id IN (${projectIds.map(() => '?').join(',')}))`);
+        photoParams.push(...projectIds);
+      }
+      if (unitIds.length) {
+        photoClauses.push(`(entity_type='unit' AND entity_id IN (${unitIds.map(() => '?').join(',')}))`);
+        photoParams.push(...unitIds);
+      }
+      let photos = [];
+      if (photoClauses.length) {
+        photos = await queryRows(
+          `SELECT id, entity_type, entity_id, file_path, is_cover, sort_order FROM photos WHERE ${photoClauses.join(' OR ')} ORDER BY entity_type, entity_id, sort_order, id`,
+          photoParams
+        );
+      }
+      const parse = housingParseJsonField || ((v) => v);
+      const mapRows = (rows, keys) => rows.map((r) => {
+        const o = Object.assign({}, r);
+        keys.forEach((k) => { o[k] = parse(o[k]); });
+        return o;
+      });
+      return jsonReply(res, {
+        city,
+        channels,
+        districts: mapRows(districts, ['tags']),
+        projects: mapRows(projects, ['tags', 'rating']),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
+        photos,
+        stats: {
+          district_count: districts.length,
+          project_count_bzf: projects.filter((p) => p.channel === 'bzf').length,
+          project_count_trade: projects.filter((p) => p.channel === 'trade').length,
+          unit_count: units.length,
+        },
+      });
+    }
+
     // GET /api/juzhu/ratings（按 rating_status 列出保租房评级）
     if (urlPath === '/api/juzhu/ratings' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
@@ -1897,6 +2096,133 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         const result = slots.map(s => ({ ...s, remaining: (s.capacity || 1) - (s.booked || 0) }));
         return jsonReply(res, { slots: result });
+      }
+    }
+
+    // POST /api/juzhu/jiazheng/wechat-link（C 端匿名预约）
+    if (urlPath === '/api/juzhu/jiazheng/wechat-link' && req.method === 'POST') {
+      if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+      const body = await readBody(req);
+      const parsed = grOrders.validateWechatLinkBody(body);
+      if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+      const products = await queryRows(
+        `SELECT p.*, s.slug AS sku_slug FROM jz_products p
+         LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+         WHERE p.id=? AND p.status='on'`,
+        [parsed.productId]
+      );
+      if (!products.length) return jsonReply(res, { ok: false, error: '产品未找到' }, 404);
+      const product = products[0];
+      const pagePath = product.path || 'pages-sub/goods/goods';
+      const productQuery = product.query || '';
+      const vendorId = String(product.vendor_id || '');
+      const vendors = loadVendorConfig ? loadVendorConfig() : {};
+      const vendor = vendors[vendorId];
+      if (!vendor || !vendor.url_link) {
+        return jsonReply(res, {
+          ok: false,
+          error: `vendor_id=${vendorId} 未配置 url_link，请检查 hmac_secret.key`,
+        }, 500);
+      }
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const orderRef = await grOrders.generateOrderRef(conn);
+        const outbound = await outboundJson('POST', vendor.url_link, {
+          path: pagePath,
+          query: productQuery,
+          order_ref: orderRef,
+        }, 10000);
+        if (!outbound.json || outbound.json.code !== 200) {
+          return jsonReply(res, { ok: false, error: (outbound.json && outbound.json.msg) || 'URL Link 生成失败' }, 502);
+        }
+        await grOrders.createOrder(conn, orderRef, String(parsed.productId), {
+          vendor_id: product.vendor_id,
+          user_id: parsed.userId,
+        });
+        return jsonReply(res, {
+          ok: true,
+          url_link: outbound.json.data || '',
+          order_ref: orderRef,
+        });
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/gr/orders?user_id=
+    if (urlPath === '/api/juzhu/gr/orders' && req.method === 'GET') {
+      if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+      const qp = new URLSearchParams(qs);
+      const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+      if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const data = await grOrders.listUserOrders(conn, parsed.userId, qp.get('limit'));
+        return jsonReply(res, { ok: true, ...data });
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/gr/orders/:ref/vendor-detail
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/gr\/orders\/([^/]+)\/vendor-detail$/);
+      if (m && req.method === 'GET') {
+        if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+        const orderRef = decodeURIComponent(m[1]);
+        const qp = new URLSearchParams(qs);
+        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+          if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
+          if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
+          const vendors = loadVendorConfig ? loadVendorConfig() : {};
+          const detailUrl = (vendors[String(order.vendor_id)] || {}).order_detail_url || '';
+          if (!detailUrl) return jsonReply(res, { ok: false, error: '商家未配置订单详情接口' });
+          const sep = detailUrl.includes('?') ? '&' : '?';
+          const url = detailUrl + sep + 'order_ref=' + encodeURIComponent(orderRef);
+          const outbound = await outboundJson('GET', url, null, 5000);
+          if (!outbound.json || outbound.json.code !== 200 || !outbound.json.data) {
+            return jsonReply(res, { ok: false, error: '商家未返回订单详情' });
+          }
+          const data = outbound.json.data;
+          const worker = data.worker || null;
+          if (worker && worker.eta) worker.eta = grOrders.normEtaPeking(worker.eta);
+          return jsonReply(res, {
+            ok: true,
+            detail: {
+              vendor_oid: data.lailai_oid,
+              status: data.status,
+              fee: data.fee,
+              worker,
+              cancel_reason: data.cancel_reason,
+            },
+          });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /api/juzhu/gr/orders/:ref
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/gr\/orders\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+        const orderRef = decodeURIComponent(m[1]);
+        const qp = new URLSearchParams(qs);
+        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+          if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
+          return jsonReply(res, { ok: true, order });
+        } finally {
+          await conn.end();
+        }
       }
     }
 
