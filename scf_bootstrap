@@ -15,7 +15,19 @@ if [ -f "$ENV_FILE" ]; then
   source "$ENV_FILE"
   set +a
 else
-  echo "WARNING: $ENV_FILE not found; relying on platform-injected env vars"
+  # 平台 auto-deploy 不包含 .env；内嵌正式配置作为兜底
+  export MYSQL_HOST=10.236.15.185
+  export MYSQL_PORT=3306
+  export MYSQL_DB=sy2_full
+  export MYSQL_USER=btg_Wu3zxj
+  export MYSQL_PASSWORD=9vycpd8hAm0FaaUj
+  export JUZHU_ENV=prod
+  export JUZHU_API_KEY=dongbo2026
+  export JUZHU_ADMIN_PASSWORD=dongbo2026
+  export TP_BASE=http://i.tp.lianjia.com
+  export TP_APP_ID=208
+  export TP_APP_KEY=b3918671c70bd1d9168c77aab0a85ef5
+  echo "INFO: using built-in prod config (no .env found)"
 fi
 
 # 平台注入的 PORT 优先于 .env
