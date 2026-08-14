@@ -57,6 +57,8 @@ let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfig = null;
 try { loadVendorConfig = require('./vendor_config.cjs').loadVendorConfig; } catch (_) {}
+let juzhuImportAll = null;
+try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 
 function getDbConfig() {
   // Node 优先 MYSQL_*；兼容 Python 侧 JUZHU_DB_*（同一 .env 可双端共用）
@@ -475,6 +477,7 @@ async function ensureSchema() {
         rating DECIMAL(3,2) DEFAULT 0,
         service_tags TEXT,
         channel_sku_id INT,
+        city_id INT,
         path VARCHAR(500),
         query VARCHAR(500),
         status VARCHAR(20) DEFAULT 'on',
@@ -624,24 +627,30 @@ async function ensureSchema() {
         [k, v]
       );
     }
-    // 家政全量种子数据（subcategories / skus / vendors / workers / products / sku_workers / sku_slots）
-    if (jzSeedAll) {
-      try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
-    }
-    // 保租房/卖旧买新种子（cities 为空时从 juzhu/data*.json 灌入）
+    try { await conn.execute('ALTER TABLE jz_products ADD COLUMN city_id INT'); } catch (_) { /* 列已存在 */ }
+    // 保租房/卖旧买新种子（projects 为空时从 juzhu/data*.json 灌入）
     if (housingSeedAll) {
       try {
         const hs = await housingSeedAll(conn);
         if (hs && !hs.skipped) console.log('housingSeedAll', JSON.stringify(hs.inserted || {}));
       } catch (e) { console.warn('housingSeedAll warn:', e.message); }
     }
+    // 源 MySQL juzhu 快照（商家/SKU/订单）；文件缺失则跳过
+    if (juzhuImportAll) {
+      try {
+        const imp = await juzhuImportAll(conn);
+        if (imp && !imp.skipped) console.log('juzhuImportAll', JSON.stringify(imp.inserted || {}));
+      } catch (e) { console.warn('juzhuImportAll warn:', e.message); }
+    }
+    // 家政全量种子数据（对应表仍为空时补 demo）
+    if (jzSeedAll) {
+      try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
+    }
     await ensureGrOrdersShape(conn);
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
-      // 沈阳扫描入库曾把 managed_unit_count 写成户型条数；与演示城市口径对齐为 户型×40
-      "UPDATE projects SET managed_unit_count = GREATEST(COALESCE(unit_count,1),1) * 40 WHERE channel='bzf' AND (managed_unit_count IS NULL OR managed_unit_count <= COALESCE(unit_count,0))",
-      // 区级房源量跟随项目在管套数加总
+      // 区级「房源量」= 下属保租项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
       `UPDATE districts d
          SET managed_unit_count = (
            SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
@@ -649,10 +658,6 @@ async function ensureSchema() {
          ),
          unit_count = (
            SELECT COALESCE(SUM(p.unit_count), 0)
-           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
-         ),
-         vacant_count = (
-           SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
            FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
          ),
          project_count = (

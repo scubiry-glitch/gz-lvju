@@ -52,15 +52,18 @@ function loadSnapshots(juzhuDir) {
 
 async function seedAll(conn, juzhuDir) {
   const dir = juzhuDir || path.join(__dirname, 'juzhu');
-  const [[c]] = await conn.execute('SELECT COUNT(*) AS c FROM cities');
-  if (Number(c.c) > 0) return { skipped: true };
+  // 以项目是否已有为准：cities 可能已有占位行（生产 sy2_full），不能因此跳过房源灌入
+  const [[p]] = await conn.execute('SELECT COUNT(*) AS c FROM projects');
+  if (Number(p.c) > 0) return { skipped: true };
 
   const snap = loadSnapshots(dir);
   let nCity = 0;
   for (const city of snap.cities) {
     await conn.execute(
       `INSERT INTO cities(id, name, slug, booking_phone, hero_bg_image)
-       VALUES(?,?,?,?,?)`,
+       VALUES(?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE name=VALUES(name), slug=VALUES(slug),
+         booking_phone=VALUES(booking_phone), hero_bg_image=VALUES(hero_bg_image)`,
       [city.id, city.name, city.slug, city.booking_phone || null, city.hero_bg_image || null]
     );
     nCity += 1;

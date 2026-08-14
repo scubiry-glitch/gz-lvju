@@ -1070,7 +1070,7 @@
     "district_count": 9,
     "project_count_bzf": 23,
     "project_count_trade": 2,
-    "unit_count": 59
+    "unit_count": 5671
   },
   "districts": [
     {
@@ -1110,7 +1110,7 @@
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g3",
-      "managed_unit_count": 5,
+      "managed_unit_count": 287,
       "tags": []
     },
     {
@@ -1130,7 +1130,7 @@
       "layout_tall": 0,
       "layout_wide": 1,
       "bg_class": "g4",
-      "managed_unit_count": 9,
+      "managed_unit_count": 849,
       "tags": []
     },
     {
@@ -1170,7 +1170,7 @@
       "layout_tall": 1,
       "layout_wide": 0,
       "bg_class": "g6",
-      "managed_unit_count": 14,
+      "managed_unit_count": 1102,
       "tags": []
     },
     {
@@ -1190,7 +1190,7 @@
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g7",
-      "managed_unit_count": 18,
+      "managed_unit_count": 1934,
       "tags": []
     },
     {
@@ -1210,7 +1210,7 @@
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g8",
-      "managed_unit_count": 11,
+      "managed_unit_count": 495,
       "tags": []
     },
     {
@@ -1230,7 +1230,7 @@
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g1",
-      "managed_unit_count": 2,
+      "managed_unit_count": 1004,
       "tags": []
     },
     {
@@ -1290,7 +1290,7 @@
       "rating_submitted_at": "2026-07-03T03:15:56Z",
       "rating_reviewed_at": "2026-07-03T03:16:13Z",
       "rating_note": "",
-      "managed_unit_count": 3
+      "managed_unit_count": 175
     },
     {
       "id": 11,
@@ -1315,7 +1315,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 1036
     },
     {
       "id": 6,
@@ -1340,7 +1340,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 102
     },
     {
       "id": 22,
@@ -1363,7 +1363,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 432
     },
     {
       "id": 3,
@@ -1388,7 +1388,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 5
+      "managed_unit_count": 644
     },
     {
       "id": 16,
@@ -1413,7 +1413,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 125
     },
     {
       "id": 12,
@@ -1436,7 +1436,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 7
+      "managed_unit_count": 236
     },
     {
       "id": 7,
@@ -1459,7 +1459,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 78
     },
     {
       "id": 23,
@@ -1482,7 +1482,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 572
     },
     {
       "id": 4,
@@ -1505,7 +1505,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 135
     },
     {
       "id": 17,
@@ -1530,7 +1530,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 51
     },
     {
       "id": 2,
@@ -1555,7 +1555,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 112
     },
     {
       "id": 13,
@@ -1580,7 +1580,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 4
+      "managed_unit_count": 372
     },
     {
       "id": 8,
@@ -1603,7 +1603,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 53
     },
     {
       "id": 18,
@@ -1628,7 +1628,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 100
     },
     {
       "id": 5,
@@ -1653,7 +1653,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 70
     },
     {
       "id": 9,
@@ -1676,7 +1676,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 4
+      "managed_unit_count": 78
     },
     {
       "id": 14,
@@ -1701,7 +1701,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 210
     },
     {
       "id": 19,
@@ -1726,7 +1726,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 102
     },
     {
       "id": 10,
@@ -1749,7 +1749,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 791
     },
     {
       "id": 20,
@@ -1774,7 +1774,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 109
     },
     {
       "id": 15,
@@ -1797,7 +1797,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 80
     },
     {
       "id": 21,
@@ -1822,7 +1822,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 8
     },
     {
       "id": 24,
