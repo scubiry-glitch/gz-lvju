@@ -1374,7 +1374,7 @@ function saveProject() {
 
   api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
     state.current = res.project;
-    toast('项目已保存，data.json 已更新');
+    toast('项目已保存');
     loadProjects().then(function(){ state.current = res.project; renderProjectList(); });
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }

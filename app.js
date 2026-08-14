@@ -236,6 +236,34 @@ function assertAdminAuthorized(urlPath, req, res) {
   return false;
 }
 
+/** 空 → null；非法抛 Error。返回纯数字真实号。对齐 juzhu/tp_client.py validate_real_phone */
+function validateRealPhone(phone) {
+  if (phone == null) return null;
+  const raw = String(phone).trim();
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  if (!/^\d+$/.test(digits) || digits.length < 11 || digits.length > 13) {
+    throw new Error('联系电话须为 11–13 位数字');
+  }
+  if (digits.startsWith('400')) {
+    throw new Error('请填写真实号码，勿填 400 虚拟号');
+  }
+  return digits;
+}
+
+/** 请求体未带 contact_phone → undefined（不更新）；带了则校验后返回纯数字或 null */
+function contactPhoneFromBody(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'contact_phone')) return undefined;
+  return validateRealPhone(body.contact_phone);
+}
+
+function stripContactPhone(row) {
+  if (!row) return row;
+  const out = Object.assign({}, row);
+  delete out.contact_phone;
+  return out;
+}
+
 module.exports.isPublicStatic = isPublicStatic;
 module.exports.isProduction = isProduction;
 module.exports.expectedApiKey = expectedApiKey;
@@ -246,6 +274,9 @@ module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
 module.exports.DEV_EXAMPLE_API_KEY = DEV_EXAMPLE_API_KEY;
 module.exports.getDbConfig = getDbConfig;
+module.exports.validateRealPhone = validateRealPhone;
+module.exports.contactPhoneFromBody = contactPhoneFromBody;
+module.exports.stripContactPhone = stripContactPhone;
 
 async function queryRows(sql, params) {
   if (!mysql2) throw new Error('mysql2 not available');
@@ -1340,14 +1371,22 @@ async function handleApiDirect(urlPath, qs, req, res) {
             address = `${cityName} · ${name}`;
           }
         }
+        let contactPhone = null;
+        try {
+          contactPhone = 'contact_phone' in body ? validateRealPhone(body.contact_phone) : null;
+        } catch (e) {
+          conn.end();
+          return jsonReply(res, { error: e.message }, 400);
+        }
         await conn.execute(
           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
-            sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint)
-           VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?)`,
+            sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
+           VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
           [cityId, districtId, channel, name, slug, body.cover_image || null, address,
            body.tags ? JSON.stringify(body.tags) : null,
            body.sort_order || 999, body.price_from || null,
-           body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null]
+           body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
+           contactPhone]
         );
         const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
         const pid = r[0].id;
@@ -1384,6 +1423,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
           for (const col of ['address', 'cover_image', 'sort_order', 'price_from',
               'is_featured', 'featured_rank', 'old_house_hint']) {
             if (col in body) put(col, body[col]);
+          }
+          try {
+            const contactPhone = contactPhoneFromBody(body);
+            if (contactPhone !== undefined) put('contact_phone', contactPhone);
+          } catch (e) {
+            conn.end();
+            return jsonReply(res, { error: e.message }, 400);
           }
           if ('tags' in body) put('tags', body.tags ? JSON.stringify(body.tags) : null);
           if ('managed_unit_count' in body) {
@@ -2034,7 +2080,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
-        projects: mapRows(projects, ['tags', 'rating']),
+        projects: mapRows(projects, ['tags', 'rating']).map(stripContactPhone),
         units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
         photos,
         stats: {
@@ -2059,7 +2105,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (qp.get('status')) { sql += ' AND p.rating_status=?'; params.push(qp.get('status')); }
       sql += " ORDER BY COALESCE(p.rating_submitted_at,'') DESC, p.id";
       const rows = await queryRows(sql, params);
-      return jsonReply(res, rows);
+      return jsonReply(res, rows.map(stripContactPhone));
     }
 
     // GET /api/juzhu/ratings/:code
@@ -2079,7 +2125,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (rows.length) proj = rows[0];
         }
         if (!proj) return jsonReply(res, { error: 'not found' }, 404);
-        return jsonReply(res, { project: proj });
+        return jsonReply(res, { project: stripContactPhone(proj) });
       }
     }
 
@@ -2138,9 +2184,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
           [proj.id]
         );
-        // 脱敏，不暴露 contact_phone
-        delete proj.contact_phone;
-        return jsonReply(res, { project: proj, units, photos });
+        return jsonReply(res, { project: stripContactPhone(proj), units, photos });
       }
     }
 
