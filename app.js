@@ -39,8 +39,8 @@ const API_KEY_ENV = 'JUZHU_API_KEY';
 /** 历史开发默认值：任何环境均不得再当作有效密钥（文档泄露即等于未授权） */
 const DEV_EXAMPLE_API_KEY = 'dev-juzhu-key';
 const FORBIDDEN_API_KEY = DEV_EXAMPLE_API_KEY;
-/** 非生产可用的后台登录默认口令；生产必须显式配置且不得用此值 */
-const DEV_DEFAULT_ADMIN_PASSWORD = 'dongbo2026';
+/** 非生产可用的后台登录默认口令（仅开发环境兜底） */
+const DEV_DEFAULT_ADMIN_PASSWORD = 'dev-admin-default';
 
 // MySQL 连接配置（fallback 直连，仅当 Python 服务不可用时使用）
 // 禁止在源码中写死账号密码；必须由运行时环境 / .env（仅进程内，不对外 HTTP）注入。
