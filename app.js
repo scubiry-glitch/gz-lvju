@@ -51,11 +51,15 @@ try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
 let housingSeedAll = null;
 let housingBackfillPhotos = null;
 let housingParseJsonField = null;
+let housingHydrateCoverFields = null;
+let housingTagsToDb = null;
 try {
   const housingSeed = require('./housing_seed.cjs');
   housingSeedAll = housingSeed.seedAll;
   housingBackfillPhotos = housingSeed.backfillPhotos;
   housingParseJsonField = housingSeed.parseJsonField;
+  housingHydrateCoverFields = housingSeed.hydrateCoverFields;
+  housingTagsToDb = housingSeed.tagsToDb;
 } catch (_) {}
 let housingCities = null;
 try { housingCities = require('./housing_cities.cjs'); } catch (_) {}
@@ -402,20 +406,32 @@ function outboundJson(method, urlStr, body, timeoutMs) {
   });
 }
 
+function encodeTags(tags) {
+  if (housingTagsToDb) return housingTagsToDb(tags);
+  if (tags == null || tags === '') return null;
+  return JSON.stringify(Array.isArray(tags) ? tags : String(tags).split(',').map((s) => s.trim()).filter(Boolean));
+}
+
 // 将行中指定字段从 JSON 字符串反序列化为数组/对象，缺失或无效时返回默认值
 function parseJsonFields(row, fields, defaultVal) {
   if (!row) return row;
+  const fallback = defaultVal !== undefined ? defaultVal : [];
   for (const f of fields) {
-    if (row[f] != null && typeof row[f] === 'string') {
-      let v = row[f];
-      // 最多尝试 3 次，处理多重 JSON 转义
-      for (let i = 0; i < 3 && typeof v === 'string'; i++) {
-        try { v = JSON.parse(v); } catch (e) { break; }
-      }
-      row[f] = (typeof v === 'string') ? (defaultVal !== undefined ? defaultVal : []) : v;
-    } else if (row[f] == null) {
-      row[f] = defaultVal !== undefined ? defaultVal : [];
+    if (row[f] == null) {
+      row[f] = fallback;
+      continue;
     }
+    if (typeof row[f] !== 'string') continue;
+    if (housingParseJsonField) {
+      const v = housingParseJsonField(row[f]);
+      row[f] = (typeof v === 'string') ? fallback : v;
+      continue;
+    }
+    let v = row[f];
+    for (let i = 0; i < 8 && typeof v === 'string'; i++) {
+      try { v = JSON.parse(v); } catch (e) { break; }
+    }
+    row[f] = (typeof v === 'string') ? fallback : v;
   }
   return row;
 }
@@ -771,7 +787,7 @@ async function ensureSchema() {
     if (housingBackfillPhotos) {
       try {
         const bf = await housingBackfillPhotos(conn);
-        if (bf && (bf.inserted || bf.covers)) console.log('housingBackfillPhotos', JSON.stringify(bf));
+        if (bf && (bf.inserted || bf.covers || bf.units)) console.log('housingBackfillPhotos', JSON.stringify(bf));
       } catch (e) { console.warn('housingBackfillPhotos warn:', e.message); }
     }
     // 源 MySQL juzhu 快照（商家/SKU/订单）；文件缺失则跳过
@@ -1048,6 +1064,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
       sql += ' ORDER BY p.channel, p.sort_order, p.id';
       const rows = await queryRows(sql, params);
+      rows.forEach((r) => parseJsonFields(r, ['tags', 'rating']));
       return jsonReply(res, rows);
     }
 
@@ -1061,7 +1078,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [pid]
         );
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(projs[0], ['tags', 'rating']);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
         const photos = await queryRows(
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order, id",
           [pid]
@@ -1387,7 +1406,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
            VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
           [cityId, districtId, channel, name, slug, body.cover_image || null, address,
-           body.tags ? JSON.stringify(body.tags) : null,
+           encodeTags(body.tags),
            body.sort_order || 999, body.price_from || null,
            body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
            contactPhone]
@@ -1400,6 +1419,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
           [pid]
         );
+        parseJsonFields(projs[0], ['tags', 'rating']);
         return jsonReply(res, { ok: true, project: projs[0] }, 201);
       } finally {
         await conn.end();
@@ -1435,7 +1455,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             conn.end();
             return jsonReply(res, { error: e.message }, 400);
           }
-          if ('tags' in body) put('tags', body.tags ? JSON.stringify(body.tags) : null);
+          if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('managed_unit_count' in body) {
             const val = body.managed_unit_count;
             put('managed_unit_count', (val !== null && val !== '') ? parseInt(val) : null);
@@ -1460,6 +1480,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
             [pid]
           );
+          parseJsonFields(projs[0], ['tags', 'rating']);
           return jsonReply(res, { ok: true, project: projs[0] });
         } finally {
           await conn.end();
@@ -1511,7 +1532,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [pid, name, slug, body.area_sqm || null, body.layout_label || null,
              body.rent_monthly || null, body.price_total || null,
-             body.tags ? JSON.stringify(body.tags) : null,
+             encodeTags(body.tags),
              body.unit_spec || null, body.promo_price || null,
              body.amenities ? JSON.stringify(body.amenities) : null,
              body.keeper ? JSON.stringify(body.keeper) : null,
@@ -1523,6 +1544,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+          parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail']);
           return jsonReply(res, { ok: true, unit: units[0] }, 201);
         } finally {
           await conn.end();
@@ -1568,7 +1590,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
               'unit_spec','promo_price','sort_order','cover_image']) {
             if (col in body) put(col, body[col]);
           }
-          if ('tags' in body) put('tags', body.tags ? JSON.stringify(body.tags) : null);
+          if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('amenities' in body) put('amenities', body.amenities ? JSON.stringify(body.amenities) : null);
           if ('keeper' in body) put('keeper', body.keeper ? JSON.stringify(body.keeper) : null);
           if ('rent_detail' in body) put('rent_detail', body.rent_detail ? JSON.stringify(body.rent_detail) : null);
@@ -1579,6 +1601,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+          parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail']);
           return jsonReply(res, { ok: true, unit: units[0] });
         } finally {
           await conn.end();
@@ -2080,7 +2103,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         keys.forEach((k) => { o[k] = parse(o[k]); });
         return o;
       });
-      return jsonReply(res, {
+      const catalog = {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
@@ -2096,7 +2119,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
             .filter((p) => p.channel === 'bzf')
             .reduce((sum, p) => sum + (Number(p.managed_unit_count != null ? p.managed_unit_count : p.unit_count) || 0), 0),
         },
-      });
+      };
+      if (housingHydrateCoverFields) housingHydrateCoverFields(catalog);
+      return jsonReply(res, catalog);
     }
 
     // GET /api/juzhu/ratings（按 rating_status 列出保租房评级）
@@ -2823,6 +2848,8 @@ const server = http.createServer((req, res) => {
 
   let filePath_decoded = decodeURIComponent(rawPath);
   if (filePath_decoded === '/') filePath_decoded = '/index.html';
+  // 常见拼写：juzhu-amdin → juzhu-admin，避免 404 回落到首页
+  if (filePath_decoded === '/juzhu-amdin.html') filePath_decoded = '/juzhu-admin.html';
 
   const filePath = path.resolve(ROOT, '.' + path.posix.normalize('/' + filePath_decoded.replace(/^\/+/, '/')));
 

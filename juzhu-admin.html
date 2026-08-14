@@ -530,8 +530,26 @@ function bindCoverUpload(inputId, previewId, getMeta) {
 
 function tagsStr(tags) {
   if (!tags) return '';
+  if (typeof tags === 'string') {
+    try {
+      var parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) tags = parsed;
+    } catch (e) {}
+  }
   if (Array.isArray(tags)) return tags.join(', ');
   return String(tags);
+}
+
+function tagsFromInput(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return [];
+  try {
+    var parsed = JSON.parse(s);
+    if (Array.isArray(parsed)) {
+      return parsed.map(function(x){ return String(x == null ? '' : x).trim(); }).filter(Boolean);
+    }
+  } catch (e) {}
+  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean);
 }
 
 function loadDistricts() {
@@ -1210,7 +1228,7 @@ function collectUnitDetail(panel) {
     other_fees: fees
   };
   return {
-    tags: panel.querySelector('.ud_tags').value,
+    tags: tagsFromInput(panel.querySelector('.ud_tags').value),
     unit_spec: panel.querySelector('.ud_spec').value.trim() || null,
     promo_price: numOrNull(panel.querySelector('.ud_promo').value),
     amenities: amenities,
@@ -1363,7 +1381,7 @@ function saveProject() {
   var body = {
     name: document.getElementById('p_name').value.trim(),
     address: document.getElementById('p_addr').value.trim(),
-    tags: document.getElementById('p_tags').value,
+    tags: tagsFromInput(document.getElementById('p_tags').value),
     sort_order: +document.getElementById('p_sort').value,
     price_from: numVal('p_price'),
     cover_image: document.getElementById('p_cover').value.trim(),

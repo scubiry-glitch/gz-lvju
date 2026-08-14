@@ -39,6 +39,8 @@ function assertAllow(p) {
   '/juzhu/app.js',
   '/juzhu/cities.json',
   '/juzhu/data.json',
+  '/juzhu-admin.html',
+  '/juzhu-amdin.html',
   '/screens/p-jz-product.html',
 ].forEach(assertAllow);
 

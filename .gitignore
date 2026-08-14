@@ -13,6 +13,8 @@ publish_test.sh
 juzhu/config.ini
 juzhu/_mysql_dump.json
 juzhu/mysql_dump.json
+juzhu/_housing_dump.json
+juzhu/_housing_dump.sql
 scripts/tp_call_log.json
 *.tp.local.json
 vendor/

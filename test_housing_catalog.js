@@ -29,6 +29,40 @@ function testLoadSnapshots() {
   });
 }
 
+function testSelectMissingUnits() {
+  const snap = [
+    { id: 1, project_id: 1, name: 'kept' },
+    { id: 2, project_id: 1, name: 'missing unit' },
+    { id: 3, project_id: 99, name: 'other city' },
+  ];
+  const missing = housing.selectMissingUnits(snap, new Set([1]), new Set([1]));
+  assert.deepStrictEqual(missing.map((u) => u.id), [2]);
+  console.log('[PASS] testSelectMissingUnits');
+}
+
+function testHydrateCoverFields() {
+  const catalog = {
+    projects: [
+      { id: 1, name: 'CCB', cover_image: '' },
+      { id: 2, cover_image: 'keep.jpg' },
+    ],
+    units: [{ id: 10, cover_image: null }],
+    districts: [{ id: 3, cover_image: null }],
+    photos: [
+      { entity_type: 'project', entity_id: 1, file_path: 'p-second.jpg', is_cover: 0, sort_order: 1 },
+      { entity_type: 'project', entity_id: 1, file_path: 'p-cover.jpg', is_cover: 1, sort_order: 0 },
+      { entity_type: 'unit', entity_id: 10, file_path: 'u.jpg', is_cover: 0, sort_order: 0 },
+      { entity_type: 'district', entity_id: 3, file_path: 'd.jpg', is_cover: 1, sort_order: 0 },
+    ],
+  };
+  housing.hydrateCoverFields(catalog);
+  assert.strictEqual(catalog.projects[0].cover_image, 'p-cover.jpg');
+  assert.strictEqual(catalog.projects[1].cover_image, 'keep.jpg');
+  assert.strictEqual(catalog.units[0].cover_image, 'u.jpg');
+  assert.strictEqual(catalog.districts[0].cover_image, 'd.jpg');
+  console.log('[PASS] testHydrateCoverFields');
+}
+
 function testEncJsonFields() {
   assert.strictEqual(housing.enc(null), null);
   assert.strictEqual(housing.enc('foo'), 'foo');
@@ -43,7 +77,20 @@ function testParseJsonField() {
   assert.deepStrictEqual(housing.parseJsonField('["a","b"]'), ['a', 'b']);
   assert.deepStrictEqual(housing.parseJsonField('{"stars":4}'), { stars: 4 });
   assert.strictEqual(housing.parseJsonField('not-json'), 'not-json');
+  assert.deepStrictEqual(housing.parseJsonField('"[\\"建融家园\\"]"'), ['建融家园']);
   console.log('[PASS] testParseJsonField');
+}
+
+function testTagsToDb() {
+  const enc = JSON.stringify(['建融家园']);
+  assert.strictEqual(housing.tagsToDb(['建融家园']), enc);
+  assert.strictEqual(housing.tagsToDb('建融家园'), enc);
+  assert.strictEqual(housing.tagsToDb('["建融家园"]'), enc);
+  assert.strictEqual(housing.tagsToDb('"[\\"建融家园\\"]"'), enc);
+  assert.deepStrictEqual(JSON.parse(housing.tagsToDb('建融家园, 近地铁')), ['建融家园', '近地铁']);
+  assert.strictEqual(housing.tagsToDb(null), null);
+  assert.strictEqual(housing.tagsToDb(''), null);
+  console.log('[PASS] testTagsToDb');
 }
 
 function testOrderRef() {
@@ -187,8 +234,11 @@ function testDuplicateCityError() {
 
 function run() {
   testLoadSnapshots();
+  testSelectMissingUnits();
+  testHydrateCoverFields();
   testEncJsonFields();
   testParseJsonField();
+  testTagsToDb();
   testOrderRef();
   testWechatLinkValidate();
   testGrOrdersValidate();
