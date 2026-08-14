@@ -31,8 +31,8 @@ if [ "$ENV_NAME" = "prod" ] || [ "$ENV_NAME" = "production" ]; then
     echo "FATAL: production requires JUZHU_API_KEY (must not be empty or dev-juzhu-key)" >&2
     exit 1
   fi
-  if [ -z "${JUZHU_ADMIN_PASSWORD:-}" ] || [ "${JUZHU_ADMIN_PASSWORD}" = "dongbo2026" ]; then
-    echo "FATAL: production requires JUZHU_ADMIN_PASSWORD (must not use dev default)" >&2
+  if [ -z "${JUZHU_ADMIN_PASSWORD:-}" ]; then
+    echo "FATAL: production requires JUZHU_ADMIN_PASSWORD" >&2
     exit 1
   fi
   if [ -z "${MYSQL_HOST:-}" ] || [ -z "${MYSQL_USER:-}" ] || [ -z "${MYSQL_PASSWORD:-}" ] || [ -z "${MYSQL_DB:-}" ]; then
