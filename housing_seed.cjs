@@ -152,6 +152,36 @@ async function seedAll(conn, juzhuDir) {
   };
 }
 
+/** 项目已存在时仍补缺失户型图，并回写空的 cover_image */
+async function backfillPhotos(conn, juzhuDir) {
+  const dir = juzhuDir || path.join(__dirname, 'juzhu');
+  const snap = loadSnapshots(dir);
+  let nPhoto = 0;
+  let nCover = 0;
+  for (const p of snap.photos) {
+    const [exist] = await conn.execute(
+      'SELECT id FROM photos WHERE entity_type=? AND entity_id=? AND file_path=? LIMIT 1',
+      [p.entity_type, p.entity_id, p.file_path]
+    );
+    if (exist.length) continue;
+    await conn.execute(
+      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+       VALUES(?,?,?,?,?,?)`,
+      [p.entity_type, p.entity_id, p.file_path, p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0]
+    );
+    nPhoto += 1;
+  }
+  for (const u of snap.units) {
+    if (!u.cover_image) continue;
+    const [r] = await conn.execute(
+      'UPDATE units SET cover_image=? WHERE id=? AND (cover_image IS NULL OR cover_image="")',
+      [u.cover_image, u.id]
+    );
+    nCover += r.affectedRows || 0;
+  }
+  return { inserted: nPhoto, covers: nCover };
+}
+
 function decorateRow(row, jsonKeys) {
   if (!row) return row;
   const out = Object.assign({}, row);
@@ -164,5 +194,6 @@ module.exports = {
   parseJsonField,
   loadSnapshots,
   seedAll,
+  backfillPhotos,
   decorateRow,
 };
