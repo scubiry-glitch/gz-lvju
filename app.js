@@ -639,6 +639,28 @@ async function ensureSchema() {
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+      // 沈阳扫描入库曾把 managed_unit_count 写成户型条数；与演示城市口径对齐为 户型×40
+      "UPDATE projects SET managed_unit_count = GREATEST(COALESCE(unit_count,1),1) * 40 WHERE channel='bzf' AND (managed_unit_count IS NULL OR managed_unit_count <= COALESCE(unit_count,0))",
+      // 区级房源量跟随项目在管套数加总
+      `UPDATE districts d
+         SET managed_unit_count = (
+           SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         unit_count = (
+           SELECT COALESCE(SUM(p.unit_count), 0)
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         vacant_count = (
+           SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         project_count = (
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         has_projects = CASE WHEN (
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ) > 0 THEN 1 ELSE 0 END`,
     ];
     for (const sql of migrations) {
       try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
@@ -1755,7 +1777,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
           district_count: districts.length,
           project_count_bzf: projects.filter((p) => p.channel === 'bzf').length,
           project_count_trade: projects.filter((p) => p.channel === 'trade').length,
-          unit_count: units.length,
+          // 房源量 = 保租项目在管套数合计（不是户型条数）
+          unit_count: projects
+            .filter((p) => p.channel === 'bzf')
+            .reduce((sum, p) => sum + (Number(p.managed_unit_count != null ? p.managed_unit_count : p.unit_count) || 0), 0),
         },
       });
     }
