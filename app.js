@@ -63,6 +63,8 @@ try {
 } catch (_) {}
 let housingCities = null;
 try { housingCities = require('./housing_cities.cjs'); } catch (_) {}
+let channelBrand = null;
+try { channelBrand = require('./channel_brand.cjs'); } catch (_) {}
 let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfig = null;
@@ -753,7 +755,11 @@ async function ensureSchema() {
       );
     }
     // 初始化 settings 种子数据
-    const settingSeeds = [['show_city_switcher', '1'], ['show_life_service', '1']];
+    const settingSeeds = [
+      ['show_city_switcher', '1'],
+      ['show_life_service', '1'],
+      ['channel_name', (channelBrand && channelBrand.DEFAULT_CHANNEL_NAME) || '新居住频道'],
+    ];
     for (const [k, v] of settingSeeds) {
       await conn.execute(
         'INSERT IGNORE INTO settings(`key`, value) VALUES (?, ?)',
@@ -1047,10 +1053,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const settings = await queryRows('SELECT `key`, value FROM settings');
       const settingsMap = {};
       for (const r of settings) settingsMap[r.key] = r.value;
+      const brand = channelBrand
+        ? channelBrand.fromSettingsMap(settingsMap)
+        : { name: (settingsMap.channel_name || '新居住频道').trim() || '新居住频道' };
       return jsonReply(res, {
         booking_phone: city ? city.booking_phone : null,
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
+        channel_name: brand.name,
       });
     }
 
@@ -1116,6 +1126,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // PUT /admin/settings
     if (urlPath === '/api/juzhu/admin/settings' && req.method === 'PUT') {
       const body = await readBody(req);
+      let parsedChannel = null;
+      if (body.channel_name !== undefined) {
+        parsedChannel = channelBrand
+          ? channelBrand.parseChannelName(body.channel_name)
+          : { ok: !!(body.channel_name || '').trim(), name: String(body.channel_name || '').trim(), error: '频道名称不能为空', status: 400 };
+        if (!parsedChannel.ok) return jsonReply(res, { error: parsedChannel.error }, parsedChannel.status);
+      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         if (body.booking_phone !== undefined) {
@@ -1133,11 +1150,21 @@ async function handleApiDirect(urlPath, qs, req, res) {
             );
           }
         }
+        let channelOut;
+        if (parsedChannel) {
+          await conn.execute(
+            'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+            ['channel_name', parsedChannel.name]
+          );
+          channelOut = parsedChannel.name;
+        }
         await conn.commit();
         const phoneOut = body.booking_phone !== undefined
           ? ((body.booking_phone || '').trim() || null)
           : undefined;
-        return jsonReply(res, { ok: true, booking_phone: phoneOut });
+        const out = { ok: true, booking_phone: phoneOut };
+        if (channelOut !== undefined) out.channel_name = channelOut;
+        return jsonReply(res, out);
       } finally {
         await conn.end();
       }

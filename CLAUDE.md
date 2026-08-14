@@ -128,3 +128,7 @@ SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再�
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor `url_link` 读 `juzhu/hmac_secret.key`，禁止对外 HTTP）
 - **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
 - **Python `juzhu/server.py`**：线上不用；仅本地联调 / Python 单测，已改连同一 MySQL
+
+## 规则 13 · 频道名称单一数据源（`settings.channel_name`）
+
+C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全局设置 `channel_name`（默认 `新居住频道`），后台 `juzhu-admin.html`「设置」页可改。词干 = 去掉末尾「频道/专区」。页面不得再写死这组字眼。

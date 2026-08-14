@@ -232,6 +232,21 @@ function testDuplicateCityError() {
   console.log('[PASS] testDuplicateCityError');
 }
 
+function testChannelBrand() {
+  const brand = require('./channel_brand.cjs');
+  assert.deepStrictEqual(brand.channelBrand(), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.deepStrictEqual(brand.channelBrand(' 新居住频道 '), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.deepStrictEqual(brand.channelBrand('旅居住宿频道'), { name: '旅居住宿频道', short: '旅居住宿', zone: '旅居住宿专区' });
+  assert.deepStrictEqual(brand.channelBrand('旅居'), { name: '旅居', short: '旅居', zone: '旅居专区' });
+  assert.deepStrictEqual(brand.channelBrand('安居专区'), { name: '安居专区', short: '安居', zone: '安居专区' });
+  assert.deepStrictEqual(brand.fromSettingsMap({}), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.strictEqual(brand.parseChannelName('').ok, false);
+  assert.strictEqual(brand.parseChannelName('   ').ok, false);
+  assert.strictEqual(brand.parseChannelName('x'.repeat(33)).ok, false);
+  assert.deepStrictEqual(brand.parseChannelName(' 旅居频道 '), { ok: true, name: '旅居频道' });
+  console.log('[PASS] testChannelBrand');
+}
+
 function run() {
   testLoadSnapshots();
   testSelectMissingUnits();
@@ -250,6 +265,7 @@ function run() {
   testCityDeleteGuard();
   testPickCity();
   testDuplicateCityError();
+  testChannelBrand();
   console.log('all passed');
 }
 

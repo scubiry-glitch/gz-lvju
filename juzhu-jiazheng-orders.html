@@ -36,7 +36,7 @@
     <div class="wrap" id="list" style="padding-top:14px;"></div>
   </div>
 </div>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -70,7 +70,7 @@
       var name = o.product_name || '服务（已下架）';
       var icon = CAT_ICON[o.category_id] || '🧰';
       return '<div class="ordcard">' +
-        '<div class="oh"><span class="shop">🐚 新居住 · 生活服务</span>' +
+        '<div class="oh"><span class="shop">🐚 ' + esc((JZ.channelShort && JZ.channelShort()) || '新居住') + ' · 生活服务</span>' +
         '<span class="stt ' + st.cls + '">' + st.label + '</span></div>' +
         '<div class="ob">' +
           '<div class="th" style="display:grid;place-items:center;font-size:30px;' +
@@ -112,7 +112,7 @@
       a.classList.toggle('on', a.getAttribute('data-s') === curStatus);
     });
   }
-  load();
+  (JZ.loadChannelBrand ? JZ.loadChannelBrand() : Promise.resolve()).then(load);
 })();
 </script>
 </body>

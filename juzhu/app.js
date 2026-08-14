@@ -2,6 +2,17 @@
 window.JUZHU = (function () {
   var cache = null;
   var _settings = null;
+  var DEFAULT_CHANNEL_NAME = '新居住频道';
+
+  function channelBrand(raw) {
+    var name = String(raw == null ? '' : raw).trim() || DEFAULT_CHANNEL_NAME;
+    var short = name.replace(/(频道|专区)$/, '') || name;
+    return { name: name, short: short, zone: short + '专区' };
+  }
+
+  function currentBrand() {
+    return channelBrand(_settings && _settings.channel_name);
+  }
 
   function loadSettings() {
     if (_settings) return Promise.resolve(_settings);
@@ -9,7 +20,7 @@ window.JUZHU = (function () {
       _settings = s;
       return s;
     }).catch(function() {
-      _settings = { show_city_switcher: true, show_life_service: true };
+      _settings = { show_city_switcher: true, show_life_service: true, channel_name: DEFAULT_CHANNEL_NAME };
       return _settings;
     });
   }
@@ -625,6 +636,10 @@ window.JUZHU = (function () {
     load: load,
     loadSettings: loadSettings,
     getSettings: function() { return _settings; },
+    channelBrand: currentBrand,
+    channelName: function() { return currentBrand().name; },
+    channelShort: function() { return currentBrand().short; },
+    channelZone: function() { return currentBrand().zone; },
     get data() { return cache; },
     districts: districts,
     districtBySlug: districtBySlug,

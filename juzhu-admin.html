@@ -150,7 +150,7 @@
 
 <div class="app-shell">
 <header class="top">
-  <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
+  <h1><span id="adminBrand">新居住</span> · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
   <div class="acts">
     <select id="citySwitch" title="切换编辑城市" style="height:32px;border:1px solid var(--border,#dde);border-radius:8px;padding:0 8px;font-size:13px;background:#fff;"></select>
     <a href="screens/p-rating-review.html" target="_blank">评级复核队列</a>
@@ -163,14 +163,23 @@
 <div class="warn" id="apiWarn" hidden>无法连接管理 API。请确认已登录，并刷新页面重试。</div>
 
 <nav class="subnav" id="subnav">
-  <button type="button" data-tab="phone">预约电话</button>
+  <button type="button" data-tab="phone">设置</button>
   <button type="button" data-tab="dict">字典</button>
   <button type="button" class="on" data-tab="content">内容</button>
 </nav>
 
 <div id="panePhone" class="pane-main pane-phone" hidden>
   <div class="card">
-    <h2>预约看房电话</h2>
+    <h2>频道名称</h2>
+    <p class="hint">用于 C 端首页主标题、导航副标题、家政页等。去掉末尾「频道 / 专区」后的词干用于短标题（如后台顶栏）。保存后立即生效。</p>
+    <div class="fld" style="margin-top:14px;">
+      <label>频道名称</label>
+      <input type="text" id="channelName" maxlength="32" placeholder="新居住频道" />
+    </div>
+    <div class="bar">
+      <button type="button" class="btn primary" id="btnSaveChannelName">保存频道名称</button>
+    </div>
+    <h2 style="margin-top:24px;">预约看房电话</h2>
     <p class="hint">已降级：户型详情「预约咨询」已改走<strong>项目联系电话</strong>（真实号 → 实时 400 虚拟号）。本页城市级号码仅作遗留配置，详情拨号不再使用。</p>
     <div class="fld" style="margin-top:14px;">
       <label>咨询电话</label>
@@ -281,8 +290,17 @@ function login(password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: password })
   }).then(function(r) {
-    return r.json().then(function(data) {
+    return r.text().then(function(text) {
+      var data = {};
+      try { data = text ? JSON.parse(text) : {}; }
+      catch (e) {
+        if (r.status === 501 || r.status === 404) {
+          throw new Error('当前页面开在静态服务上，无法登录。请改用 http://localhost:8765/juzhu-admin.html');
+        }
+        throw new Error('登录失败（HTTP ' + r.status + '）');
+      }
       if (!r.ok) throw new Error((data && (data.error || data.message)) || '登录失败');
+      if (!data.token) throw new Error('登录失败：未返回凭证');
       setAuthToken(data.token);
       return data;
     });
@@ -1448,20 +1466,49 @@ function numVal(id) {
   return v === '' ? null : +v;
 }
 
+function channelBrand(raw) {
+  var name = String(raw || '').trim() || '新居住频道';
+  var short = name.replace(/(频道|专区)$/, '') || name;
+  return { name: name, short: short, zone: short + '专区' };
+}
+
+function applyAdminChrome(name) {
+  var brand = channelBrand(name);
+  var el = document.getElementById('adminBrand');
+  if (el) el.textContent = brand.short;
+  document.title = brand.short + ' · 内容编辑后台';
+}
+
 function loadSettings() {
   document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
-  // 加载前端开关
+  // 加载前端开关与频道名称
   if (state.apiOk) {
     api('/settings').then(function(s) {
       document.getElementById('toggleCitySwitcher').checked = s.show_city_switcher !== false;
       document.getElementById('toggleLifeService').checked = s.show_life_service !== false;
+      var brand = channelBrand(s.channel_name);
+      document.getElementById('channelName').value = brand.name;
+      applyAdminChrome(brand.name);
     }).catch(function(){});
   } else {
     document.getElementById('toggleCitySwitcher').checked = true;
     document.getElementById('toggleLifeService').checked = true;
+    document.getElementById('channelName').value = '新居住频道';
   }
   return Promise.resolve();
 }
+
+document.getElementById('btnSaveChannelName').onclick = function() {
+  if (!state.apiOk) { toast('管理 API 未就绪，请刷新后重试'); return; }
+  var name = document.getElementById('channelName').value.trim();
+  if (!name) { toast('频道名称不能为空'); return; }
+  api('/settings', { method: 'PUT', body: { channel_name: name } }).then(function(res) {
+    var saved = (res && res.channel_name) || name;
+    document.getElementById('channelName').value = saved;
+    applyAdminChrome(saved);
+    toast('频道名称已保存');
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+};
 
 document.getElementById('btnSaveSettings').onclick = function() {
   if (!state.apiOk) { toast('管理 API 未就绪，请刷新后重试'); return; }

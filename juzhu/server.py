@@ -674,6 +674,12 @@ class Handler(SimpleHTTPRequestHandler):
         )
         return False
 
+    def _require_admin_authorized(self):
+        """管理页登录 token 或 API Key 均可（与 Node isAdminSessionAuthorized 对齐）。"""
+        if self._verify_admin_token(self._provided_bearer()):
+            return True
+        return self._require_api_key()
+
     def _admin_login(self):
         body = self._body() or {}
         password = (body.get("password") or "").strip()
@@ -708,9 +714,9 @@ class Handler(SimpleHTTPRequestHandler):
         if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):
             return self._jiazheng_post(path, qs, method)
 
-        # /api/juzhu/admin/* 全方法（含 GET）均需 API Key；此前仅写接口鉴权 → 读接口未授权
+        # /api/juzhu/admin/* 全方法（含 GET）均需登录会话或 API Key
         if path.startswith(ADMIN_PREFIX):
-            if not self._require_api_key():
+            if not self._require_admin_authorized():
                 return
         # wechat-link 为 C 端预约入口，匿名可调（与评价类似）；写单/派单等仍需 API Key
         elif method != "GET" and (
@@ -931,6 +937,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "booking_phone": row[0] if row else None,
                 "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
                 "show_life_service": settings.get("show_life_service", "1") == "1",
+                "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
             })
 
         if path == "/api/juzhu/districts":
@@ -2603,11 +2610,20 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
             "booking_phone": row[0] if row else None,
             "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
             "show_life_service": settings.get("show_life_service", "1") == "1",
+            "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
         })
 
     def _update_settings(self):
         body = self._body()
         phone = (body.get("booking_phone") or "").strip() or None
+        channel_out = None
+        if "channel_name" in body:
+            name = (body.get("channel_name") or "").strip()
+            if not name:
+                return self._json({"error": "频道名称不能为空"}, 400)
+            if len(name) > 32:
+                return self._json({"error": "频道名称最多 32 字"}, 400)
+            channel_out = name
         conn = connect()
         if phone is not None:
             cid = body.get("city_id")
@@ -2626,10 +2642,18 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
                     "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
                     (k, v),
                 )
+        if channel_out is not None:
+            conn.execute(
+                "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
+                ("channel_name", channel_out),
+            )
         conn.commit()
         export_json(conn)
         conn.close()
-        return self._json({"ok": True, "booking_phone": phone})
+        out = {"ok": True, "booking_phone": phone}
+        if channel_out is not None:
+            out["channel_name"] = channel_out
+        return self._json(out)
 
     def _get_dictionary(self, qs=None):
         conn = connect()
