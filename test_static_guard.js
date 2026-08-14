@@ -17,6 +17,7 @@ function assertAllow(p) {
 [
   '/.env',
   '/.env.prod',
+  '/runtime.env',
   '/package.json',
   '/.gitignore',
   '/README.md',

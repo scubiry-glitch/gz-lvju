@@ -7,7 +7,8 @@ const crypto = require('crypto');
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
 
-/** 加载运行时 .env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。 */
+/** 加载运行时 env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。
+ *  SCF 解包常丢弃隐藏文件 `.env`，故同时读非隐藏 `runtime.env`。 */
 function loadDotEnv(filePath) {
   const p = filePath || path.join(ROOT, '.env');
   if (!fs.existsSync(p)) return false;
@@ -31,6 +32,7 @@ function loadDotEnv(filePath) {
   return true;
 }
 loadDotEnv();
+loadDotEnv(path.join(ROOT, 'runtime.env'));
 
 const PORT = process.env.PORT || 9000;
 
@@ -101,6 +103,7 @@ function getDbConfig() {
 // 与 juzhu/server.py is_public_static 对齐：整仓静态根不得暴露密钥/源码/部署产物。
 const SENSITIVE_NAMES = new Set([
   '.env', '.env.local', '.env.example', '.env.prod', '.env.test',
+  'runtime.env',
   '.git', '.gitignore', '.ds_store', '__pycache__',
   'config.ini', 'server.log', 'api_doc.md', 'api-document.html',
   'hmac_secret.key', 'package.json', 'package-lock.json', 'yarn.lock',

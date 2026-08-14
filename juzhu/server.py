@@ -70,6 +70,7 @@ _SENSITIVE_NAMES = {
     ".env.example",
     ".env.prod",
     ".env.test",
+    "runtime.env",
     ".git",
     ".gitignore",
     ".DS_Store",

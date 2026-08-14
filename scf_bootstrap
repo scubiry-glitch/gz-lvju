@@ -5,6 +5,10 @@
 _EXTERNAL_PORT=${PORT}
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$DIR/.env"
+# SCF 解包常丢弃隐藏文件；runtime.env 为非隐藏副本
+if [ ! -f "$ENV_FILE" ] && [ -f "$DIR/runtime.env" ]; then
+  ENV_FILE="$DIR/runtime.env"
+fi
 
 if [ -f "$ENV_FILE" ]; then
   # 清除平台可能预设的 MySQL 变量，确保 .env 的值生效
