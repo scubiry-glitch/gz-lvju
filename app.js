@@ -407,8 +407,12 @@ function parseJsonFields(row, fields, defaultVal) {
   if (!row) return row;
   for (const f of fields) {
     if (row[f] != null && typeof row[f] === 'string') {
-      try { row[f] = JSON.parse(row[f]); }
-      catch (e) { row[f] = defaultVal !== undefined ? defaultVal : []; }
+      let v = row[f];
+      // 最多尝试 3 次，处理多重 JSON 转义
+      for (let i = 0; i < 3 && typeof v === 'string'; i++) {
+        try { v = JSON.parse(v); } catch (e) { break; }
+      }
+      row[f] = (typeof v === 'string') ? (defaultVal !== undefined ? defaultVal : []) : v;
     } else if (row[f] == null) {
       row[f] = defaultVal !== undefined ? defaultVal : [];
     }
@@ -2134,6 +2138,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const rows = await queryRows(
         "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint FROM projects WHERE channel='trade' ORDER BY is_featured DESC, featured_rank, sort_order"
       );
+      rows.forEach(r => parseJsonFields(r, ['tags']));
       return jsonReply(res, { listings: rows });
     }
 
@@ -2149,6 +2154,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
           [dist.id]
         );
+        projects.forEach(r => parseJsonFields(r, ['tags']));
         return jsonReply(res, { district: dist, projects });
       }
     }
@@ -2165,6 +2171,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE slug=?';
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags', 'rating']);
         return jsonReply(res, rows[0]);
       }
     }
