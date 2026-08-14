@@ -1,12 +1,14 @@
-"""新居住频道 · SQLite 读写 + 导出 data.json"""
+"""新居住频道 · MySQL 读写 + 导出 data.json"""
 import json
-import sqlite3
+import threading
 from pathlib import Path
 
+import dbconn
+
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = Path(__file__).resolve().parent / "juzhu.db"
+DB_PATH = Path(__file__).resolve().parent / "juzhu.db"  # 历史 SQLite 库（迁移源，不再读写）
 JSON_PATH = Path(__file__).resolve().parent / "data.json"
-SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
+SCHEMA_PATH = Path(__file__).resolve().parent / "mysql_schema.sql"
 
 JZ_WORKERS = [
     {"name": "陈建国", "level": "L4", "tags": ["细致", "主动"]},
@@ -259,24 +261,28 @@ JZ_DEFAULT_SKUS = [
 ]
 
 
+_SCHEMA_LOCK = threading.Lock()
+_SCHEMA_READY = False
+
+
 def connect():
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    ensure_schema(conn)
+    """MySQL 连接（dbconn 兼容层）。schema 自愈每个进程只跑一次：
+    远程 MySQL 下逐请求重放 DDL + 种子 upsert 成本高，且无本地文件自愈场景。"""
+    global _SCHEMA_READY
+    conn = dbconn.connect()
+    if not _SCHEMA_READY:
+        with _SCHEMA_LOCK:
+            if not _SCHEMA_READY:
+                ensure_schema(conn)
+                _SCHEMA_READY = True
     return conn
 
 
 def ensure_schema(conn):
-    # 基表自愈：schema.sql 全为 CREATE TABLE IF NOT EXISTS，幂等。
-    # 修复「重置后的 juzhu.db 只有 jz_* 家政表、缺 projects/units/districts，
-    # 导致 juzhu-admin 房源后台整链路 500」的隐患——旧版 ensure_schema 只迁移
-    # 「已存在」的表，从不建房源基表。
+    # 全量 DDL 幂等重放：CREATE TABLE IF NOT EXISTS + 内联索引（MySQL 5.7 无
+    # CREATE INDEX IF NOT EXISTS），可安全反复执行。列级迁移守卫保留以支持演进。
     if SCHEMA_PATH.exists():
-        try:
-            conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-        except sqlite3.OperationalError:
-            pass  # 忽略迁移语句（如 RENAME COLUMN）在已迁移/新库上的错误
+        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     project_cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()}
     if project_cols:
         migrations = [
@@ -323,16 +329,21 @@ def ensure_schema(conn):
     ensure_channels(conn)
     ensure_jiazheng_schema(conn)
     ensure_jz_vendor_schema(conn)
+    gr_order_cols = {r[1] for r in conn.execute("PRAGMA table_info(gr_orders)").fetchall()}
+    if gr_order_cols and "vendor_id" not in gr_order_cols:
+        conn.execute("ALTER TABLE gr_orders ADD COLUMN vendor_id INT")
+    if gr_order_cols and "user_id" not in gr_order_cols:
+        conn.execute("ALTER TABLE gr_orders ADD COLUMN user_id TEXT")
+    if gr_order_cols and "serving_at" not in gr_order_cols:
+        conn.execute("ALTER TABLE gr_orders ADD COLUMN serving_at TEXT")
     ensure_settings(conn)
     conn.commit()
 
 
 def ensure_jz_vendor_schema(conn):
-    """P/B 管理台：商家/产品/服务者/子类目（与 C 端四大类 jz_categories 分离）。"""
-    schema_path = Path(__file__).resolve().parent / "jiazheng_schema.sql"
-    if schema_path.exists():
-        conn.executescript(schema_path.read_text(encoding="utf-8"))
+    """P/B 管理台：商家/产品/服务者/子类目（表结构由 mysql_schema.sql 统一建）。"""
     product_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_products)").fetchall()}
+
     if product_cols:
         if "channel_sku_id" not in product_cols:
             conn.execute("ALTER TABLE jz_products ADD COLUMN channel_sku_id INTEGER")
@@ -399,154 +410,33 @@ def ensure_jz_vendor_schema(conn):
             )
 
 def ensure_settings(conn):
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    if "settings" not in tables:
-        conn.executescript(
-            """
-            CREATE TABLE settings (
-              key TEXT PRIMARY KEY,
-              value TEXT NOT NULL
-            );
-            INSERT INTO settings(key, value) VALUES ('show_city_switcher', '1');
-            INSERT INTO settings(key, value) VALUES ('show_life_service', '1');
-            """
-        )
-    else:
-        defaults = {
-            'show_city_switcher': '1',
-            'show_life_service': '1',
-        }
-        for k, v in defaults.items():
-            if not conn.execute("SELECT 1 FROM settings WHERE key=?", (k,)).fetchone():
-                conn.execute("INSERT INTO settings(key, value) VALUES (?, ?)", (k, v))
+    """全局设置默认值（表结构由 mysql_schema.sql 统一建）。"""
+    defaults = {
+        'show_city_switcher': '1',
+        'show_life_service': '1',
+    }
+    for k, v in defaults.items():
+        conn.execute("INSERT IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
 
 
 def ensure_channels(conn):
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    if "channels" not in tables:
-        conn.executescript(
-            """
-            CREATE TABLE channels (
-              id TEXT PRIMARY KEY,
-              label TEXT NOT NULL,
-              sort_order INTEGER NOT NULL DEFAULT 0,
-              enabled INTEGER NOT NULL DEFAULT 1,
-              note TEXT
-            );
-            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('bzf', '保租房专区', 1, 1);
-            INSERT INTO channels(id, label, sort_order, enabled) VALUES ('trade', '卖旧买新专区', 2, 1);
-            """
+    """频道默认行（表结构由 mysql_schema.sql 统一建）。"""
+    defaults = [("bzf", "保租房专区", 1), ("trade", "卖旧买新专区", 2), ("jiazheng", "生活服务专区", 3)]
+    for cid, label, order in defaults:
+        conn.execute(
+            "INSERT IGNORE INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
+            (cid, label, order),
         )
-    else:
-        defaults = [("bzf", "保租房专区", 1), ("trade", "卖旧买新专区", 2), ("jiazheng", "生活服务专区", 3)]
-        for cid, label, order in defaults:
-            row = conn.execute("SELECT label FROM channels WHERE id=?", (cid,)).fetchone()
-            if not row:
-                conn.execute(
-                    "INSERT INTO channels(id, label, sort_order, enabled) VALUES (?, ?, ?, 1)",
-                    (cid, label, order),
-                )
-            elif row[0] in ("保租房", "卖旧买新", "生活服务"):
-                # 旧短 label 统一补「专区」，与首页 tab 文案对齐
-                conn.execute("UPDATE channels SET label=? WHERE id=?", (label, cid))
+        row = conn.execute("SELECT label FROM channels WHERE id=?", (cid,)).fetchone()
+        if row and row[0] in ("保租房", "卖旧买新", "生活服务"):
+            # 旧短 label 统一补「专区」，与首页 tab 文案对齐
+            conn.execute("UPDATE channels SET label=? WHERE id=?", (label, cid))
 
 
 def ensure_jiazheng_schema(conn):
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS jz_categories (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          icon TEXT,
-          sort_order INTEGER NOT NULL DEFAULT 0,
-          enabled INTEGER NOT NULL DEFAULT 1,
-          note TEXT
-        );
-        CREATE TABLE IF NOT EXISTS jz_skus (
-          id INTEGER PRIMARY KEY,
-          category_id TEXT NOT NULL REFERENCES jz_categories(id),
-          name TEXT NOT NULL,
-          slug TEXT NOT NULL UNIQUE,
-          spec TEXT,
-          price_from INTEGER,
-          price_unit TEXT,
-          duration_min INTEGER,
-          tags TEXT,
-          badges TEXT,
-          sales_text TEXT,
-          rating_score REAL,
-          worker_min_level TEXT,
-          cover_image TEXT,
-          gallery TEXT,
-          includes TEXT,
-          service_flow TEXT,
-          service_notice TEXT,
-          sort_order INTEGER NOT NULL DEFAULT 0,
-          enabled INTEGER NOT NULL DEFAULT 1
-        );
-        CREATE TABLE IF NOT EXISTS jz_orders (
-          id TEXT PRIMARY KEY,
-          sku_id INTEGER REFERENCES jz_skus(id),
-          category_id TEXT NOT NULL REFERENCES jz_categories(id),
-          type TEXT NOT NULL,
-          house TEXT NOT NULL,
-          phone TEXT NOT NULL,
-          expect_time TEXT NOT NULL,
-          desc TEXT,
-          fee INTEGER NOT NULL,
-          pay_status TEXT NOT NULL DEFAULT 'unpaid',
-          pay_method TEXT,
-          pay_at TEXT,
-          status TEXT NOT NULL DEFAULT 'pending',
-          slot_id INTEGER,
-          worker_json TEXT,
-          rating_json TEXT,
-          source TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          log_json TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_jz_skus_category ON jz_skus(category_id, enabled, sort_order);
-        CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status, created_at);
-        """
-    )
-    # 迁移：老库 jz_orders 无 slot_id 列（下单只记录档期意向、支付时才占名额需要它）。
-    order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
-    if "slot_id" not in order_cols:
-        conn.execute("ALTER TABLE jz_orders ADD COLUMN slot_id INTEGER")
-
-    # 自愈：若 jz_categories 实为子类目表（INTEGER id + parent_type），迁到 jz_subcategories，
-    # 再重建 C 端四大类 jz_categories（TEXT id）。
-    cat_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall()}
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    if cat_cols and "parent_type" in cat_cols:
-        if "jz_subcategories" not in tables:
-            conn.execute("ALTER TABLE jz_categories RENAME TO jz_subcategories")
-        else:
-            conn.execute("DROP TABLE IF EXISTS jz_categories")
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS jz_categories (
-              id TEXT PRIMARY KEY,
-              name TEXT NOT NULL,
-              icon TEXT,
-              sort_order INTEGER NOT NULL DEFAULT 0,
-              enabled INTEGER NOT NULL DEFAULT 1,
-              note TEXT
-            );
-            """
-        )
-        cat_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall()}
-
-    if cat_cols and "enabled" not in cat_cols:
-        conn.execute("ALTER TABLE jz_categories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
-    if cat_cols and "note" not in cat_cols:
-        conn.execute("ALTER TABLE jz_categories ADD COLUMN note TEXT")
-    sku_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_skus)").fetchall()}
-    if sku_cols and "enabled" not in sku_cols:
-        conn.execute("ALTER TABLE jz_skus ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
-
-    # 仅当 id 为 TEXT（C 端四大类）时写入默认类目/SKU
+    # 表结构（jz_categories/jz_skus/jz_orders）由 mysql_schema.sql 统一建。
+    # 仅当 id 为 VARCHAR（C 端四大类；SQLite 下为 TEXT）时写入默认类目/SKU；
+    # 子类目表（INT 自增 id）被排除。
     cat_id_type = None
     for r in conn.execute("PRAGMA table_info(jz_categories)").fetchall():
         if r[1] == "id":
@@ -560,11 +450,11 @@ def ensure_jiazheng_schema(conn):
         conn.execute(
             """INSERT INTO jz_categories(id, name, icon, sort_order, enabled, note)
                VALUES (?, ?, ?, ?, 1, ?)
-               ON CONFLICT(id) DO UPDATE SET
-                 name=excluded.name,
-                 icon=excluded.icon,
-                 sort_order=excluded.sort_order,
-                 note=excluded.note""",
+               ON DUPLICATE KEY UPDATE
+                 name=VALUES(name),
+                 icon=VALUES(icon),
+                 sort_order=VALUES(sort_order),
+                 note=VALUES(note)""",
             (cid, name, icon, order, note),
         )
     for sku in JZ_DEFAULT_SKUS:
@@ -574,25 +464,25 @@ def ensure_jiazheng_schema(conn):
                  tags, badges, sales_text, rating_score, worker_min_level, cover_image,
                  gallery, includes, service_flow, service_notice, sort_order, enabled
                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-               ON CONFLICT(id) DO UPDATE SET
-                 category_id=excluded.category_id,
-                 name=excluded.name,
-                 slug=excluded.slug,
-                 spec=excluded.spec,
-                 price_from=excluded.price_from,
-                 price_unit=excluded.price_unit,
-                 duration_min=excluded.duration_min,
-                 tags=excluded.tags,
-                 badges=excluded.badges,
-                 sales_text=excluded.sales_text,
-                 rating_score=excluded.rating_score,
-                 worker_min_level=excluded.worker_min_level,
-                 cover_image=excluded.cover_image,
-                 gallery=excluded.gallery,
-                 includes=excluded.includes,
-                 service_flow=excluded.service_flow,
-                 service_notice=excluded.service_notice,
-                 sort_order=excluded.sort_order"""
+               ON DUPLICATE KEY UPDATE
+                 category_id=VALUES(category_id),
+                 name=VALUES(name),
+                 slug=VALUES(slug),
+                 spec=VALUES(spec),
+                 price_from=VALUES(price_from),
+                 price_unit=VALUES(price_unit),
+                 duration_min=VALUES(duration_min),
+                 tags=VALUES(tags),
+                 badges=VALUES(badges),
+                 sales_text=VALUES(sales_text),
+                 rating_score=VALUES(rating_score),
+                 worker_min_level=VALUES(worker_min_level),
+                 cover_image=VALUES(cover_image),
+                 gallery=VALUES(gallery),
+                 includes=VALUES(includes),
+                 service_flow=VALUES(service_flow),
+                 service_notice=VALUES(service_notice),
+                 sort_order=VALUES(sort_order)"""
             ,
             (
                 sku["id"], sku["category_id"], sku["name"], sku["slug"], sku["spec"],

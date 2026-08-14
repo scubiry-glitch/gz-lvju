@@ -1,4 +1,4 @@
-/** 新居住频道 · 共享数据层（读 juzhu/data.json 或 /api/juzhu/*） */
+/** 新居住频道 · 共享数据层（优先 /api/juzhu/catalog MySQL，失败再回落 data.json） */
 window.JUZHU = (function () {
   var cache = null;
   var _settings = null;
@@ -14,9 +14,16 @@ window.JUZHU = (function () {
     });
   }
 
-  // 按 URL ?city=（城市名）解析对应城市的数据文件；无城市或解析失败 → 默认 data.json
-  function dataUrlForCity() {
+  function resolveCityHint() {
     var city = urlCityName();
+    if (!city) {
+      try { city = localStorage.getItem('bzf_jz_city') || ''; } catch (e) {}
+    }
+    return city || '';
+  }
+
+  function dataUrlForCity() {
+    var city = resolveCityHint();
     if (!city) return Promise.resolve('');
     var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
     return fetch(base + 'cities.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) {
@@ -31,8 +38,47 @@ window.JUZHU = (function () {
     }).catch(function () { return ''; });
   }
 
-  function load() {
-    if (cache) return Promise.resolve(cache);
+  function normalizeCatalog(d) {
+    function normTags(list) {
+      (list || []).forEach(function (r) {
+        var t = r.tags;
+        if (t == null) r.tags = [];
+        else if (typeof t === 'string') {
+          try { r.tags = JSON.parse(t); } catch (e) { r.tags = t ? [t] : []; }
+        } else if (!Array.isArray(t)) r.tags = [];
+      });
+    }
+    normTags(d.districts);
+    normTags(d.projects);
+    normTags(d.units);
+    (d.units || []).forEach(function(u) {
+      if (u.amenities == null) u.amenities = [];
+      else if (typeof u.amenities === 'string') {
+        try { u.amenities = JSON.parse(u.amenities); } catch (e) { u.amenities = []; }
+      }
+      if (u.keeper && typeof u.keeper === 'string') {
+        try { u.keeper = JSON.parse(u.keeper); } catch (e) { u.keeper = null; }
+      }
+      if (u.rent_detail && typeof u.rent_detail === 'string') {
+        try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
+      }
+    });
+    return d;
+  }
+
+  function loadFromCatalog() {
+    var city = resolveCityHint();
+    var qs = city ? ('?city=' + encodeURIComponent(city)) : '';
+    return fetch('/api/juzhu/catalog' + qs).then(function (r) {
+      if (!r.ok) throw new Error('catalog http ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      if (!d || !Array.isArray(d.districts)) throw new Error('catalog empty');
+      return d;
+    });
+  }
+
+  function loadFromJson() {
     var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
     var url = base + 'data.json';
     return dataUrlForCity().then(function (cityFile) {
@@ -45,33 +91,16 @@ window.JUZHU = (function () {
     }).then(function (r) {
       if (!r.ok) throw new Error('data load failed');
       return r.json();
+    });
+  }
+
+  function load() {
+    if (cache) return Promise.resolve(cache);
+    return loadFromCatalog().catch(function () {
+      return loadFromJson();
     }).then(function (d) {
-      function normTags(list) {
-        (list || []).forEach(function (r) {
-          var t = r.tags;
-          if (t == null) r.tags = [];
-          else if (typeof t === 'string') {
-            try { r.tags = JSON.parse(t); } catch (e) { r.tags = t ? [t] : []; }
-          } else if (!Array.isArray(t)) r.tags = [];
-        });
-      }
-      normTags(d.districts);
-      normTags(d.projects);
-      normTags(d.units);
-      (d.units || []).forEach(function(u) {
-        if (u.amenities == null) u.amenities = [];
-        else if (typeof u.amenities === 'string') {
-          try { u.amenities = JSON.parse(u.amenities); } catch (e) { u.amenities = []; }
-        }
-        if (u.keeper && typeof u.keeper === 'string') {
-          try { u.keeper = JSON.parse(u.keeper); } catch (e) { u.keeper = null; }
-        }
-        if (u.rent_detail && typeof u.rent_detail === 'string') {
-          try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
-        }
-      });
-      cache = d;
-      return d;
+      cache = normalizeCatalog(d);
+      return cache;
     });
   }
 

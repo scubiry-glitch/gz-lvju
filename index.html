@@ -147,6 +147,14 @@
   .jz-promo-card.warm{background:linear-gradient(135deg,#ff8a3d,#c44a14);}
   .jz-promo-card.fresh{background:linear-gradient(135deg,#1aa39a,#0c4d44);}
   .jz-promo-card.deep{background:linear-gradient(135deg,#1a3a6b,#0b1d3a);}
+
+  /* 我的订单快捷入口 */
+  .jz-ordbar{display:flex;background:#fff;border:1px solid var(--border);border-radius:14px;
+    margin:0 16px 12px;padding:14px 0;box-shadow:0 5px 14px rgba(15,42,38,.05);}
+  .jz-ordbar a{flex:1;text-align:center;font-size:12px;color:var(--ink);position:relative;}
+  .jz-ordbar a .ic{font-size:22px;display:block;margin-bottom:4px;}
+  .jz-ordbar a .bdg{position:absolute;top:-6px;right:24%;background:#dc2626;color:#fff;font-size:9px;
+    min-width:15px;height:15px;border-radius:999px;display:grid;place-items:center;padding:0 3px;font-weight:700;}
   .collage{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 18px 8px;}
   .ctile{position:relative;border-radius:16px;overflow:hidden;color:#fff;display:block;min-height:108px;
     box-shadow:0 8px 20px rgba(15,42,38,.12);}
@@ -225,7 +233,7 @@
     </div>
 
     <div class="pane" id="pane-jiazheng">
-      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
+      <div class="sec-h" id="jzSecCats" style="margin-top:8px;"><span class="bar"></span><h2>选择服务</h2><span class="more"><a href="juzhu-jiazheng-flow.html" style="color:var(--brand);">全流程演示 ›</a></span></div>
       <div class="jz-quick">
         <div class="jz-cat-grid" id="jzCats">
           <a class="jz-cat cleaning" href="juzhu-jiazheng-list.html?type=cleaning"><div class="bg"></div><div class="in"><div class="top"><span class="pill">高频刚需</span><div class="arrow">›</div></div><div class="hero"><div class="orb">🧹</div><div class="title-wrap"><h3>保洁</h3><div class="desc">日常、深度、搬家保洁一屏直达，适合租住周期里的高频清洁场景。</div></div></div><div class="sub"><span>日常保洁</span><span>深度清洁</span><span>搬家保洁</span></div><div class="stats"><span>最快 2h 上门</span><span>金牌阿姨</span></div></div></a>
@@ -233,7 +241,7 @@
           <a class="jz-cat moving" href="juzhu-jiazheng-list.html?type=moving"><div class="bg"></div><div class="in"><div class="top"><span class="pill">大件服务</span><div class="arrow">›</div></div><div class="hero"><div class="orb">📦</div><div class="title-wrap"><h3>搬家</h3><div class="desc">同城搬家、长途搬运、钢琴等重服务，直接匹配车型与人手。</div></div></div><div class="sub"><span>居民搬家</span><span>长途搬家</span><span>钢琴搬运</span></div><div class="stats"><span>车型可选</span><span>明码报价</span></div></div></a>
           <a class="jz-cat nanny" href="juzhu-jiazheng-list.html?type=nanny"><div class="bg"></div><div class="in"><div class="top"><span class="pill">长期陪伴</span><div class="arrow">›</div></div><div class="hero"><div class="orb">👶</div><div class="title-wrap"><h3>保姆</h3><div class="desc">住家、育儿嫂、钟点工等长期照护需求，适合稳定预约。</div></div></div><div class="sub"><span>住家保姆</span><span>育儿嫂</span><span>钟点工</span></div><div class="stats"><span>背景核验</span><span>支持续约</span></div></div></a>
         </div>
-        <div class="jz-quick-intro" style="margin-top:10px;margin-bottom:0;">
+        <div class="jz-quick-intro" id="jzQuickIntro" style="margin-top:10px;margin-bottom:0;">
           <div class="copy">
             <div class="eyebrow">ONE-STOP HOME SERVICE</div>
             <h3>四大到家服务</h3>
@@ -243,8 +251,12 @@
         </div>
       </div>
 
-      <div class="sec-h"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
+      <div class="sec-h" id="jzSecSubs"><span class="bar"></span><h2>热门子类</h2><span class="more">查看全部 ›</span></div>
       <div class="jz-sub-list" id="jzSubs"></div>
+
+      <!-- 我的订单（GR 侧） -->
+      <div class="sec-h" id="jzSecOrders"><span class="bar"></span><h2>我的订单</h2><span class="more"><a href="juzhu-jiazheng-orders.html">全部订单 ›</a></span></div>
+      <div class="jz-ordbar" id="jzOrderBar"></div>
 
       <!-- 本月精选 暂时隐藏
       <div class="sec-h"><span class="bar"></span><h2>本月精选</h2></div>
@@ -298,10 +310,14 @@
   function renderHero(d){
     applyChannelChrome(d);
     document.getElementById('heroTitle').textContent = cityOf(d) + ' · 新居住';
+    var stock = (d.stats && d.stats.unit_count != null)
+      ? Number(d.stats.unit_count)
+      : (d.projects || []).filter(function(p){ return p.channel === 'bzf'; })
+          .reduce(function(sum, p){ return sum + JUZHU.managedUnits(p); }, 0);
     document.getElementById('heroStat').innerHTML =
       '<div><b>'+d.stats.project_count_bzf+'</b>保租项目</div>'+
       '<div><b>'+d.stats.project_count_trade+'</b>置换项目</div>'+
-      '<div><b>'+d.stats.unit_count+'</b>房源量</div>';
+      '<div><b>'+stock+'</b>房源量</div>';
     document.getElementById('distCount').textContent = d.stats.district_count + ' 区 ›';
     var bgEl = document.querySelector('.split-hd .bg');
     if (d.city.hero_bg_image) {
@@ -425,8 +441,8 @@
   function renderJiazhengCats(apiCats){
     var byId = {};
     JZ_CATS.forEach(function(c) { byId[c.id] = c; });
-    var list = (apiCats && apiCats.length)
-      ? apiCats.map(function(c) {
+    // API 空不兜底：城市过滤后无服务时隐藏区块，避免展示非本城硬编码内容
+    var list = (apiCats || []).map(function(c) {
           var base = byId[c.id] || {};
           return {
             id: c.id,
@@ -437,8 +453,7 @@
             stats: c.stats || base.stats || ['快速预约', '进度可见'],
             subs: base.subs || []
           };
-        })
-      : JZ_CATS;
+        });
     document.getElementById('jzCats').innerHTML = list.map(function(c){
       var subHtml = (c.subs || []).slice(0,3).map(function(s){ return '<span>'+s+'</span>'; }).join('');
       var statHtml = (c.stats || []).slice(0,2).map(function(s){ return '<span>'+s+'</span>'; }).join('');
@@ -451,6 +466,12 @@
           '<div class="stats">'+statHtml+'</div>'+
         '</div></a>';
     }).join('');
+    // 无可用类目时隐藏分类区块与简介（避免展示非本城硬编码内容）
+    var has = list.length > 0;
+    var secCats = document.getElementById('jzSecCats');
+    if (secCats) secCats.style.display = has ? '' : 'none';
+    var intro = document.getElementById('jzQuickIntro');
+    if (intro) intro.style.display = has ? '' : 'none';
   }
 
   // 热门子类（接 API SKU，链到详情页；只展示 API 实际返回的品类，不做兜底）
@@ -462,13 +483,18 @@
     document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
       var displayPrice = r.product_min_price || r.price_from || 0;
       var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
-      return '<a class="row" href="' + BZF_JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug)) + '">' +
+      // 基础链接不带 city，渲染后由 paintJzLinks 幂等补上当前城市（城市切换时同步更新）
+      return '<a class="row" href="juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(r.slug) + '">' +
         '<div><b>' + r.name + '</b><div class="meta">' + (r.spec || '') + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:12px;">' +
           '<div class="pr">' + price + '</div>' +
           '<div class="go">预约 ›</div>' +
         '</div></a>';
     }).join('');
+    // 无可用 SKU 时隐藏热门子类标题（避免空区块）
+    var secSubs = document.getElementById('jzSecSubs');
+    if (secSubs) secSubs.style.display = rows.length ? '' : 'none';
+    paintJzLinks();
   }
 
   // 营销栏（运营位）
@@ -506,6 +532,55 @@
   }
 
   // renderJiazhengPromo();  // 本月精选暂时隐藏
+
+  // —— 生活服务入口链接携带当前城市（幂等重写：保留既有参数，城市切换后同步更新）——
+  function rewriteJzLinkCity(a) {
+    var parts = a.getAttribute('href').split('?');
+    var qs = new URLSearchParams(parts[1] || '');
+    qs.delete('city');
+    var city = BZF_JZ.regionCity();
+    if (city) qs.set('city', city);
+    a.href = parts[0] + (qs.toString() ? '?' + qs.toString() : '');
+  }
+  function paintJzLinks() {
+    if (!window.BZF_JZ) return;
+    document.querySelectorAll(
+      '.jz-cat-grid a[href*="juzhu-jiazheng-list.html"], #jzSubs a[href*="juzhu-jiazheng-detail.html"]'
+    ).forEach(rewriteJzLinkCity);
+  }
+  paintJzLinks();
+  if (window.BZF_JZ && BZF_JZ.onCityChange) BZF_JZ.onCityChange(paintJzLinks);
+
+  // —— 我的订单快捷入口：user_id 为模拟值；接口失败时整块隐藏（禁用硬编码兜底）——
+  (function(){
+    if (!window.BZF_JZ) return;
+    // 模拟用户 id（后期替换为真实获取用户 id 的代码）
+    BZF_JZ.setUserId('demo_user_001');
+    var STATUS_UI = [
+      { id: 'paid',      ic: '💳',   label: '已支付' },
+      { id: 'assigned',  ic: '🧑‍🔧', label: '已派单' },
+      { id: 'serving',   ic: '🛠️',   label: '服务中' },
+      { id: 'completed', ic: '✅',   label: '已完成' }
+    ];
+    fetch('/api/juzhu/gr/orders?user_id=' + encodeURIComponent(BZF_JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok) return;
+        var counts = res.counts || {};
+        document.getElementById('jzOrderBar').innerHTML = STATUS_UI.map(function(s){
+          var n = counts[s.id] || 0;
+          return '<a href="juzhu-jiazheng-orders.html?status=' + s.id + '">' +
+            (n > 0 ? '<span class="bdg">' + n + '</span>' : '') +
+            '<span class="ic">' + s.ic + '</span>' + s.label + '</a>';
+        }).join('');
+      })
+      .catch(function(){
+        var bar = document.getElementById('jzOrderBar');
+        var sec = document.getElementById('jzSecOrders');
+        if (bar) bar.style.display = 'none';
+        if (sec) sec.style.display = 'none';
+      });
+  })();
 
   if (window.BZF_JZ && BZF_JZ.categories) {
     BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
@@ -582,11 +657,13 @@
   Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
     var d = results[0];
     lastData = d;
-    // 同步城市：如果 BZF_JZ localStorage 里存了旧城市（如南京），而数据是沈阳，则以数据为准；
-    // 但 URL 带 ?city= 直链参数时不强制改回（直链优先，只读展示）
+    // 城市来源优先级：URL ?city= 直链（只读）> localStorage 用户选择 > 后端数据城市兜底。
+    // 仅当 URL 与 localStorage 都没有城市来源时，才用数据城市初始化；
+    // localStorage 已有用户选择的城市时，尊重它，不强制改回。
     if (window.BZF_JZ && d.city && d.city.name && !(BZF_JZ.urlCity && BZF_JZ.urlCity())) {
-      var storedCity = BZF_JZ.regionCity();
-      if (storedCity !== d.city.name) {
+      var hasStored = false;
+      try { hasStored = !!localStorage.getItem('bzf_jz_city'); } catch (e) {}
+      if (!hasStored) {
         BZF_JZ.setRegionCity(d.city.name);
       }
     }

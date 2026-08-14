@@ -369,6 +369,19 @@
   }
   applyDemoMode();
 
+  // 模拟用户 id（后期替换为真实获取用户 id 的代码）
+  var USER_KEY = 'jz_demo_user_id';
+  var DEMO_USER_ID = 'demo_user_001';
+
+  function userId() {
+    try { return localStorage.getItem(USER_KEY) || DEMO_USER_ID; } catch (e) { return DEMO_USER_ID; }
+  }
+
+  function setUserId(id) {
+    try { if (id) localStorage.setItem(USER_KEY, id); } catch (e) {}
+    return userId();
+  }
+
   window.BZF_JZ = {
     STATUS: STATUS,
     ICON: ICON,
@@ -397,6 +410,8 @@
     regionCity: regionCity,
     urlCity: urlCity,
     regionCapital: regionCapital,
+    userId: userId,
+    setUserId: setUserId,
     regionCities: regionCities,
     regionCityTree: regionCityTree,
     regionProvinces: regionProvinces,

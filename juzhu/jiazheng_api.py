@@ -10,23 +10,66 @@
 """
 
 import json
-import sqlite3
+import os
+import re
+import ssl
+import time
+import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import db  # noqa: E402
 from sign_util import HmacAuth  # noqa: E402
 
 _MODULE_DIR = Path(__file__).resolve().parent
 _KEY_PATH = _MODULE_DIR / "hmac_secret.key"
-_DB_PATH = _MODULE_DIR / "juzhu.db"
+
+_CST = timezone(timedelta(hours=8))  # 北京时间 UTC+8
+
+
+def _norm_eta_peking(eta):
+    """eta 统一转为北京时间无时区字符串 'YYYY-MM-DD HH:MM:SS'。
+
+    输入示例：
+    - '2026-08-07T14:00:00+08:00' → '2026-08-07 14:00:00'
+    - '2026-08-07T14:00:00Z'      → '2026-08-07 22:00:00'（UTC 转北京时间）
+    - '2026-08-07 14:00:00'       → 原样返回（已是北京时间无时区）
+    - 无法解析的值 → 原样返回，避免误伤业务数据
+    """
+    if not eta:
+        return eta
+    s = str(eta).strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$", s):
+        return s
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return s
+        return dt.astimezone(_CST).strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return s
+
+
+def _vendor_ssl_context():
+    """商家接口出站调用的 SSL context。
+
+    uat.doorslink.net 等商家环境的证书链不完整（缺少中间证书），
+    标准验证会报 CERTIFICATE_VERIFY_FAILED。商家接口本身有 IP 白名单
+    作为安全屏障，此处放宽为不校验证书。
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 # ── 密钥加载 ──────────────────────────────────────────────────
 
 def _load_vendor_config():
     """从 hmac_secret.key 加载 vendor 配置。
-    格式: vendor_id|hmac_key|url_link（url_link 可选）
-    返回: {"1": {"key": "abc...", "url_link": "https://..."}, ...}
+    格式: vendor_id|hmac_key|url_link|order_detail_url（后两列可选）
+    返回: {"1": {"key": "abc...", "url_link": "https://...", "order_detail_url": "https://..."}, ...}
     """
     vendors = {}
     if not _KEY_PATH.exists():
@@ -41,6 +84,7 @@ def _load_vendor_config():
             vendors[vid] = {
                 "key": parts[1].strip(),
                 "url_link": parts[2].strip() if len(parts) >= 3 else "",
+                "order_detail_url": parts[3].strip() if len(parts) >= 4 else "",
             }
     return vendors
 
@@ -48,16 +92,8 @@ def _load_vendor_config():
 # ── 数据库 ────────────────────────────────────────────────────
 
 def _connect_db():
-    conn = sqlite3.connect(str(_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    schema_path = _MODULE_DIR / "schema.sql"
-    if schema_path.exists():
-        try:
-            conn.executescript(schema_path.read_text(encoding="utf-8"))
-        except sqlite3.OperationalError:
-            pass  # 忽略迁移语句在已迁移/新库上的错误
-    return conn
+    """统一走 db.connect()（MySQL 连接，schema 自愈由 db 模块负责）。"""
+    return db.connect()
 
 
 # ── 工具 ──────────────────────────────────────────────────────
@@ -121,6 +157,7 @@ def _handle_vendor(handler, path, body):
         return True
 
     routes = {
+        "/api/juzhu/jiazheng/vendor/cities/list":      _vendor_cities_list,
         "/api/juzhu/jiazheng/vendor/categories/list":    _vendor_categories_list,
         "/api/juzhu/jiazheng/vendor/skus/list":          _vendor_skus_list,
         "/api/juzhu/jiazheng/vendor/products/list":      _vendor_products_list,
@@ -145,7 +182,7 @@ def _handle_vendor(handler, path, body):
 
 def _handle_callback(handler, body):
     """第三方小程序回调 —— 更新 GR 订单状态（HMAC 鉴权，vendor_id 必填）。"""
-    _, err = _verify_vendor_auth(body)
+    vendor_id, err = _verify_vendor_auth(body)
     if err:
         _respond_json(handler, {"code": 401, "message": err}, 401)
         return True
@@ -202,8 +239,9 @@ def _handle_callback(handler, body):
             fee=fee,
             worker_name=worker.get("name") if worker else None,
             worker_phone=worker.get("phone") if worker else None,
-            eta=worker.get("eta") if worker else None,
+            eta=_norm_eta_peking(worker.get("eta")) if worker else None,
             cancel_reason=cancel_reason if status == "cancelled" else None,
+            vendor_id=vendor_id,
         )
         _respond_json(handler, {"code": 0, "message": "success"})
     except Exception as e:
@@ -231,6 +269,28 @@ def _vendor_categories_list(handler, body, vendor_id):
     return True
 
 
+def _vendor_cities_list(handler, body, vendor_id):
+    """城市列表：仅返回本商家 city_ids 关联的城市（id + name + slug，按 city_ids 顺序）。"""
+    from jiazheng_db import vendor_city_ids
+
+    conn = _connect_db()
+    try:
+        ids = vendor_city_ids(conn, vendor_id)
+        cities = []
+        if ids:
+            marks = ",".join("?" for _ in ids)
+            rows = conn.execute(
+                f"SELECT id, name, slug FROM cities WHERE id IN ({marks})",
+                tuple(ids),
+            ).fetchall()
+            order = {cid: i for i, cid in enumerate(ids)}
+            cities = sorted([dict(r) for r in rows], key=lambda c: order.get(c["id"], 99))
+        _respond_json(handler, {"code": 0, "message": "success", "list": cities})
+    finally:
+        conn.close()
+    return True
+
+
 def _vendor_skus_list(handler, body, vendor_id):
     """SPU 列表（不分页）。返回 enabled=1 的平台标准品。"""
     conn = _connect_db()
@@ -248,12 +308,14 @@ def _vendor_skus_list(handler, body, vendor_id):
 
 def _vendor_products_list(handler, body, vendor_id):
     """产品列表（vendor_id 隔离）。
-    筛选: category（精确）/ status（精确）/ name（title 模糊）。
+    筛选: category（精确）/ status（精确）/ name（title 模糊）/ city_id（精确）。
+    每项附带城市名 city_name。
     """
     conn = _connect_db()
     try:
-        sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type
+        sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type, c.name AS city_name
                  FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+                 LEFT JOIN cities c ON c.id=p.city_id
                  WHERE p.vendor_id=?"""
         params = [vendor_id]
 
@@ -266,6 +328,11 @@ def _vendor_products_list(handler, body, vendor_id):
         if status:
             sql += " AND p.status=?"
             params.append(status)
+
+        city_id = body.get("city_id")
+        if city_id not in (None, ""):
+            sql += " AND p.city_id=?"
+            params.append(int(city_id))
 
         name = (body.get("name") or "").strip()
         if name:
@@ -306,7 +373,9 @@ def _vendor_products_detail(handler, body, vendor_id):
     conn = _connect_db()
     try:
         row = conn.execute(
-            "SELECT * FROM jz_products WHERE id=? AND vendor_id=?",
+            """SELECT p.*, c.name AS city_name FROM jz_products p
+               LEFT JOIN cities c ON c.id=p.city_id
+               WHERE p.id=? AND p.vendor_id=?""",
             (int(pid), vendor_id),
         ).fetchone()
         if not row:
@@ -331,11 +400,15 @@ def _vendor_products_detail(handler, body, vendor_id):
 
 
 def _vendor_products_create(handler, body, vendor_id):
-    """创建产品。vendor_id 由鉴权提供，不可在 body 中覆写。"""
-    from jiazheng_db import create_product
+    """创建产品。vendor_id 由鉴权提供，不可在 body 中覆写；city_id 必填且须属于本商家。"""
+    from jiazheng_db import create_product, validate_product_city
 
     conn = _connect_db()
     try:
+        ok, err = validate_product_city(conn, vendor_id, body.get("city_id"))
+        if not ok:
+            _respond_json(handler, {"code": 400, "message": err}, 400)
+            return True
         data = dict(body)
         data["vendor_id"] = vendor_id  # 强制使用鉴权所得的 vendor_id
         pid = create_product(conn, data)
@@ -355,7 +428,7 @@ def _vendor_products_update(handler, body, vendor_id):
         _respond_json(handler, {"code": 400, "message": "缺少 id 参数"}, 400)
         return True
 
-    from jiazheng_db import update_product
+    from jiazheng_db import update_product, validate_product_city
 
     conn = _connect_db()
     try:
@@ -366,6 +439,12 @@ def _vendor_products_update(handler, body, vendor_id):
         if not row:
             _respond_json(handler, {"code": 404, "message": "产品不存在或不属于该商家"}, 404)
             return True
+
+        if body.get("city_id") is not None:
+            ok, err = validate_product_city(conn, vendor_id, body.get("city_id"))
+            if not ok:
+                _respond_json(handler, {"code": 400, "message": err}, 400)
+                return True
 
         data = dict(body)
         data.pop("vendor_id", None)
@@ -494,7 +573,16 @@ def handle_wechat_link(handler, body):
 
         url_link = _call_gen_url_link(api_url, path=path, query=query, order_ref=order_ref)
 
-        create_order(conn, order_ref, str(product_id))
+        # 下单用户 id（C 端模拟，后期接真实登录）
+        user_id = (body.get("user_id") or "").strip() or None
+
+        create_order(
+            conn,
+            order_ref,
+            str(product_id),
+            vendor_id=product.get("vendor_id"),
+            user_id=user_id,
+        )
 
         _respond_json(handler, {
             "ok": True,
@@ -527,14 +615,158 @@ def _call_gen_url_link(api_url, *, path, query, order_ref):
         "order_ref": order_ref,
     }).encode("utf-8")
 
+    _log(f"    [平台→商家] {_log_ts()} POST {api_url}", force=True)
+    _log(f"      >> 参数: {payload.decode('utf-8')}")
     req = urllib.request.Request(api_url, data=payload, headers={
         "Content-Type": "application/json",
     })
-
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=10, context=_vendor_ssl_context()) as resp:
+            raw = resp.read()
+        text = raw.decode("utf-8", "replace")
+        result = json.loads(text)
+    except Exception as e:
+        _log(f"      ! {type(e).__name__}: {e}")
+        if hasattr(e, "read"):  # HTTPError：附带商家返回的错误响应体
+            try:
+                _log(f"      << 返回(错误): {_clip(e.read().decode('utf-8', 'replace'))}")
+            except Exception:
+                pass
+        raise
+    _log(f"      << 返回: {_clip(text)}")
 
     if result.get("code") != 200:
         raise RuntimeError(result.get("msg") or "URL Link 生成失败")
 
     return result.get("data") or ""
+
+
+# ── 外部调用日志（print 到 stdout，随 server.py 主日志落盘） ──
+
+def _log(line, force=False):
+    """force=True 的行在简洁模式下也打印（出站请求的接口 URI 行）。"""
+    if force or _log_detail():
+        print(line, flush=True)
+
+
+def _log_ts():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_detail():
+    """详细日志开关：JUZHU_LOG_DETAIL=false/0/off 时出站调用只打印请求 URL 一行。"""
+    return os.environ.get("JUZHU_LOG_DETAIL", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _clip(text, limit=2000):
+    """日志打印截断：超长截断并标注总长度；换行转义为单行。"""
+    text = text.replace("\n", "\\n")
+    if len(text) > limit:
+        return text[:limit] + f"…[截断，共 {len(text)} 字符]"
+    return text
+
+
+# ═══════════════════════════════════════════════════════════════
+#  我的订单（GR 侧，C 端匿名可读；user_id 必填）
+# ═══════════════════════════════════════════════════════════════
+
+def handle_gr_orders(handler, qs):
+    """GET /api/juzhu/gr/orders?user_id=xxx —— 聚合返回 counts + list（过滤 pending）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    try:
+        limit = int((qs.get("limit") or ["50"])[0])
+    except ValueError:
+        limit = 50
+    conn = _connect_db()
+    try:
+        from gr_orders import list_user_orders
+
+        data = list_user_orders(conn, user_id, limit)
+        _respond_json(handler, {"ok": True, **data})
+    finally:
+        conn.close()
+    return True
+
+
+def handle_gr_order_detail(handler, order_ref, qs):
+    """GET /api/juzhu/gr/orders/{order_ref}?user_id=xxx —— 单条详情（防串单）。"""
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    conn = _connect_db()
+    try:
+        from gr_orders import get_user_order
+
+        order = get_user_order(conn, order_ref, user_id)
+        if not order:
+            _respond_json(handler, {"ok": False, "error": "订单不存在"}, 404)
+        else:
+            _respond_json(handler, {"ok": True, "order": order})
+    finally:
+        conn.close()
+    return True
+
+
+def handle_gr_vendor_detail(handler, order_ref, qs):
+    """GET /api/juzhu/gr/orders/{order_ref}/vendor-detail?user_id=xxx
+
+    中转查询商家订单详情：先校验订单归属 user，再经本后台调用商家订单详情接口
+    （order_detail_url 来自 hmac_secret.key 第 4 列），返回清洗后的详情
+    （eta 统一北京时间无时区）。商家未配置/调用失败统一返回 ok:false，
+    前端保持本地数据展示，不打扰用户。
+    """
+    user_id = (qs.get("user_id") or [""])[0].strip()
+    if not user_id:
+        _respond_json(handler, {"ok": False, "error": "缺少 user_id 参数"}, 400)
+        return True
+    conn = _connect_db()
+    try:
+        from gr_orders import get_user_order
+
+        order = get_user_order(conn, order_ref, user_id)
+        if not order:
+            _respond_json(handler, {"ok": False, "error": "订单不存在"}, 404)
+            return True
+        vendor_id = order.get("vendor_id")
+        if not vendor_id:
+            _respond_json(handler, {"ok": False, "error": "订单未关联商家"})
+            return True
+        detail_url = _load_vendor_config().get(str(vendor_id), {}).get("order_detail_url") or ""
+        if not detail_url:
+            _respond_json(handler, {"ok": False, "error": "商家未配置订单详情接口"})
+            return True
+        url = detail_url + ("&" if "?" in detail_url else "?") + "order_ref=" + urllib.parse.quote(order_ref)
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        _log(f"    [平台→商家] {_log_ts()} GET {url}", force=True)
+        try:
+            with urllib.request.urlopen(req, timeout=5, context=_vendor_ssl_context()) as resp:
+                raw = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            _log(f"      ! {type(e).__name__}: {e}")
+            _respond_json(handler, {"ok": False, "error": "商家订单详情接口调用失败"})
+            return True
+        _log(f"      << 返回: {_clip(json.dumps(raw, ensure_ascii=False))}")
+        if raw.get("code") != 200 or not raw.get("data"):
+            _respond_json(handler, {"ok": False, "error": "商家未返回订单详情"})
+            return True
+        data = raw["data"]
+        worker = data.get("worker")
+        if worker and worker.get("eta"):
+            worker["eta"] = _norm_eta_peking(worker["eta"])
+        _respond_json(handler, {
+            "ok": True,
+            "detail": {
+                "vendor_oid": data.get("lailai_oid"),
+                "status": data.get("status"),
+                "fee": data.get("fee"),
+                "worker": worker,
+                "cancel_reason": data.get("cancel_reason"),
+            },
+        })
+    finally:
+        conn.close()
+    return True
