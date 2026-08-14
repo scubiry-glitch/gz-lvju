@@ -7,6 +7,9 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then
+  # 清除平台可能预设的 MySQL 变量，确保 .env 的值生效
+  unset MYSQL_HOST MYSQL_PORT MYSQL_DB MYSQL_USER MYSQL_PASSWORD
+  unset JUZHU_API_KEY JUZHU_ADMIN_PASSWORD JUZHU_ENV
   set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
