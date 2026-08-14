@@ -7,7 +7,6 @@ db.sqlite
 publish_test.sh
 # 裸 .env 不入库；.env.prod / .env.test 等按环境文件可跟踪
 .env
-runtime.env
 juzhu/config.ini
 juzhu/_mysql_dump.json
 juzhu/mysql_dump.json
