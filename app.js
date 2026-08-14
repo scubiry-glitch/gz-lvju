@@ -33,16 +33,20 @@ let loadVendorConfig = null;
 try { loadVendorConfig = require('./vendor_config.cjs').loadVendorConfig; } catch (_) {}
 
 function getDbConfig() {
-  const host = (process.env.MYSQL_HOST || '').trim();
-  const database = (process.env.MYSQL_DB || '').trim();
-  const user = (process.env.MYSQL_USER || '').trim();
-  const password = process.env.MYSQL_PASSWORD;
+  // Node 优先 MYSQL_*；兼容 Python 侧 JUZHU_DB_*（同一 .env 可双端共用）
+  const host = (process.env.MYSQL_HOST || process.env.JUZHU_DB_HOST || '').trim();
+  const database = (process.env.MYSQL_DB || process.env.JUZHU_DB_NAME || '').trim();
+  const user = (process.env.MYSQL_USER || process.env.JUZHU_DB_USER || '').trim();
+  const password = process.env.MYSQL_PASSWORD != null && process.env.MYSQL_PASSWORD !== ''
+    ? process.env.MYSQL_PASSWORD
+    : process.env.JUZHU_DB_PASSWORD;
+  const port = parseInt(process.env.MYSQL_PORT || process.env.JUZHU_DB_PORT || '3306', 10);
   if (!host || !database || !user || password == null || password === '') {
-    throw new Error('MySQL env incomplete: set MYSQL_HOST/MYSQL_PORT/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD');
+    throw new Error('MySQL env incomplete: set MYSQL_HOST/MYSQL_PORT/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD (or JUZHU_DB_*)');
   }
   return {
     host,
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+    port,
     database,
     user,
     password,
