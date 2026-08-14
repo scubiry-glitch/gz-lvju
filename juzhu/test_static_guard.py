@@ -34,6 +34,8 @@ def main():
         "/app.js",
         "/scf_bootstrap",
         "/moma_deploy.js",
+        "/migrate_to_mysql.cjs",
+        "/vendor_api.cjs",
         "/scripts/tp_bundling_alloc.py",
         "/node_modules/mysql2/package.json",
     ):

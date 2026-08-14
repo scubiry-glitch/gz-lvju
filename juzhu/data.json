@@ -1897,7 +1897,7 @@
         "好房子4星"
       ],
       "sort_order": 1,
-      "cover_image": null,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -1933,7 +1933,7 @@
         "好房子4星"
       ],
       "sort_order": 2,
-      "cover_image": null,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -7186,6 +7186,78 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/逸居锦城/139平/ed0e7fcfcea0b13c8f70433ab6fda8dd.jpg",
       "is_cover": 0,
       "sort_order": 4
+    },
+    {
+      "id": 338,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 339,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 340,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 341,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
+    },
+    {
+      "id": 342,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 343,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 344,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 345,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
     }
   ]
 }

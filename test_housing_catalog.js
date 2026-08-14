@@ -109,6 +109,82 @@ function testFilterPending() {
   console.log('[PASS] testFilterPending');
 }
 
+function testCallbackValidate() {
+  assert.strictEqual(gr.validateCallbackBody({ order_ref: 'GR1', vendor_oid: 'V1', status: 'paid', fee: 1 }).ok, true);
+  assert.strictEqual(gr.validateCallbackBody({ order_ref: 'GR1', vendor_oid: 'V1', status: 'paid' }).ok, false);
+  console.log('[PASS] testCallbackValidate');
+}
+
+function testCityWriteValidate() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.validateCityWrite({}), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({ name: '  ' }), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  const created = cities.validateCityWrite({ name: '合肥（试点）' });
+  assert.strictEqual(created.ok, true);
+  assert.deepStrictEqual(created.fields, { name: '合肥（试点）', slug: '合肥' });
+  const withSlug = cities.validateCityWrite({
+    name: '合肥', slug: ' hefei ', booking_phone: ' 0551-1 ', hero_bg_image: ' a.jpg ',
+  });
+  assert.deepStrictEqual(withSlug.fields, {
+    name: '合肥', slug: 'hefei', booking_phone: '0551-1', hero_bg_image: 'a.jpg',
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({}, { partial: true }), {
+    ok: false, error: '无更新字段', status: 400,
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({ name: '' }, { partial: true }), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  console.log('[PASS] testCityWriteValidate');
+}
+
+function testCityDeleteGuard() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 1, districtCount: 0, projectCount: 0 }), {
+    ok: false, error: '至少保留一座城市', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 3, projectCount: 0 }), {
+    ok: false, error: '该城市仍有 3 个行政区，无法删除', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 0, projectCount: 5 }), {
+    ok: false, error: '该城市仍有 5 个项目，无法删除', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 0, projectCount: 0 }), { ok: true });
+  console.log('[PASS] testCityDeleteGuard');
+}
+
+function testPickCity() {
+  const cities = require('./housing_cities.cjs');
+  const list = [
+    { id: 1, name: '沈阳', slug: 'shenyang' },
+    { id: 2, name: '南京', slug: 'nanjing' },
+  ];
+  assert.strictEqual(cities.pickCity([], 'nanjing'), null);
+  assert.strictEqual(cities.pickCity(list, '').id, 1);
+  assert.strictEqual(cities.pickCity(list, 'nanjing').id, 2);
+  assert.strictEqual(cities.pickCity(list, '南京').id, 2);
+  assert.strictEqual(cities.pickCity(list, '2').id, 2);
+  assert.strictEqual(cities.pickCity(list, 'missing'), null);
+  console.log('[PASS] testPickCity');
+}
+
+function testDuplicateCityError() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.duplicateCityError('name'), {
+    ok: false, error: '城市名称已存在', status: 400,
+  });
+  assert.deepStrictEqual(cities.duplicateCityError('slug'), {
+    ok: false, error: 'slug 已存在', status: 400,
+  });
+  assert.strictEqual(cities.classifyDupKey({ code: 'ER_DUP_ENTRY', message: "Duplicate entry 'hefei' for key 'cities.uk_slug'" }), 'slug');
+  assert.strictEqual(cities.classifyDupKey({ code: 'ER_DUP_ENTRY', message: "Duplicate entry '合肥' for key 'cities.uk_name'" }), 'name');
+  assert.strictEqual(cities.classifyDupKey(new Error('DB 查询失败')), null);
+  console.log('[PASS] testDuplicateCityError');
+}
+
 function run() {
   testLoadSnapshots();
   testEncJsonFields();
@@ -119,6 +195,11 @@ function run() {
   testNormEta();
   testVendorConfigParse();
   testFilterPending();
+  testCallbackValidate();
+  testCityWriteValidate();
+  testCityDeleteGuard();
+  testPickCity();
+  testDuplicateCityError();
   console.log('all passed');
 }
 
