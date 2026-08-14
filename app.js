@@ -57,6 +57,8 @@ try {
   housingBackfillPhotos = housingSeed.backfillPhotos;
   housingParseJsonField = housingSeed.parseJsonField;
 } catch (_) {}
+let housingCities = null;
+try { housingCities = require('./housing_cities.cjs'); } catch (_) {}
 let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfig = null;
@@ -826,10 +828,9 @@ function slugify(name) {
 }
 
 function cityDupReply(res, err) {
-  const kind = housingCities ? housingCities.classifyDupKey(err) : 'dup';
-  const d = housingCities
-    ? housingCities.duplicateCityError(kind)
-    : { error: '城市已存在', status: 400 };
+  const kind = housingCities ? housingCities.classifyDupKey(err) : null;
+  if (!kind) return jsonReply(res, { error: 'DB 查询失败: ' + (err && err.message ? err.message : err) }, 500);
+  const d = housingCities.duplicateCityError(kind);
   return jsonReply(res, { error: d.error }, d.status);
 }
 
@@ -845,6 +846,27 @@ async function resolveBodyCityId(conn, body, emptyMsg) {
   const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
   if (!rows.length) return { error: emptyMsg || '请先配置城市', status: 400 };
   return { cityId: rows[0].id };
+}
+
+async function insertCityRow(conn, fields) {
+  const cols = Object.keys(fields);
+  await conn.execute(
+    `INSERT INTO cities(${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+    cols.map((k) => fields[k])
+  );
+  const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+  const [rows] = await conn.execute('SELECT * FROM cities WHERE id=?', [r[0].id]);
+  return rows[0];
+}
+
+async function updateCityRow(conn, cid, fields) {
+  const cols = Object.keys(fields);
+  await conn.execute(
+    `UPDATE cities SET ${cols.map((k) => `${k}=?`).join(', ')} WHERE id=?`,
+    cols.map((k) => fields[k]).concat(cid)
+  );
+  const [rows] = await conn.execute('SELECT * FROM cities WHERE id=?', [cid]);
+  return rows[0];
 }
 
 // 确保项目 slug 唯一
@@ -948,19 +970,34 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // ===== GET 只读接口 =====
 
     if (urlPath === '/api/juzhu/admin/dictionary' && req.method === 'GET') {
-      const cities = await queryRows('SELECT * FROM cities ORDER BY id LIMIT 1');
-      const districts = await queryRows('SELECT * FROM districts ORDER BY sort_order, id');
+      const qp = new URLSearchParams(qs);
+      const allCities = await queryRows('SELECT * FROM cities ORDER BY id');
+      const city = housingCities
+        ? housingCities.pickCity(allCities, qp.get('city'))
+        : (allCities[0] || null);
+      const districts = city
+        ? await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id])
+        : [];
       const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
-      return jsonReply(res, { city: cities[0] || null, districts, channels });
+      return jsonReply(res, { city, cities: allCities, districts, channels });
+    }
+
+    if (urlPath === '/api/juzhu/admin/cities' && req.method === 'GET') {
+      const rows = await queryRows('SELECT * FROM cities ORDER BY id');
+      return jsonReply(res, rows);
     }
 
     if ((urlPath === '/api/juzhu/admin/settings' || urlPath === '/api/juzhu/settings') && req.method === 'GET') {
-      const cities = await queryRows('SELECT booking_phone FROM cities ORDER BY id LIMIT 1');
+      const qp = new URLSearchParams(qs);
+      const allCities = await queryRows('SELECT id, booking_phone, slug, name FROM cities ORDER BY id');
+      const city = housingCities
+        ? housingCities.pickCity(allCities, qp.get('city') || qp.get('city_id'))
+        : (allCities[0] || null);
       const settings = await queryRows('SELECT `key`, value FROM settings');
       const settingsMap = {};
       for (const r of settings) settingsMap[r.key] = r.value;
       return jsonReply(res, {
-        booking_phone: cities[0] ? cities[0].booking_phone : null,
+        booking_phone: city ? city.booking_phone : null,
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
       });
@@ -970,6 +1007,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const qp = new URLSearchParams(qs);
       let sql = 'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE 1=1';
       const params = [];
+      if (qp.get('city_id')) { sql += ' AND p.city_id=?'; params.push(parseInt(qp.get('city_id'))); }
       if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
       if (qp.get('district_id')) { sql += ' AND p.district_id=?'; params.push(parseInt(qp.get('district_id'))); }
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
@@ -1028,10 +1066,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       try {
         if (body.booking_phone !== undefined) {
           const phone = (body.booking_phone || '').trim() || null;
-          await conn.execute(
-            'UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM (SELECT id FROM cities ORDER BY id LIMIT 1) t)',
-            [phone]
-          );
+          const resolved = await resolveBodyCityId(conn, body);
+          if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+          await conn.execute('UPDATE cities SET booking_phone=? WHERE id=?', [phone, resolved.cityId]);
         }
         for (const k of ['show_city_switcher', 'show_life_service']) {
           if (k in body) {
@@ -1043,41 +1080,111 @@ async function handleApiDirect(urlPath, qs, req, res) {
           }
         }
         await conn.commit();
-        return jsonReply(res, { ok: true });
+        const phoneOut = body.booking_phone !== undefined
+          ? ((body.booking_phone || '').trim() || null)
+          : undefined;
+        return jsonReply(res, { ok: true, booking_phone: phoneOut });
       } finally {
         await conn.end();
       }
     }
 
-    // PUT /admin/city
-    if (urlPath === '/api/juzhu/admin/city' && req.method === 'PUT') {
+    // GET 已在上方；POST /admin/cities
+    if (urlPath === '/api/juzhu/admin/cities' && req.method === 'POST') {
       const body = await readBody(req);
-      const name = (body.name || '').trim();
-      if (!name) return jsonReply(res, { error: '城市名称不能为空' }, 400);
-      const slug = (body.slug || '').trim() || slugify(name);
+      const parsed = housingCities
+        ? housingCities.validateCityWrite(body)
+        : { ok: !!(body.name || '').trim(), error: '城市名称不能为空', status: 400, fields: { name: (body.name || '').trim(), slug: (body.slug || '').trim() || slugify(body.name) } };
+      if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!rows.length) {
-          // 无城市则创建
-          await conn.execute(
-            'INSERT INTO cities(name, slug) VALUES (?, ?)',
-            [name, slug]
-          );
-        } else {
-          const cid = rows[0].id;
-          const fields = ['name=?', 'slug=?'];
-          const params = [name, slug];
-          if ('hero_bg_image' in body) {
-            fields.push('hero_bg_image=?');
-            params.push((body.hero_bg_image || '').trim() || null);
-          }
-          params.push(cid);
-          await conn.execute(`UPDATE cities SET ${fields.join(', ')} WHERE id=?`, params);
-        }
+        const city = await insertCityRow(conn, parsed.fields);
         await conn.commit();
-        const [cities] = await conn.execute('SELECT * FROM cities ORDER BY id LIMIT 1');
-        return jsonReply(res, { ok: true, city: cities[0] || null });
+        return jsonReply(res, { ok: true, city }, 201);
+      } catch (e) {
+        return cityDupReply(res, e);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/cities/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/cities\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const cid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const parsed = housingCities
+          ? housingCities.validateCityWrite(body, { partial: true })
+          : { ok: false, error: '无更新字段', status: 400 };
+        if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+          const city = await updateCityRow(conn, cid, parsed.fields);
+          await conn.commit();
+          return jsonReply(res, { ok: true, city });
+        } catch (e) {
+          return cityDupReply(res, e);
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/cities/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/cities\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const cid = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+          const [[cityCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM cities');
+          const [[distCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM districts WHERE city_id=?', [cid]);
+          const [[projCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM projects WHERE city_id=?', [cid]);
+          const guard = housingCities
+            ? housingCities.canDeleteCity({
+              cityCount: cityCnt.c, districtCount: distCnt.c, projectCount: projCnt.c,
+            })
+            : { ok: true };
+          if (!guard.ok) { conn.end(); return jsonReply(res, { error: guard.error }, guard.status); }
+          await conn.execute('DELETE FROM cities WHERE id=?', [cid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // PUT /admin/city（兼容旧前端：按 city_id 更新，缺省第一座；无城市则创建）
+    if (urlPath === '/api/juzhu/admin/city' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const parsed = housingCities
+        ? housingCities.validateCityWrite(body)
+        : { ok: !!(body.name || '').trim(), error: '城市名称不能为空', status: 400, fields: { name: (body.name || '').trim(), slug: (body.slug || '').trim() || slugify(body.name) } };
+      if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        let cid = null;
+        if (body.city_id != null && String(body.city_id).trim() !== '') {
+          cid = parseInt(body.city_id, 10);
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+        } else {
+          const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
+          cid = rows.length ? rows[0].id : null;
+        }
+        let city;
+        if (!cid) city = await insertCityRow(conn, parsed.fields);
+        else city = await updateCityRow(conn, cid, parsed.fields);
+        await conn.commit();
+        return jsonReply(res, { ok: true, city });
+      } catch (e) {
+        return cityDupReply(res, e);
       } finally {
         await conn.end();
       }
@@ -1121,9 +1228,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!name) return jsonReply(res, { error: '行政区名称不能为空' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [cities] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!cities.length) { conn.end(); return jsonReply(res, { error: '请先配置城市' }, 400); }
-        const cityId = cities[0].id;
+        const resolved = await resolveBodyCityId(conn, body);
+        if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+        const cityId = resolved.cityId;
         const slug = (body.slug || name).trim() || name;
         const [existing] = await conn.execute('SELECT id FROM districts WHERE city_id=? AND slug=?', [cityId, slug]);
         if (existing.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
@@ -1210,25 +1317,27 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!['bzf', 'trade'].includes(channel)) return jsonReply(res, { error: 'channel 须为 bzf 或 trade' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [cities] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!cities.length) { conn.end(); return jsonReply(res, { error: '未配置城市' }, 500); }
-        const cityId = cities[0].id;
+        const resolved = await resolveBodyCityId(conn, body, '未配置城市');
+        if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+        const cityId = resolved.cityId;
         let districtId = body.district_id || null;
         if (channel === 'bzf') {
           if (!districtId) { conn.end(); return jsonReply(res, { error: '保租房项目须选择行政区' }, 400); }
-          const [d] = await conn.execute('SELECT id FROM districts WHERE id=?', [districtId]);
-          if (!d.length) { conn.end(); return jsonReply(res, { error: '行政区不存在' }, 400); }
+          const [d] = await conn.execute('SELECT id FROM districts WHERE id=? AND city_id=?', [districtId, cityId]);
+          if (!d.length) { conn.end(); return jsonReply(res, { error: '行政区不存在或不属于当前城市' }, 400); }
         } else {
           districtId = null;
         }
         const slug = await uniqueProjectSlug(conn, channel, name, body.slug);
+        const [cityRows] = await conn.execute('SELECT name FROM cities WHERE id=?', [cityId]);
+        const cityName = cityRows.length ? cityRows[0].name : '';
         let address = body.address;
         if (!address) {
           if (districtId) {
             const [d] = await conn.execute('SELECT name FROM districts WHERE id=?', [districtId]);
-            address = d.length ? `${d[0].name} · ${name}` : `沈阳 · ${name}`;
+            address = d.length ? `${d[0].name} · ${name}` : `${cityName} · ${name}`;
           } else {
-            address = `沈阳 · ${name}`;
+            address = `${cityName} · ${name}`;
           }
         }
         await conn.execute(

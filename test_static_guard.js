@@ -28,6 +28,8 @@ function assertAllow(p) {
   '/app.js',
   '/scf_bootstrap',
   '/moma_deploy.js',
+  '/migrate_to_mysql.cjs',
+  '/vendor_api.cjs',
   '/node_modules/mysql2/index.js',
 ].forEach(assertBlock);
 
