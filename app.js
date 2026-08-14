@@ -4,9 +4,35 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PORT = process.env.PORT || 9000;
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
+
+/** 加载运行时 .env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。 */
+function loadDotEnv(filePath) {
+  const p = filePath || path.join(ROOT, '.env');
+  if (!fs.existsSync(p)) return false;
+  let text = '';
+  try { text = fs.readFileSync(p, 'utf8'); } catch (_) { return false; }
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) line = line.slice(7).trim();
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (Object.prototype.hasOwnProperty.call(process.env, key) && process.env[key] !== '') continue;
+    process.env[key] = val;
+  }
+  return true;
+}
+loadDotEnv();
+
+const PORT = process.env.PORT || 9000;
 
 const ADMIN_PREFIX = '/api/juzhu/admin';
 const API_KEY_ENV = 'JUZHU_API_KEY';
