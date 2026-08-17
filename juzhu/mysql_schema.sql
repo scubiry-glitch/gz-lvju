@@ -201,6 +201,9 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   hours VARCHAR(64),
   vendor_no VARCHAR(64),
   whitelist_id INT,
+  hmac_key TEXT,                          -- HMAC-SHA256 密钥（空 = 未接入）
+  url_link TEXT,                          -- 商家 URL Link 生成接口完整地址
+  order_detail_url TEXT,                  -- 商家订单详情查询接口完整地址
   status VARCHAR(16) DEFAULT 'active',
   sort_order INT DEFAULT 0,
   created_at TEXT,

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   hours TEXT,
   vendor_no TEXT,
   whitelist_id INTEGER,
+  hmac_key TEXT, url_link TEXT, order_detail_url TEXT,
   status TEXT DEFAULT 'active',
   sort_order INTEGER DEFAULT 0,
   created_at TEXT, updated_at TEXT
