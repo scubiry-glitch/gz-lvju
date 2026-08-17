@@ -27,6 +27,18 @@ def _rows_to_list(rows):
     return [_row_to_dict(r) for r in rows]
 
 
+VENDOR_SECRET_FIELDS = ("hmac_key", "url_link", "order_detail_url")
+
+
+def _strip_vendor_secrets(vendor):
+    """对外响应剥离商家密钥与接口地址（内部出站调用另从 jiazheng_api 缓存取）。"""
+    if not vendor:
+        return vendor
+    for f in VENDOR_SECRET_FIELDS:
+        vendor.pop(f, None)
+    return vendor
+
+
 # ====== Categories ======
 def list_categories(conn, parent_type=None, status="on"):
     if parent_type:
@@ -57,6 +69,7 @@ def list_vendors(conn, type_=None, status="active"):
     vendors = _rows_to_list(rows)
     # 为每个商家附加前 2 个 SKU
     for v in vendors:
+        _strip_vendor_secrets(v)
         v["products"] = list_products_by_vendor(conn, v["id"])[:2]
     return vendors
 
@@ -66,6 +79,7 @@ def get_vendor(conn, vendor_id):
     if not row:
         return None
     v = _row_to_dict(row)
+    _strip_vendor_secrets(v)
     # 关联产品
     v["products"] = list_products_by_vendor(conn, vendor_id)
     # 关联服务者
@@ -303,6 +317,7 @@ def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=
     if not row:
         return None
     vendor = _row_to_dict(row)
+    _strip_vendor_secrets(vendor)
     vendor["auth_badges"] = _vendor_auth_badges(vendor)
     # 优先取默认商品绑定的服务者（P2：SKU=SPU+服务者+时间）；无绑定回退到商家全员
     workers = list_product_workers(conn, product["id"])

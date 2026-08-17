@@ -53,10 +53,37 @@ def check_vendor_config_cache():
     print("[PASS] check_vendor_config_cache")
 
 
+def check_vendor_secrets_stripped():
+    import db as jdb
+    from jiazheng_db import list_vendors, get_vendor
+
+    conn = jdb.connect()
+    try:
+        for v in list_vendors(conn):
+            for secret in ("hmac_key", "url_link", "order_detail_url"):
+                assert secret not in v, f"list_vendors 泄露 {secret}: vendor {v.get('id')}"
+        v41 = get_vendor(conn, 41)
+        for secret in ("hmac_key", "url_link", "order_detail_url"):
+            assert secret not in v41, f"get_vendor 泄露 {secret}"
+        # C 端详情上下文里的 vendor 同样不得携带密钥
+        from jiazheng_db import get_detail_context_by_channel_sku
+
+        sku_row = conn.execute("SELECT channel_sku_id FROM jz_products WHERE status='on' LIMIT 1").fetchone()
+        if sku_row and sku_row[0]:
+            ctx = get_detail_context_by_channel_sku(conn, sku_row[0])
+            if ctx:
+                for secret in ("hmac_key", "url_link", "order_detail_url"):
+                    assert secret not in ctx["vendor"], f"详情上下文泄露 {secret}"
+    finally:
+        conn.close()
+    print("[PASS] check_vendor_secrets_stripped")
+
+
 def main():
     check_schema_files()
     check_db_migration()
     check_vendor_config_cache()
+    check_vendor_secrets_stripped()
 
 
 if __name__ == "__main__":
