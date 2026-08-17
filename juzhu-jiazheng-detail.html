@@ -595,7 +595,7 @@
     fetch('/api/juzhu/jiazheng/wechat-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_id: product.id })
+      body: JSON.stringify({ product_id: product.id, user_id: JZ.userId() })
     }).then(function(r){ return r.json(); })
       .then(function(res){
         overlay.classList.remove('on');
