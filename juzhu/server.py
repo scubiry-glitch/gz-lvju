@@ -78,7 +78,6 @@ _SENSITIVE_NAMES = {
     "server.log",
     "api_doc.md",
     "api-document.html",
-    "hmac_secret.key",
     "package.json",
     "package-lock.json",
     "yarn.lock",
