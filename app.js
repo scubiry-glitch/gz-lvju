@@ -1,40 +1,91 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PORT = process.env.PORT || 9000;
-// Python server.py 由 scf_bootstrap 启动，监听 8765
-const PYTHON_PORT = process.env.PYTHON_PORT || 8765;
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
+
+/** 加载运行时 .env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。 */
+function loadDotEnv(filePath) {
+  const p = filePath || path.join(ROOT, '.env');
+  if (!fs.existsSync(p)) return false;
+  let text = '';
+  try { text = fs.readFileSync(p, 'utf8'); } catch (_) { return false; }
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) line = line.slice(7).trim();
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (Object.prototype.hasOwnProperty.call(process.env, key) && process.env[key] !== '') continue;
+    process.env[key] = val;
+  }
+  return true;
+}
+loadDotEnv();
+
+const PORT = process.env.PORT || 9000;
 
 const ADMIN_PREFIX = '/api/juzhu/admin';
 const API_KEY_ENV = 'JUZHU_API_KEY';
 /** 历史开发默认值：任何环境均不得再当作有效密钥（文档泄露即等于未授权） */
 const DEV_EXAMPLE_API_KEY = 'dev-juzhu-key';
 const FORBIDDEN_API_KEY = DEV_EXAMPLE_API_KEY;
+/** 非生产可用的后台登录默认口令；生产必须显式配置且不得用此值 */
+const DEV_DEFAULT_ADMIN_PASSWORD = 'dongbo2026';
 
 // MySQL 连接配置（fallback 直连，仅当 Python 服务不可用时使用）
 // 禁止在源码中写死账号密码；必须由运行时环境 / .env（仅进程内，不对外 HTTP）注入。
 let mysql2 = null;
 try { mysql2 = require('mysql2/promise'); } catch (_) {}
+let jzSeedAll = null;
+try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
+let housingSeedAll = null;
+let housingBackfillPhotos = null;
+let housingParseJsonField = null;
+try {
+  const housingSeed = require('./housing_seed.cjs');
+  housingSeedAll = housingSeed.seedAll;
+  housingBackfillPhotos = housingSeed.backfillPhotos;
+  housingParseJsonField = housingSeed.parseJsonField;
+} catch (_) {}
+let grOrders = null;
+try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
+let loadVendorConfig = null;
+try { loadVendorConfig = require('./vendor_config.cjs').loadVendorConfig; } catch (_) {}
+let juzhuImportAll = null;
+try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
+let vendorApi = null;
+try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
 
 function getDbConfig() {
-  const host = (process.env.MYSQL_HOST || '').trim();
-  const database = (process.env.MYSQL_DB || '').trim();
-  const user = (process.env.MYSQL_USER || '').trim();
-  const password = process.env.MYSQL_PASSWORD;
+  // Node 优先 MYSQL_*；兼容 Python 侧 JUZHU_DB_*（同一 .env 可双端共用）
+  const host = (process.env.MYSQL_HOST || process.env.JUZHU_DB_HOST || '').trim();
+  const database = (process.env.MYSQL_DB || process.env.JUZHU_DB_NAME || '').trim();
+  const user = (process.env.MYSQL_USER || process.env.JUZHU_DB_USER || '').trim();
+  const password = process.env.MYSQL_PASSWORD != null && process.env.MYSQL_PASSWORD !== ''
+    ? process.env.MYSQL_PASSWORD
+    : process.env.JUZHU_DB_PASSWORD;
+  const port = parseInt(process.env.MYSQL_PORT || process.env.JUZHU_DB_PORT || '3306', 10);
   if (!host || !database || !user || password == null || password === '') {
-    throw new Error('MySQL env incomplete: set MYSQL_HOST/MYSQL_PORT/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD');
+    throw new Error('MySQL env incomplete: set MYSQL_HOST/MYSQL_PORT/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD (or JUZHU_DB_*)');
   }
   return {
     host,
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+    port,
     database,
     user,
     password,
     charset: 'utf8mb4',
+    collation: 'utf8mb4_general_ci',
     connectTimeout: 8000,
   };
 }
@@ -51,7 +102,7 @@ const SENSITIVE_NAMES = new Set([
 const SENSITIVE_SUFFIXES = [
   '.py', '.pyc', '.pyo', '.db', '.sqlite', '.sqlite3', '.sql',
   '.ini', '.log', '.key', '.pem', '.crt', '.p12', '.pfx',
-  '.env', '.sh', '.md',
+  '.env', '.sh', '.md', '.cjs',
 ];
 const ROOT_BLOCKED_FILES = new Set([
   'app.js', 'server.js', 'package.json', 'package-lock.json',
@@ -107,6 +158,15 @@ function expectedApiKey() {
   return key;
 }
 
+function expectedAdminPassword() {
+  const pwd = (process.env.JUZHU_ADMIN_PASSWORD || '').trim();
+  if (isProduction()) {
+    if (!pwd || pwd === DEV_DEFAULT_ADMIN_PASSWORD) return '';
+    return pwd;
+  }
+  return pwd || DEV_DEFAULT_ADMIN_PASSWORD;
+}
+
 function providedApiKey(req) {
   const auth = String((req && req.headers && req.headers.authorization) || '').trim();
   if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
@@ -118,6 +178,30 @@ function apiKeyMatches(provided, expected) {
   const a = crypto.createHash('sha256').update(provided, 'utf8').digest();
   const b = crypto.createHash('sha256').update(expected, 'utf8').digest();
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function extractBearerToken(req) {
+  const auth = String((req && req.headers && req.headers.authorization) || '').trim();
+  if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
+  return '';
+}
+
+function verifyAdminLoginToken(token) {
+  const expected = expectedAdminPassword();
+  if (!token || !expected || token.indexOf('.') < 0) return false;
+  const [expStr, sig] = token.split('.');
+  const exp = parseInt(expStr, 10);
+  if (!exp || Date.now() / 1000 > exp) return false;
+  const expectedSig = crypto.createHmac('sha256', expected).update(String(exp)).digest('hex');
+  const sigBuf = Buffer.from(sig || '', 'hex');
+  const expBuf = Buffer.from(expectedSig, 'hex');
+  if (sigBuf.length !== expBuf.length) return false;
+  return crypto.timingSafeEqual(sigBuf, expBuf);
+}
+
+function isAdminSessionAuthorized(req) {
+  if (apiKeyMatches(providedApiKey(req), expectedApiKey())) return true;
+  return verifyAdminLoginToken(extractBearerToken(req));
 }
 
 function requireApiKey(req, res) {
@@ -142,7 +226,12 @@ function assertAdminAuthorized(urlPath, req, res) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (!p.startsWith(ADMIN_PREFIX)) return true;
   if (isAdminAuthExempt(p, req.method)) return true;
-  return requireApiKey(req, res);
+  if (isAdminSessionAuthorized(req)) return true;
+  jsonReply(res, {
+    error: 'unauthorized',
+    message: '请先登录，或通过 X-API-Key / Authorization Bearer 传入有效 API Key',
+  }, 401);
+  return false;
 }
 
 module.exports.isPublicStatic = isPublicStatic;
@@ -151,8 +240,10 @@ module.exports.expectedApiKey = expectedApiKey;
 module.exports.providedApiKey = providedApiKey;
 module.exports.requireApiKey = requireApiKey;
 module.exports.assertAdminAuthorized = assertAdminAuthorized;
+module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
 module.exports.DEV_EXAMPLE_API_KEY = DEV_EXAMPLE_API_KEY;
+module.exports.getDbConfig = getDbConfig;
 
 async function queryRows(sql, params) {
   if (!mysql2) throw new Error('mysql2 not available');
@@ -165,9 +256,131 @@ async function queryRows(sql, params) {
   }
 }
 
+/** city_ids 里可能是数字 id（1,2,3）或城市名；C 端常传「沈阳」 */
+async function cityMatchTokens(cityKey) {
+  const key = String(cityKey || '').trim();
+  if (!key) return [];
+  const rows = await queryRows(
+    'SELECT id, name, slug FROM cities WHERE slug=? OR name=? OR CAST(id AS CHAR)=? LIMIT 1',
+    [key, key, key]
+  );
+  const out = [key];
+  if (rows.length) out.push(String(rows[0].id), rows[0].name, rows[0].slug);
+  return [...new Set(out.filter(Boolean))];
+}
+
+function cityIdsClause(alias, tokens) {
+  const col = `REPLACE(${alias}.city_ids, ' ', '')`;
+  const finds = tokens.map(() => `FIND_IN_SET(?, ${col})`).join(' OR ');
+  return `(${alias}.city_ids IS NULL OR ${alias}.city_ids='' OR ${finds})`;
+}
+
 async function execSql(conn, sql, params) {
   const [result] = await conn.execute(sql, params || []);
   return result;
+}
+
+async function ensureGrOrdersShape(conn) {
+  let cols = [];
+  try {
+    const [rows] = await conn.execute('SHOW COLUMNS FROM gr_orders');
+    cols = rows.map((r) => r.Field);
+  } catch (_) {
+    return;
+  }
+  if (!cols.includes('order_ref')) {
+    await conn.execute('DROP TABLE gr_orders');
+    await conn.execute(`CREATE TABLE gr_orders (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_ref VARCHAR(64) NOT NULL,
+      vendor_id INT,
+      vendor_oid VARCHAR(64),
+      user_id VARCHAR(64),
+      sku VARCHAR(128),
+      city VARCHAR(32) DEFAULT '沈阳',
+      status VARCHAR(20) DEFAULT 'pending',
+      fee INT,
+      worker_name VARCHAR(128),
+      worker_phone VARCHAR(32),
+      eta VARCHAR(32),
+      cancel_reason TEXT,
+      paid_at VARCHAR(32),
+      serving_at VARCHAR(32),
+      completed_at VARCHAR(32),
+      created_at VARCHAR(32) NOT NULL,
+      updated_at VARCHAR(32),
+      UNIQUE KEY uk_order_ref (order_ref),
+      KEY idx_gr_orders_vendor (vendor_id),
+      KEY idx_gr_orders_user (user_id)
+    ) CHARSET=utf8mb4`);
+    return;
+  }
+  const extra = [
+    ['user_id', 'VARCHAR(64)'],
+    ['vendor_id', 'INT'],
+    ['vendor_oid', 'VARCHAR(64)'],
+    ['sku', 'VARCHAR(128)'],
+    ['city', "VARCHAR(32) DEFAULT '沈阳'"],
+    ['fee', 'INT'],
+    ['worker_name', 'VARCHAR(128)'],
+    ['worker_phone', 'VARCHAR(32)'],
+    ['eta', 'VARCHAR(32)'],
+    ['cancel_reason', 'TEXT'],
+    ['paid_at', 'VARCHAR(32)'],
+    ['serving_at', 'VARCHAR(32)'],
+    ['completed_at', 'VARCHAR(32)'],
+  ];
+  for (const [name, ddl] of extra) {
+    if (!cols.includes(name)) {
+      try { await conn.execute(`ALTER TABLE gr_orders ADD COLUMN ${name} ${ddl}`); } catch (_) { /* ignore */ }
+    }
+  }
+}
+
+function outboundJson(method, urlStr, body, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(urlStr); } catch (e) { reject(e); return; }
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const payload = body != null ? JSON.stringify(body) : undefined;
+    const req = lib.request({
+      protocol: parsed.protocol,
+      hostname: parsed.hostname,
+      port: parsed.port || undefined,
+      path: parsed.pathname + parsed.search,
+      method,
+      headers: {
+        Accept: 'application/json',
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        try { resolve({ status: res.statusCode, json: JSON.parse(text), text }); }
+        catch (_) { resolve({ status: res.statusCode, json: null, text }); }
+      });
+    });
+    req.setTimeout(timeoutMs || 10000, () => { req.destroy(new Error('timeout')); });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+// 将行中指定字段从 JSON 字符串反序列化为数组/对象，缺失或无效时返回默认值
+function parseJsonFields(row, fields, defaultVal) {
+  if (!row) return row;
+  for (const f of fields) {
+    if (row[f] != null && typeof row[f] === 'string') {
+      try { row[f] = JSON.parse(row[f]); }
+      catch (e) { row[f] = defaultVal !== undefined ? defaultVal : []; }
+    } else if (row[f] == null) {
+      row[f] = defaultVal !== undefined ? defaultVal : [];
+    }
+  }
+  return row;
 }
 
 // 确保 MySQL 中存在必要的表（MySQL 语法，CREATE TABLE IF NOT EXISTS）
@@ -270,9 +483,209 @@ async function ensureSchema() {
         sort_order INT NOT NULL DEFAULT 0,
         KEY idx_entity (entity_type, entity_id)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_categories (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        icon VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        note TEXT
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_skus (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        category_id VARCHAR(50) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        slug VARCHAR(200) NOT NULL UNIQUE,
+        spec TEXT,
+        price_from INT,
+        price_unit VARCHAR(50),
+        duration_min INT,
+        tags TEXT,
+        badges TEXT,
+        sales_text VARCHAR(200),
+        rating_score DECIMAL(3,2),
+        worker_min_level VARCHAR(20),
+        cover_image VARCHAR(500),
+        gallery TEXT,
+        includes TEXT,
+        service_flow TEXT,
+        service_notice TEXT,
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_vendors (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type VARCHAR(50) NOT NULL,
+        name VARCHAR(200) NOT NULL,
+        logo VARCHAR(500),
+        address TEXT,
+        district_id INT,
+        city_ids TEXT,
+        phone VARCHAR(50),
+        rating DECIMAL(3,2) DEFAULT 0,
+        review_count INT DEFAULT 0,
+        rank_type VARCHAR(50),
+        rank_label VARCHAR(100),
+        badges TEXT,
+        live TINYINT DEFAULT 0,
+        start_price DECIMAL(10,2),
+        unit VARCHAR(50),
+        fulfillment VARCHAR(50) DEFAULT 'to_home',
+        hours VARCHAR(200),
+        vendor_no VARCHAR(100),
+        whitelist_id INT,
+        status VARCHAR(20) DEFAULT 'active',
+        sort_order INT DEFAULT 0,
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_products (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id INT NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        subtitle VARCHAR(200),
+        category VARCHAR(50),
+        duration_hours DECIMAL(4,1),
+        area_range VARCHAR(100),
+        unit VARCHAR(50),
+        price DECIMAL(10,2) NOT NULL,
+        original_price DECIMAL(10,2),
+        discount_label VARCHAR(100),
+        earliest_time VARCHAR(100),
+        advance_booking_hours INT DEFAULT 0,
+        sales_count INT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        service_tags TEXT,
+        channel_sku_id INT,
+        city_id INT,
+        path VARCHAR(500),
+        query VARCHAR(500),
+        status VARCHAR(20) DEFAULT 'on',
+        sort_order INT DEFAULT 0
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_workers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        avatar VARCHAR(500),
+        level VARCHAR(20) DEFAULT 'L3',
+        credit_score INT DEFAULT 70,
+        tags TEXT,
+        certs TEXT,
+        is_whitelisted TINYINT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        completed_orders INT DEFAULT 0,
+        years_experience INT DEFAULT 0,
+        online TINYINT DEFAULT 0,
+        distance_km DECIMAL(6,2),
+        vendor_id INT,
+        whitelist_id INT,
+        status VARCHAR(20) DEFAULT 'active'
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_orders (
+        id VARCHAR(50) PRIMARY KEY,
+        sku_id INT,
+        category_id VARCHAR(50) NOT NULL,
+        type VARCHAR(50) NOT NULL,
+        house TEXT NOT NULL,
+        phone VARCHAR(50) NOT NULL,
+        expect_time VARCHAR(100) NOT NULL,
+        \`desc\` TEXT,
+        fee INT NOT NULL,
+        pay_status VARCHAR(20) NOT NULL DEFAULT 'unpaid',
+        pay_method VARCHAR(50),
+        pay_at VARCHAR(30),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        slot_id INT,
+        worker_json TEXT,
+        rating_json TEXT,
+        source VARCHAR(100),
+        created_at VARCHAR(30) NOT NULL,
+        updated_at VARCHAR(30) NOT NULL,
+        log_json TEXT
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_sku_slots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        slot_date VARCHAR(20) NOT NULL,
+        start_time VARCHAR(20) NOT NULL,
+        end_time VARCHAR(20),
+        capacity INT NOT NULL DEFAULT 1,
+        booked INT NOT NULL DEFAULT 0,
+        worker_id INT,
+        status VARCHAR(20) NOT NULL DEFAULT 'open',
+        note TEXT,
+        KEY idx_product_date (product_id, slot_date, status)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_subcategories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        parent_type VARCHAR(50) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        icon VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL DEFAULT 'on',
+        KEY idx_parent (parent_type, sort_order)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_sku_workers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        product_id INT NOT NULL,
+        worker_id INT NOT NULL,
+        UNIQUE KEY uk_prod_worker (product_id, worker_id)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS jz_activities (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'coupon',
+        category_id VARCHAR(50),
+        sku_ids TEXT,
+        discount_type VARCHAR(50) DEFAULT 'percent',
+        discount_value DECIMAL(10,2),
+        threshold DECIMAL(10,2) DEFAULT 0,
+        start_at VARCHAR(30),
+        end_at VARCHAR(30),
+        enabled TINYINT NOT NULL DEFAULT 1,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS gr_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_ref VARCHAR(64) NOT NULL,
+        vendor_id INT,
+        vendor_oid VARCHAR(64),
+        user_id VARCHAR(64),
+        sku VARCHAR(128),
+        city VARCHAR(32) DEFAULT '沈阳',
+        status VARCHAR(20) DEFAULT 'pending',
+        fee INT,
+        worker_name VARCHAR(128),
+        worker_phone VARCHAR(32),
+        eta VARCHAR(32),
+        cancel_reason TEXT,
+        paid_at VARCHAR(32),
+        serving_at VARCHAR(32),
+        completed_at VARCHAR(32),
+        created_at VARCHAR(32) NOT NULL,
+        updated_at VARCHAR(32),
+        UNIQUE KEY uk_order_ref (order_ref),
+        KEY idx_gr_orders_vendor (vendor_id),
+        KEY idx_gr_orders_user (user_id)
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
+    }
+    // 初始化 jz_categories 种子数据
+    const jzCatSeeds = [
+      ['cleaning', '保洁', null, 1],
+      ['repair',   '维修', null, 2],
+      ['moving',   '搬家', null, 3],
+      ['nanny',    '保姆', null, 4],
+    ];
+    for (const [catId, catName, catIcon, catOrder] of jzCatSeeds) {
+      await conn.execute(
+        'INSERT IGNORE INTO jz_categories(id, name, icon, sort_order, enabled) VALUES (?, ?, ?, ?, 1)',
+        [catId, catName, catIcon, catOrder]
+      );
     }
     // 初始化 channels 种子数据
     const channelSeeds = [
@@ -294,11 +707,81 @@ async function ensureSchema() {
         [k, v]
       );
     }
+    // 旧库 CREATE TABLE IF NOT EXISTS 不会补列；导入/查询前先对齐
+    const extraCols = [
+      ['jz_vendors', 'city_ids TEXT'],
+      ['jz_vendors', 'district_id INT'],
+      ['jz_vendors', 'phone VARCHAR(50)'],
+      ['jz_vendors', 'fulfillment VARCHAR(50) DEFAULT \'to_home\''],
+      ['jz_vendors', 'vendor_no VARCHAR(100)'],
+      ['jz_vendors', 'whitelist_id INT'],
+      ['jz_vendors', 'platform_certs TEXT'],
+      ['jz_products', 'city_id INT'],
+      ['jz_products', 'channel_sku_id INT'],
+      ['jz_products', 'path VARCHAR(500)'],
+      ['jz_products', 'query VARCHAR(500)'],
+    ];
+    for (const [table, ddl] of extraCols) {
+      try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
+    }
+    // 保租房/卖旧买新种子（projects 为空时从 juzhu/data*.json 灌入）
+    if (housingSeedAll) {
+      try {
+        const hs = await housingSeedAll(conn);
+        if (hs && !hs.skipped) console.log('housingSeedAll', JSON.stringify(hs.inserted || {}));
+      } catch (e) { console.warn('housingSeedAll warn:', e.message); }
+    }
+    if (housingBackfillPhotos) {
+      try {
+        const bf = await housingBackfillPhotos(conn);
+        if (bf && (bf.inserted || bf.covers)) console.log('housingBackfillPhotos', JSON.stringify(bf));
+      } catch (e) { console.warn('housingBackfillPhotos warn:', e.message); }
+    }
+    // 源 MySQL juzhu 快照（商家/SKU/订单）；文件缺失则跳过
+    if (juzhuImportAll) {
+      try {
+        const imp = await juzhuImportAll(conn);
+        if (imp && !imp.skipped) console.log('juzhuImportAll', JSON.stringify(imp.inserted || {}));
+      } catch (e) { console.warn('juzhuImportAll warn:', e.message); }
+    }
+    // 家政全量种子数据（对应表仍为空时补 demo）
+    if (jzSeedAll) {
+      try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
+    }
+    await ensureGrOrdersShape(conn);
+    try {
+      await conn.execute('ALTER TABLE gr_orders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
+    } catch (_) { /* 5.7 无 0900 或已是该 collation */ }
+    // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
+    const migrations = [
+      "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+      // 区级「房源量」= 下属保租项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
+      `UPDATE districts d
+         SET managed_unit_count = (
+           SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         unit_count = (
+           SELECT COALESCE(SUM(p.unit_count), 0)
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         project_count = (
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ),
+         has_projects = CASE WHEN (
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+         ) > 0 THEN 1 ELSE 0 END`,
+    ];
+    for (const sql of migrations) {
+      try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
+    }
     schemaEnsured = true;
   } finally {
     await conn.end();
   }
 }
+
+module.exports.ensureSchema = ensureSchema;
 
 function jsonReply(res, data, code) {
   const body = JSON.stringify(data);
@@ -340,6 +823,28 @@ function injectBodyToRequest(proxyReq, rawBody) {
 function slugify(name) {
   name = (name || '').replace(/[（(].*?[）)]/g, '').trim();
   return name.replace(/\s+/g, '-') || 'item';
+}
+
+function cityDupReply(res, err) {
+  const kind = housingCities ? housingCities.classifyDupKey(err) : 'dup';
+  const d = housingCities
+    ? housingCities.duplicateCityError(kind)
+    : { error: '城市已存在', status: 400 };
+  return jsonReply(res, { error: d.error }, d.status);
+}
+
+async function resolveBodyCityId(conn, body, emptyMsg) {
+  const raw = body && body.city_id;
+  if (raw != null && String(raw).trim() !== '') {
+    const cid = parseInt(raw, 10);
+    if (!cid) return { error: '城市不存在', status: 400 };
+    const [rows] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+    if (!rows.length) return { error: '城市不存在', status: 400 };
+    return { cityId: rows[0].id };
+  }
+  const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
+  if (!rows.length) return { error: emptyMsg || '请先配置城市', status: 400 };
+  return { cityId: rows[0].id };
 }
 
 // 确保项目 slug 唯一
@@ -424,6 +929,22 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     await ensureSchema();
 
+    // ===== 商家 HMAC 开放接口（api_doc.md）=====
+    if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/'))) {
+      if (!vendorApi) return jsonReply(res, { code: 500, message: 'vendor_api module missing' }, 500);
+      const body = await readBody(req);
+      const vendors = loadVendorConfig ? loadVendorConfig() : {};
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const out = await vendorApi.handleRequest(urlPath, body, conn, vendors);
+        return jsonReply(res, out.data, out.status);
+      } catch (e) {
+        return jsonReply(res, { code: 500, message: String(e.message || e) }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
     // ===== GET 只读接口 =====
 
     if (urlPath === '/api/juzhu/admin/dictionary' && req.method === 'GET') {
@@ -477,7 +998,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     if (urlPath === '/api/juzhu/districts' && req.method === 'GET') {
-      const rows = await queryRows('SELECT * FROM districts ORDER BY sort_order');
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let sql = 'SELECT d.* FROM districts d';
+      const params = [];
+      if (cityKey) {
+        sql += ' INNER JOIN cities c ON c.id=d.city_id WHERE (c.slug=? OR c.name=?)';
+        params.push(cityKey, cityKey);
+      }
+      sql += ' ORDER BY d.sort_order, d.id';
+      const rows = await queryRows(sql, params);
       return jsonReply(res, rows);
     }
 
@@ -1086,6 +1616,997 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 项目虚拟号接口 =====
+
+    // GET /api/juzhu/projects/:id/virtual-phone
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/(\d+)\/virtual-phone$/);
+      if (m && req.method === 'GET') {
+        const pid = parseInt(m[1]);
+        const rows = await queryRows('SELECT id, contact_phone, name FROM projects WHERE id=?', [pid]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        const realPhone = (rows[0].contact_phone || '').trim();
+        if (!realPhone) return jsonReply(res, { error: '未配置联系电话' }, 400);
+
+        const tpBase = (process.env.TP_BASE || 'http://tp-test.lianjia.com').replace(/\/$/, '');
+        const tpAppId = (process.env.TP_APP_ID || '').trim();
+        const tpAppKey = (process.env.TP_APP_KEY || '').trim();
+        if (!tpAppId || !tpAppKey) {
+          return jsonReply(res, { error: 'TP_APP_ID/TP_APP_KEY 未配置' }, 400);
+        }
+
+        // MD5 签名（与 tp_client.py generate_sign 对齐）
+        const params = {
+          app_id: tpAppId,
+          ts: String(Math.floor(Date.now() / 1000)),
+          number: realPhone,
+          app_call_id: `juzhu-project-${pid}`,
+        };
+        const signStr = Object.entries(params)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, v]) => `${k}=${v}`)
+          .join('&') + `&app_key=${tpAppKey}`;
+        const sign = crypto.createHash('md5').update(signStr, 'utf8').digest('hex');
+        params.sign = sign;
+
+        const tpQs = new URLSearchParams(params).toString();
+        const tpUrl = `${tpBase}/bundling/alloc?${tpQs}`;
+
+        try {
+          const tpRes = await new Promise((resolve, reject) => {
+            const tpLib = tpUrl.startsWith('https') ? require('https') : require('http');
+            const tpReq = tpLib.get(tpUrl, { headers: { 'Accept': 'application/json' } }, tpResp => {
+              let body = '';
+              tpResp.on('data', d => body += d);
+              tpResp.on('end', () => {
+                try { resolve(JSON.parse(body)); }
+                catch (e) { reject(new Error('TP invalid JSON')); }
+              });
+            });
+            tpReq.on('error', reject);
+            tpReq.setTimeout(20000, () => { tpReq.destroy(); reject(new Error('TP timeout')); });
+          });
+
+          if (tpRes.errno !== 0 && tpRes.errno !== '0' && tpRes.errno != null) {
+            return jsonReply(res, { error: tpRes.errmsg || `话务错误 errno=${tpRes.errno}` }, 502);
+          }
+          const tpData = tpRes.data || [];
+          const tpItem = Array.isArray(tpData) ? tpData[0] : tpData;
+          const rawVirtual = (tpItem && (tpItem.virtual_phone_number || tpItem.virtual_phone)) || '';
+          if (!rawVirtual) return jsonReply(res, { error: '话务未返回虚拟号' }, 502);
+
+          // 格式化虚拟号（与 tp_client.py format_virtual_phone 对齐）
+          const [vMain, vExt] = rawVirtual.split('-');
+          const mainDigits = (vMain || '').replace(/\D/g, '');
+          const extDigits = (vExt || '').replace(/\D/g, '');
+          const displayMain = mainDigits.length >= 10
+            ? `${mainDigits.slice(0,3)} ${mainDigits.slice(3,6)} ${mainDigits.slice(6)}`
+            : (mainDigits || vMain);
+          const display = displayMain + (extDigits ? ` 转 ${extDigits}` : '');
+          const tel = 'tel:' + mainDigits + (extDigits ? `,${extDigits}` : '');
+          return jsonReply(res, { virtual_phone: rawVirtual, display, tel });
+        } catch (e) {
+          return jsonReply(res, { error: '暂时无法接通，请稍后重试' }, 502);
+        }
+      }
+    }
+
+    // ===== jiazheng 公开 C 端接口（Node.js 直连 MySQL 实现）=====
+
+    // GET /api/juzhu/jiazheng/categories
+    if (urlPath === '/api/juzhu/jiazheng/categories' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityName = (qp.get('city') || '').trim();
+      let rows;
+      if (cityName) {
+        const tokens = await cityMatchTokens(cityName);
+        rows = await queryRows(
+          `SELECT DISTINCT c.* FROM jz_categories c
+           WHERE c.enabled=1
+             AND EXISTS (
+               SELECT 1 FROM jz_skus s
+               JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
+               JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
+               WHERE s.category_id=c.id
+                 AND ${cityIdsClause('v', tokens)}
+             )
+           ORDER BY c.sort_order, c.id`,
+          tokens
+        );
+      } else {
+        rows = await queryRows('SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id');
+      }
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus
+    if (urlPath === '/api/juzhu/jiazheng/skus' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityName = (qp.get('city') || '').trim();
+      const categoryId = (qp.get('category') || '').trim();
+      const q = (qp.get('q') || '').trim();
+      let sql = `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                   (SELECT MIN(p.price) FROM jz_products p
+                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+                 FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                 WHERE s.enabled=1 AND c.enabled=1
+                   AND EXISTS (SELECT 1 FROM jz_products p WHERE p.channel_sku_id=s.id AND p.status='on')`;
+      const params = [];
+      if (cityName) {
+        const tokens = await cityMatchTokens(cityName);
+        sql += ` AND EXISTS (
+                  SELECT 1 FROM jz_products p2
+                  JOIN jz_vendors v2 ON v2.id=p2.vendor_id
+                  WHERE p2.channel_sku_id=s.id AND p2.status='on'
+                    AND v2.status='active'
+                    AND ${cityIdsClause('v2', tokens)}
+                )`;
+        params.push(...tokens);
+      }
+      if (categoryId) { sql += ' AND s.category_id=?'; params.push(categoryId); }
+      if (q) {
+        sql += ' AND (s.name LIKE ? OR s.spec LIKE ?)';
+        params.push('%' + q + '%', '%' + q + '%');
+      }
+      sql += ' ORDER BY s.category_id, s.sort_order, s.id';
+      const rows = await queryRows(sql, params);
+      const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
+      rows.forEach(r => parseJsonFields(r, SKU_JSON_FIELDS));
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows(
+          `SELECT s.*, c.name AS category_name FROM jz_skus s
+           JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1`,
+          [slug]
+        );
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const sku = skus[0];
+        const qp = new URLSearchParams(qs);
+        const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
+        let vendorSql = `SELECT v.*, p.id AS product_id, p.price, p.original_price,
+                           p.title, p.subtitle, p.sales_count, p.rating AS product_rating,
+                           p.service_tags, p.advance_booking_hours
+                         FROM jz_vendors v
+                         JOIN jz_products p ON p.vendor_id=v.id
+                         WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const vParams = [sku.id];
+        if (vendorId) { vendorSql += ' AND v.id=?'; vParams.push(vendorId); }
+        vendorSql += ' ORDER BY v.sort_order, v.id LIMIT 10';
+        const vendors = await queryRows(vendorSql, vParams);
+        const related = await queryRows(
+          `SELECT id, name, slug, cover_image, price_from, price_unit, rating_score, category_id
+           FROM jz_skus WHERE enabled=1 AND id!=? ORDER BY sort_order LIMIT 4`,
+          [sku.id]
+        );
+        const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
+        parseJsonFields(sku, SKU_JSON_FIELDS);
+        vendors.forEach(v => parseJsonFields(v, ['service_tags']));
+        return jsonReply(res, { sku, vendors, related });
+      }
+    }
+
+    // GET /api/juzhu/jiazheng/workers
+    if (urlPath === '/api/juzhu/jiazheng/workers' && req.method === 'GET') {
+      const rows = await queryRows(
+        'SELECT * FROM jz_workers WHERE status=? ORDER BY credit_score DESC, completed_orders DESC LIMIT 20',
+        ['active']
+      );
+      rows.forEach(r => parseJsonFields(r, ['tags']));
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/orders （需 API Key 或 phone 参数）
+    if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const phone = (qp.get('phone') || '').trim();
+      const expected = expectedApiKey();
+      const provided = providedApiKey(req);
+      if (!phone && !apiKeyMatches(provided, expected)) {
+        return jsonReply(res, { error: 'unauthorized' }, 401);
+      }
+      let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
+                 LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
+      const params = [];
+      if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
+      if (qp.get('status')) {
+        const statuses = qp.get('status').split(',').filter(Boolean);
+        if (statuses.length) {
+          sql += ' AND o.status IN (' + statuses.map(() => '?').join(',') + ')';
+          params.push(...statuses);
+        }
+      }
+      if (qp.get('pay_status')) { sql += ' AND o.pay_status=?'; params.push(qp.get('pay_status')); }
+      const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
+      sql += ' ORDER BY o.created_at DESC LIMIT ?';
+      params.push(limit);
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/orders/stats （需 API Key，必须在 orders/:id 之前）
+    if (urlPath === '/api/juzhu/jiazheng/orders/stats' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const [pendingR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='pending'");
+      const [dispatchedR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='dispatched'");
+      const [doneR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='done' OR status='rated'");
+      const [unpaidR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE pay_status='unpaid'");
+      return jsonReply(res, {
+        pending: pendingR.c, dispatched: dispatchedR.c, done: doneR.c, unpaid: unpaidR.c,
+      });
+    }
+
+    // GET /api/juzhu/jiazheng/orders/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const orderId = m[1];
+        const rows = await queryRows(
+          `SELECT o.*, s.name AS sku_name FROM jz_orders o
+           LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?`,
+          [orderId]
+        );
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, rows[0]);
+      }
+    }
+
+    // ===== 公开 C 端读接口 =====
+
+    // GET /api/juzhu/cities
+    if (urlPath === '/api/juzhu/cities' && req.method === 'GET') {
+      const rows = await queryRows('SELECT * FROM cities ORDER BY id');
+      return jsonReply(res, rows);
+    }
+
+    // GET /api/juzhu/catalog?city=shenyang —— C 端保租房整包（替代 data.json）
+    if (urlPath === '/api/juzhu/catalog' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let cities = [];
+      if (cityKey) {
+        cities = await queryRows('SELECT * FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+      }
+      if (!cities.length) {
+        cities = await queryRows("SELECT * FROM cities WHERE slug='shenyang' ORDER BY id LIMIT 1");
+      }
+      if (!cities.length) {
+        cities = await queryRows('SELECT * FROM cities ORDER BY id LIMIT 1');
+      }
+      if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
+      const city = cities[0];
+      const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
+      const districts = await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]);
+      const projects = await queryRows('SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order, id', [city.id]);
+      const projectIds = projects.map((p) => p.id);
+      let units = [];
+      if (projectIds.length) {
+        units = await queryRows(
+          `SELECT * FROM units WHERE project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY sort_order, id`,
+          projectIds
+        );
+      }
+      const unitIds = units.map((u) => u.id);
+      const districtIds = districts.map((d) => d.id);
+      const photoClauses = [];
+      const photoParams = [];
+      if (districtIds.length) {
+        photoClauses.push(`(entity_type='district' AND entity_id IN (${districtIds.map(() => '?').join(',')}))`);
+        photoParams.push(...districtIds);
+      }
+      if (projectIds.length) {
+        photoClauses.push(`(entity_type='project' AND entity_id IN (${projectIds.map(() => '?').join(',')}))`);
+        photoParams.push(...projectIds);
+      }
+      if (unitIds.length) {
+        photoClauses.push(`(entity_type='unit' AND entity_id IN (${unitIds.map(() => '?').join(',')}))`);
+        photoParams.push(...unitIds);
+      }
+      let photos = [];
+      if (photoClauses.length) {
+        photos = await queryRows(
+          `SELECT id, entity_type, entity_id, file_path, is_cover, sort_order FROM photos WHERE ${photoClauses.join(' OR ')} ORDER BY entity_type, entity_id, sort_order, id`,
+          photoParams
+        );
+      }
+      const parse = housingParseJsonField || ((v) => v);
+      const mapRows = (rows, keys) => rows.map((r) => {
+        const o = Object.assign({}, r);
+        keys.forEach((k) => { o[k] = parse(o[k]); });
+        return o;
+      });
+      return jsonReply(res, {
+        city,
+        channels,
+        districts: mapRows(districts, ['tags']),
+        projects: mapRows(projects, ['tags', 'rating']),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
+        photos,
+        stats: {
+          district_count: districts.length,
+          project_count_bzf: projects.filter((p) => p.channel === 'bzf').length,
+          project_count_trade: projects.filter((p) => p.channel === 'trade').length,
+          // 房源量 = 保租项目在管套数合计（不是户型条数）
+          unit_count: projects
+            .filter((p) => p.channel === 'bzf')
+            .reduce((sum, p) => sum + (Number(p.managed_unit_count != null ? p.managed_unit_count : p.unit_count) || 0), 0),
+        },
+      });
+    }
+
+    // GET /api/juzhu/ratings（按 rating_status 列出保租房评级）
+    if (urlPath === '/api/juzhu/ratings' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = `SELECT p.*, d.name AS district_name FROM projects p
+                 LEFT JOIN districts d ON d.id=p.district_id
+                 WHERE p.channel='bzf' AND p.rating_status IN ('pending','passed','rejected')`;
+      const params = [];
+      if (qp.get('status')) { sql += ' AND p.rating_status=?'; params.push(qp.get('status')); }
+      sql += " ORDER BY COALESCE(p.rating_submitted_at,'') DESC, p.id";
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, rows);
+    }
+
+    // GET /api/juzhu/ratings/:code
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/ratings\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const code = decodeURIComponent(m[1]);
+        // code 格式 SY-BZF-{id}，直接按 id 查
+        const idMatch = code.match(/-(\d+)$/);
+        let proj = null;
+        if (idMatch) {
+          const rows = await queryRows(
+            `SELECT p.*, d.name AS district_name FROM projects p
+             LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=? AND p.channel='bzf'`,
+            [parseInt(idMatch[1])]
+          );
+          if (rows.length) proj = rows[0];
+        }
+        if (!proj) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, { project: proj });
+      }
+    }
+
+    // GET /api/juzhu/trade
+    if (urlPath === '/api/juzhu/trade' && req.method === 'GET') {
+      const rows = await queryRows(
+        "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint FROM projects WHERE channel='trade' ORDER BY is_featured DESC, featured_rank, sort_order"
+      );
+      return jsonReply(res, { listings: rows });
+    }
+
+    // GET /api/juzhu/districts/:slug/projects
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/districts\/([^/]+)\/projects$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const dists = await queryRows('SELECT * FROM districts WHERE slug=?', [slug]);
+        if (!dists.length) return jsonReply(res, { error: 'not found' }, 404);
+        const dist = dists[0];
+        const projects = await queryRows(
+          "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
+          [dist.id]
+        );
+        return jsonReply(res, { district: dist, projects });
+      }
+    }
+
+    // GET /api/juzhu/projects/:slug  （C端项目详情，slug 匹配）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        // slug 可能是纯数字（id），兼容两种查询
+        const isId = /^\d+$/.test(slug);
+        const sql = isId
+          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE id=?'
+          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE slug=?';
+        const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, rows[0]);
+      }
+    }
+
+    // GET /api/juzhu/projects/:slug/units
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/([^/]+)\/units$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const isId = /^\d+$/.test(slug);
+        const projSql = isId ? 'SELECT * FROM projects WHERE id=?' : 'SELECT * FROM projects WHERE slug=?';
+        const projs = await queryRows(projSql, [isId ? parseInt(slug) : slug]);
+        if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
+        const proj = projs[0];
+        const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [proj.id]);
+        const photos = await queryRows(
+          "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
+          [proj.id]
+        );
+        // 脱敏，不暴露 contact_phone
+        delete proj.contact_phone;
+        return jsonReply(res, { project: proj, units, photos });
+      }
+    }
+
+    // ===== admin auth 接口 =====
+
+    // POST /api/juzhu/admin/auth/login
+    if (urlPath === '/api/juzhu/admin/auth/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      const pwd = (body.password || '').trim();
+      const expected = expectedAdminPassword();
+      if (!pwd || !expected || !crypto.timingSafeEqual(
+        crypto.createHash('sha256').update(pwd).digest(),
+        crypto.createHash('sha256').update(expected).digest()
+      )) {
+        return jsonReply(res, { error: '密码错误' }, 401);
+      }
+      const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
+      const sig = crypto.createHmac('sha256', expected).update(String(exp)).digest('hex');
+      return jsonReply(res, { token: `${exp}.${sig}`, expires_at: new Date(exp * 1000).toISOString() });
+    }
+
+    // GET /api/juzhu/admin/auth/check
+    if (urlPath === '/api/juzhu/admin/auth/check' && req.method === 'GET') {
+      const token = extractBearerToken(req);
+      if (!verifyAdminLoginToken(token)) return jsonReply(res, { ok: false }, 401);
+      const exp = parseInt(token.split('.')[0], 10);
+      return jsonReply(res, { ok: true, expires_at: new Date(exp * 1000).toISOString() });
+    }
+
+    // GET /api/juzhu/admin/districts（admin 前缀，需鉴权）
+    if (urlPath === '/api/juzhu/admin/districts' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const rows = await queryRows('SELECT * FROM districts ORDER BY sort_order');
+      return jsonReply(res, rows);
+    }
+
+    // POST /api/juzhu/admin/ratings/:code/review
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/ratings\/([^/]+)\/review$/);
+      if (m && req.method === 'POST') {
+        if (!requireApiKey(req, res)) return;
+        const code = decodeURIComponent(m[1]);
+        const idMatch = code.match(/-(\d+)$/);
+        if (!idMatch) return jsonReply(res, { error: 'invalid code' }, 400);
+        const pid = parseInt(idMatch[1]);
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM projects WHERE id=? AND channel=? AND rating_status=?', [pid, 'bzf', 'pending']);
+          if (!rows.length) return jsonReply(res, { error: 'not found or not pending' }, 404);
+          const action = body.action === 'pass' ? 'passed' : 'rejected';
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          let rating = {};
+          try { rating = JSON.parse(rows[0].rating || '{}'); } catch (_) {}
+          if (body.dims) rating.dims = body.dims;
+          if (body.total != null) rating.total = body.total;
+          await conn.execute(
+            'UPDATE projects SET rating=?, rating_status=?, rating_reviewed_at=?, rating_note=? WHERE id=?',
+            [JSON.stringify(rating), action, now, body.note || null, pid]
+          );
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
+          return jsonReply(res, { ok: true, project: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 家政 C 端写接口 =====
+
+    // POST /api/juzhu/jiazheng/orders（下单）
+    if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'POST') {
+      const body = await readBody(req);
+      const productId = body.product_id || body.sku_id;
+      if (!productId) return jsonReply(res, { error: 'product_id 必填' }, 400);
+      if (!body.house) return jsonReply(res, { error: 'house 必填' }, 400);
+      if (!body.phone) return jsonReply(res, { error: 'phone 必填' }, 400);
+      if (!body.expectTime) return jsonReply(res, { error: 'expectTime 必填' }, 400);
+
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [prods] = await conn.execute(
+          `SELECT p.*, s.category_id, s.name AS sku_name, c.name AS category_name
+           FROM jz_products p
+           JOIN jz_skus s ON s.id=p.channel_sku_id
+           JOIN jz_categories c ON c.id=s.category_id
+           WHERE p.id=? AND p.status='on' AND s.enabled=1 AND c.enabled=1`,
+          [productId]
+        );
+        if (!prods.length) { conn.end(); return jsonReply(res, { error: '商品不存在或已下架' }, 400); }
+        const prod = prods[0];
+
+        const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+        const orderId = 'WO-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const fee = body.fee != null ? parseInt(body.fee) : Math.round((prod.price || 0) * 100);
+        const log = [{ at: now, action: 'created', note: `来源: ${body.source || 'c_web'}` }];
+
+        await conn.execute(
+          `INSERT INTO jz_orders(id,sku_id,category_id,type,house,phone,expect_time,\`desc\`,fee,pay_status,status,slot_id,source,created_at,updated_at,log_json)
+           VALUES (?,?,?,?,?,?,?,?,?,'unpaid','pending',?,?,?,?,?)`,
+          [orderId, prod.channel_sku_id || null, prod.category_id, prod.category_id,
+           body.house, body.phone, body.expectTime, body.desc || null,
+           fee, body.slot_id || null, body.source || 'c_web', now, now, JSON.stringify(log)]
+        );
+        await conn.commit();
+        const [orders] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+        return jsonReply(res, { ok: true, order: orders[0] }, 201);
+      } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/jiazheng/orders/:id/pay
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/pay$/);
+      if (m && req.method === 'POST') {
+        const orderId = m[1];
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          if (order.pay_status === 'paid') { conn.end(); return jsonReply(res, { ok: true, order }); }
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          if (order.slot_id) {
+            const [slotRes] = await conn.execute(
+              'UPDATE jz_sku_slots SET booked=booked+1 WHERE id=? AND status=? AND booked<capacity',
+              [order.slot_id, 'open']
+            );
+            if (slotRes.affectedRows === 0) { conn.end(); return jsonReply(res, { error: '档期已满，请重新选择' }, 400); }
+          }
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'paid', pay_method: body.pay_method || 'online' });
+          await conn.execute(
+            "UPDATE jz_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=?, log_json=? WHERE id=?",
+            [body.pay_method || 'online', now, now, JSON.stringify(log), orderId]
+          );
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // POST /api/juzhu/jiazheng/orders/:id/dispatch（派单）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/dispatch$/);
+      if (m && req.method === 'POST') {
+        if (!requireApiKey(req, res)) return;
+        const orderId = m[1];
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          if (order.pay_status !== 'paid' || order.status !== 'pending') {
+            conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
+          }
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const worker = body.worker || null;
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'dispatched', worker });
+          await conn.execute(
+            "UPDATE jz_orders SET status='dispatched', worker_json=?, updated_at=?, log_json=? WHERE id=?",
+            [worker ? JSON.stringify(worker) : null, now, JSON.stringify(log), orderId]
+          );
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // POST /api/juzhu/jiazheng/orders/:id/advance（推进状态）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/advance$/);
+      if (m && req.method === 'POST') {
+        if (!requireApiKey(req, res)) return;
+        const orderId = m[1];
+        const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          const curIdx = STATUS_ORDER.indexOf(order.status);
+          if (curIdx === -1) { conn.end(); return jsonReply(res, { error: `当前状态 ${order.status} 不可推进` }, 400); }
+          if (order.status === 'pending') { conn.end(); return jsonReply(res, { error: '请先派单再推进状态' }, 400); }
+          if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
+          const nextStatus = STATUS_ORDER[curIdx + 1];
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'advance', from: order.status, to: nextStatus });
+          await conn.execute(
+            'UPDATE jz_orders SET status=?, updated_at=?, log_json=? WHERE id=?',
+            [nextStatus, now, JSON.stringify(log), orderId]
+          );
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // POST /api/juzhu/jiazheng/orders/:id/rate（评价，C端无需鉴权）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/rate$/);
+      if (m && req.method === 'POST') {
+        const orderId = m[1];
+        const body = await readBody(req);
+        const score = parseInt(body.score);
+        if (!score || score < 1 || score > 5) return jsonReply(res, { error: 'score 须为 1-5' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          if (order.status !== 'done') { conn.end(); return jsonReply(res, { error: '仅已完成订单可评价' }, 400); }
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const rating = { score, tags: body.tags || [], text: body.text || '' };
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'rated', score });
+          await conn.execute(
+            "UPDATE jz_orders SET status='rated', rating_json=?, updated_at=?, log_json=? WHERE id=?",
+            [JSON.stringify(rating), now, JSON.stringify(log), orderId]
+          );
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug/slots（可约档期）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)\/slots$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const qp = new URLSearchParams(qs);
+        const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
+        const skus = await queryRows('SELECT id FROM jz_skus WHERE slug=? AND enabled=1', [slug]);
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const skuId = skus[0].id;
+        let prodSql = `SELECT p.id FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
+                       WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const prodParams = [skuId];
+        if (vendorId) { prodSql += ' AND p.vendor_id=?'; prodParams.push(vendorId); }
+        prodSql += ' ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1';
+        const prods = await queryRows(prodSql, prodParams);
+        if (!prods.length) return jsonReply(res, { slots: [] });
+        const productId = prods[0].id;
+        const today = new Date().toISOString().slice(0, 10);
+        const slots = await queryRows(
+          `SELECT s.*, w.name AS worker_name, w.level AS worker_level, w.avatar AS worker_avatar
+           FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id
+           WHERE s.product_id=? AND s.status='open' AND s.booked<s.capacity AND s.slot_date>=?
+           ORDER BY s.slot_date, s.start_time, s.id`,
+          [productId, today]
+        );
+        const result = slots.map(s => ({ ...s, remaining: (s.capacity || 1) - (s.booked || 0) }));
+        return jsonReply(res, { slots: result });
+      }
+    }
+
+    // POST /api/juzhu/jiazheng/wechat-link（C 端匿名预约）
+    if (urlPath === '/api/juzhu/jiazheng/wechat-link' && req.method === 'POST') {
+      if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+      const body = await readBody(req);
+      const parsed = grOrders.validateWechatLinkBody(body);
+      if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+      const products = await queryRows(
+        `SELECT p.*, s.slug AS sku_slug FROM jz_products p
+         LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+         WHERE p.id=? AND p.status='on'`,
+        [parsed.productId]
+      );
+      if (!products.length) return jsonReply(res, { ok: false, error: '产品未找到' }, 404);
+      const product = products[0];
+      const pagePath = product.path || 'pages-sub/goods/goods';
+      const productQuery = product.query || '';
+      const vendorId = String(product.vendor_id || '');
+      const vendors = loadVendorConfig ? loadVendorConfig() : {};
+      const vendor = vendors[vendorId];
+      if (!vendor || !vendor.url_link) {
+        return jsonReply(res, {
+          ok: false,
+          error: `vendor_id=${vendorId} 未配置 url_link，请检查 hmac_secret.key`,
+        }, 500);
+      }
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const orderRef = await grOrders.generateOrderRef(conn);
+        const outbound = await outboundJson('POST', vendor.url_link, {
+          path: pagePath,
+          query: productQuery,
+          order_ref: orderRef,
+        }, 10000);
+        if (!outbound.json || outbound.json.code !== 200) {
+          return jsonReply(res, { ok: false, error: (outbound.json && outbound.json.msg) || 'URL Link 生成失败' }, 502);
+        }
+        await grOrders.createOrder(conn, orderRef, String(parsed.productId), {
+          vendor_id: product.vendor_id,
+          user_id: parsed.userId,
+        });
+        return jsonReply(res, {
+          ok: true,
+          url_link: outbound.json.data || '',
+          order_ref: orderRef,
+        });
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/gr/orders?user_id=
+    if (urlPath === '/api/juzhu/gr/orders' && req.method === 'GET') {
+      if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+      const qp = new URLSearchParams(qs);
+      const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+      if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const data = await grOrders.listUserOrders(conn, parsed.userId, qp.get('limit'));
+        return jsonReply(res, { ok: true, ...data });
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/gr/orders/:ref/vendor-detail
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/gr\/orders\/([^/]+)\/vendor-detail$/);
+      if (m && req.method === 'GET') {
+        if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+        const orderRef = decodeURIComponent(m[1]);
+        const qp = new URLSearchParams(qs);
+        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+          if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
+          if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
+          const vendors = loadVendorConfig ? loadVendorConfig() : {};
+          const detailUrl = (vendors[String(order.vendor_id)] || {}).order_detail_url || '';
+          if (!detailUrl) return jsonReply(res, { ok: false, error: '商家未配置订单详情接口' });
+          const sep = detailUrl.includes('?') ? '&' : '?';
+          const url = detailUrl + sep + 'order_ref=' + encodeURIComponent(orderRef);
+          const outbound = await outboundJson('GET', url, null, 5000);
+          if (!outbound.json || outbound.json.code !== 200 || !outbound.json.data) {
+            return jsonReply(res, { ok: false, error: '商家未返回订单详情' });
+          }
+          const data = outbound.json.data;
+          const worker = data.worker || null;
+          if (worker && worker.eta) worker.eta = grOrders.normEtaPeking(worker.eta);
+          return jsonReply(res, {
+            ok: true,
+            detail: {
+              vendor_oid: data.lailai_oid,
+              status: data.status,
+              fee: data.fee,
+              worker,
+              cancel_reason: data.cancel_reason,
+            },
+          });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /api/juzhu/gr/orders/:ref
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/gr\/orders\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
+        const orderRef = decodeURIComponent(m[1]);
+        const qp = new URLSearchParams(qs);
+        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+          if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
+          return jsonReply(res, { ok: true, order });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // ===== /api/juzhu/jz/* 管理台接口 =====
+
+    // GET /api/juzhu/jz/categories
+    if (urlPath === '/api/juzhu/jz/categories' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const all = qp.get('all') === '1';
+      let sql = all
+        ? 'SELECT * FROM jz_categories ORDER BY sort_order, id'
+        : "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id";
+      const rows = await queryRows(sql);
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/spu
+    if (urlPath === '/api/juzhu/jz/spu' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+           (SELECT COUNT(*) FROM jz_products p WHERE p.channel_sku_id=s.id) AS sku_count
+         FROM jz_skus s LEFT JOIN jz_categories c ON c.id=s.category_id
+         ORDER BY s.category_id, s.sort_order, s.id`
+      );
+      rows.forEach(r => parseJsonFields(r, ['tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/vendors
+    if (urlPath === '/api/juzhu/jz/vendors' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = "SELECT * FROM jz_vendors WHERE status='active' ORDER BY type, sort_order, id";
+      const params = [];
+      if (qp.get('type')) { sql = "SELECT * FROM jz_vendors WHERE type=? AND status='active' ORDER BY sort_order, id"; params.push(qp.get('type')); }
+      const vendors = await queryRows(sql, params);
+      // 每个商家附带前2个上架产品
+      for (const v of vendors) {
+        v.products = await queryRows(
+          "SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order, id LIMIT 2",
+          [v.id]
+        );
+        v.products.forEach(p => parseJsonFields(p, ['service_tags']));
+      }
+      return jsonReply(res, { list: vendors });
+    }
+
+    // GET /api/juzhu/jz/vendors/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jz\/vendors\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT * FROM jz_vendors WHERE id=?', [parseInt(m[1])]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        const v = rows[0];
+        v.products = await queryRows("SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order", [v.id]);
+        v.products.forEach(p => parseJsonFields(p, ['service_tags']));
+        return jsonReply(res, v);
+      }
+    }
+
+    // GET /api/juzhu/jz/products
+    if (urlPath === '/api/juzhu/jz/products' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = 'SELECT p.*, v.name AS vendor_name, v.type AS vendor_type FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id WHERE 1=1';
+      const params = [];
+      if (qp.get('vendor_id')) { sql += ' AND p.vendor_id=?'; params.push(parseInt(qp.get('vendor_id'))); }
+      if (qp.get('type')) { sql += ' AND v.type=?'; params.push(qp.get('type')); }
+      if (qp.get('status')) { sql += ' AND p.status=?'; params.push(qp.get('status')); }
+      sql += ' ORDER BY p.vendor_id, p.sort_order, p.id LIMIT 200';
+      const rows = await queryRows(sql, params);
+      rows.forEach(r => parseJsonFields(r, ['service_tags']));
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/products/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jz\/products\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT p.*, v.name AS vendor_name FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id WHERE p.id=?', [parseInt(m[1])]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['service_tags']);
+        return jsonReply(res, rows[0]);
+      }
+    }
+
+    // GET /api/juzhu/jz/workers
+    if (urlPath === '/api/juzhu/jz/workers' && req.method === 'GET') {
+      const rows = await queryRows("SELECT * FROM jz_workers WHERE status='active' ORDER BY credit_score DESC, completed_orders DESC");
+      rows.forEach(r => parseJsonFields(r, ['tags']));
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/workers/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jz\/workers\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT * FROM jz_workers WHERE id=?', [parseInt(m[1])]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags']);
+        return jsonReply(res, rows[0]);
+      }
+    }
+
+    // GET /api/juzhu/jz/orders
+    if (urlPath === '/api/juzhu/jz/orders' && req.method === 'GET') {
+      if (!requireApiKey(req, res)) return;
+      const qp = new URLSearchParams(qs);
+      let sql = 'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1';
+      const params = [];
+      if (qp.get('status')) { sql += ' AND o.status=?'; params.push(qp.get('status')); }
+      const limit = Math.min(parseInt(qp.get('limit') || '50'), 200);
+      sql += ' ORDER BY o.created_at DESC LIMIT ?'; params.push(limit);
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/orders/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jz\/orders\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        if (!requireApiKey(req, res)) return;
+        const rows = await queryRows(
+          'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?',
+          [m[1]]
+        );
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, rows[0]);
+      }
+    }
+
+    // GET /api/juzhu/jz/subcategories
+    if (urlPath === '/api/juzhu/jz/subcategories' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = "SELECT * FROM jz_subcategories WHERE status='on'";
+      const params = [];
+      if (qp.get('type')) { sql += ' AND parent_type=?'; params.push(qp.get('type')); }
+      sql += ' ORDER BY sort_order, id';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug/detail
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)\/detail$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows(
+          `SELECT s.*, c.name AS category_name FROM jz_skus s
+           JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1`,
+          [slug]
+        );
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, skus[0]);
+      }
+    }
+
+    // GET /api/juzhu/jiazheng/skus/:slug/vendors
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)\/vendors$/);
+      if (m && req.method === 'GET') {
+        const slug = decodeURIComponent(m[1]);
+        const skus = await queryRows('SELECT id FROM jz_skus WHERE slug=? AND enabled=1', [slug]);
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const skuId = skus[0].id;
+        const qp = new URLSearchParams(qs);
+        const cityName = (qp.get('city') || '').trim();
+        let sql = `SELECT v.*, p.id AS product_id, p.price, p.original_price,
+                     p.title, p.subtitle, p.sales_count, p.rating AS product_rating,
+                     p.service_tags, p.advance_booking_hours
+                   FROM jz_vendors v
+                   JOIN jz_products p ON p.vendor_id=v.id
+                   WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const params = [skuId];
+        if (cityName) {
+          const tokens = await cityMatchTokens(cityName);
+          sql += ` AND ${cityIdsClause('v', tokens)}`;
+          params.push(...tokens);
+        }
+        sql += ' ORDER BY v.sort_order, v.id LIMIT 20';
+        const vendors = await queryRows(sql, params);
+        return jsonReply(res, { vendors });
+      }
+    }
+
     // 未匹配：返回 404
     return jsonReply(res, { error: '接口不存在', path: urlPath, method: req.method }, 404);
   } catch (e) {
@@ -1114,37 +2635,6 @@ const mimeTypes = {
   '.pdf': 'application/pdf',
 };
 
-// 反向代理：将请求转发到 Python 服务，失败则 fallback 到 Node.js 直连
-// 先缓冲 body，确保 fallback 时 readBody() 仍可读取
-function proxyToPythonWithFallback(urlPath, qs, req, res) {
-  // 缓冲请求体，以便 fallback 时 handleApiDirect 可以重新解析
-  const chunks = [];
-  req.on('data', chunk => chunks.push(chunk));
-  req.on('end', () => {
-    const rawBody = Buffer.concat(chunks).toString('utf8');
-    req._rawBody = rawBody;
-
-    const options = {
-      hostname: '127.0.0.1',
-      port: PYTHON_PORT,
-      path: req.url,
-      method: req.method,
-      headers: req.headers,
-    };
-    const proxyReq = http.request(options, proxyRes => {
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      proxyRes.pipe(res, { end: true });
-    });
-    proxyReq.on('error', () => {
-      // Python 不可用，尝试 Node.js 直连 MySQL
-      handleApiDirect(urlPath, qs, req, res);
-    });
-    // 将已缓冲的 body 写入代理请求
-    if (rawBody) proxyReq.write(rawBody);
-    proxyReq.end();
-  });
-}
-
 const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
@@ -1160,9 +2650,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // /api/juzhu/* 先代理到 Python，失败则 fallback 到 Node.js
+  // /api/juzhu/* 直接走 Node.js MySQL 实现
   if (rawPath.startsWith('/api/juzhu')) {
-    return proxyToPythonWithFallback(rawPath, qs, req, res);
+    return handleApiDirect(rawPath, qs, req, res);
   }
 
   if (!isPublicStatic(rawPath)) {
@@ -1229,5 +2719,7 @@ if (require.main === module) {
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
     console.log('auth: /api/juzhu/admin/* requires API Key (auth/login|check exempt); forbidden historical default');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
+    // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
+    ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
   });
 }

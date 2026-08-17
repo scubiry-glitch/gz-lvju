@@ -100,7 +100,7 @@
 
 ## 规则 9 · 家政工单 API 总线（`screens/_jzapi.js`）
 
-**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，SQLite 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
+**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
@@ -116,3 +116,12 @@
 ## 规则 11 · 静态服务不得暴露源码与密钥
 
 `juzhu/server.py` 与线上 Node 入口 `app.js` 用仓库根做静态根时，**必须**拦截敏感路径：`.env*`、隐藏文件、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`package.json`、`README.md`、根目录 `app.js`/`scf_bootstrap`/`moma_*`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。MySQL 账号只进运行时环境变量 / 本地 `.env.*`（gitignore），**禁止**写进 `app.js` 源码默认值。
+
+## 规则 12 · 线上运行时纯 Node + MySQL；C 端保租房走 catalog
+
+SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再依赖 Python。
+
+- **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
+- **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
+- **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
+- **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor `url_link` 读 `juzhu/hmac_secret.key`，禁止对外 HTTP）

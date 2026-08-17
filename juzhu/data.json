@@ -1070,7 +1070,7 @@
     "district_count": 9,
     "project_count_bzf": 23,
     "project_count_trade": 2,
-    "unit_count": 59
+    "unit_count": 5671
   },
   "districts": [
     {
@@ -1104,13 +1104,13 @@
       "cover_image": "assets/juzhu/sy/districts/和平区.jpg",
       "project_count": 2,
       "unit_count": 5,
-      "vacant_count": 5,
+      "vacant_count": 200,
       "avg_price": 1513,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g3",
-      "managed_unit_count": 5,
+      "managed_unit_count": 287,
       "tags": []
     },
     {
@@ -1124,13 +1124,13 @@
       "cover_image": "assets/juzhu/sy/districts/大东区.jpeg",
       "project_count": 3,
       "unit_count": 9,
-      "vacant_count": 9,
+      "vacant_count": 360,
       "avg_price": 1778,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 1,
       "bg_class": "g4",
-      "managed_unit_count": 9,
+      "managed_unit_count": 849,
       "tags": []
     },
     {
@@ -1164,13 +1164,13 @@
       "cover_image": "assets/juzhu/sy/districts/沈河区.jpeg",
       "project_count": 5,
       "unit_count": 14,
-      "vacant_count": 14,
+      "vacant_count": 560,
       "avg_price": 1654,
       "is_hot": 1,
       "layout_tall": 1,
       "layout_wide": 0,
       "bg_class": "g6",
-      "managed_unit_count": 14,
+      "managed_unit_count": 1102,
       "tags": []
     },
     {
@@ -1184,13 +1184,13 @@
       "cover_image": "assets/juzhu/sy/districts/浑南区.jpeg",
       "project_count": 5,
       "unit_count": 18,
-      "vacant_count": 18,
+      "vacant_count": 720,
       "avg_price": 1962,
       "is_hot": 1,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g7",
-      "managed_unit_count": 18,
+      "managed_unit_count": 1934,
       "tags": []
     },
     {
@@ -1204,13 +1204,13 @@
       "cover_image": "assets/juzhu/sy/districts/皇姑区.jpeg",
       "project_count": 6,
       "unit_count": 11,
-      "vacant_count": 11,
+      "vacant_count": 440,
       "avg_price": 1643,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g8",
-      "managed_unit_count": 11,
+      "managed_unit_count": 495,
       "tags": []
     },
     {
@@ -1224,13 +1224,13 @@
       "cover_image": "assets/juzhu/sy/districts/苏家屯区.png",
       "project_count": 2,
       "unit_count": 2,
-      "vacant_count": 2,
+      "vacant_count": 80,
       "avg_price": 1588,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g1",
-      "managed_unit_count": 2,
+      "managed_unit_count": 1004,
       "tags": []
     },
     {
@@ -1290,7 +1290,7 @@
       "rating_submitted_at": "2026-07-03T03:15:56Z",
       "rating_reviewed_at": "2026-07-03T03:16:13Z",
       "rating_note": "",
-      "managed_unit_count": 3
+      "managed_unit_count": 175
     },
     {
       "id": 11,
@@ -1315,7 +1315,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 1036
     },
     {
       "id": 6,
@@ -1340,7 +1340,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 102
     },
     {
       "id": 22,
@@ -1363,7 +1363,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 432
     },
     {
       "id": 3,
@@ -1388,7 +1388,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 5
+      "managed_unit_count": 644
     },
     {
       "id": 16,
@@ -1413,7 +1413,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 125
     },
     {
       "id": 12,
@@ -1436,7 +1436,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 7
+      "managed_unit_count": 236
     },
     {
       "id": 7,
@@ -1459,7 +1459,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 78
     },
     {
       "id": 23,
@@ -1482,7 +1482,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 572
     },
     {
       "id": 4,
@@ -1505,7 +1505,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 135
     },
     {
       "id": 17,
@@ -1530,7 +1530,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 51
     },
     {
       "id": 2,
@@ -1555,7 +1555,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 112
     },
     {
       "id": 13,
@@ -1580,7 +1580,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 4
+      "managed_unit_count": 372
     },
     {
       "id": 8,
@@ -1603,7 +1603,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 53
     },
     {
       "id": 18,
@@ -1628,7 +1628,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 100
     },
     {
       "id": 5,
@@ -1653,7 +1653,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 70
     },
     {
       "id": 9,
@@ -1676,7 +1676,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 4
+      "managed_unit_count": 78
     },
     {
       "id": 14,
@@ -1701,7 +1701,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 210
     },
     {
       "id": 19,
@@ -1726,7 +1726,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 102
     },
     {
       "id": 10,
@@ -1749,7 +1749,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 791
     },
     {
       "id": 20,
@@ -1774,7 +1774,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 3
+      "managed_unit_count": 109
     },
     {
       "id": 15,
@@ -1797,7 +1797,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 2
+      "managed_unit_count": 80
     },
     {
       "id": 21,
@@ -1822,7 +1822,7 @@
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
       "rating_note": null,
-      "managed_unit_count": 1
+      "managed_unit_count": 8
     },
     {
       "id": 24,
@@ -1897,7 +1897,7 @@
         "好房子4星"
       ],
       "sort_order": 1,
-      "cover_image": null,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -1933,7 +1933,7 @@
         "好房子4星"
       ],
       "sort_order": 2,
-      "cover_image": null,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -7186,6 +7186,78 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/逸居锦城/139平/ed0e7fcfcea0b13c8f70433ab6fda8dd.jpg",
       "is_cover": 0,
       "sort_order": 4
+    },
+    {
+      "id": 338,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 339,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 340,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 341,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
+    },
+    {
+      "id": 342,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 343,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 344,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 345,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
     }
   ]
 }

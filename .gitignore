@@ -11,5 +11,9 @@ publish_test.sh
 !.env.example
 !**/.env.example
 juzhu/config.ini
+juzhu/_mysql_dump.json
+juzhu/mysql_dump.json
 scripts/tp_call_log.json
 *.tp.local.json
+vendor/
+node_modules/
