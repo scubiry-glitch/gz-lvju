@@ -39,9 +39,24 @@ def check_db_migration():
     print("[PASS] check_db_migration")
 
 
+def check_vendor_config_cache():
+    from jiazheng_api import _load_vendor_config
+
+    vendors = _load_vendor_config()
+    assert "41" in vendors and "42" in vendors, f"缓存缺 vendor: {list(vendors)}"
+    v41 = vendors["41"]
+    assert v41["key"] and v41["url_link"] and v41["order_detail_url"], v41
+    v42 = vendors["42"]
+    assert v42["key"] and v42["url_link"] and not v42.get("order_detail_url"), v42
+    # 缓存命中：第二次调用返回同一对象
+    assert _load_vendor_config() is vendors, "缓存未生效"
+    print("[PASS] check_vendor_config_cache")
+
+
 def main():
     check_schema_files()
     check_db_migration()
+    check_vendor_config_cache()
 
 
 if __name__ == "__main__":

@@ -6,24 +6,21 @@
   - /api/juzhu/jiazheng/vendor/*           → HMAC 签名（vendor_id 必填）
   - /api/juzhu/jiazheng/wechat-link        → 由 server.py API Key 路由调用
 
-认证: HMAC-SHA256（sign_util.HmacAuth），vendor_id → hmac_secret.key 查密钥
+认证: HMAC-SHA256（sign_util.HmacAuth），vendor_id → jz_vendors 表 hmac_key 查密钥
 """
 
 import json
 import os
 import re
 import ssl
+import threading
 import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import db  # noqa: E402
 from sign_util import HmacAuth  # noqa: E402
-
-_MODULE_DIR = Path(__file__).resolve().parent
-_KEY_PATH = _MODULE_DIR / "hmac_secret.key"
 
 _CST = timezone(timedelta(hours=8))  # 北京时间 UTC+8
 
@@ -66,27 +63,40 @@ def _vendor_ssl_context():
 
 # ── 密钥加载 ──────────────────────────────────────────────────
 
+_VENDOR_CONFIG_CACHE = None
+_VENDOR_CONFIG_LOCK = threading.Lock()
+
+
 def _load_vendor_config():
-    """从 hmac_secret.key 加载 vendor 配置。
-    格式: vendor_id|hmac_key|url_link|order_detail_url（后两列可选）
-    返回: {"1": {"key": "abc...", "url_link": "https://...", "order_detail_url": "https://..."}, ...}
+    """从 jz_vendors 表加载商家密钥配置（进程内懒加载缓存）。
+
+    返回: {"41": {"key": "...", "url_link": "...", "order_detail_url": "..."}, ...}
+    仅返回 hmac_key 非空的商家；改表后需重启 server 生效。
     """
-    vendors = {}
-    if not _KEY_PATH.exists():
+    global _VENDOR_CONFIG_CACHE
+    if _VENDOR_CONFIG_CACHE is not None:
+        return _VENDOR_CONFIG_CACHE
+    with _VENDOR_CONFIG_LOCK:
+        if _VENDOR_CONFIG_CACHE is not None:
+            return _VENDOR_CONFIG_CACHE
+        vendors = {}
+        conn = _connect_db()
+        try:
+            rows = conn.execute(
+                "SELECT id, hmac_key, url_link, order_detail_url FROM jz_vendors "
+                "WHERE hmac_key IS NOT NULL AND TRIM(hmac_key) <> ''"
+            ).fetchall()
+            for r in rows:
+                vid = str(r["id"])
+                vendors[vid] = {
+                    "key": (r["hmac_key"] or "").strip(),
+                    "url_link": (r["url_link"] or "").strip(),
+                    "order_detail_url": (r["order_detail_url"] or "").strip(),
+                }
+        finally:
+            conn.close()
+        _VENDOR_CONFIG_CACHE = vendors
         return vendors
-    for line in _KEY_PATH.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split("|")
-        if len(parts) >= 2:
-            vid = parts[0].strip()
-            vendors[vid] = {
-                "key": parts[1].strip(),
-                "url_link": parts[2].strip() if len(parts) >= 3 else "",
-                "order_detail_url": parts[3].strip() if len(parts) >= 4 else "",
-            }
-    return vendors
 
 
 # ── 数据库 ────────────────────────────────────────────────────
@@ -525,7 +535,7 @@ def handle_wechat_link(handler, body):
 
     流程：
     1. 查产品 → 获取 path / query / vendor_id
-    2. 查 vendor 的 url_link（来自 hmac_secret.key 第三列）
+    2. 查 vendor 的 url_link（来自 jz_vendors 表）
     3. 生成 order_ref
     4. 调用商家 URL Link 接口
     5. 创建 GR 订单
@@ -558,7 +568,7 @@ def handle_wechat_link(handler, body):
         if not vendor or not vendor.get("url_link"):
             _respond_json(
                 handler,
-                {"ok": False, "error": f"vendor_id={vendor_id} 未配置 url_link，请检查 hmac_secret.key"},
+                {"ok": False, "error": f"vendor_id={vendor_id} 未配置 url_link，请检查 jz_vendors 表配置"},
                 500,
             )
             return True
@@ -715,7 +725,7 @@ def handle_gr_vendor_detail(handler, order_ref, qs):
     """GET /api/juzhu/gr/orders/{order_ref}/vendor-detail?user_id=xxx
 
     中转查询商家订单详情：先校验订单归属 user，再经本后台调用商家订单详情接口
-    （order_detail_url 来自 hmac_secret.key 第 4 列），返回清洗后的详情
+    （order_detail_url 来自 jz_vendors 表），返回清洗后的详情
     （eta 统一北京时间无时区）。商家未配置/调用失败统一返回 ok:false，
     前端保持本地数据展示，不打扰用户。
     """
