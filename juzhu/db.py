@@ -360,6 +360,38 @@ def ensure_jz_vendor_schema(conn):
             conn.execute("ALTER TABLE jz_vendors ADD COLUMN city_ids TEXT")
         if "platform_certs" not in vendor_cols:
             conn.execute("ALTER TABLE jz_vendors ADD COLUMN platform_certs TEXT")
+        for col in ("hmac_key", "url_link", "order_detail_url"):
+            if col not in vendor_cols:
+                conn.execute(f"ALTER TABLE jz_vendors ADD COLUMN {col} TEXT")
+        # 密钥配置迁移：hmac_secret.key 仍存在时导入（仅当该行 hmac_key 为空，不覆盖表内已有值）
+        key_path = Path(__file__).resolve().parent / "hmac_secret.key"
+        if key_path.exists():
+            imported = 0
+            try:
+                for line in key_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split("|")
+                    if len(parts) < 2:
+                        continue
+                    vid = parts[0].strip()
+                    hmac_key = parts[1].strip()
+                    url_link = parts[2].strip() if len(parts) >= 3 else None
+                    order_detail_url = parts[3].strip() if len(parts) >= 4 else None
+                    row = conn.execute(
+                        "SELECT hmac_key FROM jz_vendors WHERE id=?", (int(vid),)
+                    ).fetchone()
+                    if row and not (row[0] or "").strip():
+                        conn.execute(
+                            "UPDATE jz_vendors SET hmac_key=?, url_link=?, order_detail_url=? WHERE id=?",
+                            (hmac_key, url_link, order_detail_url, int(vid)),
+                        )
+                        imported += 1
+                if imported:
+                    print(f"[migrate] 商家密钥配置已迁入 jz_vendors（{imported} 家），可删除 hmac_secret.key", flush=True)
+            except Exception as e:
+                print(f"[migrate] hmac_secret.key 导入失败（不影响启动）: {e}", flush=True)
         # 演示数据：未标注服务城市的商家视为全省可约，避免 C 端带 ?city= 后列表为空
         city_ids = [
             str(r[0])

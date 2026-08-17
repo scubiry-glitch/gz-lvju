@@ -25,8 +25,23 @@ def check_schema_files():
     print("[PASS] check_schema_files")
 
 
+def check_db_migration():
+    import db as jdb
+
+    conn = jdb.connect()
+    cols = {dict(r)["name"] for r in conn.execute("PRAGMA table_info(jz_vendors)").fetchall()}
+    assert {"hmac_key", "url_link", "order_detail_url"} <= cols, f"缺列: {cols}"
+    row41 = conn.execute("SELECT hmac_key, url_link, order_detail_url FROM jz_vendors WHERE id=41").fetchone()
+    row42 = conn.execute("SELECT hmac_key, url_link, order_detail_url FROM jz_vendors WHERE id=42").fetchone()
+    assert row41 and row41[0] and row41[1] and row41[2], f"41 未从文件导入: {row41}"
+    assert row42 and row42[0] and row42[1] and row42[2] is None, f"42 未从文件导入: {row42}"
+    conn.close()
+    print("[PASS] check_db_migration")
+
+
 def main():
     check_schema_files()
+    check_db_migration()
 
 
 if __name__ == "__main__":
