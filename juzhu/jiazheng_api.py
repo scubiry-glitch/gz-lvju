@@ -757,6 +757,24 @@ def handle_gr_vendor_detail(handler, order_ref, qs):
         worker = data.get("worker")
         if worker and worker.get("eta"):
             worker["eta"] = _norm_eta_peking(worker["eta"])
+        # 静默同步本地订单：补 vendor_oid、推进状态、写 fee/worker/cancel_reason，
+        # 下次查询本地订单详情即为最新数据；同步失败不影响响应
+        try:
+            from gr_orders import sync_order_from_vendor_detail
+
+            sync_order_from_vendor_detail(
+                conn,
+                order_ref=order_ref,
+                vendor_oid=data.get("lailai_oid"),
+                status=data.get("status"),
+                fee=data.get("fee"),
+                worker_name=(worker or {}).get("name"),
+                worker_phone=(worker or {}).get("phone"),
+                eta=(worker or {}).get("eta"),
+                cancel_reason=data.get("cancel_reason"),
+            )
+        except Exception as e:
+            _log(f"      ! 本地订单同步失败: {type(e).__name__}: {e}")
         _respond_json(handler, {
             "ok": True,
             "detail": {

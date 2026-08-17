@@ -181,6 +181,58 @@ def check_gr_vendor_detail_api():
     print("[PASS] check_gr_vendor_detail_api")
 
 
+def check_vendor_detail_sync():
+    import time
+    from gr_orders import create_order, get_order_by_ref, sync_order_from_vendor_detail
+
+    conn = jdb.connect()
+    stamp = str(int(time.time() * 1000))
+
+    # 场景1：pending + paid 详情 → 状态推进、vendor_oid 补空、fee/paid_at 写入
+    ref = f"GRTESTS{stamp}a"
+    create_order(conn, ref, "99", city="沈阳", vendor_id=41, user_id=TEST_USER)
+    ok = sync_order_from_vendor_detail(conn, ref, vendor_oid="LL_10001", status="paid", fee=12800)
+    row = get_order_by_ref(conn, ref)
+    assert ok and row["status"] == "paid" and row["vendor_oid"] == "LL_10001", row
+    assert row["fee"] == 12800 and row.get("paid_at"), row
+
+    # 场景2：assigned 详情 → worker_name/phone/eta 写入、状态推进
+    ok = sync_order_from_vendor_detail(conn, ref, vendor_oid="LL_10001", status="assigned",
+                                       worker_name="李师傅", worker_phone="13900005678",
+                                       eta="2026-08-12 09:00:00")
+    row = get_order_by_ref(conn, ref)
+    assert ok and row["status"] == "assigned", row
+    assert row["worker_name"] == "李师傅" and row["worker_phone"] == "13900005678", row
+    assert row["eta"] == "2026-08-12 09:00:00", row
+
+    # 场景3：状态不回退：本地 completed + 商家 assigned → 保持 completed
+    sync_order_from_vendor_detail(conn, ref, vendor_oid="LL_10001", status="completed")
+    sync_order_from_vendor_detail(conn, ref, vendor_oid="LL_10001", status="assigned",
+                                  worker_name="王师傅")
+    row = get_order_by_ref(conn, ref)
+    assert row["status"] == "completed" and row.get("completed_at"), row
+
+    # 场景4：cancelled 终态：本地 paid + 商家 cancelled → 接受并写 cancel_reason；不接受回退
+    ref2 = f"GRTESTS{stamp}b"
+    create_order(conn, ref2, "99", city="沈阳", vendor_id=41, user_id=TEST_USER)
+    sync_order_from_vendor_detail(conn, ref2, vendor_oid="LL_10002", status="paid", fee=9900)
+    sync_order_from_vendor_detail(conn, ref2, vendor_oid="LL_10002", status="cancelled",
+                                  cancel_reason="顾客取消订单")
+    row = get_order_by_ref(conn, ref2)
+    assert row["status"] == "cancelled" and row["cancel_reason"] == "顾客取消订单", row
+    sync_order_from_vendor_detail(conn, ref2, vendor_oid="LL_10002", status="paid")
+    row = get_order_by_ref(conn, ref2)
+    assert row["status"] == "cancelled", row
+
+    # 场景5：订单不存在 → 返回 False 不抛异常
+    assert sync_order_from_vendor_detail(conn, "GRTEST_NOT_EXIST", vendor_oid=None, status="paid") is False
+
+    conn.execute("DELETE FROM gr_orders WHERE order_ref IN (?, ?)", (ref, ref2))
+    conn.commit()
+    conn.close()
+    print("[PASS] check_vendor_detail_sync")
+
+
 def main():
     check_user_id_column()
     check_create_order_with_user()
@@ -188,6 +240,7 @@ def main():
     check_gr_orders_api()
     check_serving_at_and_eta()
     check_gr_vendor_detail_api()
+    check_vendor_detail_sync()
     print("ALL PASS")
 
 

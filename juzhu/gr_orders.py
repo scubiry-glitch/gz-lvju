@@ -132,6 +132,83 @@ def update_order_callback(conn, order_ref, vendor_oid, status,
 # 我的订单（C 端）可见状态：pending 属未支付阶段，不对用户展示
 USER_VISIBLE_STATUSES = ("paid", "assigned", "serving", "completed", "cancelled")
 
+# 状态推进顺序（pending 起步，completed 为正常流程终点；cancelled 单独终态处理）
+STATUS_ORDER = {"pending": 0, "paid": 1, "assigned": 2, "serving": 3, "completed": 4}
+
+
+def sync_order_from_vendor_detail(conn, order_ref, vendor_oid, status,
+                                  fee=None, worker_name=None, worker_phone=None,
+                                  eta=None, cancel_reason=None):
+    """商家订单详情查询接口的静默同步：以商家返回的数据补全/推进本地订单。
+
+    - vendor_oid 仅在本地为空时写入（不覆盖已有值）
+    - status 仅向前推进（pending→paid→assigned→serving→completed）；
+      cancelled 为终态：商家返回 cancelled 直接接受，本地已 cancelled 不接受回退
+    - 条件字段非 null/非空才覆盖（fee、worker_name、worker_phone、eta、cancel_reason）
+    - 状态实际变化时写对应状态时间字段（paid_at/serving_at/completed_at）
+    返回 True 表示已处理（订单不存在返回 False，不抛异常）。
+    """
+    local = get_order_by_ref(conn, order_ref)
+    if not local:
+        return False
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sets, params = [], []
+
+    # vendor_oid 只补空
+    if not local.get("vendor_oid") and vendor_oid:
+        sets.append("vendor_oid = ?")
+        params.append(vendor_oid)
+
+    # 状态推进
+    local_status = local.get("status") or "pending"
+    new_status = None
+    if local_status == "cancelled":
+        new_status = status if status == "cancelled" else None
+    elif status == "cancelled":
+        new_status = "cancelled"
+    elif STATUS_ORDER.get(status, -1) > STATUS_ORDER.get(local_status, -1):
+        new_status = status
+    if new_status and new_status != local_status:
+        sets.append("status = ?")
+        params.append(new_status)
+        if new_status == "paid":
+            sets.append("paid_at = ?")
+            params.append(now)
+        elif new_status == "serving":
+            sets.append("serving_at = ?")
+            params.append(now)
+        elif new_status == "completed":
+            sets.append("completed_at = ?")
+            params.append(now)
+
+    # 条件字段：非 null/非空才覆盖
+    if fee is not None:
+        sets.append("fee = ?")
+        params.append(fee)
+    if worker_name:
+        sets.append("worker_name = ?")
+        params.append(worker_name)
+    if worker_phone:
+        sets.append("worker_phone = ?")
+        params.append(worker_phone)
+    if eta:
+        sets.append("eta = ?")
+        params.append(eta)
+    if cancel_reason:
+        sets.append("cancel_reason = ?")
+        params.append(cancel_reason)
+
+    if not sets:
+        return True
+
+    sets.append("updated_at = ?")
+    params.append(now)
+    params.append(order_ref)
+    conn.execute(f"UPDATE gr_orders SET {', '.join(sets)} WHERE order_ref = ?", params)
+    conn.commit()
+    return True
+
 
 def list_user_orders(conn, user_id, limit=50):
     """按用户列出订单（过滤 pending），附带 4 状态计数与服务名/类目（join 产品与 SPU）。"""
