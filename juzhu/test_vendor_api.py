@@ -26,23 +26,26 @@ import urllib.request
 # ── 测试环境（商家：来来 vendor_id=41） ──
 BASE = os.environ.get("JUZHU_TEST_BASE", "http://49.232.103.71:8765")
 VENDOR_ID = 41
-# 密钥不硬编码：从 hmac_secret.key（gitignore 屏蔽）按 vendor_id 读取
-_KEY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hmac_secret.key")
+# 密钥不硬编码：从 jz_vendors 表按 vendor_id 读取（hmac_secret.key 已废弃）
 
 auth = None  # HmacAuth 实例，模块加载后初始化
 
 
 def _load_secret(vendor_id: int) -> str:
-    """从 hmac_secret.key（格式: vendor_id|hmac_key|url_link）读取指定商家密钥。"""
-    with open(_KEY_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split("|")
-            if len(parts) >= 2 and parts[0] == str(vendor_id):
-                return parts[1]
-    raise RuntimeError(f"hmac_secret.key 中未找到 vendor_id={vendor_id} 的密钥")
+    """从 jz_vendors 表读取指定商家 HMAC 密钥（迁移后密钥存表不存文件）。"""
+    from tp_client import load_dotenv
+
+    load_dotenv()
+    import db as jdb
+
+    conn = jdb.connect()
+    try:
+        row = conn.execute("SELECT hmac_key FROM jz_vendors WHERE id=?", (vendor_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row or not (row[0] or "").strip():
+        raise RuntimeError(f"jz_vendors 表中未找到 vendor_id={vendor_id} 的 hmac_key")
+    return row[0].strip()
 
 
 class HmacAuth:
