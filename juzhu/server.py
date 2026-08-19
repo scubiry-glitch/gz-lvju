@@ -860,7 +860,7 @@ class Handler(SimpleHTTPRequestHandler):
         if m and method == "POST":
             return self._rate_jz_order(m.group(1))
 
-        # === 生成微信小程序 URL Link（需 API Key） ===
+        # === 生成微信小程序 URL Link（C 端预约入口，匿名可调，见上方路由鉴权说明） ===
         if path == "/api/juzhu/jiazheng/wechat-link" and method == "POST":
             body = self._body()
             return jiazheng_api.handle_wechat_link(self, body)

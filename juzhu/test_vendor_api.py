@@ -138,7 +138,7 @@ def check(name: str, cond: bool, extra: str = ""):
 
 
 def main() -> int:
-    # 步骤计数：cities×2 + 查询×2 + 列表×2 + 写×10 + 回调×5 = 21
+    # 步骤计数：cities×2 + 类目/SPU×2 + 产品列表×2 + 产品写操作×11 + 回调×5 = 22
     steps = [
         ("/api/juzhu/jiazheng/vendor/cities/list", {"vendor_id": VENDOR_ID}, "城市列表（商家 41）"),
         ("/api/juzhu/jiazheng/vendor/cities/list", {"vendor_id": 42}, "城市列表（商家 42·多城）"),
