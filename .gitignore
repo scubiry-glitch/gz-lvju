@@ -14,5 +14,7 @@ juzhu/_housing_dump.json
 juzhu/_housing_dump.sql
 scripts/tp_call_log.json
 *.tp.local.json
-vendor/
+# vendor 默认忽略；jsbridge 离线包需入库供 npm file: 依赖
+vendor/*
+!vendor/lianjia-jsbridge3-1.1.6.tgz
 node_modules/
