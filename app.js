@@ -97,6 +97,7 @@ function getDbConfig() {
     charset: 'utf8mb4',
     collation: 'utf8mb4_general_ci',
     connectTimeout: 8000,
+    decimalNumbers: true,
   };
 }
 
@@ -462,6 +463,109 @@ function parseJsonFields(row, fields, defaultVal) {
     row[f] = (typeof v === 'string') ? fallback : v;
   }
   return row;
+}
+
+// ==== 家政 SKU 详情契约 helper（对齐 Python 版 jiazheng_db.py）====
+const VENDOR_BADGE_LABELS = {
+  whitelist: '白名单商家',
+  backcheck: '平台背调',
+  insurance: '已投保',
+  top10: '销量榜单',
+  commitment: '不满意重做',
+};
+const WORKER_CERT_LABELS = {
+  id_card: '实名认证',
+  health: '健康证',
+  skill: '技能证',
+  insurance: '保险保障',
+};
+const CATEGORY_REVIEW_FALLBACKS = {
+  cleaning: [
+    { name: '张*华', score: 5, tags: ['准时', '干净', '细致'], text: '阿姨很专业，卫生间和厨房的死角都处理得很干净。', created_at: '近 30 天' },
+    { name: '李*', score: 5, tags: ['专业', '周到'], text: '沟通顺畅，工具带得很全，整体体验很稳。', created_at: '近 60 天' },
+    { name: '王*', score: 4, tags: ['态度好'], text: '服务过程细致，结束后还主动提醒后续保洁建议。', created_at: '近 90 天' },
+  ],
+  repair: [
+    { name: '周*', score: 5, tags: ['上门快', '专业'], text: '师傅到得很快，问题定位清楚，维修过程也规范。', created_at: '近 30 天' },
+    { name: '孙*', score: 5, tags: ['讲解清楚'], text: '处理完后把原因和后续注意事项都交代明白了。', created_at: '近 60 天' },
+    { name: '赵*', score: 4, tags: ['态度好'], text: '响应速度不错，价格透明，适合家里突发维修。', created_at: '近 90 天' },
+  ],
+  moving: [
+    { name: '陈*', score: 5, tags: ['守时', '稳妥'], text: '搬运师傅动作熟练，大件包裹保护做得很好。', created_at: '近 30 天' },
+    { name: '钱*', score: 5, tags: ['效率高'], text: '装车和还原都很快，流程也很省心。', created_at: '近 60 天' },
+    { name: '吴*', score: 4, tags: ['态度好'], text: '整体体验稳定，适合家庭同城搬家预约。', created_at: '近 90 天' },
+  ],
+  nanny: [
+    { name: '刘*', score: 5, tags: ['耐心', '专业'], text: '阿姨沟通温和，照护和家务安排都比较有条理。', created_at: '近 30 天' },
+    { name: '许*', score: 5, tags: ['准时', '放心'], text: '平台认证和背调信息完整，看起来更安心。', created_at: '近 60 天' },
+    { name: '何*', score: 4, tags: ['细致'], text: '整体服务比较稳，适合长期预约。', created_at: '近 90 天' },
+  ],
+};
+
+// 把 rank_type + rank_label 组合成 rank 嵌套对象（对齐 Python _row_to_dict）
+function composeRank(row) {
+  if (row.rank_type || row.rank_label) {
+    row.rank = (row.rank_type && row.rank_label) ? { type: row.rank_type, label: row.rank_label } : null;
+  }
+  return row;
+}
+
+function vendorAuthBadges(vendor) {
+  const badges = [];
+  if (vendor.whitelist_id) badges.push('白名单商家');
+  const rank = vendor.rank || {};
+  if (rank.label && !badges.includes(rank.label)) badges.push(rank.label);
+  for (const key of (vendor.badges || [])) {
+    const label = VENDOR_BADGE_LABELS[key];
+    if (label && !badges.includes(label)) badges.push(label);
+  }
+  if (vendor.live) badges.push('在线接单');
+  return badges.slice(0, 5);
+}
+
+function workerAuthBadges(worker) {
+  const badges = [];
+  if (worker.is_whitelisted) badges.push('白名单服务者');
+  for (const key of (worker.certs || [])) {
+    const label = WORKER_CERT_LABELS[key];
+    if (label && !badges.includes(label)) badges.push(label);
+  }
+  return badges.slice(0, 5);
+}
+
+function maskPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length >= 4) return digits[0] + '**' + digits[digits.length - 1];
+  return '匿名用户';
+}
+
+function reviewReply(vendorName, score) {
+  if (score >= 5) return (vendorName || '商家') + '：感谢认可，我们会继续按认证标准完成每次上门服务。';
+  if (score >= 4) return (vendorName || '商家') + '：感谢反馈，我们会继续优化服务细节与响应体验。';
+  return '';
+}
+
+function merchantIntroOf(vendor, product) {
+  const intro = {
+    summary: '',
+    stats: [],
+    service_flow: ['线上预约 + 确认时间', '平台派单 + 服务者确认', '按标准上门服务', '服务完成 + 记录回传', '客户评价 + 信用回流'],
+    guarantees: ['服务前 2 小时可免费取消', '服务前 2 小时内取消扣 30%', '服务开始后不可取消', '认证商家按平台标准提供售后处理'],
+  };
+  if (!vendor) return intro;
+  const vendorName = vendor.name || '认证商家';
+  const category = (product && product.category) || vendor.type || '家政';
+  const subtitle = (product && product.subtitle) || (product && product.title) || '';
+  intro.summary = vendorName + ' 提供 ' + category + ' 服务，覆盖 '
+    + (vendor.address || '本地核心区域') + '，营业时段 ' + (vendor.hours || '08:00-22:00') + '。'
+    + (subtitle ? subtitle + '。' : '')
+    + '平台展示的商家、服务者认证状态与评价会同步回流到详情页，便于下单前判断履约稳定性。';
+  intro.stats = [
+    { label: '服务评分', value: String(vendor.rating || '4.8') },
+    { label: '累计评价', value: String(vendor.review_count || 0) },
+    { label: '起订价格', value: '¥' + (vendor.start_price || 0) + '/' + (vendor.unit || '次') },
+  ];
+  return intro;
 }
 
 // 确保 MySQL 中存在必要的表（MySQL 语法，CREATE TABLE IF NOT EXISTS）
@@ -1994,45 +2098,153 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       sql += ' ORDER BY s.category_id, s.sort_order, s.id';
       const rows = await queryRows(sql, params);
-      const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
+      const SKU_JSON_FIELDS = ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice'];
       rows.forEach(r => parseJsonFields(r, SKU_JSON_FIELDS));
       return jsonReply(res, { items: rows });
     }
 
-    // GET /api/juzhu/jiazheng/skus/:slug
+    // GET /api/juzhu/jiazheng/skus/:slug（C 端详情：对齐 Python 版字段契约）
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)$/);
       if (m && req.method === 'GET') {
         const slug = decodeURIComponent(m[1]);
         const skus = await queryRows(
-          `SELECT s.*, c.name AS category_name FROM jz_skus s
-           JOIN jz_categories c ON c.id=s.category_id
-           WHERE s.slug=? AND s.enabled=1`,
+          `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                  (SELECT MIN(p.price) FROM jz_products p
+                   WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+           FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1 AND c.enabled=1`,
           [slug]
         );
         if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
-        const sku = skus[0];
+        const item = skus[0];
+        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice']);
+
         const qp = new URLSearchParams(qs);
         const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
-        let vendorSql = `SELECT v.*, p.id AS product_id, p.price, p.original_price,
-                           p.title, p.subtitle, p.sales_count, p.rating AS product_rating,
-                           p.service_tags, p.advance_booking_hours
-                         FROM jz_vendors v
-                         JOIN jz_products p ON p.vendor_id=v.id
+        const cityName = (qp.get('city') || '').trim();
+        let cityId = null;
+        if (cityName) {
+          const cityRows = await queryRows('SELECT id FROM cities WHERE name=? OR slug=? LIMIT 1', [cityName, cityName]);
+          if (cityRows.length) cityId = cityRows[0].id;
+        }
+
+        // products：同 SPU 全部上架商品（双维度城市过滤，对齐 Python list_channel_sku_products）
+        let prodSql = `SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
+                         v.rating AS vendor_rating, v.review_count AS vendor_review_count,
+                         v.type AS vendor_type
+                       FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
+                       WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
+        const prodParams = [item.id];
+        if (vendorId) { prodSql += ' AND p.vendor_id=?'; prodParams.push(vendorId); }
+        if (cityId !== null) {
+          prodSql += ` AND p.city_id=? AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))`;
+          prodParams.push(cityId, String(cityId));
+        }
+        prodSql += ' ORDER BY p.rating DESC, p.sales_count DESC, p.id';
+        const products = await queryRows(prodSql, prodParams);
+        products.forEach(p => parseJsonFields(p, ['service_tags']));
+
+        // vendor：默认商品对应的商家（剥离密钥 + auth_badges）
+        let product = null;
+        let vendor = null;
+        let workers = [];
+        let reviews = [];
+        if (products.length) {
+          product = products[0];
+          const vrows = await queryRows('SELECT * FROM jz_vendors WHERE id=?', [product.vendor_id]);
+          if (vrows.length) {
+            vendor = vrows[0];
+            for (const f of ['hmac_key', 'url_link', 'order_detail_url']) delete vendor[f];
+            parseJsonFields(vendor, ['badges']);
+            composeRank(vendor);
+            vendor.auth_badges = vendorAuthBadges(vendor);
+            // workers：默认商品绑定的服务者优先，无绑定回退商家全员，取前 4
+            workers = await queryRows(
+              `SELECT w.* FROM jz_sku_workers sw JOIN jz_workers w ON w.id=sw.worker_id
+               WHERE sw.product_id=? ORDER BY w.level DESC, w.rating DESC`, [product.id]
+            );
+            if (!workers.length) {
+              workers = await queryRows(
+                `SELECT * FROM jz_workers WHERE vendor_id=? AND status='active' ORDER BY level DESC, rating DESC LIMIT 4`, [vendor.id]
+              );
+            }
+            workers = workers.slice(0, 4);
+            workers.forEach(w => { parseJsonFields(w, ['certs', 'tags']); w.auth_badges = workerAuthBadges(w); });
+          }
+        }
+
+        // vendors：多商家同款（比价/切换，对齐 Python list_channel_sku_vendors）
+        let vendorSql = `SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,
+                           p.rating AS product_rating, p.sales_count,
+                           v.id AS vendor_id, v.name AS vendor_name, v.logo AS vendor_logo,
+                           v.rating AS vendor_rating, v.review_count, v.rank_label, v.badges
+                         FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
                          WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
-        const vParams = [sku.id];
-        if (vendorId) { vendorSql += ' AND v.id=?'; vParams.push(vendorId); }
-        vendorSql += ' ORDER BY v.sort_order, v.id LIMIT 10';
-        const vendors = await queryRows(vendorSql, vParams);
+        const vParams = [item.id];
+        if (cityId !== null) {
+          vendorSql += ` AND p.city_id=? AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))`;
+          vParams.push(cityId, String(cityId));
+        }
+        vendorSql += ' ORDER BY p.rating DESC, p.sales_count DESC, p.id';
+        const vendorRows = await queryRows(vendorSql, vParams);
+        const vendors = [];
+        const seenVendor = new Set();
+        for (const row of vendorRows) {
+          if (seenVendor.has(row.vendor_id)) continue;  // 一商家一行：同 vendor 多 product 取评分最高的
+          seenVendor.add(row.vendor_id);
+          parseJsonFields(row, ['badges']);
+          row.auth_badges = vendorAuthBadges(row);
+          vendors.push(row);
+        }
+
+        // related：同 category 的 4 个 SPU
         const related = await queryRows(
           `SELECT id, name, slug, cover_image, price_from, price_unit, rating_score, category_id
-           FROM jz_skus WHERE enabled=1 AND id!=? ORDER BY sort_order LIMIT 4`,
-          [sku.id]
+           FROM jz_skus WHERE enabled=1 AND category_id=? AND slug<>? ORDER BY sort_order, id LIMIT 4`,
+          [item.category_id, item.slug]
         );
-        const SKU_JSON_FIELDS = ['tags', 'badges', 'includes', 'service_flow', 'service_notice'];
-        parseJsonFields(sku, SKU_JSON_FIELDS);
-        vendors.forEach(v => parseJsonFields(v, ['service_tags']));
-        return jsonReply(res, { sku, vendors, related });
+        related.forEach(r => parseJsonFields(r, ['gallery', 'tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+
+        // reviews：真实评价优先，不足 3 条补类目 fallback（对齐 Python _review_rows/_fallback_reviews）
+        if (products.length) {
+          const ids = products.slice(0, 8).map(p => p.id);
+          const ph = ids.map(() => '?').join(',');
+          const orderRows = await queryRows(
+            `SELECT o.*, s.name AS sku_name FROM jz_orders o
+             LEFT JOIN jz_products p ON p.id=o.sku_id
+             LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+             WHERE o.rating_json IS NOT NULL AND o.rating_json<>'' AND o.sku_id IN (${ph})
+             ORDER BY COALESCE(o.updated_at, o.created_at) DESC LIMIT 6`,
+            ids
+          );
+          for (const row of orderRows) {
+            let rating = null;
+            try { rating = JSON.parse(row.rating_json); } catch (e) { /* 非法 JSON 跳过 */ }
+            if (!rating || !rating.score) continue;
+            const score = parseFloat(rating.score) || 0;
+            reviews.push({
+              name: maskPhone(row.phone),
+              score,
+              tags: rating.tags || [],
+              text: rating.text || ((row.sku_name || '本次服务') + '整体完成较稳定。'),
+              created_at: (rating.created_at || row.updated_at || row.created_at || '').replace('T', ' ').replace('Z', '').slice(0, 16),
+              reply: reviewReply(vendor && vendor.name, score),
+            });
+          }
+          if (reviews.length < 3 && vendor) {
+            const fallback = CATEGORY_REVIEW_FALLBACKS[item.category_id] || CATEGORY_REVIEW_FALLBACKS[vendor.type] || CATEGORY_REVIEW_FALLBACKS.cleaning;
+            for (const f of fallback) {
+              if (reviews.length >= 4) break;
+              reviews.push(Object.assign({}, f, { reply: reviewReply(vendor.name, f.score || 0) }));
+            }
+          }
+        }
+
+        // merchant_intro（对齐 Python _merchant_intro）
+        const merchant_intro = merchantIntroOf(vendor, product);
+
+        return jsonReply(res, { item, related, product, products, vendor, vendors, workers, reviews, merchant_intro });
       }
     }
 
@@ -2739,17 +2951,35 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
-    // GET /api/juzhu/jz/products
+    // GET /api/juzhu/jz/products（B 端产品管理：对齐 Python 版 list_products 字段契约）
     if (urlPath === '/api/juzhu/jz/products' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
-      let sql = 'SELECT p.*, v.name AS vendor_name, v.type AS vendor_type FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id WHERE 1=1';
+      let sql = `SELECT p.*, v.name AS vendor_name, v.type AS vendor_type,
+                   COALESCE(s.category_id, v.type) AS product_category,
+                   c.name AS city_name
+                 FROM jz_products p
+                 LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+                 LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+                 LEFT JOIN cities c ON c.id=p.city_id
+                 WHERE 1=1`;
       const params = [];
       if (qp.get('vendor_id')) { sql += ' AND p.vendor_id=?'; params.push(parseInt(qp.get('vendor_id'))); }
-      if (qp.get('type')) { sql += ' AND v.type=?'; params.push(qp.get('type')); }
+      if (qp.get('type')) { sql += ' AND COALESCE(s.category_id, v.type)=?'; params.push(qp.get('type')); }
       if (qp.get('status')) { sql += ' AND p.status=?'; params.push(qp.get('status')); }
       sql += ' ORDER BY p.vendor_id, p.sort_order, p.id LIMIT 200';
       const rows = await queryRows(sql, params);
       rows.forEach(r => parseJsonFields(r, ['service_tags']));
+      // 附加：引用的 SPU 名 + 绑定服务者 id 列表（对齐 Python 版 list_products）
+      for (const row of rows) {
+        const workerRows = await queryRows('SELECT worker_id FROM jz_sku_workers WHERE product_id=?', [row.id]);
+        row.worker_ids = workerRows.map(w => w.worker_id);
+        if (row.channel_sku_id) {
+          const spuRows = await queryRows('SELECT name FROM jz_skus WHERE id=?', [row.channel_sku_id]);
+          row.spu_name = spuRows.length ? spuRows[0].name : null;
+        } else {
+          row.spu_name = null;
+        }
+      }
       return jsonReply(res, { list: rows });
     }
 
