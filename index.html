@@ -284,7 +284,7 @@
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
 <script src="screens/_jzapi.js?v=3"></script>
-<script src="juzhu/app.js?v=20"></script>
+<script src="juzhu/app.js?v=21"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -663,7 +663,7 @@
   document.getElementById('navCitySub').addEventListener('click', openCitySheet);
   // —— 后端配置：读取 settings 控制城市切换器显隐 ——
   (function(){
-    fetch('/api/juzhu/settings').then(function(r){ return r.json(); }).then(function(s){
+    JUZHU.loadSettings().then(function(s){
       if (!s.show_city_switcher) {
         var sub = document.getElementById('navCitySub');
         if (sub) { sub.classList.remove('city-tap'); sub.style.cursor = 'default'; }
@@ -690,7 +690,7 @@
     closeCitySheet();
   });
 
-  Promise.all([JUZHU.load(), JUZHU.loadSettings()]).then(function(results) {
+  Promise.all([JUZHU.load({ lite: true }), JUZHU.loadSettings()]).then(function(results) {
     var d = results[0];
     lastData = d;
     // 城市来源优先级：URL ?city= 直链（只读）> localStorage 用户选择 > 后端数据城市兜底。

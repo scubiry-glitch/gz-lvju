@@ -287,15 +287,38 @@ module.exports.validateRealPhone = validateRealPhone;
 module.exports.contactPhoneFromBody = contactPhoneFromBody;
 module.exports.stripContactPhone = stripContactPhone;
 
-async function queryRows(sql, params) {
+let _pool = null;
+function getPool() {
   if (!mysql2) throw new Error('mysql2 not available');
-  const conn = await mysql2.createConnection(getDbConfig());
-  try {
-    const [rows] = await conn.execute(sql, params || []);
-    return rows;
-  } finally {
-    await conn.end();
+  if (!_pool) {
+    _pool = mysql2.createPool(Object.assign({}, getDbConfig(), {
+      waitForConnections: true,
+      connectionLimit: 8,
+      queueLimit: 0,
+      enableKeepAlive: true,
+    }));
   }
+  return _pool;
+}
+
+async function queryRows(sql, params) {
+  const [rows] = await getPool().execute(sql, params || []);
+  return rows;
+}
+
+const CATALOG_TTL_MS = 15000;
+const catalogMemo = new Map();
+function catalogMemoGet(key) {
+  const hit = catalogMemo.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.exp) {
+    catalogMemo.delete(key);
+    return null;
+  }
+  return hit.val;
+}
+function catalogMemoSet(key, val) {
+  catalogMemo.set(key, { val, exp: Date.now() + CATALOG_TTL_MS });
 }
 
 /** city_ids 里可能是数字 id（1,2,3）或城市名；C 端常传「沈阳」 */
@@ -443,8 +466,17 @@ function parseJsonFields(row, fields, defaultVal) {
 
 // 确保 MySQL 中存在必要的表（MySQL 语法，CREATE TABLE IF NOT EXISTS）
 let schemaEnsured = false;
+let schemaPromise = null;
 async function ensureSchema() {
   if (schemaEnsured || !mysql2) return;
+  if (schemaPromise) return schemaPromise;
+  schemaPromise = ensureSchemaRun().catch(function (err) {
+    schemaPromise = null;
+    throw err;
+  });
+  return schemaPromise;
+}
+async function ensureSchemaRun() {
   const conn = await mysql2.createConnection(getDbConfig());
   try {
     const ddls = [
@@ -2078,9 +2110,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // GET /api/juzhu/catalog?city=shenyang —— C 端保租房整包（替代 data.json）
+    // lite=1：首页首屏只要城市/区/项目封面与统计，不下发户型与全量 photos
     if (urlPath === '/api/juzhu/catalog' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
       const cityKey = (qp.get('city') || '').trim();
+      const lite = qp.get('lite') === '1' || qp.get('lite') === 'true';
+      const memoKey = (lite ? 'L:' : 'F:') + (cityKey || '_');
+      const cached = catalogMemoGet(memoKey);
+      if (cached) return jsonReply(res, cached);
       let cities = [];
       if (cityKey) {
         cities = await queryRows('SELECT * FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
@@ -2093,12 +2130,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
       const city = cities[0];
-      const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
-      const districts = await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]);
-      const projects = await queryRows('SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order, id', [city.id]);
+      const [channels, districts, projects] = await Promise.all([
+        queryRows('SELECT * FROM channels ORDER BY sort_order, id'),
+        queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]),
+        queryRows('SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order, id', [city.id]),
+      ]);
       const projectIds = projects.map((p) => p.id);
       let units = [];
-      if (projectIds.length) {
+      if (!lite && projectIds.length) {
         units = await queryRows(
           `SELECT * FROM units WHERE project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY sort_order, id`,
           projectIds
@@ -2108,17 +2147,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const districtIds = districts.map((d) => d.id);
       const photoClauses = [];
       const photoParams = [];
-      if (districtIds.length) {
-        photoClauses.push(`(entity_type='district' AND entity_id IN (${districtIds.map(() => '?').join(',')}))`);
-        photoParams.push(...districtIds);
-      }
-      if (projectIds.length) {
-        photoClauses.push(`(entity_type='project' AND entity_id IN (${projectIds.map(() => '?').join(',')}))`);
-        photoParams.push(...projectIds);
-      }
-      if (unitIds.length) {
-        photoClauses.push(`(entity_type='unit' AND entity_id IN (${unitIds.map(() => '?').join(',')}))`);
-        photoParams.push(...unitIds);
+      if (!lite) {
+        if (districtIds.length) {
+          photoClauses.push(`(entity_type='district' AND entity_id IN (${districtIds.map(() => '?').join(',')}))`);
+          photoParams.push(...districtIds);
+        }
+        if (projectIds.length) {
+          photoClauses.push(`(entity_type='project' AND entity_id IN (${projectIds.map(() => '?').join(',')}))`);
+          photoParams.push(...projectIds);
+        }
+        if (unitIds.length) {
+          photoClauses.push(`(entity_type='unit' AND entity_id IN (${unitIds.map(() => '?').join(',')}))`);
+          photoParams.push(...unitIds);
+        }
       }
       let photos = [];
       if (photoClauses.length) {
@@ -2151,6 +2192,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         },
       };
       if (housingHydrateCoverFields) housingHydrateCoverFields(catalog);
+      catalogMemoSet(memoKey, catalog);
       return jsonReply(res, catalog);
     }
 

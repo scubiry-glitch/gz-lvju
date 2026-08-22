@@ -2,6 +2,7 @@
 window.JUZHU = (function () {
   var cache = null;
   var _settings = null;
+  var _settingsP = null;
   var DEFAULT_CHANNEL_NAME = '新居住频道';
 
   function channelBrand(raw) {
@@ -16,13 +17,15 @@ window.JUZHU = (function () {
 
   function loadSettings() {
     if (_settings) return Promise.resolve(_settings);
-    return fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
+    if (_settingsP) return _settingsP;
+    _settingsP = fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
       _settings = s;
       return s;
     }).catch(function() {
       _settings = { show_city_switcher: true, show_life_service: true, channel_name: DEFAULT_CHANNEL_NAME };
       return _settings;
     });
+    return _settingsP;
   }
 
   function resolveCityHint() {
@@ -93,9 +96,12 @@ window.JUZHU = (function () {
     return d;
   }
 
-  function loadFromCatalog() {
+  function loadFromCatalog(lite) {
     var city = resolveCityHint();
-    var qs = city ? ('?city=' + encodeURIComponent(city)) : '';
+    var parts = [];
+    if (city) parts.push('city=' + encodeURIComponent(city));
+    if (lite) parts.push('lite=1');
+    var qs = parts.length ? ('?' + parts.join('&')) : '';
     return fetch('/api/juzhu/catalog' + qs).then(function (r) {
       if (!r.ok) throw new Error('catalog http ' + r.status);
       return r.json();
@@ -121,9 +127,11 @@ window.JUZHU = (function () {
     });
   }
 
-  function load() {
+  function load(opts) {
+    opts = opts || {};
     if (cache) return Promise.resolve(cache);
-    return loadFromCatalog().catch(function () {
+    var lite = !!opts.lite;
+    return loadFromCatalog(lite).catch(function () {
       return loadFromJson();
     }).then(function (d) {
       cache = normalizeCatalog(d);

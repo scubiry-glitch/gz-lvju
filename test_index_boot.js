@@ -24,8 +24,8 @@ function testRevealAfterCatalogPaint() {
   const reveal = html.includes("classList.remove('is-booting')")
     || html.includes('classList.remove("is-booting")');
   assert.ok(reveal, 'catalog 渲染后必须摘掉 is-booting');
-  const loadIdx = html.indexOf('Promise.all([JUZHU.load()');
-  assert.ok(loadIdx > 0, '应在 JUZHU.load 完成后揭开首屏');
+  const loadIdx = html.indexOf('Promise.all([JUZHU.load({ lite: true })');
+  assert.ok(loadIdx > 0, '应在 JUZHU.load({ lite: true }) 完成后揭开首屏');
   const afterLoad = html.slice(loadIdx);
   assert.ok(
     afterLoad.includes("classList.remove('is-booting')")
