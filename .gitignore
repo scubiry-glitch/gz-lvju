@@ -5,6 +5,8 @@ db.sqlite
 *.sqlite
 *.sqlite3
 publish_test.sh
+stop_test.sh
+start_test.sh
 # 裸 .env 不入库；.env.prod / .env.test 等按环境文件可跟踪
 .env
 juzhu/config.ini
