@@ -5,6 +5,8 @@ db.sqlite
 *.sqlite
 *.sqlite3
 publish_test.sh
+stop_test.sh
+start_test.sh
 # 话务密钥与联调产物（禁止入库）；GitHub 不跟踪运行时环境文件
 .env
 .env.*
