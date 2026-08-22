@@ -276,8 +276,9 @@
     </div>
   </div>
 </div>
+<script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=2"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script src="juzhu/app.js?v=16"></script>
 <script>
 (function(){
@@ -551,11 +552,27 @@
   paintJzLinks();
   if (window.BZF_JZ && BZF_JZ.onCityChange) BZF_JZ.onCityChange(paintJzLinks);
 
-  // —— 我的订单快捷入口：user_id 为模拟值；接口失败时整块隐藏（禁用硬编码兜底）——
+  // —— 用户身份：App 内经 @lianjia/jsbridge3 注入取 userId；获取不到则视为未登录 ——
+  // 前置：h5 域名须在 App 白名单（ke.com/lianjia.com/zufangzi.com 主域），否则 App 不注入 jsbridge
+  // 未登录：不使用模拟用户，隐藏"我的订单"模块；下单拦截见 juzhu-jiazheng-detail.html
   (function(){
     if (!window.BZF_JZ) return;
-    // 模拟用户 id（后期替换为真实获取用户 id 的代码）
-    BZF_JZ.setUserId('demo_user_001');
+    var uid = BZF_JZ.bridgeUserId();
+    if (uid) {
+      try { console.log('[jsbridge3] userId=' + uid); } catch (e) {}
+    } else {
+      try { console.log('[jsbridge3] 未获取到用户信息（非 App 环境或未登录）'); } catch (e) {}
+      var sec = document.getElementById('jzSecOrders');
+      var bar = document.getElementById('jzOrderBar');
+      if (sec) sec.style.display = 'none';
+      if (bar) bar.style.display = 'none';
+    }
+  })();
+
+  // —— 我的订单快捷入口：仅登录后加载；接口失败时整块隐藏（禁用硬编码兜底）——
+  (function(){
+    if (!window.BZF_JZ) return;
+    if (!BZF_JZ.userId()) return; // 未登录：模块已在上方隐藏，且不发起请求
     var STATUS_UI = [
       { id: 'paid',      ic: '💳',   label: '已支付' },
       { id: 'assigned',  ic: '🧑‍🔧', label: '已派单' },

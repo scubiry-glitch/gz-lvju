@@ -369,17 +369,35 @@
   }
   applyDemoMode();
 
-  // 模拟用户 id（后期替换为真实获取用户 id 的代码）
+  // 用户 id：App 内经 jsbridge3（window.JsBridgeV3）获取真实值后 setUserId 写入；
+  // 获取不到时返回 null，不兜底演示 id（未登录态由页面自行处理：隐藏模块/提示登录）。
   var USER_KEY = 'jz_demo_user_id';
-  var DEMO_USER_ID = 'demo_user_001';
 
   function userId() {
-    try { return localStorage.getItem(USER_KEY) || DEMO_USER_ID; } catch (e) { return DEMO_USER_ID; }
+    try { return localStorage.getItem(USER_KEY) || null; } catch (e) { return null; }
   }
 
   function setUserId(id) {
-    try { if (id) localStorage.setItem(USER_KEY, id); } catch (e) {}
+    try {
+      if (id) localStorage.setItem(USER_KEY, id);
+      else localStorage.removeItem(USER_KEY); // 清空残留的旧演示用户
+    } catch (e) {}
     return userId();
+  }
+
+  // 从 App 注入的 jsbridge3 同步解析用户身份：成功写入并返回 userId，失败/无注入清空返回 null。
+  // 需页面先引入根目录 jsbridgesdk.js（挂载 window.JsBridgeV3）。
+  function bridgeUserId() {
+    var uid = '';
+    try {
+      if (window.JsBridgeV3) {
+        JsBridgeV3.init({ preventDomainSetting: true }); // v3 需业务主动 init；token 前端透传，不种主域 cookie
+        var u = JsBridgeV3.getUserInfo() || {};
+        uid = u.userId || u.user_id || u.uid || u.ucid || '';
+      }
+    } catch (e) { /* 非 App 环境无注入 */ }
+    setUserId(uid ? String(uid) : '');
+    return uid ? String(uid) : null;
   }
 
   window.BZF_JZ = {
@@ -412,6 +430,7 @@
     regionCapital: regionCapital,
     userId: userId,
     setUserId: setUserId,
+    bridgeUserId: bridgeUserId,
     regionCities: regionCities,
     regionCityTree: regionCityTree,
     regionProvinces: regionProvinces,

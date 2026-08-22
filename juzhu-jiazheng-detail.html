@@ -238,8 +238,9 @@
   <div class="spinner"></div>
   <div class="text">正在生成预约链接…</div>
 </div>
+<script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=2"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -586,6 +587,11 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
+    // 登录拦截：App 内经 jsbridge3 获取用户身份，取不到（非 App 环境或未登录）不生成小程序链接
+    if (!JZ.userId() && !JZ.bridgeUserId()) {
+      toast('暂未登录，请登录后重试');
+      return;
+    }
     // 显示 loading
     var overlay = document.getElementById('loadingOverlay');
     overlay.classList.add('on');
