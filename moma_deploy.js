@@ -90,7 +90,7 @@ const os = require('os');
     });
   }
 
-  const serviceId = env === 'prod' ? 'btg-serverless' : 'gpt-api';
+  const serviceId = 'btg-serverless';
   const commonHeaders = { 'X-Email-Prefix': emailPrefix, 'X-User-Ucid': ucid };
   const jsonHeaders = { ...commonHeaders, 'Content-Type': 'application/json' };
 

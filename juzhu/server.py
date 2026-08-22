@@ -70,6 +70,7 @@ _SENSITIVE_NAMES = {
     ".env.example",
     ".env.prod",
     ".env.test",
+    "runtime.env",
     ".git",
     ".gitignore",
     ".DS_Store",
@@ -106,6 +107,7 @@ _SENSITIVE_SUFFIXES = (
     ".pfx",
     ".sh",
     ".md",
+    ".cjs",
 )
 _API_DOC_BASENAMES = {
     "api-document.html",
@@ -672,6 +674,12 @@ class Handler(SimpleHTTPRequestHandler):
         )
         return False
 
+    def _require_admin_authorized(self):
+        """管理页登录 token 或 API Key 均可（与 Node isAdminSessionAuthorized 对齐）。"""
+        if self._verify_admin_token(self._provided_bearer()):
+            return True
+        return self._require_api_key()
+
     def _admin_login(self):
         body = self._body() or {}
         password = (body.get("password") or "").strip()
@@ -706,9 +714,9 @@ class Handler(SimpleHTTPRequestHandler):
         if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):
             return self._jiazheng_post(path, qs, method)
 
-        # /api/juzhu/admin/* 全方法（含 GET）均需 API Key；此前仅写接口鉴权 → 读接口未授权
+        # /api/juzhu/admin/* 全方法（含 GET）均需登录会话或 API Key
         if path.startswith(ADMIN_PREFIX):
-            if not self._require_api_key():
+            if not self._require_admin_authorized():
                 return
         # wechat-link 为 C 端预约入口，匿名可调（与评价类似）；写单/派单等仍需 API Key
         elif method != "GET" and (
@@ -767,6 +775,23 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path == f"{ADMIN_PREFIX}/dictionary" and method == "GET":
             return self._get_dictionary(qs)
+
+        if path == f"{ADMIN_PREFIX}/cities" and method == "GET":
+            conn = connect()
+            data = rows_to_list(conn.execute("SELECT * FROM cities ORDER BY id"))
+            conn.close()
+            return self._json(data)
+
+        if path == f"{ADMIN_PREFIX}/cities" and method == "POST":
+            return self._create_city()
+
+        m = re.match(rf"^{ADMIN_PREFIX}/cities/(\d+)$", path)
+        if m:
+            cid = int(m.group(1))
+            if method == "PUT":
+                return self._update_city_by_id(cid)
+            if method == "DELETE":
+                return self._delete_city(cid)
 
         if path == f"{ADMIN_PREFIX}/city" and method == "PUT":
             return self._update_city()
@@ -912,6 +937,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "booking_phone": row[0] if row else None,
                 "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
                 "show_life_service": settings.get("show_life_service", "1") == "1",
+                "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
             })
 
         if path == "/api/juzhu/districts":
@@ -2584,11 +2610,20 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
             "booking_phone": row[0] if row else None,
             "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
             "show_life_service": settings.get("show_life_service", "1") == "1",
+            "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
         })
 
     def _update_settings(self):
         body = self._body()
         phone = (body.get("booking_phone") or "").strip() or None
+        channel_out = None
+        if "channel_name" in body:
+            name = (body.get("channel_name") or "").strip()
+            if not name:
+                return self._json({"error": "频道名称不能为空"}, 400)
+            if len(name) > 32:
+                return self._json({"error": "频道名称最多 32 字"}, 400)
+            channel_out = name
         conn = connect()
         if phone is not None:
             cid = body.get("city_id")
@@ -2607,49 +2642,166 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
                     "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
                     (k, v),
                 )
+        if channel_out is not None:
+            conn.execute(
+                "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
+                ("channel_name", channel_out),
+            )
         conn.commit()
         export_json(conn)
         conn.close()
-        return self._json({"ok": True, "booking_phone": phone})
+        out = {"ok": True, "booking_phone": phone}
+        if channel_out is not None:
+            out["channel_name"] = channel_out
+        return self._json(out)
 
     def _get_dictionary(self, qs=None):
         conn = connect()
         qs = qs or {}
+        cities = rows_to_list(conn.execute("SELECT * FROM cities ORDER BY id"))
         city_id = self._city_id(conn, qs)
+        city = None
         if city_id:
-            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (city_id,)).fetchone())
-            districts = rows_to_list(conn.execute("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id", (city_id,)))
-        else:
-            city = row_to_dict(conn.execute("SELECT * FROM cities ORDER BY id LIMIT 1").fetchone())
-            districts = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order, id"))
+            city = next((c for c in cities if c.get("id") == city_id), None)
+        if not city and cities:
+            city = cities[0]
+        districts = []
+        if city:
+            districts = rows_to_list(
+                conn.execute("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id", (city["id"],))
+            )
         channels = rows_to_list(conn.execute("SELECT * FROM channels ORDER BY sort_order, id"))
         conn.close()
-        return self._json({"city": city, "districts": districts, "channels": channels})
+        return self._json({"city": city, "cities": cities, "districts": districts, "channels": channels})
+
+    def _city_fields_from_body(self, body, require_name=True):
+        name = (body.get("name") or "").strip()
+        if require_name and not name:
+            return None, self._json({"error": "城市名称不能为空"}, 400)
+        if not require_name and "name" in body and not name:
+            return None, self._json({"error": "城市名称不能为空"}, 400)
+        fields = []
+        params = []
+        if name:
+            fields.append("name=?")
+            params.append(name)
+        if "slug" in body or name:
+            slug = (body.get("slug") or "").strip() or (slugify(name) if name else "")
+            if slug:
+                fields.append("slug=?")
+                params.append(slug)
+        if "booking_phone" in body:
+            fields.append("booking_phone=?")
+            params.append((body.get("booking_phone") or "").strip() or None)
+        if "hero_bg_image" in body:
+            fields.append("hero_bg_image=?")
+            params.append((body.get("hero_bg_image") or "").strip() or None)
+        if not fields:
+            return None, self._json({"error": "无更新字段"}, 400)
+        return (fields, params), None
+
+    def _create_city(self):
+        body = self._body()
+        parsed, err = self._city_fields_from_body(body, require_name=True)
+        if err:
+            return err
+        fields, params = parsed
+        cols = [f.split("=")[0] for f in fields]
+        conn = connect()
+        try:
+            conn.execute(
+                f"INSERT INTO cities({', '.join(cols)}) VALUES ({', '.join(['?'] * len(params))})",
+                params,
+            )
+            cid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.commit()
+            export_json(conn)
+            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
+            return self._json({"ok": True, "city": city}, 201)
+        except Exception as e:
+            msg = str(e)
+            if "uk_slug" in msg or "slug" in msg.lower():
+                return self._json({"error": "slug 已存在"}, 400)
+            if "uk_name" in msg or "name" in msg.lower():
+                return self._json({"error": "城市名称已存在"}, 400)
+            raise
+        finally:
+            conn.close()
+
+    def _update_city_by_id(self, cid):
+        body = self._body()
+        parsed, err = self._city_fields_from_body(body, require_name=False)
+        if err:
+            return err
+        fields, params = parsed
+        conn = connect()
+        if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+            conn.close()
+            return self._json({"error": "城市不存在"}, 404)
+        try:
+            params.append(cid)
+            conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
+            conn.commit()
+            export_json(conn)
+            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
+            return self._json({"ok": True, "city": city})
+        except Exception as e:
+            msg = str(e)
+            if "uk_slug" in msg or "slug" in msg.lower():
+                return self._json({"error": "slug 已存在"}, 400)
+            if "uk_name" in msg or "name" in msg.lower():
+                return self._json({"error": "城市名称已存在"}, 400)
+            raise
+        finally:
+            conn.close()
+
+    def _delete_city(self, cid):
+        conn = connect()
+        if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+            conn.close()
+            return self._json({"error": "城市不存在"}, 404)
+        city_n = conn.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
+        if city_n <= 1:
+            conn.close()
+            return self._json({"error": "至少保留一座城市"}, 400)
+        dist_n = conn.execute("SELECT COUNT(*) FROM districts WHERE city_id=?", (cid,)).fetchone()[0]
+        if dist_n:
+            conn.close()
+            return self._json({"error": f"该城市仍有 {dist_n} 个行政区，无法删除"}, 400)
+        proj_n = conn.execute("SELECT COUNT(*) FROM projects WHERE city_id=?", (cid,)).fetchone()[0]
+        if proj_n:
+            conn.close()
+            return self._json({"error": f"该城市仍有 {proj_n} 个项目，无法删除"}, 400)
+        conn.execute("DELETE FROM cities WHERE id=?", (cid,))
+        conn.commit()
+        export_json(conn)
+        conn.close()
+        return self._json({"ok": True})
 
     def _update_city(self):
         body = self._body()
-        name = (body.get("name") or "").strip()
-        slug = (body.get("slug") or "").strip()
-        if not name:
-            return self._json({"error": "城市名称不能为空"}, 400)
+        parsed, err = self._city_fields_from_body(body, require_name=True)
+        if err:
+            return err
+        fields, params = parsed
         conn = connect()
         cid = body.get("city_id")
         if not cid:
             row = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
             cid = row[0] if row else None
         if not cid:
-            conn.close()
-            return self._json({"error": "未找到城市"}, 404)
-        if not slug:
-            slug = slugify(name)
-        fields = ["name=?", "slug=?"]
-        params = [name, slug]
-        if "hero_bg_image" in body:
-            val = (body.get("hero_bg_image") or "").strip() or None
-            fields.append("hero_bg_image=?")
-            params.append(val)
-        params.append(cid)
-        conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
+            cols = [f.split("=")[0] for f in fields]
+            conn.execute(
+                f"INSERT INTO cities({', '.join(cols)}) VALUES ({', '.join(['?'] * len(params))})",
+                params,
+            )
+            cid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        else:
+            if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+                conn.close()
+                return self._json({"error": "城市不存在"}, 404)
+            params = list(params) + [cid]
+            conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
         conn.commit()
         export_json(conn)
         city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())

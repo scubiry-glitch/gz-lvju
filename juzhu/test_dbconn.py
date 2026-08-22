@@ -112,6 +112,11 @@ def t_config():
     assert cfg == {"host": "h", "port": 3307, "user": "u", "password": "p", "database": "d"}
     cfg2 = load_db_config({})
     assert cfg2["port"] == 3306 and cfg2["database"] == "juzhu"
+    cfg3 = load_db_config({
+        "MYSQL_HOST": "10.0.0.1", "MYSQL_PORT": "3308", "MYSQL_USER": "n",
+        "MYSQL_PASSWORD": "q", "MYSQL_DB": "demo",
+    })
+    assert cfg3 == {"host": "10.0.0.1", "port": 3308, "user": "n", "password": "q", "database": "demo"}
 
 
 def main():

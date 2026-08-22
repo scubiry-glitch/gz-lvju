@@ -29,11 +29,11 @@ import pymysql
 def load_db_config(environ=None):
     env = environ if environ is not None else os.environ
     return {
-        "host": env.get("JUZHU_DB_HOST") or "127.0.0.1",
-        "port": int(env.get("JUZHU_DB_PORT") or 3306),
-        "user": env.get("JUZHU_DB_USER") or "root",
-        "password": env.get("JUZHU_DB_PASSWORD") or "",
-        "database": env.get("JUZHU_DB_NAME") or "juzhu",
+        "host": env.get("JUZHU_DB_HOST") or env.get("MYSQL_HOST") or "127.0.0.1",
+        "port": int(env.get("JUZHU_DB_PORT") or env.get("MYSQL_PORT") or 3306),
+        "user": env.get("JUZHU_DB_USER") or env.get("MYSQL_USER") or "root",
+        "password": env.get("JUZHU_DB_PASSWORD") or env.get("MYSQL_PASSWORD") or "",
+        "database": env.get("JUZHU_DB_NAME") or env.get("MYSQL_DB") or "juzhu",
     }
 
 

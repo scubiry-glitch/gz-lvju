@@ -17,6 +17,7 @@ function assertAllow(p) {
 [
   '/.env',
   '/.env.prod',
+  '/runtime.env',
   '/package.json',
   '/.gitignore',
   '/README.md',
@@ -28,6 +29,8 @@ function assertAllow(p) {
   '/app.js',
   '/scf_bootstrap',
   '/moma_deploy.js',
+  '/migrate_to_mysql.cjs',
+  '/vendor_api.cjs',
   '/node_modules/mysql2/index.js',
 ].forEach(assertBlock);
 
@@ -37,6 +40,8 @@ function assertAllow(p) {
   '/juzhu/app.js',
   '/juzhu/cities.json',
   '/juzhu/data.json',
+  '/juzhu-admin.html',
+  '/juzhu-amdin.html',
   '/screens/p-jz-product.html',
 ].forEach(assertAllow);
 

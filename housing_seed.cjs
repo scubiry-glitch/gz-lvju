@@ -15,10 +15,76 @@ function parseJsonField(v) {
   if (v == null) return null;
   if (typeof v === 'object') return v;
   if (typeof v !== 'string') return v;
-  const s = v.trim();
-  if (!s) return v;
-  if (!(s.startsWith('[') || s.startsWith('{'))) return v;
-  try { return JSON.parse(s); } catch (_) { return v; }
+  let cur = v;
+  for (let i = 0; i < 8; i++) {
+    if (typeof cur !== 'string') return cur;
+    const s = cur.trim();
+    if (!s) return cur;
+    const looksJson = s.startsWith('[') || s.startsWith('{')
+      || (s.startsWith('"') && s.endsWith('"') && s.length >= 2);
+    if (!looksJson) return cur;
+    try { cur = JSON.parse(s); } catch (_) { return cur; }
+  }
+  return cur;
+}
+
+function coerceTags(tags) {
+  let v = parseJsonField(tags);
+  if (Array.isArray(v)) {
+    return v.map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
+  }
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (!s) return [];
+    return s.split(',').map((x) => x.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+/** 管理端写入 tags：始终存 JSON 数组文本，避免对字符串再 JSON.stringify 套娃 */
+function tagsToDb(tags) {
+  if (tags == null || tags === '') return null;
+  return JSON.stringify(coerceTags(tags));
+}
+
+function selectMissingUnits(snapUnits, projectIds, unitIds) {
+  const proj = projectIds instanceof Set ? projectIds : new Set(projectIds || []);
+  const have = unitIds instanceof Set ? unitIds : new Set(unitIds || []);
+  return (snapUnits || []).filter((u) => {
+    if (u == null || u.id == null) return false;
+    if (!proj.has(Number(u.project_id))) return false;
+    return !have.has(Number(u.id));
+  });
+}
+
+function pickCoverPath(photos, entityType, entityId) {
+  const id = Number(entityId);
+  const list = (photos || []).filter((p) => (
+    p && p.entity_type === entityType && Number(p.entity_id) === id
+  )).slice().sort((a, b) => {
+    const cover = (Number(b.is_cover) || 0) - (Number(a.is_cover) || 0);
+    if (cover) return cover;
+    const sort = (a.sort_order || 0) - (b.sort_order || 0);
+    if (sort) return sort;
+    return (a.id || 0) - (b.id || 0);
+  });
+  return (list[0] && list[0].file_path) || null;
+}
+
+function hydrateCoverFields(catalog) {
+  if (!catalog) return catalog;
+  const photos = catalog.photos || [];
+  function fill(list, type) {
+    (list || []).forEach((row) => {
+      if (!row || row.cover_image) return;
+      const path = pickCoverPath(photos, type, row.id);
+      if (path) row.cover_image = path;
+    });
+  }
+  fill(catalog.districts, 'district');
+  fill(catalog.projects, 'project');
+  fill(catalog.units, 'unit');
+  return catalog;
 }
 
 function snapshotFiles(juzhuDir) {
@@ -152,34 +218,108 @@ async function seedAll(conn, juzhuDir) {
   };
 }
 
-/** 项目已存在时仍补缺失户型图，并回写空的 cover_image */
+async function fillEmptyCoverColumn(conn, table, entityType) {
+  const [empties] = await conn.execute(
+    `SELECT id FROM ${table} WHERE cover_image IS NULL OR cover_image=''`
+  );
+  let n = 0;
+  for (const row of empties || []) {
+    const [ph] = await conn.execute(
+      `SELECT file_path FROM photos WHERE entity_type=? AND entity_id=?
+       ORDER BY is_cover DESC, sort_order, id LIMIT 1`,
+      [entityType, row.id]
+    );
+    if (!ph.length || !ph[0].file_path) continue;
+    const [r] = await conn.execute(
+      `UPDATE ${table} SET cover_image=? WHERE id=? AND (cover_image IS NULL OR cover_image='')`,
+      [ph[0].file_path, row.id]
+    );
+    n += r.affectedRows || 0;
+  }
+  return n;
+}
+
+/** 项目已存在时仍补缺失户型/图片，并回写空的 cover_image */
 async function backfillPhotos(conn, juzhuDir) {
   const dir = juzhuDir || path.join(__dirname, 'juzhu');
   const snap = loadSnapshots(dir);
+  const [projRows] = await conn.execute('SELECT id FROM projects');
+  const [unitRows] = await conn.execute('SELECT id FROM units');
+  const projectIds = new Set((projRows || []).map((r) => Number(r.id)));
+  const unitIds = new Set((unitRows || []).map((r) => Number(r.id)));
+
+  let nUnit = 0;
+  for (const u of selectMissingUnits(snap.units, projectIds, unitIds)) {
+    try {
+      await conn.execute(
+        `INSERT INTO units(id, project_id, name, slug, area_sqm, layout_label, rent_monthly,
+          price_total, tags, unit_spec, promo_price, amenities, keeper, rent_detail,
+          sort_order, cover_image)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          u.id, u.project_id, u.name, u.slug,
+          u.area_sqm == null ? null : u.area_sqm,
+          u.layout_label || null,
+          u.rent_monthly == null ? null : u.rent_monthly,
+          u.price_total == null ? null : u.price_total,
+          enc(u.tags), u.unit_spec || null,
+          u.promo_price == null ? null : u.promo_price,
+          enc(u.amenities), enc(u.keeper), enc(u.rent_detail),
+          u.sort_order || 0, u.cover_image || null,
+        ]
+      );
+      nUnit += 1;
+      unitIds.add(Number(u.id));
+    } catch (_) { /* 主键/slug 冲突则跳过 */ }
+  }
+
   let nPhoto = 0;
-  let nCover = 0;
   for (const p of snap.photos) {
-    const [exist] = await conn.execute(
-      'SELECT id FROM photos WHERE entity_type=? AND entity_id=? AND file_path=? LIMIT 1',
-      [p.entity_type, p.entity_id, p.file_path]
-    );
-    if (exist.length) continue;
-    await conn.execute(
-      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
-       VALUES(?,?,?,?,?,?)`,
-      [p.entity_type, p.entity_id, p.file_path, p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0]
-    );
-    nPhoto += 1;
+    const eid = Number(p.entity_id);
+    if (p.entity_type === 'project' && !projectIds.has(eid)) continue;
+    if (p.entity_type === 'unit' && !unitIds.has(eid)) continue;
+    try {
+      const [exist] = await conn.execute(
+        'SELECT id FROM photos WHERE entity_type=? AND entity_id=? AND file_path=? LIMIT 1',
+        [p.entity_type, p.entity_id, p.file_path]
+      );
+      if (exist.length) continue;
+      await conn.execute(
+        `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+         VALUES(?,?,?,?,?,?)`,
+        [p.entity_type, p.entity_id, p.file_path, p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0]
+      );
+      nPhoto += 1;
+    } catch (_) { /* 单条失败不中断后续封面回写 */ }
   }
+
+  let nCover = 0;
   for (const u of snap.units) {
-    if (!u.cover_image) continue;
-    const [r] = await conn.execute(
-      'UPDATE units SET cover_image=? WHERE id=? AND (cover_image IS NULL OR cover_image="")',
-      [u.cover_image, u.id]
-    );
-    nCover += r.affectedRows || 0;
+    if (!u.cover_image || !unitIds.has(Number(u.id))) continue;
+    try {
+      const [r] = await conn.execute(
+        'UPDATE units SET cover_image=? WHERE id=? AND (cover_image IS NULL OR cover_image="")',
+        [u.cover_image, u.id]
+      );
+      nCover += r.affectedRows || 0;
+    } catch (_) { /* ignore */ }
   }
-  return { inserted: nPhoto, covers: nCover };
+  nCover += await fillEmptyCoverColumn(conn, 'units', 'unit');
+  nCover += await fillEmptyCoverColumn(conn, 'projects', 'project');
+  nCover += await fillEmptyCoverColumn(conn, 'districts', 'district');
+
+  for (const city of snap.cities) {
+    if (!city.hero_bg_image) continue;
+    try {
+      const [r] = await conn.execute(
+        'UPDATE cities SET hero_bg_image=? WHERE id=? AND (hero_bg_image IS NULL OR hero_bg_image="")',
+        [city.hero_bg_image, city.id]
+      );
+      nCover += r.affectedRows || 0;
+    } catch (_) { /* ignore */ }
+  }
+
+  return { inserted: nPhoto, covers: nCover, units: nUnit };
 }
 
 function decorateRow(row, jsonKeys) {
@@ -192,8 +332,13 @@ function decorateRow(row, jsonKeys) {
 module.exports = {
   enc,
   parseJsonField,
+  coerceTags,
+  tagsToDb,
   loadSnapshots,
   seedAll,
   backfillPhotos,
   decorateRow,
+  selectMissingUnits,
+  pickCoverPath,
+  hydrateCoverFields,
 };

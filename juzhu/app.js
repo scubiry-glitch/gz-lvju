@@ -2,6 +2,17 @@
 window.JUZHU = (function () {
   var cache = null;
   var _settings = null;
+  var DEFAULT_CHANNEL_NAME = '新居住频道';
+
+  function channelBrand(raw) {
+    var name = String(raw == null ? '' : raw).trim() || DEFAULT_CHANNEL_NAME;
+    var short = name.replace(/(频道|专区)$/, '') || name;
+    return { name: name, short: short, zone: short + '专区' };
+  }
+
+  function currentBrand() {
+    return channelBrand(_settings && _settings.channel_name);
+  }
 
   function loadSettings() {
     if (_settings) return Promise.resolve(_settings);
@@ -9,7 +20,7 @@ window.JUZHU = (function () {
       _settings = s;
       return s;
     }).catch(function() {
-      _settings = { show_city_switcher: true, show_life_service: true };
+      _settings = { show_city_switcher: true, show_life_service: true, channel_name: DEFAULT_CHANNEL_NAME };
       return _settings;
     });
   }
@@ -41,11 +52,7 @@ window.JUZHU = (function () {
   function normalizeCatalog(d) {
     function normTags(list) {
       (list || []).forEach(function (r) {
-        var t = r.tags;
-        if (t == null) r.tags = [];
-        else if (typeof t === 'string') {
-          try { r.tags = JSON.parse(t); } catch (e) { r.tags = t ? [t] : []; }
-        } else if (!Array.isArray(t)) r.tags = [];
+        r.tags = asTags(r.tags);
       });
     }
     normTags(d.districts);
@@ -63,6 +70,26 @@ window.JUZHU = (function () {
         try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
       }
     });
+    function coverOf(photos, type, id) {
+      var list = (photos || []).filter(function (p) {
+        return p.entity_type === type && Number(p.entity_id) === Number(id);
+      }).sort(function (a, b) {
+        return (Number(b.is_cover) || 0) - (Number(a.is_cover) || 0)
+          || (a.sort_order || 0) - (b.sort_order || 0);
+      });
+      return list.length ? list[0].file_path : '';
+    }
+    function fillCovers(list, type, photos) {
+      (list || []).forEach(function (row) {
+        if (row && !row.cover_image) {
+          var p = coverOf(photos, type, row.id);
+          if (p) row.cover_image = p;
+        }
+      });
+    }
+    fillCovers(d.districts, 'district', d.photos);
+    fillCovers(d.projects, 'project', d.photos);
+    fillCovers(d.units, 'unit', d.photos);
     return d;
   }
 
@@ -167,11 +194,15 @@ window.JUZHU = (function () {
   }
 
   function asTags(tags) {
-    if (tags == null) return [];
-    if (Array.isArray(tags)) return tags;
-    if (typeof tags === 'string') {
-      try { var p = JSON.parse(tags); return Array.isArray(p) ? p : [tags]; } catch (e) { return tags ? [tags] : []; }
+    var v = tags;
+    if (v == null) return [];
+    for (var i = 0; i < 8 && typeof v === 'string'; i++) {
+      var s = v.trim();
+      if (!s) return [];
+      try { v = JSON.parse(s); }
+      catch (e) { return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean); }
     }
+    if (Array.isArray(v)) return v;
     return [];
   }
 
@@ -605,6 +636,10 @@ window.JUZHU = (function () {
     load: load,
     loadSettings: loadSettings,
     getSettings: function() { return _settings; },
+    channelBrand: currentBrand,
+    channelName: function() { return currentBrand().name; },
+    channelShort: function() { return currentBrand().short; },
+    channelZone: function() { return currentBrand().zone; },
     get data() { return cache; },
     districts: districts,
     districtBySlug: districtBySlug,

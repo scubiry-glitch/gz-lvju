@@ -29,6 +29,40 @@ function testLoadSnapshots() {
   });
 }
 
+function testSelectMissingUnits() {
+  const snap = [
+    { id: 1, project_id: 1, name: 'kept' },
+    { id: 2, project_id: 1, name: 'missing unit' },
+    { id: 3, project_id: 99, name: 'other city' },
+  ];
+  const missing = housing.selectMissingUnits(snap, new Set([1]), new Set([1]));
+  assert.deepStrictEqual(missing.map((u) => u.id), [2]);
+  console.log('[PASS] testSelectMissingUnits');
+}
+
+function testHydrateCoverFields() {
+  const catalog = {
+    projects: [
+      { id: 1, name: 'CCB', cover_image: '' },
+      { id: 2, cover_image: 'keep.jpg' },
+    ],
+    units: [{ id: 10, cover_image: null }],
+    districts: [{ id: 3, cover_image: null }],
+    photos: [
+      { entity_type: 'project', entity_id: 1, file_path: 'p-second.jpg', is_cover: 0, sort_order: 1 },
+      { entity_type: 'project', entity_id: 1, file_path: 'p-cover.jpg', is_cover: 1, sort_order: 0 },
+      { entity_type: 'unit', entity_id: 10, file_path: 'u.jpg', is_cover: 0, sort_order: 0 },
+      { entity_type: 'district', entity_id: 3, file_path: 'd.jpg', is_cover: 1, sort_order: 0 },
+    ],
+  };
+  housing.hydrateCoverFields(catalog);
+  assert.strictEqual(catalog.projects[0].cover_image, 'p-cover.jpg');
+  assert.strictEqual(catalog.projects[1].cover_image, 'keep.jpg');
+  assert.strictEqual(catalog.units[0].cover_image, 'u.jpg');
+  assert.strictEqual(catalog.districts[0].cover_image, 'd.jpg');
+  console.log('[PASS] testHydrateCoverFields');
+}
+
 function testEncJsonFields() {
   assert.strictEqual(housing.enc(null), null);
   assert.strictEqual(housing.enc('foo'), 'foo');
@@ -43,7 +77,20 @@ function testParseJsonField() {
   assert.deepStrictEqual(housing.parseJsonField('["a","b"]'), ['a', 'b']);
   assert.deepStrictEqual(housing.parseJsonField('{"stars":4}'), { stars: 4 });
   assert.strictEqual(housing.parseJsonField('not-json'), 'not-json');
+  assert.deepStrictEqual(housing.parseJsonField('"[\\"建融家园\\"]"'), ['建融家园']);
   console.log('[PASS] testParseJsonField');
+}
+
+function testTagsToDb() {
+  const enc = JSON.stringify(['建融家园']);
+  assert.strictEqual(housing.tagsToDb(['建融家园']), enc);
+  assert.strictEqual(housing.tagsToDb('建融家园'), enc);
+  assert.strictEqual(housing.tagsToDb('["建融家园"]'), enc);
+  assert.strictEqual(housing.tagsToDb('"[\\"建融家园\\"]"'), enc);
+  assert.deepStrictEqual(JSON.parse(housing.tagsToDb('建融家园, 近地铁')), ['建融家园', '近地铁']);
+  assert.strictEqual(housing.tagsToDb(null), null);
+  assert.strictEqual(housing.tagsToDb(''), null);
+  console.log('[PASS] testTagsToDb');
 }
 
 function testOrderRef() {
@@ -109,16 +156,116 @@ function testFilterPending() {
   console.log('[PASS] testFilterPending');
 }
 
+function testCallbackValidate() {
+  assert.strictEqual(gr.validateCallbackBody({ order_ref: 'GR1', vendor_oid: 'V1', status: 'paid', fee: 1 }).ok, true);
+  assert.strictEqual(gr.validateCallbackBody({ order_ref: 'GR1', vendor_oid: 'V1', status: 'paid' }).ok, false);
+  console.log('[PASS] testCallbackValidate');
+}
+
+function testCityWriteValidate() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.validateCityWrite({}), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({ name: '  ' }), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  const created = cities.validateCityWrite({ name: '合肥（试点）' });
+  assert.strictEqual(created.ok, true);
+  assert.deepStrictEqual(created.fields, { name: '合肥（试点）', slug: '合肥' });
+  const withSlug = cities.validateCityWrite({
+    name: '合肥', slug: ' hefei ', booking_phone: ' 0551-1 ', hero_bg_image: ' a.jpg ',
+  });
+  assert.deepStrictEqual(withSlug.fields, {
+    name: '合肥', slug: 'hefei', booking_phone: '0551-1', hero_bg_image: 'a.jpg',
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({}, { partial: true }), {
+    ok: false, error: '无更新字段', status: 400,
+  });
+  assert.deepStrictEqual(cities.validateCityWrite({ name: '' }, { partial: true }), {
+    ok: false, error: '城市名称不能为空', status: 400,
+  });
+  console.log('[PASS] testCityWriteValidate');
+}
+
+function testCityDeleteGuard() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 1, districtCount: 0, projectCount: 0 }), {
+    ok: false, error: '至少保留一座城市', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 3, projectCount: 0 }), {
+    ok: false, error: '该城市仍有 3 个行政区，无法删除', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 0, projectCount: 5 }), {
+    ok: false, error: '该城市仍有 5 个项目，无法删除', status: 400,
+  });
+  assert.deepStrictEqual(cities.canDeleteCity({ cityCount: 2, districtCount: 0, projectCount: 0 }), { ok: true });
+  console.log('[PASS] testCityDeleteGuard');
+}
+
+function testPickCity() {
+  const cities = require('./housing_cities.cjs');
+  const list = [
+    { id: 1, name: '沈阳', slug: 'shenyang' },
+    { id: 2, name: '南京', slug: 'nanjing' },
+  ];
+  assert.strictEqual(cities.pickCity([], 'nanjing'), null);
+  assert.strictEqual(cities.pickCity(list, '').id, 1);
+  assert.strictEqual(cities.pickCity(list, 'nanjing').id, 2);
+  assert.strictEqual(cities.pickCity(list, '南京').id, 2);
+  assert.strictEqual(cities.pickCity(list, '2').id, 2);
+  assert.strictEqual(cities.pickCity(list, 'missing'), null);
+  console.log('[PASS] testPickCity');
+}
+
+function testDuplicateCityError() {
+  const cities = require('./housing_cities.cjs');
+  assert.deepStrictEqual(cities.duplicateCityError('name'), {
+    ok: false, error: '城市名称已存在', status: 400,
+  });
+  assert.deepStrictEqual(cities.duplicateCityError('slug'), {
+    ok: false, error: 'slug 已存在', status: 400,
+  });
+  assert.strictEqual(cities.classifyDupKey({ code: 'ER_DUP_ENTRY', message: "Duplicate entry 'hefei' for key 'cities.uk_slug'" }), 'slug');
+  assert.strictEqual(cities.classifyDupKey({ code: 'ER_DUP_ENTRY', message: "Duplicate entry '合肥' for key 'cities.uk_name'" }), 'name');
+  assert.strictEqual(cities.classifyDupKey(new Error('DB 查询失败')), null);
+  console.log('[PASS] testDuplicateCityError');
+}
+
+function testChannelBrand() {
+  const brand = require('./channel_brand.cjs');
+  assert.deepStrictEqual(brand.channelBrand(), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.deepStrictEqual(brand.channelBrand(' 新居住频道 '), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.deepStrictEqual(brand.channelBrand('旅居住宿频道'), { name: '旅居住宿频道', short: '旅居住宿', zone: '旅居住宿专区' });
+  assert.deepStrictEqual(brand.channelBrand('旅居'), { name: '旅居', short: '旅居', zone: '旅居专区' });
+  assert.deepStrictEqual(brand.channelBrand('安居专区'), { name: '安居专区', short: '安居', zone: '安居专区' });
+  assert.deepStrictEqual(brand.fromSettingsMap({}), { name: '新居住频道', short: '新居住', zone: '新居住专区' });
+  assert.strictEqual(brand.parseChannelName('').ok, false);
+  assert.strictEqual(brand.parseChannelName('   ').ok, false);
+  assert.strictEqual(brand.parseChannelName('x'.repeat(33)).ok, false);
+  assert.deepStrictEqual(brand.parseChannelName(' 旅居频道 '), { ok: true, name: '旅居频道' });
+  console.log('[PASS] testChannelBrand');
+}
+
 function run() {
   testLoadSnapshots();
+  testSelectMissingUnits();
+  testHydrateCoverFields();
   testEncJsonFields();
   testParseJsonField();
+  testTagsToDb();
   testOrderRef();
   testWechatLinkValidate();
   testGrOrdersValidate();
   testNormEta();
   testVendorConfigParse();
   testFilterPending();
+  testCallbackValidate();
+  testCityWriteValidate();
+  testCityDeleteGuard();
+  testPickCity();
+  testDuplicateCityError();
+  testChannelBrand();
   console.log('all passed');
 }
 

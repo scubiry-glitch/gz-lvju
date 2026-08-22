@@ -38,7 +38,9 @@
 ### T8. 配置：.env + .env.example 增加 JUZHU_DB_* 块
 
 ### T9. 迁移脚本 juzhu/migrate_to_mysql.py
+
 - 拉取测试机 juzhu.db（sshpass，凭据复用 publish_test.sh）→ 建表 → 按 FK 顺序清空+全量导入 → 行数校验
+- **Node 等价命令（线上环境无 Python 时用）**：`node migrate_to_mysql.cjs [sqlite.db]`，说明见 `docs/deploy.md`
 
 ### T10. 种子/维护脚本 ×4 改 db.connect()
 

@@ -446,6 +446,7 @@ def ensure_settings(conn):
     defaults = {
         'show_city_switcher': '1',
         'show_life_service': '1',
+        'channel_name': '新居住频道',
     }
     for k, v in defaults.items():
         conn.execute("INSERT IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))

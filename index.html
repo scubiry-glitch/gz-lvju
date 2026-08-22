@@ -35,12 +35,17 @@
   .split-hd .in{position:relative;z-index:2;}
   .split-hd .ek{font-size:9px;letter-spacing:.36em;opacity:.9;}
   .split-hd h1{font-family:var(--serif);font-size:24px;margin-top:6px;line-height:1.2;}
-  .split-hd .stat{display:flex;gap:18px;margin-top:12px;font-size:10px;opacity:.92;}
+  .split-hd .stat{display:flex;gap:18px;margin-top:12px;font-size:10px;opacity:.92;min-height:32px;}
   .split-hd .stat b{font-family:var(--serif);font-size:16px;display:block;}
   .seg-switch{display:flex;margin-top:14px;background:rgba(255,255,255,.12);border-radius:12px;padding:3px;backdrop-filter:blur(8px);}
   .seg-switch a{flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;border-radius:10px;color:rgba(255,255,255,.75);}
   .seg-switch a.on{background:#fff;color:var(--brand-deep);box-shadow:0 4px 12px rgba(0,0,0,.15);}
   .pane{display:none;}.pane.on{display:block;}
+  /* 首屏：catalog 未回前只露头图底，避免 3 个占位 tab + 空选区租房再整页重绘抖动 */
+  .app.is-booting .split-hd .in{visibility:hidden;}
+  .app.is-booting .pane,
+  .app.is-booting .scheme-bar{display:none !important;}
+  .app.is-ready .split-hd .in{visibility:visible;}
 
   /* === 家政 tab === */
   .jz-quick{padding:10px 18px 6px;}
@@ -195,11 +200,11 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app is-booting">
   <div class="scr">
     <div class="appbar ghost" style="position:absolute;">
       <a class="bk" href="beike-app-home.html">‹</a>
-      <div class="ttl">新居住<small id="navCitySub" class="city-tap">沈阳 · 新居住专区</small></div>
+      <div class="ttl"><span id="navBrand">新居住</span><small id="navCitySub" class="city-tap">沈阳 · 新居住专区</small></div>
     </div>
 
     <div class="split-hd">
@@ -279,7 +284,7 @@
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
 <script src="screens/_jzapi.js?v=3"></script>
-<script src="juzhu/app.js?v=16"></script>
+<script src="juzhu/app.js?v=20"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -292,11 +297,21 @@
     var city = cityOf(d);
     var op = (window.BZF_JZ && BZF_JZ.regionOperator()) || '贝壳';
     var bizTerm = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
-    document.getElementById('navCitySub').textContent = city + ' · 新居住专区';
+    var brand = (window.JUZHU && JUZHU.channelBrand) ? JUZHU.channelBrand() : { name: '新居住频道', short: '新居住', zone: '新居住专区' };
+    var navBrand = document.getElementById('navBrand');
+    if (navBrand) navBrand.textContent = brand.short;
+    document.getElementById('navCitySub').textContent = city + ' · ' + brand.zone;
     document.getElementById('schemeLabel').textContent = '方案 C · ' + city + '真实数据';
-    document.getElementById('bzfBannerTitle').textContent = city + bizTerm + ' · 新居住专区';
+    document.getElementById('bzfBannerTitle').textContent = city + bizTerm + ' · ' + brand.zone;
     document.getElementById('heroEk').textContent = 'Cover Collage · ' + city;
-    document.title = '新居住 · ' + city + ' · ' + op;
+    document.title = brand.short + ' · ' + city + ' · ' + op;
+  }
+
+  function revealHome() {
+    var app = document.querySelector('.app');
+    if (!app || !app.classList.contains('is-booting')) return;
+    app.classList.remove('is-booting');
+    app.classList.add('is-ready');
   }
 
   function activateTab(tabId) {
@@ -310,7 +325,8 @@
 
   function renderHero(d){
     applyChannelChrome(d);
-    document.getElementById('heroTitle').textContent = cityOf(d) + ' · 新居住';
+    var brand = (window.JUZHU && JUZHU.channelBrand) ? JUZHU.channelBrand() : { short: '新居住' };
+    document.getElementById('heroTitle').textContent = cityOf(d) + ' · ' + brand.short;
     var stock = (d.stats && d.stats.unit_count != null)
       ? Number(d.stats.unit_count)
       : (d.projects || []).filter(function(p){ return p.channel === 'bzf'; })
@@ -667,7 +683,10 @@
     if (!pick) return;
     BZF_JZ.setRegionCity(pick.getAttribute('data-city'));
     applyChannelChrome(lastData);
-    if (lastData) document.getElementById('heroTitle').textContent = cityOf(lastData) + ' · 新居住';
+    if (lastData) {
+      var brand = (window.JUZHU && JUZHU.channelBrand) ? JUZHU.channelBrand() : { short: '新居住' };
+      document.getElementById('heroTitle').textContent = cityOf(lastData) + ' · ' + brand.short;
+    }
     closeCitySheet();
   });
 
@@ -688,10 +707,12 @@
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());
+    revealHome();
   }).catch(function(err) {
     document.getElementById('err').hidden = false;
     document.getElementById('err').textContent = '数据加载失败：'+err.message+'（请先运行 python3 juzhu/seed_from_folder.py）';
     paintTabs();
+    revealHome();
   });
 })();
 </script>

@@ -123,5 +123,12 @@ SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再�
 
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
+- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`）
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
+- **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
+- **Python `juzhu/server.py`**：线上不用；仅本地联调 / Python 单测，已改连同一 MySQL
+
+## 规则 13 · 频道名称单一数据源（`settings.channel_name`）
+
+C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全局设置 `channel_name`（默认 `新居住频道`），后台 `juzhu-admin.html`「设置」页可改。词干 = 去掉末尾「频道/专区」。页面不得再写死这组字眼。

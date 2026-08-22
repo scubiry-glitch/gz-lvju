@@ -211,7 +211,7 @@
 
   // 家政频道 · 展示用「省 / 市」位置模型（多省市演示）。
   // 规则 7 边界：此处是频道展示地名（省级/市级两档可选），非 _region.js 的 relabel
-  // 换皮主体名词；不参与换皮，仅决定"X · 新居住频道"里的 X。
+  // 换皮主体名词；不参与换皮，仅决定"X · 频道名称"里的 X。
   // 一个"位置"可以是省名（省级）或市名（市级）；regionCity() 存/取任一档。
   var CITY_TREE = [
     { prov: '辽宁', cities: ['沈阳', '大连', '鞍山', '抚顺', '本溪', '丹东', '锦州', '营口'] },
@@ -325,19 +325,53 @@
     return (R && R.bank && R.bank.name) ? R.bank.name : '江苏银行';
   }
 
+  var DEFAULT_CHANNEL_NAME = '新居住频道';
+  var _channelName = DEFAULT_CHANNEL_NAME;
+  var _channelPromise = null;
+
+  function channelBrand(raw) {
+    var name = String(raw == null ? '' : raw).trim() || DEFAULT_CHANNEL_NAME;
+    var short = name.replace(/(频道|专区)$/, '') || name;
+    return { name: name, short: short, zone: short + '专区' };
+  }
+
+  function currentBrand() {
+    if (window.JUZHU && typeof JUZHU.channelBrand === 'function' && JUZHU.getSettings && JUZHU.getSettings()) {
+      return JUZHU.channelBrand();
+    }
+    return channelBrand(_channelName);
+  }
+
+  function loadChannelBrand() {
+    if (window.JUZHU && typeof JUZHU.loadSettings === 'function') {
+      return JUZHU.loadSettings().then(function() { return currentBrand(); });
+    }
+    if (_channelPromise) return _channelPromise;
+    _channelPromise = fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
+      if (s && s.channel_name) _channelName = String(s.channel_name).trim() || DEFAULT_CHANNEL_NAME;
+      return channelBrand(_channelName);
+    }).catch(function() { return channelBrand(_channelName); });
+    return _channelPromise;
+  }
+
   function applyRegionChrome(map) {
     map = map || {};
-    if (map.titleSub) {
-      var el = typeof map.titleSub === 'string' ? document.querySelector(map.titleSub) : map.titleSub;
-      if (el) el.textContent = regionCity() + ' · 新居住频道';
+    function paint(brand) {
+      brand = brand || currentBrand();
+      if (map.titleSub) {
+        var el = typeof map.titleSub === 'string' ? document.querySelector(map.titleSub) : map.titleSub;
+        if (el) el.textContent = regionCity() + ' · ' + brand.name;
+      }
+      if (map.loc) {
+        var loc = typeof map.loc === 'string' ? document.querySelector(map.loc) : map.loc;
+        if (loc) loc.textContent = regionCity();
+      }
+      if (map.docTitle) {
+        document.title = map.docTitle.replace('{city}', regionCity()).replace('{op}', regionOperator());
+      }
     }
-    if (map.loc) {
-      var loc = typeof map.loc === 'string' ? document.querySelector(map.loc) : map.loc;
-      if (loc) loc.textContent = regionCity();
-    }
-    if (map.docTitle) {
-      document.title = map.docTitle.replace('{city}', regionCity()).replace('{op}', regionOperator());
-    }
+    paint(currentBrand());
+    loadChannelBrand().then(paint);
   }
 
   // ===== 演示模式开关 =====
@@ -443,6 +477,11 @@
     regionOperator: regionOperator,
     regionDeptStem: regionDeptStem,
     regionBankName: regionBankName,
+    channelBrand: currentBrand,
+    channelName: function() { return currentBrand().name; },
+    channelShort: function() { return currentBrand().short; },
+    channelZone: function() { return currentBrand().zone; },
+    loadChannelBrand: loadChannelBrand,
     applyRegionChrome: applyRegionChrome
   };
 })();

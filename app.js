@@ -7,7 +7,8 @@ const crypto = require('crypto');
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
 
-/** 加载运行时 .env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。 */
+/** 加载运行时 env（平台直启 app.js 时 scf_bootstrap 不会 source）。不覆盖已有环境变量；禁止经 HTTP 暴露。
+ *  SCF 解包常丢弃隐藏文件 `.env`，故同时读非隐藏 `runtime.env`。 */
 function loadDotEnv(filePath) {
   const p = filePath || path.join(ROOT, '.env');
   if (!fs.existsSync(p)) return false;
@@ -31,6 +32,7 @@ function loadDotEnv(filePath) {
   return true;
 }
 loadDotEnv();
+loadDotEnv(path.join(ROOT, 'runtime.env'));
 
 const PORT = process.env.PORT || 9000;
 
@@ -39,8 +41,8 @@ const API_KEY_ENV = 'JUZHU_API_KEY';
 /** 历史开发默认值：任何环境均不得再当作有效密钥（文档泄露即等于未授权） */
 const DEV_EXAMPLE_API_KEY = 'dev-juzhu-key';
 const FORBIDDEN_API_KEY = DEV_EXAMPLE_API_KEY;
-/** 非生产可用的后台登录默认口令；生产必须显式配置且不得用此值 */
-const DEV_DEFAULT_ADMIN_PASSWORD = 'dongbo2026';
+/** 非生产可用的后台登录默认口令（仅开发环境兜底） */
+const DEV_DEFAULT_ADMIN_PASSWORD = 'dev-admin-default';
 
 // MySQL 连接配置（fallback 直连，仅当 Python 服务不可用时使用）
 // 禁止在源码中写死账号密码；必须由运行时环境 / .env（仅进程内，不对外 HTTP）注入。
@@ -51,12 +53,20 @@ try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
 let housingSeedAll = null;
 let housingBackfillPhotos = null;
 let housingParseJsonField = null;
+let housingHydrateCoverFields = null;
+let housingTagsToDb = null;
 try {
   const housingSeed = require('./housing_seed.cjs');
   housingSeedAll = housingSeed.seedAll;
   housingBackfillPhotos = housingSeed.backfillPhotos;
   housingParseJsonField = housingSeed.parseJsonField;
+  housingHydrateCoverFields = housingSeed.hydrateCoverFields;
+  housingTagsToDb = housingSeed.tagsToDb;
 } catch (_) {}
+let housingCities = null;
+try { housingCities = require('./housing_cities.cjs'); } catch (_) {}
+let channelBrand = null;
+try { channelBrand = require('./channel_brand.cjs'); } catch (_) {}
 let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfig = null;
@@ -93,6 +103,7 @@ function getDbConfig() {
 // 与 juzhu/server.py is_public_static 对齐：整仓静态根不得暴露密钥/源码/部署产物。
 const SENSITIVE_NAMES = new Set([
   '.env', '.env.local', '.env.example', '.env.prod', '.env.test',
+  'runtime.env',
   '.git', '.gitignore', '.ds_store', '__pycache__',
   'config.ini', 'server.log', 'api_doc.md', 'api-document.html',
   'hmac_secret.key', 'package.json', 'package-lock.json', 'yarn.lock',
@@ -234,6 +245,34 @@ function assertAdminAuthorized(urlPath, req, res) {
   return false;
 }
 
+/** 空 → null；非法抛 Error。返回纯数字真实号。对齐 juzhu/tp_client.py validate_real_phone */
+function validateRealPhone(phone) {
+  if (phone == null) return null;
+  const raw = String(phone).trim();
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  if (!/^\d+$/.test(digits) || digits.length < 11 || digits.length > 13) {
+    throw new Error('联系电话须为 11–13 位数字');
+  }
+  if (digits.startsWith('400')) {
+    throw new Error('请填写真实号码，勿填 400 虚拟号');
+  }
+  return digits;
+}
+
+/** 请求体未带 contact_phone → undefined（不更新）；带了则校验后返回纯数字或 null */
+function contactPhoneFromBody(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'contact_phone')) return undefined;
+  return validateRealPhone(body.contact_phone);
+}
+
+function stripContactPhone(row) {
+  if (!row) return row;
+  const out = Object.assign({}, row);
+  delete out.contact_phone;
+  return out;
+}
+
 module.exports.isPublicStatic = isPublicStatic;
 module.exports.isProduction = isProduction;
 module.exports.expectedApiKey = expectedApiKey;
@@ -244,6 +283,9 @@ module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
 module.exports.DEV_EXAMPLE_API_KEY = DEV_EXAMPLE_API_KEY;
 module.exports.getDbConfig = getDbConfig;
+module.exports.validateRealPhone = validateRealPhone;
+module.exports.contactPhoneFromBody = contactPhoneFromBody;
+module.exports.stripContactPhone = stripContactPhone;
 
 async function queryRows(sql, params) {
   if (!mysql2) throw new Error('mysql2 not available');
@@ -369,16 +411,32 @@ function outboundJson(method, urlStr, body, timeoutMs) {
   });
 }
 
+function encodeTags(tags) {
+  if (housingTagsToDb) return housingTagsToDb(tags);
+  if (tags == null || tags === '') return null;
+  return JSON.stringify(Array.isArray(tags) ? tags : String(tags).split(',').map((s) => s.trim()).filter(Boolean));
+}
+
 // 将行中指定字段从 JSON 字符串反序列化为数组/对象，缺失或无效时返回默认值
 function parseJsonFields(row, fields, defaultVal) {
   if (!row) return row;
+  const fallback = defaultVal !== undefined ? defaultVal : [];
   for (const f of fields) {
-    if (row[f] != null && typeof row[f] === 'string') {
-      try { row[f] = JSON.parse(row[f]); }
-      catch (e) { row[f] = defaultVal !== undefined ? defaultVal : []; }
-    } else if (row[f] == null) {
-      row[f] = defaultVal !== undefined ? defaultVal : [];
+    if (row[f] == null) {
+      row[f] = fallback;
+      continue;
     }
+    if (typeof row[f] !== 'string') continue;
+    if (housingParseJsonField) {
+      const v = housingParseJsonField(row[f]);
+      row[f] = (typeof v === 'string') ? fallback : v;
+      continue;
+    }
+    let v = row[f];
+    for (let i = 0; i < 8 && typeof v === 'string'; i++) {
+      try { v = JSON.parse(v); } catch (e) { break; }
+    }
+    row[f] = (typeof v === 'string') ? fallback : v;
   }
   return row;
 }
@@ -700,7 +758,11 @@ async function ensureSchema() {
       );
     }
     // 初始化 settings 种子数据
-    const settingSeeds = [['show_city_switcher', '1'], ['show_life_service', '1']];
+    const settingSeeds = [
+      ['show_city_switcher', '1'],
+      ['show_life_service', '1'],
+      ['channel_name', (channelBrand && channelBrand.DEFAULT_CHANNEL_NAME) || '新居住频道'],
+    ];
     for (const [k, v] of settingSeeds) {
       await conn.execute(
         'INSERT IGNORE INTO settings(`key`, value) VALUES (?, ?)',
@@ -734,7 +796,7 @@ async function ensureSchema() {
     if (housingBackfillPhotos) {
       try {
         const bf = await housingBackfillPhotos(conn);
-        if (bf && (bf.inserted || bf.covers)) console.log('housingBackfillPhotos', JSON.stringify(bf));
+        if (bf && (bf.inserted || bf.covers || bf.units)) console.log('housingBackfillPhotos', JSON.stringify(bf));
       } catch (e) { console.warn('housingBackfillPhotos warn:', e.message); }
     }
     // 源 MySQL juzhu 快照（商家/SKU/订单）；文件缺失则跳过
@@ -826,10 +888,9 @@ function slugify(name) {
 }
 
 function cityDupReply(res, err) {
-  const kind = housingCities ? housingCities.classifyDupKey(err) : 'dup';
-  const d = housingCities
-    ? housingCities.duplicateCityError(kind)
-    : { error: '城市已存在', status: 400 };
+  const kind = housingCities ? housingCities.classifyDupKey(err) : null;
+  if (!kind) return jsonReply(res, { error: 'DB 查询失败: ' + (err && err.message ? err.message : err) }, 500);
+  const d = housingCities.duplicateCityError(kind);
   return jsonReply(res, { error: d.error }, d.status);
 }
 
@@ -845,6 +906,27 @@ async function resolveBodyCityId(conn, body, emptyMsg) {
   const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
   if (!rows.length) return { error: emptyMsg || '请先配置城市', status: 400 };
   return { cityId: rows[0].id };
+}
+
+async function insertCityRow(conn, fields) {
+  const cols = Object.keys(fields);
+  await conn.execute(
+    `INSERT INTO cities(${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+    cols.map((k) => fields[k])
+  );
+  const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+  const [rows] = await conn.execute('SELECT * FROM cities WHERE id=?', [r[0].id]);
+  return rows[0];
+}
+
+async function updateCityRow(conn, cid, fields) {
+  const cols = Object.keys(fields);
+  await conn.execute(
+    `UPDATE cities SET ${cols.map((k) => `${k}=?`).join(', ')} WHERE id=?`,
+    cols.map((k) => fields[k]).concat(cid)
+  );
+  const [rows] = await conn.execute('SELECT * FROM cities WHERE id=?', [cid]);
+  return rows[0];
 }
 
 // 确保项目 slug 唯一
@@ -948,21 +1030,40 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // ===== GET 只读接口 =====
 
     if (urlPath === '/api/juzhu/admin/dictionary' && req.method === 'GET') {
-      const cities = await queryRows('SELECT * FROM cities ORDER BY id LIMIT 1');
-      const districts = await queryRows('SELECT * FROM districts ORDER BY sort_order, id');
+      const qp = new URLSearchParams(qs);
+      const allCities = await queryRows('SELECT * FROM cities ORDER BY id');
+      const city = housingCities
+        ? housingCities.pickCity(allCities, qp.get('city'))
+        : (allCities[0] || null);
+      const districts = city
+        ? await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id])
+        : [];
       const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
-      return jsonReply(res, { city: cities[0] || null, districts, channels });
+      return jsonReply(res, { city, cities: allCities, districts, channels });
+    }
+
+    if (urlPath === '/api/juzhu/admin/cities' && req.method === 'GET') {
+      const rows = await queryRows('SELECT * FROM cities ORDER BY id');
+      return jsonReply(res, rows);
     }
 
     if ((urlPath === '/api/juzhu/admin/settings' || urlPath === '/api/juzhu/settings') && req.method === 'GET') {
-      const cities = await queryRows('SELECT booking_phone FROM cities ORDER BY id LIMIT 1');
+      const qp = new URLSearchParams(qs);
+      const allCities = await queryRows('SELECT id, booking_phone, slug, name FROM cities ORDER BY id');
+      const city = housingCities
+        ? housingCities.pickCity(allCities, qp.get('city') || qp.get('city_id'))
+        : (allCities[0] || null);
       const settings = await queryRows('SELECT `key`, value FROM settings');
       const settingsMap = {};
       for (const r of settings) settingsMap[r.key] = r.value;
+      const brand = channelBrand
+        ? channelBrand.fromSettingsMap(settingsMap)
+        : { name: (settingsMap.channel_name || '新居住频道').trim() || '新居住频道' };
       return jsonReply(res, {
-        booking_phone: cities[0] ? cities[0].booking_phone : null,
+        booking_phone: city ? city.booking_phone : null,
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
+        channel_name: brand.name,
       });
     }
 
@@ -970,11 +1071,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const qp = new URLSearchParams(qs);
       let sql = 'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE 1=1';
       const params = [];
+      if (qp.get('city_id')) { sql += ' AND p.city_id=?'; params.push(parseInt(qp.get('city_id'))); }
       if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
       if (qp.get('district_id')) { sql += ' AND p.district_id=?'; params.push(parseInt(qp.get('district_id'))); }
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
       sql += ' ORDER BY p.channel, p.sort_order, p.id';
       const rows = await queryRows(sql, params);
+      rows.forEach((r) => parseJsonFields(r, ['tags', 'rating']));
       return jsonReply(res, rows);
     }
 
@@ -988,7 +1091,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [pid]
         );
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(projs[0], ['tags', 'rating']);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
         const photos = await queryRows(
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order, id",
           [pid]
@@ -1024,14 +1129,20 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // PUT /admin/settings
     if (urlPath === '/api/juzhu/admin/settings' && req.method === 'PUT') {
       const body = await readBody(req);
+      let parsedChannel = null;
+      if (body.channel_name !== undefined) {
+        parsedChannel = channelBrand
+          ? channelBrand.parseChannelName(body.channel_name)
+          : { ok: !!(body.channel_name || '').trim(), name: String(body.channel_name || '').trim(), error: '频道名称不能为空', status: 400 };
+        if (!parsedChannel.ok) return jsonReply(res, { error: parsedChannel.error }, parsedChannel.status);
+      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         if (body.booking_phone !== undefined) {
           const phone = (body.booking_phone || '').trim() || null;
-          await conn.execute(
-            'UPDATE cities SET booking_phone=? WHERE id=(SELECT id FROM (SELECT id FROM cities ORDER BY id LIMIT 1) t)',
-            [phone]
-          );
+          const resolved = await resolveBodyCityId(conn, body);
+          if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+          await conn.execute('UPDATE cities SET booking_phone=? WHERE id=?', [phone, resolved.cityId]);
         }
         for (const k of ['show_city_switcher', 'show_life_service']) {
           if (k in body) {
@@ -1042,42 +1153,122 @@ async function handleApiDirect(urlPath, qs, req, res) {
             );
           }
         }
+        let channelOut;
+        if (parsedChannel) {
+          await conn.execute(
+            'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+            ['channel_name', parsedChannel.name]
+          );
+          channelOut = parsedChannel.name;
+        }
         await conn.commit();
-        return jsonReply(res, { ok: true });
+        const phoneOut = body.booking_phone !== undefined
+          ? ((body.booking_phone || '').trim() || null)
+          : undefined;
+        const out = { ok: true, booking_phone: phoneOut };
+        if (channelOut !== undefined) out.channel_name = channelOut;
+        return jsonReply(res, out);
       } finally {
         await conn.end();
       }
     }
 
-    // PUT /admin/city
-    if (urlPath === '/api/juzhu/admin/city' && req.method === 'PUT') {
+    // GET 已在上方；POST /admin/cities
+    if (urlPath === '/api/juzhu/admin/cities' && req.method === 'POST') {
       const body = await readBody(req);
-      const name = (body.name || '').trim();
-      if (!name) return jsonReply(res, { error: '城市名称不能为空' }, 400);
-      const slug = (body.slug || '').trim() || slugify(name);
+      const parsed = housingCities
+        ? housingCities.validateCityWrite(body)
+        : { ok: !!(body.name || '').trim(), error: '城市名称不能为空', status: 400, fields: { name: (body.name || '').trim(), slug: (body.slug || '').trim() || slugify(body.name) } };
+      if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!rows.length) {
-          // 无城市则创建
-          await conn.execute(
-            'INSERT INTO cities(name, slug) VALUES (?, ?)',
-            [name, slug]
-          );
-        } else {
-          const cid = rows[0].id;
-          const fields = ['name=?', 'slug=?'];
-          const params = [name, slug];
-          if ('hero_bg_image' in body) {
-            fields.push('hero_bg_image=?');
-            params.push((body.hero_bg_image || '').trim() || null);
-          }
-          params.push(cid);
-          await conn.execute(`UPDATE cities SET ${fields.join(', ')} WHERE id=?`, params);
-        }
+        const city = await insertCityRow(conn, parsed.fields);
         await conn.commit();
-        const [cities] = await conn.execute('SELECT * FROM cities ORDER BY id LIMIT 1');
-        return jsonReply(res, { ok: true, city: cities[0] || null });
+        return jsonReply(res, { ok: true, city }, 201);
+      } catch (e) {
+        return cityDupReply(res, e);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/cities/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/cities\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const cid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const parsed = housingCities
+          ? housingCities.validateCityWrite(body, { partial: true })
+          : { ok: false, error: '无更新字段', status: 400 };
+        if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+          const city = await updateCityRow(conn, cid, parsed.fields);
+          await conn.commit();
+          return jsonReply(res, { ok: true, city });
+        } catch (e) {
+          return cityDupReply(res, e);
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/cities/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/cities\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const cid = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+          const [[cityCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM cities');
+          const [[distCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM districts WHERE city_id=?', [cid]);
+          const [[projCnt]] = await conn.execute('SELECT COUNT(*) AS c FROM projects WHERE city_id=?', [cid]);
+          const guard = housingCities
+            ? housingCities.canDeleteCity({
+              cityCount: cityCnt.c, districtCount: distCnt.c, projectCount: projCnt.c,
+            })
+            : { ok: true };
+          if (!guard.ok) { conn.end(); return jsonReply(res, { error: guard.error }, guard.status); }
+          await conn.execute('DELETE FROM cities WHERE id=?', [cid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // PUT /admin/city（兼容旧前端：按 city_id 更新，缺省第一座；无城市则创建）
+    if (urlPath === '/api/juzhu/admin/city' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const parsed = housingCities
+        ? housingCities.validateCityWrite(body)
+        : { ok: !!(body.name || '').trim(), error: '城市名称不能为空', status: 400, fields: { name: (body.name || '').trim(), slug: (body.slug || '').trim() || slugify(body.name) } };
+      if (!parsed.ok) return jsonReply(res, { error: parsed.error }, parsed.status);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        let cid = null;
+        if (body.city_id != null && String(body.city_id).trim() !== '') {
+          cid = parseInt(body.city_id, 10);
+          const [existing] = await conn.execute('SELECT id FROM cities WHERE id=?', [cid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
+        } else {
+          const [rows] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
+          cid = rows.length ? rows[0].id : null;
+        }
+        let city;
+        if (!cid) city = await insertCityRow(conn, parsed.fields);
+        else city = await updateCityRow(conn, cid, parsed.fields);
+        await conn.commit();
+        return jsonReply(res, { ok: true, city });
+      } catch (e) {
+        return cityDupReply(res, e);
       } finally {
         await conn.end();
       }
@@ -1121,9 +1312,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!name) return jsonReply(res, { error: '行政区名称不能为空' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [cities] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!cities.length) { conn.end(); return jsonReply(res, { error: '请先配置城市' }, 400); }
-        const cityId = cities[0].id;
+        const resolved = await resolveBodyCityId(conn, body);
+        if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+        const cityId = resolved.cityId;
         const slug = (body.slug || name).trim() || name;
         const [existing] = await conn.execute('SELECT id FROM districts WHERE city_id=? AND slug=?', [cityId, slug]);
         if (existing.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
@@ -1210,35 +1401,45 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!['bzf', 'trade'].includes(channel)) return jsonReply(res, { error: 'channel 须为 bzf 或 trade' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [cities] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
-        if (!cities.length) { conn.end(); return jsonReply(res, { error: '未配置城市' }, 500); }
-        const cityId = cities[0].id;
+        const resolved = await resolveBodyCityId(conn, body, '未配置城市');
+        if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
+        const cityId = resolved.cityId;
         let districtId = body.district_id || null;
         if (channel === 'bzf') {
           if (!districtId) { conn.end(); return jsonReply(res, { error: '保租房项目须选择行政区' }, 400); }
-          const [d] = await conn.execute('SELECT id FROM districts WHERE id=?', [districtId]);
-          if (!d.length) { conn.end(); return jsonReply(res, { error: '行政区不存在' }, 400); }
+          const [d] = await conn.execute('SELECT id FROM districts WHERE id=? AND city_id=?', [districtId, cityId]);
+          if (!d.length) { conn.end(); return jsonReply(res, { error: '行政区不存在或不属于当前城市' }, 400); }
         } else {
           districtId = null;
         }
         const slug = await uniqueProjectSlug(conn, channel, name, body.slug);
+        const [cityRows] = await conn.execute('SELECT name FROM cities WHERE id=?', [cityId]);
+        const cityName = cityRows.length ? cityRows[0].name : '';
         let address = body.address;
         if (!address) {
           if (districtId) {
             const [d] = await conn.execute('SELECT name FROM districts WHERE id=?', [districtId]);
-            address = d.length ? `${d[0].name} · ${name}` : `沈阳 · ${name}`;
+            address = d.length ? `${d[0].name} · ${name}` : `${cityName} · ${name}`;
           } else {
-            address = `沈阳 · ${name}`;
+            address = `${cityName} · ${name}`;
           }
+        }
+        let contactPhone = null;
+        try {
+          contactPhone = 'contact_phone' in body ? validateRealPhone(body.contact_phone) : null;
+        } catch (e) {
+          conn.end();
+          return jsonReply(res, { error: e.message }, 400);
         }
         await conn.execute(
           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
-            sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint)
-           VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?)`,
+            sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
+           VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
           [cityId, districtId, channel, name, slug, body.cover_image || null, address,
-           body.tags ? JSON.stringify(body.tags) : null,
+           encodeTags(body.tags),
            body.sort_order || 999, body.price_from || null,
-           body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null]
+           body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
+           contactPhone]
         );
         const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
         const pid = r[0].id;
@@ -1248,6 +1449,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
           [pid]
         );
+        parseJsonFields(projs[0], ['tags', 'rating']);
         return jsonReply(res, { ok: true, project: projs[0] }, 201);
       } finally {
         await conn.end();
@@ -1276,7 +1478,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
               'is_featured', 'featured_rank', 'old_house_hint']) {
             if (col in body) put(col, body[col]);
           }
-          if ('tags' in body) put('tags', body.tags ? JSON.stringify(body.tags) : null);
+          try {
+            const contactPhone = contactPhoneFromBody(body);
+            if (contactPhone !== undefined) put('contact_phone', contactPhone);
+          } catch (e) {
+            conn.end();
+            return jsonReply(res, { error: e.message }, 400);
+          }
+          if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('managed_unit_count' in body) {
             const val = body.managed_unit_count;
             put('managed_unit_count', (val !== null && val !== '') ? parseInt(val) : null);
@@ -1301,6 +1510,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?',
             [pid]
           );
+          parseJsonFields(projs[0], ['tags', 'rating']);
           return jsonReply(res, { ok: true, project: projs[0] });
         } finally {
           await conn.end();
@@ -1352,7 +1562,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [pid, name, slug, body.area_sqm || null, body.layout_label || null,
              body.rent_monthly || null, body.price_total || null,
-             body.tags ? JSON.stringify(body.tags) : null,
+             encodeTags(body.tags),
              body.unit_spec || null, body.promo_price || null,
              body.amenities ? JSON.stringify(body.amenities) : null,
              body.keeper ? JSON.stringify(body.keeper) : null,
@@ -1364,6 +1574,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+          parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail']);
           return jsonReply(res, { ok: true, unit: units[0] }, 201);
         } finally {
           await conn.end();
@@ -1409,7 +1620,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
               'unit_spec','promo_price','sort_order','cover_image']) {
             if (col in body) put(col, body[col]);
           }
-          if ('tags' in body) put('tags', body.tags ? JSON.stringify(body.tags) : null);
+          if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('amenities' in body) put('amenities', body.amenities ? JSON.stringify(body.amenities) : null);
           if ('keeper' in body) put('keeper', body.keeper ? JSON.stringify(body.keeper) : null);
           if ('rent_detail' in body) put('rent_detail', body.rent_detail ? JSON.stringify(body.rent_detail) : null);
@@ -1420,6 +1631,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+          parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail']);
           return jsonReply(res, { ok: true, unit: units[0] });
         } finally {
           await conn.end();
@@ -1921,11 +2133,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
         keys.forEach((k) => { o[k] = parse(o[k]); });
         return o;
       });
-      return jsonReply(res, {
+      const catalog = {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
-        projects: mapRows(projects, ['tags', 'rating']),
+        projects: mapRows(projects, ['tags', 'rating']).map(stripContactPhone),
         units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
         photos,
         stats: {
@@ -1937,7 +2149,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
             .filter((p) => p.channel === 'bzf')
             .reduce((sum, p) => sum + (Number(p.managed_unit_count != null ? p.managed_unit_count : p.unit_count) || 0), 0),
         },
-      });
+      };
+      if (housingHydrateCoverFields) housingHydrateCoverFields(catalog);
+      return jsonReply(res, catalog);
     }
 
     // GET /api/juzhu/ratings（按 rating_status 列出保租房评级）
@@ -1950,7 +2164,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (qp.get('status')) { sql += ' AND p.rating_status=?'; params.push(qp.get('status')); }
       sql += " ORDER BY COALESCE(p.rating_submitted_at,'') DESC, p.id";
       const rows = await queryRows(sql, params);
-      return jsonReply(res, rows);
+      return jsonReply(res, rows.map(stripContactPhone));
     }
 
     // GET /api/juzhu/ratings/:code
@@ -1970,7 +2184,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (rows.length) proj = rows[0];
         }
         if (!proj) return jsonReply(res, { error: 'not found' }, 404);
-        return jsonReply(res, { project: proj });
+        return jsonReply(res, { project: stripContactPhone(proj) });
       }
     }
 
@@ -1979,6 +2193,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const rows = await queryRows(
         "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint FROM projects WHERE channel='trade' ORDER BY is_featured DESC, featured_rank, sort_order"
       );
+      rows.forEach(r => parseJsonFields(r, ['tags']));
       return jsonReply(res, { listings: rows });
     }
 
@@ -1994,6 +2209,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
           [dist.id]
         );
+        projects.forEach(r => parseJsonFields(r, ['tags']));
         return jsonReply(res, { district: dist, projects });
       }
     }
@@ -2010,6 +2226,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE slug=?';
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags', 'rating']);
         return jsonReply(res, rows[0]);
       }
     }
@@ -2029,9 +2246,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
           [proj.id]
         );
-        // 脱敏，不暴露 contact_phone
-        delete proj.contact_phone;
-        return jsonReply(res, { project: proj, units, photos });
+        return jsonReply(res, { project: stripContactPhone(proj), units, photos });
       }
     }
 
@@ -2663,6 +2878,8 @@ const server = http.createServer((req, res) => {
 
   let filePath_decoded = decodeURIComponent(rawPath);
   if (filePath_decoded === '/') filePath_decoded = '/index.html';
+  // 常见拼写：juzhu-amdin → juzhu-admin，避免 404 回落到首页
+  if (filePath_decoded === '/juzhu-amdin.html') filePath_decoded = '/juzhu-admin.html';
 
   const filePath = path.resolve(ROOT, '.' + path.posix.normalize('/' + filePath_decoded.replace(/^\/+/, '/')));
 

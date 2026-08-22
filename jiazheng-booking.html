@@ -57,7 +57,7 @@
 </div>
 
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=2"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script src="jiazheng-data.js?v=2"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
@@ -149,7 +149,7 @@
       desc: document.getElementById('descInput').value.trim(),
       worker_id: qs.get('worker') || undefined,
       slot_id: qs.get('slot') || undefined,
-      source: '新居住频道'
+      source: (JZ.channelName && JZ.channelName()) || '新居住频道'
     }).then(function(o){
       location.href = 'lvju-app-pay.html?order=' + encodeURIComponent(o.id) + '&channel=jiazheng';
     }).catch(function(err){
@@ -232,6 +232,7 @@
 
   paintTimeSlots();
   renderTimeMode();
+  if (window.BZF_JZ && BZF_JZ.loadChannelBrand) BZF_JZ.loadChannelBrand();
 
   if (skuSlug) {
     BZF_JZ.sku(skuSlug).then(function(res){

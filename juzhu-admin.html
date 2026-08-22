@@ -56,6 +56,7 @@
   .tbl .thumb{width:48px;height:36px;border-radius:6px;background:#e8eeec center/cover no-repeat;}
   .tbl .acts{white-space:nowrap;}
   .tbl .acts button{padding:4px 8px;font-size:11px;margin-left:4px;}
+  .tbl tr.on td{background:color-mix(in oklab,var(--brand) 8%,#fff);}
   .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
     font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
   .toast.show{opacity:1;}
@@ -149,7 +150,7 @@
 
 <div class="app-shell">
 <header class="top">
-  <h1>新居住 · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
+  <h1><span id="adminBrand">新居住</span> · 内容编辑后台 <span class="sub">SQLite · 保存后自动同步 data.json</span></h1>
   <div class="acts">
     <select id="citySwitch" title="切换编辑城市" style="height:32px;border:1px solid var(--border,#dde);border-radius:8px;padding:0 8px;font-size:13px;background:#fff;"></select>
     <a href="screens/p-rating-review.html" target="_blank">评级复核队列</a>
@@ -159,17 +160,26 @@
   </div>
 </header>
 
-<div class="warn" id="apiWarn" hidden>请使用 <code>python3 juzhu/server.py</code> 启动服务后再编辑（纯静态 http.server 不支持保存）。</div>
+<div class="warn" id="apiWarn" hidden>无法连接管理 API。请确认已登录，并刷新页面重试。</div>
 
 <nav class="subnav" id="subnav">
-  <button type="button" data-tab="phone">预约电话</button>
+  <button type="button" data-tab="phone">设置</button>
   <button type="button" data-tab="dict">字典</button>
   <button type="button" class="on" data-tab="content">内容</button>
 </nav>
 
 <div id="panePhone" class="pane-main pane-phone" hidden>
   <div class="card">
-    <h2>预约看房电话</h2>
+    <h2>频道名称</h2>
+    <p class="hint">用于 C 端首页主标题、导航副标题、家政页等。去掉末尾「频道 / 专区」后的词干用于短标题（如后台顶栏）。保存后立即生效。</p>
+    <div class="fld" style="margin-top:14px;">
+      <label>频道名称</label>
+      <input type="text" id="channelName" maxlength="32" placeholder="新居住频道" />
+    </div>
+    <div class="bar">
+      <button type="button" class="btn primary" id="btnSaveChannelName">保存频道名称</button>
+    </div>
+    <h2 style="margin-top:24px;">预约看房电话</h2>
     <p class="hint">已降级：户型详情「预约咨询」已改走<strong>项目联系电话</strong>（真实号 → 实时 400 虚拟号）。本页城市级号码仅作遗留配置，详情拨号不再使用。</p>
     <div class="fld" style="margin-top:14px;">
       <label>咨询电话</label>
@@ -280,8 +290,17 @@ function login(password) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: password })
   }).then(function(r) {
-    return r.json().then(function(data) {
-      if (!r.ok) throw new Error((data && data.message) || '登录失败');
+    return r.text().then(function(text) {
+      var data = {};
+      try { data = text ? JSON.parse(text) : {}; }
+      catch (e) {
+        if (r.status === 501 || r.status === 404) {
+          throw new Error('当前页面开在静态服务上，无法登录。请改用 http://localhost:8765/juzhu-admin.html');
+        }
+        throw new Error('登录失败（HTTP ' + r.status + '）');
+      }
+      if (!r.ok) throw new Error((data && (data.error || data.message)) || '登录失败');
+      if (!data.token) throw new Error('登录失败：未返回凭证');
       setAuthToken(data.token);
       return data;
     });
@@ -293,9 +312,10 @@ function bootApp() {
     return loadDictionary();
   }).then(function() {
     return Promise.all([loadProjects(), loadSettings()]);
-  }).catch(function() {
+  }).catch(function(e) {
     document.body.classList.add('api-off');
     document.getElementById('apiWarn').hidden = false;
+    document.getElementById('apiWarn').textContent = '管理 API 加载失败：' + ((e && e.message) || '请刷新重试');
     switchTab('phone');
   });
 }
@@ -326,22 +346,28 @@ function adminCityParam() {
   try { return new URLSearchParams(location.search).get('city') || ''; } catch (e) { return ''; }
 }
 
+function fillCitySwitch(list) {
+  state.cities = list || [];
+  var sel = document.getElementById('citySwitch');
+  if (!sel) return;
+  var cur = adminCityParam();
+  sel.innerHTML = (state.cities || []).map(function(c) {
+    var selected = (!cur && c === state.cities[0]) || c.slug === cur || c.name === cur || String(c.id) === cur ? ' selected' : '';
+    return '<option value="'+esc(c.slug)+'"'+selected+'>'+esc(c.name)+'</option>';
+  }).join('');
+  sel.onchange = function() {
+    location.href = 'juzhu-admin.html?city=' + encodeURIComponent(sel.value);
+  };
+  var preview = document.getElementById('previewLink');
+  var slug = sel.value || cur;
+  if (preview) preview.href = 'index.html' + (slug ? '?city=' + encodeURIComponent(slug) : '');
+}
+
 function loadCities() {
   return fetch('/api/juzhu/cities').then(function(r) { return r.json(); }).then(function(list) {
-    state.cities = list || [];
-    var sel = document.getElementById('citySwitch');
-    var cur = adminCityParam();
-    sel.innerHTML = (list || []).map(function(c) {
-      var selected = (!cur && c === list[0]) || c.slug === cur || c.name === cur ? ' selected' : '';
-      return '<option value="'+c.slug+'"'+selected+'>'+esc(c.name)+'</option>';
-    }).join('');
-    sel.onchange = function() {
-      location.href = 'juzhu-admin.html?city=' + encodeURIComponent(sel.value);
-    };
-    var preview = document.getElementById('previewLink');
-    if (preview) preview.href = 'index.html' + (cur ? '?city=' + encodeURIComponent(cur) : '');
+    fillCitySwitch(list);
     return list;
-  }).catch(function() { state.cities = []; return []; });
+  }).catch(function() { fillCitySwitch([]); return []; });
 }
 
 var AMENITY_CATALOG = [
@@ -424,7 +450,7 @@ function switchTab(tab) {
 document.getElementById('subnav').onclick = function(e) {
   var btn = e.target.closest('button[data-tab]');
   if (!btn) return;
-  if (!state.apiOk) { toast('请先启动 python3 juzhu/server.py'); return; }
+  if (!state.apiOk) { toast('管理 API 未就绪，请刷新后重试'); return; }
   switchTab(btn.dataset.tab);
 };
 
@@ -442,6 +468,8 @@ function getApiKey() {
 function api(path, opts) {
   opts = opts || {};
   var headers = opts.body ? {'Content-Type':'application/json'} : {};
+  var token = getAuthToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   var key = getApiKey();
   if (key) headers['X-API-Key'] = key;
   return fetch(API + path, {
@@ -463,6 +491,8 @@ function api(path, opts) {
 
 function uploadForm(path, formData) {
   var headers = {};
+  var token = getAuthToken();
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   var key = getApiKey();
   if (key) headers['X-API-Key'] = key;
   return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
@@ -518,8 +548,26 @@ function bindCoverUpload(inputId, previewId, getMeta) {
 
 function tagsStr(tags) {
   if (!tags) return '';
+  if (typeof tags === 'string') {
+    try {
+      var parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) tags = parsed;
+    } catch (e) {}
+  }
   if (Array.isArray(tags)) return tags.join(', ');
   return String(tags);
+}
+
+function tagsFromInput(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return [];
+  try {
+    var parsed = JSON.parse(s);
+    if (Array.isArray(parsed)) {
+      return parsed.map(function(x){ return String(x == null ? '' : x).trim(); }).filter(Boolean);
+    }
+  } catch (e) {}
+  return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean);
 }
 
 function loadDistricts() {
@@ -549,6 +597,7 @@ function loadDictionary() {
     state.city = d.city || null;
     state.districts = d.districts || [];
     state.channels = d.channels || [];
+    if (d.cities && d.cities.length) fillCitySwitch(d.cities);
     document.body.classList.remove('api-off');
     document.getElementById('apiWarn').hidden = true;
     document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
@@ -560,10 +609,20 @@ function loadDictionary() {
 function renderDictionary() {
   var root = document.getElementById('dictRoot');
   if (!state.apiOk) {
-    root.innerHTML = '<div class="empty">请先启动 <code>python3 juzhu/server.py</code></div>';
+    root.innerHTML = '<div class="empty">管理 API 未就绪，请刷新后重试</div>';
     return;
   }
-  var city = state.city || {};
+  var cityList = (state.cities && state.cities.length) ? state.cities : (state.city ? [state.city] : []);
+  var cityRows = cityList.map(function(c) {
+    var on = state.city && Number(state.city.id) === Number(c.id);
+    return '<tr data-cid="'+c.id+'"'+(on?' class="on"':'')+'>'+
+      '<td><input class="c_name" value="'+esc(c.name||'')+'"/></td>'+
+      '<td><input class="c_slug" value="'+esc(c.slug||'')+'"/></td>'+
+      '<td><input class="c_phone" value="'+esc(c.booking_phone||'')+'"/></td>'+
+      '<td><input class="c_hero" value="'+esc(c.hero_bg_image||'')+'"/></td>'+
+      '<td class="acts"><button type="button" class="btn primary c_save">保存</button>'+
+      '<button type="button" class="btn danger c_del">删</button></td></tr>';
+  }).join('');
   var chRows = (state.channels || []).map(function(c) {
     return '<tr data-ch="'+c.id+'">'+
       '<td><code>'+esc(c.id)+'</code></td>'+
@@ -585,24 +644,12 @@ function renderDictionary() {
       '<button type="button" class="btn danger d_del">删</button></td></tr>';
   }).join('');
 
-  var heroBg = city.hero_bg_image || '';
-  var heroPreview = heroBg ? "background-image:url('/"+heroBg.replace(/^\//,'')+"')" : '';
-
   root.innerHTML =
-    '<div class="card"><h2>城市</h2>'+
-      '<div class="grid">'+
-        '<div class="fld"><label>城市名称</label><input id="cityName" value="'+esc(city.name||'')+'"/></div>'+
-        '<div class="fld"><label>Slug</label><input id="citySlug" value="'+esc(city.slug||'')+'"/></div>'+
-        '<div class="fld grid full img-field"><label>频道首页头图（方案 C · '+esc(city.name||'城市')+' · 新居住）</label>'+
-          '<div class="img-field-row">'+
-            '<input id="cityHeroBg" value="'+esc(heroBg)+'" placeholder="assets/juzhu/sy/city/hero.jpg"/>'+
-            '<label class="btn ghost upload-btn">上传<input type="file" accept="image/*" class="upload-input"/></label>'+
-          '</div>'+
-          '<div class="cover-preview" id="cityHeroPreview" style="'+heroPreview+'"></div>'+
-          '<p class="hint">用于 index.html 顶部「城市 · 新居住」背景，上传后自动保存</p>'+
-        '</div>'+
-      '</div>'+
-      '<div class="bar"><button type="button" class="btn primary" id="saveCity">保存城市</button></div>'+
+    '<div class="card"><h2>城市 <span class="badge">'+cityList.length+'</span></h2>'+
+      '<p class="hint">顶部切换器选择当前编辑城市（高亮行）。名称与 slug 全局唯一；仍有行政区或项目的城市不可删，且至少保留一座。</p>'+
+      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>咨询电话</th><th>头图路径</th><th>操作</th></tr></thead>'+
+      '<tbody id="cityRows">'+cityRows+'</tbody></table>'+
+      '<div class="bar"><button type="button" class="btn ghost" id="addCity">+ 新增城市</button></div>'+
     '</div>'+
     '<div class="card"><h2>频道 <span class="badge">'+state.channels.length+'</span></h2>'+
       '<p class="hint">频道 ID（bzf / trade）不可改，可调整展示名称与排序。前台 Tab 与筛选器读取此处配置。</p>'+
@@ -615,41 +662,60 @@ function renderDictionary() {
       '<div class="bar"><button type="button" class="btn ghost" id="addDistrict">+ 新增行政区</button></div>'+
     '</div>';
 
-  document.getElementById('saveCity').onclick = function() {
-    api('/city', { method:'PUT', body: {
-      city_id: state.city ? state.city.id : undefined,
-      name: document.getElementById('cityName').value.trim(),
-      slug: document.getElementById('citySlug').value.trim(),
-      hero_bg_image: document.getElementById('cityHeroBg').value.trim() || null
-    }}).then(function(res) {
-      state.city = res.city;
-      toast('城市已保存');
-    }).catch(function(e){ toast('保存失败：'+e.message); });
+  document.getElementById('addCity').onclick = function() {
+    var name = prompt('新城市名称');
+    if (!name || !name.trim()) return;
+    api('/cities', { method:'POST', body: { name: name.trim() } }).then(function(res) {
+      toast('城市已添加');
+      location.href = 'juzhu-admin.html?city=' + encodeURIComponent(res.city.slug);
+    }).catch(function(e){ toast('添加失败：'+e.message); });
   };
-
-  var heroInput = document.getElementById('cityHeroBg');
-  if (heroInput) {
-    heroInput.oninput = function() {
-      document.getElementById('cityHeroPreview').style.backgroundImage =
-        this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+  root.querySelectorAll('.c_save').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      var id = tr.dataset.cid;
+      api('/cities/'+id, { method:'PUT', body: {
+        name: tr.querySelector('.c_name').value.trim(),
+        slug: tr.querySelector('.c_slug').value.trim(),
+        booking_phone: tr.querySelector('.c_phone').value.trim() || null,
+        hero_bg_image: tr.querySelector('.c_hero').value.trim() || null
+      }}).then(function(res) {
+        var idx = (state.cities || []).findIndex(function(c){ return Number(c.id) === Number(id); });
+        if (idx >= 0 && res && res.city) state.cities[idx] = res.city;
+        if (state.city && Number(state.city.id) === Number(id) && res.city) {
+          state.city = res.city;
+          var phoneEl = document.getElementById('bookingPhone');
+          if (phoneEl) phoneEl.value = res.city.booking_phone || '';
+          if (res.city.slug) {
+            history.replaceState(null, '', 'juzhu-admin.html?city=' + encodeURIComponent(res.city.slug));
+          }
+        }
+        fillCitySwitch(state.cities);
+        toast('城市已保存');
+      }).catch(function(e){ toast('保存失败：'+e.message); });
     };
-    var heroUpload = heroInput.closest('.img-field').querySelector('.upload-input');
-    if (heroUpload) {
-      heroUpload.onchange = function() {
-        var file = heroUpload.files && heroUpload.files[0];
-        if (!file) return;
-        toast('上传中…');
-        uploadImage(file, { scope: 'city_hero' }).then(function(res) {
-          heroInput.value = res.file_path;
-          document.getElementById('cityHeroPreview').style.backgroundImage =
-            "url('/"+res.file_path.replace(/^\//,'')+"')";
-          if (state.city) state.city.hero_bg_image = res.file_path;
-          toast('头图已上传并保存');
-          heroUpload.value = '';
-        }).catch(function(e){ toast('上传失败：'+e.message); heroUpload.value = ''; });
-      };
-    }
-  }
+  });
+  root.querySelectorAll('.c_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      if (!confirm('确定删除城市「'+tr.querySelector('.c_name').value+'」？')) return;
+      var id = tr.dataset.cid;
+      api('/cities/'+id, { method:'DELETE' }).then(function() {
+        toast('城市已删除');
+        if (state.city && Number(state.city.id) === Number(id)) {
+          var rest = (state.cities || []).filter(function(c){ return Number(c.id) !== Number(id); });
+          location.href = rest.length
+            ? 'juzhu-admin.html?city=' + encodeURIComponent(rest[0].slug)
+            : 'juzhu-admin.html';
+          return;
+        }
+        return loadCities().then(loadDictionary).then(function() {
+          populateDistrictFilter();
+          renderDictionary();
+        });
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
 
   root.querySelectorAll('.ch_save').forEach(function(btn) {
     btn.onclick = function() {
@@ -691,7 +757,7 @@ function renderDictionary() {
   document.getElementById('addDistrict').onclick = function() {
     var name = prompt('新行政区名称');
     if (!name || !name.trim()) return;
-    api('/districts', { method:'POST', body: { name: name.trim() } }).then(function() {
+    api('/districts', { method:'POST', body: { name: name.trim(), city_id: state.city && state.city.id } }).then(function() {
       toast('行政区已添加');
       return loadDictionary();
     }).then(function(){ populateDistrictFilter(); renderDictionary(); })
@@ -839,6 +905,7 @@ function createProject() {
   var body = {
     name: name,
     channel: channel,
+    city_id: state.city && state.city.id,
     district_id: district_id ? +district_id : null,
     sort_order: +document.getElementById('n_sort').value || 999,
     address: document.getElementById('n_addr').value.trim() || undefined,
@@ -1179,7 +1246,7 @@ function collectUnitDetail(panel) {
     other_fees: fees
   };
   return {
-    tags: panel.querySelector('.ud_tags').value,
+    tags: tagsFromInput(panel.querySelector('.ud_tags').value),
     unit_spec: panel.querySelector('.ud_spec').value.trim() || null,
     promo_price: numOrNull(panel.querySelector('.ud_promo').value),
     amenities: amenities,
@@ -1332,7 +1399,7 @@ function saveProject() {
   var body = {
     name: document.getElementById('p_name').value.trim(),
     address: document.getElementById('p_addr').value.trim(),
-    tags: document.getElementById('p_tags').value,
+    tags: tagsFromInput(document.getElementById('p_tags').value),
     sort_order: +document.getElementById('p_sort').value,
     price_from: numVal('p_price'),
     cover_image: document.getElementById('p_cover').value.trim(),
@@ -1343,7 +1410,7 @@ function saveProject() {
 
   api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
     state.current = res.project;
-    toast('项目已保存，data.json 已更新');
+    toast('项目已保存');
     loadProjects().then(function(){ state.current = res.project; renderProjectList(); });
   }).catch(function(e){ toast('保存失败：'+e.message); });
 }
@@ -1399,25 +1466,54 @@ function numVal(id) {
   return v === '' ? null : +v;
 }
 
+function channelBrand(raw) {
+  var name = String(raw || '').trim() || '新居住频道';
+  var short = name.replace(/(频道|专区)$/, '') || name;
+  return { name: name, short: short, zone: short + '专区' };
+}
+
+function applyAdminChrome(name) {
+  var brand = channelBrand(name);
+  var el = document.getElementById('adminBrand');
+  if (el) el.textContent = brand.short;
+  document.title = brand.short + ' · 内容编辑后台';
+}
+
 function loadSettings() {
   document.getElementById('bookingPhone').value = (state.city && state.city.booking_phone) || '';
-  // 加载前端开关
+  // 加载前端开关与频道名称
   if (state.apiOk) {
     api('/settings').then(function(s) {
       document.getElementById('toggleCitySwitcher').checked = s.show_city_switcher !== false;
       document.getElementById('toggleLifeService').checked = s.show_life_service !== false;
+      var brand = channelBrand(s.channel_name);
+      document.getElementById('channelName').value = brand.name;
+      applyAdminChrome(brand.name);
     }).catch(function(){});
   } else {
     document.getElementById('toggleCitySwitcher').checked = true;
     document.getElementById('toggleLifeService').checked = true;
+    document.getElementById('channelName').value = '新居住频道';
   }
   return Promise.resolve();
 }
 
+document.getElementById('btnSaveChannelName').onclick = function() {
+  if (!state.apiOk) { toast('管理 API 未就绪，请刷新后重试'); return; }
+  var name = document.getElementById('channelName').value.trim();
+  if (!name) { toast('频道名称不能为空'); return; }
+  api('/settings', { method: 'PUT', body: { channel_name: name } }).then(function(res) {
+    var saved = (res && res.channel_name) || name;
+    document.getElementById('channelName').value = saved;
+    applyAdminChrome(saved);
+    toast('频道名称已保存');
+  }).catch(function(e){ toast('保存失败：'+e.message); });
+};
+
 document.getElementById('btnSaveSettings').onclick = function() {
-  if (!state.apiOk) { toast('请先启动 python3 juzhu/server.py'); return; }
+  if (!state.apiOk) { toast('管理 API 未就绪，请刷新后重试'); return; }
   var phone = document.getElementById('bookingPhone').value.trim();
-  api('/settings', { method: 'PUT', body: { booking_phone: phone || null } }).then(function(res) {
+  api('/settings', { method: 'PUT', body: { booking_phone: phone || null, city_id: state.city && state.city.id } }).then(function(res) {
     if (state.city) state.city.booking_phone = res.booking_phone;
     toast('咨询电话已保存');
   }).catch(function(e){ toast('保存失败：'+e.message); });
