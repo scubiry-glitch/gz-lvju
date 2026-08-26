@@ -154,7 +154,7 @@
       var cls = p.cover_image ? '' : ' g4';
       var tags = JUZHU.asTags(p.tags);
       return '<a class="mcard" href="juzhu-bzf-project.html?channel=trade&project='+encodeURIComponent(p.slug)+'">'+
-        '<div class="img'+cls+'" style="'+style+'"><span class="star">卖旧买新</span><span class="like">♡</span>'+
+        '<div class="img'+cls+'" style="'+style+'"><span class="star">卖旧买新</span>'+
         '<div class="cap"><div class="nm">'+p.name+'</div><div class="lo">'+(p.address||'')+'</div></div></div>'+
         '<div class="ci"><div class="tags">'+tags.map(function(t){return '<span>'+t+'</span>';}).join('')+'</div>'+
         '<div class="pr"><b>'+(p.price_from||'—')+'<small>万起</small></b>'+
