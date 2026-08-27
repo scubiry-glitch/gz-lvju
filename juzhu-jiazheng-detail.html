@@ -159,7 +159,7 @@
         <div class="left"><b id="price">¥0</b> <small id="priceUnit">起</small></div>
         <div class="right" id="sales">最近好评 1000+</div>
       </div>
-      <div class="coupon"><b>神券已减 10</b><span>支付成功后进入工单池，待派单状态统一进入家政订单 API</span></div>
+      <div class="coupon"><b>神券已减 10</b><span>支付成功后平台将为您安排服务，预计24小时内联系确认上门时间</span></div>
     </div>
 
     <div class="block" id="productBlock" hidden>
@@ -457,7 +457,7 @@
     hero.innerHTML = '<div class="in">'+
       '<div class="eyebrow">'+(item.category_name || '家政服务').toUpperCase()+'</div>'+
       '<h1>'+item.name+'</h1>'+
-      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后进入中台工单池统一派单。</p>'+
+      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后平台统一安排服务，全程进度可查。</p>'+
       '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span><span>'+(item.duration_min || 0)+' 分钟</span><span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
     '</div>';
     var displayPrice = (product && product.price != null) ? product.price : item.price_from;
