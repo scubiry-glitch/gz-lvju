@@ -23,8 +23,9 @@
 // 安全：
 //   - 默认 dry-run；--apply 后所有 DB 变更在单事务内执行，任一失败整体回滚
 //   - hmac_key 在 --apply 时随机生成（crypto.randomBytes，64 位 hex）；执行完成后必须把新密钥同步给来来
-//   - juzhu/hmac_secret.key（vendor_config.cjs 读取的配置文件）在 DB 提交成功后同步：
-//     文件存在则刷新 41 行、移除 42 行；文件不存在则创建并写入来来新行，保证文件与表一致
+//   - 服务端（Node/Python）统一从 jz_vendors 表读取密钥，无需文件；
+//     juzhu/hmac_secret.key 仅作兼容兜底：文件存在则刷新 41 行、移除 42 行，
+//     不存在则创建（打进部署包，供表内配置意外丢失时首次加载导入）
 //
 // 数据库配置：与 app.js getDbConfig 对齐 —— 优先 MYSQL_*，回退 JUZHU_DB_*；
 // 读取根目录 .env 与 juzhu/.env（不覆盖已注入的环境变量）。

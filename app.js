@@ -69,12 +69,19 @@ let channelBrand = null;
 try { channelBrand = require('./channel_brand.cjs'); } catch (_) {}
 let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
-let loadVendorConfig = null;
-try { loadVendorConfig = require('./vendor_config.cjs').loadVendorConfig; } catch (_) {}
+let loadVendorConfigFromDb = null;
+try { loadVendorConfigFromDb = require('./vendor_config.cjs').loadVendorConfigFromDb; } catch (_) {}
 let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 let vendorApi = null;
 try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
+
+// 商家配置统一从 jz_vendors 表读取（懒加载缓存；对齐 Python jiazheng_api._load_vendor_config）
+async function getVendorConfig() {
+  if (!loadVendorConfigFromDb) throw new Error('vendor_config module missing');
+  if (!mysql2) throw new Error('mysql2 module missing');
+  return loadVendorConfigFromDb(() => mysql2.createConnection(getDbConfig()));
+}
 
 function getDbConfig() {
   // Node 优先 MYSQL_*；兼容 Python 侧 JUZHU_DB_*（同一 .env 可双端共用）
@@ -1151,7 +1158,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/'))) {
       if (!vendorApi) return jsonReply(res, { code: 500, message: 'vendor_api module missing' }, 500);
       const body = await readBody(req);
-      const vendors = loadVendorConfig ? loadVendorConfig() : {};
+      const vendors = await getVendorConfig();
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const out = await vendorApi.handleRequest(urlPath, body, conn, vendors);
@@ -2785,12 +2792,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const pagePath = product.path || 'pages-sub/goods/goods';
       const productQuery = product.query || '';
       const vendorId = String(product.vendor_id || '');
-      const vendors = loadVendorConfig ? loadVendorConfig() : {};
+      const vendors = await getVendorConfig();
       const vendor = vendors[vendorId];
       if (!vendor || !vendor.url_link) {
         return jsonReply(res, {
           ok: false,
-          error: `vendor_id=${vendorId} 未配置 url_link，请检查 hmac_secret.key`,
+          error: `vendor_id=${vendorId} 未配置 url_link，请检查 jz_vendors 表配置`,
         }, 500);
       }
       const conn = await mysql2.createConnection(getDbConfig());
@@ -2847,7 +2854,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
           if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
           if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
-          const vendors = loadVendorConfig ? loadVendorConfig() : {};
+          const vendors = await getVendorConfig();
           const detailUrl = (vendors[String(order.vendor_id)] || {}).order_detail_url || '';
           if (!detailUrl) return jsonReply(res, { ok: false, error: '商家未配置订单详情接口' });
           const sep = detailUrl.includes('?') ? '&' : '?';
