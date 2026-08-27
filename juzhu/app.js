@@ -355,7 +355,6 @@ window.JUZHU = (function () {
 
     return '<div class="block rating-block">' +
       '<div class="bt">好房子评级 · 四维度</div>' +
-      '<div class="bs">好房子评价标准=AI打分+人工复核</div>' +
       '<div class="rating-sum">' +
         '<div class="stars-side"><div class="ek">综合星级</div>' +
         '<div class="stars">' + starsHtml(r.stars) + '</div>' +
