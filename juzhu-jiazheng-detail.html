@@ -484,7 +484,7 @@
     document.getElementById('tags').innerHTML = (item.tags || []).concat(item.badges || []).map(function(x){
       return '<span>' + x + '</span>';
     }).join('');
-    document.getElementById('includes').innerHTML = (item.includes || []).map(function(x, i){
+    document.getElementById('includes').innerHTML = (item.includes_json || []).map(function(x, i){
       return '<div class="item"><span class="dot">'+(i+1)+'</span><div><b>'+x+'</b><p>按标准工序执行，完工可回传记录。</p></div></div>';
     }).join('');
     document.getElementById('flow').innerHTML = (item.service_flow || []).map(function(x, i){

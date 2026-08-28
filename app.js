@@ -775,7 +775,7 @@ async function ensureSchemaRun() {
         worker_min_level VARCHAR(20),
         cover_image VARCHAR(500),
         gallery TEXT,
-        includes TEXT,
+        includes_json TEXT,
         service_flow TEXT,
         service_notice TEXT,
         sort_order INT NOT NULL DEFAULT 0,
@@ -2270,7 +2270,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       sql += ' ORDER BY s.category_id, s.sort_order, s.id';
       const rows = await queryRows(sql, params);
-      const SKU_JSON_FIELDS = ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice'];
+      const SKU_JSON_FIELDS = ['tags', 'badges', 'gallery', 'includes_json', 'service_flow', 'service_notice'];
       rows.forEach(r => parseJsonFields(r, SKU_JSON_FIELDS));
       return jsonReply(res, { items: rows });
     }
@@ -2290,7 +2290,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
         const item = skus[0];
-        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice']);
+        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes_json', 'service_flow', 'service_notice']);
 
         const qp = new URLSearchParams(qs);
         const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
@@ -2376,7 +2376,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
            FROM jz_skus WHERE enabled=1 AND category_id=? AND slug<>? ORDER BY sort_order, id LIMIT 4`,
           [item.category_id, item.slug]
         );
-        related.forEach(r => parseJsonFields(r, ['gallery', 'tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+        related.forEach(r => parseJsonFields(r, ['gallery', 'tags', 'badges', 'includes_json', 'service_flow', 'service_notice']));
 
         // reviews：真实评价优先，不足 3 条补类目 fallback（对齐 Python _review_rows/_fallback_reviews）
         if (products.length) {
@@ -3083,7 +3083,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
          FROM jz_skus s LEFT JOIN jz_categories c ON c.id=s.category_id
          ORDER BY s.category_id, s.sort_order, s.id`
       );
-      rows.forEach(r => parseJsonFields(r, ['tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+      rows.forEach(r => parseJsonFields(r, ['tags', 'badges', 'includes_json', 'service_flow', 'service_notice']));
       return jsonReply(res, { list: rows });
     }
 
