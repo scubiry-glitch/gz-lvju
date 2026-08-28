@@ -942,17 +942,114 @@ async function ensureSchemaRun() {
     for (const ddl of ddls) {
       await conn.execute(ddl);
     }
-    // 初始化 jz_categories 种子数据
+    // 初始化 jz_categories 种子数据（到家 4 类 + 本地生活 7 频道，同 Tab 并列）
     const jzCatSeeds = [
-      ['cleaning', '保洁', null, 1],
-      ['repair',   '维修', null, 2],
-      ['moving',   '搬家', null, 3],
-      ['nanny',    '保姆', null, 4],
+      ['cleaning', '保洁', '🧹', 1],
+      ['repair',   '维修', '🔧', 2],
+      ['moving',   '搬家', '📦', 3],
+      ['nanny',    '保姆', '👶', 4],
+      ['telecom', '电讯服务', '📱', 5],
+      ['insurance', '财险服务', '🛡', 6],
+      ['consumer_finance', '消费金融', '💳', 7],
+      ['health_care', '健康养老', '🏥', 8],
+      ['home_maintain', '居家维护', '🏠', 9],
+      ['asset', '资产服务', '🏦', 10],
+      ['recycle', '二手回收', '♻️', 11],
+      ['community', '社区服务', '🏘', 12],
     ];
     for (const [catId, catName, catIcon, catOrder] of jzCatSeeds) {
       await conn.execute(
         'INSERT IGNORE INTO jz_categories(id, name, icon, sort_order, enabled) VALUES (?, ?, ?, ?, 1)',
         [catId, catName, catIcon, catOrder]
+      );
+    }
+    // 本地生活频道演示 SKU / 商家 / 商品（INSERT IGNORE，存量库可增量补齐）
+    const lifeSkuSeeds = [
+      [25,'telecom','宽带新装 · 千兆','telecom-broadband','装维上门 · 当周开通',99,'起',120,1],
+      [26,'telecom','号码携转 · 套餐','telecom-portability','携号转网 · 套餐对比',0,'咨询',30,2],
+      [27,'insurance','家财险 · 基础版','insurance-home-basic','漏水/火灾/盗抢',128,'/年',0,1],
+      [28,'insurance','租客责任险','insurance-tenant','第三者责任 · 押金替代',68,'/年',0,2],
+      [29,'consumer_finance','分期免息 · 租住','finance-rent-installment','首付灵活 · 信用评估',0,'咨询',0,1],
+      [30,'consumer_finance','消费贷 · 额度查询','finance-credit-limit','额度秒批 · 随借随还',0,'咨询',0,2],
+      [31,'health_care','养老陪护 · 日间','health-elder-day','持证护理 · 日间到岗',280,'/天',480,1],
+      [32,'health_care','体检套餐 · 基础','health-checkup-basic','三甲对接 · 报告解读',299,'起',0,2],
+      [33,'home_maintain','管道养护 · 季度','maintain-pipe-quarter','疏通+防堵养护',198,'/季',90,1],
+      [34,'home_maintain','家电保养 · 套餐','maintain-appliance','空调/冰箱/洗衣机',159,'起',120,2],
+      [35,'asset','资产评估 · 房产','asset-appraisal','持证评估师上门',500,'起',0,1],
+      [36,'asset','托管运营 · 咨询','asset-custody','租金托管 · 报表透明',0,'咨询',0,2],
+      [37,'recycle','旧家电回收','recycle-appliance','上门估价 · 当日清运',0,'估价',60,1],
+      [38,'recycle','家具回收 · 套装','recycle-furniture','大件拆装 · 环保处置',0,'估价',90,2],
+      [39,'community','社区团购 · 日配','community-groupbuy','生鲜果蔬 · 次日达',0,'咨询',0,1],
+      [40,'community','便民代办 · 跑腿','community-errand','取送件 · 代缴代办',29,'起',60,2],
+    ];
+    for (const [id, cat, name, slug, spec, price, unit, dur, ord] of lifeSkuSeeds) {
+      await conn.execute(
+        `INSERT IGNORE INTO jz_skus(id,category_id,name,slug,spec,price_from,price_unit,duration_min,
+          tags,badges,sales_text,rating_score,worker_min_level,includes,service_flow,service_notice,sort_order,enabled)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+        [id, cat, name, slug, spec, price, unit, dur,
+          JSON.stringify(['本地生活']), JSON.stringify(['精选']), '试点开放', 4.7, 'L2',
+          JSON.stringify(['在线预约', '认证服务商', '进度可查']),
+          JSON.stringify(['选择服务', '提交需求', '服务商确认', '履约完成']),
+          JSON.stringify(['价格以实际报价为准', '部分服务需资质核验']), ord]
+      );
+    }
+    // 本地生活商家用 141+，避免撞本地已有 cleaning/moving 演示商家 41/42
+    const lifeVendors = [
+      [141,'telecom','联通装维优选','📶','全市覆盖',4.6,1200],
+      [142,'insurance','安居财险专区','🛡','全国',4.8,5600],
+      [143,'consumer_finance','江苏银行消费金融','💳','本地',4.7,3200],
+      [144,'health_care','康养到家','🏥','全市',4.8,2100],
+      [145,'home_maintain','安居养护','🔧','全市',4.6,1800],
+      [146,'asset','贝壳资产顾问','🏦','本地',4.7,900],
+      [147,'recycle','绿色回收站','♻️','全市',4.5,4400],
+      [148,'community','邻里便民站','🏘','全市',4.6,2600],
+      [151,'moving','蓝犀牛搬家','🚚','全市覆盖',4.6,2400],
+      [152,'nanny','阿姨来了','👶','全市覆盖',4.8,8800],
+    ];
+    const nowLife = new Date().toISOString().slice(0, 19);
+    for (const [id, type, name, logo, address, rating, reviews] of lifeVendors) {
+      await conn.execute(
+        `INSERT IGNORE INTO jz_vendors(id,type,name,logo,address,rating,review_count,badges,live,start_price,unit,hours,status,sort_order,created_at,updated_at,city_ids)
+         VALUES(?,?,?,?,?,?,?,?,0,0,'起','09:00-21:00','active',?,?,?,NULL)`,
+        [id, type, name, logo, address, rating, reviews, JSON.stringify(['whitelist']), id, nowLife, nowLife]
+      );
+    }
+    const lifeProducts = [
+      [5101,141,25,'宽带新装 · 千兆','装维上门',99],
+      [5102,141,26,'号码携转 · 套餐','携号转网',0],
+      [5103,142,27,'家财险 · 基础版','漏水火灾盗抢',128],
+      [5104,142,28,'租客责任险','押金替代方案',68],
+      [5105,143,29,'分期免息 · 租住','信用评估',0],
+      [5106,143,30,'消费贷 · 额度查询','随借随还',0],
+      [5107,144,31,'养老陪护 · 日间','持证护理',280],
+      [5108,144,32,'体检套餐 · 基础','三甲对接',299],
+      [5109,145,33,'管道养护 · 季度','疏通养护',198],
+      [5110,145,34,'家电保养 · 套餐','多品类保养',159],
+      [5111,146,35,'资产评估 · 房产','持证上门',500],
+      [5112,146,36,'托管运营 · 咨询','租金托管',0],
+      [5113,147,37,'旧家电回收','上门估价',0],
+      [5114,147,38,'家具回收 · 套装','大件清运',0],
+      [5115,148,39,'社区团购 · 日配','生鲜果蔬',0],
+      [5116,148,40,'便民代办 · 跑腿','取送代缴',29],
+      // 搬家 / 保姆：保证城市过滤后类目仍可见
+      [5151,151,6,'居民搬家 · 同城','金杯车·2名师傅',398],
+      [5152,151,7,'日式搬家 · 全包','打包收纳+还原',1680],
+      [5153,151,17,'长途搬家 · 跨城','厢式货车',1200],
+      [5154,151,18,'钢琴搬运 · 专业','立式/三角可接',800],
+      [5251,152,8,'钟点工 · 3小时','做饭保洁',128],
+      [5252,152,9,'育儿嫂 · 住家','持证育儿',8800],
+      [5253,152,21,'住家保姆 · 全职','做饭保洁照护',6800],
+      [5254,152,23,'月嫂 · 26天','三甲护理',12800],
+    ];
+    for (const [pid, vid, skuId, title, sub, price] of lifeProducts) {
+      await conn.execute(
+        `INSERT IGNORE INTO jz_products(id,vendor_id,title,subtitle,category,duration_hours,area_range,unit,
+          price,original_price,discount_label,earliest_time,advance_booking_hours,sales_count,rating,
+          service_tags,channel_sku_id,status,sort_order)
+         VALUES(?,?,?,?,?,1,'','起',?,?,NULL,'今天 18:00',2,100,4.7,?,?,'on',?)`,
+        [pid, vid, title, sub, title.split('·')[0].trim(), price, price ? Math.round(price * 1.5) : null,
+          JSON.stringify(['本地生活', '可预约']), skuId, pid]
       );
     }
     // 初始化 channels 种子数据
