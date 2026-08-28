@@ -69,11 +69,11 @@ def run_one(cat, sku_id, slug):
         assert advanced["order"]["status"] == step
         print("advance ->", step)
 
-    rated = call("POST", f"/api/juzhu/jiazheng/orders/{oid}/rate", {"score": 5, "tags": ["专业"]}, auth=False)
+    rated = call("POST", f"/api/juzhu/jiazheng/orders/{oid}/rate", {"score": 5, "tags": ["专业"]}, auth=True)
     assert rated["order"]["status"] == "rated"
     print("rate ok")
 
-    got = call("GET", f"/api/juzhu/jiazheng/orders/{oid}", auth=False)
+    got = call("GET", f"/api/juzhu/jiazheng/orders/{oid}", auth=True)
     assert got["order"]["category_id"] == cat
     print("verify ok", got["order"]["id"])
     return oid

@@ -83,8 +83,7 @@
       if (params[k] != null && params[k] !== '') qs.set(k, params[k]);
     });
     var url = '/api/juzhu/jiazheng/orders' + (qs.toString() ? '?' + qs : '');
-    var headers = params.phone ? {} : authHeaders();
-    return fetchJSON(url, { headers: headers }).then(function (res) {
+    return fetchJSON(url, { headers: authHeaders() }).then(function (res) {
       return (res.items || []).map(normalizeItem);
     });
   }
@@ -95,7 +94,7 @@
   }
 
   function get(id) {
-    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id))
+    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id), { headers: authHeaders() })
       .then(function (res) { return normalizeItem(res.order); });
   }
 
@@ -154,6 +153,7 @@
   function rate(id, rating) {
     return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/rate', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({
         score: rating.score,
         tags: rating.tags || [],

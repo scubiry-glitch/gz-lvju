@@ -234,6 +234,69 @@ function requireApiKey(req, res) {
   return false;
 }
 
+const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url'];
+
+function stripVendorSecrets(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    obj.forEach(stripVendorSecrets);
+    return obj;
+  }
+  for (const f of VENDOR_SECRET_FIELDS) delete obj[f];
+  return obj;
+}
+
+function isVendorHmacPath(urlPath, method) {
+  const p = String(urlPath || '').replace(/\/+$/, '') || '/';
+  const m = String(method || '').toUpperCase();
+  return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/'));
+}
+
+/**
+ * C 端公开接口白名单（无 PII 的目录/房源展示 + 来来预约跳转 + 我的订单）。
+ * 其余 /api/juzhu/* 一律要求 JUZHU_API_KEY（admin 走会话/Key，商家开放接口走 HMAC）。
+ */
+function isCEndPublicApi(urlPath, method) {
+  const p = String(urlPath || '').replace(/\/+$/, '') || '/';
+  const m = String(method || 'GET').toUpperCase();
+  if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
+  if (m !== 'GET') return false;
+  const exact = new Set([
+    '/api/juzhu/catalog',
+    '/api/juzhu/cities',
+    '/api/juzhu/districts',
+    '/api/juzhu/settings',
+    '/api/juzhu/stats',
+    '/api/juzhu/ratings',
+    '/api/juzhu/trade',
+    '/api/juzhu/jiazheng/categories',
+    '/api/juzhu/jiazheng/skus',
+    '/api/juzhu/jiazheng/workers',
+    '/api/juzhu/gr/orders',
+  ]);
+  if (exact.has(p)) return true;
+  if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
+  if (/^\/api\/juzhu\/units\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/units\/\d+\/photos$/.test(p)) return true;
+  if (/^\/api\/juzhu\/ratings\/[^/]+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/jiazheng\/skus\/[^/]+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/jiazheng\/skus\/[^/]+\/(slots|detail|vendors)$/.test(p)) return true;
+  if (/^\/api\/juzhu\/gr\/orders\/[^/]+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/gr\/orders\/[^/]+\/vendor-detail$/.test(p)) return true;
+  return false;
+}
+
+function assertApiAuthorized(urlPath, req, res) {
+  if (isAdminAuthExempt(urlPath, req.method)) return true;
+  const p = String(urlPath || '').replace(/\/+$/, '') || '/';
+  if (p.startsWith(ADMIN_PREFIX)) return true;
+  if (isVendorHmacPath(urlPath, req.method)) return true;
+  if (isCEndPublicApi(urlPath, req.method)) return true;
+  return requireApiKey(req, res);
+}
+
 function isAdminAuthExempt(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (p === `${ADMIN_PREFIX}/auth/login` && method === 'POST') return true;
@@ -287,6 +350,10 @@ module.exports.expectedApiKey = expectedApiKey;
 module.exports.providedApiKey = providedApiKey;
 module.exports.requireApiKey = requireApiKey;
 module.exports.assertAdminAuthorized = assertAdminAuthorized;
+module.exports.assertApiAuthorized = assertApiAuthorized;
+module.exports.isCEndPublicApi = isCEndPublicApi;
+module.exports.isVendorHmacPath = isVendorHmacPath;
+module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
 module.exports.DEV_EXAMPLE_API_KEY = DEV_EXAMPLE_API_KEY;
@@ -1151,6 +1218,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
   try {
     // /api/juzhu/admin/* 全方法强制 API Key（与 juzhu/server.py 对齐；auth/login|check 除外）
     if (!assertAdminAuthorized(urlPath, req, res)) return;
+    if (!assertApiAuthorized(urlPath, req, res)) return;
 
     await ensureSchema();
 
@@ -2265,15 +2333,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { items: rows });
     }
 
-    // GET /api/juzhu/jiazheng/orders （需 API Key 或 phone 参数）
+    // GET /api/juzhu/jiazheng/orders （须 API Key；phone 仅作过滤）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
       const phone = (qp.get('phone') || '').trim();
-      const expected = expectedApiKey();
-      const provided = providedApiKey(req);
-      if (!phone && !apiKeyMatches(provided, expected)) {
-        return jsonReply(res, { error: 'unauthorized' }, 401);
-      }
       let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
                  LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
       const params = [];
@@ -2714,7 +2777,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
-    // POST /api/juzhu/jiazheng/orders/:id/rate（评价，C端无需鉴权）
+    // POST /api/juzhu/jiazheng/orders/:id/rate（须 API Key）
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/rate$/);
       if (m && req.method === 'POST') {
@@ -2936,6 +2999,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const vendors = await queryRows(sql, params);
       // 每个商家附带前2个上架产品
       for (const v of vendors) {
+        stripVendorSecrets(v);
         v.products = await queryRows(
           "SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order, id LIMIT 2",
           [v.id]
@@ -2951,7 +3015,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'GET') {
         const rows = await queryRows('SELECT * FROM jz_vendors WHERE id=?', [parseInt(m[1])]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
-        const v = rows[0];
+        const v = stripVendorSecrets(rows[0]);
         v.products = await queryRows("SELECT * FROM jz_products WHERE vendor_id=? AND status='on' ORDER BY sort_order", [v.id]);
         v.products.forEach(p => parseJsonFields(p, ['service_tags']));
         return jsonReply(res, v);
@@ -3097,6 +3161,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         }
         sql += ' ORDER BY v.sort_order, v.id LIMIT 20';
         const vendors = await queryRows(sql, params);
+        vendors.forEach(stripVendorSecrets);
         return jsonReply(res, { vendors });
       }
     }
@@ -3213,7 +3278,7 @@ if (require.main === module) {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
-    console.log('auth: /api/juzhu/admin/* requires API Key (auth/login|check exempt); forbidden historical default');
+    console.log('auth: /api/juzhu/* default-deny API Key; C-end catalog/wechat-link/gr-orders public; vendor HMAC; admin session');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));

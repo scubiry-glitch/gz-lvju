@@ -83,6 +83,24 @@
 
 <script src="_nav.js"></script>
 <script>
+// 管理台接口须 API Key：自动给本页所有 /api/juzhu/jz/* 请求附带密钥
+// （须事先 localStorage.setItem('JUZHU_API_KEY', '<密钥>')；禁止内嵌历史默认密钥）。
+(function(){
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || '';
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.indexOf('/api/juzhu/jz') !== -1) {
+      var h = Object.assign({}, init.headers);
+      if (!h['X-API-Key']) h['X-API-Key'] = KEY;
+      init.headers = h;
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+<script>
 (function(){
   const STATUS_MAP = {
     pending:'待支付', paid:'已支付', assigned:'已派单',
