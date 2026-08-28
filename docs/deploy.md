@@ -24,7 +24,7 @@ export JUZHU_ENV=production                # 生产必填，缺密钥/缺 MySQL 
 node app.js                                # 默认 PORT=9000；平台注入 PORT 优先
 ```
 
-商家 HMAC 密钥文件：`juzhu/hmac_secret.key`（gitignore，格式 `vendor_id|hmac_key|url_link|order_detail_url`）。
+商家 HMAC 密钥存 `jz_vendors` 表（`hmac_key`/`url_link`/`order_detail_url` 列），Node/Python 双端统一从表读取（进程内懒加载缓存，改表后需重启服务生效）。旧文件 `juzhu/hmac_secret.key` 已废弃，若仍存在仅在首次加载时向表导入（表中为空才导入，不覆盖已有值）。
 
 启动时 `ensureSchema()` 会建表；**对应表为空**时再灌家政种子（`jz_seed.cjs`）和保租房 JSON 种子（`housing_seed.cjs`）。已有数据不会被覆盖。
 

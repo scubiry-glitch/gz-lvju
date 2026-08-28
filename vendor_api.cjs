@@ -310,7 +310,7 @@ async function handleCallback(conn, body, vendorId) {
 }
 
 const VENDOR_ROUTES = {
-  '/api/juzhu/jiazheng/vendor/cities/list': citiesList,
+  '/api/juzhu/jiazheng/vendor/cities/list': (conn, body, vendorId) => citiesList(conn, vendorId),
   '/api/juzhu/jiazheng/vendor/categories/list': (conn, body, vendorId) => categoriesList(conn, vendorId),
   '/api/juzhu/jiazheng/vendor/skus/list': (conn, body, vendorId) => skusList(conn, vendorId),
   '/api/juzhu/jiazheng/vendor/products/list': productsList,
