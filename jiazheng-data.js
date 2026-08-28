@@ -14,7 +14,11 @@
 window.JZ_DATA = (function(){
   var API = '/api/juzhu/jz';
   // 父类目术语映射：仅页面标题文案用（目录/商家/服务者数据一律走 API）
-  var CAT_NAMES = { cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'保姆' };
+  var CAT_NAMES = {
+    cleaning:'保洁', repair:'维修', moving:'搬家', nanny:'保姆',
+    telecom:'电讯服务', insurance:'财险服务', consumer_finance:'消费金融',
+    health_care:'健康养老', home_maintain:'居家维护', asset:'资产服务', recycle:'二手回收'
+  };
 
   // ===== HTTP 包装 =====
   function getJson(path){
