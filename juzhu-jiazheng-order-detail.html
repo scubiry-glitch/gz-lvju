@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>订单详情 · 生活服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:24px;}
+  .appbar{position:sticky;}
+  .steps-h{margin:13px 16px 0;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink);}
+  .steps-h::before{content:"";width:4px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--brand),var(--brand-2));}
+  .steps{display:flex;background:#fff;margin:10px 16px 0;border:1px solid var(--border);border-radius:14px;padding:14px 6px 12px;}
+  .step{flex:1;text-align:center;position:relative;}
+  .step .dot{width:22px;height:22px;border-radius:50%;background:#eef2f1;color:#96a39f;
+    display:grid;place-items:center;font-size:11px;margin:0 auto 6px;}
+  .step .line{position:absolute;top:11px;left:50%;right:-50%;height:2px;background:#eef2f1;transform:translateX(12px);}
+  .step:last-child .line{display:none;}
+  .step.done .dot{background:var(--brand-soft);color:var(--brand);}
+  .step.done .line{background:var(--brand-soft);}
+  .step.cur .dot{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;}
+  .step b{font-size:11px;color:var(--ink);display:block;}
+  .step.done b{color:var(--brand-deep);}
+  .step span{font-size:9px;color:var(--muted);margin-top:2px;display:block;letter-spacing:-.02em;}
+  .cancelled-tip{margin:13px 16px 0;background:#fff7f5;border:1px solid #fecaca;border-radius:14px;
+    padding:12px 14px;font-size:12px;color:#dc2626;}
+  .info{background:#fff;margin:13px 16px 0;border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+  .info .row{display:flex;justify-content:space-between;gap:14px;padding:12px 14px;
+    border-bottom:1px solid var(--border);font-size:13px;}
+  .info .row:last-child{border-bottom:0;}
+  .info .row .k{color:var(--muted);flex-shrink:0;}
+  .info .row .v{text-align:right;color:var(--ink);}
+  .err{padding:56px 24px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" href="juzhu-jiazheng-orders.html">‹</a>
+      <div class="ttl">订单详情</div>
+      <div class="act"><span style="visibility:hidden">⚙</span></div>
+    </div>
+    <div id="body"></div>
+  </div>
+</div>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_jzapi.js?v=3"></script>
+<script>
+(function(){
+  var JZ = window.BZF_JZ;
+  var q = new URLSearchParams(location.search);
+  var orderRef = q.get('order_ref') || '';
+
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function fmtYuan(fee){
+    if (fee == null) return '—';
+    return '¥' + Number(fee / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+
+  function fmtTime(t){ return t ? String(t).replace('T', ' ').slice(0, 16) : '—'; }
+
+  function fmtStepTime(t){
+    var full = fmtTime(t);
+    return full === '—' ? full : full.slice(5, 16);  // 横向紧凑展示 MM-DD HH:MM
+  }
+
+  function render(o){
+    var STEPS = [
+      { id: 'created',  label: '下单',   time: o.created_at },
+      { id: 'paid',     label: '已支付', time: o.paid_at },
+      { id: 'assigned', label: '已派单', time: o.eta },       // 预计上门时间
+      { id: 'serving',  label: '服务中', time: o.serving_at },
+      { id: 'completed',label: '已完成', time: o.completed_at }
+    ];
+    var order = ['paid', 'assigned', 'serving', 'completed'];
+    var curIdx = order.indexOf(o.status);
+    var html = '';
+    if (o.status === 'cancelled') {
+      html += '<div class="cancelled-tip">该订单已取消' +
+        (o.cancel_reason ? '：' + esc(o.cancel_reason) : '') + '</div>';
+    }
+    html += '<div class="steps-h">服务流程</div><div class="steps">' + STEPS.map(function(s, i){
+      var cls = '';
+      if (curIdx >= 0) {
+        if (i <= curIdx + 1) cls = 'done';
+        if (i === curIdx + 1) cls = 'cur';
+      }
+      return '<div class="step ' + cls + '"><div class="line"></div>' +
+        '<div class="dot">' + (cls === 'done' ? '✓' : (i + 1)) + '</div>' +
+        '<div><b>' + s.label + '</b><span>' + fmtStepTime(s.time) + '</span></div></div>';
+    }).join('') + '</div>';
+
+    var rows = [
+      ['服务名称', o.product_name || '服务（已下架）'],
+      ['订单金额', fmtYuan(o.fee)],
+      ['所在城市', o.city || '—'],
+      ['服务者', o.worker_name ? (o.worker_name + (o.worker_phone ? ' · ' + o.worker_phone : '')) : '待派单'],
+      ['预计上门', fmtTime(o.eta)],
+      ['订单号', o.order_ref],
+      ['下单时间', fmtTime(o.created_at)],
+      ['支付时间', fmtTime(o.paid_at)],
+      ['完成时间', fmtTime(o.completed_at)]
+    ];
+    html += '<div class="info">' + rows.map(function(r){
+      return '<div class="row"><span class="k">' + r[0] + '</span><span class="v">' + esc(r[1]) + '</span></div>';
+    }).join('') + '</div>';
+    document.getElementById('body').innerHTML = html;
+  }
+
+  var curOrder = null;
+
+  function load(){
+    // 未登录（App 内取不到用户身份）：提示登录，不发请求
+    if (!JZ.userId() && !JZ.bridgeUserId()) {
+      document.getElementById('body').innerHTML =
+          '<div class="err">暂未登录，请登录后重试</div>';
+      return;
+    }
+    fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '?user_id=' + encodeURIComponent(JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok || !res.order) {
+          document.getElementById('body').innerHTML =
+            '<div class="err">订单不存在或无权查看</div>';
+          return;
+        }
+        curOrder = res.order;
+        render(curOrder);
+        loadVendorDetail();
+      })
+      .catch(function(){
+        document.getElementById('body').innerHTML =
+          '<div class="err">加载失败，请稍后重试</div>';
+      });
+  }
+
+  function loadVendorDetail(){
+    // 静默调用商家订单详情接口覆盖展示；失败保持本地数据，用户无感知
+    fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '/vendor-detail?user_id=' + encodeURIComponent(JZ.userId()))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (!res.ok || !res.detail || !curOrder) return;
+        var d = res.detail;
+        ['status', 'fee', 'vendor_oid', 'cancel_reason'].forEach(function(k){
+          if (d[k] != null) curOrder[k] = d[k];
+        });
+        if (d.worker) {
+          if (d.worker.name) curOrder.worker_name = d.worker.name;
+          if (d.worker.phone) curOrder.worker_phone = d.worker.phone;
+          if (d.worker.eta) curOrder.eta = d.worker.eta;
+        }
+        render(curOrder);
+      })
+      .catch(function(){ /* 静默失败：保持本地数据 */ });
+  }
+
+  if (!orderRef) {
+    document.getElementById('body').innerHTML = '<div class="err">缺少订单参数</div>';
+  } else {
+    load();
+  }
+})();
+</script>
+</body>
+</html>

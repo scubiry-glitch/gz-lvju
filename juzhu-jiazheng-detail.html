@@ -11,6 +11,14 @@
   .hero.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 48%,#8bb8ff);}
   .hero.moving{background:linear-gradient(135deg,#f97316,#bf4b13 48%,#f7b267);}
   .hero.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 48%,#d6bcfa);}
+  .hero.telecom{background:linear-gradient(135deg,#1d4e89,#123a66 48%,#7db3f0);}
+  .hero.insurance{background:linear-gradient(135deg,#8c6224,#6b4a1a 48%,#e8c878);}
+  .hero.consumer_finance{background:linear-gradient(135deg,#0f1a4d,#1a2a6b 48%,#8ba3e0);}
+  .hero.health_care{background:linear-gradient(135deg,#0e7490,#0a5568 48%,#7dd3fc);}
+  .hero.home_maintain{background:linear-gradient(135deg,#3f6212,#2d4a0c 48%,#a3e635);}
+  .hero.asset{background:linear-gradient(135deg,#1e3a5f,#152a45 48%,#93c5fd);}
+  .hero.recycle{background:linear-gradient(135deg,#166534,#0f4a26 48%,#86efac);}
+  .hero.community{background:linear-gradient(135deg,#6d28d9,#4c1d95 48%,#c4b5fd);}
   .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 82% 18%,rgba(255,255,255,.18),transparent 18%),
     repeating-linear-gradient(100deg,rgba(255,255,255,.05) 0 2px,transparent 2px 18px);}
   .hero .in{position:relative;z-index:2;}
@@ -159,7 +167,12 @@
         <div class="left"><b id="price">¥0</b> <small id="priceUnit">起</small></div>
         <div class="right" id="sales">最近好评 1000+</div>
       </div>
-      <div class="coupon"><b>神券已减 10</b><span>支付成功后进入工单池，待派单状态统一进入家政订单 API</span></div>
+      <div class="coupon"><b>神券已减 10</b><span>支付成功后平台将为您安排服务，预计24小时内联系确认上门时间</span></div>
+    </div>
+
+    <div class="block" id="productBlock" hidden>
+      <h3>服务规格<span class="count">同商家多款 · 点击切换</span></h3>
+      <div id="productList"></div>
     </div>
 
     <div class="block">
@@ -233,18 +246,23 @@
   <div class="spinner"></div>
   <div class="text">正在生成预约链接…</div>
 </div>
+<script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=2"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
   var q = new URLSearchParams(location.search);
-  var TYPE_SKU = { cleaning: 'deep-clean-4h', repair: 'pipe-unclog-fast', moving: 'moving-city-standard', nanny: 'nanny-hourly-3h' };
+  var TYPE_SKU = {
+    cleaning: 'deep-clean-4h', repair: 'pipe-unclog-fast', moving: 'moving-city-standard', nanny: 'nanny-hourly-3h',
+    community: 'community-errand'
+  };
   var slug = q.get('sku') || TYPE_SKU[q.get('type')] || 'deep-clean-4h';
   var curVendor = q.get('vendor') || null;   // 多商家同款：锁定某商家
   var item = null;
   var product = null;
+  var products = [];
   var related = [];
   var vendor = null;
   var vendors = [];
@@ -315,7 +333,11 @@
 
   // 真实排班档位（有则按档下单占容量；无则降级为意向时段）
   function loadSlots(){
-    fetch('/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug) + '/slots' + (curVendor ? '?vendor=' + encodeURIComponent(curVendor) : ''))
+    var qs2 = new URLSearchParams();
+    if (curVendor) qs2.set('vendor', curVendor);
+    if (product && product.id) qs2.set('product', product.id);
+    var u = '/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug) + '/slots' + (qs2.toString() ? '?' + qs2.toString() : '');
+    fetch(u)
       .then(function(r){ return r.json(); })
       .then(function(d){
         slots = (d && d.slots) || [];
@@ -387,6 +409,44 @@
     paint();
   }
 
+  // 同商家多规格：同一商家在同一 SPU 下的多个商品（套餐/服务者/价格不同），点击切换下单商品
+  function renderProducts(){
+    var blk = document.getElementById('productBlock');
+    if (!blk) return;
+    var curVendorId = String((vendor && vendor.id) || '');
+    var list = (products || []).filter(function(p){ return String(p.vendor_id) === curVendorId; });
+    if (list.length < 2){ blk.hidden = true; return; }
+    blk.hidden = false;
+    var curId = String((product && product.id) || '');
+    document.getElementById('productList').innerHTML = list.map(function(p){
+      var cur = String(p.id) === curId;
+      var tags = (p.service_tags || []).slice(0,3).map(function(t){ return '<span class="vb">'+esc(t)+'</span>'; }).join('');
+      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="javascript:;" data-pid="'+p.id+'">'+
+        '<span class="vmi"><b>'+esc(p.title)+'</b>'+
+          '<span class="vsub">'+(p.subtitle ? esc(p.subtitle)+' · ' : '')+esc(p.unit||'次')+(p.duration_hours ? ' · '+p.duration_hours+'小时' : '')+(p.original_price ? ' · 原价'+fmtPrice(p.original_price) : '')+'</span>'+
+          (tags ? '<span class="vbs">'+tags+'</span>' : '')+
+        '</span>'+
+        '<span class="vprice">'+fmtPrice(p.price)+'</span>'+
+      '</a>';
+    }).join('');
+    document.getElementById('productList').querySelectorAll('[data-pid]').forEach(function(a){
+      a.addEventListener('click', function(){ selectProduct(a.dataset.pid); });
+    });
+  }
+
+  // 切换选中的商品：价格区联动 + 下单 product_id 联动（档期功能启用时同时重载档期）
+  function selectProduct(pid){
+    var p = (products || []).filter(function(x){ return String(x.id) === String(pid); })[0];
+    if (!p) return;
+    product = p;
+    document.getElementById('price').textContent = fmtPrice(p.price);
+    document.getElementById('ctaPrice').textContent = fmtPrice(p.price);
+    document.getElementById('productList').querySelectorAll('.vrow').forEach(function(x){
+      x.classList.toggle('cur', x.dataset.pid === String(p.id));
+    });
+    if (timeMode === 'real') loadSlots();
+  }
+
   function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
 
   function toast(msg){
@@ -398,7 +458,11 @@
   }
 
   function heroClass(cat){
-    return cat === 'repair' ? 'repair' : cat === 'moving' ? 'moving' : cat === 'nanny' ? 'nanny' : 'cleaning';
+    var known = {
+      cleaning:1, repair:1, moving:1, nanny:1, telecom:1, insurance:1,
+      consumer_finance:1, health_care:1, home_maintain:1, asset:1, recycle:1, community:1
+    };
+    return known[cat] ? cat : 'cleaning';
   }
 
   function render(){
@@ -408,7 +472,7 @@
     hero.innerHTML = '<div class="in">'+
       '<div class="eyebrow">'+(item.category_name || '家政服务').toUpperCase()+'</div>'+
       '<h1>'+item.name+'</h1>'+
-      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后进入中台工单池统一派单。</p>'+
+      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后平台统一安排服务，全程进度可查。</p>'+
       '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span><span>'+(item.duration_min || 0)+' 分钟</span><span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
     '</div>';
     var displayPrice = (product && product.price != null) ? product.price : item.price_from;
@@ -448,7 +512,7 @@
       var badges = (v.auth_badges || []).slice(0,2).map(function(b){
         return '<span class="vb">'+esc(b.label || b)+'</span>';
       }).join('');
-      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="?sku='+encodeURIComponent(slug)+'&vendor='+v.vendor_id+'">'+
+      return '<a class="vrow'+(cur ? ' cur' : '')+'" href="' + JZ.chainCity('?sku='+encodeURIComponent(slug)+'&vendor='+v.vendor_id) + '">'+
         '<span class="vlogo">'+esc(v.vendor_logo || '🏠')+'</span>'+
         '<span class="vmi"><b>'+esc(v.vendor_name)+(cur ? ' <em>当前</em>' : '')+'</b>'+
           '<span class="vsub">★'+Number(v.vendor_rating||0).toFixed(1)+' · '+num(v.review_count)+'评价'+(v.rank_label ? ' · '+esc(v.rank_label) : '')+'</span>'+
@@ -538,15 +602,21 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
+    // 登录拦截：App 内经 jsbridge3 获取用户身份，取不到（非 App 环境或未登录）不生成小程序链接
+    if (!JZ.userId() && !JZ.bridgeUserId()) {
+      toast('暂未登录，请登录后重试');
+      return;
+    }
     // 显示 loading
     var overlay = document.getElementById('loadingOverlay');
     overlay.classList.add('on');
 
     // 调用后端生成微信小程序 URL Link
+    // C 端预约：wechat-link 匿名可调，勿依赖 localStorage API Key
     fetch('/api/juzhu/jiazheng/wechat-link', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (JZ.apiKey()) },
-      body: JSON.stringify({ product_id: product.id })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: product.id, user_id: JZ.userId() })
     }).then(function(r){ return r.json(); })
       .then(function(res){
         overlay.classList.remove('on');
@@ -563,13 +633,20 @@
     item = res.item;
     related = res.related || [];
     product = res.product || null;
+    products = res.products || [];
     vendor = res.vendor || null;
     vendors = res.vendors || [];
     merchantIntro = res.merchant_intro || null;
     workers = res.workers || [];
     reviews = res.reviews || [];
+    // 该城市无上架商品（双维度过滤后 product 为空）：整页空态，不渲染 SKU 静态信息
+    if (!product) {
+      document.querySelector('.scr').innerHTML = '<div class="empty" style="padding:72px 24px;text-align:center;color:var(--muted);">当前城市暂无该服务，请切换城市或稍后再来</div>';
+      return;
+    }
     render();
     renderVendors();
+    renderProducts();
     // 选择上门时间暂时隐藏
     // if (timeMode !== 'real') renderTimeSlots();
   }).catch(function(err){

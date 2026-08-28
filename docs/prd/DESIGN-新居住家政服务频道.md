@@ -3,7 +3,7 @@
 > 版本：v1.0  
 > 日期：2026-07-09  
 > 站点：https://sy.meizu.life  
-> 入口页：`juzhu-channel-v3-grid.html`  
+> 入口页：`index.html`  
 > 城市预设：沈阳（可切换贵州/江苏等区域）
 
 ---
@@ -28,7 +28,7 @@
 | 层级 | 页面 | 说明 |
 |------|------|------|
 | L0 | `beike-app-home.html` | 贝壳 App 首页 |
-| L1 | `juzhu-channel-v3-grid.html` | 新居住频道（方案 C · 网格） |
+| L1 | `index.html` | 新居住频道（方案 C · 网格） |
 | L2 | 保租房 / 卖旧买新 / **家政** | Tab 切换（`channels` 表控制启用） |
 | L3 | `juzhu-jiazheng-list.html?type=` | 品类列表 + 子类 SKU |
 | L4 | `juzhu-jiazheng-detail.html` | 服务详情 + 下单 |
@@ -36,7 +36,7 @@
 
 ### 2.2 家政四大品类（原型内置）
 
-来源：`juzhu-channel-v3-grid.html` → `JZ_CATS`
+来源：`index.html` → `JZ_CATS`
 
 | ID | 品类 | 图标 | 子类（示例） |
 |----|------|------|-------------|
@@ -240,7 +240,7 @@ CREATE TABLE jz_orders (
 
 | 阶段 | C 端页面 | P/B 端页面 | 关键动作 |
 |------|----------|-----------|----------|
-| 浏览 | `juzhu-channel-v3-grid.html` | — | 选品类 / 子类 |
+| 浏览 | `index.html` | — | 选品类 / 子类 |
 | 下单 | `juzhu-jiazheng-detail.html`（待建） | — | 填地址/时间/备注 → `BZF_ORDERS.create()` |
 | 支付 | `lvju-app-pay.html` | `p-transaction.html` | 选支付方式 → 资金存管冻结 |
 | 派单 | `repair.html` 进度 Tab | `p-service-demand.html` / `b-dispatch-board.html` | 规则派单 / 手动派单 |
@@ -257,7 +257,7 @@ CREATE TABLE jz_orders (
 ```bash
 cd /root/.openclaw/workspacedev/bzf/sy
 python3 juzhu/server.py
-# 前台 http://localhost:8765/juzhu-channel-v3-grid.html
+# 前台 http://localhost:8765/index.html
 # 中台 screens http://localhost:8765/screens/p-console.html
 ```
 
@@ -303,7 +303,7 @@ Header: Authorization: Bearer <API_KEY>
 
 | 页面 | 状态 | 说明 |
 |------|------|------|
-| `juzhu-channel-v3-grid.html` | ✅ 已有 | 家政 Tab + 四大类入口 |
+| `index.html` | ✅ 已有 | 家政 Tab + 四大类入口 |
 | `juzhu-jiazheng-list.html` | ⬜ 待建 | 子类列表 + 筛选 |
 | `juzhu-jiazheng-detail.html` | ⬜ 待建 | SKU 详情 + 下单表单 |
 | `lvju-app-pay.html` | ✅ 已有 | 复用收银台，改订单上下文 |
@@ -368,7 +368,7 @@ Header: Authorization: Bearer <API_KEY>
 
 | 角色 | 关键页面 |
 |------|----------|
-| C 端 | `juzhu-channel-v3-grid.html`, `lvju-app-pay.html`, `lvju-app-review.html`, `repair.html` |
+| C 端 | `index.html`, `lvju-app-pay.html`, `lvju-app-review.html`, `repair.html` |
 | S 端 | `s-orders.html`, `s-cert.html`, `screens/home.html` |
 | P 端 | `p-console.html`, `p-service-demand.html`, `p-service-review.html`, `p-transaction.html` |
 | B 端 | `b-dispatch-board.html`, `b-operator-console.html` |

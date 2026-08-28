@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>本地生活专题</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .scr{padding-bottom:88px;background:#f6f4ef;}
+  .appbar{position:sticky;top:0;z-index:30;background:rgba(246,244,239,.92);backdrop-filter:blur(10px);border-bottom:1px solid rgba(15,42,38,.06);}
+
+  /* Cover · 杂志封面（首屏约 2.5 步旅程） */
+  .cover{position:relative;color:#fff;overflow:hidden;isolation:isolate;min-height:25vh;}
+  .cover::before{content:"";position:absolute;inset:0;z-index:0;
+    background:var(--cover-bg,linear-gradient(160deg,#0b5d56,#1b4f47 55%,#c58d36));}
+  .cover::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:
+      radial-gradient(ellipse at 88% 8%,rgba(255,255,255,.2),transparent 40%),
+      repeating-linear-gradient(-18deg,rgba(255,255,255,.035) 0 1px,transparent 1px 28px),
+      linear-gradient(180deg,transparent 38%,rgba(0,0,0,.4) 100%);}
+  .cover .in{position:relative;z-index:2;padding:18px 16px 38px;min-height:25vh;
+    display:flex;flex-direction:column;justify-content:flex-end;}
+  .cover .issue{font-size:9px;letter-spacing:.22em;opacity:.72;text-transform:uppercase;}
+  .cover .scene{margin-top:10px;font-size:11px;letter-spacing:.06em;opacity:.88;}
+  .cover h1{font-family:var(--serif);font-size:28px;line-height:1.14;margin-top:6px;font-weight:700;max-width:9em;
+    animation:rise .55s cubic-bezier(.22,1,.36,1) both;}
+  .cover .lede{margin-top:8px;font-size:12px;line-height:1.55;opacity:.92;max-width:32ch;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    animation:rise .55s .08s cubic-bezier(.22,1,.36,1) both;}
+  .cover .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
+    animation:rise .55s .14s cubic-bezier(.22,1,.36,1) both;}
+  .cover .meta span{font-size:9px;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.15);backdrop-filter:blur(6px);}
+  .cover .scroll-hint{display:none;}
+
+  .theme-home{--cover-bg:linear-gradient(155deg,#0b5d56 0%,#11453f 48%,#9a6b28 100%);--accent:#0f766e;--accent-soft:#e8f5f2;--ink-on:#0b5d56;}
+  .theme-care{--cover-bg:linear-gradient(155deg,#0a5568 0%,#0e7490 48%,#67e8f9 100%);--accent:#0e7490;--accent-soft:#e0f7fa;--ink-on:#0a5568;}
+  .theme-asset{--cover-bg:linear-gradient(155deg,#0a1028 0%,#0f1a4d 48%,#b48a3f 100%);--accent:#0f1a4d;--accent-soft:#eef1f8;--ink-on:#0f1a4d;}
+  .theme-green{--cover-bg:linear-gradient(155deg,#0f4a26 0%,#166534 48%,#86efac 100%);--accent:#166534;--accent-soft:#e8f8ee;--ink-on:#0f4a26;}
+  .theme-neighbor{--cover-bg:linear-gradient(155deg,#3b1d0f 0%,#7c2d12 48%,#fbbf24 100%);--accent:#9a3412;--accent-soft:#fff7ed;--ink-on:#7c2d12;}
+
+  /* 场景引言 */
+  .scene-block{margin:-16px 12px 0;position:relative;z-index:5;background:#fff;border-radius:14px;padding:12px 14px;
+    box-shadow:0 10px 24px rgba(15,42,38,.08);animation:rise .5s .12s cubic-bezier(.22,1,.36,1) both;}
+  .scene-block .who{font-size:10px;letter-spacing:.12em;color:var(--accent,#0f766e);font-weight:700;}
+  .scene-block h2{font-family:var(--serif);font-size:15px;line-height:1.35;margin-top:4px;color:var(--ink);}
+  .scene-block p{margin-top:5px;font-size:11px;line-height:1.55;color:var(--muted);
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+
+  .sec{margin:14px 12px 0;}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:9px;}
+  .sec-head h3{font-family:var(--serif);font-size:16px;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .sec-head h3::before{content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(var(--accent,#0f766e),var(--gold));}
+  .sec-head .more{font-size:10px;color:var(--muted);}
+
+  /* 用户旅程 */
+  .journey{position:relative;padding-left:2px;}
+  .journey::before{content:"";position:absolute;left:17px;top:10px;bottom:10px;width:1.5px;
+    background:linear-gradient(180deg,var(--accent,#0f766e),transparent);}
+  .j-step{position:relative;display:grid;grid-template-columns:36px 1fr;gap:8px;margin-bottom:9px;
+    opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease;}
+  .j-step.in,.j-step.ready{opacity:1;transform:none;}
+  .j-step .n{width:28px;height:28px;border-radius:50%;background:#fff;border:1.5px solid var(--accent,#0f766e);
+    color:var(--ink-on,#0b5d56);font-family:var(--serif);font-size:13px;font-weight:700;
+    display:grid;place-items:center;box-shadow:0 3px 10px rgba(15,42,38,.07);z-index:1;}
+  .j-step .card{background:#fff;border-radius:13px;padding:11px 12px 10px;border:1px solid rgba(15,42,38,.06);
+    box-shadow:0 5px 14px rgba(15,42,38,.04);}
+  .j-step .when{font-size:9px;letter-spacing:.08em;color:var(--accent,#0f766e);font-weight:700;}
+  .j-step .card h4{font-family:var(--serif);font-size:14px;margin-top:3px;color:var(--ink);}
+  .j-step .card p{margin-top:3px;font-size:11px;line-height:1.45;color:var(--muted);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .j-step .svc{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;
+    padding:8px 10px;border-radius:10px;background:var(--accent-soft,#e8f5f2);text-decoration:none;color:inherit;}
+  .j-step .svc .ic{font-size:16px;line-height:1;}
+  .j-step .svc b{display:block;font-size:12px;color:var(--ink);}
+  .j-step .svc span{font-size:9px;color:var(--muted);}
+  .j-step .svc .go{font-size:11px;font-weight:700;color:var(--ink-on,#0b5d56);white-space:nowrap;}
+
+  /* 推荐 */
+  .picks{display:grid;gap:10px;}
+  .pick{display:grid;grid-template-columns:76px 1fr auto;gap:12px;align-items:center;
+    background:#fff;border-radius:16px;padding:10px;border:1px solid rgba(15,42,38,.06);
+    text-decoration:none;color:inherit;box-shadow:0 6px 16px rgba(15,42,38,.04);
+    transition:transform .2s ease,box-shadow .2s ease;}
+  .pick:active{transform:scale(.985);}
+  .pick .poster{width:76px;height:76px;border-radius:12px;color:#fff;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,var(--accent,#0f766e),#c58d36);}
+  .pick .poster .t1{position:relative;z-index:1;font-size:9px;padding:8px 8px 0;opacity:.9;letter-spacing:.06em;}
+  .pick .poster .t2{position:relative;z-index:1;font-family:var(--serif);font-size:15px;line-height:1.1;padding:4px 8px 0;font-weight:700;}
+  .pick .poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(0,0,0,.2));}
+  .pick .main{min-width:0;}
+  .pick .main .why{font-size:10px;color:var(--accent,#0f766e);font-weight:700;letter-spacing:.04em;}
+  .pick .main h4{font-size:14px;font-weight:800;margin-top:3px;line-height:1.25;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pick .main p{margin-top:3px;font-size:11px;color:var(--muted);line-height:1.4;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pick .main .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;}
+  .pick .main .tags span{font-size:9px;padding:2px 7px;border-radius:999px;background:var(--accent-soft,#e8f5f2);color:var(--ink-on,#0b5d56);}
+  .pick .side{text-align:right;}
+  .pick .side b{font-family:var(--serif);font-size:18px;color:#ef5a2a;line-height:1;}
+  .pick .side b small{font-family:var(--font);font-size:10px;color:var(--muted);font-weight:400;}
+  .pick .side .cta{display:inline-block;margin-top:8px;font-size:11px;font-weight:700;color:#fff;
+    background:linear-gradient(90deg,#ff7a18,#ff5f6d);padding:6px 12px;border-radius:10px;}
+
+  /* 组合提示 */
+  .bundle{margin:18px 14px 0;padding:16px;border-radius:16px;background:#fff;
+    border:1px dashed color-mix(in oklab,var(--accent,#0f766e) 35%,transparent);}
+  .bundle .lab{font-size:10px;letter-spacing:.14em;color:var(--accent,#0f766e);font-weight:700;}
+  .bundle h3{font-family:var(--serif);font-size:16px;margin-top:4px;color:var(--ink);}
+  .bundle ul{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px;}
+  .bundle li{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.5;color:var(--muted);}
+  .bundle li::before{content:"✓";color:var(--accent,#0f766e);font-weight:700;flex-shrink:0;}
+
+  /* 更多品类 */
+  .more-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .more-cats a{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;border-radius:14px;
+    background:#fff;border:1px solid rgba(15,42,38,.06);text-decoration:none;color:inherit;}
+  .more-cats .ic{font-size:18px;}
+  .more-cats b{font-size:12px;font-weight:700;color:var(--ink);}
+  .more-cats span{font-size:10px;color:var(--muted);}
+
+  .foot-cta{margin:22px 14px 0;display:flex;gap:10px;}
+  .foot-cta a{flex:1;text-align:center;padding:13px;border-radius:14px;font-size:13px;font-weight:700;text-decoration:none;}
+  .foot-cta .pri{background:linear-gradient(90deg,var(--accent,#0f766e),color-mix(in oklab,var(--accent,#0f766e) 60%,#14b8a6));color:#fff;}
+  .foot-cta .sec{background:#fff;color:var(--ink-on,#0b5d56);border:1px solid rgba(15,42,38,.1);}
+
+  .topic-switch{display:flex;gap:8px;overflow-x:auto;padding:14px 14px 0;-webkit-overflow-scrolling:touch;}
+  .topic-switch::-webkit-scrollbar{display:none;}
+  .topic-switch a{flex:0 0 auto;padding:7px 12px;border-radius:999px;font-size:11px;background:#fff;
+    color:var(--muted);border:1px solid rgba(15,42,38,.08);text-decoration:none;}
+  .topic-switch a.on{background:var(--accent,#0f766e);color:#fff;border-color:transparent;font-weight:700;}
+
+  .empty-tip{padding:24px;text-align:center;color:var(--muted);font-size:12px;}
+
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes bounce{0%,100%{transform:rotate(45deg) translateY(0)}50%{transform:rotate(45deg) translateY(4px)}}
+  @media (prefers-reduced-motion:reduce){
+    .cover h1,.cover .lede,.cover .meta,.scene-block,.j-step{animation:none!important;opacity:1;transform:none;transition:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="appRoot">
+  <div class="scr">
+    <div class="appbar">
+      <a class="bk" id="backLink" href="index.html?tab=jiazheng">‹</a>
+      <div class="ttl" id="ttl">专题<small id="ttlSub">本地生活 · 场景旅程</small></div>
+      <div class="act"><span></span></div>
+    </div>
+
+    <div class="cover" id="cover">
+      <div class="in">
+        <div class="issue" id="issue">TOPIC · 01</div>
+        <div class="scene" id="sceneTag">场景</div>
+        <h1 id="title">专题标题</h1>
+        <p class="lede" id="lede">导语</p>
+        <div class="meta" id="meta"></div>
+        <div class="scroll-hint">看完整旅程 <i></i></div>
+      </div>
+    </div>
+
+    <div class="scene-block">
+      <div class="who" id="who">谁 · 什么时候</div>
+      <h2 id="sceneTitle">场景标题</h2>
+      <p id="sceneBody">场景正文</p>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head">
+        <h3>用户旅程</h3>
+        <span class="more" id="journeyHint">按时间顺序约齐</span>
+      </div>
+      <div class="journey" id="journey"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head">
+        <h3>本专题推荐</h3>
+        <span class="more">跨品类精选</span>
+      </div>
+      <div class="picks" id="picks"><div class="empty-tip">加载推荐中…</div></div>
+    </div>
+
+    <div class="bundle" id="bundle"></div>
+
+    <div class="sec">
+      <div class="sec-head">
+        <h3>相关频道</h3>
+        <span class="more">逛完整品类</span>
+      </div>
+      <div class="more-cats" id="moreCats"></div>
+    </div>
+
+    <div class="topic-switch" id="topicSwitch"></div>
+
+    <div class="foot-cta">
+      <a class="sec" id="backLife" href="index.html?tab=jiazheng">返回生活</a>
+      <a class="pri" id="primaryCta" href="#">从第一步开始</a>
+    </div>
+  </div>
+</div>
+<script src="screens/_region.js"></script>
+<script src="screens/_jzapi.js?v=3"></script>
+<script>
+(function () {
+  var JZ = window.BZF_JZ;
+  var q = new URLSearchParams(location.search);
+  var topicId = q.get('id') || 'new-home';
+
+  var TOPICS = {
+    'new-home': {
+      theme: 'theme-home',
+      issue: 'TOPIC · 01  /  NEW HOME',
+      title: '新居入住季',
+      sceneTag: '入住前 72 小时',
+      lede: '钥匙到手，家还没就绪。开荒、搬运、安装一次约齐，把毛坯感留在门外。',
+      meta: ['3 步闭环', '跨品类组合', '当日可约'],
+      who: '租客 · 交房当日—入住前',
+      sceneTitle: '新钥匙在手，家还差最后一道工序',
+      sceneBody: '交房后往往只剩两三个周末。先开荒去胶去灰，再把旧居行李搬进，最后挂灯装机——顺序对了，入住才不乱。',
+      journeyHint: '建议按「清 → 搬 → 装」排程',
+      journey: [
+        { when: 'DAY 0 · 清场', title: '开荒保洁', body: '装修残留与扬尘先清掉，给搬家腾出干净地面。', icon: '🧹', cat: 'cleaning', catName: '开荒保洁', tip: '新房首选', sku: 'raw-clean-new' },
+        { when: 'DAY 1 · 搬运', title: '居民搬家', body: '同城金杯车 + 师傅上门，大件保护包裹，楼道清运。', icon: '📦', cat: 'moving', catName: '居民搬家', tip: '同城当日', sku: 'moving-city-standard' },
+        { when: 'DAY 2 · 安装', title: '家电上门调试', body: '冰箱洗衣机热水器就位检修，当晚就能用。', icon: '🔧', cat: 'repair', catName: '家电维修', tip: '30 分钟响应', sku: 'appliance-repair' },
+        { when: '入住后 · 巩固', title: '空调清洗 · 挂机', body: '入住换季做一次蒸汽除菌，第一口空气更干净。', icon: '❄', cat: 'cleaning', catName: '空调清洗', tip: '当天可约', sku: 'ac-clean-wall' }
+      ],
+      picks: [
+        { slug: 'raw-clean-new', why: '旅程第 1 步' },
+        { slug: 'moving-city-standard', why: '旅程第 2 步' },
+        { slug: 'appliance-repair', why: '旅程第 3 步' },
+        { slug: 'ac-clean-wall', why: '入住后巩固' },
+        { slug: 'pipe-unclog-fast', why: '应急加购' },
+        { slug: 'hood-clean-deep', why: '厨卫收口' }
+      ],
+      bundle: {
+        lab: '入住 72H 清单',
+        title: '一次约齐，少跑三次',
+        items: ['开荒完成后再约搬家，避免二次扬尘', '安装与搬家错开半天，师傅不撞车', '下水不通可加购管道疏通 · 当天']
+      },
+      slots: [
+        { id: 'cleaning', icon: '🧹', name: '保洁', tip: '开荒/清洗' },
+        { id: 'moving', icon: '📦', name: '搬家', tip: '同城精选' },
+        { id: 'repair', icon: '🔧', name: '维修安装', tip: '家电管道' }
+      ]
+    },
+    care: {
+      theme: 'theme-care',
+      issue: 'TOPIC · 02  /  CARE',
+      title: '康养到家周',
+      sceneTag: '长辈同住 · 换季调养',
+      lede: '家里多了一位长辈，日常照护与居家安全要一起想——陪护、体检、管道与家电养护同屏安排。',
+      meta: ['持证护理', '日间可约', '居家维保'],
+      who: '子女 · 长辈同住 / 换季',
+      sceneTitle: '把「照料」从临时加班，变成可预约的节奏',
+      sceneBody: '白天上班时请日间陪护；周末带体检做基线；换季再做管道与家电养护——三件事串起来，家里才稳。',
+      journeyHint: '照护 → 体检 → 居家安全',
+      journey: [
+        { when: '本周 · 日间', title: '养老陪护到家', body: '持证护理员日间到岗，用药提醒与生活照护。', icon: '🏥', cat: 'health_care', catName: '养老陪护', tip: '持证护理', sku: 'health-elder-day' },
+        { when: '周末 · 体检', title: '基础体检套餐', body: '三甲对接，报告解读，给后续护理定基线。', icon: '🩺', cat: 'health_care', catName: '体检套餐', tip: '报告解读', sku: 'health-checkup-basic' },
+        { when: '可选 · 住家', title: '住家保姆全职', body: '做饭保洁照护一岗多能；轻症也可先试白班。', icon: '👶', cat: 'nanny', catName: '住家保姆', tip: '背景核验', sku: 'nanny-livein-full' },
+        { when: '换季 · 维保', title: '家电保养套餐', body: '空调冰箱洗衣机定期保养，减少老人居家故障。', icon: '🔌', cat: 'home_maintain', catName: '家电保养', tip: '换季推荐', sku: 'maintain-appliance' }
+      ],
+      picks: [
+        { slug: 'health-elder-day', why: '日间刚需' },
+        { slug: 'health-checkup-basic', why: '健康基线' },
+        { slug: 'nanny-livein-full', why: '升级住家' },
+        { slug: 'maintain-appliance', why: '换季维保' },
+        { slug: 'maintain-pipe-quarter', why: '管道安全' },
+        { slug: 'pipe-unclog-fast', why: '不通应急' }
+      ],
+      bundle: {
+        lab: '康养周提示',
+        title: '先评估，再加长服务',
+        items: ['日间陪护可先试 1–2 天再签月', '体检结果出来后再调护理等级', '管道养护与家电保养建议同周完成']
+      },
+      slots: [
+        { id: 'health_care', icon: '🏥', name: '健康养老', tip: '陪护体检' },
+        { id: 'nanny', icon: '👶', name: '保姆护理', tip: '住家/白班' },
+        { id: 'home_maintain', icon: '🏠', name: '居家维护', tip: '管道家电' }
+      ]
+    },
+    asset: {
+      theme: 'theme-asset',
+      issue: 'TOPIC · 03  /  ASSET',
+      title: '租住安心包',
+      sceneTag: '签约前后 · 算清再住',
+      lede: '房租、押金、意外——租住不只是钥匙。家财险、分期、评估与托管同屏，住得稳、账算清。',
+      meta: ['在线出单', '额度可查', '持证评估'],
+      who: '租客 / 业主 · 签约前后',
+      sceneTitle: '把风险和现金流，写进入住仪式',
+      sceneBody: '签合同前先看家财险；租金压力大时查分期或消费贷额度；转租收房做评估，长租可谈托管——各管一段账。',
+      journeyHint: '保障 → 现金流 → 资产清晰',
+      journey: [
+        { when: '签约前', title: '家财险 · 基础版', body: '漏水火灾盗抢基础保障，在线出单。', icon: '🛡', cat: 'insurance', catName: '家财险', tip: '在线出单', sku: 'insurance-home-basic' },
+        { when: '缴租期', title: '租住分期', body: '首付灵活、信用评估，缓解整付压力。', icon: '💳', cat: 'consumer_finance', catName: '租住分期', tip: '额度查询', sku: 'finance-rent-installment' },
+        { when: '换租 / 收房', title: '资产评估', body: '持证评估师上门，租金与资产心中有数。', icon: '🏦', cat: 'asset', catName: '资产评估', tip: '持证评估', sku: 'asset-appraisal' },
+        { when: '长租可选', title: '托管运营咨询', body: '租金托管、报表透明，业主少操心。', icon: '📋', cat: 'asset', catName: '托管运营', tip: '顾问对接', sku: 'asset-custody' }
+      ],
+      picks: [
+        { slug: 'insurance-home-basic', why: '基础保障' },
+        { slug: 'insurance-tenant', why: '责任兜底' },
+        { slug: 'finance-rent-installment', why: '租金分期' },
+        { slug: 'finance-credit-limit', why: '额度旁路' },
+        { slug: 'asset-appraisal', why: '资产清晰' },
+        { slug: 'asset-custody', why: '收房托管' }
+      ],
+      bundle: {
+        lab: '安心包提示',
+        title: '先保障，再谈分期',
+        items: ['家财险建议与入住同日生效', '分期不够可再查消费贷额度', '评估后再决定是否托管运营']
+      },
+      slots: [
+        { id: 'insurance', icon: '🛡', name: '财险', tip: '家财/责任' },
+        { id: 'consumer_finance', icon: '💳', name: '消费金融', tip: '分期额度' },
+        { id: 'asset', icon: '🏦', name: '资产服务', tip: '评估托管' }
+      ]
+    },
+    green: {
+      theme: 'theme-green',
+      issue: 'TOPIC · 04  /  GREEN',
+      title: '绿色焕新',
+      sceneTag: '换房 / 换机 · 一站清场',
+      lede: '旧物清出、宽带装上、号码携转、屋子擦亮——搬家换机不必分四次约人。',
+      meta: ['上门估价', '当周开通', '携号可办'],
+      who: '换房住户 · 搬出 / 装机周',
+      sceneTitle: '先腾空，再接入，最后焕新',
+      sceneBody: '旧家电家具上门估价清运；同周约宽带与携号转网；空屋保洁收口——留给下一任一个干净起点。',
+      journeyHint: '回收 → 装维 → 焕新',
+      journey: [
+        { when: '搬出前', title: '旧家电回收', body: '上门估价，当日可清运，环保处置。', icon: '♻️', cat: 'recycle', catName: '二手回收', tip: '上门估价', sku: 'recycle-appliance' },
+        { when: '同周 · 装维', title: '宽带新装 · 千兆', body: '装维上门，当周开通，换机不断网。', icon: '📱', cat: 'telecom', catName: '宽带新装', tip: '当周开通', sku: 'telecom-broadband' },
+        { when: '同周 · 号卡', title: '号码携转', body: '携号转网 + 套餐对比，换运营商不换号。', icon: '📶', cat: 'telecom', catName: '号码携转', tip: '套餐对比', sku: 'telecom-portability' },
+        { when: '清场后', title: '日常保洁收口', body: '空屋全屋除尘整理，留给下一任一个干净起点。', icon: '🧹', cat: 'cleaning', catName: '日常保洁', tip: '最快上门', sku: 'cleaning-daily-2h' }
+      ],
+      picks: [
+        { slug: 'recycle-appliance', why: '先腾空' },
+        { slug: 'telecom-broadband', why: '再接入' },
+        { slug: 'telecom-portability', why: '同周办号' },
+        { slug: 'cleaning-daily-2h', why: '再焕新' },
+        { slug: 'recycle-furniture', why: '大件加购' },
+        { slug: 'ac-clean-wall', why: '换季加购' }
+      ],
+      bundle: {
+        lab: '焕新周提示',
+        title: '清运日与装维日错开',
+        items: ['回收完成后再约宽带，避免机房堆物', '宽带与携号尽量同周办完', '空屋再做保洁与空调清洗']
+      },
+      slots: [
+        { id: 'recycle', icon: '♻️', name: '二手回收', tip: '家电家具' },
+        { id: 'telecom', icon: '📱', name: '电讯服务', tip: '宽带/携号' },
+        { id: 'cleaning', icon: '🧹', name: '保洁', tip: '焕新收口' }
+      ]
+    },
+    neighbor: {
+      theme: 'theme-neighbor',
+      issue: 'TOPIC · 05  /  NEIGHBOR',
+      title: '邻里日常',
+      sceneTag: '工作日 · 没时间出门',
+      lede: '买菜取件缴费——邻里小事不必亲自跑。团购日配、跑腿代办，忙不过来再约钟点工。',
+      meta: ['次日达', '同城跑腿', '灵活到家'],
+      who: '上班族 · 工作日晚上 / 周末',
+      sceneTitle: '把「跑腿」从临时求助，变成每周固定节奏',
+      sceneBody: '周一订好本周团购；临时取件代缴找跑腿；周五回家前约钟点工做一顿家务——社区服务把琐事挡在门外。',
+      journeyHint: '团购 → 跑腿 → 钟点补位',
+      journey: [
+        { when: '每周固定', title: '社区团购 · 日配', body: '生鲜果蔬次日达，少跑一趟菜市场。', icon: '🛒', cat: 'community', catName: '社区团购', tip: '次日达', sku: 'community-groupbuy' },
+        { when: '临时急事', title: '便民代办 · 跑腿', body: '取送件、代缴水电，同城随叫随到。', icon: '🏃', cat: 'community', catName: '便民代办', tip: '同城跑腿', sku: 'community-errand' },
+        { when: '忙不过来', title: '钟点工 · 3 小时', body: '做饭保洁灵活预约，补上工作日缺的那一班。', icon: '⏱', cat: 'nanny', catName: '钟点工', tip: '灵活用工', sku: 'nanny-hourly-3h' },
+        { when: '周末加深', title: '日常保洁', body: '周末再约一次全屋除尘，把一周灰尘清干净。', icon: '🧹', cat: 'cleaning', catName: '日常保洁', tip: '最快 2h', sku: 'cleaning-daily-2h' }
+      ],
+      picks: [
+        { slug: 'community-groupbuy', why: '每周刚需' },
+        { slug: 'community-errand', why: '急事代办' },
+        { slug: 'nanny-hourly-3h', why: '家务补位' },
+        { slug: 'cleaning-daily-2h', why: '周末加深' }
+      ],
+      bundle: {
+        lab: '邻里周提示',
+        title: '固定节奏，少临时救火',
+        items: ['团购建议周日晚下一单，覆盖工作日', '跑腿适合取件/代缴，不替代大件搬运', '钟点工与日常保洁可错开时段']
+      },
+      slots: [
+        { id: 'community', icon: '🏘', name: '社区服务', tip: '团购跑腿' },
+        { id: 'nanny', icon: '👶', name: '钟点工', tip: '灵活到家' },
+        { id: 'cleaning', icon: '🧹', name: '日常保洁', tip: '周末加深' }
+      ]
+    }
+  };
+
+  var topic = TOPICS[topicId] || TOPICS['new-home'];
+  if (!TOPICS[topicId]) topicId = 'new-home';
+
+  var root = document.getElementById('appRoot');
+  root.classList.add(topic.theme);
+  document.getElementById('cover').classList.add(topic.theme);
+
+  document.title = topic.title + ' · 本地生活专题';
+  document.getElementById('ttl').childNodes[0].nodeValue = topic.title;
+  document.getElementById('issue').textContent = topic.issue;
+  document.getElementById('sceneTag').textContent = topic.sceneTag;
+  document.getElementById('title').textContent = topic.title;
+  document.getElementById('lede').textContent = topic.lede;
+  document.getElementById('meta').innerHTML = topic.meta.map(function (m) {
+    return '<span>' + m + '</span>';
+  }).join('');
+  document.getElementById('who').textContent = topic.who;
+  document.getElementById('sceneTitle').textContent = topic.sceneTitle;
+  document.getElementById('sceneBody').textContent = topic.sceneBody;
+  document.getElementById('journeyHint').textContent = topic.journeyHint;
+
+  function cityQs(extra) {
+    var qs = new URLSearchParams(extra || {});
+    var city = JZ && JZ.regionCity && JZ.regionCity();
+    if (city) qs.set('city', city);
+    var s = qs.toString();
+    return s ? '?' + s : '';
+  }
+
+  function listHref(cat) {
+    return 'juzhu-jiazheng-list.html' + cityQs({ type: cat });
+  }
+  function detailHref(slug) {
+    return 'juzhu-jiazheng-detail.html' + cityQs({ sku: slug });
+  }
+
+  // 旅程
+  var journeyEl = document.getElementById('journey');
+  journeyEl.innerHTML = topic.journey.map(function (step, i) {
+    var href = step.sku ? detailHref(step.sku) : listHref(step.cat);
+    return '<div class="j-step" data-i="' + i + '">' +
+      '<div class="n">' + (i + 1) + '</div>' +
+      '<div class="card">' +
+        '<div class="when">' + step.when + '</div>' +
+        '<h4>' + step.title + '</h4>' +
+        '<p>' + step.body + '</p>' +
+        '<a class="svc" href="' + href + '">' +
+          '<div><div class="ic">' + step.icon + '</div></div>' +
+          '<div style="flex:1;min-width:0"><b>' + step.catName + '</b><span>' + step.tip + '</span></div>' +
+          '<div class="go">去预约 ›</div>' +
+        '</a>' +
+      '</div></div>';
+  }).join('');
+
+  // 组合提示
+  var b = topic.bundle;
+  document.getElementById('bundle').innerHTML =
+    '<div class="lab">' + b.lab + '</div>' +
+    '<h3>' + b.title + '</h3>' +
+    '<ul>' + b.items.map(function (it) { return '<li>' + it + '</li>'; }).join('') + '</ul>';
+
+  // 相关频道
+  document.getElementById('moreCats').innerHTML = topic.slots.map(function (s) {
+    return '<a href="' + listHref(s.id) + '"><div class="ic">' + s.icon + '</div><b>' + s.name + '</b><span>' + s.tip + '</span></a>';
+  }).join('');
+
+  // 专题切换
+  document.getElementById('topicSwitch').innerHTML = Object.keys(TOPICS).map(function (id) {
+    var t = TOPICS[id];
+    var on = id === topicId ? ' on' : '';
+    return '<a class="' + on.trim() + '" href="juzhu-topic.html' + cityQs({ id: id }) + '">' + t.title + '</a>';
+  }).join('');
+
+  var first = topic.journey[0];
+  document.getElementById('primaryCta').href = first.sku ? detailHref(first.sku) : listHref(first.cat);
+  document.getElementById('backLink').href = 'index.html' + cityQs({ tab: 'jiazheng' });
+  document.getElementById('backLife').href = 'index.html' + cityQs({ tab: 'jiazheng' });
+
+  if (JZ && JZ.applyRegionChrome) {
+    JZ.applyRegionChrome({ titleSub: '#ttlSub' });
+  }
+
+  // 推荐：按 slug 拉 SKU；失败则用旅程静态兜底
+  var picksEl = document.getElementById('picks');
+  function renderPicks(items) {
+    if (!items.length) {
+      picksEl.innerHTML = '<div class="empty-tip">暂无推荐，请稍后再试</div>';
+      return;
+    }
+    picksEl.innerHTML = items.map(function (it) {
+      var price = (it.price_from === 0 || it.price_from === '0')
+        ? '<b><small>咨询</small></b>'
+        : '<b>' + it.price_from + '<small>' + (it.price_unit || '起') + '</small></b>';
+      var tags = (it.tags || []).slice(0, 2).map(function (t) {
+        return '<span>' + t + '</span>';
+      }).join('');
+      var shortName = (it.name || '').split('·')[0].trim() || it.name;
+      return '<a class="pick" href="' + detailHref(it.slug) + '">' +
+        '<div class="poster"><div class="t1">PICK</div><div class="t2">' + shortName + '</div></div>' +
+        '<div class="main">' +
+          '<div class="why">' + (it._why || '专题精选') + '</div>' +
+          '<h4>' + it.name + '</h4>' +
+          '<p>' + (it.spec || '') + '</p>' +
+          (tags ? '<div class="tags">' + tags + '</div>' : '') +
+        '</div>' +
+        '<div class="side">' + price + '<div class="cta">预约</div></div>' +
+      '</a>';
+    }).join('');
+  }
+
+  function fallbackPicks() {
+    return topic.picks.map(function (p, i) {
+      var step = topic.journey.find(function (j) { return j.sku === p.slug; }) || topic.journey[i] || {};
+      return {
+        slug: p.slug,
+        name: step.catName || p.slug,
+        spec: step.tip || '',
+        price_from: '—',
+        price_unit: '',
+        tags: ['专题推荐'],
+        _why: p.why
+      };
+    });
+  }
+
+  if (JZ && JZ.skus) {
+    JZ.skus({}).then(function (all) {
+      var bySlug = {};
+      (all || []).forEach(function (s) { bySlug[s.slug] = s; });
+      var items = topic.picks.map(function (p) {
+        var s = bySlug[p.slug];
+        if (!s) return null;
+        var copy = Object.assign({}, s);
+        copy._why = p.why;
+        return copy;
+      }).filter(Boolean);
+      renderPicks(items.length ? items : fallbackPicks());
+    }).catch(function () {
+      renderPicks(fallbackPicks());
+    });
+  } else {
+    renderPicks(fallbackPicks());
+  }
+
+  // 旅程步骤入场：首屏前两步立刻可见，其余滚动渐入
+  var io = window.IntersectionObserver ? new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) {
+        en.target.classList.add('in');
+        io.unobserve(en.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -8% 0px' }) : null;
+  document.querySelectorAll('.j-step').forEach(function (el, i) {
+    if (i < 2) {
+      el.classList.add('ready');
+      return;
+    }
+    if (io) {
+      el.style.transitionDelay = ((i - 2) * 0.05) + 's';
+      io.observe(el);
+    } else {
+      el.classList.add('in');
+    }
+  });
+})();
+</script>
+</body>
+</html>

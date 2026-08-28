@@ -188,6 +188,8 @@ JZ_DATA.getVendor(type, vendorId).then(function(v){
     document.querySelectorAll('.jz-tabs a').forEach(function(a){ a.classList.toggle('on', a===t); });
     document.querySelectorAll('.tab-pane').forEach(function(p){ p.style.display = p.id === 'tab-'+t.dataset.tab ? 'block' : 'none'; });
   });
+}).catch(function(){
+  document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">商家加载失败，请稍后重试</div>';
 });
 </script>
 </body>

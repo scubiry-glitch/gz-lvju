@@ -81,7 +81,7 @@
 
 - **预设切换**：`?region=js|gx|gz_wl`（或 localStorage `bzf_region`），默认 `js`（江苏·住建厅，= 现有字面量基准，切到它时 relabel 为空操作）。`overview.html` 顶部有可视化切换下拉。
 - **两条落地路径**：
-  1. **导航/chrome**（`_nav.js` / `_navmobile.js` / `index.html` 城市切换器）→ 直接读 `window.BZF_REGION` 拼装，不走 relabel。改这类文案时改配置字段，别写死。
+  1. **导航/chrome**（`_nav.js` / `_navmobile.js` / `index.html` 新居住首页 / `index2.html` 故事板城市切换器）→ 直接读 `window.BZF_REGION` 拼装，不走 relabel。改这类文案时改配置字段，别写死。
   2. **页面正文**（`screens/*.html` 全量）→ 由 `_region.js` 的 `relabel()` 在 DOMContentLoaded 时按"江苏基准串→激活预设值"词典替换。所以正文里**仍以江苏字面量书写**（保持基准可读），新增页面只需引入 `<script src="_region.js"></script>`（在 nav 脚本之前；根目录页面用 `screens/_region.js`）。
 - **新增省份/厅**：只在 `_region.js` 的 `PRESETS` 加一个 key，不改任何页面。
 - **relabel 词典规则**：源串始终是 `PRESETS.js`（江苏基准），按"长串优先"排序避免子串误伤；运营方品牌 `贝壳` 是跨域常量（仅极少数演示场景换）。
@@ -100,9 +100,35 @@
 
 ## 规则 9 · 家政工单 API 总线（`screens/_jzapi.js`）
 
-**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，SQLite 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
+**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
-- **鉴权**：写接口与中台列表读接口用 `localStorage JUZHU_API_KEY`（默认 `dev-juzhu-key`）；C 端单订单查询与评价可匿名
+- **鉴权**：`/api/juzhu/*` **默认拒绝**，须 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端管理台经 `localStorage JUZHU_API_KEY` 对齐，勿在页面硬编码。白名单仅限 C 端目录/房源展示、`POST /api/juzhu/jiazheng/wechat-link`、`GET /api/juzhu/gr/orders*`、`GET .../virtual-phone`；商家开放接口走 HMAC；admin 走登录会话或 Key。**工单列表/详情/支付/评价/派单一律要 Key**（禁止 `?phone=` 匿名旁路）
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
+
+## 规则 10 · 话务虚拟号（TP）只走服务端
+
+绑定虚拟号走话务 `/bundling/alloc`，`app_id` / `app_key` **涉及号池成本，禁止明文写到端上或对公网静态资源**。端只消费服务端下发的虚拟号；签名与密钥仅服务端。规范见 `docs/tp-sign-and-call.md`，联调脚本 `scripts/tp_bundling_alloc.py`。本业务约定**不传 `port`**；线上 Base 为内网 `http://i.tp.lianjia.com`，测试 `http://tp-test.lianjia.com`，外网不可直连线上。
+
+**新居住项目电话（保租房 + 卖旧买新）**：真实号存 `projects.contact_phone`（仅 DB + 管理 API，**不进 data.json**）；C 端户型详情拨号走 `GET /api/juzhu/projects/{id}/virtual-phone`，每次实时绑号、禁止缓存。密钥放 `juzhu/.env.local`（模板 `juzhu/.env.example`），`server.py` 启动时自动加载。
+
+## 规则 11 · 静态服务不得暴露源码与密钥
+
+`juzhu/server.py` 与线上 Node 入口 `app.js` 用仓库根做静态根时，**必须**拦截敏感路径：`.env*`、隐藏文件、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`package.json`、`README.md`、根目录 `app.js`/`scf_bootstrap`/`moma_*`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。MySQL 账号只进运行时环境变量 / 本地 `.env.*`（gitignore），**禁止**写进 `app.js` 源码默认值。
+
+## 规则 12 · 线上运行时纯 Node + MySQL；C 端保租房走 catalog
+
+SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再依赖 Python。
+
+- **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
+- **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
+- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`）
+- **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
+- **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
+- **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
+- **Python `juzhu/server.py`**：线上不用；仅本地联调 / Python 单测，已改连同一 MySQL
+
+## 规则 13 · 频道名称单一数据源（`settings.channel_name`）
+
+C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全局设置 `channel_name`（默认 `新居住频道`），后台 `juzhu-admin.html`「设置」页可改。词干 = 去掉末尾「频道/专区」。页面不得再写死这组字眼。

@@ -11,7 +11,8 @@
   'use strict';
 
   var API_KEY_STORAGE = 'JUZHU_API_KEY';
-  var DEFAULT_KEY = 'dev-juzhu-key';
+  // 禁止内嵌历史默认密钥；须由运维/本地在 localStorage 或部署配置写入
+  var DEFAULT_KEY = '';
   var CHANGE_EVT = 'bzf-jz-orders-change';
   var POLL_MS = 4000;
 
@@ -24,7 +25,11 @@
     rated:      { c: '已评价', worker: '已评价', admin: '已评价', pct: 100, cls: 'done',     step: 5 }
   };
 
-  var ICON = { '保洁': '🧹', '维修': '🔧', '搬家': '📦', '保姆': '👶', '家政': '✨' };
+  var ICON = {
+    '保洁': '🧹', '维修': '🔧', '搬家': '📦', '保姆': '👶', '家政': '✨',
+    '电讯服务': '📱', '财险服务': '🛡', '消费金融': '💳', '健康养老': '🏥',
+    '居家维护': '🏠', '资产服务': '🏦', '二手回收': '♻️'
+  };
 
   var _pollTimer = null;
   var _listeners = [];
@@ -82,8 +87,7 @@
       if (params[k] != null && params[k] !== '') qs.set(k, params[k]);
     });
     var url = '/api/juzhu/jiazheng/orders' + (qs.toString() ? '?' + qs : '');
-    var headers = params.phone ? {} : authHeaders();
-    return fetchJSON(url, { headers: headers }).then(function (res) {
+    return fetchJSON(url, { headers: authHeaders() }).then(function (res) {
       return (res.items || []).map(normalizeItem);
     });
   }
@@ -94,7 +98,7 @@
   }
 
   function get(id) {
-    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id))
+    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id), { headers: authHeaders() })
       .then(function (res) { return normalizeItem(res.order); });
   }
 
@@ -153,6 +157,7 @@
   function rate(id, rating) {
     return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/rate', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({
         score: rating.score,
         tags: rating.tags || [],
@@ -165,7 +170,11 @@
   }
 
   function categories() {
-    return fetchJSON('/api/juzhu/jiazheng/categories').then(function (r) { return r.items || []; });
+    var qs = new URLSearchParams();
+    var city = regionCity();
+    if (city) qs.set('city', city);
+    var url = '/api/juzhu/jiazheng/categories' + (qs.toString() ? '?' + qs : '');
+    return fetchJSON(url).then(function (r) { return r.items || []; });
   }
 
   function skus(params) {
@@ -173,13 +182,19 @@
     var qs = new URLSearchParams();
     if (params.category) qs.set('category', params.category);
     if (params.q) qs.set('q', params.q);
+    var city = regionCity();
+    if (city) qs.set('city', city);
     var url = '/api/juzhu/jiazheng/skus' + (qs.toString() ? '?' + qs : '');
     return fetchJSON(url).then(function (r) { return r.items || []; });
   }
 
   function sku(slug, vendorId) {
     var u = '/api/juzhu/jiazheng/skus/' + encodeURIComponent(slug);
-    if (vendorId) u += '?vendor=' + encodeURIComponent(vendorId);
+    var qs = new URLSearchParams();
+    if (vendorId) qs.set('vendor', vendorId);
+    var city = regionCity();
+    if (city) qs.set('city', city);
+    if (qs.toString()) u += '?' + qs.toString();
     return fetchJSON(u);
   }
 
@@ -200,7 +215,7 @@
 
   // 家政频道 · 展示用「省 / 市」位置模型（多省市演示）。
   // 规则 7 边界：此处是频道展示地名（省级/市级两档可选），非 _region.js 的 relabel
-  // 换皮主体名词；不参与换皮，仅决定"X · 新居住频道"里的 X。
+  // 换皮主体名词；不参与换皮，仅决定"X · 频道名称"里的 X。
   // 一个"位置"可以是省名（省级）或市名（市级）；regionCity() 存/取任一档。
   var CITY_TREE = [
     { prov: '辽宁', cities: ['沈阳', '大连', '鞍山', '抚顺', '本溪', '丹东', '锦州', '营口'] },
@@ -291,6 +306,14 @@
     });
   }
 
+  // 为 URL 添加 city 查询参数（链式传递城市）
+  function chainCity(url) {
+    var city = regionCity();
+    if (!city) return url;
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+    return url + sep + 'city=' + encodeURIComponent(city);
+  }
+
   function regionOperator() {
     var R = window.BZF_REGION;
     return (R && R.operator) ? R.operator : '贝壳';
@@ -306,19 +329,53 @@
     return (R && R.bank && R.bank.name) ? R.bank.name : '江苏银行';
   }
 
+  var DEFAULT_CHANNEL_NAME = '新居住频道';
+  var _channelName = DEFAULT_CHANNEL_NAME;
+  var _channelPromise = null;
+
+  function channelBrand(raw) {
+    var name = String(raw == null ? '' : raw).trim() || DEFAULT_CHANNEL_NAME;
+    var short = name.replace(/(频道|专区)$/, '') || name;
+    return { name: name, short: short, zone: short + '专区' };
+  }
+
+  function currentBrand() {
+    if (window.JUZHU && typeof JUZHU.channelBrand === 'function' && JUZHU.getSettings && JUZHU.getSettings()) {
+      return JUZHU.channelBrand();
+    }
+    return channelBrand(_channelName);
+  }
+
+  function loadChannelBrand() {
+    if (window.JUZHU && typeof JUZHU.loadSettings === 'function') {
+      return JUZHU.loadSettings().then(function() { return currentBrand(); });
+    }
+    if (_channelPromise) return _channelPromise;
+    _channelPromise = fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
+      if (s && s.channel_name) _channelName = String(s.channel_name).trim() || DEFAULT_CHANNEL_NAME;
+      return channelBrand(_channelName);
+    }).catch(function() { return channelBrand(_channelName); });
+    return _channelPromise;
+  }
+
   function applyRegionChrome(map) {
     map = map || {};
-    if (map.titleSub) {
-      var el = typeof map.titleSub === 'string' ? document.querySelector(map.titleSub) : map.titleSub;
-      if (el) el.textContent = regionCity() + ' · 新居住频道';
+    function paint(brand) {
+      brand = brand || currentBrand();
+      if (map.titleSub) {
+        var el = typeof map.titleSub === 'string' ? document.querySelector(map.titleSub) : map.titleSub;
+        if (el) el.textContent = regionCity() + ' · ' + brand.name;
+      }
+      if (map.loc) {
+        var loc = typeof map.loc === 'string' ? document.querySelector(map.loc) : map.loc;
+        if (loc) loc.textContent = regionCity();
+      }
+      if (map.docTitle) {
+        document.title = map.docTitle.replace('{city}', regionCity()).replace('{op}', regionOperator());
+      }
     }
-    if (map.loc) {
-      var loc = typeof map.loc === 'string' ? document.querySelector(map.loc) : map.loc;
-      if (loc) loc.textContent = regionCity();
-    }
-    if (map.docTitle) {
-      document.title = map.docTitle.replace('{city}', regionCity()).replace('{op}', regionOperator());
-    }
+    paint(currentBrand());
+    loadChannelBrand().then(paint);
   }
 
   // ===== 演示模式开关 =====
@@ -350,6 +407,37 @@
   }
   applyDemoMode();
 
+  // 用户 id：App 内经 jsbridge3（window.JsBridgeV3）获取真实值后 setUserId 写入；
+  // 获取不到时返回 null，不兜底演示 id（未登录态由页面自行处理：隐藏模块/提示登录）。
+  var USER_KEY = 'jz_demo_user_id';
+
+  function userId() {
+    try { return localStorage.getItem(USER_KEY) || null; } catch (e) { return null; }
+  }
+
+  function setUserId(id) {
+    try {
+      if (id) localStorage.setItem(USER_KEY, id);
+      else localStorage.removeItem(USER_KEY); // 清空残留的旧演示用户
+    } catch (e) {}
+    return userId();
+  }
+
+  // 从 App 注入的 jsbridge3 同步解析用户身份：成功写入并返回 userId，失败/无注入清空返回 null。
+  // 需页面先引入根目录 jsbridgesdk.js（挂载 window.JsBridgeV3）。
+  function bridgeUserId() {
+    var uid = '';
+    try {
+      if (window.JsBridgeV3) {
+        JsBridgeV3.init({ preventDomainSetting: true }); // v3 需业务主动 init；token 前端透传，不种主域 cookie
+        var u = JsBridgeV3.getUserInfo() || {};
+        uid = u.userId || u.user_id || u.uid || u.ucid || '';
+      }
+    } catch (e) { /* 非 App 环境无注入 */ }
+    setUserId(uid ? String(uid) : '');
+    return uid ? String(uid) : null;
+  }
+
   window.BZF_JZ = {
     STATUS: STATUS,
     ICON: ICON,
@@ -378,6 +466,9 @@
     regionCity: regionCity,
     urlCity: urlCity,
     regionCapital: regionCapital,
+    userId: userId,
+    setUserId: setUserId,
+    bridgeUserId: bridgeUserId,
     regionCities: regionCities,
     regionCityTree: regionCityTree,
     regionProvinces: regionProvinces,
@@ -386,9 +477,15 @@
     isProvince: isProvince,
     setRegionCity: setRegionCity,
     onCityChange: onCityChange,
+    chainCity: chainCity,
     regionOperator: regionOperator,
     regionDeptStem: regionDeptStem,
     regionBankName: regionBankName,
+    channelBrand: currentBrand,
+    channelName: function() { return currentBrand().name; },
+    channelShort: function() { return currentBrand().short; },
+    channelZone: function() { return currentBrand().zone; },
+    loadChannelBrand: loadChannelBrand,
     applyRegionChrome: applyRegionChrome
   };
 })();

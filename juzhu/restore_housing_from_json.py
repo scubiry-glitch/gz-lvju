@@ -1,19 +1,17 @@
 """从 data.json 快照重建保租房/卖旧买新的基础表（cities/districts/projects/units/photos）。
 
-背景：juzhu.db 为 gitignore 运行库，connect() 只用 ensure_schema 迁移「已存在」的表，
-从不 CREATE 房源基表——首次/重置后的 DB 只有 jz_* 家政表，导致 juzhu-admin 后台的
-房源编辑整链路 500。此脚本按 schema.sql 建表并回填 data.json 快照，幂等可重复执行。
+MySQL 版：mysql_schema.sql 建表 + 按快照回填（INSERT ... ON DUPLICATE KEY UPDATE），幂等可重复执行。
 
 用法：python3 juzhu/restore_housing_from_json.py
 """
 import json
-import sqlite3
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DB_PATH = HERE / "juzhu.db"
 JSON_PATH = HERE / "data.json"
-SCHEMA_PATH = HERE / "schema.sql"
+SCHEMA_PATH = HERE / "mysql_schema.sql"
+
+import db  # noqa: E402
 
 JSON_COLS = {"tags", "amenities", "keeper", "rent_detail", "rating"}
 
@@ -38,8 +36,9 @@ def insert_rows(conn, table, rows):
         keys = [k for k in cols if k in row]
         vals = [enc(row[k]) if k in JSON_COLS else row[k] for k in keys]
         conn.execute(
-            "INSERT OR REPLACE INTO %s (%s) VALUES (%s)"
-            % (table, ",".join(keys), ",".join("?" * len(keys))),
+            "INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s"
+            % (table, ",".join(keys), ",".join("?" * len(keys)),
+               ",".join("%s=VALUES(%s)" % (k, k) for k in keys)),
             vals,
         )
         n += 1
@@ -48,8 +47,7 @@ def insert_rows(conn, table, rows):
 
 def main():
     data = json.loads(JSON_PATH.read_text(encoding="utf-8"))
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("PRAGMA foreign_keys = OFF")
+    conn = db.connect()
     conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
     city = data.get("city")

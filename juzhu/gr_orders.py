@@ -3,7 +3,6 @@
 - gr_orders 表的读写操作
 """
 import random
-import sqlite3
 from datetime import datetime
 
 
@@ -27,17 +26,17 @@ def generate_order_ref(conn):
     raise RuntimeError("无法生成唯一 order_ref：重试次数已达上限")
 
 
-def create_order(conn, order_ref, sku, city="沈阳"):
+def create_order(conn, order_ref, sku, city="沈阳", vendor_id=None, user_id=None):
     """创建一条 gr_orders 记录。
-    lailai_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
+    vendor_oid / fee / worker_name / worker_phone / eta / cancel_reason 留空。
     返回 order_ref。
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn.execute(
         """INSERT INTO gr_orders
-           (order_ref, sku, city, status, created_at)
-           VALUES (?, ?, ?, 'pending', ?)""",
-        (order_ref, sku, city, now),
+           (order_ref, vendor_id, user_id, sku, city, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'pending', ?)""",
+        (order_ref, vendor_id, user_id, sku, city, now),
     )
     conn.commit()
     return order_ref
@@ -53,69 +52,192 @@ def get_order_by_ref(conn, order_ref):
     return dict(row)
 
 
-def get_order_by_ref_and_lailai(conn, order_ref, lailai_oid):
-    """按 order_ref + lailai_oid 联合查询订单。"""
+def get_order_by_ref_and_vendor(conn, order_ref, vendor_oid):
+    """按 order_ref + vendor_oid 联合查询订单。"""
     row = conn.execute(
-        "SELECT * FROM gr_orders WHERE order_ref = ? AND lailai_oid = ?",
-        (order_ref, lailai_oid),
+        "SELECT * FROM gr_orders WHERE order_ref = ? AND vendor_oid = ?",
+        (order_ref, vendor_oid),
     ).fetchone()
     if row is None:
         return None
     return dict(row)
 
 
-def update_order_callback(conn, order_ref, lailai_oid, status,
+def update_order_callback(conn, order_ref, vendor_oid, status,
                            fee=None, worker_name=None, worker_phone=None,
-                           eta=None, cancel_reason=None):
+                           eta=None, cancel_reason=None, vendor_id=None):
     """回调更新 gr_orders 订单信息。
 
-    - paid 时写入 lailai_oid / status / fee / paid_at
-    - 其他状态更新 status 及对应字段
+    - paid 时写入 vendor_id / vendor_oid / status / fee / paid_at
+    - 其他状态更新 vendor_id / status 及对应字段
+    - vendor_id 传入 None 时保留原值（COALESCE 兜底）
     """
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if status == "paid":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?, fee = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?, fee = ?,
                    paid_at = ?, updated_at = ?
                WHERE order_ref = ?""",
-            (lailai_oid, status, fee, now, now, order_ref),
+            (vendor_id, vendor_oid, status, fee, now, now, order_ref),
         )
     elif status == "assigned":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    worker_name = ?, worker_phone = ?, eta = ?,
                    updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, worker_name, worker_phone, eta,
-             now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, worker_name, worker_phone, eta,
+             now, order_ref, vendor_oid),
         )
     elif status == "completed":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    completed_at = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, now, now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, now, now, order_ref, vendor_oid),
+        )
+    elif status == "serving":
+        conn.execute(
+            """UPDATE gr_orders
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
+                   serving_at = ?, updated_at = ?
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, now, now, order_ref, vendor_oid),
         )
     elif status == "cancelled":
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?,
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?,
                    cancel_reason = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, cancel_reason, now, order_ref, lailai_oid),
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, cancel_reason, now, order_ref, vendor_oid),
         )
     else:
-        # serving 及其他状态：仅更新 status
+        # 其他状态：仅更新 status
         conn.execute(
             """UPDATE gr_orders
-               SET lailai_oid = ?, status = ?, updated_at = ?
-               WHERE order_ref = ? AND lailai_oid = ?""",
-            (lailai_oid, status, now, order_ref, lailai_oid),
+               SET vendor_id = COALESCE(?, vendor_id), vendor_oid = ?, status = ?, updated_at = ?
+               WHERE order_ref = ? AND vendor_oid = ?""",
+            (vendor_id, vendor_oid, status, now, order_ref, vendor_oid),
         )
 
     conn.commit()
     return True
+
+
+# 我的订单（C 端）可见状态：pending 属未支付阶段，不对用户展示
+USER_VISIBLE_STATUSES = ("paid", "assigned", "serving", "completed", "cancelled")
+
+# 状态推进顺序（pending 起步，completed 为正常流程终点；cancelled 单独终态处理）
+STATUS_ORDER = {"pending": 0, "paid": 1, "assigned": 2, "serving": 3, "completed": 4}
+
+
+def sync_order_from_vendor_detail(conn, order_ref, vendor_oid, status,
+                                  fee=None, worker_name=None, worker_phone=None,
+                                  eta=None, cancel_reason=None):
+    """商家订单详情查询接口的静默同步：以商家返回的数据补全/推进本地订单。
+
+    - vendor_oid 仅在本地为空时写入（不覆盖已有值）
+    - status 仅向前推进（pending→paid→assigned→serving→completed）；
+      cancelled 为终态：商家返回 cancelled 直接接受，本地已 cancelled 不接受回退
+    - 条件字段非 null/非空才覆盖（fee、worker_name、worker_phone、eta、cancel_reason）
+    - 状态实际变化时写对应状态时间字段（paid_at/serving_at/completed_at）
+    返回 True 表示已处理（订单不存在返回 False，不抛异常）。
+    """
+    local = get_order_by_ref(conn, order_ref)
+    if not local:
+        return False
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sets, params = [], []
+
+    # vendor_oid 只补空
+    if not local.get("vendor_oid") and vendor_oid:
+        sets.append("vendor_oid = ?")
+        params.append(vendor_oid)
+
+    # 状态推进
+    local_status = local.get("status") or "pending"
+    new_status = None
+    if local_status == "cancelled":
+        new_status = status if status == "cancelled" else None
+    elif status == "cancelled":
+        new_status = "cancelled"
+    elif STATUS_ORDER.get(status, -1) > STATUS_ORDER.get(local_status, -1):
+        new_status = status
+    if new_status and new_status != local_status:
+        sets.append("status = ?")
+        params.append(new_status)
+        if new_status == "paid":
+            sets.append("paid_at = ?")
+            params.append(now)
+        elif new_status == "serving":
+            sets.append("serving_at = ?")
+            params.append(now)
+        elif new_status == "completed":
+            sets.append("completed_at = ?")
+            params.append(now)
+
+    # 条件字段：非 null/非空才覆盖
+    if fee is not None:
+        sets.append("fee = ?")
+        params.append(fee)
+    if worker_name:
+        sets.append("worker_name = ?")
+        params.append(worker_name)
+    if worker_phone:
+        sets.append("worker_phone = ?")
+        params.append(worker_phone)
+    if eta:
+        sets.append("eta = ?")
+        params.append(eta)
+    if cancel_reason:
+        sets.append("cancel_reason = ?")
+        params.append(cancel_reason)
+
+    if not sets:
+        return True
+
+    sets.append("updated_at = ?")
+    params.append(now)
+    params.append(order_ref)
+    conn.execute(f"UPDATE gr_orders SET {', '.join(sets)} WHERE order_ref = ?", params)
+    conn.commit()
+    return True
+
+
+def list_user_orders(conn, user_id, limit=50):
+    """按用户列出订单（过滤 pending），附带 4 状态计数与服务名/类目（join 产品与 SPU）。"""
+    rows = conn.execute(
+        """SELECT o.*, p.title AS product_name, s.category_id AS category_id
+           FROM gr_orders o
+           LEFT JOIN jz_products p ON CAST(p.id AS CHAR) = o.sku
+           LEFT JOIN jz_skus s ON s.id = p.channel_sku_id
+           WHERE o.user_id = ? AND o.status != 'pending'
+           ORDER BY o.created_at DESC, o.id DESC
+           LIMIT ?""",
+        (user_id, limit),
+    ).fetchall()
+    items = [dict(r) for r in rows]
+    counts = {"paid": 0, "assigned": 0, "serving": 0, "completed": 0}
+    for it in items:
+        if it.get("status") in counts:
+            counts[it["status"]] += 1
+    return {"counts": counts, "list": items}
+
+
+def get_user_order(conn, order_ref, user_id):
+    """按 order_ref + user_id 查单（防串单），join 产品名/类目。"""
+    row = conn.execute(
+        """SELECT o.*, p.title AS product_name, s.category_id AS category_id
+           FROM gr_orders o
+           LEFT JOIN jz_products p ON CAST(p.id AS CHAR) = o.sku
+           LEFT JOIN jz_skus s ON s.id = p.channel_sku_id
+           WHERE o.order_ref = ? AND o.user_id = ?""",
+        (order_ref, user_id),
+    ).fetchone()
+    return dict(row) if row else None

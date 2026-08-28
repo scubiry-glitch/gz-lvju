@@ -15,7 +15,7 @@ screens/_region.js   ← 系统初始化层 · 单一数据源（预设注册表
    ├─ window.BZF_PRESETS  全部预设（供 overview 切换下拉）
    │
    ├─(路径1) 导航/chrome 直接读 BZF_REGION 拼装：
-   │         _nav.js（桌面 sidebar）· _navmobile.js（移动 chrome）· index.html / home.html（城市切换器）
+   │         _nav.js（桌面 sidebar）· _navmobile.js（移动 chrome）· index.html（新居住首页）/ index2.html / home.html（城市切换器）
    │
    └─(路径2) relabel()：DOMContentLoaded 时把"江苏基准串 → 激活预设值"
              按词典替换页面正文文本节点 ⇒ 70+ 页面正文【零改动】
@@ -65,7 +65,7 @@ screens/_region.js   ← 系统初始化层 · 单一数据源（预设注册表
 | 新增核心 | `screens/_region.js` | 预设注册表 + relabel + 派生字段 |
 | 中心化消费 | `screens/_nav.js` | 系列名/用户画像/银行/厅名/国企/培训机构 改读 `R` |
 | 中心化消费 | `screens/_navmobile.js` | G/F/C 端 stamp + G 抽屉用户 org 改读 `R` |
-| 入口 | `index.html` / `screens/home.html` | 注入 region 脚本；城市切换器由 `prov.cities` 渲染（标题/省会/列表动态，切省后清除失效旧选择） |
+| 入口 | `index.html`（新居住） / `index2.html`（故事板） / `screens/home.html` | 注入 region 脚本；城市切换器由 `prov.cities` 渲染（标题/省会/列表动态，切省后清除失效旧选择） |
 | 演示入口 | `overview.html` | 🌐 预设切换下拉 + 注入 region 脚本 |
 | 正文（全量） | `screens/*.html`（91 个）+ 根目录 5 个发布页 | 引入 `<script src="_region.js">`（nav 脚本之前；根目录用 `screens/_region.js`），正文由 relabel 运行时换皮 |
 | 约定 | `CLAUDE.md` | 新增**规则 7 · 地域/部门/业务词配置单一数据源** |

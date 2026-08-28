@@ -1,22 +1,43 @@
-/** 新居住频道 · 共享数据层（读 juzhu/data.json 或 /api/juzhu/*） */
+/** 新居住频道 · 共享数据层（优先 /api/juzhu/catalog MySQL，失败再回落 data.json） */
 window.JUZHU = (function () {
   var cache = null;
   var _settings = null;
+  var _settingsP = null;
+  var DEFAULT_CHANNEL_NAME = '新居住频道';
+
+  function channelBrand(raw) {
+    var name = String(raw == null ? '' : raw).trim() || DEFAULT_CHANNEL_NAME;
+    var short = name.replace(/(频道|专区)$/, '') || name;
+    return { name: name, short: short, zone: short + '专区' };
+  }
+
+  function currentBrand() {
+    return channelBrand(_settings && _settings.channel_name);
+  }
 
   function loadSettings() {
     if (_settings) return Promise.resolve(_settings);
-    return fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
+    if (_settingsP) return _settingsP;
+    _settingsP = fetch('/api/juzhu/settings').then(function(r) { return r.json(); }).then(function(s) {
       _settings = s;
       return s;
     }).catch(function() {
-      _settings = { show_city_switcher: true, show_life_service: true };
+      _settings = { show_city_switcher: true, show_life_service: true, channel_name: DEFAULT_CHANNEL_NAME };
       return _settings;
     });
+    return _settingsP;
   }
 
-  // 按 URL ?city=（城市名）解析对应城市的数据文件；无城市或解析失败 → 默认 data.json
-  function dataUrlForCity() {
+  function resolveCityHint() {
     var city = urlCityName();
+    if (!city) {
+      try { city = localStorage.getItem('bzf_jz_city') || ''; } catch (e) {}
+    }
+    return city || '';
+  }
+
+  function dataUrlForCity() {
+    var city = resolveCityHint();
     if (!city) return Promise.resolve('');
     var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
     return fetch(base + 'cities.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) {
@@ -31,8 +52,66 @@ window.JUZHU = (function () {
     }).catch(function () { return ''; });
   }
 
-  function load() {
-    if (cache) return Promise.resolve(cache);
+  function normalizeCatalog(d) {
+    function normTags(list) {
+      (list || []).forEach(function (r) {
+        r.tags = asTags(r.tags);
+      });
+    }
+    normTags(d.districts);
+    normTags(d.projects);
+    normTags(d.units);
+    (d.units || []).forEach(function(u) {
+      if (u.amenities == null) u.amenities = [];
+      else if (typeof u.amenities === 'string') {
+        try { u.amenities = JSON.parse(u.amenities); } catch (e) { u.amenities = []; }
+      }
+      if (u.keeper && typeof u.keeper === 'string') {
+        try { u.keeper = JSON.parse(u.keeper); } catch (e) { u.keeper = null; }
+      }
+      if (u.rent_detail && typeof u.rent_detail === 'string') {
+        try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
+      }
+    });
+    function coverOf(photos, type, id) {
+      var list = (photos || []).filter(function (p) {
+        return p.entity_type === type && Number(p.entity_id) === Number(id);
+      }).sort(function (a, b) {
+        return (Number(b.is_cover) || 0) - (Number(a.is_cover) || 0)
+          || (a.sort_order || 0) - (b.sort_order || 0);
+      });
+      return list.length ? list[0].file_path : '';
+    }
+    function fillCovers(list, type, photos) {
+      (list || []).forEach(function (row) {
+        if (row && !row.cover_image) {
+          var p = coverOf(photos, type, row.id);
+          if (p) row.cover_image = p;
+        }
+      });
+    }
+    fillCovers(d.districts, 'district', d.photos);
+    fillCovers(d.projects, 'project', d.photos);
+    fillCovers(d.units, 'unit', d.photos);
+    return d;
+  }
+
+  function loadFromCatalog(lite) {
+    var city = resolveCityHint();
+    var parts = [];
+    if (city) parts.push('city=' + encodeURIComponent(city));
+    if (lite) parts.push('lite=1');
+    var qs = parts.length ? ('?' + parts.join('&')) : '';
+    return fetch('/api/juzhu/catalog' + qs).then(function (r) {
+      if (!r.ok) throw new Error('catalog http ' + r.status);
+      return r.json();
+    }).then(function (d) {
+      if (!d || !Array.isArray(d.districts)) throw new Error('catalog empty');
+      return d;
+    });
+  }
+
+  function loadFromJson() {
     var base = location.pathname.indexOf('/juzhu/') !== -1 ? '' : 'juzhu/';
     var url = base + 'data.json';
     return dataUrlForCity().then(function (cityFile) {
@@ -45,33 +124,18 @@ window.JUZHU = (function () {
     }).then(function (r) {
       if (!r.ok) throw new Error('data load failed');
       return r.json();
+    });
+  }
+
+  function load(opts) {
+    opts = opts || {};
+    if (cache) return Promise.resolve(cache);
+    var lite = !!opts.lite;
+    return loadFromCatalog(lite).catch(function () {
+      return loadFromJson();
     }).then(function (d) {
-      function normTags(list) {
-        (list || []).forEach(function (r) {
-          var t = r.tags;
-          if (t == null) r.tags = [];
-          else if (typeof t === 'string') {
-            try { r.tags = JSON.parse(t); } catch (e) { r.tags = t ? [t] : []; }
-          } else if (!Array.isArray(t)) r.tags = [];
-        });
-      }
-      normTags(d.districts);
-      normTags(d.projects);
-      normTags(d.units);
-      (d.units || []).forEach(function(u) {
-        if (u.amenities == null) u.amenities = [];
-        else if (typeof u.amenities === 'string') {
-          try { u.amenities = JSON.parse(u.amenities); } catch (e) { u.amenities = []; }
-        }
-        if (u.keeper && typeof u.keeper === 'string') {
-          try { u.keeper = JSON.parse(u.keeper); } catch (e) { u.keeper = null; }
-        }
-        if (u.rent_detail && typeof u.rent_detail === 'string') {
-          try { u.rent_detail = JSON.parse(u.rent_detail); } catch (e) { u.rent_detail = null; }
-        }
-      });
-      cache = d;
-      return d;
+      cache = normalizeCatalog(d);
+      return cache;
     });
   }
 
@@ -138,11 +202,15 @@ window.JUZHU = (function () {
   }
 
   function asTags(tags) {
-    if (tags == null) return [];
-    if (Array.isArray(tags)) return tags;
-    if (typeof tags === 'string') {
-      try { var p = JSON.parse(tags); return Array.isArray(p) ? p : [tags]; } catch (e) { return tags ? [tags] : []; }
+    var v = tags;
+    if (v == null) return [];
+    for (var i = 0; i < 8 && typeof v === 'string'; i++) {
+      var s = v.trim();
+      if (!s) return [];
+      try { v = JSON.parse(s); }
+      catch (e) { return s.split(',').map(function(x){ return x.trim(); }).filter(Boolean); }
     }
+    if (Array.isArray(v)) return v;
     return [];
   }
 
@@ -287,7 +355,6 @@ window.JUZHU = (function () {
 
     return '<div class="block rating-block">' +
       '<div class="bt">好房子评级 · 四维度</div>' +
-      '<div class="bs">好房子评价标准=AI打分+人工复核</div>' +
       '<div class="rating-sum">' +
         '<div class="stars-side"><div class="ek">综合星级</div>' +
         '<div class="stars">' + starsHtml(r.stars) + '</div>' +
@@ -367,6 +434,23 @@ window.JUZHU = (function () {
     if (!phone) return '';
     var digits = phone.replace(/[^\d+]/g, '');
     return digits ? 'tel:' + digits : '';
+  }
+
+  /** 实时取项目虚拟号（不缓存；须后端 juzhu/server.py） */
+  function fetchProjectVirtualPhone(projectId) {
+    if (!projectId) {
+      return Promise.reject(new Error('未配置联系电话'));
+    }
+    return fetch('/api/juzhu/projects/' + encodeURIComponent(projectId) + '/virtual-phone', {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' }
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!r.ok) throw new Error((j && j.error) || '暂时无法接通，请稍后重试');
+        if (!j || !j.tel) throw new Error('暂时无法接通，请稍后重试');
+        return j;
+      });
+    });
   }
 
   // 全链路城市/地域透传：把当前 URL 的 ?city= / ?region= 参数拼到站内链接上
@@ -559,6 +643,10 @@ window.JUZHU = (function () {
     load: load,
     loadSettings: loadSettings,
     getSettings: function() { return _settings; },
+    channelBrand: currentBrand,
+    channelName: function() { return currentBrand().name; },
+    channelShort: function() { return currentBrand().short; },
+    channelZone: function() { return currentBrand().zone; },
     get data() { return cache; },
     districts: districts,
     districtBySlug: districtBySlug,
@@ -587,6 +675,7 @@ window.JUZHU = (function () {
     districtManagedUnits: districtManagedUnits,
     bookingPhone: bookingPhone,
     telHref: telHref,
+    fetchProjectVirtualPhone: fetchProjectVirtualPhone,
     chainQS: chainQS,
     urlCityName: urlCityName,
     AMENITY_CATALOG: AMENITY_CATALOG,

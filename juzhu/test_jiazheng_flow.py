@@ -6,7 +6,10 @@ import urllib.error
 import urllib.request
 
 HOST = "http://127.0.0.1:8765"
-KEY = "dev-juzhu-key"
+KEY = (__import__("os").environ.get("JUZHU_API_KEY") or "").strip()
+if not KEY:
+    print("请在 .env / 环境变量设置 JUZHU_API_KEY（本地示例见 juzhu/.env.example）", file=sys.stderr)
+    sys.exit(2)
 
 # 每品类代表 SKU（与 juzhu/db.py JZ_DEFAULT_SKUS 对齐）
 FLOW = [
@@ -66,11 +69,11 @@ def run_one(cat, sku_id, slug):
         assert advanced["order"]["status"] == step
         print("advance ->", step)
 
-    rated = call("POST", f"/api/juzhu/jiazheng/orders/{oid}/rate", {"score": 5, "tags": ["专业"]}, auth=False)
+    rated = call("POST", f"/api/juzhu/jiazheng/orders/{oid}/rate", {"score": 5, "tags": ["专业"]}, auth=True)
     assert rated["order"]["status"] == "rated"
     print("rate ok")
 
-    got = call("GET", f"/api/juzhu/jiazheng/orders/{oid}", auth=False)
+    got = call("GET", f"/api/juzhu/jiazheng/orders/{oid}", auth=True)
     assert got["order"]["category_id"] == cat
     print("verify ok", got["order"]["id"])
     return oid

@@ -23,7 +23,7 @@
 <div class="app">
   <div class="scr">
     <div class="appbar">
-      <a class="bk" href="juzhu-channel-v3-grid.html?tab=jiazheng">‹</a>
+      <a class="bk" href="index.html?tab=jiazheng">‹</a>
       <div class="ttl">全流程演示<small id="citySub">四大品类</small></div>
     </div>
     <div class="hero">
@@ -35,11 +35,16 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
-  document.getElementById('citySub').textContent = JZ.regionCity() + ' · 新居住';
+  function paintCitySub() {
+    var brand = (JZ.channelBrand && JZ.channelBrand()) || { short: '新居住' };
+    document.getElementById('citySub').textContent = JZ.regionCity() + ' · ' + brand.short;
+  }
+  paintCitySub();
+  if (JZ.loadChannelBrand) JZ.loadChannelBrand().then(paintCitySub);
   document.title = '家政全流程 · ' + JZ.regionCity();
 
   var MODS = [

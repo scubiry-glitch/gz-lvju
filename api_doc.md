@@ -2,21 +2,20 @@
 
 ## 1. 概述
 
-第三方商家通过本接口管理产品（SKU）和接收订单状态回调。
+第三方商家通过本接口管理产品（SKU）、接收订单状态回调，并提供小程序 URL Link 生成接口和订单详情查询接口。
 
 - **测试环境**：`http://49.232.103.71:8765`
-- **生产环境**：`https://your-domain`
+- **生产环境**：-
 - **Content-Type**：`application/json`
 - **认证方式**：HMAC-SHA256 签名（见第 2 章）
-- **测试密钥**
-  - VENDOR_ID = 41
-  - SECRET = 7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d
+- **测试密钥**：密钥线下同步
 
 ### 接口一览
 
 | 分类 | 方法 | 路径 | 说明 |
 |------|------|------|------|
 | 回调 | `POST` | `/api/juzhu/callback` | 订单状态变更通知 |
+| 城市 | `POST` | `/api/juzhu/jiazheng/vendor/cities/list` | 查询商家关联城市 |
 | 类目 | `POST` | `/api/juzhu/jiazheng/vendor/categories/list` | 查询可用类目 |
 | SPU | `POST` | `/api/juzhu/jiazheng/vendor/skus/list` | 查询平台标准品 |
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/list` | 产品列表（支持筛选）|
@@ -25,6 +24,8 @@
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/update` | 编辑产品 |
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/status` | 状态变更（上架/下架/售罄）|
 | 产品 | `POST` | `/api/juzhu/jiazheng/vendor/products/delete` | 删除产品（软删） |
+| 链接 | `POST` | （商家提供） | 小程序 URL Link 生成（见第 5 章） |
+| 查询 | `GET` | （商家提供） | 订单详情查询（见第 5 章） |
 
 ---
 
@@ -112,7 +113,7 @@
 {
   "vendor_id": 41,
   "order_ref": "GR202608071429360148",
-  "lailai_oid": "LL_88888",
+  "vendor_oid": "SP_88888",
   "status": "assigned",
   "worker": {
     "name": "李师傅",
@@ -125,12 +126,12 @@
 展平后排序：
 
 ```
-lailai_oid=LL_88888
+vendor_oid=SP_88888
 order_ref=GR202608071429360148
 status=assigned
 timestamp=1785998316159
 vendor_id=41
-worker.eta=2026-08-07T14:00:00+08:00
+worker.eta=2026-08-07 14:00:00
 worker.name=李师傅
 worker.phone=139****5678
 ```
@@ -138,7 +139,7 @@ worker.phone=139****5678
 拼接待签名字符串：
 
 ```
-lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07T14:00:00+08:00&worker.name=李师傅&worker.phone=139****5678
+vendor_oid=SP_88888&order_ref=GR202608071429360148&status=assigned&timestamp=1785998316159&vendor_id=41&worker.eta=2026-08-07 14:00:00&worker.name=李师傅&worker.phone=139****5678
 ```
 
 ---
@@ -155,18 +156,18 @@ lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID，由 GR 侧分配 |
 | `order_ref` | string | ✅ | GR 侧订单参考号（如 `GR202608071429360148`） |
-| `lailai_oid` | string | ✅ | 来来订单号 |
+| `vendor_oid` | string | ✅ | 商家订单号 |
 | `status` | string | ✅ | 订单状态，可选值见下方状态表 |
 | `fee` | integer | 条件 | `paid` 时必填，金额（分） |
 | `worker` | object | 条件 | `assigned` 时必填，服务者信息 |
 | `worker.name` | string | 条件 | 服务者姓名 |
 | `worker.phone` | string | 条件 | 服务者电话 |
-| `worker.eta` | string | 条件 | 预计到达时间（ISO 8601） |
+| `worker.eta` | string | 条件 | 预计到达时间（格式：2026-08-07 14:00:00） |
 | `cancel_reason` | string | 条件 | `cancelled` 时必填，取消原因 |
 | `timestamp` | integer | ✅ | 当前时间戳（毫秒），用于防重放 |
 | `sign` | string | ✅ | HMAC-SHA256 签名 |
 
-> **`vendor_id` 来源**：URL Link 生成时，GR 侧将 `vendor_id` 写入 query string（`...&vendor_id=41`），小程序从 URL 参数中提取后回传。
+> **`vendor_id` 来源**：`vendor_id` 由 GR 侧分配，商家在每次回调请求体中携带，与 HMAC 签名配合完成身份校验。
 
 ### 状态枚举
 
@@ -178,7 +179,7 @@ lailai_oid=LL_88888&order_ref=GR202608071429360148&status=assigned&timestamp=178
 | `completed` | 已完成 | — |
 | `cancelled` | 已取消 | `cancel_reason` |
 
-> **注意**：首次回调 `paid` 时，GR 侧仅用 `order_ref` 查找订单并写入 `lailai_oid`；后续状态变更需同时提供 `order_ref` + `lailai_oid` 联合匹配。
+> **注意**：首次回调 `paid` 时，GR 侧仅用 `order_ref` 查找订单并写入 `vendor_oid`；后续状态变更需同时提供 `order_ref` + `vendor_oid` 联合匹配。
 
 ### 响应参数
 
@@ -207,7 +208,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "paid",
     "fee": 12800,
     "timestamp": 1785998316159,
@@ -229,7 +230,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "assigned",
     "worker": {
       "name": "李师傅",
@@ -249,7 +250,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "completed",
     "timestamp": 1785998316159,
     "sign": "..."
@@ -264,7 +265,7 @@ curl -X POST https://your-domain/api/juzhu/callback \
   -d '{
     "vendor_id": 41,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "cancelled",
     "cancel_reason": "用户主动取消",
     "timestamp": 1785998316159,
@@ -294,13 +295,48 @@ curl -X POST https://your-domain/api/juzhu/callback \
 
 ---
 
-### 4.1 类目列表
+### 4.1 城市列表
+
+```http
+POST /api/juzhu/jiazheng/vendor/cities/list
+```
+
+返回本商家 `city_ids` 关联的城市（id + 名称），用于产品创建/编辑时选择 `city_id`。**仅返回本商家关联的城市**；未关联的城市不可查询，也不能作为产品 `city_id` 提交。
+
+**请求参数**（除 `vendor_id` + 签名外无业务参数）：
+
+```json
+{"vendor_id": 41}
+```
+
+**响应**（按商家 `city_ids` 配置顺序返回）：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "list": [
+    {"id": 1, "name": "沈阳", "slug": "shenyang"},
+    {"id": 2, "name": "贵阳", "slug": "guiyang"}
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | integer | 城市 ID（产品 `city_id` 用此值） |
+| `name` | string | 城市名称 |
+| `slug` | string | 城市拼音标识 |
+
+---
+
+### 4.2 类目列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/categories/list
 ```
 
-返回所有状态为 `on` 的子类目（不分页），用于产品创建/筛选时的类目下拉。
+返回所有 `enabled=1` 的四大类目（不分页），用于产品创建/筛选时的类目下拉。
 
 **请求参数**（除 `vendor_id` + 签名外无业务参数）：
 
@@ -315,15 +351,15 @@ POST /api/juzhu/jiazheng/vendor/categories/list
   "code": 0,
   "message": "success",
   "list": [
-    {"id": 1, "parent_type": "cleaning", "name": "日常保洁", "icon": "🧹", "sort_order": 1},
-    {"id": 2, "parent_type": "cleaning", "name": "深度清洁", "icon": "🧼", "sort_order": 2}
+    {"id": "cleaning", "parent_type": "cleaning", "name": "保洁", "icon": "🧹", "sort_order": 1},
+    {"id": "repair", "parent_type": "repair", "name": "维修", "icon": "🔧", "sort_order": 2}
   ]
 }
 ```
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `id` | integer | 类目 ID |
+| `id` | string | 类目 ID（四大类标识，同 `parent_type`） |
 | `parent_type` | string | 父类型（cleaning / repair / moving / nanny） |
 | `name` | string | 类目名称 |
 | `icon` | string | 图标 emoji |
@@ -331,7 +367,7 @@ POST /api/juzhu/jiazheng/vendor/categories/list
 
 ---
 
-### 4.2 SPU 列表
+### 4.3 SPU 列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/skus/list
@@ -372,7 +408,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | integer | SPU ID（创建产品时填入 `channel_sku_id`） |
-| `category_id` | string | 所属类目 ID |
+| `category_id` | string | 所属类目标识（slug，如 `cleaning-daily`），非数字 ID |
 | `name` | string | SPU 名称 |
 | `slug` | string | URL 友好标识 |
 | `spec` | string | 规格描述 |
@@ -385,7 +421,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 
 ---
 
-### 4.3 产品列表
+### 4.4 产品列表
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/list
@@ -398,6 +434,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID |
+| `city_id` | integer | 否 | 按城市 ID 筛选 |
 | `category` | string | 否 | 按类目名称筛选（精确匹配） |
 | `status` | string | 否 | 按状态筛选：`on` / `off` / `sold_out` |
 | `name` | string | 否 | 按产品标题模糊搜索 |
@@ -418,6 +455,8 @@ POST /api/juzhu/jiazheng/vendor/products/list
     {
       "id": 3,
       "vendor_id": 41,
+      "city_id": 1,
+      "city_name": "沈阳",
       "title": "深度清洁4小时",
       "subtitle": "适合大面积深度保洁",
       "category": "深度清洁",
@@ -437,7 +476,7 @@ POST /api/juzhu/jiazheng/vendor/products/list
       "query": "id=123123",
       "status": "on",
       "sort_order": 1,
-      "vendor_name": "来来",
+      "vendor_name": "示例商家",
       "vendor_type": "cleaning",
       "spu_name": "深度清洁4小时",
       "worker_ids": [101, 102]
@@ -450,6 +489,8 @@ POST /api/juzhu/jiazheng/vendor/products/list
 |------|------|------|
 | `id` | integer | 产品 ID |
 | `vendor_id` | integer | 所属商家 ID |
+| `city_id` | integer | 商品所属城市 ID |
+| `city_name` | string | 城市名称 |
 | `title` | string | 产品标题 |
 | `subtitle` | string | 副标题 |
 | `category` | string | 类目名称 |
@@ -468,12 +509,15 @@ POST /api/juzhu/jiazheng/vendor/products/list
 | `path` | string | 小程序页面路径 |
 | `query` | string | 小程序页面参数 |
 | `status` | string | 状态：`on` / `off` / `sold_out` |
+| `sort_order` | integer | 排序 |
+| `vendor_name` | string | 商家名称（只读） |
+| `vendor_type` | string | 商家类型（只读） |
 | `spu_name` | string | 引用的 SPU 名称（只读） |
 | `worker_ids` | []integer | 绑定的服务者 ID 列表（只读） |
 
 ---
 
-### 4.4 产品详情
+### 4.5 产品详情
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/detail
@@ -508,7 +552,7 @@ POST /api/juzhu/jiazheng/vendor/products/detail
 
 ---
 
-### 4.5 创建产品
+### 4.6 创建产品
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/create
@@ -521,19 +565,20 @@ POST /api/juzhu/jiazheng/vendor/products/create
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID（签名用，不会作为入库值被覆写） |
+| `city_id` | integer | ✅ | 商品所属城市 ID（必须属于商家关联城市，见城市列表接口） |
+| `channel_sku_id` | integer | 否 | 引用的 SPU ID（从 SPU 列表接口获取） |
+| `category` | string | 否 | 类目名称 |
 | `title` | string | ✅ | 产品标题 |
 | `subtitle` | string | 否 | 副标题 |
-| `category` | string | 否 | 类目名称 |
 | `duration_hours` | float | 否 | 服务时长（小时） |
 | `area_range` | string | 否 | 适用面积范围 |
 | `unit` | string | 否 | 计价单位（默认"次"） |
-| `price` | float | 否 | 售价（元），默认 0 |
-| `original_price` | float | 否 | 原价（元） |
+| `price` | integer | 否 | 售价（分），默认 0 |
+| `original_price` | integer | 否 | 原价（分） |
 | `discount_label` | string | 否 | 折扣标签 |
 | `earliest_time` | string | 否 | 最早可约时间 |
 | `advance_booking_hours` | integer | 否 | 需提前预约小时数 |
 | `service_tags` | []string | 否 | 服务标签列表 |
-| `channel_sku_id` | integer | 否 | 引用的 SPU ID（从 SPU 列表接口获取） |
 | `path` | string | 否 | 小程序页面路径 |
 | `query` | string | 否 | 小程序页面参数 |
 | `status` | string | 否 | 状态（默认 `on`） |
@@ -545,10 +590,11 @@ POST /api/juzhu/jiazheng/vendor/products/create
 ```json
 {
   "vendor_id": 41,
+  "city_id": 1,
   "title": "日常保洁2小时",
   "subtitle": "基础日常清洁",
   "category": "日常保洁",
-  "price": 99,
+  "price": 9900,
   "unit": "次",
   "channel_sku_id": 1,
   "worker_ids": [101]
@@ -563,7 +609,7 @@ POST /api/juzhu/jiazheng/vendor/products/create
 
 ---
 
-### 4.6 编辑产品
+### 4.7 编辑产品
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/update
@@ -577,6 +623,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
 |------|------|------|------|
 | `vendor_id` | integer | ✅ | 商家 ID |
 | `id` | integer | ✅ | 产品 ID |
+| `city_id` | integer | 否 | 商品城市 ID（须属于商家关联城市；不传保持不变） |
 | （其他） | — | 否 | 同创建接口，按需传入 |
 
 **请求示例**：
@@ -586,7 +633,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
   "vendor_id": 41,
   "id": 10,
   "title": "日常保洁2小时（特惠）",
-  "price": 79,
+  "price": 7900,
   "status": "on"
 }
 ```
@@ -599,7 +646,7 @@ POST /api/juzhu/jiazheng/vendor/products/update
 
 ---
 
-### 4.7 状态变更
+### 4.8 状态变更
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/status
@@ -629,7 +676,7 @@ POST /api/juzhu/jiazheng/vendor/products/status
 
 ---
 
-### 4.8 删除产品（软删）
+### 4.9 删除产品（软删）
 
 ```http
 POST /api/juzhu/jiazheng/vendor/products/delete
@@ -658,36 +705,180 @@ POST /api/juzhu/jiazheng/vendor/products/delete
 
 ---
 
-## 5. 密钥管理
+## 5. 商家提供的接口协议
 
-### 分配流程
+商家除接入 GR 侧开放接口外，还需向 GR 侧提供以下两个接口，供 GR 侧在对应业务时机调用。
 
-1. GR 运营在管理后台创建商家 → 获得 `vendor_id`（如 41）
-2. 为商家生成 HMAC 密钥（64 位 hex，推荐 `python3 -c "import secrets; print(secrets.token_hex(32))"`）
-3. 在服务器 `hmac_secret.key` 文件中追加一行：`41|<密钥>`
-4. 将 `vendor_id` + 密钥线下交付给第三方商家
+### 5.1 小程序 URL Link 生成接口
 
-### 测试商家
+商家需提供一个 URL Link 生成接口，GR 侧在用户下单时会调用该接口获取小程序链接。
 
-| 商家 | vendor_id | HMAC 密钥 |
-|------|-----------|-----------|
-| 来来 | 41 | `7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d` |
+### 请求（GR → 商家）
 
-测试环境接口地址：`http://49.232.103.71:8765`
+GR 侧以 `POST` 方式调用，`Content-Type: application/json`：
 
-### 密钥文件格式
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `path` | string | 否 | 小程序页面路径 |
+| `query` | string | 否 | 小程序页面原始查询参数（如 `activityId=xxx`） |
+| `order_ref` | string | ✅ | GR 侧订单参考号（如 `GR202608121430120001`） |
 
+### 响应（商家 → GR）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `code` | integer | `200` 表示成功，`-1` 表示失败 |
+| `msg` | string/null | 提示信息 |
+| `data` | string/null | 成功时为小程序 URL Link，失败时为 `null` |
+
+> **重要**：GR 侧仅当 `code = 200` 时视为成功。
+
+### 调用示例
+
+```bash
+curl -X POST https://test-domain/urllink \
+  -H "Content-Type: application/json" \
+  -d '{
+    "path": "pages-sub/goods/goods",
+    "query": "activityId=2031123456789012345",
+    "order_ref": "GR202608071429360148"
+  }'
 ```
-# 注释行以 # 开头，空行忽略
-41|cbaa8192be7933a6900274c0bb5a6cdd295a44046ac3a6ec65862b3692051217
-42|a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+
+成功响应：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": "weixin://dl/business/?t=E8iVw9ME0Yc&cq=code%3DF2C202608070001"
+}
 ```
 
-### 注意事项
+### 常见错误
 
-- 密钥仅保存在服务端 `hmac_secret.key`，不落库
-- 密钥泄露后需立即更换对应行，旧密钥即刻失效
-- 签名防重放窗口为 **5 分钟**（±300000ms）
+| 场景 | code | msg 示例 |
+|------|------|----------|
+| `query` 为空 | `-1` | `参数不能为空` |
+| `order_ref` 为空 | `-1` | `GR侧订单参考号不能为空` |
+| `activityId` 缺失或非法 | `-1` | `数字格式错误` |
+| 链接生成失败 | `-1` | `生成小程序链接失败` |
+
+---
+
+### 5.2 订单详情查询接口
+
+商家需提供一个订单详情查询接口。GR 侧在用户进入订单详情页时调用。
+
+### 请求（GR → 商家）
+
+GR 侧以 `GET` 方式调用，参数通过 Query String 传递：
+
+| 字段 | 位置 | 类型 | 必填 | 说明 |
+|------|------|------|------|------|
+| `order_ref` | Query String | string | ✅ | GR 侧订单参考号（如 `GR202608071429360148`） |
+
+### 响应（商家 → GR）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `code` | integer | ✅ | `200` 表示成功，`-1` 表示失败 |
+| `msg` | string/null | 否 | 提示信息 |
+| `data` | object/null | 条件 | 成功时为订单详情，失败时为 `null` |
+| `data.order_ref` | string | ✅ | GR 侧订单参考号 |
+| `data.lailai_oid` | string | ✅ | 商家订单号 |
+| `data.status` | string | ✅ | 当前订单状态，可选值见下方状态表 |
+| `data.fee` | integer/null | 条件 | `paid` 状态返回，已支付金额（分） |
+| `data.worker` | object/null | 条件 | `assigned` 状态返回，服务者信息 |
+| `data.worker.name` | string | 条件 | 服务者姓名 |
+| `data.worker.phone` | string | 条件 | 服务者电话 |
+| `data.worker.eta` | string | 条件 | 预计到达时间（北京时间，格式：`2026-08-12 09:00:00`；兼容 ISO 8601 带时区格式，GR 侧统一转为北京时间） |
+| `data.cancel_reason` | string/null | 条件 | `cancelled` 状态返回，取消原因 |
+
+> 不适用于当前状态的条件字段返回 `null`。
+
+### 状态枚举（与回调接口一致）
+
+| status | 说明 | 状态专有字段 |
+|--------|------|-------------|
+| `pending` | 未支付 | - |
+| `paid` | 已支付 | `fee` |
+| `assigned` | 已派单 | `worker`（name、phone、eta） |
+| `serving` | 服务中 | — |
+| `completed` | 已完成 | — |
+| `cancelled` | 已取消 | `cancel_reason` |
+
+### 调用示例
+
+```bash
+curl -G https://test-domain/mall/beike/juzhu/order/detail \
+  --data-urlencode "order_ref=GR202608071429360148"
+```
+
+已支付响应（paid）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "paid",
+    "fee": 12800,
+    "cancel_reason": null,
+    "worker": null
+  }
+}
+```
+
+已派单响应（assigned）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "assigned",
+    "fee": null,
+    "cancel_reason": null,
+    "worker": {
+      "name": "李师傅",
+      "phone": "13900005678",
+      "eta": "2026-08-12T09:00:00+08:00"
+    }
+  }
+}
+```
+
+已取消响应（cancelled）：
+
+```json
+{
+  "code": 200,
+  "msg": null,
+  "data": {
+    "order_ref": "GR202608071429360148",
+    "lailai_oid": "LL_88888",
+    "status": "cancelled",
+    "fee": null,
+    "cancel_reason": "顾客取消订单",
+    "worker": null
+  }
+}
+```
+
+### 常见错误
+
+| 场景 | code | msg 示例 |
+|------|------|----------|
+| 请求来源 IP 不在白名单 | `-1` | `IP无权访问-203.0.113.10` |
+| `order_ref` 为空 | `-1` | `订单参考号不能为空` |
+| `order_ref` 对应的订单不存在 | `-1` | `订单不存在` |
+
+> GR 侧仅当 `code = 200` 且 `data` 非空时覆盖本地展示；商家接口异常或返回失败时，GR 侧保持本地订单数据展示，不影响用户操作。
 
 ---
 
@@ -752,9 +943,9 @@ class HmacAuth:
 
 # ── 使用示例（测试环境） ──
 
-VENDOR_ID = 41
-SECRET = "7d993c779bcaecf3180239984fe679a8f963a501a5b160e2dc434bce9a20666d"
-BASE = "http://49.232.103.71:8765"
+VENDOR_ID = "<向管理员索取>"
+SECRET = "<向管理员索取>"
+BASE = "<测试环境 Base URL>"
 auth = HmacAuth(SECRET)
 
 # 查询产品列表
@@ -769,7 +960,7 @@ resp = auth.post(f"{BASE}/api/juzhu/jiazheng/vendor/products/create", {
     "vendor_id": VENDOR_ID,
     "title": "新服务产品",
     "category": "日常保洁",
-    "price": 99,
+    "price": 9900,
     "unit": "次",
     "channel_sku_id": 1,
 })
@@ -779,9 +970,9 @@ print(resp)
 resp = auth.post(f"{BASE}/api/juzhu/callback", {
     "vendor_id": VENDOR_ID,
     "order_ref": "GR202608071429360148",
-    "lailai_oid": "LL_88888",
+    "vendor_oid": "SP_88888",
     "status": "paid",
-    "fee": 12800,
+    "fee": 12800,  # 128.00 元（单位：分）
 })
 print(resp)
 ```

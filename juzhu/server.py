@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """新居住频道 API + 静态文件 + 编辑后台接口。启动：python3 juzhu/server.py"""
+import gzip
+import hashlib
+import hmac
 import json
 import os
 import posixpath
 import re
 import sys
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import threading
+import time
+import traceback
+from email.utils import parsedate_to_datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -32,6 +39,7 @@ from db import (  # noqa: E402
     rating_to_db,
     row_to_dict,
     rows_to_list,
+    strip_contact_phone,
     summarize_rating,
     sync_district_stats,
     sync_project_unit_count,
@@ -41,13 +49,139 @@ from db import (  # noqa: E402
 
 import jiazheng_db as jzdb  # noqa: E402
 import jiazheng_api           # noqa: E402
+from tp_client import TpError, alloc_virtual_phone, load_dotenv, mask_phone, validate_real_phone  # noqa: E402
 
 ADMIN_PREFIX = "/api/juzhu/admin"
 ASSETS_PREFIX = "assets/juzhu/sy"
 ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 API_KEY_ENV = "JUZHU_API_KEY"
-DEFAULT_API_KEY = "dev-juzhu-key"
+DEFAULT_API_KEY = "dev-juzhu-key"  # 历史默认值：任何环境均不得再当作有效密钥
+ADMIN_PASSWORD_ENV = "JUZHU_ADMIN_PASSWORD"
+DEFAULT_ADMIN_PASSWORD = "dongbo2026"
+ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
+ADMIN_TOKEN_SALT = b"juzhu-admin-session-v1"
+
+_CEND_PUBLIC_EXACT = {
+    "/api/juzhu/catalog",
+    "/api/juzhu/cities",
+    "/api/juzhu/districts",
+    "/api/juzhu/settings",
+    "/api/juzhu/stats",
+    "/api/juzhu/ratings",
+    "/api/juzhu/trade",
+    "/api/juzhu/jiazheng/categories",
+    "/api/juzhu/jiazheng/skus",
+    "/api/juzhu/jiazheng/workers",
+    "/api/juzhu/gr/orders",
+}
+
+
+def is_cend_public_api(path, method):
+    """C 端公开白名单（无 PII 目录/房源 + 来来预约 + 我的订单）。其余须 API Key。"""
+    p = (path or "").rstrip("/") or "/"
+    m = (method or "GET").upper()
+    if m == "POST" and p == "/api/juzhu/jiazheng/wechat-link":
+        return True
+    if m != "GET":
+        return False
+    if p in _CEND_PUBLIC_EXACT:
+        return True
+    if re.match(r"^/api/juzhu/districts/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/projects/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/projects/\d+/virtual-phone$", p):
+        return True
+    if re.match(r"^/api/juzhu/units/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/units/\d+/photos$", p):
+        return True
+    if re.match(r"^/api/juzhu/ratings/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/jiazheng/skus/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/jiazheng/skus/[^/]+/(slots|detail|vendors)$", p):
+        return True
+    if re.match(r"^/api/juzhu/gr/orders/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/gr/orders/[^/]+/vendor-detail$", p):
+        return True
+    return False
+
+# 静态文件：默认不暴露源码/密钥/数据库。/juzhu/ 仅白名单（前端 data 层依赖）。
+# 与仓库根 app.js 的 isPublicStatic 保持同口径（Node 为线上入口）。
+_SENSITIVE_NAMES = {
+    ".env",
+    ".env.local",
+    ".env.example",
+    ".env.prod",
+    ".env.test",
+    "runtime.env",
+    ".git",
+    ".gitignore",
+    ".DS_Store",
+    "__pycache__",
+    "config.ini",
+    "server.log",
+    "api_doc.md",
+    "api-document.html",
+    "package.json",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "scf_bootstrap",
+    "moma_build.sh",
+    "moma_deploy.js",
+    "CLAUDE.md",
+    "README.md",
+    "VERIFICATION.md",
+}
+_SENSITIVE_SUFFIXES = (
+    ".py",
+    ".pyc",
+    ".pyo",
+    ".db",
+    ".sqlite",
+    ".sqlite3",
+    ".sql",
+    ".ini",
+    ".log",
+    ".key",
+    ".pem",
+    ".crt",
+    ".p12",
+    ".pfx",
+    ".sh",
+    ".md",
+    ".cjs",
+)
+_API_DOC_BASENAMES = {
+    "api-document.html",
+    "xjz-api.html",
+    "prd-document.html",
+    "xjz-prd.html",
+}
+_ROOT_BLOCKED_FILES = {
+    "app.js",
+    "server.js",
+    "package.json",
+    "package-lock.json",
+    "scf_bootstrap",
+    "moma_build.sh",
+    "moma_deploy.js",
+    "api_doc.md",
+    "README.md",
+    "CLAUDE.md",
+}
+_JUZHU_PUBLIC_FILES = {
+    "app.js",
+    "cities.json",
+    "data.json",
+}
+_JUZHU_PUBLIC_PREFIXES = ("data-",)
+_JUZHU_PUBLIC_SUFFIXES = (".json",)
+_BLOCKED_TOP_DIRS = {"node_modules", "scripts", ".git"}
 
 
 def slugify(name):
@@ -187,46 +321,282 @@ def unit_gallery_rel(conn, unit_id, ext):
     return rel
 
 
+# ====== 家政频道 城市解析辅助 ======
+def _resolve_city_id(conn, city_name):
+    """城市名 → city_id；不存在返回 None，city_name 为空返回 None"""
+    if not city_name:
+        return None
+    row = conn.execute(
+        "SELECT id FROM cities WHERE name=?", (city_name,)
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _url_parts(url_path):
+    path = url_path.split("?", 1)[0].split("#", 1)[0]
+    path = posixpath.normpath(unquote(path))
+    return [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
+
+
+_SENSITIVE_NAMES_LOWER = {n.lower() for n in _SENSITIVE_NAMES}
+_ROOT_BLOCKED_LOWER = {n.lower() for n in _ROOT_BLOCKED_FILES}
+
+
+def _is_sensitive_part(name):
+    lower = (name or "").lower()
+    if lower in _SENSITIVE_NAMES_LOWER or name in _SENSITIVE_NAMES:
+        return True
+    if lower in _API_DOC_BASENAMES:
+        return True
+    if lower.startswith(".env"):
+        return True
+    # 隐藏文件 / 目录（.git、.env*、.DS_Store 等）一律不对外
+    if lower.startswith(".") and lower not in (".", ".."):
+        return True
+    if lower.endswith(_SENSITIVE_SUFFIXES):
+        return True
+    return False
+
+
+def is_public_static(url_path):
+    """是否允许作为静态资源对外提供。API 路由不走此函数。"""
+    parts = _url_parts(url_path)
+    if not parts:
+        return True  # / → index；目录列表另由 list_directory 关掉
+    # 生产禁用 /docs/ 整目录（含历史 API 文档入口）
+    env = (os.environ.get("JUZHU_ENV") or "").strip().lower()
+    if parts[0] == "docs" and env in ("prod", "production"):
+        return False
+    # /juzhu/ 白名单优先（其中 app.js 是前端脚本，与根目录 Node 入口同名）
+    if parts[0] == "juzhu":
+        if len(parts) != 2:
+            return False
+        name = parts[1]
+        if name in _JUZHU_PUBLIC_FILES:
+            return True
+        if name.startswith(_JUZHU_PUBLIC_PREFIXES) and name.endswith(_JUZHU_PUBLIC_SUFFIXES):
+            return True
+        return False
+    if parts[0] in _BLOCKED_TOP_DIRS:
+        return False
+    if any(_is_sensitive_part(p) for p in parts):
+        return False
+    if len(parts) == 1 and parts[0].lower() in _ROOT_BLOCKED_LOWER:
+        return False
+    # 仓库根其它路径：允许 html/css/js/图片等业务静态页
+    return True
+
+
+# ====== 请求日志（print 到 stdout；测试环境由 nohup 重定向到 /tmp/beike_server.log） ======
+# 详细模式：每个请求一个分段（编号/时间/类别/方法/路径 + >> 参数 + << 返回）；
+# 多线程并发时各段可能交错，所有行带 #编号，可据此关联同一请求的首尾与内容。
+# 简洁模式（JUZHU_LOG_DETAIL=false）：只打印请求接口 URI，一行/请求。
+_REQ_LOCK = threading.Lock()
+_REQ_SEQ = 0
+_LOG_SEP = "=" * 80
+_REQ_BODY_LIMIT = 2000   # 参数/返回体打印截断长度（字符）
+_REQ_BODY_LINES = 60     # 参数/返回体打印最大行数
+
+
+def _log(line):
+    print(line, flush=True)
+
+
+def _log_ts():
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_detail():
+    """详细日志开关：JUZHU_LOG_DETAIL=false/0/off 时只打印请求接口 URI。"""
+    return os.environ.get("JUZHU_LOG_DETAIL", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _req_category(path):
+    """入站请求分类：商家回调/商家 vendor 接口调用我们 → [商家→平台]；其余 → [其它]。"""
+    if path == "/api/juzhu/callback" or path.startswith("/api/juzhu/jiazheng/vendor/"):
+        return "商家→平台"
+    return "其它"
+
+
 class Handler(SimpleHTTPRequestHandler):
+    # HTTP/1.1 keep-alive：复用连接，避免每个资源都重新 TCP 握手（此前默认 HTTP/1.0 每请求断连，
+    # 跨地域 RTT ~100ms/请求，页面刷新几十个资源时握手延迟累加明显）
+    protocol_version = "HTTP/1.1"
+
+    # 可 gzip 的文本资源扩展名；>1MB 的文件不压缩（避免 CPU/内存峰值）
+    _GZIP_EXT = (".html", ".htm", ".css", ".js", ".mjs", ".json", ".svg", ".txt", ".csv", ".map")
+
+    # ---------- 请求日志 ----------
+    def _req_begin(self, method):
+        """请求开始：详细模式打印分段头（编号/时间/类别/方法/路径）；简洁模式只打印接口 URI。"""
+        global _REQ_SEQ
+        with _REQ_LOCK:
+            _REQ_SEQ += 1
+            self._req_no = _REQ_SEQ
+        p = urlparse(self.path)
+        uri = (p.path or "/") + (f"?{p.query}" if p.query else "")
+        if not _log_detail():
+            _log(f"{_log_ts()} {method} {uri}")
+            return
+        _log(_LOG_SEP)
+        _log(f"#{self._req_no} {_log_ts()} [{_req_category(p.path)}] {method} {uri}")
+        if p.query:
+            _log(f"  >> 参数(query): {p.query}")
+        if method in ("POST", "PUT", "DELETE"):
+            cl = self.headers.get("Content-Length") or 0
+            ct = self.headers.get("Content-Type") or "-"
+            _log(f"  >> 参数(headers): content-type={ct}, content-length={cl}")
+
+    def _log_payload(self, text, label):
+        """打印参数/返回内容（首行带 >>/<< 标记，超长截断、限制行数，避免日志爆炸）。"""
+        if not _log_detail():
+            return
+        total = len(text)
+        if total > _REQ_BODY_LIMIT:
+            text = text[:_REQ_BODY_LIMIT] + f"…[截断，共 {total} 字符]"
+        lines = text.split("\n")[:_REQ_BODY_LINES]
+        for i, line in enumerate(lines):
+            prefix = f"  {label}: " if i == 0 else "  | "
+            _log(prefix + line)
+
+    def log_message(self, format, *args):
+        pass  # 请求日志统一由 _req_begin/_log_payload 分段输出，关闭父类默认单行日志
+
     def translate_path(self, path):
         """Python 3.6 无 directory 参数，自定义静态根目录为仓库 ROOT。"""
-        path = path.split("?", 1)[0]
-        path = path.split("#", 1)[0]
-        path = posixpath.normpath(unquote(path))
-        parts = [p for p in path.split("/") if p and p not in (os.curdir, os.pardir)]
+        parts = _url_parts(path)
         out = str(ROOT)
         for part in parts:
             out = os.path.join(out, part)
         return out
 
+    def list_directory(self, path):
+        """禁止目录浏览，避免枚举源码与数据文件。"""
+        self.send_error(404, "Not found")
+        return None
+
+    def _serve_static(self):
+        """静态文件响应：If-Modified-Since 304 + gzip + no-cache 验证。
+        目录交给父类（301/首页索引）；>1MB 文件不压缩直接发送。
+        """
+        try:
+            path = self.translate_path(self.path)
+        except Exception:
+            return self.send_error(400, "Bad request")
+        if os.path.isdir(path):
+            return super().do_GET()
+        try:
+            st = os.stat(path)
+        except OSError:
+            return self.send_error(404, "File not found")
+        lm = self.date_time_string(st.st_mtime)
+        ims = self.headers.get("If-Modified-Since")
+        if ims:
+            try:
+                if int(parsedate_to_datetime(ims).timestamp()) == int(st.st_mtime):
+                    self.send_response(304)
+                    self.send_header("Last-Modified", lm)
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    return
+            except (TypeError, ValueError):
+                pass
+        with open(path, "rb") as f:
+            body = f.read()
+        enc = ""
+        if (st.st_size <= 1_048_576 and path.lower().endswith(self._GZIP_EXT)
+                and "gzip" in self.headers.get("Accept-Encoding", "")):
+            body = gzip.compress(body)
+            enc = "gzip"
+        self.send_response(200)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Last-Modified", lm)
+        self.send_header("Cache-Control", "no-cache")
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _exc(self):
+        """接口异常兜底：记录 traceback 并尝试返回 500，保证日志段完整闭合。"""
+        _log("  ! " + traceback.format_exc().rstrip().replace("\n", "\n  ! "))
+        try:
+            self._json({"error": "server_error", "message": "服务异常，请稍后重试"}, 500)
+        except Exception:
+            pass
+
     def do_OPTIONS(self):
+        self._req_begin("OPTIONS")
         self.send_response(204)
         self._cors()
         self.end_headers()
 
     def do_GET(self):
+        self._req_begin("GET")
         p = urlparse(self.path)
-        if p.path.startswith("/api/juzhu"):
-            return self._route(p, "GET")
-        return super().do_GET()
+        try:
+            if p.path in ("/favicon.ico", "/favicon.svg"):
+                # 无专用图标时静默 204，避免控制台 404 噪音
+                self.send_response(204)
+                self.end_headers()
+                return
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "GET")
+            if not is_public_static(p.path):
+                self.send_error(404, "Not found")
+                return
+            return self._serve_static()
+        except Exception:
+            return self._exc()
+
+    def do_HEAD(self):
+        self._req_begin("HEAD")
+        p = urlparse(self.path)
+        try:
+            if p.path in ("/favicon.ico", "/favicon.svg"):
+                self.send_response(204)
+                self.end_headers()
+                return
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "GET")
+            if not is_public_static(p.path):
+                self.send_error(404, "Not found")
+                return
+            super().do_HEAD()
+        except Exception:
+            return self._exc()
 
     def do_POST(self):
+        self._req_begin("POST")
         p = urlparse(self.path)
-        if p.path.startswith("/api/juzhu"):
-            return self._route(p, "POST")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith("/api/juzhu"):
+                return self._route(p, "POST")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def do_PUT(self):
+        self._req_begin("PUT")
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
-            return self._route(p, "PUT")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
+                return self._route(p, "PUT")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def do_DELETE(self):
+        self._req_begin("DELETE")
         p = urlparse(self.path)
-        if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
-            return self._route(p, "DELETE")
-        self._json({"error": "not found"}, 404)
+        try:
+            if p.path.startswith(ADMIN_PREFIX) or p.path.startswith("/api/juzhu/jz"):
+                return self._route(p, "DELETE")
+            self._json({"error": "not found"}, 404)
+        except Exception:
+            return self._exc()
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -244,34 +614,103 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(n)
         fields, files = parse_multipart(body, boundary)
+        self._log_payload("multipart fields=" + str(list(fields.keys()))
+                          + ", files=" + str([(k, v.get("filename")) for k, v in files.items()]),
+                          ">> 参数(multipart)")
         return {"fields": fields, "files": files}
 
     def _json(self, data, code=200):
-        body = json.dumps(data, ensure_ascii=False).encode()
+        text = json.dumps(data, ensure_ascii=False)
+        body = text.encode()
+        enc = ""
+        if len(body) >= 1024 and "gzip" in self.headers.get("Accept-Encoding", ""):
+            body = gzip.compress(body)
+            enc = "gzip"
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self._cors()
         self.send_header("Content-Length", str(len(body)))
+        if enc:
+            self.send_header("Content-Encoding", enc)
+            self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
         self.wfile.write(body)
+        self._log_payload(text, "<< 返回")
 
     def _body(self):
         n = int(self.headers.get("Content-Length", 0))
         if not n:
             return {}
-        return json.loads(self.rfile.read(n).decode("utf-8"))
+        raw = self.rfile.read(n)
+        self._log_payload(raw.decode("utf-8", "replace"), ">> 参数(body)")
+        return json.loads(raw.decode("utf-8"))
+
+    def _is_production(self):
+        return (os.environ.get("JUZHU_ENV") or "").strip().lower() in ("prod", "production")
 
     def _expected_api_key(self):
-        return (os.environ.get(API_KEY_ENV) or DEFAULT_API_KEY).strip()
+        # 唯一来源：环境变量 / .env.local（load_dotenv）；代码内不再写死有效密钥
+        key = (os.environ.get(API_KEY_ENV) or "").strip()
+        # 空密钥 / 历史开发默认密钥一律无效（文档泄露不再等于未授权）
+        if not key or key == DEFAULT_API_KEY:
+            return ""
+        return key
 
-    def _provided_api_key(self):
+    def _expected_admin_password(self):
+        pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
+        if self._is_production():
+            if not pwd or pwd == DEFAULT_ADMIN_PASSWORD:
+                return ""
+            return pwd
+        # 开发允许默认密码仅用于本地门禁；API Key 仍须显式配置
+        return pwd or DEFAULT_ADMIN_PASSWORD
+
+    def _admin_token_secret(self):
+        pwd = self._expected_admin_password().encode("utf-8")
+        return hmac.new(ADMIN_TOKEN_SALT, pwd, hashlib.sha256).digest()
+
+    def _issue_admin_token(self):
+        exp = int(time.time()) + ADMIN_TOKEN_TTL_SEC
+        payload = str(exp)
+        sig = hmac.new(self._admin_token_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        return f"{payload}.{sig}", datetime.fromtimestamp(exp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _verify_admin_token(self, token):
+        if not token or "." not in token:
+            return None
+        payload, sig = token.rsplit(".", 1)
+        try:
+            exp = int(payload)
+        except ValueError:
+            return None
+        expect = hmac.new(self._admin_token_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expect, sig):
+            return None
+        if exp < int(time.time()):
+            return None
+        return datetime.fromtimestamp(exp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _provided_bearer(self):
         auth = self.headers.get("Authorization", "").strip()
         if auth.lower().startswith("bearer "):
             return auth[7:].strip()
+        return ""
+
+    def _provided_api_key(self):
+        bearer = self._provided_bearer()
+        if bearer:
+            return bearer
         return (self.headers.get("X-API-Key") or "").strip()
 
     def _require_api_key(self):
-        if self._provided_api_key() == self._expected_api_key():
+        expected = self._expected_api_key()
+        provided = self._provided_api_key()
+        # 空 expected / 空 provided 一律拒绝，避免 "" == "" 旁路
+        ok = bool(expected) and bool(provided) and hmac.compare_digest(
+            hashlib.sha256(provided.encode("utf-8")).digest(),
+            hashlib.sha256(expected.encode("utf-8")).digest(),
+        )
+        if ok:
             return True
         self._json(
             {
@@ -282,25 +721,63 @@ class Handler(SimpleHTTPRequestHandler):
         )
         return False
 
+    def _require_admin_authorized(self):
+        """管理页登录 token 或 API Key 均可（与 Node isAdminSessionAuthorized 对齐）。"""
+        if self._verify_admin_token(self._provided_bearer()):
+            return True
+        return self._require_api_key()
+
+    def _admin_login(self):
+        body = self._body() or {}
+        password = (body.get("password") or "").strip()
+        expected = self._expected_admin_password()
+        # 生产未配置密码时拒绝登录；先哈希再 compare，避免不同长度触发 ValueError / 时序旁路
+        ok = bool(expected) and bool(password) and hmac.compare_digest(
+            hashlib.sha256(password.encode("utf-8")).digest(),
+            hashlib.sha256(expected.encode("utf-8")).digest(),
+        )
+        if not ok:
+            return self._json({"error": "unauthorized", "message": "密码错误"}, 401)
+        token, expires_at = self._issue_admin_token()
+        return self._json({"token": token, "expires_at": expires_at})
+
+    def _admin_auth_check(self):
+        expires_at = self._verify_admin_token(self._provided_bearer())
+        if not expires_at:
+            return self._json({"error": "unauthorized", "message": "登录已失效，请重新登录"}, 401)
+        return self._json({"ok": True, "expires_at": expires_at})
+
     def _route(self, p, method):
         path = p.path.rstrip("/")
         qs = parse_qs(p.query)
+
+        # === 页面登录门禁（无需 API Key） ===
+        if path == f"{ADMIN_PREFIX}/auth/login" and method == "POST":
+            return self._admin_login()
+        if path == f"{ADMIN_PREFIX}/auth/check" and method == "GET":
+            return self._admin_auth_check()
 
         # === 家政频道 POST 端点（非 admin 路径） ===
         if method in ("POST", "PUT", "DELETE") and path.startswith("/api/juzhu/jz"):
             return self._jiazheng_post(path, qs, method)
 
-        if method == "GET" and not path.startswith(ADMIN_PREFIX):
-            return self._public_get(path, qs)
-
-        if method != "GET" and (
-            path.startswith(ADMIN_PREFIX)
-            or path == "/api/juzhu/jiazheng/orders"
-            or path == "/api/juzhu/jiazheng/wechat-link"
-            or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
+        # /api/juzhu/admin/* 全方法（含 GET）均需登录会话或 API Key
+        if path.startswith(ADMIN_PREFIX):
+            if not self._require_admin_authorized():
+                return
+        # wechat-link 为 C 端预约入口，匿名可调；其余 jiazheng 写接口须 API Key
+        elif method != "GET" and (
+            path == "/api/juzhu/jiazheng/orders"
+            or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance|rate)$", path)
         ):
             if not self._require_api_key():
                 return
+
+        if method == "GET" and not path.startswith(ADMIN_PREFIX):
+            if not is_cend_public_api(path, method):
+                if not self._require_api_key():
+                    return
+            return self._public_get(path, qs)
 
         if path == f"{ADMIN_PREFIX}/districts" and method == "GET":
             conn = connect()
@@ -348,6 +825,23 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path == f"{ADMIN_PREFIX}/dictionary" and method == "GET":
             return self._get_dictionary(qs)
+
+        if path == f"{ADMIN_PREFIX}/cities" and method == "GET":
+            conn = connect()
+            data = rows_to_list(conn.execute("SELECT * FROM cities ORDER BY id"))
+            conn.close()
+            return self._json(data)
+
+        if path == f"{ADMIN_PREFIX}/cities" and method == "POST":
+            return self._create_city()
+
+        m = re.match(rf"^{ADMIN_PREFIX}/cities/(\d+)$", path)
+        if m:
+            cid = int(m.group(1))
+            if method == "PUT":
+                return self._update_city_by_id(cid)
+            if method == "DELETE":
+                return self._delete_city(cid)
 
         if path == f"{ADMIN_PREFIX}/city" and method == "PUT":
             return self._update_city()
@@ -441,7 +935,7 @@ class Handler(SimpleHTTPRequestHandler):
         if m and method == "POST":
             return self._rate_jz_order(m.group(1))
 
-        # === 生成微信小程序 URL Link（需 API Key） ===
+        # === 生成微信小程序 URL Link（C 端预约入口，匿名可调） ===
         if path == "/api/juzhu/jiazheng/wechat-link" and method == "POST":
             body = self._body()
             return jiazheng_api.handle_wechat_link(self, body)
@@ -493,6 +987,7 @@ class Handler(SimpleHTTPRequestHandler):
                 "booking_phone": row[0] if row else None,
                 "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
                 "show_life_service": settings.get("show_life_service", "1") == "1",
+                "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
             })
 
         if path == "/api/juzhu/districts":
@@ -509,16 +1004,25 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._get_rating(m.group(1))
 
+        # 项目虚拟号：每次实时绑号，不做缓存；须在 slug 路由之前匹配
+        m = re.match(r"^/api/juzhu/projects/(\d+)/virtual-phone$", path)
+        if m:
+            conn.close()
+            return self._project_virtual_phone(int(m.group(1)))
+
         if path.startswith("/api/juzhu/districts/") and path.endswith("/projects"):
             slug = path.split("/")[4]
             dist = row_to_dict(conn.execute("SELECT * FROM districts WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
             if not dist:
                 conn.close()
                 return self._json({"error": "not found"}, 404)
-            projs = rows_to_list(conn.execute(
-                "SELECT * FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
-                (dist["id"],),
-            ))
+            projs = [
+                strip_contact_phone(row_to_dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
+                    (dist["id"],),
+                )
+            ]
             conn.close()
             return self._json({"district": dist, "projects": projs})
 
@@ -526,7 +1030,7 @@ class Handler(SimpleHTTPRequestHandler):
             parts = path.split("/")
             slug = parts[4] if len(parts) > 4 else ""
             if len(parts) > 5 and parts[5] == "units":
-                proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
+                proj = strip_contact_phone(row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone()))
                 if not proj:
                     conn.close()
                     return self._json({"error": "not found"}, 404)
@@ -541,15 +1045,18 @@ class Handler(SimpleHTTPRequestHandler):
                 ))
                 conn.close()
                 return self._json({"project": proj, "units": units, "photos": photos})
-            proj = row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone())
+            proj = strip_contact_phone(row_to_dict(conn.execute("SELECT * FROM projects WHERE slug=?" + (" AND city_id=?" if city_id else ""), (slug,) + city_params()).fetchone()))
             conn.close()
             return self._json(proj if proj else {"error": "not found"}, 404 if not proj else 200)
 
         if path == "/api/juzhu/trade":
-            data = rows_to_list(conn.execute(
-                "SELECT * FROM projects WHERE channel='trade'" + city_filter() + " ORDER BY is_featured DESC, featured_rank, sort_order",
-                city_params(),
-            ))
+            data = [
+                strip_contact_phone(row_to_dict(r))
+                for r in conn.execute(
+                    "SELECT * FROM projects WHERE channel='trade'" + city_filter() + " ORDER BY is_featured DESC, featured_rank, sort_order",
+                    city_params(),
+                )
+            ]
             conn.close()
             return self._json({"listings": data})
 
@@ -598,8 +1105,10 @@ class Handler(SimpleHTTPRequestHandler):
             vendor_id = qs.get("vendor_id", [None])[0]
             type_ = qs.get("type", [None])[0]
             status = qs.get("status", [None])[0]
+            city_id = qs.get("city_id", [None])[0]
             data = jzdb.list_products(conn, vendor_id=int(vendor_id) if vendor_id else None,
-                                       type_=type_, status=status)
+                                       type_=type_, status=status,
+                                       city_id=int(city_id) if city_id else None)
             conn.close()
             return self._json({"list": data})
 
@@ -643,11 +1152,45 @@ class Handler(SimpleHTTPRequestHandler):
             conn.close()
             return self._json({"list": data})
 
+        # === 我的订单（GR 侧，匿名可读；user_id 必填） ===
+        if path == "/api/juzhu/gr/orders":
+            conn.close()
+            return jiazheng_api.handle_gr_orders(self, qs)
+
+        m = re.match(r"^/api/juzhu/gr/orders/([^/]+)/vendor-detail$", path)
+        if m:
+            conn.close()
+            return jiazheng_api.handle_gr_vendor_detail(self, m.group(1), qs)
+
+        m = re.match(r"^/api/juzhu/gr/orders/([^/]+)$", path)
+        if m:
+            conn.close()
+            return jiazheng_api.handle_gr_order_detail(self, m.group(1), qs)
+
         # === 家政 C 端工单流 /api/juzhu/jiazheng/*（SKU + 订单闭环） ===
         if path == "/api/juzhu/jiazheng/categories":
-            rows = rows_to_list(conn.execute(
-                "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
-            ))
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
+            if city_id is not None:
+                rows = rows_to_list(conn.execute(
+                    """SELECT DISTINCT c.* FROM jz_categories c
+WHERE c.enabled=1
+  AND EXISTS (
+    SELECT 1 FROM jz_skus s
+    JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
+    JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
+    WHERE s.category_id=c.id
+      AND p.city_id=?
+      AND (
+        v.city_ids IS NULL OR TRIM(v.city_ids)=''
+        OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
+      )
+  )
+ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
+                ))
+            else:
+                rows = rows_to_list(conn.execute(
+                    "SELECT * FROM jz_categories WHERE enabled=1 ORDER BY sort_order, id"
+                ))
             conn.close()
             return self._json({"items": rows})
 
@@ -656,18 +1199,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json({"items": JZ_WORKERS})
 
         if path == "/api/juzhu/jiazheng/orders/stats":
-            if self._provided_api_key() != self._expected_api_key():
+            if not self._require_api_key():
                 conn.close()
-                return self._json({"error": "unauthorized"}, 401)
+                return
             return self._jz_order_stats(conn)
 
         if path == "/api/juzhu/jiazheng/orders":
-            if qs.get("phone"):
-                return self._list_jz_orders(qs, conn=conn)
-            if self._provided_api_key() == self._expected_api_key():
-                return self._list_jz_orders(qs, conn=conn)
-            conn.close()
-            return self._json({"error": "需要 phone 查询参数或有效 API Key"}, 401)
+            return self._list_jz_orders(qs, conn=conn)
 
         m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)$", path)
         if m:
@@ -694,6 +1232,22 @@ class Handler(SimpleHTTPRequestHandler):
                        AND EXISTS (SELECT 1 FROM jz_products p
                                    WHERE p.channel_sku_id=s.id AND p.status='on')"""
             params = []
+            # 城市过滤：双维度——仅展示「商品 city_id 命中该城 且 商家 city_ids 声明该城」的 SPU
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
+            if city_id is not None:
+                sql += """ AND EXISTS (
+                        SELECT 1 FROM jz_products p2
+                        JOIN jz_vendors v2 ON v2.id=p2.vendor_id
+                        WHERE p2.channel_sku_id=s.id AND p2.status='on'
+                          AND v2.status='active'
+                          AND p2.city_id=?
+                          AND (
+                            v2.city_ids IS NULL OR TRIM(v2.city_ids)=''
+                            OR CONCAT(',', v2.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
+                          )
+                    )"""
+                params.append(int(city_id))
+                params.append(str(city_id))
             if qs.get("category"):
                 sql += " AND s.category_id=?"
                 params.append(qs["category"][0])
@@ -713,9 +1267,22 @@ class Handler(SimpleHTTPRequestHandler):
                 "SELECT id FROM jz_skus WHERE slug=? AND enabled=1", (m.group(1),)
             ).fetchone()
             vendor_id = qs.get("vendor", [None])[0]
+            product_id = qs.get("product", [None])[0]
             slots = []
             if srow:
-                pid = jzdb.resolve_channel_sku_product_id(conn, srow[0], vendor_id)
+                pid = None
+                if product_id:
+                    # 指定商品：须属于该 SPU 且上架（多商品切换后按所选商品查档期）
+                    try:
+                        prow = conn.execute(
+                            "SELECT id FROM jz_products WHERE id=? AND channel_sku_id=? AND status='on'",
+                            (int(product_id), srow[0]),
+                        ).fetchone()
+                        pid = prow[0] if prow else None
+                    except ValueError:
+                        pid = None
+                else:
+                    pid = jzdb.resolve_channel_sku_product_id(conn, srow[0], vendor_id)
                 if pid:
                     jzdb.ensure_rolling_slots(conn, pid)  # 滚动排期：始终保有未来 5 天
                     slots = jzdb.list_available_slots_for_product(conn, pid)
@@ -746,14 +1313,16 @@ class Handler(SimpleHTTPRequestHandler):
                 ).fetchall()
             ]
             vendor_id = qs.get("vendor", [None])[0]
+            city_id = _resolve_city_id(conn, qs.get("city", [None])[0])
             detail_context = jzdb.get_detail_context_by_channel_sku(
-                conn, item["id"], item.get("category_id"), vendor_id) or {}
-            vendors = jzdb.list_channel_sku_vendors(conn, item["id"])
+                conn, item["id"], item.get("category_id"), vendor_id, city_id) or {}
+            vendors = jzdb.list_channel_sku_vendors(conn, item["id"], city_id)
             conn.close()
             return self._json({
                 "item": item,
                 "related": related,
                 "product": detail_context.get("product"),
+                "products": detail_context.get("products") or [],  # 同 SPU 全部上架商品（同商家多款/多商家）
                 "vendor": detail_context.get("vendor"),
                 "vendors": vendors,          # 多商家同款（比价/切换）
                 "workers": detail_context.get("workers") or [],
@@ -927,7 +1496,7 @@ class Handler(SimpleHTTPRequestHandler):
         funnel = {}
         for s in statuses:
             funnel[s] = conn.execute(
-                "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE(created_at)=?",
                 (s, today),
             ).fetchone()[0]
 
@@ -935,12 +1504,12 @@ class Handler(SimpleHTTPRequestHandler):
         daily = []
         for i in range(14, -1, -1):
             day = conn.execute(
-                "SELECT date('now','localtime','-' || ? || ' days')", (i,)
+                "SELECT DATE(DATE_SUB(NOW(), INTERVAL ? DAY))", (i,)
             ).fetchone()[0]
             row = {"date": day}
             for s in statuses:
                 row[s] = conn.execute(
-                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND date(created_at)=?",
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE(created_at)=?",
                     (s, day),
                 ).fetchone()[0]
             daily.append(row)
@@ -949,12 +1518,12 @@ class Handler(SimpleHTTPRequestHandler):
         monthly = []
         for i in range(11, -1, -1):
             month_label = conn.execute(
-                "SELECT strftime('%Y-%m', 'now','localtime','-' || ? || ' months')", (i,)
+                "SELECT DATE_FORMAT(DATE_SUB(NOW(), INTERVAL ? MONTH), '%Y-%m')", (i,)
             ).fetchone()[0]
             row = {"month": month_label}
             for s in statuses:
                 row[s] = conn.execute(
-                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND strftime('%Y-%m', created_at)=?",
+                    "SELECT COUNT(*) FROM gr_orders WHERE status=? AND DATE_FORMAT(created_at, '%Y-%m')=?",
                     (s, month_label),
                 ).fetchone()[0]
             monthly.append(row)
@@ -1179,7 +1748,7 @@ class Handler(SimpleHTTPRequestHandler):
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         if not proj:
             conn.close()
             return self._json({"error": "not found"}, 404)
@@ -1194,6 +1763,34 @@ class Handler(SimpleHTTPRequestHandler):
         ))
         conn.close()
         return self._json({"project": proj, "units": units, "photos": photos})
+
+    def _project_virtual_phone(self, pid):
+        """C 端实时取虚拟号：查项目真实号 → TP alloc → 只回虚拟号字段。"""
+        conn = connect()
+        row = conn.execute(
+            "SELECT id, contact_phone, name FROM projects WHERE id=?", (pid,)
+        ).fetchone()
+        conn.close()
+        if not row:
+            return self._json({"error": "not found"}, 404)
+        real = (row["contact_phone"] or "").strip()
+        if not real:
+            return self._json({"error": "未配置联系电话"}, 400)
+        try:
+            result = alloc_virtual_phone(real, app_call_id=f"juzhu-project-{pid}")
+        except ValueError as e:
+            return self._json({"error": str(e)}, 400)
+        except TpError as e:
+            print(
+                f"[tp] project={pid} phone={mask_phone(real)} errno={e.errno} err={e}",
+                flush=True,
+            )
+            return self._json({"error": "暂时无法接通，请稍后重试"}, 502)
+        return self._json({
+            "virtual_phone": result["virtual_phone"],
+            "display": result["display"],
+            "tel": result["tel"],
+        })
 
     def _project_by_rating_code(self, conn, code):
         pid = None
@@ -1381,12 +1978,23 @@ class Handler(SimpleHTTPRequestHandler):
 
             # === B 端·产品管理 CRUD ===
             if path == "/api/juzhu/jz/products" and method_alt == "POST":
+                ok, err = jzdb.validate_product_city(conn, body.get("vendor_id"), body.get("city_id"))
+                if not ok:
+                    return self._json({"error": err}, 400)
                 pid = jzdb.create_product(conn, body)
                 conn.commit()
                 return self._json({"ok": True, "id": pid})
             m = re.match(r"^/api/juzhu/jz/products/(\d+)$", path)
             if m and method_alt == "PUT":
-                ok = jzdb.update_product(conn, int(m.group(1)), body)
+                pid = int(m.group(1))
+                if "city_id" in body:
+                    row = conn.execute("SELECT vendor_id FROM jz_products WHERE id=?", (pid,)).fetchone()
+                    if not row:
+                        return self._json({"error": "not found"}, 404)
+                    ok, err = jzdb.validate_product_city(conn, row[0], body.get("city_id"))
+                    if not ok:
+                        return self._json({"error": err}, 400)
+                ok = jzdb.update_product(conn, pid, body)
                 conn.commit()
                 return self._json({"ok": ok})
             if m and method_alt == "DELETE":
@@ -1557,6 +2165,12 @@ class Handler(SimpleHTTPRequestHandler):
                     "is_featured", "featured_rank", "old_house_hint"):
             if col in b:
                 put(col, b.get(col))
+        if "contact_phone" in b:
+            try:
+                put("contact_phone", validate_real_phone(b.get("contact_phone")))
+            except ValueError as e:
+                conn.close()
+                return self._json({"error": str(e)}, 400)
         if "tags" in b:
             put("tags", tags_to_db(b.get("tags")))
         if "managed_unit_count" in b:
@@ -1585,7 +2199,7 @@ class Handler(SimpleHTTPRequestHandler):
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         conn.close()
         return self._json({"ok": True, "project": proj})
 
@@ -1647,15 +2261,22 @@ class Handler(SimpleHTTPRequestHandler):
         dist = conn.execute("SELECT name FROM districts WHERE id=?", (district_id,)).fetchone() if district_id else None
         address = b.get("address") or (f"{dist[0]} · {name}" if dist else f"沈阳 · {name}")
 
+        try:
+            contact_phone = validate_real_phone(b.get("contact_phone")) if "contact_phone" in b else None
+        except ValueError as e:
+            conn.close()
+            return self._json({"error": str(e)}, 400)
+
         conn.execute(
             """INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
-               sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint)
-               VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?)""",
+               sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
+               VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)""",
             (
                 city_id, district_id, channel, name, slug,
                 b.get("cover_image"), address, tags_to_db(b.get("tags")),
                 b.get("sort_order") or 999, b.get("price_from"),
                 b.get("is_featured"), b.get("featured_rank"), b.get("old_house_hint"),
+                contact_phone,
             ),
         )
         pid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -1663,11 +2284,11 @@ class Handler(SimpleHTTPRequestHandler):
         if district_id:
             sync_district_stats(conn, district_id)
         export_json(conn)
-        proj = row_to_dict(conn.execute(
+        proj = normalize_project_row(conn.execute(
             """SELECT p.*, d.name AS district_name FROM projects p
                LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?""",
             (pid,),
-        ).fetchone())
+        ).fetchone(), include_contact_phone=True)
         conn.close()
         return self._json({"ok": True, "project": proj}, 201)
 
@@ -2029,11 +2650,20 @@ class Handler(SimpleHTTPRequestHandler):
             "booking_phone": row[0] if row else None,
             "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
             "show_life_service": settings.get("show_life_service", "1") == "1",
+            "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
         })
 
     def _update_settings(self):
         body = self._body()
         phone = (body.get("booking_phone") or "").strip() or None
+        channel_out = None
+        if "channel_name" in body:
+            name = (body.get("channel_name") or "").strip()
+            if not name:
+                return self._json({"error": "频道名称不能为空"}, 400)
+            if len(name) > 32:
+                return self._json({"error": "频道名称最多 32 字"}, 400)
+            channel_out = name
         conn = connect()
         if phone is not None:
             cid = body.get("city_id")
@@ -2049,52 +2679,169 @@ class Handler(SimpleHTTPRequestHandler):
             if k in body:
                 v = "1" if body.get(k) else "0"
                 conn.execute(
-                    "INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
                     (k, v),
                 )
+        if channel_out is not None:
+            conn.execute(
+                "INSERT INTO settings(`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)",
+                ("channel_name", channel_out),
+            )
         conn.commit()
         export_json(conn)
         conn.close()
-        return self._json({"ok": True, "booking_phone": phone})
+        out = {"ok": True, "booking_phone": phone}
+        if channel_out is not None:
+            out["channel_name"] = channel_out
+        return self._json(out)
 
     def _get_dictionary(self, qs=None):
         conn = connect()
         qs = qs or {}
+        cities = rows_to_list(conn.execute("SELECT * FROM cities ORDER BY id"))
         city_id = self._city_id(conn, qs)
+        city = None
         if city_id:
-            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (city_id,)).fetchone())
-            districts = rows_to_list(conn.execute("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id", (city_id,)))
-        else:
-            city = row_to_dict(conn.execute("SELECT * FROM cities ORDER BY id LIMIT 1").fetchone())
-            districts = rows_to_list(conn.execute("SELECT * FROM districts ORDER BY sort_order, id"))
+            city = next((c for c in cities if c.get("id") == city_id), None)
+        if not city and cities:
+            city = cities[0]
+        districts = []
+        if city:
+            districts = rows_to_list(
+                conn.execute("SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id", (city["id"],))
+            )
         channels = rows_to_list(conn.execute("SELECT * FROM channels ORDER BY sort_order, id"))
         conn.close()
-        return self._json({"city": city, "districts": districts, "channels": channels})
+        return self._json({"city": city, "cities": cities, "districts": districts, "channels": channels})
+
+    def _city_fields_from_body(self, body, require_name=True):
+        name = (body.get("name") or "").strip()
+        if require_name and not name:
+            return None, self._json({"error": "城市名称不能为空"}, 400)
+        if not require_name and "name" in body and not name:
+            return None, self._json({"error": "城市名称不能为空"}, 400)
+        fields = []
+        params = []
+        if name:
+            fields.append("name=?")
+            params.append(name)
+        if "slug" in body or name:
+            slug = (body.get("slug") or "").strip() or (slugify(name) if name else "")
+            if slug:
+                fields.append("slug=?")
+                params.append(slug)
+        if "booking_phone" in body:
+            fields.append("booking_phone=?")
+            params.append((body.get("booking_phone") or "").strip() or None)
+        if "hero_bg_image" in body:
+            fields.append("hero_bg_image=?")
+            params.append((body.get("hero_bg_image") or "").strip() or None)
+        if not fields:
+            return None, self._json({"error": "无更新字段"}, 400)
+        return (fields, params), None
+
+    def _create_city(self):
+        body = self._body()
+        parsed, err = self._city_fields_from_body(body, require_name=True)
+        if err:
+            return err
+        fields, params = parsed
+        cols = [f.split("=")[0] for f in fields]
+        conn = connect()
+        try:
+            conn.execute(
+                f"INSERT INTO cities({', '.join(cols)}) VALUES ({', '.join(['?'] * len(params))})",
+                params,
+            )
+            cid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.commit()
+            export_json(conn)
+            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
+            return self._json({"ok": True, "city": city}, 201)
+        except Exception as e:
+            msg = str(e)
+            if "uk_slug" in msg or "slug" in msg.lower():
+                return self._json({"error": "slug 已存在"}, 400)
+            if "uk_name" in msg or "name" in msg.lower():
+                return self._json({"error": "城市名称已存在"}, 400)
+            raise
+        finally:
+            conn.close()
+
+    def _update_city_by_id(self, cid):
+        body = self._body()
+        parsed, err = self._city_fields_from_body(body, require_name=False)
+        if err:
+            return err
+        fields, params = parsed
+        conn = connect()
+        if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+            conn.close()
+            return self._json({"error": "城市不存在"}, 404)
+        try:
+            params.append(cid)
+            conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
+            conn.commit()
+            export_json(conn)
+            city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
+            return self._json({"ok": True, "city": city})
+        except Exception as e:
+            msg = str(e)
+            if "uk_slug" in msg or "slug" in msg.lower():
+                return self._json({"error": "slug 已存在"}, 400)
+            if "uk_name" in msg or "name" in msg.lower():
+                return self._json({"error": "城市名称已存在"}, 400)
+            raise
+        finally:
+            conn.close()
+
+    def _delete_city(self, cid):
+        conn = connect()
+        if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+            conn.close()
+            return self._json({"error": "城市不存在"}, 404)
+        city_n = conn.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
+        if city_n <= 1:
+            conn.close()
+            return self._json({"error": "至少保留一座城市"}, 400)
+        dist_n = conn.execute("SELECT COUNT(*) FROM districts WHERE city_id=?", (cid,)).fetchone()[0]
+        if dist_n:
+            conn.close()
+            return self._json({"error": f"该城市仍有 {dist_n} 个行政区，无法删除"}, 400)
+        proj_n = conn.execute("SELECT COUNT(*) FROM projects WHERE city_id=?", (cid,)).fetchone()[0]
+        if proj_n:
+            conn.close()
+            return self._json({"error": f"该城市仍有 {proj_n} 个项目，无法删除"}, 400)
+        conn.execute("DELETE FROM cities WHERE id=?", (cid,))
+        conn.commit()
+        export_json(conn)
+        conn.close()
+        return self._json({"ok": True})
 
     def _update_city(self):
         body = self._body()
-        name = (body.get("name") or "").strip()
-        slug = (body.get("slug") or "").strip()
-        if not name:
-            return self._json({"error": "城市名称不能为空"}, 400)
+        parsed, err = self._city_fields_from_body(body, require_name=True)
+        if err:
+            return err
+        fields, params = parsed
         conn = connect()
         cid = body.get("city_id")
         if not cid:
             row = conn.execute("SELECT id FROM cities ORDER BY id LIMIT 1").fetchone()
             cid = row[0] if row else None
         if not cid:
-            conn.close()
-            return self._json({"error": "未找到城市"}, 404)
-        if not slug:
-            slug = slugify(name)
-        fields = ["name=?", "slug=?"]
-        params = [name, slug]
-        if "hero_bg_image" in body:
-            val = (body.get("hero_bg_image") or "").strip() or None
-            fields.append("hero_bg_image=?")
-            params.append(val)
-        params.append(cid)
-        conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
+            cols = [f.split("=")[0] for f in fields]
+            conn.execute(
+                f"INSERT INTO cities({', '.join(cols)}) VALUES ({', '.join(['?'] * len(params))})",
+                params,
+            )
+            cid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        else:
+            if not conn.execute("SELECT id FROM cities WHERE id=?", (cid,)).fetchone():
+                conn.close()
+                return self._json({"error": "城市不存在"}, 404)
+            params = list(params) + [cid]
+            conn.execute(f"UPDATE cities SET {', '.join(fields)} WHERE id=?", params)
         conn.commit()
         export_json(conn)
         city = row_to_dict(conn.execute("SELECT * FROM cities WHERE id=?", (cid,)).fetchone())
@@ -2233,12 +2980,38 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
+    loaded = load_dotenv()
     port = 8765
     print(f"新居住服务  http://localhost:{port}")
-    print(f"  前台  /juzhu-channel-v3-grid.html")
+    print(f"  前台  /index.html")
     print(f"  后台  /juzhu-admin.html")
     print(f"  API   /api/juzhu/admin/*  ·  /api/juzhu/jiazheng/*")
-    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    if loaded:
+        print("  env   " + ", ".join(str(p.name) for p in loaded))
+    else:
+        print("  env   （未找到 .env.local / .env；TP_* 需已 export）")
+    tp_ready = bool(os.environ.get("TP_APP_ID") and os.environ.get("TP_APP_KEY"))
+    print(f"  TP    {'已配置' if tp_ready else '未配置（拨号虚拟号不可用）'}  BASE={os.environ.get('TP_BASE') or 'http://tp-test.lianjia.com'}")
+    env_name = (os.environ.get("JUZHU_ENV") or "dev").strip().lower()
+    api_key = (os.environ.get(API_KEY_ENV) or "").strip()
+    admin_pwd = (os.environ.get(ADMIN_PASSWORD_ENV) or "").strip()
+    api_set = bool(api_key)
+    admin_set = bool(admin_pwd)
+    print(f"  mode  JUZHU_ENV={env_name}  API_KEY={'已配置' if api_set and api_key != DEFAULT_API_KEY else '未配置/无效'}  ADMIN_PWD={'已配置' if admin_set else '使用开发默认'}")
+    print("  auth  /api/juzhu/admin/* 全方法需 API Key（auth/login|check 除外）；禁止历史默认密钥")
+    print("  static 已拦截 .env / *.py / *.db / *.md / api 文档页；生产禁用 /docs/")
+    if not api_set or api_key == DEFAULT_API_KEY:
+        print(f"  WARN  未配置有效 {API_KEY_ENV}（禁止 {DEFAULT_API_KEY}）— admin API 将全部 401")
+    if env_name in ("prod", "production"):
+        bad = []
+        if not api_set or api_key == DEFAULT_API_KEY:
+            bad.append(f"{API_KEY_ENV}（须显式配置且不得为开发示例 {DEFAULT_API_KEY}）")
+        if not admin_set or admin_pwd == DEFAULT_ADMIN_PASSWORD:
+            bad.append(f"{ADMIN_PASSWORD_ENV}（须显式配置且不得为开发默认值）")
+        if bad:
+            print("  FATAL 生产环境拒绝启动：" + "；".join(bad))
+            sys.exit(1)
+    ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
 if __name__ == "__main__":

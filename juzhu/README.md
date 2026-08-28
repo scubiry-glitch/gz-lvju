@@ -1,6 +1,8 @@
 # 新居住频道 · 数据层
 
-## 快速开始
+线上入口是 **Node `app.js`（SCF）+ MySQL**，说明见 [`docs/deploy.md`](../docs/deploy.md)。
+
+本地若仍用 Python 调试：
 
 ```bash
 # 1. 确保源目录存在
@@ -9,11 +11,46 @@
 # 2. 扫描入库 + 复制图片 + 导出 JSON
 python3 juzhu/seed_from_folder.py
 
-# 3. 启动服务（含编辑后台 API，推荐）
+# 3. （可选）话务虚拟号密钥
+cp juzhu/.env.example juzhu/.env.local   # 填入 TP_APP_ID / TP_APP_KEY
+# TP_BASE 默认测试 http://tp-test.lianjia.com；线上改为 http://i.tp.lianjia.com
+
+# 4. 启动服务（含编辑后台 API；自动加载 .env.local；已连 MySQL，不再读写 juzhu.db）
 python3 juzhu/server.py
-# 前台 http://localhost:8765/juzhu-channel-v3-grid.html
+# 前台 http://localhost:8765/index.html
 # 后台 http://localhost:8765/juzhu-admin.html
 ```
+
+推荐本地直接跑 Node（与线上一致）：
+
+```bash
+npm install
+node app.js    # http://localhost:9000
+```
+
+## 静态安全（必读）
+
+`server.py` 以仓库根为静态根，但会拦截敏感路径：`.env*`、`*.py`、`*.cjs`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`hmac_secret.key`、`package.json`、`README.md`、根目录 `app.js` / `scf_bootstrap` / `moma_*` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`；禁止目录列表。
+
+线上入口是 Node `app.js`（SCF）；Python `server.py` 仅本地联调。`app.js` 的 `isPublicStatic` 与上述口径一致。部署包内的运行时 `.env` **仅供进程读取**，不得通过 HTTP 访问。
+
+SQLite 存量一次性导入 MySQL：
+
+```bash
+node migrate_to_mysql.cjs /path/to/juzhu.db
+```
+
+详见 [`docs/deploy.md`](../docs/deploy.md)。
+
+生产务必：
+
+```bash
+export JUZHU_ENV=production
+export JUZHU_API_KEY='<生产密钥>'
+export JUZHU_ADMIN_PASSWORD='<生产密码>'
+```
+
+微信 URL Link：`cp juzhu/config.ini.example juzhu/config.ini`（已 gitignore，勿提交真实 token）。
 
 ## 产出物
 
@@ -34,7 +71,7 @@ python3 juzhu/server.py
 
 ## 页面
 
-- `juzhu-channel-v3-grid.html` — 频道首页（方案 C）
+- `index.html` — 频道首页（方案 C）
 - `juzhu-bzf-list.html` — 区级项目列表
 - `juzhu-bzf-project.html` — 项目户型列表
 - `juzhu-unit-detail.html` — 户型详情

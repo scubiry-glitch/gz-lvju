@@ -2,14 +2,14 @@
   "channels": [
     {
       "id": "bzf",
-      "label": "保租房专区",
+      "label": "保租房",
       "sort_order": 1,
       "enabled": 1,
       "note": null
     },
     {
       "id": "trade",
-      "label": "卖旧买新专区",
+      "label": "卖旧买新",
       "sort_order": 2,
       "enabled": 1,
       "note": null
@@ -1056,7 +1056,7 @@
     }
   ],
   "settings": {
-    "show_city_switcher": "0",
+    "show_city_switcher": "1",
     "show_life_service": "1"
   },
   "city": {
@@ -1085,12 +1085,12 @@
       "project_count": 0,
       "unit_count": 0,
       "vacant_count": 0,
-      "managed_unit_count": 0,
       "avg_price": null,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g2",
+      "managed_unit_count": 0,
       "tags": []
     },
     {
@@ -1105,12 +1105,12 @@
       "project_count": 2,
       "unit_count": 5,
       "vacant_count": 5,
-      "managed_unit_count": 287,
-      "avg_price": 1539,
+      "avg_price": 1513,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g3",
+      "managed_unit_count": 287,
       "tags": []
     },
     {
@@ -1125,12 +1125,12 @@
       "project_count": 3,
       "unit_count": 9,
       "vacant_count": 9,
-      "managed_unit_count": 849,
       "avg_price": 1778,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 1,
       "bg_class": "g4",
+      "managed_unit_count": 849,
       "tags": []
     },
     {
@@ -1145,12 +1145,12 @@
       "project_count": 0,
       "unit_count": 0,
       "vacant_count": 0,
-      "managed_unit_count": 0,
       "avg_price": null,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g5",
+      "managed_unit_count": 0,
       "tags": []
     },
     {
@@ -1165,12 +1165,12 @@
       "project_count": 5,
       "unit_count": 14,
       "vacant_count": 14,
-      "managed_unit_count": 1102,
       "avg_price": 1654,
       "is_hot": 1,
       "layout_tall": 1,
       "layout_wide": 0,
       "bg_class": "g6",
+      "managed_unit_count": 1102,
       "tags": []
     },
     {
@@ -1185,12 +1185,12 @@
       "project_count": 5,
       "unit_count": 18,
       "vacant_count": 18,
-      "managed_unit_count": 1934,
       "avg_price": 1962,
       "is_hot": 1,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g7",
+      "managed_unit_count": 1934,
       "tags": []
     },
     {
@@ -1205,12 +1205,12 @@
       "project_count": 6,
       "unit_count": 11,
       "vacant_count": 11,
-      "managed_unit_count": 495,
       "avg_price": 1643,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g8",
+      "managed_unit_count": 495,
       "tags": []
     },
     {
@@ -1225,12 +1225,12 @@
       "project_count": 2,
       "unit_count": 2,
       "vacant_count": 2,
-      "managed_unit_count": 1004,
       "avg_price": 1588,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g1",
+      "managed_unit_count": 1004,
       "tags": []
     },
     {
@@ -1245,12 +1245,12 @@
       "project_count": 0,
       "unit_count": 0,
       "vacant_count": 0,
-      "managed_unit_count": 0,
       "avg_price": null,
       "is_hot": 0,
       "layout_tall": 0,
       "layout_wide": 0,
       "bg_class": "g2",
+      "managed_unit_count": 0,
       "tags": []
     }
   ],
@@ -1262,12 +1262,11 @@
       "channel": "bzf",
       "name": "CCB建融家园中华路店",
       "slug": "CCB建融家园中华路店",
-      "cover_image": "assets/juzhu/sy/projects/bzf/和平区/CCB建融家园中华路店.jpg",
+      "cover_image": "",
       "address": "",
       "tags": [],
       "sort_order": 1,
       "unit_count": 3,
-      "managed_unit_count": 175,
       "price_from": 1440,
       "is_featured": 0,
       "featured_rank": null,
@@ -1290,7 +1289,8 @@
       },
       "rating_submitted_at": "2026-07-03T03:15:56Z",
       "rating_reviewed_at": "2026-07-03T03:16:13Z",
-      "rating_note": ""
+      "rating_note": "",
+      "managed_unit_count": 175
     },
     {
       "id": 11,
@@ -1306,7 +1306,6 @@
       ],
       "sort_order": 1,
       "unit_count": 2,
-      "managed_unit_count": 1036,
       "price_from": 1480,
       "is_featured": 0,
       "featured_rank": null,
@@ -1315,7 +1314,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 1036
     },
     {
       "id": 6,
@@ -1331,7 +1331,6 @@
       ],
       "sort_order": 1,
       "unit_count": 2,
-      "managed_unit_count": 102,
       "price_from": 1384,
       "is_featured": 0,
       "featured_rank": null,
@@ -1340,7 +1339,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 102
     },
     {
       "id": 22,
@@ -1354,7 +1354,6 @@
       "tags": [],
       "sort_order": 1,
       "unit_count": 1,
-      "managed_unit_count": 432,
       "price_from": 1536,
       "is_featured": 0,
       "featured_rank": null,
@@ -1363,7 +1362,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 432
     },
     {
       "id": 3,
@@ -1379,7 +1379,6 @@
       ],
       "sort_order": 1,
       "unit_count": 5,
-      "managed_unit_count": 644,
       "price_from": 1726,
       "is_featured": 0,
       "featured_rank": null,
@@ -1388,7 +1387,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 644
     },
     {
       "id": 16,
@@ -1404,7 +1404,6 @@
       ],
       "sort_order": 1,
       "unit_count": 1,
-      "managed_unit_count": 125,
       "price_from": 1552,
       "is_featured": 0,
       "featured_rank": null,
@@ -1413,7 +1412,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 125
     },
     {
       "id": 12,
@@ -1427,7 +1427,6 @@
       "tags": [],
       "sort_order": 2,
       "unit_count": 7,
-      "managed_unit_count": 236,
       "price_from": 2016,
       "is_featured": 0,
       "featured_rank": null,
@@ -1436,7 +1435,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 236
     },
     {
       "id": 7,
@@ -1450,7 +1450,6 @@
       "tags": [],
       "sort_order": 2,
       "unit_count": 2,
-      "managed_unit_count": 78,
       "price_from": 1568,
       "is_featured": 0,
       "featured_rank": null,
@@ -1459,7 +1458,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 78
     },
     {
       "id": 23,
@@ -1473,7 +1473,6 @@
       "tags": [],
       "sort_order": 2,
       "unit_count": 1,
-      "managed_unit_count": 572,
       "price_from": 1640,
       "is_featured": 0,
       "featured_rank": null,
@@ -1482,7 +1481,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 572
     },
     {
       "id": 4,
@@ -1496,7 +1496,6 @@
       "tags": [],
       "sort_order": 2,
       "unit_count": 2,
-      "managed_unit_count": 135,
       "price_from": 1464,
       "is_featured": 0,
       "featured_rank": null,
@@ -1505,7 +1504,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 135
     },
     {
       "id": 17,
@@ -1521,7 +1521,6 @@
       ],
       "sort_order": 2,
       "unit_count": 1,
-      "managed_unit_count": 51,
       "price_from": 1552,
       "is_featured": 0,
       "featured_rank": null,
@@ -1530,7 +1529,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 51
     },
     {
       "id": 2,
@@ -1546,7 +1546,6 @@
       ],
       "sort_order": 2,
       "unit_count": 2,
-      "managed_unit_count": 112,
       "price_from": 1384,
       "is_featured": 0,
       "featured_rank": null,
@@ -1555,7 +1554,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 112
     },
     {
       "id": 13,
@@ -1571,7 +1571,6 @@
       ],
       "sort_order": 3,
       "unit_count": 4,
-      "managed_unit_count": 372,
       "price_from": 1592,
       "is_featured": 0,
       "featured_rank": null,
@@ -1580,7 +1579,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 372
     },
     {
       "id": 8,
@@ -1594,7 +1594,6 @@
       "tags": [],
       "sort_order": 3,
       "unit_count": 3,
-      "managed_unit_count": 53,
       "price_from": 1651,
       "is_featured": 0,
       "featured_rank": null,
@@ -1603,7 +1602,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 53
     },
     {
       "id": 18,
@@ -1619,7 +1619,6 @@
       ],
       "sort_order": 3,
       "unit_count": 3,
-      "managed_unit_count": 100,
       "price_from": 1520,
       "is_featured": 0,
       "featured_rank": null,
@@ -1628,7 +1627,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 100
     },
     {
       "id": 5,
@@ -1644,7 +1644,6 @@
       ],
       "sort_order": 3,
       "unit_count": 2,
-      "managed_unit_count": 70,
       "price_from": 1600,
       "is_featured": 0,
       "featured_rank": null,
@@ -1653,7 +1652,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 70
     },
     {
       "id": 9,
@@ -1667,7 +1667,6 @@
       "tags": [],
       "sort_order": 4,
       "unit_count": 4,
-      "managed_unit_count": 78,
       "price_from": 1600,
       "is_featured": 0,
       "featured_rank": null,
@@ -1676,7 +1675,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 78
     },
     {
       "id": 14,
@@ -1692,7 +1692,6 @@
       ],
       "sort_order": 4,
       "unit_count": 3,
-      "managed_unit_count": 210,
       "price_from": 1480,
       "is_featured": 0,
       "featured_rank": null,
@@ -1701,7 +1700,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 210
     },
     {
       "id": 19,
@@ -1717,7 +1717,6 @@
       ],
       "sort_order": 4,
       "unit_count": 2,
-      "managed_unit_count": 102,
       "price_from": 1408,
       "is_featured": 0,
       "featured_rank": null,
@@ -1726,7 +1725,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 102
     },
     {
       "id": 10,
@@ -1740,7 +1740,6 @@
       "tags": [],
       "sort_order": 5,
       "unit_count": 3,
-      "managed_unit_count": 791,
       "price_from": 1464,
       "is_featured": 0,
       "featured_rank": null,
@@ -1749,7 +1748,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 791
     },
     {
       "id": 20,
@@ -1765,7 +1765,6 @@
       ],
       "sort_order": 5,
       "unit_count": 3,
-      "managed_unit_count": 109,
       "price_from": 1520,
       "is_featured": 0,
       "featured_rank": null,
@@ -1774,7 +1773,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 109
     },
     {
       "id": 15,
@@ -1788,7 +1788,6 @@
       "tags": [],
       "sort_order": 5,
       "unit_count": 2,
-      "managed_unit_count": 80,
       "price_from": 1974,
       "is_featured": 0,
       "featured_rank": null,
@@ -1797,7 +1796,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 80
     },
     {
       "id": 21,
@@ -1813,7 +1813,6 @@
       ],
       "sort_order": 6,
       "unit_count": 1,
-      "managed_unit_count": 8,
       "price_from": 2056,
       "is_featured": 0,
       "featured_rank": null,
@@ -1822,7 +1821,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": 8
     },
     {
       "id": 24,
@@ -1839,7 +1839,6 @@
       ],
       "sort_order": 2,
       "unit_count": 4,
-      "managed_unit_count": null,
       "price_from": 95,
       "is_featured": 0,
       "featured_rank": 2,
@@ -1848,7 +1847,8 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": null
     },
     {
       "id": 25,
@@ -1865,7 +1865,6 @@
       ],
       "sort_order": 3,
       "unit_count": 2,
-      "managed_unit_count": null,
       "price_from": 168,
       "is_featured": 0,
       "featured_rank": 3,
@@ -1874,111 +1873,31 @@
       "rating": null,
       "rating_submitted_at": null,
       "rating_reviewed_at": null,
-      "rating_note": null
+      "rating_note": null,
+      "managed_unit_count": null
     }
   ],
   "units": [
     {
       "id": 1,
       "project_id": 1,
-      "name": "30 平",
-      "slug": "30-平",
+      "name": "30平",
+      "slug": "30平",
       "area_sqm": 30.0,
       "layout_label": null,
       "rent_monthly": 1440,
       "price_total": null,
       "tags": [
         "政府保租房",
-        "近地铁",
+        "建融家园",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住",
         "好房子4星"
       ],
-      "unit_spec": null,
-      "promo_price": null,
-      "amenities": [
-        "ac",
-        "washer",
-        "fridge",
-        "heater",
-        "lock",
-        "wifi",
-        "tv",
-        "hood",
-        "induction"
-      ],
-      "keeper": {
-        "name": "",
-        "avatar": "assets/juzhu/sy/keepers/unit_1.jpeg",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "30平 30㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1440,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1440
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1440,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1440
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
       "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg"
-    },
-    {
-      "id": 2,
-      "project_id": 1,
-      "name": "40 平",
-      "slug": "40-平",
-      "area_sqm": 40.0,
-      "layout_label": null,
-      "rent_monthly": 1680,
-      "price_total": null,
-      "tags": [
-        "政府保租房",
-        "近地铁",
-        "押一付一",
-        "租金受控",
-        "拎包入住",
-        "好房子4星"
-      ],
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -1993,58 +1912,44 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "assets/juzhu/sy/keepers/unit_2.jpeg",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "40平 40㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1550,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1550
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1550,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1550
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
+      "keeper": null,
+      "rent_detail": null
+    },
+    {
+      "id": 2,
+      "project_id": 1,
+      "name": "40平",
+      "slug": "40平",
+      "area_sqm": 40.0,
+      "layout_label": null,
+      "rent_monthly": 1550,
+      "price_total": null,
+      "tags": [
+        "政府保租房",
+        "建融家园",
+        "押一付一",
+        "租金受控",
+        "拎包入住",
+        "好房子4星"
+      ],
       "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg"
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
+      "unit_spec": null,
+      "promo_price": null,
+      "amenities": [
+        "ac",
+        "washer",
+        "fridge",
+        "heater",
+        "lock",
+        "wifi",
+        "tv",
+        "hood",
+        "microwave",
+        "induction"
+      ],
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 3,
@@ -2057,12 +1962,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "近地铁",
+        "建融家园",
         "押一付一",
         "租金受控",
         "拎包入住",
         "好房子4星"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2077,58 +1984,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "56平 56㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1708,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1708
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1708,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1708
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_3.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 4,
@@ -2141,11 +1998,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2160,58 +2020,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "23平 23㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1384,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1384
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1384,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1384
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/23平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 5,
@@ -2224,11 +2034,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2243,58 +2056,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "32平 32㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1486,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1486
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1486,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1486
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居雪莲店/32平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 6,
@@ -2313,6 +2076,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/106平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2328,9 +2093,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/106平.jpg"
+      "rent_detail": null
     },
     {
       "id": 7,
@@ -2348,6 +2111,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/62平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2363,9 +2128,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/62平.jpg"
+      "rent_detail": null
     },
     {
       "id": 8,
@@ -2383,6 +2146,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/64平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2398,9 +2163,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/64平.jpg"
+      "rent_detail": null
     },
     {
       "id": 9,
@@ -2419,6 +2182,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 4,
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/85平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2434,9 +2199,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/85平.jpg"
+      "rent_detail": null
     },
     {
       "id": 10,
@@ -2455,6 +2218,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 5,
+      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/97平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2470,9 +2235,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 5,
-      "cover_image": "assets/juzhu/sy/units/bzf/新东人才住房/97平.jpg"
+      "rent_detail": null
     },
     {
       "id": 11,
@@ -2490,6 +2253,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/33平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2505,9 +2270,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/33平.jpg"
+      "rent_detail": null
     },
     {
       "id": 12,
@@ -2524,6 +2287,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/49平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2539,9 +2304,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/观泉店/49平.jpg"
+      "rent_detail": null
     },
     {
       "id": 13,
@@ -2559,6 +2322,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2574,9 +2339,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/50平_0.jpg"
+      "rent_detail": null
     },
     {
       "id": 14,
@@ -2594,6 +2357,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2609,9 +2374,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_3.jpg"
+      "rent_detail": null
     },
     {
       "id": 15,
@@ -2624,12 +2387,15 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2644,58 +2410,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "23平 23㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1384,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1384
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1384,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1384
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 16,
@@ -2708,12 +2424,15 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2728,58 +2447,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "32平 32㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1486,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1486
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1486,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1486
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 17,
@@ -2796,6 +2465,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/46_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2811,9 +2482,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/46_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 18,
@@ -2830,6 +2499,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/63_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2845,9 +2516,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/中金启城/63_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 19,
@@ -2864,6 +2533,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.43双西中间客厅_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2879,9 +2550,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.43双西中间客厅_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 20,
@@ -2898,6 +2567,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.59双西_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2913,9 +2584,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56.59双西_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 21,
@@ -2932,6 +2601,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56。21东北_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2947,9 +2618,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/庆余家园/庆余56。21东北_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 22,
@@ -2966,6 +2635,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民50_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -2981,9 +2652,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民50_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 23,
@@ -3000,6 +2669,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民58_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3015,9 +2686,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民58_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 24,
@@ -3034,6 +2703,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民71_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3049,9 +2720,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民71_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 25,
@@ -3069,6 +2738,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 4,
+      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民89_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3084,9 +2755,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/惠民馨苑/惠民89_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 26,
@@ -3104,6 +2773,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/33平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3119,9 +2790,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/33平.jpg"
+      "rent_detail": null
     },
     {
       "id": 27,
@@ -3138,6 +2807,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/54平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3153,9 +2824,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/54平.jpg"
+      "rent_detail": null
     },
     {
       "id": 28,
@@ -3172,6 +2841,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/55平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3187,9 +2858,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/群升新天地/55平.jpg"
+      "rent_detail": null
     },
     {
       "id": 29,
@@ -3202,12 +2871,15 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "建融家园",
         "近地铁",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3222,58 +2894,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "35平 35㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1480,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1480
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1480,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1480
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/35平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 30,
@@ -3286,11 +2908,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "建融家园",
         "近地铁",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3305,58 +2930,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "60平 60㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1710,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1710
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1710,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1710
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/CCB建融家园新市府店/60平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 31,
@@ -3374,6 +2949,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/102_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3389,9 +2966,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/102_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 32,
@@ -3409,6 +2984,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/110_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3424,9 +3001,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/110_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 33,
@@ -3444,6 +3019,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/138_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3459,9 +3036,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/138_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 34,
@@ -3479,6 +3054,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 4,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/146_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3494,9 +3071,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/146_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 35,
@@ -3514,6 +3089,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 5,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/148_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3529,9 +3106,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 5,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/148_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 36,
@@ -3549,6 +3124,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 6,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/165_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3564,9 +3141,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 6,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/165_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 37,
@@ -3584,6 +3159,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 7,
+      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/85_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3599,9 +3176,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 7,
-      "cover_image": "assets/juzhu/sy/units/bzf/中海润山府/85_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 38,
@@ -3619,6 +3194,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/49平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3634,9 +3211,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/49平.jpg"
+      "rent_detail": null
     },
     {
       "id": 39,
@@ -3654,6 +3229,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/57平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3669,9 +3246,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/57平.jpg"
+      "rent_detail": null
     },
     {
       "id": 40,
@@ -3689,6 +3264,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/61平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3704,9 +3281,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/61平.jpg"
+      "rent_detail": null
     },
     {
       "id": 41,
@@ -3724,6 +3299,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 4,
+      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/75平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3739,9 +3316,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/bzf/凤凰居人才公寓/75平.jpg"
+      "rent_detail": null
     },
     {
       "id": 42,
@@ -3754,12 +3329,15 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "近地铁",
         "精致小户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3774,58 +3352,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "35平 35㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1480,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1480
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1480,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1480
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/35平.png"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 43,
@@ -3838,11 +3366,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "近地铁",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3857,58 +3388,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "45平 45㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1590,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1590
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1590,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1590
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/45平.png"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 44,
@@ -3921,11 +3402,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "近地铁",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -3940,58 +3424,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "75平 75㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1860,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1860
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1860,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1860
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居奥体店/75平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 45,
@@ -4009,6 +3443,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/116_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4024,9 +3460,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/116_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 46,
@@ -4044,6 +3478,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/93平_副本.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4059,9 +3495,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/龙湖云峰原著/93平_副本.jpg"
+      "rent_detail": null
     },
     {
       "id": 47,
@@ -4074,11 +3508,13 @@
       "price_total": null,
       "tags": [
         "政府保租房",
-        "近地铁",
+        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4093,58 +3529,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "44 44㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1552,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1552
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1552,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1552
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店/44.png"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 48,
@@ -4162,6 +3548,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店C座/44.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4177,9 +3565,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居中海寰宇店C座/44.png"
+      "rent_detail": null
     },
     {
       "id": 49,
@@ -4192,10 +3578,13 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4210,58 +3599,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "40平 40㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1520,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1520
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1520,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1520
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_3.png"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 50,
@@ -4274,10 +3613,13 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4292,58 +3634,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "59平 59㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1702,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1702
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1702,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1702
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/59平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 51,
@@ -4356,10 +3648,13 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4374,58 +3669,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "61平 61㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1748,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1748
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1748,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1748
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_4.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 52,
@@ -4444,6 +3689,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/26平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4459,9 +3706,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/26平.jpg"
+      "rent_detail": null
     },
     {
       "id": 53,
@@ -4480,6 +3725,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/35平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4495,9 +3742,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居崇山路店/35平.jpg"
+      "rent_detail": null
     },
     {
       "id": 54,
@@ -4510,10 +3755,13 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4528,58 +3776,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "40平 40㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 1520,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1520
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 1520,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 1520
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/40平.png"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 55,
@@ -4597,6 +3795,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/56平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4612,9 +3812,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/56平.png"
+      "rent_detail": null
     },
     {
       "id": 56,
@@ -4632,6 +3830,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/71平.png",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4647,9 +3847,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居未来店/71平.png"
+      "rent_detail": null
     },
     {
       "id": 57,
@@ -4662,11 +3860,14 @@
       "price_total": null,
       "tags": [
         "政府保租房",
+        "逸居",
         "宽敞大户型",
         "押一付一",
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4681,58 +3882,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "107 107㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": 2056,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 2056
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": 2056,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": 2056
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 58,
@@ -4749,6 +3900,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/九里店/42平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4764,9 +3917,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/九里店/42平.jpg"
+      "rent_detail": null
     },
     {
       "id": 59,
@@ -4784,6 +3935,8 @@
         "租金受控",
         "拎包入住"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/bzf/地铁云杉里/55平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4799,9 +3952,7 @@
         "induction"
       ],
       "keeper": null,
-      "rent_detail": null,
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/bzf/地铁云杉里/55平.jpg"
+      "rent_detail": null
     },
     {
       "id": 60,
@@ -4814,9 +3965,11 @@
       "price_total": 119,
       "tags": [
         "卖旧买新",
-        "近地铁",
-        "近公园"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4831,58 +3984,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "70 70㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/70.jpeg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 61,
@@ -4895,9 +3998,11 @@
       "price_total": 123,
       "tags": [
         "卖旧买新",
-        "近地铁",
-        "近公园"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4912,58 +4017,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "80 80㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/80.jpeg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 62,
@@ -4976,9 +4031,11 @@
       "price_total": 124,
       "tags": [
         "卖旧买新",
-        "近地铁",
-        "近公园"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 3,
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -4993,58 +4050,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "85 85㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 3,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/85.jpeg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 63,
@@ -5057,9 +4064,11 @@
       "price_total": 126,
       "tags": [
         "卖旧买新",
-        "近地铁",
-        "近公园"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 4,
+      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -5074,58 +4083,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "90 90㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 4,
-      "cover_image": "assets/juzhu/sy/units/trade/中德人才社区/90.jpeg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 64,
@@ -5138,11 +4097,11 @@
       "price_total": 206,
       "tags": [
         "卖旧买新",
-        "精装修",
-        "一环",
-        "双地铁",
-        "双学校"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 1,
+      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -5157,58 +4116,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "110平 110㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 1,
-      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/110平.jpg"
+      "keeper": null,
+      "rent_detail": null
     },
     {
       "id": 65,
@@ -5221,11 +4130,11 @@
       "price_total": 216,
       "tags": [
         "卖旧买新",
-        "精装修",
-        "一环",
-        "双地铁",
-        "双学校"
+        "以旧换新",
+        "试点房源"
       ],
+      "sort_order": 2,
+      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg",
       "unit_spec": null,
       "promo_price": null,
       "amenities": [
@@ -5240,58 +4149,8 @@
         "microwave",
         "induction"
       ],
-      "keeper": {
-        "name": "",
-        "avatar": "",
-        "phone": ""
-      },
-      "rent_detail": {
-        "room_label": "139平 139㎡",
-        "long_term": {
-          "range": "可租4个月-1年",
-          "plan": {
-            "pay": "季付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "short_term": {
-          "range": "可租1个月-3个月",
-          "plan": {
-            "pay": "月付",
-            "rent": null,
-            "service_fee": null,
-            "service_note": "一次收取",
-            "deposit": null
-          }
-        },
-        "other_fees": [
-          {
-            "name": "水费",
-            "value": "—元/吨"
-          },
-          {
-            "name": "电费",
-            "value": "—元/度"
-          },
-          {
-            "name": "宽带费",
-            "value": "—元/月"
-          },
-          {
-            "name": "物业费",
-            "value": "—元/月"
-          },
-          {
-            "name": "供暖费",
-            "value": "—元/方"
-          }
-        ]
-      },
-      "sort_order": 2,
-      "cover_image": "assets/juzhu/sy/units/trade/逸居锦城/139平.jpg"
+      "keeper": null,
+      "rent_detail": null
     }
   ],
   "photos": [
@@ -5377,6 +4236,150 @@
       "sort_order": 0
     },
     {
+      "id": 130,
+      "entity_type": "project",
+      "entity_id": 10,
+      "file_path": "assets/juzhu/sy/projects/bzf/沈河区/群升新天地.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 144,
+      "entity_type": "project",
+      "entity_id": 11,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/CCB建融家园新市府店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/CCB建融家园新市府店/店封面 .jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 151,
+      "entity_type": "project",
+      "entity_id": 12,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/中海润山府.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/中海润山府/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 206,
+      "entity_type": "project",
+      "entity_id": 13,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/凤凰居人才公寓.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/凤凰居人才公寓/店封面 .jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 230,
+      "entity_type": "project",
+      "entity_id": 14,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/逸居奥体店.png",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/店封面.jpg.png",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 238,
+      "entity_type": "project",
+      "entity_id": 15,
+      "file_path": "assets/juzhu/sy/projects/bzf/浑南区/龙湖云峰原著.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/龙湖云峰原著/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 255,
+      "entity_type": "project",
+      "entity_id": 16,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居中海寰宇店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居中海寰宇店/店封面1.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 259,
+      "entity_type": "project",
+      "entity_id": 17,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居中海寰宇店C座.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居中海寰宇店C座/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 263,
+      "entity_type": "project",
+      "entity_id": 18,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居学樘府店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 279,
+      "entity_type": "project",
+      "entity_id": 19,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居崇山路店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居崇山路店/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 285,
+      "entity_type": "project",
+      "entity_id": 20,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居未来店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居未来店/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 296,
+      "entity_type": "project",
+      "entity_id": 21,
+      "file_path": "assets/juzhu/sy/projects/bzf/皇姑区/逸居美的瀚堂.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/店封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 301,
+      "entity_type": "project",
+      "entity_id": 22,
+      "file_path": "assets/juzhu/sy/projects/bzf/苏家屯区/九里店.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/苏家屯区/九里店/店 封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 306,
+      "entity_type": "project",
+      "entity_id": 23,
+      "file_path": "assets/juzhu/sy/projects/bzf/苏家屯区/地铁云杉里.jpeg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/苏家屯区/地铁云杉里/店 封面.jpeg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 309,
+      "entity_type": "project",
+      "entity_id": 24,
+      "file_path": "assets/juzhu/sy/projects/trade/中德人才社区.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/中德人才社区/项目 封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 326,
+      "entity_type": "project",
+      "entity_id": 25,
+      "file_path": "assets/juzhu/sy/projects/trade/逸居锦城.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/逸居锦城/项目 封面.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
       "id": 1,
       "entity_type": "district",
       "entity_id": 1,
@@ -5458,84 +4461,12 @@
       "sort_order": 0
     },
     {
-      "id": 340,
-      "entity_type": "unit",
-      "entity_id": 1,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg",
-      "source_path": "e9194caaf400128d4cb574bb7f95acc5.jpeg",
-      "is_cover": 1,
-      "sort_order": 2
-    },
-    {
-      "id": 341,
-      "entity_type": "unit",
-      "entity_id": 1,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_3.jpeg",
-      "source_path": "ec84dbd75f2e5db7c7073131b20f7b1b.jpeg",
-      "is_cover": 0,
-      "sort_order": 3
-    },
-    {
-      "id": 338,
-      "entity_type": "unit",
-      "entity_id": 1,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
-      "source_path": "0f63dbc18683d04858956e9e68b387b1.jpeg",
-      "is_cover": 0,
-      "sort_order": 4
-    },
-    {
-      "id": 339,
-      "entity_type": "unit",
-      "entity_id": 1,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
-      "source_path": "22fdaaef85480a9c849395936dd8d02e.jpeg",
-      "is_cover": 0,
-      "sort_order": 5
-    },
-    {
-      "id": 344,
-      "entity_type": "unit",
-      "entity_id": 2,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_2.jpeg",
-      "source_path": "90d81d86986f5026761aa6ec6af7ea59.jpeg",
-      "is_cover": 0,
-      "sort_order": 2
-    },
-    {
-      "id": 345,
-      "entity_type": "unit",
-      "entity_id": 2,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_3.jpeg",
-      "source_path": "712d0df1a5b35598f0da56b0fa92fdbd.jpeg",
-      "is_cover": 0,
-      "sort_order": 3
-    },
-    {
-      "id": 342,
-      "entity_type": "unit",
-      "entity_id": 2,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
-      "source_path": "3dac6454db4efe8cb8e7a4bca4d4e49b.jpeg",
-      "is_cover": 0,
-      "sort_order": 4
-    },
-    {
-      "id": 343,
-      "entity_type": "unit",
-      "entity_id": 2,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
-      "source_path": "8fab138479e64c744604017c9403fda4.jpeg",
-      "is_cover": 1,
-      "sort_order": 5
-    },
-    {
       "id": 11,
       "entity_type": "unit",
       "entity_id": 3,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/和平区/CCB建融家园中华路店/56平/43e0a33ebc3f1c8fcbeff213799c54a8.jpg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -5562,7 +4493,7 @@
       "entity_id": 3,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_3.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/和平区/CCB建融家园中华路店/56平/d30e816aa02fb1c7f757eaf5165eed42.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 3
     },
     {
@@ -5701,6 +4632,15 @@
       "sort_order": 4
     },
     {
+      "id": 32,
+      "entity_type": "unit",
+      "entity_id": 8,
+      "file_path": "assets/juzhu/sy/units/bzf/新东人才住房/64平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/新东人才住房/64平/4562faed4b2618caea51857a3879ab50.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
       "id": 33,
       "entity_type": "unit",
       "entity_id": 8,
@@ -5726,15 +4666,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/新东人才住房/64平/f5733926f67ff846787c948647e86aa7.jpg",
       "is_cover": 0,
       "sort_order": 3
-    },
-    {
-      "id": 32,
-      "entity_type": "unit",
-      "entity_id": 8,
-      "file_path": "assets/juzhu/sy/units/bzf/新东人才住房/64平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/新东人才住房/64平/4562faed4b2618caea51857a3879ab50.jpg",
-      "is_cover": 1,
-      "sort_order": 4
     },
     {
       "id": 36,
@@ -5845,12 +4776,12 @@
       "sort_order": 5
     },
     {
-      "id": 52,
+      "id": 49,
       "entity_type": "unit",
       "entity_id": 11,
-      "file_path": "assets/juzhu/sy/units/bzf/观泉店/33平_3.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/33平/a0d61888b9624c6b7f179dd78b7207ed.jpg",
-      "is_cover": 0,
+      "file_path": "assets/juzhu/sy/units/bzf/观泉店/33平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/33平/06b19a22e91f74af009a78d5547dcd58.jpg",
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -5872,21 +4803,21 @@
       "sort_order": 2
     },
     {
-      "id": 49,
+      "id": 52,
       "entity_type": "unit",
       "entity_id": 11,
-      "file_path": "assets/juzhu/sy/units/bzf/观泉店/33平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/33平/06b19a22e91f74af009a78d5547dcd58.jpg",
-      "is_cover": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/观泉店/33平_3.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/33平/a0d61888b9624c6b7f179dd78b7207ed.jpg",
+      "is_cover": 0,
       "sort_order": 3
     },
     {
-      "id": 55,
+      "id": 53,
       "entity_type": "unit",
       "entity_id": 12,
-      "file_path": "assets/juzhu/sy/units/bzf/观泉店/49平_2.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/49平/e7a695142508d37e2682e5f224cfc640.jpg",
-      "is_cover": 0,
+      "file_path": "assets/juzhu/sy/units/bzf/观泉店/49平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/49平/3a6f5f275573a41c2f28b3d42c752dd4.jpg",
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -5899,12 +4830,12 @@
       "sort_order": 1
     },
     {
-      "id": 53,
+      "id": 55,
       "entity_type": "unit",
       "entity_id": 12,
-      "file_path": "assets/juzhu/sy/units/bzf/观泉店/49平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/49平/3a6f5f275573a41c2f28b3d42c752dd4.jpg",
-      "is_cover": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/观泉店/49平_2.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/观泉店/49平/e7a695142508d37e2682e5f224cfc640.jpg",
+      "is_cover": 0,
       "sort_order": 2
     },
     {
@@ -5935,11 +4866,11 @@
       "sort_order": 2
     },
     {
-      "id": 63,
+      "id": 60,
       "entity_type": "unit",
       "entity_id": 14,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_3.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/e152e3ec2659bf42050489a56117afad.jpg",
+      "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/425016016f88c558a12acc14514d079e.jpg",
       "is_cover": 1,
       "sort_order": 0
     },
@@ -5962,13 +4893,31 @@
       "sort_order": 2
     },
     {
-      "id": 60,
+      "id": 63,
       "entity_type": "unit",
       "entity_id": 14,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/425016016f88c558a12acc14514d079e.jpg",
+      "file_path": "assets/juzhu/sy/units/bzf/逸居望花丽景店/60平_3.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/大东区/逸居望花丽景店/60平/e152e3ec2659bf42050489a56117afad.jpg",
       "is_cover": 0,
       "sort_order": 3
+    },
+    {
+      "id": 65,
+      "entity_type": "unit",
+      "entity_id": 15,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/23平/WechatIMG215.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 66,
+      "entity_type": "unit",
+      "entity_id": 15,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平_1.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/23平/WechatIMG216.jpg",
+      "is_cover": 0,
+      "sort_order": 1
     },
     {
       "id": 67,
@@ -5976,7 +4925,7 @@
       "entity_id": 15,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平_2.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/23平/WechatIMG217.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 2
     },
     {
@@ -5989,22 +4938,13 @@
       "sort_order": 3
     },
     {
-      "id": 65,
+      "id": 69,
       "entity_type": "unit",
-      "entity_id": 15,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/23平/WechatIMG215.jpg",
-      "is_cover": 0,
-      "sort_order": 4
-    },
-    {
-      "id": 66,
-      "entity_type": "unit",
-      "entity_id": 15,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/23平_1.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/23平/WechatIMG216.jpg",
-      "is_cover": 0,
-      "sort_order": 5
+      "entity_id": 16,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/32平/WechatIMG211.jpg",
+      "is_cover": 1,
+      "sort_order": 0
     },
     {
       "id": 70,
@@ -6012,7 +4952,7 @@
       "entity_id": 16,
       "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平_1.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/32平/WechatIMG212.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 1
     },
     {
@@ -6032,15 +4972,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/32平/WechatIMG214.jpg",
       "is_cover": 0,
       "sort_order": 3
-    },
-    {
-      "id": 69,
-      "entity_type": "unit",
-      "entity_id": 16,
-      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园青年大街店/32平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/CCB建融家园青年大街店/32平/WechatIMG211.jpg",
-      "is_cover": 0,
-      "sort_order": 4
     },
     {
       "id": 74,
@@ -6529,6 +5460,15 @@
       "sort_order": 6
     },
     {
+      "id": 131,
+      "entity_type": "unit",
+      "entity_id": 26,
+      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/33平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/33平/微信图片_20260129162017_315_1.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
       "id": 132,
       "entity_type": "unit",
       "entity_id": 26,
@@ -6547,13 +5487,22 @@
       "sort_order": 2
     },
     {
-      "id": 131,
+      "id": 134,
       "entity_type": "unit",
-      "entity_id": 26,
-      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/33平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/33平/微信图片_20260129162017_315_1.jpg",
+      "entity_id": 27,
+      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/54平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/54平/微信图片_20260129161159_309_1.jpg",
       "is_cover": 1,
-      "sort_order": 3
+      "sort_order": 0
+    },
+    {
+      "id": 135,
+      "entity_type": "unit",
+      "entity_id": 27,
+      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/54平_1.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/54平/微信图片_20260129161200_310_1.jpg",
+      "is_cover": 0,
+      "sort_order": 1
     },
     {
       "id": 136,
@@ -6581,24 +5530,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/54平/微信图片_20260129161203_313_1.jpg",
       "is_cover": 0,
       "sort_order": 4
-    },
-    {
-      "id": 134,
-      "entity_type": "unit",
-      "entity_id": 27,
-      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/54平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/54平/微信图片_20260129161159_309_1.jpg",
-      "is_cover": 1,
-      "sort_order": 5
-    },
-    {
-      "id": 135,
-      "entity_type": "unit",
-      "entity_id": 27,
-      "file_path": "assets/juzhu/sy/units/bzf/群升新天地/54平_1.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/沈河区/群升新天地/54平/微信图片_20260129161200_310_1.jpg",
-      "is_cover": 0,
-      "sort_order": 6
     },
     {
       "id": 139,
@@ -7402,6 +6333,15 @@
       "sort_order": 4
     },
     {
+      "id": 231,
+      "entity_type": "unit",
+      "entity_id": 42,
+      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/35平_0.png",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/35平/e05ff6116043d8540019dca1a70e5ddc.jpg.png",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
       "id": 232,
       "entity_type": "unit",
       "entity_id": 42,
@@ -7411,13 +6351,13 @@
       "sort_order": 1
     },
     {
-      "id": 231,
+      "id": 233,
       "entity_type": "unit",
-      "entity_id": 42,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/35平_0.png",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/35平/e05ff6116043d8540019dca1a70e5ddc.jpg.png",
+      "entity_id": 43,
+      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/45平_0.png",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/45平/23159722085d6a850076246304a0f59e.jpg.png",
       "is_cover": 1,
-      "sort_order": 2
+      "sort_order": 0
     },
     {
       "id": 234,
@@ -7438,13 +6378,13 @@
       "sort_order": 2
     },
     {
-      "id": 233,
+      "id": 236,
       "entity_type": "unit",
-      "entity_id": 43,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/45平_0.png",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/45平/23159722085d6a850076246304a0f59e.jpg.png",
+      "entity_id": 44,
+      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/75平_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/75平/3c6398d2531cf3c920ab87cb4558d1b5.jpg",
       "is_cover": 1,
-      "sort_order": 3
+      "sort_order": 0
     },
     {
       "id": 237,
@@ -7454,15 +6394,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/75平/52030e46a5b34d7bbb352c951d4e4beb.jpg",
       "is_cover": 0,
       "sort_order": 1
-    },
-    {
-      "id": 236,
-      "entity_type": "unit",
-      "entity_id": 44,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居奥体店/75平_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/浑南区/逸居奥体店/75平/3c6398d2531cf3c920ab87cb4558d1b5.jpg",
-      "is_cover": 1,
-      "sort_order": 2
     },
     {
       "id": 239,
@@ -7668,7 +6599,7 @@
       "entity_id": 49,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_0.png",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/40平/2.png",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -7695,7 +6626,7 @@
       "entity_id": 49,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/40平_3.png",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/40平/ebd0504f206a7411a514d2ac6f8b3924.jpg.png",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 3
     },
     {
@@ -7749,7 +6680,7 @@
       "entity_id": 51,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_0.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/61平/280a5dfb389d7c5188387ff74f874c05.jpg",
-      "is_cover": 0,
+      "is_cover": 1,
       "sort_order": 0
     },
     {
@@ -7785,7 +6716,7 @@
       "entity_id": 51,
       "file_path": "assets/juzhu/sy/units/bzf/逸居学樘府店/61平_4.jpg",
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居学樘府店/61平/cd1e8649155a8397bf2048e6498f18fe.jpg",
-      "is_cover": 1,
+      "is_cover": 0,
       "sort_order": 4
     },
     {
@@ -7933,6 +6864,24 @@
       "sort_order": 3
     },
     {
+      "id": 297,
+      "entity_type": "unit",
+      "entity_id": 57,
+      "file_path": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107_0.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/107/3820e16d04571ff76e00376cc3bb94c8.jpg",
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 298,
+      "entity_type": "unit",
+      "entity_id": 57,
+      "file_path": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107_1.jpg",
+      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/107/56bd42a6b2c9ab1df787d1ab5e0e5035.jpg",
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
       "id": 299,
       "entity_type": "unit",
       "entity_id": 57,
@@ -7949,24 +6898,6 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/107/e722c6eac2463bf836f78e8c6ef7db69.jpg",
       "is_cover": 0,
       "sort_order": 3
-    },
-    {
-      "id": 297,
-      "entity_type": "unit",
-      "entity_id": 57,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107_0.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/107/3820e16d04571ff76e00376cc3bb94c8.jpg",
-      "is_cover": 1,
-      "sort_order": 4
-    },
-    {
-      "id": 298,
-      "entity_type": "unit",
-      "entity_id": 57,
-      "file_path": "assets/juzhu/sy/units/bzf/逸居美的瀚堂/107_1.jpg",
-      "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/保租房专区/皇姑区/逸居美的瀚堂/107/56bd42a6b2c9ab1df787d1ab5e0e5035.jpg",
-      "is_cover": 0,
-      "sort_order": 5
     },
     {
       "id": 302,
@@ -8255,6 +7186,78 @@
       "source_path": "/Users/scubiry/Downloads/东博项目/新居住专区/卖旧买新专区/逸居锦城/139平/ed0e7fcfcea0b13c8f70433ab6fda8dd.jpg",
       "is_cover": 0,
       "sort_order": 4
+    },
+    {
+      "id": 338,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 339,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 340,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 341,
+      "entity_type": "unit",
+      "entity_id": 1,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
+    },
+    {
+      "id": 342,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_0.jpeg",
+      "source_path": null,
+      "is_cover": 1,
+      "sort_order": 0
+    },
+    {
+      "id": 343,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_1.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 344,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_2.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 2
+    },
+    {
+      "id": 345,
+      "entity_type": "unit",
+      "entity_id": 2,
+      "file_path": "assets/juzhu/sy/units/bzf/CCB建融家园中华路店/40平_3.jpeg",
+      "source_path": null,
+      "is_cover": 0,
+      "sort_order": 3
     }
   ]
 }

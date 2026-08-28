@@ -45,7 +45,7 @@ JZ_DATA.getCategories(type).then(function(subs){
   document.getElementById('subFilter').innerHTML = all.map(function(s,i){
     return '<a href="javascript:;" data-sub="'+(s.name||'all')+'"'+(i===0?' class="on"':'')+'>'+s.name+'</a>';
   }).join('');
-});
+}).catch(function(){});
 document.getElementById('subFilter').addEventListener('click', function(e){
   var t = e.target.closest('[data-sub]');
   if (!t) return;
@@ -98,6 +98,8 @@ function render(){
       '</div>';
     }).join('');
     document.getElementById('vendorList').innerHTML = html;
+  }).catch(function(){
+    document.getElementById('vendorList').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);">商家加载失败，请稍后重试</div>';
   });
 }
 render();

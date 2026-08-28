@@ -6,12 +6,10 @@
 - 执行后自动 export_json() 生成 data-nanjing.json / data-guiyang.json / cities.json
 """
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DB = ROOT / "juzhu.db"
 sys.path.insert(0, str(ROOT))
 import db  # noqa: E402
 
@@ -185,10 +183,8 @@ def slugify(name):
 
 
 def main():
-    conn = sqlite3.connect(str(DB))
-    conn.row_factory = sqlite3.Row
+    conn = db.connect()
     cur = conn.cursor()
-    conn.execute("PRAGMA foreign_keys = ON")
 
     for city in CITIES:
         # 城市（幂等：存在则更新，不存在则插入）

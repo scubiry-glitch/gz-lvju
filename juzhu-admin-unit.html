@@ -106,16 +106,28 @@ var AMENITY_CATALOG = [
   { id: 'induction', label: '电磁炉' }
 ];
 
-/* ── API helpers ── */
-function getApiKey() {
-  try { return localStorage.getItem('JUZHU_API_KEY') || 'dev-juzhu-key'; } catch(e) { return 'dev-juzhu-key'; }
+/* ── Auth helpers ── */
+var AUTH_TOKEN_KEY = 'JUZHU_ADMIN_TOKEN';
+function getAuthToken() {
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch(e) { return ''; }
+}
+function authHeaders(extra) {
+  var h = extra || {};
+  var token = getAuthToken();
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+}
+function checkAuth() {
+  var token = getAuthToken();
+  if (!token) return Promise.resolve(false);
+  return fetch(API + '/auth/check', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(r) { return r.ok; }).catch(function() { return false; });
 }
 
+/* ── API helpers ── */
 function api(path, opts) {
   opts = opts || {};
-  var headers = opts.body ? {'Content-Type':'application/json'} : {};
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
+  var headers = authHeaders(opts.body ? {'Content-Type':'application/json'} : {});
   return fetch(API + path, {
     method: opts.method || 'GET',
     headers: headers,
@@ -127,10 +139,7 @@ function api(path, opts) {
 }
 
 function uploadForm(path, formData) {
-  var headers = {};
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
-  return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
+  return fetch(API + path, { method: 'POST', headers: authHeaders(), body: formData }).then(function(r) {
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
@@ -625,8 +634,14 @@ function reloadPhotos() {
   });
 }
 
-// Go!
-loadUnit();
+// Go! — 先验证登录，未登录跳回管理首页
+checkAuth().then(function(ok) {
+  if (!ok) {
+    location.href = 'juzhu-admin.html';
+    return;
+  }
+  loadUnit();
+});
 </script>
 </body>
 </html>

@@ -57,7 +57,7 @@
 </div>
 
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=2"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script src="jiazheng-data.js?v=2"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
@@ -133,7 +133,10 @@
       return;
     }
     var JZ = window.BZF_JZ;
-    if (!JZ.apiKey()) JZ.setApiKey('dev-juzhu-key');
+    if (!JZ.apiKey()) {
+      alert('未配置 API Key：请在控制台执行 localStorage.setItem("JUZHU_API_KEY", "<密钥>") 后重试');
+      return;
+    }
     var btn = document.getElementById('submitBtn');
     btn.textContent = '提交中…';
     btn.style.opacity = 0.7;
@@ -146,7 +149,7 @@
       desc: document.getElementById('descInput').value.trim(),
       worker_id: qs.get('worker') || undefined,
       slot_id: qs.get('slot') || undefined,
-      source: '新居住频道'
+      source: (JZ.channelName && JZ.channelName()) || '新居住频道'
     }).then(function(o){
       location.href = 'lvju-app-pay.html?order=' + encodeURIComponent(o.id) + '&channel=jiazheng';
     }).catch(function(err){
@@ -207,6 +210,8 @@
           alert('下单失败：' + e.message);
         });
       });
+    }).catch(function(){
+      document.querySelector('.jz-wrap').innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">订单信息加载失败，请稍后重试</div>';
     });
   }
 
@@ -227,6 +232,7 @@
 
   paintTimeSlots();
   renderTimeMode();
+  if (window.BZF_JZ && BZF_JZ.loadChannelBrand) BZF_JZ.loadChannelBrand();
 
   if (skuSlug) {
     BZF_JZ.sku(skuSlug).then(function(res){

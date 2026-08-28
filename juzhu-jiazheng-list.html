@@ -12,16 +12,24 @@
   .list-sticky{position:sticky;top:58px;z-index:20;background:#fff;border-bottom:1px solid #f0f3f1;padding-bottom:10px;}
   .search{display:flex;align-items:center;gap:10px;background:#f3f5f4;border:1px solid #eef2f1;border-radius:18px;padding:12px 14px;}
   .search input{border:0;outline:0;background:transparent;flex:1;font-size:14px;color:var(--ink);font-family:inherit;}
-  .search .loc{font-size:12px;color:var(--brand);font-weight:600;}
+  .search .loc{font-size:12px;font-weight:600;color:var(--cat-brand,var(--brand));}
   .sub-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 8px;background:#fff;border-top:1px solid #f0f3f1;scrollbar-width:none;}
   .sub-tabs::-webkit-scrollbar{display:none;}
   .sub-tabs a{flex:0 0 auto;padding:8px 14px;border-radius:999px;background:#f5f7f6;color:var(--muted);font-size:12px;border:1px solid transparent;}
-  .sub-tabs a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;}
+  .sub-tabs a.on{background:linear-gradient(90deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-weight:700;}
   .hero-card{margin:10px 16px 0;border-radius:18px;padding:14px 16px;color:#fff;position:relative;overflow:hidden;
     background:linear-gradient(135deg,#0b5d56,#1b4f47 48%,#c58d36);box-shadow:0 12px 26px rgba(15,42,38,.14);}
   .hero-card.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 52%,#8bb8ff);}
   .hero-card.moving{background:linear-gradient(135deg,#f97316,#bf4b13 50%,#f7b267);}
   .hero-card.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 52%,#d6bcfa);}
+  .hero-card.telecom{background:linear-gradient(135deg,#1d4e89,#123a66 52%,#7db3f0);}
+  .hero-card.insurance{background:linear-gradient(135deg,#8c6224,#6b4a1a 52%,#e8c878);}
+  .hero-card.consumer_finance{background:linear-gradient(135deg,#0f1a4d,#1a2a6b 52%,#8ba3e0);}
+  .hero-card.health_care{background:linear-gradient(135deg,#0e7490,#0a5568 52%,#7dd3fc);}
+  .hero-card.home_maintain{background:linear-gradient(135deg,#3f6212,#2d4a0c 52%,#a3e635);}
+  .hero-card.asset{background:linear-gradient(135deg,#1e3a5f,#152a45 52%,#93c5fd);}
+  .hero-card.recycle{background:linear-gradient(135deg,#166534,#0f4a26 52%,#86efac);}
+  .hero-card.community{background:linear-gradient(135deg,#6d28d9,#4c1d95 52%,#c4b5fd);}
   .hero-card::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 86% 22%,rgba(255,255,255,.22),transparent 22%),
     repeating-linear-gradient(100deg,rgba(255,255,255,.05) 0 2px,transparent 2px 16px);opacity:.8;}
   .hero-card .in{position:relative;z-index:2;}
@@ -33,7 +41,7 @@
   .hero-cta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
   .hero-cta .price{font-family:var(--serif);font-size:22px;}
   .hero-cta .price small{font-family:var(--font);font-size:11px;opacity:.86;margin-left:4px;}
-  .hero-cta .btn{padding:9px 16px;border-radius:999px;background:#fff;color:var(--brand-deep);font-size:12px;font-weight:700;}
+  .hero-cta .btn{padding:9px 16px;border-radius:999px;background:#fff;color:var(--cat-deep,var(--brand-deep));font-size:12px;font-weight:700;}
   .toolbar{display:flex;gap:8px;align-items:center;padding:12px 16px 6px;color:var(--muted);font-size:12px;}
   .toolbar .tag{padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--border);}
   .toolbar .tag.hot{color:#ef4444;border-color:#fee2e2;background:#fff5f5;}
@@ -46,6 +54,14 @@
   .svc-poster.repair{background:linear-gradient(135deg,#2563eb,#60a5fa);}
   .svc-poster.moving{background:linear-gradient(135deg,#ea580c,#fb923c);}
   .svc-poster.nanny{background:linear-gradient(135deg,#7c3aed,#a78bfa);}
+  .svc-poster.telecom{background:linear-gradient(135deg,#1d4e89,#60a5fa);}
+  .svc-poster.insurance{background:linear-gradient(135deg,#8c6224,#e8c878);}
+  .svc-poster.consumer_finance{background:linear-gradient(135deg,#0f1a4d,#8ba3e0);}
+  .svc-poster.health_care{background:linear-gradient(135deg,#0e7490,#67e8f9);}
+  .svc-poster.home_maintain{background:linear-gradient(135deg,#3f6212,#a3e635);}
+  .svc-poster.asset{background:linear-gradient(135deg,#1e3a5f,#93c5fd);}
+  .svc-poster.recycle{background:linear-gradient(135deg,#166534,#86efac);}
+  .svc-poster.community{background:linear-gradient(135deg,#6d28d9,#c4b5fd);}
   .svc-poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.18));}
   .svc-poster .t1,.svc-poster .t2,.svc-poster .t3{position:relative;z-index:2;}
   .svc-poster .t1{font-size:9px;padding:6px 8px 0;opacity:.9;letter-spacing:.08em;}
@@ -59,7 +75,7 @@
   .svc-rank{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px;}
   .svc-rank span{font-size:10px;padding:2px 7px;border-radius:999px;background:#faf5e8;color:var(--gold-deep);}
   .svc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px;overflow:hidden;max-height:18px;}
-  .svc-tags span{font-size:10px;padding:2px 7px;border-radius:999px;background:#eef6f4;color:var(--brand-deep);}
+  .svc-tags span{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--cat-soft,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
   .svc-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3px;}
   .svc-price{color:#ef5a2a;}
   .svc-price b{font-family:var(--serif);font-size:18px;line-height:1;}
@@ -73,7 +89,7 @@
 <div class="app">
   <div class="scr">
     <div class="appbar">
-      <a class="bk" href="juzhu-channel-v3-grid.html">‹</a>
+      <a class="bk" href="index.html">‹</a>
       <div class="ttl" id="ttl">家政服务<small id="ttlSub">南京 · 新居住频道</small></div>
       <div class="act"><span>⌕</span><span>⌖</span></div>
     </div>
@@ -104,7 +120,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=3"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -120,20 +136,61 @@
     { id: 'cleaning', name: '保洁', icon: '🧹' },
     { id: 'repair', name: '维修', icon: '🔧' },
     { id: 'moving', name: '搬家', icon: '📦' },
-    { id: 'nanny', name: '保姆', icon: '👶' }
+    { id: 'nanny', name: '保姆', icon: '👶' },
+    { id: 'telecom', name: '电讯服务', icon: '📱' },
+    { id: 'insurance', name: '财险服务', icon: '🛡' },
+    { id: 'consumer_finance', name: '消费金融', icon: '💳' },
+    { id: 'health_care', name: '健康养老', icon: '🏥' },
+    { id: 'home_maintain', name: '居家维护', icon: '🏠' },
+    { id: 'asset', name: '资产服务', icon: '🏦' },
+    { id: 'recycle', name: '二手回收', icon: '♻️' },
+    { id: 'community', name: '社区服务', icon: '🏘' }
   ];
   var categories = DEFAULT_CATS.slice();
   var skus = [];
 
   JZ.applyRegionChrome({ titleSub: '#ttlSub', loc: '#cityLoc' });
-  document.title = '家政服务 · ' + JZ.regionCity();
+  document.title = '本地生活 · ' + JZ.regionCity();
+
+  /* 与 hero / poster 频道色对齐，供副导航等 chrome 使用 */
+  var CAT_THEME = {
+    cleaning:         { brand: '#0f766e', brand2: '#14b8a6', deep: '#0b5d56' },
+    repair:           { brand: '#1d4ed8', brand2: '#60a5fa', deep: '#16356a' },
+    moving:           { brand: '#ea580c', brand2: '#fb923c', deep: '#bf4b13' },
+    nanny:            { brand: '#7c3aed', brand2: '#a78bfa', deep: '#4d2579' },
+    telecom:          { brand: '#1d4e89', brand2: '#60a5fa', deep: '#123a66' },
+    insurance:        { brand: '#8c6224', brand2: '#c9a24b', deep: '#6b4a1a' },
+    consumer_finance: { brand: '#0f1a4d', brand2: '#8ba3e0', deep: '#0a1028' },
+    health_care:      { brand: '#0e7490', brand2: '#67e8f9', deep: '#0a5568' },
+    home_maintain:    { brand: '#3f6212', brand2: '#a3e635', deep: '#2d4a0c' },
+    asset:            { brand: '#1e3a5f', brand2: '#93c5fd', deep: '#152a45' },
+    recycle:          { brand: '#166534', brand2: '#86efac', deep: '#0f4a26' },
+    community:        { brand: '#6d28d9', brand2: '#c4b5fd', deep: '#4c1d95' }
+  };
 
   var CAT_UI = {
     cleaning: { heroEyebrow: 'HOUSEKEEPING SELECT', desc: '日常保洁、深度清洁、搬家保洁一屏可选，均为持证服务者就近上门。', price: '¥128', unit: '起', cls: 'cleaning' },
     repair:   { heroEyebrow: 'REPAIR EXPRESS', desc: '紧急故障优先响应，30 分钟内派发就近持证技师。', price: '¥59', unit: '起', cls: 'repair' },
     moving:   { heroEyebrow: 'MOVING SERVICE', desc: '同城搬家、长途搬运、企业搬迁明码标价，师傅与车型一键匹配。', price: '¥398', unit: '起', cls: 'moving' },
-    nanny:    { heroEyebrow: 'HOME CARE', desc: '住家保姆、育儿嫂、钟点工统一预约，背景核验、持证上岗。', price: '¥128', unit: '起', cls: 'nanny' }
+    nanny:    { heroEyebrow: 'HOME CARE', desc: '住家保姆、育儿嫂、钟点工统一预约，背景核验、持证上岗。', price: '¥128', unit: '起', cls: 'nanny' },
+    telecom:  { heroEyebrow: 'TELECOM', desc: '宽带新装、号码携转、套餐对比，装维上门开通。', price: '¥99', unit: '起', cls: 'telecom' },
+    insurance:{ heroEyebrow: 'INSURANCE', desc: '家财险、租客责任险在线投保，覆盖漏水火灾盗抢。', price: '¥68', unit: '起', cls: 'insurance' },
+    consumer_finance: { heroEyebrow: 'CONSUMER FINANCE', desc: '租住分期、消费贷额度查询，信用评估灵活还款。', price: '咨询', unit: '', cls: 'consumer_finance' },
+    health_care: { heroEyebrow: 'HEALTH & ELDER', desc: '养老陪护、体检套餐，持证护理与三甲对接。', price: '¥280', unit: '起', cls: 'health_care' },
+    home_maintain: { heroEyebrow: 'HOME MAINTAIN', desc: '管道养护、家电保养季度套餐，定期维保更省心。', price: '¥159', unit: '起', cls: 'home_maintain' },
+    asset:    { heroEyebrow: 'ASSET SERVICE', desc: '房产评估、托管运营咨询，持证顾问一对一服务。', price: '¥500', unit: '起', cls: 'asset' },
+    recycle:  { heroEyebrow: 'RECYCLE', desc: '旧家电、家具上门估价回收，环保清运当日完成。', price: '估价', unit: '', cls: 'recycle' },
+    community:{ heroEyebrow: 'COMMUNITY', desc: '社区团购日配、便民跑腿代办，邻里服务一站搞定。', price: '¥29', unit: '起', cls: 'community' }
   };
+
+  function applyCatTheme(type){
+    var t = CAT_THEME[type] || CAT_THEME.cleaning;
+    var root = document.querySelector('.scr') || document.documentElement;
+    root.style.setProperty('--cat-brand', t.brand);
+    root.style.setProperty('--cat-brand-2', t.brand2);
+    root.style.setProperty('--cat-deep', t.deep);
+    root.style.setProperty('--cat-soft', 'color-mix(in oklab,' + t.brand + ' 12%, transparent)');
+  }
 
   function priceText(item){
     var p = item.product_min_price || item.price_from || 0;
@@ -146,12 +203,13 @@
     var uniq = Array.from(new Set(names));
     document.getElementById('subTabs').innerHTML = uniq.map(function(name){
       var on = (!currentSub && name === '全部') || currentSub === name;
-      var href = name === '全部' ? '?type=' + currentType : '?type=' + currentType + '&sub=' + encodeURIComponent(name);
+      var href = name === '全部' ? JZ.chainCity('?type=' + currentType) : JZ.chainCity('?type=' + currentType + '&sub=' + encodeURIComponent(name));
       return '<a class="'+(on?'on':'')+'" href="'+href+'">'+name+'</a>';
     }).join('');
   }
 
   function renderHero(){
+    applyCatTheme(currentType);
     var cat = categories.find(function(x){ return x.id === currentType; }) || { name: '家政', icon: '✨' };
     var ui = CAT_UI[currentType] || CAT_UI.cleaning;
     var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.product_min_price||a.price_from||0)-(b.product_min_price||b.price_from||0); })[0];
@@ -195,7 +253,7 @@
       if (item.rating_score) rank.push('★ ' + Number(item.rating_score).toFixed(1));
       if (item.sales_text) rank.push(item.sales_text);
       if (item.worker_min_level) rank.push(item.worker_min_level + '+');
-      return '<a class="svc-card" href="juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)+'">'+
+      return '<a class="svc-card" href="' + JZ.chainCity('juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)) + '">'+
         '<div class="svc-poster '+cls+'">'+
           '<div class="t1">'+(item.badges && item.badges[0] ? item.badges[0] : '精选服务')+'</div>'+
           '<div class="t2">'+head+'</div>'+

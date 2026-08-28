@@ -2,9 +2,20 @@ import os
 from sign_util import HmacAuth
 
 if __name__ == "__main__":
-    key_path = os.path.join(os.path.dirname(__file__), "hmac_secret.key")
-    with open(key_path, "r") as f:
-        secret_key = f.read().strip()
+    # 密钥从 jz_vendors 表读取（hmac_secret.key 已废弃）；示例取 vendor_id=41 的密钥
+    from tp_client import load_dotenv
+
+    load_dotenv()
+    import db as jdb
+
+    conn = jdb.connect()
+    try:
+        row = conn.execute("SELECT hmac_key FROM jz_vendors WHERE id=41").fetchone()
+    finally:
+        conn.close()
+    if not row or not (row[0] or "").strip():
+        raise RuntimeError("jz_vendors 表中未找到 vendor_id=41 的 hmac_key")
+    secret_key = row[0].strip()
     # 实例化工具类
     auth = HmacAuth(secret_key=secret_key)
 
@@ -13,7 +24,7 @@ if __name__ == "__main__":
     # ==========================================
     original_data = {
         "order_ref": "GR20260729xxxx",
-        "lailai_oid": "LL_88888",
+        "vendor_oid": "SP_88888",
         "status": "paid",
         "fee": 12800,
         "worker": {

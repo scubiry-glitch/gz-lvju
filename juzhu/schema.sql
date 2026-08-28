@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS projects (
   is_featured   INTEGER NOT NULL DEFAULT 0,
   featured_rank INTEGER,
   old_house_hint TEXT,                       -- 卖旧买新：旧房估价提示
+  contact_phone TEXT,                        -- 项目联系真实号（仅 DB/管理端；不进 data.json）
   rating_status TEXT NOT NULL DEFAULT 'draft',  -- draft|pending|passed|rejected
   rating        TEXT,                        -- JSON：好房子四维度 + 星级 + 编号
   rating_submitted_at TEXT,
@@ -165,7 +166,9 @@ CREATE INDEX IF NOT EXISTS idx_jz_orders_status ON jz_orders(status, pay_status,
 CREATE TABLE IF NOT EXISTS gr_orders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   order_ref       TEXT UNIQUE NOT NULL,       -- GR侧订单参考号
-  lailai_oid      TEXT,                       -- 来来订单号
+  vendor_id       INTEGER,                    -- 商家ID（关联 jz_vendors.id）
+  vendor_oid      TEXT,                       -- 商家订单号
+  user_id         TEXT,                       -- 下单用户 id（C 端模拟，后期接真实登录）
   sku             TEXT,                       -- 服务SKU
   city            TEXT DEFAULT '沈阳',
   status          TEXT DEFAULT 'pending',     -- pending/paid/assigned/serving/completed/cancelled
@@ -175,9 +178,26 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   eta             TEXT,                       -- 预计到达时间
   cancel_reason   TEXT,                       -- 取消原因
   paid_at         TEXT,                       -- 支付时间
+  serving_at      TEXT,                       -- 服务开始时间
   completed_at    TEXT,                       -- 完成时间
   created_at      TEXT DEFAULT (datetime('now','localtime')),
   updated_at      TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_gr_orders_ref ON gr_orders(order_ref);
+
+-- 迁移：老库 gr_orders 增加 vendor_id 列（多商家接入时新增）
+-- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders ADD COLUMN vendor_id INTEGER;
+
+-- 迁移：将 lailai_oid 重命名为 vendor_oid（兼容旧数据库）
+-- 注意：此语句在首次执行后对新数据库会报错，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders RENAME COLUMN lailai_oid TO vendor_oid;
+
+-- 迁移：老库 gr_orders 增加 user_id 列（我的订单用户维度）
+-- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders ADD COLUMN user_id TEXT;
+
+-- 迁移：老库 gr_orders 增加 serving_at 列（服务中时间戳）
+-- 注意：新库建表已含该列，此语句会报 duplicate column 错误，由 _connect_db() 捕获忽略
+ALTER TABLE gr_orders ADD COLUMN serving_at TEXT;

@@ -10,7 +10,7 @@
 |------|-----|
 | 名称 | 保洁 |
 | 图标 | 🧹 |
-| 频道入口 | `juzhu-channel-v3-grid.html` → 家政 Tab → 保洁大卡 |
+| 频道入口 | `index.html` → 家政 Tab → 保洁大卡 |
 | 色系 | 青绿渐变 `.jz-cat.cleaning`（`#1aa39a → #0c4d44`） |
 | 目标用户 | 保租房租客、旅居短住客、企业办公负责人 |
 
@@ -27,7 +27,7 @@
 | 擦玻璃 | 内外双面 | ¥15/扇 起 | /扇 | 按扇数 |
 | 油烟机清洗 | 深度拆洗 | ¥128 起 | /台 | 90min |
 
-原型数据来源：`juzhu-channel-v3-grid.html` → `renderJiazhengSubs()` 热门子类行。
+原型数据来源：`index.html` → `renderJiazhengSubs()` 热门子类行。
 
 ---
 

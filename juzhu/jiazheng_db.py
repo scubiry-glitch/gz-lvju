@@ -2,7 +2,6 @@
 所有 vendor/product/worker JSON 输出都解析 badges/tags/certs 字段
 """
 import json
-import sqlite3
 
 
 def _row_to_dict(row):
@@ -26,6 +25,18 @@ def _row_to_dict(row):
 
 def _rows_to_list(rows):
     return [_row_to_dict(r) for r in rows]
+
+
+VENDOR_SECRET_FIELDS = ("hmac_key", "url_link", "order_detail_url")
+
+
+def _strip_vendor_secrets(vendor):
+    """对外响应剥离商家密钥与接口地址（内部出站调用另从 jiazheng_api 缓存取）。"""
+    if not vendor:
+        return vendor
+    for f in VENDOR_SECRET_FIELDS:
+        vendor.pop(f, None)
+    return vendor
 
 
 # ====== Categories ======
@@ -58,6 +69,7 @@ def list_vendors(conn, type_=None, status="active"):
     vendors = _rows_to_list(rows)
     # 为每个商家附加前 2 个 SKU
     for v in vendors:
+        _strip_vendor_secrets(v)
         v["products"] = list_products_by_vendor(conn, v["id"])[:2]
     return vendors
 
@@ -67,6 +79,7 @@ def get_vendor(conn, vendor_id):
     if not row:
         return None
     v = _row_to_dict(row)
+    _strip_vendor_secrets(v)
     # 关联产品
     v["products"] = list_products_by_vendor(conn, vendor_id)
     # 关联服务者
@@ -190,6 +203,10 @@ def _review_reply(vendor_name, score):
 def _review_rows(conn, product_ids, vendor_name, limit=6):
     if not product_ids:
         return []
+    # 旧库可能是 P/B 订单表（product_id/rating），无 C 端 rating_json/sku_id —— 评价可选，缺列则跳过
+    order_cols = {r[1] for r in conn.execute("PRAGMA table_info(jz_orders)").fetchall()}
+    if "rating_json" not in order_cols or "sku_id" not in order_cols:
+        return []
     placeholders = ",".join(["?"] * len(product_ids))
     rows = conn.execute(
         f"""SELECT o.*, s.name AS sku_name FROM jz_orders o
@@ -263,129 +280,59 @@ def _merchant_intro(vendor, product):
 
 
 
-def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=None):
-    row = conn.execute(
-        """SELECT
-               p.id AS product_id,
-               p.vendor_id AS product_vendor_id,
-               p.title AS product_title,
-               p.subtitle AS product_subtitle,
-               p.category AS product_category,
-               p.duration_hours AS product_duration_hours,
-               p.area_range AS product_area_range,
-               p.unit AS product_unit,
-               p.price AS product_price,
-               p.original_price AS product_original_price,
-               p.discount_label AS product_discount_label,
-               p.earliest_time AS product_earliest_time,
-               p.advance_booking_hours AS product_advance_booking_hours,
-               p.sales_count AS product_sales_count,
-               p.rating AS product_rating,
-               p.service_tags AS product_service_tags,
-               p.channel_sku_id AS product_channel_sku_id,
-               p.path AS product_path,
-               p.query AS product_query,
-               p.status AS product_status,
-               p.sort_order AS product_sort_order,
-               v.id AS vendor_id,
-               v.type AS vendor_type,
-               v.name AS vendor_name,
-               v.logo AS vendor_logo,
-               v.address AS vendor_address,
-               v.district_id AS vendor_district_id,
-               v.phone AS vendor_phone,
-               v.rating AS vendor_rating,
-               v.review_count AS vendor_review_count,
-               v.rank_type AS vendor_rank_type,
-               v.rank_label AS vendor_rank_label,
-               v.badges AS vendor_badges,
-               v.live AS vendor_live,
-               v.start_price AS vendor_start_price,
-               v.unit AS vendor_unit,
-               v.fulfillment AS vendor_fulfillment,
-               v.hours AS vendor_hours,
-               v.vendor_no AS vendor_vendor_no,
-               v.whitelist_id AS vendor_whitelist_id,
-               v.status AS vendor_status,
-               v.sort_order AS vendor_sort_order,
-               v.created_at AS vendor_created_at,
-               v.updated_at AS vendor_updated_at
-           FROM jz_products p
-           JOIN jz_vendors v ON v.id=p.vendor_id
+def list_channel_sku_products(conn, sku_id, vendor_id=None, city_id=None):
+    """某 SPU 下全部上架商品（商家 SKU），含商家摘要，按评分-销量-创建时间排序。
+    同一商家可为同一 SPU 挂多个商品（不同套餐/服务者），C 端详情页全部展示供选择。
+    """
+    city_filter = ""
+    city_params = []
+    if city_id is not None:
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
+        city_filter = (" AND p.city_id=? "
+                       "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
+                       "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
+        city_params = [int(city_id), str(city_id)]
+    rows = conn.execute(
+        """SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
+                  v.rating AS vendor_rating, v.review_count AS vendor_review_count,
+                  v.type AS vendor_type
+           FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
            WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
-           """ + ("AND p.vendor_id=? " if vendor_id else "") + """
-           ORDER BY p.rating DESC, p.sales_count DESC, p.id LIMIT 1""",
-        ((sku_id, vendor_id) if vendor_id else (sku_id,)),
-    ).fetchone()
+           """ + ("AND p.vendor_id=? " if vendor_id else "") + city_filter + """
+           ORDER BY p.rating DESC, p.sales_count DESC, p.id""",
+        ((sku_id, vendor_id) if vendor_id else (sku_id,)) + tuple(city_params),
+    ).fetchall()
+    return _rows_to_list(rows)
+
+
+def get_detail_context_by_channel_sku(conn, sku_id, category_id=None, vendor_id=None, city_id=None):
+    """C 端 SKU 详情上下文：商品列表 + 默认商品 + 默认商家 + 服务者 + 评价 + 商家介绍。
+    同一商家同一 SPU 可有多商品，products 全量返回，product 为排序第一名（默认选中）。
+    """
+    products = list_channel_sku_products(conn, sku_id, vendor_id, city_id)
+    if not products:
+        return None
+    product = products[0]
+    row = conn.execute("SELECT * FROM jz_vendors WHERE id=?", (product["vendor_id"],)).fetchone()
     if not row:
         return None
-    raw = dict(row)
-    product = _row_to_dict({
-        "id": raw.get("product_id"),
-        "vendor_id": raw.get("product_vendor_id"),
-        "title": raw.get("product_title"),
-        "subtitle": raw.get("product_subtitle"),
-        "category": raw.get("product_category"),
-        "duration_hours": raw.get("product_duration_hours"),
-        "area_range": raw.get("product_area_range"),
-        "unit": raw.get("product_unit"),
-        "price": raw.get("product_price"),
-        "original_price": raw.get("product_original_price"),
-        "discount_label": raw.get("product_discount_label"),
-        "earliest_time": raw.get("product_earliest_time"),
-        "advance_booking_hours": raw.get("product_advance_booking_hours"),
-        "sales_count": raw.get("product_sales_count"),
-        "rating": raw.get("product_rating"),
-        "service_tags": raw.get("product_service_tags"),
-        "channel_sku_id": raw.get("product_channel_sku_id"),
-        "path": raw.get("product_path"),
-        "query": raw.get("product_query"),
-        "status": raw.get("product_status"),
-        "sort_order": raw.get("product_sort_order"),
-    })
-    vendor = _row_to_dict({
-        "id": raw.get("vendor_id"),
-        "type": raw.get("vendor_type"),
-        "name": raw.get("vendor_name"),
-        "logo": raw.get("vendor_logo"),
-        "address": raw.get("vendor_address"),
-        "district_id": raw.get("vendor_district_id"),
-        "phone": raw.get("vendor_phone"),
-        "rating": raw.get("vendor_rating"),
-        "review_count": raw.get("vendor_review_count"),
-        "rank_type": raw.get("vendor_rank_type"),
-        "rank_label": raw.get("vendor_rank_label"),
-        "badges": raw.get("vendor_badges"),
-        "live": raw.get("vendor_live"),
-        "start_price": raw.get("vendor_start_price"),
-        "unit": raw.get("vendor_unit"),
-        "fulfillment": raw.get("vendor_fulfillment"),
-        "hours": raw.get("vendor_hours"),
-        "vendor_no": raw.get("vendor_vendor_no"),
-        "whitelist_id": raw.get("vendor_whitelist_id"),
-        "status": raw.get("vendor_status"),
-        "sort_order": raw.get("vendor_sort_order"),
-        "created_at": raw.get("vendor_created_at"),
-        "updated_at": raw.get("vendor_updated_at"),
-    })
+    vendor = _row_to_dict(row)
+    _strip_vendor_secrets(vendor)
     vendor["auth_badges"] = _vendor_auth_badges(vendor)
-    # 优先取该 SKU 绑定的服务者（P2：SKU=SPU+服务者+时间）；无绑定回退到商家全员
+    # 优先取默认商品绑定的服务者（P2：SKU=SPU+服务者+时间）；无绑定回退到商家全员
     workers = list_product_workers(conn, product["id"])
     if not workers:
         workers = list_workers_by_vendor(conn, vendor["id"])
     for worker in workers:
         worker["auth_badges"] = _worker_auth_badges(worker)
     workers = workers[:4]
-    product_ids = [product["id"]]
-    for p in list_products_by_vendor(conn, vendor["id"]):
-        if p.get("id") and p["id"] not in product_ids:
-            product_ids.append(p["id"])
-    reviews = _review_rows(conn, product_ids[:8], vendor.get("name"), limit=6)
+    reviews = _review_rows(conn, [p["id"] for p in products[:8]], vendor.get("name"), limit=6)
     if len(reviews) < 3:
         reviews.extend(_fallback_reviews(category_id or vendor.get("type") or "cleaning", vendor.get("name")))
         reviews = reviews[:4]
     return {
         "product": product,
+        "products": products,
         "vendor": vendor,
         "workers": workers,
         "reviews": reviews,
@@ -421,16 +368,16 @@ def upsert_activity(conn, activity):
     conn.execute(
         """INSERT INTO jz_activities(activity_id, name, unit, cover_path, cover_remote, banner_paths, detail, price, tag_id, fetched_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(activity_id) DO UPDATE SET
-             name=excluded.name,
-             unit=excluded.unit,
-             cover_path=COALESCE(excluded.cover_path, cover_path),
-             cover_remote=COALESCE(excluded.cover_remote, cover_remote),
-             banner_paths=COALESCE(excluded.banner_paths, banner_paths),
-             detail=excluded.detail,
-             price=excluded.price,
-             tag_id=excluded.tag_id,
-             fetched_at=excluded.fetched_at""",
+           ON DUPLICATE KEY UPDATE
+             name=VALUES(name),
+             unit=VALUES(unit),
+             cover_path=COALESCE(VALUES(cover_path), cover_path),
+             cover_remote=COALESCE(VALUES(cover_remote), cover_remote),
+             banner_paths=COALESCE(VALUES(banner_paths), banner_paths),
+             detail=VALUES(detail),
+             price=VALUES(price),
+             tag_id=VALUES(tag_id),
+             fetched_at=VALUES(fetched_at)""",
         (
             aid,
             activity.get("name"),
@@ -613,21 +560,60 @@ def delete_category(conn, cat_id):
 
 
 # ====== Products CRUD (B 端·产品管理) ======
-def list_products(conn, vendor_id=None, type_=None, status=None, limit=200):
-    """产品列表（支持 vendor_id / type / status 过滤）"""
-    sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type
-             FROM jz_products p LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+def vendor_city_ids(conn, vendor_id):
+    """解析商家关联城市 id 列表（city_ids 文本逗号分隔）；无关联返回 []"""
+    row = conn.execute(
+        "SELECT city_ids FROM jz_vendors WHERE id=?", (int(vendor_id),)
+    ).fetchone()
+    raw = (row[0] if row else None) or ""
+    ids = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return ids
+
+
+def validate_product_city(conn, vendor_id, city_id):
+    """商品城市校验：city_id 必填且必须属于商家的 city_ids。
+    返回 (ok, err_msg)，不通过时 err_msg 为中文提示。"""
+    if city_id is None or (isinstance(city_id, str) and not city_id.strip()):
+        return False, "缺少 city_id"
+    try:
+        cid = int(city_id)
+    except (TypeError, ValueError):
+        return False, "city_id 非法"
+    if cid not in vendor_city_ids(conn, vendor_id):
+        return False, "city_id 不属于该商家"
+    return True, ""
+
+
+def list_products(conn, vendor_id=None, type_=None, status=None, city_id=None, limit=200):
+    """产品列表（支持 vendor_id / type / status / city_id 过滤）
+    类目维度以商品引用 SPU 的 category_id 为准（product_category），
+    未引用 SPU 时兜底回退商家 type。附带城市名 city_name。
+    """
+    sql = """SELECT p.*, v.name AS vendor_name, v.type AS vendor_type,
+                    COALESCE(s.category_id, v.type) AS product_category,
+                    c.name AS city_name
+             FROM jz_products p
+             LEFT JOIN jz_vendors v ON v.id=p.vendor_id
+             LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
+             LEFT JOIN cities c ON c.id=p.city_id
              WHERE 1=1"""
     params = []
     if vendor_id is not None:
         sql += " AND p.vendor_id=?"
         params.append(int(vendor_id))
     if type_:
-        sql += " AND v.type=?"
+        sql += " AND COALESCE(s.category_id, v.type)=?"
         params.append(type_)
     if status:
         sql += " AND p.status=?"
         params.append(status)
+    if city_id is not None:
+        sql += " AND p.city_id=?"
+        params.append(int(city_id))
     sql += " ORDER BY p.vendor_id, p.sort_order, p.id LIMIT ?"
     params.append(int(limit))
     rows = conn.execute(sql, params).fetchall()
@@ -650,11 +636,12 @@ def create_product(conn, data):
     import json as _json
     cur = conn.execute(
         """INSERT INTO jz_products
-           (vendor_id, title, subtitle, category, duration_hours, area_range, unit,
+           (vendor_id, city_id, title, subtitle, category, duration_hours, area_range, unit,
             price, original_price, discount_label, earliest_time, advance_booking_hours,
             sales_count, rating, service_tags, channel_sku_id, path, query, status, sort_order)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (int(data.get("vendor_id", 0)),
+         int(data["city_id"]) if data.get("city_id") else None,
          data.get("title", ""),
          data.get("subtitle", ""),
          data.get("category", ""),
@@ -686,7 +673,7 @@ def update_product(conn, pid, data):
     import json as _json
     fields = []
     params = []
-    for k in ("vendor_id", "title", "subtitle", "category", "duration_hours", "area_range",
+    for k in ("vendor_id", "city_id", "title", "subtitle", "category", "duration_hours", "area_range",
               "unit", "price", "original_price", "discount_label", "earliest_time",
               "advance_booking_hours", "sales_count", "rating", "service_tags",
               "channel_sku_id", "path", "query", "status", "sort_order"):
@@ -695,6 +682,8 @@ def update_product(conn, pid, data):
             if k == "service_tags":
                 v = _json.dumps(v, ensure_ascii=False)
             elif k == "channel_sku_id":
+                v = int(v) if v else None
+            elif k == "city_id":
                 v = int(v) if v else None
             fields.append(f"{k}=?")
             params.append(v)
@@ -744,7 +733,7 @@ def set_product_workers(conn, product_id, worker_ids):
             if not wl or _level_num(wl[0]) < min_lv:
                 continue  # 低于 SPU 门槛，跳过绑定
         conn.execute(
-            "INSERT OR IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?,?)",
+            "INSERT IGNORE INTO jz_sku_workers(product_id, worker_id) VALUES (?,?)",
             (int(product_id), wid),
         )
 
@@ -1001,8 +990,16 @@ def ensure_rolling_slots(conn, product_id, days=5):
     return made
 
 
-def list_channel_sku_vendors(conn, sku_id):
+def list_channel_sku_vendors(conn, sku_id, city_id=None):
     """某 SPU 下所有上架商家（多商家同款 / 比价用），按评分-销量排序。"""
+    city_filter = ""
+    city_params = []
+    if city_id is not None:
+        # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
+        city_filter = (" AND p.city_id=? "
+                       "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
+                       "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
+        city_params = [int(city_id), str(city_id)]
     rows = conn.execute(
         """SELECT p.id AS product_id, p.price, p.original_price, p.discount_label,
                   p.rating AS product_rating, p.sales_count,
@@ -1010,8 +1007,9 @@ def list_channel_sku_vendors(conn, sku_id):
                   v.rating AS vendor_rating, v.review_count, v.rank_label, v.badges
            FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
            WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'
+           """ + city_filter + """
            ORDER BY p.rating DESC, p.sales_count DESC, p.id""",
-        (sku_id,),
+        (sku_id,) + tuple(city_params),
     ).fetchall()
     out, seen = [], set()
     for r in rows:

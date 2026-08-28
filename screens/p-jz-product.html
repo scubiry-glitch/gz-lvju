@@ -97,6 +97,9 @@
           <select id="f_vendor">
             <option value="">全部商家</option>
           </select>
+          <select id="f_city">
+            <option value="">全部城市</option>
+          </select>
           <input type="text" id="f_q" placeholder="搜索产品名..." style="flex:1;min-width:160px;" />
           <span class="muted" style="font-size:11px;">共 <b id="matched">0</b> 条</span>
         </div>
@@ -115,6 +118,10 @@
       <div class="fld">
         <label>所属商家 *</label>
         <select id="m_vendor" required></select>
+      </div>
+      <div class="fld">
+        <label>所属城市 *</label>
+        <select id="m_city" required></select>
       </div>
       <div class="fld">
         <label>引用 SPU（平台标准品）*</label>
@@ -204,9 +211,9 @@
 <script src="_nav.js"></script>
 <script>
 // 管理台写接口已启用鉴权：自动给本页所有 /api/juzhu/jz/* 请求附带 API Key
-// （默认 dev-juzhu-key，可用 localStorage.JUZHU_API_KEY 覆盖）。
+// （须事先 localStorage.setItem('JUZHU_API_KEY', '<密钥>')；禁止内嵌历史默认密钥）。
 (function(){
-  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || 'dev-juzhu-key';
+  var KEY = (window.localStorage && localStorage.getItem('JUZHU_API_KEY')) || '';
   var _fetch = window.fetch.bind(window);
   window.fetch = function(input, init){
     init = init || {};
@@ -235,31 +242,56 @@
   let allVendors = [];
   let allSpu = [];
   let allWorkers = [];
+  let allCities = [];
 
   async function load() {
-    const [pr, vr, sr, wr] = await Promise.all([
+    const [pr, vr, sr, wr, cr] = await Promise.all([
       fetch('/api/juzhu/jz/products').then(r=>r.json()),
       fetch('/api/juzhu/jz/vendors').then(r=>r.json()),
       fetch('/api/juzhu/jz/spu').then(r=>r.json()),
       fetch('/api/juzhu/jz/workers?all=1').then(r=>r.json()),
+      fetch('/api/juzhu/cities').then(r=>r.json()),
     ]);
     allProducts = pr.list;
     allVendors = vr.list;
     allSpu = sr.list || [];
     allWorkers = wr.list || [];
+    allCities = Array.isArray(cr) ? cr : [];
     // 商家下拉
     $('f_vendor').innerHTML = '<option value="">全部商家</option>' +
       allVendors.map(v => `<option value="${v.id}">${v.name}（${TYPE_LABELS[v.type]||v.type}）</option>`).join('');
     $('m_vendor').innerHTML = '<option value="">-- 选择商家 --</option>' +
       allVendors.map(v => `<option value="${v.id}">${v.name}（${TYPE_LABELS[v.type]||v.type}）</option>`).join('');
+    // 城市筛选下拉（cities 表数据）
+    $('f_city').innerHTML = '<option value="">全部城市</option>' +
+      allCities.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    fillCityOptions('');
     applyFilter();
   }
 
-  // 按商家类目过滤 SPU 下拉
-  function fillSpuOptions(catType) {
-    const list = allSpu.filter(s => !catType || s.category_id === catType);
+  // 表单城市下拉：选商家后联动为该商家 city_ids 中的城市；未选商家时显示全部城市
+  function fillCityOptions(vendorId) {
+    const v = allVendors.find(x => String(x.id) === String(vendorId));
+    const ids = v ? String(v.city_ids||'').split(',').filter(Boolean) : [];
+    const opts = ids.length
+      ? allCities.filter(c => ids.includes(String(c.id)))
+      : allCities;
+    $('m_city').innerHTML = '<option value="">-- 选择城市 --</option>' +
+      opts.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+
+  // SPU 下拉：全量展示，按类目 optgroup 分组（跨类目商品可正常回显/选择）
+  function fillSpuOptions() {
+    const groups = {};
+    allSpu.forEach(s => { (groups[s.category_id] = groups[s.category_id]||[]).push(s); });
     $('m_spu').innerHTML = '<option value="">-- 不关联 SPU --</option>' +
-      list.map(s => `<option value="${s.id}" data-name="${s.name}" data-cat="${s.category_name||''}" data-price="${s.price_from||0}" data-dur="${s.duration_min||0}">${s.name}（¥${s.price_from||0}）</option>`).join('');
+      ['cleaning','repair','moving','nanny'].map(t => {
+        const list = groups[t] || [];
+        if (!list.length) return '';
+        return `<optgroup label="${TYPE_LABELS[t]||t}">` +
+          list.map(s => `<option value="${s.id}" data-name="${s.name}" data-cat="${s.category_name||''}" data-price="${s.price_from||0}" data-dur="${s.duration_min||0}">${s.name}（¥${s.price_from||0}）</option>`).join('') +
+          '</optgroup>';
+      }).join('');
   }
 
   // 渲染本店服务者勾选框
@@ -278,11 +310,13 @@
     const t = $('f_type').value;
     const s = $('f_status').value;
     const v = $('f_vendor').value;
+    const cid = $('f_city').value;
     const q = $('f_q').value.trim().toLowerCase();
     let list = allProducts.filter(p => {
-      if (t && p.vendor_type !== t) return false;
+      if (t && p.product_category !== t) return false;
       if (s && p.status !== s) return false;
       if (v && p.vendor_id != v) return false;
+      if (cid && String(p.city_id) !== cid) return false;
       if (q && !p.title.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -294,7 +328,7 @@
     $('matched').textContent = list.length;
     // KPI
     const byType = {};
-    list.forEach(p => byType[p.vendor_type] = (byType[p.vendor_type]||0) + 1);
+    list.forEach(p => byType[p.product_category] = (byType[p.product_category]||0) + 1);
     $('kpis').innerHTML = Object.keys(TYPE_LABELS).map(t =>
       `<div class="kpi"><b>${byType[t]||0}</b><span>${TYPE_LABELS[t]}</span></div>`
     ).join('') + `<div class="kpi"><b>¥${list.reduce((s,p)=>s+(p.price||0),0).toFixed(0)}</b><span>总价</span></div>`;
@@ -302,12 +336,12 @@
     if (!list.length) { $('list').innerHTML = '<p style="text-align:center;color:var(--muted);padding:20px;">无匹配产品</p>'; return; }
     // 按类目分组
     const groups = {};
-    list.forEach(p => { (groups[p.vendor_type] = groups[p.vendor_type]||[]).push(p); });
+    list.forEach(p => { (groups[p.product_category] = groups[p.product_category]||[]).push(p); });
     let html = '';
     ['cleaning','repair','moving','nanny'].forEach(t => {
       if (!groups[t] || !groups[t].length) return;
       html += `<div class="group"><h4>${TYPE_LABELS[t]}（${groups[t].length}）</h4><table>`;
-      html += '<thead><tr><th>SKU</th><th>商家</th><th>引用 SPU</th><th>服务者</th><th>价格</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+      html += '<thead><tr><th>SKU</th><th>商家</th><th>城市</th><th>引用 SPU</th><th>服务者</th><th>价格</th><th>状态</th><th>操作</th></tr></thead><tbody>';
       groups[t].forEach(p => {
         const badgeClass = p.status==='on'?'b-on':(p.status==='sold_out'?'b-sold':'b-off');
         const wkCount = (p.worker_ids||[]).length;
@@ -318,6 +352,7 @@
             ${p.category?`<span class="muted" style="font-size:10px;">[${p.category}]</span>`:''}
           </td>
           <td><span class="vendor-link">${p.vendor_name||'—'}</span></td>
+          <td>${p.city_name||'—'}</td>
           <td>${p.spu_name?`<span class="spu-tag">${p.spu_name}</span>`:'<span class="spu-tag none">未关联</span>'}</td>
           <td><span class="wk-mini">👤 <b>${wkCount}</b> 人</span></td>
           <td><span class="price">¥${p.price}</span>${p.original_price?` <span class="muted" style="text-decoration:line-through;font-size:10px;">¥${p.original_price}</span>`:''}</td>
@@ -337,15 +372,12 @@
     document.querySelectorAll('.badge[data-id]').forEach(b => b.onclick = () => toggle(b.dataset.id, b.dataset.status));
   }
 
-  function vendorType(vid) {
-    const v = allVendors.find(x => String(x.id) === String(vid));
-    return v ? v.type : '';
-  }
-
   function openModal(p) {
     $('m_id').value = p ? p.id : '';
     $('modalTitle').textContent = p ? '编辑 SKU' : '新增 SKU';
     $('m_vendor').value = p ? p.vendor_id : '';
+    fillCityOptions(p ? p.vendor_id : '');
+    $('m_city').value = p && p.city_id ? String(p.city_id) : '';
     $('m_category').value = p ? (p.category||'') : '';
     $('m_title').value = p ? p.title : '';
     $('m_subtitle').value = p ? (p.subtitle||'') : '';
@@ -358,7 +390,7 @@
     $('m_sort').value = p ? (p.sort_order||99) : 99;
     $('m_status').value = p ? p.status : 'on';
     // SPU + 服务者
-    fillSpuOptions(p ? p.vendor_type : '');
+    fillSpuOptions();
     $('m_spu').value = p && p.channel_sku_id ? String(p.channel_sku_id) : '';
     $('m_path').value = p ? (p.path||'') : '';
     $('m_query').value = p ? (p.query||'') : '';
@@ -370,10 +402,11 @@
   $('mCancel').onclick = closeModal;
   $('modal').onclick = e => { if (e.target.id==='modal') closeModal(); };
 
-  // 选商家 → 过滤 SPU + 刷新本店服务者
+  // 选商家 → 城市下拉联动 + 全量 SPU 下拉 + 刷新本店服务者
   $('m_vendor').onchange = () => {
     const vid = $('m_vendor').value;
-    fillSpuOptions(vendorType(vid));
+    fillCityOptions(vid);
+    fillSpuOptions();
     $('m_spu').value = '';
     renderWorkerPicker(vid, []);
   };
@@ -387,12 +420,13 @@
     if (opt.dataset.dur) $('m_duration').value = (parseInt(opt.dataset.dur)/60).toFixed(1).replace(/\.0$/,'');
   };
 
-  ['f_type','f_status','f_vendor'].forEach(id => $(id).onchange = applyFilter);
+  ['f_type','f_status','f_vendor','f_city'].forEach(id => $(id).onchange = applyFilter);
   $('f_q').oninput = applyFilter;
 
   $('mSave').onclick = async () => {
     const body = {
       vendor_id: parseInt($('m_vendor').value),
+      city_id: parseInt($('m_city').value) || null,
       category: $('m_category').value.trim(),
       title: $('m_title').value.trim(),
       subtitle: $('m_subtitle').value.trim(),
@@ -410,6 +444,7 @@
       worker_ids: [...document.querySelectorAll('#m_workers input:checked')].map(x => parseInt(x.value)),
     };
     if (!body.vendor_id) { toast('请选择商家', 'err'); return; }
+    if (!body.city_id) { toast('请选择城市', 'err'); return; }
     if (!body.title) { toast('请输入 SKU 标题', 'err'); return; }
     if (!body.channel_sku_id) { toast('请选择引用 SPU', 'err'); return; }
     if (!body.path) { toast('请输入小程序路径 path', 'err'); return; }

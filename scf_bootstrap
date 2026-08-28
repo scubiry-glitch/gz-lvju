@@ -1,0 +1,60 @@
+#!/bin/bash
+# SCF 启动入口：注入环境变量后启动 Node.js 服务（纯 Node 模式，无 Python 依赖）
+# 运行时 .env 仅供本脚本 source，禁止通过 HTTP 访问（见 app.js isPublicStatic）
+
+_EXTERNAL_PORT=${PORT}
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$DIR/.env"
+# SCF 解包常丢弃隐藏文件；runtime.env 为非隐藏副本
+if [ ! -f "$ENV_FILE" ] && [ -f "$DIR/runtime.env" ]; then
+  ENV_FILE="$DIR/runtime.env"
+fi
+
+if [ -f "$ENV_FILE" ]; then
+  # 清除平台可能预设的 MySQL 变量，确保 .env 的值生效
+  unset MYSQL_HOST MYSQL_PORT MYSQL_DB MYSQL_USER MYSQL_PASSWORD
+  unset JUZHU_API_KEY JUZHU_ADMIN_PASSWORD JUZHU_ENV
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+else
+  # 平台 auto-deploy 不包含 .env；内嵌正式配置作为兜底
+  export MYSQL_HOST=10.236.15.185
+  export MYSQL_PORT=3306
+  export MYSQL_DB=sy2_full
+  export MYSQL_USER=btg_Wu3zxj
+  export MYSQL_PASSWORD=9vycpd8hAm0FaaUj
+  export JUZHU_ENV=prod
+  export JUZHU_API_KEY=dongbo2026
+  export JUZHU_ADMIN_PASSWORD=dongbo2026
+  export TP_BASE=http://i.tp.lianjia.com
+  export TP_APP_ID=208
+  export TP_APP_KEY=b3918671c70bd1d9168c77aab0a85ef5
+  echo "INFO: using built-in prod config (no .env found)"
+fi
+
+# 平台注入的 PORT 优先于 .env
+if [ -n "$_EXTERNAL_PORT" ]; then
+  export PORT=$_EXTERNAL_PORT
+fi
+export PORT=${PORT:-9000}
+
+# 生产硬门禁：缺密钥或仍用历史默认值则拒绝启动
+ENV_NAME="$(echo "${JUZHU_ENV:-}" | tr '[:upper:]' '[:lower:]')"
+if [ "$ENV_NAME" = "prod" ] || [ "$ENV_NAME" = "production" ]; then
+  if [ -z "${JUZHU_API_KEY:-}" ] || [ "${JUZHU_API_KEY}" = "dev-juzhu-key" ]; then
+    echo "FATAL: production requires JUZHU_API_KEY (must not be empty or dev-juzhu-key)" >&2
+    exit 1
+  fi
+  if [ -z "${JUZHU_ADMIN_PASSWORD:-}" ]; then
+    echo "FATAL: production requires JUZHU_ADMIN_PASSWORD" >&2
+    exit 1
+  fi
+  if [ -z "${MYSQL_HOST:-}" ] || [ -z "${MYSQL_USER:-}" ] || [ -z "${MYSQL_PASSWORD:-}" ] || [ -z "${MYSQL_DB:-}" ]; then
+    echo "FATAL: production requires MYSQL_HOST/MYSQL_DB/MYSQL_USER/MYSQL_PASSWORD" >&2
+    exit 1
+  fi
+fi
+
+exec node "$DIR/app.js"

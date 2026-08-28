@@ -1,0 +1,10 @@
+{
+  "name": "sy2-full",
+  "version": "1.0.0",
+  "description": "新居住服务平台",
+  "main": "app.js",
+  "dependencies": {
+    "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
+    "mysql2": "^3.23.3"
+  }
+}
