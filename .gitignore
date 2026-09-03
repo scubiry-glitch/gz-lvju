@@ -20,3 +20,15 @@ scripts/tp_call_log.json
 vendor/*
 !vendor/lianjia-jsbridge3-1.1.6.tgz
 node_modules/
+
+# Capacitor / Android 本机构建产物（android/ 工程本身可提交）
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/src/main/res/xml/config.xml
+
