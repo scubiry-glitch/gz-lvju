@@ -50,6 +50,27 @@ function levelNum(lv) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// api_doc.md 约定商家开放接口金额单位为「分」，而库内 jz_products.price 与 C 端展示均为「元」，
+// 故在 vendor 接口边界做双向换算：入参分→元存储，出参元→分返回（对齐文档示例 29900 = 299 元）。
+function centsToYuan(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) / 100 : null;
+}
+
+function yuanToCents(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+// 商家产品出参：price / original_price 元→分
+function productPriceOut(item) {
+  if (item.price != null) item.price = yuanToCents(item.price);
+  if (item.original_price != null) item.original_price = yuanToCents(item.original_price);
+  return item;
+}
+
 async function setProductWorkers(conn, productId, workerIds) {
   await conn.execute('DELETE FROM jz_sku_workers WHERE product_id=?', [productId]);
   const [minRows] = await conn.execute(
@@ -136,6 +157,7 @@ async function productsList(conn, body, vendorId) {
   sql += ' ORDER BY p.sort_order, p.id';
   const [rows] = await conn.execute(sql, params);
   for (const it of rows) await attachProductExtras(conn, it);
+  rows.forEach(productPriceOut);
   return reply(200, { code: 0, message: 'success', list: rows });
 }
 
@@ -150,6 +172,7 @@ async function productsDetail(conn, body, vendorId) {
   );
   if (!rows.length) return reply(404, { code: 404, message: '产品不存在或不属于该商家' });
   await attachProductExtras(conn, rows[0]);
+  productPriceOut(rows[0]);
   return reply(200, { code: 0, message: 'success', product: rows[0] });
 }
 
@@ -175,8 +198,8 @@ async function createProduct(conn, data) {
       data.duration_hours == null || data.duration_hours === '' ? 0 : Number(data.duration_hours),
       data.area_range || '',
       data.unit || '次',
-      data.price == null || data.price === '' ? 0 : Number(data.price),
-      data.original_price == null || data.original_price === '' ? null : Number(data.original_price),
+      data.price == null || data.price === '' ? 0 : centsToYuan(data.price),
+      data.original_price == null || data.original_price === '' ? null : centsToYuan(data.original_price),
       data.discount_label || '',
       data.earliest_time || '',
       parseInt(data.advance_booking_hours, 10) || 0,
@@ -212,6 +235,8 @@ async function updateProduct(conn, pid, data) {
     let v = data[k];
     if (k === 'service_tags') v = jsonTags(v);
     else if (k === 'channel_sku_id' || k === 'city_id') v = v ? parseInt(v, 10) : null;
+    else if (k === 'price') v = v == null || v === '' ? 0 : centsToYuan(v);            // 商家传入分→库存元
+    else if (k === 'original_price') v = v == null || v === '' ? null : centsToYuan(v); // 同上
     fields.push('`' + k + '`=?');
     params.push(v);
   }

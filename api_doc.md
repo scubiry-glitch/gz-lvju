@@ -412,7 +412,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 | `name` | string | SPU 名称 |
 | `slug` | string | URL 友好标识 |
 | `spec` | string | 规格描述 |
-| `price_from` | integer | 参考起价（分） |
+| `price_from` | integer | 参考起价（元；平台侧 SPU 数据，非商家写入字段） |
 | `price_unit` | string | 计价单位 |
 | `duration_min` | integer | 标准时长（分钟） |
 | `tags` | string | 标签（逗号分隔） |
