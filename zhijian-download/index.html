@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>智见 App 下载</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #14315e 0%, #1a4a8a 45%, #1e5fa8 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+  }
+  .container {
+    width: 100%;
+    max-width: 420px;
+    padding: 48px 28px 40px;
+    text-align: center;
+  }
+  .logo {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 24px;
+    background: linear-gradient(145deg, #ffffff 0%, #e8f1fb 100%);
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .logo span {
+    font-size: 44px;
+    font-weight: 800;
+    color: #14315e;
+    letter-spacing: 2px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 40px;
+    letter-spacing: 1px;
+  }
+  .download-btn {
+    display: block;
+    width: 100%;
+    padding: 16px 0;
+    background: #ffb300;
+    color: #14315e;
+    font-size: 18px;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    letter-spacing: 3px;
+    box-shadow: 0 8px 24px rgba(255,179,0,0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    margin-bottom: 16px;
+  }
+  .download-btn:active {
+    transform: scale(0.97);
+    box-shadow: 0 4px 12px rgba(255,179,0,0.3);
+  }
+  .file-info {
+    font-size: 13px;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 8px;
+  }
+  .tips {
+    margin-top: 32px;
+    padding: 18px 16px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.9;
+    color: rgba(255,255,255,0.85);
+    backdrop-filter: blur(4px);
+  }
+  .tips strong { color: #ffb300; }
+  .footer {
+    margin-top: 36px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo"><span>智见</span></div>
+  <h1>智见 App</h1>
+  <p class="subtitle">Android 客户端 · 官方下载</p>
+
+  <a class="download-btn" href="./zhijian-android.apk" download="zhijian-android.apk">立即下载</a>
+  <p class="file-info">zhijian-android.apk · 约 12 MB</p>
+
+  <div class="tips">
+    <strong>安装说明：</strong><br>
+    ① 下载完成后点击 APK 文件安装<br>
+    ② 若提示「未知来源」，请在设置中允许安装<br>
+    ③ 安装后打开 App 即可使用
+  </div>
+
+  <div class="footer">© 智见 · 官方下载页</div>
+</div>
+</body>
+</html>

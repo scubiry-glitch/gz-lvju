@@ -25,7 +25,11 @@
     rated:      { c: '已评价', worker: '已评价', admin: '已评价', pct: 100, cls: 'done',     step: 5 }
   };
 
-  var ICON = { '保洁': '🧹', '维修': '🔧', '搬家': '📦', '保姆': '👶', '家政': '✨' };
+  var ICON = {
+    '保洁': '🧹', '维修': '🔧', '搬家': '📦', '保姆': '👶', '家政': '✨',
+    '电讯服务': '📱', '财险服务': '🛡', '消费金融': '💳', '健康养老': '🏥',
+    '居家维护': '🏠', '资产服务': '🏦', '二手回收': '♻️'
+  };
 
   var _pollTimer = null;
   var _listeners = [];
@@ -83,8 +87,7 @@
       if (params[k] != null && params[k] !== '') qs.set(k, params[k]);
     });
     var url = '/api/juzhu/jiazheng/orders' + (qs.toString() ? '?' + qs : '');
-    var headers = params.phone ? {} : authHeaders();
-    return fetchJSON(url, { headers: headers }).then(function (res) {
+    return fetchJSON(url, { headers: authHeaders() }).then(function (res) {
       return (res.items || []).map(normalizeItem);
     });
   }
@@ -95,7 +98,7 @@
   }
 
   function get(id) {
-    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id))
+    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id), { headers: authHeaders() })
       .then(function (res) { return normalizeItem(res.order); });
   }
 
@@ -154,6 +157,7 @@
   function rate(id, rating) {
     return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/rate', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({
         score: rating.score,
         tags: rating.tags || [],

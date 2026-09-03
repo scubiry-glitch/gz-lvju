@@ -11,6 +11,14 @@
   .hero.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 48%,#8bb8ff);}
   .hero.moving{background:linear-gradient(135deg,#f97316,#bf4b13 48%,#f7b267);}
   .hero.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 48%,#d6bcfa);}
+  .hero.telecom{background:linear-gradient(135deg,#1d4e89,#123a66 48%,#7db3f0);}
+  .hero.insurance{background:linear-gradient(135deg,#8c6224,#6b4a1a 48%,#e8c878);}
+  .hero.consumer_finance{background:linear-gradient(135deg,#0f1a4d,#1a2a6b 48%,#8ba3e0);}
+  .hero.health_care{background:linear-gradient(135deg,#0e7490,#0a5568 48%,#7dd3fc);}
+  .hero.home_maintain{background:linear-gradient(135deg,#3f6212,#2d4a0c 48%,#a3e635);}
+  .hero.asset{background:linear-gradient(135deg,#1e3a5f,#152a45 48%,#93c5fd);}
+  .hero.recycle{background:linear-gradient(135deg,#166534,#0f4a26 48%,#86efac);}
+  .hero.community{background:linear-gradient(135deg,#6d28d9,#4c1d95 48%,#c4b5fd);}
   .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 82% 18%,rgba(255,255,255,.18),transparent 18%),
     repeating-linear-gradient(100deg,rgba(255,255,255,.05) 0 2px,transparent 2px 18px);}
   .hero .in{position:relative;z-index:2;}
@@ -159,7 +167,7 @@
         <div class="left"><b id="price">¥0</b> <small id="priceUnit">起</small></div>
         <div class="right" id="sales">最近好评 1000+</div>
       </div>
-      <div class="coupon"><b>神券已减 10</b><span>支付成功后进入工单池，待派单状态统一进入家政订单 API</span></div>
+      <div class="coupon"><b>神券已减 10</b><span>支付成功后平台将为您安排服务，预计24小时内联系确认上门时间</span></div>
     </div>
 
     <div class="block" id="productBlock" hidden>
@@ -246,7 +254,10 @@
 (function(){
   var JZ = window.BZF_JZ;
   var q = new URLSearchParams(location.search);
-  var TYPE_SKU = { cleaning: 'deep-clean-4h', repair: 'pipe-unclog-fast', moving: 'moving-city-standard', nanny: 'nanny-hourly-3h' };
+  var TYPE_SKU = {
+    cleaning: 'deep-clean-4h', repair: 'pipe-unclog-fast', moving: 'moving-city-standard', nanny: 'nanny-hourly-3h',
+    community: 'community-errand'
+  };
   var slug = q.get('sku') || TYPE_SKU[q.get('type')] || 'deep-clean-4h';
   var curVendor = q.get('vendor') || null;   // 多商家同款：锁定某商家
   var item = null;
@@ -447,7 +458,11 @@
   }
 
   function heroClass(cat){
-    return cat === 'repair' ? 'repair' : cat === 'moving' ? 'moving' : cat === 'nanny' ? 'nanny' : 'cleaning';
+    var known = {
+      cleaning:1, repair:1, moving:1, nanny:1, telecom:1, insurance:1,
+      consumer_finance:1, health_care:1, home_maintain:1, asset:1, recycle:1, community:1
+    };
+    return known[cat] ? cat : 'cleaning';
   }
 
   function render(){
@@ -457,7 +472,7 @@
     hero.innerHTML = '<div class="in">'+
       '<div class="eyebrow">'+(item.category_name || '家政服务').toUpperCase()+'</div>'+
       '<h1>'+item.name+'</h1>'+
-      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后进入中台工单池统一派单。</p>'+
+      '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后平台统一安排服务，全程进度可查。</p>'+
       '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span><span>'+(item.duration_min || 0)+' 分钟</span><span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
     '</div>';
     var displayPrice = (product && product.price != null) ? product.price : item.price_from;

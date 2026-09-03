@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>本地生活 · 好看排版对照</title>
+<link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  body{display:block;background:#0b1210;color:#e8eeeb;min-height:100vh;font-family:var(--font);}
+  .page{max-width:1480px;margin:0 auto;padding:28px 20px 60px;}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+  .head h1{font-family:var(--serif);font-size:26px;margin:0;color:#f4f7f5;}
+  .head p{margin:6px 0 0;font-size:13px;color:#9aaba4;max-width:56ch;line-height:1.5;}
+  .head .back{font-size:13px;color:#5eead4;font-weight:600;}
+  .board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}
+  @media (max-width:1400px){.board{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  @media (max-width:780px){.board{grid-template-columns:1fr;max-width:400px;margin:0 auto;}}
+  .col{display:flex;flex-direction:column;gap:8px;}
+  .col .tag{font-size:10px;letter-spacing:.1em;color:#7dd3c7;font-weight:700;}
+  .col .name{font-family:var(--serif);font-size:17px;color:#fff;}
+  .col .desc{font-size:12px;color:#93a59e;line-height:1.45;min-height:38px;}
+  .phone{background:#f5f7f6;border-radius:26px;overflow:hidden;border:1px solid #1f332e;
+    box-shadow:0 22px 48px rgba(0,0,0,.45);color:var(--ink);height:700px;display:flex;flex-direction:column;}
+  .phone .scr{flex:1;overflow:auto;}
+  .hd{padding:16px 14px 12px;color:#fff;background:linear-gradient(135deg,#0b5d56,#1a4038 55%,#8c6224);}
+  .hd .ek{font-size:8px;letter-spacing:.28em;opacity:.85;}
+  .hd h2{font-family:var(--serif);font-size:18px;margin-top:3px;}
+  .hd .seg{display:flex;margin-top:10px;background:rgba(255,255,255,.12);border-radius:10px;padding:3px;}
+  .hd .seg span{flex:1;text-align:center;padding:7px 0;font-size:10px;font-weight:600;color:rgba(255,255,255,.7);border-radius:8px;}
+  .hd .seg span.on{background:#fff;color:var(--brand-deep);}
+  .sec{display:flex;align-items:baseline;gap:8px;padding:12px 14px 8px;}
+  .sec .bar{width:3px;height:13px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
+  .sec b{font-family:var(--serif);font-size:13px;}
+  .sec i{margin-left:auto;font-style:normal;font-size:10px;color:var(--muted);}
+
+  .g.cleaning{background:linear-gradient(145deg,#214842,#0d221f);}
+  .g.repair{background:linear-gradient(145deg,#2a4260,#101d31);}
+  .g.moving{background:linear-gradient(145deg,#6d5544,#2a1d15);}
+  .g.nanny{background:linear-gradient(145deg,#5e5566,#2a222f);}
+  .g.telecom{background:linear-gradient(145deg,#1d4e89,#0b2444);}
+  .g.insurance{background:linear-gradient(145deg,#8c6224,#3d2a0e);}
+  .g.consumer_finance{background:linear-gradient(145deg,#0f1a4d,#0a1028);}
+  .g.health_care{background:linear-gradient(145deg,#0e7490,#063844);}
+  .g.home_maintain{background:linear-gradient(145deg,#3f6212,#1a2c07);}
+  .g.asset{background:linear-gradient(145deg,#1e3a5f,#0c1828);}
+  .g.recycle{background:linear-gradient(145deg,#166534,#0a2e18);}
+  .g.community{background:linear-gradient(145deg,#6d28d9,#2e1065);}
+
+  /* C 杂志（等大卡） */
+  .c-wrap{padding:0 12px 16px;}
+  .c-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .c-mini{border-radius:14px;padding:12px 6px;text-align:center;color:#fff;min-height:84px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    box-shadow:0 10px 20px rgba(15,42,38,.12);}
+  .c-mini .ic{font-size:18px;} .c-mini b{font-size:11px;font-family:var(--serif);}
+  .c-mini .pill{display:none;}
+
+  /* D Bento 拼贴 */
+  .d-wrap{padding:0 12px 16px;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:78px;gap:8px;}
+  .d-tile{position:relative;border-radius:18px;overflow:hidden;color:#fff;box-shadow:0 12px 24px rgba(15,42,38,.12);}
+  .d-tile .shade{position:absolute;inset:0;}
+  .d-tile .shade::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(160deg,rgba(255,255,255,.1),transparent 42%,rgba(0,0,0,.42));}
+  .d-tile .in{position:relative;z-index:2;padding:12px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
+  .d-tile .orb{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:14px;
+    background:rgba(255,255,255,.14);margin-bottom:auto;}
+  .d-tile h3{font-family:var(--serif);font-size:14px;line-height:1.15;}
+  .d-tile p{font-size:10px;opacity:.8;margin-top:2px;}
+  .d-tile.span2{grid-column:span 2;}
+  .d-tile.span4{grid-column:span 4;}
+  .d-tile.row2{grid-row:span 2;}
+  .d-tile.span4 h3,.d-tile.row2.span2 h3{font-size:20px;}
+  .d-tile.span4 .orb,.d-tile.row2.span2 .orb{width:36px;height:36px;font-size:18px;}
+
+  /* E 分组货架 */
+  .e-wrap{padding:0 0 16px;}
+  .e-group{margin-bottom:14px;}
+  .e-label{padding:0 14px 8px;font-size:10px;letter-spacing:.14em;color:#6b7c76;font-weight:700;}
+  .e-rail{display:flex;gap:10px;overflow-x:auto;padding:0 14px 4px;scroll-snap-type:x mandatory;}
+  .e-rail::-webkit-scrollbar{height:0;}
+  .e-card{flex:0 0 132px;scroll-snap-align:start;border-radius:18px;overflow:hidden;color:#fff;
+    min-height:148px;position:relative;box-shadow:0 10px 22px rgba(15,42,38,.12);}
+  .e-card .shade{position:absolute;inset:0;}
+  .e-card .shade::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(0,0,0,.5));}
+  .e-card .in{position:relative;z-index:2;padding:12px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
+  .e-card .ic{font-size:22px;margin-bottom:auto;}
+  .e-card h3{font-family:var(--serif);font-size:15px;}
+  .e-card p{font-size:10px;opacity:.85;margin-top:2px;}
+
+  /* F 浅色编辑部 */
+  .f-wrap{padding:0 12px 16px;display:grid;gap:8px;}
+  .f-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .f-row.wide{grid-template-columns:1fr;}
+  .f-card{display:flex;gap:12px;align-items:center;padding:14px;background:#fff;border:1px solid #e5ebe8;
+    border-radius:18px;box-shadow:0 8px 20px rgba(15,42,38,.05);position:relative;overflow:hidden;}
+  .f-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .f-card.cleaning::before{background:#0f766e;}
+  .f-card.repair::before{background:#1d4e89;}
+  .f-card.moving::before{background:#6d5544;}
+  .f-card.nanny::before{background:#5e5566;}
+  .f-card.telecom::before{background:#1d4e89;}
+  .f-card.insurance::before{background:#8c6224;}
+  .f-card.consumer_finance::before{background:#0f1a4d;}
+  .f-card.health_care::before{background:#0e7490;}
+  .f-card.home_maintain::before{background:#3f6212;}
+  .f-card.asset::before{background:#1e3a5f;}
+  .f-card.recycle::before{background:#166534;}
+  .f-card.community::before{background:#6d28d9;}
+  .f-card .ic{width:46px;height:46px;border-radius:16px;display:grid;place-items:center;font-size:22px;color:#fff;flex:0 0 auto;}
+  .f-card .tx{min-width:0;flex:1;}
+  .f-card .tx b{display:block;font-family:var(--serif);font-size:15px;color:var(--ink);}
+  .f-card .tx span{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
+  .f-card .go{font-size:16px;color:#9aaba4;}
+  .f-card.feat{padding:16px 16px 16px 18px;background:linear-gradient(120deg,#f7f4ee,#fff);}
+  .f-card.feat .tx b{font-size:18px;}
+  .f-card.feat .ic{width:54px;height:54px;font-size:26px;}
+
+  .pick{margin-top:6px;}
+  .pick a{display:inline-block;padding:8px 12px;border-radius:999px;background:#134e4a;color:#99f6e4;
+    font-size:12px;font-weight:700;border:1px solid #2a6a63;}
+  .pick a.on{background:#0f766e;color:#fff;}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="head">
+    <div>
+      <h1>本地生活 · 好看排版</h1>
+      <p>围绕你认可的「杂志层次」再出三套：Bento 拼贴 / 分组货架 / 浅色编辑部。点试用即可套到首页。</p>
+    </div>
+    <a class="back" href="index.html?tab=jiazheng">← 回正式首页（当前默认 C）</a>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+<script>
+(function(){
+  var CATS = [
+    { id:'cleaning', name:'保洁', icon:'🧹', pill:'高频刚需', desc:'日常 / 深度清洁', group:'到家服务' },
+    { id:'repair', name:'维修', icon:'🔧', pill:'即时修复', desc:'家电 / 管道快修', group:'到家服务' },
+    { id:'moving', name:'搬家', icon:'📦', pill:'大件服务', desc:'同城 / 长途搬运', group:'到家服务' },
+    { id:'nanny', name:'保姆', icon:'👶', pill:'长期陪伴', desc:'住家 / 育儿嫂', group:'到家服务' },
+    { id:'telecom', name:'电讯服务', icon:'📱', pill:'装维开通', desc:'宽带 / 携号转网', group:'生活配套' },
+    { id:'insurance', name:'财险服务', icon:'🛡', pill:'风险保障', desc:'家财 / 租客险', group:'生活配套' },
+    { id:'consumer_finance', name:'消费金融', icon:'💳', pill:'灵活分期', desc:'租住分期 / 额度', group:'生活配套' },
+    { id:'health_care', name:'健康养老', icon:'🏥', pill:'康养到家', desc:'陪护 / 体检', group:'生活配套' },
+    { id:'home_maintain', name:'居家维护', icon:'🏠', pill:'定期维保', desc:'管道 / 家电保养', group:'资产循环' },
+    { id:'asset', name:'资产服务', icon:'🏦', pill:'资产顾问', desc:'评估 / 托管', group:'资产循环' },
+    { id:'recycle', name:'二手回收', icon:'♻️', pill:'绿色清运', desc:'家电 / 家具回收', group:'资产循环' },
+    { id:'community', name:'社区服务', icon:'🏘', pill:'邻里便民', desc:'团购 / 跑腿代办', group:'生活配套' }
+  ];
+  function href(id){ return 'juzhu-jiazheng-list.html?type='+id; }
+  function chrome(inner){
+    return '<div class="phone"><div class="scr"><div class="hd"><div class="ek">SHENYANG · LOCAL LIFE</div><h2>本地生活服务</h2>'+
+      '<div class="seg"><span>保租房</span><span>卖旧买新</span><span class="on">家政</span></div></div>'+
+      '<div class="sec"><span class="bar"></span><b>选择服务</b><i>12 频道</i></div>'+inner+'</div></div>';
+  }
+
+  function layoutC(){
+    return chrome('<div class="c-wrap"><div class="c-grid">'+CATS.map(function(x){
+      return '<a class="c-mini g '+x.id+'" href="'+href(x.id)+'"><div class="ic">'+x.icon+'</div><b>'+x.name+'</b></a>';
+    }).join('')+'</div></div>');
+  }
+
+  function layoutD(){
+    // Bento: 保洁大横幅 + 维修高卡 + 搬家保姆 + 其余 2×2
+    var slots = [
+      {c:CATS[0], cls:'span4 row2'},
+      {c:CATS[1], cls:'span2 row2'},
+      {c:CATS[2], cls:'span2'},
+      {c:CATS[3], cls:'span2'},
+      {c:CATS[4], cls:''},{c:CATS[5], cls:''},{c:CATS[6], cls:''},{c:CATS[7], cls:''},
+      {c:CATS[8], cls:'span2'},{c:CATS[9], cls:''},{c:CATS[10], cls:''},{c:CATS[11], cls:''}
+    ];
+    return chrome('<div class="d-wrap">'+slots.map(function(s){
+      return '<a class="d-tile '+s.cls+'" href="'+href(s.c.id)+'"><div class="shade g '+s.c.id+'"></div>'+
+        '<div class="in"><div class="orb">'+s.c.icon+'</div><h3>'+s.c.name+'</h3>'+
+        (s.cls.indexOf('row2')>=0||s.cls.indexOf('span4')>=0?'<p>'+s.c.desc+'</p>':'')+
+        '</div></a>';
+    }).join('')+'</div>');
+  }
+
+  function layoutE(){
+    var groups = {};
+    CATS.forEach(function(c){ (groups[c.group]=groups[c.group]||[]).push(c); });
+    var html = Object.keys(groups).map(function(g){
+      return '<div class="e-group"><div class="e-label">'+g.toUpperCase()+'</div><div class="e-rail">'+
+        groups[g].map(function(c){
+          return '<a class="e-card" href="'+href(c.id)+'"><div class="shade g '+c.id+'"></div>'+
+            '<div class="in"><div class="ic">'+c.icon+'</div><h3>'+c.name+'</h3><p>'+c.desc+'</p></div></a>';
+        }).join('')+'</div></div>';
+    }).join('');
+    return chrome('<div class="e-wrap">'+html+'</div>');
+  }
+
+  function layoutF(){
+    var feat = CATS[0];
+    var pairs = [];
+    for (var i=1;i<CATS.length;i+=2) pairs.push(CATS.slice(i,i+2));
+    var html = '<a class="f-card feat '+feat.id+'" href="'+href(feat.id)+'">'+
+      '<div class="ic g '+feat.id+'">'+feat.icon+'</div><div class="tx"><b>'+feat.name+'</b><span>'+feat.pill+' · '+feat.desc+'</span></div><div class="go">›</div></a>';
+    html += pairs.map(function(pair){
+      return '<div class="f-row">'+pair.map(function(c){
+        return '<a class="f-card '+c.id+'" href="'+href(c.id)+'">'+
+          '<div class="ic g '+c.id+'">'+c.icon+'</div><div class="tx"><b>'+c.name+'</b><span>'+c.desc+'</span></div></a>';
+      }).join('')+'</div>';
+    }).join('');
+    return chrome('<div class="f-wrap">'+html+'</div>');
+  }
+
+  var plans = [
+    { key:'v3', tag:'C · 当前默认', name:'杂志混排', desc:'等大芯片阵列，保洁与其他频道同尺寸。', html:layoutC(), preferred:true },
+    { key:'v4', tag:'D · 新提案', name:'Bento 拼贴', desc:'不对称拼贴，保洁超宽、维修加高，更「编辑部」。', html:layoutD() },
+    { key:'v5', tag:'E · 新提案', name:'分组货架', desc:'到家 / 生活 / 资产三组横滑，场景更清晰。', html:layoutE() },
+    { key:'v6', tag:'F · 新提案', name:'浅色编辑部', desc:'白底色条 + 主推首卡，干净利落、偏产品感。', html:layoutF() }
+  ];
+
+  document.getElementById('board').innerHTML = plans.map(function(p){
+    return '<div class="col">'+
+      '<div class="tag">'+p.tag+'</div><div class="name">'+p.name+'</div><div class="desc">'+p.desc+'</div>'+
+      p.html+
+      '<div class="pick"><a class="'+(p.preferred?'on':'')+'" href="index.html?tab=jiazheng&lifeLayout='+p.key+'">'+
+      (p.preferred?'保持默认 ›':'首页试用 ›')+'</a></div></div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

@@ -7,12 +7,8 @@ db.sqlite
 publish_test.sh
 stop_test.sh
 start_test.sh
-# 话务密钥与联调产物（禁止入库）；GitHub 不跟踪运行时环境文件
+# 裸 .env 不入库；.env.prod / .env.test 等按环境文件可跟踪
 .env
-.env.*
-!.env.example
-!**/.env.example
-runtime.env
 juzhu/config.ini
 juzhu/_mysql_dump.json
 juzhu/mysql_dump.json

@@ -62,6 +62,53 @@ DEFAULT_ADMIN_PASSWORD = "dongbo2026"
 ADMIN_TOKEN_TTL_SEC = 30 * 24 * 3600
 ADMIN_TOKEN_SALT = b"juzhu-admin-session-v1"
 
+_CEND_PUBLIC_EXACT = {
+    "/api/juzhu/catalog",
+    "/api/juzhu/cities",
+    "/api/juzhu/districts",
+    "/api/juzhu/settings",
+    "/api/juzhu/stats",
+    "/api/juzhu/ratings",
+    "/api/juzhu/trade",
+    "/api/juzhu/jiazheng/categories",
+    "/api/juzhu/jiazheng/skus",
+    "/api/juzhu/jiazheng/workers",
+    "/api/juzhu/gr/orders",
+}
+
+
+def is_cend_public_api(path, method):
+    """C 端公开白名单（无 PII 目录/房源 + 来来预约 + 我的订单）。其余须 API Key。"""
+    p = (path or "").rstrip("/") or "/"
+    m = (method or "GET").upper()
+    if m == "POST" and p == "/api/juzhu/jiazheng/wechat-link":
+        return True
+    if m != "GET":
+        return False
+    if p in _CEND_PUBLIC_EXACT:
+        return True
+    if re.match(r"^/api/juzhu/districts/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/projects/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/projects/\d+/virtual-phone$", p):
+        return True
+    if re.match(r"^/api/juzhu/units/\d+$", p):
+        return True
+    if re.match(r"^/api/juzhu/units/\d+/photos$", p):
+        return True
+    if re.match(r"^/api/juzhu/ratings/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/jiazheng/skus/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/jiazheng/skus/[^/]+/(slots|detail|vendors)$", p):
+        return True
+    if re.match(r"^/api/juzhu/gr/orders/[^/]+$", p):
+        return True
+    if re.match(r"^/api/juzhu/gr/orders/[^/]+/vendor-detail$", p):
+        return True
+    return False
+
 # 静态文件：默认不暴露源码/密钥/数据库。/juzhu/ 仅白名单（前端 data 层依赖）。
 # 与仓库根 app.js 的 isPublicStatic 保持同口径（Node 为线上入口）。
 _SENSITIVE_NAMES = {
@@ -718,15 +765,18 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith(ADMIN_PREFIX):
             if not self._require_admin_authorized():
                 return
-        # wechat-link 为 C 端预约入口，匿名可调（与评价类似）；写单/派单等仍需 API Key
+        # wechat-link 为 C 端预约入口，匿名可调；其余 jiazheng 写接口须 API Key
         elif method != "GET" and (
             path == "/api/juzhu/jiazheng/orders"
-            or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance)$", path)
+            or re.match(r"^/api/juzhu/jiazheng/orders/[^/]+/(pay|quote|dispatch|advance|rate)$", path)
         ):
             if not self._require_api_key():
                 return
 
         if method == "GET" and not path.startswith(ADMIN_PREFIX):
+            if not is_cend_public_api(path, method):
+                if not self._require_api_key():
+                    return
             return self._public_get(path, qs)
 
         if path == f"{ADMIN_PREFIX}/districts" and method == "GET":
@@ -885,7 +935,7 @@ class Handler(SimpleHTTPRequestHandler):
         if m and method == "POST":
             return self._rate_jz_order(m.group(1))
 
-        # === 生成微信小程序 URL Link（C 端预约入口，匿名可调，见上方路由鉴权说明） ===
+        # === 生成微信小程序 URL Link（C 端预约入口，匿名可调） ===
         if path == "/api/juzhu/jiazheng/wechat-link" and method == "POST":
             body = self._body()
             return jiazheng_api.handle_wechat_link(self, body)
@@ -1129,7 +1179,7 @@ WHERE c.enabled=1
     JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
     JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
     WHERE s.category_id=c.id
-      AND p.city_id=?
+      AND (p.city_id=? OR p.city_id IS NULL)
       AND (
         v.city_ids IS NULL OR TRIM(v.city_ids)=''
         OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
@@ -1155,17 +1205,7 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
             return self._jz_order_stats(conn)
 
         if path == "/api/juzhu/jiazheng/orders":
-            if qs.get("phone"):
-                return self._list_jz_orders(qs, conn=conn)
-            expected = self._expected_api_key()
-            provided = self._provided_api_key()
-            # 空 expected / 空 provided 一律拒绝，避免 "" == "" 旁路
-            if expected and provided and hmac.compare_digest(
-                    hashlib.sha256(provided.encode("utf-8")).digest(),
-                    hashlib.sha256(expected.encode("utf-8")).digest()):
-                return self._list_jz_orders(qs, conn=conn)
-            conn.close()
-            return self._json({"error": "需要 phone 查询参数或有效 API Key"}, 401)
+            return self._list_jz_orders(qs, conn=conn)
 
         m = re.match(r"^/api/juzhu/jiazheng/orders/([^/]+)$", path)
         if m:
@@ -1200,7 +1240,7 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
                         JOIN jz_vendors v2 ON v2.id=p2.vendor_id
                         WHERE p2.channel_sku_id=s.id AND p2.status='on'
                           AND v2.status='active'
-                          AND p2.city_id=?
+                          AND (p2.city_id=? OR p2.city_id IS NULL)
                           AND (
                             v2.city_ids IS NULL OR TRIM(v2.city_ids)=''
                             OR CONCAT(',', v2.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
