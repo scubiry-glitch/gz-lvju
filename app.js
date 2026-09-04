@@ -451,6 +451,9 @@ function isAdminAuthExempt(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (p === `${ADMIN_PREFIX}/auth/login` && method === 'POST') return true;
   if (p === `${ADMIN_PREFIX}/auth/check` && method === 'GET') return true;
+  // 商家提交自己项目评级：处理器内按 owner_vendor_id 归属把关（vendor 会话可入，平台凭据亦可），
+  // 不在入口按 admin 会话一刀切——否则 vendor-owned 提交永远 401（死代码）
+  if (method === 'POST' && /^\/api\/juzhu\/admin\/projects\/\d+\/rating\/submit$/.test(p)) return true;
   return false;
 }
 
