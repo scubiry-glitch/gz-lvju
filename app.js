@@ -75,6 +75,9 @@ let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 let vendorApi = null;
 try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
+// 商家 HMAC-SHA256 签名（平台 → 商家方向的 urllink / order_detail 用）
+let hmacAuth = null;
+try { hmacAuth = require('./hmac_auth.cjs'); } catch (_) {}
 
 // 商家配置统一从 jz_vendors 表读取（懒加载缓存；对齐 Python jiazheng_api._load_vendor_config）
 async function getVendorConfig() {
@@ -2960,14 +2963,23 @@ async function handleApiDirect(urlPath, qs, req, res) {
           error: `vendor_id=${vendorId} 未配置 url_link，请检查 jz_vendors 表配置`,
         }, 500);
       }
+      if (!hmacAuth || !vendor.key) {
+        return jsonReply(res, {
+          ok: false,
+          error: `vendor_id=${vendorId} 未配置 hmac_key，无法按文档带签名调用 url_link`,
+        }, 500);
+      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const orderRef = await grOrders.generateOrderRef(conn);
-        const outbound = await outboundJson('POST', vendor.url_link, {
+        // 平台 → 商家 urllink：按 api_doc.md 加 HMAC-SHA256 签名（vendor_id 必带）
+        const linkBody = hmacAuth.generateSignature(vendor.key, {
+          vendor_id: Number(vendorId),
           path: pagePath,
           query: productQuery,
           order_ref: orderRef,
-        }, 10000);
+        });
+        const outbound = await outboundJson('POST', vendor.url_link, linkBody, 10000);
         if (!outbound.json || outbound.json.code !== 200) {
           return jsonReply(res, { ok: false, error: (outbound.json && outbound.json.msg) || 'URL Link 生成失败' }, 502);
         }
@@ -3015,10 +3027,23 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
           if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
           const vendors = await getVendorConfig();
-          const detailUrl = (vendors[String(order.vendor_id)] || {}).order_detail_url || '';
+          const vendor = vendors[String(order.vendor_id)] || {};
+          const detailUrl = vendor.order_detail_url || '';
           if (!detailUrl) return jsonReply(res, { ok: false, error: '商家未配置订单详情接口' });
+          if (!hmacAuth || !vendor.key) {
+            return jsonReply(res, { ok: false, error: `vendor_id=${order.vendor_id} 未配置 hmac_key，无法按文档带签名调用订单详情` });
+          }
+          // 平台 → 商家 order_detail（GET）：按 api_doc.md 把 vendor_id / timestamp / sign 一并放在 query string
+          // 商家侧按相同规则（递归展平→去空→字典序→HMAC-SHA256）验签
+          const signed = hmacAuth.generateSignature(vendor.key, {
+            vendor_id: Number(order.vendor_id),
+            order_ref: orderRef,
+          });
+          const qsParts = Object.entries(signed).map(([k, v]) =>
+            encodeURIComponent(k) + '=' + encodeURIComponent(v)
+          ).join('&');
           const sep = detailUrl.includes('?') ? '&' : '?';
-          const url = detailUrl + sep + 'order_ref=' + encodeURIComponent(orderRef);
+          const url = detailUrl + sep + qsParts;
           const outbound = await outboundJson('GET', url, null, 5000);
           if (!outbound.json || outbound.json.code !== 200 || !outbound.json.data) {
             return jsonReply(res, { ok: false, error: '商家未返回订单详情' });
