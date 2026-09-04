@@ -447,6 +447,7 @@ function isCEndPublicApi(urlPath, method) {
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/\d+\/stay-calendar$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/[^/]+\/units$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
   if (/^\/api\/juzhu\/units\/\d+$/.test(p)) return true;
@@ -530,6 +531,127 @@ function stripContactPhone(row) {
   delete out.contact_phone;
   return out;
 }
+
+// ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源 =====
+// 保险标识：商家在 projects.ext.insurance（key 数组）配置，catalog / 项目详情按此下发
+const INSURANCE_TYPES = [
+  { key: 'switch_rental', label: '换租保险', short: '换租险', icon: '🔄' },
+  { key: 'hotel_cancel', label: '酒店取消险', short: '取消险', icon: '🏨' },
+  { key: 'property', label: '财产保险', short: '财险', icon: '🛡' },
+];
+const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
+// 最短连住晚数（详情日历与下单共同校验）：rental 旅居/长租 15 晚起住，minsu 惠民短住 1 晚起；
+// 商家可在 projects.ext.min_stay_nights 覆盖（1–365）
+const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 1 };
+// 房态：open 可订 / blocked 关房（商家手工） / booked 已订（下单占用）
+const STAY_STATUS = { OPEN: 'open', BLOCKED: 'blocked', BOOKED: 'booked' };
+
+function parseExtObj(v) {
+  if (!v) return {};
+  if (typeof v === 'object') return v;
+  try {
+    const o = JSON.parse(v);
+    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+  } catch (_) { return {}; }
+}
+
+function insuranceOf(proj) {
+  const list = parseExtObj(proj && proj.ext).insurance;
+  if (!Array.isArray(list)) return [];
+  const seen = [];
+  for (const k of list) {
+    if (INSURANCE_KEYS.includes(k) && !seen.includes(k)) seen.push(k);
+  }
+  return seen;
+}
+
+function minStayNightsOf(proj) {
+  const raw = parseInt(parseExtObj(proj && proj.ext).min_stay_nights, 10);
+  let v = Number.isFinite(raw) ? raw : (STAY_MIN_NIGHTS_DEFAULT[(proj && proj.channel)] || 1);
+  if (!(v >= 1)) v = 1;
+  return Math.min(v, 365);
+}
+
+/** 项目/户型夜价默认口径（规则15）：minsu=units.ext.price_night / price_from；rental=月租/30 折算 */
+function unitNightPrice(proj, unit) {
+  const p = proj || {};
+  if (unit) {
+    if (p.channel === 'minsu') {
+      const ux = parseExtObj(unit.ext);
+      if (ux.price_night) return Math.round(ux.price_night);
+    } else if (unit.rent_monthly) {
+      return Math.max(1, Math.round(unit.rent_monthly / 30));
+    }
+  }
+  const base = p.price_from || 0;
+  if (!base) return 0;
+  return p.channel === 'minsu' ? base : Math.max(1, Math.round(base / 30));
+}
+
+/** 项目房态配置（随 catalog / 项目详情 / 房态日历下发） */
+function stayConfigOf(proj) {
+  const ins = insuranceOf(proj);
+  return {
+    min_stay_nights: minStayNightsOf(proj),
+    insurance: ins,
+    insurance_types: INSURANCE_TYPES.filter((t) => ins.includes(t.key)),
+  };
+}
+
+/** 组装某月房态日历：只存差异行，无行=open；blocked/booked 压过同日项目级 open；夜价覆盖户型级 > 项目级 > 默认 */
+async function buildStayMonth(proj, unit, unitId, y, mo) {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const first = y + '-' + pad2(mo + 1) + '-01';
+  const lastDay = new Date(y, mo + 1, 0).getDate();
+  const last = y + '-' + pad2(mo + 1) + '-' + String(lastDay).padStart(2, '0');
+  const scRows = await queryRows(
+    `SELECT unit_id, stay_date, status, price_night, source, booking_id FROM stay_calendar
+     WHERE project_id=? AND stay_date BETWEEN ? AND ? AND (unit_id=0 OR unit_id=?) ORDER BY stay_date, unit_id`,
+    [proj.id, first, last, unitId]
+  );
+  const today = new Date();
+  const todayKey = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  const defPrice = unitNightPrice(proj, unit);
+  const days = [];
+  for (let dd = 1; dd <= lastDay; dd++) {
+    const ds = y + '-' + pad2(mo + 1) + '-' + String(dd).padStart(2, '0');
+    const k = y * 10000 + (mo + 1) * 100 + dd;
+    let status = 'open';
+    let price = defPrice;
+    let source = null;
+    let bookingId = null;
+    for (const r of scRows) {
+      if (r.stay_date !== ds) continue;
+      if (r.status === 'booked') { status = 'booked'; source = r.source; bookingId = r.booking_id || null; }
+      else if (r.status === 'blocked' && status !== 'booked') { status = 'blocked'; source = r.source; }
+      if (r.price_night != null && (r.unit_id === unitId || price === defPrice)) price = r.price_night;
+    }
+    days.push({
+      date: ds,
+      status: k < todayKey ? 'past' : status,
+      price: price || null,
+      source: k < todayKey ? null : source,
+      booking_id: bookingId,
+    });
+  }
+  return { month: y + '-' + pad2(mo + 1), base_price_night: defPrice || null, days };
+}
+
+/** 闭区间 [checkin, checkout) 的日期串列表（YYYY-MM-DD） */
+function stayDateList(checkin, checkout) {
+  const out = [];
+  const start = new Date(checkin + 'T00:00:00');
+  const end = new Date(checkout + 'T00:00:00');
+  for (let d = start; d < end && out.length < 3650; d.setDate(d.getDate() + 1)) {
+    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+  }
+  return out;
+}
+
+module.exports.stayConfigOf = stayConfigOf;
+module.exports.unitNightPrice = unitNightPrice;
+module.exports.stayDateList = stayDateList;
+module.exports.INSURANCE_TYPES = INSURANCE_TYPES;
 
 module.exports.isPublicStatic = isPublicStatic;
 module.exports.isProduction = isProduction;
@@ -950,6 +1072,15 @@ async function ensureSchemaRun() {
         cover_image VARCHAR(500),
         UNIQUE KEY uk_project_slug (project_id, slug)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS booking_contacts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        name VARCHAR(64) NOT NULL,
+        phone VARCHAR(32) NOT NULL,
+        created_at VARCHAR(32) NOT NULL,
+        KEY idx_bc_user (user_id),
+        UNIQUE KEY uk_bc_user_phone (user_id, phone)
+      ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS booking_orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         order_no VARCHAR(32) NOT NULL,
@@ -972,6 +1103,20 @@ async function ensureSchemaRun() {
         KEY idx_bo_vendor (owner_vendor_id, status),
         KEY idx_bo_project (project_id),
         KEY idx_bo_user (user_id)
+      ) CHARSET=utf8mb4`,
+      // 房态日历：只存差异行（关房/已订/夜价覆盖），无行 = 可订；unit_id=0 为项目级（整栋/不限房型）
+      `CREATE TABLE IF NOT EXISTS stay_calendar (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        project_id INT NOT NULL,
+        unit_id INT NOT NULL DEFAULT 0,
+        stay_date VARCHAR(10) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'open',
+        price_night INT,
+        source VARCHAR(16) NOT NULL DEFAULT 'vendor',
+        booking_id INT,
+        updated_at VARCHAR(32),
+        UNIQUE KEY uk_sc (project_id, unit_id, stay_date),
+        KEY idx_sc_range (project_id, stay_date)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS photos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -2904,7 +3049,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
-        projects: mapRows(projects, ['tags', 'rating']).map(stripContactPhone),
+        projects: mapRows(projects, ['tags', 'rating', 'ext']).map((p) =>
+          Object.assign(stripContactPhone(p), stayConfigOf(p))),
         units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']),
         photos,
         topic: topicMeta,
@@ -2993,12 +3139,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         // slug 可能是纯数字（id），兼容两种查询
         const isId = /^\d+$/.test(slug);
         const sql = isId
-          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE id=?'
-          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE slug=?';
+          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status FROM projects WHERE id=?'
+          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status FROM projects WHERE slug=?';
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
-        return jsonReply(res, rows[0]);
+        return jsonReply(res, Object.assign(rows[0], stayConfigOf(rows[0])));
       }
     }
 
@@ -3018,8 +3164,35 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [proj.id]
         );
         parseJsonFields(proj, ['tags', 'rating']);
-        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
-        return jsonReply(res, { project: stripContactPhone(proj), units, photos });
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
+        return jsonReply(res, { project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos });
+      }
+    }
+
+    // GET /api/juzhu/projects/:id/stay-calendar?month=YYYY-MM&unit_id= —— 房态日历（公开，无 PII）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/(\d+)\/stay-calendar$/);
+      if (m && req.method === 'GET') {
+        const pid = parseInt(m[1], 10);
+        const qp = new URLSearchParams(qs);
+        const unitId = qp.get('unit_id') ? parseInt(qp.get('unit_id'), 10) || 0 : 0;
+        const mth = /^(\d{4})-(\d{2})$/.exec((qp.get('month') || '').trim());
+        const today = new Date();
+        const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
+        const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        let unit = null;
+        if (unitId) {
+          const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          unit = us[0];
+        }
+        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        return jsonReply(res, Object.assign({
+          project_id: pid,
+          unit_id: unitId,
+        }, cal, stayConfigOf(prows[0])));
       }
     }
 
@@ -3238,6 +3411,59 @@ async function handleApiDirect(urlPath, qs, req, res) {
       });
     }
 
+    // ===== 联系人簿（booking_contacts，登录用户自己的常用联系人）=====
+
+    // GET /api/juzhu/booking/contacts —— 我的联系人（本人视角，手机号不脱敏）
+    if (urlPath === '/api/juzhu/booking/contacts' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const rows = await queryRows(
+        'SELECT id, name, phone FROM booking_contacts WHERE user_id=? ORDER BY id DESC LIMIT 20',
+        [String(sess.account.id)]
+      );
+      return jsonReply(res, { items: rows });
+    }
+
+    // POST /api/juzhu/booking/contacts —— 新增联系人（本人，上限 20）
+    if (urlPath === '/api/juzhu/booking/contacts' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const phone = String(body.phone || '').trim();
+      if (!name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '姓名与 11 位手机号为必填' }, 400);
+      const cntRows = await queryRows('SELECT COUNT(*) AS n FROM booking_contacts WHERE user_id=?', [String(sess.account.id)]);
+      if (cntRows[0].n >= 20) return jsonReply(res, { error: '联系人最多 20 个' }, 400);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [r] = await conn.execute(
+          'INSERT INTO booking_contacts(user_id,name,phone,created_at) VALUES (?,?,?,?)',
+          [String(sess.account.id), name, phone, now]
+        );
+        await conn.commit();
+        return jsonReply(res, { ok: true, id: r.insertId, name, phone });
+      } finally { await conn.end(); }
+    }
+
+    // DELETE /api/juzhu/booking/contacts/:id —— 删除本人联系人
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/booking\/contacts\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const sess = await requestSession(req);
+        if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute(
+            'DELETE FROM booking_contacts WHERE id=? AND user_id=?',
+            [parseInt(m[1], 10), String(sess.account.id)]
+          );
+          await conn.commit();
+          return jsonReply(res, { ok: r.affectedRows > 0 });
+        } finally { await conn.end(); }
+      }
+    }
+
     // ===== 旅居预订（booking_orders）：C 端公开下单/查单/取消 + 商家确认 =====
 
     // POST /api/juzhu/booking —— 公开下单（规则10：手机号只入库，响应不回显）
@@ -3253,13 +3479,31 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(checkin) || !/^\d{4}-\d{2}-\d{2}$/.test(checkout)) return jsonReply(res, { error: '日期格式须为 YYYY-MM-DD' }, 400);
       const nights = Math.round((new Date(checkout) - new Date(checkin)) / 864e5);
       if (!(nights >= 1)) return jsonReply(res, { error: '离店须晚于入住至少 1 晚' }, 400);
+      if (new Date(checkin) < new Date(new Date().toDateString())) return jsonReply(res, { error: '入住日期不能早于今天' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [projs] = await conn.execute('SELECT id, channel, status, price_from, owner_vendor_id, city_id FROM projects WHERE id=?', [projectId]);
+        const [projs] = await conn.execute('SELECT id, name, channel, status, price_from, owner_vendor_id, city_id, ext FROM projects WHERE id=?', [projectId]);
         const proj = projs[0];
         if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
         if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
         if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
+        // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
+        const minNights = minStayNightsOf(proj);
+        if (nights < minNights) {
+          conn.end();
+          return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
+        }
+        // 房态冲突校验：unit 未指定 = 整栋/不限房型 → 全项目任一晚被占即拒；指定户型 → 项目级 + 该户型
+        const [conflicts] = await conn.execute(
+          `SELECT stay_date, unit_id, status FROM stay_calendar
+           WHERE project_id=? AND status IN ('blocked','booked') AND stay_date >= ? AND stay_date < ?
+           ${unitId ? 'AND unit_id IN (0, ?)' : ''} ORDER BY stay_date LIMIT 1`,
+          unitId ? [projectId, checkin, checkout, unitId] : [projectId, checkin, checkout]
+        );
+        if (conflicts.length) {
+          conn.end();
+          return jsonReply(res, { error: `所选日期 ${conflicts[0].stay_date} 已被预订或已关房，请换时段`, conflict_date: conflicts[0].stay_date }, 400);
+        }
       // 登录用户下单 → 订单归属（未登录则 user_id 为空，可后续按手机号认领）
       let bookingUserId = null;
       try {
@@ -3289,8 +3533,20 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
+        // 下单即占房态（stay_calendar booked 行，取消时释放）
+        const stayDates = stayDateList(checkin, checkout);
+        if (stayDates.length) {
+          const nowSc = now;
+          const scVals = stayDates.map((d) => [projectId, unitId || 0, d, 'booked', 'booking', ins.insertId, nowSc]);
+          await conn.query(
+            `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booking_id, updated_at)
+             VALUES ${scVals.map(() => '(?,?,?,?,?,?,?)').join(',')}
+             ON DUPLICATE KEY UPDATE status='booked', source='booking', booking_id=VALUES(booking_id), updated_at=VALUES(updated_at)`,
+            scVals.flat()
+          );
+        }
         await conn.commit();
-        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal });
+        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights });
       } finally { await conn.end(); }
     }
 
@@ -3330,6 +3586,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         await conn.execute("UPDATE booking_orders SET status='cancelled', updated_at=? WHERE id=?", [now, rows[0].id]);
+        // 释放房态
+        await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
         await conn.commit();
         return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
       } finally { await conn.end(); }
@@ -3375,6 +3633,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (rows[0].status === 'cancelled') { conn.end(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           await conn.execute('UPDATE booking_orders SET status=?, updated_at=? WHERE id=?', [status, now, rows[0].id]);
+          // 商家拒单 → 释放房态；确认则保留 booked 行
+          if (status === 'cancelled') {
+            await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
+          }
           await conn.commit();
           return jsonReply(res, { ok: true, order_no: rows[0].order_no, status });
         } finally { await conn.end(); }
@@ -3583,7 +3845,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
           projectIds
         );
       }
-      return jsonReply(res, { role: sess.role, projects: projects.map(stripContactPhone), units });
+      units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
+      return jsonReply(res, {
+        role: sess.role,
+        projects: projects.map((p) => Object.assign(stripContactPhone(parseJsonFields(p, ['ext'])), stayConfigOf(p))),
+        units,
+      });
     }
 
     // POST /api/juzhu/vendor/projects/:id/status（下架/上架：status online|offline|draft）
@@ -3645,6 +3912,162 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.commit();
           const [updated] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           return jsonReply(res, { ok: true, unit: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // GET /api/juzhu/vendor/stay-calendar?project_id=&unit_id=&month= —— 商家房态日历（owner 校验）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/stay-calendar$/);
+      if (m && req.method === 'GET') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const vqp = new URLSearchParams(qs);
+        const pid = parseInt(vqp.get('project_id') || '', 10);
+        if (!pid) return jsonReply(res, { error: 'project_id 必填' }, 400);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        const unitId = vqp.get('unit_id') ? (parseInt(vqp.get('unit_id'), 10) || 0) : 0;
+        const mth = /^(\d{4})-(\d{2})$/.exec((vqp.get('month') || '').trim());
+        const today = new Date();
+        const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
+        const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
+        let unit = null;
+        if (unitId) {
+          const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          unit = us[0];
+        }
+        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        return jsonReply(res, Object.assign({
+          role: sess.role,
+          project_id: pid,
+          project_name: prows[0].name,
+          unit_id: unitId,
+          writable: true,
+        }, cal, stayConfigOf(prows[0])));
+      }
+    }
+
+    // POST /api/juzhu/vendor/stay-calendar —— 批量设置房态/夜价
+    // body: { project_id, unit_id?, dates: ['YYYY-MM-DD'...], status: 'open'|'blocked', price_night?: number|null }
+    //   blocked=关房；open + price_night=开房并设夜价；open 无 price_night=恢复默认（删差异行）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/stay-calendar$/);
+      if (m && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        const pid = parseInt(body.project_id, 10);
+        const unitId = body.unit_id ? (parseInt(body.unit_id, 10) || 0) : 0;
+        const status = String(body.status || '');
+        const dates = Array.isArray(body.dates) ? body.dates.map(String).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+        const priceRaw = body.price_night;
+        const price = (priceRaw === null || priceRaw === undefined || priceRaw === '') ? null : parseInt(priceRaw, 10);
+        if (!pid) return jsonReply(res, { error: 'project_id 必填' }, 400);
+        if (!['open', 'blocked'].includes(status)) return jsonReply(res, { error: 'status 须为 open/blocked（booked 由下单占用）' }, 400);
+        if (price != null && !(price >= 0)) return jsonReply(res, { error: 'price_night 须为非负整数或空' }, 400);
+        if (!dates.length) return jsonReply(res, { error: 'dates 必填（YYYY-MM-DD 数组，单次 ≤ 400 天）' }, 400);
+        if (dates.length > 400) return jsonReply(res, { error: '单次最多 400 天' }, 400);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        if (unitId) {
+          const us = await queryRows('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          // 已被订单占用的晚不可改（须先取消订单）
+          const [booked] = await conn.execute(
+            `SELECT stay_date FROM stay_calendar WHERE project_id=? AND unit_id IN (0, ?)
+             AND status='booked' AND stay_date IN (${dates.map(() => '?').join(',')})`,
+            [pid, unitId, ...dates]
+          );
+          if (booked.length) {
+            return jsonReply(res, { error: `以下日期已有预订占用，须先取消订单：${booked.map((r) => r.stay_date).join('、')}` }, 400);
+          }
+          let affected = 0;
+          if (status === 'blocked') {
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            for (const d of dates) {
+              const [r] = await conn.execute(
+                `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+                 VALUES (?,?,?,'blocked',?,'vendor',?)
+                 ON DUPLICATE KEY UPDATE status='blocked', source='vendor', booking_id=NULL, updated_at=VALUES(updated_at)`,
+                [pid, unitId, d, price, now]
+              );
+              affected += r.affectedRows || 0;
+            }
+          } else if (price != null) {
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            for (const d of dates) {
+              const [r] = await conn.execute(
+                `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+                 VALUES (?,?,?,'open',?,'vendor',?)
+                 ON DUPLICATE KEY UPDATE status='open', price_night=VALUES(price_night), updated_at=VALUES(updated_at)`,
+                [pid, unitId, d, price, now]
+              );
+              affected += r.affectedRows || 0;
+            }
+          } else {
+            // 恢复默认：删差异行
+            const [r] = await conn.execute(
+              `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND status IN ('open','blocked')
+               AND stay_date IN (${dates.map(() => '?').join(',')})`,
+              [pid, unitId, ...dates]
+            );
+            affected = r.affectedRows || 0;
+          }
+          await conn.commit();
+          return jsonReply(res, { ok: true, project_id: pid, unit_id: unitId, status, price_night: price, dates: dates.length, affected });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // PUT /api/juzhu/vendor/projects/:id —— 商家配置房源保障与连住规则（写 projects.ext，规则15 不加列）
+    // body: { insurance?: ['switch_rental'|'hotel_cancel'|'property'], min_stay_nights?: 1-365 }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/projects\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const pid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        const ext = parseExtObj(prows[0].ext);
+        if ('insurance' in body) {
+          if (body.insurance === null || body.insurance === '') { ext.insurance = []; }
+          else if (Array.isArray(body.insurance)) {
+            ext.insurance = body.insurance.map(String).filter((k) => INSURANCE_KEYS.includes(k));
+          } else return jsonReply(res, { error: 'insurance 须为标识数组：' + INSURANCE_KEYS.join('/') }, 400);
+        }
+        if ('min_stay_nights' in body) {
+          if (body.min_stay_nights === null || body.min_stay_nights === '') { delete ext.min_stay_nights; }
+          else {
+            const v = parseInt(body.min_stay_nights, 10);
+            if (!(v >= 1 && v <= 365)) return jsonReply(res, { error: 'min_stay_nights 须为 1-365 的整数' }, 400);
+            ext.min_stay_nights = v;
+          }
+        }
+        if (!('insurance' in body) && !('min_stay_nights' in body)) {
+          return jsonReply(res, { error: '无可更新字段（insurance / min_stay_nights）' }, 400);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.execute('UPDATE projects SET ext=? WHERE id=?', [JSON.stringify(ext), pid]);
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
+          return jsonReply(res, { ok: true, project: Object.assign(stripContactPhone(updated[0]), stayConfigOf(updated[0])) });
         } finally { await conn.end(); }
       }
     }

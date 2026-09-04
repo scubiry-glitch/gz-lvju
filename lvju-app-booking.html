@@ -9,10 +9,19 @@
 <style>
   .bfield{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:#fff;}
   .bfield .l{font-size:13px;color:var(--muted);flex-shrink:0;}
-  .bfield input{flex:1;text-align:right;border:0;outline:0;font-size:14px;color:var(--ink);background:transparent;font-family:var(--font);}
+  .bfield input,.bfield select{flex:1;text-align:right;border:0;outline:0;font-size:14px;color:var(--ink);background:transparent;font-family:var(--font);}
   .okbox{margin:14px 18px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:14px;padding:16px;text-align:center;}
   .okbox .no{font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:700;color:var(--brand-deep);letter-spacing:.5px;}
   .err{margin:12px 18px;padding:10px 13px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;font-size:12px;color:#991b1b;display:none;}
+  .gate{margin:14px 18px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .gate .gt{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:2px;}
+  .gate .gs{font-size:11px;color:var(--muted);margin-bottom:10px;}
+  .gate input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:10px 11px;font-size:14px;margin-bottom:8px;outline:0;}
+  .gate .go{width:100%;border:0;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:14px;border-radius:999px;padding:11px 0;cursor:pointer;}
+  .cnew{background:#f8fbfa;border-bottom:1px solid var(--border);padding:10px 18px;}
+  .cnew .row{display:flex;gap:8px;margin-bottom:8px;}
+  .cnew input{flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:0;}
+  .cnew .sv{border:0;background:var(--brand);color:#fff;font-size:12px;font-weight:600;border-radius:999px;padding:8px 16px;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -39,6 +48,15 @@
       <a href="lvju-app-orders.html" style="display:inline-block;margin-top:9px;font-size:12px;font-weight:600;color:var(--brand-deep);text-decoration:none;border:1px solid var(--brand);border-radius:999px;padding:6px 16px;">去订单页查状态 →</a>
     </div>
 
+    <div id="loginGate" class="gate" style="display:none;">
+      <div class="gt">🔒 预订需要先登录</div>
+      <div class="gs">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
+      <input id="gPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
+      <input id="gPwd" placeholder="密码（≥8位，首登自动注册）" type="password" />
+      <div id="gErr" style="font-size:11px;color:#991b1b;margin-bottom:8px;display:none;"></div>
+      <button class="go" id="gGo">登录 / 注册</button>
+    </div>
+
     <div id="formBox">
       <div class="minihouse">
         <div class="th s-xijiang" id="bThumb"></div>
@@ -60,8 +78,16 @@
 
       <div class="seg">入住人 / 联系方式</div>
       <div>
-        <div class="bfield"><span class="l">联系人</span><input id="fName" placeholder="姓名" /></div>
-        <div class="bfield"><span class="l">手机号</span><input id="fPhone" placeholder="11 位手机号（用于查单/取消）" inputmode="numeric" maxlength="11" /></div>
+        <div class="bfield"><span class="l">联系人</span>
+          <select id="cSel" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);max-width:60%;"></select>
+        </div>
+        <div id="cNew" class="cnew" style="display:none;">
+          <div class="row"><input id="cName" placeholder="联系人姓名" /></div>
+          <div class="row"><input id="cPhone" placeholder="11 位手机号" inputmode="numeric" maxlength="11" /></div>
+          <button class="sv" id="cSave">保存联系人</button>
+        </div>
+        <div class="bfield"><span class="l">联系人姓名</span><input id="fName" /></div>
+        <div class="bfield"><span class="l">手机号</span><input id="fPhone" inputmode="numeric" maxlength="11" /></div>
       </div>
 
       <div class="seg">价格明细</div>
@@ -73,32 +99,115 @@
       <div id="bErr" class="err"></div>
 
       <div style="font-size:11px;color:var(--muted);padding:14px 18px 18px;line-height:1.6;">
-        提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，商家确认后订单生效；手机号仅用于订单查询与商家联系，不会完整展示。
+        提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，商家确认后订单生效；联系人保存后下次自动带出，手机号仅用于订单联络，不会完整展示给他人。
       </div>
     </div>
   </div>
 
-  <div class="cta">
+  <div class="cta" id="cBar">
     <div class="p" id="cTotal"><b>—</b><span>合计 · 待选日期</span></div>
     <a class="btn" id="bSubmit" style="cursor:pointer;">提交订单</a>
   </div>
 </div>
 <script>
-/* 预订下单：读库（/projects/:id + /units）→ POST /api/juzhu/booking 真实落库。
-   ?id= 项目、?unit= 户型、?checkin=/?checkout= 由详情页日历透传；
-   未带 ?id= 时自动兜底拉第一个在架可订房源（rental/minsu）。 */
+/* 预订下单（需登录）：GET /api/auth/me 判断登录态 →
+   未登录：显示登录门（贝壳 SDK 默认，探测失败切密码 JIT）；
+   已登录：联系人簿（booking_contacts）+ 账号资料预填 → POST /api/juzhu/booking 落库，
+   订单自动归属登录用户（user_id）。 */
 (function(){
   var q = new URLSearchParams(location.search);
   var err = document.getElementById('bErr');
   var unitSel = document.getElementById('fUnit');
   var perNight = 0;
   var curId = 0;
+  var me = null;          // { phone, display_name, id }
+  var contacts = [];      // 联系人簿
 
   function showErr(m){ err.textContent = m; err.style.display = 'block'; }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
+  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
+  function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
+  function sdkProbe(){
+    return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
+  }
 
+  /* ── 登录门 ── */
+  function showGate(){
+    document.getElementById('loginGate').style.display = 'block';
+    document.getElementById('formBox').style.display = 'none';
+    document.getElementById('cBar').style.display = 'none';
+    // 贝壳 SDK 默认登录（App 环境）
+    var sdk = sdkProbe();
+    if (sdk && typeof sdk.getUserInfo === 'function') {
+      Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
+        var i = info && info.data ? info.data : info;
+        if (i && (i.uid || i.userId || i.id) && (i.phone || i.mobile)) {
+          return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
+            .then(function(r){ return r.json(); })
+            .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){} boot(); } });
+        }
+      }).catch(function(){ /* SDK 失败 → 保持密码门 */ });
+    }
+    document.getElementById('gGo').onclick = function(){
+      var ph = document.getElementById('gPhone').value.trim(), pw = document.getElementById('gPwd').value;
+      var eEl = document.getElementById('gErr');
+      if (!/^1\d{10}$/.test(ph) || pw.length < 8) { eEl.textContent = '手机号 11 位、密码至少 8 位'; eEl.style.display = 'block'; return; }
+      eEl.style.display = 'none';
+      fetch('/api/juzhu/auth/tenant', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: ph, password: pw }) })
+        .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+        .then(function(res){
+          if (!res.ok) { eEl.textContent = res.j.error || '登录失败'; eEl.style.display = 'block'; return; }
+          try { localStorage.setItem('BJZ_TOKEN', res.j.token); } catch(e){}
+          boot();
+        }).catch(function(){ eEl.textContent = '网络异常'; eEl.style.display = 'block'; });
+    };
+  }
+
+  function checkMe(){
+    var t = tok();
+    if (!t) return Promise.resolve(null);
+    return fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + t } })
+      .then(function(r){ if (!r.ok) return null; return r.json(); })
+      .then(function(j){ return j && j.account ? j.account : null; })
+      .catch(function(){ return null; });
+  }
+
+  /* ── 联系人簿 ── */
+  function loadContacts(){
+    return fetch('/api/juzhu/booking/contacts', { headers: authH() })
+      .then(function(r){ if (!r.ok) return { items: [] }; return r.json(); })
+      .then(function(j){ contacts = j.items || []; renderContactSel(); });
+  }
+  function renderContactSel(){
+    var sel = document.getElementById('cSel');
+    var opts = [];
+    if (me) opts.push('<option value="acct" data-name="' + esc(me.display_name || '') + '" data-phone="' + esc(me.phone || '') + '">我的资料（' + esc(me.display_name || '') + ' · ' + esc(String(me.phone || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')) + '）</option>');
+    contacts.forEach(function(c){
+      opts.push('<option value="' + c.id + '" data-name="' + esc(c.name) + '" data-phone="' + esc(c.phone) + '">' + esc(c.name) + ' · ' + esc(c.phone) + '</option>');
+    });
+    opts.push('<option value="new">＋ 新增联系人…</option>');
+    sel.innerHTML = opts.join('');
+    var want = sel.querySelector('option[data-phone="' + (me && me.phone ? me.phone : '') + '"]');
+    if (want) want.selected = true;
+    applyContact();
+  }
+  function applyContact(){
+    var v = document.getElementById('cSel').value;
+    var o = document.getElementById('cSel').selectedOptions[0];
+    document.getElementById('cNew').style.display = v === 'new' ? 'block' : 'none';
+    if (v === 'acct' && me) {
+      document.getElementById('fName').value = me.display_name || '';
+      document.getElementById('fPhone').value = me.phone || '';
+    } else if (v !== 'new' && o) {
+      document.getElementById('fName').value = o.dataset.name || '';
+      document.getElementById('fPhone').value = o.dataset.phone || '';
+    }
+  }
+
+  /* ── 房源 + 价格 ── */
   function calc(){
     var ci = document.getElementById('fIn').value, co = document.getElementById('fOut').value;
     var n = (ci && co) ? Math.round((new Date(co) - new Date(ci)) / 864e5) : 0;
@@ -110,11 +219,11 @@
     document.querySelector('#cTotal span').textContent = n >= 1 ? '共 ' + n + ' 晚' : '待选日期';
   }
 
-  function load(pid, isRetry){
+  function load(pid){
     curId = pid;
     Promise.all([
       fetch('/api/juzhu/projects/' + pid).then(function(r){ if (!r.ok) { var er = new Error(String(r.status)); er.status = r.status; throw er; } return r.json(); }),
-      fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) { var er = new Error(String(r.status)); er.status = r.status; throw er; } return r.json(); })
+      fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) { var er2 = new Error(String(r.status)); er2.status = r.status; throw er2; } return r.json(); })
     ]).then(function(rs){
       var p = rs[0] || {}, units = (rs[1] || {}).units || [];
       p.tags = asArr(p.tags);
@@ -129,7 +238,6 @@
         u.tags = asArr(u.tags);
         var ex = {};
         if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) { ex = {}; } } else if (u.ext) { ex = u.ext; }
-        // 夜价口径（规则15）：minsu 短住=ext.price_night；rental 长租=月租/30 折算
         var pn;
         if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
         else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
@@ -143,8 +251,7 @@
       if (co) document.getElementById('fOut').value = co;
       calc();
     }).catch(function(e){
-      // 链接里的房源已下架/不存在（如老收藏的 id）→ 自动兜底带入在架房源，不卡死
-      if (!isRetry && (e && e.status === 404)) {
+      if (!isRetry && e && e.status === 404) {
         showErr('链接中的房源（id=' + pid + '）已下架或不存在 · 自动带入在架房源');
         fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
           var p = (cat.projects || []).filter(function(x){
@@ -154,7 +261,7 @@
         }).catch(function(){});
         return;
       }
-      showErr('房源加载失败：' + e.message);
+      showErr('房源加载失败：' + (e && e.message || ''));
     });
   }
 
@@ -163,8 +270,21 @@
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
     calc();
   });
-  document.getElementById('fIn').addEventListener('change', calc);
-  document.getElementById('fOut').addEventListener('change', calc);
+  document.getElementById('cSave').addEventListener('click', function(){
+    var nm = document.getElementById('cName').value.trim(), ph = document.getElementById('cPhone').value.trim();
+    if (!nm || !/^1\d{10}$/.test(ph)) { showErr('联系人姓名与 11 位手机号为必填'); return; }
+    fetch('/api/juzhu/booking/contacts', { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({ name: nm, phone: ph }) })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (!res.ok) { showErr(res.j.error || '保存失败'); return; }
+        return loadContacts().then(function(){
+          var sel = document.getElementById('cSel');
+          sel.value = String(res.j.id);
+          applyContact();
+        });
+      });
+  });
 
   document.getElementById('bSubmit').addEventListener('click', function(){
     err.style.display = 'none';
@@ -178,7 +298,7 @@
       contact_phone: document.getElementById('fPhone').value.trim()
     };
     var bHeaders = { 'Content-Type': 'application/json' };
-    try { var bt = localStorage.getItem('BJZ_TOKEN'); if (bt) bHeaders['Authorization'] = 'Bearer ' + bt; } catch (e) {}
+    var bt = tok(); if (bt) bHeaders['Authorization'] = 'Bearer ' + bt;
     fetch('/api/juzhu/booking', { method: 'POST', headers: bHeaders, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
@@ -186,25 +306,39 @@
         document.getElementById('okNo').textContent = res.j.order_no;
         document.getElementById('okBox').style.display = 'block';
         document.getElementById('formBox').style.display = 'none';
-        document.querySelector('.cta').style.display = 'none';
+        document.getElementById('cBar').style.display = 'none';
       })
       .catch(function(){ showErr('网络异常，请稍后再试'); });
   });
 
+  /* ── 启动：登录判断 → 联系人 → 房源 ── */
+  var isRetry = false;
   var qid = parseInt(q.get('id') || '', 10);
-  if (qid) {
-    load(qid);
-  } else {
-    // 兜底：未带 ?id=（旧缓存列表/详情跳转）→ 自动带入第一个在架可订房源
-    showErr('未指定房源：已自动带入一个在架房源 · 如需其他房源请从「找房」列表进入');
-    fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
-      var p = (cat.projects || []).filter(function(x){
-        return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
-      })[0];
-      if (!p) { showErr('暂无可预订房源 · 请从列表进入'); document.getElementById('bSubmit').style.opacity = .4; return; }
-      load(p.id);
-    }).catch(function(){ showErr('缺少房源参数，且目录服务不可用 · 请稍后再试'); });
+  function boot(){
+    document.getElementById('fIn').addEventListener('change', calc);
+    document.getElementById('fOut').addEventListener('change', calc);
+    document.getElementById('cSel').addEventListener('change', applyContact);
+    checkMe().then(function(acc){
+      if (!acc) { showGate(); return; }
+      me = { id: acc.id, phone: acc.phone || '', display_name: acc.display_name || '' };
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('formBox').style.display = 'block';
+      document.getElementById('cBar').style.display = 'flex';
+      loadContacts();
+      if (qid) load(qid);
+      else {
+        showErr('未指定房源：已自动带入一个在架房源 · 如需其他房源请从「找房」列表进入');
+        fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
+          var p = (cat.projects || []).filter(function(x){
+            return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
+          })[0];
+          if (!p) { showErr('暂无可预订房源 · 请从列表进入'); document.getElementById('bSubmit').style.opacity = .4; return; }
+          load(p.id);
+        }).catch(function(){ showErr('缺少房源参数，且目录服务不可用 · 请稍后再试'); });
+      }
+    });
   }
+  boot();
 })();
 </script>
 </body>
