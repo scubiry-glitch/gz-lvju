@@ -147,6 +147,12 @@
       <span class="lbl">新居住保租房</span>
       <span style="font-size:11px;color:var(--muted);">数据来自 <code>juzhu-admin</code> → <code>/api/juzhu/ratings</code></span>
       <div class="spacer"></div>
+      <select id="ratingStatus" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
+        <option value="pending" selected>待复核</option>
+        <option value="passed">已通过</option>
+        <option value="rejected">已驳回</option>
+        <option value="">全部状态</option>
+      </select>
       <a href="../juzhu-admin.html" class="btn btn-ghost" style="text-decoration:none;">内容后台 ↗</a>
     </div>
     <div class="table-wrap" style="margin-bottom:18px;">
@@ -326,37 +332,43 @@
   (function(){
     var STATUS = { pending:'待复核', passed:'已通过', rejected:'已驳回', draft:'草稿' };
     var STAR = ['','一','二','三','四','五'];
-    fetch('/api/juzhu/ratings?status=pending').then(function(r){ return r.json(); }).then(function(data){
-      var items = data.items || [];
-      var tbody = document.getElementById('juzhuRatings');
-      if (!items.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无待复核保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
-        return;
-      }
-      var RGCITY = (window.BZF_REGION && BZF_REGION.prov && BZF_REGION.prov.capital) || '沈阳';
-      var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
-      tbody.innerHTML = items.map(function(p){
-        var r = p.rating || {};
-        var code = r.code || ('SY-BZF-'+String(p.id).padStart(5,'0'));
-        var stars = r.stars || 3;
-        var score = r.score || '—';
-        var st = p.rating_status || 'pending';
-        var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
-        return '<tr>'+
-          '<td><span class="house-id">'+code+'</span></td>'+
-          '<td><b>'+p.name+'</b><br><small style="color:var(--muted);">'+RGCITY+' · '+RGBIZ+'</small></td>'+
-          '<td>'+(p.district_name||'—')+'</td>'+
-          '<td><span class="star-badge s'+stars+'">★ '+STAR[stars]+'星</span></td>'+
-          '<td><div class="score-cell"><div class="score-bar"><i style="width:'+score+'%;background:var(--accent);"></i></div><span class="score-num">'+score+'</span></div></td>'+
-          '<td>'+dt+'</td>'+
-          '<td><span class="status-tag '+st+'">'+(STATUS[st]||st)+'</span></td>'+
-          '<td class="action-btns"><a href="p-rating-detail.html?id='+encodeURIComponent(code)+'" class="btn btn-primary">复核</a></td>'+
-        '</tr>';
-      }).join('');
-    }).catch(function(){
-      document.getElementById('juzhuRatings').innerHTML =
-        '<tr><td colspan="8" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API · 请运行 python3 juzhu/server.py</td></tr>';
-    });
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function load(status){
+      var qs = status ? ('?status='+encodeURIComponent(status)) : '';
+      fetch('/api/juzhu/ratings'+qs).then(function(r){ return r.json(); }).then(function(data){
+        var items = data.items || [];
+        var tbody = document.getElementById('juzhuRatings');
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无'+(STATUS[status]||'')+'保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
+          return;
+        }
+        var RGCITY = (window.BZF_REGION && BZF_REGION.prov && BZF_REGION.prov.capital) || '沈阳';
+        var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
+        tbody.innerHTML = items.map(function(p){
+          var r = p.rating || {};
+          var code = r.code || (String(p.id).padStart(5,'0'));
+          var stars = r.stars || 3;
+          var score = (r.score==null) ? '—' : r.score;
+          var st = p.rating_status || 'pending';
+          var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
+          return '<tr>'+
+            '<td><span class="house-id">'+esc(code)+'</span></td>'+
+            '<td><b>'+esc(p.name)+'</b><br><small style="color:var(--muted);">'+esc(RGCITY)+' · '+esc(RGBIZ)+'</small></td>'+
+            '<td>'+esc(p.district_name||'—')+'</td>'+
+            '<td><span class="star-badge s'+stars+'">★ '+STAR[stars]+'星</span></td>'+
+            '<td><div class="score-cell"><div class="score-bar"><i style="width:'+score+'%;background:var(--accent);"></i></div><span class="score-num">'+score+'</span></div></td>'+
+            '<td>'+esc(dt)+'</td>'+
+            '<td><span class="status-tag '+st+'">'+(STATUS[st]||st)+'</span></td>'+
+            '<td class="action-btns"><a href="p-rating-detail.html?id='+encodeURIComponent(code)+'" class="btn btn-primary">复核</a></td>'+
+          '</tr>';
+        }).join('');
+      }).catch(function(){
+        document.getElementById('juzhuRatings').innerHTML =
+          '<tr><td colspan="8" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API（/api/juzhu/ratings）· 请启动 juzhu 服务</td></tr>';
+      });
+    }
+    document.getElementById('ratingStatus').onchange = function(){ load(this.value); };
+    load('pending');
   })();
   </script>
 </body>

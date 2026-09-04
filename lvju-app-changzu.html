@@ -34,36 +34,9 @@
       <a class="on">全部</a><a>整租</a><a>合租</a><a>月付</a><a>拎包入住</a><a>近地铁</a>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2>在租房源</h2><span class="more">租金排序 ›</span></div>
-    <div class="wrap">
-      <a class="lrow" href="lvju-app-detail.html">
-        <div class="th s-city"><span class="star">拎包入住</span></div>
-        <div class="info"><div class="nm">观山湖·精装一居</div>
-          <div class="meta">贵阳 · 观山湖区 · 52㎡ · 整租 · 中高楼层</div>
-          <div class="tags"><span>近地铁</span><span>月付</span><span>家电全</span></div>
-          <div class="pr"><b>¥2,600<small> /月</small></b><span class="unit">押一付一</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-detail.html">
-        <div class="th s-river"><span class="star">主卧合租</span></div>
-        <div class="info"><div class="nm">花果园·合租主卧</div>
-          <div class="meta">贵阳 · 南明区 · 18㎡ · 合租 · 独卫</div>
-          <div class="tags"><span>独立卫浴</span><span>可短租</span><span>有管家</span></div>
-          <div class="pr"><b>¥1,200<small> /月</small></b><span class="unit">月付</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-detail.html">
-        <div class="th s-city"><span class="star">整租</span></div>
-        <div class="info"><div class="nm">龙洞堡·拎包整租</div>
-          <div class="meta">贵阳 · 南明区 · 68㎡ · 两居 · 近机场</div>
-          <div class="tags"><span>拎包入住</span><span>电梯</span><span>南北通透</span></div>
-          <div class="pr"><b>¥2,100<small> /月</small></b><span class="unit">押一付一</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-detail.html">
-        <div class="th s-country"><span class="star">山居整租</span></div>
-        <div class="info"><div class="nm">西江·长住小院</div>
-          <div class="meta">黔东南 · 西江镇 · 90㎡ · 独院 · 含庭院</div>
-          <div class="tags"><span>候鸟长住</span><span>含家具</span><span>可月付</span></div>
-          <div class="pr"><b>¥3,500<small> /月</small></b><span class="unit">季付优惠</span></div></div>
-      </a>
+    <div class="sec-h"><span class="bar"></span><h2>在租房源</h2><span class="more" id="sortNote">租金排序</span></div>
+    <div class="wrap" id="listingWrap">
+      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner gold">
@@ -82,5 +55,46 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 长租与旅居同为 rental 频道（监管口径一致），本页为户型级月租视图。数据统一读 catalog。 */
+(function(){
+  var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+    var wrap = document.getElementById('listingWrap');
+    var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+    var pmap = {}; (cat.projects || []).forEach(function(p){ pmap[p.id] = p; });
+    var rows = (cat.units || []).filter(function(u){ var p = pmap[u.project_id]; return p && p.channel === 'rental'; });
+
+    if (!rows.length) {
+      wrap.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在租户型 · 运营商在后台录入后自动上架</div>';
+      document.getElementById('sortNote').textContent = '0 套在租';
+      return;
+    }
+    document.getElementById('sortNote').textContent = '共 ' + rows.length + ' 套在租';
+    wrap.innerHTML = rows.map(function(u){
+      var p = pmap[u.project_id] || {};
+      var d = dmap[p.district_id];
+      var meta = ['贵阳', d ? d.name : '', u.area_sqm ? fmt(u.area_sqm) + '㎡' : '', u.layout_label || ''].filter(Boolean).join(' · ');
+      var tags = (u.tags || []).slice(0, 3);
+      var th = u.cover_image
+        ? '<div class="th" style="background:url(' + esc(u.cover_image) + ') center/cover,#0c4d44;">'
+        : '<div class="th s-city">';
+      return '<a class="lrow" href="lvju-app-detail.html">' + th +
+        '<span class="star">' + esc(u.layout_label || '在租') + '</span></div>' +
+        '<div class="info"><div class="nm">' + esc(u.name) + '</div>' +
+        '<div class="meta">' + esc(meta) + '</div>' +
+        '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在租</span>') + '</div>' +
+        '<div class="pr"><b>' + (u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small> /月</small>' : '价格面议') + '</b>' +
+        (p.name ? '<span class="unit">' + esc(p.name) + '</span>' : '') + '</div></div></a>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('listingWrap').innerHTML =
+      '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
+  });
+})();
+</script>
 </body>
 </html>

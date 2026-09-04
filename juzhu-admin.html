@@ -412,7 +412,7 @@ function parseKeeper(u) {
 function channelLabel(id) {
   var c = (state.channels || []).find(function(x){ return x.id === id; });
   if (c) return c.label;
-  return id === 'trade' ? '卖旧买新' : '保租房';
+  return ({ rental:'租赁住宿', minsu:'惠居民宿', newhouse:'新房', resale:'二手', trade:'卖旧买新' })[id] || id;
 }
 
 function channelOptions(selected, includeAll) {
@@ -422,7 +422,8 @@ function channelOptions(selected, includeAll) {
     html += '<option value="'+c.id+'"'+(selected===c.id?' selected':'')+'>'+esc(c.label)+'</option>';
   });
   if (!state.channels || !state.channels.length) {
-    html += '<option value="bzf"'+(selected==='bzf'?' selected':'')+'>保租房</option>';
+    html += '<option value="rental"'+(selected==='rental'?' selected':'')+'>租赁住宿</option>';
+    html += '<option value="minsu"'+(selected==='minsu'?' selected':'')+'>惠居民宿</option>';
     html += '<option value="trade"'+(selected==='trade'?' selected':'')+'>卖旧买新</option>';
   }
   return html;
@@ -805,10 +806,11 @@ function renderProjectList() {
   box.innerHTML = state.projects.map(function(p) {
     var on = state.current && state.current.id === p.id ? ' on' : '';
     var ch = channelLabel(p.channel);
-    var managed = p.channel === 'bzf' ? (' · 房源量 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
+    var managed = p.channel !== 'trade' ? (' · 房源量 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
+    var vendor = p.vendor_name ? (' · 🏪 ' + esc(p.vendor_name)) : '';
     return '<button type="button" class="'+on.trim()+'" data-id="'+p.id+'">'+
       '<div class="nm">'+p.name+'</div>'+
-      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+'</div></button>';
+      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+vendor+'</div></button>';
   }).join('');
   box.querySelectorAll('button[data-id]').forEach(function(btn) {
     btn.onclick = function(){ openProject(+btn.dataset.id); };
@@ -900,7 +902,7 @@ function createProject() {
   if (!name) { toast('请填写项目名称'); return; }
   var channel = document.getElementById('n_channel').value;
   var district_id = document.getElementById('n_district').value;
-  if (channel === 'bzf' && !district_id) { toast('保租房须选择行政区'); return; }
+  if (channel !== 'trade' && !district_id) { toast('房源项目须选择行政区'); return; }
 
   var body = {
     name: name,
@@ -929,8 +931,9 @@ function numValFrom(id) {
   return v === '' ? null : +v;
 }
 
-function ratingCode(id) {
-  return 'SY-BZF-' + String(id).padStart(5, '0');
+function ratingCode(id, channel) {
+  var prefix = ({ rental:'SY-RENT', minsu:'MZ' })[channel || 'rental'] || 'SY-RENT';
+  return prefix + '-' + String(id).padStart(5, '0');
 }
 
 var RATING_STATUS = { draft:'草稿', pending:'待复核', passed:'已通过', rejected:'已驳回' };
@@ -940,19 +943,38 @@ var RATING_DIMS = [
   { key:'tech', label:'科技' },
   { key:'safety', label:'安全' }
 ];
+// 评级口径按频道（与服务端 RATING_DIMS 一致）：rental=好房子4维，minsu=彩贝5维
+var RATING_DIMS_BY_CH = {
+  rental: RATING_DIMS,
+  minsu: [
+    { key:'scenery', label:'环境景观' },
+    { key:'facilities', label:'设施配套' },
+    { key:'service', label:'服务品质' },
+    { key:'location', label:'区位交通' },
+    { key:'culture', label:'在地体验' }
+  ]
+};
+function dimsFor(channel) {
+  return RATING_DIMS_BY_CH[channel] || RATING_DIMS;
+}
+function ratingDimsTitle(channel) {
+  return channel === 'minsu' ? '彩贝评级（5 维）' : '好房子评级（4 维）';
+}
 
 function parseRating(p) {
   var r = p.rating;
-  if (!r) return { dims:{ comfort:4, green:4, tech:4, safety:4 }, checked:47, total:55 };
+  var dimsDef = dimsFor(p.channel);
+  if (!r) { r = { dims:{} }; }
   if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
-  r.dims = r.dims || { comfort:4, green:4, tech:4, safety:4 };
+  r.dims = r.dims || {};
+  dimsDef.forEach(function(d){ if (r.dims[d.key] == null) r.dims[d.key] = 4; });
   r.checked = r.checked != null ? r.checked : 47;
   r.total = r.total != null ? r.total : 55;
   return r;
 }
 
 function summarizeDims(dims) {
-  var vals = RATING_DIMS.map(function(d){ return +dims[d.key]; }).filter(function(v){ return !isNaN(v); });
+  var vals = dimsFor(state.current && state.current.channel).map(function(d){ return +dims[d.key]; }).filter(function(v){ return !isNaN(v); });
   var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 3;
   var stars = Math.min(5, Math.max(1, Math.round(avg)));
   return { stars: stars, score: Math.round(avg/5*100) };
@@ -960,7 +982,7 @@ function summarizeDims(dims) {
 
 function collectRatingFromForm() {
   var dims = {};
-  RATING_DIMS.forEach(function(d){
+  dimsFor(state.current.channel).forEach(function(d){
     dims[d.key] = parseFloat(document.getElementById('r_'+d.key).value) || 0;
   });
   var sum = summarizeDims(dims);
@@ -970,7 +992,7 @@ function collectRatingFromForm() {
     score: sum.score,
     checked: +document.getElementById('r_checked').value || 47,
     total: +document.getElementById('r_total').value || 55,
-    code: ratingCode(state.current.id)
+    code: ratingCode(state.current.id, state.current.channel)
   };
 }
 
@@ -993,13 +1015,14 @@ function renderEditor() {
 
   if (!isTrade) {
     var locked = rs === 'pending' || rs === 'passed';
-    var dimInputs = RATING_DIMS.map(function(d){
+    var dimsDef = dimsFor(p.channel);
+    var dimInputs = dimsDef.map(function(d){
       return '<div><label>'+d.label+'</label><input id="r_'+d.key+'" type="number" step="0.1" min="1" max="5" value="'+(rating.dims[d.key]||4)+'" '+(locked?'disabled':'')+'/></div>';
     }).join('');
-    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id));
+    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id, p.channel));
     ratingCard =
       '<div class="card" id="ratingCard">'+
-        '<h2>好房子评级 <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
+        '<h2>'+ratingDimsTitle(p.channel)+' <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
         '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">运营自评 → 提交中台复核 → 通过后前台详情页展示。复核入口：<a href="'+reviewLink+'" target="_blank">p-rating-review</a></p>'+
         '<div class="dim-grid">'+dimInputs+'</div>'+
         '<div class="grid" style="margin-top:12px;">'+
@@ -1098,7 +1121,7 @@ function submitRating() {
     return api('/projects/'+state.current.id+'/rating/submit', { method:'POST' });
   }).then(function(res) {
     state.current = res.project;
-    toast('已提交中台复核 · '+ratingCode(res.project.id));
+    toast('已提交中台复核 · '+ratingCode(res.project.id, res.project.channel));
     renderEditor();
   }).catch(function(e){ toast('提交失败：'+e.message); });
 }

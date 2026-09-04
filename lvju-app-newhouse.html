@@ -34,36 +34,9 @@
       <a class="on">全部</a><a>特价房</a><a>学区</a><a>地铁盘</a><a>旅居康养</a><a>江景山景</a>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2>在售楼盘</h2><span class="more">智能排序 ›</span></div>
-    <div class="wrap">
-      <a class="lrow" href="lvju-app-newhouse-detail.html">
-        <div class="th s-city"><span class="star">在售</span></div>
-        <div class="info"><div class="nm">中铁·山语城</div>
-          <div class="meta">贵阳 · 观山湖区 · 高层 · 89-128㎡</div>
-          <div class="tags"><span>地铁盘</span><span>学区</span><span>现房</span></div>
-          <div class="pr"><b>¥9,800<small> /㎡起</small></b><span class="unit">三居 ¥98万起</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-newhouse-detail.html">
-        <div class="th s-country"><span class="star">旅居康养</span></div>
-        <div class="info"><div class="nm">花溪·云栖谷</div>
-          <div class="meta">贵阳 · 花溪区 · 洋房 · 95-140㎡</div>
-          <div class="tags"><span>康养社区</span><span>山景</span><span>低密度</span></div>
-          <div class="pr"><b>¥11,200<small> /㎡起</small></b><span class="unit">含精装</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-newhouse-detail.html">
-        <div class="th s-river"><span class="star">改善</span></div>
-        <div class="info"><div class="nm">观山湖·天玺</div>
-          <div class="meta">贵阳 · 观山湖区 · 大平层 · 140-220㎡</div>
-          <div class="tags"><span>江景</span><span>豪装</span><span>稀缺</span></div>
-          <div class="pr"><b>¥15,600<small> /㎡起</small></b><span class="unit">大平层在售</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-newhouse-detail.html">
-        <div class="th s-city"><span class="star">特价房</span></div>
-        <div class="info"><div class="nm">贵安·樱花小镇</div>
-          <div class="meta">贵安新区 · 高层 · 78-110㎡ · 现房</div>
-          <div class="tags"><span>特价直降</span><span>地铁规划</span><span>低总价</span></div>
-          <div class="pr"><b>¥8,200<small> /㎡起</small></b><span class="unit">两居 ¥64万起</span></div></div>
-      </a>
+    <div class="sec-h"><span class="bar"></span><h2>在售楼盘</h2><span class="more" id="sortNote">智能排序</span></div>
+    <div class="wrap" id="listingWrap">
+      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner gold">
@@ -82,5 +55,46 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 新房频道（channel=newhouse）数据统一读新居住数据库 catalog，不再硬编码。 */
+(function(){
+  var API = '/api/juzhu/catalog?city=guiyang&channel=newhouse';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+    var wrap = document.getElementById('listingWrap');
+    var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+    var projects = (cat.projects || []).filter(function(p){ return p.channel === 'newhouse'; });
+
+    if (!projects.length) {
+      wrap.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在售楼盘 · 开发商/运营商录入并通过审核后自动上架</div>';
+      document.getElementById('sortNote').textContent = '0 个在售';
+      return;
+    }
+    document.getElementById('sortNote').textContent = '共 ' + projects.length + ' 个在售';
+    wrap.innerHTML = projects.map(function(p){
+      var d = dmap[p.district_id];
+      var meta = ['贵阳', d ? d.name : '', p.address || ''].filter(Boolean).join(' · ');
+      var tags = (p.tags || []).slice(0, 3);
+      var th = p.cover_image
+        ? '<div class="th" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
+        : '<div class="th s-city">';
+      var price = p.price_total != null ? '¥' + fmt(p.price_total) + '<small> 万起</small>'
+        : (p.price_from != null ? '¥' + fmt(p.price_from) + '<small> /㎡起</small>' : '价格面议');
+      return '<a class="lrow" href="lvju-app-newhouse-detail.html">' + th +
+        '<span class="star">在售</span></div>' +
+        '<div class="info"><div class="nm">' + esc(p.name) + '</div>' +
+        '<div class="meta">' + esc(meta) + '</div>' +
+        '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在售</span>') + '</div>' +
+        '<div class="pr"><b>' + price + '</b>' +
+        (p.managed_unit_count != null ? '<span class="unit">房源 ' + fmt(p.managed_unit_count) + '</span>' : '') + '</div></div></a>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('listingWrap').innerHTML =
+      '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
+  });
+})();
+</script>
 </body>
 </html>

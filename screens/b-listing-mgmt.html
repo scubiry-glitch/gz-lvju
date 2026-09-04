@@ -107,36 +107,37 @@
       </button>
     </div>
 
-    <div class="tab-row">
-      <div class="tab active">在售 <span class="cnt">3,842</span></div>
-      <div class="tab">已租 <span class="cnt">3,438</span></div>
-      <div class="tab">下架 <span class="cnt">142</span></div>
-      <div class="tab">草稿 <span class="cnt">28</span></div>
-      <div class="tab">异常 <span class="cnt">12</span></div>
+    <div class="tab-row" id="tabRow">
+      <div class="tab active" data-f="all">全部 <span class="cnt">—</span></div>
+      <div class="tab" data-f="passed">已评级 <span class="cnt">—</span></div>
+      <div class="tab" data-f="pending">待复核 <span class="cnt">—</span></div>
+      <div class="tab" data-f="rejected">已驳回 <span class="cnt">—</span></div>
+      <div class="tab" data-f="draft">未自评 <span class="cnt">—</span></div>
+      <div class="tab" data-f="offline">已下架 <span class="cnt">—</span></div>
     </div>
 
     <div class="filter-bar">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input placeholder="搜索房源编号、小区、地址…" />
+        <input id="q" placeholder="搜索项目 / 户型名称…" />
       </div>
-      <select><option>全部项目</option><option>梧桐公馆</option><option>河西青年</option><option>龙江新青年</option></select>
-      <select><option>全部户型</option><option>一室一厅</option><option>两室一厅</option></select>
-      <select><option>全部区</option><option>江宁区</option><option>建邺区</option><option>鼓楼区</option></select>
-      <button class="btn btn-ghost">重置</button>
+      <select id="fCity"><option value="">加载城市…</option></select>
+      <select id="fProject"><option value="">全部项目</option></select>
+      <select id="fDistrict"><option value="">全部区</option></select>
+      <select id="fVendor"><option value="">全部商家</option></select>
+      <button class="btn btn-ghost" id="fReset">重置</button>
     </div>
 
-    <div class="batch-bar">
-      已选 <strong>3</strong> 套 ·
-      <button class="btn btn-ghost" style="padding: 4px 10px;">批量调价</button>
-      <button class="btn btn-ghost" style="padding: 4px 10px;">批量下架</button>
-      <button class="btn btn-ghost" style="padding: 4px 10px;">分派服务者</button>
+    <div class="batch-bar" id="batchBar" style="display:none;">
+      已选 <strong id="selCnt">0</strong> 套 ·
+      <button class="btn btn-ghost" style="padding: 4px 10px;" disabled title="批量调价经 PUT /api/juzhu/admin/units/:id 生效，需管理员登录后开放">批量调价</button>
+      <button class="btn btn-ghost" style="padding: 4px 10px;" disabled title="批量操作即将上线，先用行内下架/上架">批量下架</button>
       <a href="b-house-rating-input.html" style="padding:4px 10px; background:linear-gradient(90deg,#0f172a,#b45309); color:#fff; border-radius:6px; font-size:12px; font-weight:600;">★ 好房子评级录入</a>
-      <a style="color: var(--accent); margin-left: auto; font-size: 12px;">取消选择</a>
+      <a style="color: var(--accent); margin-left: auto; font-size: 12px;" id="selClear">取消选择</a>
     </div>
 
-    <div style="margin:0 0 12px; padding:10px 14px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:12px; color:#92400e;">
-      ⚠ <strong>7</strong> 套房源未完成好房子自评 · <strong>3</strong> 套自评已提交待 P 端复核 ·
+    <div style="margin:0 0 12px; padding:10px 14px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; font-size:12px; color:#92400e;" id="ratingBanner">
+      ⚠ 评级统计加载中…
       <a href="b-house-rating-input.html" style="margin-left:6px; color:#92400e; text-decoration:underline; font-weight:600;">立即处理 →</a>
     </div>
 
@@ -144,133 +145,26 @@
       <table class="lst">
         <thead>
           <tr>
-            <th><input type="checkbox" /></th>
+            <th><input type="checkbox" id="chkAll" /></th>
             <th>房源</th>
             <th>项目/区</th>
             <th>户型·面积</th>
             <th>挂牌价</th>
-            <th>市场价</th>
+            <th>优惠价</th>
             <th>★ 评级</th>
             <th>状态</th>
-            <th>更新</th>
+            <th>评级动态</th>
             <th>操作</th>
           </tr>
         </thead>
-        <tbody>
-          <tr>
-            <td><input type="checkbox" checked /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">梧桐公馆 3-1506</div>
-                <div class="lst-meta">NJBZF-04528 · 南向 · 15F</div>
-              </div>
-            </td>
-            <td>梧桐公馆 / 江宁</td>
-            <td>1 室 1 厅 · 45㎡</td>
-            <td class="price-edit">¥ 2,380</td>
-            <td>¥ 3,200</td>
-            <td><span class="star-mini">4 星</span></td>
-            <td><span class="pill on">在售</span></td>
-            <td>10 分钟前</td>
-            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
-          </tr>
-          <tr>
-            <td><input type="checkbox" checked /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">梧桐公馆 3-0903</div>
-                <div class="lst-meta">NJBZF-03891 · 北向 · 9F</div>
-              </div>
-            </td>
-            <td>梧桐公馆 / 江宁</td>
-            <td>1 室 1 厅 · 42㎡</td>
-            <td class="price-edit">¥ 2,180</td>
-            <td>¥ 2,950</td>
-            <td><a href="b-house-rating-input.html"><span class="star-mini pending">待自评</span></a></td>
-            <td><span class="pill on">在售</span></td>
-            <td>2 小时前</td>
-            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
-          </tr>
-          <tr>
-            <td><input type="checkbox" checked /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">河西青年 2-1208</div>
-                <div class="lst-meta">NJBZF-05214 · 东南 · 12F</div>
-              </div>
-            </td>
-            <td>河西青年 / 建邺</td>
-            <td>2 室 1 厅 · 68㎡</td>
-            <td class="price-edit">¥ 3,120</td>
-            <td>¥ 4,100</td>
-            <td><span class="star-mini">4 星</span></td>
-            <td><span class="pill on">在售</span></td>
-            <td>4 小时前</td>
-            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
-          </tr>
-          <tr>
-            <td><input type="checkbox" /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">龙江新青年 1-2204</div>
-                <div class="lst-meta">NJBZF-06012 · 南向 · 22F</div>
-              </div>
-            </td>
-            <td>龙江新青年 / 鼓楼</td>
-            <td>1 室 1 厅 · 42㎡</td>
-            <td class="price-edit">¥ 2,680</td>
-            <td>¥ 3,500</td>
-            <td><span class="star-mini s3">3 星</span></td>
-            <td><span class="pill rented">已租</span></td>
-            <td>昨天</td>
-            <td class="row-actions"><a>查看合同</a></td>
-          </tr>
-          <tr>
-            <td><input type="checkbox" /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">南部新城 5-1801</div>
-                <div class="lst-meta">NJBZF-06478 · 南向 · 18F</div>
-              </div>
-            </td>
-            <td>南部新城 / 秦淮</td>
-            <td>1 室 1 厅 · 48㎡</td>
-            <td class="price-edit">¥ 2,180</td>
-            <td>¥ 2,900</td>
-            <td><span class="star-mini s5">5 星</span></td>
-            <td><span class="pill on">在售</span></td>
-            <td>2 天前</td>
-            <td class="row-actions"><a>编辑</a><a class="danger">下架</a></td>
-          </tr>
-          <tr>
-            <td><input type="checkbox" /></td>
-            <td>
-              <span class="lst-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11H3z"/></svg></span>
-              <div style="display: inline-block; vertical-align: middle; margin-left: 8px;">
-                <div class="lst-name">仙林湖 4-0612</div>
-                <div class="lst-meta">NJBZF-07021 · 东向 · 6F</div>
-              </div>
-            </td>
-            <td>仙林湖 / 栖霞</td>
-            <td>1 室 1 厅 · 40㎡</td>
-            <td class="price-edit" style="color: var(--danger);">¥ 1,890</td>
-            <td>¥ 2,400</td>
-            <td><span class="star-mini s2">2 星</span></td>
-            <td><span class="pill danger">异常·空置 32 天</span></td>
-            <td>5 小时前</td>
-            <td class="row-actions"><a>处置</a><a class="danger">下架</a></td>
-          </tr>
+        <tbody id="rows">
+          <tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
         </tbody>
       </table>
       <div class="pag">
-        <div>显示 1-6 共 3,842 条</div>
-        <div class="pag-controls">
-          <span>‹</span><span class="active">1</span><span>2</span><span>3</span><span>…</span><span>641</span><span>›</span>
+        <div id="pagInfo">连接数据库中…</div>
+        <div class="pag-controls" id="pagCtl" style="display:none;">
+          <span>‹</span><span class="active">1</span><span>›</span>
         </div>
       </div>
     </div>
@@ -278,5 +172,266 @@
 </div>
 <script src="_region.js?v=2"></script>
 <script src="_nav.js"></script>
+<script>
+/* 房源上下架管理：vendor 会话=本商家可管理；platform 会话=全量代管；无会话=只读。
+   数据源：/api/juzhu/vendor/projects（会话态）→ 降级 /api/juzhu/catalog（只读态）。 */
+(function(){
+  var API = '/api/juzhu';
+  var state = { role:null, vendorName:'', grain:'unit', projects:[], units:[], districts:[], cities:[], tab:'all', tabKey:'rating' };
+  function tok(){ try { return localStorage.getItem('JUZHU_VENDOR_TOKEN') || ''; } catch(e){ return ''; } }
+  function adminTok(){ try { return localStorage.getItem('JUZHU_ADMIN_TOKEN') || ''; } catch(e){ return ''; } }
+  function apiKey(){ try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e){ return ''; } }
+  function authHeaders(){
+    var h = {};
+    var t = tok() || adminTok(); if (t) h['Authorization'] = 'Bearer ' + t;
+    var k = apiKey(); if (k) h['X-API-Key'] = k;
+    return h;
+  }
+  function get(u){ return fetch(u, { headers: authHeaders() }).then(function(r){
+    if (!r.ok) { const e = new Error(r.status); e.status = r.status; throw e; } return r.json(); }); }
+  function post(u, body){ return fetch(u, { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
+    body: JSON.stringify(body||{}) }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+  function put(u, body){ return fetch(u, { method:'PUT', headers: Object.assign({'Content-Type':'application/json'}, authHeaders()),
+    body: JSON.stringify(body||{}) }).then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||r.status); return j; }); }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('zh-CN'); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  // ---- 顶栏身份徽标 + 登录 ----
+  var topbar = document.querySelector('.topbar');
+  var badge = document.createElement('div');
+  badge.className = 'btn btn-ghost'; badge.id = 'sessBadge';
+  badge.style.cursor = 'pointer';
+  topbar.appendChild(badge);
+  function renderBadge(){
+    if (state.role === 'vendor') { badge.textContent = '🏪 ' + state.vendorName + '（商家）'; }
+    else if (state.role === 'platform') { badge.textContent = '🛡 平台（全量代管）'; }
+    else { badge.textContent = '只读 · 点击登录'; }
+  }
+  badge.onclick = function(){
+    if (state.role) {
+      if (state.role === 'vendor' && confirm('退出商家登录？')) {
+        try { localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload();
+      }
+      return;
+    }
+    var name = prompt('商家登录 · 请输入 login_name：');
+    if (!name) return;
+    var pwd = prompt('密码：');
+    if (!pwd) return;
+    fetch(API + '/vendor/login', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ login_name:name, password:pwd }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j.token) { try { localStorage.setItem('JUZHU_VENDOR_TOKEN', j.token); } catch(e){} location.reload(); }
+        else alert(j.error || '登录失败');
+      }).catch(function(){ alert('登录失败：服务不可用'); });
+  };
+
+  // ---- 评级徽标 ----
+  function ratingCell(p){
+    var st = p.rating_status || 'draft';
+    var r = p.rating || {};
+    if (st === 'passed') return '<span class="star-mini s'+(r.stars||3)+'">'+(r.stars||3)+' 星 · '+esc(r.star_label||'')+'</span>';
+    if (st === 'pending') return '<a href="p-rating-detail.html?id='+encodeURIComponent(r.code||p.id)+'"><span class="star-mini pending">待复核</span></a>';
+    if (st === 'rejected') return '<a href="b-house-rating-input.html"><span class="star-mini s2" title="已驳回，需重新自评">已驳回</span></a>';
+    return '<a href="b-house-rating-input.html"><span class="star-mini pending">待自评</span></a>';
+  }
+  function statusCell(p){
+    var st = p.status || 'online';
+    if (st === 'offline') return '<span class="pill danger">已下架</span>';
+    if (st === 'draft') return '<span class="pill rented">草稿</span>';
+    return '<span class="pill on">在架</span>';
+  }
+
+  function render(){
+    var q = document.getElementById('q').value.trim().toLowerCase();
+    var pmap = {}; state.projects.forEach(function(p){ pmap[p.id]=p; });
+    var dmap = {}; state.districts.forEach(function(d){ dmap[d.id]=d; });
+    var writable = !!state.role;
+
+    // tab 计数（评级维度 × 上下架维度）
+    var cnt = { all: state.projects.length, passed:0, pending:0, rejected:0, draft:0, offline:0 };
+    state.projects.forEach(function(p){
+      cnt[p.rating_status||'draft']++;
+      if ((p.status||'online') === 'offline') cnt.offline++;
+    });
+    document.querySelectorAll('#tabRow .tab').forEach(function(t){
+      var f = t.getAttribute('data-f');
+      t.querySelector('.cnt').textContent = fmt(cnt[f] != null ? cnt[f] : 0);
+    });
+
+    var unrated = cnt.draft, pend = cnt.pending;
+    document.getElementById('ratingBanner').innerHTML =
+      '⚠ <strong>'+fmt(unrated)+'</strong> 个项目未完成好房子自评 · <strong>'+fmt(pend)+
+      '</strong> 个已提交待 P 端复核'+ (cnt.rejected?(' · <strong>'+cnt.rejected+'</strong> 个被驳回'):'') +
+      ' · <a href="b-house-rating-input.html" style="margin-left:6px; color:#92400e; text-decoration:underline; font-weight:600;">立即处理 →</a>';
+
+    function pass(p){
+      var fc = document.getElementById('fProject').value;
+      var fd = document.getElementById('fDistrict').value;
+      var fv = document.getElementById('fVendor') ? document.getElementById('fVendor').value : '';
+      if (fc && String(p.id) !== fc) return false;
+      if (fd && String(p.district_id) !== fd) return false;
+      if (fv && String(p.owner_vendor_id||'') !== fv) return false;
+      if (state.tab === 'offline') return (p.status||'online') === 'offline';
+      if (state.tab === 'online') return (p.status||'online') !== 'offline';
+      if (state.tab !== 'all' && (p.rating_status||'draft') !== state.tab) return false;
+      return true;
+    }
+
+    var rows = state.units.filter(function(u){
+      var p = pmap[u.project_id];
+      if (!p || !pass(p)) return false;
+      if (q && (String(u.name).toLowerCase().indexOf(q)<0 && String(p.name).toLowerCase().indexOf(q)<0)) return false;
+      return true;
+    });
+    var html = rows.slice(0, 60).map(function(u){
+      var p = pmap[u.project_id], d = dmap[p.district_id];
+      var upd = (p.rating_submitted_at||'').slice(0,10);
+      var off = (p.status||'online') === 'offline';
+      var act = '';
+      if (writable) {
+        act = '<a href="../juzhu-admin.html" title="内容后台完整编辑">编辑</a>' +
+          '<a data-act="price" data-unit="'+u.id+'" data-cur="'+(u.rent_monthly||'')+'">调价</a>' +
+          (off
+            ? '<a data-act="shelf" data-pid="'+p.id+'" data-to="online">上架</a>'
+            : '<a class="danger" data-act="shelf" data-pid="'+p.id+'" data-to="offline">下架</a>');
+      } else {
+        act = '<a href="../juzhu-admin.html" title="内容后台完整编辑">编辑</a>' +
+          '<a style="opacity:.45;cursor:not-allowed;" title="登录商家/平台后可管理">下架</a>';
+      }
+      return '<tr>'+
+        '<td><input type="checkbox" class="rowchk" /></td>'+
+        '<td><span class="lst-thumb">⌂</span>'+
+          '<div style="display:inline-block;vertical-align:middle;margin-left:8px;">'+
+          '<div class="lst-name">'+esc(p.name)+'</div>'+
+          '<div class="lst-meta">'+esc(u.name)+' · #'+u.id+'</div></div></td>'+
+        '<td>'+esc(p.name)+' / '+esc(d?d.name:'—')+'</td>'+
+        '<td>'+esc(u.layout_label||'—')+' · '+(u.area_sqm?fmt(u.area_sqm)+'㎡':'—')+'</td>'+
+        '<td class="price-edit">'+(u.rent_monthly?'¥ '+fmt(u.rent_monthly):'—')+'</td>'+
+        '<td>'+(u.promo_price?'¥ '+fmt(u.promo_price):'—')+'</td>'+
+        '<td>'+ratingCell(p)+'</td>'+
+        '<td>'+statusCell(p)+'</td>'+
+        '<td>'+(upd||'—')+'</td>'+
+        '<td class="row-actions">'+act+'</td>'+
+      '</tr>';
+    }).join('');
+    if (!html) html = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px;">当前筛选无数据</td></tr>';
+    document.getElementById('rows').innerHTML = html;
+    document.getElementById('pagInfo').textContent =
+      (state.role === 'vendor' ? '商家视图 · ' + state.vendorName : state.role === 'platform' ? '平台视图 · 全量' : '只读视图') +
+      ' · 显示 1-' + Math.min(rows.length, 60) + ' 共 ' + fmt(rows.length) + ' 条';
+    bindChk(); bindActs();
+  }
+
+  function bindChk(){
+    var chks = document.querySelectorAll('.rowchk');
+    function upd(){
+      var n = document.querySelectorAll('.rowchk:checked').length;
+      document.getElementById('selCnt').textContent = n;
+      document.getElementById('batchBar').style.display = n ? 'flex' : 'none';
+    }
+    chks.forEach(function(c){ c.onchange = upd; });
+    document.getElementById('chkAll').onchange = function(){
+      chks.forEach(function(c){ c.checked = document.getElementById('chkAll').checked; });
+      upd();
+    };
+    upd();
+  }
+  function bindActs(){
+    document.querySelectorAll('[data-act="shelf"]').forEach(function(a){
+      a.onclick = function(){
+        post(API + '/vendor/projects/' + a.getAttribute('data-pid') + '/status', { status: a.getAttribute('data-to') })
+          .then(function(){ load(); })
+          .catch(function(e){ alert('操作失败：' + e.message); });
+      };
+    });
+    document.querySelectorAll('[data-act="price"]').forEach(function(a){
+      a.onclick = function(){
+        var v = prompt('新挂牌月租（元/月）：', a.getAttribute('data-cur') || '');
+        if (v == null || v === '') return;
+        put(API + '/vendor/units/' + a.getAttribute('data-unit'), { rent_monthly: parseInt(v, 10) })
+          .then(function(){ load(); })
+          .catch(function(e){ alert('调价失败：' + e.message); });
+      };
+    });
+  }
+
+  function fillSelects(){
+    var fc = document.getElementById('fCity');
+    if (fc) fc.innerHTML = '<option value="">全部城市</option>' + state.cities.map(function(c){
+      return '<option value="'+c.slug+'"'+(c.slug===state.city?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('');
+    var fp = document.getElementById('fProject');
+    fp.innerHTML = '<option value="">全部项目</option>' + state.projects.map(function(p){
+      return '<option value="'+p.id+'">'+esc(p.name)+'</option>';
+    }).join('');
+    var fd = document.getElementById('fDistrict');
+    fd.innerHTML = '<option value="">全部区</option>' + state.districts.map(function(d){
+      return '<option value="'+d.id+'">'+esc(d.name)+'</option>';
+    }).join('');
+    var fv = document.getElementById('fVendor');
+    if (fv) {
+      var vs = {}; state.projects.forEach(function(p){
+        if (p.owner_vendor_id && p.vendor_name) vs[p.owner_vendor_id] = p.vendor_name;
+      });
+      fv.innerHTML = '<option value="">全部商家</option>' + Object.keys(vs).map(function(k){
+        return '<option value="'+k+'">'+esc(vs[k])+'</option>';
+      }).join('');
+    }
+  }
+
+  function load(){
+    // 1) 会话态：vendor/projects（vendor 只见自己；platform 全量）
+    get(API + '/vendor/projects').then(function(d){
+      state.role = d.role || 'platform';
+      state.projects = d.projects || [];
+      state.units = d.units || [];
+      if (state.role === 'vendor' && state.projects.length) state.vendorName = state.projects[0].vendor_name || '商家';
+      renderBadge(); fillSelects(); render();
+    }).catch(function(){
+      // 2) 只读态：公开 catalog（降级项目级逻辑同前）
+      state.role = null; renderBadge();
+      get(API + '/catalog?city=shenyang').then(function(cat){
+        state.grain = 'unit';
+        state.projects = (cat.projects || []).filter(function(p){ return p.channel === 'rental'; });
+        state.units = cat.units || [];
+        var cid = (cat.city || {}).id;
+        state.districts = (cat.districts || []).filter(function(d){ return d.city_id === cid; });
+        fillSelects(); render();
+      }).catch(function(){
+        document.getElementById('rows').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API · 请确认服务已部署</td></tr>';
+        document.getElementById('pagInfo').textContent = '数据库未连接';
+      });
+    });
+  }
+
+  document.querySelectorAll('#tabRow .tab').forEach(function(t){
+    t.onclick = function(){
+      document.querySelectorAll('#tabRow .tab').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active'); state.tab = t.getAttribute('data-f'); render();
+    };
+  });
+  ['fProject','fDistrict','fVendor'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.onchange = render;
+  });
+  document.getElementById('q').oninput = render;
+  document.getElementById('fReset').onclick = function(){
+    document.getElementById('q').value=''; document.getElementById('fProject').value='';
+    document.getElementById('fDistrict').value='';
+    var fv = document.getElementById('fVendor'); if (fv) fv.value='';
+    state.tab='all';
+    document.querySelectorAll('#tabRow .tab').forEach(function(x,i){ x.classList.toggle('active', i===0); });
+    render();
+  };
+  document.getElementById('selClear').onclick = function(){
+    document.querySelectorAll('.rowchk').forEach(function(c){ c.checked=false; });
+    document.getElementById('chkAll').checked=false; bindChk();
+  };
+
+  renderBadge();
+  load();
+})();
+</script>
 </body>
 </html>

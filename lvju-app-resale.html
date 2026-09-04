@@ -34,36 +34,9 @@
       <a class="on">全部</a><a>满五唯一</a><a>地铁</a><a>学区</a><a>电梯</a><a>南北通透</a>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2>在售二手房</h2><span class="more">总价排序 ›</span></div>
-    <div class="wrap">
-      <a class="lrow" href="lvju-app-resale-detail.html">
-        <div class="th s-city"><span class="star">VR 看房</span></div>
-        <div class="info"><div class="nm">世纪城 · 南北三居</div>
-          <div class="meta">贵阳 · 观山湖 · 88㎡ · 3室2厅 · 中楼层</div>
-          <div class="tags"><span>满五唯一</span><span>地铁</span><span>南北通透</span></div>
-          <div class="pr"><b>¥128<small> 万</small></b><span class="unit">¥1.45万/㎡</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-resale-detail.html">
-        <div class="th s-river"><span class="star">江景</span></div>
-        <div class="info"><div class="nm">未来方舟 · 江景两居</div>
-          <div class="meta">贵阳 · 云岩区 · 76㎡ · 2室2厅 · 高楼层</div>
-          <div class="tags"><span>一线江景</span><span>电梯</span><span>精装</span></div>
-          <div class="pr"><b>¥99<small> 万</small></b><span class="unit">¥1.30万/㎡</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-resale-detail.html">
-        <div class="th s-city"><span class="star">低总价</span></div>
-        <div class="info"><div class="nm">花果园 · 高层一居</div>
-          <div class="meta">贵阳 · 南明区 · 52㎡ · 1室1厅 · 高楼层</div>
-          <div class="tags"><span>低总价</span><span>近商圈</span><span>满二</span></div>
-          <div class="pr"><b>¥56<small> 万</small></b><span class="unit">¥1.08万/㎡</span></div></div>
-      </a>
-      <a class="lrow" href="lvju-app-resale-detail.html">
-        <div class="th s-country"><span class="star">学区</span></div>
-        <div class="info"><div class="nm">金阳 · 学区两居</div>
-          <div class="meta">贵阳 · 观山湖 · 81㎡ · 2室2厅 · 次新房</div>
-          <div class="tags"><span>名校学区</span><span>满五唯一</span><span>电梯</span></div>
-          <div class="pr"><b>¥110<small> 万</small></b><span class="unit">¥1.36万/㎡</span></div></div>
-      </a>
+    <div class="sec-h"><span class="bar"></span><h2>在售二手房</h2><span class="more" id="sortNote">总价排序</span></div>
+    <div class="wrap" id="listingWrap">
+      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner gold">
@@ -82,5 +55,51 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 二手频道（channel=resale，一房一档=units）数据统一读新居住数据库 catalog。 */
+(function(){
+  var API = '/api/juzhu/catalog?city=guiyang&channel=resale';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+    var wrap = document.getElementById('listingWrap');
+    var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+    var pmap = {}; (cat.projects || []).forEach(function(p){ pmap[p.id] = p; });
+    var units = (cat.units || []).filter(function(u){ var p = pmap[u.project_id]; return p && p.channel === 'resale'; });
+    var rows = units.length ? units.map(function(u){ var p = pmap[u.project_id]; return { p: p, u: u }; })
+      : (cat.projects || []).filter(function(p){ return p.channel === 'resale'; }).map(function(p){ return { p: p, u: null }; });
+
+    if (!rows.length) {
+      wrap.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在售房源 · 中介/业主委托录入后自动上架</div>';
+      document.getElementById('sortNote').textContent = '0 套在售';
+      return;
+    }
+    document.getElementById('sortNote').textContent = '共 ' + rows.length + ' 套在售';
+    wrap.innerHTML = rows.map(function(r){
+      var p = r.p || {}, u = r.u || {};
+      var d = dmap[p.district_id];
+      var meta = ['贵阳', d ? d.name : '', u.area_sqm ? fmt(u.area_sqm) + '㎡' : '', u.layout_label || ''].filter(Boolean).join(' · ');
+      var tags = ((u.tags || p.tags || [])).slice(0, 3);
+      var total = u.price_total != null ? u.price_total : p.price_total;
+      var unit = (u.area_sqm && total) ? '¥' + (Math.round(total * 10000 / u.area_sqm / 100) / 100).toFixed(2) + '万/㎡' : (p.name || '');
+      var price = total != null ? '¥' + fmt(total) + '<small> 万</small>'
+        : (p.price_from != null ? '¥' + fmt(p.price_from) + '<small> 万起</small>' : '价格面议');
+      var th = (u.cover_image || p.cover_image)
+        ? '<div class="th" style="background:url(' + esc(u.cover_image || p.cover_image) + ') center/cover,#0c4d44;">'
+        : '<div class="th s-city">';
+      return '<a class="lrow" href="lvju-app-resale-detail.html">' + th +
+        '<span class="star">在售</span></div>' +
+        '<div class="info"><div class="nm">' + esc(u.name ? p.name + ' · ' + u.name : p.name) + '</div>' +
+        '<div class="meta">' + esc(meta) + '</div>' +
+        '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在售</span>') + '</div>' +
+        '<div class="pr"><b>' + price + '</b>' + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '') + '</div></div></a>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('listingWrap').innerHTML =
+      '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
+  });
+})();
+</script>
 </body>
 </html>

@@ -204,29 +204,8 @@
 
       <!-- curated listings -->
       <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选好房 · 五彩贝旅居</h3><span class="more">查看列表 ›</span></div>
-      <div class="list">
-        <div class="mcard">
-          <div class="img a">
-            <span class="star">★ 4.9 五彩贝旅居</span>
-            <span class="like">♡</span>
-            <div class="cap"><div class="nm">云上观景惠居</div><div class="lo">黔东南 · 西江千户苗寨 · 整栋可包</div></div>
-          </div>
-          <div class="ci">
-            <div class="tags"><span>苗寨核心</span><span>日落观景台</span><span>含双早</span><span>管家服务</span></div>
-            <div class="pr"><b>¥588<small>/双周起</small></b><a class="bk" href="lvju-app-detail.html">预订</a></div>
-          </div>
-        </div>
-        <div class="mcard">
-          <div class="img b">
-            <span class="star">★ 4.8 五彩贝旅居</span>
-            <span class="like">♡</span>
-            <div class="cap"><div class="nm">森林溪畔旅居</div><div class="lo">黔南 · 荔波小七孔 · 近景区</div></div>
-          </div>
-          <div class="ci">
-            <div class="tags"><span>森林康养</span><span>溪畔独栋</span><span>可月租</span></div>
-            <div class="pr"><b>¥466<small>/双周起</small></b><a class="bk" href="lvju-app-detail.html">预订</a></div>
-          </div>
-        </div>
+      <div class="list" id="featList">
+        <div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">加载中…</div>
       </div>
     </div>
 
@@ -241,5 +220,46 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 精选好房 = 后台 is_featured 的在架项目，统一读 catalog，不再硬编码。 */
+(function(){
+  var API = '/api/juzhu/catalog?city=guiyang';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+    var el = document.getElementById('featList');
+    var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+    var featured = (cat.projects || []).filter(function(p){
+      return p.is_featured === 1 && (p.channel === 'rental' || p.channel === 'minsu');
+    }).sort(function(a,b){ return (a.featured_rank||999) - (b.featured_rank||999); });
+    var src = featured.length ? featured : (cat.projects || []).filter(function(p){ return p.channel === 'rental'; }).slice(0, 2);
+
+    if (!src.length) {
+      el.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">暂无在架精选房源</div>';
+      return;
+    }
+    el.innerHTML = src.map(function(p, i){
+      var d = dmap[p.district_id];
+      var loc = (d && p.address && p.address.indexOf(d.name) === 0) ? p.address : Array.from(new Set([d ? d.name : '', p.address || ''].filter(Boolean))).join(' · ');
+      var r = p.rating || {};
+      var star = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 五彩贝旅居' : '在架好房';
+      var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
+      var img = p.cover_image
+        ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
+        : '<div class="img ' + (i % 2 ? 'b' : 'a') + '">';
+      return '<div class="mcard">' + img +
+        '<span class="star">' + esc(star) + '</span><span class="like">♡</span>' +
+        '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
+        '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>精选</span>') + '</div>' +
+        '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/月起</small>' : '价格面议') + '</b><a class="bk" href="lvju-app-detail.html">预订</a></div></div>' +
+        '</div>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('featList').innerHTML =
+      '<div style="text-align:center;color:#b45309;padding:24px 0;font-size:12px;">无法连接新居住数据库</div>';
+  });
+})();
+</script>
 </body>
 </html>

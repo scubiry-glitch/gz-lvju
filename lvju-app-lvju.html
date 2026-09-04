@@ -34,32 +34,9 @@
       <a class="on">全部</a><a>短住</a><a>候鸟过冬</a><a>康养度假</a><a>亲子研学</a><a>整栋包栋</a>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2>精选旅居</h2><span class="more">综合排序 ›</span></div>
-    <div class="wrap">
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-xijiang"><span class="star">★ 4.9 五星旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">云上观景惠居</div><div class="lo">黔东南 · 西江千户苗寨 · 整栋可包</div></div></div>
-        <div class="ci"><div class="tags"><span>苗寨核心</span><span>日落观景台</span><span>含双早</span><span>管家服务</span></div>
-          <div class="pr"><b>¥588<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-xiaoqikong"><span class="star">★ 4.8 五星旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">森林溪畔旅居</div><div class="lo">黔南 · 荔波小七孔 · 近景区</div></div></div>
-        <div class="ci"><div class="tags"><span>森林康养</span><span>溪畔独栋</span><span>可月租</span></div>
-          <div class="pr"><b>¥466<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-fanjing"><span class="star">★ 4.9 康养旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">梵净山·云舍康养</div><div class="lo">铜仁 · 梵净山麓 · 含理疗</div></div></div>
-        <div class="ci"><div class="tags"><span>负氧离子</span><span>温泉理疗</span><span>候鸟长住</span></div>
-          <div class="pr"><b>¥720<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-wanfeng"><span class="star">★ 4.7 乡村旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">万峰林·布依小院</div><div class="lo">黔西南 · 万峰林 · 田园整租</div></div></div>
-        <div class="ci"><div class="tags"><span>田园风光</span><span>布依民俗</span><span>亲子研学</span></div>
-          <div class="pr"><b>¥398<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
+    <div class="sec-h"><span class="bar"></span><h2>精选旅居</h2><span class="more" id="sortNote">综合排序</span></div>
+    <div class="wrap" id="listingWrap">
+      <div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner gold">
@@ -78,5 +55,54 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 房源数据统一读新居住数据库（catalog），不再硬编码。
+   旅居与长租同为 rental 频道（监管口径一致），本页展示起价视图。 */
+(function(){
+  var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
+  var CITY_LABEL = { guiyang:'贵阳' };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+    var wrap = document.getElementById('listingWrap');
+    var projects = (cat.projects || []).filter(function(p){ return p.channel === 'rental'; });
+    var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+    var umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
+
+    if (!projects.length) {
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在架房源 · 运营商在后台录入并通过评级后自动上架</div>';
+      document.getElementById('sortNote').textContent = '0 套在营';
+      return;
+    }
+    document.getElementById('sortNote').textContent = '共 ' + projects.length + ' 套在营';
+    wrap.innerHTML = projects.map(function(p){
+      var units = umap[p.id] || [];
+      var price = p.price_from;
+      if (price == null && units.length) {
+        price = Math.min.apply(null, units.map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; }));
+      }
+      var r = p.rating || {};
+      var star = (p.rating_status === 'passed' && r.stars)
+        ? '<span class="star">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
+      var dd = dmap[p.district_id];
+      var loc = (dd && p.address && p.address.indexOf(dd.name) === 0) ? p.address : [dd ? dd.name : '', p.address || ''].filter(Boolean).join(' · ');
+      var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
+      var img = p.cover_image
+        ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
+        : '<div class="img s-xijiang">';
+      return '<a class="mcard" href="lvju-app-detail.html">' +
+        img + (star ? star : '') + '<span class="like">♡</span>' +
+        '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
+        '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +
+        '<div class="pr"><b>' + (price != null ? '¥' + fmt(price) + '<small>/月起</small>' : '价格面议') + '</b><span class="bk">预订</span></div></div>' +
+        '</a>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('listingWrap').innerHTML =
+      '<div style="grid-column:1/-1;text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
+  });
+})();
+</script>
 </body>
 </html>

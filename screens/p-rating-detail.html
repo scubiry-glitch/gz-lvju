@@ -434,6 +434,27 @@
       { key:'tech', label:'科技', icon:'📡', color:'#3b82f6' },
       { key:'safety', label:'安全', icon:'🛡', color:'#ef4444' }
     ];
+    // 评级口径按频道：rental=好房子4维，minsu=彩贝5维（与 RATING_DIMS 服务端定义一致）
+    var DIMS_BY_CH = {
+      rental: DIMS,
+      minsu: [
+        { key:'scenery', label:'环境景观', icon:'🏞', color:'#10b981' },
+        { key:'facilities', label:'设施配套', icon:'🛁', color:'#3b82f6' },
+        { key:'service', label:'服务品质', icon:'🛎', color:'#f59e0b' },
+        { key:'location', label:'区位交通', icon:'🚗', color:'#8b5cf6' },
+        { key:'culture', label:'在地体验', icon:'🧵', color:'#ef4444' }
+      ]
+    };
+    function authHeaders(){
+      var h = {'Content-Type':'application/json'};
+      try {
+        var t = localStorage.getItem('JUZHU_ADMIN_TOKEN');
+        var k = localStorage.getItem('JUZHU_API_KEY');
+        if (t) h['Authorization'] = 'Bearer ' + t;
+        if (k) h['X-API-Key'] = k;
+      } catch (e) {}
+      return h;
+    }
 
     fetch('/api/juzhu/ratings/'+encodeURIComponent(id)).then(function(r){
       if (!r.ok) throw new Error('not found');
@@ -442,6 +463,7 @@
       var p = data.project;
       var rating = p.rating || {};
       var dims = rating.dims || {};
+      DIMS = DIMS_BY_CH[p.channel] || (rating.dims && Object.keys(rating.dims).length ? Object.keys(rating.dims).map(function(k){ return { key:k, label:k, icon:'•', color:'#3b82f6' }; }) : DIMS);
       document.title = '好房子复核 · '+p.name;
       document.querySelector('.page-header h1').textContent = '🏠 好房子复核 · '+p.name;
       document.querySelector('.page-header .sub').innerHTML =
@@ -514,7 +536,7 @@
       bar.querySelector('.btn-danger').onclick = function(){
         var note = noteEl ? noteEl.value.trim() : '';
         fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
-          method:'POST', headers:{'Content-Type':'application/json'},
+          method:'POST', headers: authHeaders(),
           body: JSON.stringify({ action:'reject', note: note })
         }).then(function(r){ return r.json(); }).then(function(){
           alert('已驳回'); location.href = 'p-rating-review.html';
@@ -528,7 +550,7 @@
         });
         var note = noteEl ? noteEl.value.trim() : '';
         fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
-          method:'POST', headers:{'Content-Type':'application/json'},
+          method:'POST', headers: authHeaders(),
           body: JSON.stringify({ action:'pass', dims: fd, note: note, checked: rating.checked, total: rating.total })
         }).then(function(r){ return r.json(); }).then(function(){
           alert('复核通过，前台详情页将展示正式评级'); location.href = 'p-rating-review.html';
