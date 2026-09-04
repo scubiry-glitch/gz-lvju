@@ -3,8 +3,23 @@
   "version": "1.0.0",
   "description": "新居住服务平台",
   "main": "app.js",
+  "scripts": {
+    "build:android": "npx cap sync android",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:run": "npx cap run android",
+    "build:apk": "bash scripts/build-apk.sh"
+  },
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
     "mysql2": "^3.23.3"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
+    "typescript": "^7.0.2"
   }
 }
