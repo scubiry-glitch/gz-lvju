@@ -260,9 +260,11 @@ function verifyVendorLoginToken(token) {
   return { role: 'vendor', vendorId: vid };
 }
 
-// 统一会话：账号中心主体（accounts 会话/机器Key，含 platform 与 vendor 角色）优先，
-// 其次 admin 会话/全局 Key（过渡），再次 vendor token（jz_venders 单凭据，过渡）
+// 统一会话：vendor token 最先判定（token 自证，纯函数无共享状态，杜绝被误判为 platform），
+// 其次账号中心主体，再次 admin 会话/全局 Key（过渡）
 async function requestSession(req) {
+  const vtok = verifyVendorLoginToken(extractBearerToken(req));
+  if (vtok) return vtok;
   try {
     const principal = await authCenter.principalOf(req);
     if (principal && principal.type === 'account') {
@@ -275,9 +277,8 @@ async function requestSession(req) {
       }
     }
   } catch (_) { /* 账号库暂不可用时退回旧通道 */ }
-  if (isAdminSessionAuthorized(req)) return { role: 'platform' };
-  const v = verifyVendorLoginToken(extractBearerToken(req));
-  return v || null;
+  if (await isAdminSessionAuthorized(req)) return { role: 'platform' };
+  return null;
 }
 
 // 评级口径（维度键 + 评级编号前缀）按 channel 定义
@@ -438,8 +439,15 @@ async function assertApiAuthorized(urlPath, req, res) {
   if (p.startsWith(ADMIN_PREFIX)) return true;
   if (p.startsWith('/api/juzhu/vendor')) {
     if (p === '/api/juzhu/vendor/login' && req.method === 'POST') return true;
+    // 无任何凭据 → 直接 401（不进会话判定链，杜绝匿名被兜底成主体）
+    const hasCred = String((req.headers && req.headers.authorization) || '').trim()
+      || String((req.headers && (req.headers['x-api-key'] || req.headers['X-API-Key'])) || '').trim();
+    if (!hasCred) {
+      jsonReply(res, { error: 'unauthorized', message: '商家请先 POST /api/juzhu/vendor/login 或 /api/auth/login 获取 token' }, 401);
+      return false;
+    }
     if (await requestSession(req)) return true;
-    jsonReply(res, { error: 'unauthorized', message: '商家请先 POST /api/juzhu/vendor/login 或 /api/auth/login 获取 token' }, 401);
+    jsonReply(res, { error: 'unauthorized', message: '商家凭据无效或已过期，请重新 POST /api/juzhu/vendor/login' }, 401);
     return false;
   }
   if (isVendorHmacPath(urlPath, req.method)) return true;
