@@ -289,22 +289,27 @@ const RATING_DIMS = {
 };
 const RATING_CODE_PREFIX = { rental: 'SY-RENT', minsu: 'MZ' };
 
-async function requireApiKey(req, res) {
-  // 通道1：旧全局 key（过渡兼容，admin 域写操作由入口闸降级为只读）
-  const provided = providedApiKey(req);
-  if (provided && apiKeyMatches(provided, expectedApiKey())) {
-    req.principal = { type: 'legacy' };
+// C 端涉写三路径（下单/支付/评价）——旧全局 key 的最后一处过渡放行，
+// 收紧由 settings.require_c_login 开关控制（requireCEndWrite）
+const C_WRITE_PATH_RE = /^\/api\/juzhu\/jiazheng\/orders(\/[^/]+\/(pay|rate))?$/;
+
+async function requireApiKey(req, res, urlPath) {
+  // 通道1（唯一）：账号中心（Bearer 会话 或 机器账号 API Key）。
+  // 旧全局 JUZHU_API_KEY 已全面停用——管理面一律拒绝；仅 C 端涉写三路径过渡期保留。
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    req.principal = principal;
     return true;
   }
-  // 通道2：账号中心（Bearer 会话 或 机器账号 API Key）
-  const principal = await authCenter.principalOf(req).catch(() => null);
-  if (principal && (principal.type === 'account' || principal.type === 'legacy')) {
-    req.principal = principal;
+  const provided = providedApiKey(req);
+  if (provided && apiKeyMatches(provided, expectedApiKey())
+      && req.method === 'POST' && urlPath && C_WRITE_PATH_RE.test(urlPath.replace(/\/+$/, ''))) {
+    req.principal = { type: 'legacy' };
     return true;
   }
   jsonReply(res, {
     error: 'unauthorized',
-    message: '请用管理员/机器账号凭证（Authorization: Bearer <会话token> 或 X-API-Key）',
+    message: '请先用账号登录（POST /api/auth/login → Authorization: Bearer <token>）；机器对接用机器账号 API Key',
   }, 401);
   return false;
 }
@@ -349,8 +354,11 @@ async function requireDispatchPerm(req, res) {
     jsonReply(res, { error: 'forbidden', message: '当前账号无派单/推进权限（order.dispatch）' }, 403);
     return false;
   }
-  if (principal && principal.type === 'legacy') { req.principal = principal; return true; } // 旧 key 过渡
-  jsonReply(res, { error: 'unauthorized', message: '须管理凭证（key 或运营账号会话）' }, 401);
+  if (principal && principal.type === 'legacy') {
+    jsonReply(res, { error: 'forbidden', message: '旧 API Key 已停用：派单请用运营账号登录（POST /api/auth/login）' }, 403);
+    return false;
+  }
+  jsonReply(res, { error: 'unauthorized', message: '须管理凭证（运营账号会话或机器账号 Key）' }, 401);
   return false;
 }
 
@@ -453,7 +461,7 @@ async function assertApiAuthorized(urlPath, req, res) {
   }
   if (isVendorHmacPath(urlPath, req.method)) return true;
   if (isCEndPublicApi(urlPath, req.method)) return true;
-  return requireApiKey(req, res);
+  return requireApiKey(req, res, urlPath);
 }
 
 function isAdminAuthExempt(urlPath, method) {
@@ -3017,8 +3025,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/admin/idp-configs
     if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'GET') {
       const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
-        return jsonReply(res, { error: 'forbidden' }, 403);
+      if (!principal || principal.type === 'legacy' ||
+          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
+        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
       }
       return jsonReply(res, await authCenter.listIdpConfigs());
     }
@@ -3035,11 +3044,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // GET /api/juzhu/admin/accounts?vendor_id=&org_id=&principal_type=
-    // （旧全局 Key 过渡期允许只读；写操作已被入口闸拦截）
+    // 「都用账号登录」：旧全局 Key 一并停用（读也不放行）
     if (urlPath === '/api/juzhu/admin/accounts' && req.method === 'GET') {
       const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
-        return jsonReply(res, { error: 'forbidden' }, 403);
+      if (!principal || principal.type === 'legacy' ||
+          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
+        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
       }
       return jsonReply(res, await authCenter.listAccounts(Object.fromEntries(new URLSearchParams(qs))));
     }
@@ -3086,8 +3096,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/admin/audit?limit=&action=&account_id=
     if (urlPath === '/api/juzhu/admin/audit' && req.method === 'GET') {
       const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.AUDIT_READ))) {
-        return jsonReply(res, { error: 'forbidden' }, 403);
+      if (!principal || principal.type === 'legacy' ||
+          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.AUDIT_READ))) {
+        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
       }
       const qp = new URLSearchParams(qs);
       const limit = Math.min(parseInt(qp.get('limit') || '100', 10) || 100, 500);

@@ -170,6 +170,7 @@
     </div>
   </main>
 </div>
+<script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
 <script src="_nav.js"></script>
 <script>
@@ -178,7 +179,7 @@
 (function(){
   var API = '/api/juzhu';
   var state = { role:null, vendorName:'', grain:'unit', projects:[], units:[], districts:[], cities:[], tab:'all', tabKey:'rating' };
-  function tok(){ try { return localStorage.getItem('JUZHU_VENDOR_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('JUZHU_VENDOR_TOKEN') || ''; } catch(e){ return ''; } }
   function adminTok(){ try { return localStorage.getItem('JUZHU_ADMIN_TOKEN') || ''; } catch(e){ return ''; } }
   function apiKey(){ try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e){ return ''; } }
   function authHeaders(){

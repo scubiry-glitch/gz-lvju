@@ -408,7 +408,8 @@
     </div>
   </div>
 
-  <script src="_region.js"></script>
+  <script src="_console-login.js"></script>
+<script src="_region.js"></script>
   <script src="_nav.js"></script>
   <script>
     // Score adjustment calculation (旅居演示)
@@ -448,10 +449,8 @@
     function authHeaders(){
       var h = {'Content-Type':'application/json'};
       try {
-        var t = localStorage.getItem('JUZHU_ADMIN_TOKEN');
-        var k = localStorage.getItem('JUZHU_API_KEY');
+        var t = (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('JUZHU_ADMIN_TOKEN') || '';
         if (t) h['Authorization'] = 'Bearer ' + t;
-        if (k) h['X-API-Key'] = k;
       } catch (e) {}
       return h;
     }

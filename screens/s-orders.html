@@ -240,6 +240,7 @@
   <div id="tab-bar" data-series="s" data-active="orders"></div>
 </div>
 <div class="toast" id="toast" style="position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(4,47,46,.92);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;z-index:120;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center;"></div>
+<script src="_console-login.js"></script>
 <script>
   document.querySelectorAll('.st').forEach(t => t.addEventListener('click', () => {
     document.querySelectorAll('.st').forEach(x => x.classList.remove('on'));
@@ -363,20 +364,9 @@ function renderAuthBar(){
 }
 function authAction(){
   if (JZ.sessionToken()) { JZ.setSessionToken(''); renderAuthBar(); render(); return; }
-  const user = document.getElementById('authUser').value.trim();
-  const pwd = document.getElementById('authPwd').value;
-  if (!user || !pwd) { toast('请输入账号与密码'); return; }
-  fetch('/api/auth/login', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login_name: user, password: pwd })
-  }).then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
-    .then(function(res){
-      if (!res.ok) { toast(res.d.error || '登录失败'); return; }
-      JZ.setSessionToken(res.d.token);
-      toast('已登录，加载派给你的工单');
-      renderAuthBar(); render();
-    }).catch(function(){ toast('登录请求失败'); });
+  BZF_CONSOLE.requireLogin({ }).then(function(){ renderAuthBar(); render(); });
 }
+/* 旧内联登录实现已由 _console-login.js 统一登录门替代 */
 
 JZ.onChange(render);
 window.addEventListener('pageshow', function(){ renderAuthBar(); render(); });
