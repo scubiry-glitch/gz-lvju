@@ -84,18 +84,20 @@
 </div>
 <script>
 /* 预订下单：读库（/projects/:id + /units）→ POST /api/juzhu/booking 真实落库。
-   ?id= 项目（必填）、?unit= 户型、?checkin=/?checkout= 由详情页日历透传。 */
+   ?id= 项目、?unit= 户型、?checkin=/?checkout= 由详情页日历透传；
+   未带 ?id= 时自动兜底拉第一个在架可订房源（rental/minsu）。 */
 (function(){
   var q = new URLSearchParams(location.search);
-  var id = parseInt(q.get('id') || '', 10);
   var err = document.getElementById('bErr');
-  function showErr(m){ err.textContent = m; err.style.display = 'block'; }
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
-  if (!id) { showErr('缺少房源参数 · 请从列表/详情进入'); document.getElementById('bSubmit').style.opacity = .4; return; }
-
   var unitSel = document.getElementById('fUnit');
   var perNight = 0;
+  var curId = 0;
+
+  function showErr(m){ err.textContent = m; err.style.display = 'block'; }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
+
   function calc(){
     var ci = document.getElementById('fIn').value, co = document.getElementById('fOut').value;
     var n = (ci && co) ? Math.round((new Date(co) - new Date(ci)) / 864e5) : 0;
@@ -106,53 +108,59 @@
     document.querySelector('#cTotal b').textContent = total ? '¥' + fmt(total) : '—';
     document.querySelector('#cTotal span').textContent = n >= 1 ? '共 ' + n + ' 晚' : '待选日期';
   }
-  document.getElementById('fIn').addEventListener('change', calc);
-  document.getElementById('fOut').addEventListener('change', calc);
+
+  function load(pid){
+    curId = pid;
+    Promise.all([
+      fetch('/api/juzhu/projects/' + pid).then(function(r){ if (!r.ok) throw new Error('项目加载失败'); return r.json(); }),
+      fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) throw new Error('户型加载失败'); return r.json(); })
+    ]).then(function(rs){
+      var p = rs[0] || {}, units = (rs[1] || {}).units || [];
+      p.tags = asArr(p.tags);
+      document.getElementById('bName').textContent = p.name || '';
+      document.getElementById('bMeta').textContent = p.address || '';
+      var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = {}; } }
+      r = r || {};
+      document.getElementById('bStar').textContent = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 星 · 已评级' : '在架';
+      if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
+      perNight = p.price_from || 0;
+      unitSel.innerHTML = '<option value="">不限房型（按起价）</option>' + units.map(function(u){
+        u.tags = asArr(u.tags);
+        var pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from || 0);
+        return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
+      }).join('');
+      var qUnit = parseInt(q.get('unit') || '', 10);
+      if (qUnit) unitSel.value = String(qUnit);
+      if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
+      var ci = q.get('checkin'), co = q.get('checkout');
+      if (ci) document.getElementById('fIn').value = ci;
+      if (co) document.getElementById('fOut').value = co;
+      calc();
+    }).catch(function(e){
+      showErr('房源加载失败：' + e.message);
+    });
+  }
+
   unitSel.addEventListener('change', function(){
     var o = unitSel.options[unitSel.selectedIndex];
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
     calc();
   });
-
-  Promise.all([
-    fetch('/api/juzhu/projects/' + id).then(function(r){ if (!r.ok) throw new Error('项目加载失败'); return r.json(); }),
-    fetch('/api/juzhu/projects/' + id + '/units').then(function(r){ if (!r.ok) throw new Error('户型加载失败'); return r.json(); })
-  ]).then(function(rs){
-    var p = rs[0] || {}, d = rs[1] || {};
-    var units = d.units || [];
-    document.getElementById('bName').textContent = p.name || '';
-    document.getElementById('bMeta').textContent = p.address || '';
-    var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
-    r = r || {};
-    document.getElementById('bStar').textContent = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 星 · 已评级' : '在架';
-    if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
-    perNight = p.price_from || 0;
-    unitSel.innerHTML = '<option value="">不限房型（按起价）</option>' + units.map(function(u){
-      var pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from || 0);
-      return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
-    }).join('');
-    var qUnit = parseInt(q.get('unit') || '', 10);
-    if (qUnit) unitSel.value = String(qUnit);
-    if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
-    var ci = q.get('checkin'), co = q.get('checkout');
-    if (ci) document.getElementById('fIn').value = ci;
-    if (co) document.getElementById('fOut').value = co;
-    calc();
-  }).catch(function(e){
-    showErr('房源加载失败：' + e.message);
-  });
+  document.getElementById('fIn').addEventListener('change', calc);
+  document.getElementById('fOut').addEventListener('change', calc);
 
   document.getElementById('bSubmit').addEventListener('click', function(){
     err.style.display = 'none';
+    if (!curId) { showErr('房源未加载，请稍后再试'); return; }
     var body = {
-      project_id: id,
+      project_id: curId,
       unit_id: unitSel.value ? parseInt(unitSel.value, 10) : null,
       checkin: document.getElementById('fIn').value,
       checkout: document.getElementById('fOut').value,
       contact_name: document.getElementById('fName').value.trim(),
       contact_phone: document.getElementById('fPhone').value.trim()
     };
-    fetch('/api/juzhu/booking', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    fetch('/api/juzhu/booking', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
         if (!res.ok) { showErr(res.j.error || '提交失败'); return; }
@@ -163,6 +171,21 @@
       })
       .catch(function(){ showErr('网络异常，请稍后再试'); });
   });
+
+  var qid = parseInt(q.get('id') || '', 10);
+  if (qid) {
+    load(qid);
+  } else {
+    // 兜底：未带 ?id=（旧缓存列表/详情跳转）→ 自动带入第一个在架可订房源
+    showErr('未指定房源：已自动带入一个在架房源 · 如需其他房源请从「找房」列表进入');
+    fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
+      var p = (cat.projects || []).filter(function(x){
+        return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
+      })[0];
+      if (!p) { showErr('暂无可预订房源 · 请从列表进入'); document.getElementById('bSubmit').style.opacity = .4; return; }
+      load(p.id);
+    }).catch(function(){ showErr('缺少房源参数，且目录服务不可用 · 请稍后再试'); });
+  }
 })();
 </script>
 </body>

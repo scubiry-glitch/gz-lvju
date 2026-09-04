@@ -181,6 +181,8 @@
     b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e;';
     b.textContent = '示例内容 · 返回「找房」列表点击具体房源查看库内真实数据';
     document.querySelector('.scr').insertBefore(b, document.querySelector('.pd-hero'));
+    var bk0 = document.querySelector('.cta .btn');
+    if (bk0) { bk0.textContent = '去列表选房'; bk0.href = 'lvju-app-lvju.html'; }
     return;
   }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
