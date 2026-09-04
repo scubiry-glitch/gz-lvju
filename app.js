@@ -2755,8 +2755,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       if (qp.get('pay_status')) { sql += ' AND o.pay_status=?'; params.push(qp.get('pay_status')); }
       const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
-      sql += ' ORDER BY o.created_at DESC LIMIT ?';
-      params.push(limit);
+      sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
       return jsonReply(res, { items: rows });
     }
@@ -4066,7 +4065,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const params = [];
       if (qp.get('status')) { sql += ' AND o.status=?'; params.push(qp.get('status')); }
       const limit = Math.min(parseInt(qp.get('limit') || '50'), 200);
-      sql += ' ORDER BY o.created_at DESC LIMIT ?'; params.push(limit);
+      sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
       return jsonReply(res, { list: rows });
     }
