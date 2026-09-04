@@ -336,7 +336,7 @@
     function load(status){
       var qs = status ? ('?status='+encodeURIComponent(status)) : '';
       fetch('/api/juzhu/ratings'+qs).then(function(r){ return r.json(); }).then(function(data){
-        var items = data.items || [];
+        var items = Array.isArray(data) ? data : (data.items || []);
         var tbody = document.getElementById('juzhuRatings');
         if (!items.length) {
           tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无'+(STATUS[status]||'')+'保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
