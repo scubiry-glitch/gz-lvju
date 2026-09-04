@@ -499,7 +499,7 @@ function switchTab(tab) {
 // ── 账号管理（阶段1/2 admin API）──
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function renderAccounts(){
-  api('/admin/accounts').then(function(list){
+  api('/accounts').then(function(list){
     var rows = (list||[]).map(function(it){
       var a = it.account || {}, roles = (it.roles||[]).map(function(r){return r.role_code;}).join(',');
       return '<tr><td>'+a.id+'</td><td>'+esc(a.login_name||('-idp:'+a.idp_type+':'+a.idp_subject))+'</td><td>'+esc(a.display_name||'')+'</td>'+
@@ -514,11 +514,11 @@ function renderAccounts(){
     document.getElementById('accList').onclick = function(e){
       var b = e.target.closest('button'); if(!b) return;
       if (b.dataset.accToggle) {
-        api('/admin/accounts/'+b.dataset.accToggle, { method:'PUT', body: JSON.stringify({ status: b.dataset.st }) })
+        api('/accounts/'+b.dataset.accToggle, { method:'PUT', body: JSON.stringify({ status: b.dataset.st }) })
           .then(function(){ toast('已更新'); renderAccounts(); })
           .catch(function(err){ toast(err.message); });
       } else if (b.dataset.accKey) {
-        api('/admin/accounts/'+b.dataset.accKey+'/api-key', { method:'POST' })
+        api('/accounts/'+b.dataset.accKey+'/api-key', { method:'POST' })
           .then(function(d){ prompt('机器 Key（仅此一次展示）：', d.api_key); })
           .catch(function(err){ toast(err.message); });
       }
@@ -533,14 +533,14 @@ document.getElementById('btnAccCreate').onclick = function(){
   };
   var v = document.getElementById('accVendor').value.trim();
   if (v) body.vendor_id = parseInt(v, 10);
-  api('/admin/accounts', { method:'POST', body: JSON.stringify(body) })
+  api('/accounts', { method:'POST', body: JSON.stringify(body) })
     .then(function(){ toast('账号已创建'); renderAccounts(); })
     .catch(function(err){ toast(err.message); });
 };
 
 // ── 审计日志 ──
 function renderAudit(){
-  api('/admin/audit?limit=100').then(function(rows){
+  api('/audit?limit=100').then(function(rows){
     document.getElementById('auditCount').textContent = ' 最近 '+(rows||[]).length+' 条';
     var tr = (rows||[]).map(function(r){
       return '<tr><td>'+esc(r.created_at)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.resource||'')+(r.resource_id?('#'+esc(r.resource_id)):'')+'</td>'+
