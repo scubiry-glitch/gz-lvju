@@ -34,14 +34,14 @@ const DEMO = [
     channel: 'minsu', slug: 'demo-minsu-xingkong', name: '示例·星空整栋惠居',
     address: '观山湖区 · 示例景区东门', price_from: 980, featured: 1,
     units: [
-      { name: '整栋 · 6 室', layout_label: '6室3卫', area_sqm: 260, rent_monthly: 19600, tags: ['整栋包栋', '管家服务'] },
-      { name: '庭院大床房', layout_label: '1室1卫', area_sqm: 32, rent_monthly: 980, tags: ['含双早', '庭院'] },
+      { name: '整栋 · 6 室', layout_label: '6室3卫', area_sqm: 260, rent_monthly: 19600, price_night: 1960, tags: ['整栋包栋', '管家服务'] },
+      { name: '庭院大床房', layout_label: '1室1卫', area_sqm: 32, price_night: 980, tags: ['含双早', '庭院'] },
     ],
   },
   {
     channel: 'minsu', slug: 'demo-minsu-guzhen', name: '示例·古镇石巷小筑',
     address: '花溪区 · 示例古镇南街', price_from: 528, featured: 0,
-    units: [{ name: '庭院房', layout_label: '1室1卫', area_sqm: 28, rent_monthly: 528, tags: ['古镇里弄', '好停车'] }],
+    units: [{ name: '庭院房', layout_label: '1室1卫', area_sqm: 28, price_night: 528, tags: ['古镇里弄', '好停车'] }],
   },
   // ── newhouse 新房（总价口径）──
   {
@@ -166,12 +166,15 @@ async function seed(db, bcrypt) {
     const pid = r.insertId;
     nProj++;
     for (const u of item.units || []) {
+      const ext = {};
+      if (u.price_night) ext.price_night = u.price_night;
       await db.execute(
-        `INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,tags)
-         VALUES (?,?,?,?,?,?,?,?)`,
+        `INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,tags,ext)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
         [pid, u.name, slugify(u.name), u.area_sqm || null, u.layout_label || null,
           u.rent_monthly || null, u.price_total || null,
-          JSON.stringify(u.tags || [])]
+          JSON.stringify(u.tags || []),
+          Object.keys(ext).length ? JSON.stringify(ext) : null]
       );
       nUnits++;
     }

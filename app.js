@@ -1666,7 +1666,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(projs[0], ['tags', 'rating']);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
-        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
         const photos = await queryRows(
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order, id",
           [pid]
@@ -2905,7 +2905,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         channels,
         districts: mapRows(districts, ['tags']),
         projects: mapRows(projects, ['tags', 'rating']).map(stripContactPhone),
-        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']),
         photos,
         topic: topicMeta,
         stats: {
@@ -3268,9 +3268,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
       } catch (_) {}
         let perNight = 0;
         if (unitId) {
-          const [us] = await conn.execute('SELECT id, project_id, rent_monthly FROM units WHERE id=?', [unitId]);
+          const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
           if (!us.length || us[0].project_id !== projectId) { conn.end(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
-          perNight = us[0].rent_monthly ? Math.round(us[0].rent_monthly / 30) : 0;
+          // 夜价口径（规则15）：minsu 短住 = units.ext.price_night；rental 长租 = 月租/30 折算
+          if (proj.channel === 'minsu') {
+            let ux = {};
+            try { ux = us[0].ext ? JSON.parse(us[0].ext) : {}; } catch (_) { ux = {}; }
+            perNight = ux.price_night || 0;
+          } else {
+            perNight = us[0].rent_monthly ? Math.round(us[0].rent_monthly / 30) : 0;
+          }
         }
         if (!perNight) perNight = proj.channel === 'minsu' ? (proj.price_from || 0) : (proj.price_from ? Math.round(proj.price_from / 30) : 0);
         const priceTotal = perNight * nights;

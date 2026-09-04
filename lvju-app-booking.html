@@ -126,7 +126,12 @@
       perNight = p.price_from || 0;
       unitSel.innerHTML = '<option value="">不限房型（按起价）</option>' + units.map(function(u){
         u.tags = asArr(u.tags);
-        var pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from || 0);
+        var ex = {};
+        if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) { ex = {}; } } else if (u.ext) { ex = u.ext; }
+        // 夜价口径（规则15）：minsu 短住=ext.price_night；rental 长租=月租/30 折算
+        var pn;
+        if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
+        else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
         return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
       }).join('');
       var qUnit = parseInt(q.get('unit') || '', 10);
