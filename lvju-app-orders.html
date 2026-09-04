@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:,">
 <title>我的订单 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 </head>
@@ -14,10 +15,6 @@
       <a class="bk" href="lvju-app-me.html" onclick="if(history.length>1){history.back();return false}">‹</a>
       <div class="ttl">我的订单</div>
       <div class="act"><span>🔍</span></div>
-    </div>
-
-    <div class="otabs">
-      <a class="on">预订查单</a><a>全部</a><a>待支付</a><a>待入住</a><a>待评价</a><a>已完成</a>
     </div>
 
     <div id="loginBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
@@ -52,64 +49,6 @@
       </div>
       <div id="qMsg" style="font-size:11px;color:var(--muted);margin-top:7px;">输入订单号 + 下单手机号（双因子），可查询进度或取消待确认订单</div>
       <div id="qCard" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;"></div>
-    </div>
-
-    <div class="wrap" style="padding-top:14px;">
-      <!-- 待入住 -->
-      <div class="ordcard">
-        <div class="oh"><span class="shop">🐚 贝壳旅居 · 旅居</span><span class="stt stay">待入住</span></div>
-        <div class="ob">
-          <div class="th s-xijiang"></div>
-          <div class="oi">
-            <div class="nm">云上观景惠居</div>
-            <div class="meta">6/14 — 6/16 · 2 晚 · 观景大床房</div>
-            <div class="amt">实付 <b>¥1,176</b> · 订单号 …8821</div>
-          </div>
-        </div>
-        <div class="of"><a href="lvju-app-order-detail.html">订单详情</a><a class="primary" href="lvju-app-checkin.html">查看凭证</a></div>
-      </div>
-
-      <!-- 待支付 -->
-      <div class="ordcard">
-        <div class="oh"><span class="shop">🐚 贝壳旅居 · 惠居</span><span class="stt wait">待支付 · 14:32</span></div>
-        <div class="ob">
-          <div class="th s-xiaoqikong"></div>
-          <div class="oi">
-            <div class="nm">荔波·森屿泳池别院</div>
-            <div class="meta">6/20 — 6/22 · 2 晚 · 独栋带泳池</div>
-            <div class="amt">应付 <b>¥1,976</b> · 订单号 …9036</div>
-          </div>
-        </div>
-        <div class="of"><a href="lvju-app-refund.html">取消订单</a><a class="primary" href="lvju-app-pay.html">去支付</a></div>
-      </div>
-
-      <!-- 已完成 -->
-      <div class="ordcard">
-        <div class="oh"><span class="shop">🐚 贝壳旅居 · 惠居</span><span class="stt done">已完成</span></div>
-        <div class="ob">
-          <div class="th s-dong"></div>
-          <div class="oi">
-            <div class="nm">侗乡·鼓楼水岸</div>
-            <div class="meta">5/01 — 5/03 · 2 晚 · 临水栋</div>
-            <div class="amt">实付 <b>¥1,396</b> · 订单号 …7715</div>
-          </div>
-        </div>
-        <div class="of"><a href="lvju-app-detail.html">再次预订</a><a class="primary" href="lvju-app-review.html">评价晒图</a></div>
-      </div>
-
-      <!-- 已完成 · 看房团 -->
-      <div class="ordcard">
-        <div class="oh"><span class="shop">🧭 贝壳旅居 · 置业导购</span><span class="stt done">已完成</span></div>
-        <div class="ob">
-          <div class="th s-city"></div>
-          <div class="oi">
-            <div class="nm">观山湖看房团 · 4 盘联看</div>
-            <div class="meta">4/20 周日 · 含往返大巴 + 顾问陪同</div>
-            <div class="amt">免费报名 · 订单号 …5521</div>
-          </div>
-        </div>
-        <div class="of"><a href="lvju-app-newhouse.html">再约看房</a></div>
-      </div>
     </div>
   </div>
 
@@ -189,18 +128,26 @@
   }
   function myRender(items){
     document.getElementById('myCnt').textContent = items.length ? '· ' + items.length + ' 笔' : '';
-    if (!items.length) { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px 2px;">还没有预订 · 去「找房」挑一间</div>'; return; }
+    if (!items.length) { document.getElementById('myList').innerHTML = '<div class="ordcard" style="text-align:center;"><div style="font-size:12px;color:var(--muted);padding:10px 2px;">还没有预订 · 去「找房」挑一间</div></div>'; return; }
     var ST = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
     document.getElementById('myList').innerHTML = items.map(function(o){
       var st = ST[o.status] || [o.status, 'stay'];
+      var cover = o.project_cover
+        ? '<div class="th" style="background:url(' + esc(o.project_cover) + ') center/cover;"></div>'
+        : '<div class="th s-xijiang"></div>';
       return '<div class="ordcard">' +
         '<div class="oh"><span class="shop">🐚 贝壳旅居 · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
-        '<div class="ob"><div class="oi" style="padding-left:0;">' +
-          '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +
-          '<div class="meta">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
-          '<div class="amt">合计 <b>¥' + fmt(o.price_total) + '</b> · ' + esc(o.order_no) + ' · ' + esc(o.contact_phone) + '</div>' +
-        '</div></div>' +
-        (o.status === 'pending' ? '<div class="of"><a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a></div>' : '') +
+        '<div class="ob">' + cover +
+          '<div class="oi">' +
+            '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +
+            '<div class="meta">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
+            '<div class="amt">合计 <b>¥' + fmt(o.price_total) + '</b> · 订单号 …' + esc(o.order_no.slice(-4)) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="of">' +
+          (o.status === 'pending' ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
+          '<a class="primary" href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
+        '</div>' +
       '</div>';
     }).join('');
     document.querySelectorAll('[data-myid]').forEach(function(a){

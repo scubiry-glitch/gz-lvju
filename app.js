@@ -3337,7 +3337,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
       let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
                         b.nights, b.price_total, b.status, b.created_at,
-                        b.contact_name, b.contact_phone, p.name AS project_name
+                        b.contact_name, b.contact_phone, p.name AS project_name, p.cover_image AS project_cover
                  FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE 1=1`;
       const params = [];
       if (sess.role === 'vendor') { sql += ' AND b.owner_vendor_id=?'; params.push(sess.vendorId); }
