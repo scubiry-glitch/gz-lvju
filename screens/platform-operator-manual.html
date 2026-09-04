@@ -46,7 +46,7 @@
 <li>1 个公共底座：发证管理、信用规则、数据中台、权限 RBAC、工作流、Webhook、API 网关、通知</li>
 <li>核心公式（平台侧视角）：<strong>可售 SKU = 平台 SPU + 本店服务者 + 价格</strong>，SPU 与标准工序由平台统一定义，商家不可改</li>
 <li>平台核心资产：等级标准（L0–L7）、题库试卷、信用规则（42 条）、流量策略（7 条）、分账规则（分级抽佣矩阵）</li>
-<p><strong>权限提示：</strong> 管理台写接口已启用鉴权，页面自动携带 API Key（默认 <code>dev-juzhu-key</code>，可 localStorage.JUZHU_API_KEY 覆盖）。P 端角色权限由 RBAC 控制（超管/中台运营/监管员/审计员/DPO 等 14 角色，186 权限点）。</p>
+<p><strong>权限提示：</strong> 管理台已统一账号登录，页面打开时弹出登录框（POST /api/auth/login）。P 端角色权限由 RBAC 控制（超管/中台运营/监管员/审计员/DPO 等 14 角色，186 权限点）。</p>
 <hr/>
 <h2>1. 基础数据录入（平台侧）</h2>
 <p>基础数据分四层：<strong>服务子类目（P）→ 标准品 SPU（P）→ 等级标准与题库（P）→ 商家 SKU（B）</strong>。前三层全部由平台运营方维护。</p>
@@ -322,7 +322,7 @@
 <p><strong>Q7：Webhook 死信队列怎么处理？</strong></p>
 <p>A：死信 = 投递失败事件（当前 14 条），需人工查看失败原因（订阅方地址变更/限流/超时），修复后重放；持续失败需联系订阅方或下线订阅。</p>
 <p><strong>Q8：API Key 是什么？</strong></p>
-<p>A：管理台写接口的鉴权密钥，默认 <code>dev-juzhu-key</code>，可通过 localStorage 的 <code>JUZHU_API_KEY</code> 覆盖。正式环境请使用分配的生产密钥并妥善保管。</p>
+<p>A：控制台统一账号登录：打开页面弹登录框，用管理员分配的账号登录；不再使用全局 API Key。</p>
 <hr/>
 <h2>附录 A：平台侧核心接口速查（P 端视角）</h2>
 <table><thead><tr><th>用途</th><th>方法</th><th>路径</th></tr></thead><tbody><tr><td>类目管理</td><td>GET/POST</td><td><code>/api/juzhu/jz/categories</code></td></tr><tr><td>SPU 管理</td><td>GET/POST</td><td><code>/api/juzhu/jz/spu</code></td></tr><tr><td>服务者管理</td><td>GET</td><td><code>/api/juzhu/jz/workers</code></td></tr><tr><td>派单</td><td>POST</td><td><code>/api/juzhu/jiazheng/orders/{id}/dispatch</code></td></tr><tr><td>订单统计</td><td>GET</td><td><code>/api/juzhu/jiazheng/orders/stats</code></td></tr><tr><td>信用分获取</td><td>GET</td><td><code>/v3/credit/{spid}</code></td></tr><tr><td>智能派单</td><td>POST</td><td><code>/v3/order/dispatch</code></td></tr><tr><td>证书签发</td><td>POST</td><td><code>/v3/cert/issue</code>（需中台运营+主管双签）</td></tr><tr><td>证书吊销</td><td>DEL</td><td><code>/v3/cert/{id}/revoke</code>（高危·需审批流）</td></tr><tr><td>证书续期</td><td>POST</td><td><code>/v3/cert/renew</code></td></tr><tr><td>扫码验真</td><td>GET</td><td><code>/pub/cert/verify?code=...</code></td></tr><tr><td>信用事件上报</td><td>PUT</td><td><code>/v3/credit/{spid}/event</code></td></tr><tr><td>物资批次质检上报</td><td>POST</td><td><code>/v3/material/batch/qc</code></td></tr></tbody></table>

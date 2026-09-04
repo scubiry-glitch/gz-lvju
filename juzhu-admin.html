@@ -165,8 +165,50 @@
 <nav class="subnav" id="subnav">
   <button type="button" data-tab="phone">设置</button>
   <button type="button" data-tab="dict">字典</button>
+  <button type="button" data-tab="accounts">账号</button>
+  <button type="button" data-tab="audit">审计</button>
   <button type="button" class="on" data-tab="content">内容</button>
 </nav>
+
+
+<div id="paneAccounts" class="pane-main" hidden>
+  <div class="card">
+    <h2>账号管理</h2>
+    <p class="hint">账号中心（accounts/roles）。任何主体原生多账号：商家挂 vendor_id、机构挂 org_id，各自绑角色。密码仅创建/重置时输入。</p>
+    <div class="fld" style="margin-top:12px;">
+      <label>新建账号</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="accLogin" placeholder="login_name" style="width:150px;">
+        <input type="password" id="accPwd" placeholder="密码(≥8位)" style="width:130px;">
+        <input type="text" id="accVendor" placeholder="vendor_id(选填)" style="width:120px;">
+        <select id="accRole">
+          <option value="vendor_owner">vendor_owner</option>
+          <option value="vendor_operator">vendor_operator</option>
+          <option value="operator_admin">operator_admin</option>
+          <option value="worker">worker</option>
+          <option value="user">user</option>
+          <option value="gov_viewer">gov_viewer</option>
+          <option value="bank_viewer">bank_viewer</option>
+          <option value="holding_viewer">holding_viewer</option>
+          <option value="platform_op">platform_op</option>
+        </select>
+        <button type="button" class="btn primary" id="btnAccCreate">创建</button>
+      </div>
+    </div>
+    <div id="accList" style="margin-top:14px;"></div>
+  </div>
+</div>
+<div id="paneAudit" class="pane-main" hidden>
+  <div class="card">
+    <h2>审计日志</h2>
+    <p class="hint">管理写操作与登录事件（audit_log，默认留存 180 天）。</p>
+    <div class="bar" style="margin-top:10px;">
+      <button type="button" class="btn" id="btnAuditReload">刷新</button>
+      <span class="hint" id="auditCount"></span>
+    </div>
+    <div id="auditList" style="margin-top:12px;"></div>
+  </div>
+</div>
 
 <div id="panePhone" class="pane-main pane-phone" hidden>
   <div class="card">
@@ -446,8 +488,69 @@ function switchTab(tab) {
   document.getElementById('panePhone').hidden = tab !== 'phone';
   document.getElementById('paneDict').hidden = tab !== 'dict';
   document.getElementById('paneContent').hidden = tab !== 'content';
+  document.getElementById('paneAccounts').hidden = tab !== 'accounts';
+  document.getElementById('paneAudit').hidden = tab !== 'audit';
   if (tab === 'dict') renderDictionary();
+  if (tab === 'accounts') renderAccounts();
+  if (tab === 'audit') renderAudit();
 }
+
+
+// ── 账号管理（阶段1/2 admin API）──
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function renderAccounts(){
+  api('/admin/accounts').then(function(list){
+    var rows = (list||[]).map(function(it){
+      var a = it.account || {}, roles = (it.roles||[]).map(function(r){return r.role_code;}).join(',');
+      return '<tr><td>'+a.id+'</td><td>'+esc(a.login_name||('-idp:'+a.idp_type+':'+a.idp_subject))+'</td><td>'+esc(a.display_name||'')+'</td>'+
+        '<td>'+esc(roles)+'</td><td>'+(a.vendor_id?('V'+a.vendor_id):(a.org_id?('O'+a.org_id):(a.worker_id?('W'+a.worker_id):'-')))+'</td>'+
+        '<td>'+(a.principal_type==='machine'?'机器':'人')+'</td>'+
+        '<td><span class="hint">'+esc(a.status)+'</span></td>'+
+        '<td><button class="btn" data-acc-toggle="'+a.id+'" data-st="'+(a.status==='active'?'disabled':'active')+'">'+(a.status==='active'?'停用':'启用')+'</button> '+
+        '<button class="btn" data-acc-key="'+a.id+'">签发Key</button></td></tr>';
+    }).join('');
+    document.getElementById('accList').innerHTML =
+      '<table class="tbl"><thead><tr><th>ID</th><th>登录名</th><th>显示名</th><th>角色</th><th>绑定</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+    document.getElementById('accList').onclick = function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      if (b.dataset.accToggle) {
+        api('/admin/accounts/'+b.dataset.accToggle, { method:'PUT', body: JSON.stringify({ status: b.dataset.st }) })
+          .then(function(){ toast('已更新'); renderAccounts(); })
+          .catch(function(err){ toast(err.message); });
+      } else if (b.dataset.accKey) {
+        api('/admin/accounts/'+b.dataset.accKey+'/api-key', { method:'POST' })
+          .then(function(d){ prompt('机器 Key（仅此一次展示）：', d.api_key); })
+          .catch(function(err){ toast(err.message); });
+      }
+    };
+  }).catch(function(err){ document.getElementById('accList').textContent = '加载失败：'+err.message; });
+}
+document.getElementById('btnAccCreate').onclick = function(){
+  var body = {
+    login_name: document.getElementById('accLogin').value.trim(),
+    password: document.getElementById('accPwd').value,
+    roles: [document.getElementById('accRole').value],
+  };
+  var v = document.getElementById('accVendor').value.trim();
+  if (v) body.vendor_id = parseInt(v, 10);
+  api('/admin/accounts', { method:'POST', body: JSON.stringify(body) })
+    .then(function(){ toast('账号已创建'); renderAccounts(); })
+    .catch(function(err){ toast(err.message); });
+};
+
+// ── 审计日志 ──
+function renderAudit(){
+  api('/admin/audit?limit=100').then(function(rows){
+    document.getElementById('auditCount').textContent = ' 最近 '+(rows||[]).length+' 条';
+    var tr = (rows||[]).map(function(r){
+      return '<tr><td>'+esc(r.created_at)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.resource||'')+(r.resource_id?('#'+esc(r.resource_id)):'')+'</td>'+
+        '<td>'+(r.account_id||'-')+'</td><td>'+esc(r.role_code||'')+'</td><td>'+esc(r.ip||'')+'</td></tr>';
+    }).join('');
+    document.getElementById('auditList').innerHTML =
+      '<table class="tbl"><thead><tr><th>时间</th><th>动作</th><th>资源</th><th>账号</th><th>角色</th><th>IP</th></tr></thead><tbody>'+tr+'</tbody></table>';
+  }).catch(function(err){ document.getElementById('auditList').textContent = '加载失败：'+err.message; });
+}
+document.getElementById('btnAuditReload').onclick = renderAudit;
 
 document.getElementById('subnav').onclick = function(e) {
   var btn = e.target.closest('button[data-tab]');

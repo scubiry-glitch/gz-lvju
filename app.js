@@ -270,15 +270,27 @@ async function requestSession(req) {
     const principal = await authCenter.principalOf(req);
     if (principal && principal.type === 'account') {
       const perms = authCenter.permissionsOf(principal);
-      if (perms.has('*') || perms.has(authCenter.P.ADMIN_READ)) {
+      // 真平台主体：'*' 全权，或（无商家/机构绑定的）平台管理读账号。
+      // 有 vendor_id 的账号即使带 admin.read（如 operator_admin）也按 vendor 归属隔离，
+      // 防止运营商账号借管理读权限看到全部项目。
+      const isTruePlatform = perms.has('*') ||
+        (perms.has(authCenter.P.ADMIN_READ) && !principal.account.vendor_id && !principal.account.org_id);
+      if (isTruePlatform) {
         return { role: 'platform', account: principal.account, roles: principal.roles, principal };
       }
       if (principal.account.vendor_id) {
         return { role: 'vendor', vendorId: principal.account.vendor_id, account: principal.account, roles: principal.roles, principal };
       }
+      if (perms.has(authCenter.P.ADMIN_READ)) {
+        // 有机构绑定的管理读账号（gov/bank/holding 等）：读按平台，写仍由权限闸收紧
+        return { role: 'platform', account: principal.account, roles: principal.roles, principal };
+      }
     }
   } catch (_) { /* 账号库暂不可用时退回旧通道 */ }
-  if (await isAdminSessionAuthorized(req)) return { role: 'platform' };
+  // 兜底仅限旧式 admin token（账号中心之前的会话）。
+  // 不能用 isAdminSessionAuthorized：它接受一切合法账号会话，会把 gov_viewer 等
+  // 非平台账号在这里升格成 platform（越权看全量）——账号主体已在上方按角色判定。
+  if (verifyAdminLoginToken(extractBearerToken(req))) return { role: 'platform' };
   return null;
 }
 
