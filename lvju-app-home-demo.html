@@ -252,7 +252,7 @@
         '<span class="star">' + esc(star) + '</span><span class="like">♡</span>' +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>精选</span>') + '</div>' +
-        '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/月起</small>' : '价格面议') + '</b><a class="bk" href="lvju-app-detail.html">预订</a></div></div>' +
+        '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/月起</small>' : '价格面议') + '</b><a class="bk" href="lvju-app-detail.html?id=' + p.id + '">预订</a></div></div>' +
         '</div>';
     }).join('');
   }).catch(function(){

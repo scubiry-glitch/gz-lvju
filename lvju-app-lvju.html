@@ -91,7 +91,7 @@
       var img = p.cover_image
         ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="img s-xijiang">';
-      return '<a class="mcard" href="lvju-app-detail.html">' +
+      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' +
         img + (star ? star : '') + '<span class="like">♡</span>' +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +

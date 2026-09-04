@@ -74,25 +74,30 @@
       <div class="act"><span>♡</span><span>⤴</span></div>
     </div>
 
-    <div class="pd-hero s-xijiang">
+    <div class="pd-hero s-xijiang" id="dHero">
       <div class="badge">
-        <span class="star">★ 4.9 五星旅居</span>
-        <div class="nm">云上观景惠居</div>
-        <div class="lo">黔东南州 · 西江千户苗寨 · 整栋可包</div>
+        <span class="star" id="dStars">★ 4.9 五星旅居</span>
+        <div class="nm" id="dName">云上观景惠居</div>
+        <div class="lo" id="dLoc">黔东南州 · 西江千户苗寨 · 整栋可包</div>
       </div>
-      <div class="dots">1 / 18</div>
+      <div class="dots" id="dDots">1 / 18</div>
     </div>
 
     <div class="block">
-      <div class="bt">苗寨核心 · 日落观景台</div>
-      <div class="bs">整栋 6 室 · 可住 10 人 · 含双早 · 旅居管家入驻</div>
-      <div class="tagline"><span>苗寨核心位</span><span>日落观景台</span><span>含双早</span><span>管家服务</span><span>地暖</span><span>可包栋</span></div>
+      <div class="bt" id="dTitle">苗寨核心 · 日落观景台</div>
+      <div class="bs" id="dSpec">整栋 6 室 · 可住 10 人 · 含双早 · 旅居管家入驻</div>
+      <div class="tagline" id="dTagline"><span>苗寨核心位</span><span>日落观景台</span><span>含双早</span><span>管家服务</span><span>地暖</span><span>可包栋</span></div>
+    </div>
+
+    <div class="block" id="dUnitsBlock">
+      <div class="bt">可预订房型</div>
+      <div id="dUnits" style="margin-top:6px;"><div style="font-size:12px;color:var(--muted);padding:8px 0;">加载中…</div></div>
     </div>
 
     <div class="block">
-      <div class="bt">旅居星级评价 · 5 维</div>
-      <div class="bs">按旅居住宿维度评定</div>
-      <div style="margin-top:8px;">
+      <div class="bt" id="dRateTitle">旅居星级评价 · 5 维</div>
+      <div class="bs" id="dRateNote">按旅居住宿维度评定</div>
+      <div style="margin-top:8px;" id="dRateRows">
         <div class="rate-row"><span class="k">环境景观</span><span class="bar"><i style="width:96%"></i></span><span class="v">4.9</span></div>
         <div class="rate-row"><span class="k">服务品质</span><span class="bar"><i style="width:92%"></i></span><span class="v">4.7</span></div>
         <div class="rate-row"><span class="k">设施配套</span><span class="bar"><i style="width:88%"></i></span><span class="v">4.5</span></div>
@@ -158,12 +163,94 @@
   </div>
 
   <div class="cta">
-    <div class="p"><b>¥588<small> /双周起</small></b><span>含双早 · 可包栋 · 最短14天</span></div>
+    <div class="p" id="dCta"><b>¥588<small> /双周起</small></b><span>含双早 · 可包栋 · 最短14天</span></div>
     <div class="heart">♡</div>
     <a class="btn" href="lvju-app-booking.html">立即预订</a>
   </div>
 </div>
 <script src="screens/_qr.js"></script>
+<script>
+/* 房源详情统一读库：GET /api/juzhu/projects/:id（公网白名单）。
+   ?id= 缺省时保留本页示例内容（原型基线）。评级维度按频道：
+   rental=好房子4维，minsu=旅居彩贝5维（与 RATING_DIMS 服务端定义一致）。 */
+(function(){
+  var q = new URLSearchParams(location.search);
+  var id = parseInt(q.get('id') || '', 10);
+  if (!id) {
+    var b = document.createElement('div');
+    b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e;';
+    b.textContent = '示例内容 · 返回「找房」列表点击具体房源查看库内真实数据';
+    document.querySelector('.scr').insertBefore(b, document.querySelector('.pd-hero'));
+    return;
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  var DIMS = {
+    rental: [ {k:'comfort',l:'舒适'}, {k:'green',l:'绿色'}, {k:'tech',l:'智慧'}, {k:'safety',l:'安全'} ],
+    minsu:  [ {k:'scenery',l:'环境景观'}, {k:'facilities',l:'设施配套'}, {k:'service',l:'服务品质'}, {k:'location',l:'区位交通'}, {k:'culture',l:'在地体验'} ]
+  };
+  Promise.all([
+      fetch('/api/juzhu/projects/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/juzhu/projects/' + id + '/units').then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    ]).then(function(rs){
+    var d = rs[1] || {};
+    var p = Object.assign({}, rs[0] || {}, d.project || {}), units = d.units || [];
+    function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
+    p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); });
+    var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
+    r = r || {};
+    document.getElementById('dName').textContent = p.name || '';
+    document.getElementById('dLoc').textContent = p.address || '';
+    if (p.cover_image) document.getElementById('dHero').style.background = 'url(' + p.cover_image + ') center/cover';
+    var st = p.rating_status || 'draft';
+    var star = document.getElementById('dStars');
+    if (st === 'passed' && r.stars) { star.textContent = '★ ' + r.stars + ' 星 · ' + (r.star_label || ''); }
+    else if (st === 'pending') { star.textContent = '评级复核中'; }
+    else { star.textContent = '待评级'; }
+    var tags = p.tags || [];
+    document.getElementById('dTitle').textContent = tags[0] ? tags[0] + ' · 旅居好房' : '旅居好房';
+    var addr = p.address || '';
+    document.getElementById('dSpec').textContent = (p.managed_unit_count ? '在管房源 ' + p.managed_unit_count + ' 套 · ' : '') + addr;
+    document.getElementById('dTagline').innerHTML = tags.length
+      ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('')
+      : '<span>在架</span>';
+    // 户型/在管房源
+    var uEl = document.getElementById('dUnits');
+    uEl.innerHTML = units.length ? units.map(function(u){
+      var pr = u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small>/月起</small>' : (u.price_total ? '¥' + fmt(u.price_total) + '<small>万</small>' : '价格面议');
+      return '<div class="rate-row" style="justify-content:space-between;">' +
+        '<span class="k" style="min-width:0;flex:1;">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</span>' +
+        '<span class="v" style="font-family:var(--serif);color:var(--gold-deep);">' + pr + '</span></div>';
+    }).join('') : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">该项目暂无户型明细</div>';
+    document.getElementById('dUnitsBlock').style.display = '';
+    // 评级维度
+    var dimsDef = DIMS[p.channel] || [];
+    document.getElementById('dRateTitle').textContent = p.channel === 'minsu' ? '旅居彩贝评价 · 5 维' : '好房子评价 · 4 维';
+    if (st === 'passed' && r.dims && dimsDef.length) {
+      document.getElementById('dRateRows').innerHTML = dimsDef.map(function(d){
+        var v = +r.dims[d.k] || 0;
+        return '<div class="rate-row"><span class="k">' + d.l + '</span><span class="bar"><i style="width:' + Math.round(v / 5 * 100) + '%"></i></span><span class="v">' + v.toFixed(1) + '</span></div>';
+      }).join('') + '<div class="bs" style="margin-top:8px;">综合 <b>' + (r.score || '—') + '</b> 分 · 评定编号 <b>' + esc(r.code || '') + '</b></div>';
+    } else if (st === 'pending') {
+      document.getElementById('dRateRows').innerHTML = '<div class="bs">评级已提交，中台复核中</div>';
+    } else {
+      document.getElementById('dRateRows').innerHTML = '<div class="bs">该项目尚未完成评级自评</div>';
+    }
+    // 底部价格
+    var price = p.price_from;
+    if (price == null && units.length) {
+      price = Math.min.apply(null, units.map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; }));
+    }
+    document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
+      '<span>' + (p.is_featured ? '平台精选 · ' : '') + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
+  }).catch(function(){
+    var b = document.createElement('div');
+    b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;font-size:12px;color:#991b1b;';
+    b.textContent = '房源加载失败（id=' + id + '）· 请返回列表重试';
+    document.querySelector('.scr').insertBefore(b, document.querySelector('.pd-hero'));
+  });
+})();
+</script>
 <script>
 /* 房源 / 管家 验证卡：本地离线生成真二维码，编码 portal-verify 真实绝对地址 */
 document.querySelectorAll('a.qrlink').forEach(function(a){

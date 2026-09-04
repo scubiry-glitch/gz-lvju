@@ -57,11 +57,11 @@
       <div class="act"><span>♡</span><span>⤴</span></div>
     </div>
 
-    <div class="pd-hero s-city">
+    <div class="pd-hero s-city" id="dHero">
       <div class="badge">
-        <span class="star">在售 · 现房</span>
-        <div class="nm">中铁·山语城</div>
-        <div class="lo">贵阳 · 观山湖区 · 高层社区</div>
+        <span class="star" id="dStars">在售 · 现房</span>
+        <div class="nm" id="dName">中铁·山语城</div>
+        <div class="lo" id="dLoc">贵阳 · 观山湖区 · 高层社区</div>
       </div>
       <div class="dots">1 / 24</div>
     </div>
@@ -69,20 +69,20 @@
     <div class="priceband">
       <div>
         <div class="up">参考均价</div>
-        <div class="tp">¥9,800<small> /㎡起</small></div>
+        <div class="tp" id="dPrice">¥9,800<small> /㎡起</small></div>
       </div>
-      <div class="dp">三居总价<b>¥98 万起</b>首付约 ¥29.4 万起</div>
+      <div class="dp" id="dPriceSub">三居总价<b>¥98 万起</b>首付约 ¥29.4 万起</div>
     </div>
 
     <div class="block">
-      <div class="bt">观山湖核心 · 地铁现房社区</div>
-      <div class="bs">高层 89–128㎡ · 三居为主 · 精装交付 · 即买即住</div>
-      <div class="tagline"><span>地铁盘</span><span>名校学区</span><span>现房</span><span>低密度</span><span>品牌开发商</span><span>精装交付</span></div>
+      <div class="bt" id="dTitle">观山湖核心 · 地铁现房社区</div>
+      <div class="bs" id="dSpec">高层 89–128㎡ · 三居为主 · 精装交付 · 即买即住</div>
+      <div class="tagline" id="dTagline"><span>地铁盘</span><span>名校学区</span><span>现房</span><span>低密度</span><span>品牌开发商</span><span>精装交付</span></div>
     </div>
 
     <div class="block">
       <div class="bt">在售户型</div>
-      <div class="htypes">
+      <div class="htypes" id="dUnits">
         <div class="ht"><div class="pic s-city"></div><div class="tx"><div class="h">A · 89㎡</div><div class="a">三房两厅 · 朝南</div><div class="pp">¥98 万起</div></div></div>
         <div class="ht"><div class="pic s-river"></div><div class="tx"><div class="h">B · 108㎡</div><div class="a">三房两卫 · 南北通透</div><div class="pp">¥118 万起</div></div></div>
         <div class="ht"><div class="pic s-country"></div><div class="tx"><div class="h">C · 128㎡</div><div class="a">四房两卫 · 双阳台</div><div class="pp">¥142 万起</div></div></div>
@@ -99,7 +99,7 @@
       <div class="kv"><span class="k">产权年限</span><span class="v">70 年</span></div>
       <div class="kv"><span class="k">容积率 / 绿化率</span><span class="v">2.4 / 38%</span></div>
       <div class="kv"><span class="k">物业费</span><span class="v">¥2.8 /㎡·月</span></div>
-      <div class="kv"><span class="k">开发商</span><span class="v">中铁置业（贵州）</span></div>
+      <div class="kv"><span class="k">开发商</span><span class="v" id="dVendor">中铁置业（贵州）</span></div>
     </div>
 
     <div class="block">
@@ -148,6 +148,51 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   catch(e){ img.src='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data='+encodeURIComponent(target); }
   img.title='扫码直达：'+target;
 });
+</script>
+<script>
+/* 楼盘详情统一读库：GET /api/juzhu/projects/:id；?id= 缺省时保留示例内容。 */
+(function(){
+  var id = parseInt(new URLSearchParams(location.search).get('id') || '', 10);
+  if (!id) return;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  Promise.all([
+      fetch('/api/juzhu/projects/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/juzhu/projects/' + id + '/units').then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    ]).then(function(rs){
+    var d = rs[1] || {};
+    var p = Object.assign({}, rs[0] || {}, d.project || {}), units = d.units || [];
+    function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
+    p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); });
+    document.getElementById('dName').textContent = p.name || '';
+    document.getElementById('dLoc').textContent = p.address || '';
+    if (p.cover_image) document.getElementById('dHero').style.background = 'url(' + p.cover_image + ') center/cover';
+    var tags = p.tags || [];
+    document.getElementById('dTagline').innerHTML = tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在售</span>';
+    document.getElementById('dTitle').textContent = tags[0] ? tags[0] + ' · 楼盘速览' : '楼盘速览';
+    document.getElementById('dSpec').textContent = (units.length ? '在售户型 ' + units.length + ' 个 · ' : '') + (p.address || '');
+    if (p.price_from != null) document.getElementById('dPrice').innerHTML = '¥' + fmt(p.price_from) + '<small> /㎡起</small>';
+    var totals = units.map(function(u){ return u.price_total; }).filter(function(v){ return v > 0; });
+    if (totals.length) {
+      var min = Math.min.apply(null, totals);
+      document.getElementById('dPriceSub').innerHTML = '总价 <b>¥' + fmt(min) + ' 万起</b>（' + units.length + ' 个在售户型）';
+    }
+    var vname = p.vendor_name || '';
+    var vEl = document.getElementById('dVendor'); if (vEl && vname) vEl.textContent = vname;
+    document.getElementById('dUnits').innerHTML = units.length ? units.map(function(u, i){
+      var pic = u.cover_image ? ' style="background:url(' + esc(u.cover_image) + ') center/cover;"' : '';
+      return '<div class="ht"><div class="pic"' + pic + '></div><div class="tx">' +
+        '<div class="h">' + esc(u.name) + '</div>' +
+        '<div class="a">' + esc(u.layout_label || '') + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</div>' +
+        '<div class="pp">' + (u.price_total ? '¥' + fmt(u.price_total) + ' 万' : (p.price_from ? '¥' + fmt(p.price_from) + ' /㎡起' : '价格面议')) + '</div></div></div>';
+    }).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">暂无在售户型明细</div>';
+    var st = p.rating_status || 'draft';
+    var star = document.getElementById('dStars');
+    star.textContent = (p.status === 'online' ? '在售' : '待售') + (st === 'passed' ? ' · 已评级' : '');
+  }).catch(function(){
+    document.getElementById('dName').textContent = '房源加载失败（id=' + id + '）';
+  });
+})();
 </script>
 </body>
 </html>

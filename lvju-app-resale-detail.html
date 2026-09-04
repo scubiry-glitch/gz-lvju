@@ -51,12 +51,12 @@
       <div class="act"><span>♡</span><span>⤴</span></div>
     </div>
 
-    <div class="pd-hero s-city">
+    <div class="pd-hero s-city" id="dHero">
       <span class="vrtag">▶ VR 实勘看房</span>
       <div class="badge">
-        <span class="star">真房源认证</span>
-        <div class="nm">世纪城 · 南北三居</div>
-        <div class="lo">贵阳 · 观山湖 · 88㎡ · 中楼层</div>
+        <span class="star" id="dStars">真房源认证</span>
+        <div class="nm" id="dName">世纪城 · 南北三居</div>
+        <div class="lo" id="dLoc">贵阳 · 观山湖 · 88㎡ · 中楼层</div>
       </div>
       <div class="dots">1 / 16</div>
     </div>
@@ -64,15 +64,15 @@
     <div class="priceband">
       <div>
         <div class="up">挂牌总价</div>
-        <div class="tp">¥128<small> 万</small></div>
+        <div class="tp" id="dPrice">¥128<small> 万</small></div>
       </div>
-      <div class="dp">单价 ¥1.45 万/㎡<b>首付约 ¥38.4 万</b>参考月供 ¥4,860</div>
+      <div class="dp" id="dPriceSub">单价 ¥1.45 万/㎡<b>首付约 ¥38.4 万</b>参考月供 ¥4,860</div>
     </div>
 
     <div class="block">
-      <div class="bt">满五唯一 · 南北通透三居</div>
-      <div class="bs">88㎡ · 3 室 2 厅 1 卫 · 中楼层(12/26) · 朝南 · 精装</div>
-      <div class="tagline"><span>满五唯一</span><span>地铁</span><span>南北通透</span><span>电梯</span><span>精装</span><span>近商圈</span></div>
+      <div class="bt" id="dTitle">满五唯一 · 南北通透三居</div>
+      <div class="bs" id="dSpec">88㎡ · 3 室 2 厅 1 卫 · 中楼层(12/26) · 朝南 · 精装</div>
+      <div class="tagline" id="dTagline"><span>满五唯一</span><span>地铁</span><span>南北通透</span><span>电梯</span><span>精装</span><span>近商圈</span></div>
     </div>
 
     <div class="block" style="padding-bottom:6px;">
@@ -137,6 +137,48 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   catch(e){ img.src='https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=0&data='+encodeURIComponent(target); }
   img.title='扫码直达：'+target;
 });
+</script>
+<script>
+/* 二手详情（一房一档）读库：GET /api/juzhu/projects/:id；?id= 缺省时保留示例内容。
+   ?unit= 可选指定具体户型号（来自列表页），缺省取第一个户型。 */
+(function(){
+  var q = new URLSearchParams(location.search);
+  var id = parseInt(q.get('id') || '', 10);
+  if (!id) return;
+  var unitId = parseInt(q.get('unit') || '', 10) || 0;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  Promise.all([
+      fetch('/api/juzhu/projects/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('/api/juzhu/projects/' + id + '/units').then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    ]).then(function(rs){
+    var d = rs[1] || {};
+    var p = Object.assign({}, rs[0] || {}, d.project || {}), units = d.units || [];
+    function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
+    p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); });
+    var u = units.filter(function(x){ return x.id === unitId; })[0] || units[0] || {};
+    var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
+    r = r || {};
+    document.getElementById('dName').textContent = (p.name || '') + (u.name ? ' · ' + u.name : '');
+    document.getElementById('dLoc').textContent = p.address || '';
+    if (u.cover_image) document.getElementById('dHero').style.background = 'url(' + u.cover_image + ') center/cover';
+    else if (p.cover_image) document.getElementById('dHero').style.background = 'url(' + p.cover_image + ') center/cover';
+    var total = u.price_total != null ? u.price_total : p.price_total;
+    document.getElementById('dPrice').innerHTML = total != null ? '¥' + fmt(total) + '<small> 万</small>' : '价格面议';
+    var unitPrice = (u.area_sqm && total) ? '单价 ¥' + (Math.round(total * 10000 / u.area_sqm / 100) / 100).toFixed(2) + ' 万/㎡' : '';
+    document.getElementById('dPriceSub').innerHTML = unitPrice + '<b>首付约 ¥' + (total ? fmt(Math.round(total * 0.3 * 10) / 10) : '—') + ' 万</b>';
+    document.getElementById('dTitle').textContent = ((u.tags || p.tags || [])[0] || '在售') + ' · 好房速览';
+    document.getElementById('dSpec').textContent = [u.area_sqm ? fmt(u.area_sqm) + '㎡' : '', u.layout_label || '', p.address || ''].filter(Boolean).join(' · ');
+    var tags = (u.tags || p.tags || []);
+    document.getElementById('dTagline').innerHTML = tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在售</span>';
+    var st = p.rating_status || 'draft';
+    var star = document.getElementById('dStars');
+    star.textContent = st === 'passed' && r.stars ? '★ ' + r.stars + ' 星真房源' : '真房源认证';
+  }).catch(function(err){
+    console.error('[resale-detail] 渲染失败:', err && (err.stack || err.message));
+    document.getElementById('dName').textContent = '房源加载失败（id=' + id + '）';
+  });
+})();
 </script>
 </body>
 </html>

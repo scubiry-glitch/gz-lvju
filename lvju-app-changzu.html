@@ -82,7 +82,7 @@
       var th = u.cover_image
         ? '<div class="th" style="background:url(' + esc(u.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="th s-city">';
-      return '<a class="lrow" href="lvju-app-detail.html">' + th +
+      return '<a class="lrow" href="lvju-app-detail.html?id=' + p.id + '">' + th +
         '<span class="star">' + esc(u.layout_label || '在租') + '</span></div>' +
         '<div class="info"><div class="nm">' + esc(u.name) + '</div>' +
         '<div class="meta">' + esc(meta) + '</div>' +

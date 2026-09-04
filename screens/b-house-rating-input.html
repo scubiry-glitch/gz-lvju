@@ -140,8 +140,8 @@
     <div class="page-header">
       <div>
         <div class="breadcrumb"><a href="b-listing-mgmt.html">← 房源管理</a></div>
-        <h1>★ 好房子评级 · 自评录入</h1>
-        <div class="sub">梧桐公馆 3-0903 · NJBZF-03891 · 按 <a href="d-property-standard.html" style="color:var(--accent);">房的标准</a> 55 项自查清单逐项勾选 · 含<b style="color:#16a34a;">物资 6 类（家具/家电/建材/智能锁/涂料/卫浴）</b> + 服务 4 类 + 其他 45 项三层</div>
+        <h1 id="rateTitle">★ 好房子评级 · 自评录入</h1>
+        <div class="sub" id="rateSub">梧桐公馆 3-0903 · NJBZF-03891 · 按 <a href="d-property-standard.html" style="color:var(--accent);">房的标准</a> 55 项自查清单逐项勾选 · 含<b style="color:#16a34a;">物资 6 类（家具/家电/建材/智能锁/涂料/卫浴）</b> + 服务 4 类 + 其他 45 项三层</div>
       </div>
       <div class="right">
         <button class="btn btn-ghost">导入上次自评</button>
@@ -156,7 +156,7 @@
         <div class="stars">★★★★<span style="opacity:0.3;">★</span></div>
         <div class="num"><b>4</b> 星 · <b>82</b> / 100 分</div>
       </div>
-      <div class="dims">
+      <div class="dims" id="dimsBox">
         <div class="drow"><span>🛋 舒适</span><div class="bar"><div class="fill" style="width:82%; background:var(--comfort);"></div></div><span class="v">4.1</span></div>
         <div class="drow"><span>🌿 绿色</span><div class="bar"><div class="fill" style="width:68%; background:var(--green);"></div></div><span class="v">3.4</span></div>
         <div class="drow"><span>📡 科技</span><div class="bar"><div class="fill" style="width:92%; background:var(--tech);"></div></div><span class="v">4.6</span></div>
@@ -324,5 +324,35 @@
 
   <script src="_region.js?v=2"></script>
   <script src="_nav.js"></script>
+  <script>
+  /* 评级口径按频道（?channel=，默认 rental）：rental=好房子4维，minsu=旅居彩贝5维。
+     维度键与 服务端 RATING_DIMS / juzhu-admin 完全一致。 */
+  (function(){
+    var ch = (new URLSearchParams(location.search).get('channel') || 'rental').toLowerCase();
+    var DIMS = {
+      rental: [
+        { k:'comfort', i:'🛋', l:'舒适', v:'4.1', w:82 },
+        { k:'green',   i:'🌿', l:'绿色', v:'3.4', w:68 },
+        { k:'tech',    i:'📡', l:'智慧', v:'4.6', w:92 },
+        { k:'safety',  i:'🛡', l:'安全', v:'4.4', w:88 }
+      ],
+      minsu: [
+        { k:'scenery',    i:'🏞', l:'环境景观', v:'4.9', w:96 },
+        { k:'facilities', i:'🛁', l:'设施配套', v:'4.5', w:88 },
+        { k:'service',    i:'🛎', l:'服务品质', v:'4.7', w:92 },
+        { k:'location',   i:'🚗', l:'区位交通', v:'4.3', w:84 },
+        { k:'culture',    i:'🧵', l:'在地体验', v:'5.0', w:98 }
+      ]
+    };
+    var def = DIMS[ch] || DIMS.rental;
+    if (ch === 'minsu') {
+      document.getElementById('rateTitle').textContent = '★ 旅居彩贝评级 · 自评录入（5 维）';
+      document.getElementById('rateSub').innerHTML = '按 <a href="../lvju-rating-standard.html" style="color:var(--accent);">旅居星级标准</a> 五大维度加权 100 分评定：环境景观 / 设施配套 / 服务品质 / 区位交通 / 在地体验';
+    }
+    document.getElementById('dimsBox').innerHTML = def.map(function(d){
+      return '<div class="drow"><span>' + d.i + ' ' + d.l + '</span><div class="bar"><div class="fill" style="width:' + d.w + '%;"></div></div><span class="v">' + d.v + '</span></div>';
+    }).join('');
+  })();
+  </script>
 </body>
 </html>

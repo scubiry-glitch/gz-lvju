@@ -56,6 +56,45 @@
 
   // ============ 6 系列定义（单一数据源） ============
   const SERIES = {
+    // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
+    lvju: {
+      name: '旅居找房 App（C 端）', short: '旅居 · C 端移动原型', icon: '🏔',
+      primary: '#0c4d44', primaryDeep: '#07352f',
+      user: { avatar: '旅', name: '旅居客', org: '贝壳旅居 · 贵州' },
+      mobile: true,
+      groups: [
+        { name: '找房 · 全频道', items: [
+          { id: 'home',    label: '频道首页',       href: 'lvju-app-home-demo.html', icon: 'home' },
+          { id: 'lvju',    label: '旅居（短住·候鸟·康养）', href: 'lvju-app-lvju.html',    icon: 'home' },
+          { id: 'minsu',   label: '惠居（整栋·星级·管家）', href: 'lvju-app-minsu.html',   icon: 'home' },
+          { id: 'changzu', label: '长租（整租·合租·月付）', href: 'lvju-app-changzu.html', icon: 'list' },
+          { id: 'newhouse',label: '新房（楼盘·特价房）',   href: 'lvju-app-newhouse.html',icon: 'grid' },
+          { id: 'resale',  label: '二手（在售·真房源）',   href: 'lvju-app-resale.html',  icon: 'grid' },
+        ]},
+        { name: '房源详情（接库）', items: [
+          { id: 'detail',          label: '房源详情 · 通用',   href: 'lvju-app-detail.html',         icon: 'list' },
+          { id: 'newhouse-detail', label: '新房详情',          href: 'lvju-app-newhouse-detail.html', icon: 'grid' },
+          { id: 'resale-detail',   label: '二手详情（一房一档）', href: 'lvju-app-resale-detail.html',  icon: 'grid' },
+        ]},
+        { name: '交易与我的', items: [
+          { id: 'booking', label: '预订',   href: 'lvju-app-booking.html', icon: 'home' },
+          { id: 'orders',  label: '订单',   href: 'lvju-app-orders.html',  icon: 'list' },
+          { id: 'me',      label: '我的',   href: 'lvju-app-me.html',      icon: 'user' },
+        ]},
+        { name: '标准与验真', items: [
+          { id: 'rating-standard', label: '旅居星级标准', href: 'lvju-rating-standard.html', icon: 'award' },
+          { id: 'overview',        label: '旅居总览蓝图', href: 'lvju-overview.html',        icon: 'grid' },
+        ]},
+      ],
+      tabbar: [
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: '🏠' },
+        { id: 'search', label: '找房', href: 'lvju-app-lvju.html',      icon: '🔎' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: '📖' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: '🧾' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: '👤' },
+      ],
+    },
+
     g: {
       name: R.deptName + '监管端', short: R.channel + ' · G 端', icon: '⚖',
       primary: '#1e40af', primaryDeep: '#1e3a8a',

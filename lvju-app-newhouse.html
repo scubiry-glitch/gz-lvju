@@ -82,7 +82,7 @@
         : '<div class="th s-city">';
       var price = p.price_total != null ? '¥' + fmt(p.price_total) + '<small> 万起</small>'
         : (p.price_from != null ? '¥' + fmt(p.price_from) + '<small> /㎡起</small>' : '价格面议');
-      return '<a class="lrow" href="lvju-app-newhouse-detail.html">' + th +
+      return '<a class="lrow" href="lvju-app-newhouse-detail.html?id=' + p.id + '">' + th +
         '<span class="star">在售</span></div>' +
         '<div class="info"><div class="nm">' + esc(p.name) + '</div>' +
         '<div class="meta">' + esc(meta) + '</div>' +

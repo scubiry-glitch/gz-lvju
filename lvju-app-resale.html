@@ -88,7 +88,7 @@
       var th = (u.cover_image || p.cover_image)
         ? '<div class="th" style="background:url(' + esc(u.cover_image || p.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="th s-city">';
-      return '<a class="lrow" href="lvju-app-resale-detail.html">' + th +
+      return '<a class="lrow" href="lvju-app-resale-detail.html?id=' + p.id + '&unit=' + u.id + '">' + th +
         '<span class="star">在售</span></div>' +
         '<div class="info"><div class="nm">' + esc(u.name ? p.name + ' · ' + u.name : p.name) + '</div>' +
         '<div class="meta">' + esc(meta) + '</div>' +
