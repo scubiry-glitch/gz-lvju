@@ -425,6 +425,7 @@ function isVendorHmacPath(urlPath, method) {
 function isCEndPublicApi(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
+  if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
   if (m !== 'GET') return false;
   const exact = new Set([
@@ -811,6 +812,12 @@ function maskPhone(phone) {
   return '匿名用户';
 }
 
+// 标准打码：138****1234（预订响应/列表一律用它，规则10：完整手机号只入库不回显）
+function maskPhoneStd(phone) {
+  const s = String(phone || '').trim();
+  return /^\d{11}$/.test(s) ? s.slice(0, 3) + '****' + s.slice(7) : s.slice(0, 3) + '****';
+}
+
 function reviewReply(vendorName, score) {
   if (score >= 5) return (vendorName || '商家') + '：感谢认可，我们会继续按认证标准完成每次上门服务。';
   if (score >= 4) return (vendorName || '商家') + '：感谢反馈，我们会继续优化服务细节与响应体验。';
@@ -938,6 +945,27 @@ async function ensureSchemaRun() {
         sort_order INT NOT NULL DEFAULT 0,
         cover_image VARCHAR(500),
         UNIQUE KEY uk_project_slug (project_id, slug)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS booking_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_no VARCHAR(32) NOT NULL,
+        project_id INT NOT NULL,
+        unit_id INT,
+        channel VARCHAR(16) NOT NULL,
+        city_id INT,
+        owner_vendor_id INT NOT NULL,
+        contact_name VARCHAR(64) NOT NULL,
+        contact_phone VARCHAR(32) NOT NULL,
+        checkin VARCHAR(10) NOT NULL,
+        checkout VARCHAR(10) NOT NULL,
+        nights INT NOT NULL,
+        price_total INT NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        created_at VARCHAR(32) NOT NULL,
+        updated_at VARCHAR(32) NOT NULL,
+        UNIQUE KEY uk_order_no (order_no),
+        KEY idx_bo_vendor (owner_vendor_id, status),
+        KEY idx_bo_project (project_id)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS photos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -3123,6 +3151,132 @@ async function handleApiDirect(urlPath, qs, req, res) {
         params
       );
       return jsonReply(res, rows);
+    }
+
+    // ===== 旅居预订（booking_orders）：C 端公开下单/查单/取消 + 商家确认 =====
+
+    // POST /api/juzhu/booking —— 公开下单（规则10：手机号只入库，响应不回显）
+    if (urlPath === '/api/juzhu/booking' && req.method === 'POST') {
+      const body = await readBody(req);
+      const projectId = parseInt(body.project_id, 10);
+      const unitId = body.unit_id ? parseInt(body.unit_id, 10) : null;
+      const name = String(body.contact_name || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      const checkin = String(body.checkin || '').trim();
+      const checkout = String(body.checkout || '').trim();
+      if (!projectId || !name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '项目、联系人、11 位手机号为必填' }, 400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(checkin) || !/^\d{4}-\d{2}-\d{2}$/.test(checkout)) return jsonReply(res, { error: '日期格式须为 YYYY-MM-DD' }, 400);
+      const nights = Math.round((new Date(checkout) - new Date(checkin)) / 864e5);
+      if (!(nights >= 1)) return jsonReply(res, { error: '离店须晚于入住至少 1 晚' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [projs] = await conn.execute('SELECT id, channel, status, price_from, owner_vendor_id, city_id FROM projects WHERE id=?', [projectId]);
+        const proj = projs[0];
+        if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
+        if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
+        if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
+        let perNight = 0;
+        if (unitId) {
+          const [us] = await conn.execute('SELECT id, project_id, rent_monthly FROM units WHERE id=?', [unitId]);
+          if (!us.length || us[0].project_id !== projectId) { conn.end(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
+          perNight = us[0].rent_monthly ? Math.round(us[0].rent_monthly / 30) : 0;
+        }
+        if (!perNight) perNight = proj.channel === 'minsu' ? (proj.price_from || 0) : (proj.price_from ? Math.round(proj.price_from / 30) : 0);
+        const priceTotal = perNight * nights;
+        const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
+        const [ins] = await conn.execute(
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,created_at,updated_at)
+           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)`,
+          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, name, phone, checkin, checkout, nights, priceTotal, now, now]
+        );
+        const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
+        await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal });
+      } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/booking/lookup —— order_no + 手机号 双因子查单（规则9：禁止 ?phone= 匿名旁路）
+    if (urlPath === '/api/juzhu/booking/lookup' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const rows = await queryRows('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
+      if (!rows.length) return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404);
+      const o = rows[0];
+      return jsonReply(res, {
+        order: {
+          order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
+          contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
+          checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
+          status: o.status, created_at: o.created_at,
+        },
+      });
+    }
+
+    // POST /api/juzhu/booking/cancel —— 用户取消自己的 pending
+    if (urlPath === '/api/juzhu/booking/cancel' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
+        if (!rows.length) { conn.end(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute("UPDATE booking_orders SET status='cancelled', updated_at=? WHERE id=?", [now, rows[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
+      } finally { await conn.end(); }
+    }
+
+    // GET /api/juzhu/vendor/booking/orders —— vendor 只见自己；platform 全量（可 ?status=）
+    if (urlPath === '/api/juzhu/vendor/booking/orders' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
+                        b.nights, b.price_total, b.status, b.created_at,
+                        b.contact_name, b.contact_phone, p.name AS project_name
+                 FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE 1=1`;
+      const params = [];
+      if (sess.role === 'vendor') { sql += ' AND b.owner_vendor_id=?'; params.push(sess.vendorId); }
+      const bqp = new URLSearchParams(qs);
+      if (bqp.get('status')) { sql += ' AND b.status=?'; params.push(bqp.get('status')); }
+      sql += ' ORDER BY b.id DESC LIMIT 200';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, {
+        role: sess.role,
+        items: rows.map((o) => Object.assign({}, o, { contact_phone: maskPhoneStd(o.contact_phone) })),
+      });
+    }
+
+    // POST /api/juzhu/vendor/booking/:id/status —— 商家确认/取消（owner 校验）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/booking\/(\d+)\/status$/);
+      if (m && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        const status = String(body.status || '');
+        if (!['confirmed', 'cancelled'].includes(status)) return jsonReply(res, { error: 'status 须为 confirmed/cancelled' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE id=?', [parseInt(m[1], 10)]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
+            conn.end();
+            return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
+          }
+          if (rows[0].status === 'cancelled') { conn.end(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          await conn.execute('UPDATE booking_orders SET status=?, updated_at=? WHERE id=?', [status, now, rows[0].id]);
+          await conn.commit();
+          return jsonReply(res, { ok: true, order_no: rows[0].order_no, status });
+        } finally { await conn.end(); }
+      }
     }
 
     // ===== 商家后台（vendor-admin，账号中心会话，scope=vendor；与 /api/juzhu/vendor/* 并存）=====

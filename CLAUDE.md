@@ -136,3 +136,16 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 ## 规则 14 · 脚本一律用 Node（mysql2），不用 Python
 
 一切数据库操作（DDL/DML/迁移/备份）、一次性脚本、数据验证脚本、联调与回归测试用 **Node + `mysql2`**（仓库已装依赖；`node -e` 或 `scripts/*.cjs`），**禁止**为跑 SQL 引入或编写 Python（pymysql 等）。与规则 12 同一口径：**只用 Node，Python 存量（`juzhu/server.py`、`juzhu/test_vendor_api.py` 等）仅作历史参考，不运行、不维护、不扩展**。连接配置只从环境变量读（`MYSQL_*` / `JUZHU_DB_*`），禁止把凭证写进脚本或仓库文件。
+
+## 规则 15 · 房源频道模型（channel / topic / 评级口径）
+
+**频道是业务类型，专题是筛选条件，两者不许混。**（2026-09-04 拍板）
+
+- `projects.channel ∈ rental(租赁住宿=长租+旅居，监管同口径) / minsu(惠居民宿) / newhouse(新房) / resale(二手) / trade(卖旧买新)`。
+  **`bzf`（保租房）不再是 channel** —— 它是一个专题（topic），定义存 `settings` KV（key `topic_bzf`，JSON 条件 `{channel:'rental', tags:['保租房']}`），查询走 `GET /api/juzhu/catalog?topic=bzf`。**禁止**在任何表/新代码里把 bzf 当 channel 写死。
+- 频道差异属性放 `projects.ext` / `units.ext`（JSON text），**不为单个频道加专用列、不建分表**。
+- **商家维度必挂**：`projects.owner_vendor_id`（NOT NULL，153=平台自营），商家接口 `/api/juzhu/vendor/*` 一律按它隔离。
+- **评级口径按频道**（服务端 `RATING_DIMS` 是单一数据源，前后端一致）：`rental`=好房子4维（comfort/green/tech/safety）、`minsu`=旅居彩贝5维（scenery/facilities/service/location/culture）、newhouse/resale 暂无。评级编号前缀：rental=`SY-RENT-`、minsu=`MZ-`（旧 `SY-BZF-` 兼容查询）。
+- 上下架 = `projects.status`（online/offline/draft）；C 端 catalog 只出 `online`。
+- 演示数据：`node scripts/demo-listings.cjs seed|clean`（tag「演示」一键清理，禁止用真实商家名）。
+- 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），不与主服务 8766 抢端口。

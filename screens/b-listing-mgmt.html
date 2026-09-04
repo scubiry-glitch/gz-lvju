@@ -114,6 +114,7 @@
       <div class="tab" data-f="rejected">已驳回 <span class="cnt">—</span></div>
       <div class="tab" data-f="draft">未自评 <span class="cnt">—</span></div>
       <div class="tab" data-f="offline">已下架 <span class="cnt">—</span></div>
+      <div class="tab" data-f="bookings">预订 <span class="cnt">—</span></div>
     </div>
 
     <div class="filter-bar">
@@ -407,10 +408,55 @@
     });
   }
 
+  function loadBookings(){
+    get(API + '/vendor/booking/orders').then(function(d){
+      state.bookings = d.items || [];
+      renderBookings();
+    }).catch(function(e){
+      document.getElementById('rows').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#991b1b;padding:24px;">预订加载失败：' + esc(e.message || '') + '</td></tr>';
+    });
+  }
+  function renderBookings(){
+    var bs = state.bookings || [];
+    var ST = { pending: ['待确认', 'rented'], confirmed: ['已确认', 'on'], cancelled: ['已取消', 'danger'] };
+    if (!bs.length) {
+      document.getElementById('rows').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px;">暂无预订</td></tr>';
+    } else {
+      document.getElementById('rows').innerHTML = bs.map(function(o){
+        var st = ST[o.status] || [o.status, ''];
+        var act = '';
+        if (o.status === 'pending' && state.role) {
+          act = '<a data-bact="confirmed" data-bid="' + o.id + '">确认</a>' +
+                '<a class="danger" data-bact="cancelled" data-bid="' + o.id + '">取消</a>';
+        }
+        return '<tr><td colspan="10" style="padding:10px 14px;">' +
+          '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">' +
+            '<span class="pill ' + st[1] + '" style="flex-shrink:0;">' + st[0] + '</span>' +
+            '<b style="font-size:12px;">' + esc(o.order_no) + '</b>' +
+            '<span style="font-size:12px;">' + esc(o.project_name || ('项目#' + o.project_id)) + '</span>' +
+            '<span style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</span>' +
+            '<span style="font-size:12px;font-weight:600;">¥' + fmt(o.price_total) + '</span>' +
+            '<span style="font-size:12px;color:var(--muted);">' + esc(o.contact_name || '') + ' · ' + esc(o.contact_phone || '') + '</span>' +
+            '<span class="row-actions" style="margin-left:auto;">' + act + '</span>' +
+          '</div></td></tr>';
+      }).join('');
+    }
+    document.getElementById('pagInfo').textContent = '预订 · 共 ' + bs.length + ' 笔';
+    document.querySelectorAll('[data-bact]').forEach(function(a){
+      a.onclick = function(){
+        post(API + '/vendor/booking/' + a.getAttribute('data-bid') + '/status', { status: a.getAttribute('data-bact') })
+          .then(function(){ loadBookings(); })
+          .catch(function(e){ alert('操作失败：' + e.message); });
+      };
+    });
+  }
+
   document.querySelectorAll('#tabRow .tab').forEach(function(t){
     t.onclick = function(){
       document.querySelectorAll('#tabRow .tab').forEach(function(x){ x.classList.remove('active'); });
-      t.classList.add('active'); state.tab = t.getAttribute('data-f'); render();
+      t.classList.add('active'); state.tab = t.getAttribute('data-f');
+      if (state.tab === 'bookings') { if (state.role) loadBookings(); else { document.getElementById('rows').innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:24px;">登录后查看预订（无会话为只读视图）</td></tr>'; } return; }
+      render();
     };
   });
   ['fProject','fDistrict','fVendor'].forEach(function(id){

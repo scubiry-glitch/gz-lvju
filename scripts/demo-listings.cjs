@@ -99,6 +99,23 @@ async function ensureVendor(db, v, bcrypt) {
   return r.insertId;
 }
 
+// 清理验收残留：测试商家（vendor_a/b）+ 其测试项目（104/105 等 slug 前缀 test-vendor-）+ 评级记录
+async function cleanTest(db) {
+  const [projects] = await db.query("SELECT id FROM projects WHERE slug LIKE 'test-vendor-%'");
+  for (const p of projects) {
+    await db.execute('DELETE FROM photos WHERE entity_type=? AND entity_id IN (SELECT id FROM units WHERE project_id=?)', ['unit', p.id]);
+    await db.execute('DELETE FROM units WHERE project_id=?', [p.id]);
+    await db.execute('DELETE FROM projects WHERE id=?', [p.id]);
+  }
+  const [vendors] = await db.query("SELECT id FROM jz_vendors WHERE login_name IN ('vendor_a','vendor_b')");
+  for (const v of vendors) {
+    await db.execute('DELETE FROM photos WHERE entity_type=? AND entity_id IN (SELECT id FROM units WHERE project_id IN (SELECT id FROM projects WHERE owner_vendor_id=?))', ['unit', v.id]).catch(() => {});
+    await db.execute('DELETE FROM projects WHERE owner_vendor_id=?', [v.id]);
+    await db.execute('DELETE FROM jz_vendors WHERE id=?', [v.id]);
+  }
+  console.log(`clean-test: 删除测试项目 ${projects.length} 个、测试商家 ${vendors.length} 个（含评级记录）`);
+}
+
 async function clean(db, bcrypt) {
   const [projects] = await db.query(
     "SELECT id FROM projects WHERE JSON_CONTAINS(tags, ?) OR slug LIKE 'demo-%'",
@@ -172,14 +189,15 @@ async function seed(db, bcrypt) {
 
 (async () => {
   const mode = process.argv[2] || '';
-  if (!['seed', 'clean'].includes(mode)) {
-    console.error('用法: node scripts/demo-listings.cjs seed|clean');
+  if (!['seed', 'clean', 'clean-test'].includes(mode)) {
+    console.error('用法: node scripts/demo-listings.cjs seed|clean|clean-test');
     process.exit(1);
   }
   const bcrypt = require('bcryptjs');
   const db = await conn();
   try {
     if (mode === 'seed') await seed(db, bcrypt);
+    else if (mode === 'clean-test') await cleanTest(db);
     else await clean(db, bcrypt);
   } finally {
     await db.end();

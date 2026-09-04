@@ -142,3 +142,21 @@ User=www
 | MySQL | 远程测试库（`juzhu/.env.local` 配置，gitignored），启动前 `set -a; . juzhu/.env.local; set +a` |
 | 日志 | `/var/log/juzhu-api.log` |
 | nginx conf | `/etc/nginx/conf.d/sytest.meizu.life.conf`（改前备份 `.bak.20260904-pre-mysql`） |
+
+## 5. 房源频道模型与新端点速查（2026-09-04，详见 CLAUDE.md 规则 15）
+
+- 频道：`projects.channel ∈ rental/minsu/newhouse/resale/trade`；**bzf 是 topic 不是 channel**（`settings` KV `topic_bzf`）。
+- catalog：`GET /api/juzhu/catalog?city=&channel=&topic=`（三参可组合；`?topic=bzf` = 保租房专题）；只返回 `status='online'`。
+- 商家端（Bearer 会话，按 `owner_vendor_id` 隔离）：
+  - `POST /api/juzhu/vendor/login`（login_name + password）
+  - `GET  /api/juzhu/vendor/projects`（vendor 只见自己；platform 全量，可 `?vendor_id=`）
+  - `PUT  /api/juzhu/vendor/units/:id`、`POST /api/juzhu/vendor/projects/:id/status`（online/offline/draft）
+- 评级：`GET /api/juzhu/ratings?status=&channel=`、`POST /api/juzhu/admin/ratings/:code/review`（platform）；
+  口径 rental=好房子4维 / minsu=彩贝5维，编号前缀 `SY-RENT-` / `MZ-`（旧 `SY-BZF-` 兼容）。
+- 项目详情（C 端公开）：`GET /api/juzhu/projects/:id_or_slug` + `GET /api/juzhu/projects/:id/units`。
+
+## 6. 演示与测试数据（本地库）
+
+- 演示项目：`node scripts/demo-listings.cjs seed|clean`（tag「演示」，含 minsu/newhouse/resale 各 2 个 + 户型）。
+- 验收残留清理：`node scripts/demo-listings.cjs clean-test`（测试商家 vendor_a/b、项目 104/105 及评级记录）。
+- 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），与主服务 8766 隔离。

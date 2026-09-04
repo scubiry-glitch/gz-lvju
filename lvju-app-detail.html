@@ -243,6 +243,20 @@
     }
     document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
       '<span>' + (p.is_featured ? '平台精选 · ' : '') + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
+    // 预订 CTA：带项目/户型/日历日期进下单页
+    var bk = document.querySelector('.cta .btn');
+    if (bk && ['rental', 'minsu'].indexOf(p.channel) >= 0) {
+      bk.href = 'lvju-app-booking.html?id=' + id + (units.length ? '&unit=' + units[0].id : '');
+      bk.addEventListener('click', function(ev){
+        var sum = document.getElementById('calsum');
+        var ci = sum && sum.dataset ? (sum.dataset.ci || '') : '';
+        var co = sum && sum.dataset ? (sum.dataset.co || '') : '';
+        if (ci) { ev.preventDefault(); location.href = bk.href + '&checkin=' + ci + (co ? '&checkout=' + co : ''); }
+      });
+    } else if (bk) {
+      bk.style.opacity = .45;
+      bk.addEventListener('click', function(ev){ ev.preventDefault(); alert('该频道（' + (p.channel || '') + '）暂不支持在线预订'); });
+    }
   }).catch(function(){
     var b = document.createElement('div');
     b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;font-size:12px;color:#991b1b;';
@@ -278,6 +292,11 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   var ctaOrig=ctaP?ctaP.innerHTML:'';
 
   function price(d){var w=d.getDay();return (w===0||w===6)?588:468;}   // 周末 588 / 平日 468
+  function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function syncBooking(){ /* 预订 CTA 带上当前房源/日期（由数据脚本定义） */
+    var a=document.querySelector('.cta .btn');
+    if(a && window.__bookingBase){ a.href = window.__bookingBase + (a.dataset.sep?'':''); }
+  }
   function key(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
   function fmt(d){return (d.getMonth()+1)+'/'+d.getDate();}
   function nights(){return (ci&&co)?Math.round((co-ci)/864e5):0;}
@@ -320,11 +339,12 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   }
 
   function updateSum(){
-    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店</span>'; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
-    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选择离店日期</span>'; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
+    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店</span>'; sum.dataset.ci=''; sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; syncBooking(); return; }
+    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选择离店日期</span>'; sum.dataset.ci=iso(ci); sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; syncBooking(); return; }
     var n=nights(), t=total();
     sum.innerHTML='<span>'+fmt(ci)+' 入住 → '+fmt(co)+' 离店 · '+n+' 晚</span>'
       +'<span class="tot">合计<b>¥'+t.toLocaleString()+'</b></span>';
+    sum.dataset.ci=iso(ci); sum.dataset.co=iso(co); syncBooking();
     if(ctaP) ctaP.innerHTML='<b>¥'+t.toLocaleString()+'<small> / '+n+' 晚</small></b><span>'+fmt(ci)+'–'+fmt(co)+' · 含双早</span>';
   }
 
