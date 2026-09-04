@@ -160,7 +160,9 @@
       contact_name: document.getElementById('fName').value.trim(),
       contact_phone: document.getElementById('fPhone').value.trim()
     };
-    fetch('/api/juzhu/booking', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) })
+    var bHeaders = { 'Content-Type': 'application/json' };
+    try { var bt = localStorage.getItem('BJZ_TOKEN'); if (bt) bHeaders['Authorization'] = 'Bearer ' + bt; } catch (e) {}
+    fetch('/api/juzhu/booking', { method: 'POST', headers: bHeaders, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
         if (!res.ok) { showErr(res.j.error || '提交失败'); return; }

@@ -20,8 +20,28 @@
       <a class="on">预订查单</a><a>全部</a><a>待支付</a><a>待入住</a><a>待评价</a><a>已完成</a>
     </div>
 
+    <div id="loginBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
+      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">登录后自动展示我的预订</div>
+      <div id="lgMsg" style="font-size:11px;color:var(--muted);margin-bottom:10px;">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <input id="lgPhone" placeholder="手机号" inputmode="numeric" maxlength="11" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13px;outline:0;" />
+        <input id="lgPwd" placeholder="密码（≥8位，首登自动注册）" type="password" style="flex:1.4;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13px;outline:0;" />
+      </div>
+      <button id="lgGo" style="width:100%;border:0;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;">密码登录 / 注册</button>
+      <button id="lgSdk" style="width:100%;margin-top:8px;border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-deep);font-weight:700;font-size:13px;border-radius:999px;padding:9px 0;cursor:pointer;display:none;">🐚 贝壳 SDK 登录（检测到 App 环境）</button>
+      <div id="lgErr" style="font-size:11px;color:#991b1b;margin-top:7px;display:none;"></div>
+    </div>
+
+    <div id="myBox" style="margin:14px 14px 0;display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--ink);">📋 我的预订 <span id="myCnt" style="font-size:11px;color:var(--muted);font-weight:400;"></span></div>
+        <a id="myOut" style="font-size:11px;color:var(--muted);cursor:pointer;">退出登录</a>
+      </div>
+      <div id="myList"></div>
+    </div>
+
     <div id="lookupBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 15px;">
-      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">🔍 预订查单 / 取消</div>
+      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">🔍 预订查单 / 取消（免登录）</div>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
         <input id="qNo" placeholder="订单号 BKG-…" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:0;" />
         <input id="qPhone" placeholder="下单手机号" inputmode="numeric" maxlength="11" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:0;" />
@@ -157,6 +177,98 @@
       }).catch(function(){ msg('网络异常，请稍后再试', true); });
   });
   if (q.get('order_no') && q.get('phone')) lookup();
+
+  /* ── 登录（贝壳 SDK 默认 → 密码兜底）+ 我的预订 ── */
+  var lgBox = document.getElementById('loginBox');
+  var myBox = document.getElementById('myBox');
+  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
+  function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
+  function sdkProbe(){
+    // App 内 jsbridge3 / jsbridgesdk 注入的全局；E2E 可用 window.__beikeSdk 模拟
+    return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
+  }
+  function myRender(items){
+    document.getElementById('myCnt').textContent = items.length ? '· ' + items.length + ' 笔' : '';
+    if (!items.length) { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px 2px;">还没有预订 · 去「找房」挑一间</div>'; return; }
+    var ST = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
+    document.getElementById('myList').innerHTML = items.map(function(o){
+      var st = ST[o.status] || [o.status, 'stay'];
+      return '<div class="ordcard">' +
+        '<div class="oh"><span class="shop">🐚 贝壳旅居 · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
+        '<div class="ob"><div class="oi" style="padding-left:0;">' +
+          '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +
+          '<div class="meta">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
+          '<div class="amt">合计 <b>¥' + fmt(o.price_total) + '</b> · ' + esc(o.order_no) + ' · ' + esc(o.contact_phone) + '</div>' +
+        '</div></div>' +
+        (o.status === 'pending' ? '<div class="of"><a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a></div>' : '') +
+      '</div>';
+    }).join('');
+    document.querySelectorAll('[data-myid]').forEach(function(a){
+      a.onclick = function(){
+        if (!confirm('确定取消该预订吗？')) return;
+        var o = items.filter(function(x){ return String(x.id) === a.getAttribute('data-myid'); })[0];
+        fetch('/api/juzhu/booking/cancel', { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+          body: JSON.stringify({ order_no: o.order_no, contact_phone: o.contact_phone_raw || '' }) })
+          .then(function(r){ return r.json(); })
+          .then(function(j){ if (j.error) { alert(j.error); return; } loadMine(); })
+          .catch(function(){ alert('网络异常'); });
+      };
+    });
+  }
+  function loadMine(){
+    lgBox.style.display = 'none';
+    myBox.style.display = 'block';
+    fetch('/api/juzhu/booking/my', { headers: authH() })
+      .then(function(r){ if (r.status === 401) { try { localStorage.removeItem('BJZ_TOKEN'); } catch(e){} lgBox.style.display = 'block'; myBox.style.display = 'none'; throw new Error('401'); } return r.json(); })
+      .then(function(j){ myRender(j.items || []); })
+      .catch(function(e){ if (e.message !== '401') { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:#991b1b;">加载失败</div>'; } });
+  }
+  function afterLogin(j){
+    try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){}
+    loadMine();
+  }
+  function trySdkLogin(){
+    var sdk = sdkProbe();
+    if (!sdk || typeof sdk.getUserInfo !== 'function') return Promise.resolve(false);
+    return Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
+      var i = info && info.data ? info.data : info;
+      var uid = i && (i.uid || i.userId || i.id), ph = i && (i.phone || i.mobile);
+      if (!uid || !ph) return false;
+      return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ uid: String(uid), phone: String(ph), name: (i.name || '').trim() }) })
+        .then(function(r){ return r.json(); })
+        .then(function(j){ if (j.ok) { afterLogin(j); return true; } return false; });
+    }).catch(function(){ return false; });
+  }
+  function boot(){
+    if (tok()) { loadMine(); return; }
+    lgBox.style.display = 'block';
+    trySdkLogin().then(function(ok){
+      if (ok) return;
+      lgBox.style.display = 'block';
+      document.getElementById('lgMsg').textContent = '当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）';
+      document.getElementById('lgSdk').style.display = sdkProbe() ? 'block' : 'none';
+    });
+  }
+  document.getElementById('lgGo').addEventListener('click', function(){
+    var ph = document.getElementById('lgPhone').value.trim(), pw = document.getElementById('lgPwd').value;
+    var eEl = document.getElementById('lgErr');
+    if (!/^1\d{10}$/.test(ph) || pw.length < 8) { eEl.textContent = '手机号 11 位、密码至少 8 位'; eEl.style.display = 'block'; return; }
+    eEl.style.display = 'none';
+    fetch('/api/juzhu/auth/tenant', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone: ph, password: pw }) })
+      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(res){
+        if (!res.ok) { eEl.textContent = res.j.error || '登录失败'; eEl.style.display = 'block'; return; }
+        afterLogin(res.j);
+      }).catch(function(){ eEl.textContent = '网络异常'; eEl.style.display = 'block'; });
+  });
+  document.getElementById('lgSdk').addEventListener('click', function(){
+    trySdkLogin().then(function(ok){ if (!ok) { document.getElementById('lgErr').textContent = 'SDK 登录失败，请用密码登录'; document.getElementById('lgErr').style.display = 'block'; } });
+  });
+  document.getElementById('myOut').addEventListener('click', function(){
+    try { localStorage.removeItem('BJZ_TOKEN'); } catch(e){} location.reload();
+  });
+  boot();
 })();
 </script>
 </body>

@@ -281,6 +281,8 @@ async function requestSession(req) {
       if (principal.account.vendor_id) {
         return { role: 'vendor', vendorId: principal.account.vendor_id, account: principal.account, roles: principal.roles, principal };
       }
+      // 其余账号角色（user 租客等）→ 登录用户
+      return { role: 'user', account: principal.account, roles: principal.roles, principal };
       if (perms.has(authCenter.P.ADMIN_READ)) {
         // 有机构绑定的管理读账号（gov/bank/holding 等）：读按平台，写仍由权限闸收紧
         return { role: 'platform', account: principal.account, roles: principal.roles, principal };
@@ -426,6 +428,7 @@ function isCEndPublicApi(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel')) return true;
+  if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
   if (m !== 'GET') return false;
   const exact = new Set([
@@ -955,6 +958,7 @@ async function ensureSchemaRun() {
         channel VARCHAR(16) NOT NULL,
         city_id INT,
         owner_vendor_id INT NOT NULL,
+        user_id VARCHAR(64),
         contact_name VARCHAR(64) NOT NULL,
         contact_phone VARCHAR(32) NOT NULL,
         checkin VARCHAR(10) NOT NULL,
@@ -966,7 +970,8 @@ async function ensureSchemaRun() {
         updated_at VARCHAR(32) NOT NULL,
         UNIQUE KEY uk_order_no (order_no),
         KEY idx_bo_vendor (owner_vendor_id, status),
-        KEY idx_bo_project (project_id)
+        KEY idx_bo_project (project_id),
+        KEY idx_bo_user (user_id)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS photos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1354,6 +1359,9 @@ async function ensureSchemaRun() {
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+      // 预订订单归属（登录用户；老订单 user_id 为空，可按登录账号手机号认领）
+      "ALTER TABLE booking_orders ADD COLUMN user_id VARCHAR(64)",
+      "ALTER TABLE booking_orders ADD KEY idx_bo_user (user_id)",
       // 区级「房源量」= 下属租赁住宿项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
       `UPDATE districts d
          SET managed_unit_count = (
@@ -3153,6 +3161,83 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, rows);
     }
 
+    // ===== C 端登录（租客）：贝壳 SDK 默认 + 密码兜底（JIT 建档，role=user）=====
+
+    // POST /api/juzhu/auth/tenant —— 手机号+密码；首登自动建档（真实凭证，生产可用）
+    if (urlPath === '/api/juzhu/auth/tenant' && req.method === 'POST') {
+      const body = await readBody(req);
+      const phone = String(body.phone || '').trim();
+      const password = String(body.password || '');
+      const name = String(body.name || '').trim();
+      if (!/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '手机号格式不对' }, 400);
+      if (password.length < 8) return jsonReply(res, { error: '密码至少 8 位' }, 400);
+      const loginName = 'u' + phone;
+      const dup = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      if (!dup.length) {
+        const created = await authCenter.createAccount({
+          login_name: loginName, password, roles: ['user'], principal_type: 'user',
+          phone, display_name: name || ('租客' + phone.slice(-4)),
+        }, { ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ua: req.headers['user-agent'] || '' });
+        if (created.error) return jsonReply(res, { error: created.error }, 400);
+      } else {
+        // 已有账号：校验密码是否匹配，不匹配则拒绝（防止他人抢注覆盖）
+        const check = await authCenter.loginWithPassword(phone, password, '', '');
+        if (check.error) return jsonReply(res, { error: '该手机号已注册，密码不对' }, 401);
+      }
+      const login = await authCenter.loginWithPassword(phone, password, (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), req.headers['user-agent'] || '');
+      if (login.error) return jsonReply(res, { error: login.error }, 401);
+      return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
+    }
+
+    // POST /api/juzhu/auth/beike —— 贝壳 SDK 登录换会话（App 内 jsbridge getUserInfo 回传）
+    // ⚠ 生产环境必须接入真实 SDK 验签（app_id/secret 或 OIDC），当前仅非生产开放（出边界）
+    if (urlPath === '/api/juzhu/auth/beike' && req.method === 'POST') {
+      if (isProduction()) return jsonReply(res, { error: '生产环境暂未接入贝壳 SDK 验签，请用密码登录' }, 501);
+      const body = await readBody(req);
+      const uid = String(body.uid || '').trim();
+      const phone = String(body.phone || '').trim();
+      const name = String(body.name || '').trim();
+      if (!uid || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: 'uid 与手机号必填' }, 400);
+      const loginName = 'bk' + uid;
+      let accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      if (!accRows.length) {
+        const created = await authCenter.createAccount({
+          login_name: loginName, password: 'bk-' + crypto.randomBytes(12).toString('hex'),
+          roles: ['user'], principal_type: 'user', phone,
+          display_name: name || ('贝壳用户' + uid.slice(-4)),
+        }, { ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ua: req.headers['user-agent'] || '' });
+        if (created.error) return jsonReply(res, { error: created.error }, 400);
+      } else {
+        await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone) WHERE id=?', [phone, accRows[0].id]).catch(() => {});
+      }
+      accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      const sess = await authCenter.createSession(accRows[0].id, (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), req.headers['user-agent'] || '');
+      return jsonReply(res, { ok: true, token: sess.token, role: 'user', expires_at: sess.expires_at });
+    }
+
+    // GET /api/juzhu/booking/my —— 我的预订（登录会话；按 user_id + 账号手机号认领）
+    if (urlPath === '/api/juzhu/booking/my' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized', message: '请先登录（贝壳 SDK 或手机号密码）' }, 401);
+      const accPhone = sess.account.phone || '';
+      const rows = await queryRows(
+        `SELECT b.id, b.order_no, b.project_id, b.channel, p.name AS project_name,
+                b.checkin, b.checkout, b.nights, b.price_total, b.status, b.created_at,
+                b.contact_name, b.contact_phone
+         FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
+         WHERE b.user_id=? ${accPhone ? 'OR b.contact_phone=?' : ''}
+         ORDER BY b.id DESC LIMIT 100`,
+        accPhone ? [String(sess.account.id), accPhone] : [String(sess.account.id)]
+      );
+      return jsonReply(res, {
+        role: sess.role,
+        items: rows.map((o) => Object.assign({}, o, {
+          contact_phone: maskPhoneStd(o.contact_phone),
+          contact_phone_raw: o.contact_phone, // 本人订单，取消接口需要原号
+        })),
+      });
+    }
+
     // ===== 旅居预订（booking_orders）：C 端公开下单/查单/取消 + 商家确认 =====
 
     // POST /api/juzhu/booking —— 公开下单（规则10：手机号只入库，响应不回显）
@@ -3175,6 +3260,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
         if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
         if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
+      // 登录用户下单 → 订单归属（未登录则 user_id 为空，可后续按手机号认领）
+      let bookingUserId = null;
+      try {
+        const bsess = await requestSession(req);
+        if (bsess && bsess.account) bookingUserId = String(bsess.account.id);
+      } catch (_) {}
         let perNight = 0;
         if (unitId) {
           const [us] = await conn.execute('SELECT id, project_id, rent_monthly FROM units WHERE id=?', [unitId]);
@@ -3185,9 +3276,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const priceTotal = perNight * nights;
         const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
         const [ins] = await conn.execute(
-          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,created_at,updated_at)
-           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)`,
-          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, name, phone, checkin, checkout, nights, priceTotal, now, now]
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,created_at,updated_at)
+           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?,?)`,
+          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal, now, now]
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
