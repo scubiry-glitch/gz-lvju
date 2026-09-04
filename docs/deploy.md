@@ -2,6 +2,8 @@
 
 线上运行时是 **纯 Node + MySQL**：SCF 入口 `scf_bootstrap` → `node app.js`，`/api/juzhu/*` 直连 MySQL，**不再依赖 Python**。
 
+> **前后端分离部署**：静态前端（nginx 直服务，无需 Node）与后端 API（`node app.js` + MySQL）分开部署，二者只经 `/api/` 反代耦合，可分机放置、独立发布。分机/分进程部署见 **§4**。
+
 ## 1. 启动
 
 ```bash
@@ -59,3 +61,88 @@ node migrate_to_mysql.cjs /path/to/juzhu.db
 - 已通过 `dbconn.py` 改连 **同一套 MySQL**，不再读写 `juzhu.db`
 
 新接口与种子以 Node 为准。不要在 SCF 部署里再启 Python。
+
+## 4. 前后端分离部署（静态站 + Node API 分开）
+
+架构上只有两块，互相之间**唯一的耦合点是 `/api/` 反代**：
+
+```
+┌─ 前端（静态，无状态，不需要 Node）─┐     ┌─ 后端（Node API + MySQL）──────┐
+│ nginx root → 静态目录（HTML/JS/JSON）│ ──→ │ node app.js（监听 127.0.0.1:N）│ ──→ MySQL
+│ 浏览器直接访问，页面内 fetch('/api/…')│     │ 规则12：唯一运行时，无 Python   │
+└──────────────────────────────────┘     └───────────────────────────────┘
+```
+
+### 4.1 前端（静态站）部署
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name <your-domain>;
+    root /srv/sy-web;                 # 静态产物目录（仓库的页面与 screens/ 等）
+    index index.html;
+    charset utf-8;
+    autoindex off;                    # 规则11：禁止目录列表
+
+    # 规则11：源码/密钥/部署产物必须拦截（完整清单见 §11 与本仓库
+    # /etc/nginx/conf.d/sytest.meizu.life.conf 的现行实现）
+    location ~ /\.(?!well-known) { deny all; }        # .env* .git
+    location = /app.js       { deny all; }            # 根 Node 入口
+    location = /runtime.env  { deny all; }
+    location = /package.json { deny all; }
+    location ~* \.(py|db|sql|ini|cjs|mjs|sh)$ { deny all; }
+    # 若把 /juzhu/ 目录也放进来：仅白名单 app.js / cities.json / data.json / data-*.json
+
+    location ^~ /api/ {               # 唯一耦合点：反代到后端
+        proxy_pass http://127.0.0.1:8766;   # 后端与本机同机时；分机换成内网 IP
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+- 前端是**纯静态产物**：`rsync`/CI 上传 → reload 即发布，可独立回滚（保留上一版目录软链切换）。
+- 页面调 API 用**相对路径** `/api/…`（现有 `_jzapi.js` 即如此），同域反代免 CORS；若前后端确需跨域，由后端加 CORS 白名单，不在前端写死绝对后端地址。
+
+### 4.2 后端（Node API）部署
+
+```bash
+npm install                       # mysql2（生产依赖）
+export MYSQL_HOST=... MYSQL_PORT=3306 MYSQL_DB=juzhu MYSQL_USER=... MYSQL_PASSWORD=...
+export JUZHU_API_KEY='<生产密钥>'    # 禁止 dev-juzhu-key
+export JUZHU_ADMIN_PASSWORD='<生产密码>'
+export JUZHU_ENV=production
+PORT=8766 node app.js             # 只监听 127.0.0.1，由 nginx/网关对外
+```
+
+要点：
+
+- **后端可单独换端口/单独重启**，前端零改动（反代地址改一行）。端口冲突时换 `PORT` 即可，8765 在本机已被其它服务占用，现用 **8766**。
+- 进程守护建议 systemd（`setsid nohup` 仅适合临时）：
+
+```ini
+# /etc/systemd/system/juzhu-api.service
+[Service]
+WorkingDirectory=/srv/sy-api
+EnvironmentFile=/srv/sy-api/runtime.env          # 权限 600，不入 git
+ExecStart=/usr/bin/node app.js
+Environment=PORT=8766
+Restart=always
+User=www
+```
+
+- 分机部署时：后端机只开 `127.0.0.1`（同机反代）或内网安全组（跨机反代），**绝不经公网直连**；MySQL 账号只授后端机来源 IP。
+- 健康检查：`curl -s http://127.0.0.1:8766/api/juzhu/catalog?city=<slug>&lite=1` 返回 200 JSON；冷启动首跑 `ensureSchema` 可能耗时数分钟（弱网远程库更明显），期间 API 挂起属正常，等日志 `ensureSchema done`。
+
+### 4.3 本仓库预览环境（现况参考，2026-09-04）
+
+| 项 | 值 |
+|---|---|
+| 前端 | nginx `sytest.meizu.life`，root 直服务本仓库 `/proweb/run/sy`（改动即生效） |
+| 后端 | `node app.js`，`PORT=8766`，setsid 裸进程（重启机器不自拉） |
+| MySQL | 远程测试库（`juzhu/.env.local` 配置，gitignored），启动前 `set -a; . juzhu/.env.local; set +a` |
+| 日志 | `/var/log/juzhu-api.log` |
+| nginx conf | `/etc/nginx/conf.d/sytest.meizu.life.conf`（改前备份 `.bak.20260904-pre-mysql`） |
