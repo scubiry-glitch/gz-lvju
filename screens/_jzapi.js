@@ -67,8 +67,25 @@
     });
   }
 
+  var SESSION_STORAGE = 'BZF_SESSION_TOKEN';
+
+  // 账号中心会话 token（/api/auth/login 签发）。存在时优先于 API Key：
+  // S/C 端登录用户带本人会话，管理台仍可用 localStorage JUZHU_API_KEY。
+  function sessionToken() {
+    return (localStorage.getItem(SESSION_STORAGE) || '').trim();
+  }
+
+  function setSessionToken(token) {
+    if (token) localStorage.setItem(SESSION_STORAGE, String(token).trim());
+    else localStorage.removeItem(SESSION_STORAGE);
+    notify();
+  }
+
   function authHeaders() {
-    return { Authorization: 'Bearer ' + apiKey() };
+    var t = sessionToken();
+    if (t) return { Authorization: 'Bearer ' + t };
+    var k = apiKey();
+    return k ? { Authorization: 'Bearer ' + k } : {};
   }
 
   function normalizeItem(o) {
@@ -443,6 +460,8 @@
     ICON: ICON,
     apiKey: apiKey,
     setApiKey: setApiKey,
+    sessionToken: sessionToken,
+    setSessionToken: setSessionToken,
     esc: esc,
     list: list,
     all: all,

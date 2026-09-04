@@ -33,6 +33,10 @@ const P = {
   ADMIN_READ: 'admin.read',
   ADMIN_WRITE: 'admin.write',
   AUDIT_READ: 'audit.read',
+  ORDER_CREATE: 'order.create',
+  RATING_WRITE: 'rating.write',
+  DISPATCH: 'order.dispatch',
+  REPORT_READ: 'report.read',
   VENDOR_SUMMARY: 'vendor.summary.read',
   VENDOR_ORDER_READ: 'vendor.order.read',
   VENDOR_ORDER_WRITE: 'vendor.order.write',
@@ -176,7 +180,24 @@ async function ensureAuthSchema(conn) {
   }
   // jz_vendors 回填 org_id（可空，渐进迁移；列已存在则忽略）
   try { await conn.execute('ALTER TABLE jz_vendors ADD COLUMN org_id INT NULL'); } catch (_) {}
+  // worker（服务者）身份绑定：accounts.worker_id → jz_workers.id（阶段2）
+  try { await conn.execute('ALTER TABLE accounts ADD COLUMN worker_id INT NULL'); } catch (_) {}
   try { await conn.execute('ALTER TABLE accounts ADD KEY idx_acc_apikey (api_key_hash(64))'); } catch (_) {}
+  try { await conn.execute('ALTER TABLE accounts ADD KEY idx_acc_worker (worker_id)'); } catch (_) {}
+
+  // 演示种子：国企持有方 + 平台主体（org_no 幂等，不覆盖已有）
+  const now2 = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const orgSeeds = [
+    ['ORG-PLATFORM-1', 'platform', '平台运营方（服务认证中台）'],
+    ['ORG-HOLDING-1', 'holding', '国企持有方（安居集团）'],
+    ['ORG-GOV-JS-1', 'gov', '省住建厅（监管）'],
+  ];
+  for (const [orgNo, orgType, name] of orgSeeds) {
+    await conn.execute(
+      'INSERT IGNORE INTO orgs(org_no, org_type, name, status, created_at, updated_at) VALUES (?,?,?,?,?,?)',
+      [orgNo, orgType, name, 'active', now2, now2]
+    );
+  }
 
   // 内置角色种子（IGNORE：不覆盖已有）
   for (const r of BUILTIN_ROLES) {
@@ -442,6 +463,7 @@ function validateAccountInput(body, { partial } = {}) {
   }
   if (body.vendor_id !== undefined) out.vendor_id = body.vendor_id == null || body.vendor_id === '' ? null : parseInt(body.vendor_id, 10) || null;
   if (body.org_id !== undefined) out.org_id = body.org_id == null || body.org_id === '' ? null : parseInt(body.org_id, 10) || null;
+  if (body.worker_id !== undefined) out.worker_id = body.worker_id == null || body.worker_id === '' ? null : parseInt(body.worker_id, 10) || null;
   if (body.phone !== undefined) out.phone = String(body.phone || '').trim() || null;
   if (body.display_name !== undefined) out.display_name = String(body.display_name || '').trim().slice(0, 64) || null;
   if (body.principal_type !== undefined) {
@@ -465,18 +487,24 @@ async function createAccount(body, ctx) {
     const v = await d.query('SELECT id FROM jz_vendors WHERE id=? LIMIT 1', [out.vendor_id]);
     if (!v.length) return { error: 'vendor_id 不存在' };
   }
+  if (out.worker_id) {
+    const w = await d.query('SELECT id FROM jz_workers WHERE id=? LIMIT 1', [out.worker_id]);
+    if (!w.length) return { error: 'worker_id 不存在' };
+  }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const ins = await d.exec(
-    `INSERT INTO accounts(org_id, vendor_id, principal_type, login_name, phone, password_hash, display_name, status, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO accounts(org_id, vendor_id, worker_id, principal_type, login_name, phone, password_hash, display_name, status, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      out.org_id || null, out.vendor_id || null, out.principal_type || 'user', out.login_name,
+      out.org_id || null, out.vendor_id || null, out.worker_id || null, out.principal_type || 'user', out.login_name,
       out.phone || null, out.password ? hashPassword(out.password) : null, out.display_name || null,
       'active', now, now,
     ]
   );
   for (const rc of out.roles) {
-    const scope = out.vendor_id ? { level: 'vendor', vendor_id: out.vendor_id } : { level: out.org_id ? 'org' : 'all', org_id: out.org_id || undefined };
+    const scope = out.worker_id
+      ? { level: 'self', worker_id: out.worker_id }
+      : out.vendor_id ? { level: 'vendor', vendor_id: out.vendor_id } : { level: out.org_id ? 'org' : 'all', org_id: out.org_id || undefined };
     await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)', [ins.insertId, rc, JSON.stringify(scope)]);
   }
   const full = await getAccountWithRoles(ins.insertId);
@@ -494,7 +522,7 @@ async function updateAccount(id, body, ctx) {
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const sets = [];
   const params = [];
-  const map = { login_name: 'login_name', phone: 'phone', display_name: 'display_name', status: 'status', org_id: 'org_id', vendor_id: 'vendor_id' };
+  const map = { login_name: 'login_name', phone: 'phone', display_name: 'display_name', status: 'status', org_id: 'org_id', vendor_id: 'vendor_id', worker_id: 'worker_id' };
   for (const [k, col] of Object.entries(map)) {
     if (out[k] !== undefined) { sets.push(col + '=?'); params.push(out[k]); }
   }
@@ -511,7 +539,9 @@ async function updateAccount(id, body, ctx) {
     await d.exec('DELETE FROM account_roles WHERE account_id=?', [id]);
     const base = before.account;
     for (const rc of out.roles) {
-      const scope = base.vendor_id ? { level: 'vendor', vendor_id: base.vendor_id } : { level: base.org_id ? 'org' : 'all', org_id: base.org_id || undefined };
+      const scope = base.worker_id
+        ? { level: 'self', worker_id: base.worker_id }
+        : base.vendor_id ? { level: 'vendor', vendor_id: base.vendor_id } : { level: base.org_id ? 'org' : 'all', org_id: base.org_id || undefined };
       await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)', [id, rc, JSON.stringify(scope)]);
     }
   }
@@ -552,6 +582,16 @@ async function listAccounts(q) {
   return out;
 }
 
+// ── 审计留存：默认 180 天，启动时清理一次 ──
+async function cleanupAudit(retentionDays) {
+  const days = parseInt(retentionDays || process.env.AUDIT_RETENTION_DAYS || '180', 10) || 180;
+  const cutoff = new Date(Date.now() - days * 86400 * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  const d = di();
+  const r = await d.exec('DELETE FROM audit_log WHERE created_at < ?', [cutoff]);
+  if (r.affectedRows > 0) console.log(`authCenter: 清理 ${days} 天前审计日志 ${r.affectedRows} 行`);
+  return r.affectedRows;
+}
+
 module.exports = {
   init,
   ensureAuthSchema,
@@ -577,6 +617,7 @@ module.exports = {
   listAccounts,
   // 工具
   audit,
+  cleanupAudit,
   sha256Hex,
   hashPassword,
   verifyPassword,

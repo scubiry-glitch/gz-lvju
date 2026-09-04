@@ -307,6 +307,77 @@ async function requireApiKey(req, res) {
   return false;
 }
 
+async function settingValue(key) {
+  try {
+    const rows = await queryRows('SELECT value FROM settings WHERE `key`=? LIMIT 1', [key]);
+    return rows.length ? String(rows[0].value == null ? '' : rows[0].value) : '';
+  } catch (_) { return ''; }
+}
+
+/**
+ * C 端涉写闸（下单/支付/评价）：
+ * - 账号主体且具备 perm（或 '*'）→ 通过
+ * - settings.require_c_login=1（试点收紧开关）→ 其余凭据（匿名/旧 key）一律 401
+ * - 默认 off → 保持既有演示行为不破坏
+ */
+async function requireCEndWrite(req, res, perm) {
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account' && authCenter.hasPermission(principal, perm)) {
+    req.principal = principal;
+    return true;
+  }
+  if ((await settingValue('require_c_login')) === '1') {
+    jsonReply(res, { error: 'unauthorized', message: '涉写操作须登录本人账号（POST /api/auth/login）' }, 401);
+    return false;
+  }
+  req.principal = principal; // off：保持现状（可能为 legacy/匿名）
+  return true;
+}
+
+/** 运营动作闸（派单/推进）：平台主体或具备 order.dispatch 的账号；worker 等其他账号 403 */
+async function requireDispatchPerm(req, res) {
+  const principal = (req.principal && req.principal.type === 'account')
+    ? req.principal
+    : await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    if (authCenter.hasPermission(principal, 'order.dispatch') || authCenter.hasPermission(principal, '*')) {
+      req.principal = principal;
+      return true;
+    }
+    jsonReply(res, { error: 'forbidden', message: '当前账号无派单/推进权限（order.dispatch）' }, 403);
+    return false;
+  }
+  if (principal && principal.type === 'legacy') { req.principal = principal; return true; } // 旧 key 过渡
+  jsonReply(res, { error: 'unauthorized', message: '须管理凭证（key 或运营账号会话）' }, 401);
+  return false;
+}
+
+/** 工单读取闸：非管理账号（如 worker）只见本人；无 worker 绑定即 403 */
+async function restrictOrdersRead(req, res) {
+  const principal = req.principal;
+  if (principal && principal.type === 'account' &&
+      !authCenter.hasPermission(principal, '*') && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ)) {
+    if (!principal.account.worker_id) {
+      jsonReply(res, { error: 'forbidden', message: '当前账号无工单列表读取权限' }, 403);
+      return null;
+    }
+    return String(principal.account.worker_id); // worker 只见派给自己的
+  }
+  return undefined; // 平台/legacy → 不限
+}
+
+/** 账号主体的运营写动作 → audit_log（legacy/匿名不记） */
+async function auditIfAccount(req, action, resource, resourceId, after) {
+  const p = req.principal;
+  if (p && p.type === 'account') {
+    await authCenter.audit({
+      accountId: p.account.id, principalType: 'account', roles: p.roles,
+      action, resource, resourceId, scopeLevel: authCenter.bestScopeLevel(p),
+      after, ip: p.ip, ua: p.ua,
+    });
+  }
+}
+
 const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url'];
 
 function stripVendorSecrets(obj) {
@@ -1228,6 +1299,8 @@ async function ensureSchemaRun() {
     }
     // 账号与权限中心：orgs/accounts/roles/account_roles/sessions/audit_log + 角色种子 + platform_admin 引导
     await authCenter.ensureAuthSchema(conn);
+    // 审计留存（默认 180 天，AUDIT_RETENTION_DAYS 可调）
+    await authCenter.cleanupAudit().catch((e) => console.warn('cleanupAudit warn:', e.message));
     schemaEnsured = true;
   } finally {
     await conn.end();
@@ -2588,10 +2661,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/jiazheng/orders （须 API Key；phone 仅作过滤）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
+      const workerFilter = await restrictOrdersRead(req, res);
+      if (workerFilter === null) return;
       const phone = (qp.get('phone') || '').trim();
       let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
                  LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
       const params = [];
+      if (workerFilter) { sql += " AND o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json) AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id'))=?"; params.push(workerFilter); }
       if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
       if (qp.get('status')) {
         const statuses = qp.get('status').split(',').filter(Boolean);
@@ -2611,6 +2687,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/jiazheng/orders/stats （需 API Key，必须在 orders/:id 之前）
     if (urlPath === '/api/juzhu/jiazheng/orders/stats' && req.method === 'GET') {
       if (!(await requireApiKey(req, res))) return;
+      const wf = await restrictOrdersRead(req, res);
+      if (wf !== undefined) return jsonReply(res, { error: 'forbidden', message: '统计仅管理账号可见' }, 403);
       const [pendingR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='pending'");
       const [dispatchedR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='dispatched'");
       const [doneR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='done' OR status='rated'");
@@ -2624,6 +2702,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
       if (m && req.method === 'GET') {
+        const workerFilter = await restrictOrdersRead(req, res);
+        if (workerFilter === null) return;
         const orderId = m[1];
         const rows = await queryRows(
           `SELECT o.*, s.name AS sku_name FROM jz_orders o
@@ -2631,6 +2711,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [orderId]
         );
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (workerFilter) {
+          let mine = false;
+          try { mine = rows[0].worker_json && String(JSON.parse(rows[0].worker_json).id) === workerFilter; } catch (_) {}
+          if (!mine) return jsonReply(res, { error: 'forbidden', message: '非派给你的工单' }, 403);
+        }
         return jsonReply(res, rows[0]);
       }
     }
@@ -3009,6 +3094,104 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 服务者（S 端）接口：worker 会话，scope=self 只碰本人名下工单 =====
+
+    // GET /api/juzhu/s/orders —— 派给我的工单（worker_json.id = 绑定 worker_id）
+    if (urlPath === '/api/juzhu/s/orders' && req.method === 'GET') {
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account') {
+        return jsonReply(res, { error: 'unauthorized', message: '请用服务者账号登录（POST /api/auth/login）' }, 401);
+      }
+      const wid = principal.account.worker_id;
+      if (!wid) return jsonReply(res, { error: 'forbidden', message: '当前账号未绑定服务者（worker_id）' }, 403);
+      const rows = await queryRows(
+        `SELECT o.id, o.sku_id, o.type, o.house, o.expect_time, o.status, o.pay_status, o.worker_json,
+                o.created_at, o.updated_at, o.log_json, s.name AS sku_name
+         FROM jz_orders o LEFT JOIN jz_skus s ON s.id = o.sku_id
+         WHERE o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json)
+           AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id')) = ?
+         ORDER BY o.created_at DESC LIMIT 200`,
+        [String(wid)]
+      );
+      return jsonReply(res, { items: rows, worker_id: wid });
+    }
+
+    // POST /api/juzhu/s/orders/:id/advance —— 本人名下工单推进（accepted→serving→done 封顶；评价归客户）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/s\/orders\/([^/]+)\/advance$/);
+      if (m && req.method === 'POST') {
+        const principal = await authCenter.principalOf(req).catch(() => null);
+        if (!principal || principal.type !== 'account') {
+          return jsonReply(res, { error: 'unauthorized', message: '请用服务者账号登录' }, 401);
+        }
+        const wid = principal.account.worker_id;
+        if (!wid) return jsonReply(res, { error: 'forbidden', message: '当前账号未绑定服务者' }, 403);
+        const orderId = m[1];
+        const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          // scope=self：只能推进派给自己的工单
+          let mine = false;
+          try { mine = order.worker_json && JSON.parse(order.worker_json) && String(JSON.parse(order.worker_json).id) === String(wid); } catch (_) {}
+          if (!mine) { conn.end(); return jsonReply(res, { error: 'forbidden', message: '非派给你的工单' }, 403); }
+          const curIdx = STATUS_ORDER.indexOf(order.status);
+          if (curIdx === -1 || order.status === 'pending') { conn.end(); return jsonReply(res, { error: '当前状态不可推进' }, 400); }
+          if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
+          const nextStatus = STATUS_ORDER[curIdx + 1];
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'advance', by: 'worker:' + wid, from: order.status, to: nextStatus });
+          await conn.execute(
+            'UPDATE jz_orders SET status=?, updated_at=?, log_json=? WHERE id=?',
+            [nextStatus, now, JSON.stringify(log), orderId]
+          );
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          await authCenter.audit({
+            accountId: principal.account.id, principalType: 'account', roles: principal.roles,
+            action: 's.order.advance', resource: 'jz_orders', resourceId: String(orderId), scopeLevel: 'self',
+            after: { status: nextStatus }, ip: principal.ip, ua: principal.ua,
+          });
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 持有方/机构只读视角（B 端资管；holding_viewer 只读，无任何运营动作）=====
+    // GET /api/juzhu/org/report —— 资管大盘聚合（只读）
+    if (urlPath === '/api/juzhu/org/report' && req.method === 'GET') {
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account' ||
+          !(authCenter.hasPermission(principal, 'report.read') || authCenter.hasPermission(principal, '*'))) {
+        return jsonReply(res, { error: 'forbidden', message: '需持有方/平台只读账号（report.read）' }, 403);
+      }
+      const byChannel = await queryRows(
+        `SELECT channel, COUNT(*) projects, COALESCE(SUM(COALESCE(managed_unit_count, unit_count)),0) units
+         FROM projects GROUP BY channel ORDER BY channel`
+      );
+      const vendorsByType = await queryRows(
+        `SELECT type, COUNT(*) n FROM jz_vendors WHERE status='active' GROUP BY type ORDER BY n DESC`
+      );
+      const ordersByStatus = await queryRows('SELECT status, COUNT(*) n FROM jz_orders GROUP BY status ORDER BY n DESC');
+      const operators = await queryRows(
+        `SELECT v.id, v.name, v.type, COUNT(p.id) project_count
+         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+         WHERE v.type IN ('platform','housing_operator','lvju_host')
+         GROUP BY v.id, v.name, v.type ORDER BY project_count DESC LIMIT 20`
+      );
+      return jsonReply(res, {
+        view: 'holding', readonly: true,
+        generated_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+        housing: { by_channel: byChannel },
+        vendors: { by_type: vendorsByType },
+        orders: { by_status: ordersByStatus },
+        operators,
+      });
+    }
+
     // ===== 商家（vendor）接口：role=vendor 会话，一律按 owner_vendor_id 隔离 =====
 
     // POST /api/juzhu/vendor/login
@@ -3178,6 +3361,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     // POST /api/juzhu/jiazheng/orders（下单）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'POST') {
+      if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
       const body = await readBody(req);
       const productId = body.product_id || body.sku_id;
       if (!productId) return jsonReply(res, { error: 'product_id 必填' }, 400);
@@ -3220,6 +3404,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/pay$/);
       if (m && req.method === 'POST') {
+        if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
@@ -3254,7 +3439,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/dispatch$/);
       if (m && req.method === 'POST') {
-        if (!(await requireApiKey(req, res))) return;
+        if (!(await requireDispatchPerm(req, res))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
@@ -3275,6 +3460,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             [worker ? JSON.stringify(worker) : null, now, JSON.stringify(log), orderId]
           );
           await conn.commit();
+          await auditIfAccount(req, 'order.dispatch', 'jz_orders', String(orderId), { worker });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           return jsonReply(res, { ok: true, order: updated[0] });
         } finally { await conn.end(); }
@@ -3285,7 +3471,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/advance$/);
       if (m && req.method === 'POST') {
-        if (!(await requireApiKey(req, res))) return;
+        if (!(await requireDispatchPerm(req, res))) return;
         const orderId = m[1];
         const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
         const conn = await mysql2.createConnection(getDbConfig());
@@ -3307,6 +3493,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             [nextStatus, now, JSON.stringify(log), orderId]
           );
           await conn.commit();
+          await auditIfAccount(req, 'order.advance', 'jz_orders', String(orderId), { from: order.status, to: nextStatus });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           return jsonReply(res, { ok: true, order: updated[0] });
         } finally { await conn.end(); }
@@ -3317,6 +3504,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/rate$/);
       if (m && req.method === 'POST') {
+        if (!(await requireCEndWrite(req, res, authCenter.P.RATING_WRITE))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const score = parseInt(body.score);
