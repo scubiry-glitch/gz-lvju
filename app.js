@@ -444,6 +444,7 @@ function isCEndPublicApi(urlPath, method) {
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/[^/]+\/units$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
   if (/^\/api\/juzhu\/units\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/units\/\d+\/photos$/.test(p)) return true;
