@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:,">
 <title>预定下单 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 <style>
@@ -109,11 +110,11 @@
     document.querySelector('#cTotal span').textContent = n >= 1 ? '共 ' + n + ' 晚' : '待选日期';
   }
 
-  function load(pid){
+  function load(pid, isRetry){
     curId = pid;
     Promise.all([
-      fetch('/api/juzhu/projects/' + pid).then(function(r){ if (!r.ok) throw new Error('项目加载失败'); return r.json(); }),
-      fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) throw new Error('户型加载失败'); return r.json(); })
+      fetch('/api/juzhu/projects/' + pid).then(function(r){ if (!r.ok) { var er = new Error(String(r.status)); er.status = r.status; throw er; } return r.json(); }),
+      fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) { var er = new Error(String(r.status)); er.status = r.status; throw er; } return r.json(); })
     ]).then(function(rs){
       var p = rs[0] || {}, units = (rs[1] || {}).units || [];
       p.tags = asArr(p.tags);
@@ -142,6 +143,17 @@
       if (co) document.getElementById('fOut').value = co;
       calc();
     }).catch(function(e){
+      // 链接里的房源已下架/不存在（如老收藏的 id）→ 自动兜底带入在架房源，不卡死
+      if (!isRetry && (e && e.status === 404)) {
+        showErr('链接中的房源（id=' + pid + '）已下架或不存在 · 自动带入在架房源');
+        fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
+          var p = (cat.projects || []).filter(function(x){
+            return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
+          })[0];
+          if (p) load(p.id, true);
+        }).catch(function(){});
+        return;
+      }
       showErr('房源加载失败：' + e.message);
     });
   }
