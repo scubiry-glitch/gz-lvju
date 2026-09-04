@@ -331,3 +331,86 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   updated_at      VARCHAR(32),
   KEY idx_gr_orders_vendor (vendor_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 账号与权限中心（阶段1，docs/account-and-auth-design.md §3.1）
+-- 运行时由 app.js ensureSchema → auth_center.ensureAuthSchema 幂等创建；
+-- 此处为同构 DDL 备份（新环境可整文件执行）。
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS orgs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_no VARCHAR(32) NOT NULL UNIQUE,
+  org_type VARCHAR(16) NOT NULL,              -- holding|operator|vendor|labor|material|training|bank|gov|platform
+  name VARCHAR(128) NOT NULL,
+  city_ids TEXT,
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  whitelist_id INT NULL,
+  idp_issuer VARCHAR(255) NULL,               -- gov/bank 独立 IdP（阶段3 对接，字段先就位）
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  KEY idx_org_type (org_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 登录身份：人/机器共用；任意主体原生多账号（无主/子层级）
+CREATE TABLE IF NOT EXISTS accounts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_id INT NULL,
+  vendor_id INT NULL,                          -- 商家直连 jz_vendors.id
+  principal_type VARCHAR(8) NOT NULL DEFAULT 'user',  -- user|machine
+  login_name VARCHAR(64) NULL,
+  phone VARCHAR(32) NULL,
+  password_hash VARCHAR(128) NULL,             -- salt:sha256(salt:pwd)；IdP 联邦账号恒 NULL
+  api_key_hash VARCHAR(128) NULL,              -- 机器 Key 只存哈希
+  idp_type VARCHAR(16) NULL,                   -- local|oidc|saml|wechat|sms
+  idp_subject VARCHAR(128) NULL,
+  display_name VARCHAR(64),
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  last_login_at VARCHAR(32),
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  UNIQUE KEY uk_login_name (login_name),
+  UNIQUE KEY uk_idp (idp_type, idp_subject),
+  KEY idx_acc_vendor (vendor_id), KEY idx_acc_org (org_id), KEY idx_acc_phone (phone)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS roles (
+  role_code VARCHAR(32) PRIMARY KEY,
+  name VARCHAR(64) NOT NULL,
+  permissions TEXT NOT NULL,                   -- JSON 数组；'*'=全权
+  builtin TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS account_roles (
+  account_id INT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  scope TEXT NULL,                             -- {"level":"vendor|org|city|self|all"}（5.7 TEXT 不能带 DEFAULT）
+  PRIMARY KEY (account_id, role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  jti VARCHAR(64) NOT NULL UNIQUE,
+  token_hash VARCHAR(128) NOT NULL,
+  account_id INT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  revoked_at BIGINT NULL,
+  ua VARCHAR(255), ip VARCHAR(64), created_at VARCHAR(32),
+  KEY idx_sess_account (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  account_id INT NULL,
+  principal_type VARCHAR(16),
+  role_code VARCHAR(32),
+  action VARCHAR(64) NOT NULL,
+  resource VARCHAR(128),
+  resource_id VARCHAR(64),
+  scope_level VARCHAR(16),
+  before_json LONGTEXT, after_json LONGTEXT,
+  ip VARCHAR(64), ua VARCHAR(255),
+  created_at VARCHAR(32),
+  KEY idx_audit_time (id), KEY idx_audit_account (account_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- jz_vendors 渐进迁移：回填 org_id（列已存在则忽略报错）
+-- ALTER TABLE jz_vendors ADD COLUMN org_id INT NULL;

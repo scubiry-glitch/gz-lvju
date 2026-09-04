@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
+    "bcryptjs": "^3.0.3",
     "mysql2": "^3.23.3"
   },
   "devDependencies": {
