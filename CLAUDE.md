@@ -117,9 +117,9 @@
 
 `juzhu/server.py` 与线上 Node 入口 `app.js` 用仓库根做静态根时，**必须**拦截敏感路径：`.env*`、隐藏文件、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`package.json`、`README.md`、根目录 `app.js`/`scf_bootstrap`/`moma_*`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。MySQL 账号只进运行时环境变量 / 本地 `.env.*`（gitignore），**禁止**写进 `app.js` 源码默认值。
 
-## 规则 12 · 线上运行时纯 Node + MySQL；C 端保租房走 catalog
+## 规则 12 · 只用 Node（禁新增 Python）+ MySQL；C 端保租房走 catalog
 
-SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再依赖 Python。
+**一切新增与改动只用 Node，不用 Python**（2026-09-04 拍板）：运行时、脚本、工具、迁移、单测一律 Node（`app.js` / `*.cjs`，Node 22+），**不得新增任何 Python 代码，也不再维护/扩展存量 Python**。`juzhu/server.py` 等 Python 文件仅作历史参考保留；此前由 Python 承担的本地联调与商家 HMAC 回归，改由 Node 侧脚本 / 直调接口完成。SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL。
 
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
@@ -127,8 +127,12 @@ SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再�
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
 - **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
-- **Python `juzhu/server.py`**：线上不用；仅本地联调 / Python 单测，已改连同一 MySQL
+- **Python 存量**（`juzhu/server.py` 等）：仅作历史参考保留，不再运行 / 维护 / 扩展（见下方规则 14）
 
 ## 规则 13 · 频道名称单一数据源（`settings.channel_name`）
 
 C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全局设置 `channel_name`（默认 `新居住频道`），后台 `juzhu-admin.html`「设置」页可改。词干 = 去掉末尾「频道/专区」。页面不得再写死这组字眼。
+
+## 规则 14 · 脚本一律用 Node（mysql2），不用 Python
+
+一切数据库操作（DDL/DML/迁移/备份）、一次性脚本、数据验证脚本、联调与回归测试用 **Node + `mysql2`**（仓库已装依赖；`node -e` 或 `scripts/*.cjs`），**禁止**为跑 SQL 引入或编写 Python（pymysql 等）。与规则 12 同一口径：**只用 Node，Python 存量（`juzhu/server.py`、`juzhu/test_vendor_api.py` 等）仅作历史参考，不运行、不维护、不扩展**。连接配置只从环境变量读（`MYSQL_*` / `JUZHU_DB_*`），禁止把凭证写进脚本或仓库文件。

@@ -52,15 +52,11 @@ node migrate_to_mysql.cjs /path/to/juzhu.db
 
 ## 3. Python `juzhu/server.py` 还用吗？
 
-**线上不用。** `scf_bootstrap` 只 `exec node app.js`。
+**不用（含本地）。** `scf_bootstrap` 只 `exec node app.js`。按 CLAUDE.md 规则 12/14（2026-09-04 拍板：只用 Node，不用 Python），Python 存量（`juzhu/server.py`、`juzhu/test_vendor_api.py`、`dbconn.py` 等）**仅作历史参考保留，不运行、不维护、不扩展**：
 
-`juzhu/server.py` 保留为：
-
-- 本地/历史联调（端口 8765）
-- Python 单测与商家 HMAC 回归脚本（`juzhu/test_vendor_api.py` 等）
-- 已通过 `dbconn.py` 改连 **同一套 MySQL**，不再读写 `juzhu.db`
-
-新接口与种子以 Node 为准。不要在 SCF 部署里再启 Python。
+- 本地联调 → 直接跑 `node app.js`（同一路径，见 §4.2）
+- 商家 HMAC 回归 → 用 Node 脚本直调开放接口，不用 `juzhu/test_vendor_api.py`
+- 新接口与种子以 Node 为准，任何新代码不得引入 Python
 
 ## 4. 前后端分离部署（静态站 + Node API 分开）
 

@@ -318,7 +318,7 @@ gov/bank 用户 → 机构 IdP（政务外网统一认证 / 银行内网 SSO）
 | 规则 9 鉴权 | 全局 key 收敛、`?phone=` 旁路关闭、vendor secret 不出库、页面 key 只进 localStorage |
 | 规则 10 TP | 虚拟号密钥不下端，通道不变 |
 | 规则 11 静态/密钥 | 账号体系新增的 `.env`、schema 变更照旧不进静态白名单；`audit_log` 不经静态服务暴露 |
-| 规则 12 运行时 | 全部 DDL 进 `mysql_schema.sql` + `ensureSchema`；Node 单运行时实现，Python 侧仅联调 |
+| 规则 12/14 只用 Node | 全部 DDL 进 `mysql_schema.sql` + `ensureSchema`；实现、脚本、回归测试一律 Node + mysql2，不新增/不运行 Python |
 | 规则 13 频道名 | `channel_name` 等设置项权限收归 `platform_admin` |
 
 ---
