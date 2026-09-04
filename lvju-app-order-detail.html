@@ -23,17 +23,17 @@
       <div class="act"><a href="lvju-app-service.html">🎧</a></div>
     </div>
 
-    <div class="statusbar stay">
-      <div class="s1">待入住 · 已确认</div>
-      <div class="s2">6/14 入住 · 资金已存管，入住确认后结算给房东</div>
+    <div class="statusbar stay" id="dStatus">
+      <div class="s1" id="dState">待入住 · 已确认</div>
+      <div class="s2" id="dStateSub">6/14 入住 · 资金已存管，入住确认后结算给房东</div>
     </div>
 
     <div class="minihouse">
-      <div class="th s-xijiang"></div>
+      <div class="th s-xijiang" id="dThumb"></div>
       <div class="mi">
-        <div class="nm">云上观景惠居</div>
-        <div class="meta">黔东南 · 西江千户苗寨 · 整栋可包</div>
-        <div class="st">★ 4.9 五星旅居 · 观景大床房</div>
+        <div class="nm" id="dName">云上观景惠居</div>
+        <div class="meta" id="dMeta">黔东南 · 西江千户苗寨 · 整栋可包</div>
+        <div class="st" id="dUnit">★ 4.9 五星旅居 · 观景大床房</div>
       </div>
     </div>
 
@@ -47,37 +47,33 @@
 
     <div class="seg">入住信息</div>
     <div class="panel">
-      <div class="kv"><span class="k">入住 / 离店</span><span class="v">6/14 — 6/16 · 2 晚</span></div>
-      <div class="kv"><span class="k">房型</span><span class="v">观景大床房 · 整栋</span></div>
-      <div class="kv"><span class="k">入住人</span><span class="v">张先生 · 2 位成人</span></div>
-      <div class="kv"><span class="k">手机</span><span class="v">138****6688</span></div>
-      <div class="kv"><span class="k">套餐</span><span class="v">含双早 + 苗寨门票</span></div>
-      <div class="kv"><span class="k">旅居管家</span><span class="v">杨晓芳 · L4 持证</span></div>
+      <div class="kv"><span class="k">入住 / 离店</span><span class="v" id="dDates">6/14 — 6/16 · 2 晚</span></div>
+      <div class="kv"><span class="k">房型</span><span class="v" id="dUnitKv">观景大床房 · 整栋</span></div>
+      <div class="kv"><span class="k">入住人</span><span class="v" id="dContact">张先生 · 2 位成人</span></div>
+      <div class="kv"><span class="k">手机</span><span class="v" id="dPhone">138****6688</span></div>
     </div>
 
     <div class="seg">价格明细</div>
     <div class="panel">
-      <div class="kv"><span class="k">房费 ¥588 × 2 晚</span><span class="v">¥1,176</span></div>
-      <div class="kv"><span class="k">门票套餐</span><span class="v">¥120</span></div>
-      <div class="kv"><span class="k">平台优惠</span><span class="v" style="color:var(--ok)">−¥120</span></div>
-      <div class="kv big"><span class="k">实付</span><span class="v">¥1,176</span></div>
+      <div class="kv"><span class="k" id="dFeeLine">房费 ¥588 × 2 晚</span><span class="v" id="dFee">¥1,176</span></div>
+      <div class="kv big"><span class="k">合计</span><span class="v" id="dTotal">¥1,176</span></div>
     </div>
 
     <div class="seg">订单信息</div>
     <div class="panel">
-      <div class="kv"><span class="k">订单号</span><span class="v">LJ20260614-8821</span></div>
-      <div class="kv"><span class="k">下单时间</span><span class="v">2026-06-13 15:42</span></div>
-      <div class="kv"><span class="k">支付方式</span><span class="v">贝壳支付 · 资金存管</span></div>
-      <div class="kv"><span class="k">支付时间</span><span class="v">2026-06-13 15:43</span></div>
-      <div class="kv"><span class="k">存管状态</span><span class="v" style="color:var(--brand-deep)">已冻结 · 入住后结算</span></div>
+      <div class="kv"><span class="k">订单号</span><span class="v" id="dNo">LJ20260614-8821</span></div>
+      <div class="kv"><span class="k">下单时间</span><span class="v" id="dCreated">2026-06-13 15:42</span></div>
+      <div class="kv"><span class="k">支付方式</span><span class="v">在线预订 · 到店付</span></div>
+      <div class="kv"><span class="k">订单状态</span><span class="v" id="dKvState">待商家确认</span></div>
+      <div class="kv"><span class="k">房源详情</span><span class="v"><a id="dHouseLink" href="lvju-app-detail.html">查看房源 →</a></span></div>
     </div>
 
     <div style="height:14px;"></div>
   </div>
 
-  <div class="cta">
-    <a class="ghost" href="lvju-app-refund.html" style="border:1px solid var(--border);color:var(--brand-deep);padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;">申请退改</a>
-    <a class="btn" href="lvju-app-chat.html" style="margin-left:auto;">联系管家</a>
+  <div class="cta" id="dCta">
+    <a class="ghost" href="lvju-app-orders.html" style="border:1px solid var(--border);color:var(--brand-deep);padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;">返回订单</a>
+    <a class="btn" id="dCancel" style="margin-left:auto;background:#dc2626;">取消订单</a>
   </div>
 </div>
 <script src="screens/_qr.js"></script>
@@ -87,6 +83,98 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   var target; try{ target=new URL(a.getAttribute('href'),location.href).href; }catch(e){ return; }
   try{ var qr=qrcode(0,'M'); qr.addData(target); qr.make(); img.src=qr.createDataURL(3,0); }catch(e){}
 });
+</script>
+<script>
+/* 订单详情读库：?order_no=BKG-…
+   ① 登录态：GET /api/juzhu/booking/my 里按单号取；
+   ② 未登录：双因子 lookup（补输下单手机号）。 */
+(function(){
+  var q = new URLSearchParams(location.search);
+  var orderNo = q.get('order_no') || '';
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  var ST = { pending: ['待商家确认', '资金到账后商家确认，确认前可免费取消'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'] };
+  function render(o){
+    var st = ST[o.status] || [o.status, ''];
+    document.getElementById('dState').textContent = st[0];
+    document.getElementById('dStateSub').textContent = esc(o.checkin) + ' 入住 · ' + st[1];
+    document.getElementById('dKvState').textContent = st[0];
+    document.getElementById('dName').textContent = o.project_name || ('项目#' + o.project_id);
+    document.getElementById('dMeta').textContent = o.channel === 'minsu' ? '惠居 · 整栋/庭院' : '租赁住宿';
+    document.getElementById('dUnit').textContent = o.unit_label || '整栋预订';
+    document.getElementById('dDates').textContent = o.checkin + ' — ' + o.checkout + ' · ' + o.nights + ' 晚';
+    document.getElementById('dUnitKv').textContent = o.unit_label || '整栋预订';
+    document.getElementById('dContact').textContent = o.contact_name || '—';
+    document.getElementById('dPhone').textContent = o.contact_phone_masked || o.contact_phone || '—';
+    document.getElementById('dFeeLine').textContent = '房费 ¥' + fmt(Math.round((o.price_total||0) / Math.max(o.nights,1))) + ' × ' + o.nights + ' 晚';
+    document.getElementById('dFee').textContent = '¥' + fmt(o.price_total);
+    document.getElementById('dTotal').textContent = '¥' + fmt(o.price_total);
+    document.getElementById('dNo').textContent = o.order_no;
+    document.getElementById('dCreated').textContent = (o.created_at || '').replace('T', ' ').slice(0, 16) || '—';
+    document.getElementById('dHouseLink').href = 'lvju-app-detail.html?id=' + o.project_id;
+    var cancel = document.getElementById('dCancel');
+    if (o.status !== 'pending') cancel.style.display = 'none';
+    cancel.onclick = function(){
+      if (!confirm('确定取消订单 ' + o.order_no + ' 吗？')) return;
+      fetch('/api/juzhu/booking/cancel', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ order_no: o.order_no, contact_phone: o.contact_phone_raw || o.lookup_phone || '' }) })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j.error) { alert(j.error); return; }
+          // 原地更新状态（reload 会丢掉已输入的查单手机号）
+          var kv = document.getElementById('dKvState');
+          kv.textContent = '已取消';
+          document.getElementById('dState').textContent = '已取消';
+          var c = document.getElementById('dCancel'); if (c) c.style.display = 'none';
+        })
+        .catch(function(){ alert('网络异常'); });
+    };
+  }
+  function renderPhone(p){ document.getElementById('dPhone').textContent = p; }
+
+  var token = ''; try { token = localStorage.getItem('BJZ_TOKEN') || ''; } catch(e) {}
+  if (token) {
+    fetch('/api/juzhu/booking/my', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        var o = (j.items || []).filter(function(x){ return x.order_no === orderNo; })[0];
+        if (!o) throw new Error('not found');
+        o.lookup_phone = o.contact_phone_raw || '';
+        render(o);
+      }).catch(function(){
+        // 未登录兜底：请输入下单手机号做双因子查单
+        bootLookup();
+      });
+  } else {
+    bootLookup();
+  }
+
+  function bootLookup(){
+    var panel = document.createElement('div');
+    panel.className = 'seg';
+    panel.textContent = '查单：请输入下单手机号';
+    var bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;gap:8px;padding:0 18px 10px;';
+    bar.innerHTML = '<input id="odPhone" placeholder="下单手机号" inputmode="numeric" maxlength="11" style="flex:1;border:1px solid #e7ece9;border-radius:9px;padding:9px 11px;font-size:13px;outline:0;">' +
+      '<button id="odGo" style="border:0;background:linear-gradient(90deg,#0f766e,#14b8a6);color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:9px 18px;cursor:pointer;">查询</button>';
+    var scr = document.querySelector('.scr');
+    scr.insertBefore(bar, scr.querySelector('.minihouse'));
+    scr.insertBefore(panel, bar);
+    document.getElementById('odGo').onclick = function(){
+      var ph = document.getElementById('odPhone').value.trim();
+      if (!ph) return;
+      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ order_no: orderNo, contact_phone: ph }) })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j.error) { alert(j.error); return; }
+          var o = j.order; o.lookup_phone = ph;
+          render(o);
+          panel.remove(); bar.remove();
+        }).catch(function(){ alert('网络异常'); });
+    };
+  }
+})();
 </script>
 </body>
 </html>

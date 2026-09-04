@@ -146,7 +146,8 @@
         '</div>' +
         '<div class="of">' +
           (o.status === 'pending' ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
-          '<a class="primary" href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
+          '<a href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
+          '<a class="primary" href="lvju-app-order-detail.html?order_no=' + encodeURIComponent(o.order_no) + '">订单详情</a>' +
         '</div>' +
       '</div>';
     }).join('');

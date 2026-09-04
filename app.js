@@ -3300,12 +3300,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const orderNo = String(body.order_no || '').trim();
       const phone = String(body.contact_phone || '').trim();
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
-      const rows = await queryRows('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
+      const rows = await queryRows(
+        `SELECT b.*, p.name AS project_name FROM booking_orders b
+         LEFT JOIN projects p ON p.id=b.project_id
+         WHERE b.order_no=? AND b.contact_phone=? LIMIT 1`, [orderNo, phone]);
       if (!rows.length) return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404);
       const o = rows[0];
       return jsonReply(res, {
         order: {
           order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
+          project_name: o.project_name,
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
           checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
           status: o.status, created_at: o.created_at,
