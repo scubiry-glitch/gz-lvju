@@ -414,3 +414,19 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 -- jz_vendors 渐进迁移：回填 org_id（列已存在则忽略报错）
 -- ALTER TABLE jz_vendors ADD COLUMN org_id INT NULL;
+
+-- 账号中心 · IdP 联邦配置（阶段3，§4.6）：一组织一 IdP；client_secret 只在服务端
+CREATE TABLE IF NOT EXISTS idp_configs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_no VARCHAR(32) NOT NULL UNIQUE,
+  idp_type VARCHAR(16) NOT NULL DEFAULT 'oidc',
+  issuer VARCHAR(255) NOT NULL,
+  client_id VARCHAR(128) NOT NULL,
+  client_secret TEXT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  scope VARCHAR(255) NOT NULL DEFAULT 'openid profile',
+  jit_enabled TINYINT NOT NULL DEFAULT 1,
+  enabled TINYINT NOT NULL DEFAULT 1,
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  KEY idx_idp_org (org_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

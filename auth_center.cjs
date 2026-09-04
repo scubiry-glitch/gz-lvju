@@ -160,6 +160,20 @@ async function ensureAuthSchema(conn) {
       ua VARCHAR(255), ip VARCHAR(64), created_at VARCHAR(32),
       KEY idx_sess_account (account_id)
     ) CHARSET=utf8mb4`,
+    `CREATE TABLE IF NOT EXISTS idp_configs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      org_no VARCHAR(32) NOT NULL UNIQUE,
+      idp_type VARCHAR(16) NOT NULL DEFAULT 'oidc',
+      issuer VARCHAR(255) NOT NULL,
+      client_id VARCHAR(128) NOT NULL,
+      client_secret TEXT NULL,
+      role_code VARCHAR(32) NOT NULL,
+      scope VARCHAR(255) NOT NULL DEFAULT 'openid profile',
+      jit_enabled TINYINT NOT NULL DEFAULT 1,
+      enabled TINYINT NOT NULL DEFAULT 1,
+      created_at VARCHAR(32), updated_at VARCHAR(32),
+      KEY idx_idp_org (org_no)
+    ) CHARSET=utf8mb4`,
     `CREATE TABLE IF NOT EXISTS audit_log (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       account_id INT NULL,
@@ -592,6 +606,82 @@ async function cleanupAudit(retentionDays) {
   return r.affectedRows;
 }
 
+// ── IdP 联邦登录（阶段3 §4.6）：OIDC 配置 + JIT 建档 ──
+
+/** 按 org_no 取启用的 IdP 配置（含 client_secret，仅服务端内部使用） */
+async function getIdpConfig(orgNo) {
+  const d = di();
+  const rows = await d.query('SELECT * FROM idp_configs WHERE org_no=? AND enabled=1 LIMIT 1', [orgNo]);
+  return rows[0] || null;
+}
+
+/** 配置列表（secret 永不外发，只回是否已设置的布尔） */
+async function listIdpConfigs() {
+  const d = di();
+  return d.query(
+    `SELECT id, org_no, idp_type, issuer, client_id, role_code, scope, jit_enabled, enabled,
+            (client_secret IS NOT NULL AND client_secret <> '') AS has_secret,
+            created_at, updated_at
+     FROM idp_configs ORDER BY id`);
+}
+
+async function upsertIdpConfig(body, ctx) {
+  const d = di();
+  const orgNo = String(body.org_no || '').trim();
+  const issuer = String(body.issuer || '').trim().replace(/\/+$/, '');
+  const clientId = String(body.client_id || '').trim();
+  const roleCode = String(body.role_code || '').trim();
+  if (!orgNo || !issuer || !clientId || !roleCode) return { error: 'org_no/issuer/client_id/role_code 必填' };
+  if (!/^https?:\/\//.test(issuer)) return { error: 'issuer 须为 http(s) URL' };
+  const org = await d.query('SELECT id, org_type FROM orgs WHERE org_no=? LIMIT 1', [orgNo]);
+  if (!org.length) return { error: 'org_no 不存在于 orgs' };
+  const known = new Set(BUILTIN_ROLES.map((r) => r.role_code));
+  if (!known.has(roleCode)) return { error: '未知角色: ' + roleCode };
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const secret = body.client_secret != null ? String(body.client_secret) : null;
+  await d.exec(
+    `INSERT INTO idp_configs(org_no, idp_type, issuer, client_id, client_secret, role_code, scope, jit_enabled, enabled, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,1,?,?)
+     ON DUPLICATE KEY UPDATE issuer=VALUES(issuer), client_id=VALUES(client_id),
+       client_secret=IF(VALUES(client_secret) IS NULL, client_secret, VALUES(client_secret)),
+       role_code=VALUES(role_code), scope=VALUES(scope), jit_enabled=VALUES(jit_enabled),
+       enabled=VALUES(enabled), updated_at=VALUES(updated_at)`,
+    [orgNo, 'oidc', issuer, clientId, secret && secret !== '' ? secret : null, roleCode,
+     String(body.scope || 'openid profile'), body.jit_enabled === 0 ? 0 : 1, now, now]
+  );
+  const row = (await d.query('SELECT id FROM idp_configs WHERE org_no=? LIMIT 1', [orgNo]))[0];
+  await audit(Object.assign({ action: 'idp_config.upsert', resource: 'idp_configs', resourceId: String(row.id), after: { org_no: orgNo, issuer, role_code: roleCode }, result: 'ok' }, ctx));
+  return { ok: true, org_no: orgNo };
+}
+
+/**
+ * IdP claims → 账号（匹配 (idp_type,idp_subject)；未命中且 JIT 开 → 建档）。
+ * 返回 {account, roles}；JIT 关闭且未命中 → null。
+ */
+async function resolveIdpAccount(config, claims, ctx) {
+  const d = di();
+  const subject = String(claims.sub || '');
+  const idpType = config.idp_type || 'oidc';
+  const found = await d.query(
+    "SELECT id FROM accounts WHERE idp_type=? AND idp_subject=? LIMIT 1", [idpType, subject]);
+  if (found.length) return getAccountWithRoles(found[0].id);
+  if (!config.jit_enabled) return null;
+  const org = (await d.query('SELECT id, org_type, name FROM orgs WHERE org_no=? LIMIT 1', [config.org_no]))[0];
+  if (!org) return null;
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const displayName = String(claims.name || claims.preferred_username || claims.sub).slice(0, 64);
+  const ins = await d.exec(
+    `INSERT INTO accounts(org_id, vendor_id, worker_id, principal_type, login_name, phone, password_hash, idp_type, idp_subject, display_name, status, created_at, updated_at)
+     VALUES (?,NULL,NULL,'user',NULL,NULL,NULL,?,?,?,'active',?,?)`,
+    [org.id, idpType, subject, displayName, now, now]
+  );
+  await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)',
+    [ins.insertId, config.role_code, JSON.stringify({ level: 'org', org_id: org.id })]);
+  const full = await getAccountWithRoles(ins.insertId);
+  await audit(Object.assign({ action: 'idp.jit-create', resource: 'account', resourceId: String(ins.insertId), after: full, result: 'ok' }, ctx));
+  return full;
+}
+
 module.exports = {
   init,
   ensureAuthSchema,
@@ -615,6 +705,11 @@ module.exports = {
   updateAccount,
   issueApiKey,
   listAccounts,
+  // IdP 联邦（阶段3）
+  getIdpConfig,
+  listIdpConfigs,
+  upsertIdpConfig,
+  resolveIdpAccount,
   // 工具
   audit,
   cleanupAudit,

@@ -5,9 +5,10 @@ const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
 const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
+const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
-  exec: async (sql, params) => { const [r] = await getPool().execute(sql, params || []); return r; },
+  exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
   jsonReply,
   expectedApiKey,
   expectedAdminPassword,
@@ -537,9 +538,25 @@ function getPool() {
   return _pool;
 }
 
+/** 连接类错误（连接池半开/被远端关闭/短暂不可达）→ 换连接重试一次；业务错误不重试 */
+const DB_RETRYABLE = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR'];
+async function withDbRetry(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    const code = e && (e.code || e.errno);
+    const fatal = e && e.fatal === true;
+    if (!DB_RETRYABLE.includes(code) && !fatal) throw e;
+    await new Promise((r) => setTimeout(r, 250));
+    return fn();
+  }
+}
+
 async function queryRows(sql, params) {
-  const [rows] = await getPool().execute(sql, params || []);
-  return rows;
+  return withDbRetry(async () => {
+    const [rows] = await getPool().execute(sql, params || []);
+    return rows;
+  });
 }
 
 const CATALOG_TTL_MS = 15000;
@@ -2944,6 +2961,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
           [proj.id]
         );
+        parseJsonFields(proj, ['tags', 'rating']);
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
         return jsonReply(res, { project: stripContactPhone(proj), units, photos });
       }
     }
@@ -2993,6 +3012,27 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // ===== 账号中心管理（platform_admin；原生多账号：任何主体直接挂 N 个 account）=====
+
+    // ===== IdP 联邦配置（platform_admin；secret 只写不读）=====
+    // GET /api/juzhu/admin/idp-configs
+    if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'GET') {
+      const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
+      if (!principal || (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
+        return jsonReply(res, { error: 'forbidden' }, 403);
+      }
+      return jsonReply(res, await authCenter.listIdpConfigs());
+    }
+    // PUT /api/juzhu/admin/idp-configs —— 新建/更新（body.org_no 为主键维度；client_secret 缺省=不改）
+    if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const wp = req.principal;
+      const out = await authCenter.upsertIdpConfig(body, {
+        accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+        ip: wp && wp.ip, ua: wp && wp.ua,
+      });
+      if (out.error) return jsonReply(res, { error: out.error }, 400);
+      return jsonReply(res, out);
+    }
 
     // GET /api/juzhu/admin/accounts?vendor_id=&org_id=&principal_type=
     // （旧全局 Key 过渡期允许只读；写操作已被入口闸拦截）
@@ -3951,10 +3991,82 @@ const mimeTypes = {
   '.pdf': 'application/pdf',
 };
 
-// ===== /api/auth/* —— 账号中心轻路由（登录 / 登出 / 身份），不属于 juzhu 域 =====
+// ===== /api/auth/* —— 账号中心轻路由（登录 / 登出 / 身份 / IdP 联邦），不属于 juzhu 域 =====
+
+// OIDC authorize 流程的 state → {nonce, verifier, exp}（单进程内存态，10 分钟单次消费）
+const idpStates = new Map();
+function idpStatePut(state, val) {
+  idpStates.set(state, Object.assign({ exp: Date.now() + 10 * 60 * 1000 }, val));
+  if (idpStates.size > 500) for (const [k, v] of idpStates) if (Date.now() > v.exp) idpStates.delete(k);
+}
+function idpStateTake(state) {
+  const v = idpStates.get(state);
+  if (!v || Date.now() > v.exp) { idpStates.delete(state); return null; }
+  idpStates.delete(state);
+  return v;
+}
+
 async function handleAuthRoutes(rawPath, qs, req, res) {
   const p = rawPath.replace(/\/+$/, '') || '/';
   try {
+    // ── IdP 联邦（阶段3 §4.6）：GET /api/auth/idp/login?org=<org_no>[&redirect_uri=] ──
+    if (p === '/api/auth/idp/login' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const orgNo = (qp.get('org') || '').trim();
+      const cfg = await authCenter.getIdpConfig(orgNo);
+      if (!cfg) return jsonReply(res, { error: 'not found', message: '组织未配置或未启用 IdP: ' + orgNo }, 404);
+      const base = 'http' + (req.headers['x-forwarded-proto'] === 'https' ? 's' : '') + '://' + (req.headers['x-forwarded-host'] || req.headers.host);
+      const redirectUri = base + '/api/auth/idp/callback';
+      const built = await idpOidc.buildAuthUrl(cfg, redirectUri);
+      idpStatePut(built.state, { nonce: built.nonce, verifier: built.verifier, org_no: orgNo, redirect_uri: redirectUri, next: (qp.get('next') || '').slice(0, 200) });
+      res.writeHead(302, { Location: built.url });
+      res.end();
+      return;
+    }
+    // ── GET /api/auth/idp/callback?code&state → 验签 → 匹配/JIT → 会话 ──
+    if (p === '/api/auth/idp/callback' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const st = idpStateTake(qp.get('state') || '');
+      if (!st) return jsonReply(res, { error: 'invalid_state', message: 'state 无效或已过期' }, 400);
+      if (qp.get('error')) return jsonReply(res, { error: qp.get('error'), message: qp.get('error_description') || '' }, 401);
+      const cfg = await authCenter.getIdpConfig(st.org_no);
+      if (!cfg) return jsonReply(res, { error: 'not found', message: 'IdP 配置已停用' }, 404);
+      let claims;
+      try {
+        claims = await idpOidc.exchangeAndVerify(cfg, {
+          code: qp.get('code'), nonce: st.nonce, verifier: st.verifier, redirectUri: st.redirect_uri,
+        });
+      } catch (e) {
+        return jsonReply(res, { error: 'idp_verify_failed', message: String(e.message || e) }, 401);
+      }
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
+      const ua = req.headers['user-agent'] || '';
+      const full = await authCenter.resolveIdpAccount(cfg, claims, {
+        accountId: null, principalType: 'idp', ip, ua,
+      });
+      if (!full) return jsonReply(res, { error: 'forbidden', message: 'JIT 建档未开启且无匹配账号' }, 403);
+      const sess = await authCenter.createSession(full.account.id, ip, ua);
+      await authCenter.audit({
+        accountId: full.account.id, principalType: 'idp', roles: full.roles,
+        action: 'auth.idp.login', resource: 'idp_configs', resourceId: st.org_no,
+        scopeLevel: authCenter.bestScopeLevel(full), ip, ua,
+      });
+      if (st.next && /^\/[^/]/.test(st.next)) {
+        res.writeHead(302, { Location: st.next + (st.next.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(sess.token) });
+        res.end();
+        return;
+      }
+      return jsonReply(res, {
+        token: sess.token,
+        expires_at: sess.expires_at,
+        account: full.account,
+        roles: full.roles.map((r) => r.role_code),
+        permissions: [...authCenter.permissionsOf(full)],
+        idp: { org_no: st.org_no, sub: claims.sub },
+      });
+    }
     if (p === '/api/auth/login' && req.method === 'POST') {
       await ensureSchema();
       const body = await readBody(req);
