@@ -26,6 +26,7 @@ for (const f of ['juzhu/.env.local', '.env', 'runtime.env']) {
 }
 const hmac = require('../hmac_auth.cjs');
 const mysql = require('mysql2/promise');
+const http = require('http');
 
 const BASE = (process.argv[2] || process.env.JUZHU_REG_BASE || 'http://127.0.0.1:8766').replace(/\/+$/, '');
 const DEMO_TAG = '演示';
@@ -89,6 +90,39 @@ async function catalogEventually(base, projectId, citySlug, want) {
   const conn = await connectDb();
   const vendor = await pickVendor(conn);
   console.log(`vendor: #${vendor.id} ${vendor.name}（${vendor.type}）\n`);
+
+  // ── Webhook 接收器：记录收到的签名事件，可按脚本要求返回 500 触发重试 ──
+  const hits = [];
+  const failFirst = new Set();       // 事件名集合：首次投递故意 500，验证重试
+  const hook = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => { raw += c; });
+    req.on('end', () => {
+      let body = null;
+      try { body = JSON.parse(raw || '{}'); } catch (_) {}
+      hits.push(body);
+      const key = body && body.event;
+      if (key && failFirst.has(key) && !failFirst[key + '_done']) {
+        failFirst[key + '_done'] = true;
+        res.writeHead(500); res.end('flaky'); return;
+      }
+      res.writeHead(200); res.end('ok');
+    });
+  });
+  await new Promise((r) => hook.listen(0, '127.0.0.1', r));
+  const hookPort = hook.address().port;
+  const [origHook] = await conn.execute('SELECT webhook_url FROM jz_vendors WHERE id=?', [vendor.id]);
+  await conn.execute('UPDATE jz_vendors SET webhook_url=? WHERE id=?', ['http://127.0.0.1:' + hookPort + '/hook', vendor.id]);
+  // 服务端推送前直读商家 webhook_url（不走进程缓存）：配置即时生效，无需重启
+  const waitForWebhook = async (event, timeoutMs) => {
+    const deadline = Date.now() + (timeoutMs || 30000);
+    while (Date.now() < deadline) {
+      const hit = hits.find((h) => h && h.event === event);
+      if (hit) return hit;
+      await new Promise((r2) => setTimeout(r2, 300));
+    }
+    return null;
+  };
 
   // ── 0) 清理上次运行残留（按名字前缀），保证可重跑 ──
   await conn.execute("DELETE FROM stay_calendar WHERE project_id IN (SELECT id FROM (SELECT id FROM projects WHERE name LIKE ? AND owner_vendor_id=?) t)", [RUN + '%', vendor.id]);
@@ -247,6 +281,49 @@ async function catalogEventually(base, projectId, citySlug, want) {
     check('已支付拒单 → refunded', r.status === 200 && r.j.pay_status === 'refunded', JSON.stringify(r.j));
   }
 
+  // 客户侧取消一笔（webhook 的 cancelled 由客户动作触发；商家自己拒单不推给自己）
+  const bk4 = await call('/api/juzhu/booking', {
+    project_id: mid, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
+    contact_name: '履约回归', contact_phone: bkPhone,
+  });
+  check('客户再下一单（用于取消事件）', bk4.status === 200, JSON.stringify(bk4.j));
+  bkIds.push(bk4.j.order_no);
+  await call('/api/juzhu/booking/cancel', { order_no: bk4.j.order_no, contact_phone: bkPhone });
+
+  // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
+  if (hits.length === 0) {
+    check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
+  } else {
+    const evCreated = await waitForWebhook('booking.created', 20000);
+    check('webhook booking.created 送达', !!evCreated, '未见事件');
+    if (evCreated) {
+      const v = hmac.verifySignature(vendor.hmac_key, evCreated);
+      check('webhook 签名可被商家验签（同 HMAC 算法）', v.ok === true, JSON.stringify(v));
+      check('webhook 载荷含订单号', evCreated.order && evCreated.order.order_no === bk.j.order_no,
+        evCreated.order && evCreated.order.order_no);
+      check('webhook 载荷不含明文手机号', !JSON.stringify(evCreated).includes(bkPhone), '');
+    }
+    // 首次 500 → 期待重试后仍送达（重试间隔 5s/30s/120s）：等到第 2 次投递落地再断言
+    failFirst.add('booking.cancelled');
+    let cancelHits = [];
+    const dl2 = Date.now() + 45000;
+    while (Date.now() < dl2) {
+      cancelHits = hits.filter((h) => h && h.event === 'booking.cancelled');
+      if (cancelHits.length >= 2) break;
+      await new Promise((r2) => setTimeout(r2, 300));
+    }
+    check('webhook booking.cancelled 送达（含 500 后重试）', cancelHits.length >= 2, 'hits=' + cancelHits.length);
+    const evCancelled = cancelHits[cancelHits.length - 1];
+    if (evCancelled) {
+      const v2 = hmac.verifySignature(vendor.hmac_key, evCancelled);
+      check('cancelled 事件验签通过', v2.ok === true, JSON.stringify(v2));
+      check('cancelled 事件订单号正确', evCancelled.order && evCancelled.order.order_no === bk4.j.order_no,
+        evCancelled.order && evCancelled.order.order_no);
+    }
+    const evPaid = hits.find((h) => h && h.event === 'booking.paid');
+    check('webhook booking.paid 送达（预付单）', !!evPaid, '');
+  }
+
   // 负例：不存在/他人订单 404
   r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: 999999 }));
   check('bookings/confirm 不存在 id → 404', r.status === 404, 'status=' + r.status);
@@ -258,6 +335,8 @@ async function catalogEventually(base, projectId, citySlug, want) {
   await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [mid]);
   await conn.execute('DELETE FROM units WHERE project_id=?', [mid]);
   await conn.execute('DELETE FROM projects WHERE id=?', [mid]);
+  await conn.execute('UPDATE jz_vendors SET webhook_url=? WHERE id=?', [origHook[0] && origHook[0].webhook_url || null, vendor.id]);
+  hook.close();
   // 删户型（新增一个一次性户型再删）
   r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, { project_id: pid, name: '一次性户型' }));
   const tmpUnit = r.j.unit && r.j.unit.id;

@@ -546,6 +546,69 @@ const unitNightPrice = stayCfg.unitNightPrice;
 const stayConfigOf = stayCfg.stayConfigOf;
 const stayDateList = stayCfg.stayDateList;
 
+// ===== 商家 Webhook 推送（平台 → 商家，HMAC 签名与开放接口同算法）=====
+// 事件：booking.created / booking.paid / booking.cancelled。只通知不担保必达：
+// 重试 3 次（5s/30s/120s）仍失败即放弃，商家以 bookings/list 拉取对账兜底。
+const WEBHOOK_RETRY_DELAYS = [5000, 30000, 120000];
+
+function webhookSign(secretKey, payload, timestamp) {
+  const hmacAuth = require('./hmac_auth.cjs');
+  const flat = hmacAuth.flattenAndFilter(payload);
+  flat.timestamp = String(timestamp);
+  return require('crypto').createHmac('sha256', secretKey)
+    .update(hmacAuth.buildStringToSign(flat), 'utf8').digest('hex');
+}
+
+async function deliverWebhook(vendor, event, data, attempt) {
+  const n = attempt || 0;
+  let res = null;
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 5000);
+    res = await fetch(vendor.webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: ac.signal,
+    }).finally(() => clearTimeout(timer));
+  } catch (_) { res = null; }
+  if (res && res.ok) {
+    console.log('[webhook] delivered', event, 'vendor#' + data.vendor_id, 'attempt', n + 1);
+    return;
+  }
+  if (n < WEBHOOK_RETRY_DELAYS.length) {
+    setTimeout(() => {
+      deliverWebhook(vendor, event, data, n + 1).catch(() => {});
+    }, WEBHOOK_RETRY_DELAYS[n]);
+  } else {
+    console.warn('[webhook] give up', event, 'vendor#' + data.vendor_id, 'after', n + 1, 'attempts');
+  }
+}
+
+/** 下发商家 webhook：签名体 = 事件 + 订单数据（不含 sign），同开放接口算法 */
+function notifyVendorBooking(vendorId, event, order) {
+  (async () => {
+    // 推送前直读商家行（不走 getVendorConfig 进程缓存）：webhook_url 配置即时生效
+    const conn = await mysql2.createConnection(getDbConfig());
+    let v = null;
+    try {
+      const [rows] = await conn.execute('SELECT id, hmac_key, webhook_url FROM jz_vendors WHERE id=?', [vendorId]);
+      v = rows[0] || null;
+    } finally { await conn.end(); }
+    if (!v || !v.webhook_url || !v.hmac_key) return;   // 未配置 = 不推送
+    const ts = Date.now();
+    const payload = { event, vendor_id: vendorId, order };
+    const body = {
+      event,
+      vendor_id: vendorId,
+      order,
+      timestamp: ts,
+      sign: webhookSign(v.hmac_key, payload, ts),
+    };
+    deliverWebhook(v, event, body, 0).catch(() => {});
+  })().catch((e) => console.warn('[webhook] notify error:', e.message));
+}
+
 /** 组装某月房态日历（规则见 stay_config.buildStayMonth；行读取走连接池） */
 function buildStayMonth(proj, unit, unitId, y, mo) {
   return stayCfg.buildStayMonth(queryRows, proj, unit, unitId, y, mo);
@@ -1368,6 +1431,7 @@ async function ensureSchemaRun() {
       ['jz_vendors', 'vendor_no VARCHAR(100)'],
       ['jz_vendors', 'whitelist_id INT'],
       ['jz_vendors', 'platform_certs TEXT'],
+      ['jz_vendors', 'webhook_url VARCHAR(500)'],
       ['jz_products', 'city_id INT'],
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
@@ -3461,6 +3525,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
           );
         }
         await conn.commit();
+        notifyVendorBooking(proj.owner_vendor_id, 'booking.created', {
+          order_no: orderNo, project_id: projectId, unit_id: unitId || null,
+          channel: proj.channel, checkin: checkin, checkout: checkout,
+          nights: nights, price_total: priceTotal, status: 'pending', pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
+        });
         return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights });
       } finally { await conn.end(); }
     }
@@ -3506,6 +3575,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         // 释放房态
         await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
         await conn.commit();
+        notifyVendorBooking(rows[0].owner_vendor_id, 'booking.cancelled', {
+          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
+          nights: rows[0].nights, price_total: rows[0].price_total,
+          status: 'cancelled', pay_status: newPay || null, cancel_by: 'customer',
+        });
         return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
       } finally { await conn.end(); }
     }
@@ -3526,6 +3601,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
         await conn.commit();
+        notifyVendorBooking(rows[0].owner_vendor_id, 'booking.paid', {
+          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
+          nights: rows[0].nights, price_total: rows[0].price_total,
+          status: rows[0].status, pay_status: 'paid', pay_method: payMethod, pay_at: now,
+        });
         return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status });
       } finally { await conn.end(); }
     }

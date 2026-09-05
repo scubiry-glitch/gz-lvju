@@ -246,7 +246,7 @@
       <li><a href="#auth">HMAC 签名认证</a></li>
       <li><a href="#dict">数据字典（projects / units / ext）</a></li>
       <li><a href="#endpoints">房源接口（创建 / 更新 / 上下架 / 户型）</a></li>
-      <li><a href="#fulfill">订单履约（查单 / 确认 / 拒单）</a></li>
+      <li><a href="#fulfill">订单履约与 Webhook（查单 / 确认 / 拒单 / 事件通知）</a></li>
       <li><a href="#calendar">房态日历与短住规则</a></li>
       <li><a href="#insurance">保险标识</a></li>
       <li><a href="#console">在线调试台（可直接下单接口）</a></li>
@@ -525,8 +525,33 @@
       <tr><td>确认前置</td><td>—</td><td><code>unpaid</code> 的订单不可确认（400），支付完成后可确认；<code>cancelled</code> 不可再变更</td></tr>
       <tr><td>拒单/取消</td><td>—</td><td>自动释放占用的房态晚；已支付订单 <code>pay_status</code> 标记 <code>refunded</code></td></tr>
     </table>
+    <h3>Webhook 事件通知（平台 → 商家）</h3>
+    <p>客户动作触发的订单变更，平台会<strong>主动推送签名事件</strong>到你为商家配置的通知地址（接入单里提供 URL 即可），不必轮询等单：</p>
+    <table>
+      <tr><th>event</th><th>触发时机</th><th>商家应做什么</th></tr>
+      <tr><td><code>booking.created</code></td><td>客户提交预订单</td><td>备房；预付单等待支付到账</td></tr>
+      <tr><td><code>booking.paid</code></td><td>预付单支付完成（惠居民宿）</td><td>此时方可确认订单</td></tr>
+      <tr><td><code>booking.cancelled</code></td><td>客户取消（商家自己拒单不会推送）</td><td>释放已备房源</td></tr>
+    </table>
+    <p>推送为 <code>POST</code> JSON，body 即开放接口同款结构：<code>event</code> + <code>vendor_id</code> + <code>order</code>（订单对象，手机号不外传）+ <code>timestamp</code> + <code>sign</code>。<strong>验签与开放接口同一算法</strong>（对去掉 <code>sign</code>/<code>timestamp</code> 的参数扁平排序后 HMAC-SHA256），收到后先验签再处理：</p>
+<pre><code><span class="tok-com">// Node 验签示例（与平台 hmac_auth.cjs 同算法）</span>
+app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
+  <span class="tok-key">const</span> body = req.body;
+  <span class="tok-key">const</span> payload = { ...body };
+  <span class="tok-key">delete</span> payload.sign;
+  <span class="tok-key">const</span> flat = flatten(payload);              <span class="tok-com">// 与请求签名同一套 flatten</span>
+  flat.timestamp = String(body.timestamp);
+  <span class="tok-key">const</span> expect = crypto.createHmac(<span class="tok-str">'sha256'</span>, HMAC_KEY)
+    .update(Object.keys(flat).sort().map(k =&gt; k + <span class="tok-str">'='</span> + flat[k]).join(<span class="tok-str">'&amp;'</span>)).digest(<span class="tok-str">'hex'</span>);
+  <span class="tok-key">if</span> (expect !== String(body.sign).toLowerCase()) <span class="tok-key">return</span> res.status(401).end();
+  <span class="tok-com">// 处理 body.event / body.order …</span>
+  res.status(200).end(<span class="tok-str">'ok'</span>);                    <span class="tok-com">// 2xx 即视为送达</span>
+});</code></pre>
+    <div class="callout warn">
+      <strong>送达语义：</strong>非 2xx 或超时（5s）视为失败，按 <strong>5s / 30s / 120s</strong> 重试 3 次后放弃——Webhook 是「尽力通知」，不担保必达；请以 <code>bookings/list</code> 定时对账兜底（推荐粒度：每分钟拉一次 <code>status='pending'</code>）。订单明细里不含客户明文手机号。
+    </div>
     <div class="callout info">
-      <strong>完整业务流（商家视角）：</strong>创建房源（草稿）→ 补价与户型 → 上架 → 房态/夜价日常维护 → 拉取订单 → 确认或拒单 → 入住 / 离店；任一环节失败都会返回明确的 400/404 与原因（见 <a href="#errors">错误码</a>）。
+      <strong>完整业务流（商家视角）：</strong>创建房源（草稿）→ 补价与户型 → 上架 → 房态/夜价日常维护 → 收 Webhook（或拉单对账）→ 确认或拒单 → 入住 / 离店；任一环节失败都会返回明确的 400/404 与原因（见 <a href="#errors">错误码</a>）。
     </div>
   </section>
 
