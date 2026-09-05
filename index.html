@@ -502,6 +502,17 @@
     return { tall: phase === 3, wide: phase === 2 };
   }
 
+  // 磁力瓦片按房源量降序（规模大的区排前面）：主序=在管房源量，平手依次比项目数/原序；空区自然沉底
+  function sortCollageByStock(list) {
+    return list.slice().sort(function (a, b) {
+      var s = JUZHU.districtManagedUnits(b) - JUZHU.districtManagedUnits(a);
+      if (s) return s;
+      var pc = (b.project_count || 0) - (a.project_count || 0);
+      if (pc) return pc;
+      return (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
+    });
+  }
+
   function renderCollage(list){
     document.getElementById('collage').innerHTML = list.map(function(d,i){
       var lay = collageLayout(d, list);
@@ -992,7 +1003,7 @@
     }
     paintTabs();
     renderHero(d);
-    renderCollage(JUZHU.districts());
+    renderCollage(sortCollageByStock(JUZHU.districts()));
     renderTrade(JUZHU.tradeListings());
     // 频道 pane：长租排除「旅居」tag（旅居走民宿/旅居入口，避免同房源双入口）；其余频道全量
     var lvjuOnly = function(p){ return (JUZHU.asTags(p.tags) || []).indexOf('旅居') >= 0; };
