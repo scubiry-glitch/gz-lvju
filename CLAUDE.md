@@ -123,7 +123,7 @@
 
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
-- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`）
+- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（家政）+ `/api/juzhu/housing/vendor/*`（房源，2026-09）（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`；文档页 `screens/property-intake-api.html` 含在线调试台，回归 `node scripts/housing_vendor_hmac_regression.cjs`）
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
 - **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
@@ -157,7 +157,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 
 - **房态**：`stay_calendar` 表只存差异行（`status: open/blocked/booked`、`price_night` 覆盖、`booking_id`），**无行 = 默认可订**；`unit_id=0` 表示项目级（整栋/不限房型）。`booked` 只由下单写入、取消自动释放，商家接口不可改已订晚。
   - C 端公开读：`GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（含夜价/三态/最短连住/保险）
-  - 商家读写：`GET|POST /api/juzhu/vendor/stay-calendar`（关房/开房/设夜价，owner 校验）
+  - 商家读写（会话态）：`GET|POST /api/juzhu/vendor/stay-calendar`；商家读写（HMAC 开放态）：`POST /api/juzhu/housing/vendor/stay-calendar`（owner 校验）
 - **最短连住**：`STAY_MIN_NIGHTS_DEFAULT`（rental=15 晚 / minsu=1）+ `projects.ext.min_stay_nights`（1-365，商家可覆盖）。**三处同口径校验**：C 端日历选段、下单页、`POST /api/juzhu/booking` 服务端兜底；改口径只改服务端常量或 ext，不要在前端另设数字。
 - **保险标识**：`INSURANCE_TYPES`（`switch_rental` 换租保险 / `hotel_cancel` 酒店取消险 / `property` 财产保险）是唯一枚举，存 `projects.ext.insurance`（key 数组），商家经 `PUT /api/juzhu/vendor/projects/:id` 配置；catalog/项目详情按 `insurance_types` 下发（含 label/icon），C 端直接渲染，**不要再造一份中文名映射**。
 - **回填工具**：`node scripts/stay-calendar-init.cjs`（保险缺配置按频道默认补齐 + 存量订单重建为 booked 行，幂等可重跑）。

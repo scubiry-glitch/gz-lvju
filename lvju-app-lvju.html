@@ -127,6 +127,7 @@
    选定后卡片按「晚数 × 起价/30」估总价，并透传 ?checkin/&checkout 到详情/下单。 */
 (function(){
   var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
+  var API_MINSU = '/api/juzhu/catalog?city=guiyang&channel=minsu';   // minsu 带「旅居」tag 的也进旅居视图
   var MIN_NIGHTS = 15;                       // 旅居连住下限（服务端同口径，商家可在项目上覆盖）
   var TODAY = new Date(); TODAY.setHours(0,0,0,0);
   var MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
@@ -151,7 +152,8 @@
     var wrap = document.getElementById('listingWrap');
     if (!cat) return;
     var projects = (cat.projects || []).filter(function(p){
-      return p.channel === 'rental' && (p.tags || []).indexOf('旅居') >= 0;   // 旅居视图：仅带「旅居」tag 的 rental
+      // 旅居视图：rental + minsu 两频道中带「旅居」tag 的房源（merge 已注入 minsu 项目）
+      return (p.channel === 'rental' || p.channel === 'minsu') && (p.tags || []).indexOf('旅居') >= 0;
     });
     var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
     var umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
@@ -192,8 +194,13 @@
     }).join('');
   }
 
-  fetch(API).then(function(r){ return r.json(); }).then(function(c){
-    cat = c; paint();
+  // 旅居视图 = rental + minsu 两频道中带「旅居」tag 的房源（两频道均支持旅居 tag）
+  Promise.all([fetch(API).then(function(r){ return r.json(); }), fetch(API_MINSU).then(function(r){ return r.json(); })])
+  .then(function(rs){
+    cat = rs[0];
+    var minsu = rs[1] || { projects: [], units: [], districts: [] };
+    (minsu.projects || []).forEach(function(p){ if ((p.tags || []).indexOf('旅居') >= 0) { p.channel = 'minsu'; cat.projects.push(p); (cat.units = cat.units || []).push.apply(cat.units, (minsu.units || []).filter(function(u){ return u.project_id === p.id; })); } });
+    paint();
   }).catch(function(){
     document.getElementById('listingWrap').innerHTML =
       '<div style="grid-column:1/-1;text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';

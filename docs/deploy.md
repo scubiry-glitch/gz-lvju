@@ -160,6 +160,10 @@ User=www
   - `PUT /api/juzhu/vendor/projects/:id`（ext：`insurance` 三类标识 + `min_stay_nights`）
   - `POST /api/juzhu/booking` 下单即锁房（stay_calendar booked），取消自动释放；最短连住服务端兜底
   - 回填：`node scripts/stay-calendar-init.cjs`；管理页：`screens/b-stay-calendar.html`
+- 房源开放接口（2026-09-09，商家 HMAC，与家政同机制）：
+  - 前缀 `/api/juzhu/housing/vendor/*`（projects list/detail/create/update/status + units create/update + stay-calendar/set），实现 `vendor_api.cjs` `HOUSING_ROUTES`
+  - 签名同 `hmac_auth.cjs`；文档页 `screens/property-intake-api.html`（v2.0，含在线调试台）；回归 `node scripts/housing_vendor_hmac_regression.cjs`
+  - 单一数据源 `stay_config.cjs`（INSURANCE_TYPES / 最短连住 / 夜价口径），app.js 与 vendor_api.cjs 共用
 
 ## 6. 演示与测试数据（本地库）
 
