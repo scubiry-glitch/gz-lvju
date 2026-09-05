@@ -129,7 +129,7 @@ window.JUZHU = (function () {
 
   function load(opts) {
     opts = opts || {};
-    if (cache) return Promise.resolve(cache);
+    if (cache && !opts.fresh) return Promise.resolve(cache);   // fresh=true: 换城后强制重拉 catalog
     var lite = !!opts.lite;
     return loadFromCatalog(lite).catch(function () {
       return loadFromJson();

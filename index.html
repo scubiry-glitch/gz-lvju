@@ -822,10 +822,12 @@
 
   document.getElementById('tabs').addEventListener('click',function(e){
     var t = e.target.closest('[data-tab]'); if(!t) return;
+    curTab = t.dataset.tab;
     activateTab(t.dataset.tab);
   });
 
   var initTab = new URLSearchParams(location.search).get('tab') || (location.hash || '').replace('#', '');
+  var curTab = initTab;   // 当前选中 tab（切城市重绘时保持不动）
   // 默认杂志混排（lifeLayout=v3）；可用 ?lifeLayout=v3|v4|v5|v6|default 覆盖
   var lifeLayout = new URLSearchParams(location.search).get('lifeLayout') || 'v3';
   if (lifeLayout === 'default') lifeLayout = '';
@@ -838,10 +840,25 @@
     var chs = JUZHU.enabledChannels();
     if (!chs.length) return;
     tabs.innerHTML = chs.map(function(c, i) {
-      var on = initTab ? (c.id === initTab) : (i === 0);
+      var on = curTab ? (c.id === curTab) : (initTab ? c.id === initTab : i === 0);
       return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
     }).join('');
-    activateTab(initTab || (chs[0] && chs[0].id) || 'bzf');
+    activateTab(curTab || initTab || (chs[0] && chs[0].id) || 'bzf');
+  }
+
+  // 数据到达后的统一绘制（启动与切城市共用）：tab 保留当前选中，全部 pane 重绘
+  function paintData(d) {
+    lastData = d;
+    paintTabs();
+    renderHero(d);
+    renderCollage(sortCollageByStock(JUZHU.districts()));
+    renderTrade(JUZHU.tradeListings());
+    // 频道 pane：长租排除「旅居」tag（旅居走民宿/旅居入口，避免同房源双入口）；其余频道全量
+    var lvjuOnly = function(p){ return (JUZHU.asTags(p.tags) || []).indexOf('旅居') >= 0; };
+    renderChannelPane('rental', JUZHU.projects({ channel: 'rental' }).filter(function(p){ return !lvjuOnly(p); }));
+    renderChannelPane('minsu', JUZHU.projects({ channel: 'minsu' }));
+    renderChannelPane('newhouse', JUZHU.projects({ channel: 'newhouse' }));
+    renderChannelPane('resale', JUZHU.projects({ channel: 'resale' }));
   }
 
   // 领券中心 + 专题
@@ -979,13 +996,26 @@
     if (prov) { sheetProv = prov.getAttribute('data-prov'); renderProvCol(); renderCityCol(); return; }
     var pick = e.target.closest('[data-city]');
     if (!pick) return;
-    BZF_JZ.setRegionCity(pick.getAttribute('data-city'));
-    applyChannelChrome(lastData);
-    if (lastData) {
-      var brand = (window.JUZHU && JUZHU.channelBrand) ? JUZHU.channelBrand() : { short: '新居住' };
-      document.getElementById('heroTitle').textContent = cityOf(lastData) + ' · ' + brand.short;
-    }
+    var picked = pick.getAttribute('data-city');
+    if (picked === BZF_JZ.regionCity()) { closeCitySheet(); return; }
+    BZF_JZ.setRegionCity(picked);
+    // URL ?city= 直链优先级高于本地存储：同步改写地址栏，否则重拉仍取直链城市
+    try {
+      var qs2 = new URLSearchParams(location.search);
+      qs2.set('city', picked);
+      history.replaceState(null, '', location.pathname + (qs2.toString() ? '?' + qs2.toString() : ''));
+    } catch (e2) {}
     closeCitySheet();
+    applyChannelChrome(lastData);
+    // 目标城市数据强制重拉 + 全部 pane 重绘（catalog 缓存用 fresh 旁路）
+    var collageEl = document.getElementById('collage');
+    if (collageEl) collageEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">正在切换城市…</div>';
+    JUZHU.load({ lite: true, fresh: true }).then(function (d) {
+      paintData(d);
+      if (window.BZF_JZ) BZF_JZ.skus().then(renderJiazhengSubs).catch(function () {});   // 家政货架也按新城重取
+    }).catch(function () {
+      if (collageEl) collageEl.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#991b1b;padding:26px 0;">城市数据加载失败 · 请重试</div>';
+    });
   });
 
   Promise.all([JUZHU.load({ lite: true }), JUZHU.loadSettings()]).then(function(results) {
@@ -1001,16 +1031,7 @@
         BZF_JZ.setRegionCity(d.city.name);
       }
     }
-    paintTabs();
-    renderHero(d);
-    renderCollage(sortCollageByStock(JUZHU.districts()));
-    renderTrade(JUZHU.tradeListings());
-    // 频道 pane：长租排除「旅居」tag（旅居走民宿/旅居入口，避免同房源双入口）；其余频道全量
-    var lvjuOnly = function(p){ return (JUZHU.asTags(p.tags) || []).indexOf('旅居') >= 0; };
-    renderChannelPane('rental', JUZHU.projects({ channel: 'rental' }).filter(function(p){ return !lvjuOnly(p); }));
-    renderChannelPane('minsu', JUZHU.projects({ channel: 'minsu' }));
-    renderChannelPane('newhouse', JUZHU.projects({ channel: 'newhouse' }));
-    renderChannelPane('resale', JUZHU.projects({ channel: 'resale' }));
+    paintData(d);
     revealHome();
   }).catch(function(err) {
     document.getElementById('err').hidden = false;
