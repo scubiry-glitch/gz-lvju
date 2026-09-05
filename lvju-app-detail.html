@@ -290,12 +290,11 @@
     if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
     document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
       '<span>' + (p.is_featured ? '平台精选 · ' : '') + '连住 ' + minNights + ' 晚起 · ' + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
-    // CTA 分流（口径）：minsu 民宿 + rental 带「旅居」tag → 立即预订；
-    // rental 长租 → 400 电话咨询 + 在线预订单（双入口）；
-    // newhouse / resale → 400 电话咨询（virtual-phone）
+    // CTA 分流（口径 2026-09-05）：minsu → 立即预订（预付收银台）；
+    // rental（长租/旅居均含）→ 400 电话咨询 + 在线预订单 双入口；
+    // newhouse / resale → 400 电话咨询
     var bk = document.querySelector('.cta .btn');
-    var isStay = p.channel === 'minsu' ||
-      (p.channel === 'rental' && tags.indexOf('旅居') >= 0);
+    var isStay = p.channel === 'minsu';
     if (bk && isStay) {
       bk.textContent = '立即预订';
       bk.href = 'lvju-app-booking.html?id=' + id + (units.length ? '&unit=' + units[0].id : '');
