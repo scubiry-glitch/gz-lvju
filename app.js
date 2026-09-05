@@ -417,7 +417,7 @@ function stripVendorSecrets(obj) {
 function isVendorHmacPath(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || '').toUpperCase();
-  return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/'));
+  return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/') || p.startsWith('/api/juzhu/housing/vendor/'));
 }
 
 /**
@@ -532,71 +532,19 @@ function stripContactPhone(row) {
   return out;
 }
 
-// ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源 =====
-// 保险标识：商家在 projects.ext.insurance（key 数组）配置，catalog / 项目详情按此下发
-const INSURANCE_TYPES = [
-  { key: 'switch_rental', label: '换租保险', short: '换租险', icon: '🔄' },
-  { key: 'hotel_cancel', label: '酒店取消险', short: '取消险', icon: '🏨' },
-  { key: 'property', label: '财产保险', short: '财险', icon: '🛡' },
-];
-const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
-// 最短连住晚数（详情日历与下单共同校验）：rental 旅居/长租 15 晚起住，minsu 惠民短住 1 晚起；
-// 商家可在 projects.ext.min_stay_nights 覆盖（1–365）
-const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 1 };
-// 房态：open 可订 / blocked 关房（商家手工） / booked 已订（下单占用）
-const STAY_STATUS = { OPEN: 'open', BLOCKED: 'blocked', BOOKED: 'booked' };
-
-function parseExtObj(v) {
-  if (!v) return {};
-  if (typeof v === 'object') return v;
-  try {
-    const o = JSON.parse(v);
-    return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
-  } catch (_) { return {}; }
-}
-
-function insuranceOf(proj) {
-  const list = parseExtObj(proj && proj.ext).insurance;
-  if (!Array.isArray(list)) return [];
-  const seen = [];
-  for (const k of list) {
-    if (INSURANCE_KEYS.includes(k) && !seen.includes(k)) seen.push(k);
-  }
-  return seen;
-}
-
-function minStayNightsOf(proj) {
-  const raw = parseInt(parseExtObj(proj && proj.ext).min_stay_nights, 10);
-  let v = Number.isFinite(raw) ? raw : (STAY_MIN_NIGHTS_DEFAULT[(proj && proj.channel)] || 1);
-  if (!(v >= 1)) v = 1;
-  return Math.min(v, 365);
-}
-
-/** 项目/户型夜价默认口径（规则15）：minsu=units.ext.price_night / price_from；rental=月租/30 折算 */
-function unitNightPrice(proj, unit) {
-  const p = proj || {};
-  if (unit) {
-    if (p.channel === 'minsu') {
-      const ux = parseExtObj(unit.ext);
-      if (ux.price_night) return Math.round(ux.price_night);
-    } else if (unit.rent_monthly) {
-      return Math.max(1, Math.round(unit.rent_monthly / 30));
-    }
-  }
-  const base = p.price_from || 0;
-  if (!base) return 0;
-  return p.channel === 'minsu' ? base : Math.max(1, Math.round(base / 30));
-}
-
-/** 项目房态配置（随 catalog / 项目详情 / 房态日历下发） */
-function stayConfigOf(proj) {
-  const ins = insuranceOf(proj);
-  return {
-    min_stay_nights: minStayNightsOf(proj),
-    insurance: ins,
-    insurance_types: INSURANCE_TYPES.filter((t) => ins.includes(t.key)),
-  };
-}
+// ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源：stay_config.cjs =====
+// 会话态接口（app.js）与商家 HMAC 开放接口（vendor_api.cjs）共用同一份口径
+const stayCfg = require('./stay_config.cjs');
+const INSURANCE_TYPES = stayCfg.INSURANCE_TYPES;
+const INSURANCE_KEYS = stayCfg.INSURANCE_KEYS;
+const STAY_MIN_NIGHTS_DEFAULT = stayCfg.STAY_MIN_NIGHTS_DEFAULT;
+const STAY_STATUS = stayCfg.STAY_STATUS;
+const parseExtObj = stayCfg.parseExtObj;
+const insuranceOf = stayCfg.insuranceOf;
+const minStayNightsOf = stayCfg.minStayNightsOf;
+const unitNightPrice = stayCfg.unitNightPrice;
+const stayConfigOf = stayCfg.stayConfigOf;
+const stayDateList = stayCfg.stayDateList;
 
 /** 组装某月房态日历：只存差异行，无行=open；blocked/booked 压过同日项目级 open；夜价覆盖户型级 > 项目级 > 默认 */
 async function buildStayMonth(proj, unit, unitId, y, mo) {
@@ -635,17 +583,6 @@ async function buildStayMonth(proj, unit, unitId, y, mo) {
     });
   }
   return { month: y + '-' + pad2(mo + 1), base_price_night: defPrice || null, days };
-}
-
-/** 闭区间 [checkin, checkout) 的日期串列表（YYYY-MM-DD） */
-function stayDateList(checkin, checkout) {
-  const out = [];
-  const start = new Date(checkin + 'T00:00:00');
-  const end = new Date(checkout + 'T00:00:00');
-  for (let d = start; d < end && out.length < 3650; d.setDate(d.getDate() + 1)) {
-    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
-  }
-  return out;
 }
 
 module.exports.stayConfigOf = stayConfigOf;
@@ -1431,10 +1368,10 @@ async function ensureSchemaRun() {
     }
     // 初始化 channels 种子数据（bzf 已转为 topic，不再作为 channel —— 见 CLAUDE.md 房源库通用化）
     const channelSeeds = [
-      ['rental', '租赁住宿', 0],
+      ['rental', '长租', 0],
       ['trade', '卖旧买新专区', 2],
       ['jiazheng', '生活服务专区', 3],
-      ['minsu', '惠居民宿', 4],
+      ['minsu', '民宿', 4],
       ['newhouse', '新房', 5],
       ['resale', '二手', 6],
     ];
@@ -1726,8 +1663,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     await ensureSchema();
 
-    // ===== 商家 HMAC 开放接口（api_doc.md）=====
-    if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/'))) {
+    // ===== 商家 HMAC 开放接口（api_doc.md：家政 /api/juzhu/jiazheng/vendor/*；房源 /api/juzhu/housing/vendor/*）=====
+    if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/') || urlPath.startsWith('/api/juzhu/housing/vendor/'))) {
       if (!vendorApi) return jsonReply(res, { code: 500, message: 'vendor_api module missing' }, 500);
       const body = await readBody(req);
       const vendors = await getVendorConfig();
@@ -3482,11 +3419,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (new Date(checkin) < new Date(new Date().toDateString())) return jsonReply(res, { error: '入住日期不能早于今天' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [projs] = await conn.execute('SELECT id, name, channel, status, price_from, owner_vendor_id, city_id, ext FROM projects WHERE id=?', [projectId]);
+        const [projs] = await conn.execute('SELECT id, name, channel, status, price_from, owner_vendor_id, city_id, ext, tags FROM projects WHERE id=?', [projectId]);
         const proj = projs[0];
         if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
         if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
         if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
+        // 在线预订仅开放：minsu 民宿 + rental 带「旅居」tag 的旅居房源；
+        // 长租/新房/二手走 400 电话咨询（规则：非短住业态不提供在线下单）
+        var projTags = [];
+        try { projTags = JSON.parse(proj.tags || '[]'); } catch (_) { projTags = []; }
+        var bookable = proj.channel === 'minsu' || (proj.channel === 'rental' && projTags.indexOf('旅居') >= 0);
+        if (!bookable) { conn.end(); return jsonReply(res, { error: '该频道仅支持电话咨询，请拨打页面咨询电话' }, 400); }
         // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
         const minNights = minStayNightsOf(proj);
         if (nights < minNights) {
