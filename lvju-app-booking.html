@@ -71,6 +71,7 @@
       <div>
         <div class="bfield"><span class="l">入住日期</span><input type="date" id="fIn" /></div>
         <div class="bfield"><span class="l">离店日期</span><input type="date" id="fOut" /></div>
+        <div class="bfield" style="border-bottom:0;"><span class="l" style="flex:1;font-size:11.5px;color:#92400e;" id="stayNote">旅居房源须连续入住 · 连住 15 晚起</span></div>
         <div class="bfield"><span class="l">房型</span>
           <select id="fUnit" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"></select>
         </div>
@@ -208,15 +209,21 @@
   }
 
   /* ── 房源 + 价格 ── */
+  var minNights = 15;     // 旅居口径连住下限（随项目下发，服务端同口径兜底）
   function calc(){
     var ci = document.getElementById('fIn').value, co = document.getElementById('fOut').value;
     var n = (ci && co) ? Math.round((new Date(co) - new Date(ci)) / 864e5) : 0;
-    var total = (n >= 1 && perNight) ? perNight * n : 0;
+    var short_ = (n >= 1 && n < minNights);
+    var total = (n >= minNights && perNight) ? perNight * n : 0;
     document.getElementById('pLine').textContent = '房费 ¥' + fmt(perNight) + ' × ' + (n > 0 ? n : '—') + ' 晚';
     document.getElementById('pTotal').textContent = total ? '¥' + fmt(total) : '—';
     document.getElementById('pSum').textContent = total ? '¥' + fmt(total) : '—';
     document.querySelector('#cTotal b').textContent = total ? '¥' + fmt(total) : '—';
-    document.querySelector('#cTotal span').textContent = n >= 1 ? '共 ' + n + ' 晚' : '待选日期';
+    document.querySelector('#cTotal span').textContent =
+      short_ ? '连住不足 ' + minNights + ' 晚' : (n >= 1 ? '共 ' + n + ' 晚' : '待选日期');
+    var note = document.getElementById('stayNote');
+    if (short_) note.textContent = '⚠ 该房源须连续入住 ≥ ' + minNights + ' 晚，当前 ' + n + ' 晚';
+    else note.textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
   }
 
   function load(pid){
@@ -234,6 +241,13 @@
       document.getElementById('bStar').textContent = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 星 · 已评级' : '在架';
       if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
       perNight = p.price_from || 0;
+      // 最短连住（旅居口径：rental 15 晚起 / minsu 1 晚起，商家可在项目上覆盖）+ 最早可入住日
+      minNights = p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15);
+      var today = new Date(); today.setHours(0,0,0,0);
+      var tmin = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      document.getElementById('fIn').min = tmin;
+      document.getElementById('fOut').min = tmin;
+      document.getElementById('stayNote').textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
       unitSel.innerHTML = '<option value="">不限房型（按起价）</option>' + units.map(function(u){
         u.tags = asArr(u.tags);
         var ex = {};
@@ -289,6 +303,9 @@
   document.getElementById('bSubmit').addEventListener('click', function(){
     err.style.display = 'none';
     if (!curId) { showErr('房源未加载，请稍后再试'); return; }
+    var ciV = document.getElementById('fIn').value, coV = document.getElementById('fOut').value;
+    var nV = (ciV && coV) ? Math.round((new Date(coV) - new Date(ciV)) / 864e5) : 0;
+    if (nV < minNights) { showErr('该房源须连续入住 ≥ ' + minNights + ' 晚（当前 ' + (nV || 0) + ' 晚），请回到详情日历选择连续时间段'); return; }
     var body = {
       project_id: curId,
       unit_id: unitSel.value ? parseInt(unitSel.value, 10) : null,
