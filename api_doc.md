@@ -882,6 +882,27 @@ curl -G https://test-domain/mall/beike/juzhu/order/detail \
 
 ---
 
+## 5.9 房源开放接口（housing，2026-09 增补）
+
+复用本文档第 2 节的同一套 HMAC-SHA256 签名（同密钥体系 `jz_vendors.hmac_key`、同 sign/timestamp 约定），路径前缀换为 `/api/juzhu/housing/vendor/*`，全部 `POST` JSON，响应 `{code, message, ...}`（成功 code=0）。
+
+| 接口 | 说明 |
+|------|------|
+| `/api/juzhu/housing/vendor/projects/list` | 本商家房源列表（可按 channel/status/city_id/keyword 过滤，≤200 条） |
+| `/api/juzhu/housing/vendor/projects/detail` | 房源详情 + 户型明细 |
+| `/api/juzhu/housing/vendor/projects/create` | 创建房源（默认 `draft` 不入 C 端；可带 `units` 一次建全；`contact_phone` 仅入库不回显） |
+| `/api/juzhu/housing/vendor/projects/update` | 按 id 增量更新（价格/地址/标签/保险/最短连住等；`city_id`/`channel` 不可改） |
+| `/api/juzhu/housing/vendor/projects/status` | 上下架：`online` / `offline` / `draft`（上架前置：已有 `price_from` 且 ≥1 个户型） |
+| `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext`） |
+| `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价等） |
+| `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房 / `open` 开房（可带 `price_night` 覆盖或恢复默认）；已订晚不可改 |
+
+字段字典、上架语义（C 端 catalog 只出 `online`，≤15s 缓存）、保险标识枚举（`switch_rental`/`hotel_cancel`/`property`）、最短连住（缺省 rental=15 晚）与完整示例见线上文档页 `screens/property-intake-api.html`（含可直接调用的在线调试台）。
+
+回归：`node scripts/housing_vendor_hmac_regression.cjs [base_url]`（创建→上架→C 端可见→更新→房态→下架→越权负例→清理，全链路真实签名）。
+
+---
+
 ## 6. 参考实现（Python）
 
 ```python

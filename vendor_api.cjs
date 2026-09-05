@@ -1,8 +1,10 @@
 // vendor_api.cjs — 商家 HMAC 开放接口（对齐 api_doc.md）
+// 家政：/api/juzhu/jiazheng/vendor/*；房源：/api/juzhu/housing/vendor/*（同一套 HMAC 鉴权）
 'use strict';
 
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
+const stayCfg = require('./stay_config.cjs');
 
 function reply(status, data) {
   return { status, data };
@@ -346,13 +348,426 @@ const VENDOR_ROUTES = {
   '/api/juzhu/jiazheng/vendor/products/delete': productsDelete,
 };
 
+// ============================================================
+// 房源开放接口（/api/juzhu/housing/vendor/*）
+// 与会话态 /api/juzhu/vendor/* 同一库、同一口径：owner_vendor_id 隔离、
+// 上架=projects.status、保险/最短连住走 projects.ext（stay_config 单一数据源）
+// ============================================================
+
+function stripContactPhone(row) {
+  if (!row) return row;
+  const out = Object.assign({}, row);
+  delete out.contact_phone;
+  return out;
+}
+
+function slugifyName(name) {
+  return (String(name || '').replace(/[（(].*?[）)]/g, '').trim().replace(/\s+/g, '-')) || 'item';
+}
+
+async function uniqueProjectSlug(conn, channel, name, want) {
+  const base = String(want || '').trim() || slugifyName(name);
+  let slug = base;
+  for (let i = 2; i < 50; i++) {
+    const [rows] = await conn.execute(
+      'SELECT id FROM projects WHERE channel=? AND slug=? LIMIT 1', [channel, slug]);
+    if (!rows.length) return slug;
+    slug = base + '-' + i;
+  }
+  return base + '-' + Date.now();
+}
+
+async function uniqueUnitSlug(conn, projectId, name, want) {
+  const base = String(want || '').trim() || slugifyName(name);
+  let slug = base;
+  for (let i = 2; i < 50; i++) {
+    const [rows] = await conn.execute(
+      'SELECT id FROM units WHERE project_id=? AND slug=? LIMIT 1', [projectId, slug]);
+    if (!rows.length) return slug;
+    slug = base + '-' + i;
+  }
+  return base + '-' + Date.now();
+}
+
+function tagsToDb(v) {
+  if (v == null || v === '') return null;
+  if (Array.isArray(v)) return JSON.stringify(v.map((x) => String(x == null ? '' : x).trim()).filter(Boolean));
+  return JSON.stringify(String(v).split(',').map((x) => x.trim()).filter(Boolean));
+}
+
+function phoneFromBody(v) {
+  if (v == null || v === '') return null;
+  const s = String(v).trim();
+  if (!/^1\d{10}$/.test(s)) throw new Error('contact_phone 须为 11 位手机号');
+  return s;
+}
+
+/** 商家自有房源校验：不存在/非本商家 → 404（不泄露他人房源存在性） */
+async function ownProject(conn, vendorId, pid) {
+  const [rows] = await conn.execute('SELECT * FROM projects WHERE id=?', [parseInt(pid, 10)]);
+  if (!rows.length || rows[0].owner_vendor_id !== vendorId) return null;
+  return rows[0];
+}
+
+async function vendorAllowedCityIds(conn, vendorId) {
+  const ids = await vendorCityIds(conn, vendorId);
+  return ids; // 空 = 未配置城市约束（不限制）
+}
+
+async function housingProjectOut(conn, row) {
+  const out = stripContactPhone(Object.assign({}, row));
+  Object.assign(out, stayCfg.stayConfigOf(row));
+  return out;
+}
+
+async function housingProjectsList(conn, body, vendorId) {
+  let sql = `SELECT p.*, d.name AS district_name, c.name AS city_name
+             FROM projects p
+             LEFT JOIN districts d ON d.id=p.district_id
+             LEFT JOIN cities c ON c.id=p.city_id
+             WHERE p.owner_vendor_id=?`;
+  const params = [vendorId];
+  const b = body || {};
+  if (b.channel) { sql += ' AND p.channel=?'; params.push(String(b.channel)); }
+  if (b.status) { sql += ' AND p.status=?'; params.push(String(b.status)); }
+  if (b.city_id != null && b.city_id !== '') { sql += ' AND p.city_id=?'; params.push(parseInt(b.city_id, 10)); }
+  const kw = String(b.keyword || '').trim();
+  if (kw) { sql += ' AND p.name LIKE ?'; params.push('%' + kw + '%'); }
+  sql += ' ORDER BY p.sort_order, p.id DESC LIMIT 200';
+  const [rows] = await conn.execute(sql, params);
+  const list = [];
+  for (const r of rows) list.push(await housingProjectOut(conn, r));
+  return reply(200, { code: 0, message: 'success', list, total: list.length });
+}
+
+async function housingProjectsDetail(conn, body, vendorId) {
+  const pid = body && body.id;
+  if (!pid) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, pid);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  const [units] = await conn.execute('SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id', [row.id]);
+  return reply(200, {
+    code: 0, message: 'success',
+    project: await housingProjectOut(conn, row),
+    units,
+  });
+}
+
+/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错 */
+function extFromBody(body, baseExt) {
+  const ext = stayCfg.parseExtObj(baseExt);
+  if (Object.prototype.hasOwnProperty.call(body, 'insurance')) {
+    if (body.insurance === null || body.insurance === '') ext.insurance = [];
+    else if (Array.isArray(body.insurance)) {
+      const unknown = body.insurance.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
+      if (unknown.length) throw new Error('insurance 含未知标识: ' + unknown.join(',') + '（可用: ' + stayCfg.INSURANCE_KEYS.join('/') + '）');
+      ext.insurance = body.insurance.map(String);
+    } else throw new Error('insurance 须为标识数组: ' + stayCfg.INSURANCE_KEYS.join('/'));
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'min_stay_nights')) {
+    if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
+    else {
+      const v = parseInt(body.min_stay_nights, 10);
+      if (!(v >= 1 && v <= 365)) throw new Error('min_stay_nights 须为 1-365 的整数');
+      ext.min_stay_nights = v;
+    }
+  }
+  return ext;
+}
+
+const PROJECT_UPDATABLE_COLS = ['name', 'address', 'cover_image', 'sort_order', 'price_from',
+  'is_featured', 'featured_rank', 'old_house_hint', 'unit_count', 'managed_unit_count'];
+
+async function createUnit(conn, projectId, channel, priceFrom, u) {
+  const name = String((u && u.name) || '').trim();
+  if (!name) throw new Error('户型 name 必填');
+  const slug = await uniqueUnitSlug(conn, projectId, name, u.slug);
+  let ext = {};
+  if (u.price_night != null && u.price_night !== '') {
+    const pn = parseInt(u.price_night, 10);
+    if (!(pn >= 0)) throw new Error('units[].price_night 须为非负整数（元/晚）');
+    ext.price_night = pn;
+  }
+  const [r] = await conn.execute(
+    `INSERT INTO units(project_id, name, slug, area_sqm, layout_label, rent_monthly, price_total,
+       tags, unit_spec, promo_price, amenities, sort_order, cover_image, ext)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      projectId, name, slug,
+      u.area_sqm == null || u.area_sqm === '' ? null : Number(u.area_sqm),
+      u.layout_label || null,
+      u.rent_monthly == null || u.rent_monthly === '' ? null : parseInt(u.rent_monthly, 10),
+      u.price_total == null || u.price_total === '' ? null : parseInt(u.price_total, 10),
+      tagsToDb(u.tags), u.unit_spec || null,
+      u.promo_price == null || u.promo_price === '' ? null : parseInt(u.promo_price, 10),
+      tagsToDb(u.amenities),
+      u.sort_order == null || u.sort_order === '' ? 99 : parseInt(u.sort_order, 10),
+      u.cover_image || null,
+      Object.keys(ext).length ? JSON.stringify(ext) : null,
+    ]
+  );
+  return r.insertId;
+}
+
+async function housingProjectsCreate(conn, body, vendorId) {
+  const b = body || {};
+  const name = String(b.name || '').trim();
+  if (!name) return reply(400, { code: 400, message: 'name 必填' });
+  const channel = String(b.channel || 'rental');
+  if (!stayCfg.HOUSING_CHANNELS.includes(channel)) {
+    return reply(400, { code: 400, message: 'channel 须为 ' + stayCfg.HOUSING_CHANNELS.join('/') });
+  }
+  const cityId = parseInt(b.city_id, 10);
+  if (!cityId) return reply(400, { code: 400, message: 'city_id 必填' });
+  const [city] = await conn.execute('SELECT id, name FROM cities WHERE id=?', [cityId]);
+  if (!city.length) return reply(400, { code: 400, message: 'city_id 不存在' });
+  const allowed = await vendorAllowedCityIds(conn, vendorId);
+  if (allowed.length && !allowed.includes(cityId)) {
+    return reply(400, { code: 400, message: 'city_id 不属于该商家开放城市' });
+  }
+  let districtId = b.district_id != null && b.district_id !== '' ? parseInt(b.district_id, 10) : null;
+  if (districtId) {
+    const [d] = await conn.execute('SELECT id FROM districts WHERE id=? AND city_id=?', [districtId, cityId]);
+    if (!d.length) return reply(400, { code: 400, message: 'district_id 不存在或不属于该城市' });
+  }
+  let contactPhone;
+  try { contactPhone = phoneFromBody(b.contact_phone); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  let ext;
+  try { ext = extFromBody(b, {}); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  const status = b.status == null || b.status === '' ? 'draft' : String(b.status);
+  if (['online', 'offline', 'draft'].indexOf(status) < 0) {
+    return reply(400, { code: 400, message: 'status 须为 online / offline / draft（缺省 draft）' });
+  }
+  const slug = await uniqueProjectSlug(conn, channel, name, b.slug);
+  const address = String(b.address || '').trim() || (city[0].name + ' · ' + name);
+  const [r] = await conn.execute(
+    `INSERT INTO projects(city_id, district_id, channel, name, slug, cover_image, address, tags,
+       sort_order, unit_count, price_from, is_featured, old_house_hint, contact_phone,
+       owner_vendor_id, status, ext)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      cityId, districtId, channel, name, slug, b.cover_image || null, address, tagsToDb(b.tags),
+      b.sort_order == null || b.sort_order === '' ? 999 : parseInt(b.sort_order, 10),
+      Array.isArray(b.units) ? b.units.length : 0,
+      b.price_from == null || b.price_from === '' ? null : parseInt(b.price_from, 10),
+      0, b.old_house_hint || null, contactPhone,
+      vendorId, status, Object.keys(ext).length ? JSON.stringify(ext) : null,
+    ]
+  );
+  const pid = r.insertId;
+  for (const u of (Array.isArray(b.units) ? b.units : [])) {
+    try { await createUnit(conn, pid, channel, b.price_from, u); }
+    catch (e) { return reply(400, { code: 400, message: 'units 创建失败：' + e.message, project_id: pid }); }
+  }
+  const row = await ownProject(conn, vendorId, pid);
+  return reply(200, { code: 0, message: 'success', project: await housingProjectOut(conn, row) });
+}
+
+async function housingProjectsUpdate(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  const sets = [], params = [];
+  if (b.name != null && String(b.name).trim()) {
+    sets.push('name=?'); params.push(String(b.name).trim());
+    sets.push('slug=?'); params.push(await uniqueProjectSlug(conn, row.channel, b.name, b.slug));
+  } else if (b.slug) {
+    sets.push('slug=?'); params.push(await uniqueProjectSlug(conn, row.channel, row.name, b.slug));
+  }
+  for (const col of PROJECT_UPDATABLE_COLS) {
+    if (col === 'name') continue;
+    if (Object.prototype.hasOwnProperty.call(b, col)) {
+      let v = b[col];
+      if (['sort_order', 'price_from', 'unit_count', 'managed_unit_count', 'featured_rank'].includes(col)) {
+        v = v == null || v === '' ? null : parseInt(v, 10);
+      } else if (col === 'is_featured') {
+        v = v ? 1 : 0;
+      } else if (v != null && typeof v === 'object') {
+        v = JSON.stringify(v);
+      }
+      sets.push('`' + col + '`=?'); params.push(v);
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'tags')) { sets.push('tags=?'); params.push(tagsToDb(b.tags)); }
+  if (Object.prototype.hasOwnProperty.call(b, 'contact_phone')) {
+    try { sets.push('contact_phone=?'); params.push(phoneFromBody(b.contact_phone)); }
+    catch (e) { return reply(400, { code: 400, message: e.message }); }
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')) {
+    let ext;
+    try { ext = extFromBody(b, row.ext); }
+    catch (e) { return reply(400, { code: 400, message: e.message }); }
+    sets.push('ext=?'); params.push(JSON.stringify(ext));
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'district_id')) {
+    const did = b.district_id != null && b.district_id !== '' ? parseInt(b.district_id, 10) : null;
+    if (did) {
+      const [d] = await conn.execute('SELECT id FROM districts WHERE id=? AND city_id=?', [did, row.city_id]);
+      if (!d.length) return reply(400, { code: 400, message: 'district_id 不存在或不属于该城市' });
+    }
+    sets.push('district_id=?'); params.push(did);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'city_id')) {
+    return reply(400, { code: 400, message: 'city_id 不支持修改（请下架后新建房源）' });
+  }
+  if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
+  params.push(row.id);
+  await conn.execute(`UPDATE projects SET ${sets.join(', ')} WHERE id=?`, params);
+  const fresh = await ownProject(conn, vendorId, row.id);
+  return reply(200, { code: 0, message: 'success', project: await housingProjectOut(conn, fresh) });
+}
+
+async function housingProjectsStatus(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const status = String(b.status || '').trim();
+  if (['online', 'offline', 'draft'].indexOf(status) < 0) {
+    return reply(400, { code: 400, message: 'status 须为 online（上架）/ offline（下架）/ draft（草稿）' });
+  }
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  // 上架前置检查：无价格、无图片的房源不允许直接上架（C 端 catalog 只出 online）
+  if (status === 'online') {
+    if (!row.price_from) return reply(400, { code: 400, message: '上架前须设置 price_from（起价，元）' });
+    const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [row.id]);
+    if (!u.length || !u[0].c) return reply(400, { code: 400, message: '上架前须至少创建 1 个户型（units/create）' });
+  }
+  await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, row.id]);
+  return reply(200, { code: 0, message: 'success', id: row.id, status });
+}
+
+async function housingUnitsCreate(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.project_id) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const row = await ownProject(conn, vendorId, b.project_id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  try {
+    const uid = await createUnit(conn, row.id, row.channel, row.price_from, b);
+    await conn.execute('UPDATE projects SET unit_count=(SELECT COUNT(*) FROM units WHERE project_id=?) WHERE id=?', [row.id, row.id]);
+    const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+    return reply(200, { code: 0, message: 'success', unit: u[0] });
+  } catch (e) {
+    return reply(400, { code: 400, message: e.message });
+  }
+}
+
+async function housingUnitsUpdate(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const [rows] = await conn.execute(
+    `SELECT u.*, p.owner_vendor_id, p.channel AS channel FROM units u
+     JOIN projects p ON p.id=u.project_id WHERE u.id=?`, [parseInt(b.id, 10)]);
+  if (!rows.length || rows[0].owner_vendor_id !== vendorId) {
+    return reply(404, { code: 404, message: '户型不存在或不属于该商家' });
+  }
+  const sets = [], params = [];
+  for (const col of ['name', 'layout_label', 'unit_spec', 'cover_image']) {
+    if (Object.prototype.hasOwnProperty.call(b, col)) { sets.push('`' + col + '`=?'); params.push(b[col]); }
+  }
+  for (const col of ['area_sqm']) {
+    if (Object.prototype.hasOwnProperty.call(b, col)) {
+      sets.push('`' + col + '`=?'); params.push(b[col] == null || b[col] === '' ? null : Number(b[col]));
+    }
+  }
+  for (const col of ['rent_monthly', 'price_total', 'promo_price', 'sort_order']) {
+    if (Object.prototype.hasOwnProperty.call(b, col)) {
+      sets.push('`' + col + '`=?'); params.push(b[col] == null || b[col] === '' ? null : parseInt(b[col], 10));
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'tags')) { sets.push('tags=?'); params.push(tagsToDb(b.tags)); }
+  if (Object.prototype.hasOwnProperty.call(b, 'amenities')) { sets.push('amenities=?'); params.push(tagsToDb(b.amenities)); }
+  if (Object.prototype.hasOwnProperty.call(b, 'price_night')) {
+    const cur = stayCfg.parseExtObj(rows[0].ext);
+    if (b.price_night === null || b.price_night === '') delete cur.price_night;
+    else {
+      const pn = parseInt(b.price_night, 10);
+      if (!(pn >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数（元/晚）' });
+      cur.price_night = pn;
+    }
+    sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null);
+  }
+  if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
+  params.push(rows[0].id);
+  await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, params);
+  const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [rows[0].id]);
+  return reply(200, { code: 0, message: 'success', unit: u[0] });
+}
+
+/** 房态批量设置：与 C/B 端同口径（已订晚不可改；open+无夜价=恢复默认价并删差异行） */
+async function housingStayCalendarSet(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.project_id) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const row = await ownProject(conn, vendorId, b.project_id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  const unitId = b.unit_id != null && b.unit_id !== '' ? parseInt(b.unit_id, 10) : 0;
+  const status = String(b.status || '');
+  const dates = Array.isArray(b.dates) ? b.dates.map(String).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+  const price = (b.price_night === null || b.price_night === undefined || b.price_night === '') ? null : parseInt(b.price_night, 10);
+  if (['open', 'blocked'].indexOf(status) < 0) return reply(400, { code: 400, message: 'status 须为 open / blocked（booked 由订单写入）' });
+  if (price != null && !(price >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数或空' });
+  if (!dates.length) return reply(400, { code: 400, message: 'dates 必填（YYYY-MM-DD 数组，单次 ≤ 400 天）' });
+  if (dates.length > 400) return reply(400, { code: 400, message: '单次最多 400 天' });
+  if (unitId) {
+    const [u] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, row.id]);
+    if (!u.length) return reply(400, { code: 400, message: 'unit_id 不存在或不属于该房源' });
+  }
+  const marks = dates.map(() => '?').join(',');
+  const [booked] = await conn.execute(
+    `SELECT stay_date FROM stay_calendar WHERE project_id=? AND unit_id IN (0, ?)
+     AND status='booked' AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
+  if (booked.length) {
+    return reply(400, { code: 400, message: '以下日期已有预订占用，须先取消订单：' + booked.map((r) => r.stay_date).join('、') });
+  }
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  let affected = 0;
+  if (status === 'blocked') {
+    for (const d of dates) {
+      const [r] = await conn.execute(
+        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+         VALUES (?,?,?,'blocked',?,'vendor',?)
+         ON DUPLICATE KEY UPDATE status='blocked', source='vendor', booking_id=NULL, updated_at=VALUES(updated_at)`,
+        [row.id, unitId, d, price, now]);
+      affected += r.affectedRows || 0;
+    }
+  } else if (price != null) {
+    for (const d of dates) {
+      const [r] = await conn.execute(
+        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+         VALUES (?,?,?,'open',?,'vendor',?)
+         ON DUPLICATE KEY UPDATE status='open', price_night=VALUES(price_night), updated_at=VALUES(updated_at)`,
+        [row.id, unitId, d, price, now]);
+      affected += r.affectedRows || 0;
+    }
+  } else {
+    const [r] = await conn.execute(
+      `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND status IN ('open','blocked')
+       AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
+    affected = r.affectedRows || 0;
+  }
+  return reply(200, { code: 0, message: 'success', project_id: row.id, unit_id: unitId, status, price_night: price, dates: dates.length, affected });
+}
+
+const HOUSING_ROUTES = {
+  '/api/juzhu/housing/vendor/projects/list': housingProjectsList,
+  '/api/juzhu/housing/vendor/projects/detail': housingProjectsDetail,
+  '/api/juzhu/housing/vendor/projects/create': housingProjectsCreate,
+  '/api/juzhu/housing/vendor/projects/update': housingProjectsUpdate,
+  '/api/juzhu/housing/vendor/projects/status': housingProjectsStatus,
+  '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
+  '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
+  '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
+};
+
 async function handleRequest(path, body, conn, vendors) {
   const auth = verifyVendorAuth(body, vendors);
   if (auth.error) return reply(401, { code: 401, message: auth.error });
   if (path === '/api/juzhu/callback') {
     return handleCallback(conn, body, auth.vendorId);
   }
-  const fn = VENDOR_ROUTES[path];
+  const fn = VENDOR_ROUTES[path] || HOUSING_ROUTES[path];
   if (!fn) return reply(404, { code: 404, message: '未知 vendor 路由' });
   return fn(conn, body, auth.vendorId);
 }
@@ -363,4 +778,5 @@ module.exports = {
   validateProductCitySync,
   handleRequest,
   VENDOR_ROUTES,
+  HOUSING_ROUTES,
 };
