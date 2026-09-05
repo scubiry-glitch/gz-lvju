@@ -33,7 +33,7 @@
       <div class="ttl">预定下单<small>填写并核对提交</small></div>
     </div>
 
-    <div class="steps">
+    <div class="steps" id="stepsBar">
       <span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span>
       <span class="st"><span class="n">2</span>商家确认</span><span class="sep">›</span>
       <span class="st"><span class="n">3</span>完成</span>
@@ -56,6 +56,14 @@
       <input id="gPwd" placeholder="密码（≥8位，首登自动注册）" type="password" />
       <div id="gErr" style="font-size:11px;color:#991b1b;margin-bottom:8px;display:none;"></div>
       <button class="go" id="gGo">登录 / 注册</button>
+    </div>
+
+    <div id="noBook" style="display:none;background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px 18px;text-align:center;">
+      <div style="font-size:34px;">📞</div>
+      <div style="font-weight:700;margin:8px 0 4px;"><span class="nb-name"></span> · 仅支持电话咨询</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;">该项目未开通在线预订，咨询与签约请拨打房源电话<br>（虚拟号专线保护，双方真实号码均不外泄）</div>
+      <button class="sv" id="nbCall" style="margin-top:14px;width:100%;">📞 拨打咨询电话</button>
+      <a href="javascript:history.back()" style="display:block;margin-top:10px;font-size:12px;color:var(--muted);">← 返回上页</a>
     </div>
 
     <div id="formBox">
@@ -236,6 +244,33 @@
     ]).then(function(rs){
       var p = rs[0] || {}, units = (rs[1] || {}).units || [];
       curChannel = p.channel || '';
+      // 未开通「按晚预订」（口径 2026-09-05）→ 仅电话咨询，不出预订表单（服务端同样拒绝兜底）
+      if (p.bookable === false) {
+        document.getElementById('formBox').style.display = 'none';
+        var cb = document.getElementById('cBar'); if (cb) cb.style.display = 'none';
+        var nb = document.getElementById('noBook');
+        nb.style.display = 'block';
+        nb.querySelector('.nb-name').textContent = p.name || '';
+        document.getElementById('nbCall').addEventListener('click', function(){
+          var self = this;
+          self.textContent = '获取专线…';
+          fetch('/api/juzhu/projects/' + pid + '/virtual-phone')
+            .then(function(r){ return r.json(); })
+            .then(function(res){
+              if (res.tel) { location.href = res.tel; self.textContent = '📞 拨打咨询电话'; }
+              else { alert(res.error || '该项目暂未配置咨询电话'); self.textContent = '📞 拨打咨询电话'; }
+            })
+            .catch(function(){ alert('暂时无法接通，请稍后重试'); self.textContent = '📞 拨打咨询电话'; });
+        });
+        return;
+      }
+      // 步骤条按频道：minsu 预付口径含支付步骤（rental 保持 3 步确认制）
+      var sb = document.getElementById('stepsBar');
+      if (sb && curChannel === 'minsu') sb.innerHTML =
+        '<span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span>' +
+        '<span class="st"><span class="n">2</span>在线支付</span><span class="sep">›</span>' +
+        '<span class="st"><span class="n">3</span>商家确认</span><span class="sep">›</span>' +
+        '<span class="st"><span class="n">4</span>完成</span>';
       p.tags = asArr(p.tags);
       document.getElementById('bName').textContent = p.name || '';
       document.getElementById('bMeta').textContent = p.address || '';
@@ -269,10 +304,10 @@
       calc();
     }).catch(function(e){
       if (!isRetry && e && e.status === 404) {
-        showErr('链接中的房源（id=' + pid + '）已下架或不存在 · 自动带入在架房源');
+        showErr('链接中的房源（id=' + pid + '）已下架或不存在 · 自动带入可预订房源');
         fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
           var p = (cat.projects || []).filter(function(x){
-            return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
+            return x.bookable && x.status !== 'offline';
           })[0];
           if (p) load(p.id, true);
         }).catch(function(){});
@@ -350,7 +385,15 @@
     document.getElementById('fOut').addEventListener('change', calc);
     document.getElementById('cSel').addEventListener('change', applyContact);
     checkMe().then(function(acc){
-      if (!acc) { showGate(); return; }
+      if (!acc) {
+        // 未登录：指定房源未开通按晚预订 → 直接给「仅电话咨询」引导卡（无需会话）；
+        // 可订房源仍先登录（预订单需要会话归属）
+        if (!qid) { showGate(); return; }
+        fetch('/api/juzhu/projects/' + qid).then(function(r){ return r.json(); }).then(function(p){
+          if (p.bookable === false) load(qid); else showGate();
+        }).catch(function(){ showGate(); });
+        return;
+      }
       me = { id: acc.id, phone: acc.phone || '', display_name: acc.display_name || '' };
       document.getElementById('loginGate').style.display = 'none';
       document.getElementById('formBox').style.display = 'block';
@@ -358,10 +401,10 @@
       loadContacts();
       if (qid) load(qid);
       else {
-        showErr('未指定房源：已自动带入一个在架房源 · 如需其他房源请从「找房」列表进入');
+        showErr('未指定房源：已自动带入一个可预订房源 · 如需其他房源请从「找房」列表进入');
         fetch('/api/juzhu/catalog?city=guiyang').then(function(r){ return r.json(); }).then(function(cat){
           var p = (cat.projects || []).filter(function(x){
-            return (x.channel === 'rental' || x.channel === 'minsu') && x.status !== 'offline';
+            return x.bookable && x.status !== 'offline';
           })[0];
           if (!p) { showErr('暂无可预订房源 · 请从列表进入'); document.getElementById('bSubmit').style.opacity = .4; return; }
           load(p.id);

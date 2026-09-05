@@ -14,6 +14,11 @@ const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
 // 商家可在 projects.ext.min_stay_nights 覆盖（1–365）
 const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 1 };
 
+// 在线预订能力开关（口径 2026-09-05）：默认一律仅 400 电话咨询；项目开通
+// （projects.ext.stay_bookable === true，B 端房态页「按晚预订」开关）后才支持
+// 日历选房 + 在线下单。tag 不参与判断；「无行=默认可订」仅在已开通项目上生效。
+const STAY_BOOKABLE_KEY = 'stay_bookable';
+
 // 房态：open 可订 / blocked 关房（商家手工） / booked 已订（下单占用）
 const STAY_STATUS = { OPEN: 'open', BLOCKED: 'blocked', BOOKED: 'booked' };
 
@@ -62,10 +67,16 @@ function unitNightPrice(proj, unit) {
   return p.channel === 'minsu' ? base : Math.max(1, Math.round(base / 30));
 }
 
-/** 项目房态配置（随 catalog / 项目详情 / 房态日历下发） */
+/** 项目是否已开通在线预订（唯一判断点，booking / 页面 CTA 均以此为准） */
+function bookableOf(proj) {
+  return parseExtObj(proj && proj.ext)[STAY_BOOKABLE_KEY] === true;
+}
+
+/** 项目房态配置（随 catalog / 项目详情 / 房态日历下发，含 bookable 能力位） */
 function stayConfigOf(proj) {
   const ins = insuranceOf(proj);
   return {
+    bookable: bookableOf(proj),
     min_stay_nights: minStayNightsOf(proj),
     insurance: ins,
     insurance_types: INSURANCE_TYPES.filter((t) => ins.includes(t.key)),
@@ -130,11 +141,13 @@ module.exports = {
   INSURANCE_TYPES,
   INSURANCE_KEYS,
   STAY_MIN_NIGHTS_DEFAULT,
+  STAY_BOOKABLE_KEY,
   STAY_STATUS,
   HOUSING_CHANNELS,
   parseExtObj,
   insuranceOf,
   minStayNightsOf,
+  bookableOf,
   unitNightPrice,
   stayConfigOf,
   stayDateList,

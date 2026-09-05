@@ -542,6 +542,7 @@ const STAY_STATUS = stayCfg.STAY_STATUS;
 const parseExtObj = stayCfg.parseExtObj;
 const insuranceOf = stayCfg.insuranceOf;
 const minStayNightsOf = stayCfg.minStayNightsOf;
+const bookableOf = stayCfg.bookableOf;
 const unitNightPrice = stayCfg.unitNightPrice;
 const stayConfigOf = stayCfg.stayConfigOf;
 const stayDateList = stayCfg.stayDateList;
@@ -3379,7 +3380,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         role: sess.role,
         items: rows.map((o) => Object.assign({}, o, {
           contact_phone: maskPhoneStd(o.contact_phone),
-          contact_phone_raw: o.contact_phone, // 本人订单，取消接口需要原号
+          contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
+          contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
         })),
       });
     }
@@ -3460,11 +3462,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
         if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
         if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
-        // 在线预订仅开放：minsu 民宿 + rental 带「旅居」tag 的旅居房源；
-        // 口径（2026-09-05）：rental 全量开放预订单（电话咨询保留为辅助入口）；
-        // minsu 走预付收银台；newhouse / resale 仍仅电话咨询
-        var bookable = proj.channel === 'minsu' || proj.channel === 'rental';
-        if (!bookable) { conn.end(); return jsonReply(res, { error: '该频道仅支持电话咨询，请拨打页面咨询电话' }, 400); }
+        // 在线预订 = 项目已开通（projects.ext.stay_bookable，B 端房态页「按晚预订」开关）；
+        // 口径（2026-09-05）：默认一律仅 400 电话咨询，开通后 minsu 走预付收银台、
+        // rental 走预订单；tag 不参与判断，购房类频道（newhouse/resale/trade）不可订
+        if (!bookableOf(proj)) { conn.end(); return jsonReply(res, { error: '该项目未开通在线预订，请拨打页面咨询电话' }, 400); }
         // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
         const minNights = minStayNightsOf(proj);
         if (nights < minNights) {
@@ -3492,16 +3493,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (unitId) {
           const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
           if (!us.length || us[0].project_id !== projectId) { conn.end(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
-          // 夜价口径（规则15）：minsu 短住 = units.ext.price_night；rental 长租 = 月租/30 折算
-          if (proj.channel === 'minsu') {
-            let ux = {};
-            try { ux = us[0].ext ? JSON.parse(us[0].ext) : {}; } catch (_) { ux = {}; }
-            perNight = ux.price_night || 0;
-          } else {
-            perNight = us[0].rent_monthly ? Math.round(us[0].rent_monthly / 30) : 0;
-          }
+          perNight = unitNightPrice(proj, us[0]);   // 夜价口径（规则15/16）单一数据源 stay_config.cjs
         }
-        if (!perNight) perNight = proj.channel === 'minsu' ? (proj.price_from || 0) : (proj.price_from ? Math.round(proj.price_from / 30) : 0);
+        if (!perNight) perNight = unitNightPrice(proj, null);
         const priceTotal = perNight * nights;
         const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
         const [ins] = await conn.execute(
@@ -4053,8 +4047,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
-    // PUT /api/juzhu/vendor/projects/:id —— 商家配置房源保障与连住规则（写 projects.ext，规则15 不加列）
-    // body: { insurance?: ['switch_rental'|'hotel_cancel'|'property'], min_stay_nights?: 1-365 }
+    // PUT /api/juzhu/vendor/projects/:id —— 商家配置房源保障/连住规则/按晚预订开关（写 projects.ext，规则15 不加列）
+    // body: { insurance?: ['switch_rental'|'hotel_cancel'|'property'], min_stay_nights?: 1-365, stay_bookable?: bool }
     {
       const m = urlPath.match(/^\/api\/juzhu\/vendor\/projects\/(\d+)$/);
       if (m && req.method === 'PUT') {
@@ -4082,8 +4076,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
             ext.min_stay_nights = v;
           }
         }
-        if (!('insurance' in body) && !('min_stay_nights' in body)) {
-          return jsonReply(res, { error: '无可更新字段（insurance / min_stay_nights）' }, 400);
+        if ('stay_bookable' in body) {
+          // 「按晚预订」开关（口径 2026-09-05）：开通 = C 端日历选房 + 在线下单；关闭 = 仅 400 电话咨询
+          ext.stay_bookable = body.stay_bookable === true || body.stay_bookable === 'true' || body.stay_bookable === 1;
+        }
+        if (!('insurance' in body) && !('min_stay_nights' in body) && !('stay_bookable' in body)) {
+          return jsonReply(res, { error: '无可更新字段（insurance / min_stay_nights / stay_bookable）' }, 400);
         }
         const conn = await mysql2.createConnection(getDbConfig());
         try {

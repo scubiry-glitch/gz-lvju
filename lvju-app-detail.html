@@ -149,7 +149,7 @@
       <div id="dInsRows" style="margin-top:4px;"></div>
     </div>
 
-    <div class="block">
+    <div class="block" id="calblock">
       <div class="bt">价格日历 <span class="cal-toggle" id="caltoggle">展开选日期 <span class="arr">⌄</span></span></div>
       <div class="bs" id="dCalNote">旅居房源连续入住 · 连住 15 晚起</div>
       <div class="cal">
@@ -285,17 +285,35 @@
     // 最短连住（旅居口径：rental 15 晚起 / minsu 1 晚起，商家可在项目上覆盖）
     var minNights = p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15);
     var perNight = (p.channel === 'minsu') ? (price || 0) : (price ? Math.max(1, Math.round(price / 30)) : 0);
-    document.getElementById('dCalNote').textContent = '旅居房源连续入住 · 连住 ' + minNights + ' 晚起' + (perNight ? ' · 夜价 ¥' + fmt(perNight) + ' 起' : '');
-    window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel };
-    if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
+    // 「按晚预订」能力位（服务端 stay_bookable 随项目下发）：未开通 = 仅电话咨询，无日历无预订
+    var canBook = p.bookable === true;
+    document.getElementById('calblock').style.display = canBook ? '' : 'none';
     document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
-      '<span>' + (p.is_featured ? '平台精选 · ' : '') + '连住 ' + minNights + ' 晚起 · ' + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
-    // CTA 分流（口径 2026-09-05）：minsu → 立即预订（预付收银台）；
-    // rental（长租/旅居均含）→ 400 电话咨询 + 在线预订单 双入口；
-    // newhouse / resale → 400 电话咨询
+      '<span>' + (p.is_featured ? '平台精选 · ' : '') + (canBook ? '连住 ' + minNights + ' 晚起 · ' : '电话咨询 · ') + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
+    if (canBook) {
+      document.getElementById('dCalNote').textContent = '旅居房源连续入住 · 连住 ' + minNights + ' 晚起' + (perNight ? ' · 夜价 ¥' + fmt(perNight) + ' 起' : '');
+      window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel };
+      // 必须在 dCta 动态渲染之后调用：live 初始化会以当前 CTA 内容为「清日期恢复基线」
+      if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
+    }
+    // CTA 分流（口径 2026-09-05）：项目开通「按晚预订」→ 立即预订（minsu 预付收银台 /
+    // rental 预订单，booking 页按频道分流）+ 📞 电话咨询 双入口；未开通（保租房/普通长租/
+    // 新房/二手缺省）→ 仅 📞 电话咨询
+    function bindPhone(el) {
+      el.addEventListener('click', function(ev){
+        ev.preventDefault();
+        el.textContent = '获取专线…';
+        fetch('/api/juzhu/projects/' + id + '/virtual-phone')
+          .then(function(r){ return r.json(); })
+          .then(function(res){
+            if (res.tel) { location.href = res.tel; el.textContent = '📞 电话咨询'; }
+            else { alert(res.error || '该项目暂未配置咨询电话，请在内容编辑后台填写联系电话'); el.textContent = '📞 电话咨询'; }
+          })
+          .catch(function(){ alert('暂时无法接通，请稍后重试'); el.textContent = '📞 电话咨询'; });
+      });
+    }
     var bk = document.querySelector('.cta .btn');
-    var isStay = p.channel === 'minsu';
-    if (bk && isStay) {
+    if (bk && canBook) {
       bk.textContent = '立即预订';
       bk.href = 'lvju-app-booking.html?id=' + id + (units.length ? '&unit=' + units[0].id : '');
       bk.addEventListener('click', function(ev){
@@ -304,28 +322,17 @@
         var co = sum && sum.dataset ? (sum.dataset.co || '') : '';
         if (ci) { ev.preventDefault(); location.href = bk.href + '&checkin=' + ci + (co ? '&checkout=' + co : ''); }
       });
+      // 副入口：📞 电话咨询（虚拟号专线，与主预订并存）
+      var bk2 = document.createElement('a');
+      bk2.className = 'btn';
+      bk2.style.cssText = 'background:#fff;color:var(--brand-deep,#0f766e);border:1px solid var(--brand-deep,#0f766e);';
+      bk2.textContent = '📞 电话咨询';
+      bk2.href = '#';
+      bk.parentNode.insertBefore(bk2, bk);
+      bindPhone(bk2);
     } else if (bk) {
-      // rental 长租：预订单模式（提交后商家确认生效，无在线支付）
-      if (p.channel === 'rental') {
-        var bk2 = document.createElement('a');
-        bk2.className = 'btn';
-        bk2.style.cssText = 'background:#fff;color:var(--brand-deep,#0f766e);border:1px solid var(--brand-deep,#0f766e);';
-        bk2.textContent = '在线预订单';
-        bk2.href = 'lvju-app-booking.html?id=' + id + (units.length ? '&unit=' + units[0].id : '');
-        bk.parentNode.insertBefore(bk2, bk);
-      }
       bk.textContent = '📞 电话咨询';
-      bk.addEventListener('click', function(ev){
-        ev.preventDefault();
-        bk.textContent = '获取专线…';
-        fetch('/api/juzhu/projects/' + id + '/virtual-phone')
-          .then(function(r){ return r.json(); })
-          .then(function(res){
-            if (res.tel) { location.href = res.tel; bk.textContent = '📞 电话咨询'; }
-            else { alert(res.error || '该项目暂未配置咨询电话，请在内容编辑后台填写联系电话'); bk.textContent = '📞 电话咨询'; }
-          })
-          .catch(function(){ alert('暂时无法接通，请稍后重试'); bk.textContent = '📞 电话咨询'; });
-      });
+      bindPhone(bk);
     }
   }).catch(function(){
     var b = document.createElement('div');
@@ -470,9 +477,10 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   window.__CAL_SET_CONFIG__ = function(cfg){
     live = cfg || null;
     if (!live) return;
+    ctaOrig = ctaP ? ctaP.innerHTML : ctaOrig;   // 数据脚本此刻已渲染动态 CTA，恢复基线跟随真实数据
     TODAY = new Date(); TODAY.setHours(0,0,0,0);
     MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-    MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 5, 1);
+    MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 11, 1);  // 可订窗口：未来 12 个月
     view = new Date(MIN.getFullYear(), MIN.getMonth(), 1);
     ci = co = null; calCache = {};
     // 详情页/列表页透传的日期（校验最短连住，不足则丢弃离店日）

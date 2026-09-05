@@ -110,6 +110,7 @@
         '<div class="meta">' + esc(meta) + '</div>' +
         '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在租</span>') + '</div>' +
         '<div class="pr"><b>' + (u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small> /月</small>' : '价格面议') + '</b>' +
+        (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') +
         '<span class="unit">门店 · ' + esc(p.name) + '</span></div></div></a>';
     }).join('');
   }).catch(function(){

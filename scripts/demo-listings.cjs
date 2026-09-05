@@ -155,13 +155,20 @@ async function seed(db, bcrypt) {
   let nProj = 0, nUnits = 0;
   for (const item of DEMO) {
     const districtKey = DISTRICT_NAMES.find((dn) => (item.address || '').includes(dn));
+    // 项目级 ext：minsu 演示单开通「按晚预订」（stay_bookable，口径 2026-09-05）+ 保险默认；其余频道缺省仅电话咨询
+    const pext = {};
+    if (item.channel === 'minsu') {
+      pext.stay_bookable = true;
+      pext.insurance = ['hotel_cancel', 'property'];
+    }
     const [r] = await db.execute(
-      `INSERT INTO projects(id,city_id,district_id,channel,name,slug,address,tags,sort_order,price_from,is_featured,featured_rank,status,owner_vendor_id,unit_count)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`,
+      `INSERT INTO projects(id,city_id,district_id,channel,name,slug,address,tags,sort_order,price_from,is_featured,featured_rank,status,owner_vendor_id,unit_count,ext)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
       [item.id, cityId, districtKey ? districts[districtKey] || null : null, item.channel, item.name, item.slug, item.address,
         JSON.stringify([DEMO_TAG, ...(item.featured ? ['精选'] : [])]),
         item.featured ? 1 : 50, item.price_from || null,
-        item.featured ? 1 : 0, item.featured ? 1 : null, 'online', vendorIds[item.channel]]
+        item.featured ? 1 : 0, item.featured ? 1 : null, 'online', vendorIds[item.channel],
+        Object.keys(pext).length ? JSON.stringify(pext) : null]
     );
     const pid = r.insertId;
     nProj++;

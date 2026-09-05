@@ -131,7 +131,7 @@
   var MIN_NIGHTS = 15;                       // 旅居连住下限（服务端同口径，商家可在项目上覆盖）
   var TODAY = new Date(); TODAY.setHours(0,0,0,0);
   var MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
-  var MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 5, 1);   // 可看近 6 个月
+  var MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 11, 1);   // 可订窗口：未来 12 个月
   var view = new Date(MIN.getFullYear(), MIN.getMonth(), 1);
   var ci = null, co = null, cat = null;
   var WK = ['日','一','二','三','四','五','六'];
@@ -189,7 +189,7 @@
         img + (star ? star : '') + '<span class="like">♡</span>' +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + ins + '</div>' +
-        '<div class="pr">' + priceHtml + '<span class="bk">预订</span></div></div>' +
+        '<div class="pr">' + priceHtml + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +
         '</a>';
     }).join('');
   }

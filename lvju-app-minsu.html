@@ -91,7 +91,7 @@
       return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' + img + star + '<span class="like">♡</span>' +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +
-        '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/晚起</small>' : '价格面议') + '</b><span class="bk">预订</span></div></div>' +
+        '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/晚起</small>' : '价格面议') + '</b>' + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +
         '</a>';
     }).join('');
   }

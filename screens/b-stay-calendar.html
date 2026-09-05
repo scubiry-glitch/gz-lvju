@@ -89,7 +89,8 @@
     </div>
 
     <div class="note" id="note">
-      房态日历 = 逐晚库存：<b>可订 / 关房 / 已订</b> 三态 + 夜价覆盖；无差异行即默认「可订」。
+      房态日历 = 逐晚库存：<b>可订 / 关房 / 已订</b> 三态 + 夜价覆盖；无差异行即默认「可订」（仅对已开通项目生效）。
+      <b>按晚预订</b>为项目级开关（projects.ext.stay_bookable）：未开通项目 C 端仅 400 电话咨询，开通后才支持日历选房 + 在线下单（缺省关闭）。
       C 端详情日历实时读本页数据；<b>已订</b> 由客户订单自动占用（取消自动释放），商家只能改「关房 / 开房 / 夜价」。
       旅居口径<b>连住 15 晚起</b>（可按项目调整），下单时 C/B/服务端三处同口径校验。
     </div>
@@ -141,8 +142,10 @@
         </div>
 
         <div class="card">
-          <h3>入住规则与保障</h3>
+          <h3>按晚预订 / 入住规则与保障</h3>
           <div class="sub">随项目下发 C 端详情页与下单校验（projects.ext，规则 15 不加列）</div>
+          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="cBook" />
+            <span><b>🟢 按晚预订（日历选房 + 在线下单）</b><small>开通后 C 端展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询。缺省关闭，开通即 C 端即时生效</small></span></label>
           <div class="frow">
             <label>最短连住</label>
             <input type="number" id="cMin" min="1" max="365" style="width:90px;" />
@@ -247,6 +250,7 @@
     state.cfg = {
       min_stay_nights: p ? (p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15)) : 15,
       insurance: (p && p.insurance) || [],
+      bookable: !!(p && p.bookable),
     };
     $('cMin').value = state.cfg.min_stay_nights;
     Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
@@ -254,6 +258,8 @@
       c.disabled = !state.writable;
     });
     $('cMin').disabled = !state.writable;
+    $('cBook').checked = state.cfg.bookable;
+    $('cBook').disabled = !state.writable;
   }
 
   /* ── 月历 ── */
@@ -279,6 +285,7 @@
       var p = currentProject();
       var unitName = state.unitId ? ($('fUnit').selectedOptions[0] || {}).textContent : '整栋 / 不限房型';
       $('calSub').textContent = (p ? p.name : '') + ' · ' + unitName +
+        ' · ' + (p && p.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
         ' · 最短连住 ' + (j.min_stay_nights || state.cfg.min_stay_nights) + ' 晚 · 保障 ' +
         ((j.insurance_types || []).map(function(t){ return t.short; }).join('/') || '未配置');
       var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订', ''], past: ['—', ''] };
@@ -345,12 +352,16 @@
       if (c.checked) ins.push(c.value);
     });
     fetch(API + '/vendor/projects/' + state.pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins }) })
+      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins, stay_bookable: $('cBook').checked }) })
       .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
       .then(function(j){
-        toast('已保存 · 连住 ' + j.project.min_stay_nights + ' 晚 / 保障 ' + (j.project.insurance || []).length + ' 项');
+        toast('已保存 · ' + (j.project.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
+          ' · 连住 ' + j.project.min_stay_nights + ' 晚 / 保障 ' + (j.project.insurance || []).length + ' 项');
         var p = currentProject();
-        if (p) { p.min_stay_nights = j.project.min_stay_nights; p.insurance = j.project.insurance; p.insurance_types = j.project.insurance_types; }
+        if (p) {
+          p.min_stay_nights = j.project.min_stay_nights; p.insurance = j.project.insurance;
+          p.insurance_types = j.project.insurance_types; p.bookable = j.project.bookable;
+        }
         renderCal();
       })
       .catch(function(e){ toast('保存失败：' + e.message); });

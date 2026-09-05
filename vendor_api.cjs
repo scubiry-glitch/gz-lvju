@@ -472,6 +472,11 @@ function extFromBody(body, baseExt) {
       ext.min_stay_nights = v;
     }
   }
+  if (Object.prototype.hasOwnProperty.call(body, 'stay_bookable')) {
+    // 「按晚预订」开关：开通后 C 端支持日历选房 + 在线下单；关闭 = 仅 400 电话咨询
+    if (body.stay_bookable === null || body.stay_bookable === '') delete ext.stay_bookable;
+    else ext.stay_bookable = body.stay_bookable === true || body.stay_bookable === 'true' || body.stay_bookable === 1;
+  }
   return ext;
 }
 
@@ -596,7 +601,8 @@ async function housingProjectsUpdate(conn, body, vendorId) {
     try { sets.push('contact_phone=?'); params.push(phoneFromBody(b.contact_phone)); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
   }
-  if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')) {
+  if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
+    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')) {
     let ext;
     try { ext = extFromBody(b, row.ext); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
