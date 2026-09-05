@@ -3431,10 +3431,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
         if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
         // 在线预订仅开放：minsu 民宿 + rental 带「旅居」tag 的旅居房源；
-        // 长租/新房/二手走 400 电话咨询（规则：非短住业态不提供在线下单）
-        var projTags = [];
-        try { projTags = JSON.parse(proj.tags || '[]'); } catch (_) { projTags = []; }
-        var bookable = proj.channel === 'minsu' || (proj.channel === 'rental' && projTags.indexOf('旅居') >= 0);
+        // 口径（2026-09-05）：rental 全量开放预订单（电话咨询保留为辅助入口）；
+        // minsu 走预付收银台；newhouse / resale 仍仅电话咨询
+        var bookable = proj.channel === 'minsu' || proj.channel === 'rental';
         if (!bookable) { conn.end(); return jsonReply(res, { error: '该频道仅支持电话咨询，请拨打页面咨询电话' }, 400); }
         // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
         const minNights = minStayNightsOf(proj);
@@ -3514,11 +3513,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const o = rows[0];
       return jsonReply(res, {
         order: {
-          order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
+          id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
           project_name: o.project_name,
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
           checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
-          status: o.status, created_at: o.created_at,
+          status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, created_at: o.created_at,
         },
       });
     }
