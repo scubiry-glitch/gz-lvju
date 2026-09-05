@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>开放平台常见问题 FAQ · 新居住</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #115e59;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --warn: #b45309;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.7; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: var(--font-mono); background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; border: 1px solid var(--border); }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .doc-shell { max-width: 900px; min-width: 0; padding-bottom: 48px; }
+    .doc-nav { display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+    .doc-nav .back { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--bg); color: var(--fg); }
+    .doc-nav h1 { flex: 1; font-size: 16px; margin: 0; }
+    .doc-nav .ver { font-size: 11px; color: var(--muted); padding: 3px 8px; background: var(--bg); border-radius: 999px; }
+
+    .hero { margin: 20px 20px 12px; padding: 22px 24px; border-radius: var(--radius-lg); background: linear-gradient(135deg, #064e3b, #115e59); color: #fff; }
+    .hero h2 { font-size: 21px; margin: 0 0 6px; }
+    .hero p { opacity: .93; margin: 0; max-width: 64ch; }
+
+    section { background: var(--surface); margin: 12px 20px; padding: 6px 24px 18px; border-radius: var(--radius-md); border: 1px solid var(--border); }
+    section > h2 { font-size: 16.5px; margin: 18px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    section > h2 .num { width: 24px; height: 24px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+
+    details { border-bottom: 1px dashed var(--border); padding: 12px 2px; }
+    details:last-child { border-bottom: 0; }
+    details summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+    details summary::-webkit-details-marker { display: none; }
+    details summary .q { color: var(--accent); font-family: var(--font-mono); font-weight: 800; flex-shrink: 0; }
+    details[open] summary { margin-bottom: 6px; }
+    details .a { font-size: 13.5px; color: #333; padding-left: 24px; }
+    details .a p { margin: 6px 0; }
+    details .a ul, details .a ol { margin: 6px 0; padding-left: 20px; }
+    details .a .tip { background: var(--accent-soft); border-radius: 8px; padding: 9px 12px; margin: 8px 0; font-size: 13px; color: color-mix(in oklab, var(--accent) 80%, black); }
+    details .a .warn { background: color-mix(in oklab, #eab308 14%, transparent); border-radius: 8px; padding: 9px 12px; margin: 8px 0; font-size: 13px; color: color-mix(in oklab, var(--warn) 80%, black); }
+
+    .toc { background: var(--surface); margin: 12px 20px; padding: 14px 24px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 13px; }
+    .toc a { margin-right: 16px; white-space: nowrap; display: inline-block; padding: 2px 0; }
+
+    .doc-foot { margin: 24px 20px; padding: 14px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; color: var(--muted); }
+
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } #side-nav { display: none; } }
+    @media (max-width: 720px) { section { margin-inline: 12px; padding: 4px 16px 14px; } .hero { margin-inline: 12px; padding: 18px; } }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="portal" data-active="open-faq"></div>
+
+  <div class="doc-shell">
+
+  <div class="doc-nav">
+    <a class="back" href="open-platform.html">←</a>
+    <h1>开放平台常见问题</h1>
+    <span class="ver">2026-09</span>
+  </div>
+
+  <div class="hero">
+    <h2>常见问题 FAQ</h2>
+    <p>按主题分组，全部回答对应当前线上实现；每条附相关文档章节，点开即查。</p>
+  </div>
+
+  <div class="toc">
+    <a href="#cred">① 凭证与安全</a>
+    <a href="#sign">② 签名与 401</a>
+    <a href="#listing">③ 房源接入与上下架</a>
+    <a href="#stay">④ 房态 · 连住 · 保险</a>
+    <a href="#jz">⑤ 家政 / 本地生活</a>
+    <a href="#env">⑥ 环境 · 工具 · 数据</a>
+  </div>
+
+  <section id="cred">
+    <h2><span class="num">①</span> 凭证与安全</h2>
+
+    <details>
+      <summary><span class="q">Q1</span>怎么拿到 <code>vendor_id</code> 和 <code>hmac_key</code>？</summary>
+      <div class="a">
+        <p>由平台统一配置后线下下发，一对凭证按业务线授权（房源 / 本地生活 / 搬家），无需分别申请。</p>
+        <p class="tip">商家须为启用状态；数据可见范围与凭证一一对应，只能操作自己名下的房源与商品。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q2</span>密钥丢了 / 疑似泄露怎么办？</summary>
+      <div class="a">
+        <p>联系平台重置密钥（旧密钥立即失效）。重置后所有在跑任务都要换新密钥重签。</p>
+        <p class="warn">密钥等同密码：只放服务端或自己的联调机；不要写进前端代码、不要提交仓库、不要在群里发。文档与页面（含调试台）都不会展示平台侧存储的真实密钥。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q3</span>调试台会不会把我的密钥传到别处？</summary>
+      <div class="a">
+        <p>不会。调试台签名在你的浏览器本地完成（内置与平台一致的 HMAC-SHA256 实现），请求只发往你在 Base 里填的地址。勾选「记住」时密钥存本机 localStorage，换机/清缓存即失效。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="sign">
+    <h2><span class="num">②</span> 签名与 401</h2>
+
+    <details>
+      <summary><span class="q">Q4</span>返回 401「缺失签名(sign)或时间戳(timestamp)参数」</summary>
+      <div class="a">
+        <p><code>sign</code> 与 <code>timestamp</code> 必须放在 <strong>JSON body</strong> 里（不是 HTTP header），与业务参数一起发送。用调试台跑一次对照请求体即可定位。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q5</span>返回 401「请求已过期」</summary>
+      <div class="a">
+        <p>服务器校验 <code>timestamp</code> 与当前时间的偏差（窗口 ±5 分钟）。常见原因：服务器时钟不准；或把同一次签名<strong>复用</strong>超过 5 分钟——重试必须重新签名。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q6</span>返回 401「签名校验失败」，但算法看起来没问题</summary>
+      <div class="a">
+        <p>按命中率排查：</p>
+        <ol>
+          <li><strong>数组序列化</strong>：签名时数组用单引号形式 <code>tags=['旅居', '近地铁']</code>，不是 JSON 的双引号；</li>
+          <li><strong>空值不参与</strong>：<code>null</code> 和 <code>''</code> 的键在签名时跳过，但 body 里可以带；</li>
+          <li><strong>嵌套对象</strong>：按 <code>父键.子键</code> 点号展平（如 <code>units</code> 数组里的对象）——直接把最终 body 交给签名函数，不要手工拼串；</li>
+          <li><strong>布尔</strong>：<code>true→'True'</code>、<code>false→'False'</code>；</li>
+          <li><strong>UTF-8</strong>：中文按 UTF-8 字节参与 HMAC；</li>
+          <li><strong>密钥</strong>：确认用的是本 <code>vendor_id</code> 对应的最新 <code>hmac_key</code>（重置后旧钥匙立即失效）。</li>
+        </ol>
+        <p class="tip">最快定位法：打开<a href="property-intake-api.html#console">在线调试台</a>发同一个请求，对比它显示的 <code>stringToSign</code> 与你自己拼的串，第一个不一致的字符就是问题点。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q7</span>「vendor_id=… 的密钥未配置」</summary>
+      <div class="a">
+        <p>body 里的 <code>vendor_id</code> 在平台侧没有对应密钥：核对是否发错环境（演示 vs 生产）、或商家尚未开通。平台侧核对密钥是否已配置或已被重置。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="listing">
+    <h2><span class="num">③</span> 房源接入与上下架</h2>
+
+    <details>
+      <summary><span class="q">Q8</span>房源创建成功为什么 C 端看不到？</summary>
+      <div class="a">
+        <p>创建默认 <code>status='draft'</code>（草稿），C 端目录只展示 <code>online</code>。上架路径：<code>projects/update</code> 补 <code>price_from</code> + <code>units/create</code> 至少 1 个户型 → <code>projects/status</code> 传 <code>online</code>。缺价或缺户型时上架接口直接 400 提示。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q9</span>上架成功了，C 端多久能看到？下架呢？</summary>
+      <div class="a">
+        <p>C 端目录 <code>GET /api/juzhu/catalog</code> 有 ≤ 15 秒缓存，<strong>上架最迟 15 秒可见、下架最迟 15 秒消失</strong>。联调判断可见性请轮询等待，不要立即断言（平台回归脚本就是这么做的）。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q10</span><code>channel</code> / <code>city_id</code> 能改吗？</summary>
+      <div class="a">
+        <p><code>channel</code>（业务频道）与 <code>city_id</code>（城市）创建后不可改——接口会明确拒绝。城市挂错请下架后新建房源；<code>district_id</code>（行政区）可以改，但须属于该城市。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q11</span>返回 404「房源不存在或不属于该商家」，但房源明明存在？</summary>
+      <div class="a">
+        <p>这是<strong>归属隔离</strong>：接口只命中你自己名下的房源。「不存在」和「别人的」统一返回 404，避免探测他人房源。先用 <code>projects/list</code> 确认 id 在自己名下。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q12</span>为什么查询接口不回显 <code>contact_phone</code>？</summary>
+      <div class="a">
+        <p>真实电话只入库，用于 C 端拨号时服务端实时绑定虚拟号；任何列表/详情接口都不回显，防爬取与泄露。创建/更新接口可以提交它（须 11 位手机号），但读回来永远看不到。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q13</span>slug 冲突（重名房源）怎么处理？</summary>
+      <div class="a">
+        <p>不传 <code>slug</code> 时平台按名称自动生成并在同频道内保证唯一（冲突自动加 <code>-2/-3…</code> 后缀）；传了自定义 <code>slug</code> 也一样做唯一化，无需自己处理。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="stay">
+    <h2><span class="num">④</span> 房态 · 连住 · 保险</h2>
+
+    <details>
+      <summary><span class="q">Q14</span>房态返回 400「以下日期已有预订占用」</summary>
+      <div class="a">
+        <p>这些晚已被订单占用（<code>booked</code>），任何接口都不能改成可订/关房——须先走订单取消；取消后平台自动释放房态。这是防超卖的硬约束，商家侧与开放接口同口径。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q15</span>没设置过的日期是什么房态？夜价优先级？</summary>
+      <div class="a">
+        <p>未设置过的晚默认可订。夜价优先级：<strong>户型级覆盖 &gt; 项目级覆盖 &gt; 默认夜价</strong>（rental=月租/30 折算，minsu=<code>units.ext.price_night</code> 或起价）。「恢复默认价」= 传 <code>status:'open'</code> 且不带 <code>price_night</code>，平台清除该晚价格覆盖。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q16</span>最短连住是多少？在哪生效？</summary>
+      <div class="a">
+        <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=1</code> 晚；商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400，改口径只需改服务端常量或该字段，不需要改页面。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q17</span>保险标识有哪些？传错了会怎样？</summary>
+      <div class="a">
+        <p>仅三个平台统一枚举：<code>switch_rental</code> 换租保险、<code>hotel_cancel</code> 酒店取消险、<code>property</code> 财产保险。传未知 key 返回 400 并列出可用枚举；清空传 <code>[]</code>。配置后随 catalog / 详情 / 房态日历下发 C 端展示（含名称与图标）。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="jz">
+    <h2><span class="num">⑤</span> 家政 / 本地生活</h2>
+
+    <details>
+      <summary><span class="q">Q18</span>家政商品的价格单位是什么？</summary>
+      <div class="a">
+        <p>商家开放接口一律<strong>「分」</strong>（如 <code>29900</code> = 299 元），平台在接口边界做分↔元换算入库；房源接口则用「元」（<code>rent_monthly</code> 元/月、<code>price_night</code> 元/晚）。两条业务线单位不同，别混。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q19</span>家政商品下架和房源下架有什么区别？</summary>
+      <div class="a">
+        <p>家政商品 <code>products/status</code> 用 <code>on / off / sold_out</code>（<code>delete</code> 接口实际是把状态置 <code>off</code>）；房源 <code>projects/status</code> 用 <code>online / offline / draft</code>。语义各自独立，别把房源的状态值传给家政接口。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q20</span>开放接口支持别的鉴权方式吗（token / 账号密码）？</summary>
+      <div class="a">
+        <p><strong>不支持。开放接口统一只接受 HMAC-SHA256 签名</strong>（<code>vendor_id</code> + <code>timestamp</code> + <code>sign</code> 放在请求体里），按商家隔离数据，没有 token / 账号密码等替代方式。这也是唯一需要对接的鉴权机制。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="env">
+    <h2><span class="num">⑥</span> 环境 · 工具 · 数据</h2>
+
+    <details>
+      <summary><span class="q">Q21</span>有没有现成的自检脚本？</summary>
+      <div class="a">
+<pre>node scripts/housing_vendor_hmac_regression.cjs [base_url]   # 房源全生命周期（创建→上架→房态→下架→越权）
+node scripts/vendor_hmac_regression.cjs                      # 家政开放接口</pre>
+        <p>脚本走真实 HTTP 签名链路并自动清理演示数据；自检签名实现是否正确，跑通它即可。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q22</span>演示环境和生产的差别？</summary>
+      <div class="a">
+        <p>接口与签名完全一致，仅 Base 不同。演示环境（本页同源 <code>sytest.meizu.life</code>）数据可随时清理重建，用测试商家练手；生产 Base 以平台接入单为准。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q23</span>怎么提问题最快？</summary>
+      <div class="a">
+        <p>接入群报四样：<code>vendor_id</code>、接口路径、请求里的 <code>timestamp</code>、返回的 <code>message</code> 与 HTTP 状态码。<strong>不要发 <code>hmac_key</code></strong>，也不要发完整业务数据截图。</p>
+      </div>
+    </details>
+  </section>
+
+  <div class="doc-foot">
+    <p>没有找到答案？回到<a href="open-platform.html">开放平台门户</a>查看完整文档与手册，或联系平台接入群（报障口径见 Q23）。</p>
+  </div>
+
+  </div>
+</div>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

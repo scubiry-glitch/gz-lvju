@@ -317,8 +317,14 @@
           { id: 'index',  label: '公示门户首页', href: 'portal-index.html',  icon: 'search' },
           { id: 'verify', label: '扫码验真详情', href: 'portal-verify.html', icon: 'check' },
         ]},
-        { name: '对外开放规范', items: [
-          { id: 'intake-api', label: '房源接入 API', href: 'property-intake-api.html', icon: 'plug' },
+        { name: '开放平台（接口 · 手册 · FAQ）', items: [
+          { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
+          { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
+          { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
+          { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
+          { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },
+          { id: 'platform-manual', label: '平台运营手册',       href: '平台运营方操作手册.html',        icon: 'book' },
+          { id: 'open-faq',      label: '常见问题 FAQ',         href: 'open-faq.html',                 icon: 'check' },
         ]},
       ],
     },

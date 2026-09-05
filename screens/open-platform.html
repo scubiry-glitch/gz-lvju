@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>开放平台 · 新居住（接口文档 · 运营手册 · 常见问题）</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #ffffff; --fg: #111111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #115e59;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --gold: #b45309;
+      --code-bg: #0f172a; --code-fg: #e2e8f0;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+      background: var(--bg); color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    p { margin: 0 0 10px; }
+    h1, h2, h3, h4 { font-weight: 700; }
+    code { font-family: var(--font-mono); background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; border: 1px solid var(--border); }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .doc-shell { max-width: 980px; min-width: 0; padding-bottom: 48px; }
+
+    .doc-nav {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 20;
+    }
+    .doc-nav h1 { flex: 1; font-size: 16px; margin: 0; }
+    .doc-nav .ver { font-size: 11px; color: var(--muted); padding: 3px 8px; background: var(--bg); border-radius: 999px; }
+
+    .hero {
+      margin: 20px 20px 12px; padding: 26px 24px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, #064e3b 0%, #115e59 55%, #0d9488 100%);
+      color: white;
+    }
+    .hero h2 { font-size: 24px; margin: 0 0 8px; letter-spacing: 0.3px; }
+    .hero p { opacity: 0.94; max-width: 64ch; }
+    .hero .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .hero .badge { font-size: 11px; padding: 3px 10px; background: rgba(255,255,255,0.18); border-radius: 999px; }
+
+    section { background: var(--surface); margin: 12px 20px; padding: 20px 24px; border-radius: var(--radius-md); border: 1px solid var(--border); }
+    section h2 {
+      font-size: 18px; margin: 0 0 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    section h2 .num {
+      width: 26px; height: 26px; border-radius: 6px;
+      background: var(--accent-soft); color: var(--accent);
+      display: grid; place-items: center; font-size: 13px; font-weight: 800;
+    }
+    section h3 { font-size: 15px; margin: 16px 0 6px; }
+
+    /* 文档卡 */
+    .doc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 12px 0; }
+    .doc-card {
+      display: block; padding: 16px 18px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md);
+      color: var(--fg); transition: border-color .15s, transform .15s;
+    }
+    .doc-card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); }
+    .doc-card .kind { font-size: 10.5px; font-weight: 700; letter-spacing: .5px; color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 2px 8px; }
+    .doc-card .kind.gold { color: var(--gold); background: color-mix(in oklab, var(--gold) 12%, transparent); }
+    .doc-card h4 { margin: 9px 0 4px; font-size: 15px; }
+    .doc-card p { font-size: 12.5px; color: var(--muted); margin: 0; }
+    .doc-card .meta { margin-top: 9px; font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+    .doc-card .go { display: inline-block; margin-top: 9px; font-size: 12px; font-weight: 600; }
+
+    /* 步骤 */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+    .step { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px 14px; font-size: 12.5px; }
+    .step b { display: block; font-size: 13px; margin-bottom: 4px; }
+    .step .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; margin-right: 6px; }
+
+    /* 表格 */
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 13px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--bg); font-weight: 700; font-size: 12px; color: var(--muted); }
+    td code { font-size: 12px; }
+    .m { font-family: var(--font-mono); font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 4px; color: #fff; background: #16a34a; }
+    .tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+    .tag.hmac { background: color-mix(in oklab, #b45309 12%, transparent); color: var(--gold); }
+    .tag.key { background: color-mix(in oklab, #2563eb 12%, transparent); color: #2563eb; }
+    .tag.pub { background: color-mix(in oklab, #16a34a 14%, transparent); color: #16a34a; }
+
+    .callout { padding: 12px 14px; border-radius: var(--radius-sm); margin: 10px 0; font-size: 13px; display: flex; gap: 10px; align-items: flex-start; }
+    .callout.info { background: var(--accent-soft); color: color-mix(in oklab, var(--accent) 80%, black); }
+    .callout.warn { background: color-mix(in oklab, #eab308 14%, transparent); color: color-mix(in oklab, #eab308 70%, black); }
+
+    pre { background: var(--code-bg); color: var(--code-fg); padding: 12px 14px; border-radius: var(--radius-sm); overflow-x: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.55; margin: 8px 0; }
+
+    .doc-foot { margin: 24px 20px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; color: var(--muted); }
+    .doc-foot strong { color: var(--fg); }
+
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } #side-nav { display: none; } .steps { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) { section { margin-inline: 12px; padding: 16px; } .hero { margin-inline: 12px; padding: 18px; } }
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="portal" data-active="open-platform"></div>
+
+  <div class="doc-shell">
+
+  <div class="doc-nav">
+    <a class="back-btn" href="portal-index.html" aria-label="返回公示门户" style="display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--bg);color:var(--fg);text-decoration:none;">←</a>
+    <h1>开放平台</h1>
+    <span class="ver">docs v2.0 · 2026-09</span>
+  </div>
+
+  <div class="hero">
+    <h2>新居住开放平台</h2>
+    <p>面向<strong>商家（运营商 / 服务商）</strong>与<strong>平台运营方</strong>的统一入口。开放能力按业务线分开提供：<strong>房源</strong>（旅居 / 长租 / 惠居）、<strong>通用本地生活</strong>（保洁 / 维修 / 保姆 / 养老…）、<strong>搬家</strong>（垂类）。所有开放接口统一使用 <strong>HMAC-SHA256</strong> 商家签名鉴权，一套凭证按业务线授权，不接受其他鉴权方式。</p>
+    <div class="badges">
+      <span class="badge">3 条业务线分开接入</span>
+      <span class="badge">18 个开放接口</span>
+      <span class="badge">仅 HMAC-SHA256 一种鉴权</span>
+      <span class="badge">在线签名调试台</span>
+      <span class="badge">回归脚本开箱即用</span>
+    </div>
+  </div>
+
+  <section id="quickstart">
+    <h2><span class="num">1</span> 三步接入</h2>
+    <div class="steps">
+      <div class="step"><b><span class="n">1</span>领取凭证</b>平台为商家配置接入密钥，线下下发 <code>vendor_id</code> + <code>hmac_key</code>；密钥等同密码，只放服务端。</div>
+      <div class="step"><b><span class="n">2</span>签名调通</b>读<a href="property-intake-api.html#auth">签名算法</a>，用<a href="property-intake-api.html#console">在线调试台</a>或回归脚本调通所属业务线的查询接口。</div>
+      <div class="step"><b><span class="n">3</span>创建并上架</b>房源走 <code>projects/create</code>（草稿）→ 补价与户型 → <code>projects/status</code> 上架；本地生活 / 搬家商品走 <code>products/create</code>。</div>
+    </div>
+    <div class="callout info">
+      <strong>环境：</strong>联调/演示 <code>https://sytest.meizu.life</code>（本页同源，接口走相对路径 <code>/api/juzhu/*</code>）；生产 Base 以平台接入单下发的域名为准，接口与签名不变。
+    </div>
+  </section>
+
+  <section id="docs">
+    <h2><span class="num">2</span> 接口文档（按业务线）</h2>
+
+    <h3>🏠 房源（旅居 · 长租 · 惠居）</h3>
+    <div class="doc-grid">
+      <a class="doc-card" href="property-intake-api.html">
+        <span class="kind">房源 · v2.0</span>
+        <h4>房源接入 API（商家版）</h4>
+        <p>房源创建 / 更新 / 上下架 / 户型 / 逐晚房态，共 8 个接口；含保险标识与最短连住口径，页内可直接签名调真实接口。</p>
+        <div class="meta"><span>HMAC-SHA256</span><span>8 接口</span><span>含调试台</span></div>
+        <span class="go">打开文档 →</span>
+      </a>
+    </div>
+
+    <h3>🧹 通用本地生活（保洁 · 维修 · 保姆 · 养老…）</h3>
+    <div class="doc-grid">
+      <a class="doc-card" href="../api-doc.html#8-hmac-sha256">
+        <span class="kind">本地生活 · v1.0</span>
+        <h4>本地生活商家接口文档</h4>
+        <p>商家开放接口（HMAC）：商品 create / update / status / delete、城市 / 类目 / 标准品查询、订单状态回调与错误码约定。</p>
+        <div class="meta"><span>HMAC-SHA256</span><span>10 接口</span><span>金额单位：分</span></div>
+        <span class="go">打开文档（商家接口章节）→</span>
+      </a>
+    </div>
+
+    <h3>🚚 搬家（moving 垂类）</h3>
+    <div class="doc-grid">
+      <a class="doc-card" href="../moving-vendor-guide.html">
+        <span class="kind">搬家 · v1.0</span>
+        <h4>搬家服务商接入指引</h4>
+        <p>搬家类目专属业务约定：平台标准品（SPU）引用、商家可售商品（SKU）规则、商家信息与下单信息约定、订单状态机与联调验收清单。接口协议复用本地生活商家接口。</p>
+        <div class="meta"><span>业务约定</span><span>6 个搬家标准品</span><span>含联调清单</span></div>
+        <span class="go">打开指引 →</span>
+      </a>
+    </div>
+
+    <h3>🧰 通用工具（各业务线共用）</h3>
+    <div class="doc-grid">
+      <a class="doc-card" href="property-intake-api.html#regression">
+        <span class="kind gold">联调工具</span>
+        <h4>签名与回归脚本</h4>
+        <p>与平台一致的签名算法说明 + 两条端到端回归脚本（房源全生命周期 / 本地生活开放接口），接入方可用来自检签名实现是否正确。</p>
+        <div class="meta"><span>Node 22+</span><span>可重跑</span></div>
+        <span class="go">查看用法 →</span>
+      </a>
+    </div>
+  </section>
+
+  <section id="manuals">
+    <h2><span class="num">3</span> 运营操作手册（按角色）</h2>
+    <div class="doc-grid">
+      <a class="doc-card" href="本地生活运营服务商操作手册.html">
+        <span class="kind">商家 · 运营</span>
+        <h4>本地生活运营服务商操作手册</h4>
+        <p>服务商入驻、商品（SPU/SKU）维护、服务者与排班、订单履约与结算、平台考核，附商家信息与下单信息约定。</p>
+        <div class="meta"><span>家政 / 本地生活</span><span>B 端视角</span></div>
+        <span class="go">打开手册 →</span>
+      </a>
+      <a class="doc-card" href="平台运营方操作手册.html">
+        <span class="kind">平台 · 运营</span>
+        <h4>平台运营方操作手册（服务认证中台 P 端）</h4>
+        <p>服务认证中台日常运营：商家/服务者准入审核、派单监控、结算对账、证书与评级管理、数据看板。</p>
+        <div class="meta"><span>P 端</span><span>审核 · 监控 · 结算</span></div>
+        <span class="go">打开手册 →</span>
+      </a>
+      <a class="doc-card" href="b-listing-mgmt.html">
+        <span class="kind">商家 · 工作台</span>
+        <h4>房源工作台（上下架 · 预订）</h4>
+        <p>房源列表、调价、上下架、预订确认；配合房态日历做逐晚库存管理。登录商家 / 平台账号后可写，未登录为只读视图。</p>
+        <div class="meta"><span>B 端</span><span>登录后可操作</span></div>
+        <span class="go">打开工作台 →</span>
+      </a>
+      <a class="doc-card" href="b-stay-calendar.html">
+        <span class="kind">商家 · 工作台</span>
+        <h4>房态日历 · 保障配置</h4>
+        <p>逐晚房态（可订 / 关房 / 已订）、批量关房与夜价覆盖、最短连住与保险标识配置，与开放接口同库同口径。</p>
+        <div class="meta"><span>B 端</span><span>与开放接口同口径</span></div>
+        <span class="go">打开工作台 →</span>
+      </a>
+    </div>
+  </section>
+
+  <section id="apis">
+    <h2><span class="num">4</span> 开放接口速查（均为 HMAC 签名 POST）</h2>
+
+    <h3>4.1 房源业务线（<code>/api/juzhu/housing/vendor/*</code>）</h3>
+    <table>
+      <tr><th>接口</th><th>说明</th></tr>
+      <tr><td><code>POST /housing/vendor/projects/list</code></td><td>本商家房源列表（channel / status / city_id / keyword 过滤）</td></tr>
+      <tr><td><code>POST /housing/vendor/projects/detail</code></td><td>房源详情 + 户型明细</td></tr>
+      <tr><td><code>POST /housing/vendor/projects/create</code></td><td>创建房源（默认草稿，可带户型）</td></tr>
+      <tr><td><code>POST /housing/vendor/projects/update</code></td><td>增量更新（价格 / 标签 / 保险 / 最短连住）</td></tr>
+      <tr><td><code>POST /housing/vendor/projects/status</code></td><td>上架 online / 下架 offline / 草稿 draft</td></tr>
+      <tr><td><code>POST /housing/vendor/units/create</code> · <code>units/update</code></td><td>户型新增与调价 / 夜价</td></tr>
+      <tr><td><code>POST /housing/vendor/stay-calendar/set</code></td><td>逐晚房态：关房 / 开房 / 夜价覆盖（已订晚不可改）</td></tr>
+    </table>
+
+    <h3>4.2 通用本地生活业务线（<code>/api/juzhu/jiazheng/vendor/*</code>）</h3>
+    <table>
+      <tr><th>接口</th><th>说明</th></tr>
+      <tr><td><code>POST /api/juzhu/jiazheng/vendor/products/list|detail|create|update|status|delete</code></td><td>商家商品（服务）管理；金额单位「分」</td></tr>
+      <tr><td><code>POST /api/juzhu/jiazheng/vendor/cities|categories|skus/list</code></td><td>开放城市 / 类目 / 平台标准品查询</td></tr>
+      <tr><td><code>POST /api/juzhu/callback</code></td><td>订单状态回调（商家 → 平台，含服务者信息）</td></tr>
+    </table>
+
+    <h3>4.3 搬家业务线</h3>
+    <p>搬家不自建接口，<strong>复用 4.2 的全部开放接口</strong>（类目 <code>moving</code>），增量部分是业务约定：引用平台搬家标准品（6 个 SPU）、商家可售商品规则、订单状态机与联调验收清单，见 <a href="../moving-vendor-guide.html">搬家服务商接入指引</a>。</p>
+
+    <p style="font-size:12.5px;color:var(--muted);">完整入参出参见对应文档：<a href="property-intake-api.html">房源 v2.0</a> · <a href="../api-doc.html#8-hmac-sha256">本地生活 v1.0（商家接口章节）</a> · <a href="../moving-vendor-guide.html">搬家指引</a>。鉴权统一为 HMAC-SHA256，开放接口不接受其他鉴权方式。</p>
+  </section>
+
+  <section id="faq">
+    <h2><span class="num">5</span> 常见问题</h2>
+    <p>签名失败、上架不生效、房态改不动、密钥遗失……高频问题与排查路径整理在 <a href="open-faq.html">开放平台 FAQ</a>。</p>
+    <div class="callout info">
+      <strong>找不到答案？</strong>联系平台接入群，报 <code>vendor_id</code> + 接口路径 + <code>timestamp</code> + 返回的 <code>message</code>（<strong>不要发密钥</strong>）。
+    </div>
+  </section>
+
+  <div class="doc-foot">
+    <p><strong>开放平台文档中心</strong> · 房源 API v2.0（2026-09）· 本地生活 API v1.0（2026-08-13）· 手册随功能迭代更新。</p>
+    <p><strong>密钥安全：</strong>所有文档与页面不展示真实密钥；调试台签名在浏览器本地完成，密钥仅存本机（可选）。</p>
+    <p style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">试点阶段接口字段只增不破坏；发布节奏随政策与试点进展而定，重大变更通过接入单提前通知。</p>
+  </div>
+
+  </div>
+</div>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

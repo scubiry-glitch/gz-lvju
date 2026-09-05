@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>房源接入 API · 保租房统一服务平台</title>
+  <title>房源接入 API · 新居住开放平台（商家版）</title>
   <style>
     :root {
       --bg: #fafafa; --surface: #ffffff; --fg: #111111;
-      --muted: #6b6b6b; --border: #e5e5e5; --accent: #2f6feb;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #0f766e;
       --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
       --success: #17a34a; --warn: #eab308; --danger: #dc2626;
       --code-bg: #0f172a; --code-fg: #e2e8f0;
@@ -50,11 +50,11 @@
       margin: 20px 20px 12px;
       padding: 24px;
       border-radius: var(--radius-lg);
-      background: linear-gradient(135deg, #0c4a6e 0%, #0284c7 100%);
+      background: linear-gradient(135deg, #07352f 0%, #0f766e 100%);
       color: white;
     }
     .hero h2 { font-size: 22px; margin: 0 0 6px; letter-spacing: 0.3px; }
-    .hero p { opacity: 0.92; max-width: 60ch; }
+    .hero p { opacity: 0.92; max-width: 62ch; }
     .hero .badges { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
     .hero .badge {
       font-size: 11px; padding: 3px 10px;
@@ -121,13 +121,9 @@
       border-radius: 4px;
       color: white;
     }
-    .ep .method.POST   { background: #16a34a; }
-    .ep .method.GET    { background: #2563eb; }
-    .ep .method.PUT    { background: #ea580c; }
-    .ep .method.DELETE { background: #dc2626; }
-    .ep .path {
-      font-family: var(--font-mono); font-size: 13px; font-weight: 600;
-    }
+    .ep .method.POST { background: #16a34a; }
+    .ep .method.GET  { background: #2563eb; }
+    .ep .path { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
     .ep .desc { font-size: 12px; color: var(--muted); margin-left: auto; }
 
     /* tables */
@@ -137,26 +133,6 @@
     td code { font-size: 12px; }
     .req { color: var(--danger); font-weight: 700; }
     .opt { color: var(--muted); }
-
-    /* mode cards */
-    .mode-grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0;
-    }
-    .mode-card {
-      padding: 14px;
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-    }
-    .mode-card h4 { margin: 0 0 6px; font-size: 14px; color: var(--fg); }
-    .mode-card .pill {
-      display: inline-block; padding: 1px 7px; font-size: 10px;
-      border-radius: 4px; margin-right: 4px; font-weight: 600;
-    }
-    .mode-1 .pill { background: var(--accent-soft); color: var(--accent); }
-    .mode-2 .pill { background: color-mix(in oklab, var(--warn) 18%, transparent); color: color-mix(in oklab, var(--warn) 70%, black); }
-    .mode-3 .pill { background: color-mix(in oklab, var(--danger) 14%, transparent); color: var(--danger); }
-    .mode-card p { font-size: 12px; color: var(--muted); margin: 4px 0; }
 
     /* callout */
     .callout {
@@ -171,6 +147,12 @@
     .callout.danger  { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
     .callout strong { font-weight: 700; }
 
+    /* steps */
+    .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 12px 0; }
+    .step { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; font-size: 12px; }
+    .step b { display: block; font-size: 12.5px; margin-bottom: 4px; }
+    .step .n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; margin-right: 6px; }
+
     /* TOC */
     .toc {
       background: var(--surface);
@@ -183,20 +165,51 @@
     .toc ol { padding-left: 20px; margin: 0; columns: 2; column-gap: 24px; }
     .toc li { font-size: 13px; padding: 2px 0; break-inside: avoid; }
 
+    /* ── 调试台 ── */
+    .play { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    .play label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+    .play input[type=text], .play input[type=password], .play select {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 13px; font-family: var(--font-mono); background: var(--bg); color: var(--fg);
+    }
+    .play textarea {
+      width: 100%; min-height: 150px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 12.5px; font-family: var(--font-mono); background: var(--bg); color: var(--fg); resize: vertical;
+    }
+    .play .row { display: flex; gap: 10px; }
+    .play .row > div { flex: 1; }
+    .play .go {
+      margin-top: 12px; width: 100%; padding: 10px; border-radius: 999px;
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 14px;
+    }
+    .play .go[disabled] { opacity: .5; }
+    .play .out {
+      background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius-sm);
+      font-family: var(--font-mono); font-size: 12px; padding: 12px; min-height: 220px;
+      white-space: pre-wrap; word-break: break-all; max-height: 460px; overflow: auto;
+    }
+    .play .out .st { display: inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 700; margin-bottom: 8px; }
+    .play .out .st.s2 { background: color-mix(in oklab, var(--success) 25%, transparent); }
+    .play .out .st.s4 { background: color-mix(in oklab, var(--danger) 30%, transparent); }
+    .play .sts { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); word-break: break-all; background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; }
+    .play .hint { font-size: 11px; color: var(--muted); }
+    .play .chk { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+
     /* footer */
     .doc-foot { margin: 24px 20px; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12px; color: var(--muted); }
     .doc-foot strong { color: var(--fg); }
 
-    /* 窄屏隐藏侧栏 */
     @media (max-width: 900px) {
       .console { grid-template-columns: 1fr; }
       #side-nav { display: none; }
+      .play { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 720px) {
-      .mode-grid { grid-template-columns: 1fr; }
       .toc ol { columns: 1; }
       section { margin-inline: 12px; padding: 16px; }
       .hero { margin-inline: 12px; padding: 18px; }
+      .steps { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -211,480 +224,514 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
     </a>
     <h1>房源接入 API</h1>
-    <span class="ver">v1.3 · 2026-09</span>
+    <span class="ver">v2.0 · 2026-09</span>
   </div>
 
   <div class="hero">
-    <h2>江苏保租房 · 房源接入 API</h2>
-    <p>面向运营机构（自如 / 龙湖冠寓 / 华润有巢 / 招商伊敦等）、城投 / 国资业主、保租房项目方开放。按统一房屋数据字典推送房源 → 平台清洗验真 → 住建后台监管 → 上架"市级保租房专区"。</p>
+    <h2>房源开放接口（商家版）· 房源创建 / 上下架 / 户型 / 房态</h2>
+    <p>面向白名单运营商与持有方商家：自助完成创建、调价、户型维护、逐晚房态与上下架；C 端目录（catalog）只展示 <code>online</code> 房源。鉴权复用平台商家开放接口同一套 <strong>HMAC-SHA256</strong> 机制（与家政开放接口同签名算法、同密钥体系）。</p>
     <div class="badges">
       <span class="badge">RESTful · JSON</span>
-      <span class="badge">OAuth 2.0 + 机构资质</span>
-      <span class="badge">SLA 6–8 周接入</span>
-      <span class="badge">省级价格红线校验</span>
-      <span class="badge">第三方审计：清华 / 东南 / 省社科院</span>
+      <span class="badge">统一 HMAC-SHA256 鉴权</span>
+      <span class="badge">8 个接口 · 全部 POST</span>
+      <span class="badge">房态日历 · 逐晚库存</span>
+      <span class="badge">owner 隔离 · 越权不可见</span>
     </div>
   </div>
 
   <div class="toc">
     <h3>目录</h3>
     <ol>
-      <li><a href="#overview">接入概览与三种模式</a></li>
-      <li><a href="#auth">认证授权</a></li>
-      <li><a href="#dict">房屋数据字典</a></li>
-      <li><a href="#endpoints">核心接口</a></li>
+      <li><a href="#overview">接入概览与流程</a></li>
+      <li><a href="#auth">HMAC 签名认证</a></li>
+      <li><a href="#dict">数据字典（projects / units / ext）</a></li>
+      <li><a href="#endpoints">房源接口（创建 / 更新 / 上下架 / 户型）</a></li>
       <li><a href="#calendar">房态日历与短住规则</a></li>
-      <li><a href="#redline">价格红线校验</a></li>
-      <li><a href="#webhook">备案回流 Webhook</a></li>
+      <li><a href="#insurance">保险标识</a></li>
+      <li><a href="#console">在线调试台（可直接下单接口）</a></li>
       <li><a href="#errors">错误码</a></li>
-      <li><a href="#sla">接入 SLA 与流程</a></li>
-      <li><a href="#excel">Excel 模板（非 API 渠道）</a></li>
+      <li><a href="#regression">联调与回归</a></li>
     </ol>
   </div>
 
   <section id="overview">
     <h2><span class="num">1</span> 接入概览</h2>
-    <p>统一服务平台采取"<strong>住建主导、贝壳承建、同业开放</strong>"原则。机构通过本 API 推送房源与运营记录，平台完成数据清洗、价格红线校验、合规验真后统一上架；住建后台只读监管，数据接受省社科院/东南大学/省房协月度审计。</p>
+    <p>房源开放接口是平台商家开放接口的房源分支：<strong>路径前缀 <code>/api/juzhu/housing/vendor/*</code>，全部为 <code>POST</code>，请求/响应均为 JSON</strong>。鉴权、密钥、错误码风格与家政开放接口（<code>/api/juzhu/jiazheng/vendor/*</code>）完全一致，一套密钥两个业务共用。</p>
+    <ul>
+      <li>提交即生效：房源与户型实时可查，逐晚房态即时更新；客户订单占用的晚自动锁定，任何接口都不可改。</li>
+      <li>数据归属：房源创建时自动绑定签约商家，所有读写按归属隔离——查询、更新、上下架只能命中自己的房源，他人房源一律 404（不泄露存在性）。</li>
+      <li>上架语义：<code>status</code> ∈ <code>draft</code>（草稿，默认）/ <code>online</code>（上架）/ <code>offline</code>（下架）；C 端目录只出 <code>online</code>。目录有 ≤ 15 秒缓存，上下架最迟 15 秒生效。</li>
+    </ul>
 
-    <h3>三种接入模式</h3>
-    <div class="mode-grid">
-      <div class="mode-card mode-1">
-        <h4><span class="pill">模式一</span>自营接入</h4>
-        <p><strong>适用：</strong>具备完整运营能力的机构（自如 / 龙湖 / 华润等）。</p>
-        <p>仅推送房源与备案数据；运营、收款、维修由机构闭环。</p>
-        <p>调用范围：<code>/listings/*</code> + <code>/filings/*</code></p>
-      </div>
-      <div class="mode-card mode-2">
-        <h4><span class="pill">模式二</span>总代监管</h4>
-        <p><strong>适用：</strong>国资 / 城投有招租能力但合规需平台兜底。</p>
-        <p>平台代收代付与三方备案；机构持有经营权。</p>
-        <p>调用范围：以上 + <code>/payments/*</code> + <code>/escrow/*</code></p>
-      </div>
-      <div class="mode-card mode-3">
-        <h4><span class="pill">模式三</span>深度托管</h4>
-        <p><strong>适用：</strong>业主无运营能力 / 信托垫资项目。</p>
-        <p>平台获完整经营权（招租 + 装改 + 收款 + 维修）。</p>
-        <p>调用范围：仅 <code>/assets/*</code>（业主侧资产推送即可）</p>
-      </div>
+    <h3>接入流程</h3>
+    <div class="steps">
+      <div class="step"><b><span class="n">1</span>开通凭证</b>平台为商家配置接入密钥，线下下发 <code>vendor_id</code> + <code>hmac_key</code>。</div>
+      <div class="step"><b><span class="n">2</span>沙箱联调</b>用调试台或脚本签名调通 <code>projects/list</code>（只读）。</div>
+      <div class="step"><b><span class="n">3</span>创建房源</b><code>projects/create</code> 建草稿（默认不入 C 端），补户型与价格。</div>
+      <div class="step"><b><span class="n">4</span>平台核验</b>房源评级 / 合规信息由平台侧维护，商家可自查 <code>projects/detail</code>。</div>
+      <div class="step"><b><span class="n">5</span>上架运营</b><code>projects/status</code> 上架；日常用房态接口做关房/夜价，随用随调。</div>
     </div>
 
     <h3>环境</h3>
     <table>
-      <tr><th width="20%">环境</th><th width="50%">Base URL</th><th>说明</th></tr>
-      <tr><td>沙箱</td><td><code>https://api-sandbox.bzf.jiangsu.gov.cn</code></td><td>对接联调，住建只读</td></tr>
-      <tr><td>预生产</td><td><code>https://api-staging.bzf.jiangsu.gov.cn</code></td><td>UAT，数据每周清空</td></tr>
-      <tr><td>生产</td><td><code>https://api.bzf.jiangsu.gov.cn</code></td><td>正式接入，住建实时监管</td></tr>
+      <tr><th width="20%">环境</th><th width="50%">Base</th><th>说明</th></tr>
+      <tr><td>联调/演示</td><td><code>https://sytest.meizu.life</code>（本页同源，调试台直接可用）</td><td>演示库，数据可随时清理重建</td></tr>
+      <tr><td>生产</td><td>以平台接入单下发的域名为准</td><td>同一套接口与签名，仅换 Base</td></tr>
     </table>
-
     <div class="callout info">
-      <strong>开放性承诺：</strong>本文档同步对外公开（GitHub Pages + 住建厅官网），对所有符合资质的机构按同等条件开放接入；接入率 / 满意度 / 投诉率指标接受第三方季度审计与公示。
+      <strong>同源调用：</strong>本页与 API 同域部署，前端直接请求相对路径 <code>/api/juzhu/housing/vendor/*</code> 即可；跨域接入方按上表 Base 拼全路径。
     </div>
   </section>
 
   <section id="auth">
-    <h2><span class="num">2</span> 认证授权</h2>
+    <h2><span class="num">2</span> HMAC 签名认证（与家政开放接口同机制）</h2>
 
-    <h3>2.1 资质前置</h3>
-    <p>仅向以下主体颁发凭证：</p>
-    <ul>
-      <li>住建厅"<strong>运营主体白名单</strong>"在册机构（≥A 级）</li>
-      <li>省级国资 / 城投及其授权代理</li>
-      <li>金融机构（银行 / 信托）持有的保租房项目方</li>
-    </ul>
-    <p>申请入口：<a href="operators.html">运营主体白名单 → 申请接入</a>，材料齐全后 5 个工作日完成审核。</p>
+    <h3>2.1 凭证</h3>
+    <p>每个商家一个 <code>vendor_id</code> + 一把 <code>hmac_key</code>，由平台统一配置并线下下发。<code>hmac_key</code> 等同密码：只放服务端或自己的联调机，<strong>不要写进前端代码、不要提交仓库</strong>。</p>
 
-    <h3>2.2 OAuth 2.0 (client_credentials)</h3>
-    <div class="ep">
-      <span class="method POST">POST</span>
-      <span class="path">/oauth/token</span>
-      <span class="desc">获取 access_token</span>
+    <h3>2.2 签名算法</h3>
+    <ol style="font-size:13.5px;">
+      <li>取业务参数对象 <code>body</code>，加上 <code>vendor_id</code>；<strong>剔除</strong> <code>sign</code> 字段。</li>
+      <li>扁平化：嵌套对象用 <code>父键.子键</code> 点号展平；<code>null</code>、<code>''</code>（空串）的键<strong>不参与签名</strong>。</li>
+      <li>值序列化：字符串原样；数字/布尔转字符串（<code>true→'True'</code>、<code>false→'False'</code>）；数组 → <code>['a', 'b']</code>（单引号、逗号空格分隔）。</li>
+      <li>按键名<strong>字典序排序</strong>，拼成 <code>k1=v1&amp;k2=v2&amp;…</code>（<code>&amp;</code> 连接，无转义）。</li>
+      <li>追加 <code>timestamp</code>（毫秒时间戳）参与上述串；用 <code>hmac_key</code> 做 <strong>HMAC-SHA256</strong>，取 <strong>hex 小写</strong> 为 <code>sign</code>。</li>
+      <li>请求体 = 业务参数 + <code>vendor_id</code> + <code>timestamp</code> + <code>sign</code>，<code>POST</code> JSON 发送。时间戳与服务器偏差 <strong>±5 分钟</strong> 内有效。</li>
+    </ol>
+
+<pre><code><span class="tok-com">// Node 签名示例</span>
+<span class="tok-key">const</span> crypto = require(<span class="tok-str">'crypto'</span>);
+
+<span class="tok-key">function</span> pyStr(v) {
+  <span class="tok-key">if</span> (v === <span class="tok-key">true</span>)  <span class="tok-key">return</span> <span class="tok-str">'True'</span>;
+  <span class="tok-key">if</span> (v === <span class="tok-key">false</span>) <span class="tok-key">return</span> <span class="tok-str">'False'</span>;
+  <span class="tok-key">if</span> (Array.isArray(v)) <span class="tok-key">return</span> <span class="tok-str">'['</span> + v.map(x =&gt; (<span class="tok-key">typeof</span> x === <span class="tok-str">'string'</span> ? <span class="tok-str">"'"</span> + x + <span class="tok-str">"'"</span> : pyStr(x))).join(<span class="tok-str">', '</span>) + <span class="tok-str">']'</span>;
+  <span class="tok-key">return</span> String(v);
+}
+<span class="tok-key">function</span> flatten(data, prefix) {
+  <span class="tok-key">const</span> flat = {};
+  <span class="tok-key">for</span> (<span class="tok-key">const</span> [k, v] <span class="tok-key">of</span> Object.entries(data || {})) {
+    <span class="tok-key">if</span> (v == <span class="tok-key">null</span> || v === <span class="tok-str">''</span>) <span class="tok-key">continue</span>;          <span class="tok-com">// 空值不参与签名</span>
+    <span class="tok-key">const</span> key = prefix ? prefix + <span class="tok-str">'.'</span> + k : k;
+    <span class="tok-key">if</span> (v &amp;&amp; <span class="tok-key">typeof</span> v === <span class="tok-str">'object'</span> &amp;&amp; !Array.isArray(v)) Object.assign(flat, flatten(v, key));
+    <span class="tok-key">else</span> flat[key] = pyStr(v);
+  }
+  <span class="tok-key">return</span> flat;
+}
+<span class="tok-key">function</span> sign(secretKey, body) {
+  <span class="tok-key">const</span> payload = { ...body };
+  <span class="tok-key">delete</span> payload.sign;
+  <span class="tok-key">const</span> timestamp = Date.now();
+  <span class="tok-key">const</span> flat = flatten(payload);
+  flat.timestamp = String(timestamp);
+  <span class="tok-key">const</span> stringToSign = Object.keys(flat).sort().map(k =&gt; k + <span class="tok-str">'='</span> + flat[k]).join(<span class="tok-str">'&amp;'</span>);
+  payload.timestamp = timestamp;
+  payload.sign = crypto.createHmac(<span class="tok-str">'sha256'</span>, secretKey).update(stringToSign, <span class="tok-str">'utf8'</span>).digest(<span class="tok-str">'hex'</span>);
+  <span class="tok-key">return</span> payload;                        <span class="tok-com">// 直接作为 POST body</span>
+}
+
+<span class="tok-key">const</span> body = sign(HMAC_KEY, { vendor_id: VENDOR_ID });
+<span class="tok-key">await</span> fetch(BASE + <span class="tok-str">'/api/juzhu/housing/vendor/projects/list'</span>, {
+  method: <span class="tok-str">'POST'</span>, headers: { <span class="tok-str">'Content-Type'</span>: <span class="tok-str">'application/json'</span> },
+  body: JSON.stringify(body),
+});</code></pre>
+
+    <div class="callout warn">
+      <strong>易错点：</strong>① 数组参与签名用单引号形式（<code>tags=['演示', '回归']</code>），与 JSON 序列化不同；② 嵌套对象（如 <code>units</code> 数组里的对象）会被点号展平进签名，<strong>直接把最终 body 交给 sign 函数即可，不要手工拼</strong>；③ 重试时须重新签名（timestamp 会过期）。
     </div>
-<pre><code><span class="tok-met">POST</span> /oauth/token
-Content-Type: application/x-www-form-urlencoded
-
-grant_type=client_credentials
-&amp;client_id=<span class="tok-str">ziroom_jiangsu_2026</span>
-&amp;client_secret=<span class="tok-str">****</span>
-&amp;scope=<span class="tok-str">listings:write filings:write</span></code></pre>
-
-<pre><code>{
-  <span class="tok-key">"access_token"</span>: <span class="tok-str">"eyJhbGciOi..."</span>,
-  <span class="tok-key">"token_type"</span>: <span class="tok-str">"Bearer"</span>,
-  <span class="tok-key">"expires_in"</span>: <span class="tok-num">7200</span>,
-  <span class="tok-key">"scope"</span>: <span class="tok-str">"listings:write filings:write"</span>
-}</code></pre>
-
-    <h3>2.3 请求签名（敏感写操作）</h3>
-    <p>除 Bearer Token 外，写接口需要附加 <code>X-Signature</code>（HMAC-SHA256），算法：</p>
-    <pre><code>signature = HMAC_SHA256(
-  client_secret,
-  HTTP_METHOD + "\n" + PATH + "\n" + X-Timestamp + "\n" + sha256(body)
-)</code></pre>
-    <p>请求头示例：</p>
-    <pre><code><span class="tok-key">Authorization</span>: Bearer eyJhbGciOi...
-<span class="tok-key">X-Timestamp</span>: 1717574400
-<span class="tok-key">X-Nonce</span>: a3f8c2-...
-<span class="tok-key">X-Signature</span>: sha256=8a1f...
-<span class="tok-key">X-Operator-Id</span>: ziroom_jiangsu_2026</code></pre>
-
-    <h3>2.4 限流</h3>
-    <table>
-      <tr><th>等级</th><th>QPS</th><th>日总量</th><th>适用</th></tr>
-      <tr><td>L1</td><td>10</td><td>50,000</td><td>新接入 30 天</td></tr>
-      <tr><td>L2</td><td>50</td><td>500,000</td><td>稳定运营，默认</td></tr>
-      <tr><td>L3</td><td>200</td><td>不限</td><td>承建方 / 大型机构（&gt;5000 套）</td></tr>
-    </table>
+    <p>响应统一为 JSON：成功 <code>{ "code": 0, "message": "success", … }</code>；失败 HTTP 状态码 + <code>{ "code": 4xx, "message": "原因" }</code>（见 <a href="#errors">错误码</a>）。</p>
   </section>
 
   <section id="dict">
-    <h2><span class="num">3</span> 房屋数据字典</h2>
-    <p>字典由住建厅主导制定，分为<strong>静态披露字段</strong>（房屋本体属性）与<strong>动态运营记录</strong>（生命周期事件）。所有接入方按本字典推送，平台清洗后统一展示。</p>
+    <h2><span class="num">3</span> 数据字典</h2>
+    <p>字段与平台房源模型一致、即接口契约本身；带 ★ 为商家写入接口接受的字段。</p>
 
-    <h3>3.1 静态字段（Listing）</h3>
+    <h3>3.1 房源（projects）</h3>
     <table>
-      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
-      <tr><td><code>external_id</code></td><td>string</td><td class="req">是</td><td>机构内部唯一房源 ID</td></tr>
-      <tr><td><code>operator_id</code></td><td>string</td><td class="req">是</td><td>白名单中的机构标识</td></tr>
-      <tr><td><code>project_name</code></td><td>string</td><td class="req">是</td><td>项目 / 小区名（中文）</td></tr>
-      <tr><td><code>address</code></td><td>object</td><td class="req">是</td><td><code>{ city, district, street, building, room }</code></td></tr>
-      <tr><td><code>geo</code></td><td>object</td><td class="req">是</td><td>WGS84 <code>{ lng, lat }</code></td></tr>
-      <tr><td><code>layout</code></td><td>string</td><td class="req">是</td><td>枚举：<code>1B1H</code> <code>2B1H</code> <code>3B2H</code> <code>STUDIO</code></td></tr>
-      <tr><td><code>area_sqm</code></td><td>number</td><td class="req">是</td><td>建筑面积，保留 1 位小数</td></tr>
-      <tr><td><code>orientation</code></td><td>string</td><td>否</td><td><code>N/S/E/W/NE/SE/SW/NW</code></td></tr>
-      <tr><td><code>floor</code></td><td>object</td><td class="req">是</td><td><code>{ current, total }</code></td></tr>
-      <tr><td><code>rent_monthly</code></td><td>number</td><td class="req">是</td><td>单位元/月，须 ≤ 价格红线</td></tr>
-      <tr><td><code>service_fee_pct</code></td><td>number</td><td class="req">是</td><td>服务费率，省级标准 ≤ 8%</td></tr>
-      <tr><td><code>market_price_ref</code></td><td>number</td><td>否</td><td>市场参考价（用于展示对照）</td></tr>
-      <tr><td><code>house_quality</code></td><td>object</td><td class="req">是</td><td>好房子 4 维度评级 — 见 3.3</td></tr>
-      <tr><td><code>amenities</code></td><td>string[]</td><td>否</td><td><code>AC / FRIDGE / WASHER / WIFI / SMART_LOCK / ELEVATOR</code></td></tr>
-      <tr><td><code>stay_rules</code></td><td>object</td><td>否</td><td>短住规则 <code>{ min_stay_nights }</code>：最短连住晚数；旅居默认 <b>15</b> 晚、惠居民宿默认 1 晚，日历与下单同口径校验 — 见 3.5</td></tr>
-      <tr><td><code>insurance</code></td><td>string[]</td><td>否</td><td>房源保险标识（商家配置，C 端展示「入住保障」），枚举见 3.6</td></tr>
-      <tr><td><code>photos</code></td><td>object[]</td><td class="req">是</td><td>≥ 6 张，详见 3.4</td></tr>
-      <tr><td><code>access_mode</code></td><td>string</td><td class="req">是</td><td><code>SELF</code>(自营) / <code>AGENCY</code>(总代) / <code>TRUSTEE</code>(托管)</td></tr>
-      <tr><td><code>cert_no</code></td><td>string</td><td class="req">是</td><td>保租房项目认定文号（住建口径）</td></tr>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>id</code></td><td>int</td><td>平台生成，创建后返回；后续接口用 <code>id</code> 定位房源</td></tr>
+      <tr><td><code>name</code></td><td>string</td><td class="req">★必填</td>房源/项目名</td></tr>
+      <tr><td><code>channel</code></td><td>string</td><td>★ 业务频道：<code>rental</code> 租赁住宿（长租+旅居，监管同口径）/ <code>minsu</code> 惠居民宿 / <code>newhouse</code> 新房 / <code>resale</code> 二手 / <code>trade</code> 卖旧买新；缺省 <code>rental</code>，创建后不可改</td></tr>
+      <tr><td><code>city_id</code></td><td>int</td><td class="req">★必填</td>城市 id（<code>cities.id</code>）；须在该商家开放城市内</td></tr>
+      <tr><td><code>district_id</code></td><td>int</td><td>★ 行政区 id（<code>districts.id</code>），须属于 <code>city_id</code></td></tr>
+      <tr><td><code>address</code></td><td>string</td><td>★ 详细地址；缺省自动拼「城市 · 名称」</td></tr>
+      <tr><td><code>slug</code></td><td>string</td><td>URL 标识；缺省由名称自动生成并保证同频道唯一</td></tr>
+      <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 URL</td></tr>
+      <tr><td><code>tags</code></td><td>string[]</td><td>★ 标签数组（如 <code>["保租房","近地铁"]</code>）</td></tr>
+      <tr><td><code>price_from</code></td><td>int</td><td>★ 起价，单位元。<code>rental</code> 口径为「元/月」，<code>minsu</code> 为「元/晚」；<strong>上架前置条件</strong></td></tr>
+      <tr><td><code>sort_order</code> / <code>is_featured</code> / <code>old_house_hint</code></td><td>—</td><td>★ 排序权重 / 平台精选（一般由平台设置）/ 卖旧买新提示</td></tr>
+      <tr><td><code>contact_phone</code></td><td>string</td><td>★ 真实联系电话，<strong>仅入库用于虚拟号绑定，任何查询接口不回显</strong></td></tr>
+      <tr><td><code>owner_vendor_id</code></td><td>int</td><td>数据归属商家（签名商家自动写入，不可改）</td></tr>
+      <tr><td><code>status</code></td><td>string</td><td>★ <code>draft</code> 草稿（默认）/ <code>online</code> 上架 / <code>offline</code> 下架</td></tr>
+      <tr><td><code>ext</code></td><td>object</td><td>★ 频道差异属性：<code>insurance</code>（保险标识数组，见 6）+ <code>min_stay_nights</code>（最短连住，见 5）</td></tr>
+      <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>评级状态与结果（平台侧维护，商家只读）</td></tr>
     </table>
 
-    <h3>3.2 动态运营记录（Event）</h3>
+    <h3>3.2 户型（units）</h3>
     <table>
-      <tr><th>事件类型</th><th>触发时机</th><th>必传字段</th></tr>
-      <tr><td><code>LISTED</code></td><td>上架</td><td>—</td></tr>
-      <tr><td><code>VIEWING_BOOKED</code></td><td>预约带看</td><td>tenant_hash, scheduled_at</td></tr>
-      <tr><td><code>CONTRACT_SIGNED</code></td><td>签约</td><td>filing_no, term_months, deposit, monthly_rent</td></tr>
-      <tr><td><code>PAYMENT_SETTLED</code></td><td>支付到账</td><td>payment_channel, amount, due_at</td></tr>
-      <tr><td><code>REPAIR_REQUESTED</code></td><td>报修</td><td>category, severity, sla_hours</td></tr>
-      <tr><td><code>REPAIR_CLOSED</code></td><td>维修完成</td><td>cost, satisfaction_score</td></tr>
-      <tr><td><code>CHECKOUT</code></td><td>退租</td><td>reason, return_amount</td></tr>
-      <tr><td><code>DELISTED</code></td><td>下架</td><td>reason</td></tr>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>project_id</code></td><td>int</td><td class="req">★必填</td>所属房源 id</td></tr>
+      <tr><td><code>name</code></td><td>string</td><td class="req">★必填</td>户型名（如「两居 68㎡」「整栋 · 6 室」）</td></tr>
+      <tr><td><code>area_sqm</code></td><td>number</td><td>★ 面积（㎡）</td></tr>
+      <tr><td><code>layout_label</code></td><td>string</td><td>★ 户型标签（<code>2室1厅</code>）</td></tr>
+      <tr><td><code>rent_monthly</code></td><td>int</td><td>★ 月租（元/月）；<code>rental</code> 频道夜价按 <code>月租/30</code> 折算</td></tr>
+      <tr><td><code>price_total</code></td><td>int</td><td>★ 总价（元），<code>newhouse</code>/<code>resale</code> 频道用</td></tr>
+      <tr><td><code>promo_price</code></td><td>int</td><td>★ 优惠价（元）</td></tr>
+      <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>；<code>minsu</code> 频道预订按它计价</td></tr>
+      <tr><td><code>tags</code> / <code>amenities</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 配套枚举数组 / 房型说明 / 封面 / 排序</td></tr>
     </table>
 
-    <h3>3.3 好房子四维度评级</h3>
-    <pre><code>{
-  <span class="tok-key">"house_quality"</span>: {
-    <span class="tok-key">"comfort"</span>:  <span class="tok-num">4</span>,   <span class="tok-com">// 舒适：独卫、采光、隔音</span>
-    <span class="tok-key">"green"</span>:    <span class="tok-num">3</span>,   <span class="tok-com">// 绿色：节能门窗、空气循环</span>
-    <span class="tok-key">"smart"</span>:    <span class="tok-num">5</span>,   <span class="tok-com">// 科技：智能门锁、智能电表、HDR 监控</span>
-    <span class="tok-key">"safety"</span>:   <span class="tok-num">4</span>    <span class="tok-com">// 安全：消防、应急通道、保险覆盖</span>
-  }
-}</code></pre>
-    <p>评级 1–5；总星 = round(avg)。住建厅季度抽检，连续两季度低于 3 星将被强制下架整改。</p>
-
-    <h3>3.4 图片资源</h3>
-    <p>推送时使用对象引用，平台拉取后 CDN 化：</p>
-    <pre><code>{
-  <span class="tok-key">"photos"</span>: [
-    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.ziroom.com/..."</span>, <span class="tok-key">"tag"</span>: <span class="tok-str">"LIVING_ROOM"</span>, <span class="tok-key">"order"</span>: <span class="tok-num">1</span> },
-    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.ziroom.com/..."</span>, <span class="tok-key">"tag"</span>: <span class="tok-str">"BEDROOM_MASTER"</span>, <span class="tok-key">"order"</span>: <span class="tok-num">2</span> }
-  ]
-}</code></pre>
-    <p>分类标签：<code>LIVING_ROOM / BEDROOM_MASTER / BEDROOM_SECOND / KITCHEN / BATHROOM / BALCONY / EXTERIOR / FLOORPLAN</code></p>
-
-    <h3>3.5 短住规则与房态日历（v1.3 新增）</h3>
-    <p>旅居 / 短住类房源按<strong>逐晚库存</strong>管理。日历每格三态：<code>open</code> 可订（默认，无差异行即视为可订）、<code>blocked</code> 关房（机构手工关闭）、<code>booked</code> 已订（订单占用，客户取消自动释放）。支持逐晚夜价覆盖，未覆盖晚回落到项目默认夜价。</p>
-    <pre><code>{
-  <span class="tok-key">"stay_rules"</span>: { <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span> },   <span class="tok-com">// 旅居连住 15 晚起；日历选段与下单同口径校验</span>
-  <span class="tok-key">"calendar"</span>: [
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>,    <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span> },          <span class="tok-com">// 关房：不对 C 端可订</span>
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-03"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span> }           <span class="tok-com">// 已订：由订单写入，机构不可改</span>
-  ]
-}</code></pre>
-    <div class="callout warn">
-      <strong>口径约束：</strong><code>min_stay_nights</code> 在 C 端日历选段、下单接口、服务端校验三处保持同口径；不足最短连住返回 <code>E_STAY_MIN_NIGHTS</code>。已订晚不可被机构改为可订，须先取消订单（<code>E_DATE_CONFLICT</code>）。
+    <h3>3.3 房态日历（逐晚库存）</h3>
+    <table>
+      <tr><th>字段</th><th>说明</th></tr>
+      <tr><td><code>project_id</code> + <code>unit_id</code></td><td>库存归属；<code>unit_id=0</code> 表示项目级（整栋 / 不限房型）</td></tr>
+      <tr><td><code>stay_date</code></td><td>晚（YYYY-MM-DD，入住当晚）</td></tr>
+      <tr><td><code>status</code></td><td><code>open</code> 可订（默认，<strong>未设置过的晚即可订</strong>）/ <code>blocked</code> 关房（商家）/ <code>booked</code> 已订（平台订单写入，接口不可改，取消自动释放）</td></tr>
+      <tr><td><code>price_night</code></td><td>当晚价格覆盖（元），未覆盖回落默认夜价；户型级 &gt; 项目级 &gt; 默认</td></tr>
+    </table>
+    <div class="callout info">
+      <strong>验收工具：</strong><code>GET /api/juzhu/projects/{id}/stay-calendar?month=YYYY-MM&amp;unit_id=</code>（公开只读，用于上下架 / 房态验收）返回逐晚三态 + 价格 + 最短连住 + 保险标识，与 C 端日历渲染一致。
     </div>
-
-    <h3>3.6 保险标识（v1.3 新增）</h3>
-    <p>机构为房源配置的<strong>入住保障</strong>标识，C 端房源卡与详情页展示，验真页可核保单状态：</p>
-    <table>
-      <tr><th>标识</th><th>名称</th><th>保障口径</th></tr>
-      <tr><td><code>SWITCH_RENTAL</code></td><td>换租保险</td><td>租期到期换租衔接期内的房租损失与搬迁费用</td></tr>
-      <tr><td><code>HOTEL_CANCEL</code></td><td>酒店取消险</td><td>行程变更按规则退改，未入住部分房费可退</td></tr>
-      <tr><td><code>PROPERTY</code></td><td>财产保险</td><td>入住期间屋内财产与房屋主体意外损坏</td></tr>
-    </table>
   </section>
 
   <section id="endpoints">
-    <h2><span class="num">4</span> 核心接口</h2>
+    <h2><span class="num">4</span> 房源接口</h2>
+    <p>以下示例省略签名三件套（<code>vendor_id</code> / <code>timestamp</code> / <code>sign</code>），实际每个请求体都必须携带（见 <a href="#auth">§2</a>，或直接用 <a href="#console">§7 调试台</a>）。</p>
 
-    <h3>4.1 房源批量推送（Upsert）</h3>
-    <div class="ep">
-      <span class="method POST">POST</span>
-      <span class="path">/v1/listings:batchUpsert</span>
-      <span class="desc">单次最多 200 条</span>
-    </div>
-<pre><code><span class="tok-met">POST</span> /v1/listings:batchUpsert
-Authorization: Bearer ...
+    <h3>4.1 房源列表</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/list</span><span class="desc">本商家房源（最多 200 条）</span></div>
+<pre><code>{
+  <span class="tok-key">"channel"</span>: <span class="tok-str">"rental"</span>,      <span class="tok-com">// 可选过滤：channel / status / city_id / keyword</span>
+  <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span>
+}
 
+→ 200
 {
-  <span class="tok-key">"listings"</span>: [
+  <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>,
+  <span class="tok-key">"list"</span>: [
     {
-      <span class="tok-key">"external_id"</span>: <span class="tok-str">"ZR-NJ-2024-00188"</span>,
-      <span class="tok-key">"operator_id"</span>: <span class="tok-str">"ziroom_jiangsu_2026"</span>,
-      <span class="tok-key">"project_name"</span>: <span class="tok-str">"江宁·梧桐公馆人才公寓"</span>,
-      <span class="tok-key">"address"</span>: {
-        <span class="tok-key">"city"</span>: <span class="tok-str">"南京市"</span>,
-        <span class="tok-key">"district"</span>: <span class="tok-str">"江宁区"</span>,
-        <span class="tok-key">"street"</span>: <span class="tok-str">"双龙大道 1688 号"</span>,
-        <span class="tok-key">"building"</span>: <span class="tok-str">"3 栋"</span>,
-        <span class="tok-key">"room"</span>: <span class="tok-str">"1506"</span>
-      },
-      <span class="tok-key">"geo"</span>: { <span class="tok-key">"lng"</span>: <span class="tok-num">118.857</span>, <span class="tok-key">"lat"</span>: <span class="tok-num">31.927</span> },
-      <span class="tok-key">"layout"</span>: <span class="tok-str">"1B1H"</span>,
-      <span class="tok-key">"area_sqm"</span>: <span class="tok-num">45.0</span>,
-      <span class="tok-key">"orientation"</span>: <span class="tok-str">"S"</span>,
-      <span class="tok-key">"floor"</span>: { <span class="tok-key">"current"</span>: <span class="tok-num">15</span>, <span class="tok-key">"total"</span>: <span class="tok-num">26</span> },
-      <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">2380</span>,
-      <span class="tok-key">"service_fee_pct"</span>: <span class="tok-num">0.08</span>,
-      <span class="tok-key">"market_price_ref"</span>: <span class="tok-num">3200</span>,
-      <span class="tok-key">"house_quality"</span>: { <span class="tok-key">"comfort"</span>:<span class="tok-num">4</span>, <span class="tok-key">"green"</span>:<span class="tok-num">3</span>, <span class="tok-key">"smart"</span>:<span class="tok-num">5</span>, <span class="tok-key">"safety"</span>:<span class="tok-num">4</span> },
-      <span class="tok-key">"amenities"</span>: [<span class="tok-str">"AC"</span>,<span class="tok-str">"FRIDGE"</span>,<span class="tok-str">"WASHER"</span>,<span class="tok-str">"WIFI"</span>,<span class="tok-str">"SMART_LOCK"</span>,<span class="tok-str">"ELEVATOR"</span>],
-      <span class="tok-key">"photos"</span>: [ <span class="tok-com">/* … ≥ 6 张 … */</span> ],
-      <span class="tok-key">"access_mode"</span>: <span class="tok-str">"SELF"</span>,
-      <span class="tok-key">"cert_no"</span>: <span class="tok-str">"宁住保字〔2024〕第 0188 号"</span>
+      <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"name"</span>: <span class="tok-str">"示例·观山遇见旅居"</span>, <span class="tok-key">"channel"</span>: <span class="tok-str">"rental"</span>,
+      <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span>, <span class="tok-key">"price_from"</span>: <span class="tok-num">2400</span>,
+      <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>,
+      <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],
+      <span class="tok-key">"insurance_types"</span>: [ { <span class="tok-key">"key"</span>: <span class="tok-str">"switch_rental"</span>, <span class="tok-key">"label"</span>: <span class="tok-str">"换租保险"</span>, <span class="tok-key">"icon"</span>: <span class="tok-str">"🔄"</span> }, <span class="tok-com">/*…*/</span> ]
     }
-  ]
+  ],
+  <span class="tok-key">"total"</span>: <span class="tok-num">1</span>
 }</code></pre>
 
-    <h4>响应（部分成功）</h4>
+    <h3>4.2 房源详情</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/detail</span><span class="desc">含户型明细</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">1611</span> }
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 同 4.1，另含 address/tags/ext 等 */</span> }, <span class="tok-key">"units"</span>: [ <span class="tok-com">/* 户型数组 */</span> ] }</code></pre>
+
+    <h3>4.3 创建房源（默认草稿，不入 C 端）</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/create</span><span class="desc">可带 units 一次建全</span></div>
 <pre><code>{
-  <span class="tok-key">"accepted"</span>: <span class="tok-num">198</span>,
-  <span class="tok-key">"rejected"</span>: <span class="tok-num">2</span>,
-  <span class="tok-key">"results"</span>: [
-    {
-      <span class="tok-key">"external_id"</span>: <span class="tok-str">"ZR-NJ-2024-00188"</span>,
-      <span class="tok-key">"listing_id"</span>: <span class="tok-str">"L-JS-NJ-9f3a..."</span>,
-      <span class="tok-key">"status"</span>: <span class="tok-str">"PENDING_REVIEW"</span>
-    },
-    {
-      <span class="tok-key">"external_id"</span>: <span class="tok-str">"ZR-NJ-2024-00200"</span>,
-      <span class="tok-key">"status"</span>: <span class="tok-str">"REJECTED"</span>,
-      <span class="tok-key">"error"</span>: { <span class="tok-key">"code"</span>: <span class="tok-str">"E_PRICE_REDLINE"</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"租金 ¥3680 超出江宁区一室一厅红线 ¥3400"</span> }
-    }
-  ]
-}</code></pre>
+  <span class="tok-key">"name"</span>: <span class="tok-str">"观山湖·遇见旅居"</span>,
+  <span class="tok-key">"channel"</span>: <span class="tok-str">"rental"</span>,
+  <span class="tok-key">"city_id"</span>: <span class="tok-num">4</span>,
+  <span class="tok-key">"district_id"</span>: <span class="tok-num">41</span>,
+  <span class="tok-key">"address"</span>: <span class="tok-str">"观山湖区 · 示例大道 88 号"</span>,
+  <span class="tok-key">"tags"</span>: [<span class="tok-str">"旅居"</span>, <span class="tok-str">"近地铁"</span>],
+  <span class="tok-key">"price_from"</span>: <span class="tok-num">2400</span>,
+  <span class="tok-key">"contact_phone"</span>: <span class="tok-str">"13800001234"</span>,       <span class="tok-com">// 仅入库（虚拟号绑定），永不回显</span>
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>,               <span class="tok-com">// 最短连住，写入 ext（见 §5）</span>
+  <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],   <span class="tok-com">// 保险标识（见 §6）</span>
+  <span class="tok-key">"units"</span>: [
+    { <span class="tok-key">"name"</span>: <span class="tok-str">"一居 45㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"1室1厅"</span>, <span class="tok-key">"area_sqm"</span>: <span class="tok-num">45</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">2400</span> }
+  ],
+  <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>                      <span class="tok-com">// 缺省 draft；draft/offline 不出 C 端</span>
+}
 
-    <h3>4.2 房源状态变更</h3>
-    <div class="ep">
-      <span class="method PUT">PUT</span>
-      <span class="path">/v1/listings/{listing_id}/status</span>
-      <span class="desc">上架 / 暂存 / 下架</span>
-    </div>
-<pre><code><span class="tok-met">PUT</span> /v1/listings/L-JS-NJ-9f3a.../status
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"project"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>, <span class="tok-com">/*…*/</span> } }</code></pre>
 
-{
-  <span class="tok-key">"action"</span>: <span class="tok-str">"DELIST"</span>,        <span class="tok-com">// LIST | HOLD | DELIST</span>
-  <span class="tok-key">"reason"</span>: <span class="tok-str">"已成交"</span>,
-  <span class="tok-key">"effective_at"</span>: <span class="tok-str">"2026-06-10T00:00:00+08:00"</span>
-}</code></pre>
-
-    <h3>4.3 上报运营事件</h3>
-    <div class="ep">
-      <span class="method POST">POST</span>
-      <span class="path">/v1/listings/{listing_id}/events</span>
-      <span class="desc">动态字段推送</span>
-    </div>
-<pre><code><span class="tok-met">POST</span> /v1/listings/L-JS-NJ-9f3a.../events
-
-{
-  <span class="tok-key">"type"</span>: <span class="tok-str">"CONTRACT_SIGNED"</span>,
-  <span class="tok-key">"occurred_at"</span>: <span class="tok-str">"2026-06-05T14:32:00+08:00"</span>,
-  <span class="tok-key">"payload"</span>: {
-    <span class="tok-key">"filing_no"</span>: <span class="tok-str">"NJ-FL-2026-0010088"</span>,
-    <span class="tok-key">"tenant_hash"</span>: <span class="tok-str">"sha256:b1f..."</span>,
-    <span class="tok-key">"term_months"</span>: <span class="tok-num">12</span>,
-    <span class="tok-key">"monthly_rent"</span>: <span class="tok-num">2380</span>,
-    <span class="tok-key">"deposit"</span>: <span class="tok-num">0</span>,           <span class="tok-com">// 省级标准：免押金</span>
-    <span class="tok-key">"insurance"</span>: [<span class="tok-str">"PROPERTY"</span>,<span class="tok-str">"SWITCH_RENTAL"</span>]   <span class="tok-com">// 枚举见 3.6</span>
-  }
-}</code></pre>
-
-    <h3>4.4 查询房源</h3>
-    <div class="ep">
-      <span class="method GET">GET</span>
-      <span class="path">/v1/listings?operator_id=&amp;status=&amp;page=&amp;page_size=</span>
-      <span class="desc">本机构房源列表</span>
-    </div>
-
-    <h3>4.5 房态日历批量推送（v1.3 新增）</h3>
-    <div class="ep">
-      <span class="method POST">POST</span>
-      <span class="path">/v1/listings/{listing_id}/calendar:batchUpsert</span>
-      <span class="desc">逐晚房态 / 夜价覆盖，单次 ≤ 400 晚</span>
-    </div>
-<pre><code><span class="tok-met">POST</span> /v1/listings/L-JS-NJ-9f3a.../calendar:batchUpsert
-
-{
-  <span class="tok-key">"unit_ref"</span>: <span class="tok-str">"WHOLE"</span>,                 <span class="tok-com">// 户型引用，缺省 = 项目级（整栋 / 不限房型）</span>
-  <span class="tok-key">"days"</span>: [
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span> },
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-03"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-str">null</span> }  <span class="tok-com">// 恢复默认价</span>
-  ]
-}</code></pre>
-    <p>约束：<code>booked</code> 仅由平台订单写入（接口不可设置）；已订晚不可改为 <code>open</code>/<code>blocked</code>，返回 <code>E_DATE_CONFLICT</code>。</p>
-
-    <div class="ep">
-      <span class="method GET">GET</span>
-      <span class="path">/v1/listings/{listing_id}/calendar?month=2026-11&amp;unit_ref=</span>
-      <span class="desc">查询逐晚房态与夜价</span>
-    </div>
+    <h3>4.4 更新房源</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/update</span><span class="desc">按 id 增量更新，仅传变更字段</span></div>
 <pre><code>{
-  <span class="tok-key">"listing_id"</span>: <span class="tok-str">"L-JS-NJ-9f3a..."</span>,
-  <span class="tok-key">"month"</span>: <span class="tok-str">"2026-11"</span>,
-  <span class="tok-key">"stay_rules"</span>: { <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span> },
-  <span class="tok-key">"days"</span>: [
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> }
-  ]
-}</code></pre>
+  <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>,
+  <span class="tok-key">"price_from"</span>: <span class="tok-num">2680</span>,
+  <span class="tok-key">"tags"</span>: [<span class="tok-str">"旅居"</span>, <span class="tok-str">"近地铁"</span>, <span class="tok-str">"含早"</span>],
+  <span class="tok-key">"insurance"</span>: [<span class="tok-str">"hotel_cancel"</span>, <span class="tok-str">"property"</span>],
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">20</span>
+}
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 更新后全量 */</span> } }</code></pre>
+    <p class="opt" style="font-size:12.5px;">不可改：<code>city_id</code>、<code>channel</code>、<code>owner_vendor_id</code>；改 <code>name</code> 会同步重生成唯一 <code>slug</code>。</p>
 
-    <h3>4.6 三方备案接口</h3>
-    <div class="ep">
-      <span class="method POST">POST</span>
-      <span class="path">/v1/filings</span>
-      <span class="desc">提交租赁合同至住建备案系统</span>
-    </div>
-    <p>平台代为对接住建厅备案系统；机构推送即视为已尽备案义务，回执 5 分钟内返回。</p>
-  </section>
-
-  <section id="redline">
-    <h2><span class="num">5</span> 价格红线校验</h2>
-    <p>每条房源在 <code>batchUpsert</code> 时同步校验，校验源 = 江苏住房租赁数据治理委员会发布的"区域 × 户型 × 季度"上限表。</p>
-    <div class="ep">
-      <span class="method GET">GET</span>
-      <span class="path">/v1/redline?city=南京市&amp;district=江宁区&amp;layout=1B1H</span>
-      <span class="desc">查询当前红线</span>
-    </div>
-<pre><code>{
-  <span class="tok-key">"city"</span>: <span class="tok-str">"南京市"</span>,
-  <span class="tok-key">"district"</span>: <span class="tok-str">"江宁区"</span>,
-  <span class="tok-key">"layout"</span>: <span class="tok-str">"1B1H"</span>,
-  <span class="tok-key">"redline_monthly"</span>: <span class="tok-num">3400</span>,
-  <span class="tok-key">"market_avg"</span>: <span class="tok-num">3120</span>,
-  <span class="tok-key">"updated_at"</span>: <span class="tok-str">"2026-06-01"</span>,
-  <span class="tok-key">"audit_by"</span>: [<span class="tok-str">"清华大学"</span>,<span class="tok-str">"东南大学"</span>,<span class="tok-str">"省社科院"</span>]
-}</code></pre>
+    <h3>4.5 上下架</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/status</span><span class="desc">上架 / 下架 / 转草稿</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }     <span class="tok-com">// online 上架 / offline 下架 / draft 转草稿</span>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }</code></pre>
     <div class="callout warn">
-      <strong>注：</strong>价格红线每季度由数据治理委员会调整一次；机构如对红线有异议，可通过 <code>/v1/redline/disputes</code> 提交申诉，60 天内由第三方审计组裁决。
+      <strong>上架前置检查：</strong>必须已设 <code>price_from</code> 且至少有 1 个户型，否则 400。C 端目录有 ≤ 15 秒缓存，上架后最迟 15 秒可见、下架后最迟 15 秒消失。
     </div>
+
+    <h3>4.6 新增户型</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/create</span><span class="desc">向已有房源追加户型</span></div>
+<pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"name"</span>: <span class="tok-str">"两居 68㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"2室1厅"</span>,
+  <span class="tok-key">"area_sqm"</span>: <span class="tok-num">68</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3200</span> }
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-com">/*…*/</span> } }</code></pre>
+
+    <h3>4.7 更新户型（调价等）</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span> }
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…*/</span> } }</code></pre>
   </section>
 
-  <section id="webhook">
-    <h2><span class="num">6</span> 备案回流 Webhook</h2>
-    <p>住建系统回执由平台中转至机构端。机构在控制台配置 callback URL，平台用与请求签名相同的 HMAC 算法签名后投递，3 次重试。</p>
+  <section id="calendar">
+    <h2><span class="num">5</span> 房态日历与短住规则</h2>
 
-    <h3>事件类型</h3>
+    <h3>5.1 批量设置房态 / 夜价</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/set</span><span class="desc">关房 / 开房 / 夜价覆盖，单次 ≤ 400 晚</span></div>
+<pre><code>{
+  <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
+  <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>,                        <span class="tok-com">// 0 或缺省 = 项目级（整栋 / 不限房型）</span>
+  <span class="tok-key">"dates"</span>: [<span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"2026-12-11"</span>],
+  <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// blocked 关房；open 开房</span>
+  <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>                  <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 恢复默认</span>
+}
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"affected"</span>: <span class="tok-num">2</span>, <span class="tok-key">"dates"</span>: <span class="tok-num">2</span> }</code></pre>
+    <ul style="font-size:13.5px;">
+      <li><strong>已订晚不可改</strong>：区间内有 <code>booked</code>（订单占用）返回 400 并列出日期，须先取消订单。</li>
+      <li>未设置过的晚天然可订；「恢复默认价」= 清除该晚价格覆盖，回落默认夜价。</li>
+    </ul>
+
+    <h3>5.2 最短连住（min_stay_nights）</h3>
+    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=1</code> 晚，商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。<strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。</p>
+  </section>
+
+  <section id="insurance">
+    <h2><span class="num">6</span> 保险标识</h2>
+    <p>商家为房源配置的「入住保障」，随 catalog / 详情 / 房态日历下发 C 端展示。枚举由平台统一维护，接口只接受以下 key，未知 key 返回 400：</p>
     <table>
-      <tr><th>event</th><th>说明</th></tr>
-      <tr><td><code>listing.approved</code></td><td>房源通过住建审核，已上架</td></tr>
-      <tr><td><code>listing.rejected</code></td><td>审核未通过</td></tr>
-      <tr><td><code>calendar.locked</code> <span class="pill" style="background:var(--accent-soft);color:var(--accent);font-size:10px;">v1.3</span></td><td>房态被订单占用（某晚 booked）→ 建议机构端同步锁定本地库存</td></tr>
-      <tr><td><code>calendar.released</code> <span class="pill" style="background:var(--accent-soft);color:var(--accent);font-size:10px;">v1.3</span></td><td>订单取消释放房态 → 建议机构端恢复可订</td></tr>
-      <tr><td><code>filing.confirmed</code></td><td>合同备案号已生效</td></tr>
-      <tr><td><code>redline.updated</code></td><td>所辖区域红线发生变化（建议存量复核）</td></tr>
-      <tr><td><code>compliance.alert</code></td><td>合规预警（连续投诉 / 评分过低 / 违规收费）</td></tr>
+      <tr><th>key</th><th>名称</th><th>保障口径</th></tr>
+      <tr><td><code>switch_rental</code></td><td>换租保险</td><td>租期到期换租衔接期内的房租损失与搬迁费用</td></tr>
+      <tr><td><code>hotel_cancel</code></td><td>酒店取消险</td><td>行程变更按规则退改，未入住部分房费可退</td></tr>
+      <tr><td><code>property</code></td><td>财产保险</td><td>入住期间屋内财产与房屋主体意外损坏</td></tr>
     </table>
+    <p class="opt" style="font-size:12.5px;">配置入口：<code>projects/create</code> / <code>projects/update</code> 传 <code>insurance</code> 数组；清空传 <code>[]</code>。出参同时给出 <code>insurance</code>（key 数组）与 <code>insurance_types</code>（含 label/icon，可直接渲染）。</p>
+  </section>
 
-    <h3>Payload 示例</h3>
-<pre><code><span class="tok-met">POST</span> https://ziroom.com/hooks/bzf-jiangsu
-X-BZF-Signature: sha256=...
-
-{
-  <span class="tok-key">"event"</span>: <span class="tok-str">"filing.confirmed"</span>,
-  <span class="tok-key">"occurred_at"</span>: <span class="tok-str">"2026-06-05T14:35:12+08:00"</span>,
-  <span class="tok-key">"data"</span>: {
-    <span class="tok-key">"listing_id"</span>: <span class="tok-str">"L-JS-NJ-9f3a..."</span>,
-    <span class="tok-key">"filing_no"</span>: <span class="tok-str">"NJ-FL-2026-0010088"</span>,
-    <span class="tok-key">"valid_until"</span>: <span class="tok-str">"2027-06-04"</span>
-  }
-}</code></pre>
+  <section id="console">
+    <h2><span class="num">7</span> 在线调试台</h2>
+    <p>在本页直接签名并调用真实接口：选择接口 → 填业务参数 JSON（<strong>无需自己写 vendor_id/timestamp/sign</strong>）→ 发送。签名在你的浏览器本地完成，<code>hmac_key</code> 只留在本机（可选「记住」，存 localStorage，换机不带）。</p>
+    <div class="callout danger">
+      <strong>密钥安全：</strong>调试台等同用你的商家身份操作房源。演示环境请使用测试商家密钥；生产密钥不要在公共电脑上使用或勾选「记住」。
+    </div>
+    <div class="play">
+      <div>
+        <label>接口</label>
+        <select id="pPath">
+          <option value="/api/juzhu/housing/vendor/projects/list">projects/list · 房源列表</option>
+          <option value="/api/juzhu/housing/vendor/projects/detail">projects/detail · 房源详情</option>
+          <option value="/api/juzhu/housing/vendor/projects/create">projects/create · 创建房源（草稿）</option>
+          <option value="/api/juzhu/housing/vendor/projects/update">projects/update · 更新房源</option>
+          <option value="/api/juzhu/housing/vendor/projects/status">projects/status · 上下架</option>
+          <option value="/api/juzhu/housing/vendor/units/create">units/create · 新增户型</option>
+          <option value="/api/juzhu/housing/vendor/units/update">units/update · 更新户型</option>
+          <option value="/api/juzhu/housing/vendor/stay-calendar/set">stay-calendar/set · 房态/夜价</option>
+        </select>
+        <div class="row">
+          <div>
+            <label>vendor_id</label>
+            <input type="text" id="pVendor" placeholder="如 161" />
+          </div>
+          <div>
+            <label>hmac_key</label>
+            <input type="password" id="pKey" placeholder="平台下发的商家密钥" autocomplete="off" />
+          </div>
+        </div>
+        <label>Base（跨域接入方改这里；本页同源可留空）</label>
+        <input type="text" id="pBase" placeholder="留空 = 当前站点" />
+        <label>业务参数 JSON（数组/嵌套对象会按平台规则参与签名）</label>
+        <textarea id="pBody" spellcheck="false">{}</textarea>
+        <label class="chk"><input type="checkbox" id="pRemember" /> 在本机记住 vendor_id / hmac_key（localStorage）</label>
+        <button class="go" id="pGo">签名并发送</button>
+        <div class="sts" id="pSts">stringToSign 预览会显示在这里（联调对签用）</div>
+        <p class="hint" style="margin-top:8px;">常用模板：上架 <code>{"id":123,"status":"online"}</code> · 关房 <code>{"project_id":123,"dates":["2026-12-10"],"status":"blocked"}</code> · 建房源见 §4.3 示例。</p>
+      </div>
+      <div>
+        <label>响应</label>
+        <div class="out" id="pOut">等待发送…</div>
+      </div>
+    </div>
   </section>
 
   <section id="errors">
-    <h2><span class="num">7</span> 错误码</h2>
+    <h2><span class="num">8</span> 错误码</h2>
     <table>
       <tr><th>HTTP</th><th>code</th><th>含义</th><th>处置</th></tr>
-      <tr><td>400</td><td><code>E_VALIDATION</code></td><td>字段格式错误</td><td>按返回 <code>details</code> 修正</td></tr>
-      <tr><td>400</td><td><code>E_PRICE_REDLINE</code></td><td>租金超红线</td><td>调整租金，或 <code>/redline/disputes</code> 申诉</td></tr>
-      <tr><td>400</td><td><code>E_PHOTO_INSUFFICIENT</code></td><td>图片少于 6 张</td><td>补图后重推</td></tr>
-      <tr><td>400</td><td><code>E_CERT_NO_MISSING</code></td><td>保租房认定文号缺失或失效</td><td>联系区住建局核发</td></tr>
-      <tr><td>401</td><td><code>E_AUTH</code></td><td>token 失效</td><td>重取 token</td></tr>
-      <tr><td>403</td><td><code>E_SCOPE</code></td><td>scope 不足</td><td>升级机构资质</td></tr>
-      <tr><td>409</td><td><code>E_DUPLICATE_EXTID</code></td><td>external_id 与已有冲突</td><td>使用 PUT 更新</td></tr>
-      <tr><td>422</td><td><code>E_HOUSE_QUALITY_LOW</code></td><td>好房子评级 &lt; 3</td><td>整改后重报</td></tr>
-      <tr><td>400</td><td><code>E_STAY_MIN_NIGHTS</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>入住晚数不足最短连住（旅居默认 15 晚）</td><td>调整连续入住时段后重推</td></tr>
-      <tr><td>400</td><td><code>E_DATE_CONFLICT</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>所选日期已被预订或已关房</td><td>换时段，或先取消占用订单</td></tr>
-      <tr><td>400</td><td><code>E_INSURANCE_UNKNOWN</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>保险标识不在 3.6 枚举内</td><td>按枚举修正后重推</td></tr>
-      <tr><td>429</td><td><code>E_RATE_LIMIT</code></td><td>触发限流</td><td>退避重试，或申请升级</td></tr>
-      <tr><td>503</td><td><code>E_REDLINE_AUDIT</code></td><td>红线接口审计中</td><td>稍后 5 分钟重试</td></tr>
+      <tr><td>401</td><td>—</td><td>缺失签名(sign)或时间戳(timestamp)参数</td><td>检查签名三件套是否都在 body 里</td></tr>
+      <tr><td>401</td><td>—</td><td>请求已过期（±5 分钟窗口）</td><td>校准服务器时间后重签</td></tr>
+      <tr><td>401</td><td>—</td><td>签名校验失败 / <code>vendor_id</code> 密钥未配置</td><td>核对 <code>hmac_key</code> 与签名算法（数组、空值、嵌套展平）</td></tr>
+      <tr><td>400</td><td>—</td><td><code>name</code> / <code>city_id</code> / <code>project_id</code> 等必填缺失</td><td>按 message 补齐</td></tr>
+      <tr><td>400</td><td>—</td><td>channel 非法 / <code>city_id</code> 不属于商家开放城市 / <code>district_id</code> 不属于城市</td><td>先用 <code>projects/list</code> 或平台侧确认主数据</td></tr>
+      <tr><td>400</td><td>—</td><td>上架被拒：缺 <code>price_from</code> 或无户型</td><td>补价 + <code>units/create</code> 后重试</td></tr>
+      <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 不在 1–365</td><td>按 §6 / §5 枚举修正</td></tr>
+      <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
+      <tr><td>400</td><td>—</td><td>无可更新字段 / <code>city_id</code> 不支持修改</td><td>按 message 调整</td></tr>
+      <tr><td>404</td><td>404</td><td>房源 / 户型不存在<strong>或不属于该商家</strong></td><td>统一 404，不区分「不存在」与「越权」，防探测</td></tr>
+      <tr><td>404</td><td>404</td><td>未知 vendor 路由</td><td>核对路径（本页 8 条）</td></tr>
+      <tr><td>405</td><td>—</td><td>非 POST 请求</td><td>全部接口仅支持 POST</td></tr>
     </table>
   </section>
 
-  <section id="sla">
-    <h2><span class="num">8</span> 接入 SLA 与流程</h2>
-    <p>承诺 <strong>6–8 周</strong>完成接入。流程：</p>
-    <ol>
-      <li><strong>Week 0–1</strong>：资质审核（白名单备案 / 网安等保 / 数据安全协议）</li>
-      <li><strong>Week 2</strong>：颁发沙箱凭证 + 1V1 技术对接群</li>
-      <li><strong>Week 3–4</strong>：字典映射 + 接口联调 + 单元测试</li>
-      <li><strong>Week 5</strong>：UAT 全链路演练（含 redline / webhook / 备案回流）</li>
-      <li><strong>Week 6</strong>：合规审计 + 隐私评估（PIA）+ 安全渗透测试</li>
-      <li><strong>Week 7–8</strong>：灰度（10% 房源）→ 全量切流 → 住建备案</li>
-    </ol>
-
-    <h3>运行期 SLA</h3>
-    <table>
-      <tr><th>指标</th><th>目标值</th><th>违约赔付</th></tr>
-      <tr><td>接口可用性（生产）</td><td>≥ 99.9% / 月</td><td>承建方付月费 5% / 0.1%</td></tr>
-      <tr><td>批量推送 P99 延迟</td><td>≤ 1500 ms</td><td>—</td></tr>
-      <tr><td>Webhook 投递成功率</td><td>≥ 99%（3 次重试内）</td><td>失败队列保留 7 天</td></tr>
-      <tr><td>备案回执时延</td><td>≤ 5 min（住建系统时延除外）</td><td>—</td></tr>
-    </table>
-  </section>
-
-  <section id="excel">
-    <h2><span class="num">9</span> Excel 模板（非 API 渠道）</h2>
-    <p>面向尚未具备 API 能力的小型机构 / 国资项目方，提供统一 Excel 模板（与上述字典字段 1:1 对应）。机构填写后上传，平台后台批量导入。</p>
-    <ul>
-      <li>下载模板：<a href="#">listings-template-v1.2.xlsx</a></li>
-      <li>导入入口：<a href="operators.html">运营主体白名单 → 数据导入</a></li>
-      <li>单次最多 5000 行；导入后 10 分钟内邮件返回校验报告。</li>
-    </ul>
+  <section id="regression">
+    <h2><span class="num">9</span> 联调与回归</h2>
+    <p>平台提供端到端回归脚本（Node，走真实 HTTP 签名链路），接入方可用它自检签名实现是否正确：</p>
+<pre><code><span class="tok-com"># 覆盖：创建→上架→C 端可见→保险/连住更新→房态→下架→越权负例→清理</span>
+node scripts/housing_vendor_hmac_regression.cjs [base_url]   <span class="tok-com"># 默认 http://127.0.0.1:8766</span>
+node scripts/vendor_hmac_regression.cjs                       <span class="tok-com"># 家政开放接口同机制回归</span></code></pre>
     <div class="callout info">
-      <strong>过渡安排：</strong>Excel 渠道仅限接入首年使用，第二年起强制 API 化（豁免：年存量 &lt; 200 套的微型机构）。
     </div>
   </section>
 
   <div class="doc-foot">
-    <p><strong>归口部门：</strong>江苏省住房和城乡建设厅 · 住房租赁监管处</p>
-    <p><strong>承建方：</strong>贝壳找房（保租房统一服务平台）</p>
-    <p><strong>审计与公示：</strong>清华大学公共管理学院 · 东南大学 · 江苏省社科院 · 江苏省房地产业协会</p>
-    <p><strong>反馈：</strong>api-feedback@bzf.jiangsu.gov.cn · 工单系统 → <a href="gov-admin.html">12345 政务直达</a></p>
-    <p style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">本文档基于 V25 行业标准编制；正式发布以省住建厅后续发布版本为准（具体发布时间随政策节奏而定）。</p>
+    <p><strong>版本：</strong>v2.0（2026-09）· 文档与线上实现同步校准。</p>
+    <p><strong>密钥与凭证：</strong>由平台统一配置并线下下发；遗失须走平台重置，不要在多个业务间共享 <code>hmac_key</code>。</p>
+    <p style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">试点阶段接口字段以本页为准，扩展字段只增不破坏；重大变更会提前在「接入单」里同步。发布节奏随政策与试点进展而定。</p>
   </div>
 
   </div>
 </div>
 <script src="_region.js?v=2"></script>
 <script src="_nav.js"></script>
+<script>
+/* 在线调试台：浏览器本地按平台签名规则签名，直接调用真实接口。
+   hmac_key 仅存本机 localStorage（用户勾选时），不随请求发给任何第三方。 */
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var tpl = {
+    '/api/juzhu/housing/vendor/projects/list': { channel: 'rental' },
+    '/api/juzhu/housing/vendor/projects/detail': { id: 0 },
+    '/api/juzhu/housing/vendor/projects/create': {
+      name: '示例·观山遇见旅居', channel: 'rental', city_id: 0, district_id: 0,
+      address: '观山湖区 · 示例大道 88 号', tags: ['旅居', '近地铁'], price_from: 2400,
+      min_stay_nights: 15, insurance: ['switch_rental', 'property'],
+      units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }]
+    },
+    '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20 },
+    '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
+    '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200 },
+    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128 },
+    '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null },
+  };
+
+  /* ── 平台签名规则实现 ── */
+  function pyStr(v) {
+    if (v === true) return 'True';
+    if (v === false) return 'False';
+    if (Array.isArray(v)) return '[' + v.map(function (x) { return (typeof x === 'string') ? "'" + x + "'" : pyStr(x); }).join(', ') + ']';
+    return String(v);
+  }
+  function flatten(data, prefix) {
+    var flat = {};
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return flat;
+    Object.keys(data).forEach(function (k) {
+      var v = data[k];
+      if (v == null || v === '') return;
+      var key = prefix ? prefix + '.' + k : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) { var sub = flatten(v, key); Object.keys(sub).forEach(function (sk) { flat[sk] = sub[sk]; }); }
+      else flat[key] = pyStr(v);
+    });
+    return flat;
+  }
+  function stringToSignOf(payload, ts) {
+    var flat = flatten(payload, '');
+    flat.timestamp = String(ts);
+    return Object.keys(flat).sort().map(function (k) { return k + '=' + flat[k]; }).join('&');
+  }
+  /* 纯 JS HMAC-SHA256（hex）—— 不依赖 crypto.subtle，http 环境同样可用。
+     SHA256() 输入/输出均为二进制安全字符串（输出 32 字节 raw），hex 由 binToHex 转换 */
+  var SHA256 = (function(){
+    var K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+    function rotr(x,n){ return (x>>>n)|(x<<(32-n)); }
+    return function(msg){
+      var l = msg.length, words = [], i;
+      for (i = 0; i < l; i++) words[i>>2] = (words[i>>2]||0) | (msg.charCodeAt(i) << (24 - (i%4)*8));
+      words[l>>2] = (words[l>>2]||0) | (0x80 << (24 - (l%4)*8));
+      var bitLen = l*8;
+      words[((bitLen + 64 >> 9) << 4) + 15] = bitLen;   // 长度字段放末块尾字（数组自动扩到整块）
+      var nblk = words.length >> 4;
+      var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19], w = new Array(64);
+      for (var b = 0; b < nblk; b++) {
+        for (i = 0; i < 16; i++) w[i] = words[b*16+i] || 0;
+        for (i = 16; i < 64; i++) {
+          var s0 = rotr(w[i-15],7) ^ rotr(w[i-15],18) ^ (w[i-15]>>>3);
+          var s1 = rotr(w[i-2],17) ^ rotr(w[i-2],19) ^ (w[i-2]>>>10);
+          w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+        }
+        var a=H[0],bb=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+        for (i = 0; i < 64; i++) {
+          var S1 = rotr(e,6) ^ rotr(e,11) ^ rotr(e,25);
+          var ch = (e & f) ^ (~e & g);
+          var t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+          var S0 = rotr(a,2) ^ rotr(a,13) ^ rotr(a,22);
+          var mj = (a & bb) ^ (a & c) ^ (bb & c);
+          var t2 = (S0 + mj) | 0;
+          h=g; g=f; f=e; e=(d+t1)|0; d=c; c=bb; bb=a; a=(t1+t2)|0;
+        }
+        H[0]=(H[0]+a)|0; H[1]=(H[1]+bb)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0;
+        H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+      }
+      return H.map(function(x){ return String.fromCharCode((x>>>24)&255, (x>>>16)&255, (x>>>8)&255, x&255); }).join('');
+    };
+  })();
+  function utf8(s){ return unescape(encodeURIComponent(s)); }
+  function binToHex(bin){ var out = ''; for (var i = 0; i < bin.length; i++) out += ('0' + bin.charCodeAt(i).toString(16)).slice(-2); return out; }
+  function hmacHex(secret, msg) {
+    var key = utf8(secret), m = utf8(msg);
+    if (key.length > 64) key = SHA256(key);            // >64 字节先摘要
+    while (key.length < 64) key += '\x00';
+    var o = '', ip = '';
+    for (var i = 0; i < 64; i++) { o += String.fromCharCode(key.charCodeAt(i) ^ 0x5c); ip += String.fromCharCode(key.charCodeAt(i) ^ 0x36); }
+    return binToHex(SHA256(o + SHA256(ip + m)));       // 内层摘要以 raw bytes 拼接
+  }
+
+  /* ── 表单逻辑 ── */
+  try {
+    var saved = JSON.parse(localStorage.getItem('BZF_HOUSING_PLAY') || 'null');
+    if (saved) { $('pVendor').value = saved.vendor || ''; $('pKey').value = saved.key || ''; $('pRemember').checked = true; }
+  } catch (e) {}
+  $('pPath').onchange = function(){
+    var t = JSON.parse(JSON.stringify(tpl[this.value] || {}));
+    $('pBody').value = JSON.stringify(t, null, 2);
+  };
+  $('pPath').onchange();
+
+  function out(html){ $('pOut').innerHTML = html; }
+  $('pGo').onclick = function(){
+    var path = $('pPath').value;
+    var vendor = $('pVendor').value.trim();
+    var key = $('pKey').value.trim();
+    var base = $('pBase').value.trim().replace(/\/+$/, '');
+    var body;
+    try { body = JSON.parse($('pBody').value || '{}'); }
+    catch (e) { out('<span class="st s4">JSON 解析失败</span>\n' + e.message); return; }
+    if (!vendor) { out('<span class="st s4">缺少 vendor_id</span>'); return; }
+    if (!key) { out('<span class="st s4">缺少 hmac_key（平台下发）</span>'); return; }
+    if ($('pRemember').checked) { try { localStorage.setItem('BZF_HOUSING_PLAY', JSON.stringify({ vendor: vendor, key: key })); } catch (e) {} }
+    else { try { localStorage.removeItem('BZF_HOUSING_PLAY'); } catch (e) {} }
+
+    body.vendor_id = Number(vendor) || vendor;
+    var ts = Date.now();
+    var sts = stringToSignOf(body, ts);
+    var sign = hmacHex(key, sts);
+    body.timestamp = ts;
+    body.sign = sign;
+    $('pSts').textContent = 'stringToSign = ' + sts;
+
+    out('<span class="st s2">发送中…</span>');
+    fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.text().then(function (t) { return { status: r.status, text: t }; }); })
+      .then(function (res) {
+        var pretty = res.text;
+        try { pretty = JSON.stringify(JSON.parse(res.text), null, 2); } catch (e) {}
+        out('<span class="st ' + (res.status < 400 ? 's2' : 's4') + '">HTTP ' + res.status + '</span>\n' + pretty);
+      })
+      .catch(function (e) { out('<span class="st s4">请求失败</span>\n' + e.message); });
+  };
+})();
+</script>
 </body>
 </html>

@@ -124,6 +124,7 @@
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
 - **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（家政）+ `/api/juzhu/housing/vendor/*`（房源，2026-09）（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`；文档页 `screens/property-intake-api.html` 含在线调试台，回归 `node scripts/housing_vendor_hmac_regression.cjs`）
+- **文档中心**：`screens/open-platform.html`（开放平台门户：接口文档 + 运营手册 + FAQ 汇总，nav 在 portal 系列「开放平台」组）；FAQ 在 `screens/open-faq.html`。手册只保留中文名版（`本地生活运营服务商操作手册.html` / `平台运营方操作手册.html`），英文别名副本已删。**不要链接 `api_doc.md` 等被静态服务拦截的文件**，对外一律引 HTML 文档页。
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
 - **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）

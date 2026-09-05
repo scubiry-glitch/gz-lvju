@@ -39,7 +39,7 @@
 </div>
 
 <div class="wrap">
-  <div class="meta">接口协议以《商家服务系统 API 文档》（由 GR 对接人随接入提供）为准，本文只讲业务约定。</div>
+  <div class="meta">接口协议以<a href="api-doc.html#8-hmac-sha256" style="color:inherit;text-decoration:underline;">《本地生活服务平台 API 文档》商家接口章节</a>为准（<a href="screens/open-platform.html" style="color:inherit;text-decoration:underline;">开放平台门户</a>可查阅全部文档），本文只讲业务约定。</div>
   <div class="note">⚠️ 敏感信息（HMAC 密钥、服务器凭证等）一律线下同步，不通过任何文档与页面传递。</div>
 
   <div class="card">
@@ -63,7 +63,7 @@ C 端频道展示与流量             （选 SPU + 定城市 + 定价）     �
       <tr><td><b>SPU</b>（标准服务品）</td><td>平台</td><td><b>平台统一设计，商家不可改标准</b></td><td>规格、标准时长、参考起价、服务流程、服务者最低等级。跨商家口径一致、可比价</td></tr>
       <tr><td><b>SKU</b>（可售单元）</td><td>商家</td><td><b>商家实例化</b></td><td>选 SPU → 定城市 → 定售价 → 上下架 → 配小程序跳转 path/query →（可选）绑服务者。<b>C 端真正可下单的最小单元</b></td></tr>
     </table>
-    <div class="note">命名澄清：平台表里 <code>jz_skus</code> = 平台标准品（SPU 语义），<code>jz_products</code> = 商家 SKU 语义。叫法以本文档为准。</div>
+    <div class="note">命名澄清：平台侧的「标准品（SPU）」与商家侧的「可售商品（SKU）」是两层概念，叫法以本文档为准。</div>
 
     <h3>2.2 搬家 SPU 现网清单（直接引用，勿自造）</h3>
     <table>
@@ -96,7 +96,7 @@ C 端频道展示与流量             （选 SPU + 定城市 + 定价）     �
 
   <div class="card">
     <h2>3. 商家（vendor）信息约定</h2>
-    <p>平台为每家商家分配<b>唯一商家 ID（vendor_id，先例：41 来来、42 蓝犀牛）</b>与 HMAC 密钥。商家主数据约定：</p>
+    <p>平台为每家商家分配<b>唯一商家 ID（vendor_id，随接入单告知）</b>与 HMAC 密钥。商家主数据约定：</p>
     <table>
       <tr><th>字段</th><th>约定</th></tr>
       <tr><td>type</td><td><b>单值</b>：cleaning / repair / moving / nanny 四选一；搬家填 <code>moving</code>（单值驱动 B 端产品列表）</td></tr>
@@ -149,7 +149,7 @@ cancelled：终态，必带 cancel_reason，任意状态可取消，回调须按
   <div class="card">
     <h2>6. 环境与联调流程</h2>
     <ul>
-      <li><b>联调环境</b>：http://49.232.103.71:8765（手机需系统浏览器访问，勿在微信内直接打开——跳转依赖 weixin:// 协议）；生产环境由 GR 侧另行告知。</li>
+      <li><b>联调环境</b>：以接入单下发为准（当前演示站 <a href="https://sytest.meizu.life" style="color:inherit;">https://sytest.meizu.life</a>，开放接口同源 <code>/api/juzhu/*</code>；小程序跳转依赖 weixin:// 协议，需系统浏览器打开，勿在微信内直接打开）。</li>
       <li><b>测试城市</b>：1 沈阳 / 2 贵阳 / 3 北京 / 4 上海；商品按"城市 + 类目"双维度展示。</li>
       <li><b>联调顺序</b>：商家信息收集 → 平台侧配置（vendor 行 + 密钥）→ 商家实现签名与接口 → 签名自测 → 产品 CRUD 联调 → 下单全链路（wechat-link → url_link → paid 回调）→ 订单状态逐级推进核对 → 订单详情同步 → C 端回归验收。参考先例：41 来来（保洁）、42 蓝犀牛（搬家）。</li>
       <li><b>C 端验收点</b>：B 端商品页能筛到自家商品且 SPU 蓝色已关联、状态上架、价格正确、path/query 非空；C 端列表/详情正常出卡；下单唤起自家小程序；支付后回调 paid，"我的订单"金额正确；逐级推进 assigned / serving / completed；取消单显示原因。</li>
@@ -171,11 +171,11 @@ cancelled：终态，必带 cancel_reason，任意状态可取消，回调须按
       <tr><td>密钥</td><td>HMAC-SHA256，64 位 hex，线下互传，禁止明文入库/入文档</td></tr>
       <tr><td>客户信息</td><td>平台不代收不转发；商家小程序内自行收集</td></tr>
       <tr><td>号码展示</td><td>平台侧统一掩码脱敏</td></tr>
-      <tr><td>测试地址</td><td>http://49.232.103.71:8765</td></tr>
+      <tr><td>测试地址</td><td>以接入单下发为准（演示站 sytest.meizu.life）</td></tr>
     </table>
   </div>
 
-  <div class="footer">本文档由 GR 平台侧维护 · 接口细节冲突时以《商家服务系统 API 文档》为准</div>
+  <div class="footer">本文档由平台侧维护 · 接口细节冲突时以<a href="api-doc.html#8-hmac-sha256" style="color:inherit;">在线接口文档</a>为准 · 更多见<a href="screens/open-platform.html" style="color:inherit;">开放平台门户</a></div>
 </div>
 </body>
 </html>
