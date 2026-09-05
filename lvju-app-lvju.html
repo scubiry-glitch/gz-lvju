@@ -259,7 +259,7 @@
       else if (ci && k === key(ci)) c.classList.add('end');
       if (past || dis) c.innerHTML = '<div class="dn">' + dd + '</div>';
       else {
-        c.innerHTML = '<div class="dn">' + dd + '</div><div class="cp">' + (k === key(ci) ? '入住' : '可选') + '</div>';
+        c.innerHTML = '<div class="dn">' + dd + '</div><div class="cp">' + (ci && k === key(ci) ? '入住' : '可选') + '</div>';
         (function(dt){ c.addEventListener('click', function(){ pick(dt); }); })(d);
       }
       grid.appendChild(c);
