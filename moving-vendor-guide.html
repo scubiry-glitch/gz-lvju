@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>搬家服务商接入指引 · 商品与信息约定</title>
+<style>
+  :root{--brand:#0f766e;--brand-dark:#115e59;--ink:#1f2937;--sub:#6b7280;--line:#e5e7eb;--bg:#f6f7f9;--card:#fff;--warn-bg:#fffbeb;--warn-line:#fcd34d;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;padding-bottom:48px;}
+  .hero{background:linear-gradient(135deg,#0f766e,#115e59 70%);color:#fff;padding:32px 20px 26px;}
+  .hero .tag{display:inline-block;font-size:12px;letter-spacing:2px;background:rgba(255,255,255,.18);border-radius:999px;padding:2px 10px;margin-bottom:10px;}
+  .hero h1{font-size:22px;font-weight:700;margin-bottom:6px;}
+  .hero p{font-size:13px;opacity:.85;}
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px;}
+  .meta{font-size:12px;color:var(--sub);margin:14px 0 4px;text-align:right;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 18px 14px;margin-top:14px;}
+  .card h2{font-size:16px;color:var(--brand-dark);margin-bottom:10px;padding-left:10px;border-left:4px solid var(--brand);}
+  .card h3{font-size:14px;margin:12px 0 6px;color:#374151;}
+  .card p,.card li{font-size:13.5px;color:#374151;}
+  .card ul,.card ol{padding-left:20px;margin:6px 0;}
+  .card li{margin:3px 0;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 4px;background:#fff;}
+  th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top;}
+  th{background:#f0fdfa;color:var(--brand-dark);font-weight:600;white-space:nowrap;}
+  code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:#be185d;}
+  .note{background:var(--warn-bg);border:1px solid var(--warn-line);border-radius:8px;padding:10px 12px;font-size:12.5px;margin:10px 0 2px;}
+  .flow{background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:10px 12px;font-size:12.5px;margin:8px 0;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;color:#334155;}
+  .footer{text-align:center;font-size:12px;color:var(--sub);margin-top:22px;}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="wrap">
+    <span class="tag">新居住 · 生活服务专区 · 搬家类目</span>
+    <h1>搬家服务商接入指引 · 商品与信息约定</h1>
+    <p>v1.0 · 2026-09-02 ｜ 面向搬家（moving）类目新接入服务商</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="meta">接口协议以《商家服务系统 API 文档》（由 GR 对接人随接入提供）为准，本文只讲业务约定。</div>
+  <div class="note">⚠️ 敏感信息（HMAC 密钥、服务器凭证等）一律线下同步，不通过任何文档与页面传递。</div>
+
+  <div class="card">
+    <h2>1. 整体模型：三层角色怎么分工</h2>
+    <div class="flow">平台（GR 侧）                 搬家服务商（商家）             客户
+─────────────────────      ─────────────────────      ───────────────
+定类目 / 子类目 / 标准品 SPU   维护自己可售的 SKU             在平台 C 端浏览选品
+C 端频道展示与流量             （选 SPU + 定城市 + 定价）     点"下一步"唤起商家小程序
+订单状态聚合、"我的订单"        小程序内预约 / 收款 / 履约       在商家小程序内完成下单支付
+平台级认证（白名单 / 资质）     回调同步订单状态给平台          回平台 C 端跟踪进度</div>
+    <p><b>一句话分工：平台管标准、商家管售卖与履约、客户信息由商家自己的小程序收集</b>（详见第 4 章）。</p>
+  </div>
+
+  <div class="card">
+    <h2>2. 商品模型约定（SPU / SKU）</h2>
+    <h3>2.1 概念分层（先对齐叫法）</h3>
+    <table>
+      <tr><th>概念</th><th>归属层</th><th>谁定义</th><th>含义</th></tr>
+      <tr><td>类目（大类）</td><td>平台</td><td>平台</td><td>保洁 / 维修 / <b>搬家</b> / 保姆；ID：cleaning / repair / moving / nanny</td></tr>
+      <tr><td>子类目</td><td>平台</td><td>平台</td><td>搬家下 6 个子类：居民搬家 / 长途搬家 / 钢琴搬运 / 企业搬迁 / 日式搬家 / 搬货上下楼</td></tr>
+      <tr><td><b>SPU</b>（标准服务品）</td><td>平台</td><td><b>平台统一设计，商家不可改标准</b></td><td>规格、标准时长、参考起价、服务流程、服务者最低等级。跨商家口径一致、可比价</td></tr>
+      <tr><td><b>SKU</b>（可售单元）</td><td>商家</td><td><b>商家实例化</b></td><td>选 SPU → 定城市 → 定售价 → 上下架 → 配小程序跳转 path/query →（可选）绑服务者。<b>C 端真正可下单的最小单元</b></td></tr>
+    </table>
+    <div class="note">命名澄清：平台表里 <code>jz_skus</code> = 平台标准品（SPU 语义），<code>jz_products</code> = 商家 SKU 语义。叫法以本文档为准。</div>
+
+    <h3>2.2 搬家 SPU 现网清单（直接引用，勿自造）</h3>
+    <table>
+      <tr><th>SPU slug</th><th>名称</th><th>规格</th><th>参考起价</th><th>计价</th><th>标准时长</th><th>服务者等级</th></tr>
+      <tr><td>moving-city-standard</td><td>居民搬家·同城</td><td>金杯车·2 名师傅</td><td>¥398 起</td><td>/车次</td><td>180 min</td><td>L2</td></tr>
+      <tr><td>moving-japanese-full</td><td>日式搬家·全包</td><td>打包收纳 + 还原归位</td><td>¥1680 起</td><td>/次</td><td>480 min</td><td>L4</td></tr>
+      <tr><td>moving-longhaul</td><td>长途搬家·跨城</td><td>厢式货车·300km+</td><td>¥1200 起</td><td>/车次</td><td>600 min</td><td>L3</td></tr>
+      <tr><td>moving-piano</td><td>钢琴搬运·专业</td><td>立式/三角钢琴可接</td><td>¥800 起</td><td>/次</td><td>120 min</td><td>L4</td></tr>
+      <tr><td>moving-office</td><td>企业搬迁·整体</td><td>办公整体搬迁方案</td><td>¥2800 起</td><td>/项目</td><td>720 min</td><td>L4</td></tr>
+      <tr><td>moving-updown</td><td>搬货上下楼·计件</td><td>无电梯搬运·计件</td><td>¥200 起</td><td>/次</td><td>120 min</td><td>L2</td></tr>
+    </table>
+    <ul>
+      <li>SPU 的 <code>price_from</code> 只是<b>参考起价/展示价</b>，不是商家售价；售价由商家在 SKU 上自定。</li>
+      <li>SPU 经接口 <code>POST /api/juzhu/jiazheng/vendor/skus/list</code> 拉取，创建 SKU 时填 <code>channel_sku_id</code> 引用。</li>
+      <li>现场自定义项（楼层费、超距费、大件加价、打包费）在商家自己的小程序内按行规报价收款，平台不干预。</li>
+    </ul>
+
+    <h3>2.3 商家 SKU 约定（决定 C 端能不能看到、怎么跳转）</h3>
+    <table>
+      <tr><th>约定项</th><th>规则</th><th>违反后果</th></tr>
+      <tr><td>城市维度</td><td>SKU 必须带 <code>city_id</code>，且只能属于被授权城市</td><td>未覆盖城市 C 端不展示</td></tr>
+      <tr><td>关联 SPU</td><td><code>channel_sku_id</code> 必须关联平台 SPU（详情页蓝色 SPU 标签）</td><td>未关联商品不上 C 端</td></tr>
+      <tr><td>状态</td><td>on 上架 / off 下架 / sold_out 售罄</td><td>非 on 不展示</td></tr>
+      <tr><td>跳转参数</td><td><code>path</code>、<code>query</code> 必须非空</td><td>下单后无法进入商家小程序商品页</td></tr>
+      <tr><td>价格</td><td><code>price</code>/<code>original_price</code> 单位一律<b>分</b>（¥128 = 12800）</td><td>金额错位</td></tr>
+      <tr><td>服务者（可选）</td><td><code>worker_ids</code> 绑定本店已认证服务者</td><td>仅影响详情页展示</td></tr>
+      <tr><td>删除</td><td>无物理删除，接口删除 = 置 off 软删</td><td>—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>3. 商家（vendor）信息约定</h2>
+    <p>平台为每家商家分配<b>唯一商家 ID（vendor_id，先例：41 来来、42 蓝犀牛）</b>与 HMAC 密钥。商家主数据约定：</p>
+    <table>
+      <tr><th>字段</th><th>约定</th></tr>
+      <tr><td>type</td><td><b>单值</b>：cleaning / repair / moving / nanny 四选一；搬家填 <code>moving</code>（单值驱动 B 端产品列表）</td></tr>
+      <tr><td>name</td><td>C 端展示名（如"某某搬家"）</td></tr>
+      <tr><td>city_ids</td><td>服务城市（逗号分隔 city_id）；现网：1 沈阳 / 2 贵阳 / 3 北京 / 4 上海，新增城市需平台先建</td></tr>
+      <tr><td>vendor_no</td><td>商家编码（可选，运营标注用）</td></tr>
+      <tr><td>whitelist_id / badges</td><td>平台认证标识：whitelist 白名单、backcheck 实地核查、top10 等；决定 C 端认证徽章</td></tr>
+      <tr><td>start_price / unit / hours</td><td>C 端商家卡片展示：起价（如 398）、计价（车次）、营业时间（如 06:00-22:00）</td></tr>
+      <tr><td>hmac_key</td><td>HMAC-SHA256 密钥，<b>64 位 hex</b>（openssl rand -hex 32）；仅平台与商家线下互知</td></tr>
+      <tr><td>url_link</td><td>商家提供的<b>小程序 URL Link 生成接口</b>完整地址（必配）</td></tr>
+      <tr><td>order_detail_url</td><td>商家提供的<b>订单详情查询接口</b>完整地址（可选，不配则 C 端详情不实时覆盖）</td></tr>
+      <tr><td>status / sort_order</td><td>active 启用；排序一般与 vendor_id 同值</td></tr>
+    </table>
+    <p style="margin-top:8px"><b>入驻需提供</b>：公司/品牌名、服务城市、展示素材（logo、起价、营业时间）、小程序 AppID、商品页 path/query 样例、URL Link 与订单详情接口地址、联调联系人。</p>
+  </div>
+
+  <div class="card">
+    <h2>4. 客户（下单）信息约定</h2>
+    <p><b>平台不代收、不向商家透传客户联系信息。</b>真实链路：C 端用户看到 SKU → 点"下一步" → 平台调商家 <code>url_link</code> 接口（只传 <code>path</code>、<code>query</code>、<code>order_ref</code>）→ 生成 <code>weixin://</code> 链接唤起商家小程序 → <b>客户在商家小程序内自行填写预约信息并支付</b> → 商家回调平台同步状态。</p>
+    <ul>
+      <li><b>客户信息由商家小程序收集</b>（平台不存储、不参与、不转发）。搬家字段参考：搬出/搬入地址、楼层与电梯、搬家日期与时段、车型（面包车/金杯/厢货/纯人力）、大件物品（冰箱/洗衣机/钢琴…）、打包服务、联系电话、备注。</li>
+      <li>平台侧每单只记订单标识与流转状态，供 C 端"我的订单"展示：<code>order_ref</code>（GR + 时间戳 + 序号，如 GR202608071429360148）、<code>vendor_oid</code>（商家单号）、<code>user_id</code>（C 端当前为模拟值 demo_user_001）、<code>sku</code>/<code>city</code> 快照、<code>fee</code>（分）、状态时间轴。</li>
+      <li><b>vendor_oid 一致性</b>：首次 paid 回调平台用 <code>order_ref</code> 匹配并写入 <code>vendor_oid</code>；此后所有回调需 <code>order_ref + vendor_oid</code> 联合匹配。</li>
+      <li>服务者电话平台展示统一<b>掩码脱敏</b>（如 139****5678），商家回调 <code>worker.phone</code> 请给完整号，展示层由平台处理。</li>
+    </ul>
+    <h3>订单状态机</h3>
+    <div class="flow">pending（C 端不可见）→ paid（必带 fee）→ assigned（必带 worker：姓名/电话/预计上门）
+→ serving → completed
+cancelled：终态，必带 cancel_reason，任意状态可取消，回调须按序推进</div>
+  </div>
+
+  <div class="card">
+    <h2>5. 接口与安全约定（概览）</h2>
+    <table>
+      <tr><th>方向</th><th>接口</th><th>说明</th></tr>
+      <tr><td>平台 → 商家（开放）</td><td>城市 / 类目 / SPU / 产品 列表查询</td><td>商家自维护 SKU 用</td></tr>
+      <tr><td>平台 → 商家（开放）</td><td>产品 create / update / status / delete</td><td>商家操作自己的 SKU</td></tr>
+      <tr><td>商家 → 平台</td><td>POST /api/juzhu/callback</td><td>订单状态回调（paid/assigned/serving/completed/cancelled）</td></tr>
+      <tr><td>平台 → 商家</td><td>URL Link 生成接口（商家提供）</td><td>平台传 path/query/order_ref，商家回 weixin:// 链接（code=200 成功）</td></tr>
+      <tr><td>平台 → 商家</td><td>订单详情查询接口（商家提供，GET）</td><td>客户打开订单详情时平台静默同步最新状态</td></tr>
+    </table>
+    <ul>
+      <li><b>认证</b>：所有请求体带 HMAC-SHA256 签名：含 vendor_id → 移除 sign → 加毫秒 timestamp → 嵌套对象递归展平（. 分层）→ 去空值 → 按 key 字典序排序 → k1=v1&amp;k2=v2 拼接 → 以 hmac_key 做 HMAC-SHA256 取 hex 小写 → 随请求发送。验签失败 401。</li>
+      <li><b>防重放</b>：timestamp 毫秒时间戳，过期或重复被拒。</li>
+      <li><b>IP 白名单</b>：平台调用商家两个接口的出站 IP 需商家加白，实际 IP 以平台日志提示为准。</li>
+      <li>错误码：0 成功 / 400 参数缺失 / 401 签名失败 / 404 订单或产品不存在 / 500 服务端错误。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>6. 环境与联调流程</h2>
+    <ul>
+      <li><b>联调环境</b>：http://49.232.103.71:8765（手机需系统浏览器访问，勿在微信内直接打开——跳转依赖 weixin:// 协议）；生产环境由 GR 侧另行告知。</li>
+      <li><b>测试城市</b>：1 沈阳 / 2 贵阳 / 3 北京 / 4 上海；商品按"城市 + 类目"双维度展示。</li>
+      <li><b>联调顺序</b>：商家信息收集 → 平台侧配置（vendor 行 + 密钥）→ 商家实现签名与接口 → 签名自测 → 产品 CRUD 联调 → 下单全链路（wechat-link → url_link → paid 回调）→ 订单状态逐级推进核对 → 订单详情同步 → C 端回归验收。参考先例：41 来来（保洁）、42 蓝犀牛（搬家）。</li>
+      <li><b>C 端验收点</b>：B 端商品页能筛到自家商品且 SPU 蓝色已关联、状态上架、价格正确、path/query 非空；C 端列表/详情正常出卡；下单唤起自家小程序；支付后回调 paid，"我的订单"金额正确；逐级推进 assigned / serving / completed；取消单显示原因。</li>
+      <li><b>金额核对</b>：回调与产品接口金额单位是分（12800 = ¥128），C 端自动转元展示。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>7. 约定速查表</h2>
+    <table>
+      <tr><th>事项</th><th>约定值</th></tr>
+      <tr><td>商家类目 type</td><td>moving（单值）</td></tr>
+      <tr><td>平台标准品</td><td>引用现网 6 个搬家 SPU（见 2.2），不自造</td></tr>
+      <tr><td>商家可售单元</td><td>SKU = SPU + city_id + 售价（分）+ 状态 + path/query</td></tr>
+      <tr><td>C 端可见三条件</td><td>城市覆盖 + 已关联 SPU + status=on</td></tr>
+      <tr><td>金额单位</td><td>分（页面展示自动转元）</td></tr>
+      <tr><td>时间格式</td><td>YYYY-MM-DD HH:mm:ss；timestamp 用毫秒</td></tr>
+      <tr><td>订单号</td><td>平台 order_ref（GR+…）；商家 vendor_oid；首次 paid 绑定后联合匹配</td></tr>
+      <tr><td>密钥</td><td>HMAC-SHA256，64 位 hex，线下互传，禁止明文入库/入文档</td></tr>
+      <tr><td>客户信息</td><td>平台不代收不转发；商家小程序内自行收集</td></tr>
+      <tr><td>号码展示</td><td>平台侧统一掩码脱敏</td></tr>
+      <tr><td>测试地址</td><td>http://49.232.103.71:8765</td></tr>
+    </table>
+  </div>
+
+  <div class="footer">本文档由 GR 平台侧维护 · 接口细节冲突时以《商家服务系统 API 文档》为准</div>
+</div>
+</body>
+</html>
