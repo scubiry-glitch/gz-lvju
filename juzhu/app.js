@@ -422,7 +422,7 @@ window.JUZHU = (function () {
     if (district.managed_unit_count != null && district.managed_unit_count !== '') {
       return Number(district.managed_unit_count) || 0;
     }
-    return projects({ channel: 'bzf', district_id: district.id })
+    return projects({ channel: 'rental', district_id: district.id }).filter(function(p){ return (p.tags || []).indexOf('保租房') >= 0; })
       .reduce(function(sum, p) { return sum + managedUnits(p); }, 0);
   }
 

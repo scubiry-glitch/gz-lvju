@@ -456,7 +456,7 @@
     document.getElementById('heroTitle').textContent = cityOf(d) + ' · ' + brand.short;
     var stock = (d.stats && d.stats.unit_count != null)
       ? Number(d.stats.unit_count)
-      : (d.projects || []).filter(function(p){ return p.channel === 'bzf'; })
+      : (d.projects || []).filter(function(p){ return (p.channel === 'rental' || p.channel === 'bzf') && (p.tags || []).indexOf('保租房') >= 0; })
           .reduce(function(sum, p){ return sum + JUZHU.managedUnits(p); }, 0);
     document.getElementById('heroStat').innerHTML =
       '<div><b>'+d.stats.project_count_bzf+'</b>保租项目</div>'+

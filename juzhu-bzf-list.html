@@ -90,7 +90,7 @@
     document.getElementById('ttl').innerHTML = bizTerm+'<small>'+d.name+'</small>';
     if (d.cover_image) document.getElementById('dBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(d.cover_image)+')';
 
-    var projs = JUZHU.projects({ channel: 'bzf', district_id: d.id });
+    var projs = JUZHU.projects({ channel: 'rental', district_id: d.id }).filter(function(p){ return (p.tags || []).indexOf('保租房') >= 0; });
     if (!projs.length) {
       document.getElementById('list').innerHTML = '<div class="empty">该区暂无在营项目<br><small>（文件夹标注：暂无项目）</small></div>';
       return;
