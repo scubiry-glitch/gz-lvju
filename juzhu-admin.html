@@ -455,7 +455,7 @@ function parseKeeper(u) {
 function channelLabel(id) {
   var c = (state.channels || []).find(function(x){ return x.id === id; });
   if (c) return c.label;
-  return ({ rental:'租赁住宿', minsu:'惠居民宿', newhouse:'新房', resale:'二手', trade:'卖旧买新' })[id] || id;
+  return ({ rental:'租赁住宿', minsu:'民宿民宿', newhouse:'新房', resale:'二手', trade:'卖旧买新' })[id] || id;
 }
 
 function channelOptions(selected, includeAll) {
@@ -466,7 +466,7 @@ function channelOptions(selected, includeAll) {
   });
   if (!state.channels || !state.channels.length) {
     html += '<option value="rental"'+(selected==='rental'?' selected':'')+'>租赁住宿</option>';
-    html += '<option value="minsu"'+(selected==='minsu'?' selected':'')+'>惠居民宿</option>';
+    html += '<option value="minsu"'+(selected==='minsu'?' selected':'')+'>民宿民宿</option>';
     html += '<option value="trade"'+(selected==='trade'?' selected':'')+'>卖旧买新</option>';
   }
   return html;

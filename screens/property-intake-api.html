@@ -352,7 +352,7 @@
       <tr><th>字段</th><th>类型</th><th>说明</th></tr>
       <tr><td><code>id</code></td><td>int</td><td>平台生成，创建后返回；后续接口用 <code>id</code> 定位房源</td></tr>
       <tr><td><code>name</code></td><td>string</td><td class="req">★必填</td>房源/项目名</td></tr>
-      <tr><td><code>channel</code></td><td>string</td><td>★ 业务频道：<code>rental</code> 租赁住宿（长租+旅居，监管同口径）/ <code>minsu</code> 惠居民宿 / <code>newhouse</code> 新房 / <code>resale</code> 二手 / <code>trade</code> 卖旧买新；缺省 <code>rental</code>，创建后不可改</td></tr>
+      <tr><td><code>channel</code></td><td>string</td><td>★ 业务频道：<code>rental</code> 租赁住宿（长租+旅居，监管同口径）/ <code>minsu</code> 民宿民宿 / <code>newhouse</code> 新房 / <code>resale</code> 二手 / <code>trade</code> 卖旧买新；缺省 <code>rental</code>，创建后不可改</td></tr>
       <tr><td><code>city_id</code></td><td>int</td><td class="req">★必填</td>城市 id（<code>cities.id</code>）；须在该商家开放城市内</td></tr>
       <tr><td><code>district_id</code></td><td>int</td><td>★ 行政区 id（<code>districts.id</code>），须属于 <code>city_id</code></td></tr>
       <tr><td><code>address</code></td><td>string</td><td>★ 详细地址；缺省自动拼「城市 · 名称」</td></tr>
@@ -522,7 +522,7 @@
     <table>
       <tr><th>字段</th><th>取值</th><th>说明</th></tr>
       <tr><td><code>status</code></td><td><code>pending → confirmed / cancelled</code></td><td>确认后订单生效；取消为终态，不可再变更</td></tr>
-      <tr><td><code>pay_status</code></td><td><code>unpaid / paid / refunded</code> 或 空</td><td>惠居民宿为预付（先付后确认）；租赁住宿预订单为空（商家确认后线下收款）</td></tr>
+      <tr><td><code>pay_status</code></td><td><code>unpaid / paid / refunded</code> 或 空</td><td>民宿民宿为预付（先付后确认）；租赁住宿预订单为空（商家确认后线下收款）</td></tr>
       <tr><td>确认前置</td><td>—</td><td><code>unpaid</code> 的订单不可确认（400），支付完成后可确认；<code>cancelled</code> 不可再变更</td></tr>
       <tr><td>拒单/取消</td><td>—</td><td>自动释放占用的房态晚；已支付订单 <code>pay_status</code> 标记 <code>refunded</code></td></tr>
     </table>
@@ -531,7 +531,7 @@
     <table>
       <tr><th>event</th><th>触发时机</th><th>商家应做什么</th></tr>
       <tr><td><code>booking.created</code></td><td>客户提交预订单</td><td>备房；预付单等待支付到账</td></tr>
-      <tr><td><code>booking.paid</code></td><td>预付单支付完成（惠居民宿）</td><td>此时方可确认订单</td></tr>
+      <tr><td><code>booking.paid</code></td><td>预付单支付完成（民宿民宿）</td><td>此时方可确认订单</td></tr>
       <tr><td><code>booking.cancelled</code></td><td>客户取消（商家自己拒单不会推送）</td><td>释放已备房源</td></tr>
     </table>
     <p>推送为 <code>POST</code> JSON，body 即开放接口同款结构：<code>event</code> + <code>vendor_id</code> + <code>order</code>（订单对象，手机号不外传）+ <code>timestamp</code> + <code>sign</code>。<strong>验签与开放接口同一算法</strong>（对去掉 <code>sign</code>/<code>timestamp</code> 的参数扁平排序后 HMAC-SHA256），收到后先验签再处理：</p>

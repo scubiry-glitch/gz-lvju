@@ -29,9 +29,9 @@ const CITY_SLUG = 'guiyang';
 const DISTRICT_NAMES = ['观山湖区', '花溪区'];
 
 const DEMO = [
-  // ── minsu 惠居（彩贝 5 维口径）──
+  // ── minsu 民宿（彩贝 5 维口径）──
   {
-    id: 9001, channel: 'minsu', slug: 'demo-minsu-xingkong', name: '示例·星空整栋惠居',
+    id: 9001, channel: 'minsu', slug: 'demo-minsu-xingkong', name: '示例·星空整栋民宿',
     address: '观山湖区 · 示例景区东门', price_from: 980, featured: 1,
     units: [
       { id: 9101, name: '整栋 · 6 室', layout_label: '6室3卫', area_sqm: 260, rent_monthly: 19600, price_night: 1960, tags: ['整栋包栋', '管家服务'] },
@@ -148,7 +148,7 @@ async function seed(db, bcrypt) {
     if (d.length) districts[dn] = d[0].id;
   }
   const vendorIds = {
-    minsu: await ensureVendor(db, DEMO_VENDORS[0], bcrypt), // 惠居暂挂示例置业；如需 lvju_host 可改
+    minsu: await ensureVendor(db, DEMO_VENDORS[0], bcrypt), // 民宿暂挂示例置业；如需 lvju_host 可改
     newhouse: await ensureVendor(db, DEMO_VENDORS[0], bcrypt),
     resale: await ensureVendor(db, DEMO_VENDORS[1], bcrypt),
   };

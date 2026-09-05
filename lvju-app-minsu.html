@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
-<title>惠居 · 整栋·星级·管家 · 贝壳找房旅居</title>
+<title>民宿 · 整栋·星级·管家 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 </head>
 <body>
@@ -13,7 +13,7 @@
 
     <div class="appbar ghost">
       <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">惠居<small>整栋 · 星级 · 管家</small></div>
+      <div class="ttl">民宿<small>整栋 · 星级 · 管家</small></div>
       <div class="act"><a href="lvju-app-map.html">🗺</a><span>♡</span><span>⤴</span></div>
     </div>
 
@@ -22,9 +22,9 @@
       <div class="in">
         <div class="ek">Boutique Stay</div>
         <h1>住进一间<br>有主人的房子</h1>
-        <p>整栋包栋、星级惠居，每一间都过旅居星级评定与验真</p>
+        <p>整栋包栋、星级民宿，每一间都过旅居星级评定与验真</p>
         <div class="stat">
-          <div><b>1,800+</b><span>认证惠居</span></div>
+          <div><b>1,800+</b><span>认证民宿</span></div>
           <div><b>92%</b><span>星级达标</span></div>
           <div><b>验真</b><span>扫码可查</span></div>
         </div>
@@ -35,14 +35,14 @@
       <a class="on" data-d="">全部</a>
     </div>
 
-    <div class="sec-h"><span class="bar"></span><h2>惠居门店</h2><span class="more" id="sortNote">星级优先</span></div>
+    <div class="sec-h"><span class="bar"></span><h2>民宿门店</h2><span class="more" id="sortNote">星级优先</span></div>
     <div class="wrap" id="listingWrap">
       <div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner">
       <span class="bi">🛡</span>
-      <div class="bt"><b>每间惠居一张验真卡</b><p>公安实名 · 住建备案 · 安心险，扫码核验</p></div>
+      <div class="bt"><b>每间民宿一张验真卡</b><p>公安实名 · 住建备案 · 安心险，扫码核验</p></div>
       <a class="go" href="lvju-rating-standard.html">了解 ›</a>
     </div>
 
@@ -57,8 +57,8 @@
   </div>
 </div>
 <script>
-/* 惠居/民宿频道（channel=minsu，彩贝 5 维评级口径）数据统一读新居住数据库 catalog。
-   门店概念（参考长租「区→项目→户型」）：一栋/一院 = 一家惠居门店，
+/* 民宿/民宿频道（channel=minsu，彩贝 5 维评级口径）数据统一读新居住数据库 catalog。
+   门店概念（参考长租「区→项目→户型」）：一栋/一院 = 一家民宿门店，
    顶部行政区筛选切换门店；卡片点开进详情看房型。 */
 (function(){
   var API = '/api/juzhu/catalog?city=guiyang&channel=minsu';
@@ -75,7 +75,7 @@
     });
     document.getElementById('sortNote').textContent = '共 ' + rows.length + ' 栋在营';
     if (!rows.length) {
-      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该区域暂无在架惠居 · 切换区域或从「找房」进入</div>';
+      wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该区域暂无在架民宿 · 切换区域或从「找房」进入</div>';
       return;
     }
     wrap.innerHTML = rows.map(function(p){
@@ -83,7 +83,7 @@
       var loc = (d && p.address && p.address.indexOf(d.name) === 0) ? p.address : Array.from(new Set([d ? d.name : '', p.address || ''].filter(Boolean))).join(' · ');
       var r = p.rating || {};
       var star = (p.rating_status === 'passed' && r.stars)
-        ? '<span class="star">★ ' + r.stars + ' 星惠居</span>' : '';
+        ? '<span class="star">★ ' + r.stars + ' 星民宿</span>' : '';
       var tags = (p.tags || []).slice(0, 3);
       var img = p.cover_image
         ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
@@ -101,7 +101,7 @@
     projects = (cat.projects || []).filter(function(p){ return p.channel === 'minsu'; });
 
     if (!projects.length) {
-      document.getElementById('listingWrap').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在架惠居 · 托管商家录入并通过彩贝评级后自动上架</div>';
+      document.getElementById('listingWrap').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在架民宿 · 托管商家录入并通过彩贝评级后自动上架</div>';
       document.getElementById('sortNote').textContent = '0 栋在营';
       return;
     }

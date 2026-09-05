@@ -66,7 +66,7 @@
         { name: '找房 · 全频道', items: [
           { id: 'home',    label: '频道首页',       href: 'lvju-app-home-demo.html', icon: 'home' },
           { id: 'lvju',    label: '旅居（短住·候鸟·康养）', href: 'lvju-app-lvju.html',    icon: 'home' },
-          { id: 'minsu',   label: '惠居（整栋·星级·管家）', href: 'lvju-app-minsu.html',   icon: 'home' },
+          { id: 'minsu',   label: '民宿（整栋·星级·管家）', href: 'lvju-app-minsu.html',   icon: 'home' },
           { id: 'changzu', label: '长租（整租·合租·月付）', href: 'lvju-app-changzu.html', icon: 'list' },
           { id: 'newhouse',label: '新房（楼盘·特价房）',   href: 'lvju-app-newhouse.html',icon: 'grid' },
           { id: 'resale',  label: '二手（在售·真房源）',   href: 'lvju-app-resale.html',  icon: 'grid' },

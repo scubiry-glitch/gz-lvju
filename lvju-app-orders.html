@@ -94,7 +94,7 @@
         '<span style="font-size:11px;color:var(--muted);">' + esc(o.order_no) + '</span>' +
         '<span style="font-size:11px;font-weight:700;color:var(--brand-deep);">' + esc(st[0]) + '</span>' +
       '</div>' +
-      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</div>' +
       '<div style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
       '<div style="font-size:12px;color:var(--muted);margin-top:2px;">联系人 ' + esc(o.contact_name) + ' · ' + esc(o.contact_phone_masked) + '</div>' +
       '<div style="font-size:13px;font-weight:700;color:var(--gold-deep);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
@@ -153,7 +153,7 @@
         ? '<div class="th" style="background:url(' + esc(o.project_cover) + ') center/cover;"></div>'
         : '<div class="th s-xijiang"></div>';
       return '<div class="ordcard">' +
-        '<div class="oh"><span class="shop">🐚 贝壳旅居 · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
+        '<div class="oh"><span class="shop">🐚 贝壳旅居 · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
         '<div class="ob">' + cover +
           '<div class="oi">' +
             '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +

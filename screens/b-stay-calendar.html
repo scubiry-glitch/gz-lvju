@@ -227,7 +227,7 @@
       return;
     }
     fp.innerHTML = state.projects.map(function(p){
-      return '<option value="'+p.id+'">'+esc(p.name)+(p.channel==='minsu'?' · 惠居':'')+'</option>';
+      return '<option value="'+p.id+'">'+esc(p.name)+(p.channel==='minsu'?' · 民宿':'')+'</option>';
     }).join('');
     var want = parseInt(new URLSearchParams(location.search).get('project') || '', 10);
     state.pid = want || state.projects[0].id;

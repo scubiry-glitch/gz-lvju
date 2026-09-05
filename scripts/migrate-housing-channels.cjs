@@ -33,7 +33,7 @@ const CHANNEL_SEEDS = [
   ['bzf', '保租房专区', 1],
   ['trade', '卖旧买新专区', 2],
   ['jiazheng', '生活服务专区', 3],
-  ['minsu', '惠居民宿', 4],
+  ['minsu', '民宿', 4],
   ['newhouse', '新房', 5],
   ['resale', '二手', 6],
 ];
@@ -43,7 +43,7 @@ const TOPIC_BZF = JSON.stringify({ label: '保租房专区', channel: 'rental', 
 const VENDOR_SEEDS = [
   { login: 'chengyu', type: 'housing_operator', name: '城寓资产管理（白名单运营商）', cityIds: '1', sort: 901 },
   { login: 'shanshe', type: 'lvju_host', name: '山舍旅居托管', cityIds: '3', sort: 902 },
-  { login: 'yunqi', type: 'lvju_host', name: '云栖民宿（惠居）', cityIds: '2,3', sort: 903 },
+  { login: 'yunqi', type: 'lvju_host', name: '云栖民宿', cityIds: '2,3', sort: 903 },
   { login: 'chengfa', type: 'developer', name: '城发置地', cityIds: '1', sort: 904 },
   { login: 'zhenfy', type: 'agent', name: '真房源经纪', cityIds: '1', sort: 905 },
 ];
@@ -57,7 +57,7 @@ const PROJECT_SEEDS = [
   { vendor: 'shanshe', city: 3, district: 65, channel: 'rental', name: '山舍·森林溪畔栈屋', slug: 'shanshe-forest',
     tags: ['旅居', '康养'], priceFrom: 21800, cover: 'assets/lvju/wanfenglin.jpg',
     units: [['溪畔双床房', '二居一卫', 26, 21800], ['栈屋大床房', '一居一卫', 32, 25800]] },
-  { vendor: 'yunqi', city: 3, district: 65, channel: 'minsu', name: '云栖·观山整栋惠居', slug: 'yunqi-guanshan',
+  { vendor: 'yunqi', city: 3, district: 65, channel: 'minsu', name: '云栖·观山整栋民宿', slug: 'yunqi-guanshan',
     tags: ['整栋', '星级'], priceFrom: 12800, cover: 'assets/lvju/guiyang-city.jpg',
     units: [['整栋四居', '四居三卫', 160, null, 128000], ['星级大床房', '一居一卫', 35, 15800]] },
   { vendor: 'yunqi', city: 3, district: 63, channel: 'minsu', name: '云栖·管家服务小院', slug: 'yunqi-guanjia',
