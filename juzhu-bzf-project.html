@@ -64,18 +64,27 @@
   var slug = q.get('project');
   var channel = q.get('channel') || 'bzf';
   var isTrade = channel === 'trade';
+  // 频道文案（规则15）：同一项目详情模板按入参 channel 切换措辞，缺省保租房
+  var CH_LABEL = {
+    trade:    { ek: 'TRADE · 卖旧买新', small: '置换',   units: '在售户型' },
+    rental:   { ek: 'RENT · 长租公寓',  small: '长租',   units: '在租户型' },
+    minsu:    { ek: 'STAY · 民宿',      small: '民宿',   units: '在售房型' },
+    newhouse: { ek: 'NEW · 新房',       small: '新房',   units: '在售户型' },
+    resale:   { ek: 'ESATE · 二手',     small: '二手',   units: '在售户型' }
+  };
+  var chl = CH_LABEL[channel] || null;
 
   JUZHU.load().then(function(){
     var p = JUZHU.projectBySlug(slug);
     if (!p) { document.getElementById('list').innerHTML = '<p style="padding:24px;color:#999;text-align:center">项目不存在</p>'; return; }
 
-    document.getElementById('pEk').textContent = isTrade ? 'TRADE · 卖旧买新' : ('BZF · ' + ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房'));
+    document.getElementById('pEk').textContent = chl ? chl.ek : ('BZF · ' + ((window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房'));
     document.getElementById('pname').textContent = p.name;
     document.getElementById('pmeta').textContent = (isTrade
       ? ((p.address || '') + ' · ' + p.unit_count + ' 户型')
       : ('房源量 ' + JUZHU.managedUnits(p) + ' · ' + p.unit_count + ' 个户型 · ' + (p.address || '')));
-    document.getElementById('ttl').innerHTML = p.name + '<small>'+(isTrade?'置换':'保租')+'</small>';
-    document.getElementById('listTitle').textContent = isTrade ? '在售户型' : '在租户型';
+    document.getElementById('ttl').innerHTML = p.name + '<small>'+(chl ? chl.small : '保租')+'</small>';
+    document.getElementById('listTitle').textContent = chl ? chl.units : '在租户型';
     document.getElementById('unitN').textContent = p.unit_count + ' 套 ›';
     if (p.cover_image) document.getElementById('pBg').style.backgroundImage = 'url('+JUZHU.thumbUrl(p.cover_image)+')';
 

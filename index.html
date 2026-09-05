@@ -360,6 +360,26 @@
       </div>
     </div>
 
+    <div class="pane" id="pane-rental">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>长租房源</h2><span class="more" id="rentalCount">—</span></div>
+      <div id="rentalList"></div>
+    </div>
+
+    <div class="pane" id="pane-minsu">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>民宿门店</h2><span class="more" id="minsuCount">—</span></div>
+      <div id="minsuList"></div>
+    </div>
+
+    <div class="pane" id="pane-newhouse">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>新房楼盘</h2><span class="more" id="newhouseCount">—</span></div>
+      <div id="newhouseList"></div>
+    </div>
+
+    <div class="pane" id="pane-resale">
+      <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>二手房源</h2><span class="more" id="resaleCount">—</span></div>
+      <div id="resaleList"></div>
+    </div>
+
     <div class="pane" id="pane-trade">
       <div class="sec-h" style="margin-top:8px;"><span class="bar"></span><h2>置换推荐</h2><span class="more">综合排序 ›</span></div>
       <div class="spread" id="spread"></div>
@@ -502,6 +522,42 @@
           '<div><b>'+d.project_count+'</b>项目</div>'+
           '<div><b>'+(d.avg_price?'¥'+d.avg_price:'—')+'</b>均价</div>'+
         '</div></div></a>';
+    }).join('');
+  }
+
+  // === 频道 pane（长租/民宿/新房/二手）：与频道 tab 一一对应，按当前城市 catalog 过滤 ===
+  var CHANNEL_META = {
+    rental:   { label: '长租', count: 'rentalCount',   list: 'rentalList',   empty: '该城市暂无在架长租房源 · 切换城市或从「找房」查看' },
+    minsu:    { label: '民宿', count: 'minsuCount',    list: 'minsuList',    empty: '该城市暂无在架民宿门店 · 切换城市可见贵阳门店' },
+    newhouse: { label: '新房', count: 'newhouseCount', list: 'newhouseList', empty: '该城市暂无在售新房楼盘' },
+    resale:   { label: '二手', count: 'resaleCount',   list: 'resaleList',   empty: '该城市暂无在售二手房源' }
+  };
+  function channelHref(mode, x) {
+    if (mode === 'minsu') return 'lvju-app-detail.html?id=' + x.id + JUZHU.chainQS();
+    return 'juzhu-bzf-project.html?channel=' + mode + '&project=' + encodeURIComponent(x.slug) + JUZHU.chainQS();
+  }
+  function channelPrice(mode, x) {
+    if (mode === 'rental') return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/月起</small>' : '价格面议';
+    if (mode === 'minsu')  return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/晚起</small>' : '价格面议';
+    return x.price_from != null ? x.price_from + '<small>起</small>' : '价格面议';
+  }
+  function renderChannelPane(mode, list) {
+    var meta = CHANNEL_META[mode];
+    var box = document.getElementById(meta.list);
+    if (!box) return;
+    document.getElementById(meta.count).textContent = list.length ? '共 ' + list.length + ' 个' : '—';
+    if (!list.length) { box.innerHTML = '<p class="load-err">' + meta.empty + '</p>'; return; }
+    box.innerHTML = list.map(function(x) {
+      var tags = JUZHU.asTags(x.tags).slice(0, 3).join(' · ');
+      var st = x.cover_image
+        ? 'style="background-image:url(' + JUZHU.thumbUrl(x.cover_image) + ');background-size:cover;background-position:center;"'
+        : '';
+      var star = mode === 'minsu' ? '门店' : meta.label;
+      return '<a class="lrow" href="' + channelHref(mode, x) + '">' +
+        '<div class="th" ' + st + '><span class="star">' + star + '</span></div>' +
+        '<div class="info"><div class="nm">' + x.name + '</div>' +
+        '<div class="meta">' + (x.address || '') + (tags ? ' · ' + tags : '') + '</div>' +
+        '<div class="pr"><b>' + channelPrice(mode, x) + '</b><span class="unit">' + x.unit_count + ' 户型</span></div></div></a>';
     }).join('');
   }
 
@@ -938,6 +994,12 @@
     renderHero(d);
     renderCollage(JUZHU.districts());
     renderTrade(JUZHU.tradeListings());
+    // 频道 pane：长租排除「旅居」tag（旅居走民宿/旅居入口，避免同房源双入口）；其余频道全量
+    var lvjuOnly = function(p){ return (JUZHU.asTags(p.tags) || []).indexOf('旅居') >= 0; };
+    renderChannelPane('rental', JUZHU.projects({ channel: 'rental' }).filter(function(p){ return !lvjuOnly(p); }));
+    renderChannelPane('minsu', JUZHU.projects({ channel: 'minsu' }));
+    renderChannelPane('newhouse', JUZHU.projects({ channel: 'newhouse' }));
+    renderChannelPane('resale', JUZHU.projects({ channel: 'resale' }));
     revealHome();
   }).catch(function(err) {
     document.getElementById('err').hidden = false;
