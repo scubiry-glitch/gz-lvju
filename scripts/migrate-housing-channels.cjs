@@ -2,7 +2,7 @@
 /**
  * 房源库通用化一次性迁移（幂等，可重复执行）：
  *  1) 备份 projects / units / jz_vendors → *_bak_20260904（快照表，可手动删除回滚参考）
- *  2) channels 增 rental/minsu/newhouse/resale；bzf 行 enabled=0（行保留，可回滚）
+ *  2) channels 增 rental/minsu/newhouse/resale；bzf 行置首（保租房专区=首屏默认 tab）
  *  3) settings 写 topic_bzf 专题定义 KV（channel=rental + tags 含「保租房」）
  *  4) jz_vendors 增 housing 域商家（platform 池 + 白名单运营商/旅居托管/开发商/经纪），
  *     login 账号仅在缺失时创建，密码随机生成并打印一次（不入库明文、不写文档）
@@ -29,8 +29,8 @@ function getDbConfig() {
 }
 
 const CHANNEL_SEEDS = [
-  ['rental', '租赁住宿', 0],
-  ['bzf', '保租房专区', 1],
+  ['bzf', '保租房专区', -1],
+  ['rental', '长租', 0],
   ['trade', '卖旧买新专区', 2],
   ['jiazheng', '生活服务专区', 3],
   ['minsu', '民宿', 4],
@@ -114,12 +114,12 @@ function randPassword() {
     }
   }
 
-  // 2) channels 数据行 + bzf 下线
+  // 2) channels 数据行（bzf=保租房专区置首：首屏默认 tab，2026-09-05 按行政区磁力卡片方案恢复）
   for (const [id, label, order] of CHANNEL_SEEDS) {
     await conn.execute('INSERT IGNORE INTO channels(id,label,sort_order,enabled) VALUES (?,?,?,1)', [id, label, order]);
   }
-  await conn.execute("UPDATE channels SET enabled=0 WHERE id='bzf'");
-  log('channels ok; bzf enabled=0');
+  await conn.execute("UPDATE channels SET enabled=1, sort_order=-1 WHERE id='bzf'");
+  log('channels ok; bzf 保租房专区置首（默认 tab）');
 
   // 3) topic_bzf 专题 KV
   await conn.execute('INSERT IGNORE INTO settings(`key`,value) VALUES (?,?)', ['topic_bzf', TOPIC_BZF]);
