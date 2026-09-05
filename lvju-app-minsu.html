@@ -61,7 +61,9 @@
    门店概念（参考长租「区→项目→户型」）：一栋/一院 = 一家民宿门店，
    顶部行政区筛选切换门店；卡片点开进详情看房型。 */
 (function(){
-  var API = '/api/juzhu/catalog?city=guiyang&channel=minsu';
+  // 城市提示：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
+  var CITY = new URLSearchParams(location.search).get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
+  var API = '/api/juzhu/catalog?city=' + encodeURIComponent(CITY) + '&channel=minsu';
   var dmap = {}, projects = [];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }

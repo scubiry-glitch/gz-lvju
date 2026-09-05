@@ -59,7 +59,9 @@
 <script>
 /* 新房频道（channel=newhouse）数据统一读新居住数据库 catalog，不再硬编码。 */
 (function(){
-  var API = '/api/juzhu/catalog?city=guiyang&channel=newhouse';
+  // 城市提示：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
+  var CITY = new URLSearchParams(location.search).get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
+  var API = '/api/juzhu/catalog?city=' + encodeURIComponent(CITY) + '&channel=newhouse';
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
 

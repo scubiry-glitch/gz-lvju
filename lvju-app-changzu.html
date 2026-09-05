@@ -59,7 +59,9 @@
 <script>
 /* 长租与旅居同为 rental 频道（监管口径一致），本页为户型级月租视图。数据统一读 catalog。 */
 (function(){
-  var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
+  // 城市提示：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
+  var CITY = new URLSearchParams(location.search).get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
+  var API = '/api/juzhu/catalog?city=' + encodeURIComponent(CITY) + '&channel=rental';
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
 

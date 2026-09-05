@@ -126,8 +126,10 @@
    入住时间段：连续区间选择（先入住后离店），旅居口径连住 ≥15 晚；
    选定后卡片按「晚数 × 起价/30」估总价，并透传 ?checkin/&checkout 到详情/下单。 */
 (function(){
-  var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
-  var API_MINSU = '/api/juzhu/catalog?city=guiyang&channel=minsu';   // minsu 带「旅居」tag 的也进旅居视图
+  // 城市提示：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
+  var CITY = new URLSearchParams(location.search).get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
+  var API = '/api/juzhu/catalog?city=' + encodeURIComponent(CITY) + '&channel=rental';
+  var API_MINSU = '/api/juzhu/catalog?city=' + encodeURIComponent(CITY) + '&channel=minsu';   // minsu 带「旅居」tag 的也进旅居视图
   var MIN_NIGHTS = 15;                       // 旅居连住下限（服务端同口径，商家可在项目上覆盖）
   var TODAY = new Date(); TODAY.setHours(0,0,0,0);
   var MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
