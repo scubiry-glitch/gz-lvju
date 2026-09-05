@@ -211,7 +211,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
     </a>
     <h1>房源接入 API</h1>
-    <span class="ver">v1.2 · 2026-06</span>
+    <span class="ver">v1.3 · 2026-09</span>
   </div>
 
   <div class="hero">
@@ -233,6 +233,7 @@
       <li><a href="#auth">认证授权</a></li>
       <li><a href="#dict">房屋数据字典</a></li>
       <li><a href="#endpoints">核心接口</a></li>
+      <li><a href="#calendar">房态日历与短住规则</a></li>
       <li><a href="#redline">价格红线校验</a></li>
       <li><a href="#webhook">备案回流 Webhook</a></li>
       <li><a href="#errors">错误码</a></li>
@@ -356,6 +357,8 @@ grant_type=client_credentials
       <tr><td><code>market_price_ref</code></td><td>number</td><td>否</td><td>市场参考价（用于展示对照）</td></tr>
       <tr><td><code>house_quality</code></td><td>object</td><td class="req">是</td><td>好房子 4 维度评级 — 见 3.3</td></tr>
       <tr><td><code>amenities</code></td><td>string[]</td><td>否</td><td><code>AC / FRIDGE / WASHER / WIFI / SMART_LOCK / ELEVATOR</code></td></tr>
+      <tr><td><code>stay_rules</code></td><td>object</td><td>否</td><td>短住规则 <code>{ min_stay_nights }</code>：最短连住晚数；旅居默认 <b>15</b> 晚、惠居民宿默认 1 晚，日历与下单同口径校验 — 见 3.5</td></tr>
+      <tr><td><code>insurance</code></td><td>string[]</td><td>否</td><td>房源保险标识（商家配置，C 端展示「入住保障」），枚举见 3.6</td></tr>
       <tr><td><code>photos</code></td><td>object[]</td><td class="req">是</td><td>≥ 6 张，详见 3.4</td></tr>
       <tr><td><code>access_mode</code></td><td>string</td><td class="req">是</td><td><code>SELF</code>(自营) / <code>AGENCY</code>(总代) / <code>TRUSTEE</code>(托管)</td></tr>
       <tr><td><code>cert_no</code></td><td>string</td><td class="req">是</td><td>保租房项目认定文号（住建口径）</td></tr>
@@ -394,6 +397,29 @@ grant_type=client_credentials
   ]
 }</code></pre>
     <p>分类标签：<code>LIVING_ROOM / BEDROOM_MASTER / BEDROOM_SECOND / KITCHEN / BATHROOM / BALCONY / EXTERIOR / FLOORPLAN</code></p>
+
+    <h3>3.5 短住规则与房态日历（v1.3 新增）</h3>
+    <p>旅居 / 短住类房源按<strong>逐晚库存</strong>管理。日历每格三态：<code>open</code> 可订（默认，无差异行即视为可订）、<code>blocked</code> 关房（机构手工关闭）、<code>booked</code> 已订（订单占用，客户取消自动释放）。支持逐晚夜价覆盖，未覆盖晚回落到项目默认夜价。</p>
+    <pre><code>{
+  <span class="tok-key">"stay_rules"</span>: { <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span> },   <span class="tok-com">// 旅居连住 15 晚起；日历选段与下单同口径校验</span>
+  <span class="tok-key">"calendar"</span>: [
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>,    <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span> },          <span class="tok-com">// 关房：不对 C 端可订</span>
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-03"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span> }           <span class="tok-com">// 已订：由订单写入，机构不可改</span>
+  ]
+}</code></pre>
+    <div class="callout warn">
+      <strong>口径约束：</strong><code>min_stay_nights</code> 在 C 端日历选段、下单接口、服务端校验三处保持同口径；不足最短连住返回 <code>E_STAY_MIN_NIGHTS</code>。已订晚不可被机构改为可订，须先取消订单（<code>E_DATE_CONFLICT</code>）。
+    </div>
+
+    <h3>3.6 保险标识（v1.3 新增）</h3>
+    <p>机构为房源配置的<strong>入住保障</strong>标识，C 端房源卡与详情页展示，验真页可核保单状态：</p>
+    <table>
+      <tr><th>标识</th><th>名称</th><th>保障口径</th></tr>
+      <tr><td><code>SWITCH_RENTAL</code></td><td>换租保险</td><td>租期到期换租衔接期内的房租损失与搬迁费用</td></tr>
+      <tr><td><code>HOTEL_CANCEL</code></td><td>酒店取消险</td><td>行程变更按规则退改，未入住部分房费可退</td></tr>
+      <tr><td><code>PROPERTY</code></td><td>财产保险</td><td>入住期间屋内财产与房屋主体意外损坏</td></tr>
+    </table>
   </section>
 
   <section id="endpoints">
@@ -487,7 +513,7 @@ Authorization: Bearer ...
     <span class="tok-key">"term_months"</span>: <span class="tok-num">12</span>,
     <span class="tok-key">"monthly_rent"</span>: <span class="tok-num">2380</span>,
     <span class="tok-key">"deposit"</span>: <span class="tok-num">0</span>,           <span class="tok-com">// 省级标准：免押金</span>
-    <span class="tok-key">"insurance"</span>: [<span class="tok-str">"home_property"</span>,<span class="tok-str">"switch_rental"</span>]
+    <span class="tok-key">"insurance"</span>: [<span class="tok-str">"PROPERTY"</span>,<span class="tok-str">"SWITCH_RENTAL"</span>]   <span class="tok-com">// 枚举见 3.6</span>
   }
 }</code></pre>
 
@@ -498,7 +524,40 @@ Authorization: Bearer ...
       <span class="desc">本机构房源列表</span>
     </div>
 
-    <h3>4.5 三方备案接口</h3>
+    <h3>4.5 房态日历批量推送（v1.3 新增）</h3>
+    <div class="ep">
+      <span class="method POST">POST</span>
+      <span class="path">/v1/listings/{listing_id}/calendar:batchUpsert</span>
+      <span class="desc">逐晚房态 / 夜价覆盖，单次 ≤ 400 晚</span>
+    </div>
+<pre><code><span class="tok-met">POST</span> /v1/listings/L-JS-NJ-9f3a.../calendar:batchUpsert
+
+{
+  <span class="tok-key">"unit_ref"</span>: <span class="tok-str">"WHOLE"</span>,                 <span class="tok-com">// 户型引用，缺省 = 项目级（整栋 / 不限房型）</span>
+  <span class="tok-key">"days"</span>: [
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-03"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-str">null</span> }  <span class="tok-com">// 恢复默认价</span>
+  ]
+}</code></pre>
+    <p>约束：<code>booked</code> 仅由平台订单写入（接口不可设置）；已订晚不可改为 <code>open</code>/<code>blocked</code>，返回 <code>E_DATE_CONFLICT</code>。</p>
+
+    <div class="ep">
+      <span class="method GET">GET</span>
+      <span class="path">/v1/listings/{listing_id}/calendar?month=2026-11&amp;unit_ref=</span>
+      <span class="desc">查询逐晚房态与夜价</span>
+    </div>
+<pre><code>{
+  <span class="tok-key">"listing_id"</span>: <span class="tok-str">"L-JS-NJ-9f3a..."</span>,
+  <span class="tok-key">"month"</span>: <span class="tok-str">"2026-11"</span>,
+  <span class="tok-key">"stay_rules"</span>: { <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span> },
+  <span class="tok-key">"days"</span>: [
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-01"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-11-02"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">468</span> }
+  ]
+}</code></pre>
+
+    <h3>4.6 三方备案接口</h3>
     <div class="ep">
       <span class="method POST">POST</span>
       <span class="path">/v1/filings</span>
@@ -538,6 +597,8 @@ Authorization: Bearer ...
       <tr><th>event</th><th>说明</th></tr>
       <tr><td><code>listing.approved</code></td><td>房源通过住建审核，已上架</td></tr>
       <tr><td><code>listing.rejected</code></td><td>审核未通过</td></tr>
+      <tr><td><code>calendar.locked</code> <span class="pill" style="background:var(--accent-soft);color:var(--accent);font-size:10px;">v1.3</span></td><td>房态被订单占用（某晚 booked）→ 建议机构端同步锁定本地库存</td></tr>
+      <tr><td><code>calendar.released</code> <span class="pill" style="background:var(--accent-soft);color:var(--accent);font-size:10px;">v1.3</span></td><td>订单取消释放房态 → 建议机构端恢复可订</td></tr>
       <tr><td><code>filing.confirmed</code></td><td>合同备案号已生效</td></tr>
       <tr><td><code>redline.updated</code></td><td>所辖区域红线发生变化（建议存量复核）</td></tr>
       <tr><td><code>compliance.alert</code></td><td>合规预警（连续投诉 / 评分过低 / 违规收费）</td></tr>
@@ -570,6 +631,9 @@ X-BZF-Signature: sha256=...
       <tr><td>403</td><td><code>E_SCOPE</code></td><td>scope 不足</td><td>升级机构资质</td></tr>
       <tr><td>409</td><td><code>E_DUPLICATE_EXTID</code></td><td>external_id 与已有冲突</td><td>使用 PUT 更新</td></tr>
       <tr><td>422</td><td><code>E_HOUSE_QUALITY_LOW</code></td><td>好房子评级 &lt; 3</td><td>整改后重报</td></tr>
+      <tr><td>400</td><td><code>E_STAY_MIN_NIGHTS</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>入住晚数不足最短连住（旅居默认 15 晚）</td><td>调整连续入住时段后重推</td></tr>
+      <tr><td>400</td><td><code>E_DATE_CONFLICT</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>所选日期已被预订或已关房</td><td>换时段，或先取消占用订单</td></tr>
+      <tr><td>400</td><td><code>E_INSURANCE_UNKNOWN</code> <span style="color:var(--accent);font-size:11px;">v1.3</span></td><td>保险标识不在 3.6 枚举内</td><td>按枚举修正后重推</td></tr>
       <tr><td>429</td><td><code>E_RATE_LIMIT</code></td><td>触发限流</td><td>退避重试，或申请升级</td></tr>
       <tr><td>503</td><td><code>E_REDLINE_AUDIT</code></td><td>红线接口审计中</td><td>稍后 5 分钟重试</td></tr>
     </table>

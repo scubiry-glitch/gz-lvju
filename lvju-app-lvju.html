@@ -3,8 +3,48 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:,">
 <title>旅居 · 短住·候鸟·康养 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* 入住时间段（连续区间 · 连住 15 晚起） */
+  .staybar{margin:10px 16px 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;}
+  .staybar .ic{font-size:16px;}
+  .staybar .tx{flex:1;font-size:13px;color:var(--ink);min-width:0;}
+  .staybar .tx small{display:block;font-size:10.5px;color:var(--muted);margin-top:1px;}
+  .staybar .tx.on{color:var(--brand-deep);font-weight:600;}
+  .staybar .clr{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:3px 9px;flex-shrink:0;}
+  .staybar .arr{color:var(--muted);font-size:12px;}
+  .staypanel{position:fixed;left:0;right:0;bottom:0;top:0;z-index:60;background:rgba(6,20,17,.45);display:none;}
+  .staypanel.open{display:block;}
+  .staypanel .sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-height:78vh;overflow:auto;}
+  .staypanel .sh{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .staypanel .sh b{font-family:var(--serif);font-size:15px;}
+  .staypanel .sh .min{font-size:10.5px;color:var(--brand-deep);background:var(--brand-soft);border-radius:999px;padding:2px 9px;}
+  .staypanel .sh .x{margin-left:auto;color:var(--muted);font-size:18px;padding:2px 6px;}
+  .calnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+  .calnav .mo{font-family:var(--serif);font-weight:700;font-size:14px;color:var(--ink);}
+  .calnav button{border:1px solid var(--border);background:#fff;border-radius:8px;width:28px;height:28px;font-size:15px;line-height:1;color:var(--ink);}
+  .calnav button:disabled{opacity:.3;}
+  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .calgrid .wk{text-align:center;font-size:10.5px;color:var(--muted);padding:1px 0 3px;}
+  .calgrid .cell{text-align:center;border-radius:9px;padding:5px 0 4px;min-height:37px;cursor:pointer;}
+  .calgrid .cell.blank{visibility:hidden;}
+  .calgrid .cell .dn{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.15;}
+  .calgrid .cell .cp{font-size:9px;color:var(--gold-deep);margin-top:1px;}
+  .calgrid .cell.past,.calgrid .cell.dis{cursor:default;}
+  .calgrid .cell.past .dn,.calgrid .cell.dis .dn{color:#c8d0cb;}
+  .calgrid .cell.dis .cp{color:#c8d0cb;}
+  .calgrid .cell.range{background:var(--brand-soft);}
+  .calgrid .cell.end{background:linear-gradient(135deg,var(--brand),var(--brand-deep));}
+  .calgrid .cell.end .dn,.calgrid .cell.end .cp{color:#fff;}
+  .stayhint{font-size:11px;color:var(--gold-deep);min-height:15px;margin-top:7px;}
+  .stayhint.bad{color:#b91c1c;}
+  .staysum{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:var(--ink);gap:8px;}
+  .staysum .go{background:var(--brand-deep);color:#fff;border-radius:999px;font-size:12px;font-weight:600;padding:7px 18px;}
+  .staysum .go.off{opacity:.4;}
+  .staysum .tot b{font-family:var(--serif);color:var(--gold-deep);}
+</style>
 </head>
 <body>
 <div class="app">
@@ -27,11 +67,36 @@
           <div><b>9</b><span>市州覆盖</span></div>
           <div><b>★4.8</b><span>均评分</span></div>
         </div>
+        <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;font-size:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:4px 12px;">🌙 连住 15 晚起 · 候鸟康养节奏</div>
       </div>
     </div>
 
     <div class="filt">
       <a class="on">全部</a><a>短住</a><a>候鸟过冬</a><a>康养度假</a><a>亲子研学</a><a>整栋包栋</a>
+    </div>
+
+    <div class="staybar" id="staybar">
+      <span class="ic">📅</span>
+      <span class="tx" id="sbText">选择入住时间段<small>旅居房源须连续入住 · 连住 15 晚起</small></span>
+      <span class="clr" id="sbClear" style="display:none;">清除</span>
+      <span class="arr">⌄</span>
+    </div>
+
+    <div class="staypanel" id="stayPanel">
+      <div class="sheet">
+        <div class="sh"><b>选择入住时间段</b><span class="min">连住 15 晚起</span><span class="x" id="spClose">✕</span></div>
+        <div class="calnav">
+          <button id="spPrev" aria-label="上个月">‹</button>
+          <div class="mo" id="spMo"></div>
+          <button id="spNext" aria-label="下个月">›</button>
+        </div>
+        <div class="calgrid" id="spGrid"></div>
+        <div class="stayhint" id="spHint"></div>
+        <div class="staysum">
+          <span id="spSum">先选入住日，再选离店日</span>
+          <span class="go off" id="spGo">确定</span>
+        </div>
+      </div>
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2>精选旅居</h2><span class="more" id="sortNote">综合排序</span></div>
@@ -57,15 +122,34 @@
 </div>
 <script>
 /* 房源数据统一读新居住数据库（catalog），不再硬编码。
-   旅居与长租同为 rental 频道（监管口径一致），本页展示起价视图。 */
+   旅居与长租同为 rental 频道（监管口径一致），本页展示起价视图。
+   入住时间段：连续区间选择（先入住后离店），旅居口径连住 ≥15 晚；
+   选定后卡片按「晚数 × 起价/30」估总价，并透传 ?checkin/&checkout 到详情/下单。 */
 (function(){
   var API = '/api/juzhu/catalog?city=guiyang&channel=rental';
-  var CITY_LABEL = { guiyang:'贵阳' };
+  var MIN_NIGHTS = 15;                       // 旅居连住下限（服务端同口径，商家可在项目上覆盖）
+  var TODAY = new Date(); TODAY.setHours(0,0,0,0);
+  var MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+  var MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 5, 1);   // 可看近 6 个月
+  var view = new Date(MIN.getFullYear(), MIN.getMonth(), 1);
+  var ci = null, co = null, cat = null;
+  var WK = ['日','一','二','三','四','五','六'];
+
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function key(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+  function short(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+  function nights(){ return (ci&&co) ? Math.round((co-ci)/864e5) : 0; }
+  function perNight(p){
+    var v = p.price_from || 0;
+    return v ? Math.max(1, Math.round(v/30)) : 0;   // rental 口径：月租（起价）/30 折算夜价
+  }
 
-  fetch(API).then(function(r){ return r.json(); }).then(function(cat){
+  /* ---------- 房源卡（读 catalog 缓存） ---------- */
+  function paint(){
     var wrap = document.getElementById('listingWrap');
+    if (!cat) return;
     var projects = (cat.projects || []).filter(function(p){ return p.channel === 'rental'; });
     var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
     var umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
@@ -76,32 +160,124 @@
       return;
     }
     document.getElementById('sortNote').textContent = '共 ' + projects.length + ' 套在营';
+    var n = nights();
     wrap.innerHTML = projects.map(function(p){
       var units = umap[p.id] || [];
       var price = p.price_from;
       if (price == null && units.length) {
         price = Math.min.apply(null, units.map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; }));
       }
+      var pn = perNight(p);
       var r = p.rating || {};
       var star = (p.rating_status === 'passed' && r.stars)
         ? '<span class="star">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
       var dd = dmap[p.district_id];
       var loc = (dd && p.address && p.address.indexOf(dd.name) === 0) ? p.address : [dd ? dd.name : '', p.address || ''].filter(Boolean).join(' · ');
       var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
+      var ins = (p.insurance_types || []).map(function(t){ return '<span>' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('');
       var img = p.cover_image
         ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="img s-xijiang">';
-      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' +
+      var priceHtml;
+      if (n >= MIN_NIGHTS && pn) priceHtml = '<b>¥' + fmt(pn * n) + '<small>/ ' + n + ' 晚</small></b>';
+      else priceHtml = '<b>' + (price != null ? '¥' + fmt(price) + '<small>/月起</small>' : '价格面议') + '</b>';
+      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + (n ? '&checkin=' + iso(ci) + (co ? '&checkout=' + iso(co) : '') : '') + '">' +
         img + (star ? star : '') + '<span class="like">♡</span>' +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
-        '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +
-        '<div class="pr"><b>' + (price != null ? '¥' + fmt(price) + '<small>/月起</small>' : '价格面议') + '</b><span class="bk">预订</span></div></div>' +
+        '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + ins + '</div>' +
+        '<div class="pr">' + priceHtml + '<span class="bk">预订</span></div></div>' +
         '</a>';
     }).join('');
+  }
+
+  fetch(API).then(function(r){ return r.json(); }).then(function(c){
+    cat = c; paint();
   }).catch(function(){
     document.getElementById('listingWrap').innerHTML =
       '<div style="grid-column:1/-1;text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
   });
+
+  /* ---------- 入住时间段（连续区间，连住 ≥ 15 晚） ---------- */
+  var panel = document.getElementById('stayPanel'), grid = document.getElementById('spGrid'),
+      moLbl = document.getElementById('spMo'), prev = document.getElementById('spPrev'), next = document.getElementById('spNext'),
+      hint = document.getElementById('spHint'), sum = document.getElementById('spSum'), go = document.getElementById('spGo'),
+      sbText = document.getElementById('sbText'), sbClear = document.getElementById('sbClear');
+
+  document.getElementById('staybar').addEventListener('click', function(ev){
+    if (ev.target.id === 'sbClear') return;
+    panel.classList.add('open'); renderCal();
+  });
+  document.getElementById('spClose').addEventListener('click', function(){ panel.classList.remove('open'); });
+  panel.addEventListener('click', function(ev){ if (ev.target === panel) panel.classList.remove('open'); });
+  sbClear.addEventListener('click', function(ev){
+    ev.stopPropagation(); ci = co = null; syncBar(); renderCal(); paint();
+  });
+
+  function pick(d){
+    if (!ci || (ci && co) || d <= ci) { ci = d; co = null; hint.textContent = ''; hint.className = 'stayhint'; }
+    else {
+      var n = Math.round((d - ci) / 864e5);
+      if (n < MIN_NIGHTS) {
+        var min = new Date(ci.getTime() + MIN_NIGHTS * 864e5);
+        hint.textContent = '旅居房源须连续入住 ≥ ' + MIN_NIGHTS + ' 晚，最早 ' + short(min) + ' 离店（选 ' + n + ' 晚不足）';
+        hint.className = 'stayhint bad';
+        return;
+      }
+      co = d; hint.textContent = ''; hint.className = 'stayhint';
+    }
+    renderCal();
+  }
+
+  function renderCal(){
+    moLbl.textContent = view.getFullYear() + ' 年 ' + (view.getMonth()+1) + ' 月';
+    prev.disabled = view <= MIN; next.disabled = view >= MAX;
+    grid.innerHTML = '';
+    WK.forEach(function(w){ var e = document.createElement('div'); e.className = 'wk'; e.textContent = w; grid.appendChild(e); });
+    var lead = new Date(view.getFullYear(), view.getMonth(), 1).getDay();
+    for (var i = 0; i < lead; i++){ var b = document.createElement('div'); b.className = 'cell blank'; grid.appendChild(b); }
+    var dim = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
+    var minCo = ci ? new Date(ci.getTime() + MIN_NIGHTS * 864e5) : null;   // 最早可离店日
+    for (var dd = 1; dd <= dim; dd++){
+      var d = new Date(view.getFullYear(), view.getMonth(), dd);
+      var c = document.createElement('div'); c.className = 'cell';
+      var k = key(d);
+      var past = d < TODAY, tooFar = d > MAX;
+      var dis = past || tooFar || (ci && !co && d < minCo && k !== key(ci));
+      if (past) c.classList.add('past'); else if (dis) c.classList.add('dis');
+      if (ci && co && k >= key(ci) && k <= key(co)) c.classList.add(k === key(ci) || k === key(co) ? 'end' : 'range');
+      else if (ci && k === key(ci)) c.classList.add('end');
+      if (past || dis) c.innerHTML = '<div class="dn">' + dd + '</div>';
+      else {
+        c.innerHTML = '<div class="dn">' + dd + '</div><div class="cp">' + (k === key(ci) ? '入住' : '可选') + '</div>';
+        (function(dt){ c.addEventListener('click', function(){ pick(dt); }); })(d);
+      }
+      grid.appendChild(c);
+    }
+    var n = nights();
+    if (!ci) { sum.textContent = '先选入住日，再选离店日（连住 ' + MIN_NIGHTS + ' 晚起）'; go.className = 'go off'; }
+    else if (!co) { sum.textContent = short(ci) + ' 入住 · 请选离店日（≥ ' + MIN_NIGHTS + ' 晚）'; go.className = 'go off'; }
+    else { sum.innerHTML = short(ci) + ' → ' + short(co) + ' · ' + n + ' 晚'; go.className = 'go'; }
+  }
+
+  function syncBar(){
+    var n = nights();
+    if (n >= MIN_NIGHTS) {
+      sbText.innerHTML = esc(short(ci) + ' 入住 → ' + short(co) + ' 离店 · ' + n + ' 晚') + '<small>已按连住估算 · 点此修改</small>';
+      sbText.className = 'tx on';
+      sbClear.style.display = '';
+    } else {
+      sbText.innerHTML = '选择入住时间段<small>旅居房源须连续入住 · 连住 15 晚起</small>';
+      sbText.className = 'tx';
+      sbClear.style.display = 'none';
+    }
+  }
+
+  go.addEventListener('click', function(){
+    if (nights() < MIN_NIGHTS) return;
+    panel.classList.remove('open'); syncBar(); paint();
+  });
+
+  renderCal(); syncBar();
 })();
 </script>
 </body>

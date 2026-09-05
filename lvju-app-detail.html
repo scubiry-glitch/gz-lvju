@@ -54,6 +54,18 @@
   .calgrid .cell.wknd .cp{color:#b45309;}
   .calgrid .cell.past{cursor:default;}
   .calgrid .cell.past .dn{color:#cbd2ce;}
+  .calgrid .cell.dis{cursor:default;}
+  .calgrid .cell.dis .dn,.calgrid .cell.dis .cp{color:#cbd2ce;}
+  .calgrid .cell.noslot .dn{color:#e08a8a;}
+  .calgrid .cell.noslot .cp{color:#e08a8a;}
+  .callegend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-top:7px;}
+  .callegend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;vertical-align:-1px;}
+  .insrow{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:12.5px;color:var(--ink);}
+  .insrow:last-child{border-bottom:0;}
+  .insrow .ig{font-size:16px;flex-shrink:0;}
+  .insrow .it b{display:block;font-size:12.5px;}
+  .insrow .it small{color:var(--muted);font-size:10.5px;}
+  .insrow .ok{margin-left:auto;color:var(--brand);font-weight:700;flex-shrink:0;}
   .calgrid .cell.range{background:var(--brand-soft);}
   .calgrid .cell.end{background:linear-gradient(135deg,var(--brand),var(--brand-deep));}
   .calgrid .cell.end .dn,.calgrid .cell.end .cp{color:#fff;}
@@ -132,9 +144,14 @@
       </div>
     </div>
 
+    <div class="block" id="dInsBlock" style="display:none;">
+      <div class="bt">入住保障 <span class="bs" style="font-weight:400;">商家已投保 · 扫码验真可查</span></div>
+      <div id="dInsRows" style="margin-top:4px;"></div>
+    </div>
+
     <div class="block">
       <div class="bt">价格日历 <span class="cal-toggle" id="caltoggle">展开选日期 <span class="arr">⌄</span></span></div>
-      <div class="bs">6 月 · 平日 ¥468 起 · 周末 ¥588</div>
+      <div class="bs" id="dCalNote">旅居房源连续入住 · 连住 15 晚起</div>
       <div class="cal">
         <div class="d on"><div class="day">6/13 六</div><div class="p">¥588</div></div>
         <div class="d on"><div class="day">6/14 日</div><div class="p">¥588</div></div>
@@ -149,6 +166,12 @@
           <button id="calnext" aria-label="下个月">›</button>
         </div>
         <div class="calgrid" id="calgrid"></div>
+        <div class="callegend">
+          <span><i style="background:var(--brand-soft);"></i>已选</span>
+          <span><i style="background:linear-gradient(135deg,var(--brand),var(--brand-deep));"></i>入住/离店</span>
+          <span><i style="background:#fde8e8;"></i>已订/关房</span>
+          <span><i style="background:#f1f5f4;"></i>不可选</span>
+        </div>
         <div class="calsum" id="calsum"></div>
       </div>
     </div>
@@ -244,8 +267,29 @@
     if (price == null && units.length) {
       price = Math.min.apply(null, units.map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; }));
     }
+    // 入住保障（保险标识：商家在 projects.ext.insurance 配置，服务端 INSURANCE_TYPES 单一数据源）
+    var INS_NOTE = {
+      switch_rental: '到期换租衔接期内的房租损失与搬迁费用由保险覆盖',
+      hotel_cancel: '行程有变按规则退改，未入住部分房费可退',
+      property: '屋内财产与房屋主体意外损坏，入住期间在保'
+    };
+    var ins = Array.isArray(p.insurance_types) ? p.insurance_types : [];
+    if (ins.length) {
+      document.getElementById('dInsRows').innerHTML = ins.map(function(t){
+        return '<div class="insrow"><span class="ig">' + (t.icon || '🛡') + '</span>' +
+          '<span class="it"><b>' + esc(t.label) + '</b><small>' + esc(INS_NOTE[t.key] || '商家已投保，保单以订单详情为准') + '</small></span>' +
+          '<span class="ok">✓ 已投保</span></div>';
+      }).join('');
+      document.getElementById('dInsBlock').style.display = '';
+    }
+    // 最短连住（旅居口径：rental 15 晚起 / minsu 1 晚起，商家可在项目上覆盖）
+    var minNights = p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15);
+    var perNight = (p.channel === 'minsu') ? (price || 0) : (price ? Math.max(1, Math.round(price / 30)) : 0);
+    document.getElementById('dCalNote').textContent = '旅居房源连续入住 · 连住 ' + minNights + ' 晚起' + (perNight ? ' · 夜价 ¥' + fmt(perNight) + ' 起' : '');
+    window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel };
+    if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
     document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
-      '<span>' + (p.is_featured ? '平台精选 · ' : '') + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
+      '<span>' + (p.is_featured ? '平台精选 · ' : '') + '连住 ' + minNights + ' 晚起 · ' + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
     // 预订 CTA：带项目/户型/日历日期进下单页
     var bk = document.querySelector('.cta .btn');
     if (bk && ['rental', 'minsu'].indexOf(p.channel) >= 0) {
@@ -279,84 +323,158 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
 });
 </script>
 <script>
-/* 价格日历：展开整月网格，选择入住→离店区间，实时算晚数/合计并同步底部预订栏 */
+/* 价格日历（房态版）：整月网格读 GET /api/juzhu/projects/:id/stay-calendar（已订/关房不可选、夜价覆盖），
+   连续区间选择（先入住后离店）并强制最短连住（旅居 15 晚起，商家可在项目上覆盖）；
+   无 ?id= 的示例基线仍用演示价 6–9 月。 */
 (function(){
-  var TODAY=new Date(2026,5,13);            // 演示基准日 2026-06-13
-  var MIN=new Date(2026,5,1), MAX=new Date(2026,8,1);  // 可看 6–9 月
-  var view=new Date(2026,5,1);
-  var ci=null, co=null;                     // 入住 / 离店
-  var WK=['日','一','二','三','四','五','六'];
-  var grid=document.getElementById('calgrid');
-  var moLbl=document.getElementById('calmo');
-  var prev=document.getElementById('calprev'), next=document.getElementById('calnext');
-  var sum=document.getElementById('calsum');
-  var toggle=document.getElementById('caltoggle'), full=document.getElementById('calfull');
-  var ctaP=document.querySelector('.cta .p');
-  var ctaOrig=ctaP?ctaP.innerHTML:'';
+  var q = new URLSearchParams(location.search);
+  var live = null;                          // { projectId, minNights, basePrice } —— 数据脚本就绪后注入
+  var TODAY = new Date(2026,5,13);          // 演示基准日 2026-06-13
+  var MIN = new Date(2026,5,1), MAX = new Date(2026,8,1);  // 可看 6–9 月
+  var view = new Date(2026,5,1);
+  var ci = null, co = null;                 // 入住 / 离店
+  var calCache = {};                        // month -> days map（live 模式）
+  var WK = ['日','一','二','三','四','五','六'];
+  var grid = document.getElementById('calgrid');
+  var moLbl = document.getElementById('calmo');
+  var prev = document.getElementById('calprev'), next = document.getElementById('calnext');
+  var sum = document.getElementById('calsum');
+  var toggle = document.getElementById('caltoggle'), full = document.getElementById('calfull');
+  var ctaP = document.querySelector('.cta .p');
+  var ctaOrig = ctaP ? ctaP.innerHTML : '';
 
-  function price(d){var w=d.getDay();return (w===0||w===6)?588:468;}   // 周末 588 / 平日 468
-  function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-  function syncBooking(){ /* 预订 CTA 带上当前房源/日期（由数据脚本定义） */
-    var a=document.querySelector('.cta .btn');
-    if(a && window.__bookingBase){ a.href = window.__bookingBase + (a.dataset.sep?'':''); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function minNights(){ return (live && live.minNights) || 15; }
+  function price(d){
+    if (live && live.basePrice) {           // 周末小幅上浮（与商家夜价口径一致）
+      var w = d.getDay();
+      return Math.round(live.basePrice * ((w===0||w===6) ? 1.25 : 1));
+    }
+    return (d.getDay()===0||d.getDay()===6) ? 588 : 468;   // 示例基线
   }
-  function key(d){return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();}
-  function fmt(d){return (d.getMonth()+1)+'/'+d.getDate();}
-  function nights(){return (ci&&co)?Math.round((co-ci)/864e5):0;}
-  function total(){var t=0;if(ci&&co){var d=new Date(ci);while(d<co){t+=price(d);d.setDate(d.getDate()+1);}}return t;}
+  function dayInfo(d){                       // live 模式：{status, price} ；无数据回退演示价
+    if (!live) return null;
+    var m = calCache[moKey(view)];
+    if (!m) return null;
+    return m[iso(d)] || null;
+  }
+  function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function moKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function key(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+  function fmt(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+  function nights(){ return (ci&&co) ? Math.round((co-ci)/864e5) : 0; }
+  function total(){ var t=0; if(ci&&co){ var d=new Date(ci); while(d<co){ var inf=dayInfo(d); t += (inf && inf.price) ? inf.price : price(d); d.setDate(d.getDate()+1); } } return t; }
+
+  // live 数据加载（按月缓存；未加载完先用演示价渲染，到达后重绘）
+  function loadMonth(y, mo){
+    if (!live) return Promise.resolve();
+    var mk = y + '-' + String(mo+1).padStart(2,'0');
+    if (calCache[mk]) return Promise.resolve();
+    var unit = q.get('unit') || '';
+    return fetch('/api/juzhu/projects/' + live.projectId + '/stay-calendar?month=' + mk + (unit ? '&unit_id=' + unit : ''))
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(j){
+        var map = {};
+        (j.days || []).forEach(function(d){ map[d.date] = d; });
+        calCache[mk] = map;
+        render();
+      }).catch(function(){ calCache[mk] = {}; });   // 失败按全可订渲染（下单仍有服务端校验兜底）
+  }
 
   function pick(d){
-    if(!ci || (ci&&co) || d<=ci){ ci=d; co=null; }   // 重新起算
-    else { co=d; }                                    // 选离店
+    if (!ci || (ci&&co) || d <= ci) { ci = d; co = null; }   // 重新起算
+    else {
+      var n = Math.round((d - ci) / 864e5);
+      if (n < minNights()) {
+        var minCo = new Date(ci.getTime() + minNights()*864e5);
+        sum.innerHTML = '<span class="hint" style="color:#b91c1c;">须连续入住 ≥ ' + minNights() + ' 晚 · 最早 ' + fmt(minCo) + ' 离店</span>';
+        return;
+      }
+      co = d;
+    }
     render();
   }
 
   function render(){
-    moLbl.textContent=view.getFullYear()+' 年 '+(view.getMonth()+1)+' 月';
-    prev.disabled = view<=MIN; next.disabled = view>=MAX;
-    grid.innerHTML='';
-    WK.forEach(function(w){var e=document.createElement('div');e.className='wk';e.textContent=w;grid.appendChild(e);});
-    var lead=new Date(view.getFullYear(),view.getMonth(),1).getDay();
-    for(var i=0;i<lead;i++){var b=document.createElement('div');b.className='cell blank';grid.appendChild(b);}
-    var dim=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
-    for(var dd=1;dd<=dim;dd++){
-      var d=new Date(view.getFullYear(),view.getMonth(),dd);
-      var c=document.createElement('div'); c.className='cell';
-      var w=d.getDay(); if(w===0||w===6) c.classList.add('wknd');
-      if(d<TODAY){
-        c.classList.add('past'); c.innerHTML='<div class="dn">'+dd+'</div>';
-      } else {
-        c.innerHTML='<div class="dn">'+dd+'</div><div class="cp">¥'+price(d)+'</div>';
-        (function(dt){c.addEventListener('click',function(){pick(dt);});})(d);
+    moLbl.textContent = view.getFullYear()+' 年 '+(view.getMonth()+1)+' 月';
+    prev.disabled = view <= MIN; next.disabled = view >= MAX;
+    grid.innerHTML = '';
+    WK.forEach(function(w){ var e=document.createElement('div'); e.className='wk'; e.textContent=w; grid.appendChild(e); });
+    var lead = new Date(view.getFullYear(), view.getMonth(), 1).getDay();
+    for (var i=0;i<lead;i++){ var b=document.createElement('div'); b.className='cell blank'; grid.appendChild(b); }
+    var dim = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
+    var minCo = ci ? new Date(ci.getTime() + minNights()*864e5) : null;
+    for (var dd=1; dd<=dim; dd++){
+      var d = new Date(view.getFullYear(), view.getMonth(), dd);
+      var c = document.createElement('div'); c.className = 'cell';
+      var w = d.getDay(); if (w===0||w===6) c.classList.add('wknd');
+      var inf = dayInfo(d);
+      var k = key(d);
+      var noslot = inf && (inf.status === 'booked' || inf.status === 'blocked');
+      var past = d < TODAY;
+      var beyond = d > MAX;
+      var dis = ci && !co && d < minCo && k !== key(ci);
+      if (past) c.classList.add('past');
+      else if (noslot) c.classList.add('noslot');
+      else if (beyond || dis) c.classList.add('dis');
+      if (ci){
+        if (co){
+          if (k===key(ci)||k===key(co)) c.classList.add('end');
+          else if (d>ci && d<co) c.classList.add('range');
+        } else if (k===key(ci)) c.classList.add('end');
       }
-      if(ci){
-        var k=key(d);
-        if(co){
-          if(k===key(ci)||k===key(co)) c.classList.add('end');
-          else if(d>ci && d<co) c.classList.add('range');
-        } else if(k===key(ci)) c.classList.add('end');
-      }
+      var cp = noslot ? (inf.status === 'booked' ? '已订' : '关房')
+        : past ? '—'
+        : (k===key(ci) ? '入住' : (dis ? '不满'+minNights()+'晚' : '¥' + ((inf && inf.price) ? inf.price : price(d))));
+      c.innerHTML = '<div class="dn">'+dd+'</div><div class="cp">'+cp+'</div>';
+      if (!past && !noslot && !beyond) (function(dt){ c.addEventListener('click', function(){ pick(dt); }); })(d);
       grid.appendChild(c);
     }
     updateSum();
   }
 
   function updateSum(){
-    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店</span>'; sum.dataset.ci=''; sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; syncBooking(); return; }
-    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选择离店日期</span>'; sum.dataset.ci=iso(ci); sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; syncBooking(); return; }
+    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店（连住 '+minNights()+' 晚起）</span>'; sum.dataset.ci=''; sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
+    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选离店日期（≥ '+minNights()+' 晚）</span>'; sum.dataset.ci=iso(ci); sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
     var n=nights(), t=total();
     sum.innerHTML='<span>'+fmt(ci)+' 入住 → '+fmt(co)+' 离店 · '+n+' 晚</span>'
       +'<span class="tot">合计<b>¥'+t.toLocaleString()+'</b></span>';
-    sum.dataset.ci=iso(ci); sum.dataset.co=iso(co); syncBooking();
-    if(ctaP) ctaP.innerHTML='<b>¥'+t.toLocaleString()+'<small> / '+n+' 晚</small></b><span>'+fmt(ci)+'–'+fmt(co)+' · 含双早</span>';
+    sum.dataset.ci=iso(ci); sum.dataset.co=iso(co);
+    if(ctaP) ctaP.innerHTML='<b>¥'+t.toLocaleString()+'<small> / '+n+' 晚</small></b><span>'+fmt(ci)+'–'+fmt(co)+' · 连住'+minNights()+'晚起</span>';
   }
+
+  // 数据脚本就绪后切入房态模式（真实「今天」起算 + 最短连住 + 夜价/已订）
+  window.__CAL_SET_CONFIG__ = function(cfg){
+    live = cfg || null;
+    if (!live) return;
+    TODAY = new Date(); TODAY.setHours(0,0,0,0);
+    MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 5, 1);
+    view = new Date(MIN.getFullYear(), MIN.getMonth(), 1);
+    ci = co = null; calCache = {};
+    // 详情页/列表页透传的日期（校验最短连住，不足则丢弃离店日）
+    var qi = q.get('checkin') || '', qo = q.get('checkout') || '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(qi)) {
+      var d1 = new Date(qi + 'T00:00:00');
+      if (d1 >= TODAY && d1 <= MAX) {
+        ci = d1;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(qo)) {
+          var d2 = new Date(qo + 'T00:00:00');
+          if (d2 > ci && Math.round((d2-ci)/864e5) >= minNights()) co = d2;
+        }
+      }
+    }
+    render();
+    loadMonth(view.getFullYear(), view.getMonth());
+  };
+  if (window.__STAY__) window.__CAL_SET_CONFIG__(window.__STAY__);
 
   toggle.addEventListener('click',function(){
     full.classList.toggle('open'); toggle.classList.toggle('open');
-    if(full.classList.contains('open')) full.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if(full.classList.contains('open')){ render(); full.scrollIntoView({behavior:'smooth',block:'nearest'}); }
   });
-  prev.addEventListener('click',function(){ if(view>MIN){view=new Date(view.getFullYear(),view.getMonth()-1,1);render();} });
-  next.addEventListener('click',function(){ if(view<MAX){view=new Date(view.getFullYear(),view.getMonth()+1,1);render();} });
+  prev.addEventListener('click',function(){ if(view>MIN){ view=new Date(view.getFullYear(),view.getMonth()-1,1); render(); loadMonth(view.getFullYear(),view.getMonth()); } });
+  next.addEventListener('click',function(){ if(view<MAX){ view=new Date(view.getFullYear(),view.getMonth()+1,1); render(); loadMonth(view.getFullYear(),view.getMonth()); } });
   render();
 })();
 </script>

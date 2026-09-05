@@ -149,3 +149,15 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - 上下架 = `projects.status`（online/offline/draft）；C 端 catalog 只出 `online`。
 - 演示数据：`node scripts/demo-listings.cjs seed|clean`（tag「演示」一键清理，禁止用真实商家名）；**演示项目/户型使用固定 id 段 9001-9006 / 9101-9109**，reseed 后直链不失效。
 - 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），不与主服务 8766 抢端口。
+
+## 规则 16 · 房态日历 / 保险标识 / 最短连住（旅居短住口径）
+
+**逐晚库存与入住规则的单一数据源在服务端（`app.js`），页面不得各自硬编码口径。**（2026-09-05 拍板）
+
+- **房态**：`stay_calendar` 表只存差异行（`status: open/blocked/booked`、`price_night` 覆盖、`booking_id`），**无行 = 默认可订**；`unit_id=0` 表示项目级（整栋/不限房型）。`booked` 只由下单写入、取消自动释放，商家接口不可改已订晚。
+  - C 端公开读：`GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（含夜价/三态/最短连住/保险）
+  - 商家读写：`GET|POST /api/juzhu/vendor/stay-calendar`（关房/开房/设夜价，owner 校验）
+- **最短连住**：`STAY_MIN_NIGHTS_DEFAULT`（rental=15 晚 / minsu=1）+ `projects.ext.min_stay_nights`（1-365，商家可覆盖）。**三处同口径校验**：C 端日历选段、下单页、`POST /api/juzhu/booking` 服务端兜底；改口径只改服务端常量或 ext，不要在前端另设数字。
+- **保险标识**：`INSURANCE_TYPES`（`switch_rental` 换租保险 / `hotel_cancel` 酒店取消险 / `property` 财产保险）是唯一枚举，存 `projects.ext.insurance`（key 数组），商家经 `PUT /api/juzhu/vendor/projects/:id` 配置；catalog/项目详情按 `insurance_types` 下发（含 label/icon），C 端直接渲染，**不要再造一份中文名映射**。
+- **回填工具**：`node scripts/stay-calendar-init.cjs`（保险缺配置按频道默认补齐 + 存量订单重建为 booked 行，幂等可重跑）。
+- 入口页：B 端 `screens/b-stay-calendar.html`（房态月历 + 批量关房/夜价 + 连住与保险配置），C 端 `lvju-app-lvju.html`（连续时间段选择）→ `lvju-app-detail.html`（房态日历）→ `lvju-app-booking.html`。

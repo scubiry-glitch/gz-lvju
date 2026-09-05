@@ -142,6 +142,7 @@
         ]},
         { name: '运营商工作台（白名单机构使用）', items: [
           { id: 'listing',         label: '房源上下架',       href: 'b-listing-mgmt.html',        icon: 'list' },
+          { id: 'stay-calendar',   label: '房态日历 · 保障配置', href: 'b-stay-calendar.html',     icon: 'layout' },
           { id: 'intake-api',      label: '房源接入 API ↗',   href: 'property-intake-api.html',   icon: 'plug' },
           { id: 'rating-input',    label: '★ 好房子评级录入', href: 'b-house-rating-input.html',  icon: 'star', badge: 7, badgeKind: 'warn' },
           { id: 'dispatch',        label: '派单看板',         href: 'b-dispatch-board.html',      icon: 'radio' },

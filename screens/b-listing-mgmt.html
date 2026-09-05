@@ -295,11 +295,13 @@
       if (writable) {
         act = '<a href="../juzhu-admin.html" title="内容后台完整编辑">编辑</a>' +
           '<a data-act="price" data-unit="'+u.id+'" data-cur="'+(u.rent_monthly||'')+'">调价</a>' +
+          '<a href="b-stay-calendar.html?project='+p.id+'" title="房态日历 / 夜价 / 最短连住 / 保险标识">房态</a>' +
           (off
             ? '<a data-act="shelf" data-pid="'+p.id+'" data-to="online">上架</a>'
             : '<a class="danger" data-act="shelf" data-pid="'+p.id+'" data-to="offline">下架</a>');
       } else {
         act = '<a href="../juzhu-admin.html" title="内容后台完整编辑">编辑</a>' +
+          '<a href="b-stay-calendar.html?project='+p.id+'" title="房态日历（只读）">房态</a>' +
           '<a style="opacity:.45;cursor:not-allowed;" title="登录商家/平台后可管理">下架</a>';
       }
       return '<tr>'+

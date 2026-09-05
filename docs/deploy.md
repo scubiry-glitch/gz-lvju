@@ -154,6 +154,12 @@ User=www
 - 评级：`GET /api/juzhu/ratings?status=&channel=`、`POST /api/juzhu/admin/ratings/:code/review`（platform）；
   口径 rental=好房子4维 / minsu=彩贝5维，编号前缀 `SY-RENT-` / `MZ-`（旧 `SY-BZF-` 兼容）。
 - 项目详情（C 端公开）：`GET /api/juzhu/projects/:id_or_slug` + `GET /api/juzhu/projects/:id/units`。
+- 房态/保险/连住（2026-09-05，详见 CLAUDE.md 规则 16）：
+  - `GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（公开，逐晚房态/夜价/三态）
+  - `GET|POST /api/juzhu/vendor/stay-calendar`（商家查/关房/开房/设夜价，已订晚不可改）
+  - `PUT /api/juzhu/vendor/projects/:id`（ext：`insurance` 三类标识 + `min_stay_nights`）
+  - `POST /api/juzhu/booking` 下单即锁房（stay_calendar booked），取消自动释放；最短连住服务端兜底
+  - 回填：`node scripts/stay-calendar-init.cjs`；管理页：`screens/b-stay-calendar.html`
 
 ## 6. 演示与测试数据（本地库）
 

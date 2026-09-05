@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>房态日历管理 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .main { padding: 22px 28px 40px; min-width: 0; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    .sess { margin-left: auto; font-size: 12px; color: var(--muted); border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); padding: 7px 12px; }
+    .sess a { color: var(--accent); margin-left: 6px; cursor: pointer; }
+
+    .note { margin: 0 0 14px; padding: 10px 14px; background: var(--accent-soft); border-radius: var(--radius-md); font-size: 12.5px; color: #134e4a; }
+    .grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 14px; align-items: start; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; }
+    .card h3 { margin: 0 0 10px; font-size: 14px; }
+    .card .sub { font-size: 11.5px; color: var(--muted); margin: -6px 0 10px; }
+
+    .ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    select, input[type=date], input[type=number], input[type=text] {
+      padding: 7px 10px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); font-size: 13px; color: var(--fg); font-family: var(--font);
+    }
+    .monav { display: flex; align-items: center; gap: 8px; }
+    .monav button { width: 28px; height: 28px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; font-size: 15px; line-height: 1; }
+    .monav .mo { font-weight: 600; font-size: 14px; min-width: 92px; text-align: center; }
+
+    .calgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .calgrid .wk { text-align: center; font-size: 11px; color: var(--muted); padding: 2px 0 4px; }
+    .cell { border: 1px solid var(--border); border-radius: 8px; min-height: 62px; padding: 5px 7px; position: relative; background: var(--surface); }
+    .cell .dn { font-size: 12.5px; font-weight: 600; }
+    .cell .pr { font-size: 11px; color: #b45309; margin-top: 2px; }
+    .cell .st { position: absolute; right: 6px; top: 5px; font-size: 9.5px; padding: 1px 6px; border-radius: 999px; }
+    .cell.open .st { color: var(--success); background: color-mix(in oklab, var(--success) 12%, transparent); }
+    .cell.blocked { background: #f1f5f4; }
+    .cell.blocked .st { color: var(--muted); background: #e5e7eb; }
+    .cell.blocked .dn, .cell.blocked .pr { color: var(--muted); }
+    .cell.booked { background: #fdecec; border-color: #f6c8c8; }
+    .cell.booked .st { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+    .cell.past { background: #fafafa; }
+    .cell.past .dn, .cell.past .pr { color: #cbd5e1; }
+    .cell.blank { visibility: hidden; }
+    .cell.writable { cursor: pointer; }
+    .cell.writable:hover { border-color: var(--accent); }
+    .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 12px; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+
+    .frow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; font-size: 12.5px; }
+    .frow label { color: var(--muted); flex-shrink: 0; }
+    .chk { display: flex; gap: 9px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
+    .chk:last-of-type { border-bottom: 0; }
+    .chk input { margin-top: 3px; }
+    .chk b { font-size: 12.5px; }
+    .chk small { display: block; color: var(--muted); font-size: 11px; }
+    .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 26px; background: #111; color: #fff; font-size: 12.5px; padding: 9px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s; z-index: 50; pointer-events: none; }
+    .toast.on { opacity: .92; }
+
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } .side { display: none; } .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="b" data-active="stay-calendar"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>房态日历管理</h1>
+      <a class="btn btn-ghost" href="b-listing-mgmt.html">← 房源列表</a>
+      <span class="sess" id="sess">会话检测中…</span>
+    </div>
+
+    <div class="note" id="note">
+      房态日历 = 逐晚库存：<b>可订 / 关房 / 已订</b> 三态 + 夜价覆盖；无差异行即默认「可订」。
+      C 端详情日历实时读本页数据；<b>已订</b> 由客户订单自动占用（取消自动释放），商家只能改「关房 / 开房 / 夜价」。
+      旅居口径<b>连住 15 晚起</b>（可按项目调整），下单时 C/B/服务端三处同口径校验。
+    </div>
+
+    <div class="ctl">
+      <label style="color:var(--muted);font-size:12.5px;">房源</label>
+      <select id="fProject" style="max-width:280px;"><option>加载中…</option></select>
+      <label style="color:var(--muted);font-size:12.5px;">房型</label>
+      <select id="fUnit" style="max-width:200px;"><option value="">整栋 / 不限房型</option></select>
+      <div class="monav">
+        <button id="mPrev" aria-label="上个月">‹</button>
+        <span class="mo" id="mLabel">—</span>
+        <button id="mNext" aria-label="下个月">›</button>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3 id="calTitle">房态月历</h3>
+        <div class="sub" id="calSub">加载中…</div>
+        <div class="calgrid" id="cal">
+          <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载中…</div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#fff;border:1px solid var(--border);"></i>可订（默认）</span>
+          <span><i style="background:#fdecec;"></i>已订 · 订单占用</span>
+          <span><i style="background:#f1f5f4;"></i>关房（商家）</span>
+          <span><i style="background:#fafafa;"></i>已过</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:14px;">
+          <h3>批量设置房态 / 夜价</h3>
+          <div class="sub">关房 = 不对 C 端可订；开房并填夜价 = 覆盖默认价；开房不填价 = 恢复默认价</div>
+          <div class="frow"><label>起</label><input type="date" id="bFrom" /> <label>止</label><input type="date" id="bTo" /></div>
+          <div class="frow">
+            <label>动作</label>
+            <select id="bAct">
+              <option value="blocked">关房（不可订）</option>
+              <option value="open">开房</option>
+            </select>
+            <input type="number" id="bPrice" placeholder="夜价覆盖（元/晚）" min="0" style="width:150px;" />
+          </div>
+          <div class="frow">
+            <button class="btn btn-primary" id="bApply">应用到所选日期</button>
+            <span style="color:var(--muted);font-size:11.5px;" id="bDays"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>入住规则与保障</h3>
+          <div class="sub">随项目下发 C 端详情页与下单校验（projects.ext，规则 15 不加列）</div>
+          <div class="frow">
+            <label>最短连住</label>
+            <input type="number" id="cMin" min="1" max="365" style="width:90px;" />
+            <span style="color:var(--muted);font-size:11.5px;">晚（旅居默认 15）</span>
+          </div>
+          <div id="cIns">
+            <label class="chk"><input type="checkbox" value="switch_rental" />
+              <span><b>🔄 换租保险</b><small>租期到期换租衔接期，房租损失与搬迁费用有保障</small></span></label>
+            <label class="chk"><input type="checkbox" value="hotel_cancel" />
+              <span><b>🏨 酒店取消险</b><small>行程变更按规则退改，未入住房费可退</small></span></label>
+            <label class="chk"><input type="checkbox" value="property" />
+              <span><b>🛡 财产保险</b><small>入住期间屋内财产与房屋主体意外损坏在保</small></span></label>
+          </div>
+          <div class="frow" style="margin-top:10px;">
+            <button class="btn btn-primary" id="cSave">保存规则与保障</button>
+            <span style="color:var(--muted);font-size:11.5px;">保存后 C 端即时生效</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+/* 房态日历管理：/api/juzhu/vendor/projects（会话态，vendor=本商家 / platform=全量）
+   → 降级 /api/juzhu/catalog + 公开 /projects/:id/stay-calendar（只读）。
+   写：POST /api/juzhu/vendor/stay-calendar（房态/夜价）、PUT /api/juzhu/vendor/projects/:id（连住/保险）。 */
+(function(){
+  var API = '/api/juzhu';
+  var state = { role: null, projects: [], units: [], pid: 0, unitId: 0,
+                month: null, cfg: { min_stay_nights: 15, insurance: [] }, writable: false };
+
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('zh-CN'); }
+  function toast(m){
+    var t = $('toast'); t.textContent = m; t.classList.add('on');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('on'); }, 2400);
+  }
+  function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function pad2(n){ return String(n).padStart(2,'0'); }
+
+  /* ── 数据载入 ── */
+  function loadProjects(){
+    return fetch(API + '/vendor/projects').then(function(r){
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function(d){
+      state.role = d.role || 'platform';
+      state.projects = d.projects || [];
+      state.units = d.units || [];
+      state.writable = true;
+      $('sess').innerHTML = (state.role === 'vendor' ? '🏪 商家会话' : '🛡 平台会话 · 全量代管') +
+        ' · <a href="b-listing-mgmt.html">切换</a>';
+    }).catch(function(){
+      // 只读态：公开 catalog（演示/未登录）
+      state.role = null; state.writable = false;
+      $('sess').textContent = '只读视图 · 登录商家/平台后可管理';
+      return fetch(API + '/catalog?city=guiyang&channel=rental').then(function(r){ return r.json(); }).then(function(cat){
+        state.projects = (cat.projects || []).filter(function(p){ return p.channel === 'rental' || p.channel === 'minsu'; });
+        state.units = cat.units || [];
+      });
+    });
+  }
+
+  function currentProject(){
+    for (var i = 0; i < state.projects.length; i++) if (state.projects[i].id === state.pid) return state.projects[i];
+    return null;
+  }
+
+  function fillSelectors(){
+    var fp = $('fProject');
+    if (!state.projects.length) {
+      fp.innerHTML = '<option value="">暂无在管房源</option>';
+      return;
+    }
+    fp.innerHTML = state.projects.map(function(p){
+      return '<option value="'+p.id+'">'+esc(p.name)+(p.channel==='minsu'?' · 惠居':'')+'</option>';
+    }).join('');
+    var want = parseInt(new URLSearchParams(location.search).get('project') || '', 10);
+    state.pid = want || state.projects[0].id;
+    fp.value = String(state.pid);
+    fillUnits();
+    loadConfig();
+  }
+
+  function fillUnits(){
+    var fu = $('fUnit');
+    var us = state.units.filter(function(u){ return u.project_id === state.pid; });
+    fu.innerHTML = '<option value="">整栋 / 不限房型</option>' + us.map(function(u){
+      return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'</option>';
+    }).join('');
+    state.unitId = 0;
+  }
+
+  function loadConfig(){
+    var p = currentProject();
+    state.cfg = {
+      min_stay_nights: p ? (p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15)) : 15,
+      insurance: (p && p.insurance) || [],
+    };
+    $('cMin').value = state.cfg.min_stay_nights;
+    Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
+      c.checked = state.cfg.insurance.indexOf(c.value) >= 0;
+      c.disabled = !state.writable;
+    });
+    $('cMin').disabled = !state.writable;
+  }
+
+  /* ── 月历 ── */
+  function monthOf(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1); }
+  function shiftMonth(n){
+    var parts = state.month.split('-').map(Number);
+    var d = new Date(parts[0], parts[1] - 1 + n, 1);
+    state.month = monthOf(d);
+    renderCal();
+  }
+
+  function renderCal(){
+    if (!state.pid) {
+      $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">请先选择房源</div>';
+      return;
+    }
+    $('mLabel').textContent = state.month.replace('-', ' / ');
+    $('calTitle').textContent = '房态月历 · ' + state.month;
+    $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载房态…</div>';
+    var url = API + '/projects/' + state.pid + '/stay-calendar?month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '');
+    fetch(url).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }).then(function(j){
+      var days = j.days || [];
+      var p = currentProject();
+      var unitName = state.unitId ? ($('fUnit').selectedOptions[0] || {}).textContent : '整栋 / 不限房型';
+      $('calSub').textContent = (p ? p.name : '') + ' · ' + unitName +
+        ' · 最短连住 ' + (j.min_stay_nights || state.cfg.min_stay_nights) + ' 晚 · 保障 ' +
+        ((j.insurance_types || []).map(function(t){ return t.short; }).join('/') || '未配置');
+      var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订', ''], past: ['—', ''] };
+      var html = ['日','一','二','三','四','五','六'].map(function(w){ return '<div class="wk">'+w+'</div>'; }).join('');
+      var first = new Date(parseInt(state.month.slice(0,4), 10), parseInt(state.month.slice(5,7), 10) - 1, 1);
+      for (var i = 0; i < first.getDay(); i++) html += '<div class="cell blank"></div>';
+      days.forEach(function(d){
+        var st = ST[d.status] ? d.status : 'open';
+        var cls = 'cell ' + st + (state.writable && (st === 'open' || st === 'blocked') ? ' writable' : '');
+        html += '<div class="' + cls + '" data-date="' + d.date + '" data-status="' + st + '">' +
+          '<div class="dn">' + parseInt(d.date.slice(8,10), 10) + '</div>' +
+          '<span class="st">' + ST[st][0] + '</span>' +
+          (d.price ? '<div class="pr">¥' + fmt(d.price) + '</div>' : '') +
+          '</div>';
+      });
+      $('cal').innerHTML = html;
+      bindCells();
+    }).catch(function(e){
+      $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#991b1b;padding:26px 0;">房态加载失败：' + esc(e.message) + '</div>';
+    });
+  }
+
+  function bindCells(){
+    if (!state.writable) return;
+    Array.prototype.forEach.call($('cal').querySelectorAll('.cell.writable'), function(c){
+      c.onclick = function(){
+        var date = c.getAttribute('data-date');
+        var cur = c.getAttribute('data-status');
+        setStay([date], cur === 'blocked' ? 'open' : 'blocked', null);
+      };
+    });
+  }
+
+  function setStay(dates, status, price){
+    return fetch(API + '/vendor/stay-calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: state.pid, unit_id: state.unitId || null, dates: dates, status: status, price_night: price }) })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
+      .then(function(j){ toast('已' + (status === 'blocked' ? '关房' : '开放') + ' ' + j.dates + ' 晚' + (price != null ? ' · 夜价 ¥' + fmt(price) : '')); renderCal(); })
+      .catch(function(e){ toast('操作失败：' + e.message); });
+  }
+
+  /* ── 批量 ── */
+  $('bApply').onclick = function(){
+    if (!state.writable) { toast('只读视图 · 请先登录商家/平台'); return; }
+    if (!state.pid) { toast('请先选择房源'); return; }
+    var from = $('bFrom').value, to = $('bTo').value;
+    if (!from || !to || to < from) { toast('请选择有效的起止日期'); return; }
+    var dates = [];
+    var d = new Date(from + 'T00:00:00'), end = new Date(to + 'T00:00:00');
+    while (d <= end && dates.length < 400) { dates.push(iso(d)); d.setDate(d.getDate() + 1); }
+    var status = $('bAct').value;
+    var priceRaw = $('bPrice').value.trim();
+    var price = (status === 'open' && priceRaw !== '') ? parseInt(priceRaw, 10) : null;
+    if (price != null && !(price >= 0)) { toast('夜价须为非负整数'); return; }
+    setStay(dates, status, price);
+  };
+
+  /* ── 规则与保障 ── */
+  $('cSave').onclick = function(){
+    if (!state.writable) { toast('只读视图 · 请先登录商家/平台'); return; }
+    if (!state.pid) { toast('请先选择房源'); return; }
+    var ins = [];
+    Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
+      if (c.checked) ins.push(c.value);
+    });
+    fetch(API + '/vendor/projects/' + state.pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins }) })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
+      .then(function(j){
+        toast('已保存 · 连住 ' + j.project.min_stay_nights + ' 晚 / 保障 ' + (j.project.insurance || []).length + ' 项');
+        var p = currentProject();
+        if (p) { p.min_stay_nights = j.project.min_stay_nights; p.insurance = j.project.insurance; p.insurance_types = j.project.insurance_types; }
+        renderCal();
+      })
+      .catch(function(e){ toast('保存失败：' + e.message); });
+  };
+
+  /* ── 事件 ── */
+  $('fProject').onchange = function(){
+    state.pid = parseInt(this.value, 10) || 0;
+    fillUnits(); loadConfig(); renderCal();
+  };
+  $('fUnit').onchange = function(){ state.unitId = parseInt(this.value, 10) || 0; renderCal(); };
+  $('mPrev').onclick = function(){ shiftMonth(-1); };
+  $('mNext').onclick = function(){ shiftMonth(1); };
+  $('bFrom').onchange = $('bTo').onchange = function(){
+    var from = $('bFrom').value, to = $('bTo').value;
+    $('bDays').textContent = (from && to && to >= from)
+      ? Math.round((new Date(to) - new Date(from)) / 864e5) + 1 + ' 晚'
+      : '';
+  };
+
+  loadProjects().then(function(){
+    fillSelectors();
+    var now = new Date();
+    state.month = monthOf(now);
+    renderCal();
+  }).catch(function(){
+    $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#991b1b;padding:26px 0;">无法连接新居住 API</div>';
+  });
+})();
+</script>
+</body>
+</html>
