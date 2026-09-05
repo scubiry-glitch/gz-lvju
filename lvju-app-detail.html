@@ -425,7 +425,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
       }
       var cp = noslot ? (inf.status === 'booked' ? '已订' : '关房')
         : past ? '—'
-        : (k===key(ci) ? '入住' : (dis ? '不满'+minNights()+'晚' : '¥' + ((inf && inf.price) ? inf.price : price(d))));
+        : (ci && k===key(ci) ? '入住' : (dis ? '不满'+minNights()+'晚' : '¥' + ((inf && inf.price) ? inf.price : price(d))));
       c.innerHTML = '<div class="dn">'+dd+'</div><div class="cp">'+cp+'</div>';
       if (!past && !noslot && !beyond) (function(dt){ c.addEventListener('click', function(){ pick(dt); }); })(d);
       grid.appendChild(c);
