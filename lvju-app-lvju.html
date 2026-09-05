@@ -150,7 +150,9 @@
   function paint(){
     var wrap = document.getElementById('listingWrap');
     if (!cat) return;
-    var projects = (cat.projects || []).filter(function(p){ return p.channel === 'rental'; });
+    var projects = (cat.projects || []).filter(function(p){
+      return p.channel === 'rental' && (p.tags || []).indexOf('旅居') >= 0;   // 旅居视图：仅带「旅居」tag 的 rental
+    });
     var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
     var umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
 

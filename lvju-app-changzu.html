@@ -67,7 +67,10 @@
     var wrap = document.getElementById('listingWrap');
     var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
     var pmap = {}; (cat.projects || []).forEach(function(p){ pmap[p.id] = p; });
-    var rows = (cat.units || []).filter(function(u){ var p = pmap[u.project_id]; return p && p.channel === 'rental'; });
+    var rows = (cat.units || []).filter(function(u){
+      var p = pmap[u.project_id];
+      return p && p.channel === 'rental' && (p.tags || []).indexOf('旅居') < 0;   // 长租视图：排除旅居 tag
+    });
 
     if (!rows.length) {
       wrap.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在租户型 · 运营商在后台录入后自动上架</div>';

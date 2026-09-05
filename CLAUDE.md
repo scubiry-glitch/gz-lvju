@@ -147,6 +147,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **商家维度必挂**：`projects.owner_vendor_id`（NOT NULL，153=平台自营），商家接口 `/api/juzhu/vendor/*` 一律按它隔离。
 - **评级口径按频道**（服务端 `RATING_DIMS` 是单一数据源，前后端一致）：`rental`=好房子4维（comfort/green/tech/safety）、`minsu`=旅居彩贝5维（scenery/facilities/service/location/culture）、newhouse/resale 暂无。评级编号前缀：rental=`SY-RENT-`、minsu=`MZ-`（旧 `SY-BZF-` 兼容查询）。
 - 上下架 = `projects.status`（online/offline/draft）；C 端 catalog 只出 `online`。
+- 频道内视图区分：rental 频道内以 tag「旅居」区分两个 C 端视图——lvju-app-lvju 只出带「旅居」tag（山舍等旅居托管），lvju-app-changzu 排除「旅居」tag（保租房/长租公寓）。前端过滤（lvju-catalog requiredTag / 页面内 filter），不加服务端参数。
 - 演示数据：`node scripts/demo-listings.cjs seed|clean`（tag「演示」一键清理，禁止用真实商家名）；**演示项目/户型使用固定 id 段 9001-9006 / 9101-9109**，reseed 后直链不失效。
 - 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），不与主服务 8766 抢端口。
 
