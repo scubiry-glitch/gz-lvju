@@ -78,6 +78,21 @@
       return;
     }
     document.getElementById('sortNote').textContent = '共 ' + rows.length + ' 套在租';
+    // 标题党式命名：区县 · 亮点tag + 居室（原始户型名如“30 平”不直接当标题）
+    var CN = { '1':'一','2':'二','3':'三','4':'四','5':'五' };
+    function cnRoom(lb){
+      var m = String(lb || '').match(/^(\d)\s*居/);
+      return m ? CN[m[1]] + '居' : (lb || '');
+    }
+    function pickHighlight(tags){
+      var words = ['精装','拎包','近地铁','南北通透','家电','电梯','独卫','阳台','新装','温馨'];
+      for (var i = 0; i < tags.length; i++) {
+        for (var j = 0; j < words.length; j++) {
+          if (String(tags[i]).indexOf(words[j]) >= 0) return tags[i];
+        }
+      }
+      return tags[0] || '';
+    }
     wrap.innerHTML = rows.map(function(u){
       var p = pmap[u.project_id] || {};
       var d = dmap[p.district_id];
@@ -86,13 +101,16 @@
       var th = u.cover_image
         ? '<div class="th" style="background:url(' + esc(u.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="th s-city">';
+      // 标题：项目名 · 亮点 + 居室（如 “甲秀楼店 · 精装三居”），原始户型名放 meta
+      var hi = pickHighlight(tags), room = cnRoom(u.layout_label);
+      var title = p.name + (hi ? ' · ' + hi : '') + (room ? room : '');
       return '<a class="lrow" href="lvju-app-detail.html?id=' + p.id + '">' + th +
         '<span class="star">' + esc(u.layout_label || '在租') + '</span></div>' +
-        '<div class="info"><div class="nm">' + esc(u.name) + '</div>' +
+        '<div class="info"><div class="nm">' + esc(title) + '</div>' +
         '<div class="meta">' + esc(meta) + '</div>' +
         '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在租</span>') + '</div>' +
         '<div class="pr"><b>' + (u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small> /月</small>' : '价格面议') + '</b>' +
-        (p.name ? '<span class="unit">' + esc(p.name) + '</span>' : '') + '</div></div></a>';
+        '<span class="unit">门店 · ' + esc(p.name) + '</span></div></div></a>';
     }).join('');
   }).catch(function(){
     document.getElementById('listingWrap').innerHTML =
