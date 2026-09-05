@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
 const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
 const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
+const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
   exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
@@ -3039,6 +3040,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         },
       };
       if (housingHydrateCoverFields) housingHydrateCoverFields(catalog);
+      imgThumbs.mapThumbsDeep(catalog, 640);   // C 端图片缩略图（原图保留，admin 端不受影响）
       catalogMemoSet(memoKey, catalog);
       return jsonReply(res, catalog);
     }
@@ -3117,7 +3119,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
-        return jsonReply(res, Object.assign(rows[0], stayConfigOf(rows[0])));
+        return jsonReply(res, imgThumbs.mapThumbsDeep(Object.assign(rows[0], stayConfigOf(rows[0])), 640));
       }
     }
 
@@ -3138,7 +3140,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         parseJsonFields(proj, ['tags', 'rating']);
         units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
-        return jsonReply(res, { project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos });
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos }, 640));
       }
     }
 
@@ -4923,5 +4925,7 @@ if (require.main === module) {
     console.log('static: blocked .env / source / deploy artifacts / API docs');
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
+    // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
+    imgThumbs.initBackground();
   });
 }
