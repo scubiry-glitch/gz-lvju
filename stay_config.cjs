@@ -83,6 +83,49 @@ function stayDateList(checkin, checkout) {
   return out;
 }
 
+/**
+ * 组装某月房态日历：无差异行 = open；blocked/booked 压过同日项目级 open；
+ * 夜价覆盖户型级 > 项目级 > 默认。fetchRows(sql, params) → Promise<rows>，
+ * 由调用方注入（app.js 连接池 / vendor_api.cjs HMAC 连接）。
+ */
+async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const first = y + '-' + pad2(mo + 1) + '-01';
+  const lastDay = new Date(y, mo + 1, 0).getDate();
+  const last = y + '-' + pad2(mo + 1) + '-' + String(lastDay).padStart(2, '0');
+  const scRows = await fetchRows(
+    `SELECT unit_id, stay_date, status, price_night, source, booking_id FROM stay_calendar
+     WHERE project_id=? AND stay_date BETWEEN ? AND ? AND (unit_id=0 OR unit_id=?) ORDER BY stay_date, unit_id`,
+    [proj.id, first, last, unitId]
+  );
+  const today = new Date();
+  const todayKey = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  const defPrice = unitNightPrice(proj, unit);
+  const days = [];
+  for (let dd = 1; dd <= lastDay; dd++) {
+    const ds = y + '-' + pad2(mo + 1) + '-' + String(dd).padStart(2, '0');
+    const k = y * 10000 + (mo + 1) * 100 + dd;
+    let status = 'open';
+    let price = defPrice;
+    let source = null;
+    let bookingId = null;
+    for (const r of scRows) {
+      if (r.stay_date !== ds) continue;
+      if (r.status === 'booked') { status = 'booked'; source = r.source; bookingId = r.booking_id || null; }
+      else if (r.status === 'blocked' && status !== 'booked') { status = 'blocked'; source = r.source; }
+      if (r.price_night != null && (r.unit_id === unitId || price === defPrice)) price = r.price_night;
+    }
+    days.push({
+      date: ds,
+      status: k < todayKey ? 'past' : status,
+      price: price || null,
+      source: k < todayKey ? null : source,
+      booking_id: bookingId,
+    });
+  }
+  return { month: y + '-' + pad2(mo + 1), base_price_night: defPrice || null, days };
+}
+
 module.exports = {
   INSURANCE_TYPES,
   INSURANCE_KEYS,
@@ -95,4 +138,5 @@ module.exports = {
   unitNightPrice,
   stayConfigOf,
   stayDateList,
+  buildStayMonth,
 };

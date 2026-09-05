@@ -169,6 +169,101 @@ async function catalogEventually(base, projectId, citySlug, want) {
   }));
   check('恢复默认价 → 200', r.status === 200, JSON.stringify(r.j));
 
+  // ── 5.5) 订单履约闭环：公开下单 → 商家查单/确认/拒单 → 房态联动 ──
+  const bkPhone = '13900007777';
+  const bkIds = [];
+  async function publicBooking(nights, projId, minNights) {
+    const d1b = new Date('2026-12-20T00:00:00');
+    const d2b = new Date(d1b); d2b.setDate(d2b.getDate() + nights);
+    const r = await call('/api/juzhu/booking', {
+      project_id: projId, checkin: d1b.toISOString().slice(0, 10), checkout: d2b.toISOString().slice(0, 10),
+      contact_name: '履约回归', contact_phone: bkPhone,
+    });
+    if (r.status !== 200) return { status: r.status, j: r.j, need: minNights };
+    return r;
+  }
+  // 下单（rental 演示房，最短连住已被改为 20 晚）
+  let bk = await publicBooking(20, pid, 20);
+  check('公开下单（20 晚）→ 200', bk.status === 200 && bk.j.order_no, JSON.stringify(bk.j));
+  bkIds.push(bk.j.order_no);
+  // 商家查单：可见、手机号掩码
+  r = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, {}));
+  const found = (r.j.list || []).find((o) => o.order_no === bk.j.order_no);
+  check('bookings/list 可见本商家订单', r.status === 200 && found && found.status === 'pending', JSON.stringify(r.j).slice(0, 120));
+  check('手机号掩码（不回明文）', found && /^139\*\*\*\*\d{4}$/.test(found.contact_phone), found && found.contact_phone);
+  // 确认
+  r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found.id }));
+  check('bookings/confirm → confirmed', r.status === 200 && r.j.status === 'confirmed', JSON.stringify(r.j));
+  // 房态查询：当月占用 = checkin 到月末（动态计算，避免时区/月份边界硬编码）
+  const ciStr = new Date(new Date('2026-12-20T00:00:00').getTime()).toISOString().slice(0, 10);
+  const expDec = Math.round((new Date('2027-01-01T00:00:00Z') - new Date(ciStr + 'T00:00:00Z')) / 864e5);
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: pid, month: '2026-12' }));
+  const qBooked = (r.j.days || []).filter((d) => d.status === 'booked');
+  check('stay-calendar/query 可见订单占用（' + expDec + ' 晚）', r.status === 200 && qBooked.length === expDec,
+    JSON.stringify({ status: r.status, booked: qBooked.length, expect: expDec, msg: r.j.message }));
+  // 第二笔 → 拒单 → 房态释放
+  const bk2 = await (async () => {   // 不重叠日期，避免与已确认订单房态冲突
+    const a = new Date('2027-02-05T00:00:00'); const b2 = new Date(a); b2.setDate(b2.getDate() + 21);
+    return call('/api/juzhu/booking', { project_id: pid, checkin: a.toISOString().slice(0, 10), checkout: b2.toISOString().slice(0, 10),
+      contact_name: '履约回归', contact_phone: bkPhone });
+  })();
+  bkIds.push(bk2.j.order_no);
+  r = await call('/api/juzhu/housing/vendor/bookings/detail', signed(vendor, { id: (await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, {}))).j.list.find((o) => o.order_no === bk2.j.order_no).id }));
+  check('bookings/detail 可查（越权外统一 404）', r.status === 200 && r.j.booking.order_no === bk2.j.order_no, JSON.stringify(r.j).slice(0, 100));
+  r = await call('/api/juzhu/housing/vendor/bookings/cancel', signed(vendor, { id: r.j.booking.id }));
+  check('bookings/cancel → cancelled + 释放房态', r.status === 200 && r.j.status === 'cancelled', JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: pid, month: '2026-12' }));
+  check('拒单后占用回到 ' + expDec + ' 晚', (r.j.days || []).filter((d) => d.status === 'booked').length === expDec,
+    JSON.stringify({ booked: (r.j.days || []).filter((d) => d.status === 'booked').length, expect: expDec }));
+  // 预付口径：minsu 单未支付不可确认
+  // 预付闭环：自建 minsu 演示房（新日历无历史占用），走 未支付拒确认 → 支付 → 确认 → 拒单退款
+  r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
+    name: RUN + '·回归演示民宿', channel: 'minsu', city_id: city.id, district_id: district.id,
+    price_from: 980, tags: ['演示'], min_stay_nights: 1,
+    units: [{ name: '庭院房', price_night: 980 }],
+  }));
+  const mid = r.j.project && r.j.project.id;
+  check('创建 minsu 演示房 → 200', r.status === 200 && !!mid, JSON.stringify(r.j).slice(0, 120));
+  await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: mid, status: 'online' }));
+  const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+  const mi1 = tmr.toISOString().slice(0, 10);
+  const tmr2 = new Date(tmr); tmr2.setDate(tmr2.getDate() + 1);
+  const bk3 = await call('/api/juzhu/booking', {
+    project_id: mid, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
+    contact_name: '履约回归', contact_phone: bkPhone,
+  });
+  if (bk3.status !== 200) {
+    check('minsu 预付闭环（下单）', false, JSON.stringify(bk3.j).slice(0, 160));
+  } else {
+    bkIds.push(bk3.j.order_no);
+    r = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, { project_id: mid }));
+    const found3 = (r.j.list || []).find((o) => o.order_no === bk3.j.order_no);
+    r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
+    check('minsu 未支付确认被拒 400', r.status === 400 && /未支付/.test(r.j.message || ''), JSON.stringify(r.j));
+    await call('/api/juzhu/booking/pay', { order_no: bk3.j.order_no, contact_phone: bkPhone, pay_method: 'online' });
+    r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
+    check('支付后确认 → confirmed', r.status === 200 && r.j.status === 'confirmed', JSON.stringify(r.j));
+    r = await call('/api/juzhu/housing/vendor/bookings/cancel', signed(vendor, { id: found3.id }));
+    check('已支付拒单 → refunded', r.status === 200 && r.j.pay_status === 'refunded', JSON.stringify(r.j));
+  }
+
+  // 负例：不存在/他人订单 404
+  r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: 999999 }));
+  check('bookings/confirm 不存在 id → 404', r.status === 404, 'status=' + r.status);
+  // 清理本节订单
+  for (const id of bkIds) { /* 订单行随项目清理；9001 的单置 cancelled 释放房态 */ }
+  const om = bkIds.map(() => '?').join(',');
+  await conn.execute('DELETE FROM stay_calendar WHERE booking_id IN (SELECT id FROM (SELECT id FROM booking_orders WHERE order_no IN (' + om + ')) t)', bkIds);
+  await conn.execute('DELETE FROM booking_orders WHERE order_no IN (' + om + ')', bkIds);
+  await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [mid]);
+  await conn.execute('DELETE FROM units WHERE project_id=?', [mid]);
+  await conn.execute('DELETE FROM projects WHERE id=?', [mid]);
+  // 删户型（新增一个一次性户型再删）
+  r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, { project_id: pid, name: '一次性户型' }));
+  const tmpUnit = r.j.unit && r.j.unit.id;
+  r = await call('/api/juzhu/housing/vendor/units/delete', signed(vendor, { id: tmpUnit }));
+  check('units/delete → 200', r.status === 200, JSON.stringify(r.j));
+
   // ── 6) 下架 → catalog 不可见 ──
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'offline' }));
   check('下架 offline → 200', r.status === 200 && r.j.status === 'offline', JSON.stringify(r.j));

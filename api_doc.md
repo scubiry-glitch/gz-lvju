@@ -895,7 +895,13 @@ curl -G https://test-domain/mall/beike/juzhu/order/detail \
 | `/api/juzhu/housing/vendor/projects/status` | 上下架：`online` / `offline` / `draft`（上架前置：已有 `price_from` 且 ≥1 个户型） |
 | `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext`） |
 | `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价等） |
+| `/api/juzhu/housing/vendor/units/delete` | 删除户型（有关联订单或被占用晚时拒绝） |
 | `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房 / `open` 开房（可带 `price_night` 覆盖或恢复默认）；已订晚不可改 |
+| `/api/juzhu/housing/vendor/stay-calendar/query` | 商家视角逐晚房态查询（含占用来源/关联订单、最短连住、保险） |
+| `/api/juzhu/housing/vendor/bookings/list` | 本商家订单（status/pay_status/project_id 过滤，≤200 条；手机号掩码） |
+| `/api/juzhu/housing/vendor/bookings/detail` | 按 id 查单（owner 校验） |
+| `/api/juzhu/housing/vendor/bookings/confirm` | 确认订单（`pay_status='unpaid'` 不可确认；确认后订单生效） |
+| `/api/juzhu/housing/vendor/bookings/cancel` | 拒单/取消（自动释放房态；已支付标记 `refunded`） |
 
 字段字典、上架语义（C 端 catalog 只出 `online`，≤15s 缓存）、保险标识枚举（`switch_rental`/`hotel_cancel`/`property`）、最短连住（缺省 rental=15 晚）与完整示例见线上文档页 `screens/property-intake-api.html`（含可直接调用的在线调试台）。
 

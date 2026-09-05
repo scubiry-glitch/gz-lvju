@@ -229,11 +229,11 @@
 
   <div class="hero">
     <h2>房源开放接口（商家版）· 房源创建 / 上下架 / 户型 / 房态</h2>
-    <p>面向白名单运营商与持有方商家：自助完成创建、调价、户型维护、逐晚房态与上下架；C 端目录（catalog）只展示 <code>online</code> 房源。鉴权复用平台商家开放接口同一套 <strong>HMAC-SHA256</strong> 机制（与家政开放接口同签名算法、同密钥体系）。</p>
+    <p>面向白名单运营商与持有方商家：自助完成创建、调价、户型维护、逐晚房态、上下架，并接住客户订单（查单 / 确认 / 拒单）；C 端目录只展示 <code>online</code> 房源。鉴权复用平台商家开放接口同一套 <strong>HMAC-SHA256</strong> 机制（与家政开放接口同签名算法、同密钥体系）。</p>
     <div class="badges">
       <span class="badge">RESTful · JSON</span>
       <span class="badge">统一 HMAC-SHA256 鉴权</span>
-      <span class="badge">8 个接口 · 全部 POST</span>
+      <span class="badge">14 个接口 · 全部 POST</span>
       <span class="badge">房态日历 · 逐晚库存</span>
       <span class="badge">owner 隔离 · 越权不可见</span>
     </div>
@@ -246,6 +246,7 @@
       <li><a href="#auth">HMAC 签名认证</a></li>
       <li><a href="#dict">数据字典（projects / units / ext）</a></li>
       <li><a href="#endpoints">房源接口（创建 / 更新 / 上下架 / 户型）</a></li>
+      <li><a href="#fulfill">订单履约（查单 / 确认 / 拒单）</a></li>
       <li><a href="#calendar">房态日历与短住规则</a></li>
       <li><a href="#insurance">保险标识</a></li>
       <li><a href="#console">在线调试台（可直接下单接口）</a></li>
@@ -476,10 +477,61 @@
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span> }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…*/</span> } }</code></pre>
+
+    <h3>4.8 删除户型</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/delete</span><span class="desc">有关联订单或被占用晚时拒绝</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span> }
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span> }</code></pre>
+
+    <h3>4.9 房态查询（商家视角）</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/query</span><span class="desc">逐晚三态 + 占用来源 + 最短连住/保险</span></div>
+<pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>, <span class="tok-key">"month"</span>: <span class="tok-str">"2026-12"</span> }
+→ 200 {
+  <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"month"</span>: <span class="tok-str">"2026-12"</span>, <span class="tok-key">"base_price_night"</span>: <span class="tok-num">80</span>,
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>, <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],
+  <span class="tok-key">"days"</span>: [
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-19"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span>, <span class="tok-key">"source"</span>: <span class="tok-str">"booking"</span>, <span class="tok-key">"booking_id"</span>: <span class="tok-num">36</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-20"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span> }
+  ]
+}</code></pre>
+  </section>
+
+  <section id="fulfill">
+    <h2><span class="num">5</span> 订单履约（商家接单）</h2>
+    <p>客户在 C 端提交预订单后，商家经开放接口完成<strong>接单闭环</strong>：定时拉取订单 → 确认生效或拒单 → 拒单自动释放房态。订单按签约商家隔离，联系人手机号只回掩码（<code>139****5678</code>）。</p>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/list</span><span class="desc">本商家订单（≤200 条）</span></div>
+<pre><code>{
+  <span class="tok-key">"status"</span>: <span class="tok-str">"pending"</span>,        <span class="tok-com">// 可选过滤：status / pay_status / project_id</span>
+  <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>
+}
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"list"</span>: [ {
+  <span class="tok-key">"id"</span>: <span class="tok-num">36</span>, <span class="tok-key">"order_no"</span>: <span class="tok-str">"BKG-RENTAL-00036"</span>, <span class="tok-key">"project_name"</span>: <span class="tok-str">"观山湖·遇见旅居"</span>,
+  <span class="tok-key">"checkin"</span>: <span class="tok-str">"2026-12-19"</span>, <span class="tok-key">"checkout"</span>: <span class="tok-str">"2027-01-08"</span>, <span class="tok-key">"nights"</span>: <span class="tok-num">20</span>,
+  <span class="tok-key">"price_total"</span>: <span class="tok-num">1600</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"pending"</span>, <span class="tok-key">"pay_status"</span>: <span class="tok-key">null</span>,
+  <span class="tok-key">"contact_name"</span>: <span class="tok-str">"张**"</span>, <span class="tok-key">"contact_phone"</span>: <span class="tok-str">"139****5678"</span>
+} ] }</code></pre>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/detail</span><span class="desc">按 id 查单（owner 校验）</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">36</span> } → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"booking"</span>: { <span class="tok-com">/* 同上，单条 */</span> } }</code></pre>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/confirm</span><span class="desc">确认生效</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">36</span> } → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"confirmed"</span> }</code></pre>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/cancel</span><span class="desc">拒单 / 取消（自动释放房态）</span></div>
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">36</span> }
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"cancelled"</span>, <span class="tok-key">"pay_status"</span>: <span class="tok-key">null</span> }</code></pre>
+    <h3>订单状态与支付口径</h3>
+    <table>
+      <tr><th>字段</th><th>取值</th><th>说明</th></tr>
+      <tr><td><code>status</code></td><td><code>pending → confirmed / cancelled</code></td><td>确认后订单生效；取消为终态，不可再变更</td></tr>
+      <tr><td><code>pay_status</code></td><td><code>unpaid / paid / refunded</code> 或 空</td><td>惠居民宿为预付（先付后确认）；租赁住宿预订单为空（商家确认后线下收款）</td></tr>
+      <tr><td>确认前置</td><td>—</td><td><code>unpaid</code> 的订单不可确认（400），支付完成后可确认；<code>cancelled</code> 不可再变更</td></tr>
+      <tr><td>拒单/取消</td><td>—</td><td>自动释放占用的房态晚；已支付订单 <code>pay_status</code> 标记 <code>refunded</code></td></tr>
+    </table>
+    <div class="callout info">
+      <strong>完整业务流（商家视角）：</strong>创建房源（草稿）→ 补价与户型 → 上架 → 房态/夜价日常维护 → 拉取订单 → 确认或拒单 → 入住 / 离店；任一环节失败都会返回明确的 400/404 与原因（见 <a href="#errors">错误码</a>）。
+    </div>
   </section>
 
   <section id="calendar">
-    <h2><span class="num">5</span> 房态日历与短住规则</h2>
+    <h2><span class="num">6</span> 房态日历与短住规则</h2>
 
     <h3>5.1 批量设置房态 / 夜价</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/set</span><span class="desc">关房 / 开房 / 夜价覆盖，单次 ≤ 400 晚</span></div>
@@ -501,7 +553,7 @@
   </section>
 
   <section id="insurance">
-    <h2><span class="num">6</span> 保险标识</h2>
+    <h2><span class="num">7</span> 保险标识</h2>
     <p>商家为房源配置的「入住保障」，随 catalog / 详情 / 房态日历下发 C 端展示。枚举由平台统一维护，接口只接受以下 key，未知 key 返回 400：</p>
     <table>
       <tr><th>key</th><th>名称</th><th>保障口径</th></tr>
@@ -513,7 +565,7 @@
   </section>
 
   <section id="console">
-    <h2><span class="num">7</span> 在线调试台</h2>
+    <h2><span class="num">8</span> 在线调试台</h2>
     <p>在本页直接签名并调用真实接口：选择接口 → 填业务参数 JSON（<strong>无需自己写 vendor_id/timestamp/sign</strong>）→ 发送。签名在你的浏览器本地完成，<code>hmac_key</code> 只留在本机（可选「记住」，存 localStorage，换机不带）。</p>
     <div class="callout danger">
       <strong>密钥安全：</strong>调试台等同用你的商家身份操作房源。演示环境请使用测试商家密钥；生产密钥不要在公共电脑上使用或勾选「记住」。
@@ -530,6 +582,12 @@
           <option value="/api/juzhu/housing/vendor/units/create">units/create · 新增户型</option>
           <option value="/api/juzhu/housing/vendor/units/update">units/update · 更新户型</option>
           <option value="/api/juzhu/housing/vendor/stay-calendar/set">stay-calendar/set · 房态/夜价</option>
+          <option value="/api/juzhu/housing/vendor/stay-calendar/query">stay-calendar/query · 房态查询</option>
+          <option value="/api/juzhu/housing/vendor/units/delete">units/delete · 删除户型</option>
+          <option value="/api/juzhu/housing/vendor/bookings/list">bookings/list · 订单列表</option>
+          <option value="/api/juzhu/housing/vendor/bookings/detail">bookings/detail · 订单详情</option>
+          <option value="/api/juzhu/housing/vendor/bookings/confirm">bookings/confirm · 确认订单</option>
+          <option value="/api/juzhu/housing/vendor/bookings/cancel">bookings/cancel · 拒单/取消</option>
         </select>
         <div class="row">
           <div>
@@ -548,7 +606,7 @@
         <label class="chk"><input type="checkbox" id="pRemember" /> 在本机记住 vendor_id / hmac_key（localStorage）</label>
         <button class="go" id="pGo">签名并发送</button>
         <div class="sts" id="pSts">stringToSign 预览会显示在这里（联调对签用）</div>
-        <p class="hint" style="margin-top:8px;">常用模板：上架 <code>{"id":123,"status":"online"}</code> · 关房 <code>{"project_id":123,"dates":["2026-12-10"],"status":"blocked"}</code> · 建房源见 §4.3 示例。</p>
+        <p class="hint" style="margin-top:8px;">常用模板：上架 <code>{"id":123,"status":"online"}</code> · 关房 <code>{"project_id":123,"dates":["2026-12-10"],"status":"blocked"}</code> · 建房源见 §4.3 示例 · 接单 <code>{"id":36}</code>（confirm/cancel 同参，id 取 bookings/list 返回值）。</p>
       </div>
       <div>
         <label>响应</label>
@@ -558,7 +616,7 @@
   </section>
 
   <section id="errors">
-    <h2><span class="num">8</span> 错误码</h2>
+    <h2><span class="num">9</span> 错误码</h2>
     <table>
       <tr><th>HTTP</th><th>code</th><th>含义</th><th>处置</th></tr>
       <tr><td>401</td><td>—</td><td>缺失签名(sign)或时间戳(timestamp)参数</td><td>检查签名三件套是否都在 body 里</td></tr>
@@ -570,14 +628,15 @@
       <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 不在 1–365</td><td>按 §6 / §5 枚举修正</td></tr>
       <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
       <tr><td>400</td><td>—</td><td>无可更新字段 / <code>city_id</code> 不支持修改</td><td>按 message 调整</td></tr>
-      <tr><td>404</td><td>404</td><td>房源 / 户型不存在<strong>或不属于该商家</strong></td><td>统一 404，不区分「不存在」与「越权」，防探测</td></tr>
+      <tr><td>400</td><td>—</td><td>订单未支付不可确认 / 订单已取消不可变更</td><td>支付走收银台后重试确认；取消为终态</td></tr>
+      <tr><td>404</td><td>404</td><td>订单不存在<strong>或不属于该商家</strong>（房源 / 户型同理）</td><td>统一 404，不区分「不存在」与「越权」，防探测</td></tr>
       <tr><td>404</td><td>404</td><td>未知 vendor 路由</td><td>核对路径（本页 8 条）</td></tr>
       <tr><td>405</td><td>—</td><td>非 POST 请求</td><td>全部接口仅支持 POST</td></tr>
     </table>
   </section>
 
   <section id="regression">
-    <h2><span class="num">9</span> 联调与回归</h2>
+    <h2><span class="num">10</span> 联调与回归</h2>
     <p>平台提供端到端回归脚本（Node，走真实 HTTP 签名链路），接入方可用它自检签名实现是否正确：</p>
 <pre><code><span class="tok-com"># 覆盖：创建→上架→C 端可见→保险/连住更新→房态→下架→越权负例→清理</span>
 node scripts/housing_vendor_hmac_regression.cjs [base_url]   <span class="tok-com"># 默认 http://127.0.0.1:8766</span>
@@ -615,6 +674,12 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200 },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128 },
     '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null },
+    '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
+    '/api/juzhu/housing/vendor/units/delete': { id: 0 },
+    '/api/juzhu/housing/vendor/bookings/list': { status: 'pending' },
+    '/api/juzhu/housing/vendor/bookings/detail': { id: 0 },
+    '/api/juzhu/housing/vendor/bookings/confirm': { id: 0 },
+    '/api/juzhu/housing/vendor/bookings/cancel': { id: 0 },
   };
 
   /* ── 平台签名规则实现 ── */

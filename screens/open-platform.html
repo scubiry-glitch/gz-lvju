@@ -126,7 +126,7 @@
     <p>面向<strong>商家（运营商 / 服务商）</strong>与<strong>平台运营方</strong>的统一入口。开放能力按业务线分开提供：<strong>房源</strong>（旅居 / 长租 / 惠居）、<strong>通用本地生活</strong>（保洁 / 维修 / 保姆 / 养老…）、<strong>搬家</strong>（垂类）。所有开放接口统一使用 <strong>HMAC-SHA256</strong> 商家签名鉴权，一套凭证按业务线授权，不接受其他鉴权方式。</p>
     <div class="badges">
       <span class="badge">3 条业务线分开接入</span>
-      <span class="badge">18 个开放接口</span>
+      <span class="badge">24 个开放接口</span>
       <span class="badge">仅 HMAC-SHA256 一种鉴权</span>
       <span class="badge">在线签名调试台</span>
       <span class="badge">回归脚本开箱即用</span>
@@ -153,8 +153,8 @@
       <a class="doc-card" href="property-intake-api.html">
         <span class="kind">房源 · v2.0</span>
         <h4>房源接入 API（商家版）</h4>
-        <p>房源创建 / 更新 / 上下架 / 户型 / 逐晚房态，共 8 个接口；含保险标识与最短连住口径，页内可直接签名调真实接口。</p>
-        <div class="meta"><span>HMAC-SHA256</span><span>8 接口</span><span>含调试台</span></div>
+        <p>覆盖商家完整业务流：房源创建 / 更新 / 上下架、户型、逐晚房态，以及订单履约（查单 / 确认 / 拒单），共 14 个接口；含保险标识与最短连住口径，页内可直接签名调真实接口。</p>
+        <div class="meta"><span>HMAC-SHA256</span><span>14 接口</span><span>含调试台</span></div>
         <span class="go">打开文档 →</span>
       </a>
     </div>
@@ -239,7 +239,9 @@
       <tr><td><code>POST /housing/vendor/projects/update</code></td><td>增量更新（价格 / 标签 / 保险 / 最短连住）</td></tr>
       <tr><td><code>POST /housing/vendor/projects/status</code></td><td>上架 online / 下架 offline / 草稿 draft</td></tr>
       <tr><td><code>POST /housing/vendor/units/create</code> · <code>units/update</code></td><td>户型新增与调价 / 夜价</td></tr>
-      <tr><td><code>POST /housing/vendor/stay-calendar/set</code></td><td>逐晚房态：关房 / 开房 / 夜价覆盖（已订晚不可改）</td></tr>
+      <tr><td><code>POST /housing/vendor/stay-calendar/set</code> · <code>stay-calendar/query</code></td><td>逐晚房态：关房 / 开房 / 夜价覆盖（已订晚不可改）与商家视角查询</td></tr>
+      <tr><td><code>POST /housing/vendor/units/delete</code></td><td>删除户型（有关联订单或被占用晚时拒绝）</td></tr>
+      <tr><td><code>POST /housing/vendor/bookings/list|detail|confirm|cancel</code></td><td>订单履约：查单（手机号掩码）/ 详情 / 确认 / 拒单（自动释放房态，已支付标退款）</td></tr>
     </table>
 
     <h3>4.2 通用本地生活业务线（<code>/api/juzhu/jiazheng/vendor/*</code>）</h3>

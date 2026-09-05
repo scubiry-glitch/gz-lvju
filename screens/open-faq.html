@@ -189,7 +189,15 @@
     </details>
 
     <details>
-      <summary><span class="q">Q13</span>slug 冲突（重名房源）怎么处理？</summary>
+      <summary><span class="q">Q13</span>客户下了单，商家怎么接单？</summary>
+      <div class="a">
+        <p>开放接口履约闭环：<code>bookings/list</code>（建议每分钟定时拉取 <code>status='pending'</code>）→ <code>bookings/confirm</code> 确认生效或 <code>bookings/cancel</code> 拒单。拒单自动释放房态；惠居民宿预付单未支付时确认会被拒，等收银台支付完成后再确认。联系人手机号只回掩码。</p>
+        <p class="tip">订单详情见 <a href="property-intake-api.html#fulfill">房源接入 API §5 订单履约</a>，可用页内调试台直接试。</p>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="q">Q14</span>slug 冲突（重名房源）怎么处理？</summary>
       <div class="a">
         <p>不传 <code>slug</code> 时平台按名称自动生成并在同频道内保证唯一（冲突自动加 <code>-2/-3…</code> 后缀）；传了自定义 <code>slug</code> 也一样做唯一化，无需自己处理。</p>
       </div>
@@ -207,21 +215,21 @@
     </details>
 
     <details>
-      <summary><span class="q">Q15</span>没设置过的日期是什么房态？夜价优先级？</summary>
+      <summary><span class="q">Q14</span>没设置过的日期是什么房态？夜价优先级？</summary>
       <div class="a">
         <p>未设置过的晚默认可订。夜价优先级：<strong>户型级覆盖 &gt; 项目级覆盖 &gt; 默认夜价</strong>（rental=月租/30 折算，minsu=<code>units.ext.price_night</code> 或起价）。「恢复默认价」= 传 <code>status:'open'</code> 且不带 <code>price_night</code>，平台清除该晚价格覆盖。</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="q">Q16</span>最短连住是多少？在哪生效？</summary>
+      <summary><span class="q">Q14</span>最短连住是多少？在哪生效？</summary>
       <div class="a">
         <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=1</code> 晚；商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400，改口径只需改服务端常量或该字段，不需要改页面。</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="q">Q17</span>保险标识有哪些？传错了会怎样？</summary>
+      <summary><span class="q">Q14</span>保险标识有哪些？传错了会怎样？</summary>
       <div class="a">
         <p>仅三个平台统一枚举：<code>switch_rental</code> 换租保险、<code>hotel_cancel</code> 酒店取消险、<code>property</code> 财产保险。传未知 key 返回 400 并列出可用枚举；清空传 <code>[]</code>。配置后随 catalog / 详情 / 房态日历下发 C 端展示（含名称与图标）。</p>
       </div>
@@ -232,21 +240,21 @@
     <h2><span class="num">⑤</span> 家政 / 本地生活</h2>
 
     <details>
-      <summary><span class="q">Q18</span>家政商品的价格单位是什么？</summary>
+      <summary><span class="q">Q14</span>家政商品的价格单位是什么？</summary>
       <div class="a">
         <p>商家开放接口一律<strong>「分」</strong>（如 <code>29900</code> = 299 元），平台在接口边界做分↔元换算入库；房源接口则用「元」（<code>rent_monthly</code> 元/月、<code>price_night</code> 元/晚）。两条业务线单位不同，别混。</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="q">Q19</span>家政商品下架和房源下架有什么区别？</summary>
+      <summary><span class="q">Q14</span>家政商品下架和房源下架有什么区别？</summary>
       <div class="a">
         <p>家政商品 <code>products/status</code> 用 <code>on / off / sold_out</code>（<code>delete</code> 接口实际是把状态置 <code>off</code>）；房源 <code>projects/status</code> 用 <code>online / offline / draft</code>。语义各自独立，别把房源的状态值传给家政接口。</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="q">Q20</span>开放接口支持别的鉴权方式吗（token / 账号密码）？</summary>
+      <summary><span class="q">Q14</span>开放接口支持别的鉴权方式吗（token / 账号密码）？</summary>
       <div class="a">
         <p><strong>不支持。开放接口统一只接受 HMAC-SHA256 签名</strong>（<code>vendor_id</code> + <code>timestamp</code> + <code>sign</code> 放在请求体里），按商家隔离数据，没有 token / 账号密码等替代方式。这也是唯一需要对接的鉴权机制。</p>
       </div>
@@ -257,7 +265,7 @@
     <h2><span class="num">⑥</span> 环境 · 工具 · 数据</h2>
 
     <details>
-      <summary><span class="q">Q21</span>有没有现成的自检脚本？</summary>
+      <summary><span class="q">Q14</span>有没有现成的自检脚本？</summary>
       <div class="a">
 <pre>node scripts/housing_vendor_hmac_regression.cjs [base_url]   # 房源全生命周期（创建→上架→房态→下架→越权）
 node scripts/vendor_hmac_regression.cjs                      # 家政开放接口</pre>
@@ -266,14 +274,14 @@ node scripts/vendor_hmac_regression.cjs                      # 家政开放接�
     </details>
 
     <details>
-      <summary><span class="q">Q22</span>演示环境和生产的差别？</summary>
+      <summary><span class="q">Q14</span>演示环境和生产的差别？</summary>
       <div class="a">
         <p>接口与签名完全一致，仅 Base 不同。演示环境（本页同源 <code>sytest.meizu.life</code>）数据可随时清理重建，用测试商家练手；生产 Base 以平台接入单为准。</p>
       </div>
     </details>
 
     <details>
-      <summary><span class="q">Q23</span>怎么提问题最快？</summary>
+      <summary><span class="q">Q14</span>怎么提问题最快？</summary>
       <div class="a">
         <p>接入群报四样：<code>vendor_id</code>、接口路径、请求里的 <code>timestamp</code>、返回的 <code>message</code> 与 HTTP 状态码。<strong>不要发 <code>hmac_key</code></strong>，也不要发完整业务数据截图。</p>
       </div>
@@ -281,7 +289,7 @@ node scripts/vendor_hmac_regression.cjs                      # 家政开放接�
   </section>
 
   <div class="doc-foot">
-    <p>没有找到答案？回到<a href="open-platform.html">开放平台门户</a>查看完整文档与手册，或联系平台接入群（报障口径见 Q23）。</p>
+    <p>没有找到答案？回到<a href="open-platform.html">开放平台门户</a>查看完整文档与手册，或联系平台接入群（报障口径见 Q14）。</p>
   </div>
 
   </div>
