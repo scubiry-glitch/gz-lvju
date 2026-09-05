@@ -364,7 +364,7 @@
       <tr><td><code>contact_phone</code></td><td>string</td><td>★ 真实联系电话，<strong>仅入库用于虚拟号绑定，任何查询接口不回显</strong></td></tr>
       <tr><td><code>owner_vendor_id</code></td><td>int</td><td>数据归属商家（签名商家自动写入，不可改）</td></tr>
       <tr><td><code>status</code></td><td>string</td><td>★ <code>draft</code> 草稿（默认）/ <code>online</code> 上架 / <code>offline</code> 下架</td></tr>
-      <tr><td><code>ext</code></td><td>object</td><td>★ 频道差异属性：<code>insurance</code>（保险标识数组，见 6）+ <code>min_stay_nights</code>（最短连住，见 5）</td></tr>
+      <tr><td><code>ext</code></td><td>object</td><td>★ 频道差异属性：<code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，见 6）+ <code>stay_bookable</code>（按晚预订开关，见 5.3）</td></tr>
       <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>评级状态与结果（平台侧维护，商家只读）</td></tr>
     </table>
 
@@ -454,7 +454,8 @@
   <span class="tok-key">"price_from"</span>: <span class="tok-num">2680</span>,
   <span class="tok-key">"tags"</span>: [<span class="tok-str">"旅居"</span>, <span class="tok-str">"近地铁"</span>, <span class="tok-str">"含早"</span>],
   <span class="tok-key">"insurance"</span>: [<span class="tok-str">"hotel_cancel"</span>, <span class="tok-str">"property"</span>],
-  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">20</span>
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">20</span>,
+  <span class="tok-key">"stay_bookable"</span>: <span class="tok-key">true</span>
 }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 更新后全量 */</span> } }</code></pre>
     <p class="opt" style="font-size:12.5px;">不可改：<code>city_id</code>、<code>channel</code>、<code>owner_vendor_id</code>；改 <code>name</code> 会同步重生成唯一 <code>slug</code>。</p>
@@ -575,6 +576,9 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
 
     <h3>5.2 最短连住（min_stay_nights）</h3>
     <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=1</code> 晚，商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。<strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。</p>
+
+    <h3>5.3 按晚预订开关（stay_bookable）</h3>
+    <p>房源默认<strong>仅 400 电话咨询</strong>（C 端不展示价格日历、下单接口拒绝）。<code>projects/create</code> / <code>projects/update</code> 传 <code>"stay_bookable": true</code> 开通后，C 端才展示日历并支持在线下单（<code>catalog</code> / 详情 / 房态日历出参均带 <code>bookable</code> 能力位）。关闭传 <code>false</code>（已生成订单不受影响，可正常确认/取消）。判断由平台服务端唯一执行，<strong>tag / 频道不参与</strong>。</p>
   </section>
 
   <section id="insurance">
@@ -694,7 +698,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
       min_stay_nights: 15, insurance: ['switch_rental', 'property'],
       units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }]
     },
-    '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20 },
+    '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, stay_bookable: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200 },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128 },
