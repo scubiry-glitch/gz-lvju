@@ -68,12 +68,25 @@
   document.getElementById('qNo').value = q.get('order_no') || '';
   document.getElementById('qPhone').value = q.get('phone') || '';
   var STATUS = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
+  function stOf(o){
+    if (o.status === 'pending') {
+      if (o.pay_status === 'unpaid') return ['待支付', 'wait'];
+      if (o.pay_status === 'paid') return ['已支付 · 待商家确认', 'stay'];
+      return STATUS.pending;
+    }
+    if (o.status === 'confirmed' && o.pay_status === 'refunded') return ['已退款', 'done'];
+    if (o.status === 'cancelled' && o.pay_status === 'refunded') return ['已取消 · 已退款', 'done'];
+    return STATUS[o.status] || [o.status, 'stay'];
+  }
+  function payLink(o, phone){
+    return 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(o.order_no) + '&phone=' + encodeURIComponent(phone || '');
+  }
   var cur = null;
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   function render(o){
     cur = o;
-    var st = STATUS[o.status] || [o.status, 'stay'];
+    var st = stOf(o);
     var card = document.getElementById('qCard');
     card.style.display = 'block';
     card.innerHTML =
@@ -81,10 +94,14 @@
         '<span style="font-size:11px;color:var(--muted);">' + esc(o.order_no) + '</span>' +
         '<span style="font-size:11px;font-weight:700;color:var(--brand-deep);">' + esc(st[0]) + '</span>' +
       '</div>' +
-      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin:5px 0 2px;">项目 #' + o.project_id + ' · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</div>' +
+      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '惠居' : '租赁住宿') + '</div>' +
       '<div style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
       '<div style="font-size:12px;color:var(--muted);margin-top:2px;">联系人 ' + esc(o.contact_name) + ' · ' + esc(o.contact_phone_masked) + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:var(--gold-deep);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>';
+      '<div style="font-size:13px;font-weight:700;color:var(--gold-deep);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
+      (o.status === 'pending' && o.pay_status === 'unpaid'
+        ? '<a href="' + payLink(o, document.getElementById('qPhone').value.trim()) + '" style="display:block;text-align:center;margin-top:8px;background:var(--brand-deep);color:#fff;font-size:12px;font-weight:700;border-radius:9px;padding:9px 0;text-decoration:none;">去支付 →</a>'
+        : '') +
+      (o.pay_status === 'paid' ? '<div style="font-size:11px;color:var(--success);margin-top:4px;">✓ 已支付' + (o.pay_method ? ' · ' + esc(o.pay_method) : '') + '</div>' : '');
     document.getElementById('qCancel').style.display = o.status === 'pending' ? 'block' : 'none';
   }
   function msg(m, isErr){ var el = document.getElementById('qMsg'); el.textContent = m; el.style.color = isErr ? '#991b1b' : 'var(--muted)'; }
@@ -131,7 +148,7 @@
     if (!items.length) { document.getElementById('myList').innerHTML = '<div class="ordcard" style="text-align:center;"><div style="font-size:12px;color:var(--muted);padding:10px 2px;">还没有预订 · 去「找房」挑一间</div></div>'; return; }
     var ST = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
     document.getElementById('myList').innerHTML = items.map(function(o){
-      var st = ST[o.status] || [o.status, 'stay'];
+      var st = stOf(o);
       var cover = o.project_cover
         ? '<div class="th" style="background:url(' + esc(o.project_cover) + ') center/cover;"></div>'
         : '<div class="th s-xijiang"></div>';
@@ -146,6 +163,7 @@
         '</div>' +
         '<div class="of">' +
           (o.status === 'pending' ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
+          (o.status === 'pending' && o.pay_status === 'unpaid' ? '<a href="' + payLink(o, o.contact_phone_raw) + '" style="color:var(--brand-deep);font-weight:700;cursor:pointer;">去支付 →</a>' : '') +
           '<a href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
           '<a class="primary" href="lvju-app-order-detail.html?order_no=' + encodeURIComponent(o.order_no) + '">订单详情</a>' +
         '</div>' +

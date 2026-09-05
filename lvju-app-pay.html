@@ -67,6 +67,45 @@
   var q = new URLSearchParams(location.search);
   var oid = q.get('order');
   var channel = q.get('channel');
+
+  // ── 旅居预订（channel=booking）：双因子查单 → 收银台 → POST /booking/pay ──
+  if (channel === 'booking') {
+    var bNo = q.get('order_no') || '';
+    var bPhone = q.get('phone') || '';
+    var bPrice = q.get('price') || '';
+    if (!bNo || !bPhone) { document.getElementById('paySub').textContent = '缺少订单参数，请从订单页重新进入'; return; }
+    var lookup = function(){
+      return fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) })
+        .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); });
+    };
+    lookup().then(function(res){
+      if (!res.ok) { document.getElementById('paySub').textContent = '订单加载失败：' + (res.d.error || ''); return; }
+      var o = res.d.order;
+      if (o.pay_status === 'paid') { location.replace('lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(bNo) + '&phone=' + encodeURIComponent(bPhone)); return; }
+      if (o.status !== 'pending') { document.getElementById('paySub').textContent = '订单状态为「' + o.status + '」，无需支付'; return; }
+      var amt = (o.price_total != null ? o.price_total : (parseInt(bPrice, 10) || 0));
+      document.querySelector('.ttl').innerHTML = '收银台<small>旅居预订 · ' + (o.project_name ? window.BZF_JZ.esc(o.project_name) : '预订订单') + '</small>';
+      document.getElementById('payAmt').textContent = '¥' + Number(amt).toLocaleString();
+      document.getElementById('paySub').textContent = '订单号 ' + o.order_no + ' · ' + o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
+      document.getElementById('payBtn').textContent = '确认支付 ¥' + Number(amt).toLocaleString();
+      document.getElementById('payBtn').href = '#';
+      document.getElementById('payBtn').addEventListener('click', function(e){
+        e.preventDefault();
+        document.querySelectorAll('.payopt').forEach(function(x){ if (x.classList.contains('sel')) method = x.querySelector('.nm').textContent.trim(); });
+        fetch('/api/juzhu/booking/pay', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, pay_method: method }) })
+          .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+          .then(function(res){
+            if (!res.ok) { alert(res.d.error || '支付失败'); return; }
+            location.href = 'lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(bNo) + '&phone=' + encodeURIComponent(bPhone);
+          })
+          .catch(function(){ alert('网络异常，请稍后再试'); });
+      });
+    }).catch(function(){ document.getElementById('paySub').textContent = '网络异常，请稍后再试'; });
+    return;
+  }
+
   if (!oid || channel !== 'jiazheng') return;
 
   var JZ = window.BZF_JZ;

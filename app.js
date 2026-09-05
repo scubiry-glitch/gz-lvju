@@ -427,7 +427,7 @@ function isVendorHmacPath(urlPath, method) {
 function isCEndPublicApi(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
-  if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel')) return true;
+  if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
   if (m !== 'GET') return false;
@@ -1444,6 +1444,11 @@ async function ensureSchemaRun() {
       // 预订订单归属（登录用户；老订单 user_id 为空，可按登录账号手机号认领）
       "ALTER TABLE booking_orders ADD COLUMN user_id VARCHAR(64)",
       "ALTER TABLE booking_orders ADD KEY idx_bo_user (user_id)",
+      // 支付（阶段3 旅居收银台）：minsu=unpaid/paid/refunded；rental 预订单 NULL（不涉及）
+      "ALTER TABLE booking_orders ADD COLUMN pay_status VARCHAR(20)",
+      "ALTER TABLE booking_orders ADD COLUMN pay_method VARCHAR(50)",
+      "ALTER TABLE booking_orders ADD COLUMN pay_at VARCHAR(30)",
+      "ALTER TABLE booking_orders ADD KEY idx_bo_pay (pay_status)",
       // 区级「房源量」= 下属租赁住宿项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
       `UPDATE districts d
          SET managed_unit_count = (
@@ -3333,6 +3338,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const rows = await queryRows(
         `SELECT b.id, b.order_no, b.project_id, b.channel, p.name AS project_name,
                 b.checkin, b.checkout, b.nights, b.price_total, b.status, b.created_at,
+                b.pay_status, b.pay_method,
                 b.contact_name, b.contact_phone
          FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
          WHERE b.user_id=? ${accPhone ? 'OR b.contact_phone=?' : ''}
@@ -3470,9 +3476,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const priceTotal = perNight * nights;
         const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
         const [ins] = await conn.execute(
-          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,created_at,updated_at)
-           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?,?)`,
-          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal, now, now]
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,pay_status,created_at,updated_at)
+           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?, ?,?)`,
+          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal,
+           proj.channel === 'minsu' ? 'unpaid' : null, now, now]
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
@@ -3528,11 +3535,33 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!rows.length) { conn.end(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
         if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        await conn.execute("UPDATE booking_orders SET status='cancelled', updated_at=? WHERE id=?", [now, rows[0].id]);
+        // 已支付订单取消 → 标记退款（模拟退款通道；真实网关接入后走原路退回）
+        const newPay = rows[0].pay_status === 'paid' ? 'refunded' : rows[0].pay_status;
+        await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status=?, updated_at=? WHERE id=?", [newPay, now, rows[0].id]);
         // 释放房态
         await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
         await conn.commit();
         return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
+      } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/booking/pay —— 收银台支付（双因子：order_no + contact_phone；模拟通道，网关接入后替换）
+    if (urlPath === '/api/juzhu/booking/pay' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      const payMethod = String(body.pay_method || 'online').slice(0, 50);
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
+        if (!rows.length) { conn.end(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '订单已取消或已完结，无法支付' }, 400); }
+        if (rows[0].pay_status !== 'unpaid') { conn.end(); return jsonReply(res, { error: '该订单不在待支付状态（当前：' + (rows[0].pay_status || '无需支付）') }, 400); }
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status });
       } finally { await conn.end(); }
     }
 
@@ -3574,6 +3603,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
             return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
           }
           if (rows[0].status === 'cancelled') { conn.end(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
+          // 预付口径：minsu 单 pay_status='unpaid' 时租客未支付，不可确认生效
+          if (status === 'confirmed' && rows[0].pay_status === 'unpaid') {
+            conn.end();
+            return jsonReply(res, { error: '租客尚未支付（收银台待付），支付完成后可确认生效' }, 400);
+          }
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           await conn.execute('UPDATE booking_orders SET status=?, updated_at=? WHERE id=?', [status, now, rows[0].id]);
           // 商家拒单 → 释放房态；确认则保留 booked 行

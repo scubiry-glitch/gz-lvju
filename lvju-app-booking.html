@@ -45,6 +45,7 @@
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">订单号（请留存，配合手机号查单/取消）</div>
       <div class="no" id="okNo"></div>
       <div style="font-size:11px;color:var(--muted);margin-top:6px;">商家确认后订单生效 · 状态可在「订单」页查询</div>
+      <a id="okPay" href="#" style="display:none;margin:12px 6px 0 0;background:var(--brand-deep,#0f766e);color:#fff;font-size:13px;font-weight:700;text-decoration:none;border-radius:999px;padding:9px 22px;">立即支付 →</a>
       <a href="lvju-app-orders.html" style="display:inline-block;margin-top:9px;font-size:12px;font-weight:600;color:var(--brand-deep);text-decoration:none;border:1px solid var(--brand);border-radius:999px;padding:6px 16px;">去订单页查状态 →</a>
     </div>
 
@@ -121,6 +122,7 @@
   var unitSel = document.getElementById('fUnit');
   var perNight = 0;
   var curId = 0;
+  var curChannel = '';
   var me = null;          // { phone, display_name, id }
   var contacts = [];      // 联系人簿
 
@@ -233,6 +235,7 @@
       fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) { var er2 = new Error(String(r.status)); er2.status = r.status; throw er2; } return r.json(); })
     ]).then(function(rs){
       var p = rs[0] || {}, units = (rs[1] || {}).units || [];
+      curChannel = p.channel || '';
       p.tags = asArr(p.tags);
       document.getElementById('bName').textContent = p.name || '';
       document.getElementById('bMeta').textContent = p.address || '';
@@ -321,6 +324,17 @@
       .then(function(res){
         if (!res.ok) { showErr(res.j.error || '提交失败'); return; }
         document.getElementById('okNo').textContent = res.j.order_no;
+        // 民宿（minsu）为预付口径：提交成功后引导收银台支付；长租（rental）预订单走商家确认
+        var payBtn = document.getElementById('okPay');
+        if (payBtn) {
+          if (curChannel === 'minsu') {
+            payBtn.href = 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(res.j.order_no) +
+              '&phone=' + encodeURIComponent(body.contact_phone) + '&price=' + encodeURIComponent(res.j.price_total || '');
+            payBtn.style.display = 'inline-block';
+          } else {
+            payBtn.style.display = 'none';
+          }
+        }
         document.getElementById('okBox').style.display = 'block';
         document.getElementById('formBox').style.display = 'none';
         document.getElementById('cBar').style.display = 'none';

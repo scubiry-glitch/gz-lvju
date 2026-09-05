@@ -57,6 +57,36 @@
 (function(){
   var q = new URLSearchParams(location.search);
   var oid = q.get('order');
+
+  // ── 旅居预订支付完成（channel=booking）：双因子查单回显 ──
+  if (q.get('channel') === 'booking') {
+    var bNo = q.get('order_no') || '', bPhone = q.get('phone') || '';
+    document.querySelector('.ttl').textContent = '支付完成';
+    document.getElementById('okTitle').textContent = '支付成功';
+    document.getElementById('okDesc').innerHTML = '资金已存管冻结，商家确认后订单生效<br>可随时在「订单」页查看状态或申请取消';
+    if (bNo && bPhone) {
+      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var o = d.order || {};
+          document.getElementById('svcName').textContent = o.project_name || '旅居预订';
+          document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
+          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · 已支付 · 待商家确认';
+          document.getElementById('infoPanel').innerHTML =
+            '<div class="kv"><span class="k">预订项目</span><span class="v">' + (o.project_name || ('#' + o.project_id)) + '</span></div>' +
+            '<div class="kv"><span class="k">实付金额</span><span class="v">¥' + Number(o.price_total).toLocaleString() + '</span></div>' +
+            '<div class="kv"><span class="k">入住 / 离店</span><span class="v">' + o.checkin + ' / ' + o.checkout + '</span></div>' +
+            '<div class="kv"><span class="k">后续流程</span><span class="v">商家确认后订单生效</span></div>';
+          var bo = document.getElementById('btnOrder');
+          bo.href = 'lvju-app-orders.html';
+          bo.textContent = '查看我的预订';
+        }).catch(function(){});
+    }
+    document.getElementById('btnOrder').href = 'lvju-app-orders.html';
+    return;
+  }
+
   if (!oid || q.get('channel') !== 'jiazheng') return;
   var JZ = window.BZF_JZ;
   JZ.get(oid).then(function(o){
