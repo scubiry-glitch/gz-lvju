@@ -91,6 +91,9 @@ const ROUTES = [
   { method: 'POST',   re: '^/api/juzhu/admin/upload$', perm: 'house.write', act: 'upload', res: 'photos' },
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
+  // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/consult$', perm: 'admin.read', act: null, res: null },
+  { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/consult-mode$', perm: 'settings.write', act: 'vendor.consult-mode.update', res: 'vendors', idGroup: 1 },
   // IAM
   { method: 'POST',   re: '^/api/juzhu/admin/accounts$', perm: 'iam.write', act: 'account.create', res: 'account' },
   { method: 'PUT',    re: '^/api/juzhu/admin/accounts/(\\d+)$', perm: 'iam.write', act: 'account.update', res: 'account', idGroup: 1 },
@@ -99,6 +102,9 @@ const ROUTES = [
   // 评级（提交走归属 guard；复核走平台复核点）
   { method: 'POST',   re: '^/api/juzhu/admin/projects/(\\d+)/rating/submit$', perm: 'rating.write', act: 'rating.submit', res: 'projects', idGroup: 1, guard: 'ratingSubmit' },
   { method: 'POST',   re: '^/api/juzhu/admin/ratings/([^/]+)/review$', perm: 'rating.review', act: 'rating.review', res: 'projects', idGroup: 1 },
+  // 商家咨询方式（平台级配置）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/consult$', perm: 'admin.read', act: null, res: null },
+  { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/consult-mode$', perm: 'settings.write', act: 'vendor.consult_mode.update', res: 'vendors', idGroup: 1 },
   // ── GET 收口（旧全局 key 在这些路由不再畅通；此前仅 accounts/idp-configs/audit 有手写闸）──
   { method: 'GET',    re: '^/api/juzhu/admin/(dictionary|cities|settings|projects|units|districts)$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/projects/(\\d+)$', perm: 'admin.read', act: null, res: null },

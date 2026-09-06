@@ -419,18 +419,18 @@ async function permStrictMode() {
   return _permStrictCache.v;
 }
 
-async function requirePerm(req, res, perm, label) {
+async function requireAnyPerm(req, res, perms, label) {
   const principal = (req.principal && req.principal.type === 'account')
     ? req.principal
     : await authCenter.principalOf(req).catch(() => null);
   if (principal && principal.type === 'account') {
-    let ok = authCenter.hasPermission(principal, perm) || authCenter.hasPermission(principal, '*');
+    let ok = (perms || []).some((p) => authCenter.hasPermission(principal, p)) || authCenter.hasPermission(principal, '*');
     if (!ok && (await permStrictMode()) !== '1' && authCenter.hasPermission(principal, authCenter.P.ADMIN_WRITE)) ok = true;
     if (ok) {
       req.principal = principal;
       return true;
     }
-    jsonReply(res, { error: 'forbidden', message: '当前账号无' + label + '权限（' + perm + '）' }, 403);
+    jsonReply(res, { error: 'forbidden', message: '当前账号无' + label + '权限（' + (perms || []).join('/') + '）' }, 403);
     return false;
   }
   if (principal && principal.type === 'legacy') {
@@ -439,6 +439,13 @@ async function requirePerm(req, res, perm, label) {
   }
   jsonReply(res, { error: 'unauthorized', message: '须运营凭证（账号会话或机器账号 Key）' }, 401);
   return false;
+}
+
+/** 通用权限闸：账号 + 指定权限（admin 域入口闸与运营写面统一走这里；legacy key 一律 403）
+ *  过渡开关 settings.perm_strict != '1' 时，持有旧 admin.write 的账号仍放行（不断崖）；
+ *  B7 翻 '1' 后按 perm_registry 权限点严格收口。 */
+async function requirePerm(req, res, perm, label) {
+  return requireAnyPerm(req, res, [perm], label);
 }
 
 /**
@@ -1443,6 +1450,8 @@ async function ensureSchemaRun() {
         status VARCHAR(20) DEFAULT 'active',
         can_extra TINYINT DEFAULT 0,
         note VARCHAR(200) NULL,
+        org_id INT NULL,                       -- 归属机构（scope 行级过滤用；NULL=平台级，全员可见）
+        vendor_id INT NULL,                    -- 归属运营商（同上）
         created_at VARCHAR(30),
         updated_at VARCHAR(30),
         UNIQUE KEY uk_staff_emp_no (emp_no)
@@ -1670,6 +1679,9 @@ async function ensureSchemaRun() {
     for (const sql of migrations) {
       try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
     }
+    // 花名册归属列（scope 行级过滤；NULL=平台级）——存量表渐进补列
+    try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN org_id INT NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN vendor_id INT NULL'); } catch (_) {}
     // 账号与权限中心：orgs/accounts/roles/account_roles/sessions/audit_log + 角色种子 + platform_admin 引导
     await authCenter.ensureAuthSchema(conn);
     // 审计留存（默认 180 天，AUDIT_RETENTION_DAYS 可调）
@@ -1954,6 +1966,22 @@ async function handleApiDirect(urlPath, qs, req, res) {
         + ' LEFT JOIN districts d ON d.id=p.district_id'
         + ' LEFT JOIN jz_vendors v ON v.id=p.owner_vendor_id WHERE 1=1';
       const params = [];
+      // scope 行级过滤（不可被 query 参数绕过；QS 显式条件与 scope 取交集，窄者胜）：
+      // city → city_id IN；org → 本机构下商家；vendor → 本商家；self 档不放行管理列表
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (principal && principal.type === 'account') {
+        const scope = authCenter.scopeOf(principal);
+        if (scope.level === 'city') {
+          const cs = authCenter.scopeCitySql(scope, 'p.city_id');
+          sql += cs.sql; params.push(...cs.params);
+        } else if (scope.level === 'org' && scope.orgId != null) {
+          sql += ' AND p.owner_vendor_id IN (SELECT id FROM jz_vendors WHERE org_id=?)'; params.push(scope.orgId);
+        } else if (scope.level === 'vendor' && scope.vendorId != null) {
+          sql += ' AND p.owner_vendor_id=?'; params.push(scope.vendorId);
+        } else if (scope.level !== 'all') {
+          return jsonReply(res, { error: 'forbidden', message: '当前账号数据范围不足（' + scope.level + ' 档）' }, 403);
+        }
+      }
       if (qp.get('city_id')) { sql += ' AND p.city_id=?'; params.push(parseInt(qp.get('city_id'))); }
       if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
       if (qp.get('district_id')) { sql += ' AND p.district_id=?'; params.push(parseInt(qp.get('district_id'))); }
@@ -2005,15 +2033,28 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const [pb] = await queryRows("SELECT COUNT(*) AS c FROM projects WHERE channel IN ('rental','minsu')");
       const [pt] = await queryRows("SELECT COUNT(*) AS c FROM projects WHERE channel='trade'");
       const [u] = await queryRows("SELECT COALESCE(SUM(managed_unit_count), 0) AS c FROM projects WHERE channel IN ('rental','minsu')");
-      // 运营商维度（持有方资管大盘用）：平台自营 + 房源运营商/旅居托管
-      const operators = await queryRows(
-        `SELECT v.id, v.name, v.type, COUNT(p.id) AS project_count,
-                COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0) AS unit_count
-         FROM jz_vendors v
-         LEFT JOIN projects p ON p.owner_vendor_id = v.id AND p.channel IN ('rental','minsu')
-         WHERE v.type IN ('platform','housing_operator','lvju_host')
-         GROUP BY v.id, v.name, v.type ORDER BY project_count DESC, v.id`
-      );
+      // 运营商维度（持有方资管大盘用）：仅持有 report.read 的账号会话可见——
+      // 匿名/旧 Key 消费方（C 端/B 端演示页）拿降级响应，不再泄漏商家明细
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      const isAccount = principal && principal.type === 'account';
+      const canSeeOperators = isAccount &&
+        (authCenter.hasPermission(principal, 'report.read') || authCenter.hasPermission(principal, '*'));
+      let operators = [];
+      let degraded = true;
+      if (canSeeOperators) {
+        const scope = authCenter.scopeOf(principal);
+        const cityJoin = authCenter.scopeCitySql(scope, 'p.city_id');
+        operators = await queryRows(
+          `SELECT v.id, v.name, v.type, COUNT(p.id) AS project_count,
+                  COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0) AS unit_count
+           FROM jz_vendors v
+           LEFT JOIN projects p ON p.owner_vendor_id = v.id AND p.channel IN ('rental','minsu')${cityJoin.sql}
+           WHERE v.type IN ('platform','housing_operator','lvju_host')
+           GROUP BY v.id, v.name, v.type ORDER BY project_count DESC, v.id`,
+          cityJoin.params
+        );
+        degraded = false;
+      }
       return jsonReply(res, {
         districts: d.c,
         projects_rental: pb.c,
@@ -2021,6 +2062,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         projects_trade: pt.c,
         units: u.c,
         operators,
+        degraded, // true = 匿名/无 report.read，operators 已剥离
       });
     }
 
@@ -3336,8 +3378,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         // slug 可能是纯数字（id），兼容两种查询
         const isId = /^\d+$/.test(slug);
         const sql = isId
-          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status FROM projects WHERE id=?'
-          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status FROM projects WHERE slug=?';
+          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE id=?'
+          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE slug=?';
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
@@ -3985,33 +4027,50 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // ===== 持有方/机构只读视角（B 端资管；holding_viewer 只读，无任何运营动作）=====
-    // GET /api/juzhu/org/report —— 资管大盘聚合（只读）
+    // GET /api/juzhu/org/report —— 资管大盘聚合（只读；按账号 scope 过滤：city 档只见授权城市，all 全量）
     if (urlPath === '/api/juzhu/org/report' && req.method === 'GET') {
       const principal = await authCenter.principalOf(req).catch(() => null);
       if (!principal || principal.type !== 'account' ||
           !(authCenter.hasPermission(principal, 'report.read') || authCenter.hasPermission(principal, '*'))) {
         return jsonReply(res, { error: 'forbidden', message: '需持有方/平台只读账号（report.read）' }, 403);
       }
+      // scope 收口（规则 4）：持有方/监管按授权城市看数，不得因 report.read 看全平台
+      const scope = authCenter.scopeOf(principal);
+      if (scope.level !== 'all' && scope.level !== 'city') {
+        return jsonReply(res, { error: 'forbidden', message: '报表按 city/all 数据范围开放（当前 ' + scope.level + ' 档）' }, 403);
+      }
+      const citySql = authCenter.scopeCitySql(scope, 'p.city_id');
+      const citySqlPlain = authCenter.scopeCitySql(scope, 'city_id');
       const byChannel = await queryRows(
         `SELECT channel, COUNT(*) projects, COALESCE(SUM(COALESCE(managed_unit_count, unit_count)),0) units
-         FROM projects GROUP BY channel ORDER BY channel`
+         FROM projects WHERE 1=1${citySqlPlain.sql} GROUP BY channel ORDER BY channel`,
+        citySqlPlain.params
       );
+      // city 档口径：只统计在该市有项目的机构类型
       const vendorsByType = await queryRows(
-        `SELECT type, COUNT(*) n FROM jz_vendors WHERE status='active' GROUP BY type ORDER BY n DESC`
+        `SELECT v.type, COUNT(DISTINCT v.id) n FROM jz_vendors v
+         JOIN projects p ON p.owner_vendor_id = v.id WHERE v.status='active'${citySql.sql}
+         GROUP BY v.type ORDER BY n DESC`,
+        citySql.params
       );
-      const ordersByStatus = await queryRows('SELECT status, COUNT(*) n FROM jz_orders GROUP BY status ORDER BY n DESC');
+      // jz_orders 与城市/项目无直接外键（经 sku 间接归属），city 档诚实降级为空集（试点口径）
+      const ordersByStatus = scope.level === 'all'
+        ? await queryRows('SELECT status, COUNT(*) n FROM jz_orders GROUP BY status ORDER BY n DESC')
+        : [];
       const operators = await queryRows(
         `SELECT v.id, v.name, v.type, COUNT(p.id) project_count
-         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id${citySql.sql}
          WHERE v.type IN ('platform','housing_operator','lvju_host')
-         GROUP BY v.id, v.name, v.type ORDER BY project_count DESC LIMIT 20`
+         GROUP BY v.id, v.name, v.type ORDER BY project_count DESC LIMIT 20`,
+        citySql.params
       );
       return jsonReply(res, {
         view: 'holding', readonly: true,
+        scope: { level: scope.level, city_ids: scope.cityIds || null },
         generated_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
         housing: { by_channel: byChannel },
         vendors: { by_type: vendorsByType },
-        orders: { by_status: ordersByStatus },
+        orders: scope.level === 'all' ? { by_status: ordersByStatus } : { by_status: [], note: 'city 口径暂不提供工单聚合（试点范围）' },
         operators,
       });
     }
@@ -4915,10 +4974,21 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // ===== 运营商员工花名册（operator_staff）=====
-    // 读：任意账号 principal（国企持有方只读，规则 4）；写：worker.manage + audit_log
+    // 读：org.read（持有方/机构只读）或 worker.manage（运营商管理）；写：worker.manage + audit_log
+    // 行级（scope）：org 档只见自家 + 平台级（org_id IS NULL）；vendor 档同理按 vendor_id；
+    // city 档无城市映射，只见平台级行；all 档全量
     if (urlPath === '/api/juzhu/staff' && req.method === 'GET') {
-      const rows = await queryRows('SELECT * FROM operator_staff ORDER BY level DESC, month_orders DESC, id ASC');
-      return jsonReply(res, { list: rows });
+      if (!(await requireAnyPerm(req, res, ['org.read', 'worker.manage'], '花名册'))) return;
+      const principal = req.principal;
+      const scope = authCenter.scopeOf(principal);
+      let where = '';
+      const params = [];
+      if (scope.level === 'org' && scope.orgId != null) { where = ' WHERE (org_id=? OR org_id IS NULL)'; params.push(scope.orgId); }
+      else if (scope.level === 'vendor' && scope.vendorId != null) { where = ' WHERE (vendor_id=? OR vendor_id IS NULL)'; params.push(scope.vendorId); }
+      else if (scope.level === 'self') { where = ' WHERE phone=? AND phone IS NOT NULL'; params.push(String((principal.account || {}).phone || '')); }
+      else if (scope.level !== 'all') { where = ' WHERE org_id IS NULL AND vendor_id IS NULL'; }
+      const rows = await queryRows(`SELECT * FROM operator_staff${where} ORDER BY level DESC, month_orders DESC, id ASC`, params);
+      return jsonReply(res, { list: rows, scope: scope.level });
     }
 
     if (urlPath === '/api/juzhu/staff' && req.method === 'POST') {
@@ -4962,9 +5032,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/staff\/(\d+)$/);
       if (m && req.method === 'GET') {
+        if (!(await requireAnyPerm(req, res, ['org.read', 'worker.manage'], '花名册'))) return;
         const rows = await queryRows('SELECT * FROM operator_staff WHERE id=?', [parseInt(m[1], 10)]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
-        return jsonReply(res, rows[0]);
+        // 行级 scope：同列表口径（org/vendor 只见自家 + 平台级）
+        const scope = authCenter.scopeOf(req.principal);
+        const r = rows[0];
+        if (scope.level === 'org' && scope.orgId != null && r.org_id != null && Number(r.org_id) !== scope.orgId) {
+          return jsonReply(res, { error: 'forbidden', message: '超出当前账号数据范围' }, 403);
+        }
+        if (scope.level === 'vendor' && scope.vendorId != null && r.vendor_id != null && Number(r.vendor_id) !== scope.vendorId) {
+          return jsonReply(res, { error: 'forbidden', message: '超出当前账号数据范围' }, 403);
+        }
+        return jsonReply(res, r);
       }
       if (m && req.method === 'PUT') {
         if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;

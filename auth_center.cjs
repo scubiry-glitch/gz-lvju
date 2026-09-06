@@ -376,6 +376,104 @@ function bestScopeLevel(principal) {
   return best;
 }
 
+/**
+ * scope（数据权限）落地助手（docs §3.2 ABAC-lite）
+ * city 档的 city_ids 是显式授权（account_roles.scope.city_ids），orgs.city_ids 只做 UI 带入初值，
+ * 不做服务端隐式推导——机构经营城市变动不应无审计地改变授权面。
+ */
+const SCOPE_LEVELS = Object.keys(SCOPE_RANK);
+
+/** 主体有效数据域视图：取 roles 中 SCOPE_RANK 最高的一档；city 档取该档 city_ids（空数组=无授权→空结果集） */
+function scopeOf(principal) {
+  let bestLv = 'self';
+  let bestScope = {};
+  for (const r of (principal && principal.roles) || []) {
+    const sc = r.scope && typeof r.scope === 'object' ? r.scope : {};
+    const lv = sc.level || 'self';
+    if ((SCOPE_RANK[lv] || 1) > (SCOPE_RANK[bestLv] || 1)) { bestLv = lv; bestScope = sc; }
+  }
+  const acc = (principal && principal.account) || {};
+  const num = (v) => (v == null ? null : (parseInt(v, 10) || null));
+  return {
+    level: bestLv,
+    cityIds: bestLv === 'city'
+      ? (Array.isArray(bestScope.city_ids) ? bestScope.city_ids.map(num).filter((x) => x != null) : [])
+      : null,
+    orgId: num(bestScope.org_id) != null ? num(bestScope.org_id) : num(acc.org_id),
+    vendorId: num(bestScope.vendor_id) != null ? num(bestScope.vendor_id) : num(acc.vendor_id),
+    workerId: num(bestScope.worker_id) != null ? num(bestScope.worker_id) : num(acc.worker_id),
+    accountId: acc.id || null,
+  };
+}
+
+/** 资源行 city_id 是否可见（all 恒真；city 看 cityIds；其余档 false） */
+function cityAllowed(scope, cityId) {
+  if (!scope) return false;
+  if (scope.level === 'all') return true;
+  if (scope.level === 'city') return cityId != null && Array.isArray(scope.cityIds) && scope.cityIds.includes(Number(cityId));
+  return false;
+}
+
+/** city 维 SQL 片段：all → 不过滤；city → col IN (...)（空=无授权，恒假）；vendor/org/self 档不开放 city 维（试点口径，恒假） */
+function scopeCitySql(scope, column) {
+  if (!scope || scope.level === 'all') return { sql: '', params: [] };
+  if (scope.level === 'city' && Array.isArray(scope.cityIds) && scope.cityIds.length) {
+    return { sql: ` AND ${column} IN (${scope.cityIds.map(() => '?').join(',')})`, params: scope.cityIds };
+  }
+  return { sql: ' AND 1=0', params: [] };
+}
+
+/** 由 orgs.city_ids 派生 scope（仅账号中心「按机构带出城市」初值用，提交仍是显式 body） */
+async function deriveScopeFromOrg(orgId) {
+  const d = di();
+  const rows = await d.query('SELECT id, city_ids FROM orgs WHERE id=? LIMIT 1', [orgId]);
+  if (!rows.length) return { error: 'org 不存在' };
+  let ids = [];
+  try { ids = JSON.parse(rows[0].city_ids || '[]') || []; } catch (_) { ids = []; }
+  return { level: 'city', city_ids: ids.map((x) => parseInt(x, 10)).filter(Number.isFinite) };
+}
+
+/** 单资源断言：任一角色 scope 覆盖 need 档位即通过 */
+function assertScope(principal, need) {
+  if (principal && principal.type === 'account') {
+    for (const r of principal.roles || []) {
+      if (scopeCovers({ level: (r.scope && r.scope.level) || 'self' }, need)) return { ok: true };
+    }
+  }
+  return { ok: false, error: '当前账号数据范围不足（需 ' + need + ' 档）' };
+}
+
+/** body.scope 归一化（validateAccountInput 用）：显式覆盖自动推导；降权由调用方（app.js 闸）保证 */
+function normalizeScopeInput(input, errors) {
+  const s = input && typeof input === 'object' && !Array.isArray(input) ? input : null;
+  if (!s) { errors.push('scope 须为对象'); return null; }
+  const level = String(s.level || '').trim();
+  if (!SCOPE_LEVELS.includes(level)) { errors.push('scope.level 须为 ' + SCOPE_LEVELS.join('|')); return null; }
+  const norm = { level };
+  if (level === 'city') {
+    const ids = Array.isArray(s.city_ids) ? s.city_ids.map((x) => parseInt(x, 10)).filter(Number.isFinite) : [];
+    if (!ids.length) errors.push('scope.city_ids 必填（非空数组）');
+    if (ids.length > 50) errors.push('scope.city_ids 最多 50 个');
+    norm.city_ids = [...new Set(ids)];
+  }
+  if (s.org_id !== undefined) norm.org_id = parseInt(s.org_id, 10) || undefined;
+  if (s.vendor_id !== undefined) norm.vendor_id = parseInt(s.vendor_id, 10) || undefined;
+  if (s.worker_id !== undefined) norm.worker_id = parseInt(s.worker_id, 10) || undefined;
+  return norm;
+}
+
+/** 角色绑定的 scope：body 显式优先，否则按绑定主体自动推导（createAccount/updateAccount 共用） */
+function scopeForRole(out, base) {
+  const b = base || {};
+  if (out.scope) return out.scope;
+  const wid = out.worker_id != null ? out.worker_id : b.worker_id;
+  if (wid != null) return { level: 'self', worker_id: wid };
+  const vid = out.vendor_id != null ? out.vendor_id : b.vendor_id;
+  if (vid != null) return { level: 'vendor', vendor_id: vid };
+  const oid = out.org_id != null ? out.org_id : b.org_id;
+  return oid != null ? { level: 'org', org_id: oid } : { level: 'all' };
+}
+
 // ── 会话分级 TTL：管理面 12h / C·S 端 30d / IdP 12h（docs §4.1 分级；机器账号走 API Key 不发会话）──
 const SESSION_TTL = {
   human_admin: 12 * 3600,
@@ -694,6 +792,10 @@ function validateAccountInput(body, { partial } = {}) {
     if (!['user', 'machine'].includes(body.principal_type)) errors.push('principal_type 须为 user|machine');
     out.principal_type = body.principal_type;
   }
+  if (body.scope !== undefined) {
+    const norm = normalizeScopeInput(body.scope, errors);
+    if (norm) out.scope = norm;
+  }
   if (body.status !== undefined) {
     if (!['active', 'locked', 'disabled'].includes(body.status)) errors.push('status 须为 active|locked|disabled');
     out.status = body.status;
@@ -726,10 +828,8 @@ async function createAccount(body, ctx) {
     ]
   );
   for (const rc of out.roles) {
-    const scope = out.worker_id
-      ? { level: 'self', worker_id: out.worker_id }
-      : out.vendor_id ? { level: 'vendor', vendor_id: out.vendor_id } : { level: out.org_id ? 'org' : 'all', org_id: out.org_id || undefined };
-    await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)', [ins.insertId, rc, JSON.stringify(scope)]);
+    await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)',
+      [ins.insertId, rc, JSON.stringify(scopeForRole(out, null))]);
   }
   const full = await getAccountWithRoles(ins.insertId);
   await audit(Object.assign({ action: 'account.create', resource: 'account', resourceId: String(ins.insertId), after: full, result: 'ok' }, ctx));
@@ -771,11 +871,12 @@ async function updateAccount(id, body, ctx) {
     await d.exec('DELETE FROM account_roles WHERE account_id=?', [id]);
     const base = before.account;
     for (const rc of out.roles) {
-      const scope = base.worker_id
-        ? { level: 'self', worker_id: base.worker_id }
-        : base.vendor_id ? { level: 'vendor', vendor_id: base.vendor_id } : { level: base.org_id ? 'org' : 'all', org_id: base.org_id || undefined };
-      await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)', [id, rc, JSON.stringify(scope)]);
+      await d.exec('INSERT INTO account_roles(account_id, role_code, scope) VALUES (?,?,?)',
+        [id, rc, JSON.stringify(scopeForRole(out, base))]);
     }
+    // 角色/数据范围变更 → 吊销该账号全部会话（权限收窄立即生效）
+    await d.exec('UPDATE sessions SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL',
+      [Math.floor(Date.now() / 1000), id]);
   }
   const after = await getAccountWithRoles(id);
   await audit(Object.assign({ action: 'account.update', resource: 'account', resourceId: String(id), before, after, result: 'ok' }, ctx));
@@ -924,6 +1025,12 @@ module.exports = {
   hasPermission,
   bestScopeLevel,
   scopeCovers,
+  scopeOf,
+  cityAllowed,
+  scopeCitySql,
+  deriveScopeFromOrg,
+  assertScope,
+  SCOPE_LEVELS,
   getAccountWithRoles,
   permissionsOf,
   // 账号管理
