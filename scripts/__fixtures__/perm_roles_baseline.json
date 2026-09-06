@@ -1,0 +1,100 @@
+{
+  "platform_admin": {
+    "name": "平台管理员",
+    "permissions": [
+      "*"
+    ]
+  },
+  "platform_op": {
+    "name": "平台运营",
+    "permissions": [
+      "admin.read",
+      "admin.write",
+      "audit.read",
+      "rating.review"
+    ]
+  },
+  "holding_viewer": {
+    "name": "国企持有方（只读）",
+    "permissions": [
+      "org.read",
+      "report.read",
+      "sla.read"
+    ]
+  },
+  "operator_admin": {
+    "name": "白名单运营商管理员",
+    "permissions": [
+      "admin.read",
+      "house.write",
+      "order.dispatch",
+      "org.read",
+      "org.write",
+      "worker.manage"
+    ]
+  },
+  "operator_dispatcher": {
+    "name": "运营商调度员",
+    "permissions": [
+      "admin.read",
+      "order.dispatch",
+      "org.read"
+    ]
+  },
+  "operator_housekeeper": {
+    "name": "管家",
+    "permissions": [
+      "order.self",
+      "org.read"
+    ]
+  },
+  "gov_viewer": {
+    "name": "政府监管（只读）",
+    "permissions": [
+      "complaint.read",
+      "compliance.read",
+      "report.read"
+    ]
+  },
+  "bank_viewer": {
+    "name": "金融方（只读）",
+    "permissions": [
+      "fund.read",
+      "report.read"
+    ]
+  },
+  "vendor_owner": {
+    "name": "商家管理员",
+    "permissions": [
+      "vendor.fund.read",
+      "vendor.order.read",
+      "vendor.order.write",
+      "vendor.product.read",
+      "vendor.product.write",
+      "vendor.summary.read",
+      "vendor.worker.read"
+    ]
+  },
+  "vendor_operator": {
+    "name": "商家客服/运营",
+    "permissions": [
+      "vendor.order.read",
+      "vendor.order.write",
+      "vendor.summary.read"
+    ]
+  },
+  "worker": {
+    "name": "服务者",
+    "permissions": [
+      "income.self",
+      "order.self"
+    ]
+  },
+  "user": {
+    "name": "租客",
+    "permissions": [
+      "order.create",
+      "rating.write"
+    ]
+  }
+}

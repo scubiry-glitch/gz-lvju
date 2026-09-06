@@ -356,20 +356,35 @@ CREATE TABLE IF NOT EXISTS accounts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   org_id INT NULL,
   vendor_id INT NULL,                          -- 商家直连 jz_vendors.id
+  worker_id INT NULL,                          -- 服务者绑定 jz_workers.id（阶段2）
   principal_type VARCHAR(8) NOT NULL DEFAULT 'user',  -- user|machine
   login_name VARCHAR(64) NULL,
   phone VARCHAR(32) NULL,
-  password_hash VARCHAR(128) NULL,             -- salt:sha256(salt:pwd)；IdP 联邦账号恒 NULL
+  password_hash VARCHAR(128) NULL,             -- 新写 scrypt$<salt>$<hash>；存量 salt:sha256(salt:pwd) 登录时懒升级；IdP 联邦账号恒 NULL
   api_key_hash VARCHAR(128) NULL,              -- 机器 Key 只存哈希
   idp_type VARCHAR(16) NULL,                   -- local|oidc|saml|wechat|sms
   idp_subject VARCHAR(128) NULL,
   display_name VARCHAR(64),
-  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  status VARCHAR(16) NOT NULL DEFAULT 'active',  -- active|locked|disabled（locked 由登录防爆破自动置位/到期自动解锁）
+  failed_login_count INT NOT NULL DEFAULT 0,   -- 连续失败计数（成功登录清零）
+  locked_until VARCHAR(32) NULL,               -- ISO8601；NULL=未锁
+  last_failed_at VARCHAR(32) NULL,
   last_login_at VARCHAR(32),
   created_at VARCHAR(32), updated_at VARCHAR(32),
   UNIQUE KEY uk_login_name (login_name),
   UNIQUE KEY uk_idp (idp_type, idp_subject),
-  KEY idx_acc_vendor (vendor_id), KEY idx_acc_org (org_id), KEY idx_acc_phone (phone)
+  KEY idx_acc_vendor (vendor_id), KEY idx_acc_org (org_id), KEY idx_acc_phone (phone),
+  KEY idx_acc_apikey (api_key_hash(64)), KEY idx_acc_worker (worker_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 登录防爆破节流：ident（login_name/phone 维度，账号不存在也拦枚举）+ ip 两类桶
+CREATE TABLE IF NOT EXISTS login_throttle (
+  bucket VARCHAR(80) PRIMARY KEY,              -- sha256(kind:identifier)
+  kind VARCHAR(8) NOT NULL,                    -- ident|ip
+  fail_count INT NOT NULL DEFAULT 0,
+  window_start VARCHAR(32) NULL,
+  locked_until VARCHAR(32) NULL,
+  updated_at VARCHAR(32) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -401,15 +416,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   account_id INT NULL,
   principal_type VARCHAR(16),
-  role_code VARCHAR(32),
+  role_code VARCHAR(128),                      -- 多角色逗号拼接，放宽避免静默写失败
   action VARCHAR(64) NOT NULL,
   resource VARCHAR(128),
   resource_id VARCHAR(64),
   scope_level VARCHAR(16),
+  result VARCHAR(8) NULL,                      -- ok|fail（登录失败/锁定审计靠它区分）
   before_json LONGTEXT, after_json LONGTEXT,
   ip VARCHAR(64), ua VARCHAR(255),
   created_at VARCHAR(32),
-  KEY idx_audit_time (id), KEY idx_audit_account (account_id, id)
+  KEY idx_audit_time (id), KEY idx_audit_account (account_id, id),
+  KEY idx_audit_action (action, id), KEY idx_audit_created (created_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- jz_vendors 渐进迁移：回填 org_id（列已存在则忽略报错）
