@@ -360,7 +360,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   principal_type VARCHAR(8) NOT NULL DEFAULT 'user',  -- user|machine
   login_name VARCHAR(64) NULL,
   phone VARCHAR(32) NULL,
-  password_hash VARCHAR(128) NULL,             -- 新写 scrypt$<salt>$<hash>；存量 salt:sha256(salt:pwd) 登录时懒升级；IdP 联邦账号恒 NULL
+  password_hash VARCHAR(200) NULL,             -- 新写 scrypt$<salt>$<hash>（≈168 字符）；存量 salt:sha256(salt:pwd) 登录时懒升级；IdP 联邦账号恒 NULL
   api_key_hash VARCHAR(128) NULL,              -- 机器 Key 只存哈希
   idp_type VARCHAR(16) NULL,                   -- local|oidc|saml|wechat|sms
   idp_subject VARCHAR(128) NULL,

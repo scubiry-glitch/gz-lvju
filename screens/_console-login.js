@@ -50,9 +50,10 @@
     headers.delete('X-API-Key'); // 旧全局 key 已停用
     init.headers = headers;
     var replayed = (init && init.__replayed) || false;
+    var gateOn = document.documentElement.dataset.consoleLogin !== 'off'; // 页面自管登录态时不接管
     return _fetch(input, init).then(function (r) {
       // 登录接口自身的 401 交给页面登录表单处理，不弹层不重放（否则一次密码错误会被计成两次节流失败）
-      if (r.status === 401 && !replayed && !/\/auth\/login(\?|$)/.test(url)) {
+      if (r.status === 401 && gateOn && !replayed && !/\/auth\/login(\?|$)/.test(url)) {
         return ensureLogin().then(function () {
           var init2 = Object.assign({}, init, { __replayed: true });
           return window.fetch(input, init2);

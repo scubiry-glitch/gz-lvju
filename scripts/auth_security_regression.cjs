@@ -108,7 +108,7 @@ async function call(pathname, method, token, body) {
   check('解锁后 locked_until 清空、计数清零', afterUnlock[0].status === 'active' && !afterUnlock[0].locked_until && afterUnlock[0].failed_login_count === 0,
     JSON.stringify(afterUnlock[0]));
   const relg = await call('/api/auth/login', 'POST', null, { login_name: accName, password: 'Sec-Reg-2026!' });
-  check('解锁后正确密码登录恢复', relg.status === 200 && relg.body.token, `status=${relg.status}`);
+  check('解锁后正确密码登录恢复', relg.status === 200 && relg.body.token, `status=${relg.status} body=${JSON.stringify(relg.body).slice(0, 120)}`);
 
   // 4. audit result 列落库
   const [okRows] = await conn.execute("SELECT result, COUNT(*) n FROM audit_log WHERE action='auth.login' AND created_at >= ? GROUP BY result", [START_ISO]);
@@ -135,10 +135,19 @@ async function call(pathname, method, token, body) {
   const [tAcc] = await conn.execute('SELECT id, failed_login_count FROM accounts WHERE login_name=?', ['u' + phone]);
   check('tenant 错误密码只计一次失败（双调用修复）', tAcc.length && tAcc[0].failed_login_count === 1, `count=${tAcc.length ? tAcc[0].failed_login_count : 'n/a'}`);
 
-  // 7. scrypt（B3 起生效；当前应已是 scrypt$ 或灰度前的 sha256，仅打印观察）
+  // 7. scrypt：新号前缀 scrypt$；人为降级为存量 sha256 格式后登录应成功并懒升级
   const [hashRow] = await conn.execute('SELECT password_hash FROM accounts WHERE id=?', [accId]);
-  const prefix = String(hashRow[0].password_hash || '').split('$')[0].split(':')[0];
-  console.log(`# password_hash 前缀：${prefix}（B3 后应为 scrypt）`);
+  check('新账号密码哈希为 scrypt 格式', String(hashRow[0].password_hash).startsWith('scrypt$'), String(hashRow[0].password_hash).slice(0, 20));
+  {
+    const crypto = require('crypto');
+    const salt = crypto.randomBytes(8).toString('hex');
+    const goodLegacy = salt + ':' + crypto.createHash('sha256').update(salt + ':' + 'Sec-Reg-2026!').digest('hex');
+    await conn.execute('UPDATE accounts SET password_hash=?, failed_login_count=0, locked_until=NULL, status=\'active\' WHERE id=?', [goodLegacy, accId]);
+    const relogin = await call('/api/auth/login', 'POST', null, { login_name: accName, password: 'Sec-Reg-2026!' });
+    check('存量 sha256 行登录成功（格式兼容）', relogin.status === 200, `status=${relogin.status}`);
+    const [upgraded] = await conn.execute('SELECT password_hash FROM accounts WHERE id=?', [accId]);
+    check('登录后懒升级为 scrypt 格式', String(upgraded[0].password_hash).startsWith('scrypt$'), String(upgraded[0].password_hash).slice(0, 20));
+  }
 
   // ── 清理 ──
   await conn.execute('DELETE FROM sessions WHERE account_id=?', [accId]);

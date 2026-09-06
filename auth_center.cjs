@@ -82,15 +82,52 @@ function timingSafeEq(a, b) {
   return crypto.timingSafeEqual(ba, bb);
 }
 
+// ── 密码哈希：scrypt（2026-09 起）；存量 sha256(salt:pwd) 行登录时校验通过后懒升级 ──
+// 格式：scrypt$<salt 32hex>$<hash 128hex>（N/r/p/keylen 为模块常量不进串；将来调参用 scrypt$2$ 前缀）
+const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64, saltBytes: 16 };
+const _scrypt = crypto.scrypt;
+
 function hashPassword(pwd, salt) {
-  const s = salt || crypto.randomBytes(8).toString('hex');
-  return s + ':' + sha256Hex(s + ':' + String(pwd));
+  const s = salt || crypto.randomBytes(SCRYPT.saltBytes).toString('hex');
+  return new Promise((resolve, reject) => {
+    _scrypt(String(pwd), s, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p }, (err, key) => {
+      if (err) return reject(err);
+      resolve('scrypt$' + s + '$' + key.toString('hex'));
+    });
+  });
 }
 
+/** 返回 {ok, needRehash}：scrypt$ 前缀走 scrypt；存量 salt:sha256(salt:pwd) 走旧逻辑并标记需升级 */
 function verifyPassword(pwd, stored) {
-  if (!pwd || !stored || stored.indexOf(':') < 0) return false;
-  const [salt, hash] = stored.split(':');
-  return timingSafeEq(sha256Hex(salt + ':' + String(pwd)), hash);
+  if (!pwd || !stored) return Promise.resolve({ ok: false, needRehash: false });
+  if (String(stored).startsWith('scrypt$')) {
+    const parts = String(stored).split('$');
+    if (parts.length !== 3) return Promise.resolve({ ok: false, needRehash: false });
+    const [, salt, hex] = parts;
+    return new Promise((resolve) => {
+      _scrypt(String(pwd), salt, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p }, (err, key) => {
+        if (err) return resolve({ ok: false, needRehash: false });
+        let b; try { b = Buffer.from(hex, 'hex'); } catch (_) { return resolve({ ok: false, needRehash: false }); }
+        resolve({ ok: key.length === b.length && crypto.timingSafeEqual(key, b), needRehash: false });
+      });
+    });
+  }
+  if (String(stored).indexOf(':') < 0) return Promise.resolve({ ok: false, needRehash: false });
+  const [salt, hash] = String(stored).split(':');
+  const ok = timingSafeEq(sha256Hex(salt + ':' + String(pwd)), hash);
+  return Promise.resolve({ ok, needRehash: ok });
+}
+
+/** 校验并在需要时懒升级哈希格式（幂等；升级失败不影响登录） */
+async function verifyAndUpgrade(pwd, stored, accountId) {
+  const v = await verifyPassword(pwd, stored);
+  if (v.ok && v.needRehash && accountId) {
+    try {
+      const d = di();
+      await d.exec('UPDATE accounts SET password_hash=?, updated_at=? WHERE id=?', [await hashPassword(pwd), isoNow(), accountId]);
+    } catch (e) { console.warn('password rehash warn:', e.message); }
+  }
+  return v.ok;
 }
 
 /** 服务端签名根：优先全局 API Key env，退化 admin 密码 env；都没有时仅 dev 允许固定值 */
@@ -225,6 +262,8 @@ async function ensureAuthSchema(conn) {
       updated_at VARCHAR(32) NULL
     ) CHARSET=utf8mb4`);
   } catch (e) { throw new Error('ensureAuthSchema(login_throttle): ' + e.message); }
+  // scrypt 串（scrypt$+32hex+128hex ≈168 字符）超旧 VARCHAR(128)，放宽
+  try { await conn.execute('ALTER TABLE accounts MODIFY password_hash VARCHAR(200) NULL'); } catch (_) {}
   // 审计补 result 列（登录成功/失败、锁定事件靠它区分）+ 查询索引；role_code 放宽防多角色拼接静默写失败
   try { await conn.execute("ALTER TABLE audit_log ADD COLUMN result VARCHAR(8) NULL"); } catch (_) {}
   try { await conn.execute('ALTER TABLE audit_log MODIFY role_code VARCHAR(128)'); } catch (_) {}
@@ -268,7 +307,7 @@ async function bootstrapPlatformAdmin(conn) {
   const [ins] = await conn.execute(
     `INSERT INTO accounts(org_id, vendor_id, principal_type, login_name, password_hash, display_name, status, created_at, updated_at)
      VALUES (NULL, NULL, 'user', 'admin', ?, '平台管理员', 'active', ?, ?)`,
-    [hashPassword(pwd), now, now]
+    [await hashPassword(pwd), now, now]
   );
   await conn.execute(
     "INSERT INTO account_roles(account_id, role_code, scope) VALUES (?, 'platform_admin', ?)",
@@ -337,11 +376,31 @@ function bestScopeLevel(principal) {
   return best;
 }
 
+// ── 会话分级 TTL：管理面 12h / C·S 端 30d / IdP 12h（docs §4.1 分级；机器账号走 API Key 不发会话）──
+const SESSION_TTL = {
+  human_admin: 12 * 3600,
+  human_app: SESSION_TTL_SECONDS,   // 30d
+  idp: 12 * 3600,
+  machine: 365 * 86400,             // 预留：机器主体不发会话，仅 API Key
+};
+/** 按角色权限面取 TTL：持管理面权限点 → 12h，否则 30d */
+function ttlForAccount(roles) {
+  const ADMIN_PERMS = new Set(['iam.write', 'iam.key.write', 'role.write', 'settings.write', 'dict.write',
+    'house.write', 'order.dispatch', 'worker.manage', 'rating.review', 'audit.read', 'admin.read', 'admin.write']);
+  for (const r of roles || []) {
+    for (const p of r.permissions || []) {
+      if (p === '*' || ADMIN_PERMS.has(p)) return SESSION_TTL.human_admin;
+    }
+  }
+  return SESSION_TTL.human_app;
+}
+
 // ── 会话：签发 / 校验 / 吊销 ──
-async function createSession(accountId, ip, ua) {
+async function createSession(accountId, ip, ua, opts) {
   const d = di();
+  const ttl = Math.max(60, parseInt((opts && opts.ttlSeconds) || SESSION_TTL.human_app, 10) || SESSION_TTL.human_app);
   const jti = crypto.randomBytes(16).toString('hex');
-  const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const exp = Math.floor(Date.now() / 1000) + ttl;
   const payload = b64url(JSON.stringify({ aid: accountId, jti, exp }));
   const sig = crypto.createHmac('sha256', perAccountSecret(accountId)).update(payload).digest('base64url');
   const token = payload + '.' + sig;
@@ -461,8 +520,9 @@ function isLockedRow(acc) {
 }
 
 // ── 登录 ──
-/** identifier：login_name 或 phone；成功返回 {token, expires_at, account, roles}；节流命中返回 {error, retry_after} */
-async function loginWithPassword(identifier, password, ip, ua) {
+/** identifier：login_name 或 phone；opts.ttlSeconds 可覆盖会话时长（缺省按角色分级）；
+ *  成功返回 {token, expires_at, account, roles}；节流命中返回 {error, retry_after, throttled} */
+async function loginWithPassword(identifier, password, ip, ua, opts) {
   const d = di();
   const id = String(identifier || '').trim();
   if (!id || !password) return { error: '请输入账号与密码' };
@@ -485,7 +545,8 @@ async function loginWithPassword(identifier, password, ip, ua) {
   const lock = isLockedRow(acc);
   if (lock.disabled) return { error: '账号已停用，请联系管理员' };
   if (lock.locked) return { error: '账号已临时锁定', retry_after: lock.retry_after, throttled: true };
-  if (!verifyPassword(password, acc.password_hash)) {
+  const v = await verifyPassword(password, acc.password_hash);
+  if (!v.ok) {
     const now = isoNow();
     await d.exec('UPDATE accounts SET failed_login_count=failed_login_count+1, last_failed_at=?, updated_at=? WHERE id=?', [now, now, acc.id]);
     const ctx = { accountId: acc.id, principalType: 'user', ip, ua };
@@ -500,15 +561,17 @@ async function loginWithPassword(identifier, password, ip, ua) {
     }
     return { error: '账号或密码错误' };
   }
-  // 成功：计数清零 + 惰性解锁（locked 已到期）+ 清 ident 节流
+  // 成功：存量 sha256 行懒升级 scrypt；计数清零 + 惰性解锁 + 清 ident 节流
+  if (v.needRehash) await verifyAndUpgrade(password, acc.password_hash, acc.id);
   const now = isoNow();
   await d.exec(
     "UPDATE accounts SET failed_login_count=0, locked_until=NULL, status=IF(status='locked','active',status), last_login_at=?, updated_at=? WHERE id=?",
     [now, now, acc.id]
   );
   await throttleClear('ident', id);
-  const sess = await createSession(acc.id, ip, ua);
   const full = await getAccountWithRoles(acc.id);
+  const ttlSeconds = (opts && opts.ttlSeconds) || ttlForAccount(full.roles);
+  const sess = await createSession(acc.id, ip, ua, { ttlSeconds });
   await audit({ accountId: acc.id, principalType: 'user', roles: full.roles, action: 'auth.login', resource: 'account', resourceId: String(acc.id), result: 'ok', ip, ua });
   return Object.assign({ token: sess.token, expires_at: sess.expires_at }, full);
 }
@@ -658,7 +721,7 @@ async function createAccount(body, ctx) {
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [
       out.org_id || null, out.vendor_id || null, out.worker_id || null, out.principal_type || 'user', out.login_name,
-      out.phone || null, out.password ? hashPassword(out.password) : null, out.display_name || null,
+      out.phone || null, out.password ? await hashPassword(out.password) : null, out.display_name || null,
       'active', now, now,
     ]
   );
@@ -687,7 +750,7 @@ async function updateAccount(id, body, ctx) {
   for (const [k, col] of Object.entries(map)) {
     if (out[k] !== undefined) { sets.push(col + '=?'); params.push(out[k]); }
   }
-  if (out.password) { sets.push('password_hash=?'); params.push(hashPassword(out.password)); }
+  if (out.password) { sets.push('password_hash=?'); params.push(await hashPassword(out.password)); }
   // 解锁（status 改回 active）必须同步清锁定与失败计数，并清 login_throttle 的 ident 桶，
   // 否则 isLockedRow / throttleCheck 仍按锁定拒绝
   if (out.status === 'active' && rows[0].status === 'locked') {
@@ -842,6 +905,7 @@ module.exports = {
   ensureAuthSchema,
   BUILTIN_ROLES,
   P,
+  SESSION_TTL,
   // 会话与登录
   loginWithPassword,
   createSession,
@@ -854,6 +918,7 @@ module.exports = {
   throttleFail,
   throttleClear,
   isLockedRow,
+  ttlForAccount,
   // 主体与鉴权
   principalOf,
   hasPermission,

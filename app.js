@@ -1598,6 +1598,7 @@ async function ensureSchemaRun() {
       ['jz_vendors', 'whitelist_id INT'],
       ['jz_vendors', 'platform_certs TEXT'],
       ['jz_vendors', 'webhook_url VARCHAR(500)'],
+      ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
       ['jz_products', 'city_id INT'],
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
@@ -2024,6 +2025,36 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // ===== 写操作接口 =====
+
+    // GET /admin/vendors/consult —— 商家维度咨询方式（C 端详情页左下角咨询入口优先级）
+    if (urlPath === '/api/juzhu/admin/vendors/consult' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT v.id, v.name, v.type, v.consult_mode, COUNT(p.id) AS project_count
+         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+         WHERE v.status='active'
+         GROUP BY v.id, v.name, v.type, v.consult_mode
+         ORDER BY project_count DESC, v.id`);
+      return jsonReply(res, rows.map((v) => Object.assign(v, { consult_mode: v.consult_mode || 'consultant' })));
+    }
+
+    // PUT /admin/vendors/:id/consult-mode —— 切换商家咨询方式（consultant=咨询顾问/400 虚拟号；ai=AI 咨询，上线前勿切）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/consult-mode$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const mode = String(body.consult_mode || '').trim();
+        if (!['consultant', 'ai'].includes(mode)) return jsonReply(res, { error: 'consult_mode 仅支持 consultant / ai' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute(
+            'UPDATE jz_vendors SET consult_mode=?, updated_at=? WHERE id=?',
+            [mode, new Date().toISOString().slice(0, 19).replace('T', ' '), parseInt(m[1], 10)]
+          );
+          if (!r.affectedRows) return jsonReply(res, { error: 'not found' }, 404);
+          return jsonReply(res, { ok: true, id: parseInt(m[1], 10), consult_mode: mode });
+        } finally { await conn.end(); }
+      }
+    }
 
     // PUT /admin/settings
     if (urlPath === '/api/juzhu/admin/settings' && req.method === 'PUT') {
@@ -3310,7 +3341,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
-        return jsonReply(res, imgThumbs.mapThumbsDeep(Object.assign(rows[0], stayConfigOf(rows[0])), 640));
+        // 商家维度咨询优先展示模式（jz_vendors.consult_mode，缺省 consultant）
+        const vrows = rows[0].owner_vendor_id
+          ? await queryRows('SELECT consult_mode FROM jz_vendors WHERE id=?', [rows[0].owner_vendor_id])
+          : [];
+        return jsonReply(res, imgThumbs.mapThumbsDeep(
+          Object.assign(rows[0], stayConfigOf(rows[0]), { consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant' }), 640));
       }
     }
 
@@ -3372,7 +3408,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const pwd = String(body.password || '');
       if (!idName) return jsonReply(res, { error: '请输入账号' }, 400);
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
-      const out = await authCenter.loginWithPassword(idName, pwd, ip, req.headers['user-agent'] || '');
+      const out = await authCenter.loginWithPassword(idName, pwd, ip, req.headers['user-agent'] || '', { ttlSeconds: authCenter.SESSION_TTL.human_admin });
       if (out.error) return jsonReply(res, { error: out.error, retry_after: out.retry_after }, out.throttled ? 429 : 401);
       return jsonReply(res, {
         token: out.token,
@@ -5065,7 +5101,7 @@ async function handleAuthRoutes(rawPath, qs, req, res) {
         accountId: null, principalType: 'idp', ip, ua,
       });
       if (!full) return jsonReply(res, { error: 'forbidden', message: 'JIT 建档未开启且无匹配账号' }, 403);
-      const sess = await authCenter.createSession(full.account.id, ip, ua);
+      const sess = await authCenter.createSession(full.account.id, ip, ua, { ttlSeconds: authCenter.SESSION_TTL.idp });
       await authCenter.audit({
         accountId: full.account.id, principalType: 'idp', roles: full.roles,
         action: 'auth.idp.login', resource: 'idp_configs', resourceId: st.org_no,

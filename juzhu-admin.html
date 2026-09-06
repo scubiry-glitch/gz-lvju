@@ -215,6 +215,11 @@
 </div>
 
 <div id="panePhone" class="pane-main pane-phone" hidden>
+  <div class="card" id="consultCard">
+    <h2>商家咨询方式</h2>
+    <p class="hint">商家维度控制 C 端房源详情页左下角咨询入口的优先展示（仅对已开通按晚预订的项目生效）。<strong>咨询顾问</strong> = 400 虚拟号专线（与保租房咨询同链路，缺省）；<strong>AI 咨询</strong> = 智能 agent 入口（上线后再切换）。保存后 C 端实时读取。</p>
+    <div id="consultList" style="margin-top:6px;"></div>
+  </div>
   <div class="card">
     <h2>频道名称</h2>
     <p class="hint">用于 C 端首页主标题、导航副标题、家政页等。去掉末尾「频道 / 专区」后的词干用于短标题（如后台顶栏）。保存后立即生效。</p>
@@ -291,23 +296,21 @@
 <script src="screens/_console-login.js"></script>
 <script>
 var API = '/api/juzhu/admin';
-var AUTH_TOKEN_KEY = 'JUZHU_ADMIN_TOKEN';
 var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
 
+// 会话 token 统一走账号中心（BZF_SESSION_TOKEN，与 _console-login.js / 其他控制台共享），
+// 旧 JUZHU_ADMIN_TOKEN / JUZHU_API_KEY 已废止
 function getAuthToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch (e) { return ''; }
+  return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || '';
 }
 function setAuthToken(token) {
-  try {
-    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
-    else localStorage.removeItem(AUTH_TOKEN_KEY);
-  } catch (e) {}
+  if (window.BZF_CONSOLE) BZF_CONSOLE.setToken(token);
 }
 function showLogin(msg) {
   document.body.classList.add('auth-locked');
   document.getElementById('loginMask').hidden = false;
   document.getElementById('loginErr').textContent = msg || '';
-  var input = document.getElementById('loginPassword');
+  var input = document.getElementById('loginUser') || document.getElementById('loginPassword');
   input.value = '';
   setTimeout(function(){ input.focus(); }, 50);
 }
@@ -387,8 +390,13 @@ document.getElementById('loginForm').onsubmit = function(e) {
 };
 
 document.getElementById('btnLogout').onclick = function() {
+  var t = getAuthToken();
   setAuthToken('');
-  showLogin('');
+  if (t && window.BZF_CONSOLE) {
+    // 服务端吊销会话；失败不影响本地登出
+    fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + t } }).catch(function(){});
+  }
+  showLogin('已退出');
 };
 
 // 当前编辑城市：URL ?city=（slug 或名称）优先，缺省为 cities[0]
@@ -500,6 +508,31 @@ function switchTab(tab) {
   if (tab === 'dict') renderDictionary();
   if (tab === 'accounts') renderAccounts();
   if (tab === 'audit') renderAudit();
+  if (tab === 'phone') renderConsultModes();
+}
+
+// ── 商家咨询方式（jz_vendors.consult_mode，商家维度）──
+function renderConsultModes(){
+  var VTYPE = { platform: '平台自营', housing_operator: '房源运营商', lvju_host: '旅居托管', homestay: '民宿' };
+  api('/vendors/consult').then(function(list){
+    document.getElementById('consultList').innerHTML = !list || !list.length
+      ? '<p class="hint">暂无在职商家</p>'
+      : '<table class="tbl"><thead><tr><th>商家</th><th>类型</th><th>房源项目</th><th>咨询方式</th></tr></thead><tbody>' +
+        list.map(function(v){
+          return '<tr><td>'+esc(v.name)+'</td><td>'+esc(VTYPE[v.type]||v.type||'—')+'</td><td>'+v.project_count+'</td>'+
+            '<td><select data-consult="'+v.id+'">'+
+              '<option value="consultant"'+(v.consult_mode==='consultant'?' selected':'')+'>咨询顾问（400 虚拟号）</option>'+
+              '<option value="ai"'+(v.consult_mode==='ai'?' selected':'')+'>AI 咨询（未上线）</option>'+
+            '</select></td></tr>';
+        }).join('') + '</tbody></table>';
+    document.querySelectorAll('#consultList select[data-consult]').forEach(function(sel){
+      sel.onchange = function(){
+        api('/vendors/'+sel.dataset.consult+'/consult-mode', { method:'PUT', body:{ consult_mode: sel.value } })
+          .then(function(){ toast('咨询方式已更新'); })
+          .catch(function(e){ toast('保存失败：'+e.message); renderConsultModes(); });
+      };
+    });
+  }).catch(function(err){ document.getElementById('consultList').textContent = '加载失败：'+err.message; });
 }
 
 
@@ -573,28 +606,23 @@ function toast(msg) {
   setTimeout(function(){ el.classList.remove('show'); }, 2400);
 }
 
-function getApiKey() {
-  try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e) { return ''; }
-}
+// 旧全局 API Key 通道已废止：管理台只认账号会话 token（BZF_SESSION_TOKEN）
 
 function api(path, opts) {
   opts = opts || {};
   var headers = opts.body ? {'Content-Type':'application/json'} : {};
   var token = getAuthToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
   return fetch(API + path, {
     method: opts.method || 'GET',
     headers: headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function(r) {
     if (r.status === 401) {
-      var newKey = prompt('API Key 无效或未配置，请输入有效 Key：');
-      if (newKey !== null && String(newKey).trim()) {
-        try { localStorage.setItem('JUZHU_API_KEY', String(newKey).trim()); } catch(e) {}
-      }
-      throw new Error('认证失败，请配置有效 API Key 后重试');
+      // 会话失效：清 token 回登录层（不走 prompt/Key 兜底）
+      setAuthToken('');
+      showLogin('登录已失效，请重新登录');
+      throw new Error('登录已失效，请重新登录');
     }
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
@@ -605,9 +633,12 @@ function uploadForm(path, formData) {
   var headers = {};
   var token = getAuthToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
   return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
+    if (r.status === 401) {
+      setAuthToken('');
+      showLogin('登录已失效，请重新登录');
+      throw new Error('登录已失效，请重新登录');
+    }
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
@@ -1732,6 +1763,15 @@ function debounce(fn, ms) {
   var t;
   return function() { clearTimeout(t); t = setTimeout(fn, ms); };
 }
+
+// 旧 token 一次性迁移：JUZHU_ADMIN_TOKEN 本就是账号中心会话，平移到共享 key，避免全体被登出
+(function migrateLegacyToken() {
+  try {
+    var old = localStorage.getItem('JUZHU_ADMIN_TOKEN');
+    if (old && !localStorage.getItem('BZF_SESSION_TOKEN')) BZF_CONSOLE.setToken(old);
+    localStorage.removeItem('JUZHU_ADMIN_TOKEN');
+  } catch (e) {}
+})();
 
 checkAuth().then(function(ok) {
   if (ok) return bootApp();
