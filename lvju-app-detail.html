@@ -13,6 +13,10 @@
   .pd-hero .badge .nm{font-family:var(--serif);font-size:24px;font-weight:700;margin-top:8px;text-shadow:0 2px 14px rgba(0,0,0,.4);}
   .pd-hero .badge .lo{font-size:12px;opacity:.92;margin-top:2px;}
   .pd-hero .dots{position:absolute;right:14px;bottom:16px;z-index:2;font-size:11px;background:rgba(8,18,16,.45);padding:3px 10px;border-radius:999px;}
+  /* 真图轮播（scroll-snap 横滑，photos 来自 units 接口） */
+  .hero-track{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;}
+  .hero-track::-webkit-scrollbar{width:0;height:0;}
+  .hero-slide{flex:0 0 100%;height:100%;background-size:cover;background-position:center;scroll-snap-align:start;}
   .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
   .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
   .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
@@ -30,52 +34,150 @@
   .host .hn{font-weight:700;font-size:14px;}
   .host .hm{font-size:11px;color:var(--muted);margin-top:2px;}
   .host .lvl{margin-left:auto;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-deep));padding:4px 10px;border-radius:999px;}
-  .cal{display:flex;gap:8px;margin-top:11px;overflow-x:auto;}
-  .cal .d{flex:0 0 auto;text-align:center;border:1px solid var(--border);border-radius:10px;padding:8px 12px;min-width:62px;}
-  .cal .d.on{border-color:var(--brand);background:var(--brand-soft);}
-  .cal .d .day{font-size:11px;color:var(--muted);}
-  .cal .d .p{font-family:var(--serif);font-weight:700;color:var(--gold-deep);font-size:14px;margin-top:3px;}
-  /* 可展开的整月价格日历 + 入住/离店区间选择 */
-  .cal-toggle{float:right;font-size:12px;font-weight:700;color:var(--brand-deep);cursor:pointer;user-select:none;}
-  .cal-toggle .arr{display:inline-block;transition:transform .2s;}
-  .cal-toggle.open .arr{transform:rotate(180deg);}
-  .calfull{margin-top:12px;border:1px solid var(--border);border-radius:14px;padding:12px 12px 13px;display:none;}
-  .calfull.open{display:block;}
-  .calnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
-  .calnav .mo{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
-  .calnav button{border:1px solid var(--border);background:#fff;border-radius:8px;width:30px;height:30px;font-size:16px;line-height:1;color:var(--ink);cursor:pointer;}
-  .calnav button:disabled{opacity:.3;cursor:default;}
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-  .calgrid .wk{text-align:center;font-size:11px;color:var(--muted);padding:1px 0 3px;}
-  .calgrid .cell{text-align:center;border-radius:9px;padding:5px 0 4px;min-height:40px;cursor:pointer;}
-  .calgrid .cell.blank{visibility:hidden;cursor:default;}
-  .calgrid .cell .dn{font-size:13px;font-weight:600;color:var(--ink);line-height:1.15;}
-  .calgrid .cell .cp{font-size:9px;color:var(--gold-deep);margin-top:1px;}
-  .calgrid .cell.wknd .cp{color:#b45309;}
-  .calgrid .cell.past{cursor:default;}
-  .calgrid .cell.past .dn{color:#cbd2ce;}
-  .calgrid .cell.dis{cursor:default;}
-  .calgrid .cell.dis .dn,.calgrid .cell.dis .cp{color:#cbd2ce;}
-  .calgrid .cell.noslot .dn{color:#e08a8a;}
-  .calgrid .cell.noslot .cp{color:#e08a8a;}
-  .callegend{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-top:7px;}
-  .callegend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;vertical-align:-1px;}
+  /* ---- 可预订房型（携程式：日期条 + 房型卡）---- */
+  .datebar{display:flex;align-items:center;gap:9px;margin-top:11px;background:#f4f9f8;border:1px solid color-mix(in oklab,var(--brand) 18%,transparent);border-radius:13px;padding:9px 12px;cursor:pointer;}
+  .datebar .ds{flex:1;min-width:0;}
+  .datebar .ds small{display:block;font-size:9.5px;color:var(--muted);letter-spacing:.05em;}
+  .datebar .ds b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;margin-top:1px;white-space:nowrap;}
+  .datebar .ds b.ph{color:#a3afaa;font-weight:600;font-size:12.5px;}
+  .datebar .mid{flex-shrink:0;text-align:center;font-size:9.5px;color:var(--muted);line-height:1.25;}
+  .datebar .mid b{display:block;font-size:12px;color:var(--brand-deep);white-space:nowrap;}
+  .datebar .ar{flex-shrink:0;color:#b6c2bd;font-size:16px;}
+  .roomcard{display:flex;gap:11px;border:1.5px solid var(--border);border-radius:14px;padding:10px;margin-top:10px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+  .roomcard.sel{border-color:var(--brand);box-shadow:0 8px 18px rgba(15,118,110,.13);}
+  .roomcard .rth{width:82px;height:80px;border-radius:10px;flex-shrink:0;position:relative;}
+  .roomcard.sel .rth::after{content:"✓ 已选";position:absolute;left:5px;bottom:5px;font-size:8.5px;font-weight:700;color:#fff;background:rgba(11,93,86,.92);padding:2px 6px;border-radius:5px;}
+  .roomcard .rin{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .roomcard .rnm{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;}
+  .roomcard .rmeta{font-size:10.5px;color:var(--muted);margin-top:3px;}
+  .roomcard .rtags{display:flex;gap:5px;flex-wrap:wrap;margin-top:auto;padding-top:6px;}
+  .roomcard .rtags span{font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:1px 7px;border-radius:5px;}
+  .roomcard .rbuy{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;gap:3px;}
+  .roomcard .rp{text-align:right;}
+  .roomcard .rp b{font-family:var(--serif);font-size:17px;color:var(--gold-deep);}
+  .roomcard .rp small{font-size:9px;color:var(--muted);}
+  .roomcard .rt{font-size:9px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:2px 7px;border-radius:6px;white-space:nowrap;}
+  .roomcard .rt.est{color:var(--muted);background:#f1f5f4;}
+  .roomcard .rbtn{font-size:11.5px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 18px;border-radius:999px;}
+  .roomcard .rbtn.full{background:#eef2f1;color:#8a9994;}
+  .units-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.5;}
+  /* 加载骨架：数据到达前替代静态示例卡，避免闪变 */
+  .skl-card{display:flex;gap:11px;border:1.5px solid var(--border);border-radius:14px;padding:10px;margin-top:10px;background:#fff;}
+  .skl-th{width:82px;height:80px;border-radius:10px;flex-shrink:0;}
+  .skl-lines{flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center;}
+  .skl-line{height:11px;border-radius:6px;}
+  .skl, .skl-line{background:linear-gradient(90deg,#eef2f1 25%,#f7faf9 45%,#eef2f1 65%);background-size:200% 100%;animation:sklMove 1.2s linear infinite;}
+  @keyframes sklMove{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+  .cta .btn{white-space:nowrap;}   /* 不换行 */
+  /* 底栏左：AI 咨询入口（未来对接 AI agent，见 __AI_CONSULT__ 钩子） */
+  .ai-cta{display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 15px 5px 6px;cursor:pointer;font-family:var(--font);}
+  .ai-orb{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:15px;color:#fff;flex-shrink:0;
+    background:conic-gradient(from 210deg,var(--brand),var(--gold),var(--brand-2),var(--brand));
+    animation:aiPulse 2.6s ease-in-out infinite;}
+  @keyframes aiPulse{
+    0%,100%{box-shadow:0 4px 12px rgba(15,118,110,.32);}
+    50%{box-shadow:0 4px 18px rgba(180,138,63,.6);}
+  }
+  .ai-txt{text-align:left;line-height:1.25;}
+  .ai-txt b{display:block;font-size:13px;color:var(--ink);}
+  .ai-txt small{font-size:9px;color:var(--muted);display:block;}
+  .ai-cta.soon .ai-txt small{color:var(--brand-deep);}
+  /* 房型区标题右侧：收藏（原底栏心形并入） */
+  .hd-fav{float:right;width:30px;height:26px;border:0;background:none;font-size:16px;line-height:1;color:#b9c4c0;cursor:pointer;padding:0;}
+  .hd-fav.on{color:#e0245e;}
+  /* 「查看房型」滚动后引导选日期 */
+  @keyframes barFlash{0%,100%{box-shadow:0 0 0 0 rgba(15,118,110,0);}30%{box-shadow:0 0 0 4px rgba(15,118,110,.25);}}
+  .datebar.flash{animation:barFlash 1.1s ease-in-out 2;}
+  /* ---- 房态日历整屏（底部滑出，携程式）---- */
+  .calsheet{position:absolute;inset:0;z-index:60;visibility:hidden;}
+  .calsheet.open{visibility:visible;}
+  .cs-mask{position:absolute;inset:0;background:rgba(8,18,16,.45);opacity:0;transition:opacity .25s;}
+  .calsheet.open .cs-mask{opacity:1;}
+  .cs-panel{position:absolute;left:0;right:0;bottom:0;height:93%;background:#fff;border-radius:18px 18px 0 0;display:flex;flex-direction:column;
+    transform:translateY(103%);transition:transform .28s cubic-bezier(.32,.72,.33,1);box-shadow:0 -14px 44px rgba(0,0,0,.28);}
+  .calsheet.open .cs-panel{transform:translateY(0);}
+  .cs-grip{flex-shrink:0;width:38px;height:4px;border-radius:999px;background:#d8e0dd;margin:8px auto 0;cursor:grab;}
+  .cs-head{flex-shrink:0;padding:6px 16px 11px;border-bottom:1px solid var(--border);touch-action:none;}
+  .cs-today{position:absolute;right:14px;bottom:76px;z-index:2;border:1px solid var(--border);background:#fff;color:var(--brand-deep);
+    font-family:var(--font);font-size:11px;font-weight:700;padding:8px 14px;border-radius:999px;cursor:pointer;box-shadow:0 6px 16px rgba(15,42,38,.14);}
+  .cs-h1{display:flex;align-items:center;font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
+  .cs-x{margin-left:auto;width:28px;height:28px;border-radius:50%;background:#f1f4f3;display:grid;place-items:center;font-size:12px;color:var(--muted);font-family:var(--font);cursor:pointer;}
+  .cs-range{display:flex;align-items:center;gap:9px;margin-top:11px;}
+  .cs-range .csd{flex:1;min-width:0;background:#f4f9f8;border-radius:11px;padding:7px 11px;}
+  .cs-range .csd small{display:block;font-size:9.5px;color:var(--muted);}
+  .cs-range .csd b{display:block;font-size:14px;font-weight:700;color:var(--ink);margin-top:1px;white-space:nowrap;}
+  .cs-range .csd b.ph{color:#a3afaa;font-weight:600;font-size:12.5px;}
+  .cs-range .carr{flex-shrink:0;color:#b6c2bd;font-size:15px;}
+  .cs-range .cnn{flex-shrink:0;font-size:10px;font-weight:700;color:var(--brand-deep);background:var(--brand-soft);padding:5px 11px;border-radius:999px;}
+  .cs-tip{font-size:10.5px;color:var(--muted);margin-top:9px;}
+  .cs-tip.warn{color:#b91c1c;font-weight:600;}
+  .cs-months{flex:1;overflow-y:auto;position:relative;padding:0 12px;}
+  .cs-months::-webkit-scrollbar{width:0;}
+  .csm{padding-top:16px;}
+  .csm-t{font-family:var(--serif);font-weight:700;font-size:14.5px;color:var(--ink);padding:0 4px 9px;}
+  .cs-wk{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10px;color:var(--muted);padding-bottom:6px;}
+  .cs-wk span:first-child,.cs-wk span:last-child{color:#cf8b84;}
+  .cs-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:3px;}
+  .cd{position:relative;text-align:center;padding:5px 0 4px;border-radius:0;cursor:pointer;min-height:46px;}
+  .cd.blank{visibility:hidden;}
+  .cd .dn{display:block;width:30px;height:30px;line-height:30px;margin:0 auto;font-size:14px;font-weight:600;color:var(--ink);border-radius:50%;}
+  .cd .dp{display:block;font-size:8.5px;color:var(--gold-deep);margin-top:1px;line-height:1.25;white-space:nowrap;}
+  .cd.wknd .dp{color:#b45309;}
+  .cd.tdy .dn{box-shadow:inset 0 0 0 1.5px var(--brand);color:var(--brand-deep);}
+  .cd.past{cursor:default;}
+  .cd.past .dn{color:#ccd4d0;font-weight:500;}
+  .cd.noslot{cursor:default;background:#f7f8f8;}
+  .cd.noslot .dn{color:#c3ccc8;font-weight:500;}
+  .cd.noslot .dp{color:#e0a3a3;}
+  .cd.dis{cursor:default;}
+  .cd.dis .dn{color:#ccd4d0;font-weight:500;}
+  .cd.dis .dp{color:#ccd4d0;}
+  .cd.range{background:var(--brand-soft);}
+  .cd.range .dp{color:var(--brand-deep);}
+  .cd.end .dn{background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;box-shadow:0 4px 10px rgba(11,93,86,.35);}
+  .cd.end .dp{color:var(--brand-deep);font-weight:700;}
+  .cs-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:9.5px;color:var(--muted);padding:16px 4px 20px;}
+  .cs-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+  .cs-bar{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 16px max(10px,env(safe-area-inset-bottom));border-top:1px solid var(--border);background:#fff;}
+  .cs-tot{flex:1;font-size:10.5px;color:var(--muted);line-height:1.35;}
+  .cs-tot b{font-family:var(--serif);font-size:19px;color:var(--gold-deep);margin:0 2px;}
+  .cs-ok{flex-shrink:0;border:0;font-family:var(--font);background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:14px;padding:12px 32px;border-radius:999px;cursor:pointer;}
+  .cs-ok:disabled{background:#e3e9e7;color:#a2aea9;cursor:default;}
   .insrow{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px dashed var(--border);font-size:12.5px;color:var(--ink);}
   .insrow:last-child{border-bottom:0;}
   .insrow .ig{font-size:16px;flex-shrink:0;}
   .insrow .it b{display:block;font-size:12.5px;}
   .insrow .it small{color:var(--muted);font-size:10.5px;}
   .insrow .ok{margin-left:auto;color:var(--brand);font-weight:700;flex-shrink:0;}
-  .calgrid .cell.range{background:var(--brand-soft);}
-  .calgrid .cell.end{background:linear-gradient(135deg,var(--brand),var(--brand-deep));}
-  .calgrid .cell.end .dn,.calgrid .cell.end .cp{color:#fff;}
-  .calsum{margin-top:11px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--ink);gap:8px;}
-  .calsum .hint{color:var(--muted);}
-  .calsum .tot b{font-family:var(--serif);color:var(--gold-deep);font-size:16px;margin-left:3px;}
   .nearby a{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
   .nearby a:last-child{border-bottom:0;}
   .nearby a .e{font-size:17px;}
   .nearby a .ar{margin-left:auto;color:var(--muted);}
+  /* ── 周边玩法 · 杂志区块（规则 17）：眉题 + 封面故事大卡 + 景区/商圈 分组编辑行 ── */
+  .nearby .nb-ek{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:8px 0 12px;}
+  .nb-feat{position:relative;display:block;border-radius:16px;overflow:hidden;height:196px;color:#fff;margin-bottom:4px;box-shadow:0 8px 22px rgba(15,42,38,.14);}
+  .nb-feat .bg{position:absolute;inset:0;background:#223 center/cover;}
+  .nb-feat .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(6,16,14,.82),rgba(6,16,14,.05) 62%);}
+  .nb-feat .lv{position:absolute;top:11px;left:11px;z-index:2;font-size:10px;font-weight:700;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);color:#ffd98a;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+  .nb-feat .in{position:absolute;left:14px;right:14px;bottom:13px;z-index:2;}
+  .nb-feat .ek{display:block;font-size:9.5px;letter-spacing:.26em;text-transform:uppercase;color:#ffd98a;}
+  .nb-feat .nm{display:block;font-family:var(--serif);font-size:22px;font-weight:700;line-height:1.25;margin-top:4px;text-shadow:0 2px 14px rgba(0,0,0,.35);}
+  .nb-feat .sum{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11.5px;line-height:1.6;opacity:.95;margin-top:5px;}
+  .nb-feat .tags{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
+  .nb-feat .tags i{font-style:normal;font-size:9.5px;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);}
+  .nb-gt{display:flex;align-items:center;gap:7px;margin:15px 0 4px;font-size:10px;letter-spacing:.2em;font-weight:700;color:var(--brand-deep);}
+  .nb-gt .bar{width:3px;height:13px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
+  .nb-gt em{font-style:normal;font-weight:400;color:var(--muted);letter-spacing:.12em;}
+  .nb-row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);}
+  .nb-row:last-child{border-bottom:0;}
+  .nb-row .th{width:88px;height:66px;border-radius:10px;flex-shrink:0;background:#eef2f1 center/cover;}
+  .nb-row .tx{flex:1;min-width:0;}
+  .nb-row .k{display:block;font-size:9.5px;letter-spacing:.14em;font-weight:700;color:var(--gold-deep);}
+  .nb-row .nm{display:block;font-family:var(--serif);font-size:14.5px;font-weight:700;color:var(--ink);margin-top:2px;}
+  .nb-row .sum{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;line-height:1.55;color:var(--muted);margin-top:3px;}
+  .nb-row .ar{align-self:center;color:var(--muted);font-size:15px;}
+  .nb-foot{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--muted);}
+  .nb-foot a{color:var(--brand);font-weight:600;}
 </style>
 </head>
 <body>
@@ -84,7 +186,7 @@
 
     <div class="appbar ghost">
       <a class="bk" href="lvju-app-lvju.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="act"><span>♡</span><span>⤴</span></div>
+      <div class="act"><span id="appFav" title="收藏">♡</span><span id="appShare" title="分享">⤴</span></div>
     </div>
 
     <div class="pd-hero s-xijiang" id="dHero">
@@ -103,8 +205,26 @@
     </div>
 
     <div class="block" id="dUnitsBlock">
-      <div class="bt">可预订房型</div>
-      <div id="dUnits" style="margin-top:6px;"><div style="font-size:12px;color:var(--muted);padding:8px 0;">加载中…</div></div>
+      <div class="bt">可预订房型 <button class="hd-fav" id="dFav" type="button" title="收藏房源">♡</button></div>
+      <div class="datebar" id="datebar">
+        <div class="ds"><small>入住</small><b class="ph" id="dbIn">请选择</b></div>
+        <div class="mid"><b id="dbN">— 晚</b></div>
+        <div class="ds"><small>离店</small><b class="ph" id="dbOut">请选择</b></div>
+        <span class="ar">›</span>
+      </div>
+      <div id="dUnits" style="margin-top:4px;">
+        <div class="roomcard sel" data-rt="demo-a">
+          <div class="rth g1"></div>
+          <div class="rin"><div class="rnm">观景大床房</div><div class="rmeta">28㎡ · 一居一卫 · 含双早</div><div class="rtags"><span>山景</span><span>大床 1.8m</span><span>亲子</span></div></div>
+          <div class="rbuy"><div class="rp"><b>¥468</b><small>/晚均</small></div><div class="rt" data-rt="demo-a">选日期看总价</div><span class="rbtn">订</span></div>
+        </div>
+        <div class="roomcard" data-rt="demo-b">
+          <div class="rth g3"></div>
+          <div class="rin"><div class="rnm">吊脚楼双床房</div><div class="rmeta">30㎡ · 二居一卫 · 含双早</div><div class="rtags"><span>吊脚楼</span><span>双床 1.2m</span><span>地暖</span></div></div>
+          <div class="rbuy"><div class="rp"><b>¥528</b><small>/晚均</small></div><div class="rt" data-rt="demo-b">选日期看总价</div><span class="rbtn">订</span></div>
+        </div>
+      </div>
+      <div class="units-note" id="dUnitsNote">总价按各户型逐晚实价合计 · 连住 15 晚起 · 已订 / 关房不可选</div>
     </div>
 
     <div class="block">
@@ -117,7 +237,7 @@
         <div class="rate-row"><span class="k">交通区位</span><span class="bar"><i style="width:84%"></i></span><span class="v">4.3</span></div>
         <div class="rate-row"><span class="k">特色体验</span><span class="bar"><i style="width:98%"></i></span><span class="v">5.0</span></div>
       </div>
-      <div class="verify">
+      <div class="verify" id="dVerify">
         <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJ-2026-0000888" title="扫码 / 点击验真"><img class="qrimg" alt="房源验真二维码"></a>
         <div>
           <div class="no">GZ-LJ-2026-0000888</div>
@@ -127,14 +247,14 @@
       </div>
     </div>
 
-    <div class="block">
+    <div class="block" id="dHostBlock">
       <div class="bt">旅居管家</div>
-      <div class="host">
-        <div class="av g3">👩</div>
-        <div><div class="hn">杨晓芳 · 金牌旅居管家</div><div class="hm">持证上岗 · 信用分 4.8 · 客户评价 ★4.9</div></div>
-        <span class="lvl">L4 持证</span>
+      <div class="host" id="dHostRow">
+        <div class="av g3" id="dHostAv">👩</div>
+        <div><div class="hn" id="dHostName">杨晓芳 · 金牌旅居管家</div><div class="hm" id="dHostMeta">持证上岗 · 信用分 4.8 · 客户评价 ★4.9</div></div>
+        <span class="lvl" id="dHostLvl">L4 持证</span>
       </div>
-      <div class="verify">
+      <div class="verify" id="dHostVerify">
         <a class="qrlink" href="screens/portal-verify.html?code=GZ-LJS-2026-0007788" title="扫码 / 点击验真"><img class="qrimg" alt="管家持证验真二维码"></a>
         <div>
           <div class="no">GZ-LJS-2026-0007788</div>
@@ -149,50 +269,113 @@
       <div id="dInsRows" style="margin-top:4px;"></div>
     </div>
 
-    <div class="block" id="calblock">
-      <div class="bt">价格日历 <span class="cal-toggle" id="caltoggle">展开选日期 <span class="arr">⌄</span></span></div>
-      <div class="bs" id="dCalNote">旅居房源连续入住 · 连住 15 晚起</div>
-      <div class="cal">
-        <div class="d on"><div class="day">6/13 六</div><div class="p">¥588</div></div>
-        <div class="d on"><div class="day">6/14 日</div><div class="p">¥588</div></div>
-        <div class="d"><div class="day">6/15 一</div><div class="p">¥468</div></div>
-        <div class="d"><div class="day">6/16 二</div><div class="p">¥468</div></div>
-        <div class="d"><div class="day">6/17 三</div><div class="p">¥468</div></div>
+    <!-- 周边玩法（规则 17）：无 ?id= 时保留静态基线；线上按项目绑定的 商圈/景区 渲染杂志区块，空绑定整块隐藏 -->
+    <div class="block nearby" id="dNearbyBlock">
+      <div class="bt" style="margin-bottom:2px;">周边玩法 <span class="bs" style="font-weight:400;">按步程与车程编排 · 商家实地整理</span></div>
+      <div class="nb-ek">Nearby · Editor's Picks</div>
+      <div id="nbStatic">
+        <a href="lvju-app-spots.html"><span class="e">⛰</span>西江千户苗寨观景台 · 步行 5 分钟<span class="ar">›</span></a>
+        <a href="lvju-app-food.html"><span class="e">🍲</span>苗家长桌宴 · 酸汤鱼 · 楼下即是<span class="ar">›</span></a>
+        <a href="lvju-app-routes.html"><span class="e">🧭</span>黔东南秘境 3 日路线 · 含本店<span class="ar">›</span></a>
       </div>
-      <div class="calfull" id="calfull">
-        <div class="calnav">
-          <button id="calprev" aria-label="上个月">‹</button>
-          <div class="mo" id="calmo"></div>
-          <button id="calnext" aria-label="下个月">›</button>
-        </div>
-        <div class="calgrid" id="calgrid"></div>
-        <div class="callegend">
-          <span><i style="background:var(--brand-soft);"></i>已选</span>
-          <span><i style="background:linear-gradient(135deg,var(--brand),var(--brand-deep));"></i>入住/离店</span>
-          <span><i style="background:#fde8e8;"></i>已订/关房</span>
-          <span><i style="background:#f1f5f4;"></i>不可选</span>
-        </div>
-        <div class="calsum" id="calsum"></div>
-      </div>
-    </div>
-
-    <div class="block nearby">
-      <div class="bt" style="margin-bottom:6px;">周边玩法</div>
-      <a href="lvju-app-spots.html"><span class="e">⛰</span>西江千户苗寨观景台 · 步行 5 分钟<span class="ar">›</span></a>
-      <a href="lvju-app-food.html"><span class="e">🍲</span>苗家长桌宴 · 酸汤鱼 · 楼下即是<span class="ar">›</span></a>
-      <a href="lvju-app-routes.html"><span class="e">🧭</span>黔东南秘境 3 日路线 · 含本店<span class="ar">›</span></a>
+      <div id="nbDyn"></div>
     </div>
 
     <div style="height:14px;"></div>
   </div>
 
   <div class="cta">
-    <div class="p" id="dCta"><b>¥588<small> /双周起</small></b><span>含双早 · 可包栋 · 最短14天</span></div>
-    <div class="heart">♡</div>
-    <a class="btn" href="lvju-app-booking.html">立即预订</a>
+    <!-- 左下：咨询入口（商家维度 consult_mode 决定形态：consultant=咨询顾问/400 虚拟号；ai=AI 咨询，上线后经 __AI_CONSULT__ 接管） -->
+    <button class="ai-cta" id="aiCta" type="button">
+      <span class="ai-orb">☎</span>
+      <span class="ai-txt"><b>咨询顾问</b><small>400 专线 · 免费转接</small></span>
+    </button>
+    <a class="btn" id="dMainBtn" href="#dUnitsBlock">查看房型</a>
+  </div>
+
+  <!-- 房态日历整屏（底部滑出）：整月竖滚 + 逐晚房价/已订 + 连住校验 + 合计确定 -->
+  <div class="calsheet" id="calsheet" aria-hidden="true">
+    <div class="cs-mask" id="csMask"></div>
+    <div class="cs-panel">
+      <div class="cs-grip" id="csGrip"></div>
+      <div class="cs-head" id="csHead">
+        <div class="cs-h1">选择入住日期<span class="cs-x" id="csClose">✕</span></div>
+        <div class="cs-range">
+          <div class="csd"><small>入住</small><b class="ph" id="csIn">请选择</b></div>
+          <span class="carr">→</span>
+          <div class="csd"><small>离店</small><b class="ph" id="csOut">请选择</b></div>
+          <span class="cnn" id="csN">未选择</span>
+        </div>
+        <div class="cs-tip" id="csTip">连住 15 晚起 · 点选入住与离店日期，再点「确定」</div>
+      </div>
+      <div class="cs-months" id="csMonths"></div>
+      <button class="cs-today" id="csToday" type="button" style="display:none;">↑ 回到本月</button>
+      <div class="cs-bar">
+        <div class="cs-tot" id="csTot">请选择入住与离店日期</div>
+        <button class="cs-ok" id="csOk" disabled>确定</button>
+      </div>
+    </div>
   </div>
 </div>
 <script src="screens/_qr.js"></script>
+<script>
+/* 周边玩法 · 杂志区块渲染（规则 17）：数据来自 GET /api/juzhu/projects/:id 的 spots
+   （项目绑定的商圈/景区，服务端已按 景区→商圈 + 绑定排序）。第 1 条 = 封面故事大卡，
+   其余按维度分组为编辑行；空绑定整块隐藏（不回落静态演示内容，防异地项目挂错样例）。
+   深链：spot.link 优先 → 已知 spot-detail 词条 → 回落 lvju-app-spots.html（spot-detail
+   页 ?spot= 解析失配会静默回落，禁止裸拼未收录 slug）。 */
+window.__NEARBY_RENDER__ = (function(){
+  var SPOT_DETAIL = { huangguoshu: 1, xiaoqikong: 1, xijiang: 1, fanjing: 1, wanfeng: 1 };
+  var TYPE_LABEL = { scenic: '景区', biz: '商圈' };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function href(s){
+    if (s.link) return s.link;
+    if (s.slug && SPOT_DETAIL[s.slug]) return 'lvju-app-spot-detail.html?spot=' + encodeURIComponent(s.slug);
+    return 'lvju-app-spots.html';
+  }
+  function featHtml(s){
+    var tag = (s.tags && s.tags[0]) || TYPE_LABEL[s.type] || '周边';
+    return '<a class="nb-feat" href="' + href(s) + '">' +
+      '<span class="bg" style="background-image:url(' + esc(s.cover_image || '') + ')"></span>' +
+      '<span class="lv">' + esc(tag) + '</span>' +
+      '<span class="in">' +
+        '<span class="ek">' + esc(s.note || TYPE_LABEL[s.type] || '封面故事') + '</span>' +
+        '<span class="nm">' + esc(s.name) + '</span>' +
+        (s.summary ? '<span class="sum">' + esc(s.summary) + '</span>' : '') +
+        ((s.tags && s.tags.length) ? '<span class="tags">' + s.tags.map(function(t){ return '<i>' + esc(t) + '</i>'; }).join('') + '</span>' : '') +
+      '</span></a>';
+  }
+  function rowHtml(s){
+    return '<a class="nb-row" href="' + href(s) + '">' +
+      '<span class="th" style="background-image:url(' + esc(s.cover_image || '') + ')"></span>' +
+      '<span class="tx">' +
+        '<span class="k">' + esc(s.note || TYPE_LABEL[s.type] || '周边') + '</span>' +
+        '<span class="nm">' + esc(s.name) + '</span>' +
+        (s.summary ? '<span class="sum">' + esc(s.summary) + '</span>' : '') +
+      '</span><span class="ar">›</span></a>';
+  }
+  return function(spots){
+    var block = document.getElementById('dNearbyBlock'),
+        stat = document.getElementById('nbStatic'),
+        dyn = document.getElementById('nbDyn');
+    if (!block || !dyn || !Array.isArray(spots)) return;
+    spots = spots.filter(function(s){ return s && s.name; });
+    if (!spots.length) { block.style.display = 'none'; return; }   // 绑定空 → 整块隐藏
+    if (stat) stat.style.display = 'none';
+    var groups = { scenic: [], biz: [] };
+    spots.slice(1).forEach(function(s){ groups[s.type === 'biz' ? 'biz' : 'scenic'].push(s); });
+    var h = featHtml(spots[0]);
+    [['scenic', 'SCENIC'], ['biz', 'AROUND']].forEach(function(g){
+      var list = groups[g[0]];
+      if (!list || !list.length) return;
+      h += '<div class="nb-gt"><span class="bar"></span>' + TYPE_LABEL[g[0]] + ' <em>' + g[1] + '</em></div>' +
+        list.map(rowHtml).join('');
+    });
+    h += '<div class="nb-foot"><span>共 ' + spots.length + ' 处 · 步程 / 车程由商家实地整理</span><a href="lvju-app-spots.html">全部玩法 ›</a></div>';
+    dyn.innerHTML = h;
+  };
+})();
+</script>
 <script>
 /* 房源详情统一读库：GET /api/juzhu/projects/:id（公网白名单）。
    ?id= 缺省时保留本页示例内容（原型基线）。评级维度按频道：
@@ -205,7 +388,7 @@
     b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:12px;color:#92400e;';
     b.textContent = '示例内容 · 返回「找房」列表点击具体房源查看库内真实数据';
     document.querySelector('.scr').insertBefore(b, document.querySelector('.pd-hero'));
-    var bk0 = document.querySelector('.cta .btn');
+    var bk0 = document.getElementById('dMainBtn');
     if (bk0) { bk0.textContent = '去列表选房'; bk0.href = 'lvju-app-lvju.html'; }
     return;
   }
@@ -215,6 +398,14 @@
     rental: [ {k:'comfort',l:'舒适'}, {k:'green',l:'绿色'}, {k:'tech',l:'智慧'}, {k:'safety',l:'安全'} ],
     minsu:  [ {k:'scenery',l:'环境景观'}, {k:'facilities',l:'设施配套'}, {k:'service',l:'服务品质'}, {k:'location',l:'区位交通'}, {k:'culture',l:'在地体验'} ]
   };
+  // 加载骨架：先于任何异步渲染铺上灰块，避免先闪静态示例卡
+  (function(){
+    var u = document.getElementById('dUnits');
+    if (u) u.innerHTML = [1, 2].map(function(){
+      return '<div class="skl-card"><div class="skl skl-th"></div><div class="skl-lines">' +
+        '<div class="skl-line" style="width:55%;"></div><div class="skl-line" style="width:38%;"></div><div class="skl-line" style="width:70%;"></div></div></div>';
+    }).join('');
+  })();
   Promise.all([
       fetch('/api/juzhu/projects/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }),
       fetch('/api/juzhu/projects/' + id + '/units').then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -225,9 +416,33 @@
     p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); });
     var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
     r = r || {};
+    // 周边玩法（规则 17）：绑定的商圈/景区 → 杂志区块。仅当响应带 spots 字段才接管
+    // （旧服务进程无此字段 → 保留静态基线）；带字段但为空数组 = 未绑定 → 整块隐藏
+    if (window.__NEARBY_RENDER__ && Array.isArray(p.spots)) window.__NEARBY_RENDER__(p.spots);
     document.getElementById('dName').textContent = p.name || '';
     document.getElementById('dLoc').textContent = p.address || '';
-    if (p.cover_image) document.getElementById('dHero').style.background = 'url(' + p.cover_image + ') center/cover';
+    var hero = document.getElementById('dHero');
+    if (p.cover_image) hero.style.background = 'url(' + p.cover_image + ') center/cover';
+    // 真图轮播：units 接口下发的户型实拍（无图回退封面；单图隐藏计数）
+    var photos = (rs[1] || {}).photos || [];
+    var urls = photos.map(function(ph){ return ph.file_path || ''; }).filter(Boolean);
+    if (!urls.length && p.cover_image) urls = [p.cover_image];
+    var dots = document.getElementById('dDots');
+    if (urls.length > 1) {
+      var track = document.createElement('div');
+      track.className = 'hero-track';
+      track.innerHTML = urls.slice(0, 8).map(function(u){ return '<div class="hero-slide" style="background-image:url(\'' + u + '\')"></div>'; }).join('');
+      hero.insertBefore(track, hero.firstChild);
+      var updDots = function(){
+        var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+        dots.textContent = (i + 1) + ' / ' + track.children.length;
+      };
+      track.addEventListener('scroll', function(){ window.requestAnimationFrame(updDots); }, { passive: true });
+      updDots();
+    } else if (dots) {
+      dots.style.display = 'none';
+    }
+    document.title = (p.name || '房源详情') + ' · 贝壳找房旅居';
     var st = p.rating_status || 'draft';
     var star = document.getElementById('dStars');
     if (st === 'passed' && r.stars) { star.textContent = '★ ' + r.stars + ' 星 · ' + (r.star_label || ''); }
@@ -240,14 +455,15 @@
     document.getElementById('dTagline').innerHTML = tags.length
       ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('')
       : '<span>在架</span>';
-    // 户型/在管房源
-    var uEl = document.getElementById('dUnits');
-    uEl.innerHTML = units.length ? units.map(function(u){
-      var pr = u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small>/月起</small>' : (u.price_total ? '¥' + fmt(u.price_total) + '<small>万</small>' : '价格面议');
-      return '<div class="rate-row" style="justify-content:space-between;">' +
-        '<span class="k" style="min-width:0;flex:1;">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</span>' +
-        '<span class="v" style="font-family:var(--serif);color:var(--gold-deep);">' + pr + '</span></div>';
-    }).join('') : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">该项目暂无户型明细</div>';
+    // 户型：只组装数据，房型卡 + 房态日历由下方日历脚本（携程式交互）统一渲染
+    var unitsX = units.map(function(u){
+      var ex = {}; if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) {} } else if (u.ext) { ex = u.ext; }
+      var per = 0;   // 晚均价（与服务端 unitNightPrice 同口径：minsu=ext.price_night / price_from；rental=月租/30）
+      if (p.channel === 'minsu') per = (+ex.price_night) || (p.price_from || 0);
+      else if (u.rent_monthly) per = Math.max(1, Math.round(u.rent_monthly / 30));
+      else if (p.price_from) per = Math.max(1, Math.round(p.price_from / 30));
+      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '' };
+    });
     document.getElementById('dUnitsBlock').style.display = '';
     // 评级维度
     var dimsDef = DIMS[p.channel] || [];
@@ -262,6 +478,43 @@
     } else {
       document.getElementById('dRateRows').innerHTML = '<div class="bs">该项目尚未完成评级自评</div>';
     }
+    // 旅居管家：读 units.keeper（admin 户型详情可维护）；无数据整块隐藏，不再显示演示管家
+    var keeper = null;
+    (rs[1].units || []).some(function(u){
+      var k = u.keeper;
+      if (typeof k === 'string') { try { k = JSON.parse(k); } catch (e) { k = null; } }
+      if (k && k.name) { keeper = k; return true; }
+      return false;
+    });
+    var hostBlock = document.getElementById('dHostBlock');
+    if (hostBlock) {
+      if (keeper) {
+        document.getElementById('dHostName').textContent = keeper.name + ' · 旅居管家';
+        document.getElementById('dHostMeta').textContent = '平台核验 · 咨询 / 入住全程服务' + (keeper.phone ? ' · 电话经虚拟号保护' : '');
+        var avEl = document.getElementById('dHostAv');
+        if (keeper.avatar) { avEl.style.background = 'url(' + keeper.avatar + ') center/cover'; avEl.textContent = ''; }
+        var hv = document.getElementById('dHostVerify');
+        if (hv) hv.style.display = 'none';   // 管家无真实证号，不展示验真卡
+      } else {
+        hostBlock.style.display = 'none';
+      }
+    }
+    // 房源验真：仅评级通过且有编号时展示真实编号 + 二维码；否则隐藏（编号单一来源 = rating.code）
+    var verifyEl = document.getElementById('dVerify');
+    if (verifyEl) {
+      if (st === 'passed' && r.code) {
+        verifyEl.querySelector('.no').textContent = r.code;
+        var qra = verifyEl.querySelector('a.qrlink');
+        var qtarget = new URL('screens/portal-verify.html?code=' + encodeURIComponent(r.code), location.href).href;
+        qra.href = qtarget;
+        var vlink = verifyEl.querySelector('.vb a');
+        if (vlink) { vlink.href = qtarget; vlink.textContent = '扫码验真 ↗ ' + r.code; }
+        try { var qq = qrcode(0, 'M'); qq.addData(qtarget); qq.make(); qra.querySelector('img').src = qq.createDataURL(3, 0); } catch (e) {}
+      } else {
+        verifyEl.style.display = 'none';
+      }
+    }
+
     // 底部价格
     var price = p.price_from;
     if (price == null && units.length) {
@@ -287,15 +540,15 @@
     var perNight = (p.channel === 'minsu') ? (price || 0) : (price ? Math.max(1, Math.round(price / 30)) : 0);
     // 「按晚预订」能力位（服务端 stay_bookable 随项目下发）：未开通 = 仅电话咨询，无日历无预订
     var canBook = p.bookable === true;
-    document.getElementById('calblock').style.display = canBook ? '' : 'none';
-    document.getElementById('dCta').innerHTML = (price != null ? '<b>¥' + fmt(price) + '<small> 起</small></b>' : '<b>价格面议</b>') +
-      '<span>' + (p.is_featured ? '平台精选 · ' : '') + (canBook ? '连住 ' + minNights + ' 晚起 · ' : '电话咨询 · ') + (p.status !== 'offline' ? '在架' : '暂缓预订') + '</span>';
-    if (canBook) {
-      document.getElementById('dCalNote').textContent = '旅居房源连续入住 · 连住 ' + minNights + ' 晚起' + (perNight ? ' · 夜价 ¥' + fmt(perNight) + ' 起' : '');
-      window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel };
-      // 必须在 dCta 动态渲染之后调用：live 初始化会以当前 CTA 内容为「清日期恢复基线」
-      if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
-    }
+    document.getElementById('datebar').style.display = canBook ? '' : 'none';
+    document.getElementById('dUnitsNote').textContent = canBook
+      ? '总价按各户型逐晚实价合计 · 连住 ' + minNights + ' 晚起 · 已订 / 关房不可选'
+      : '该项目未开通按晚预订 · 价格仅供参考 · 请电话咨询';
+    // 未开通按晚预订：主按钮即电话咨询（规则16），左下咨询入口隐藏避免双入口
+    var orbEl = document.getElementById('aiCta');
+    if (orbEl) orbEl.style.display = canBook ? '' : 'none';
+    window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel, bookable: canBook, consultMode: p.consult_mode || 'consultant', units: unitsX };
+    if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
     // CTA 分流（口径 2026-09-05）：项目开通「按晚预订」→ 立即预订（minsu 预付收银台 /
     // rental 预订单，booking 页按频道分流）+ 📞 电话咨询 双入口；未开通（保租房/普通长租/
     // 新房/二手缺省）→ 仅 📞 电话咨询
@@ -312,29 +565,25 @@
           .catch(function(){ alert('暂时无法接通，请稍后重试'); el.textContent = '📞 电话咨询'; });
       });
     }
-    var bk = document.querySelector('.cta .btn');
+    // 底栏主按钮：开通按晚预订 = 「查看房型」（预订动作在房型卡上，见 goBooking）；未开通 = 📞 电话咨询
+    var bk = document.getElementById('dMainBtn');
     if (bk && canBook) {
-      bk.textContent = '立即预订';
-      bk.href = 'lvju-app-booking.html?id=' + id + (units.length ? '&unit=' + units[0].id : '');
+      bk.textContent = '查看房型';
+      bk.href = '#dUnitsBlock';
       bk.addEventListener('click', function(ev){
-        var sum = document.getElementById('calsum');
-        var ci = sum && sum.dataset ? (sum.dataset.ci || '') : '';
-        var co = sum && sum.dataset ? (sum.dataset.co || '') : '';
-        if (ci) { ev.preventDefault(); location.href = bk.href + '&checkin=' + ci + (co ? '&checkout=' + co : ''); }
+        ev.preventDefault();
+        var blk = document.getElementById('dUnitsBlock');
+        if (blk) blk.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        var bar = document.getElementById('datebar');   // 引导选日期
+        if (bar) { bar.classList.remove('flash'); void bar.offsetWidth; bar.classList.add('flash'); }
       });
-      // 副入口：📞 电话咨询（虚拟号专线，与主预订并存）
-      var bk2 = document.createElement('a');
-      bk2.className = 'btn';
-      bk2.style.cssText = 'background:#fff;color:var(--brand-deep,#0f766e);border:1px solid var(--brand-deep,#0f766e);';
-      bk2.textContent = '📞 电话咨询';
-      bk2.href = '#';
-      bk.parentNode.insertBefore(bk2, bk);
-      bindPhone(bk2);
     } else if (bk) {
       bk.textContent = '📞 电话咨询';
       bindPhone(bk);
     }
   }).catch(function(){
+    var u = document.getElementById('dUnits');
+    if (u) u.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px 2px;">户型加载失败 · 请返回列表重试</div>';
     var b = document.createElement('div');
     b.style.cssText = 'margin:0 0 10px;padding:9px 13px;background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;font-size:12px;color:#991b1b;';
     b.textContent = '房源加载失败（id=' + id + '）· 请返回列表重试';
@@ -353,137 +602,440 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
 });
 </script>
 <script>
-/* 价格日历（房态版）：整月网格读 GET /api/juzhu/projects/:id/stay-calendar（已订/关房不可选、夜价覆盖），
-   连续区间选择（先入住后离店）并强制最短连住（旅居 15 晚起，商家可在项目上覆盖）；
-   无 ?id= 的示例基线仍用演示价 6–9 月。 */
+/* 可预订房型 + 房态日历（携程式交互）：
+   ① 「日期条」常驻房型区顶部（入住 / 晚数 / 离店），点击整屏底部滑出日历；
+   ② 日历整月竖向滚动、逐晚读 GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=
+     （已订 / 关房不可选、商家夜价覆盖、最短连住校验——口径均在服务端，规则16）；
+   ③ 房型卡：晚均价 + 选中区间总价（选中房型 = 日历实价合计，其余按晚均估算），「订」直达下单；
+   ④ 与底部 CTA 联动：选定区间后 CTA 显示总价与晚数，跳转透传 unit / checkin / checkout。
+   无 ?id= 的示例基线仍用演示价（2026-06 窗口）。 */
 (function(){
   var q = new URLSearchParams(location.search);
-  var live = null;                          // { projectId, minNights, basePrice } —— 数据脚本就绪后注入
+  var live = null;                          // { projectId, minNights, basePrice, channel, bookable, units } —— 数据脚本注入
   var TODAY = new Date(2026,5,13);          // 演示基准日 2026-06-13
-  var MIN = new Date(2026,5,1), MAX = new Date(2026,8,1);  // 可看 6–9 月
-  var view = new Date(2026,5,1);
+  var MIN = new Date(2026,5,1), MAX = new Date(2026,8,1);  // 演示窗口 6–9 月
   var ci = null, co = null;                 // 入住 / 离店
-  var calCache = {};                        // month -> days map（live 模式）
+  var selUnit = 0;                          // 选中户型 id（0 = 未指定）
+  var calCache = {}, pending = {};          // key: unitId|monthKey -> {date:day}（按户型隔离）/ 去重中的请求
+  var monthEls = {};                        // monthKey -> {sec, cells:[{d, el, dn, dp}]}
+  var monthsBuilt = false, io = null;
+  var tipMsg = null;                        // 一次性提示（选日期反馈），paintBars 消费后清除
   var WK = ['日','一','二','三','四','五','六'];
-  var grid = document.getElementById('calgrid');
-  var moLbl = document.getElementById('calmo');
-  var prev = document.getElementById('calprev'), next = document.getElementById('calnext');
-  var sum = document.getElementById('calsum');
-  var toggle = document.getElementById('caltoggle'), full = document.getElementById('calfull');
-  var ctaP = document.querySelector('.cta .p');
-  var ctaOrig = ctaP ? ctaP.innerHTML : '';
+  function $(id){ return document.getElementById(id); }
+  var sheet=$('calsheet'), mask=$('csMask'), months=$('csMonths'),
+      csIn=$('csIn'), csOut=$('csOut'), csN=$('csN'), csTip=$('csTip'), csTot=$('csTot'), csOk=$('csOk'),
+      datebar=$('datebar'), dbIn=$('dbIn'), dbOut=$('dbOut'), dbN=$('dbN'),
+      unitsEl=$('dUnits');
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-  function minNights(){ return (live && live.minNights) || 15; }
-  function price(d){
-    if (live && live.basePrice) {           // 周末小幅上浮（与商家夜价口径一致）
-      var w = d.getDay();
-      return Math.round(live.basePrice * ((w===0||w===6) ? 1.25 : 1));
-    }
-    return (d.getDay()===0||d.getDay()===6) ? 588 : 468;   // 示例基线
-  }
-  function dayInfo(d){                       // live 模式：{status, price} ；无数据回退演示价
-    if (!live) return null;
-    var m = calCache[moKey(view)];
-    if (!m) return null;
-    return m[iso(d)] || null;
-  }
+  function fmtN(n){ return (n||0).toLocaleString('zh-CN'); }
   function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function moKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
   function key(d){ return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
-  function fmt(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
-  function nights(){ return (ci&&co) ? Math.round((co-ci)/864e5) : 0; }
-  function total(){ var t=0; if(ci&&co){ var d=new Date(ci); while(d<co){ var inf=dayInfo(d); t += (inf && inf.price) ? inf.price : price(d); d.setDate(d.getDate()+1); } } return t; }
-
-  // live 数据加载（按月缓存；未加载完先用演示价渲染，到达后重绘）
-  function loadMonth(y, mo){
-    if (!live) return Promise.resolve();
-    var mk = y + '-' + String(mo+1).padStart(2,'0');
-    if (calCache[mk]) return Promise.resolve();
-    var unit = q.get('unit') || '';
-    return fetch('/api/juzhu/projects/' + live.projectId + '/stay-calendar?month=' + mk + (unit ? '&unit_id=' + unit : ''))
-      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(j){
-        var map = {};
-        (j.days || []).forEach(function(d){ map[d.date] = d; });
-        calCache[mk] = map;
-        render();
-      }).catch(function(){ calCache[mk] = {}; });   // 失败按全可订渲染（下单仍有服务端校验兜底）
+  function md(d){ return (d.getMonth()+1)+'月'+d.getDate()+'日'; }
+  function mds(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+  function wk(d){ return '周'+WK[d.getDay()]; }
+  function minNights(){ return (live && live.minNights) || 15; }
+  function demoPrice(d){ return (d.getDay()===0||d.getDay()===6) ? 588 : 468; }   // 示例基线价
+  function dayInfoOf(d, uid){ if (!live) return null; var m = calCache[(uid || selUnit) + '|' + moKey(d)]; return m ? (m[iso(d)] || null) : null; }
+  function dayInfo(d){ return dayInfoOf(d, selUnit); }
+  function dayPrice(d){ var inf = dayInfo(d); return (inf && inf.price) ? inf.price : ((live && live.basePrice) ? live.basePrice : demoPrice(d)); }
+  function nights(){ return (ci && co) ? Math.round((co - ci) / 864e5) : 0; }
+  function total(){ var t=0; if (ci && co) { var d = new Date(ci); while (d < co) { t += dayPrice(d); d.setDate(d.getDate()+1); } } return t; }
+  // 指定户型在所选区间的实价合计：est=该区间房态未全部到位（回退晚均价估）；blocked=含已订/关房（不可订）
+  function unitTotal(uid){
+    var per = 0;
+    (live.units || []).forEach(function(u){ if (u.id === uid) per = u.per || 0; });
+    if (!per) per = live.basePrice || 0;
+    var t = 0, est = false, blocked = false;
+    if (ci && co) {
+      var d = new Date(ci);
+      while (d < co) {
+        var inf = dayInfoOf(d, uid);
+        if (!inf) est = true;
+        else if (inf.status === 'booked' || inf.status === 'blocked') blocked = true;
+        t += (inf && inf.price) ? inf.price : per;
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    return { t: t, est: est, blocked: blocked };
   }
 
+  /* ---------- 房型卡 ---------- */
+  function renderCards(){
+    var us = live ? (live.units || []) : null;
+    if (!us) return;                                   // 示例基线：保留页内静态房型卡
+    if (!us.length) { unitsEl.innerHTML = '<div class="units-note">该项目暂无户型明细</div>'; return; }
+    var bookable = live.bookable;
+    unitsEl.innerHTML = us.map(function(u, i){
+      var meta = [u.area ? u.area + '㎡' : '', u.layout].filter(Boolean).join(' · ');
+      var tags = (u.tags || []).slice(0, 3).map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('');
+      var right = bookable
+        ? '<div class="rp"><b>¥' + fmtN(u.per) + '</b><small>/晚均</small></div>' +
+          '<div class="rt" data-rt="' + u.id + '">选日期看总价</div>' +
+          '<span class="rbtn" data-u="' + u.id + '">订</span>'
+        : '<div class="rp"><b>¥' + fmtN(u.monthly || u.per) + '</b><small>' + (live.channel === 'minsu' ? '/晚' : '/月起') + '</small></div>';
+      return '<div class="roomcard' + (bookable && u.id === selUnit ? ' sel' : '') + '" data-u="' + u.id + '">' +
+        '<div class="rth' + (u.cover ? '' : ' g' + ((i % 6) + 1)) + '"' + (u.cover ? ' style="background-image:url(\'' + u.cover + '\')"' : '') + '></div>' +
+        '<div class="rin"><div class="rnm">' + esc(u.name) + '</div>' +
+        (meta ? '<div class="rmeta">' + esc(meta) + '</div>' : '') +
+        '<div class="rtags">' + tags + '</div></div>' +
+        '<div class="rbuy">' + right + '</div></div>';
+    }).join('');
+    if (!bookable) return;
+    unitsEl.querySelectorAll('.roomcard').forEach(function(card){
+      card.addEventListener('click', function(){ setUnit(+card.dataset.u); });
+    });
+    unitsEl.querySelectorAll('.rbtn').forEach(function(btn){
+      btn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        setUnit(+btn.dataset.u);
+        if (ci && co && unitTotal(+btn.dataset.u).blocked) { openCal(); return; }   // 该时段此户型含已订 → 回日历换
+        if (ci && co) goBooking(); else openCal();     // 没选日期先弹日历（携程式：订 = 选日期）
+      });
+    });
+  }
+
+  function setUnit(uid){
+    if (!live || !live.bookable || !uid || selUnit === uid) return;
+    selUnit = uid;
+    unitsEl.querySelectorAll('.roomcard').forEach(function(c){ c.classList.toggle('sel', +c.dataset.u === uid); });
+    if (monthsBuilt) Object.keys(monthEls).forEach(paintMonth);   // 房态按户型各自缓存，重绘即可（不重拉）
+    paintCards(); paintBars();
+  }
+
+  /* ---------- 房态数据（户型 × 月份 各自缓存；每月一个批量请求带全所有户型，每张卡的总价都是实价） ---------- */
+  function loadMonth(mk){
+    if (!live) return;
+    var us = (live.units && live.units.length) ? live.units : [];
+    var key = 'batch|' + mk;
+    if (pending[key]) return;
+    if (us.length && us.every(function(u){ return calCache[u.id + '|' + mk]; })) return;   // 该月已全量到位
+    pending[key] = true;
+    fetch('/api/juzhu/projects/' + live.projectId + '/stay-calendar?month=' + mk + (us.length ? '&units=' + us.map(function(u){ return u.id; }).join(',') : ''))
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(j){
+        if (j.units) {                                      // 批量形状：{units:[{unit_id, base_price_night, days}]}
+          j.units.forEach(function(u){
+            var map = {};
+            (u.days || []).forEach(function(x){ map[x.date] = x; });
+            calCache[u.unit_id + '|' + mk] = map;
+            if (u.unit_id === selUnit && u.base_price_night) live.basePrice = u.base_price_night;
+          });
+        } else if (j.days) {                                // 旧形状兜底（单户型/无户型参数）
+          var map0 = {};
+          (j.days || []).forEach(function(x){ map0[x.date] = x; });
+          calCache[(selUnit || 0) + '|' + mk] = map0;
+          if (j.base_price_night) live.basePrice = j.base_price_night;
+        }
+        delete pending[key];
+        paintMonth(mk); paintBars(); paintCards();   // 夜价到位后同步弹层合计与各卡总价
+      })
+      .catch(function(){
+        us.forEach(function(u){ calCache[u.id + '|' + mk] = calCache[u.id + '|' + mk] || {}; });   // 失败按可订渲染（下单仍有服务端兜底）
+        delete pending[key];
+        paintMonth(mk);
+      });
+  }
+
+  /* ---------- 日历月份构建（首次打开时建 DOM，之后只改状态类） ---------- */
+  function ensureMonths(){
+    if (monthsBuilt) return;
+    monthsBuilt = true;
+    months.innerHTML = '';
+    monthEls = {};
+    io = new IntersectionObserver(function(ents){
+      ents.forEach(function(e){ if (e.isIntersecting) loadMonth(e.target.dataset.mk); });
+    }, { root: months, rootMargin: '240px 0px' });
+    for (var m = new Date(MIN); m <= MAX; m = new Date(m.getFullYear(), m.getMonth()+1, 1)) {
+      var cur = new Date(m), mk = moKey(cur);
+      var sec = document.createElement('div');
+      sec.className = 'csm'; sec.dataset.mk = mk;
+      sec.innerHTML = '<div class="csm-t">' + cur.getFullYear() + ' 年 ' + (cur.getMonth()+1) + ' 月</div>' +
+        '<div class="cs-wk">' + WK.map(function(w){ return '<span>' + w + '</span>'; }).join('') + '</div>' +
+        '<div class="cs-grid"></div>';
+      var grid = sec.querySelector('.cs-grid'), cells = [];
+      for (var i = 0; i < new Date(cur.getFullYear(), cur.getMonth(), 1).getDay(); i++) {
+        var b = document.createElement('div'); b.className = 'cd blank'; grid.appendChild(b);
+      }
+      var dim = new Date(cur.getFullYear(), cur.getMonth()+1, 0).getDate();
+      for (var dd = 1; dd <= dim; dd++) {
+        var d = new Date(cur.getFullYear(), cur.getMonth(), dd);
+        var el = document.createElement('div');
+        el.className = 'cd';
+        el.innerHTML = '<span class="dn">' + dd + '</span><span class="dp"></span>';
+        el.addEventListener('click', function(dt){ return function(){ pick(dt); }; }(d));
+        grid.appendChild(el);
+        cells.push({ d: d, el: el, dn: el.querySelector('.dn'), dp: el.querySelector('.dp') });
+      }
+      months.appendChild(sec);
+      monthEls[mk] = { sec: sec, cells: cells };
+      io.observe(sec);
+    }
+    var lg = document.createElement('div');
+    lg.className = 'cs-legend';
+    lg.innerHTML = '<span><i style="background:#f7f8f8;border:1px solid var(--border);"></i>已订 / 关房</span>' +
+      '<span><i style="background:var(--brand-soft);"></i>已选连住</span>' +
+      '<span><i style="background:linear-gradient(135deg,var(--brand),var(--brand-deep));border-radius:50%;"></i>入住 / 离店</span>';
+    months.appendChild(lg);
+  }
+
+  /* ---------- 绘制（只改类名/文案，保持滚动位置） ---------- */
+  function paintMonth(mk){
+    var mo = monthEls[mk]; if (!mo) return;
+    var minCo = ci ? new Date(ci.getTime() + minNights() * 864e5) : null;
+    var tKey = key(TODAY);
+    mo.cells.forEach(function(c){
+      var d = c.d, k = key(d), inf = dayInfo(d);
+      var past = d < TODAY, beyond = d > MAX;
+      var noslot = inf && (inf.status === 'booked' || inf.status === 'blocked');
+      var dis = ci && !co && !past && !noslot && !beyond && d < minCo && k !== key(ci);
+      var isCi = ci && k === key(ci), isCo = co && k === key(co);
+      var cl = 'cd';
+      if (d.getDay() === 0 || d.getDay() === 6) cl += ' wknd';
+      if (k === tKey) cl += ' tdy';
+      if (past) cl += ' past';
+      else if (noslot) cl += ' noslot';
+      else if (beyond || dis) cl += ' dis';
+      if (isCi || isCo) cl += ' end';
+      else if (ci && co && d > ci && d < co) cl += ' range';
+      c.el.className = cl;
+      c.dp.textContent = isCi ? '入住' : isCo ? '离店'
+        : past ? ''
+        : noslot ? (inf.status === 'booked' ? '已订' : '关房')
+        : k === tKey ? '今天'
+        : dis ? '不满' + minNights() + '晚'
+        : '¥' + ((inf && inf.price) || dayPrice(d));
+    });
+  }
+
+  function setSeg(el, d){
+    if (!el) return;
+    if (!d) { el.classList.add('ph'); el.textContent = '请选择'; return; }
+    el.classList.remove('ph');
+    el.textContent = md(d) + ' ' + wk(d);
+  }
+
+  function paintBars(){
+    var n = nights(), t = total();
+    setSeg(csIn, ci); setSeg(csOut, co);
+    csN.textContent = n ? n + ' 晚' : (ci ? '选离店' : '未选择');
+    if (tipMsg) { csTip.textContent = tipMsg; csTip.className = 'cs-tip warn'; tipMsg = null; }
+    else {
+      csTip.textContent = live
+        ? '连住 ' + minNights() + ' 晚起 · 已订 / 关房不可选 · 点「确定」带入总价'
+        : '连住 15 晚起 · 点选入住与离店日期，再点「确定」';
+      csTip.className = 'cs-tip';
+    }
+    if (n && live && unitTotal(selUnit).blocked) csTot.innerHTML = '<span style="color:#b91c1c;font-weight:600;">选中户型该时段含已订 · 请换日期或房型</span>';
+    else if (n) csTot.innerHTML = '合计<b>¥' + t.toLocaleString() + '</b>' + mds(ci) + '–' + mds(co) + ' · 均价 ¥' + Math.round(t / n) + '/晚';
+    else if (live && live.basePrice) csTot.innerHTML = '<b>¥' + live.basePrice + '</b>/晚起 · 连住 ' + minNights() + ' 晚起';
+    else csTot.textContent = '请选择入住与离店日期';
+    csOk.disabled = !n;
+    setSeg(dbIn, ci); setSeg(dbOut, co);
+    dbN.textContent = n ? '共 ' + n + ' 晚' : '— 晚';
+  }
+
+  function paintCards(){
+    var n = nights();
+    unitsEl.querySelectorAll('.roomcard').forEach(function(card){
+      var uid = card.dataset.u, rt = card.querySelector('.rt'), btn = card.querySelector('.rbtn');
+      if (!rt) return;
+      var reset = function(){ rt.classList.remove('est'); if (btn) { btn.textContent = '订'; btn.classList.remove('full'); } };
+      if (!n) { rt.textContent = '选日期看总价'; reset(); return; }
+      if (!live) { rt.textContent = '¥' + total().toLocaleString() + ' · ' + n + '晚'; reset(); return; }
+      var r = unitTotal(+uid);
+      if (r.blocked) {                                   // 该户型在所选区间含已订/关房 → 不可订
+        rt.textContent = '该时段含已订'; rt.classList.add('est');
+        if (btn) { btn.textContent = '满'; btn.classList.add('full'); }
+        return;
+      }
+      rt.textContent = (r.est ? '约 ¥' : '¥') + r.t.toLocaleString() + ' · ' + n + '晚';
+      rt.classList.toggle('est', r.est);
+      reset();
+    });
+  }
+
+  function paintAll(){
+    if (monthsBuilt) Object.keys(monthEls).forEach(paintMonth);
+    paintBars(); paintCards();
+  }
+
+
+  /* ---------- 区间选择（先入住后离店；已订/关房/超窗不可选；不足连住只提示） ---------- */
+  function tip(m){ tipMsg = m; paintBars(); }
   function pick(d){
-    if (!ci || (ci&&co) || d <= ci) { ci = d; co = null; }   // 重新起算
+    if (d < TODAY || d > MAX) return;
+    var inf = dayInfo(d);
+    if (inf && (inf.status === 'booked' || inf.status === 'blocked')) return;
+    if (!ci || (ci && co) || d <= ci) { ci = d; co = null; }   // 重新起算
     else {
       var n = Math.round((d - ci) / 864e5);
       if (n < minNights()) {
-        var minCo = new Date(ci.getTime() + minNights()*864e5);
-        sum.innerHTML = '<span class="hint" style="color:#b91c1c;">须连续入住 ≥ ' + minNights() + ' 晚 · 最早 ' + fmt(minCo) + ' 离店</span>';
+        tip('须连续入住 ≥ ' + minNights() + ' 晚 · 最早 ' + md(new Date(ci.getTime() + minNights() * 864e5)) + ' 离店');
+        return;
+      }
+      // 区间内含已订/关房夜（选中户型口径）→ 拒绝成段，指出第一晚（与服务端下单校验同口径，规则16）
+      var firstBad = null;
+      for (var t = new Date(ci); t < d; t.setDate(t.getDate() + 1)) {
+        var tInf = dayInfo(t);
+        if (tInf && (tInf.status === 'booked' || tInf.status === 'blocked')) { firstBad = new Date(t); break; }
+      }
+      if (firstBad) {
+        tip(md(firstBad) + (dayInfo(firstBad).status === 'booked' ? ' 已订' : ' 关房') + ' · 请调整日期或换房型');
         return;
       }
       co = d;
     }
-    render();
+    paintAll();
   }
 
-  function render(){
-    moLbl.textContent = view.getFullYear()+' 年 '+(view.getMonth()+1)+' 月';
-    prev.disabled = view <= MIN; next.disabled = view >= MAX;
-    grid.innerHTML = '';
-    WK.forEach(function(w){ var e=document.createElement('div'); e.className='wk'; e.textContent=w; grid.appendChild(e); });
-    var lead = new Date(view.getFullYear(), view.getMonth(), 1).getDay();
-    for (var i=0;i<lead;i++){ var b=document.createElement('div'); b.className='cell blank'; grid.appendChild(b); }
-    var dim = new Date(view.getFullYear(), view.getMonth()+1, 0).getDate();
-    var minCo = ci ? new Date(ci.getTime() + minNights()*864e5) : null;
-    for (var dd=1; dd<=dim; dd++){
-      var d = new Date(view.getFullYear(), view.getMonth(), dd);
-      var c = document.createElement('div'); c.className = 'cell';
-      var w = d.getDay(); if (w===0||w===6) c.classList.add('wknd');
-      var inf = dayInfo(d);
-      var k = key(d);
-      var noslot = inf && (inf.status === 'booked' || inf.status === 'blocked');
-      var past = d < TODAY;
-      var beyond = d > MAX;
-      var dis = ci && !co && d < minCo && k !== key(ci);
-      if (past) c.classList.add('past');
-      else if (noslot) c.classList.add('noslot');
-      else if (beyond || dis) c.classList.add('dis');
-      if (ci){
-        if (co){
-          if (k===key(ci)||k===key(co)) c.classList.add('end');
-          else if (d>ci && d<co) c.classList.add('range');
-        } else if (k===key(ci)) c.classList.add('end');
-      }
-      var cp = noslot ? (inf.status === 'booked' ? '已订' : '关房')
-        : past ? '—'
-        : (ci && k===key(ci) ? '入住' : (dis ? '不满'+minNights()+'晚' : '¥' + ((inf && inf.price) ? inf.price : price(d))));
-      c.innerHTML = '<div class="dn">'+dd+'</div><div class="cp">'+cp+'</div>';
-      if (!past && !noslot && !beyond) (function(dt){ c.addEventListener('click', function(){ pick(dt); }); })(d);
-      grid.appendChild(c);
+  /* ---------- 弹层开关 / 跳转 ---------- */
+  function openCal(){
+    if (live && live.bookable === false) return;
+    ensureMonths();
+    sheet.classList.add('open'); sheet.setAttribute('aria-hidden', 'false');
+    paintAll();
+    var mo = monthEls[moKey(ci || TODAY)];             // 打开即定位到入住月 / 当月
+    if (mo) months.scrollTop = mo.sec.offsetTop;
+  }
+  function closeCal(){
+    sheet.classList.remove('open'); sheet.setAttribute('aria-hidden', 'true');
+  }
+  function goBooking(){
+    location.href = 'lvju-app-booking.html?id=' + live.projectId +
+      (selUnit ? '&unit=' + selUnit : '') +
+      (ci && co ? '&checkin=' + iso(ci) + '&checkout=' + iso(co) : '');
+  }
+
+  datebar.addEventListener('click', openCal);
+  mask.addEventListener('click', closeCal);
+  $('csClose').addEventListener('click', closeCal);
+  csOk.addEventListener('click', closeCal);
+
+  // 下滑关闭：头部/把手拖拽，>80px 松手即关（拖动中禁用过渡，松手恢复）
+  (function(){
+    var panel = document.querySelector('.cs-panel'), startY = null, dy = 0;
+    var zone = $('csHead');
+    var begin = function(y){ if (!sheet.classList.contains('open')) return; startY = y; dy = 0; panel.style.transition = 'none'; };
+    var move = function(y){
+      if (startY == null) return;
+      dy = Math.max(0, y - startY);
+      panel.style.transform = 'translateY(' + dy + 'px)';
+    };
+    var end = function(){
+      if (startY == null) return;
+      panel.style.transition = '';
+      panel.style.transform = dy > 80 ? 'translateY(103%)' : '';
+      if (dy > 80) closeCal();
+      setTimeout(function(){ panel.style.transform = ''; }, 300);
+      startY = null;
+    };
+    zone.addEventListener('touchstart', function(e){ begin(e.touches[0].clientY); }, { passive: true });
+    zone.addEventListener('touchmove', function(e){ move(e.touches[0].clientY); }, { passive: true });
+    zone.addEventListener('touchend', end);
+    zone.addEventListener('touchcancel', end);
+    $('csGrip').addEventListener('click', closeCal);
+  })();
+
+  // 回到本月：滚离当月首屏后出现
+  (function(){
+    var todayBtn = $('csToday');
+    months.addEventListener('scroll', function(){
+      var mo = monthEls[moKey(TODAY)];
+      todayBtn.style.display = (mo && months.scrollTop > mo.sec.offsetTop + 40) ? 'block' : 'none';
+    }, { passive: true });
+    todayBtn.addEventListener('click', function(){
+      var mo = monthEls[moKey(TODAY)];
+      if (mo) months.scrollTop = mo.sec.offsetTop;
+      todayBtn.style.display = 'none';
+    });
+  })();
+
+  // 收藏：房型区标题 + 顶部 appbar 双入口，同一 localStorage（bzf_fav）双向同步
+  var fav = $('dFav'), appFav = $('appFav');
+  var favKey = 'bzf_fav', favId = q.get('id') || 'demo', favMap = {};
+  try { favMap = JSON.parse(localStorage.getItem(favKey) || '{}') || {}; } catch (e) { favMap = {}; }
+  var paintFav = function(){
+    var on = !!favMap[favId], ch = on ? '♥' : '♡';
+    if (fav) { fav.textContent = ch; fav.classList.toggle('on', on); }
+    if (appFav) { appFav.textContent = ch; appFav.style.color = on ? '#ff6b81' : ''; }
+  };
+  var toggleFav = function(){
+    if (favMap[favId]) delete favMap[favId]; else favMap[favId] = 1;
+    try { localStorage.setItem(favKey, JSON.stringify(favMap)); } catch (e) {}
+    paintFav();
+  };
+  paintFav();
+  if (fav) fav.addEventListener('click', toggleFav);
+  if (appFav) appFav.addEventListener('click', toggleFav);
+  // 分享：navigator.share 优先，不支持降级复制链接
+  var appShare = $('appShare');
+  if (appShare) appShare.addEventListener('click', function(){
+    var payload = { title: document.title, url: location.href };
+    if (navigator.share) { navigator.share(payload).catch(function(){}); return; }
+    var done = function(){
+      appShare.textContent = '✓';
+      setTimeout(function(){ appShare.textContent = '⤴'; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(location.href).then(done, done);
+    else done();
+  });
+
+  // 左下咨询入口（商家维度 consultMode）：consultant=咨询顾问（400 虚拟号，保租房咨询同链路）；
+  // ai=AI 咨询（上线后定义 window.__AI_CONSULT__(ctx) 即可接管，ctx 含项目/日期/户型）
+  var ai = $('aiCta');
+  function paintConsult(){
+    if (!ai) return;
+    var mode = (live && live.consultMode) || 'consultant';
+    var orb = ai.querySelector('.ai-orb'), t = ai.querySelector('.ai-txt b'), sm = ai.querySelector('small');
+    if (!orb || !t || !sm) return;
+    if (mode === 'ai') { orb.textContent = '✦'; t.textContent = 'AI 咨询'; sm.textContent = '问价格 · 问房态'; }
+    else { orb.textContent = '☎'; t.textContent = '咨询顾问'; sm.textContent = '400 专线 · 免费转接'; }
+    ai.dataset.mode = mode;
+  }
+  function orbNote(msg, done){
+    var sm = ai && ai.querySelector('small'); if (!sm) return;
+    sm.textContent = msg; ai.classList.add('soon');
+    setTimeout(function(){ sm.textContent = done; ai.classList.remove('soon'); }, 1800);
+  }
+  if (ai) ai.addEventListener('click', function(){
+    var mode = ai.dataset.mode || 'consultant';
+    var ctx = { projectId: live && live.projectId, unit: selUnit || null, checkin: ci ? iso(ci) : null, checkout: co ? iso(co) : null };
+    if (mode === 'ai') {
+      if (typeof window.__AI_CONSULT__ === 'function') { window.__AI_CONSULT__(ctx); return; }
+      orbNote('智能咨询即将上线', '问价格 · 问房态');
+      return;
     }
-    updateSum();
-  }
+    // 咨询顾问：400 虚拟号（每次实时绑号、禁止缓存——规则10）
+    if (!live || !live.projectId) { orbNote('示例房源 · 未配置专线', '400 专线 · 免费转接'); return; }
+    if (ai.dataset.busy) return;
+    ai.dataset.busy = '1';
+    var sm = ai.querySelector('small'), sm0 = sm ? sm.textContent : '';
+    if (sm) sm.textContent = '获取专线…';
+    fetch('/api/juzhu/projects/' + live.projectId + '/virtual-phone')
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if (res.tel) { location.href = res.tel; if (sm) sm.textContent = sm0; }
+        else { alert(res.error || '该项目暂未配置咨询电话，请在内容编辑后台填写联系电话'); if (sm) sm.textContent = sm0; }
+      })
+      .catch(function(){ alert('暂时无法接通，请稍后重试'); if (sm) sm.textContent = sm0; })
+      .then(function(){ delete ai.dataset.busy; });
+  });
 
-  function updateSum(){
-    if(!ci){ sum.innerHTML='<span class="hint">点选日期：先选入住，再选离店（连住 '+minNights()+' 晚起）</span>'; sum.dataset.ci=''; sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
-    if(!co){ sum.innerHTML='<span class="hint">'+fmt(ci)+' 入住 · 请选离店日期（≥ '+minNights()+' 晚）</span>'; sum.dataset.ci=iso(ci); sum.dataset.co=''; if(ctaP)ctaP.innerHTML=ctaOrig; return; }
-    var n=nights(), t=total();
-    sum.innerHTML='<span>'+fmt(ci)+' 入住 → '+fmt(co)+' 离店 · '+n+' 晚</span>'
-      +'<span class="tot">合计<b>¥'+t.toLocaleString()+'</b></span>';
-    sum.dataset.ci=iso(ci); sum.dataset.co=iso(co);
-    if(ctaP) ctaP.innerHTML='<b>¥'+t.toLocaleString()+'<small> / '+n+' 晚</small></b><span>'+fmt(ci)+'–'+fmt(co)+' · 连住'+minNights()+'晚起</span>';
-  }
-
-  // 数据脚本就绪后切入房态模式（真实「今天」起算 + 最短连住 + 夜价/已订）
+  // 数据脚本就绪后切入房态模式（真实「今天」起算 + 最短连住 + 户型卡/夜价/已订）
   window.__CAL_SET_CONFIG__ = function(cfg){
     live = cfg || null;
     if (!live) return;
-    ctaOrig = ctaP ? ctaP.innerHTML : ctaOrig;   // 数据脚本此刻已渲染动态 CTA，恢复基线跟随真实数据
     TODAY = new Date(); TODAY.setHours(0,0,0,0);
     MIN = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
     MAX = new Date(TODAY.getFullYear(), TODAY.getMonth() + 11, 1);  // 可订窗口：未来 12 个月
-    view = new Date(MIN.getFullYear(), MIN.getMonth(), 1);
-    ci = co = null; calCache = {};
-    // 详情页/列表页透传的日期（校验最短连住，不足则丢弃离店日）
+    // URL 透传：?unit= 选中户型；?checkin/&checkout= 区间（校验最短连住，不足则丢弃离店日）
+    var us = live.units || [];
+    selUnit = parseInt(q.get('unit') || '', 10) || 0;
+    if (selUnit && !us.some(function(u){ return u.id === selUnit; })) selUnit = 0;
+    if (!selUnit && us.length) selUnit = us[0].id;
+    ci = co = null; calCache = {}; pending = {}; monthsBuilt = false; monthEls = {};
     var qi = q.get('checkin') || '', qo = q.get('checkout') || '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(qi)) {
       var d1 = new Date(qi + 'T00:00:00');
@@ -495,18 +1047,13 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
         }
       }
     }
-    render();
-    loadMonth(view.getFullYear(), view.getMonth());
+    renderCards();
+    paintConsult();
+    paintBars();
   };
   if (window.__STAY__) window.__CAL_SET_CONFIG__(window.__STAY__);
-
-  toggle.addEventListener('click',function(){
-    full.classList.toggle('open'); toggle.classList.toggle('open');
-    if(full.classList.contains('open')){ render(); full.scrollIntoView({behavior:'smooth',block:'nearest'}); }
-  });
-  prev.addEventListener('click',function(){ if(view>MIN){ view=new Date(view.getFullYear(),view.getMonth()-1,1); render(); loadMonth(view.getFullYear(),view.getMonth()); } });
-  next.addEventListener('click',function(){ if(view<MAX){ view=new Date(view.getFullYear(),view.getMonth()+1,1); render(); loadMonth(view.getFullYear(),view.getMonth()); } });
-  render();
+  paintConsult();
+  paintBars();
 })();
 </script>
 </body>
