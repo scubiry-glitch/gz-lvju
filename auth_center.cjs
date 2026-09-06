@@ -50,6 +50,15 @@ const P = {
 
 const SESSION_TTL_SECONDS = 30 * 86400;
 
+// ── 登录防爆破（docs §4.1：连错 5 次锁 30 分钟；env 可调）──
+const LOCK_THRESHOLD = parseInt(process.env.AUTH_LOCK_THRESHOLD || '5', 10) || 5;
+const LOCK_WINDOW_SECONDS = parseInt(process.env.AUTH_LOCK_WINDOW || '900', 10) || 900;
+const LOCK_BASE_SECONDS = parseInt(process.env.AUTH_LOCK_BASE || '900', 10) || 900;
+const LOCK_STEP = parseInt(process.env.AUTH_LOCK_STEP || '3', 10) || 3;
+const LOCK_MAX_SECONDS = parseInt(process.env.AUTH_LOCK_MAX || '86400', 10) || 86400;
+const IP_THRESHOLD = parseInt(process.env.AUTH_IP_THRESHOLD || '30', 10) || 30;
+const IP_WINDOW_SECONDS = parseInt(process.env.AUTH_IP_WINDOW || '600', 10) || 600;
+
 // ── 依赖注入 ──
 let DI = null;
 function init(deps) {
@@ -202,6 +211,25 @@ async function ensureAuthSchema(conn) {
   try { await conn.execute('ALTER TABLE accounts ADD COLUMN worker_id INT NULL'); } catch (_) {}
   try { await conn.execute('ALTER TABLE accounts ADD KEY idx_acc_apikey (api_key_hash(64))'); } catch (_) {}
   try { await conn.execute('ALTER TABLE accounts ADD KEY idx_acc_worker (worker_id)'); } catch (_) {}
+  // 登录防爆破：失败计数 + 锁定（status='locked' 枚举复用；到期自动解锁见 isLocked）
+  try { await conn.execute('ALTER TABLE accounts ADD COLUMN failed_login_count INT NOT NULL DEFAULT 0'); } catch (_) {}
+  try { await conn.execute('ALTER TABLE accounts ADD COLUMN locked_until VARCHAR(32) NULL'); } catch (_) {}
+  try { await conn.execute('ALTER TABLE accounts ADD COLUMN last_failed_at VARCHAR(32) NULL'); } catch (_) {}
+  try {
+    await conn.execute(`CREATE TABLE IF NOT EXISTS login_throttle (
+      bucket VARCHAR(80) PRIMARY KEY,
+      kind VARCHAR(8) NOT NULL,
+      fail_count INT NOT NULL DEFAULT 0,
+      window_start VARCHAR(32) NULL,
+      locked_until VARCHAR(32) NULL,
+      updated_at VARCHAR(32) NULL
+    ) CHARSET=utf8mb4`);
+  } catch (e) { throw new Error('ensureAuthSchema(login_throttle): ' + e.message); }
+  // 审计补 result 列（登录成功/失败、锁定事件靠它区分）+ 查询索引；role_code 放宽防多角色拼接静默写失败
+  try { await conn.execute("ALTER TABLE audit_log ADD COLUMN result VARCHAR(8) NULL"); } catch (_) {}
+  try { await conn.execute('ALTER TABLE audit_log MODIFY role_code VARCHAR(128)'); } catch (_) {}
+  try { await conn.execute('ALTER TABLE audit_log ADD KEY idx_audit_action (action, id)'); } catch (_) {}
+  try { await conn.execute('ALTER TABLE audit_log ADD KEY idx_audit_created (created_at, id)'); } catch (_) {}
 
   // 演示种子：国企持有方 + 平台主体（org_no 幂等，不覆盖已有）
   const now2 = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -353,26 +381,133 @@ async function revokeSession(token) {
   return r.affectedRows > 0;
 }
 
+// ── 登录防爆破：ident（login_name/phone，账号不存在也拦枚举）+ ip 两级节流 ──
+function isoNow() { return new Date().toISOString().replace(/\.\d+Z$/, 'Z'); }
+function throttleBucket(kind, identifier) {
+  return sha256Hex(kind + ':' + String(identifier || '').toLowerCase());
+}
+function isoPlus(seconds) { return new Date(Date.now() + seconds * 1000).toISOString().replace(/\.\d+Z$/, 'Z'); }
+
+/** 命中锁定 → { locked:true, retry_after }；否则 { locked:false }（表缺失等异常按未锁处理） */
+async function throttleCheck(kind, identifier) {
+  const d = di();
+  if (!identifier) return { locked: false };
+  try {
+    const rows = await d.query('SELECT locked_until FROM login_throttle WHERE bucket=? LIMIT 1', [throttleBucket(kind, identifier)]);
+    if (!rows.length || !rows[0].locked_until) return { locked: false };
+    const until = Date.parse(rows[0].locked_until);
+    if (until > Date.now()) return { locked: true, retry_after: Math.ceil((until - Date.now()) / 1000) };
+    return { locked: false };
+  } catch (_) { return { locked: false }; }
+}
+
+/** 记一次失败；ident 达阈值按连续触发次数递增锁定（3x 步进封顶 24h），ip 达阈值锁窗口 */
+async function throttleFail(kind, identifier, ctx) {
+  const d = di();
+  if (!identifier) return { locked: false };
+  try {
+    const now = Date.now();
+    const nowIso = isoNow();
+    const windowSec = kind === 'ip' ? IP_WINDOW_SECONDS : LOCK_WINDOW_SECONDS;
+    const threshold = kind === 'ip' ? IP_THRESHOLD : LOCK_THRESHOLD;
+    const rows = await d.query('SELECT fail_count, window_start FROM login_throttle WHERE bucket=? LIMIT 1', [throttleBucket(kind, identifier)]);
+    let failCount = 1;
+    let windowStart = nowIso;
+    if (rows.length && rows[0].window_start) {
+      const ws = Date.parse(rows[0].window_start);
+      if (now - ws < windowSec * 1000) { failCount = (rows[0].fail_count || 0) + 1; windowStart = rows[0].window_start; }
+    }
+    let lockedUntil = null;
+    if (failCount >= threshold) {
+      const sec = kind === 'ip'
+        ? windowSec
+        : Math.min(LOCK_BASE_SECONDS * Math.pow(LOCK_STEP, Math.min(4, failCount - threshold)), LOCK_MAX_SECONDS);
+      lockedUntil = isoPlus(sec);
+    }
+    await d.exec(
+      `INSERT INTO login_throttle(bucket, kind, fail_count, window_start, locked_until, updated_at) VALUES (?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE fail_count=VALUES(fail_count), window_start=VALUES(window_start),
+         locked_until=VALUES(locked_until), updated_at=VALUES(updated_at)`,
+      [throttleBucket(kind, identifier), kind, failCount, windowStart, lockedUntil, nowIso]
+    );
+    if (lockedUntil && kind === 'ident') {
+      await audit(Object.assign({
+        action: 'auth.login.lock', resource: 'account', resourceId: String(identifier).slice(0, 60),
+        result: 'fail', after: { locked_until: lockedUntil, fail_count: failCount },
+      }, ctx || {}));
+    }
+    return { locked: !!lockedUntil, locked_until: lockedUntil, fail_count: failCount };
+  } catch (e) {
+    console.warn('throttleFail warn:', e.message);
+    return { locked: false };
+  }
+}
+
+async function throttleClear(kind, identifier) {
+  const d = di();
+  if (!identifier) return;
+  try { await d.exec('DELETE FROM login_throttle WHERE bucket=?', [throttleBucket(kind, identifier)]); } catch (_) {}
+}
+
+/** 账号行锁定判定：locked 且未到期 → 锁定中；到期由调用方惰性解锁 */
+function isLockedRow(acc) {
+  if (!acc) return { locked: false };
+  if (acc.status === 'disabled') return { locked: false, disabled: true };
+  const until = acc.locked_until ? Date.parse(acc.locked_until) : 0;
+  if (acc.status === 'locked' && until > Date.now()) {
+    return { locked: true, retry_after: Math.ceil((until - Date.now()) / 1000) };
+  }
+  return { locked: false };
+}
+
 // ── 登录 ──
-/** identifier：login_name 或 phone；成功返回 {token, expires_at, account, roles} */
+/** identifier：login_name 或 phone；成功返回 {token, expires_at, account, roles}；节流命中返回 {error, retry_after} */
 async function loginWithPassword(identifier, password, ip, ua) {
   const d = di();
   const id = String(identifier || '').trim();
   if (!id || !password) return { error: '请输入账号与密码' };
+  const ipHit = ip ? await throttleCheck('ip', ip) : { locked: false };
+  if (ipHit.locked) return { error: '该来源尝试过于频繁，请稍后再试', retry_after: ipHit.retry_after, throttled: true };
+  const idHit = await throttleCheck('ident', id);
+  if (idHit.locked) return { error: '密码错误次数过多，账号已临时锁定', retry_after: idHit.retry_after, throttled: true };
   const rows = await d.query(
     'SELECT * FROM accounts WHERE (login_name=? OR phone=?) AND principal_type=\'user\' LIMIT 1',
     [id, id]
   );
-  if (!rows.length) return { error: '账号或密码错误' };
-  const acc = rows[0];
-  if (acc.status !== 'active') return { error: '账号已停用，请联系管理员' };
-  if (!verifyPassword(password, acc.password_hash)) {
-    await audit({ accountId: acc.id, principalType: 'user', action: 'auth.login', resource: 'account', resourceId: String(acc.id), result: 'fail', ip, ua });
+  if (!rows.length) {
+    // 账号不存在也计数并落审计：堵用户名枚举（此前不写审计）
+    await throttleFail('ident', id);
+    if (ip) await throttleFail('ip', ip);
+    await audit({ action: 'auth.login', resource: 'account', resourceId: id.slice(0, 60), result: 'fail', ip, ua });
     return { error: '账号或密码错误' };
   }
+  const acc = rows[0];
+  const lock = isLockedRow(acc);
+  if (lock.disabled) return { error: '账号已停用，请联系管理员' };
+  if (lock.locked) return { error: '账号已临时锁定', retry_after: lock.retry_after, throttled: true };
+  if (!verifyPassword(password, acc.password_hash)) {
+    const now = isoNow();
+    await d.exec('UPDATE accounts SET failed_login_count=failed_login_count+1, last_failed_at=?, updated_at=? WHERE id=?', [now, now, acc.id]);
+    const ctx = { accountId: acc.id, principalType: 'user', ip, ua };
+    await throttleFail('ident', id, ctx);
+    if (ip) await throttleFail('ip', ip, ctx);
+    await audit(Object.assign({ action: 'auth.login', resource: 'account', resourceId: String(acc.id), result: 'fail' }, ctx));
+    const after = await throttleCheck('ident', id);
+    if (after.locked) {
+      // 本次尝试已真实校验并计失败 → 仍回 401（带锁定提示）；从下一次起 pre-check 直接 429
+      await d.exec("UPDATE accounts SET status='locked', locked_until=?, updated_at=? WHERE id=?", [isoPlus(after.retry_after), now, acc.id]);
+      return { error: '密码错误次数过多，账号已临时锁定', retry_after: after.retry_after, locked: true };
+    }
+    return { error: '账号或密码错误' };
+  }
+  // 成功：计数清零 + 惰性解锁（locked 已到期）+ 清 ident 节流
+  const now = isoNow();
+  await d.exec(
+    "UPDATE accounts SET failed_login_count=0, locked_until=NULL, status=IF(status='locked','active',status), last_login_at=?, updated_at=? WHERE id=?",
+    [now, now, acc.id]
+  );
+  await throttleClear('ident', id);
   const sess = await createSession(acc.id, ip, ua);
-  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  await d.exec('UPDATE accounts SET last_login_at=?, updated_at=? WHERE id=?', [now, now, acc.id]);
   const full = await getAccountWithRoles(acc.id);
   await audit({ accountId: acc.id, principalType: 'user', roles: full.roles, action: 'auth.login', resource: 'account', resourceId: String(acc.id), result: 'ok', ip, ua });
   return Object.assign({ token: sess.token, expires_at: sess.expires_at }, full);
@@ -440,8 +575,8 @@ async function audit(entry) {
   try {
     await d.exec(
       `INSERT INTO audit_log(account_id, principal_type, role_code, action, resource, resource_id,
-        scope_level, before_json, after_json, ip, ua, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        scope_level, result, before_json, after_json, ip, ua, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         entry.accountId || null,
         entry.principalType || (entry.roles && entry.roles.length ? 'user' : entry.accountId ? 'user' : null) || null,
@@ -450,6 +585,7 @@ async function audit(entry) {
         String(entry.resource || '').slice(0, 120),
         entry.resourceId != null ? String(entry.resourceId).slice(0, 60) : null,
         entry.scopeLevel || null,
+        entry.result || null,
         entry.before ? JSON.stringify(entry.before).slice(0, 60000) : null,
         entry.after ? JSON.stringify(entry.after).slice(0, 60000) : null,
         String(entry.ip || '').slice(0, 60) || null,
@@ -552,6 +688,14 @@ async function updateAccount(id, body, ctx) {
     if (out[k] !== undefined) { sets.push(col + '=?'); params.push(out[k]); }
   }
   if (out.password) { sets.push('password_hash=?'); params.push(hashPassword(out.password)); }
+  // 解锁（status 改回 active）必须同步清锁定与失败计数，并清 login_throttle 的 ident 桶，
+  // 否则 isLockedRow / throttleCheck 仍按锁定拒绝
+  if (out.status === 'active' && rows[0].status === 'locked') {
+    sets.push('locked_until=NULL', 'failed_login_count=0');
+    const buckets = [throttleBucket('ident', before.account.login_name)];
+    if (before.account.phone) buckets.push(throttleBucket('ident', before.account.phone));
+    try { await d.exec('DELETE FROM login_throttle WHERE bucket IN (' + buckets.map(() => '?').join(',') + ')', buckets); } catch (_) {}
+  }
   if (sets.length) {
     sets.push('updated_at=?'); params.push(now, id);
     await d.exec('UPDATE accounts SET ' + sets.join(',') + ' WHERE id=?', params);
@@ -705,6 +849,11 @@ module.exports = {
   revokeSession,
   bearerToken,
   apiKeyOf,
+  // 登录防爆破
+  throttleCheck,
+  throttleFail,
+  throttleClear,
+  isLockedRow,
   // 主体与鉴权
   principalOf,
   hasPermission,

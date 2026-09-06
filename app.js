@@ -3365,20 +3365,15 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // ===== admin auth 接口 =====
 
     // POST /api/juzhu/admin/auth/login —— 走账号中心（accounts 表）
-    // 兼容旧页面只传 password：未带 login_name 时若仅有一个 active platform_admin 则默认该账号
+    // 必须显式 login_name（旧「只传 password 默认唯一 platform_admin」已移除：可被探测账号存在性）
     if (urlPath === '/api/juzhu/admin/auth/login' && req.method === 'POST') {
       const body = await readBody(req);
-      let idName = String(body.login_name || body.username || '').trim();
+      const idName = String(body.login_name || body.username || '').trim();
       const pwd = String(body.password || '');
-      if (!idName) {
-        const admins = await queryRows(
-          `SELECT a.login_name FROM accounts a JOIN account_roles ar ON ar.account_id=a.id
-           WHERE ar.role_code='platform_admin' AND a.status='active' AND a.principal_type='user' LIMIT 2`);
-        if (admins.length === 1) idName = admins[0].login_name;
-      }
+      if (!idName) return jsonReply(res, { error: '请输入账号' }, 400);
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
       const out = await authCenter.loginWithPassword(idName, pwd, ip, req.headers['user-agent'] || '');
-      if (out.error) return jsonReply(res, { error: out.error }, 401);
+      if (out.error) return jsonReply(res, { error: out.error, retry_after: out.retry_after }, out.throttled ? 429 : 401);
       return jsonReply(res, {
         token: out.token,
         expires_at: out.expires_at,
@@ -3497,20 +3492,25 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '手机号格式不对' }, 400);
       if (password.length < 8) return jsonReply(res, { error: '密码至少 8 位' }, 400);
       const loginName = 'u' + phone;
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      const ua2 = req.headers['user-agent'] || '';
       const dup = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
       if (!dup.length) {
         const created = await authCenter.createAccount({
           login_name: loginName, password, roles: ['user'], principal_type: 'user',
           phone, display_name: name || ('租客' + phone.slice(-4)),
-        }, { ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ua: req.headers['user-agent'] || '' });
+        }, { ip, ua: ua2 });
         if (created.error) return jsonReply(res, { error: created.error }, 400);
-      } else {
-        // 已有账号：校验密码是否匹配，不匹配则拒绝（防止他人抢注覆盖）
-        const check = await authCenter.loginWithPassword(phone, password, '', '');
-        if (check.error) return jsonReply(res, { error: '该手机号已注册，密码不对' }, 401);
+        // 新建档即已持有本人密码，直接发会话（避免再走一次登录把一次请求计成两次失败）
+        const sess = await authCenter.createSession(created.account.id, ip, ua2);
+        return jsonReply(res, { ok: true, token: sess.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: created.account.display_name });
       }
-      const login = await authCenter.loginWithPassword(phone, password, (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), req.headers['user-agent'] || '');
-      if (login.error) return jsonReply(res, { error: login.error }, 401);
+      // 已有账号：校验密码（防他人抢注覆盖）；只调一次，带真实 ip/ua 保证审计与节流计数准确
+      const login = await authCenter.loginWithPassword(phone, password, ip, ua2);
+      if (login.error) {
+        if (login.throttled) return jsonReply(res, { error: login.error, retry_after: login.retry_after }, 429);
+        return jsonReply(res, { error: '该手机号已注册，密码不对' }, 401);
+      }
       return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
     }
 
@@ -3988,16 +3988,29 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const name = String(body.login_name || '').trim();
       const pwd = String(body.password || '');
       if (!name || !pwd) return jsonReply(res, { error: 'login_name/password 必填' }, 400);
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      // 商家登录同走登录节流（ident 维度带 v: 前缀与账号中心隔离）
+      const vHit = await authCenter.throttleCheck('ident', 'v:' + name);
+      if (vHit.locked) return jsonReply(res, { error: '密码错误次数过多，账号已临时锁定', retry_after: vHit.retry_after }, 429);
       const vrows = await queryRows(
         'SELECT id, name, type, status, password_hash FROM jz_vendors WHERE login_name=? LIMIT 1',
         [name]
       );
       const v = vrows[0];
-      if (!v || !v.password_hash) return jsonReply(res, { error: '账号或密码错误' }, 401);
+      if (!v || !v.password_hash) {
+        await authCenter.throttleFail('ident', 'v:' + name);
+        return jsonReply(res, { error: '账号或密码错误' }, 401);
+      }
       if (v.status !== 'active') return jsonReply(res, { error: '商家已停用' }, 403);
-      if (!bcrypt.compareSync(pwd, v.password_hash)) return jsonReply(res, { error: '账号或密码错误' }, 401);
+      if (!bcrypt.compareSync(pwd, v.password_hash)) {
+        const hit = await authCenter.throttleFail('ident', 'v:' + name);
+        if (hit.locked) return jsonReply(res, { error: '密码错误次数过多，账号已临时锁定', retry_after: undefined }, 429);
+        return jsonReply(res, { error: '账号或密码错误' }, 401);
+      }
+      await authCenter.throttleClear('ident', 'v:' + name);
       const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
       const sig = crypto.createHmac('sha256', vendorTokenSecret()).update(`${exp}.${v.id}`).digest('hex');
+      await authCenter.audit({ action: 'auth.vendor.login', resource: 'vendor', resourceId: String(v.id), result: 'ok', ip, ua: req.headers['user-agent'] || '' });
       return jsonReply(res, {
         token: `${exp}.${v.id}.${sig}`,
         role: 'vendor',
@@ -5082,7 +5095,7 @@ async function handleAuthRoutes(rawPath, qs, req, res) {
         ip,
         req.headers['user-agent'] || ''
       );
-      if (out.error) return jsonReply(res, { error: out.error }, 401);
+      if (out.error) return jsonReply(res, { error: out.error, retry_after: out.retry_after }, out.throttled ? 429 : 401);
       return jsonReply(res, {
         token: out.token,
         expires_at: out.expires_at,

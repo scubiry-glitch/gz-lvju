@@ -136,10 +136,14 @@
 <div class="login-mask" id="loginMask">
   <form class="login-card" id="loginForm" autocomplete="on">
     <h2>内容编辑后台</h2>
-    <p class="sub">请输入登录密码后继续</p>
+    <p class="sub">请输入账号与密码后继续（账号中心统一登录）</p>
+    <div class="fld">
+      <label for="loginUser">账号</label>
+      <input type="text" id="loginUser" name="username" required autofocus placeholder="登录账号 / 手机号" />
+    </div>
     <div class="fld">
       <label for="loginPassword">密码</label>
-      <input type="password" id="loginPassword" name="password" required autofocus placeholder="登录密码" />
+      <input type="password" id="loginPassword" name="password" required placeholder="登录密码" />
     </div>
     <p class="err" id="loginErr" aria-live="polite"></p>
     <div class="bar">
@@ -327,11 +331,11 @@ function checkAuth() {
     return false;
   });
 }
-function login(password) {
+function login(account, password) {
   return fetch(API + '/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: password })
+    body: JSON.stringify({ login_name: account, password: password })
   }).then(function(r) {
     return r.text().then(function(text) {
       var data = {};
@@ -342,6 +346,7 @@ function login(password) {
         }
         throw new Error('登录失败（HTTP ' + r.status + '）');
       }
+      if (r.status === 429) throw new Error((data && data.error || '尝试过于频繁') + (data.retry_after ? '，请 ' + Math.ceil(data.retry_after / 60) + ' 分钟后再试' : ''));
       if (!r.ok) throw new Error((data && (data.error || data.message)) || '登录失败');
       if (!data.token) throw new Error('登录失败：未返回凭证');
       setAuthToken(data.token);
@@ -365,15 +370,17 @@ function bootApp() {
 
 document.getElementById('loginForm').onsubmit = function(e) {
   e.preventDefault();
+  var acc = document.getElementById('loginUser').value.trim();
   var pwd = document.getElementById('loginPassword').value;
   var err = document.getElementById('loginErr');
   var btn = document.getElementById('btnLogin');
   err.textContent = '';
+  if (!acc) { err.textContent = '请输入账号'; return; }
   btn.disabled = true;
-  login(pwd).then(function() {
+  login(acc, pwd).then(function() {
     return bootApp();
   }).catch(function(ex) {
-    err.textContent = ex.message || '密码错误';
+    err.textContent = ex.message || '账号或密码错误';
   }).then(function() {
     btn.disabled = false;
   });
@@ -1144,6 +1151,37 @@ function renderEditor() {
       '</div>';
   }
 
+  // 按晚预订 · 入住规则与保障（写 projects.ext，规则15/16 不加列；校验口径与服务端 vendor PUT 一致）
+  var stayCard = '';
+  if (p.channel === 'rental' || p.channel === 'minsu') {
+    var ext = {};
+    try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
+    var defNights = p.channel === 'minsu' ? 1 : 15;   // 与服务端 STAY_MIN_NIGHTS_DEFAULT 一致
+    var insOn = Array.isArray(ext.insurance) ? ext.insurance : [];
+    // 与服务端 stay_config.cjs INSURANCE_TYPES 同一枚举（label/icon 单一数据源在服务端）
+    var INSURANCES = [
+      { key: 'switch_rental', icon: '🔄', label: '换租保险', desc: '租期到期换租衔接期，房租损失与搬迁费用有保障' },
+      { key: 'hotel_cancel', icon: '🏨', label: '酒店取消险', desc: '行程变更按规则取消，未入住房费可退' },
+      { key: 'property', icon: '🛡', label: '财产保险', desc: '入住期间屋内财产与房屋主体意外损坏在保' }
+    ];
+    stayCard =
+      '<div class="card" id="stayCard">'+
+        '<h2>按晚预订 · 入住规则与保障 <span class="rating-status '+(ext.stay_bookable ? 'passed' : 'draft')+'" id="p_bookable_st">'+(ext.stay_bookable ? '🟢 在线预订' : '⚪ 仅 400 电话咨询')+'</span></h2>'+
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">开通 = C 端详情展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询（缺省关闭）。逐晚房态 / 夜价在 <a href="screens/b-stay-calendar.html?project='+p.id+'" target="_blank">运营工作台 · 房态日历</a> 维护；保存后 C 端即时生效。</p>'+
+        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="p_bookable" '+(ext.stay_bookable?'checked':'')+' style="margin-top:2px;"/>'+
+          '<span><b>🟢 按晚预订（日历选房 + 在线下单）</b><br><span style="font-size:11px;color:var(--muted);">旅居 / 民宿频道可开；保租房默认不开（保持 400 咨询）</span></span></label>'+
+        '<div class="grid" style="margin-top:10px;">'+
+          '<div class="fld"><label>最短连住（晚，留空 = 频道默认 '+defNights+'）</label><input id="p_minstay" type="number" min="1" max="365" value="'+(ext.min_stay_nights||'')+'" placeholder="'+defNights+'"/></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;">'+
+          INSURANCES.map(function(t){
+            return '<label style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="p_ins" value="'+t.key+'" '+(insOn.indexOf(t.key)>=0?'checked':'')+' style="margin-top:2px;"/>'+
+              '<span>'+t.icon+' '+t.label+'<br><span style="font-size:10.5px;color:var(--muted);">'+t.desc+'</span></span></label>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+  }
+
   document.getElementById('main').innerHTML =
     '<div class="card">'+
       '<h2>'+p.name+' <span class="badge">'+chLabel+'</span></h2>'+
@@ -1168,6 +1206,7 @@ function renderEditor() {
         '<button class="btn danger" type="button" id="delProj">删除项目</button>'+
       '</div>'+
     '</div>'+
+    stayCard+
     ratingCard+
     '<div class="card">'+
       '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
@@ -1189,6 +1228,13 @@ function renderEditor() {
   document.getElementById('delProj').onclick = deleteProject;
   document.getElementById('addUnit').onclick = addUnit;
   renderUnits(isTrade);
+  if (stayCard) {   // 开关切换即时刷新徽标
+    var bkEl = document.getElementById('p_bookable'), bkSt = document.getElementById('p_bookable_st');
+    if (bkEl && bkSt) bkEl.onchange = function(){
+      bkSt.textContent = bkEl.checked ? '🟢 在线预订' : '⚪ 仅 400 电话咨询';
+      bkSt.className = 'rating-status ' + (bkEl.checked ? 'passed' : 'draft');
+    };
+  }
 
   if (!isTrade) {
     RATING_DIMS.forEach(function(d){
@@ -1534,6 +1580,23 @@ function saveProject() {
   };
   if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
   else body.managed_unit_count = numVal('p_managed');
+
+  // 按晚预订/最短连住/保险 → projects.ext（整包替换前先合并旧 ext，避免覆盖未知键；
+  // 校验与服务端 vendor PUT /projects/:id 同口径：连住 1-365，保险仅限服务端枚举）
+  if (document.getElementById('p_bookable')) {
+    var ext = {};
+    try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
+    ext.stay_bookable = document.getElementById('p_bookable').checked;
+    var mnV = document.getElementById('p_minstay').value.trim();
+    if (mnV === '') { delete ext.min_stay_nights; }
+    else {
+      var mnN = parseInt(mnV, 10);
+      if (!(mnN >= 1 && mnN <= 365)) { toast('最短连住须为 1-365 的整数'); return; }
+      ext.min_stay_nights = mnN;
+    }
+    ext.insurance = Array.prototype.map.call(document.querySelectorAll('.p_ins:checked'), function(cb){ return cb.value; });
+    body.ext = ext;
+  }
 
   api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
     state.current = res.project;
