@@ -162,11 +162,14 @@
       <a class="page-card" href="juzhu-order-progress.html"><span class="name">订单进度 · 评价<span class="file">juzhu-order-progress.html</span></span></a>
       <a class="page-card" href="screens/p-service-demand.html"><span class="name">P · 工单池派单<span class="file">screens/p-service-demand.html</span></span></a>
       <a class="page-card" href="screens/p-service-review.html"><span class="name">P · 评价回流<span class="file">screens/p-service-review.html</span></span></a>
+      <a class="page-card" href="screens/p-jz-order-overview.html"><span class="name">P · 服务订单概览<span class="file">screens/p-jz-order-overview.html</span></span></a>
       <a class="page-card" href="screens/p-jz-category.html"><span class="name">P · 子类目管理<span class="file">screens/p-jz-category.html</span></span></a>
       <a class="page-card" href="screens/p-jz-spu.html"><span class="name">P · 服务标准品 SPU<span class="file">screens/p-jz-spu.html</span></span></a>
       <a class="page-card" href="screens/p-jz-product.html"><span class="name">B · 商家 SKU（产品）<span class="file">screens/p-jz-product.html</span></span></a>
       <a class="page-card" href="screens/p-jz-schedule.html"><span class="name">B · SKU 排班（档期）<span class="file">screens/p-jz-schedule.html</span></span></a>
       <a class="page-card" href="screens/b-dispatch-board.html"><span class="name">B · 派单看板<span class="file">screens/b-dispatch-board.html</span></span></a>
+      <a class="page-card" href="juzhu-admin.html"><span class="name">内容编辑后台<span class="file">juzhu-admin.html</span></span></a>
+      <a class="page-card" href="screens/account-center.html"><span class="name">账号中心 · IAM<span class="file">screens/account-center.html</span></span></a>
     </div>
   </section>
 
@@ -234,10 +237,10 @@
     { key: 'op',   label: '🏢 运营机构 · 国企持有方 + 白名单运营商',
       desc: '国企=持有资产+委托运营+资管视角；白名单运营商（自如/龙湖/华润/招商/贝壳省心租）=日常派单/工单/上架/管家',
       series: [
-        { source: 'b', filterGroups: ['国企资管视角（持有方）'],
+        { source: 'b', filterGroups: ['国企持有方 · 资管视角'],
           name: 'B · 国企持有方 · 资管视角', short: '只读 SLA / 资管大盘 · 不做派单/上架/管家',
           icon: '🏢', primary: '#0f766e', primaryDeep: '#134e4a' },
-        { source: 'b', filterGroups: ['运营商工作台（白名单机构使用）', '业主托管', '生态联动'],
+        { source: 'b', filterGroups: ['白名单运营商 · 日常运营', '🏠 家政 · 本地生活（运营商作业）', '业主与生态'],
           name: 'B · 白名单运营商 + 业主托管', short: '自如/龙湖/华润/招商/贝壳省心租 等 · 日常派单/上架/管家/工单',
           icon: '🏬', primary: '#14b8a6', primaryDeep: '#0f766e' },
       ],

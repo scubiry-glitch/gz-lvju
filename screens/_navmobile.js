@@ -31,7 +31,7 @@
         { id: 'approval', label: '待批',   href: 'g-approval.html', icon: 'check', badge: 5 },
         { id: 'me',       label: '我',     href: 'g-me.html',       icon: 'user' },
       ],
-      /* 汉堡抽屉的完整 11 页菜单（复用 _nav.js 的 G sidebar 结构） */
+      /* 汉堡抽屉的完整菜单（复用 _nav.js 的 G sidebar 结构，与桌面侧栏同清单） */
       drawer: {
         user: { avatar: '张', name: '张科长', org: R.govOrg },
         groups: [
@@ -45,9 +45,12 @@
             { id: 'inspection', label: '抽查记录',     href: 'g-inspection.html', icon: 'search' },
           ]},
           { name: '主体准入', items: [
-            { id: 'whitelist-operator', label: '运营方白名单', href: 'g-whitelist-operator.html', icon: 'check', badge: 5,  badgeKind: 'warn' },
-            { id: 'whitelist-service',  label: '服务者白名单', href: 'g-whitelist-service.html',  icon: 'user',  badge: 11 },
-            { id: 'whitelist-supplier', label: '供应商白名单', href: 'g-whitelist-supplier.html', icon: 'box',   badge: 3,  badgeKind: 'warn' },
+            { id: 'whitelist-review',   label: '白名单审核总览',   href: 'g-whitelist-review.html',   icon: 'check', badge: 25, badgeKind: 'warn' },
+            { id: 'whitelist-operator', label: '运营方白名单',     href: 'g-whitelist-operator.html', icon: 'check', badge: 5,  badgeKind: 'warn' },
+            { id: 'whitelist-service',  label: '服务者白名单',     href: 'g-whitelist-service.html',  icon: 'user',  badge: 11 },
+            { id: 'whitelist-supplier', label: '供应商白名单',     href: 'g-whitelist-supplier.html', icon: 'box',   badge: 3,  badgeKind: 'warn' },
+            { id: 'whitelist-vendor',   label: '人力服务商白名单', href: 'g-whitelist-vendor.html',   icon: 'box',   badge: 3,  badgeKind: 'warn' },
+            { id: 'whitelist-training', label: '培训机构白名单',   href: 'g-whitelist-training.html', icon: 'award', badge: 3,  badgeKind: 'warn' },
           ]},
           { name: '政策与数据', items: [
             { id: 'policy', label: '政策发布', href: 'g-policy.html', icon: 'file' },
@@ -409,7 +412,8 @@
     const base   = el.dataset.base;
     const cfg = MOBILE[series];
     if (!cfg || !cfg.tabbar) { el.outerHTML = ''; return; }
-    const items = cfg.tabbar.map(it => {
+    const canM = window.BZF_NAV_CAN; // 未注入=未登录/演示态 → 全显
+    const items = cfg.tabbar.filter(it => !it.perms || !canM || it.perms.some(p => { try { return !!canM(p); } catch (_) { return true; } })).map(it => {
       const isActive = it.id === active ? ' active' : '';
       return `<a class="${isActive ? 'active' : ''}" href="${resolveHref(it.href, base)}">${ico(it.icon)}${it.label}</a>`;
     }).join('');
@@ -422,8 +426,9 @@
     if (!cfg || !cfg.drawer) return;
     if (document.querySelector('.nvm-drawer-mask')) return;  // 防重复
     const D = cfg.drawer;
-    const groupsHtml = D.groups.map(g => {
-      const items = g.items.map(it => {
+    const groupsHtml = D.groups.filter(g => !g.items.some(it => it.perms) || g.items.some(it => !it.perms) || g.items.some(it => it.perms && it.perms.some(p => { try { return !!(window.BZF_NAV_CAN && window.BZF_NAV_CAN(p)); } catch (_) { return true; } }))).map(g => {
+      const canD = window.BZF_NAV_CAN;
+      const items = g.items.filter(it => !it.perms || !canD || it.perms.some(p => { try { return !!canD(p); } catch (_) { return true; } })).map(it => {
         const isActive = it.id === activeId ? ' active' : '';
         const badge = it.badge != null
           ? `<span class="bd${it.badgeKind ? ' ' + it.badgeKind : ''}">${it.badge}</span>` : '';
@@ -532,5 +537,5 @@
     mount();
   }
 
-  window.BZF_NAVMOBILE = { MOBILE, renderTabbar, openSheet, closeSheet };
+  window.BZF_NAVMOBILE = { MOBILE, renderTabbar, openSheet, closeSheet, refresh: mount };
 })();

@@ -495,7 +495,7 @@ pending → dispatched → accepted → serving → done → rated
 | API 网关 | `p-api-gateway.html` |
 | 事件订阅 & Webhook | `p-webhooks.html` |
 | 数据中台 | `p-data-hub.html` |
-| 权限与角色 | `p-permissions.html` |
+| 账号中心 | `account-center.html` |
 | 通知中心 | `p-notifications.html` |
 | 结算付款（F 金融端） | `f-settlement.html` |
 | 监管账户对账（F 金融端） | `f-escrow.html` |

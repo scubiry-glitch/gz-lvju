@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>账号中心 · 服务认证中台</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0; --line: #f1f5f9;
+      --accent: #0f172a; --accent2: #6366f1; --accent-soft: color-mix(in oklab, var(--accent2) 10%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold: #ca8a04;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: ui-sans-serif, system-ui, -apple-system, 'PingFang SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--fg); font-family:var(--font); font-size:13.5px; line-height:1.5;}
+    button{font:inherit; cursor:pointer; border:0; background:none; padding:0;}
+    a{color:inherit; text-decoration:none;}
+    input,select{font:inherit;}
+    .console{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+    .main{display:flex; flex-direction:column; min-width:0;}
+    .top{background:var(--surface); border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; gap:12px;}
+    .crumb{flex:1; font-size:12px; color:var(--muted);} .crumb b{color:var(--fg); font-weight:600; font-size:14px;}
+    .pill{font-size:10px; padding:3px 8px; background:var(--accent-soft); color:var(--accent2); border-radius:4px; font-weight:600;}
+    .content{padding:18px 28px;}
+    .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; margin-bottom:14px;}
+    .card h3{font-size:14px; font-weight:600; margin:0 0 12px; display:flex; align-items:center; gap:8px;}
+    .card h3 .tag{font-size:10px; padding:2px 6px; background:var(--accent-soft); color:var(--accent2); border-radius:3px;}
+    .card h3 .extra{margin-left:auto; font-size:11px; color:var(--muted); font-weight:400;}
+
+    .tabs{display:flex; gap:6px; padding:12px 28px 0; flex-wrap:wrap;}
+    .tabs button{padding:8px 14px; border-radius:8px 8px 0 0; font-size:12.5px; font-weight:600; color:var(--muted); background:var(--line);}
+    .tabs button.on{background:var(--surface); color:var(--fg); border:1px solid var(--border); border-bottom-color:var(--surface);}
+
+    .kpi-bar{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px;}
+    .ki{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px;}
+    .ki .l{font-size:10px; color:var(--muted);}
+    .ki .n{font-size:18px; font-weight:700; margin-top:2px;}
+    .ki .d{font-size:10px; color:var(--muted); margin-top:2px;}
+    .ki .n.bad{color:var(--danger);}
+
+    .tbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+    .tbl th,.tbl td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle;}
+    .tbl th{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; background:#f9fafb; position:sticky; top:0;}
+    .tbl tr:hover td{background:#fafcff;}
+    .mono{font-family:var(--mono); font-size:11px;}
+    .tag{display:inline-block; padding:1px 7px; background:var(--accent-soft); color:var(--accent2); border-radius:3px; font-size:10.5px; font-weight:600; margin-right:4px;}
+    .tag.mute{background:var(--line); color:var(--muted);}
+    .tag.ok{background:color-mix(in oklab, var(--success) 14%, transparent); color:var(--success);}
+    .tag.bad{background:color-mix(in oklab, var(--danger) 14%, transparent); color:var(--danger);}
+    .tag.warn{background:color-mix(in oklab, var(--warn) 14%, transparent); color:var(--warn);}
+    .btn{padding:6px 12px; border-radius:6px; font-size:12px; font-weight:500; border:1px solid var(--border); background:var(--surface);}
+    .btn.pri{background:var(--accent2); color:#fff; border-color:var(--accent2);}
+    .btn.mini{padding:3px 8px; font-size:11px;}
+    .btn.danger{color:var(--danger); border-color:#fecaca;}
+    .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+    .fld{display:flex; flex-direction:column; gap:3px; font-size:11px; color:var(--muted);}
+    .fld input,.fld select{padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:12.5px; min-width:110px; background:#fff;}
+    .mtx-wrap{overflow:auto; max-height:60vh; border:1px solid var(--border); border-radius:var(--radius-sm);}
+    .mtx{width:100%; border-collapse:collapse; font-size:11.5px;}
+    .mtx th,.mtx td{padding:6px 8px; border-bottom:1px solid var(--line); text-align:center; min-width:64px;}
+    .mtx th{background:var(--line); font-size:10px; color:var(--muted); position:sticky; top:0;}
+    .mtx td:first-child,.mtx th:first-child{text-align:left; position:sticky; left:0; background:var(--surface); min-width:220px; border-right:1px solid var(--line);}
+    .mtx .grp td{background:linear-gradient(90deg, var(--accent-soft), transparent); font-size:10px; color:var(--accent2); font-weight:700; text-align:left;}
+    .mtx input[type=checkbox]{width:15px; height:15px;}
+    .mtx input:disabled{opacity:.85;}
+    .pane{display:none;} .pane.on{display:block;}
+    .hint{font-size:11.5px; color:var(--muted);}
+    .toast{position:fixed; bottom:20px; right:20px; background:#0f172a; color:#fff; padding:10px 16px; border-radius:10px; font-size:12.5px; opacity:0; transition:.25s; pointer-events:none; z-index:99;}
+    .toast.show{opacity:1;}
+    .toast.err{background:var(--danger);}
+    .drawer{position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; z-index:90;}
+    .drawer.open{display:block;}
+    .drawer-panel{position:absolute; right:0; top:0; bottom:0; width:420px; background:#fff; padding:22px; overflow:auto; box-shadow:-12px 0 40px rgba(0,0,0,.15);}
+    .drawer-panel h4{margin:0 0 14px; font-size:14px;}
+    .drawer-panel .fld{margin-bottom:10px;}
+    .drawer-panel .fld input,.drawer-panel .fld select{width:100%;}
+    .empty{color:var(--muted); padding:26px; text-align:center; font-size:12px;}
+  </style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="account-center"></div>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / <b>账号中心</b></div>
+      <span class="pill">IAM · 功能权限 + 数据权限（scope）</span>
+      <button class="btn" id="btnRefreshAll">刷新</button>
+    </div>
+
+    <div class="tabs">
+      <button data-tab="overview" class="on">总览</button>
+      <button data-tab="roles">功能权限</button>
+      <button data-tab="scope">数据权限</button>
+      <button data-tab="accounts">账号</button>
+      <button data-tab="audit">审计</button>
+      <button data-tab="idp">IdP 配置</button>
+    </div>
+
+    <div class="content">
+
+      <!-- 总览 -->
+      <section class="pane on" id="pane-overview">
+        <div class="kpi-bar" id="kpiBar"><div class="ki"><div class="l">加载中…</div></div></div>
+        <div class="card">
+          <h3>内置角色速览 <span class="tag">roles</span> <span class="extra">自定义角色见「功能权限」</span></h3>
+          <div id="overviewRoles" class="row"></div>
+        </div>
+      </section>
+
+      <!-- 功能权限 -->
+      <section class="pane" id="pane-roles">
+        <div class="card">
+          <h3>角色与权限矩阵 <span class="tag">读写</span>
+            <span class="extra">勾选即写回（builtin 角色只读，改内置面走 scripts/perm_roles_resync.cjs）</span></h3>
+          <div class="row" style="margin-bottom:10px;">
+            <button class="btn pri" id="btnNewRole">+ 新建角色</button>
+            <span class="hint" id="rolesHint"></span>
+          </div>
+          <div id="newRoleForm" style="display:none; margin-bottom:12px;" class="row">
+            <span class="fld">role_code<input id="nrCode" placeholder="custom_role"></span>
+            <span class="fld">名称<input id="nrName" placeholder="自定义角色"></span>
+            <button class="btn pri" id="nrSave">创建</button>
+            <button class="btn" id="nrCancel">取消</button>
+          </div>
+          <div class="mtx-wrap">
+            <table class="mtx" id="permMtx"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 数据权限 -->
+      <section class="pane" id="pane-scope">
+        <div class="card">
+          <h3>数据权限（scope） <span class="tag">account_roles.scope</span>
+            <span class="extra">五档：self &lt; vendor &lt; org &lt; city &lt; all；city 档 city_ids 为显式授权</span></h3>
+          <p class="hint" style="margin-top:0;">点账号行「配置」打开抽屉：选数据范围档位；city 档勾选授权城市（可按机构带出）。
+            变更保存后该账号全部会话立即吊销。</p>
+          <div class="tbl-wrap" style="overflow:auto; max-height:62vh;">
+            <table class="tbl" id="scopeTbl">
+              <thead><tr><th>ID</th><th>账号</th><th>绑定</th><th>角色</th><th>当前 scope</th><th>操作</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 账号 -->
+      <section class="pane" id="pane-accounts">
+        <div class="card">
+          <h3>账号全生命周期 <span class="tag">accounts</span></h3>
+          <div class="row" style="margin-bottom:10px;">
+            <span class="fld">搜索<input id="accQ" placeholder="login_name / 姓名 / 手机号"></span>
+            <span class="fld">角色<select id="accRoleFilter"><option value="">全部角色</option></select></span>
+            <span class="fld">状态<select id="accStatusFilter"><option value="">全部状态</option><option value="active">active</option><option value="locked">locked</option><option value="disabled">disabled</option></select></span>
+            <button class="btn" id="accSearch">查询</button>
+            <button class="btn pri" id="btnNewAcc">+ 新建账号</button>
+          </div>
+          <div id="accCreateForm" style="display:none; margin-bottom:12px;" class="row">
+            <span class="fld">login_name<input id="naLogin" style="width:130px;"></span>
+            <span class="fld">密码<input id="naPwd" type="password" style="width:120px;" placeholder="≥8 位"></span>
+            <span class="fld">显示名<input id="naName" style="width:100px;"></span>
+            <span class="fld">角色（多选）<select id="naRoles" multiple size="2" style="min-width:160px;"></select></span>
+            <span class="fld">org_id<input id="naOrg" style="width:70px;" placeholder="选填"></span>
+            <span class="fld">vendor_id<input id="naVendor" style="width:70px;" placeholder="选填"></span>
+            <span class="fld">worker_id<input id="naWorker" style="width:70px;" placeholder="选填"></span>
+            <button class="btn pri" id="naSave">创建</button>
+          </div>
+          <div style="overflow:auto; max-height:60vh;">
+            <table class="tbl" id="accTbl">
+              <thead><tr><th>ID</th><th>账号</th><th>显示名</th><th>角色</th><th>绑定</th><th>类型</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 审计 -->
+      <section class="pane" id="pane-audit">
+        <div class="card">
+          <h3>审计日志 <span class="tag">audit_log</span> <span class="extra">留存 180 天（AUDIT_RETENTION_DAYS）</span></h3>
+          <div class="row" style="margin-bottom:10px;">
+            <span class="fld">action 前缀<input id="auAction" placeholder="auth. / account. / project." style="width:150px;"></span>
+            <span class="fld">account_id<input id="auAccount" style="width:80px;"></span>
+            <span class="fld">result<select id="auResult"><option value="">全部</option><option value="ok">ok</option><option value="fail">fail</option></select></span>
+            <span class="fld">从<input id="auFrom" placeholder="2026-09-01T00:00:00Z" style="width:160px;"></span>
+            <span class="fld">到<input id="auTo" style="width:160px;"></span>
+            <button class="btn" id="auSearch">查询</button>
+            <button class="btn" id="auNext">更早 →</button>
+          </div>
+          <div class="quick row" style="margin-bottom:8px;">
+            <button class="btn mini" data-auq="auth.login&result=fail">登录失败</button>
+            <button class="btn mini" data-auq="auth.login.lock">锁定事件</button>
+            <button class="btn mini" data-auq="account.">IAM 写操作</button>
+            <button class="btn mini" data-auq="rating.">评级动作</button>
+          </div>
+          <div style="overflow:auto; max-height:60vh;">
+            <table class="tbl" id="auTbl">
+              <thead><tr><th>时间</th><th>动作</th><th>资源</th><th>账号</th><th>角色</th><th>结果</th><th>IP</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- IdP 配置 -->
+      <section class="pane" id="pane-idp">
+        <div class="card">
+          <h3>IdP 联邦登录（OIDC） <span class="tag">idp_configs</span>
+            <span class="extra">gov/bank 走各自机构 IdP，本系统不存其密码（设计 §4.6）；secret 只写不读</span></h3>
+          <div class="row" style="margin-bottom:10px;">
+            <span class="fld">org_no<input id="idpOrg" placeholder="ORG-GOV-JS-1"></span>
+            <span class="fld">issuer<input id="idpIssuer" placeholder="https://idp.example.com" style="width:220px;"></span>
+            <span class="fld">client_id<input id="idpClient"></span>
+            <span class="fld">client_secret<input id="idpSecret" type="password" placeholder="留空=不改"></span>
+            <span class="fld">角色<select id="idpRole"><option value="gov_viewer">gov_viewer</option><option value="bank_viewer">bank_viewer</option></select></span>
+            <button class="btn pri" id="idpSave">保存</button>
+          </div>
+          <table class="tbl" id="idpTbl">
+            <thead><tr><th>org_no</th><th>类型</th><th>issuer</th><th>client_id</th><th>角色</th><th>JIT</th><th>启用</th><th>secret</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="drawer" id="scopeDrawer">
+  <div class="drawer-panel">
+    <h4>数据权限配置 <span class="mono" id="sdAccount" style="color:var(--muted);"></span></h4>
+    <label class="fld">数据范围档位
+      <select id="sdLevel">
+        <option value="self">self · 仅本人</option>
+        <option value="vendor">vendor · 本商家</option>
+        <option value="org">org · 本机构</option>
+        <option value="city">city · 指定城市</option>
+        <option value="all">all · 全平台</option>
+      </select>
+    </label>
+    <div id="sdCityWrap" style="display:none;">
+      <div class="row" style="margin-bottom:6px;">
+        <span class="hint">授权城市（city_ids）</span>
+        <button class="btn mini" id="sdDerive">按机构带出</button>
+      </div>
+      <div id="sdCities" class="row" style="max-height:180px; overflow:auto; align-items:flex-start;"></div>
+    </div>
+    <label class="fld">org_id<span><input id="sdOrg" placeholder="机构绑定（org 档）"></span></label>
+    <label class="fld">vendor_id<span><input id="sdVendor" placeholder="商家绑定（vendor 档）"></span></label>
+    <label class="fld">worker_id<span><input id="sdWorker" placeholder="服务者绑定（self 档）"></span></label>
+    <p class="hint" style="color:var(--warn);">保存后该账号全部会话立即失效，需重新登录。</p>
+    <div class="row">
+      <button class="btn pri" id="sdSave">保存并吊销会话</button>
+      <button class="btn" id="sdClose">取消</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+(function () {
+  'use strict';
+  var API = '/api/juzhu/admin';
+  var state = { roles: [], perms: [], accounts: [], cities: [], orgs: [], me: null, auditBefore: null, scopeEditId: null };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function toast(msg, err) {
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'toast show' + (err ? ' err' : '');
+    setTimeout(function () { el.className = 'toast'; }, 2600);
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = opts.body ? { 'Content-Type': 'application/json' } : {};
+    var t = window.BZF_CONSOLE ? BZF_CONSOLE.token() : '';
+    if (t) headers['Authorization'] = 'Bearer ' + t;
+    return fetch(API + path, { method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) {
+        if (r.status === 401) { BZF_CONSOLE.setToken(''); location.reload(); throw new Error('登录已失效'); }
+        return r.json().then(function (j) {
+          if (!r.ok) throw new Error((j && (j.error || j.message)) || ('HTTP ' + r.status));
+          return j;
+        });
+      });
+  }
+  function $(id) { return document.getElementById(id); }
+  function can(perm) { return state.me && (state.me.permissions || []).indexOf(perm) >= 0; }
+  function isStar() { return state.me && (state.me.permissions || []).indexOf('*') >= 0; }
+
+  // ── tabs ──
+  document.querySelectorAll('.tabs button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.tabs button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      document.querySelectorAll('.pane').forEach(function (p) { p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab); });
+      loadTab(b.dataset.tab);
+    });
+  });
+  function loadTab(tab) {
+    if (tab === 'overview') loadOverview();
+    else if (tab === 'roles') loadPermMatrix();
+    else if (tab === 'scope') loadScope();
+    else if (tab === 'accounts') loadAccounts();
+    else if (tab === 'audit') loadAudit();
+    else if (tab === 'idp') loadIdp();
+  }
+
+  // ── 总览 ──
+  function loadOverview() {
+    api('/iam/overview').then(function (ov) {
+      var items = [
+        ['账号总数', ov.accounts_total, '机器 ' + ov.accounts_machine],
+        ['角色总数', ov.roles_total, '内置 + 自定义'],
+        ['锁定中', ov.locked_now, '登录防爆破', ov.locked_now > 0],
+        ['24h 登录失败', ov.login_failed_24h, 'result=fail', ov.login_failed_24h > 0],
+        ['24h 锁定事件', ov.login_locked_24h, 'auth.login.lock', ov.login_locked_24h > 0],
+        ['24h IAM 写操作', ov.iam_writes_24h, 'account./role.'],
+      ];
+      $('kpiBar').innerHTML = items.map(function (it) {
+        return '<div class="ki"><div class="l">' + esc(it[0]) + '</div><div class="n' + (it[3] ? ' bad' : '') + '">' + esc(it[1]) + '</div><div class="d">' + esc(it[2] || '') + '</div></div>';
+      }).join('');
+      return api('/roles');
+    }).then(function (roles) {
+      state.roles = roles || [];
+      $('overviewRoles').innerHTML = state.roles.map(function (r) {
+        return '<span class="tag' + (r.builtin ? '' : ' ok') + '" title="' + esc((r.permissions || []).join(', ')) + '">' +
+          esc(r.role_code) + ' · ' + r.account_count + ' 账号</span>';
+      }).join('');
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  // ── 功能权限：矩阵 ──
+  function loadPermMatrix() {
+    Promise.all([api('/permissions'), api('/roles')]).then(function (rs) {
+      state.perms = rs[0].perms; state.roles = rs[1];
+      var customRoles = state.roles.filter(function (r) { return !r.builtin; });
+      $('rolesHint').textContent = state.roles.length + ' 角色（自定义 ' + customRoles.length + '）· ' + state.perms.length + ' 权限点';
+      var byDomain = {};
+      state.perms.forEach(function (p) { (byDomain[p.domain] = byDomain[p.domain] || []).push(p); });
+      var cols = state.roles;
+      var html = '<thead><tr><th>权限点</th>' + cols.map(function (r) {
+        return '<th title="' + esc(r.name) + '">' + esc(r.role_code) + (r.builtin ? '' : ' ✎') + '</th>';
+      }).join('') + '</tr></thead><tbody>';
+      Object.keys(byDomain).sort().forEach(function (domain) {
+        html += '<tr class="grp"><td colspan="' + (cols.length + 1) + '">' + esc(domain) + '</td></tr>';
+        byDomain[domain].forEach(function (p) {
+          html += '<tr><td><b class="mono">' + esc(p.code) + '</b> <span class="hint">' + esc(p.name) + '</span></td>';
+          cols.forEach(function (r) {
+            var has = (r.permissions || []).indexOf('*') >= 0 || (r.permissions || []).indexOf(p.code) >= 0;
+            var editable = !r.builtin && !isBuiltinOnly(p, r);
+            html += '<td><input type="checkbox" data-role="' + esc(r.role_code) + '" data-perm="' + esc(p.code) + '"' +
+              (has ? ' checked' : '') + (editable ? '' : ' disabled title="内置角色只读（或 * 全权）"') + '></td>';
+          });
+          html += '</tr>';
+        });
+      });
+      html += '</tbody>';
+      $('permMtx').innerHTML = html;
+      $('permMtx').addEventListener('change', onPermToggle);
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function isBuiltinOnly(p, r) { return (r.permissions || []).indexOf('*') >= 0; } // '*' 行锁死
+  function onPermToggle(ev) {
+    var cb = ev.target;
+    if (cb.tagName !== 'INPUT') return;
+    var roleCode = cb.dataset.role, perm = cb.dataset.perm;
+    var role = state.roles.filter(function (r) { return r.role_code === roleCode; })[0];
+    if (!role) return;
+    var perms = (role.permissions || []).slice();
+    var i = perms.indexOf(perm);
+    if (cb.checked && i < 0) perms.push(perm);
+    if (!cb.checked && i >= 0) perms.splice(i, 1);
+    api('/roles/' + encodeURIComponent(roleCode), { method: 'PUT', body: { permissions: perms } })
+      .then(function (out) {
+        role.permissions = out.permissions;
+        toast('已更新 ' + roleCode + '（该角色账号会话已吊销）');
+      })
+      .catch(function (e) { cb.checked = !cb.checked; toast(e.message, true); });
+  }
+  $('btnNewRole').addEventListener('click', function () { $('newRoleForm').style.display = 'flex'; });
+  $('nrCancel').addEventListener('click', function () { $('newRoleForm').style.display = 'none'; });
+  $('nrSave').addEventListener('click', function () {
+    api('/roles', { method: 'POST', body: { role_code: $('nrCode').value.trim(), name: $('nrName').value.trim(), permissions: [] } })
+      .then(function () { toast('角色已创建（默认无权限点，去矩阵勾选）'); $('newRoleForm').style.display = 'none'; loadPermMatrix(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+
+  // ── 数据权限 ──
+  function scopeText(r) {
+    return (r.roles || []).map(function (x) { return x.role_code + '·' + ((x.scope && x.scope.level) || 'self'); }).join('，') || '—';
+  }
+  function loadScope() {
+    api('/accounts?limit=200').then(function (list) {
+      state.accounts = list || [];
+      var tbody = $('scopeTbl').querySelector('tbody');
+      tbody.innerHTML = state.accounts.map(function (it) {
+        var a = it.account;
+        var bind = a.vendor_id ? ('V#' + a.vendor_id) : a.org_id ? ('O#' + a.org_id) : a.worker_id ? ('W#' + a.worker_id) : '—';
+        return '<tr><td class="mono">' + a.id + '</td><td>' + esc(a.login_name || ('idp:' + (a.idp_type || '') + ':' + (a.idp_subject || ''))) + '</td>' +
+          '<td class="mono">' + esc(bind) + '</td><td>' + esc((it.roles || []).map(function (r) { return r.role_code; }).join(',')) + '</td>' +
+          '<td class="mono">' + esc(scopeText(it)) + '</td>' +
+          '<td><button class="btn mini" data-scope-edit="' + a.id + '">配置</button></td></tr>';
+      }).join('') || '<tr><td colspan="6" class="empty">无账号</td></tr>';
+      tbody.querySelectorAll('[data-scope-edit]').forEach(function (b) {
+        b.addEventListener('click', function () { openScopeDrawer(parseInt(b.dataset.scopeEdit, 10)); });
+      });
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function openScopeDrawer(accountId) {
+    var hit = state.accounts.filter(function (it) { return it.account.id === accountId; })[0];
+    if (!hit) return;
+    state.scopeEditId = accountId;
+    var a = hit.account;
+    var cur = (hit.roles && hit.roles[0] && hit.roles[0].scope) || {};
+    $('sdAccount').textContent = a.login_name || ('#' + a.id);
+    $('sdLevel').value = cur.level || 'self';
+    $('sdOrg').value = (cur.org_id != null ? cur.org_id : (a.org_id || ''));
+    $('sdVendor').value = (cur.vendor_id != null ? cur.vendor_id : (a.vendor_id || ''));
+    $('sdWorker').value = (cur.worker_id != null ? cur.worker_id : (a.worker_id || ''));
+    var checked = (cur.level === 'city' && Array.isArray(cur.city_ids)) ? cur.city_ids : [];
+    renderCityChecks(checked);
+    $('sdCityWrap').style.display = $('sdLevel').value === 'city' ? 'block' : 'none';
+    $('scopeDrawer').classList.add('open');
+  }
+  function renderCityChecks(checked) {
+    var set = {};
+    (checked || []).forEach(function (x) { set[Number(x)] = true; });
+    $('sdCities').innerHTML = state.cities.map(function (c) {
+      return '<label class="tag" style="cursor:pointer;"><input type="checkbox" class="sd-city" value="' + c.id + '"' + (set[c.id] ? ' checked' : '') + '> ' + esc(c.name) + '</label>';
+    }).join('') || '<span class="hint">无城市字典</span>';
+  }
+  $('sdLevel').addEventListener('change', function () {
+    $('sdCityWrap').style.display = $('sdLevel').value === 'city' ? 'block' : 'none';
+  });
+  $('sdDerive').addEventListener('click', function () {
+    var orgId = parseInt($('sdOrg').value, 10);
+    if (!orgId) { toast('先填 org_id', true); return; }
+    var org = state.orgs.filter(function (o) { return o.id === orgId; })[0];
+    if (!org) { toast('orgs 里无 #' + orgId, true); return; }
+    renderCityChecks(org.city_ids || []);
+  });
+  $('sdClose').addEventListener('click', function () { $('scopeDrawer').classList.remove('open'); });
+  $('sdSave').addEventListener('click', function () {
+    var level = $('sdLevel').value;
+    var scope = { level: level };
+    if (level === 'city') {
+      scope.city_ids = Array.prototype.slice.call(document.querySelectorAll('.sd-city:checked')).map(function (c) { return parseInt(c.value, 10); });
+      if (!scope.city_ids.length) { toast('city 档须至少勾选一个城市', true); return; }
+    }
+    if ($('sdOrg').value) scope.org_id = parseInt($('sdOrg').value, 10);
+    if ($('sdVendor').value) scope.vendor_id = parseInt($('sdVendor').value, 10);
+    if ($('sdWorker').value) scope.worker_id = parseInt($('sdWorker').value, 10);
+    api('/accounts/' + state.scopeEditId, { method: 'PUT', body: { roles: currentRoleCodes(state.scopeEditId), scope: scope } })
+      .then(function () { toast('数据权限已保存，该账号会话已吊销'); $('scopeDrawer').classList.remove('open'); loadScope(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+  function currentRoleCodes(accountId) {
+    var hit = state.accounts.filter(function (it) { return it.account.id === accountId; })[0];
+    return hit ? (hit.roles || []).map(function (r) { return r.role_code; }) : [];
+  }
+
+  // ── 账号 ──
+  function fillRoleSelects() {
+    var opts = state.roles.map(function (r) { return '<option value="' + esc(r.role_code) + '">' + esc(r.role_code) + (r.builtin ? '' : ' ✎') + '</option>'; }).join('');
+    $('naRoles').innerHTML = opts;
+    $('accRoleFilter').innerHTML = '<option value="">全部角色</option>' + opts;
+  }
+  function loadAccounts() {
+    var qs = [];
+    if ($('accQ').value.trim()) qs.push('q=' + encodeURIComponent($('accQ').value.trim()));
+    if ($('accRoleFilter').value) qs.push('role_code=' + encodeURIComponent($('accRoleFilter').value));
+    if ($('accStatusFilter').value) qs.push('status=' + encodeURIComponent($('accStatusFilter').value));
+    qs.push('limit=200');
+    return api('/accounts?' + qs.join('&')).then(function (list) {
+      state.accounts = list || [];
+      var tbody = $('accTbl').querySelector('tbody');
+      tbody.innerHTML = state.accounts.map(function (it) {
+        var a = it.account;
+        var name = a.login_name || ('idp:' + (a.idp_type || '') + ':' + (a.idp_subject || ''));
+        var bind = a.vendor_id ? ('V#' + a.vendor_id) : a.org_id ? ('O#' + a.org_id) : a.worker_id ? ('W#' + a.worker_id) : '—';
+        var stTag = a.status === 'active' ? 'ok' : a.status === 'locked' ? 'warn' : 'bad';
+        var ops = [];
+        ops.push('<button class="btn mini" data-op="roles" data-id="' + a.id + '">角色</button>');
+        ops.push('<button class="btn mini" data-op="pwd" data-id="' + a.id + '">重置密码</button>');
+        ops.push('<button class="btn mini" data-op="status" data-id="' + a.id + '" data-st="' + (a.status === 'active' ? 'disabled' : 'active') + '">' + (a.status === 'active' ? '停用' : '启用') + '</button>');
+        if (a.status === 'locked') ops.push('<button class="btn mini" data-op="unlock" data-id="' + a.id + '">解锁</button>');
+        ops.push('<button class="btn mini" data-op="key" data-id="' + a.id + '">签发 Key</button>');
+        ops.push('<button class="btn mini" data-op="kick" data-id="' + a.id + '">下线</button>');
+        return '<tr><td class="mono">' + a.id + '</td><td class="mono">' + esc(name) + '</td><td>' + esc(a.display_name || '') + '</td>' +
+          '<td>' + esc((it.roles || []).map(function (r) { return r.role_code; }).join(',')) + '</td>' +
+          '<td class="mono">' + esc(bind) + '</td><td>' + esc(a.principal_type === 'machine' ? '机器' : '人') + '</td>' +
+          '<td><span class="tag ' + stTag + '">' + esc(a.status) + '</span></td>' +
+          '<td class="mono">' + esc(a.last_login_at || '—') + '</td>' +
+          '<td style="white-space:nowrap;">' + ops.join('') + '</td></tr>';
+      }).join('') || '<tr><td colspan="9" class="empty">无账号</td></tr>';
+      tbody.querySelectorAll('[data-op]').forEach(function (b) {
+        b.addEventListener('click', function () { accountOp(b.dataset.op, parseInt(b.dataset.id, 10), b.dataset.st); });
+      });
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function accountOp(op, id, st) {
+    var done = function () { loadAccounts(); };
+    if (op === 'status') {
+      api('/accounts/' + id, { method: 'PUT', body: { status: st } }).then(done).catch(function (e) { toast(e.message, true); });
+    } else if (op === 'unlock') {
+      api('/accounts/' + id, { method: 'PUT', body: { unlock: 1 } }).then(function () { toast('已解锁'); done(); }).catch(function (e) { toast(e.message, true); });
+    } else if (op === 'pwd') {
+      var np = prompt('重置密码（≥8 位）：');
+      if (!np) return;
+      api('/accounts/' + id, { method: 'PUT', body: { password: np } }).then(function () { toast('密码已重置，会话已吊销'); }).catch(function (e) { toast(e.message, true); });
+    } else if (op === 'key') {
+      api('/accounts/' + id + '/api-key', { method: 'POST', body: {} }).then(function (out) {
+        prompt('机器 Key 明文仅此一次：', out.api_key);
+      }).catch(function (e) { toast(e.message, true); });
+    } else if (op === 'kick') {
+      api('/accounts/' + id + '/sessions', { method: 'DELETE', body: {} }).then(function (out) { toast('已下线 ' + out.revoked + ' 个会话'); }).catch(function (e) { toast(e.message, true); });
+    } else if (op === 'roles') {
+      var hit = state.accounts.filter(function (it) { return it.account.id === id; })[0];
+      var cur = hit ? (hit.roles || []).map(function (r) { return r.role_code; }).join(',') : '';
+      var nr = prompt('角色（逗号分隔，可选：' + state.roles.map(function (r) { return r.role_code; }).join(' ') + '）：', cur);
+      if (nr == null) return;
+      var roles = nr.split(/[,，\s]+/).filter(Boolean);
+      if (!roles.length) { toast('至少一个角色', true); return; }
+      api('/accounts/' + id, { method: 'PUT', body: { roles: roles } }).then(function () { toast('角色已更新'); done(); }).catch(function (e) { toast(e.message, true); });
+    }
+  }
+  $('accSearch').addEventListener('click', loadAccounts);
+  $('btnNewAcc').addEventListener('click', function () { $('accCreateForm').style.display = 'flex'; });
+  $('naSave').addEventListener('click', function () {
+    var body = {
+      login_name: $('naLogin').value.trim(),
+      password: $('naPwd').value,
+      display_name: $('naName').value.trim() || null,
+      roles: Array.prototype.slice.call($('naRoles').selectedOptions).map(function (o) { return o.value; }),
+    };
+    if ($('naOrg').value) body.org_id = parseInt($('naOrg').value, 10);
+    if ($('naVendor').value) body.vendor_id = parseInt($('naVendor').value, 10);
+    if ($('naWorker').value) body.worker_id = parseInt($('naWorker').value, 10);
+    if (!body.roles.length) { toast('至少选一个角色', true); return; }
+    api('/accounts', { method: 'POST', body: body })
+      .then(function () { toast('账号已创建'); $('accCreateForm').style.display = 'none'; loadAccounts(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+
+  // ── 审计 ──
+  function loadAudit(beforeId) {
+    var qp = [];
+    if ($('auAction').value.trim()) qp.push('action=' + encodeURIComponent($('auAction').value.trim()));
+    if ($('auAccount').value.trim()) qp.push('account_id=' + encodeURIComponent($('auAccount').value.trim()));
+    if ($('auResult').value) qp.push('result=' + encodeURIComponent($('auResult').value));
+    if ($('auFrom').value.trim()) qp.push('from=' + encodeURIComponent($('auFrom').value.trim()));
+    if ($('auTo').value.trim()) qp.push('to=' + encodeURIComponent($('auTo').value.trim()));
+    qp.push('limit=100');
+    if (beforeId) qp.push('before_id=' + beforeId);
+    api('/audit?' + qp.join('&')).then(function (rows) {
+      rows = rows || [];
+      state.auditBefore = rows.length === 100 ? rows[rows.length - 1].id : null;
+      $('auNext').style.display = state.auditBefore ? '' : 'none';
+      var accName = {};
+      state.accounts.forEach(function (it) { accName[it.account.id] = it.account.login_name; });
+      $('auTbl').querySelector('tbody').innerHTML = rows.map(function (r) {
+        var resTag = r.result === 'fail' ? 'bad' : r.result === 'ok' ? 'ok' : 'mute';
+        return '<tr><td class="mono">' + esc(r.created_at) + '</td><td class="mono">' + esc(r.action) + '</td>' +
+          '<td class="mono">' + esc((r.resource || '') + (r.resource_id ? '#' + r.resource_id : '')) + '</td>' +
+          '<td class="mono">' + esc(r.account_id ? (accName[r.account_id] || ('#' + r.account_id)) : '—') + '</td>' +
+          '<td class="mono">' + esc(r.role_code || '—') + '</td>' +
+          '<td>' + (r.result ? '<span class="tag ' + resTag + '">' + esc(r.result) + '</span>' : '—') + '</td>' +
+          '<td class="mono">' + esc(r.ip || '—') + '</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="empty">无记录</td></tr>';
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  $('auSearch').addEventListener('click', function () { loadAudit(); });
+  $('auNext').addEventListener('click', function () { if (state.auditBefore) loadAudit(state.auditBefore); });
+  document.querySelectorAll('[data-auq]').forEach(function (b) {
+    b.addEventListener('click', function () { $('auAction').value = b.dataset.auq.split('&')[0]; if (b.dataset.auq.indexOf('result=fail') >= 0) $('auResult').value = 'fail'; else $('auResult').value = ''; loadAudit(); });
+  });
+
+  // ── IdP ──
+  function loadIdp() {
+    api('/idp-configs').then(function (rows) {
+      rows = rows || [];
+      $('idpTbl').querySelector('tbody').innerHTML = rows.map(function (r) {
+        return '<tr><td class="mono">' + esc(r.org_no) + '</td><td>' + esc(r.idp_type) + '</td>' +
+          '<td class="mono">' + esc(r.issuer) + '</td><td class="mono">' + esc(r.client_id) + '</td>' +
+          '<td class="mono">' + esc(r.role_code) + '</td>' +
+          '<td>' + (r.jit_enabled ? '<span class="tag ok">开</span>' : '<span class="tag mute">关</span>') + '</td>' +
+          '<td>' + (r.enabled ? '<span class="tag ok">启用</span>' : '<span class="tag mute">停用</span>') + '</td>' +
+          '<td>' + (r.has_secret ? '<span class="tag ok">已设</span>' : '<span class="tag mute">未设</span>') + '</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="empty">暂无 IdP 配置（阶段 3 政企接入期启用）</td></tr>';
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  $('idpSave').addEventListener('click', function () {
+    var body = {
+      org_no: $('idpOrg').value.trim(), issuer: $('idpIssuer').value.trim(),
+      client_id: $('idpClient').value.trim(), role_code: $('idpRole').value,
+    };
+    if ($('idpSecret').value) body.client_secret = $('idpSecret').value;
+    api('/idp-configs', { method: 'PUT', body: body })
+      .then(function () { toast('IdP 配置已保存'); $('idpSecret').value = ''; loadIdp(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+
+  // ── boot ──
+  $('btnRefreshAll').addEventListener('click', function () { loadTab(document.querySelector('.tabs button.on').dataset.tab); });
+  BZF_CONSOLE.requireLogin({ hint: '账号中心（需 iam/audit 读权限）' }).then(function (me) {
+    state.me = me;
+    return Promise.all([api('/roles'), api('/orgs'), fetch('/api/juzhu/admin/cities', { headers: { Authorization: 'Bearer ' + (BZF_CONSOLE.token() || '') } }).then(function (r) { return r.json(); })]);
+  }).then(function (rs) {
+    state.roles = rs[0] || [];
+    state.orgs = rs[1] || [];
+    state.cities = Array.isArray(rs[2]) ? rs[2] : (rs[2] && rs[2].cities) || [];
+    fillRoleSelects();
+    loadOverview();
+  }).catch(function (e) {
+    toast('加载失败：' + (e && e.message || e), true);
+  });
+})();
+</script>
+</body>
+</html>

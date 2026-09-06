@@ -102,6 +102,8 @@
         if (!res.ok || !res.d.token) { errEl.textContent = res.d.error || '登录失败'; return; }
         setToken(res.d.token);
         closeOverlay();
+        // 通知导航模块拉取登录态（真实用户盒 + 菜单按权限裁剪）
+        if (window.BZF_NAV && BZF_NAV.hydrate) { try { BZF_NAV.hydrate(); } catch (_) {} }
         var waiters = pending.splice(0);
         waiters.forEach(function (w) { w.resolve(); });
       })

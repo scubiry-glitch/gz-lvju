@@ -57,6 +57,11 @@
   .tbl .acts{white-space:nowrap;}
   .tbl .acts button{padding:4px 8px;font-size:11px;margin-left:4px;}
   .tbl tr.on td{background:color-mix(in oklab,var(--brand) 8%,#fff);}
+  /* 周边绑定添加行（规则 17） */
+  .ps-add{display:flex;gap:8px;align-items:center;margin:10px 0 12px;flex-wrap:wrap;}
+  .ps-add select{padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:240px;}
+  .ps-add input{padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;}
+  #psPickNote{min-width:200px;}
   .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
     font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
   .toast.show{opacity:1;}
@@ -177,40 +182,20 @@
 
 <div id="paneAccounts" class="pane-main" hidden>
   <div class="card">
-    <h2>账号管理</h2>
-    <p class="hint">账号中心（accounts/roles）。任何主体原生多账号：商家挂 vendor_id、机构挂 org_id，各自绑角色。密码仅创建/重置时输入。</p>
-    <div class="fld" style="margin-top:12px;">
-      <label>新建账号</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <input type="text" id="accLogin" placeholder="login_name" style="width:150px;">
-        <input type="password" id="accPwd" placeholder="密码(≥8位)" style="width:130px;">
-        <input type="text" id="accVendor" placeholder="vendor_id(选填)" style="width:120px;">
-        <select id="accRole">
-          <option value="vendor_owner">vendor_owner</option>
-          <option value="vendor_operator">vendor_operator</option>
-          <option value="operator_admin">operator_admin</option>
-          <option value="worker">worker</option>
-          <option value="user">user</option>
-          <option value="gov_viewer">gov_viewer</option>
-          <option value="bank_viewer">bank_viewer</option>
-          <option value="holding_viewer">holding_viewer</option>
-          <option value="platform_op">platform_op</option>
-        </select>
-        <button type="button" class="btn primary" id="btnAccCreate">创建</button>
-      </div>
+    <h2>账号与权限已迁移至账号中心</h2>
+    <p class="hint">账号 / 角色 / 权限矩阵 / 数据权限（scope）/ 审计 / IdP 配置已统一收敛到 P 端「账号中心」（同一账号会话，无需重复登录）。本页保留内容编辑职责。</p>
+    <div class="bar" style="margin-top:14px;">
+      <a class="btn primary" href="screens/account-center.html" target="_blank">打开账号中心 ↗</a>
     </div>
-    <div id="accList" style="margin-top:14px;"></div>
   </div>
 </div>
 <div id="paneAudit" class="pane-main" hidden>
   <div class="card">
-    <h2>审计日志</h2>
-    <p class="hint">管理写操作与登录事件（audit_log，默认留存 180 天）。</p>
-    <div class="bar" style="margin-top:10px;">
-      <button type="button" class="btn" id="btnAuditReload">刷新</button>
-      <span class="hint" id="auditCount"></span>
+    <h2>审计查询已迁移至账号中心</h2>
+    <p class="hint">审计日志（audit_log）现支持 action 前缀 / result / 时间范围 / IP 过滤与翻页，统一在账号中心「审计」页查询。</p>
+    <div class="bar" style="margin-top:14px;">
+      <a class="btn primary" href="screens/account-center.html" target="_blank">打开账号中心 ↗</a>
     </div>
-    <div id="auditList" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -296,7 +281,7 @@
 <script src="screens/_console-login.js"></script>
 <script>
 var API = '/api/juzhu/admin';
-var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
+var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false, spots: [], spotBindings: [] };
 
 // 会话 token 统一走账号中心（BZF_SESSION_TOKEN，与 _console-login.js / 其他控制台共享），
 // 旧 JUZHU_ADMIN_TOKEN / JUZHU_API_KEY 已废止
@@ -506,8 +491,6 @@ function switchTab(tab) {
   document.getElementById('paneAccounts').hidden = tab !== 'accounts';
   document.getElementById('paneAudit').hidden = tab !== 'audit';
   if (tab === 'dict') renderDictionary();
-  if (tab === 'accounts') renderAccounts();
-  if (tab === 'audit') renderAudit();
   if (tab === 'phone') renderConsultModes();
 }
 
@@ -536,61 +519,8 @@ function renderConsultModes(){
 }
 
 
-// ── 账号管理（阶段1/2 admin API）──
+// ── 账号/审计已迁移至账号中心（screens/account-center.html），此处仅保留迁移卡 ──
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function renderAccounts(){
-  api('/accounts').then(function(list){
-    var rows = (list||[]).map(function(it){
-      var a = it.account || {}, roles = (it.roles||[]).map(function(r){return r.role_code;}).join(',');
-      return '<tr><td>'+a.id+'</td><td>'+esc(a.login_name||('-idp:'+a.idp_type+':'+a.idp_subject))+'</td><td>'+esc(a.display_name||'')+'</td>'+
-        '<td>'+esc(roles)+'</td><td>'+(a.vendor_id?('V'+a.vendor_id):(a.org_id?('O'+a.org_id):(a.worker_id?('W'+a.worker_id):'-')))+'</td>'+
-        '<td>'+(a.principal_type==='machine'?'机器':'人')+'</td>'+
-        '<td><span class="hint">'+esc(a.status)+'</span></td>'+
-        '<td><button class="btn" data-acc-toggle="'+a.id+'" data-st="'+(a.status==='active'?'disabled':'active')+'">'+(a.status==='active'?'停用':'启用')+'</button> '+
-        '<button class="btn" data-acc-key="'+a.id+'">签发Key</button></td></tr>';
-    }).join('');
-    document.getElementById('accList').innerHTML =
-      '<table class="tbl"><thead><tr><th>ID</th><th>登录名</th><th>显示名</th><th>角色</th><th>绑定</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
-    document.getElementById('accList').onclick = function(e){
-      var b = e.target.closest('button'); if(!b) return;
-      if (b.dataset.accToggle) {
-        api('/accounts/'+b.dataset.accToggle, { method:'PUT', body: JSON.stringify({ status: b.dataset.st }) })
-          .then(function(){ toast('已更新'); renderAccounts(); })
-          .catch(function(err){ toast(err.message); });
-      } else if (b.dataset.accKey) {
-        api('/accounts/'+b.dataset.accKey+'/api-key', { method:'POST' })
-          .then(function(d){ prompt('机器 Key（仅此一次展示）：', d.api_key); })
-          .catch(function(err){ toast(err.message); });
-      }
-    };
-  }).catch(function(err){ document.getElementById('accList').textContent = '加载失败：'+err.message; });
-}
-document.getElementById('btnAccCreate').onclick = function(){
-  var body = {
-    login_name: document.getElementById('accLogin').value.trim(),
-    password: document.getElementById('accPwd').value,
-    roles: [document.getElementById('accRole').value],
-  };
-  var v = document.getElementById('accVendor').value.trim();
-  if (v) body.vendor_id = parseInt(v, 10);
-  api('/accounts', { method:'POST', body: JSON.stringify(body) })
-    .then(function(){ toast('账号已创建'); renderAccounts(); })
-    .catch(function(err){ toast(err.message); });
-};
-
-// ── 审计日志 ──
-function renderAudit(){
-  api('/audit?limit=100').then(function(rows){
-    document.getElementById('auditCount').textContent = ' 最近 '+(rows||[]).length+' 条';
-    var tr = (rows||[]).map(function(r){
-      return '<tr><td>'+esc(r.created_at)+'</td><td>'+esc(r.action)+'</td><td>'+esc(r.resource||'')+(r.resource_id?('#'+esc(r.resource_id)):'')+'</td>'+
-        '<td>'+(r.account_id||'-')+'</td><td>'+esc(r.role_code||'')+'</td><td>'+esc(r.ip||'')+'</td></tr>';
-    }).join('');
-    document.getElementById('auditList').innerHTML =
-      '<table class="tbl"><thead><tr><th>时间</th><th>动作</th><th>资源</th><th>账号</th><th>角色</th><th>IP</th></tr></thead><tbody>'+tr+'</tbody></table>';
-  }).catch(function(err){ document.getElementById('auditList').textContent = '加载失败：'+err.message; });
-}
-document.getElementById('btnAuditReload').onclick = renderAudit;
 
 document.getElementById('subnav').onclick = function(e) {
   var btn = e.target.closest('button[data-tab]');
@@ -740,6 +670,7 @@ function loadDictionary() {
     state.city = d.city || null;
     state.districts = d.districts || [];
     state.channels = d.channels || [];
+    state.spots = d.spots || [];
     if (d.cities && d.cities.length) fillCitySwitch(d.cities);
     document.body.classList.remove('api-off');
     document.getElementById('apiWarn').hidden = true;
@@ -786,6 +717,31 @@ function renderDictionary() {
       '<td class="acts"><button type="button" class="btn primary d_save">保存</button>'+
       '<button type="button" class="btn danger d_del">删</button></td></tr>';
   }).join('');
+  // 周边玩法维度（规则 17）：商圈 / 景区字典，项目在「内容」tab 的项目编辑器里绑定
+  var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈' };
+  function spotCityOpts(cityId) {
+    return '<option value="">全省通用</option>' + cityList.map(function(c) {
+      return '<option value="'+c.id+'"'+(Number(cityId)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('');
+  }
+  var spotRows = (state.spots || []).map(function(s) {
+    return '<tr data-sid="'+s.id+'">'+
+      '<td><input class="s_name" value="'+esc(s.name||'')+'"/></td>'+
+      '<td><select class="s_type">'+
+        '<option value="scenic"'+(s.type!=='biz'?' selected':'')+'>景区</option>'+
+        '<option value="biz"'+(s.type==='biz'?' selected':'')+'>商圈</option></select></td>'+
+      '<td><select class="s_city">'+spotCityOpts(s.city_id)+'</select></td>'+
+      '<td><input class="s_slug" value="'+esc(s.slug||'')+'" placeholder="qingyan-ancient-town"/></td>'+
+      '<td><input class="s_icon" value="'+esc(s.icon||'')+'" style="width:44px;"/></td>'+
+      '<td><input class="s_cover" value="'+esc(s.cover_image||'')+'"/></td>'+
+      '<td><input class="s_sum" value="'+esc(s.summary||'')+'" placeholder="编辑导语（杂志口吻，一两句）"/></td>'+
+      '<td><input class="s_tags" value="'+esc(tagsStr(s.tags))+'" placeholder="5A 级, 明清石巷"/></td>'+
+      '<td><input class="s_link" value="'+esc(s.link||'')+'" placeholder="选填深链"/></td>'+
+      '<td><input class="s_sort" type="number" value="'+(s.sort_order||0)+'" style="width:56px;"/></td>'+
+      '<td><input class="s_en" type="checkbox"'+(s.enabled!==0?' checked':'')+'/></td>'+
+      '<td class="acts"><button type="button" class="btn primary s_save">保存</button>'+
+      '<button type="button" class="btn danger s_del">删</button></td></tr>';
+  }).join('');
 
   root.innerHTML =
     '<div class="card"><h2>城市 <span class="badge">'+cityList.length+'</span></h2>'+
@@ -803,6 +759,26 @@ function renderDictionary() {
       '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>备注</th><th>排序</th><th>封面路径</th><th>项目/户型/房源量</th><th>操作</th></tr></thead>'+
       '<tbody id="distRows">'+distRows+'</tbody></table>'+
       '<div class="bar"><button type="button" class="btn ghost" id="addDistrict">+ 新增行政区</button></div>'+
+    '</div>'+
+    '<div class="card"><h2>周边玩法（景区 / 商圈） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
+      '<p class="hint">C 端房源详情页「周边玩法」杂志区块的数据源（规则 17）。城市选「全省通用」= 跨市目的地（如黄果树、西江），任何项目都可绑定；slug 是 C 端深链词汇（小写字母/数字/连字符，全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「链接」选填，留空则景区回落 <code>lvju-app-spot-detail.html</code> / 列表页。仍被项目绑定的地点不可删（先在项目里解除绑定）。</p>'+
+      '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
+        '<th>名称</th><th>类型</th><th>城市</th><th>Slug</th><th>图标</th><th>封面路径</th><th>编辑导语</th><th>标签</th><th>链接</th><th>排序</th><th>启用</th><th>操作</th>'+
+      '</tr></thead>'+
+      '<tbody id="spotRows">'+spotRows+
+        '<tr class="new"><td><input class="n_name" placeholder="名称"/></td>'+
+        '<td><select class="n_type"><option value="scenic">景区</option><option value="biz">商圈</option></select></td>'+
+        '<td><select class="n_city">'+spotCityOpts(state.city && state.city.id)+'</select></td>'+
+        '<td><input class="n_slug" placeholder="留空自动生成"/></td>'+
+        '<td><input class="n_icon" placeholder="🏮" style="width:44px;"/></td>'+
+        '<td><input class="n_cover" placeholder="assets/lvju/xx.jpg"/></td>'+
+        '<td><input class="n_sum" placeholder="编辑导语（杂志口吻）"/></td>'+
+        '<td><input class="n_tags" placeholder="逗号分隔"/></td>'+
+        '<td><input class="n_link" placeholder="选填深链"/></td>'+
+        '<td><input class="n_sort" type="number" value="999" style="width:56px;"/></td>'+
+        '<td></td>'+
+        '<td class="acts"><button type="button" class="btn ghost" id="newSpotSave">+ 新增</button></td></tr>'+
+      '</tbody></table></div>'+
     '</div>';
 
   document.getElementById('addCity').onclick = function() {
@@ -906,6 +882,53 @@ function renderDictionary() {
     }).then(function(){ populateDistrictFilter(); renderDictionary(); })
       .catch(function(e){ toast('添加失败：'+e.message); });
   };
+
+  // ── 周边玩法维度（spots CRUD，规则 17）──
+  function spotBodyFrom(tr, prefix) {
+    var body = {
+      name: tr.querySelector('.'+prefix+'name').value.trim(),
+      type: tr.querySelector('.'+prefix+'type').value,
+      city_id: tr.querySelector('.'+prefix+'city').value || null,
+      slug: tr.querySelector('.'+prefix+'slug').value.trim() || null,
+      icon: tr.querySelector('.'+prefix+'icon').value.trim() || null,
+      cover_image: tr.querySelector('.'+prefix+'cover').value.trim() || null,
+      summary: tr.querySelector('.'+prefix+'sum').value.trim() || null,
+      tags: tagsFromInput(tr.querySelector('.'+prefix+'tags').value),
+      link: tr.querySelector('.'+prefix+'link').value.trim() || null,
+      sort_order: +tr.querySelector('.'+prefix+'sort').value || 0
+    };
+    if (prefix === 's_') body.enabled = tr.querySelector('.s_en').checked ? 1 : 0;
+    return body;
+  }
+  root.querySelectorAll('.s_save').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      api('/spots/'+tr.dataset.sid, { method:'PUT', body: spotBodyFrom(tr, 's_') }).then(function(res) {
+        var idx = (state.spots || []).findIndex(function(s){ return Number(s.id) === Number(tr.dataset.sid); });
+        if (idx >= 0 && res && res.spot) state.spots[idx] = res.spot;
+        toast('地点已保存');
+      }).catch(function(e){ toast('保存失败：'+e.message); });
+    };
+  });
+  root.querySelectorAll('.s_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      if (!confirm('确定删除地点「'+tr.querySelector('.s_name').value+'」？')) return;
+      api('/spots/'+tr.dataset.sid, { method:'DELETE' }).then(function() {
+        toast('地点已删除');
+        state.spots = (state.spots || []).filter(function(s){ return Number(s.id) !== Number(tr.dataset.sid); });
+        renderDictionary();
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
+  var newSpotBtn = document.getElementById('newSpotSave');
+  if (newSpotBtn) newSpotBtn.onclick = function() {
+    var tr = newSpotBtn.closest('tr');
+    api('/spots', { method:'POST', body: spotBodyFrom(tr, 'n_') }).then(function() {
+      toast('地点已创建');
+      return loadDictionary();
+    }).then(renderDictionary).catch(function(e){ toast('添加失败：'+e.message); });
+  };
 }
 
 function saveDistrictRow(tr) {
@@ -966,13 +989,107 @@ function openProject(id, expandedAfter) {
   } else {
     state.expandedUnit = null;
   }
-  api('/projects/'+id).then(function(res) {
-    state.current = res.project;
-    state.units = res.units || [];
-    state.photos = res.photos || [];
-    renderProjectList();
-    renderEditor();
+  // 周边绑定（规则 17）与项目主档并行拉取；字典未就绪时兜底再拉一次 spots
+  Promise.all([api('/projects/'+id), api('/projects/'+id+'/spots')]).then(function(rs) {
+    state.current = rs[0].project;
+    state.units = rs[0].units || [];
+    state.photos = rs[0].photos || [];
+    state.spotBindings = (rs[1] && rs[1].bindings) || [];
+    var ready = state.spots && state.spots.length
+      ? Promise.resolve()
+      : api('/spots').then(function(list){ state.spots = Array.isArray(list) ? list : ((list && list.spots) || []); });
+    return ready.then(function() {
+      renderProjectList();
+      renderEditor();
+    });
   }).catch(function(e){ toast('加载失败：'+e.message); });
+}
+
+// ── 周边玩法 · 项目绑定（规则 17）：草稿存 state.spotBindings，单次 PUT 整体替换 ──
+function spotsCardHtml(p) {
+  var b = state.spotBindings || [];
+  var byId = {};
+  (state.spots || []).forEach(function(s){ byId[s.id] = s; });
+  var unpicked = (state.spots || []).filter(function(s){
+    return !b.some(function(x){ return Number(x.spot_id) === Number(s.id); });
+  });
+  function opt(s) {
+    return '<option value="'+s.id+'">['+(s.type==='biz'?'商圈':'景区')+'] '+esc(s.name||s.slug)+' · '+(s.city_id?'':'全省通用')+'</option>';
+  }
+  return '<div class="card" id="spotsCard">'+
+    '<h2>周边玩法（景区 / 商圈）<span class="badge" style="background:var(--gold)" id="psCount">'+b.length+'</span></h2>'+
+    '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">C 端详情页「周边玩法」杂志区块按此渲染：第一条为封面故事大卡，其余按 景区→商圈 分组。「编辑行文」写步程/车程与推荐理由（如：步行 5 分钟 · 古镇北门）。列表整体一次保存（覆盖该项目的全部绑定）；跨市目的地（黄果树、西江等）在「字典」tab 存为全省通用。地点维度的增删改在 <a href="javascript:void(0)" id="psGotoDict">字典 · 周边玩法</a>。</p>'+
+    '<div class="ps-add"><select id="psPick">'+
+      (unpicked.length ? unpicked.map(opt).join('') : '<option value="">（字典里的地点都已绑定）</option>')+
+      '</select>'+
+      '<input id="psPickNote" placeholder="编辑行文：步行 5 分钟"/>'+
+      '<input id="psPickSort" type="number" value="'+(b.length ? Math.max.apply(null, b.map(function(x){ return +x.sort_order||0; })) + 10 : 10)+'" style="width:70px;"/>'+
+      '<button type="button" class="btn ghost" id="psAdd">+ 加入</button></div>'+
+    '<table class="tbl"><thead><tr><th>名称</th><th>类型</th><th>编辑行文</th><th>排序</th><th>操作</th></tr></thead>'+
+    '<tbody id="psRows">'+ b.map(function(x){
+        var s = byId[x.spot_id] || {};
+        return '<tr data-spot-id="'+x.spot_id+'"><td>'+esc(s.name || ('未知 #'+x.spot_id))+'</td>'+
+          '<td>'+(s.type==='biz'?'商圈':'景区')+'</td>'+
+          '<td><input class="ps_note" value="'+esc(x.note||'')+'"/></td>'+
+          '<td><input class="ps_sort" type="number" value="'+(x.sort_order||0)+'" style="width:70px;"/></td>'+
+          '<td class="acts"><button type="button" class="btn danger ps_rm">移除</button></td></tr>';
+      }).join('') + (b.length ? '' : '<tr><td colspan="5" style="color:var(--muted);font-size:12px;">尚未绑定。C 端详情页将不展示「周边玩法」区块。</td></tr>')+'</tbody></table>'+
+    '<div class="bar"><button type="button" class="btn primary" id="psSave">保存周边绑定</button>'+
+      '<a class="btn ghost" target="_blank" href="lvju-app-detail.html?id='+p.id+'">前台预览 ›</a></div></div>';
+}
+
+function bindSpotsCard(p) {
+  var card = document.getElementById('spotsCard');
+  if (!card) return;
+  function rerenderCard() {
+    card.outerHTML = spotsCardHtml(p);
+    bindSpotsCard(p);
+  }
+  var add = document.getElementById('psAdd');
+  if (add) add.onclick = function() {
+    var pick = document.getElementById('psPick');
+    if (!pick || !pick.value) { toast('没有可添加的地点'); return; }
+    state.spotBindings = (state.spotBindings || []).concat([{
+      spot_id: Number(pick.value),
+      note: document.getElementById('psPickNote').value.trim(),
+      sort_order: Number(document.getElementById('psPickSort').value) || 0
+    }]);
+    rerenderCard();
+  };
+  card.querySelectorAll('.ps_rm').forEach(function(btn) {
+    btn.onclick = function() {
+      var sid = Number(btn.closest('tr').dataset.spotId);
+      state.spotBindings = (state.spotBindings || []).filter(function(x){ return Number(x.spot_id) !== sid; });
+      rerenderCard();
+    };
+  });
+  // 行文/排序即时回写草稿（不重渲染，避免输入丢焦点）
+  card.querySelectorAll('tr[data-spot-id]').forEach(function(tr) {
+    var sid = Number(tr.dataset.spotId);
+    var note = tr.querySelector('.ps_note'), sort = tr.querySelector('.ps_sort');
+    if (note) note.oninput = function() {
+      var it = (state.spotBindings || []).find(function(x){ return Number(x.spot_id) === sid; });
+      if (it) it.note = note.value;
+    };
+    if (sort) sort.oninput = function() {
+      var it = (state.spotBindings || []).find(function(x){ return Number(x.spot_id) === sid; });
+      if (it) it.sort_order = Number(sort.value) || 0;
+    };
+  });
+  var save = document.getElementById('psSave');
+  if (save) save.onclick = function() {
+    var bindings = (state.spotBindings || []).map(function(x){
+      return { spot_id: x.spot_id, note: (x.note || '').trim(), sort_order: Number(x.sort_order) || 0 };
+    });
+    api('/projects/'+p.id+'/spots', { method:'PUT', body: { bindings: bindings } }).then(function(res) {
+      state.spotBindings = (res && res.bindings) || bindings;
+      var cnt = document.getElementById('psCount');
+      if (cnt) cnt.textContent = state.spotBindings.length;
+      toast('周边绑定已保存');
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+  var goto_ = document.getElementById('psGotoDict');
+  if (goto_) goto_.onclick = function() { switchTab('dict'); };
 }
 
 function photosOf(unitId) {
@@ -1238,6 +1355,7 @@ function renderEditor() {
       '</div>'+
     '</div>'+
     stayCard+
+    spotsCardHtml(p)+
     ratingCard+
     '<div class="card">'+
       '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
@@ -1259,6 +1377,7 @@ function renderEditor() {
   document.getElementById('delProj').onclick = deleteProject;
   document.getElementById('addUnit').onclick = addUnit;
   renderUnits(isTrade);
+  bindSpotsCard(p);
   if (stayCard) {   // 开关切换即时刷新徽标
     var bkEl = document.getElementById('p_bookable'), bkSt = document.getElementById('p_bookable_st');
     if (bkEl && bkSt) bkEl.onchange = function(){
