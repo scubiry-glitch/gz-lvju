@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
 const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
+const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
 const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
 const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
 authCenter.init({
@@ -62,6 +63,8 @@ let mysql2 = null;
 try { mysql2 = require('mysql2/promise'); } catch (_) {}
 let jzSeedAll = null;
 try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
+let staffSeedAll = null;
+try { staffSeedAll = require('./staff_seed.cjs').seedAll; } catch (_) {}
 let housingSeedAll = null;
 let housingBackfillPhotos = null;
 let housingParseJsonField = null;
@@ -234,7 +237,9 @@ function verifyAdminLoginToken(token) {
 }
 
 async function isAdminSessionAuthorized(req) {
-  if (apiKeyMatches(providedApiKey(req), expectedApiKey())) return true;
+  // 凭据解析统一走账号中心（X-API-Key 或「Bearer <非会话串>」都认，见 auth_center.apiKeyOf）
+  const key = authCenter.apiKeyOf(req);
+  if (key && apiKeyMatches(key, expectedApiKey())) return true;
   const bearer = extractBearerToken(req);
   if (verifyAdminLoginToken(bearer)) return true; // 旧 admin token（过渡兼容）
   const sess = await authCenter.verifySessionToken(bearer).catch(() => null);
@@ -403,6 +408,146 @@ async function auditIfAccount(req, action, resource, resourceId, after) {
   }
 }
 
+/** 通用权限闸：账号 + 指定权限（admin 域入口闸与运营写面统一走这里；legacy key 一律 403）
+ *  过渡开关 settings.perm_strict != '1' 时，持有旧 admin.write 的账号仍放行（不断崖）；
+ *  B7 翻 '1' 后按 perm_registry 权限点严格收口。 */
+let _permStrictCache = { v: '0', at: 0 };
+async function permStrictMode() {
+  if (Date.now() - _permStrictCache.at > 10000) {
+    _permStrictCache = { v: (await settingValue('perm_strict')) || '0', at: Date.now() };
+  }
+  return _permStrictCache.v;
+}
+
+async function requirePerm(req, res, perm, label) {
+  const principal = (req.principal && req.principal.type === 'account')
+    ? req.principal
+    : await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    let ok = authCenter.hasPermission(principal, perm) || authCenter.hasPermission(principal, '*');
+    if (!ok && (await permStrictMode()) !== '1' && authCenter.hasPermission(principal, authCenter.P.ADMIN_WRITE)) ok = true;
+    if (ok) {
+      req.principal = principal;
+      return true;
+    }
+    jsonReply(res, { error: 'forbidden', message: '当前账号无' + label + '权限（' + perm + '）' }, 403);
+    return false;
+  }
+  if (principal && principal.type === 'legacy') {
+    jsonReply(res, { error: 'forbidden', message: '旧 API Key 已停用：请用运营账号登录（POST /api/auth/login）' }, 403);
+    return false;
+  }
+  jsonReply(res, { error: 'unauthorized', message: '须运营凭证（账号会话或机器账号 Key）' }, 401);
+  return false;
+}
+
+/**
+ * 评级提交闸（POST /admin/projects/:id/rating/submit，原 isAdminAuthExempt 裸豁免收口）：
+ * - 账号中心主体：须 rating.write（商家自报）/ house.write（运营商录入）/ rating.review / '*'；
+ *   vendor 绑定账号的归属（owner_vendor_id）由处理器内既有校验兜底。
+ * - 旧 vendor 会话 / 旧平台凭据：维持处理器内 requestSession + requireApiKey 双通道把关（行为不变）。
+ */
+async function guardRatingSubmit(req, res) {
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    const perms = authCenter.permissionsOf(principal);
+    const ok = perms.has('*') || perms.has('rating.write') || perms.has('house.write') || perms.has('rating.review') ||
+      ((await permStrictMode()) !== '1' && perms.has(authCenter.P.ADMIN_WRITE));
+    if (!ok) {
+      jsonReply(res, { error: 'forbidden', message: '当前账号无评级提交权限（rating.write / house.write）' }, 403);
+      return false;
+    }
+    req.principal = principal;
+    return true;
+  }
+  // 旧通道凭据（vendor token / 旧 admin token / 全局 Key）→ 放行到处理器内 owner_vendor_id 归属把关；
+  // 真匿名在此 401，避免泄漏「项目是否存在」
+  const bearer = extractBearerToken(req);
+  const legacyCred = verifyVendorLoginToken(bearer) || verifyAdminLoginToken(bearer) ||
+    apiKeyMatches(providedApiKey(req), expectedApiKey());
+  if (!legacyCred) {
+    jsonReply(res, { error: 'unauthorized', message: '评级提交须登录（POST /api/auth/login）' }, 401);
+    return false;
+  }
+  return true;
+}
+
+// ===== 运营商员工花名册（operator_staff）字段校验与工号生成 =====
+const STAFF_LEVELS = ['L1', 'L2', 'L3', 'L4'];
+const STAFF_STATUS = ['active', 'observe', 'train', 'leave', 'off'];
+
+/** 校验花名册字段；partial=true 时只取 body 里出现的键（PUT 部分更新） */
+function validateStaff(body, opts) {
+  const partial = !!(opts && opts.partial);
+  const b = body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const out = {};
+  if (has('name') || !partial) {
+    const name = String(b.name || '').trim();
+    if (!name) return { error: '姓名必填' };
+    if (name.length > 100) return { error: '姓名过长（≤100 字）' };
+    out.name = name;
+  }
+  if (has('emp_no')) {
+    const v = String(b.emp_no || '').trim();
+    if (v.length > 30) return { error: '工号过长（≤30 字符）' };
+    out.emp_no = v || null;
+  }
+  if (has('phone') || !partial) {
+    const v = String(b.phone || '').trim();
+    if (v && !/^\d{11}$/.test(v)) return { error: '手机号须为 11 位数字' };
+    out.phone = v || null;
+  }
+  if (has('level') || !partial) {
+    const v = String(b.level || 'L2');
+    if (!STAFF_LEVELS.includes(v)) return { error: '等级仅支持 L1-L4' };
+    out.level = v;
+  }
+  if (has('role') || !partial) out.role = String(b.role || '').trim() || null;
+  if (has('station') || !partial) out.station = String(b.station || '').trim() || null;
+  if (has('month_orders') || !partial) {
+    const raw = b.month_orders;
+    const n = (raw === undefined || raw === null || raw === '') ? 0 : parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 9999) return { error: '本月单量须为 0-9999 整数' };
+    out.month_orders = n;
+  }
+  if (has('rating') || !partial) {
+    const raw = b.rating;
+    const r = (raw === undefined || raw === null || raw === '') ? 0 : Number(raw);
+    if (!Number.isFinite(r) || r < 0 || r > 5) return { error: '客评须为 0-5' };
+    out.rating = r;
+  }
+  if (has('contract_type') || !partial) {
+    const v = String(b.contract_type || '正式');
+    if (!['正式', '试用'].includes(v)) return { error: '合同类型仅支持 正式/试用' };
+    out.contract_type = v;
+  }
+  if (has('contract_end') || !partial) {
+    const v = b.contract_end ? String(b.contract_end).trim() : '';
+    if (v && !/^\d{4}-\d{2}$/.test(v)) return { error: '合同到期格式须为 YYYY-MM' };
+    out.contract_end = v || null;
+  }
+  if (has('status') || !partial) {
+    const v = String(b.status || 'active');
+    if (!STAFF_STATUS.includes(v)) return { error: '状态枚举非法' };
+    out.status = v;
+  }
+  if (has('can_extra') || !partial) out.can_extra = b.can_extra ? 1 : 0;
+  if (has('note') || !partial) out.note = String(b.note || '').trim() || null;
+  return { row: out };
+}
+
+/** 按当前年段生成 EMP-YYYY-NNNN（取该年段最大序号 +1；撞号由调用方重试） */
+async function nextEmpNo(conn) {
+  const prefix = 'EMP-' + new Date().getFullYear() + '-';
+  const [rows] = await conn.execute(
+    'SELECT COALESCE(MAX(CAST(RIGHT(emp_no, 4) AS UNSIGNED)), 0) AS m FROM operator_staff WHERE emp_no LIKE ?',
+    [prefix + '%']
+  );
+  const base = (rows[0] && rows[0].m) || 0;
+  return prefix + String(base + 1).padStart(4, '0');
+}
+
 const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url'];
 
 function stripVendorSecrets(obj) {
@@ -487,8 +632,8 @@ function isAdminAuthExempt(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (p === `${ADMIN_PREFIX}/auth/login` && method === 'POST') return true;
   if (p === `${ADMIN_PREFIX}/auth/check` && method === 'GET') return true;
-  // 商家提交自己项目评级：处理器内按 owner_vendor_id 归属把关（vendor 会话可入，平台凭据亦可），
-  // 不在入口按 admin 会话一刀切——否则 vendor-owned 提交永远 401（死代码）
+  // 商家提交自己项目评级：认证层放行旧 vendor 会话（vendor token 不在 isAdminSessionAuthorized 内），
+  // 权限层由 perm_registry 路由的 guard:'ratingSubmit'（guardRatingSubmit）+ 处理器内 owner_vendor_id 把关
   if (method === 'POST' && /^\/api\/juzhu\/admin\/projects\/\d+\/rating\/submit$/.test(p)) return true;
   return false;
 }
@@ -1283,6 +1428,25 @@ async function ensureSchemaRun() {
         KEY idx_gr_orders_vendor (vendor_id),
         KEY idx_gr_orders_user (user_id)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS operator_staff (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        emp_no VARCHAR(30) NULL,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) NULL,
+        level VARCHAR(10) DEFAULT 'L2',
+        \`role\` VARCHAR(50) NULL,
+        station VARCHAR(100) NULL,
+        month_orders INT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        contract_type VARCHAR(10) DEFAULT '正式',
+        contract_end VARCHAR(10) NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        can_extra TINYINT DEFAULT 0,
+        note VARCHAR(200) NULL,
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30),
+        UNIQUE KEY uk_staff_emp_no (emp_no)
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
@@ -1465,6 +1629,10 @@ async function ensureSchemaRun() {
     // 家政全量种子数据（对应表仍为空时补 demo）
     if (jzSeedAll) {
       try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
+    }
+    // 运营商员工花名册种子（INSERT IGNORE + uk_staff_emp_no 幂等，多实例并发安全）
+    if (staffSeedAll) {
+      try { await staffSeedAll(conn); } catch (e) { console.warn('staffSeedAll warn:', e.message); }
     }
     await ensureGrOrdersShape(conn);
     try {
@@ -1678,24 +1846,47 @@ async function handleApiDirect(urlPath, qs, req, res) {
     if (!(await assertAdminAuthorized(urlPath, req, res))) return;
     if (!(await assertApiAuthorized(urlPath, req, res))) return;
 
-    // ── 账号中心（阶段1）：admin 域写操作必须是账号主体且有 admin.write；旧全局 key 只读过渡 ──
-    if (urlPath.startsWith(ADMIN_PREFIX) && !isAdminAuthExempt(urlPath, req.method) && req.method !== 'GET') {
-      const wp = await authCenter.principalOf(req).catch(() => null);
-      if (!wp || wp.type === 'legacy') {
-        return jsonReply(res, {
-          error: 'forbidden',
-          message: '旧全局 API Key 对管理域只读；请用管理员账号登录（POST /api/auth/login → Authorization: Bearer <token>）',
-        }, 403);
+    // ── 账号中心权限闸（perm_registry.cjs 单一数据源）：admin 域按路由细粒度校验 + 细粒度审计 ──
+    // 写操作不再一刀切 admin.write（project.update / account.create / settings.update ...），
+    // GET 亦收口（dictionary/cities/projects 等此前对旧全局 key 无任何权限要求）。
+    if (urlPath.startsWith(ADMIN_PREFIX)) {
+      const rule = permRegistry.match(urlPath, req.method);
+      if (rule && rule.guard === 'ratingSubmit') {
+        // 评级提交双通道：账号主体按权限点，旧 vendor 会话由处理器内 owner_vendor_id 把关
+        if (!(await guardRatingSubmit(req, res))) return;
+      } else if (rule && !rule.exempt) {
+        if (!(await requirePerm(req, res, rule.perm, permRegistry.labelOf(rule.perm)))) return;
+        if (req.method !== 'GET') {
+          const p = req.principal;
+          if (p && p.type === 'account') {
+            const m = urlPath.match(new RegExp(rule.re));
+            await authCenter.audit({
+              accountId: p.account.id, principalType: 'account', roles: p.roles,
+              action: rule.act || rule.perm, resource: rule.res || 'admin',
+              resourceId: rule.idGroup != null && m ? m[rule.idGroup] : null,
+              scopeLevel: authCenter.bestScopeLevel(p), ip: p.ip, ua: p.ua,
+            });
+          }
+        }
+      } else if (!rule && req.method !== 'GET') {
+        // 未注册写路由回退旧行为：账号主体 + admin.write（新路由必须先进 perm_registry.ROUTES）
+        const wp = await authCenter.principalOf(req).catch(() => null);
+        if (!wp || wp.type === 'legacy') {
+          return jsonReply(res, {
+            error: 'forbidden',
+            message: '旧全局 API Key 对管理域只读；请用管理员账号登录（POST /api/auth/login → Authorization: Bearer <token>）',
+          }, 403);
+        }
+        if (!authCenter.hasPermission(wp, authCenter.P.ADMIN_WRITE)) {
+          return jsonReply(res, { error: 'forbidden', message: '当前账号无管理写权限（admin.write）' }, 403);
+        }
+        req.principal = wp;
+        await authCenter.audit({
+          accountId: wp.account.id, principalType: 'account', roles: wp.roles,
+          action: 'admin.write', resource: urlPath, scopeLevel: authCenter.bestScopeLevel(wp),
+          ip: wp.ip, ua: wp.ua,
+        });
       }
-      if (!authCenter.hasPermission(wp, authCenter.P.ADMIN_WRITE)) {
-        return jsonReply(res, { error: 'forbidden', message: '当前账号无管理写权限（admin.write）' }, 403);
-      }
-      req.principal = wp;
-      await authCenter.audit({
-        accountId: wp.account.id, principalType: 'account', roles: wp.roles,
-        action: 'admin.write', resource: urlPath, scopeLevel: authCenter.bestScopeLevel(wp),
-        ip: wp.ip, ua: wp.ua,
-      });
     }
 
     await ensureSchema();
@@ -3218,13 +3409,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // ===== 账号中心管理（platform_admin；原生多账号：任何主体直接挂 N 个 account）=====
 
     // ===== IdP 联邦配置（platform_admin；secret 只写不读）=====
-    // GET /api/juzhu/admin/idp-configs
+    // GET /api/juzhu/admin/idp-configs（权限已由入口闸按 perm_registry 校验：admin.read）
     if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'GET') {
-      const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || principal.type === 'legacy' ||
-          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
-        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
-      }
       return jsonReply(res, await authCenter.listIdpConfigs());
     }
     // PUT /api/juzhu/admin/idp-configs —— 新建/更新（body.org_no 为主键维度；client_secret 缺省=不改）
@@ -3240,13 +3426,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // GET /api/juzhu/admin/accounts?vendor_id=&org_id=&principal_type=
-    // 「都用账号登录」：旧全局 Key 一并停用（读也不放行）
+    // （权限已由入口闸按 perm_registry 校验：admin.read；旧全局 Key 在闸上已 403）
     if (urlPath === '/api/juzhu/admin/accounts' && req.method === 'GET') {
-      const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || principal.type === 'legacy' ||
-          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ))) {
-        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
-      }
       return jsonReply(res, await authCenter.listAccounts(Object.fromEntries(new URLSearchParams(qs))));
     }
 
@@ -3290,12 +3471,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // GET /api/juzhu/admin/audit?limit=&action=&account_id=
+    // （权限已由入口闸按 perm_registry 校验：audit.read）
     if (urlPath === '/api/juzhu/admin/audit' && req.method === 'GET') {
-      const principal = req.principal || (await authCenter.principalOf(req).catch(() => null));
-      if (!principal || principal.type === 'legacy' ||
-          (principal.type === 'account' && !authCenter.hasPermission(principal, authCenter.P.AUDIT_READ))) {
-        return jsonReply(res, { error: 'forbidden', message: '请用账号会话登录（旧 API Key 已停用）' }, 403);
-      }
       const qp = new URLSearchParams(qs);
       const limit = Math.min(parseInt(qp.get('limit') || '100', 10) || 100, 500);
       const where = [];
@@ -4685,6 +4862,109 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const vendors = await queryRows(sql, params);
         vendors.forEach(stripVendorSecrets);
         return jsonReply(res, { vendors });
+      }
+    }
+
+    // ===== 运营商员工花名册（operator_staff）=====
+    // 读：任意账号 principal（国企持有方只读，规则 4）；写：worker.manage + audit_log
+    if (urlPath === '/api/juzhu/staff' && req.method === 'GET') {
+      const rows = await queryRows('SELECT * FROM operator_staff ORDER BY level DESC, month_orders DESC, id ASC');
+      return jsonReply(res, { list: rows });
+    }
+
+    if (urlPath === '/api/juzhu/staff' && req.method === 'POST') {
+      if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+      const body = await readBody(req);
+      const v = validateStaff(body, { partial: false });
+      if (v.error) return jsonReply(res, { error: v.error }, 400);
+      const clientEmpNo = (body.emp_no || '').trim() || null;
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const now = new Date().toISOString().slice(0, 19);
+        const ins = 'INSERT INTO operator_staff (emp_no,name,phone,level,`role`,station,month_orders,rating,contract_type,contract_end,status,can_extra,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+        let row = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const empNo = clientEmpNo || (await nextEmpNo(conn));
+          row = { ...v.row, emp_no: empNo, created_at: now, updated_at: now };
+          try {
+            const [ret] = await conn.execute(ins, [
+              row.emp_no, row.name, row.phone, row.level, row.role, row.station, row.month_orders, row.rating,
+              row.contract_type, row.contract_end, row.status, row.can_extra, row.note, row.created_at, row.updated_at,
+            ]);
+            row.id = ret.insertId;
+            break;
+          } catch (e) {
+            if (e && e.code === 'ER_DUP_ENTRY') {
+              if (clientEmpNo) return jsonReply(res, { error: '工号已存在：' + clientEmpNo }, 400);
+              if (attempt === 3) return jsonReply(res, { error: '工号生成冲突，请重试' }, 500);
+              continue;
+            }
+            throw e;
+          }
+        }
+        await conn.commit();
+        await auditIfAccount(req, 'staff.create', 'operator_staff', String(row.id), row);
+        return jsonReply(res, { ok: true, staff: row }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/staff\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT * FROM operator_staff WHERE id=?', [parseInt(m[1], 10)]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, rows[0]);
+      }
+      if (m && req.method === 'PUT') {
+        if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+        const id = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const v = validateStaff(body, { partial: true });
+        if (v.error) return jsonReply(res, { error: v.error }, 400);
+        if (!Object.keys(v.row).length) return jsonReply(res, { error: '无可更新字段' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cur] = await conn.execute('SELECT * FROM operator_staff WHERE id=?', [id]);
+          if (!cur.length) return jsonReply(res, { error: 'not found' }, 404);
+          const sets = [];
+          const params = [];
+          for (const k of Object.keys(v.row)) {
+            sets.push((k === 'role' ? '`role`' : k) + '=?');
+            params.push(v.row[k]);
+          }
+          sets.push('updated_at=?');
+          params.push(new Date().toISOString().slice(0, 19));
+          params.push(id);
+          try {
+            await conn.execute('UPDATE operator_staff SET ' + sets.join(', ') + ' WHERE id=?', params);
+          } catch (e) {
+            if (e && e.code === 'ER_DUP_ENTRY') return jsonReply(res, { error: '工号已存在' }, 400);
+            throw e;
+          }
+          await conn.commit();
+          const after = await queryRows('SELECT * FROM operator_staff WHERE id=?', [id]);
+          await auditIfAccount(req, 'staff.update', 'operator_staff', String(id), after[0]);
+          return jsonReply(res, { ok: true, staff: after[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+      if (m && req.method === 'DELETE') {
+        if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+        const id = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cur] = await conn.execute('SELECT * FROM operator_staff WHERE id=?', [id]);
+          if (!cur.length) return jsonReply(res, { error: 'not found' }, 404);
+          await conn.execute('DELETE FROM operator_staff WHERE id=?', [id]);
+          await conn.commit();
+          await auditIfAccount(req, 'staff.delete', 'operator_staff', String(id), cur[0]);
+          return jsonReply(res, { ok: true, id });
+        } finally {
+          await conn.end();
+        }
       }
     }
 

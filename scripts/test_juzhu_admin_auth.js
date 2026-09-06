@@ -17,7 +17,7 @@ function mockRes() {
   };
 }
 
-function run() {
+async function run() {
   const prevEnv = process.env.JUZHU_ENV;
   const prevKey = process.env.JUZHU_API_KEY;
 
@@ -50,14 +50,14 @@ function run() {
   process.env.JUZHU_API_KEY = 'local-only-change-me';
   let res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized('/api/juzhu/admin/districts', { method: 'POST', headers: {} }, res),
+    await app.assertAdminAuthorized('/api/juzhu/admin/districts', { method: 'POST', headers: {} }, res),
     false
   );
   assert.strictEqual(res.statusCode, 401);
 
   res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized(
+    await app.assertAdminAuthorized(
       '/api/juzhu/admin/districts',
       { method: 'POST', headers: { 'x-api-key': 'local-only-change-me' } },
       res
@@ -67,7 +67,7 @@ function run() {
 
   res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized(
+    await app.assertAdminAuthorized(
       '/api/juzhu/admin/settings',
       { method: 'PUT', headers: { authorization: 'Bearer wrong-key' } },
       res
@@ -79,14 +79,14 @@ function run() {
   // 公开路径不挡
   res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized('/api/juzhu/districts', { method: 'GET', headers: {} }, res),
+    await app.assertAdminAuthorized('/api/juzhu/districts', { method: 'GET', headers: {} }, res),
     true
   );
 
   // auth 豁免
   res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized('/api/juzhu/admin/auth/login', { method: 'POST', headers: {} }, res),
+    await app.assertAdminAuthorized('/api/juzhu/admin/auth/login', { method: 'POST', headers: {} }, res),
     true
   );
 
@@ -99,7 +99,7 @@ function run() {
   const sig = crypto.createHmac('sha256', 'dongbo2026').update(String(exp)).digest('hex');
   res = mockRes();
   assert.strictEqual(
-    app.assertAdminAuthorized(
+    await app.assertAdminAuthorized(
       '/api/juzhu/admin/dictionary',
       { method: 'GET', headers: { authorization: 'Bearer ' + exp + '.' + sig } },
       res
@@ -117,4 +117,4 @@ function run() {
   console.log('OK scripts/test_juzhu_admin_auth.js');
 }
 
-run();
+run().catch((e) => { console.error(e); process.exit(1); });

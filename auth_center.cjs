@@ -12,21 +12,25 @@
 
 const crypto = require('crypto');
 
-// ── 内置角色（首版 12 个，宁少勿多；permissions 为 JSON 数组，'*' = 全权）──
-const BUILTIN_ROLES = [
-  { role_code: 'platform_admin', name: '平台管理员', permissions: ['*'] },
-  { role_code: 'platform_op', name: '平台运营', permissions: ['admin.read', 'admin.write', 'audit.read', 'rating.review'] },
-  { role_code: 'holding_viewer', name: '国企持有方（只读）', permissions: ['report.read', 'org.read', 'sla.read'] },
-  { role_code: 'operator_admin', name: '白名单运营商管理员', permissions: ['admin.read', 'org.read', 'org.write', 'house.write', 'order.dispatch', 'worker.manage'] },
-  { role_code: 'operator_dispatcher', name: '运营商调度员', permissions: ['admin.read', 'org.read', 'order.dispatch'] },
-  { role_code: 'operator_housekeeper', name: '管家', permissions: ['org.read', 'order.self'] },
-  { role_code: 'gov_viewer', name: '政府监管（只读）', permissions: ['report.read', 'complaint.read', 'compliance.read'] },
-  { role_code: 'bank_viewer', name: '金融方（只读）', permissions: ['report.read', 'fund.read'] },
-  { role_code: 'vendor_owner', name: '商家管理员', permissions: ['vendor.summary.read', 'vendor.order.read', 'vendor.order.write', 'vendor.product.read', 'vendor.product.write', 'vendor.worker.read', 'vendor.fund.read'] },
-  { role_code: 'vendor_operator', name: '商家客服/运营', permissions: ['vendor.summary.read', 'vendor.order.read', 'vendor.order.write'] },
-  { role_code: 'worker', name: '服务者', permissions: ['order.self', 'income.self'] },
-  { role_code: 'user', name: '租客', permissions: ['order.create', 'rating.write'] },
+// ── 内置角色（首版 12 个，宁少勿多）──
+// code/name 的权威清单在这里；permissions 由 perm_registry.cjs（权限点注册表）折叠，
+// 不再手写两份——改角色权限面先改注册表，再跑 scripts/perm_registry_snapshot.cjs 对基线。
+const permRegistry = require('./perm_registry.cjs');
+const ROLE_DEFS = [
+  { role_code: 'platform_admin', name: '平台管理员' },
+  { role_code: 'platform_op', name: '平台运营' },
+  { role_code: 'holding_viewer', name: '国企持有方（只读）' },
+  { role_code: 'operator_admin', name: '白名单运营商管理员' },
+  { role_code: 'operator_dispatcher', name: '运营商调度员' },
+  { role_code: 'operator_housekeeper', name: '管家' },
+  { role_code: 'gov_viewer', name: '政府监管（只读）' },
+  { role_code: 'bank_viewer', name: '金融方（只读）' },
+  { role_code: 'vendor_owner', name: '商家管理员' },
+  { role_code: 'vendor_operator', name: '商家客服/运营' },
+  { role_code: 'worker', name: '服务者' },
+  { role_code: 'user', name: '租客' },
 ];
+const BUILTIN_ROLES = ROLE_DEFS.map((r) => Object.assign({}, r, { permissions: permRegistry.roleDefaults(r.role_code) }));
 
 // 内部权限点（与上述角色 permissions 配合使用）
 const P = {
@@ -384,8 +388,15 @@ function bearerToken(req) {
 
 function apiKeyOf(req) {
   const auth = String((req && req.headers && req.headers.authorization) || '').trim();
-  if (auth.toLowerCase().startsWith('bearer ')) return ''; // Bearer 保留给会话
-  return String((req && req.headers && (req.headers['x-api-key'] || req.headers['X-API-Key'])) || '').trim();
+  const xkey = String((req && req.headers && (req.headers['x-api-key'] || req.headers['X-API-Key'])) || '').trim();
+  if (xkey) return xkey;
+  // Bearer 原则上保留给会话；但兼容「Bearer <全局/机器 Key>」传输（_jzapi.js fallback 等历史客户端）：
+  // 仅当该串明显不是会话 token（不含 '.'）时才作为 key 候选，timingSafe 比对失败自然落到 legacy/拒绝
+  if (auth.toLowerCase().startsWith('bearer ')) {
+    const t = auth.slice(7).trim();
+    return t.indexOf('.') < 0 ? t : '';
+  }
+  return '';
 }
 
 function clientIp(req) {
@@ -693,6 +704,7 @@ module.exports = {
   verifySessionToken,
   revokeSession,
   bearerToken,
+  apiKeyOf,
   // 主体与鉴权
   principalOf,
   hasPermission,
