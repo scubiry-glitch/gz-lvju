@@ -336,3 +336,30 @@ gov/bank 用户 → 机构 IdP（政务外网统一认证 / 银行内网 SSO）
 1. **C 端登录形态**（微信为主还是手机号为主）——跟微信预约 `wechat-link` 链路一起定。
 2. **审计留存期**——建议 ≥180 天，等政府合规要求确认。
 3. **`account.manage` 权限下放节奏**（机构自助开号 vs 平台代开）——试点期由 `platform_admin` 代开，跑通后再评估下放给 `vendor_owner`/`operator_admin`。
+
+---
+
+## 附：落地状态（2026-09-06 · 阶段 1 完成盘点）
+
+> 本节为实施后增量记录；上文为设计稿原文（保留作对照）。
+
+**阶段 1 出口标准逐条核对：**
+- ①全部管理写接口带审计 → ✅ `perm_registry.ROUTES` 26 条写路由逐条落细粒度 `audit_log.action`（`project.update`/`account.create`/`role.update`…，替代粗粒度 `admin.write`）
+- ②商家能用子账号分岗登录 → ✅ `vendor_owner`/`vendor_operator` 原生多账号（§4.3 未做主/子设计，按本表执行）；商家登录口接入登录节流
+- ③旧全局 key 只剩只读 → ✅ 更进一步：admin 域 GET 亦按 `admin.read` 收口，旧 key 全域 403
+
+**本轮（B0-B7）额外落地（超出阶段 1 原范围）：**
+- 权限点注册表 `perm_registry.cjs` 单一数据源（PERMS 权限点目录 + ROUTES 路由映射 + `roleDefaults` 折叠 + 基线快照闸）
+- 防爆破：`login_throttle` 两级节流（§4.1「连错 5 次锁 30 分钟」落地，IP 维度防喷洒）+ `audit_log.result` 列 + 账号不存在也留痕
+- 密码 scrypt 懒升级；会话分级 TTL（管理面 12h / C·S 30d / IdP 12h）
+- scope 落地：city 档 `city_ids` 显式授权（§3.2）；org/report、admin/projects、staff 行级过滤；`stats` 对匿名降级
+- 账号中心 `screens/account-center.html`：roles CRUD（自定义角色，`'*'` 红线）、权限矩阵、数据权限抽屉、会话管理（解锁/强制下线）、审计增强、IdP 配置 UI
+- 菜单按权限裁剪（`_nav.js` item.perms；未登录全显）
+- `settings.perm_strict` 过渡开关已置 `1`（platform_op 写权限收归 platform_admin）
+
+**待拍板项进展：**
+- #3 `account.manage` 下放 → 权限点已注册、未接路由（试点期平台代开维持）
+- #1 C 端登录形态 → 未动（仍随微信 `wechat-link` 链路一起定）
+- #2 审计留存期 → 默认 180 天维持（`AUDIT_RETENTION_DAYS`）
+
+**回归基线**：`scripts/perm_gate_regression.cjs`、`auth_security_regression.cjs`、`scope_regression.cjs`、`iam_api_regression.cjs` 四条 + `node test_static_guard.js`，全绿为过。
