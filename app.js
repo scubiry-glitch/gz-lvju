@@ -3543,15 +3543,119 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
-    // GET /api/juzhu/admin/audit?limit=&action=&account_id=
+    // ===== 账号中心管理面（B5）：permissions / overview / roles / orgs / sessions =====
+    // （各路由权限已由入口闸按 perm_registry 校验，见 ROUTES IAM 管理面段）
+
+    // GET /admin/permissions —— 权限点目录 + 角色赋值矩阵（账号中心「功能权限」页数据源）
+    if (urlPath === '/api/juzhu/admin/permissions' && req.method === 'GET') {
+      const roles = await authCenter.listRoles();
+      return jsonReply(res, {
+        perms: permRegistry.PERMS,
+        roles: roles.map((r) => ({ role_code: r.role_code, name: r.name, builtin: r.builtin, account_count: r.account_count, permissions: r.permissions })),
+      });
+    }
+
+    // GET /admin/iam/overview —— 总览卡片
+    if (urlPath === '/api/juzhu/admin/iam/overview' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.iamOverview());
+    }
+
+    // 角色 CRUD
+    if (urlPath === '/api/juzhu/admin/roles' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.listRoles());
+    }
+    if (urlPath === '/api/juzhu/admin/roles' && req.method === 'POST') {
+      const body = await readBody(req);
+      const wp = req.principal;
+      const out = await authCenter.createRole(body, {
+        accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+        ip: wp && wp.ip, ua: wp && wp.ua,
+      });
+      if (out.error) return jsonReply(res, { error: out.error }, 400);
+      return jsonReply(res, out);
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/roles\/([^/]+)$/);
+      if (m && (req.method === 'PUT' || req.method === 'DELETE')) {
+        const body = req.method === 'PUT' ? await readBody(req) : {};
+        const wp = req.principal;
+        const ctx = {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        };
+        const out = req.method === 'PUT'
+          ? await authCenter.updateRole(decodeURIComponent(m[1]), body, ctx)
+          : await authCenter.deleteRole(decodeURIComponent(m[1]), ctx);
+        if (out.error) return jsonReply(res, { error: out.error }, 400);
+        return jsonReply(res, out);
+      }
+    }
+
+    // orgs：数据权限配置的机构下拉 + city_ids 维护
+    if (urlPath === '/api/juzhu/admin/orgs' && req.method === 'GET') {
+      const orgs = await authCenter.listOrgs();
+      return jsonReply(res, orgs.map((o) => Object.assign(o, { city_ids: (() => { try { return JSON.parse(o.city_ids || '[]'); } catch (_) { return []; } })() })));
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/orgs\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const wp = req.principal;
+        // org.write 非平台主体（有 org 绑定）只能维护本机构
+        const isPlatform = wp && wp.type === 'account' && (authCenter.hasPermission(wp, '*') ||
+          (!wp.account.org_id && !wp.account.vendor_id));
+        if (wp && wp.type === 'account' && !isPlatform && Number(wp.account.org_id) !== parseInt(m[1], 10)) {
+          return jsonReply(res, { error: 'forbidden', message: '只能维护本机构信息' }, 403);
+        }
+        const out = await authCenter.updateOrg(parseInt(m[1], 10), body, {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        if (out.error) return jsonReply(res, { error: out.error }, 400);
+        return jsonReply(res, out);
+      }
+    }
+
+    // 会话管理：列表 / 全部下线 / 单会话下线
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/accounts\/(\d+)\/sessions$/);
+      if (m && req.method === 'GET') return jsonReply(res, await authCenter.listSessions(parseInt(m[1], 10)));
+      if (m && req.method === 'DELETE') {
+        const wp = req.principal;
+        const out = await authCenter.revokeAccountSessions(parseInt(m[1], 10), {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        return jsonReply(res, out);
+      }
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/sessions\/([^/]+)$/);
+      if (m && req.method === 'DELETE') {
+        const wp = req.principal;
+        const out = await authCenter.revokeSessionByJti(decodeURIComponent(m[1]), {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        return jsonReply(res, out);
+      }
+    }
+
+    // GET /api/juzhu/admin/audit?limit=&action=&account_id=&resource=&result=&from=&to=&ip=&before_id=
     // （权限已由入口闸按 perm_registry 校验：audit.read）
     if (urlPath === '/api/juzhu/admin/audit' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
       const limit = Math.min(parseInt(qp.get('limit') || '100', 10) || 100, 500);
       const where = [];
       const params = [];
-      if (qp.get('action')) { where.push('action=?'); params.push(qp.get('action')); }
+      if (qp.get('action')) { where.push('action LIKE ?'); params.push(qp.get('action') + '%'); }
       if (qp.get('account_id')) { where.push('account_id=?'); params.push(parseInt(qp.get('account_id'), 10)); }
+      if (qp.get('resource')) { where.push('resource=?'); params.push(qp.get('resource')); }
+      if (qp.get('result')) { where.push('result=?'); params.push(qp.get('result')); }
+      if (qp.get('ip')) { where.push('ip=?'); params.push(qp.get('ip')); }
+      if (qp.get('from')) { where.push('created_at>=?'); params.push(qp.get('from')); }
+      if (qp.get('to')) { where.push('created_at<=?'); params.push(qp.get('to')); }
+      if (qp.get('before_id')) { where.push('id<?'); params.push(parseInt(qp.get('before_id'), 10)); }
       const rows = await queryRows(
         `SELECT * FROM audit_log ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY id DESC LIMIT ${limit}`,
         params

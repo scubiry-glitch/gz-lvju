@@ -779,9 +779,7 @@ function validateAccountInput(body, { partial } = {}) {
   if (!partial || body.roles !== undefined) {
     const roles = Array.isArray(body.roles) ? body.roles.map(String) : [];
     if (!roles.length) errors.push('roles 必填（数组）');
-    const known = new Set(BUILTIN_ROLES.map((r) => r.role_code));
-    for (const r of roles) if (!known.has(r)) errors.push('未知角色: ' + r);
-    out.roles = roles;
+    out.roles = [...new Set(roles)];
   }
   if (body.vendor_id !== undefined) out.vendor_id = body.vendor_id == null || body.vendor_id === '' ? null : parseInt(body.vendor_id, 10) || null;
   if (body.org_id !== undefined) out.org_id = body.org_id == null || body.org_id === '' ? null : parseInt(body.org_id, 10) || null;
@@ -803,10 +801,23 @@ function validateAccountInput(body, { partial } = {}) {
   return { errors, out };
 }
 
+/** 角色存在性校验（roles 表：内置 + 自定义）；返回未知角色数组 */
+async function unknownRoles(roleCodes) {
+  const d = di();
+  const codes = (roleCodes || []).filter(Boolean);
+  if (!codes.length) return [];
+  const rows = await d.query(
+    `SELECT role_code FROM roles WHERE role_code IN (${codes.map(() => '?').join(',')})`, codes);
+  const known = new Set(rows.map((r) => r.role_code));
+  return codes.filter((c) => !known.has(c));
+}
+
 async function createAccount(body, ctx) {
   const d = di();
   const { errors, out } = validateAccountInput(body);
   if (errors.length) return { error: errors.join('；') };
+  const unknown = await unknownRoles(out.roles);
+  if (unknown.length) return { error: '未知角色: ' + unknown.join(',') };
   const dup = await d.query('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [out.login_name]);
   if (dup.length) return { error: 'login_name 已存在' };
   if (out.vendor_id) {
@@ -843,6 +854,10 @@ async function updateAccount(id, body, ctx) {
   const before = await getAccountWithRoles(id);
   const { errors, out } = validateAccountInput(body, { partial: true });
   if (errors.length) return { error: errors.join('；') };
+  if (out.roles) {
+    const unknown = await unknownRoles(out.roles);
+    if (unknown.length) return { error: '未知角色: ' + unknown.join(',') };
+  }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const sets = [];
   const params = [];
@@ -851,7 +866,18 @@ async function updateAccount(id, body, ctx) {
     if (out[k] !== undefined) { sets.push(col + '=?'); params.push(out[k]); }
   }
   if (out.password) { sets.push('password_hash=?'); params.push(await hashPassword(out.password)); }
-  // 解锁（status 改回 active）必须同步清锁定与失败计数，并清 login_throttle 的 ident 桶，
+  // 显式解锁（body.unlock=1）：清锁定/计数/节流桶，locked → active；与 status 字段解耦
+  if (body.unlock != null && body.unlock !== 0 && body.unlock !== false) {
+    await d.exec(
+      "UPDATE accounts SET status=IF(status='locked','active',status), locked_until=NULL, failed_login_count=0, updated_at=? WHERE id=?",
+      [now, id]
+    );
+    const buckets = [throttleBucket('ident', rows[0].login_name)];
+    if (rows[0].phone) buckets.push(throttleBucket('ident', rows[0].phone));
+    try { await d.exec('DELETE FROM login_throttle WHERE bucket IN (' + buckets.map(() => '?').join(',') + ')', buckets); } catch (_) {}
+    await audit(Object.assign({ action: 'account.unlock', resource: 'account', resourceId: String(id), result: 'ok' }, ctx || {}));
+  }
+  // 解锁（status 改回 active）同样清锁定与失败计数，并清 login_throttle 的 ident 桶，
   // 否则 isLockedRow / throttleCheck 仍按锁定拒绝
   if (out.status === 'active' && rows[0].status === 'locked') {
     sets.push('locked_until=NULL', 'failed_login_count=0');
@@ -902,9 +928,22 @@ async function listAccounts(q) {
   const params = [];
   if (q.vendor_id) { where.push('a.vendor_id=?'); params.push(parseInt(q.vendor_id, 10)); }
   if (q.org_id) { where.push('a.org_id=?'); params.push(parseInt(q.org_id, 10)); }
+  if (q.worker_id) { where.push('a.worker_id=?'); params.push(parseInt(q.worker_id, 10)); }
   if (q.principal_type) { where.push('a.principal_type=?'); params.push(q.principal_type); }
+  if (q.status) { where.push('a.status=?'); params.push(String(q.status)); }
+  if (q.q) {
+    const like = '%' + String(q.q).replace(/[%_]/g, (m) => '\\' + m) + '%';
+    where.push('(a.login_name LIKE ? OR a.display_name LIKE ? OR a.phone LIKE ?)');
+    params.push(like, like, like);
+  }
+  if (q.role_code) {
+    where.push('a.id IN (SELECT account_id FROM account_roles WHERE role_code=?)');
+    params.push(String(q.role_code));
+  }
+  const limit = Math.min(parseInt(q.limit || '100', 10) || 100, 500);
+  const offset = Math.max(parseInt(q.offset || '0', 10) || 0, 0);
   const rows = await d.query(
-    `SELECT a.* FROM accounts a ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.id DESC LIMIT 500`,
+    `SELECT a.* FROM accounts a ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY a.id DESC LIMIT ${limit} OFFSET ${offset}`,
     params
   );
   const out = [];
@@ -913,6 +952,182 @@ async function listAccounts(q) {
     out.push({ account: full.account, roles: full.roles.map((r) => ({ role_code: r.role_code, scope: r.scope })) });
   }
   return out;
+}
+
+// ── 账号中心管理 API（B5）：roles CRUD / orgs / sessions / 总览 ──
+
+/** 角色清单（含 builtin 标记与关联账号数） */
+async function listRoles() {
+  const d = di();
+  const roles = await d.query(
+    `SELECT r.role_code, r.name, r.permissions, r.builtin,
+            (SELECT COUNT(*) FROM account_roles ar WHERE ar.role_code = r.role_code) AS account_count
+     FROM roles r ORDER BY r.builtin DESC, r.role_code`);
+  return roles.map((r) => ({
+    role_code: r.role_code,
+    name: r.name,
+    builtin: !!r.builtin,
+    account_count: Number(r.account_count || 0),
+    permissions: safeJson(r.permissions, []),
+  }));
+}
+
+const ROLE_CODE_RE = /^[a-z][a-z0-9_]{2,31}$/;
+
+/** 新建自定义角色（builtin=0）；permissions 必须是 perm_registry 已注册权限点的子集 */
+async function createRole(body, ctx) {
+  const d = di();
+  const roleCode = String(body.role_code || '').trim();
+  const name = String(body.name || '').trim();
+  const permissions = Array.isArray(body.permissions) ? body.permissions.map(String) : [];
+  if (!ROLE_CODE_RE.test(roleCode)) return { error: 'role_code 须为 3-32 位小写字母/数字/下划线，字母开头' };
+  if (!name) return { error: 'name 必填' };
+  const known = new Set(permRegistry.permCodes());
+  const unknown = permissions.filter((p) => !known.has(p));
+  if (unknown.length) return { error: '未注册权限点: ' + unknown.join(',') };
+  if (permissions.includes('*')) return { error: "'*' 仅限内置 platform_admin" };
+  const dup = await d.query('SELECT role_code FROM roles WHERE role_code=? LIMIT 1', [roleCode]);
+  if (dup.length) return { error: 'role_code 已存在' };
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  await d.exec('INSERT INTO roles(role_code, name, permissions, builtin) VALUES (?,?,?,0)', [roleCode, name, JSON.stringify([...new Set(permissions)])]);
+  const created = (await d.query('SELECT role_code, name, permissions, builtin FROM roles WHERE role_code=?', [roleCode]))[0];
+  await audit(Object.assign({ action: 'role.create', resource: 'roles', resourceId: roleCode, after: created, result: 'ok' }, ctx || {}));
+  return { role_code: created.role_code, name: created.name, builtin: !!created.builtin, permissions: safeJson(created.permissions, []) };
+}
+
+/** 修改角色：builtin=1 拒改（内置角色权限面走 scripts/perm_roles_resync.cjs）；'*' 红线同上 */
+async function updateRole(roleCode, body, ctx) {
+  const d = di();
+  const rows = await d.query('SELECT role_code, name, permissions, builtin FROM roles WHERE role_code=? LIMIT 1', [roleCode]);
+  if (!rows.length) return { error: '角色不存在' };
+  const role = rows[0];
+  if (role.builtin) return { error: '内置角色不可在线编辑（改权限面请跑 scripts/perm_roles_resync.cjs）' };
+  const sets = [];
+  const params = [];
+  if (body.name !== undefined) {
+    const name = String(body.name || '').trim();
+    if (!name) return { error: 'name 不能为空' };
+    sets.push('name=?'); params.push(name);
+  }
+  if (body.permissions !== undefined) {
+    const permissions = Array.isArray(body.permissions) ? body.permissions.map(String) : [];
+    const known = new Set(permRegistry.permCodes());
+    const unknown = permissions.filter((p) => !known.has(p));
+    if (unknown.length) return { error: '未注册权限点: ' + unknown.join(',') };
+    if (permissions.includes('*')) return { error: "'*' 仅限内置 platform_admin" };
+    sets.push('permissions=?'); params.push(JSON.stringify([...new Set(permissions)]));
+  }
+  if (!sets.length) return { error: '无可更新字段' };
+  await d.exec('UPDATE roles SET ' + sets.join(',') + ' WHERE role_code=?', [...params, roleCode]);
+  // 角色权限面变化 → 该角色全部账号的会话吊销（收窄立即生效）
+  await d.exec('UPDATE sessions SET revoked_at=? WHERE account_id IN (SELECT account_id FROM account_roles WHERE role_code=?) AND revoked_at IS NULL',
+    [Math.floor(Date.now() / 1000), roleCode]);
+  const after = (await d.query('SELECT role_code, name, permissions, builtin FROM roles WHERE role_code=?', [roleCode]))[0];
+  await audit(Object.assign({
+    action: 'role.update', resource: 'roles', resourceId: roleCode,
+    before: { name: role.name, permissions: safeJson(role.permissions, []) },
+    after: { name: after.name, permissions: safeJson(after.permissions, []) }, result: 'ok',
+  }, ctx || {}));
+  return { role_code: after.role_code, name: after.name, builtin: !!after.builtin, permissions: safeJson(after.permissions, []) };
+}
+
+/** 删除自定义角色：仅 builtin=0 且无账号引用 */
+async function deleteRole(roleCode, ctx) {
+  const d = di();
+  const rows = await d.query('SELECT role_code, builtin FROM roles WHERE role_code=? LIMIT 1', [roleCode]);
+  if (!rows.length) return { error: '角色不存在' };
+  if (rows[0].builtin) return { error: '内置角色不可删除' };
+  const refs = await d.query('SELECT account_id FROM account_roles WHERE role_code=? LIMIT 1', [roleCode]);
+  if (refs.length) return { error: '仍有账号挂该角色，先改绑后再删除' };
+  await d.exec('DELETE FROM roles WHERE role_code=?', [roleCode]);
+  await audit(Object.assign({ action: 'role.delete', resource: 'roles', resourceId: roleCode, result: 'ok' }, ctx || {}));
+  return { ok: true };
+}
+
+/** 账号中心总览（总览卡片聚合） */
+async function iamOverview() {
+  const d = di();
+  const cutoff = new Date(Date.now() - 86400 * 1000).toISOString().replace(/\.\d+Z$/, 'Z');
+  const [acc] = await d.query('SELECT COUNT(*) n FROM accounts');
+  const [roleN] = await d.query('SELECT COUNT(*) n FROM roles');
+  const [locked] = await d.query("SELECT COUNT(*) n FROM accounts WHERE status='locked' AND locked_until IS NOT NULL");
+  const [machineN] = await d.query("SELECT COUNT(*) n FROM accounts WHERE principal_type='machine'");
+  const [failed24h] = await d.query("SELECT COUNT(*) n FROM audit_log WHERE action='auth.login' AND result='fail' AND created_at >= ?", [cutoff]);
+  const [locks24h] = await d.query("SELECT COUNT(*) n FROM audit_log WHERE action='auth.login.lock' AND created_at >= ?", [cutoff]);
+  const [writes24h] = await d.query("SELECT COUNT(*) n FROM audit_log WHERE (action LIKE 'account.%' OR action LIKE 'role.%') AND created_at >= ?", [cutoff]);
+  return {
+    accounts_total: Number(acc.n), accounts_machine: Number(machineN.n),
+    roles_total: Number(roleN.n), locked_now: Number(locked.n),
+    login_failed_24h: Number(failed24h.n), login_locked_24h: Number(locks24h.n),
+    iam_writes_24h: Number(writes24h.n),
+  };
+}
+
+/** orgs 清单（账号中心数据权限配置的机构下拉） */
+async function listOrgs() {
+  const d = di();
+  return d.query('SELECT id, org_no, org_type, name, city_ids, status, created_at, updated_at FROM orgs ORDER BY id');
+}
+
+/** 维护 orgs：city_ids（JSON 数组）/ status / name */
+async function updateOrg(id, body, ctx) {
+  const d = di();
+  const rows = await d.query('SELECT * FROM orgs WHERE id=? LIMIT 1', [id]);
+  if (!rows.length) return { error: 'org 不存在' };
+  const before = rows[0];
+  const sets = [];
+  const params = [];
+  if (body.name !== undefined) { sets.push('name=?'); params.push(String(body.name).trim().slice(0, 128)); }
+  if (body.status !== undefined) {
+    if (!['active', 'suspended', 'terminated'].includes(body.status)) return { error: 'status 须为 active|suspended|terminated' };
+    sets.push('status=?'); params.push(body.status);
+  }
+  if (body.city_ids !== undefined) {
+    let ids = Array.isArray(body.city_ids) ? body.city_ids.map((x) => parseInt(x, 10)).filter(Number.isFinite) : null;
+    if (!ids) return { error: 'city_ids 须为数组' };
+    sets.push('city_ids=?'); params.push(JSON.stringify([...new Set(ids)]));
+  }
+  if (!sets.length) return { error: '无可更新字段' };
+  sets.push('updated_at=?'); params.push(new Date().toISOString().replace(/\.\d+Z$/, 'Z'), id);
+  await d.exec('UPDATE orgs SET ' + sets.join(',') + ' WHERE id=?', params);
+  const after = (await d.query('SELECT id, org_no, org_type, name, city_ids, status FROM orgs WHERE id=?', [id]))[0];
+  if (after && typeof after.city_ids === 'string') {
+    try { after.city_ids = JSON.parse(after.city_ids || '[]') || []; } catch (_) { after.city_ids = []; }
+  }
+  await audit(Object.assign({
+    action: 'org.update', resource: 'orgs', resourceId: String(id),
+    before: { name: before.name, city_ids: before.city_ids, status: before.status },
+    after, result: 'ok',
+  }, ctx || {}));
+  return after;
+}
+
+/** 某账号的会话清单（不含 token 原文/哈希） */
+async function listSessions(accountId) {
+  const d = di();
+  return d.query(
+    `SELECT jti, ua, ip, expires_at, revoked_at, created_at FROM sessions
+     WHERE account_id=? ORDER BY (revoked_at IS NULL) DESC, id DESC LIMIT 100`, [accountId]);
+}
+
+/** 吊销某账号全部会话（强制下线） */
+async function revokeAccountSessions(accountId, ctx) {
+  const d = di();
+  const r = await d.exec('UPDATE sessions SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL',
+    [Math.floor(Date.now() / 1000), accountId]);
+  await audit(Object.assign({ action: 'account.revoke-sessions', resource: 'account', resourceId: String(accountId), after: { revoked: r.affectedRows }, result: 'ok' }, ctx || {}));
+  return { revoked: r.affectedRows };
+}
+
+/** 按 jti 吊销单个会话 */
+async function revokeSessionByJti(jti, ctx) {
+  const d = di();
+  const r = await d.exec('UPDATE sessions SET revoked_at=? WHERE jti=? AND revoked_at IS NULL',
+    [Math.floor(Date.now() / 1000), jti]);
+  if (r.affectedRows) {
+    await audit(Object.assign({ action: 'account.revoke-session', resource: 'session', resourceId: String(jti).slice(0, 60), result: 'ok' }, ctx || {}));
+  }
+  return { revoked: r.affectedRows > 0 };
 }
 
 // ── 审计留存：默认 180 天，启动时清理一次 ──
@@ -1038,6 +1253,18 @@ module.exports = {
   updateAccount,
   issueApiKey,
   listAccounts,
+  unknownRoles,
+  // 账号中心管理（B5）
+  listRoles,
+  createRole,
+  updateRole,
+  deleteRole,
+  iamOverview,
+  listOrgs,
+  updateOrg,
+  listSessions,
+  revokeAccountSessions,
+  revokeSessionByJti,
   // IdP 联邦（阶段3）
   getIdpConfig,
   listIdpConfigs,

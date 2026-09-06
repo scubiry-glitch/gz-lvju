@@ -99,6 +99,18 @@ const ROUTES = [
   { method: 'PUT',    re: '^/api/juzhu/admin/accounts/(\\d+)$', perm: 'iam.write', act: 'account.update', res: 'account', idGroup: 1 },
   { method: 'POST',   re: '^/api/juzhu/admin/accounts/(\\d+)/api-key$', perm: 'iam.key.write', act: 'account.issue-api-key', res: 'account', idGroup: 1 },
   { method: 'PUT',    re: '^/api/juzhu/admin/idp-configs$', perm: 'iam.write', act: 'idp_config.upsert', res: 'idp_configs' },
+  // ── IAM 管理面（B5：账号中心）──
+  { method: 'GET',    re: '^/api/juzhu/admin/permissions$', perm: 'admin.read', act: null, res: null },
+  { method: 'GET',    re: '^/api/juzhu/admin/iam/overview$', perm: 'admin.read', act: null, res: null },
+  { method: 'GET',    re: '^/api/juzhu/admin/roles$', perm: 'admin.read', act: null, res: null },
+  { method: 'POST',   re: '^/api/juzhu/admin/roles$', perm: 'role.write', act: 'role.create', res: 'roles' },
+  { method: 'PUT',    re: '^/api/juzhu/admin/roles/([^/]+)$', perm: 'role.write', act: 'role.update', res: 'roles', idGroup: 1 },
+  { method: 'DELETE', re: '^/api/juzhu/admin/roles/([^/]+)$', perm: 'role.write', act: 'role.delete', res: 'roles', idGroup: 1 },
+  { method: 'GET',    re: '^/api/juzhu/admin/orgs$', perm: 'admin.read', act: null, res: null },
+  { method: 'PUT',    re: '^/api/juzhu/admin/orgs/(\\d+)$', perm: 'org.write', act: 'org.update', res: 'orgs', idGroup: 1 },
+  { method: 'GET',    re: '^/api/juzhu/admin/accounts/(\\d+)/sessions$', perm: 'admin.read', act: null, res: null },
+  { method: 'DELETE', re: '^/api/juzhu/admin/accounts/(\\d+)/sessions$', perm: 'iam.write', act: 'account.revoke-sessions', res: 'account', idGroup: 1 },
+  { method: 'DELETE', re: '^/api/juzhu/admin/sessions/([^/]+)$', perm: 'iam.write', act: 'account.revoke-session', res: 'session', idGroup: 1 },
   // 评级（提交走归属 guard；复核走平台复核点）
   { method: 'POST',   re: '^/api/juzhu/admin/projects/(\\d+)/rating/submit$', perm: 'rating.write', act: 'rating.submit', res: 'projects', idGroup: 1, guard: 'ratingSubmit' },
   { method: 'POST',   re: '^/api/juzhu/admin/ratings/([^/]+)/review$', perm: 'rating.review', act: 'rating.review', res: 'projects', idGroup: 1 },
