@@ -5270,6 +5270,60 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { list: rows });
     }
 
+    // GET /api/juzhu/jz/orders/overview —— gr_orders 指标概览（今日漏斗 + 近15天 + 近12月；必须在 orders/:id 之前）
+    if (urlPath === '/api/juzhu/jz/orders/overview' && req.method === 'GET') {
+      if (!(await requireApiKey(req, res))) return;
+      const STATUSES = ['pending', 'paid', 'assigned', 'serving', 'completed', 'cancelled'];
+      // gr_orders.created_at 以北京时间字符串（YYYY-MM-DD HH:MM:SS）落库，分桶按北京日期（对齐 gr_orders.cjs cstParts）
+      const p2 = (n) => String(n).padStart(2, '0');
+      const cstDay = (offsetDays) => {
+        const d = new Date(Date.now() + 8 * 60 * 60 * 1000 + offsetDays * 86400000);
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+      };
+      const cstMonth = (offsetMonths) => {
+        const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+        d.setUTCDate(1);
+        d.setUTCMonth(d.getUTCMonth() + offsetMonths);
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}`;
+      };
+      const blankRow = (key, val) => {
+        const row = {};
+        row[key] = val;
+        STATUSES.forEach((s) => { row[s] = 0; });
+        return row;
+      };
+      const funnel = blankRow('date', cstDay(0));
+      delete funnel.date;
+      const daily = [];
+      for (let i = -14; i <= 0; i++) daily.push(blankRow('date', cstDay(i)));
+      const dailyIdx = {};
+      daily.forEach((r) => { dailyIdx[r.date] = r; });
+      const monthly = [];
+      for (let i = -11; i <= 0; i++) monthly.push(blankRow('month', cstMonth(i)));
+      const monthlyIdx = {};
+      monthly.forEach((r) => { monthlyIdx[r.month] = r; });
+      // created_at 为定宽字符串，LEFT() 直接分桶；三条聚合代替逐状态逐桶查询
+      const buckets = await Promise.all([
+        queryRows(
+          `SELECT status, COUNT(*) AS c FROM gr_orders
+           WHERE created_at >= ? AND created_at < ? GROUP BY status`,
+          [cstDay(0) + ' 00:00:00', cstDay(1) + ' 00:00:00']
+        ),
+        queryRows(
+          'SELECT LEFT(created_at,10) AS d, status, COUNT(*) AS c FROM gr_orders WHERE created_at >= ? GROUP BY LEFT(created_at,10), status',
+          [cstDay(-14) + ' 00:00:00']
+        ),
+        queryRows(
+          'SELECT LEFT(created_at,7) AS m, status, COUNT(*) AS c FROM gr_orders WHERE created_at >= ? GROUP BY LEFT(created_at,7), status',
+          [cstMonth(-11) + '-01 00:00:00']
+        ),
+      ]);
+      buckets[0].forEach((r) => { if (funnel[r.status] != null) funnel[r.status] = r.c; });
+      buckets[1].forEach((r) => { if (dailyIdx[r.d] && dailyIdx[r.d][r.status] != null) dailyIdx[r.d][r.status] = r.c; });
+      buckets[2].forEach((r) => { if (monthlyIdx[r.m] && monthlyIdx[r.m][r.status] != null) monthlyIdx[r.m][r.status] = r.c; });
+      return jsonReply(res, { funnel, daily, monthly });
+    }
+
     // GET /api/juzhu/jz/orders/:id
     {
       const m = urlPath.match(/^\/api\/juzhu\/jz\/orders\/([^/]+)$/);
