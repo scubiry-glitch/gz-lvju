@@ -3677,6 +3677,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
         const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
         if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        // units=u1,u2 批量形状：一次返回该月多个户型的房态（C 端详情页整月横滚用，省 (N-1)/N 请求）
+        const unitsParam = (qp.get('units') || '').split(',').map((x) => parseInt(x, 10)).filter((x) => x > 0).slice(0, 10);
+        if (unitsParam.length) {
+          const out = [];
+          for (const uid of unitsParam) {
+            const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [uid, pid]);
+            if (!us.length) continue;
+            out.push(Object.assign({ unit_id: uid }, await buildStayMonth(prows[0], us[0], uid, y, mo)));
+          }
+          return jsonReply(res, { project_id: pid, month: `${y}-${String(mo + 1).padStart(2, '0')}`, units: out });
+        }
         let unit = null;
         if (unitId) {
           const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [unitId, pid]);
