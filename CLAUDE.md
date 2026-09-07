@@ -168,12 +168,12 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 
 ## 规则 17 · 周边玩法维度（`spots` / `project_spots`）
 
-**C 端房源详情页「周边玩法」杂志区块的数据只来自 `spots`（商圈/景区维度字典）+ `project_spots`（项目绑定），页面不得硬编码 mock。**（2026-09-06 拍板）
+**C 端房源详情页「周边玩法」杂志区块与笔记详情页的数据只来自 `spots`（维度字典）+ `project_spots`（项目绑定），页面不得硬编码 mock。**（2026-09-06 拍板）
 
-- **维度**：`type ∈ scenic(景区) / biz(商圈)`（枚举收口在 `app.js` 的 `SPOT_TYPES`）；`city_id NULL = 全省通用`（跨市目的地如黄果树/西江，任何项目可绑）；`slug` 全局唯一（`uk_spot_slug`），是 C 端深链词汇（小写字母/数字/连字符）；`summary` 为杂志口吻编辑导语；`cover_image` 填 `assets/` 下 jpg/png（≥60KB，缩略图管线自动出 .t240/.t640）。
-- **后台配置**：`juzhu-admin.html` 「字典」tab 第 4 卡配维度；项目编辑器「周边玩法」卡绑定（草稿存 `state.spotBindings`，单次 `PUT /admin/projects/:id/spots` 整体替换，≤12 条）。写路由走 **`house.write`**（dict.write 未授予任何角色，勿用）；被绑定的地点不可删。
-- **C 端渲染**：公开 `GET /api/juzhu/projects/:id` 随行下发 `spots`（enabled=1，SQL 已按 景区→商圈+sort 排定）；第 1 条 = 封面故事大卡，其余分组编辑行；**绑定空 → 整块隐藏**，不得回落静态演示内容。深链顺序：`spot.link` → 已收录 spot-detail 词条（huangguoshu/xiaoqikong/xijiang/fanjing/wanfeng）→ `lvju-app-spots.html`，禁止裸拼未收录 slug（spot-detail 页失配会静默回落）。
-- **样例数据**：`node scripts/spots-seed.cjs seed|clean`（贵阳 9 地点 + #93/#94 绑定；clean 只删脚本内 slug 清单）。
+- **维度**：`type ∈ scenic(景区) / biz(商圈) / food(美食) / cafe(咖啡)`（枚举与中文名收口在 `app.js` 的 `SPOT_TYPES` / `SPOT_TYPE_LABELS`，`type_label` 随接口下发，前端不得另造映射）；`city_id NULL = 全省通用`（跨市目的地如黄果树/西江，任何项目可绑）；`slug` 全局唯一（`uk_spot_slug`，小写字母/数字/连字符）；`summary` 为导语；`body` 为小红书式笔记正文（空行分段，空则前台回落 summary）；`photos` 为 JSON 图集（与封面合成轮播）；`address / duration / ticket` 为攻略信息（笔记页「去之前」卡，缺省不占行）；`cover_image` 填 `assets/` 下 jpg/png（≥60KB，缩略图管线自动出 .t240/.t640）。
+- **后台配置**：`juzhu-admin.html` 独立「周边」tab（`renderSpots`，2026-09-06 从字典 tab 迁出；导航为 项目/周边/字典/设置/账号/审计）配维度（行内「笔记」按钮展开正文/图集/攻略编辑，随主行一起保存）；项目编辑器（「项目」tab）「周边玩法」卡绑定（草稿存 `state.spotBindings`，单次 `PUT /admin/projects/:id/spots` 整体替换，≤12 条）。写路由走 **`house.write`**（dict.write 未授予任何角色，勿用）；被绑定的地点不可删。
+- **C 端渲染**：公开 `GET /api/juzhu/projects/:id` 随行下发 `spots`（enabled=1，SQL 已按 景区→商圈→美食→咖啡+sort 排定）；第 1 条 = 封面故事大卡，其余按维度分组编辑行；**绑定空 → 整块隐藏**，不得回落静态演示内容。深链顺序：`spot.link`（admin 覆写逃生口，缺省不填）→ **笔记详情页 `lvju-app-spot-post.html?id=`**（小红书式：图集轮播 + 编辑部行 + 正文 + #标签 + 攻略卡 + 相关笔记，数据来自公开 `GET /api/juzhu/spots/:id`，related 同类优先补齐同城市/通用）；`lvju-app-spot-detail.html` 仅保留旧 5 词条静态页。
+- **样例数据**：`node scripts/spots-seed.cjs seed|clean`（贵阳 25 地点：景区/商圈/美食/咖啡，**旅居 8 项目全绑定** #93/#94/9036-9041 各一组「本地景区 + 本地商圈/美食 + 远途一日」，每地点带正文/图集/攻略；clean 只删脚本内 slug 清单与其绑定行）。
 
 ## 规则 18 · 权限点注册表单一数据源（`perm_registry.cjs`）+ 账号中心
 

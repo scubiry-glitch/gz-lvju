@@ -172,11 +172,12 @@
 <div class="warn" id="apiWarn" hidden>无法连接管理 API。请确认已登录，并刷新页面重试。</div>
 
 <nav class="subnav" id="subnav">
-  <button type="button" data-tab="phone">设置</button>
+  <button type="button" class="on" data-tab="content">项目</button>
+  <button type="button" data-tab="spots">周边</button>
   <button type="button" data-tab="dict">字典</button>
+  <button type="button" data-tab="phone">设置</button>
   <button type="button" data-tab="accounts">账号</button>
   <button type="button" data-tab="audit">审计</button>
-  <button type="button" class="on" data-tab="content">内容</button>
 </nav>
 
 
@@ -242,6 +243,10 @@
       <button type="button" class="btn primary" id="btnSaveToggles">保存开关</button>
     </div>
   </div>
+</div>
+
+<div id="paneSpots" class="pane-main" hidden>
+  <div class="main" id="spotsRoot"></div>
 </div>
 
 <div id="paneDict" class="pane-main pane-dict" hidden>
@@ -486,11 +491,13 @@ function switchTab(tab) {
     b.classList.toggle('on', b.dataset.tab === tab);
   });
   document.getElementById('panePhone').hidden = tab !== 'phone';
+  document.getElementById('paneSpots').hidden = tab !== 'spots';
   document.getElementById('paneDict').hidden = tab !== 'dict';
   document.getElementById('paneContent').hidden = tab !== 'content';
   document.getElementById('paneAccounts').hidden = tab !== 'accounts';
   document.getElementById('paneAudit').hidden = tab !== 'audit';
   if (tab === 'dict') renderDictionary();
+  if (tab === 'spots') renderSpots();
   if (tab === 'phone') renderConsultModes();
 }
 
@@ -717,32 +724,7 @@ function renderDictionary() {
       '<td class="acts"><button type="button" class="btn primary d_save">保存</button>'+
       '<button type="button" class="btn danger d_del">删</button></td></tr>';
   }).join('');
-  // 周边玩法维度（规则 17）：商圈 / 景区字典，项目在「内容」tab 的项目编辑器里绑定
-  var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈' };
-  function spotCityOpts(cityId) {
-    return '<option value="">全省通用</option>' + cityList.map(function(c) {
-      return '<option value="'+c.id+'"'+(Number(cityId)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
-    }).join('');
-  }
-  var spotRows = (state.spots || []).map(function(s) {
-    return '<tr data-sid="'+s.id+'">'+
-      '<td><input class="s_name" value="'+esc(s.name||'')+'"/></td>'+
-      '<td><select class="s_type">'+
-        '<option value="scenic"'+(s.type!=='biz'?' selected':'')+'>景区</option>'+
-        '<option value="biz"'+(s.type==='biz'?' selected':'')+'>商圈</option></select></td>'+
-      '<td><select class="s_city">'+spotCityOpts(s.city_id)+'</select></td>'+
-      '<td><input class="s_slug" value="'+esc(s.slug||'')+'" placeholder="qingyan-ancient-town"/></td>'+
-      '<td><input class="s_icon" value="'+esc(s.icon||'')+'" style="width:44px;"/></td>'+
-      '<td><input class="s_cover" value="'+esc(s.cover_image||'')+'"/></td>'+
-      '<td><input class="s_sum" value="'+esc(s.summary||'')+'" placeholder="编辑导语（杂志口吻，一两句）"/></td>'+
-      '<td><input class="s_tags" value="'+esc(tagsStr(s.tags))+'" placeholder="5A 级, 明清石巷"/></td>'+
-      '<td><input class="s_link" value="'+esc(s.link||'')+'" placeholder="选填深链"/></td>'+
-      '<td><input class="s_sort" type="number" value="'+(s.sort_order||0)+'" style="width:56px;"/></td>'+
-      '<td><input class="s_en" type="checkbox"'+(s.enabled!==0?' checked':'')+'/></td>'+
-      '<td class="acts"><button type="button" class="btn primary s_save">保存</button>'+
-      '<button type="button" class="btn danger s_del">删</button></td></tr>';
-  }).join('');
-
+  // 周边玩法维度已迁至独立「周边」tab（renderSpots，2026-09-06）：字典回归城市/频道/行政区
   root.innerHTML =
     '<div class="card"><h2>城市 <span class="badge">'+cityList.length+'</span></h2>'+
       '<p class="hint">顶部切换器选择当前编辑城市（高亮行）。名称与 slug 全局唯一；仍有行政区或项目的城市不可删，且至少保留一座。</p>'+
@@ -759,26 +741,6 @@ function renderDictionary() {
       '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>备注</th><th>排序</th><th>封面路径</th><th>项目/户型/房源量</th><th>操作</th></tr></thead>'+
       '<tbody id="distRows">'+distRows+'</tbody></table>'+
       '<div class="bar"><button type="button" class="btn ghost" id="addDistrict">+ 新增行政区</button></div>'+
-    '</div>'+
-    '<div class="card"><h2>周边玩法（景区 / 商圈） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
-      '<p class="hint">C 端房源详情页「周边玩法」杂志区块的数据源（规则 17）。城市选「全省通用」= 跨市目的地（如黄果树、西江），任何项目都可绑定；slug 是 C 端深链词汇（小写字母/数字/连字符，全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「链接」选填，留空则景区回落 <code>lvju-app-spot-detail.html</code> / 列表页。仍被项目绑定的地点不可删（先在项目里解除绑定）。</p>'+
-      '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
-        '<th>名称</th><th>类型</th><th>城市</th><th>Slug</th><th>图标</th><th>封面路径</th><th>编辑导语</th><th>标签</th><th>链接</th><th>排序</th><th>启用</th><th>操作</th>'+
-      '</tr></thead>'+
-      '<tbody id="spotRows">'+spotRows+
-        '<tr class="new"><td><input class="n_name" placeholder="名称"/></td>'+
-        '<td><select class="n_type"><option value="scenic">景区</option><option value="biz">商圈</option></select></td>'+
-        '<td><select class="n_city">'+spotCityOpts(state.city && state.city.id)+'</select></td>'+
-        '<td><input class="n_slug" placeholder="留空自动生成"/></td>'+
-        '<td><input class="n_icon" placeholder="🏮" style="width:44px;"/></td>'+
-        '<td><input class="n_cover" placeholder="assets/lvju/xx.jpg"/></td>'+
-        '<td><input class="n_sum" placeholder="编辑导语（杂志口吻）"/></td>'+
-        '<td><input class="n_tags" placeholder="逗号分隔"/></td>'+
-        '<td><input class="n_link" placeholder="选填深链"/></td>'+
-        '<td><input class="n_sort" type="number" value="999" style="width:56px;"/></td>'+
-        '<td></td>'+
-        '<td class="acts"><button type="button" class="btn ghost" id="newSpotSave">+ 新增</button></td></tr>'+
-      '</tbody></table></div>'+
     '</div>';
 
   document.getElementById('addCity').onclick = function() {
@@ -882,8 +844,84 @@ function renderDictionary() {
     }).then(function(){ populateDistrictFilter(); renderDictionary(); })
       .catch(function(e){ toast('添加失败：'+e.message); });
   };
+}
 
-  // ── 周边玩法维度（spots CRUD，规则 17）──
+// ── 周边玩法维度（独立「周边」tab，规则 17）：景区/商圈/美食/咖啡字典 + 笔记编辑 ──
+function renderSpots() {
+  var root = document.getElementById('spotsRoot');
+  if (!state.apiOk) {
+    root.innerHTML = '<div class="empty">管理 API 未就绪，请刷新后重试</div>';
+    return;
+  }
+  var cityList = (state.cities && state.cities.length) ? state.cities : (state.city ? [state.city] : []);
+  var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+  var typeCounts = {};
+  (state.spots || []).forEach(function(s){ typeCounts[s.type] = (typeCounts[s.type] || 0) + 1; });
+  var typeSummary = Object.keys(SPOT_TYPE_LABEL).map(function(k){
+    return SPOT_TYPE_LABEL[k] + ' ' + (typeCounts[k] || 0);
+  }).join(' · ');
+  function spotTypeOpts(sel) {
+    return Object.keys(SPOT_TYPE_LABEL).map(function(k){
+      return '<option value="'+k+'"'+(sel===k?' selected':'')+'>'+SPOT_TYPE_LABEL[k]+'</option>';
+    }).join('');
+  }
+  function spotCityOpts(cityId) {
+    return '<option value="">全省通用</option>' + cityList.map(function(c) {
+      return '<option value="'+c.id+'"'+(Number(cityId)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('');
+  }
+  // 笔记展开编辑行（正文/图集/攻略信息），随主行一起保存
+  function spotNoteRow(s) {
+    var ph = Array.isArray(s.photos) ? s.photos : (typeof s.photos === 'string' && s.photos ? (function(){ try { return JSON.parse(s.photos); } catch(e){ return []; } })() : []);
+    return '<tr class="s_note_row" data-for="'+s.id+'" style="display:none;"><td colspan="12" style="background:#fafcfb;">'+
+      '<div style="display:grid;grid-template-columns:90px 1fr;gap:8px 10px;align-items:start;font-size:12px;">'+
+        '<b style="padding-top:6px;">笔记正文</b><textarea class="s_body" rows="4" placeholder="小红书式正文，空行分段；留空则前台只显示导语">'+esc(s.body||'')+'</textarea>'+
+        '<b style="padding-top:6px;">图集</b><input class="s_photos" value="'+esc(ph.join(', '))+'" placeholder="assets/lvju/a.jpg, assets/lvju/b.jpg（逗号分隔，含封面共 2-4 张效果最佳）"/>'+
+        '<b style="padding-top:6px;">地址</b><input class="s_address" value="'+esc(s.address||'')+'" placeholder="如：贵阳市花溪区青岩镇北街"/>'+
+        '<b style="padding-top:6px;">建议停留</b><input class="s_duration" value="'+esc(s.duration||'')+'" placeholder="如：半天 / 2 小时"/>'+
+        '<b style="padding-top:6px;">门票</b><input class="s_ticket" value="'+esc(s.ticket||'')+'" placeholder="如：免费 / ¥110（含观光车）"/>'+
+      '</div></td></tr>';
+  }
+  var spotRows = (state.spots || []).map(function(s) {
+    return '<tr data-sid="'+s.id+'">'+
+      '<td><input class="s_name" value="'+esc(s.name||'')+'"/></td>'+
+      '<td><select class="s_type">'+spotTypeOpts(s.type)+'</select></td>'+
+      '<td><select class="s_city">'+spotCityOpts(s.city_id)+'</select></td>'+
+      '<td><input class="s_slug" value="'+esc(s.slug||'')+'" placeholder="qingyan-ancient-town"/></td>'+
+      '<td><input class="s_icon" value="'+esc(s.icon||'')+'" style="width:44px;"/></td>'+
+      '<td><input class="s_cover" value="'+esc(s.cover_image||'')+'"/></td>'+
+      '<td><input class="s_sum" value="'+esc(s.summary||'')+'" placeholder="编辑导语（杂志口吻，一两句）"/></td>'+
+      '<td><input class="s_tags" value="'+esc(tagsStr(s.tags))+'" placeholder="5A 级, 明清石巷"/></td>'+
+      '<td><input class="s_link" value="'+esc(s.link||'')+'" placeholder="选填深链"/></td>'+
+      '<td><input class="s_sort" type="number" value="'+(s.sort_order||0)+'" style="width:56px;"/></td>'+
+      '<td><input class="s_en" type="checkbox"'+(s.enabled!==0?' checked':'')+'/></td>'+
+      '<td class="acts"><button type="button" class="btn ghost s_note">笔记</button>'+
+      '<button type="button" class="btn primary s_save">保存</button>'+
+      '<button type="button" class="btn danger s_del">删</button></td></tr>' + spotNoteRow(s);
+  }).join('');
+
+  root.innerHTML =
+    '<div class="card"><h2>周边玩法（景区 / 商圈 / 美食 / 咖啡） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
+      '<p class="hint"><b>'+typeSummary+'</b> — C 端房源详情页「周边玩法」杂志区块与笔记详情页（lvju-app-spot-post）的数据源。城市选「全省通用」= 跨市目的地（如黄果树、西江），任何项目都可绑定；slug 是 C 端深链词汇（小写字母/数字/连字符，全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「笔记」里写正文 / 图集 / 攻略信息，正文留空则只显示导语；「链接」选填覆写深链。仍被项目绑定的地点不可删（先在「项目」tab 的项目编辑器里解除绑定）。</p>'+
+      '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
+        '<th>名称</th><th>类型</th><th>城市</th><th>Slug</th><th>图标</th><th>封面路径</th><th>编辑导语</th><th>标签</th><th>链接</th><th>排序</th><th>启用</th><th>操作</th>'+
+      '</tr></thead>'+
+      '<tbody id="spotRows">'+spotRows+
+        '<tr class="new"><td><input class="n_name" placeholder="名称"/></td>'+
+        '<td><select class="n_type">'+spotTypeOpts('scenic')+'</select></td>'+
+        '<td><select class="n_city">'+spotCityOpts(state.city && state.city.id)+'</select></td>'+
+        '<td><input class="n_slug" placeholder="留空自动生成"/></td>'+
+        '<td><input class="n_icon" placeholder="🏮" style="width:44px;"/></td>'+
+        '<td><input class="n_cover" placeholder="assets/lvju/xx.jpg"/></td>'+
+        '<td><input class="n_sum" placeholder="编辑导语（杂志口吻）"/></td>'+
+        '<td><input class="n_tags" placeholder="逗号分隔"/></td>'+
+        '<td><input class="n_link" placeholder="选填深链"/></td>'+
+        '<td><input class="n_sort" type="number" value="999" style="width:56px;"/></td>'+
+        '<td></td>'+
+        '<td class="acts"><button type="button" class="btn ghost" id="newSpotSave">+ 新增</button></td></tr>'+
+      '</tbody></table></div>'+
+    '</div>';
+
   function spotBodyFrom(tr, prefix) {
     var body = {
       name: tr.querySelector('.'+prefix+'name').value.trim(),
@@ -897,9 +935,29 @@ function renderDictionary() {
       link: tr.querySelector('.'+prefix+'link').value.trim() || null,
       sort_order: +tr.querySelector('.'+prefix+'sort').value || 0
     };
-    if (prefix === 's_') body.enabled = tr.querySelector('.s_en').checked ? 1 : 0;
+    if (prefix === 's_') {
+      body.enabled = tr.querySelector('.s_en').checked ? 1 : 0;
+      // 笔记编辑行（同排一起保存：正文 / 图集 / 攻略信息）
+      var noteRow = tr.nextElementSibling;
+      if (noteRow && noteRow.classList.contains('s_note_row')) {
+        body.body = noteRow.querySelector('.s_body').value.trim() || null;
+        body.photos = noteRow.querySelector('.s_photos').value.split(/[,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+        body.address = noteRow.querySelector('.s_address').value.trim() || null;
+        body.duration = noteRow.querySelector('.s_duration').value.trim() || null;
+        body.ticket = noteRow.querySelector('.s_ticket').value.trim() || null;
+      }
+    }
     return body;
   }
+  root.querySelectorAll('.s_note').forEach(function(btn) {
+    btn.onclick = function() {
+      var noteRow = btn.closest('tr').nextElementSibling;
+      if (noteRow && noteRow.classList.contains('s_note_row')) {
+        noteRow.style.display = noteRow.style.display === 'none' ? '' : 'none';
+        btn.textContent = noteRow.style.display === 'none' ? '笔记' : '收起';
+      }
+    };
+  });
   root.querySelectorAll('.s_save').forEach(function(btn) {
     btn.onclick = function() {
       var tr = btn.closest('tr');
@@ -917,7 +975,7 @@ function renderDictionary() {
       api('/spots/'+tr.dataset.sid, { method:'DELETE' }).then(function() {
         toast('地点已删除');
         state.spots = (state.spots || []).filter(function(s){ return Number(s.id) !== Number(tr.dataset.sid); });
-        renderDictionary();
+        renderSpots();
       }).catch(function(e){ toast('删除失败：'+e.message); });
     };
   });
@@ -927,7 +985,7 @@ function renderDictionary() {
     api('/spots', { method:'POST', body: spotBodyFrom(tr, 'n_') }).then(function() {
       toast('地点已创建');
       return loadDictionary();
-    }).then(renderDictionary).catch(function(e){ toast('添加失败：'+e.message); });
+    }).then(renderSpots).catch(function(e){ toast('添加失败：'+e.message); });
   };
 }
 
@@ -1018,7 +1076,7 @@ function spotsCardHtml(p) {
   }
   return '<div class="card" id="spotsCard">'+
     '<h2>周边玩法（景区 / 商圈）<span class="badge" style="background:var(--gold)" id="psCount">'+b.length+'</span></h2>'+
-    '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">C 端详情页「周边玩法」杂志区块按此渲染：第一条为封面故事大卡，其余按 景区→商圈 分组。「编辑行文」写步程/车程与推荐理由（如：步行 5 分钟 · 古镇北门）。列表整体一次保存（覆盖该项目的全部绑定）；跨市目的地（黄果树、西江等）在「字典」tab 存为全省通用。地点维度的增删改在 <a href="javascript:void(0)" id="psGotoDict">字典 · 周边玩法</a>。</p>'+
+    '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">C 端详情页「周边玩法」杂志区块按此渲染：第一条为封面故事大卡，其余按 景区→商圈→美食→咖啡 分组。「编辑行文」写步程/车程与推荐理由（如：步行 5 分钟 · 古镇北门）。列表整体一次保存（覆盖该项目的全部绑定）；跨市目的地（黄果树、西江等）在「周边」tab 存为全省通用。地点维度的增删改在 <a href="javascript:void(0)" id="psGotoDict">周边 tab</a>。</p>'+
     '<div class="ps-add"><select id="psPick">'+
       (unpicked.length ? unpicked.map(opt).join('') : '<option value="">（字典里的地点都已绑定）</option>')+
       '</select>'+
@@ -1089,7 +1147,7 @@ function bindSpotsCard(p) {
     }).catch(function(e){ toast('保存失败：'+e.message); });
   };
   var goto_ = document.getElementById('psGotoDict');
-  if (goto_) goto_.onclick = function() { switchTab('dict'); };
+  if (goto_) goto_.onclick = function() { switchTab('spots'); };
 }
 
 function photosOf(unitId) {

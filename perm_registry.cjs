@@ -78,6 +78,12 @@ const ROUTES = [
   { method: 'POST',   re: '^/api/juzhu/admin/districts$', perm: 'dict.write', act: 'district.create', res: 'districts' },
   { method: 'PUT',    re: '^/api/juzhu/admin/districts/(\\d+)$', perm: 'dict.write', act: 'district.update', res: 'districts', idGroup: 1 },
   { method: 'DELETE', re: '^/api/juzhu/admin/districts/(\\d+)$', perm: 'dict.write', act: 'district.delete', res: 'districts', idGroup: 1 },
+  // 周边玩法维度（spots / project_spots）：内容编辑口径走 house.write
+  // （dict.write 当前 roles:[] 未授予任何角色，运营账号会全 403）
+  { method: 'POST',   re: '^/api/juzhu/admin/spots$', perm: 'house.write', act: 'spot.create', res: 'spots' },
+  { method: 'PUT',    re: '^/api/juzhu/admin/spots/(\\d+)$', perm: 'house.write', act: 'spot.update', res: 'spots', idGroup: 1 },
+  { method: 'DELETE', re: '^/api/juzhu/admin/spots/(\\d+)$', perm: 'house.write', act: 'spot.delete', res: 'spots', idGroup: 1 },
+  { method: 'PUT',    re: '^/api/juzhu/admin/projects/(\\d+)/spots$', perm: 'house.write', act: 'project.spots.replace', res: 'projects', idGroup: 1 },
   // 房源 / 户型 / 图片
   { method: 'POST',   re: '^/api/juzhu/admin/projects$', perm: 'house.write', act: 'project.create', res: 'projects' },
   { method: 'PUT',    re: '^/api/juzhu/admin/projects/(\\d+)$', perm: 'house.write', act: 'project.update', res: 'projects', idGroup: 1 },
@@ -120,6 +126,8 @@ const ROUTES = [
   // ── GET 收口（旧全局 key 在这些路由不再畅通；此前仅 accounts/idp-configs/audit 有手写闸）──
   { method: 'GET',    re: '^/api/juzhu/admin/(dictionary|cities|settings|projects|units|districts)$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/projects/(\\d+)$', perm: 'admin.read', act: null, res: null },
+  { method: 'GET',    re: '^/api/juzhu/admin/spots$', perm: 'admin.read', act: null, res: null },
+  { method: 'GET',    re: '^/api/juzhu/admin/projects/(\\d+)/spots$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/units/(\\d+)(/photos)?$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/(accounts|idp-configs)$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/audit$', perm: 'audit.read', act: null, res: null },

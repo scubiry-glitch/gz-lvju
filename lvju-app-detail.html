@@ -320,26 +320,32 @@
 <script src="screens/_qr.js"></script>
 <script>
 /* 周边玩法 · 杂志区块渲染（规则 17）：数据来自 GET /api/juzhu/projects/:id 的 spots
-   （项目绑定的商圈/景区，服务端已按 景区→商圈 + 绑定排序）。第 1 条 = 封面故事大卡，
+   （项目绑定的维度地点，服务端已按 景区→商圈→美食→咖啡 + 绑定排序）。第 1 条 = 封面故事大卡，
    其余按维度分组为编辑行；空绑定整块隐藏（不回落静态演示内容，防异地项目挂错样例）。
-   深链：spot.link 优先 → 已知 spot-detail 词条 → 回落 lvju-app-spots.html（spot-detail
-   页 ?spot= 解析失配会静默回落，禁止裸拼未收录 slug）。 */
+   深链：spot.link 优先（admin 覆写）→ 笔记详情页 lvju-app-spot-post.html?id= →
+   已知 spot-detail 词条 → 回落 lvju-app-spots.html。 */
 window.__NEARBY_RENDER__ = (function(){
   var SPOT_DETAIL = { huangguoshu: 1, xiaoqikong: 1, xijiang: 1, fanjing: 1, wanfeng: 1 };
-  var TYPE_LABEL = { scenic: '景区', biz: '商圈' };
+  // 分组序与中文/英文眉题（type_label 由服务端下发，这里只做缺省兜底）
+  var TYPE_ORDER = [
+    ['scenic', '景区', 'SCENIC'], ['biz', '商圈', 'AROUND'],
+    ['food', '美食', 'EAT'], ['cafe', '咖啡', 'CAFÉ']
+  ];
+  function typeLabel(s){ return s.type_label || ({ scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' })[s.type] || '周边'; }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function href(s){
     if (s.link) return s.link;
+    if (s.id) return 'lvju-app-spot-post.html?id=' + s.id;   // 库内地点 → 笔记详情页
     if (s.slug && SPOT_DETAIL[s.slug]) return 'lvju-app-spot-detail.html?spot=' + encodeURIComponent(s.slug);
     return 'lvju-app-spots.html';
   }
   function featHtml(s){
-    var tag = (s.tags && s.tags[0]) || TYPE_LABEL[s.type] || '周边';
+    var tag = (s.tags && s.tags[0]) || typeLabel(s);
     return '<a class="nb-feat" href="' + href(s) + '">' +
       '<span class="bg" style="background-image:url(' + esc(s.cover_image || '') + ')"></span>' +
       '<span class="lv">' + esc(tag) + '</span>' +
       '<span class="in">' +
-        '<span class="ek">' + esc(s.note || TYPE_LABEL[s.type] || '封面故事') + '</span>' +
+        '<span class="ek">' + esc(s.note || typeLabel(s) || '封面故事') + '</span>' +
         '<span class="nm">' + esc(s.name) + '</span>' +
         (s.summary ? '<span class="sum">' + esc(s.summary) + '</span>' : '') +
         ((s.tags && s.tags.length) ? '<span class="tags">' + s.tags.map(function(t){ return '<i>' + esc(t) + '</i>'; }).join('') + '</span>' : '') +
@@ -349,7 +355,7 @@ window.__NEARBY_RENDER__ = (function(){
     return '<a class="nb-row" href="' + href(s) + '">' +
       '<span class="th" style="background-image:url(' + esc(s.cover_image || '') + ')"></span>' +
       '<span class="tx">' +
-        '<span class="k">' + esc(s.note || TYPE_LABEL[s.type] || '周边') + '</span>' +
+        '<span class="k">' + esc(s.note || typeLabel(s) || '周边') + '</span>' +
         '<span class="nm">' + esc(s.name) + '</span>' +
         (s.summary ? '<span class="sum">' + esc(s.summary) + '</span>' : '') +
       '</span><span class="ar">›</span></a>';
@@ -362,13 +368,17 @@ window.__NEARBY_RENDER__ = (function(){
     spots = spots.filter(function(s){ return s && s.name; });
     if (!spots.length) { block.style.display = 'none'; return; }   // 绑定空 → 整块隐藏
     if (stat) stat.style.display = 'none';
-    var groups = { scenic: [], biz: [] };
-    spots.slice(1).forEach(function(s){ groups[s.type === 'biz' ? 'biz' : 'scenic'].push(s); });
+    var groups = {};
+    spots.slice(1).forEach(function(s){ var k = s.type || 'scenic'; (groups[k] = groups[k] || []).push(s); });
     var h = featHtml(spots[0]);
-    [['scenic', 'SCENIC'], ['biz', 'AROUND']].forEach(function(g){
+    // 已知维度按 TYPE_ORDER 分组；服务端扩展的新类型排在已知名之后（眉题用类型大写）
+    var order = TYPE_ORDER.slice();
+    Object.keys(groups).forEach(function(k){ if (!order.some(function(o){ return o[0] === k; })) order.push([k, k, String(k).toUpperCase()]); });
+    order.forEach(function(g){
       var list = groups[g[0]];
       if (!list || !list.length) return;
-      h += '<div class="nb-gt"><span class="bar"></span>' + TYPE_LABEL[g[0]] + ' <em>' + g[1] + '</em></div>' +
+      var label = list[0].type_label || g[1] || g[2];   // 服务端 type_label 优先（新类型免改此页）
+      h += '<div class="nb-gt"><span class="bar"></span>' + esc(label) + ' <em>' + g[2] + '</em></div>' +
         list.map(rowHtml).join('');
     });
     h += '<div class="nb-foot"><span>共 ' + spots.length + ' 处 · 步程 / 车程由商家实地整理</span><a href="lvju-app-spots.html">全部玩法 ›</a></div>';

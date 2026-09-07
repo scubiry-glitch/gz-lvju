@@ -600,6 +600,7 @@ function isCEndPublicApi(urlPath, method) {
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/spots\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/stay-calendar$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/[^/]+\/units$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
@@ -1149,6 +1150,38 @@ async function ensureSchemaRun() {
         bg_class VARCHAR(50),
         UNIQUE KEY uk_city_slug (city_id, slug)
       ) CHARSET=utf8mb4`,
+      // 周边玩法维度（规则 17）：商圈/景区字典 + 项目绑定。city_id NULL = 全省通用（跨市目的地）；
+      // slug 全局唯一（uk_spot_slug），是 C 端深链词汇（lvju-app-spot-detail.html?spot=）。
+      `CREATE TABLE IF NOT EXISTS spots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        city_id INT NULL,
+        type VARCHAR(20) NOT NULL DEFAULT 'scenic',
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) NOT NULL,
+        icon VARCHAR(16),
+        cover_image VARCHAR(500),
+        summary TEXT,
+        body TEXT,
+        photos TEXT,
+        address VARCHAR(200),
+        duration VARCHAR(40),
+        ticket VARCHAR(40),
+        tags TEXT,
+        link VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        UNIQUE KEY uk_spot_slug (slug),
+        KEY idx_spot_city (city_id, type, sort_order)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS project_spots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        project_id INT NOT NULL,
+        spot_id INT NOT NULL,
+        note VARCHAR(120),
+        sort_order INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uk_proj_spot (project_id, spot_id),
+        KEY idx_ps_spot (spot_id)
+      ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS projects (
         id INT AUTO_INCREMENT PRIMARY KEY,
         city_id INT NOT NULL,
@@ -1651,6 +1684,12 @@ async function ensureSchemaRun() {
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+      // 周边玩法笔记化（2026-09-06）：正文/图集/攻略信息（旧库 spots 补列，新库 DDL 已含）
+      "ALTER TABLE spots ADD COLUMN body TEXT",
+      "ALTER TABLE spots ADD COLUMN photos TEXT",
+      "ALTER TABLE spots ADD COLUMN address VARCHAR(200)",
+      "ALTER TABLE spots ADD COLUMN duration VARCHAR(40)",
+      "ALTER TABLE spots ADD COLUMN ticket VARCHAR(40)",
       // 预订订单归属（登录用户；老订单 user_id 为空，可按登录账号手机号认领）
       "ALTER TABLE booking_orders ADD COLUMN user_id VARCHAR(64)",
       "ALTER TABLE booking_orders ADD KEY idx_bo_user (user_id)",
@@ -1932,7 +1971,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
         ? await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id])
         : [];
       const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
-      return jsonReply(res, { city, cities: allCities, districts, channels });
+      // 周边玩法维度（规则 17）：不按城市过滤——绑定 picker 需要全省通用（city_id NULL）与跨市目的地
+      const spots = await queryRows('SELECT * FROM spots ORDER BY type, sort_order, id');
+      spots.forEach((r) => parseJsonFields(r, ['tags']));
+      return jsonReply(res, { city, cities: allCities, districts, channels, spots });
     }
 
     if (urlPath === '/api/juzhu/admin/cities' && req.method === 'GET') {
@@ -2358,6 +2400,177 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.execute('DELETE FROM districts WHERE id=?', [did]);
           await conn.commit();
           return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // ===== 周边玩法字典（spots / project_spots，规则 17）=====
+    // SPOT_TYPES 单一数据源：scenic=景区 | biz=商圈（可扩展；改这里别在页面另造枚举）
+    const SPOT_TYPES = ['scenic', 'biz', 'food', 'cafe'];
+    const SPOT_TYPE_LABELS = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+    const SPOT_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+
+    // GET /admin/spots（字典全量；?type=&city_id= 可选过滤）
+    if (urlPath === '/api/juzhu/admin/spots' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const conds = [], params = [];
+      if (qp.get('type')) { conds.push('type=?'); params.push(qp.get('type')); }
+      if (qp.get('city_id')) { conds.push('city_id=?'); params.push(parseInt(qp.get('city_id'))); }
+      const rows = await queryRows(
+        'SELECT * FROM spots' + (conds.length ? ' WHERE ' + conds.join(' AND ') : '') + ' ORDER BY type, sort_order, id',
+        params
+      );
+      rows.forEach((r) => parseJsonFields(r, ['tags']));
+      return jsonReply(res, rows);
+    }
+
+    // POST /admin/spots
+    if (urlPath === '/api/juzhu/admin/spots' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = (body.name || '').trim();
+      if (!name) return jsonReply(res, { error: '名称不能为空' }, 400);
+      const type = body.type || 'scenic';
+      if (!SPOT_TYPES.includes(type)) return jsonReply(res, { error: 'type 须为 ' + SPOT_TYPES.join('/') }, 400);
+      let slug = (body.slug || '').trim();
+      if (!slug) slug = 'spot-' + Date.now().toString(36);
+      if (!SPOT_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [dup] = await conn.execute('SELECT id FROM spots WHERE slug=?', [slug]);
+        if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+        await conn.execute(
+          'INSERT INTO spots(city_id, type, name, slug, icon, cover_image, summary, body, photos, address, duration, ticket, tags, link, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          [body.city_id ? parseInt(body.city_id) : null, type, name, slug,
+           (body.icon || '').trim() || null, (body.cover_image || '').trim() || null,
+           (body.summary || '').trim() || null,
+           (body.body || '').trim() || null,
+           Array.isArray(body.photos) ? JSON.stringify(body.photos) : null,
+           (body.address || '').trim() || null, (body.duration || '').trim() || null,
+           (body.ticket || '').trim() || null,
+           Array.isArray(body.tags) ? JSON.stringify(body.tags) : null,
+           (body.link || '').trim() || null, parseInt(body.sort_order) || 999,
+           body.enabled === 0 || body.enabled === '0' ? 0 : 1]
+        );
+        const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+        const [rows] = await conn.execute('SELECT * FROM spots WHERE id=?', [r[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, spot: rows[0] }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/spots/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/spots\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const sid = parseInt(m[1]);
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '地点不存在' }, 404); }
+          if (body.type != null && !SPOT_TYPES.includes(body.type)) {
+            conn.end(); return jsonReply(res, { error: 'type 须为 ' + SPOT_TYPES.join('/') }, 400);
+          }
+          const mapping = { name: 'name', slug: 'slug', type: 'type', city_id: 'city_id', icon: 'icon',
+            cover_image: 'cover_image', summary: 'summary', body: 'body', photos: 'photos',
+            address: 'address', duration: 'duration', ticket: 'ticket',
+            tags: 'tags', link: 'link', sort_order: 'sort_order', enabled: 'enabled' };
+          const fields = [], params = [];
+          for (const [key, col] of Object.entries(mapping)) {
+            if (!(key in body)) continue;
+            let val = body[key];
+            if (key === 'sort_order') val = parseInt(val) || 0;
+            else if (key === 'enabled') val = (val === 0 || val === '0') ? 0 : 1;
+            else if (key === 'city_id') val = val ? parseInt(val) : null;
+            else if (key === 'tags' || key === 'photos') val = Array.isArray(val) ? JSON.stringify(val) : (val || null);
+            else if (typeof val === 'string') val = val.trim() || null;
+            if (key === 'slug' && val && !SPOT_SLUG_RE.test(val)) {
+              conn.end(); return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+            }
+            fields.push(`${col}=?`); params.push(val);
+          }
+          if (!fields.length) { conn.end(); return jsonReply(res, { error: '无更新字段' }, 400); }
+          if (body.slug != null) {
+            const [dup] = await conn.execute('SELECT id FROM spots WHERE slug=? AND id<>?', [body.slug, sid]);
+            if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+          }
+          params.push(sid);
+          await conn.execute(`UPDATE spots SET ${fields.join(', ')} WHERE id=?`, params);
+          await conn.commit();
+          const [rows] = await conn.execute('SELECT * FROM spots WHERE id=?', [sid]);
+          return jsonReply(res, { ok: true, spot: rows[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/spots/:id（被项目绑定中则拒绝，先在项目里解除绑定）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/spots\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const sid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cnt] = await conn.execute('SELECT COUNT(*) AS c FROM project_spots WHERE spot_id=?', [sid]);
+          if (cnt[0].c > 0) { conn.end(); return jsonReply(res, { error: `该地点仍被 ${cnt[0].c} 个项目绑定，请先在项目里解除绑定` }, 400); }
+          const [existing] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '地点不存在' }, 404); }
+          await conn.execute('DELETE FROM spots WHERE id=?', [sid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /admin/projects/:id/spots（绑定列表） / PUT（整体替换绑定）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/projects\/(\d+)\/spots$/);
+      if (m && (req.method === 'GET' || req.method === 'PUT')) {
+        const pid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          if (req.method === 'GET') {
+            const [rows] = await conn.execute(
+              'SELECT ps.spot_id, ps.note, ps.sort_order, s.name, s.type, s.icon, s.slug, s.cover_image ' +
+              'FROM project_spots ps JOIN spots s ON s.id=ps.spot_id WHERE ps.project_id=? ORDER BY ps.sort_order, ps.id', [pid]);
+            return jsonReply(res, { ok: true, bindings: rows });
+          }
+          // PUT：整体替换（草稿式编辑，一次保存全量提交；会覆盖同项目的并发编辑）
+          const body = await readBody(req);
+          const list = Array.isArray(body.bindings) ? body.bindings : [];
+          if (list.length > 12) return jsonReply(res, { error: '最多绑定 12 处（保持 C 端区块克制）' }, 400);
+          const seen = new Set();
+          for (const b of list) {
+            const sid = parseInt(b && b.spot_id, 10);
+            if (!sid) return jsonReply(res, { error: 'bindings 里存在无效 spot_id' }, 400);
+            if (seen.has(sid)) return jsonReply(res, { error: '同一地点重复绑定' }, 400);
+            seen.add(sid);
+          }
+          for (const sid of seen) {
+            const [ex] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+            if (!ex.length) return jsonReply(res, { error: `地点 #${sid} 不存在` }, 400);
+          }
+          await conn.beginTransaction();
+          await conn.execute('DELETE FROM project_spots WHERE project_id=?', [pid]);
+          for (const b of list) {
+            await conn.execute(
+              'INSERT INTO project_spots(project_id, spot_id, note, sort_order) VALUES (?,?,?,?)',
+              [pid, parseInt(b.spot_id, 10), ((b.note || '') + '').trim().slice(0, 120) || null, parseInt(b.sort_order) || 0]);
+          }
+          await conn.commit();
+          const [rows] = await conn.execute(
+            'SELECT ps.spot_id, ps.note, ps.sort_order, s.name, s.type FROM project_spots ps JOIN spots s ON s.id=ps.spot_id WHERE ps.project_id=? ORDER BY ps.sort_order, ps.id', [pid]);
+          return jsonReply(res, { ok: true, bindings: rows });
+        } catch (e) {
+          try { await conn.rollback(); } catch (_) {}
+          throw e;
         } finally {
           await conn.end();
         }
@@ -3383,12 +3596,50 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
+        // 周边玩法（规则 17）：随项目下发绑定的维度地点（enabled=1，景区→商圈→美食→咖啡 分组序由 SQL 排定）
+        const spots = await queryRows(
+          "SELECT s.id,s.type,s.name,s.slug,s.icon,s.cover_image,s.summary,s.tags,s.link,ps.note " +
+          'FROM project_spots ps JOIN spots s ON s.id=ps.spot_id ' +
+          'WHERE ps.project_id=? AND s.enabled=1 ' +
+          "ORDER BY FIELD(s.type,'scenic','biz','food','cafe'), ps.sort_order, s.sort_order, s.id",
+          [rows[0].id]
+        );
+        spots.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
         // 商家维度咨询优先展示模式（jz_vendors.consult_mode，缺省 consultant）
         const vrows = rows[0].owner_vendor_id
           ? await queryRows('SELECT consult_mode FROM jz_vendors WHERE id=?', [rows[0].owner_vendor_id])
           : [];
         return jsonReply(res, imgThumbs.mapThumbsDeep(
-          Object.assign(rows[0], stayConfigOf(rows[0]), { consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant' }), 640));
+          Object.assign(rows[0], stayConfigOf(rows[0]), {
+            consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant',
+            spots
+          }), 640));
+      }
+    }
+
+    // GET /api/juzhu/spots/:id —— 周边玩法笔记详情（公网白名单，C 端 lvju-app-spot-post 页消费）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/spots\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const sid = parseInt(m[1]);
+        const rows = await queryRows('SELECT * FROM spots WHERE id=? AND enabled=1', [sid]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags', 'photos']);
+        rows[0].type_label = SPOT_TYPE_LABELS[rows[0].type] || rows[0].type;
+        // 相关笔记：同类优先，不足 3 条时以同城市/全省通用补齐（不做跨类凑数误导）
+        let related = await queryRows(
+          'SELECT id,type,name,slug,icon,cover_image,summary,tags FROM spots WHERE enabled=1 AND id<>? AND type=? ORDER BY sort_order, id LIMIT 4',
+          [sid, rows[0].type]
+        );
+        if (related.length < 3) {
+          const extra = await queryRows(
+            "SELECT id,type,name,slug,icon,cover_image,summary,tags FROM spots WHERE enabled=1 AND id<>? AND type<>? AND (city_id=? OR city_id IS NULL) ORDER BY FIELD(type,'scenic','biz','food','cafe'), sort_order, id LIMIT 4",
+            [sid, rows[0].type, rows[0].city_id]
+          );
+          related = related.concat(extra).slice(0, 4);
+        }
+        related.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ spot: rows[0], related }, 640));
       }
     }
 
