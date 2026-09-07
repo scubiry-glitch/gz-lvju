@@ -16,6 +16,10 @@ juzhu/_housing_dump.json
 juzhu/_housing_dump.sql
 scripts/tp_call_log.json
 *.tp.local.json
+# img_thumbs.cjs 运行时生成的缩略图（启动全量扫描 + 每小时增量自动补齐，不入库；
+# 仓库只提交 jpg/png 原图，见 CLAUDE.md 规则 17「缩略图管线自动出 .t240/.t640」）
+assets/**/*.t240.webp
+assets/**/*.t640.webp
 # vendor 默认忽略；jsbridge 离线包需入库供 npm file: 依赖
 vendor/*
 !vendor/lianjia-jsbridge3-1.1.6.tgz
