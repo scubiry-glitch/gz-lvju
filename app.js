@@ -2117,6 +2117,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
          FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
          WHERE v.status='active'
          GROUP BY v.id, v.name, v.type, v.consult_mode
+         HAVING project_count > 0
          ORDER BY project_count DESC, v.id`);
       return jsonReply(res, rows.map((v) => Object.assign(v, { consult_mode: v.consult_mode || 'consultant' })));
     }
