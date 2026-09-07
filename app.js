@@ -120,7 +120,8 @@ function getDbConfig() {
     user,
     password,
     charset: 'utf8mb4',
-    collation: 'utf8mb4_general_ci',
+    // 注意：不要传 collation 连接选项——mysql2 不支持，会在每次建连时刷屏
+    // "Ignoring invalid configuration option ... collation" 警告（charset=utf8mb4 默认即该排序规则）
     connectTimeout: 8000,
     decimalNumbers: true,
   };
@@ -1754,6 +1755,7 @@ function readBody(req) {
     req.on('data', chunk => { data += chunk; });
     req.on('end', () => {
       req._rawBody = data;
+      reqLogBody(data);
       try { resolve(data ? JSON.parse(data) : {}); }
       catch (e) { resolve({}); }
     });
@@ -5661,10 +5663,119 @@ async function handleAuthRoutes(rawPath, qs, req, res) {
     return jsonReply(res, { error: String(e.message || e) }, 500);
   }
 }
+// ================= 每请求日志（对齐 Python juzhu/server.py 分段格式） =================
+// 详细模式（默认）：每请求打印 分隔线 + #编号 时间 [类别] 方法 URI + query/headers + 请求体 + 响应状态与返回体；
+// 简洁模式（JUZHU_LOG_DETAIL=false/0/off）：每请求仅一行「时间 方法 URI」。
+const LOG_SEP = '='.repeat(80);
+const LOG_BODY_LIMIT = 2000;   // 请求体/返回体打印截断长度（字符）
+let reqSeq = 0;
+
+function logDetailOn() {
+  const v = (process.env.JUZHU_LOG_DETAIL || 'true').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'off' || v === 'no');
+}
+
+function logTs() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// 入站请求分类：商家回调/商家 vendor 接口调用我们 → [商家→平台]；其余 → [其它]
+function reqLogCategory(path) {
+  return (path === '/api/juzhu/callback' || path.startsWith('/api/juzhu/jiazheng/vendor/')) ? '商家→平台' : '其它';
+}
+
+// 请求开始：详细模式打印分段头；简洁模式只打印接口 URI
+function reqLogBegin(req, rawPath, qs) {
+  reqSeq += 1;
+  const uri = rawPath + (qs ? '?' + qs : '');
+  if (!logDetailOn()) {
+    console.log(`${logTs()} ${req.method} ${uri}`);
+    return;
+  }
+  const lines = [LOG_SEP, `#${reqSeq} ${logTs()} [${reqLogCategory(rawPath)}] ${req.method} ${uri}`];
+  if (qs) lines.push(`  >> 参数(query): ${qs}`);
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    lines.push(`  >> 参数(headers): content-type=${req.headers['content-type'] || '-'}, content-length=${req.headers['content-length'] || 0}`);
+  }
+  console.log(lines.join('\n'));
+}
+
+// 请求体（JSON）原文打印：与 Python _body() 一致，超长截断
+function reqLogBody(rawBody) {
+  if (!logDetailOn() || !rawBody) return;
+  const text = String(rawBody);
+  const body = text.length > LOG_BODY_LIMIT ? `${text.slice(0, LOG_BODY_LIMIT)}…[截断，共 ${text.length} 字符]` : text;
+  console.log(`  >> 参数(body): ${body.replace(/\n/g, '\n  | ')}`);
+}
+
+// 响应完成：包装 res 收集返回体（仅 /api/juzhu），finish 时打印状态码/大小/耗时/返回体
+function resLogWrap(req, res) {
+  const started = Date.now();
+  let size = 0;
+  let body = '';
+  let bodyTruncated = false;
+  let contentType = null;
+  // finish 后 getHeader 已取不到，需在 writeHead/setHeader 时提前记录 content-type
+  const origWriteHead = res.writeHead.bind(res);
+  res.writeHead = (code, headers) => {
+    if (Array.isArray(headers)) {
+      for (let i = 0; i < headers.length; i += 2) {
+        if (String(headers[i]).toLowerCase() === 'content-type') contentType = headers[i + 1];
+      }
+    } else if (headers) {
+      contentType = headers['Content-Type'] || headers['content-type'] || contentType;
+    }
+    return origWriteHead(code, headers);
+  };
+  const origSetHeader = res.setHeader.bind(res);
+  res.setHeader = (name, value) => {
+    if (String(name).toLowerCase() === 'content-type') contentType = value;
+    return origSetHeader(name, value);
+  };
+  const collect = (chunk) => {
+    if (chunk == null) return;
+    size += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+    if (bodyTruncated || body.length >= LOG_BODY_LIMIT) return;
+    const s = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    body += s;
+    if (body.length > LOG_BODY_LIMIT) {
+      body = body.slice(0, LOG_BODY_LIMIT);
+      bodyTruncated = true;
+    }
+  };
+  const origWrite = res.write.bind(res);
+  res.write = (chunk, enc, cb) => { collect(chunk); return origWrite(chunk, enc, cb); };
+  const origEnd = res.end.bind(res);
+  res.end = (chunk, enc, cb) => { collect(chunk); return origEnd(chunk, enc, cb); };
+  res.on('finish', () => {
+    if (!logDetailOn()) return;
+    const ct = contentType || res.getHeader('content-type') || '-';
+    const lines = [`  << 状态: ${res.statusCode} · ${size}B · ${Date.now() - started}ms · ${ct}`];
+    if (body.length || bodyTruncated) {
+      let text = body;
+      if (bodyTruncated) text += `…[截断，共 ${size} 字节]`;
+      lines.push(`  << 返回: ${text.replace(/\n/g, '\n  | ')}`);
+    }
+    console.log(lines.join('\n'));
+  });
+  // 兜底：连接中断且未正常结束（无响应体/超时）时也留痕
+  res.on('close', () => {
+    if (!res.writableFinished && logDetailOn()) {
+      console.log(`  << 状态: 连接中断（未完成响应）· ${Date.now() - started}ms`);
+    }
+  });
+}
 
 const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
+
+  // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
+  const apiReq = rawPath.startsWith('/api/juzhu');
+  reqLogBegin(req, rawPath, qs);
+  if (apiReq) resLogWrap(req, res);
 
   // CORS preflight
   if (req.method === 'OPTIONS' && (rawPath.startsWith('/api/juzhu') || rawPath.startsWith('/api/auth'))) {
@@ -5678,7 +5789,7 @@ const server = http.createServer((req, res) => {
   }
 
   // /api/juzhu/* 直接走 Node.js MySQL 实现
-  if (rawPath.startsWith('/api/juzhu')) {
+  if (apiReq) {
     return handleApiDirect(rawPath, qs, req, res);
   }
 
