@@ -50,7 +50,7 @@
   <div id="side-nav" data-series="p" data-active="jz-order-overview"></div>
   <main class="main">
     <div class="top">
-      <div class="crumb">控制台 / × P 服务认证中台 / 居住服务 · 家政频道 / <b>服务订单概览</b></div>
+      <div class="crumb">控制台 / × P 服务认证中台 / 居住服务 · 本地生活 / <b>服务订单概览</b></div>
     </div>
     <div class="content">
 
@@ -134,7 +134,7 @@
   }
 
   function renderFunnel(funnel) {
-    const today = new Date().toISOString().slice(0,10);
+    const today = new Date(Date.now() + 8*3600*1000).toISOString().slice(0,10); // 北京日期，与服务端分桶同口径
     $('funnelDate').textContent = '日期：' + today;
 
     const vals = STATUS_ORDER.map(s => funnel[s]||0);
