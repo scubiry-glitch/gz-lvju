@@ -193,6 +193,6 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 
 - **三层模型**：内容原子 = `spots`（地点 + 笔记，规则 17 单一数据源）→ 内容编排 = `routes`（spots 的有序串联，`stops` JSON `[{spot_id, note}]`，**不复制正文**）→ 房源集合 = `topic_*`（settings KV 筛选条件，规则 15）。`routes.city_id NULL = 全省通用`，与 spots 同口径。
 - **后台**：内容 tab 三卡 = 房源专题（KV CRUD + 实时在架数 + 启用/下架）+ 旅游路线（CRUD + 站点编辑器：选 spots 排序加行程提示，≤12 站）+ 周边玩法（原 renderSpots 平移）。admin 接口：`GET/POST/PUT/DELETE /api/juzhu/admin/routes*`、`GET /api/juzhu/admin/topics`、`PUT|DELETE /api/juzhu/admin/topics/:slug`，全部登记 `perm_registry.ROUTES`（写 = `house.write`，读 = `admin.read`）。**`topic_bzf` 是保租房专区既有契约：可编辑/下架，禁止删除（服务端硬闸）**。专题下架（`enabled:false`）后 `catalog?topic=` 立即 404（服务端同响应不泄露存在性 + `catalogMemoInvalidateTopics()` 清缓存）。
-- **公开接口（白名单 GET）**：`/api/juzhu/routes?city=`、`/api/juzhu/routes/:id`（站点水合附 spot 摘要卡）、`/api/juzhu/spots?city=&type=`（列表，此前只有 :id 详情）。路线封面缺省回落首个有点位的封面，前端不必再兜底造图。
+- **公开接口（白名单 GET）**：`/api/juzhu/routes?city=`、`/api/juzhu/routes/:id`（站点水合附 spot 摘要卡）、`/api/juzhu/spots?city=&type=`（列表，此前只有 :id 详情）、`/api/juzhu/topics`（enabled 专题清单，含 label/desc/cover_image/tags/channel）。路线封面缺省回落首个有点位的封面，前端不必再兜底造图。**C 端专题入口必须读 `/api/juzhu/topics` 动态渲染，禁止硬编码专题清单**（后台建/删专题即时生效）；专题页存在性以服务端 KV 为准，本地 META 只做文案兜底。
 - **C 端接库页**：`lvju-app-routes.html`（路线卡 + 时间线，站点深链 `lvju-app-spot-post.html?id=`）、`lvju-app-spots.html`（玩法列表，类型筛选 chip 用接口下发的 `type_label`，**前端不得另造类型映射**）、`lvju-app-topic.html`（专题列表 + 底部「去哪玩」挂同城 routes/scenic spots）。
 - **种子**：`node scripts/find-topic-seed.cjs seed|clean`（topic KV）、`node scripts/routes-seed.cjs seed|clean`（3 条贵阳路线，站点复用 spots-seed 的 slug；幂等，clean 只删本脚本清单）。

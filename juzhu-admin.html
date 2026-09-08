@@ -876,6 +876,13 @@ function channelOpts(sel) {
   var CH = [['', '不限频道'], ['rental', '长租 rental'], ['minsu', '民宿 minsu'], ['newhouse', '新房 newhouse'], ['resale', '二手 resale'], ['trade', '卖旧买新 trade']];
   return CH.map(function(c){ return '<option value="'+c[0]+'"'+((sel||'')===c[0]?' selected':'')+'>'+c[1]+'</option>'; }).join('');
 }
+function tDescRow(t) {
+  return '<tr class="t_desc_row" style="display:none;"><td colspan="7" style="background:#fafcfb;">'+
+    '<div style="display:grid;grid-template-columns:90px 1fr;gap:8px 10px;align-items:start;font-size:12px;">'+
+      '<b style="padding-top:6px;">入口简介</b><textarea class="t_desc" rows="2" placeholder="显示在 C 端专题入口卡片（一句话卖点）">'+esc(t.desc||'')+'</textarea>'+
+      '<b style="padding-top:6px;">入口封面</b><input class="t_cover" value="'+esc(t.cover_image||'')+'" placeholder="assets/lvju/xx.jpg（留空=自动取首个命中房源封面）"/>'+
+    '</div></td></tr>';
+}
 function contentTopicsHtml() {
   var counts = (state.topics || []).map(topicCount);
   var rows = (state.topics || []).map(function(t, i) {
@@ -887,11 +894,12 @@ function contentTopicsHtml() {
       '<td><input class="t_tags" value="'+esc((t.tags||[]).join(', '))+'" placeholder="逗号分隔，全部命中"/></td>'+
       '<td>'+(cnt==null?'—':cnt+' 套')+'</td>'+
       '<td><input class="t_en" type="checkbox"'+(t.enabled!==false?' checked':'')+'/></td>'+
-      '<td class="acts"><button type="button" class="btn primary t_save">保存</button>'+
-      (t.slug==='bzf'?'':'<button type="button" class="btn danger t_del">删</button>')+'</td></tr>';
+      '<td class="acts"><button type="button" class="btn ghost t_copy">文案</button>'+
+      '<button type="button" class="btn primary t_save">保存</button>'+
+      (t.slug==='bzf'?'':'<button type="button" class="btn danger t_del">删</button>')+'</td></tr>' + tDescRow(t);
   }).join('');
   return '<div class="card"><h2>房源专题（topic_*） <span class="badge" style="background:var(--gold)">'+(state.topics||[]).length+'</span></h2>'+
-    '<p class="hint">专题 = 房源筛选条件（频道选填 + tags 全部命中，规则 15）；slug 是 C 端深链 ?topic=（找房枢纽「专题入口」与专题页 lvju-app-topic 消费）。「启用」= C 端可见，取消勾选并保存即下架（C 端立即 404）。在架数按当前城市 catalog 实时推导。<b>bzf（保租房专区）为既有契约，不可删除。</b></p>'+
+    '<p class="hint">专题 = 房源筛选条件（频道选填 + tags 全部命中，规则 15）；slug 是 C 端深链 ?topic=。C 端找房枢纽「专题入口」与专题页 <b>实时读本清单</b>，这里建/改/下架立即生效。「启用」取消勾选并保存即下架（C 端 404）；「文案」里编辑入口简介与封面（封面留空=自动取首个命中房源封面）。在架数按当前城市 catalog 推导。<b>bzf（保租房专区）为既有契约，不可删除。</b></p>'+
     '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
       '<th>名称</th><th>Slug</th><th>频道</th><th>Tags 条件</th><th>在架</th><th>启用</th><th>操作</th>'+
     '</tr></thead><tbody id="topicRows">'+rows+
@@ -913,71 +921,150 @@ function stopsEditorHtml(stops) {
   return (stops||[]).map(function(s, i) {
     return '<div class="stp" style="display:flex;gap:6px;align-items:center;margin:4px 0;">'+
       '<span style="width:20px;text-align:right;color:#8a958f;font-size:12px;">'+(i+1)+'.</span>'+
-      '<select class="stp_spot" style="flex:0 0 200px;">'+opts(s.spot_id)+'</select>'+
+      '<select class="stp_spot" style="flex:0 0 220px;">'+opts(s.spot_id)+'</select>'+
       '<input class="stp_note" value="'+esc(s.note||'')+'" placeholder="行程提示（如：Day1 下午 · 古镇石板街）" style="flex:1;"/>'+
       '<button type="button" class="btn ghost stp_up"'+(i===0?' disabled':'')+'>↑</button>'+
       '<button type="button" class="btn ghost stp_dn"'+(i===(stops||[]).length-1?' disabled':'')+'>↓</button>'+
       '<button type="button" class="btn danger stp_rm">移除</button></div>';
   }).join('');
 }
+function cityNameOf(id) {
+  var c = (state.cities || []).filter(function(x){ return Number(x.id) === Number(id); })[0];
+  return c ? c.name : '全省通用';
+}
+var routeDraft = null;   // 当前编辑中的路线工作副本（null=面板关闭）
+function renderRouteEditor() {
+  var box = document.getElementById('routeEditor');
+  if (!box) return;
+  if (!routeDraft) { box.innerHTML = ''; return; }
+  var cityOpts = '<option value="">全省通用</option>' + (state.cities||[]).map(function(c){
+    return '<option value="'+c.id+'"'+(Number(routeDraft.city_id)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+  }).join('');
+  box.innerHTML = '<div class="card" style="border:2px solid var(--brand);margin-top:12px;">'+
+    '<h2>编辑路线 · '+esc(routeDraft.name||'(未命名)')+' <span style="color:#8a958f;font-size:11px;font-weight:400;">slug: '+esc(routeDraft.slug||'(创建时自动生成)')+'</span></h2>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 110px 110px 1.4fr;gap:8px 10px;font-size:12px;align-items:end;">'+
+      '<label>名称<input class="re_name" value="'+esc(routeDraft.name||'')+'" placeholder="如：筑城慢享 · 古镇两日"/></label>'+
+      '<label>城市<select class="re_city">'+cityOpts+'</select></label>'+
+      '<label>天数<input class="re_days" type="number" min="1" max="30" value="'+(routeDraft.days||1)+'"/></label>'+
+      '<label>排序<input class="re_sort" type="number" value="'+(routeDraft.sort_order||0)+'"/></label>'+
+      '<label>封面路径<input class="re_cover" value="'+esc(routeDraft.cover_image||'')+'" placeholder="assets/lvju/xx.jpg（留空=取首站封面）"/></label>'+
+      '<label style="grid-column:1/-1;">简介<textarea class="re_summary" rows="2" placeholder="一句话行程卖点，显示在 C 端路线卡头部">'+esc(routeDraft.summary||'')+'</textarea></label>'+
+    '</div>'+
+    '<label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;"><input class="re_en" type="checkbox"'+(routeDraft.enabled!==0?' checked':'')+'/> 上架（C 端可见）</label>'+
+    '<div style="margin-top:10px;"><b style="font-size:12px;">站点编排（≤12 站，自上而下即行程顺序；站点正文/图集在「周边玩法」维护）</b>'+
+      '<div class="re_stops">'+stopsEditorHtml(routeDraft.stops)+'</div>'+
+      '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">'+
+        '<button type="button" class="btn ghost re_add">+ 添加站点</button>'+
+        '<button type="button" class="btn primary re_save">保存路线</button>'+
+        '<button type="button" class="btn ghost re_close">关闭</button>'+
+        '<span class="hint">改动需点「保存路线」才生效</span></div>'+
+    '</div></div>';
+  // 接线（面板每次重渲染都是新节点，直接赋 onclick）
+  box.querySelector('.re_add').onclick = function() {
+    syncDraftFromDom(box);
+    if (routeDraft.stops.length >= 12) { toast('单条路线最多 12 站'); return; }
+    routeDraft.stops.push({ spot_id: 0, note: '' });
+    box.querySelector('.re_stops').innerHTML = stopsEditorHtml(routeDraft.stops);
+  };
+  box.querySelector('.re_close').onclick = function() { routeDraft = null; renderRouteEditor(); renderSpots(); };
+  box.querySelector('.re_save').onclick = function() {
+    syncDraftFromDom(box);
+    var body = {
+      name: box.querySelector('.re_name').value.trim(),
+      city_id: box.querySelector('.re_city').value || null,
+      days: +box.querySelector('.re_days').value || 1,
+      sort_order: +box.querySelector('.re_sort').value || 0,
+      cover_image: box.querySelector('.re_cover').value.trim() || null,
+      summary: box.querySelector('.re_summary').value.trim() || null,
+      enabled: box.querySelector('.re_en').checked ? 1 : 0,
+      stops: routeDraft.stops.filter(function(s){ return s.spot_id; })
+    };
+    if (!body.name) { toast('路线名称不能为空'); return; }
+    if (!body.stops.length) { toast('至少添加 1 个站点'); return; }
+    var p = routeDraft.id
+      ? api('/routes/' + routeDraft.id, { method:'PUT', body: body })
+      : api('/routes', { method:'POST', body: Object.assign({ slug: routeDraft.slug || null }, body) });
+    p.then(function() {
+      toast(routeDraft.id ? '路线已保存' : '路线已创建');
+      routeDraft = null;
+      return loadContentData();
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+  box.querySelector('.re_stops').onclick = function(e) {
+    var row = e.target.closest('.stp');
+    if (!row) return;
+    var all = Array.from(this.querySelectorAll('.stp'));
+    var i = all.indexOf(row);
+    syncDraftFromDom(box);
+    if (e.target.closest('.stp_up') && i > 0) {
+      var t = routeDraft.stops[i]; routeDraft.stops[i] = routeDraft.stops[i-1]; routeDraft.stops[i-1] = t;
+    } else if (e.target.closest('.stp_dn') && i > -1 && i < routeDraft.stops.length - 1) {
+      var t2 = routeDraft.stops[i]; routeDraft.stops[i] = routeDraft.stops[i+1]; routeDraft.stops[i+1] = t2;
+    } else if (e.target.closest('.stp_rm')) {
+      routeDraft.stops.splice(i, 1);
+    } else return;
+    this.innerHTML = stopsEditorHtml(routeDraft.stops);
+  };
+}
+function syncDraftFromDom(box) {
+  // 结构性操作（加站/排序/移除）前，先把 DOM 里未保存的选点/提示写回工作副本，避免丢输入
+  if (!routeDraft) return;
+  Array.from(box.querySelectorAll('.stp')).forEach(function(el, i) {
+    if (!routeDraft.stops[i]) return;
+    routeDraft.stops[i].spot_id = parseInt(el.querySelector('.stp_spot').value, 10) || 0;
+    routeDraft.stops[i].note = el.querySelector('.stp_note').value.trim();
+  });
+}
 function contentRoutesHtml() {
   var rows = (state.routes || []).map(function(r) {
     var stops = Array.isArray(r.stops) ? r.stops : (function(){ try { return JSON.parse(r.stops||'[]'); } catch(e){ return []; } })();
-    return '<tr data-rid="'+r.id+'">'+
-      '<td><input class="r_name" value="'+esc(r.name||'')+'"/></td>'+
-      '<td><input class="r_slug" value="'+esc(r.slug||'')+'" readonly style="color:#8a958f;"/></td>'+
-      '<td><select class="r_city"><option value="">全省通用</option>'+ (state.cities||[]).map(function(c){
-        return '<option value="'+c.id+'"'+(Number(r.city_id)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
-      }).join('') +'</select></td>'+
-      '<td><input class="r_days" type="number" min="1" max="30" value="'+(r.days||1)+'" style="width:52px;"/></td>'+
-      '<td><button type="button" class="btn ghost r_stops">站点 <b>'+(stops||[]).length+'</b> ▾</button></td>'+
-      '<td><input class="r_sort" type="number" value="'+(r.sort_order||0)+'" style="width:56px;"/></td>'+
-      '<td><input class="r_en" type="checkbox"'+(r.enabled!==0?' checked':'')+'/></td>'+
-      '<td class="acts"><button type="button" class="btn primary r_save">保存</button>'+
-      '<button type="button" class="btn danger r_del">删</button></td></tr>'+
-      '<tr class="r_stops_row" style="display:none;"><td colspan="8" style="background:#fafcfb;">'+
-        '<div class="r_stops_list">'+stopsEditorHtml(stops)+'</div>'+
-        '<div style="margin-top:6px;"><button type="button" class="btn ghost stp_add">+ 添加站点</button>'+
-        '<span class="hint" style="margin-left:10px;">站点即「周边玩法」条目，正文/图集在那边维护；这里只排顺序与行程提示。改动后需点该行「保存」。</span></div>'+
-      '</td></tr>';
+    var editing = routeDraft && Number(routeDraft.id) === Number(r.id);
+    return '<tr data-rid="'+r.id+'"'+(editing?' style="outline:2px solid var(--brand);"':'')+'>'+
+      '<td><b>'+esc(r.name||'')+'</b>'+(editing?' <span class="badge" style="background:var(--brand)">编辑中</span>':'')+'</td>'+
+      '<td>'+esc(cityNameOf(r.city_id))+'</td>'+
+      '<td>'+(r.days||1)+' 天</td>'+
+      '<td><b>'+(stops||[]).length+'</b> 站</td>'+
+      '<td>'+(r.enabled!==0?'<span style="color:var(--brand-deep);">上架</span>':'<span style="color:#b45309;">下架</span>')+'</td>'+
+      '<td class="acts"><button type="button" class="btn primary r_edit">编辑</button>'+
+      '<button type="button" class="btn danger r_del">删</button></td></tr>';
   }).join('');
   return '<div class="card"><h2>旅游路线（routes） <span class="badge" style="background:var(--gold)">'+(state.routes||[]).length+'</span></h2>'+
-    '<p class="hint">路线 = 周边地点的有序编排（内容单一数据源仍是「周边玩法」，这里只管顺序与行程提示）；C 端 lvju-app-routes 列表与专题页「去哪玩」消费。slug 为深链词汇；城市「全省通用」= 跨市路线。</p>'+
+    '<p class="hint">路线 = 周边地点的有序编排（站点正文/图集在「周边玩法」维护，这里管简介、封面、顺序与行程提示）；C 端 lvju-app-routes 列表与专题页「去哪玩」消费。点「编辑」在下方展开完整编辑面板；城市「全省通用」= 跨市路线。</p>'+
     '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
-      '<th>名称</th><th>Slug</th><th>城市</th><th>天数</th><th>站点</th><th>排序</th><th>启用</th><th>操作</th>'+
+      '<th>名称</th><th>城市</th><th>天数</th><th>站点</th><th>状态</th><th>操作</th>'+
     '</tr></thead><tbody id="routeRows">'+rows+
-      '<tr class="new"><td><input class="n_name" placeholder="如：筑城慢享 · 古镇两日"/></td>'+
-      '<td><input class="n_slug" placeholder="guiyang-leisure-2d（留空自动）"/></td>'+
-      '<td><select class="n_city"><option value="">全省通用</option>'+ (state.cities||[]).map(function(c){
-        return '<option value="'+c.id+'">'+esc(c.name)+'</option>';
-      }).join('') +'</select></td>'+
-      '<td><input class="n_days" type="number" value="1" min="1" max="30" style="width:52px;"/></td>'+
-      '<td></td><td><input class="n_sort" type="number" value="999" style="width:56px;"/></td><td></td>'+
-      '<td class="acts"><button type="button" class="btn ghost" id="newRouteSave">+ 新增</button></td></tr>'+
-    '</tbody></table></div></div>';
-}
-function routeStopsOf(tr) {
-  // 从站点编辑行读回有序 [{spot_id, note}]；编辑行未展开时返回 null（保持原值）
-  var listRow = tr.nextElementSibling;
-  if (!listRow || !listRow.classList.contains('r_stops_row')) return null;
-  return Array.from(listRow.querySelectorAll('.stp')).map(function(el) {
-    return { spot_id: parseInt(el.querySelector('.stp_spot').value, 10) || 0,
-             note: el.querySelector('.stp_note').value.trim() };
-  }).filter(function(s){ return s.spot_id; });
+      '<tr class="new"><td colspan="6"><button type="button" class="btn ghost" id="newRouteSave">+ 新建路线</button>　<span class="hint">创建后自动展开编辑面板（名称/简介/封面/站点编排一次完成）</span></td></tr>'+
+    '</tbody></table></div></div>'+
+    '<div id="routeEditor"></div>';
 }
 function wireContentCards(root) {
   // ── 专题 ──
+  root.querySelectorAll('.t_copy').forEach(function(btn) {
+    btn.onclick = function() {
+      var row = btn.closest('tr').nextElementSibling;
+      if (row && row.classList.contains('t_desc_row')) {
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+        btn.textContent = row.style.display === 'none' ? '文案' : '收起';
+      }
+    };
+  });
   root.querySelectorAll('.t_save').forEach(function(btn) {
     btn.onclick = function() {
       var tr = btn.closest('tr');
       var tags = tr.querySelector('.t_tags').value.split(/[,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
-      api('/topics/' + tr.dataset.slug, { method:'PUT', body: {
+      var body = {
         label: tr.querySelector('.t_label').value.trim(),
         tags: tags,
         channel: tr.querySelector('.t_channel').value || null,
         enabled: tr.querySelector('.t_en').checked
-      }}).then(function() {
-        toast('专题已保存' + (tr.querySelector('.t_en').checked ? '' : '（已下架）'));
+      };
+      var descRow = tr.nextElementSibling;
+      if (descRow && descRow.classList.contains('t_desc_row')) {
+        body.desc = descRow.querySelector('.t_desc').value.trim();
+        body.cover_image = descRow.querySelector('.t_cover').value.trim();
+      }
+      api('/topics/' + tr.dataset.slug, { method:'PUT', body: body }).then(function() {
+        toast('专题已保存' + (body.enabled ? '' : '（已下架）'));
         return loadContentData();
       }).catch(function(e){ toast('保存失败：'+e.message); });
     };
@@ -1004,81 +1091,28 @@ function wireContentCards(root) {
       return loadContentData();
     }).catch(function(e){ toast('创建失败：'+e.message); });
   };
-  // ── 路线 ──
-  function syncStopsCount(tr) {
-    var stops = routeStopsOf(tr) || [];
-    var btn = tr.querySelector('.r_stops');
-    if (btn) btn.innerHTML = '站点 <b>' + stops.length + '</b> ▾';
-  }
-  root.querySelectorAll('.r_stops').forEach(function(btn) {
+  // ── 路线（主从：紧凑列表 + 全宽编辑面板）──
+  root.querySelectorAll('.r_edit').forEach(function(btn) {
     btn.onclick = function() {
-      var tr = btn.closest('tr');
-      var listRow = tr.nextElementSibling;
-      if (!listRow || !listRow.classList.contains('r_stops_row')) return;
-      var open = listRow.style.display === 'none';
-      listRow.style.display = open ? '' : 'none';
-    };
-  });
-  root.onclick = function(e) {   // 覆盖式赋值：renderSpots 重渲染幂等，不用 addEventListener（会叠加）
-    var listRow = e.target.closest('.r_stops_row');
-    if (!listRow) return;
-    var tr = listRow.previousElementSibling;
-    function rerenderList(list) {
-      listRow.querySelector('.r_stops_list').innerHTML = stopsEditorHtml(list);
-      syncStopsCount(tr);
-    }
-    var up = e.target.closest('.stp_up'), dn = e.target.closest('.stp_dn'), rm = e.target.closest('.stp_rm'), add = e.target.closest('.stp_add');
-    if (add) {
-      var list = routeStopsOf(tr) || [];
-      if (list.length >= 12) { toast('单条路线最多 12 站'); return; }
-      list.push({ spot_id: 0, note: '' });
-      rerenderList(list);
-    } else if (up || dn) {
-      var all = Array.from(listRow.querySelectorAll('.stp'));
-      var i = all.indexOf(e.target.closest('.stp'));
-      var j = up ? i - 1 : i + 1;
-      var cur = routeStopsOf(tr) || [];
-      if (i < 0 || j < 0 || j >= cur.length) return;
-      var tmp = cur[i]; cur[i] = cur[j]; cur[j] = tmp;
-      rerenderList(cur);
-    } else if (rm) {
-      var all2 = Array.from(listRow.querySelectorAll('.stp'));
-      var k = all2.indexOf(e.target.closest('.stp'));
-      var cur2 = routeStopsOf(tr) || [];
-      if (k < 0) return;
-      cur2.splice(k, 1);
-      rerenderList(cur2);
-    }
-  };
-  root.querySelectorAll('.r_save').forEach(function(btn) {
-    btn.onclick = function() {
-      var tr = btn.closest('tr');
-      var body = {
-        name: tr.querySelector('.r_name').value.trim(),
-        city_id: tr.querySelector('.r_city').value || null,
-        days: +tr.querySelector('.r_days').value || 1,
-        sort_order: +tr.querySelector('.r_sort').value || 0,
-        enabled: tr.querySelector('.r_en').checked ? 1 : 0
-      };
-      var stops = routeStopsOf(tr);
-      if (stops) body.stops = stops; else {
-        var cur = (state.routes || []).filter(function(r){ return Number(r.id) === Number(tr.dataset.rid); })[0];
-        body.summary = cur ? cur.summary : null;
-        body.stops = cur ? (Array.isArray(cur.stops) ? cur.stops : []) : [];
-      }
-      var curRow = (state.routes || []).filter(function(r){ return Number(r.id) === Number(tr.dataset.rid); })[0] || {};
-      body.summary = body.summary || curRow.summary || null;
-      api('/routes/' + tr.dataset.rid, { method:'PUT', body: body }).then(function() {
-        toast('路线已保存');
-        return loadContentData();
-      }).catch(function(e){ toast('保存失败：'+e.message); });
+      var rid = Number(btn.closest('tr').dataset.rid);
+      var r = (state.routes || []).filter(function(x){ return Number(x.id) === rid; })[0];
+      if (!r) return;
+      routeDraft = JSON.parse(JSON.stringify(r));
+      if (!Array.isArray(routeDraft.stops)) routeDraft.stops = [];
+      renderSpots();
+      renderRouteEditor();
+      var box = document.getElementById('routeEditor');
+      if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
   });
   root.querySelectorAll('.r_del').forEach(function(btn) {
     btn.onclick = function() {
       var tr = btn.closest('tr');
-      if (!confirm('删除路线「'+tr.querySelector('.r_name').value+'」？')) return;
-      api('/routes/' + tr.dataset.rid, { method:'DELETE' }).then(function() {
+      var rid = Number(tr.dataset.rid);
+      var r = (state.routes || []).filter(function(x){ return Number(x.id) === rid; })[0] || {};
+      if (!confirm('删除路线「'+(r.name||'')+'」？C 端将立即不再展示。')) return;
+      api('/routes/' + rid, { method:'DELETE' }).then(function() {
+        if (routeDraft && Number(routeDraft.id) === rid) routeDraft = null;
         toast('路线已删除');
         return loadContentData();
       }).catch(function(e){ toast('删除失败：'+e.message); });
@@ -1086,18 +1120,12 @@ function wireContentCards(root) {
   });
   var newRoute = document.getElementById('newRouteSave');
   if (newRoute) newRoute.onclick = function() {
-    var tr = newRoute.closest('tr');
-    api('/routes', { method:'POST', body: {
-      name: tr.querySelector('.n_name').value.trim(),
-      slug: tr.querySelector('.n_slug').value.trim() || null,
-      city_id: tr.querySelector('.n_city').value || null,
-      days: +tr.querySelector('.n_days').value || 1,
-      sort_order: +tr.querySelector('.n_sort').value || 0,
-      stops: []
-    }}).then(function() {
-      toast('路线已创建（点「站点 ▾」编排行程后保存）');
-      return loadContentData();
-    }).catch(function(e){ toast('创建失败：'+e.message); });
+    routeDraft = { id: 0, slug: null, name: '', summary: '', cover_image: '',
+      city_id: (state.city && state.city.id) || null, days: 1, sort_order: 999, enabled: 1, stops: [] };
+    renderSpots();
+    renderRouteEditor();
+    var box = document.getElementById('routeEditor');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 }
 

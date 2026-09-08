@@ -108,7 +108,7 @@
     zhengdong: { label: '整栋包栋',   desc: '整栋院落 · 家庭聚会与团建包栋', fb: 's-xijiang' },
     bzf:       { label: '保租房专区', desc: '国企持有方房源 · 白名单运营商运营 · 统一监管', fb: 's-city' },
   };
-  var meta = META[SLUG];
+  var meta = META[SLUG] || { label: '', desc: '', fb: 's-xijiang' };   // 本地 META 仅兜底文案；后台新建专题即时可开（存在性以服务端 KV 为准）
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
@@ -120,20 +120,20 @@
   }
 
   document.getElementById('hubLink').href = 'lvju-app-search.html?city=' + encodeURIComponent(CITY);
-  document.getElementById('tbName').textContent = meta ? meta.label : '找房专题';
-  document.getElementById('tbDesc').textContent = meta ? meta.desc : '';
-  if (!meta) {
+  document.getElementById('tbName').textContent = meta.label || '加载中…';
+  document.getElementById('tbDesc').textContent = meta.desc || '';
+  if (!SLUG) {
     document.title = '找房专题 · 贝壳找房旅居';
     document.getElementById('tbBg').className = 'bg s-xijiang';
     document.getElementById('tbStat').innerHTML = '';
     document.getElementById('listingWrap').innerHTML =
       '<div style="text-align:center;color:#9aa5a1;padding:30px 16px;font-size:12px;line-height:1.8;">' +
-      '该专题不存在或暂未上线<br/><a href="lvju-app-search.html?city=' + encodeURIComponent(CITY) +
+      '未指定专题<br/><a href="lvju-app-search.html?city=' + encodeURIComponent(CITY) +
       '" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">去找房枢纽</a></div>';
     return;
   }
   document.title = meta.label + ' · 找房专题 · 贝壳找房旅居';
-  document.querySelector('#tbTitle small').textContent = meta.label;
+  if (meta.label) document.querySelector('#tbTitle small').textContent = meta.label;
 
   var dmap = {}, umap = {};
 
@@ -232,8 +232,10 @@
       if (cat.error) throw new Error(cat.error);
       dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
       umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
-      var label = (cat.topic && cat.topic.label) || meta.label;
+      var label = (cat.topic && cat.topic.label) || meta.label || '找房专题';
       document.getElementById('tbName').textContent = label;
+      if (cat.topic && cat.topic.desc) document.getElementById('tbDesc').textContent = cat.topic.desc;
+      document.querySelector('#tbTitle small').textContent = label;
       document.title = label + ' · 找房专题 · 贝壳找房旅居';
       var cityName = (cat.city && cat.city.name) || CITY;
       var ps = (cat.projects || []).slice()
