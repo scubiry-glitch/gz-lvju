@@ -64,6 +64,8 @@
       mobile: true,
       groups: [
         { name: '找房 · 全频道', items: [
+          { id: 'search',  label: '找房枢纽（全频道搜索）', href: 'lvju-app-search.html', icon: 'search' },
+          { id: 'topic',   label: '找房专题（候鸟·康养·亲子·整栋）', href: 'lvju-app-topic.html?topic=kangyang', icon: 'grid' },
           { id: 'home',    label: '频道首页',       href: 'lvju-app-home-demo.html', icon: 'home' },
           { id: 'lvju',    label: '旅居（短住·候鸟·康养）', href: 'lvju-app-lvju.html',    icon: 'home' },
           { id: 'minsu',   label: '民宿（整栋·星级·管家）', href: 'lvju-app-minsu.html',   icon: 'home' },
@@ -84,11 +86,13 @@
         { name: '标准与验真', items: [
           { id: 'rating-standard', label: '旅居星级标准', href: 'lvju-rating-standard.html', icon: 'award' },
           { id: 'overview',        label: '旅居总览蓝图', href: 'lvju-overview.html',        icon: 'grid' },
+          { id: 'roadmap',         label: '一年迭代规划（五期 · 功能矩阵）', href: 'lvju-roadmap.html', icon: 'chart' },
+          { id: 'journey',         label: '全链路旅程与需求范围', href: 'lvju-journey.html', icon: 'map' },
         ]},
       ],
       tabbar: [
         { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: '🏠' },
-        { id: 'search', label: '找房', href: 'lvju-app-lvju.html',      icon: '🔎' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',   icon: '🔎' },
         { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: '📖' },
         { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: '🧾' },
         { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: '👤' },
@@ -221,6 +225,7 @@
         { name: '🏬 × B 白名单运营商', items: [
           { id: 'b-standards',     label: '★ B 分级标准 + 星级评价', href: 'p-b-standards.html',         icon: 'layers', badge: 'NEW' },
           { id: 'b-whitelist',     label: '★ 白名单审定 + 同业开放', href: 'p-b-whitelist.html',         icon: 'check' },
+          { id: 'vendor-onboarding', label: '商家入驻受理（房源）', href: 'p-vendor-onboarding.html',  icon: 'plug', perms: ['vendor.onboarding.review'] },
           { id: 'rating-review',   label: '🐚 房源评级复核 · AI引擎', href: 'p-rating-review.html',       icon: 'star',   badge: '23' },
           { id: 'b-rating',        label: '好房子评级录入 ↗',        href: 'b-house-rating-input.html',  icon: 'star' },
           { id: 'b-console',       label: 'B 运营商工作台 ↗',        href: 'b-operator-console.html',    icon: 'home' },
@@ -322,10 +327,12 @@
         ]},
         { name: '开放平台（接口 · 手册 · FAQ）', items: [
           { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
+          { id: 'vendor-onboarding', label: '商家入驻申请', href: 'vendor-onboarding.html',    icon: 'user' },
           { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
           { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
           { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
           { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },
+          { id: 'lvju-manual',   label: '旅居商家运营手册',     href: '旅居商家运营手册.html',          icon: 'book' },
           { id: 'platform-manual', label: '平台运营手册',       href: '平台运营方操作手册.html',        icon: 'book' },
           { id: 'open-faq',      label: '常见问题 FAQ',         href: 'open-faq.html',                 icon: 'check' },
         ]},

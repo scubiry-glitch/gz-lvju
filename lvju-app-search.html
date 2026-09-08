@@ -3,8 +3,125 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>搜索 · 西江 旅居 · 贝壳找房旅居</title>
+<link rel="icon" href="data:,">
+<title>找房 · 全频道 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* 找房枢纽（底部「找房」tab 直达）—— 携程/美团式横向卡片 + 筛选栏 + 搜索发现 + 专题入口。
+     数据一次拉 catalog（全频道），分段/关键词/筛选/排序全部客户端过滤，不新增服务端参数。 */
+  .searchin input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none;padding:0;}
+  .searchin input::placeholder{color:#9aa6a2;}
+  .searchin .clr{flex-shrink:0;color:#9aa6a2;font-size:13px;padding:2px 4px;display:none;}
+
+  /* 频道分段（sticky） */
+  .chanbar{position:sticky;top:59px;z-index:29;display:flex;gap:8px;overflow-x:auto;
+    padding:10px 14px;background:rgba(245,247,246,.96);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);}
+  .chanbar::-webkit-scrollbar{height:0;}
+  .chanbar a{flex:0 0 auto;font-size:12.5px;color:var(--muted);background:#fff;border:1px solid var(--border);padding:6px 14px;border-radius:999px;}
+  .chanbar a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;border-color:transparent;font-weight:600;}
+  .chanbar a .n{font-size:9.5px;opacity:.72;margin-left:2px;}
+
+  /* 筛选栏（区域/价格/评分/排序 · 美团式四宫格） */
+  .fbar{display:flex;background:#fff;border-bottom:1px solid var(--border);}
+  .fbar .cell{flex:1;padding:11px 0 10px;text-align:center;font-size:12.5px;color:var(--ink);cursor:pointer;user-select:none;}
+  .fbar .cell .v{max-width:72px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
+  .fbar .cell .arr{font-size:8px;color:var(--muted);margin-left:3px;transform:scaleY(.85);display:inline-block;}
+  .fbar .cell.on{color:var(--brand-deep);font-weight:700;}
+  .fbar .cell.on .arr{color:var(--brand-deep);}
+  .fbar .cell.dis{color:#c4ccc8;cursor:default;}
+
+  /* 搜索结果行卡片（携程/美团式：左图右文，底部价格 + CTA） */
+  .hlist{padding:10px 12px 24px;}
+  .lcard{display:flex;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:10px;
+    box-shadow:0 4px 14px rgba(15,42,38,.05);}
+  .lcard .im{position:relative;flex:0 0 116px;height:87px;border-radius:10px;overflow:hidden;
+    background-size:cover;background-position:center;background-color:#0c4d44;}
+  .lcard .im .bdg{position:absolute;top:0;left:0;font-size:9px;font-weight:700;color:#fff;padding:2px 8px 2px 6px;border-radius:9px 0 9px 0;}
+  .lcard .im .bdg.feat{background:linear-gradient(90deg,var(--gold),var(--gold-deep));}
+  .lcard .im .bdg.onsale{background:linear-gradient(90deg,var(--brand),var(--brand-deep));}
+  .lcard .in{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .lcard .t{display:flex;align-items:center;gap:5px;min-width:0;}
+  .lcard .t .nm{font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lcard .t .ch{flex-shrink:0;font-size:9px;font-weight:700;color:#8c6224;background:var(--gold-soft);padding:1.5px 6px;border-radius:5px;}
+  .lcard .meta{margin-top:4px;font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;}
+  .lcard .meta .sc{color:var(--gold-deep);font-weight:800;font-size:11.5px;font-family:var(--serif);}
+  .lcard .meta .sc + i{font-style:normal;opacity:.55;}
+  .lcard .tags{display:flex;gap:4px;margin-top:6px;overflow:hidden;}
+  .lcard .tags span{flex-shrink:0;font-size:9px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 6px;border-radius:4px;}
+  .lcard .tags span.am{color:#92400e;background:#fef3c7;}
+  .lcard .bt{margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding-top:6px;}
+  .lcard .pr{color:var(--gold-deep);font-family:var(--serif);line-height:1;white-space:nowrap;}
+  .lcard .pr i{font-style:normal;font-size:10px;margin-right:1px;}
+  .lcard .pr b{font-size:19px;font-weight:700;}
+  .lcard .pr small{font-size:9.5px;color:var(--muted);font-family:var(--font);margin-left:2px;}
+  .lcard .go{flex-shrink:0;font-size:12px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));
+    padding:8px 17px;border-radius:999px;box-shadow:0 4px 10px rgba(11,93,86,.22);}
+  .lcard .go.tel{background:#fff;color:#92400e;border:1px solid #ecd9ac;box-shadow:none;}
+
+  /* 专题入口（横滑卡片，仅推荐流 & 无关键词时展示） */
+  .topics{display:flex;gap:9px;overflow-x:auto;padding:12px 12px 2px;}
+  .topics::-webkit-scrollbar{height:0;}
+  .topics .tp{position:relative;flex:0 0 132px;height:86px;border-radius:12px;overflow:hidden;color:#fff;
+    box-shadow:0 6px 16px rgba(10,40,36,.16);}
+  .topics .tp .bg{position:absolute;inset:0;background-size:cover;background-position:center;background-color:#0c4d44;}
+  .topics .tp .bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,18,16,.05) 30%,rgba(8,18,16,.72) 100%);}
+  .topics .tp .in{position:absolute;left:9px;right:8px;bottom:7px;z-index:2;}
+  .topics .tp b{font-family:var(--serif);font-size:13.5px;font-weight:700;display:block;text-shadow:0 1px 6px rgba(0,0,0,.35);}
+  .topics .tp small{font-size:8.5px;opacity:.92;display:block;margin-top:1px;}
+  .topics .tp .rn{position:absolute;top:7px;left:8px;z-index:2;font-size:8.5px;font-weight:700;background:rgba(8,18,16,.45);
+    backdrop-filter:blur(4px);padding:1.5px 7px;border-radius:999px;}
+
+  /* 计数行 */
+  .countline{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--muted);padding:10px 16px 0;}
+  .countline b{color:var(--ink);}
+  .city-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--brand-deep);
+    background:var(--brand-soft);border-radius:999px;padding:3px 10px;cursor:pointer;user-select:none;}
+
+  /* 搜索发现浮层（历史 + 热门，聚焦弹出） */
+  .smask{position:absolute;inset:0;z-index:38;background:rgba(8,18,16,.14);display:none;}
+  .sugg{position:absolute;left:0;right:0;top:59px;z-index:40;background:#fff;border-radius:0 0 18px 18px;
+    box-shadow:0 20px 44px rgba(8,18,16,.20);padding:15px 16px 17px;display:none;}
+  .sg-h{display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--ink);margin:0 0 9px;}
+  .sg-h .op{margin-left:auto;font-size:10px;font-weight:400;color:var(--muted);}
+  .sg-h .op.hot{color:var(--muted);}
+  .sg-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .sg-chips a{font-size:12px;color:var(--ink);background:#f3f6f5;border-radius:999px;padding:6px 13px;display:inline-flex;align-items:center;gap:5px;}
+  .sg-chips a .x{color:#b8c2be;font-size:11px;padding-right:1px;}
+  .sg-chips a.hotw i{font-style:normal;font-weight:800;color:#e05e3a;font-family:var(--serif);}
+  .sg-chips a.hotw.top i{color:#d3401f;}
+  .sg-empty{font-size:11px;color:var(--muted);padding:2px 0 4px;}
+  .sugg .sg-sec + .sg-sec{margin-top:15px;}
+
+  /* 通用筛选弹层（底部 sheet） */
+  .fsheet{position:fixed;inset:0;z-index:60;background:rgba(6,20,17,.45);display:none;}
+  .fsheet.open{display:block;}
+  .fsheet .panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;
+    padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;}
+  .fsheet .sh{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .fsheet .sh b{font-family:var(--serif);font-size:15px;color:var(--ink);}
+  .fsheet .sh .x{margin-left:auto;color:var(--muted);font-size:18px;padding:2px 6px;}
+  .fsheet .opts{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:6px 0 2px;}
+  .fsheet .opts a{position:relative;text-align:center;font-size:13px;color:var(--ink);background:#f5f7f6;border:1px solid var(--border);
+    border-radius:10px;padding:11px 6px;}
+  .fsheet .opts a.on{color:var(--brand-deep);font-weight:700;background:var(--brand-soft);border-color:color-mix(in oklab,var(--brand) 35%,var(--border));}
+  .fsheet .opts a .ck{position:absolute;top:5px;right:7px;font-size:11px;color:var(--brand-deep);display:none;}
+  .fsheet .opts a.on .ck{display:inline;}
+
+  /* 城市切换弹层（省→市级联，与首页同源：localStorage bzf_jz_city + URL ?city=） */
+  .csheet{position:absolute;inset:0;z-index:60;display:none;}
+  .csheet.on{display:block;}
+  .cs-mask{position:absolute;inset:0;background:rgba(8,18,16,.45);}
+  .cs-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:15px 16px max(16px,env(safe-area-inset-bottom));}
+  .cs-h{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cs-x{font-size:13px;color:var(--muted);padding:2px 6px;}
+  .cs-body{display:flex;gap:14px;max-height:52vh;overflow:hidden;}
+  .cs-prov{flex:0 0 84px;overflow-y:auto;border-right:1px solid var(--border);padding-right:8px;}
+  .cs-prov a{display:block;padding:9px 6px;font-size:13px;color:var(--muted);border-radius:8px;}
+  .cs-prov a.on{color:var(--brand-deep);font-weight:700;background:var(--brand-soft);}
+  .cs-cities{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
+  .cs-cities a{padding:9px 6px;text-align:center;font-size:13px;color:var(--ink);background:#f5f7f6;border-radius:9px;}
+  .cs-cities a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -12,38 +129,68 @@
 
     <div class="appbar">
       <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="searchin"><span class="ic">🔍</span><span class="kw">西江 旅居</span></div>
+      <div class="searchin">
+        <span class="ic">🔍</span>
+        <input id="kw" placeholder="搜目的地 / 楼盘 / 民宿 / 景区" autocomplete="off" />
+        <span class="clr" id="kwClear">✕</span>
+      </div>
       <a href="lvju-app-map.html" style="font-size:12px;font-weight:700;color:var(--brand-deep);flex-shrink:0;">🗺 地图</a>
     </div>
 
-    <div class="filt">
-      <a class="on">综合</a><a>区域 ▾</a><a>价格 ▾</a><a>房型 ▾</a><a>★ 星级 ▾</a>
-    </div>
-    <div class="sortbar">
-      <a class="on">综合排序</a><a>价格优先</a><a>星级优先</a><a>距景区近</a>
+    <!-- 搜索发现（历史 + 热门）：聚焦弹出，点外收起 -->
+    <div class="smask" id="sMask"></div>
+    <div class="sugg" id="sugg">
+      <div class="sg-sec" id="histSec">
+        <div class="sg-h">搜索历史<span class="op" id="histClear">🗑 清空</span></div>
+        <div class="sg-chips" id="histChips"></div>
+      </div>
+      <div class="sg-sec">
+        <div class="sg-h">热门搜索</div>
+        <div class="sg-chips" id="hotChips"></div>
+      </div>
     </div>
 
-    <div style="font-size:11px;color:var(--muted);padding:11px 18px 0;">为你找到 <b style="color:var(--ink)">86</b> 个「西江 · 旅居」结果</div>
+    <!-- 频道分段（sticky）：口径与各频道页一致，前端过滤 -->
+    <div class="chanbar" id="chanbar"></div>
 
-    <div class="wrap" style="padding-top:12px;">
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-xijiang"><span class="star">★ 4.9 五星旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">云上观景民宿</div><div class="lo">黔东南 · 西江千户苗寨 · 距景区 0.3km</div></div></div>
-        <div class="ci"><div class="tags"><span>苗寨核心</span><span>日落观景台</span><span>含双早</span></div>
-          <div class="pr"><b>¥588<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-stilt"><span class="star">★ 4.8 五星民宿</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">苗岭·星空整栋</div><div class="lo">黔东南 · 西江 · 距景区 0.6km</div></div></div>
-        <div class="ci"><div class="tags"><span>整栋包栋</span><span>屋顶星空</span><span>管家入驻</span></div>
-          <div class="pr"><b>¥1,280<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
-      <a class="mcard" href="lvju-app-detail.html">
-        <div class="img s-country"><span class="star">★ 4.7 乡村旅居</span><span class="like">♡</span>
-          <div class="cap"><div class="nm">西江·田园长住小院</div><div class="lo">黔东南 · 西江镇 · 距景区 1.2km</div></div></div>
-        <div class="ci"><div class="tags"><span>独院</span><span>可月租</span><span>含庭院</span></div>
-          <div class="pr"><b>¥398<small>/晚起</small></b><span class="bk">预订</span></div></div>
-      </a>
+    <!-- 筛选栏：区域 / 价格 / 评分 / 排序（价格·评分仅居住族分段启用） -->
+    <div class="fbar" id="fbar">
+      <a class="cell" data-f="dist"><span class="v">区域</span><span class="arr">▼</span></a>
+      <a class="cell" data-f="price"><span class="v">价格</span><span class="arr">▼</span></a>
+      <a class="cell" data-f="star"><span class="v">评分</span><span class="arr">▼</span></a>
+      <a class="cell" data-f="sort"><span class="v">综合排序</span><span class="arr">▼</span></a>
+    </div>
+
+    <div class="countline">
+      <a class="city-chip" id="cityChip">📍 <span id="cityName">—</span> ▾</a>
+      <span id="countTxt">加载中…</span>
+    </div>
+
+    <!-- 专题入口（横滑） -->
+    <div class="topics" id="topics" style="display:none;"></div>
+
+    <div class="hlist" id="listingWrap">
+      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
+    </div>
+  </div>
+
+  <!-- 筛选弹层（区域/价格/评分/排序共用） -->
+  <div class="fsheet" id="fSheet">
+    <div class="panel">
+      <div class="sh"><b id="fsTitle">筛选</b><span class="x" id="fsClose">✕</span></div>
+      <div class="opts" id="fsOpts"></div>
+    </div>
+  </div>
+
+  <!-- 城市切换弹层（省→市级联；不设「全省」档，避免 catalog 落到服务端默认城市的误读） -->
+  <div class="csheet" id="citySheet">
+    <div class="cs-mask" data-close></div>
+    <div class="cs-panel">
+      <div class="cs-h">选择城市<span class="cs-x" data-close>✕ 关闭</span></div>
+      <div class="cs-body">
+        <div class="cs-prov" id="csProv"></div>
+        <div class="cs-cities" id="csCities"></div>
+      </div>
     </div>
   </div>
 
@@ -55,5 +202,455 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script src="screens/_jzapi.js"></script>
+<script>
+/* 找房枢纽：底部「找房」tab 的全频道落地页（携程/美团式列表）。
+   分段口径与各频道页一致（规则 15：旅居 = rental/minsu 带「旅居」tag，长租/民宿 = 各频道排除「旅居」）；
+   卡片渲染沿用各频道页口径（评级 / 晚价·月价 / 新房·二手价 / stay_bookable CTA）。
+   专题（topics）：settings KV topic_<slug>（scripts/find-topic-seed.cjs），入口计数本地推导，落地页走
+   catalog?topic= 服务端过滤（lvju-app-topic.html）。
+   卖旧买新（trade）走新居住频道专区政府，不进本枢纽。 */
+(function(){
+  // 城市：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
+  var qs = new URLSearchParams(location.search);
+  var CITY = qs.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || '贵阳';
+  var KW = (qs.get('kw') || '').trim();
+  var SEG = (qs.get('seg') || 'all');
+
+  var SEGS = [
+    { id: 'all',      label: '推荐', kind: 'mixed' },
+    { id: 'lvju',     label: '旅居', kind: 'stay' },
+    { id: 'minsu',    label: '民宿', kind: 'stay' },
+    { id: 'changzu',  label: '长租', kind: 'stay' },
+    { id: 'newhouse', label: '新房', kind: 'newhouse' },
+    { id: 'resale',   label: '二手', kind: 'resale' },
+  ];
+  var SEG_BY_ID = {}; SEGS.forEach(function(s){ SEG_BY_ID[s.id] = s; });
+  if (!SEG_BY_ID[SEG]) SEG = 'all';
+
+  // 专题入口（与 scripts/find-topic-seed.cjs 同一清单；bzf 为既有规则 15 专题）
+  var TOPICS = [
+    { slug: 'kangyang',  label: '康养度假', desc: '森林温泉 · 慢节奏疗愈', tag: '康养', fb: 's-stilt' },
+    { slug: 'houniao',   label: '候鸟过冬', desc: '温暖过冬 · 候鸟南飞', tag: '候鸟', fb: 's-wanfeng' },
+    { slug: 'bzf',       label: '保租房专区', desc: '国企持有 · 统一监管', tag: '保租房', fb: 's-city' },
+    { slug: 'qinzi',     label: '亲子研学', desc: '田园山林 · 自然课堂', tag: '亲子', fb: 's-country' },
+    { slug: 'zhengdong', label: '整栋包栋', desc: '家庭聚会 · 包栋院落', tag: '整栋', fb: 's-xijiang' },
+  ];
+
+  // 筛选项：价格/评分仅居住族（stay）分段启用；档位按库内真实价格带设计
+  var PRICE_OPTS = [
+    { id: 0, label: '不限' },
+    { id: 1, label: '¥1,000 以内', min: 0, max: 1000 },
+    { id: 2, label: '¥1,000 - 2,000', min: 1000, max: 2000 },
+    { id: 3, label: '¥2,000 以上', min: 2000, max: Infinity },
+  ];
+  var STAR_OPTS = [
+    { id: 0, label: '不限' },
+    { id: 45, label: '4.5 分以上', min: 4.5 },
+    { id: 40, label: '4.0 分以上', min: 4.0 },
+  ];
+  var SORT_OPTS = [
+    { id: 'def', label: '综合排序' },
+    { id: 'price', label: '价格优先' },
+    { id: 'star', label: '星级优先' },
+  ];
+  var F = { dist: 0, price: 0, star: 0, sort: 'def' };   // dist: 0=不限 / district_id
+
+  var cat = null, dmap = {}, umap = {};
+  var CHANNEL_LABEL = { rental: '长租', minsu: '民宿', newhouse: '新房', resale: '二手' };
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  function hasLvjuTag(p){ return (p.tags || []).indexOf('旅居') >= 0; }
+  function channelChip(p){
+    if (p.channel === 'rental') return hasLvjuTag(p) ? '旅居' : '长租';
+    if (p.channel === 'minsu')  return hasLvjuTag(p) ? '旅居' : '民宿';
+    return CHANNEL_LABEL[p.channel] || p.channel;
+  }
+  function syncUrl(){
+    try {
+      var p = new URLSearchParams();
+      p.set('city', CITY);
+      if (SEG !== 'all') p.set('seg', SEG);
+      if (KW) p.set('kw', KW);
+      history.replaceState(null, '', location.pathname + '?' + p.toString());
+    } catch(e){}
+  }
+
+  /* ---------- 过滤管道：分段 → 关键词 → 区域 → 价格 → 评分 → 排序 ---------- */
+  function segProjects(seg){
+    var ps = (cat && cat.projects) || [];
+    if (seg === 'lvju')     return ps.filter(function(p){ return (p.channel === 'rental' || p.channel === 'minsu') && hasLvjuTag(p); });
+    if (seg === 'minsu')    return ps.filter(function(p){ return p.channel === 'minsu' && !hasLvjuTag(p); });
+    if (seg === 'changzu')  return ps.filter(function(p){ return p.channel === 'rental' && !hasLvjuTag(p); });
+    if (seg === 'newhouse') return ps.filter(function(p){ return p.channel === 'newhouse'; });
+    if (seg === 'resale')   return ps.filter(function(p){ return p.channel === 'resale'; });
+    // 推荐 = 四频道混编（featured 优先，其余按 catalog 既有排序）
+    return ps.filter(function(p){ return CHANNEL_LABEL[p.channel]; })
+      .sort(function(a,b){ return (b.is_featured||0) - (a.is_featured||0) || (a.featured_rank||999) - (b.featured_rank||999); });
+  }
+  function kwMatch(p){
+    if (!KW) return true;
+    var d = dmap[p.district_id];
+    var hay = [p.name, p.address, d ? d.name : '', (p.tags || []).join(' '), CHANNEL_LABEL[p.channel] || '']
+      .concat((umap[p.id] || []).map(function(u){ return [u.name, u.layout_label, (u.tags||[]).join(' ')].join(' '); }))
+      .join(' ').toLowerCase();
+    var words = KW.toLowerCase().split(/\s+/).filter(Boolean);
+    for (var i = 0; i < words.length; i++) { if (hay.indexOf(words[i]) < 0) return false; }
+    return true;
+  }
+  function priceOf(p){   // 可比较价格（数值），面议返回 null
+    if (p.channel === 'newhouse') return p.price_total != null ? p.price_total : (p.price_from != null ? p.price_from : null);
+    if (p.channel === 'resale') {
+      var t = (umap[p.id] || []).map(function(u){ return u.price_total; }).filter(function(v){ return v > 0; });
+      if (t.length) return Math.min.apply(null, t);
+      return p.price_total != null ? p.price_total : (p.price_from != null ? p.price_from : null);
+    }
+    if (p.price_from != null) return p.price_from;
+    var r = (umap[p.id] || []).map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; });
+    return r.length ? Math.min.apply(null, r) : null;
+  }
+  function starsOf(p){ return (p.rating_status === 'passed' && p.rating && p.rating.stars) ? Number(p.rating.stars) : null; }
+  function applyFilters(ps){
+    var priceOpt = PRICE_OPTS.filter(function(o){ return o.id === F.price; })[0];
+    var starOpt = STAR_OPTS.filter(function(o){ return o.id === F.star; })[0];
+    return ps.filter(function(p){
+      if (F.dist && p.district_id !== F.dist) return false;
+      if (priceOpt && priceOpt.min != null) { var v = priceOf(p); if (v == null || v < priceOpt.min || v >= priceOpt.max) return false; }
+      if (starOpt && starOpt.min != null) { var s = starsOf(p); if (s == null || s < starOpt.min) return false; }
+      return true;
+    });
+  }
+  function sortProjects(ps){
+    if (F.sort === 'price') {
+      // 跨频道单位不可比（万 / 月 / 晚）：先按可比组（居住→新房→二手），组内价格升序，面议沉底
+      var famOf = function(p){ return p.channel === 'newhouse' ? 1 : (p.channel === 'resale' ? 2 : 0); };
+      return ps.slice().sort(function(a,b){
+        var fa = famOf(a), fb = famOf(b);
+        if (fa !== fb) return fa - fb;
+        var pa = priceOf(a), pb = priceOf(b);
+        if (pa == null && pb == null) return 0;
+        if (pa == null) return 1;
+        if (pb == null) return -1;
+        return pa - pb;
+      });
+    }
+    if (F.sort === 'star') {
+      return ps.slice().sort(function(a,b){
+        var sa = starsOf(a), sb = starsOf(b);
+        if (sa == null && sb == null) return 0;
+        if (sa == null) return 1;
+        if (sb == null) return -1;
+        return sb - sa;
+      });
+    }
+    return ps;
+  }
+
+  /* ---------- 卡片（携程/美团式横卡，口径同各频道页） ---------- */
+  function cardHtml(p){
+    var d = dmap[p.district_id];
+    var loc = (d && p.address && p.address.indexOf(d.name) === 0) ? p.address : [d ? d.name : '', p.address || ''].filter(Boolean).join(' · ');
+    var fam = SEG_BY_ID[SEG].kind === 'mixed'
+      ? (p.channel === 'newhouse' ? 'newhouse' : (p.channel === 'resale' ? 'resale' : 'stay'))
+      : SEG_BY_ID[SEG].kind;
+    var badge = '';
+    if (fam === 'stay') { if (p.is_featured) badge = '<span class="bdg feat">精选</span>'; }
+    else badge = '<span class="bdg onsale">在售</span>';
+    var fb = fam === 'newhouse' ? 's-city' : (fam === 'resale' ? 's-river' : 's-xijiang');
+    var im = p.cover_image
+      ? '<div class="im" style="background-image:url(' + esc(p.cover_image) + ')">' + badge
+      : '<div class="im ' + fb + '">' + badge;
+    im += '</div>';
+
+    var r = p.rating || {};
+    var meta;
+    if (fam === 'stay' && p.rating_status === 'passed' && r.stars) {
+      meta = '<span class="sc">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
+        '<i>' + esc(channelChip(p)) + '</i><span>' + esc(loc) + '</span>';
+    } else {
+      var extra = (fam === 'newhouse' && p.managed_unit_count != null) ? ' · 房源 ' + fmt(p.managed_unit_count) : '';
+      meta = '<span>' + esc(loc) + extra + '</span>';   // 频道已在标题行 .ch 呈现，不重复
+    }
+    var tags = (p.tags || []).filter(function(t){ return t !== '保租房' && t !== '演示' && t !== '精选'; }).slice(0, 3);
+    var ins = fam === 'stay'
+      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
+      : '';
+    var tagHtml = tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + ins;
+
+    var price, href, cta;
+    if (fam === 'stay') {
+      var pf = p.price_from;
+      if (pf == null && p.channel === 'rental') {
+        var rents = (umap[p.id] || []).map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; });
+        if (rents.length) pf = Math.min.apply(null, rents);
+      }
+      price = pf != null ? '<i>¥</i><b>' + fmt(pf) + '</b><small>' + (p.channel === 'minsu' ? '/晚起' : '/月起') + '</small>' : '<span style="font-size:13px;">价格面议</span>';
+      href = 'lvju-app-detail.html?id=' + p.id;
+      cta = p.bookable ? '<span class="go">预订</span>' : '<span class="go tel">📞 咨询</span>';
+    } else if (fam === 'newhouse') {
+      price = p.price_total != null ? '<i>¥</i><b>' + fmt(p.price_total) + '</b><small>万起</small>'
+        : (p.price_from != null ? '<i>¥</i><b>' + fmt(p.price_from) + '</b><small>/㎡起</small>' : '<span style="font-size:13px;">价格面议</span>');
+      href = 'lvju-app-newhouse-detail.html?id=' + p.id;
+      cta = '<span class="go">查看</span>';
+    } else {
+      var us = (umap[p.id] || []).slice().sort(function(a,b){ return (a.price_total||9e9) - (b.price_total||9e9); });
+      var u0 = us[0];
+      var total = (u0 && u0.price_total != null) ? u0.price_total : p.price_total;
+      price = total != null ? '<i>¥</i><b>' + fmt(total) + '</b><small>万起</small>'
+        : (p.price_from != null ? '<i>¥</i><b>' + fmt(p.price_from) + '</b><small>万起</small>' : '<span style="font-size:13px;">价格面议</span>');
+      href = 'lvju-app-resale-detail.html?id=' + p.id + (u0 ? '&unit=' + u0.id : '');
+      cta = '<span class="go">查看</span>';
+    }
+    return '<a class="lcard" href="' + href + '">' + im +
+      '<div class="in"><div class="t"><span class="nm">' + esc(p.name) + '</span><span class="ch">' + esc(channelChip(p)) + '</span></div>' +
+      '<div class="meta">' + meta + '</div>' +
+      (tagHtml ? '<div class="tags">' + tagHtml + '</div>' : '') +
+      '<div class="bt"><span class="pr">' + price + '</span>' + cta + '</div>' +
+      '</div></a>';
+  }
+
+  /* ---------- 渲染 ---------- */
+  var chanEl = document.getElementById('chanbar'), wrap = document.getElementById('listingWrap'),
+      countEl = document.getElementById('countTxt'), kwEl = document.getElementById('kw'), kwClr = document.getElementById('kwClear'),
+      topicsEl = document.getElementById('topics');
+
+  function famKind(){ return SEG_BY_ID[SEG].kind; }
+
+  function paintChan(){
+    chanEl.innerHTML = SEGS.map(function(s){
+      var n = segProjects(s.id).filter(kwMatch).length;
+      return '<a data-seg="' + s.id + '"' + (s.id === SEG ? ' class="on"' : '') + '>' + s.label + '<span class="n">' + n + '</span></a>';
+    }).join('');
+  }
+
+  function paintFbar(){
+    var dis = famKind() !== 'stay';
+    var distName = F.dist ? ((dmap[F.dist] || {}).name || '区域') : '区域';
+    var cells = {
+      dist: ['区域', distName],
+      price: ['价格', dis ? '价格' : (function(){ var o = PRICE_OPTS.filter(function(x){ return x.id === F.price; })[0]; return F.price ? o.label.replace(/ /g, '') : '价格'; })()],
+      star: ['评分', dis ? '评分' : (F.star ? (STAR_OPTS.filter(function(x){ return x.id === F.star; })[0]).label.replace(' 分以上', '分+') : '评分')],
+      sort: ['综合排序', (SORT_OPTS.filter(function(x){ return x.id === F.sort; })[0]).label],
+    };
+    document.querySelectorAll('#fbar .cell').forEach(function(cell){
+      var f = cell.getAttribute('data-f');
+      var active = (f === 'dist' && F.dist) || (f === 'price' && !dis && F.price) || (f === 'star' && !dis && F.star) || (f === 'sort' && F.sort !== 'def');
+      cell.className = 'cell' + (f !== 'dist' && f !== 'sort' && dis ? ' dis' : '') + (active ? ' on' : '');
+      cell.innerHTML = '<span class="v">' + esc(cells[f][1]) + '</span><span class="arr">▼</span>';
+    });
+  }
+
+  function paintTopics(){
+    var show = SEG === 'all' && !KW;
+    topicsEl.style.display = show ? '' : 'none';
+    if (!show || !cat) return;
+    topicsEl.innerHTML = TOPICS.map(function(t){
+      var ps = (cat.projects || []).filter(function(p){ return (p.tags || []).indexOf(t.tag) >= 0; });
+      if (!ps.length) return '';
+      var bg = ' class="' + t.fb + '"';   // .s-* 兜底类（自带 cover 背景）
+      for (var j = 0; j < ps.length; j++) {
+        if (ps[j].cover_image) { bg = ' style="background-image:url(' + esc(ps[j].cover_image) + ');background-size:cover;background-position:center;"'; break; }
+      }
+      return '<a class="tp" href="lvju-app-topic.html?topic=' + encodeURIComponent(t.slug) + '&city=' + encodeURIComponent(CITY) + '">' +
+        '<div class="bg"' + bg + '></div>' +
+        '<span class="rn">' + ps.length + ' 套在架</span>' +
+        '<div class="in"><b>' + esc(t.label) + '</b><small>' + esc(t.desc) + '</small></div></a>';
+    }).join('');
+  }
+
+  function paint(){
+    if (!cat) return;
+    paintChan(); paintFbar(); paintTopics();
+    document.getElementById('cityName').textContent = (cat.city && cat.city.name) || CITY;
+    var segLabel = SEG_BY_ID[SEG].label;
+    var rows = sortProjects(applyFilters(segProjects(SEG).filter(kwMatch)));
+    countEl.innerHTML = '为你找到 <b>' + rows.length + '</b> 个「' + esc(segLabel) + (KW ? ' · ' + esc(KW) : '') + '」结果';
+    if (!rows.length) { wrap.innerHTML = emptyHtml(); return; }
+    wrap.innerHTML = rows.map(cardHtml).join('');
+  }
+
+  function emptyHtml(){
+    var cityName = (cat.city && cat.city.name) || CITY;
+    var prov = (window.BZF_JZ && BZF_JZ.provinceOf) ? BZF_JZ.provinceOf(cityName) : null;
+    var segLabel = SEG_BY_ID[SEG].label;
+    var guiyang = famKind() === 'stay' && prov === '贵州' && cityName !== '贵阳';
+    var btn = guiyang
+      ? '<a href="javascript:void(0)" id="goGuiyang" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">去贵阳看' + esc(segLabel) + '</a>'
+      : '<a href="javascript:void(0)" id="openCity" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">切换城市</a>';
+    return '<div style="grid-column:1/-1;text-align:center;padding:30px 16px;color:#9aa5a1;font-size:12px;line-height:1.8;">' +
+      '<div style="font-size:30px;margin-bottom:6px;opacity:.6;">🔍</div>' +
+      '当前城市「' + esc(cityName) + '」暂无符合条件的' + esc(segLabel) + '房源' + (KW ? ' · 换个关键词或筛选试试' : '') +
+      (guiyang ? ' · 旅居房源目前集中在贵阳' : '') + '<br/>' + btn + '</div>';
+  }
+
+  /* ---------- 搜索发现（历史 localStorage + 热门数据推导） ---------- */
+  var HIST_KEY = 'bzf_search_hist';
+  function histGet(){ try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(e){ return []; } }
+  function histPush(w){
+    if (!w) return;
+    var h = histGet().filter(function(x){ return x !== w; });
+    h.unshift(w);
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0, 8))); } catch(e){}
+  }
+  function paintSugg(){
+    var hist = histGet();
+    document.getElementById('histSec').style.display = hist.length ? '' : 'none';
+    document.getElementById('histChips').innerHTML = hist.map(function(w){
+      return '<a data-hw="' + esc(w) + '">' + esc(w) + '<span class="x" data-hdel="' + esc(w) + '">✕</span></a>';
+    }).join('');
+    // 热门 = 库内 tag 词频（排除渠道内部标记），取前 8
+    var freq = {};
+    ((cat && cat.projects) || []).forEach(function(p){ (p.tags || []).forEach(function(t){
+      if (t === '保租房' || t === '演示' || t === '精选') return;
+      freq[t] = (freq[t] || 0) + 1;
+    }); });
+    var hot = Object.keys(freq).sort(function(a,b){ return freq[b] - freq[a]; }).slice(0, 8);
+    document.getElementById('hotChips').innerHTML = hot.map(function(w, i){
+      return '<a class="hotw' + (i < 3 ? ' top' : '') + '" data-hw="' + esc(w) + '"><i>' + (i + 1) + '</i>' + esc(w) + '</a>';
+    }).join('');
+  }
+  function openSugg(){ paintSugg(); document.getElementById('sugg').style.display = 'block'; document.getElementById('sMask').style.display = 'block'; }
+  function closeSugg(){ document.getElementById('sugg').style.display = 'none'; document.getElementById('sMask').style.display = 'none'; }
+  function commitKw(w){
+    KW = (w || '').trim();
+    kwEl.value = KW;
+    syncClr(); syncUrl();
+    if (KW) histPush(KW);
+    closeSugg(); paint();
+  }
+
+  /* ---------- 筛选弹层 ---------- */
+  var fsEl = document.getElementById('fSheet'), fsTitle = document.getElementById('fsTitle'), fsOpts = document.getElementById('fsOpts');
+  var fsCur = null;
+  function distOpts(){
+    var seen = {};
+    (segProjects(SEG).filter(kwMatch) || []).forEach(function(p){ if (p.district_id) seen[p.district_id] = dmap[p.district_id]; });
+    var opts = [{ id: 0, label: '不限区域' }];
+    Object.keys(seen).sort(function(a,b){ return (seen[a].sort_order||0) - (seen[b].sort_order||0) || a - b; }).forEach(function(id){
+      opts.push({ id: Number(id), label: seen[id].name });
+    });
+    return opts;
+  }
+  function openSheet(f){
+    var dis = (f === 'price' || f === 'star') && famKind() !== 'stay';
+    if (dis) return;
+    fsCur = f;
+    var title = { dist: '区域', price: '价格', star: '评分', sort: '排序' }[f];
+    var cur = F[f];
+    var opts = f === 'dist' ? distOpts() : (f === 'price' ? PRICE_OPTS : (f === 'star' ? STAR_OPTS : SORT_OPTS));
+    fsTitle.textContent = title;
+    fsOpts.innerHTML = opts.map(function(o){
+      return '<a data-v="' + o.id + '"' + (String(cur) === String(o.id) ? ' class="on"' : '') + '><span class="ck">✓</span>' + esc(o.label) + '</a>';
+    }).join('');
+    fsEl.classList.add('open');
+  }
+  fsOpts.addEventListener('click', function(e){
+    var a = e.target.closest('[data-v]');
+    if (!a || !fsCur) return;
+    F[fsCur] = fsCur === 'dist' ? Number(a.getAttribute('data-v')) : (fsCur === 'sort' ? a.getAttribute('data-v') : Number(a.getAttribute('data-v')));
+    fsEl.classList.remove('open');
+    paint();
+  });
+  document.getElementById('fsClose').addEventListener('click', function(){ fsEl.classList.remove('open'); });
+  fsEl.addEventListener('click', function(e){ if (e.target === fsEl) fsEl.classList.remove('open'); });
+  document.getElementById('fbar').addEventListener('click', function(e){
+    var cell = e.target.closest('[data-f]');
+    if (cell) openSheet(cell.getAttribute('data-f'));
+  });
+
+  /* ---------- 交互 ---------- */
+  chanEl.addEventListener('click', function(e){
+    var a = e.target.closest('[data-seg]');
+    if (!a) return;
+    SEG = a.getAttribute('data-seg');
+    F.dist = 0;   // 分段切换后区域清单会变，重置区域筛选
+    syncUrl(); closeSugg(); paint();
+  });
+  wrap.addEventListener('click', function(e){
+    if (e.target.id === 'goGuiyang') { doSwitch('贵阳'); return; }
+    if (e.target.id === 'openCity') { openSheetCity(); }
+  });
+  var kwTimer = null;
+  function syncClr(){ kwClr.style.display = KW ? 'inline-block' : 'none'; }
+  kwEl.addEventListener('focus', openSugg);
+  kwEl.addEventListener('input', function(){
+    KW = kwEl.value.trim();
+    syncClr();
+    clearTimeout(kwTimer);
+    kwTimer = setTimeout(function(){ syncUrl(); paint(); }, 140);
+  });
+  kwEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') { commitKw(kwEl.value); kwEl.blur(); } });
+  kwClr.addEventListener('click', function(){ commitKw(''); kwEl.focus(); });
+  document.getElementById('sugg').addEventListener('click', function(e){
+    var del = e.target.closest('[data-hdel]');
+    if (del) {
+      var w = del.getAttribute('data-hdel');
+      try { localStorage.setItem(HIST_KEY, JSON.stringify(histGet().filter(function(x){ return x !== w; }))); } catch(err){}
+      paintSugg(); e.stopPropagation(); return;
+    }
+    var hw = e.target.closest('[data-hw]');
+    if (hw) commitKw(hw.getAttribute('data-hw'));
+  });
+  document.getElementById('histClear').addEventListener('click', function(){
+    try { localStorage.removeItem(HIST_KEY); } catch(e){}
+    paintSugg();
+  });
+  document.getElementById('sMask').addEventListener('click', closeSugg);
+
+  /* ---------- 城市切换弹层（与首页同口径） ---------- */
+  var sheetProv = null;
+  function renderProv(){
+    var provs = (window.BZF_JZ && BZF_JZ.regionProvinces) ? BZF_JZ.regionProvinces() : [];
+    document.getElementById('csProv').innerHTML = provs.map(function(p){
+      return '<a data-prov="' + esc(p) + '"' + (p === sheetProv ? ' class="on"' : '') + '>' + esc(p) + '</a>';
+    }).join('');
+  }
+  function renderCities(){
+    var cities = (window.BZF_JZ && BZF_JZ.citiesOf) ? BZF_JZ.citiesOf(sheetProv) : [];
+    document.getElementById('csCities').innerHTML = cities.map(function(c){
+      return '<a data-city="' + esc(c) + '"' + (c === CITY ? ' class="on"' : '') + '>' + esc(c) + '</a>';
+    }).join('');
+  }
+  function openSheetCity(){
+    if (!window.BZF_JZ) return;
+    sheetProv = BZF_JZ.provinceOf(CITY) || BZF_JZ.regionProvinces()[0];
+    renderProv(); renderCities();
+    document.getElementById('citySheet').classList.add('on');
+  }
+  function closeSheetCity(){ document.getElementById('citySheet').classList.remove('on'); }
+  function doSwitch(city){
+    CITY = city;
+    try { localStorage.setItem('bzf_jz_city', city); } catch(e){}
+    closeSheetCity();
+    load();
+  }
+  document.getElementById('cityChip').addEventListener('click', openSheetCity);
+  document.getElementById('citySheet').addEventListener('click', function(e){
+    if (e.target.hasAttribute('data-close')) { closeSheetCity(); return; }
+    var prov = e.target.closest('[data-prov]');
+    if (prov) { sheetProv = prov.getAttribute('data-prov'); renderProv(); renderCities(); return; }
+    var pick = e.target.closest('[data-city]');
+    if (pick) doSwitch(pick.getAttribute('data-city'));
+  });
+
+  /* ---------- 数据（一次拉全频道 catalog） ---------- */
+  function load(){
+    countEl.textContent = '加载中…';
+    wrap.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>';
+    fetch('/api/juzhu/catalog?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(data){
+      cat = data;
+      dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
+      umap = {}; (cat.units || []).forEach(function(u){ (umap[u.project_id] = umap[u.project_id] || []).push(u); });
+      syncUrl(); paint();
+    }).catch(function(){
+      wrap.innerHTML = '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接新居住数据库 · 请稍后再试</div>';
+    });
+  }
+
+  syncClr();
+  load();
+})();
+</script>
 </body>
 </html>

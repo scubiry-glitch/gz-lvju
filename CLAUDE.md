@@ -186,3 +186,13 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **登录防爆破**：`login_throttle` 表两级节流（ident 连错 5 次锁 30 分钟、IP 30 次/10min，env `AUTH_LOCK_*` 可调）；账号不存在也计失败并落审计（`audit_log.result` 列区分 ok/fail）。admin 登录必须显式 login_name（「只传 password 默认唯一管理员」已移除）。密码哈希 `scrypt$salt$hash`，存量 sha256 行登录时懒升级。
 - **账号中心页面**：`screens/account-center.html`（P 端，功能权限+数据权限+账号+审计+IdP 六 tab）是账号/权限唯一管理入口；`juzhu-admin.html` 账号/审计 tab 只留迁移卡。`_nav.js` item 支持可选 `perms: [...]`（任一命中即显示；**未登录/演示态一律全显**，保静态演示页基线观感）；`mount()` 幂等可重入，暴露 `BZF_NAV.refresh/hydrate`。
 - **回归**：`scripts/perm_gate_regression.cjs`（权限矩阵）/ `auth_security_regression.cjs`（防爆破+scrypt+TTL）/ `scope_regression.cjs`（行级过滤）/ `iam_api_regression.cjs`（账号中心 API）四条全绿才算过。
+
+## 规则 19 · 内容域统筹（专题 / 路线 / 周边玩法，一个后台面）
+
+**「住」的房源集合与「玩」的内容编排同属内容域，后台统一在 `juzhu-admin.html`「内容」tab（原「周边」tab 升级），C 端各页只读接口，不得硬编码。**（2026-09-09 拍板）
+
+- **三层模型**：内容原子 = `spots`（地点 + 笔记，规则 17 单一数据源）→ 内容编排 = `routes`（spots 的有序串联，`stops` JSON `[{spot_id, note}]`，**不复制正文**）→ 房源集合 = `topic_*`（settings KV 筛选条件，规则 15）。`routes.city_id NULL = 全省通用`，与 spots 同口径。
+- **后台**：内容 tab 三卡 = 房源专题（KV CRUD + 实时在架数 + 启用/下架）+ 旅游路线（CRUD + 站点编辑器：选 spots 排序加行程提示，≤12 站）+ 周边玩法（原 renderSpots 平移）。admin 接口：`GET/POST/PUT/DELETE /api/juzhu/admin/routes*`、`GET /api/juzhu/admin/topics`、`PUT|DELETE /api/juzhu/admin/topics/:slug`，全部登记 `perm_registry.ROUTES`（写 = `house.write`，读 = `admin.read`）。**`topic_bzf` 是保租房专区既有契约：可编辑/下架，禁止删除（服务端硬闸）**。专题下架（`enabled:false`）后 `catalog?topic=` 立即 404（服务端同响应不泄露存在性 + `catalogMemoInvalidateTopics()` 清缓存）。
+- **公开接口（白名单 GET）**：`/api/juzhu/routes?city=`、`/api/juzhu/routes/:id`（站点水合附 spot 摘要卡）、`/api/juzhu/spots?city=&type=`（列表，此前只有 :id 详情）。路线封面缺省回落首个有点位的封面，前端不必再兜底造图。
+- **C 端接库页**：`lvju-app-routes.html`（路线卡 + 时间线，站点深链 `lvju-app-spot-post.html?id=`）、`lvju-app-spots.html`（玩法列表，类型筛选 chip 用接口下发的 `type_label`，**前端不得另造类型映射**）、`lvju-app-topic.html`（专题列表 + 底部「去哪玩」挂同城 routes/scenic spots）。
+- **种子**：`node scripts/find-topic-seed.cjs seed|clean`（topic KV）、`node scripts/routes-seed.cjs seed|clean`（3 条贵阳路线，站点复用 spots-seed 的 slug；幂等，clean 只删本脚本清单）。

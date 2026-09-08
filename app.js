@@ -583,6 +583,9 @@ function isCEndPublicApi(urlPath, method) {
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
+  // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
+  if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
+  if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
   if (m !== 'GET') return false;
   const exact = new Set([
     '/api/juzhu/catalog',
@@ -596,11 +599,14 @@ function isCEndPublicApi(urlPath, method) {
     '/api/juzhu/jiazheng/skus',
     '/api/juzhu/jiazheng/workers',
     '/api/juzhu/gr/orders',
+    '/api/juzhu/routes',
+    '/api/juzhu/spots',
   ]);
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/spots\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/routes\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/stay-calendar$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/[^/]+\/units$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
@@ -700,6 +706,70 @@ const bookableOf = stayCfg.bookableOf;
 const unitNightPrice = stayCfg.unitNightPrice;
 const stayConfigOf = stayCfg.stayConfigOf;
 const stayDateList = stayCfg.stayDateList;
+const MIN_PUBLISH_PHOTOS = 8;
+
+function parseExtSafe(value) {
+  if (value == null || value === '') return {};
+  if (typeof value === 'object') return value;
+  try { const v = JSON.parse(value); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; }
+}
+
+async function projectPublishEligibility(conn, projectId, vendorId) {
+  const [rows] = await conn.execute(
+    `SELECT p.*, v.status AS vendor_status, v.review_status AS vendor_review_status
+       FROM projects p LEFT JOIN jz_vendors v ON v.id=p.owner_vendor_id WHERE p.id=?`, [projectId]);
+  if (!rows.length) return { ok: false, error: '房源不存在', status: 404 };
+  const p = rows[0];
+  if (vendorId != null && Number(p.owner_vendor_id) !== Number(vendorId)) return { ok: false, error: '无权操作该房源', status: 403 };
+  if (!p.owner_vendor_id || p.vendor_status !== 'active' || (p.vendor_review_status && p.vendor_review_status !== 'approved')) {
+    return { ok: false, error: '商家尚未通过审核或已停用', status: 400 };
+  }
+  if (p.rating_status !== 'passed') return { ok: false, error: '房源审核/评级未通过，不能上架', status: 400 };
+  if (!p.price_from || p.price_from <= 0) return { ok: false, error: '上架前须设置 price_from（起价，元）', status: 400 };
+  const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [p.id]);
+  if (!u[0] || !Number(u[0].c)) return { ok: false, error: '上架前须至少创建 1 个户型（units/create）', status: 400 };
+  const [ph] = await conn.execute(
+    `SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
+       WHERE (entity_type='project' AND entity_id=?)
+          OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [p.id, p.id]);
+  if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) {
+    return { ok: false, error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`, status: 400 };
+  }
+  if (!p.cover_image && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
+  return { ok: true, project: p, ext: parseExtSafe(p.ext) };
+}
+
+function bookingPaymentExpired(row) {
+  return row && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
+    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
+}
+
+async function expireBooking(conn, row) {
+  if (!bookingPaymentExpired(row)) return false;
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending' AND pay_status='unpaid'", [now, row.id]);
+  await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+  return true;
+}
+
+async function cleanupExpiredBookingOrders() {
+  let conn;
+  try {
+    conn = await getPool().getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.execute(
+      `SELECT * FROM booking_orders
+         WHERE channel='minsu' AND status='pending' AND pay_status='unpaid'
+           AND payment_expires_at IS NOT NULL AND payment_expires_at <= UTC_TIMESTAMP()
+         ORDER BY id LIMIT 100 FOR UPDATE`);
+    if (!rows.length) { await conn.commit(); return; }
+    for (const row of rows) await expireBooking(conn, row);
+    await conn.commit();
+  } catch (e) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(e && e.code)) console.warn('cleanupExpiredBookingOrders:', e.message);
+  } finally { if (conn) conn.release(); }
+}
 
 // ===== 商家 Webhook 推送（平台 → 商家，HMAC 签名与开放接口同算法）=====
 // 事件：booking.created / booking.paid / booking.cancelled。只通知不担保必达：
@@ -828,6 +898,12 @@ async function queryRows(sql, params) {
 }
 
 const CATALOG_TTL_MS = 15000;
+// 专题（topic_*）上下架/删除后立即失效 topic 缓存，不让 C 端在 TTL 窗口内看到已下架专题
+function catalogMemoInvalidateTopics() {
+  for (const key of Array.from(catalogMemo.keys())) {
+    if (key.includes('|t=')) catalogMemo.delete(key);
+  }
+}
 const catalogMemo = new Map();
 function catalogMemoGet(key) {
   const hit = catalogMemo.get(key);
@@ -1182,6 +1258,22 @@ async function ensureSchemaRun() {
         UNIQUE KEY uk_proj_spot (project_id, spot_id),
         KEY idx_ps_spot (spot_id)
       ) CHARSET=utf8mb4`,
+      // 内容编排（旅游路线）：spots 的有序串联。stops 为 JSON [{spot_id, note}]，站点内容仍在 spots
+      // 单一数据源里（规则 17）；city_id NULL = 全省通用，与 spots 同口径。
+      `CREATE TABLE IF NOT EXISTS routes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        city_id INT NULL,
+        slug VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        summary TEXT,
+        cover_image VARCHAR(500),
+        days INT NOT NULL DEFAULT 1,
+        stops TEXT,
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        UNIQUE KEY uk_route_slug (slug),
+        KEY idx_route_city (city_id, sort_order)
+      ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS projects (
         id INT AUTO_INCREMENT PRIMARY KEY,
         city_id INT NOT NULL,
@@ -1204,6 +1296,9 @@ async function ensureSchemaRun() {
         rating_submitted_at VARCHAR(30),
         rating_reviewed_at VARCHAR(30),
         rating_note TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        owner_vendor_id INT,
+        ext TEXT,
         UNIQUE KEY uk_channel_slug (channel, slug)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS units (
@@ -1223,6 +1318,7 @@ async function ensureSchemaRun() {
         rent_detail TEXT,
         sort_order INT NOT NULL DEFAULT 0,
         cover_image VARCHAR(500),
+        ext TEXT,
         UNIQUE KEY uk_project_slug (project_id, slug)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS booking_contacts (
@@ -1250,12 +1346,18 @@ async function ensureSchemaRun() {
         nights INT NOT NULL,
         price_total INT NOT NULL,
         status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        pay_status VARCHAR(20),
+        pay_method VARCHAR(50),
+        pay_at VARCHAR(30),
+        idempotency_key VARCHAR(100),
+        payment_expires_at VARCHAR(32),
         created_at VARCHAR(32) NOT NULL,
         updated_at VARCHAR(32) NOT NULL,
         UNIQUE KEY uk_order_no (order_no),
         KEY idx_bo_vendor (owner_vendor_id, status),
         KEY idx_bo_project (project_id),
         KEY idx_bo_user (user_id)
+        ,UNIQUE KEY uk_bo_idempotency (idempotency_key)
       ) CHARSET=utf8mb4`,
       // 房态日历：只存差异行（关房/已订/夜价覆盖），无行 = 可订；unit_id=0 为项目级（整栋/不限房型）
       `CREATE TABLE IF NOT EXISTS stay_calendar (
@@ -1336,6 +1438,11 @@ async function ensureSchemaRun() {
         sort_order INT DEFAULT 0,
         created_at VARCHAR(30),
         updated_at VARCHAR(30)
+        ,login_name VARCHAR(120)
+        ,password_hash VARCHAR(255)
+        ,review_status VARCHAR(20) NOT NULL DEFAULT 'approved'
+        ,review_note TEXT
+        ,reviewed_at VARCHAR(30)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS jz_products (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1489,6 +1596,35 @@ async function ensureSchemaRun() {
         updated_at VARCHAR(30),
         UNIQUE KEY uk_staff_emp_no (emp_no)
       ) CHARSET=utf8mb4`,
+      // 商家入驻申请单（服务认证中台受理；真实流程：申请落库 → 受理 → 通过/驳回）
+      `CREATE TABLE IF NOT EXISTS vendor_onboarding (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        apply_no VARCHAR(32) NOT NULL,
+        company VARCHAR(160) NOT NULL,
+        contact VARCHAR(64) NOT NULL,
+        phone VARCHAR(32) NOT NULL,
+        license_no VARCHAR(64) DEFAULT '',
+        license_valid VARCHAR(32) DEFAULT '',
+        permit_type VARCHAR(32) DEFAULT '',
+        channels VARCHAR(64) DEFAULT 'rental',
+        category_scope VARCHAR(255) DEFAULT '',
+        house_count INT DEFAULT 0,
+        settle_bank VARCHAR(120) DEFAULT '',
+        settle_account VARCHAR(64) DEFAULT '',
+        deposit_tier VARCHAR(32) DEFAULT '',
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        rate_base DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+        rate_discount DECIMAL(5,2) DEFAULT NULL,
+        checklist_json TEXT,
+        review_note VARCHAR(500) DEFAULT '',
+        reviewer VARCHAR(64) DEFAULT '',
+        reviewed_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_vo_status (status),
+        INDEX idx_vo_no (apply_no),
+        INDEX idx_vo_phone (phone)
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
@@ -1632,6 +1768,17 @@ async function ensureSchemaRun() {
     }
     // 旧库 CREATE TABLE IF NOT EXISTS 不会补列；导入/查询前先对齐
     const extraCols = [
+      ['projects', "status VARCHAR(20) NOT NULL DEFAULT 'draft'"],
+      ['projects', 'owner_vendor_id INT'],
+      ['projects', 'ext TEXT'],
+      ['units', 'ext TEXT'],
+      ['booking_orders', 'idempotency_key VARCHAR(100)'],
+      ['booking_orders', 'payment_expires_at VARCHAR(32)'],
+      ['jz_vendors', 'login_name VARCHAR(120)'],
+      ['jz_vendors', 'password_hash VARCHAR(255)'],
+      ['jz_vendors', "review_status VARCHAR(20) NOT NULL DEFAULT 'approved'"],
+      ['jz_vendors', 'review_note TEXT'],
+      ['jz_vendors', 'reviewed_at VARCHAR(30)'],
       ['jz_vendors', 'city_ids TEXT'],
       ['jz_vendors', 'district_id INT'],
       ['jz_vendors', 'phone VARCHAR(50)'],
@@ -1684,6 +1831,9 @@ async function ensureSchemaRun() {
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
+      "ALTER TABLE booking_orders ADD UNIQUE KEY uk_bo_idempotency (idempotency_key)",
+      // 旧版种子在 status=online 时尚未落 rating_status；仅回填历史在线数据，新建房源仍默认为 draft。
+      "UPDATE projects SET rating_status='passed' WHERE status='online' AND (rating_status IS NULL OR rating_status='draft')",
       // 周边玩法笔记化（2026-09-06）：正文/图集/攻略信息（旧库 spots 补列，新库 DDL 已含）
       "ALTER TABLE spots ADD COLUMN body TEXT",
       "ALTER TABLE spots ADD COLUMN photos TEXT",
@@ -1959,6 +2109,112 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 商家入驻申请（服务认证中台受理）：公开提交 + 进度查询 + admin 受理（权限点 vendor.onboarding.review）=====
+
+    // POST /api/juzhu/onboarding/apply —— 公开提交（申请人尚无凭据；白名单见 isCEndPublicApi）
+    if (urlPath === '/api/juzhu/onboarding/apply' && req.method === 'POST') {
+      await ensureSchema();
+      const body = await readBody(req);
+      const company = String(body.company || '').trim();
+      const contact = String(body.contact || '').trim();
+      const phone = String(body.phone || '').trim();
+      if (!company || !contact || !phone) return jsonReply(res, { error: 'bad request', message: '企业名称 / 联系人 / 手机号 必填' }, 400);
+      if (company.length > 160 || contact.length > 64 || phone.length > 32) return jsonReply(res, { error: 'bad request', message: '字段超长' }, 400);
+      const channels = String(body.channels || 'rental').split(',').map(s => s.trim()).filter(s => ['rental', 'minsu'].includes(s)).join(',') || 'rental';
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [r] = await conn.execute(
+          `INSERT INTO vendor_onboarding
+             (apply_no, company, contact, phone, license_no, license_valid, permit_type,
+              channels, category_scope, house_count, settle_bank, settle_account, deposit_tier, status, rate_base)
+           VALUES ('', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 10.00)`,
+          [company, contact, phone,
+           String(body.license_no || '').slice(0, 64), String(body.license_valid || '').slice(0, 32),
+           String(body.permit_type || '').slice(0, 32), channels,
+           String(body.category_scope || '').slice(0, 255),
+           Math.max(0, Math.min(9999, parseInt(body.house_count, 10) || 0)),
+           String(body.settle_bank || '').slice(0, 120), String(body.settle_account || '').slice(0, 64),
+           String(body.deposit_tier || '').slice(0, 32)]
+        );
+        const applyNo = 'GZ-RZ-' + new Date().getFullYear() + '-' + String(r.insertId).padStart(5, '0');
+        await conn.execute('UPDATE vendor_onboarding SET apply_no=? WHERE id=?', [applyNo, r.insertId]);
+        return jsonReply(res, { apply_no: applyNo, status: 'pending', message: '已受理登记，资料齐全后 T+2 出审核结果' }, 200);
+      } catch (e) {
+        return jsonReply(res, { error: 'server error', message: String(e.message || e) }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/onboarding/status?no=&phone= —— 进度查询（须单号+手机号双匹配，防枚举）
+    if (urlPath === '/api/juzhu/onboarding/status' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const no = (qp.get('no') || '').trim();
+      const phone = (qp.get('phone') || '').trim();
+      if (!no || !phone) return jsonReply(res, { error: 'bad request', message: '请提供申请单号与手机号' }, 400);
+      const rows = await queryRows(
+        'SELECT apply_no, company, status, channels, review_note, reviewer, reviewed_at, created_at FROM vendor_onboarding WHERE apply_no=? AND phone=? LIMIT 1',
+        [no, phone]
+      );
+      if (!rows.length) return jsonReply(res, { error: 'not found', message: '未找到匹配的申请单（请核对单号与手机号）' }, 404);
+      return jsonReply(res, rows[0]);
+    }
+
+    // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
+    if (urlPath === '/api/juzhu/admin/vendor-onboarding' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const st = (qp.get('status') || '').trim();
+      const sql = 'SELECT * FROM vendor_onboarding' + (st ? ' WHERE status=?' : '') + ' ORDER BY created_at DESC LIMIT 200';
+      const rows = await queryRows(sql, st ? [st] : []);
+      const byStatus = await queryRows('SELECT status, COUNT(*) AS c FROM vendor_onboarding GROUP BY status');
+      const counts = {}; byStatus.forEach(r => { counts[r.status] = r.c; });
+      return jsonReply(res, { items: rows, counts: counts });
+    }
+
+    // POST /api/juzhu/admin/vendor-onboarding/:id/review —— 受理 / 通过 / 驳回（状态机 + 审计由权限闸记录）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendor-onboarding\/(\d+)\/review$/);
+      if (m && req.method === 'POST') {
+        await ensureSchema();
+        const id = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const action = String(body.action || '').trim();
+        if (!['review', 'approve', 'reject'].includes(action)) return jsonReply(res, { error: 'bad request', message: 'action 须为 review / approve / reject' }, 400);
+        const rows = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        const cur = rows[0];
+        if (cur.status === 'approved' || cur.status === 'rejected') return jsonReply(res, { error: 'conflict', message: '该申请单已终审（' + cur.status + '），不可再变更' }, 409);
+        let next;
+        if (action === 'review') {
+          if (cur.status !== 'pending') return jsonReply(res, { error: 'conflict', message: '仅待受理单可转核验中' }, 409);
+          next = 'reviewing';
+        } else if (action === 'approve') {
+          next = 'approved';
+        } else {
+          next = 'rejected';
+          if (!String(body.note || '').trim()) return jsonReply(res, { error: 'bad request', message: '驳回必须填写理由（留痕）' }, 400);
+        }
+        const reviewer = (req.principal && req.principal.account && (req.principal.account.name || req.principal.account.login_name)) || '';
+        let discount = null;
+        if (action === 'approve' && body.rate_discount !== undefined && body.rate_discount !== null && body.rate_discount !== '') {
+          discount = Math.max(0, Math.min(10, parseFloat(body.rate_discount) || 0));
+        }
+        const checklist = body.checklist ? String(JSON.stringify(body.checklist)).slice(0, 2000) : (cur.checklist_json || null);
+        await queryRows(
+          `UPDATE vendor_onboarding SET status=?, rate_discount=?, checklist_json=?, review_note=?, reviewer=?, reviewed_at=NOW() WHERE id=?`,
+          [next, discount, checklist, String(body.note || '').slice(0, 500), String(reviewer).slice(0, 64), id]
+        );
+        const out = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
+        return jsonReply(res, Object.assign({}, out[0], {
+          message: next === 'approved'
+            ? '已通过。密钥（vendor_id + hmac_key）按线下流程发放；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '')
+            : (next === 'reviewing' ? '已转入核验中' : '已驳回（已留痕）'),
+        }));
+      }
+    }
+
     // ===== GET 只读接口 =====
 
     if (urlPath === '/api/juzhu/admin/dictionary' && req.method === 'GET') {
@@ -2111,6 +2367,35 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // ===== 写操作接口 =====
 
     // GET /admin/vendors/consult —— 商家维度咨询方式（C 端详情页左下角咨询入口优先级）
+    if (urlPath === '/api/juzhu/admin/vendors' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = 'SELECT id, type, name, phone, city_ids, status, review_status, review_note, reviewed_at, created_at, updated_at FROM jz_vendors WHERE 1=1';
+      const params = [];
+      if (qp.get('review_status')) { sql += ' AND review_status=?'; params.push(qp.get('review_status')); }
+      if (qp.get('status')) { sql += ' AND status=?'; params.push(qp.get('status')); }
+      sql += ' ORDER BY id DESC LIMIT 500';
+      return jsonReply(res, await queryRows(sql, params));
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/review$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const reviewStatus = String(body.review_status || '').trim();
+        if (!['reviewing', 'approved', 'rejected'].includes(reviewStatus)) return jsonReply(res, { error: 'review_status 须为 reviewing/approved/rejected' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          const nextStatus = reviewStatus === 'approved' ? 'active' : (reviewStatus === 'rejected' ? 'suspended' : 'active');
+          const [r] = await conn.execute(
+            'UPDATE jz_vendors SET review_status=?, review_note=?, reviewed_at=?, status=?, updated_at=? WHERE id=?',
+            [reviewStatus, String(body.review_note || '').trim().slice(0, 1000) || null, now, nextStatus, now, parseInt(m[1], 10)]
+          );
+          if (!r.affectedRows) return jsonReply(res, { error: '商家不存在' }, 404);
+          return jsonReply(res, { ok: true, id: parseInt(m[1], 10), review_status: reviewStatus, status: nextStatus });
+        } finally { await conn.end(); }
+      }
+    }
+
     if (urlPath === '/api/juzhu/admin/vendors/consult' && req.method === 'GET') {
       const rows = await queryRows(
         `SELECT v.id, v.name, v.type, v.consult_mode, COUNT(p.id) AS project_count
@@ -2578,6 +2863,177 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 内容域：旅游路线（routes）+ 房源专题（settings KV topic_*）=====
+    // 与 spots 同属内容编辑口径（house.write，规则 17/18）；专题 = 房源筛选条件（规则 15），
+    // 路线 = spots 的有序编排（站点内容仍在 spots 单一数据源，不复制正文）。
+    const ROUTE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+    const TOPIC_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+
+    // GET /admin/routes（全量含未上架；?city_id= 可选过滤）
+    if (urlPath === '/api/juzhu/admin/routes' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const rows = qp.get('city_id')
+        ? await queryRows('SELECT * FROM routes WHERE city_id=? OR city_id IS NULL ORDER BY sort_order, id', [parseInt(qp.get('city_id'))])
+        : await queryRows('SELECT * FROM routes ORDER BY sort_order, id');
+      rows.forEach((r) => { try { r.stops = r.stops ? JSON.parse(r.stops) : []; } catch (_) { r.stops = []; } });
+      return jsonReply(res, rows);
+    }
+
+    // POST /admin/routes
+    if (urlPath === '/api/juzhu/admin/routes' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = (body.name || '').trim();
+      if (!name) return jsonReply(res, { error: '路线名称不能为空' }, 400);
+      let slug = (body.slug || '').trim();
+      if (!slug) slug = 'route-' + Date.now().toString(36);
+      if (!ROUTE_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+      const stops = Array.isArray(body.stops) ? body.stops : [];
+      if (stops.length > 12) return jsonReply(res, { error: '单条路线最多 12 个点位（保持行程克制）' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [dup] = await conn.execute('SELECT id FROM routes WHERE slug=?', [slug]);
+        if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+        for (const s of stops) {
+          const sid = parseInt(s && s.spot_id, 10);
+          if (!sid) { conn.end(); return jsonReply(res, { error: 'stops 里存在无效 spot_id' }, 400); }
+          const [ex] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: `点位 #${sid} 不存在` }, 400); }
+        }
+        await conn.execute(
+          'INSERT INTO routes(city_id, slug, name, summary, cover_image, days, stops, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?)',
+          [body.city_id ? parseInt(body.city_id) : null, slug, name,
+           (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
+           Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+           JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+           parseInt(body.sort_order) || 999,
+           (body.enabled === false || body.enabled === 0 || body.enabled === '0') ? 0 : 1]
+        );
+        const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+        const [rows] = await conn.execute('SELECT * FROM routes WHERE id=?', [r[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, route: rows[0] }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/routes/:id（全量更新）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/routes\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const rid = parseInt(m[1]);
+        const body = await readBody(req);
+        const name = (body.name || '').trim();
+        if (!name) return jsonReply(res, { error: '路线名称不能为空' }, 400);
+        const stops = Array.isArray(body.stops) ? body.stops : [];
+        if (stops.length > 12) return jsonReply(res, { error: '单条路线最多 12 个点位（保持行程克制）' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [ex] = await conn.execute('SELECT id FROM routes WHERE id=?', [rid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: '路线不存在' }, 404); }
+          for (const s of stops) {
+            const sid = parseInt(s && s.spot_id, 10);
+            if (!sid) { conn.end(); return jsonReply(res, { error: 'stops 里存在无效 spot_id' }, 400); }
+            const [sp] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+            if (!sp.length) { conn.end(); return jsonReply(res, { error: `点位 #${sid} 不存在` }, 400); }
+          }
+          await conn.execute(
+            'UPDATE routes SET city_id=?, name=?, summary=?, cover_image=?, days=?, stops=?, sort_order=?, enabled=? WHERE id=?',
+            [body.city_id ? parseInt(body.city_id) : null, name,
+             (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
+             Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+             JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+             parseInt(body.sort_order) || 999,
+             (body.enabled === false || body.enabled === 0 || body.enabled === '0') ? 0 : 1,
+             rid]
+          );
+          const [rows] = await conn.execute('SELECT * FROM routes WHERE id=?', [rid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true, route: rows[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/routes/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/routes\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const rid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [ex] = await conn.execute('SELECT id FROM routes WHERE id=?', [rid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: '路线不存在' }, 404); }
+          await conn.execute('DELETE FROM routes WHERE id=?', [rid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /admin/topics —— settings KV topic_* 清单（slug/label/channel/tags/enabled）
+    if (urlPath === '/api/juzhu/admin/topics' && req.method === 'GET') {
+      const rows = await queryRows("SELECT `key`, value FROM settings WHERE `key` LIKE 'topic\\_%'");
+      const topics = rows.map((r) => {
+        const slug = String(r.key).replace(/^topic_/, '');
+        let crit = {};
+        try { crit = JSON.parse(r.value || '{}'); } catch (_) { crit = {}; }
+        return { slug, label: crit.label || slug, channel: crit.channel || null, tags: Array.isArray(crit.tags) ? crit.tags : [], enabled: crit.enabled !== false };
+      }).sort((a, b) => a.slug.localeCompare(b.slug));
+      return jsonReply(res, topics);
+    }
+
+    // PUT /admin/topics/:slug（upsert；专题 = 房源筛选条件，tags 至少 1 个）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/topics\/([a-z0-9][a-z0-9-]*)$/);
+      if (m && req.method === 'PUT') {
+        const slug = m[1];
+        if (!TOPIC_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符' }, 400);
+        const body = await readBody(req);
+        const label = (body.label || '').trim();
+        if (!label) return jsonReply(res, { error: '专题名称不能为空' }, 400);
+        const tags = Array.isArray(body.tags) ? body.tags.map((t) => String(t || '').trim()).filter(Boolean) : [];
+        if (!tags.length) return jsonReply(res, { error: '专题至少需要 1 个 tag 条件（专题=筛选条件，规则 15）' }, 400);
+        const crit = { label, tags };
+        if (body.channel) crit.channel = String(body.channel);
+        // enabled 接受布尔 false / 0 / '0'（admin UI 传布尔，脚本可能传 0）
+        crit.enabled = !(body.enabled === false || body.enabled === 0 || body.enabled === '0');
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.execute(
+            'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+            ['topic_' + slug, JSON.stringify(crit)]
+          );
+          await conn.commit();
+          catalogMemoInvalidateTopics();
+          return jsonReply(res, { ok: true, topic: { slug, label, channel: crit.channel || null, tags, enabled: crit.enabled } });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/topics/:slug（bzf 保租房专区是规则 15 既有契约，禁止删除）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/topics\/([a-z0-9][a-z0-9-]*)$/);
+      if (m && req.method === 'DELETE') {
+        if (m[1] === 'bzf') return jsonReply(res, { error: 'topic_bzf 是保租房专区既有契约（规则 15），不可删除；可编辑或下架' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute('DELETE FROM settings WHERE `key`=?', ['topic_' + m[1]]);
+          if (!r.affectedRows) { conn.end(); return jsonReply(res, { error: '专题不存在' }, 404); }
+          await conn.commit();
+          catalogMemoInvalidateTopics();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
     // POST /admin/projects
     if (urlPath === '/api/juzhu/admin/projects' && req.method === 'POST') {
       const body = await readBody(req);
@@ -2587,6 +3043,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!name) return jsonReply(res, { error: '项目名称不能为空' }, 400);
       if (!HOUSING_CHANNELS.includes(channel) && channel !== 'trade') {
         return jsonReply(res, { error: 'channel 须为 rental/minsu/newhouse/resale/trade' }, 400);
+      }
+      if (['rental', 'minsu'].includes(channel) && String(body.status || '').toLowerCase() === 'online') {
+        return jsonReply(res, { error: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' }, 400);
       }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
@@ -3434,7 +3893,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
       const city = cities[0];
       // channel / topic 过滤（topic 定义存 settings KV：topic_<slug>；qpChannel/qpTopic 已在上方解析）
-      let projSql = 'SELECT * FROM projects WHERE city_id=? AND (status=\'online\' OR status IS NULL)';
+      let projSql = "SELECT * FROM projects WHERE city_id=? AND status='online' AND rating_status='passed'";
       const projParams = [city.id];
       let topicMeta = null;
       if (qpTopic) {
@@ -3442,6 +3901,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!kvRows.length) return jsonReply(res, { error: `unknown topic: ${qpTopic}` }, 404);
         let crit = {};
         try { crit = JSON.parse(kvRows[0].value || '{}'); } catch (_) { crit = {}; }
+        // 专题下架 = crit.enabled === false（后台「内容」tab 可配），对外与 unknown topic 同响应，不泄露存在性
+        if (crit.enabled === false) return jsonReply(res, { error: `unknown topic: ${qpTopic}` }, 404);
         topicMeta = { topic: qpTopic, label: crit.label || qpTopic };
         if (crit.channel) { projSql += ' AND channel=?'; projParams.push(String(crit.channel)); }
         for (const t of (crit.tags || [])) {
@@ -3576,7 +4037,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!dists.length) return jsonReply(res, { error: 'not found' }, 404);
         const dist = dists[0];
         const projects = await queryRows(
-          "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='rental' ORDER BY sort_order",
+          "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='rental' AND status='online' AND rating_status='passed' ORDER BY sort_order",
           [dist.id]
         );
         projects.forEach(r => parseJsonFields(r, ['tags']));
@@ -3592,8 +4053,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         // slug 可能是纯数字（id），兼容两种查询
         const isId = /^\d+$/.test(slug);
         const sql = isId
-          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE id=?'
-          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE slug=?';
+          ? "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE id=? AND status='online' AND rating_status='passed'"
+          : "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE slug=? AND status='online' AND rating_status='passed'";
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
@@ -3616,6 +4077,73 @@ async function handleApiDirect(urlPath, qs, req, res) {
             spots
           }), 640));
       }
+    }
+
+    // ===== 内容域公开读（旅游路线 + 周边玩法列表，公网白名单）=====
+    // 路线站点水合：stops JSON [{spot_id, note}] → 附 spot 摘要卡（正文仍在 spots，笔记页深链按 spot.id）
+    const hydrateRouteStops = async (rows) => {
+      rows.forEach((r) => { try { r.stops = r.stops ? JSON.parse(r.stops) : []; } catch (_) { r.stops = []; } });
+      const ids = [];
+      rows.forEach((r) => r.stops.forEach((s) => { const id = parseInt(s.spot_id, 10); if (id && ids.indexOf(id) < 0) ids.push(id); }));
+      const smap = {};
+      if (ids.length) {
+        const sp = await queryRows('SELECT id,type,name,slug,icon,cover_image,summary,address,duration,ticket FROM spots WHERE enabled=1 AND id IN (' + ids.map(() => '?').join(',') + ')', ids);
+        sp.forEach((s) => { s.type_label = SPOT_TYPE_LABELS[s.type] || s.type; smap[s.id] = s; });
+      }
+      rows.forEach((r) => {
+        r.stop_count = r.stops.length;
+        r.stops = r.stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10) || 0, note: s.note || '', spot: smap[parseInt(s.spot_id, 10)] || null }));
+      });
+      return rows;
+    };
+
+    // GET /api/juzhu/routes?city= —— 路线列表（enabled；city 匹配或全省通用；未知城市回落通用路线不报错）
+    if (urlPath === '/api/juzhu/routes' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let cityId = null;
+      if (cityKey) {
+        const cities = await queryRows('SELECT id FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+        cityId = cities.length ? cities[0].id : null;
+      }
+      const rows = await queryRows(
+        'SELECT * FROM routes WHERE enabled=1 AND (city_id IS NULL' + (cityId ? ' OR city_id=?' : '') + ') ORDER BY sort_order, id',
+        cityId ? [cityId] : []
+      );
+      await hydrateRouteStops(rows);
+      return jsonReply(res, imgThumbs.mapThumbsDeep({ routes: rows }, 640));
+    }
+
+    // GET /api/juzhu/routes/:id —— 路线详情
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/routes\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT * FROM routes WHERE id=? AND enabled=1', [parseInt(m[1])]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        await hydrateRouteStops(rows);
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ route: rows[0] }, 640));
+      }
+    }
+
+    // GET /api/juzhu/spots?city=&type= —— 周边玩法列表（C 端 lvju-app-spots 列表页消费；city_id NULL = 全省通用）
+    if (urlPath === '/api/juzhu/spots' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const conds = ['enabled=1'], params = [];
+      if (qp.get('type')) { conds.push('type=?'); params.push(qp.get('type')); }
+      const cityKey = (qp.get('city') || '').trim();
+      let cityId = null;
+      if (cityKey) {
+        const cities = await queryRows('SELECT id FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+        cityId = cities.length ? cities[0].id : null;
+      }
+      if (cityId) { conds.push('(city_id=? OR city_id IS NULL)'); params.push(cityId); }
+      const rows = await queryRows(
+        'SELECT id,type,name,slug,icon,cover_image,summary,address,duration,ticket,tags FROM spots WHERE ' + conds.join(' AND ') +
+        " ORDER BY FIELD(type,'scenic','biz','food','cafe'), sort_order, id",
+        params
+      );
+      rows.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
+      return jsonReply(res, imgThumbs.mapThumbsDeep({ spots: rows }, 640));
     }
 
     // GET /api/juzhu/spots/:id —— 周边玩法笔记详情（公网白名单，C 端 lvju-app-spot-post 页消费）
@@ -3650,7 +4178,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'GET') {
         const slug = decodeURIComponent(m[1]);
         const isId = /^\d+$/.test(slug);
-        const projSql = isId ? 'SELECT * FROM projects WHERE id=?' : 'SELECT * FROM projects WHERE slug=?';
+        const projSql = isId
+          ? "SELECT * FROM projects WHERE id=? AND status='online' AND rating_status='passed'"
+          : "SELECT * FROM projects WHERE slug=? AND status='online' AND rating_status='passed'";
         const projs = await queryRows(projSql, [isId ? parseInt(slug) : slug]);
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         const proj = projs[0];
@@ -3676,7 +4206,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const today = new Date();
         const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
         const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
-        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        const prows = await queryRows("SELECT * FROM projects WHERE id=? AND status='online' AND rating_status='passed'", [pid]);
         if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
         // units=u1,u2 批量形状：一次返回该月多个户型的房态（C 端详情页整月横滚用，省 (N-1)/N 请求）
         const unitsParam = (qp.get('units') || '').split(',').map((x) => parseInt(x, 10)).filter((x) => x > 0).slice(0, 10);
@@ -4069,33 +4599,51 @@ async function handleApiDirect(urlPath, qs, req, res) {
     if (urlPath === '/api/juzhu/booking' && req.method === 'POST') {
       const body = await readBody(req);
       const projectId = parseInt(body.project_id, 10);
-      const unitId = body.unit_id ? parseInt(body.unit_id, 10) : null;
+      const unitId = body.unit_id == null || body.unit_id === '' ? null : parseInt(body.unit_id, 10);
       const name = String(body.contact_name || '').trim();
       const phone = String(body.contact_phone || '').trim();
       const checkin = String(body.checkin || '').trim();
       const checkout = String(body.checkout || '').trim();
+      const idempotencyKey = String(body.idempotency_key || req.headers['idempotency-key'] || '').trim().slice(0, 100);
       if (!projectId || !name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '项目、联系人、11 位手机号为必填' }, 400);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(checkin) || !/^\d{4}-\d{2}-\d{2}$/.test(checkout)) return jsonReply(res, { error: '日期格式须为 YYYY-MM-DD' }, 400);
+      if (unitId !== null && (!Number.isInteger(unitId) || unitId <= 0)) return jsonReply(res, { error: 'unit_id 须为正整数' }, 400);
+      if (!stayCfg.isValidDateString(checkin) || !stayCfg.isValidDateString(checkout)) return jsonReply(res, { error: '日期须为真实有效的 YYYY-MM-DD' }, 400);
       const nights = Math.round((new Date(checkout) - new Date(checkin)) / 864e5);
       if (!(nights >= 1)) return jsonReply(res, { error: '离店须晚于入住至少 1 晚' }, 400);
       if (new Date(checkin) < new Date(new Date().toDateString())) return jsonReply(res, { error: '入住日期不能早于今天' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [projs] = await conn.execute('SELECT id, name, channel, status, price_from, owner_vendor_id, city_id, ext, tags FROM projects WHERE id=?', [projectId]);
+        await conn.beginTransaction();
+        if (idempotencyKey) {
+          const [existing] = await conn.execute('SELECT * FROM booking_orders WHERE idempotency_key=? LIMIT 1 FOR UPDATE', [idempotencyKey]);
+          if (existing.length) {
+            await conn.commit();
+            return jsonReply(res, { ok: true, order_no: existing[0].order_no, nights: existing[0].nights,
+              price_total: existing[0].price_total, status: existing[0].status, pay_status: existing[0].pay_status,
+              idempotent_replay: true });
+          }
+        }
+        const [projs] = await conn.execute('SELECT id, name, channel, status, rating_status, price_from, owner_vendor_id, city_id, ext, tags FROM projects WHERE id=? FOR UPDATE', [projectId]);
         const proj = projs[0];
-        if (!proj) { conn.end(); return jsonReply(res, { error: '项目不存在' }, 404); }
-        if (!['rental', 'minsu'].includes(proj.channel)) { conn.end(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
-        if (proj.status && proj.status !== 'online') { conn.end(); return jsonReply(res, { error: '房源已下架，暂不可预订' }, 400); }
+        if (!proj) { await conn.rollback(); return jsonReply(res, { error: '项目不存在' }, 404); }
+        if (!['rental', 'minsu'].includes(proj.channel)) { await conn.rollback(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
+        if (proj.status !== 'online' || proj.rating_status !== 'passed') { await conn.rollback(); return jsonReply(res, { error: '房源未通过审核或已下架，暂不可预订' }, 400); }
         // 在线预订 = 项目已开通（projects.ext.stay_bookable，B 端房态页「按晚预订」开关）；
         // 口径（2026-09-05）：默认一律仅 400 电话咨询，开通后 minsu 走预付收银台、
         // rental 走预订单；tag 不参与判断，购房类频道（newhouse/resale/trade）不可订
-        if (!bookableOf(proj)) { conn.end(); return jsonReply(res, { error: '该项目未开通在线预订，请拨打页面咨询电话' }, 400); }
+        if (!bookableOf(proj)) { await conn.rollback(); return jsonReply(res, { error: '该项目未开通在线预订，请拨打页面咨询电话' }, 400); }
         // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
         const minNights = minStayNightsOf(proj);
         if (nights < minNights) {
-          conn.end();
+          await conn.rollback();
           return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
         }
+        // 事务内锁项目行，清理已过期的 mock 待支付订单后再复核房态，避免并发双订。
+        const [stale] = await conn.execute(
+          `SELECT DISTINCT b.* FROM booking_orders b JOIN stay_calendar s ON s.booking_id=b.id
+             WHERE b.project_id=? AND b.status='pending' AND b.pay_status='unpaid' AND b.payment_expires_at IS NOT NULL
+               AND s.status='booked' AND s.stay_date >= ? AND s.stay_date < ? FOR UPDATE`, [projectId, checkin, checkout]);
+        for (const old of stale) await expireBooking(conn, old);
         // 房态冲突校验：unit 未指定 = 整栋/不限房型 → 全项目任一晚被占即拒；指定户型 → 项目级 + 该户型
         const [conflicts] = await conn.execute(
           `SELECT stay_date, unit_id, status FROM stay_calendar
@@ -4104,7 +4652,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           unitId ? [projectId, checkin, checkout, unitId] : [projectId, checkin, checkout]
         );
         if (conflicts.length) {
-          conn.end();
+          await conn.rollback();
           return jsonReply(res, { error: `所选日期 ${conflicts[0].stay_date} 已被预订或已关房，请换时段`, conflict_date: conflicts[0].stay_date }, 400);
         }
       // 登录用户下单 → 订单归属（未登录则 user_id 为空，可后续按手机号认领）
@@ -4116,17 +4664,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
         let perNight = 0;
         if (unitId) {
           const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
-          if (!us.length || us[0].project_id !== projectId) { conn.end(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
+          if (!us.length || us[0].project_id !== projectId) { await conn.rollback(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
           perNight = unitNightPrice(proj, us[0]);   // 夜价口径（规则15/16）单一数据源 stay_config.cjs
         }
         if (!perNight) perNight = unitNightPrice(proj, null);
         const priceTotal = perNight * nights;
         const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
+        const paymentExpiresAt = proj.channel === 'minsu' ? new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ') : null;
+        const tempOrderNo = `TMP-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`.slice(0, 32);
         const [ins] = await conn.execute(
-          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,pay_status,created_at,updated_at)
-           VALUES ('',?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?, ?,?)`,
-          [projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal,
-           proj.channel === 'minsu' ? 'unpaid' : null, now, now]
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,pay_status,idempotency_key,payment_expires_at,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?,?,?,?,?)`,
+          [tempOrderNo, projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal,
+           proj.channel === 'minsu' ? 'unpaid' : null, idempotencyKey || null, paymentExpiresAt, now, now]
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
@@ -4138,7 +4688,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.query(
             `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booking_id, updated_at)
              VALUES ${scVals.map(() => '(?,?,?,?,?,?,?)').join(',')}
-             ON DUPLICATE KEY UPDATE status='booked', source='booking', booking_id=VALUES(booking_id), updated_at=VALUES(updated_at)`,
+             ON DUPLICATE KEY UPDATE status=status`,
             scVals.flat()
           );
         }
@@ -4148,7 +4698,15 @@ async function handleApiDirect(urlPath, qs, req, res) {
           channel: proj.channel, checkin: checkin, checkout: checkout,
           nights: nights, price_total: priceTotal, status: 'pending', pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
         });
-        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights });
+        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights,
+          payment_expires_at: paymentExpiresAt, pay_status: proj.channel === 'minsu' ? 'unpaid' : null });
+      } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        if (e && e.code === 'ER_DUP_ENTRY' && idempotencyKey) {
+          const [existing] = await conn.execute('SELECT * FROM booking_orders WHERE idempotency_key=? LIMIT 1', [idempotencyKey]);
+          if (existing.length) return jsonReply(res, { ok: true, order_no: existing[0].order_no, status: existing[0].status, pay_status: existing[0].pay_status, idempotent_replay: true });
+        }
+        throw e;
       } finally { await conn.end(); }
     }
 
@@ -4164,13 +4722,18 @@ async function handleApiDirect(urlPath, qs, req, res) {
          WHERE b.order_no=? AND b.contact_phone=? LIMIT 1`, [orderNo, phone]);
       if (!rows.length) return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404);
       const o = rows[0];
+      if (bookingPaymentExpired(o)) {
+        const conn = await mysql2.createConnection(getDbConfig());
+        try { await conn.beginTransaction(); await expireBooking(conn, o); await conn.commit(); } finally { await conn.end(); }
+        o.status = 'cancelled'; o.pay_status = 'expired';
+      }
       return jsonReply(res, {
         order: {
           id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
           project_name: o.project_name,
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
           checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
-          status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, created_at: o.created_at,
+          status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, payment_expires_at: o.payment_expires_at, created_at: o.created_at,
         },
       });
     }
@@ -4183,9 +4746,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
-        if (!rows.length) { conn.end(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
-        if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
+        await conn.beginTransaction();
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1 FOR UPDATE', [orderNo, phone]);
+        if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
+        if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         // 已支付订单取消 → 标记退款（模拟退款通道；真实网关接入后走原路退回）
         const newPay = rows[0].pay_status === 'paid' ? 'refunded' : rows[0].pay_status;
@@ -4209,13 +4774,20 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const orderNo = String(body.order_no || '').trim();
       const phone = String(body.contact_phone || '').trim();
       const payMethod = String(body.pay_method || 'online').slice(0, 50);
+      if (!['online', 'wechat', 'alipay', 'mock'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1', [orderNo, phone]);
-        if (!rows.length) { conn.end(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
-        if (rows[0].status !== 'pending') { conn.end(); return jsonReply(res, { error: '订单已取消或已完结，无法支付' }, 400); }
-        if (rows[0].pay_status !== 'unpaid') { conn.end(); return jsonReply(res, { error: '该订单不在待支付状态（当前：' + (rows[0].pay_status || '无需支付）') }, 400); }
+        await conn.beginTransaction();
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1 FOR UPDATE', [orderNo, phone]);
+        if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
+        if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '订单已取消或已完结，无法支付' }, 400); }
+        if (rows[0].pay_status === 'paid') {
+          await conn.commit();
+          return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status, idempotent_replay: true });
+        }
+        if (rows[0].pay_status !== 'unpaid') { await conn.rollback(); return jsonReply(res, { error: '该订单不在待支付状态（当前：' + (rows[0].pay_status || '无需支付）') }, 400); }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
         await conn.commit();
@@ -4260,16 +4832,22 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!['confirmed', 'cancelled'].includes(status)) return jsonReply(res, { error: 'status 须为 confirmed/cancelled' }, 400);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE id=?', [parseInt(m[1], 10)]);
-          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          await conn.beginTransaction();
+          const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(m[1], 10)]);
+          if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: 'not found' }, 404); }
           if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
-            conn.end();
+            await conn.rollback();
             return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
           }
-          if (rows[0].status === 'cancelled') { conn.end(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
+          if (bookingPaymentExpired(rows[0])) {
+            await expireBooking(conn, rows[0]);
+            await conn.commit();
+            return jsonReply(res, { error: '待支付订单已过期并释放房态' }, 400);
+          }
+          if (rows[0].status === 'cancelled') { await conn.rollback(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
           // 预付口径：minsu 单 pay_status='unpaid' 时租客未支付，不可确认生效
           if (status === 'confirmed' && rows[0].pay_status === 'unpaid') {
-            conn.end();
+            await conn.rollback();
             return jsonReply(res, { error: '租客尚未支付（收银台待付），支付完成后可确认生效' }, 400);
           }
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -4543,6 +5121,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
             conn.end();
             return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+          }
+          if (status === 'online') {
+            const eligibility = await projectPublishEligibility(conn, pid, sess.role === 'vendor' ? sess.vendorId : null);
+            if (!eligibility.ok) return jsonReply(res, { error: eligibility.error }, eligibility.status || 400);
           }
           await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, pid]);
           await conn.commit();
@@ -5270,7 +5852,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { list: rows });
     }
 
-    // GET /api/juzhu/jz/orders/overview —— gr_orders 指标概览（今日漏斗 + 近15天 + 近12月；必须在 orders/:id 之前）
+    // GET /api/juzhu/jz/orders/overview —— gr_orders 指标概览（漏斗 + 日/月趋势；支持 city/vendor_id/start/end 筛选；必须在 orders/:id 之前）
     if (urlPath === '/api/juzhu/jz/orders/overview' && req.method === 'GET') {
       if (!(await requireApiKey(req, res))) return;
       const STATUSES = ['pending', 'paid', 'assigned', 'serving', 'completed', 'cancelled'];
@@ -5280,10 +5862,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const d = new Date(Date.now() + 8 * 60 * 60 * 1000 + offsetDays * 86400000);
         return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
       };
-      const cstMonth = (offsetMonths) => {
-        const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
-        d.setUTCDate(1);
-        d.setUTCMonth(d.getUTCMonth() + offsetMonths);
+      const dayShift = (iso, n) => {
+        const d = new Date(Date.parse(iso + 'T00:00:00Z') + n * 86400000);
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+      };
+      const monthOf = (iso) => iso.slice(0, 7);
+      const monthShift = (ym, n) => {
+        const [y, m] = ym.split('-').map(Number);
+        const d = new Date(Date.UTC(y, m - 1 + n, 1));
         return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}`;
       };
       const blankRow = (key, val) => {
@@ -5292,36 +5878,57 @@ async function handleApiDirect(urlPath, qs, req, res) {
         STATUSES.forEach((s) => { row[s] = 0; });
         return row;
       };
-      const funnel = blankRow('date', cstDay(0));
-      delete funnel.date;
+
+      // 区间参数（YYYY-MM-DD 闭区间；缺省 = 今日）；ISO 日期字符串序 = 时间序
+      const qp = new URLSearchParams(qs);
+      const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      let start = RE_DATE.test(qp.get('start') || '') ? qp.get('start') : cstDay(0);
+      let end = RE_DATE.test(qp.get('end') || '') ? qp.get('end') : start;
+      if (start > end) { const t = start; start = end; end = t; }
+      // 桶上限：按日最多 92 桶（超出取区间尾段），按月最多 24 桶
+      const spanDays = Math.floor((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+      const dailyFrom = dayShift(end, -(Math.min(spanDays, 92) - 1));
+      const monthlyFrom = monthOf(start) > monthShift(monthOf(end), -23) ? monthOf(start) : monthShift(monthOf(end), -23);
+
+      // 筛选条件（vendor_id=0 表示未关联商家的单）
+      const where = ['created_at >= ?', 'created_at < ?'];
+      const params = [start + ' 00:00:00', dayShift(end, 1) + ' 00:00:00'];
+      const city = (qp.get('city') || '').trim();
+      if (city) { where.push('city=?'); params.push(city); }
+      const vendorRaw = (qp.get('vendor_id') || '').trim();
+      if (vendorRaw === '0') where.push('vendor_id IS NULL');
+      else if (/^\d+$/.test(vendorRaw)) { where.push('vendor_id=?'); params.push(parseInt(vendorRaw, 10)); }
+      const whereSql = 'WHERE ' + where.join(' AND ');
+
+      const funnel = {};
+      STATUSES.forEach((s) => { funnel[s] = 0; });
       const daily = [];
-      for (let i = -14; i <= 0; i++) daily.push(blankRow('date', cstDay(i)));
-      const dailyIdx = {};
-      daily.forEach((r) => { dailyIdx[r.date] = r; });
+      for (let d = dailyFrom; d <= end; d = dayShift(d, 1)) daily.push(blankRow('date', d));
       const monthly = [];
-      for (let i = -11; i <= 0; i++) monthly.push(blankRow('month', cstMonth(i)));
-      const monthlyIdx = {};
-      monthly.forEach((r) => { monthlyIdx[r.month] = r; });
+      for (let m = monthlyFrom; m <= monthOf(end); m = monthShift(m, 1)) monthly.push(blankRow('month', m));
       // created_at 为定宽字符串，LEFT() 直接分桶；三条聚合代替逐状态逐桶查询
       const buckets = await Promise.all([
-        queryRows(
-          `SELECT status, COUNT(*) AS c FROM gr_orders
-           WHERE created_at >= ? AND created_at < ? GROUP BY status`,
-          [cstDay(0) + ' 00:00:00', cstDay(1) + ' 00:00:00']
-        ),
-        queryRows(
-          'SELECT LEFT(created_at,10) AS d, status, COUNT(*) AS c FROM gr_orders WHERE created_at >= ? GROUP BY LEFT(created_at,10), status',
-          [cstDay(-14) + ' 00:00:00']
-        ),
-        queryRows(
-          'SELECT LEFT(created_at,7) AS m, status, COUNT(*) AS c FROM gr_orders WHERE created_at >= ? GROUP BY LEFT(created_at,7), status',
-          [cstMonth(-11) + '-01 00:00:00']
-        ),
+        queryRows(`SELECT status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY status`, params),
+        queryRows(`SELECT LEFT(created_at,10) AS d, status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY LEFT(created_at,10), status`, params),
+        queryRows(`SELECT LEFT(created_at,7) AS m, status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY LEFT(created_at,7), status`, params),
       ]);
       buckets[0].forEach((r) => { if (funnel[r.status] != null) funnel[r.status] = r.c; });
+      const dailyIdx = {};
+      daily.forEach((r) => { dailyIdx[r.date] = r; });
       buckets[1].forEach((r) => { if (dailyIdx[r.d] && dailyIdx[r.d][r.status] != null) dailyIdx[r.d][r.status] = r.c; });
+      const monthlyIdx = {};
+      monthly.forEach((r) => { monthlyIdx[r.month] = r; });
       buckets[2].forEach((r) => { if (monthlyIdx[r.m] && monthlyIdx[r.m][r.status] != null) monthlyIdx[r.m][r.status] = r.c; });
-      return jsonReply(res, { funnel, daily, monthly });
+
+      // 筛选下拉数据源：城市取单内实际出现值（空表回落 cities 表），商家取 jz_vendors 全量
+      const cityRows = await queryRows("SELECT DISTINCT city FROM gr_orders WHERE city IS NOT NULL AND city<>'' ORDER BY city LIMIT 50");
+      let cities = cityRows.map((r) => r.city);
+      if (!cities.length) {
+        cities = (await queryRows('SELECT name FROM cities ORDER BY id LIMIT 30')).map((r) => r.name);
+      }
+      const vendors = (await queryRows('SELECT id, name FROM jz_vendors ORDER BY id LIMIT 200'))
+        .map((r) => ({ id: r.id, name: r.name }));
+      return jsonReply(res, { funnel, daily, monthly, range: { start, end }, filter_options: { cities, vendors } });
     }
 
     // GET /api/juzhu/jz/orders/:id
@@ -5738,6 +6345,8 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
+  const bookingExpiryTimer = setInterval(() => cleanupExpiredBookingOrders().catch(() => {}), 60 * 1000);
+  bookingExpiryTimer.unref();
   const envName = (process.env.JUZHU_ENV || 'dev').trim().toLowerCase();
   const apiKey = (process.env[API_KEY_ENV] || '').trim();
   if (envName === 'prod' || envName === 'production') {

@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>旅游景点 · 必打卡 · 贝壳旅居·内容服务</title>
+<link rel="icon" href="data:,">
+<title>周边玩法 · 必打卡 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 </head>
 <body>
@@ -12,7 +13,7 @@
 
     <div class="appbar ghost">
       <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">旅游景点<small>必打卡 · 玩在贵州</small></div>
+      <div class="ttl">周边玩法<small>必打卡 · 玩在贵州</small></div>
       <div class="act"><span>🔍</span><span>♡</span></div>
     </div>
 
@@ -21,57 +22,98 @@
       <div class="in">
         <div class="ek">Destinations</div>
         <h1>山水与人间<br>都值得一去</h1>
-        <p>世界遗产、民族村寨、自然奇观，看完景点顺手订旁边的旅居</p>
+        <p>景点、市集、美食与咖啡，看完玩法顺手订旁边的旅居</p>
       </div>
     </div>
 
-    <div class="filt">
-      <a class="on">全部</a><a>世界遗产</a><a>自然风光</a><a>民族村寨</a><a>红色文化</a><a>亲子</a>
-    </div>
+    <div class="filt" id="filt"></div>
 
-    <div class="wrap">
-      <a class="spot" href="lvju-app-spot-detail.html?spot=xiaoqikong">
-        <div class="bg s-xiaoqikong"></div><span class="lv">★ 5A · 世界遗产</span>
-        <div class="in"><div class="nm">荔波小七孔</div>
-          <div class="meta"><span>📍黔南 · 荔波</span><span>🎫 ¥110</span><span>⏱ 建议 1 天</span></div></div>
-      </a>
-      <a class="spot" href="lvju-app-spot-detail.html?spot=xijiang">
-        <div class="bg s-xijiang"></div><span class="lv">★ 5A · 民族村寨</span>
-        <div class="in"><div class="nm">西江千户苗寨</div>
-          <div class="meta"><span>📍黔东南 · 雷山</span><span>🎫 ¥90</span><span>⏱ 1-2 天</span></div></div>
-      </a>
-      <a class="spot" href="lvju-app-spot-detail.html?spot=fanjing">
-        <div class="bg s-fanjing"></div><span class="lv">★ 世界遗产 · 名山</span>
-        <div class="in"><div class="nm">梵净山</div>
-          <div class="meta"><span>📍铜仁 · 江口</span><span>🎫 ¥110+索道</span><span>⏱ 1 天</span></div></div>
-      </a>
-      <a class="spot" href="lvju-app-spot-detail.html?spot=huangguoshu">
-        <div class="bg s-huangguoshu"></div><span class="lv">★ 5A · 大瀑布</span>
-        <div class="in"><div class="nm">黄果树瀑布</div>
-          <div class="meta"><span>📍安顺 · 镇宁</span><span>🎫 ¥160</span><span>⏱ 1 天</span></div></div>
-      </a>
-      <a class="spot" href="lvju-app-spot-detail.html?spot=wanfeng">
-        <div class="bg s-wanfeng"></div><span class="lv">★ 4A · 喀斯特</span>
-        <div class="in"><div class="nm">万峰林</div>
-          <div class="meta"><span>📍黔西南 · 兴义</span><span>🎫 ¥60</span><span>⏱ 半天</span></div></div>
-      </a>
+    <div class="wrap" id="spotWrap">
+      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
     <div class="banner gold">
       <span class="bi">🏔</span>
-      <div class="bt"><b>看上了这片山水？</b><p>景点旁的旅居星级旅居，旅居到贵州，生活更精彩</p></div>
-      <a class="go" href="lvju-app-lvju.html">订旅居 ›</a>
+      <div class="bt"><b>看上了这片山水？</b><p>找房枢纽按城市 / 价格 / 评分帮你挑好房</p></div>
+      <a class="go" id="hubLink" href="lvju-app-search.html">订旅居 ›</a>
     </div>
 
   </div>
 
   <div class="tabbar">
     <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-lvju.html"><span class="ti">🔎</span>找房</a>
+    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
     <a class="on"><span class="ti">📖</span>内容</a>
     <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script>
+/* 周边玩法列表：数据来自 GET /api/juzhu/spots?city=&type=（spots 表，规则 17 单一数据源；
+   后台 juzhu-admin「内容」tab 维护）。卡片深链 → 笔记详情页 lvju-app-spot-post?id=。
+   类型筛选 chip 的中文名用接口下发的 type_label，不在前端另造映射。 */
+(function(){
+  var qs = new URLSearchParams(location.search);
+  var CITY = qs.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || '贵阳';
+  var TYPE = qs.get('type') || '';
+  var rows = [];
+  var FB = ['s-xiaoqikong', 's-xijiang', 's-fanjingshan', 's-huangguoshu', 's-wanfeng', 's-qingyan'];
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function paintFilt(){
+    var types = [];
+    rows.forEach(function(s){ if (s.type && types.map(function(t){ return t.key; }).indexOf(s.type) < 0) types.push({ key: s.type, label: s.type_label || s.type }); });
+    var el = document.getElementById('filt');
+    if (!types.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<a data-t=""' + (!TYPE ? ' class="on"' : '') + '>全部</a>' +
+      types.map(function(t){ return '<a data-t="' + t.key + '"' + (TYPE === t.key ? ' class="on"' : '') + '>' + esc(t.label) + '</a>'; }).join('');
+  }
+  function cardHtml(s, i) {
+    var bg = s.cover_image
+      ? 'background-image:url(' + esc(s.cover_image) + ')'
+      : FB[i % FB.length];
+    var lv = (s.tags && s.tags.length) ? '★ ' + s.tags.slice(0, 1).join('') : (s.type_label || '');
+    var meta = [
+      s.address ? '📍 ' + s.address : '',
+      s.ticket ? '🎫 ' + s.ticket : '',
+      s.duration ? '⏱ ' + s.duration : ''
+    ].filter(Boolean).map(function(m){ return '<span>' + esc(m) + '</span>'; }).join('');
+    return '<a class="spot" href="lvju-app-spot-post.html?id=' + s.id + '">' +
+      '<div class="bg ' + (s.cover_image ? '' : bg) + '"' + (s.cover_image ? ' style="' + bg + '"' : '') + '></div>' +
+      (lv ? '<span class="lv">' + esc(lv) + '</span>' : '') +
+      '<div class="in"><div class="nm">' + esc(s.name) + '</div>' +
+      '<div class="meta">' + (meta || '<span>' + esc(s.summary || '') + '</span>') + '</div></div></a>';
+  }
+  function paint(){
+    var wrap = document.getElementById('spotWrap');
+    var list = TYPE ? rows.filter(function(s){ return s.type === TYPE; }) : rows;
+    if (!list.length) {
+      wrap.innerHTML = '<div style="text-align:center;padding:30px 16px;color:#9aa5a1;font-size:12px;line-height:1.8;">' +
+        '当前城市「' + esc(CITY) + '」暂无' + (TYPE ? '该类' : '') + '玩法内容 · 可到找房枢纽切换城市<br/>' +
+        '<a href="lvju-app-search.html?city=' + encodeURIComponent(CITY) + '" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">去找房枢纽</a></div>';
+      return;
+    }
+    wrap.innerHTML = list.map(cardHtml).join('');
+  }
+  document.getElementById('filt').addEventListener('click', function(e){
+    var a = e.target.closest('[data-t]');
+    if (!a) return;
+    TYPE = a.getAttribute('data-t');
+    paintFilt(); paint();
+  });
+  document.getElementById('hubLink').href = 'lvju-app-search.html?city=' + encodeURIComponent(CITY);
+  fetch('/api/juzhu/spots?city=' + encodeURIComponent(CITY) + (TYPE ? '&type=' + encodeURIComponent(TYPE) : ''))
+    .then(function(r){ return r.json(); })
+    .then(function(c){
+      rows = c.spots || [];
+      paintFilt(); paint();
+    })
+    .catch(function(){
+      document.getElementById('spotWrap').innerHTML =
+        '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接内容数据 · 请稍后再试</div>';
+    });
+})();
+</script>
 </body>
 </html>
