@@ -88,13 +88,22 @@
       document.querySelector('.ttl').innerHTML = '收银台<small>旅居预订 · ' + (o.project_name ? window.BZF_JZ.esc(o.project_name) : '预订订单') + '</small>';
       document.getElementById('payAmt').textContent = '¥' + Number(amt).toLocaleString();
       document.getElementById('paySub').textContent = '订单号 ' + o.order_no + ' · ' + o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
+      var expiresAt = o.payment_expires_at ? new Date(String(o.payment_expires_at).replace(' ', 'T') + 'Z').getTime() : 0;
+      var tick = function(){
+        var left = expiresAt ? Math.max(0, expiresAt - Date.now()) : 0;
+        if (!expiresAt) { document.getElementById('payCd').textContent = '待支付'; return; }
+        var mins = Math.floor(left / 60000), secs = Math.floor((left % 60000) / 1000);
+        document.getElementById('payCd').textContent = left ? ('⏱ 请在 ' + mins + ':' + String(secs).padStart(2, '0') + ' 内完成支付') : '订单已过期，请重新下单';
+        if (!left) document.getElementById('payBtn').style.opacity = '.45';
+      };
+      tick(); setInterval(tick, 1000);
       document.getElementById('payBtn').textContent = '确认支付 ¥' + Number(amt).toLocaleString();
       document.getElementById('payBtn').href = '#';
       document.getElementById('payBtn').addEventListener('click', function(e){
         e.preventDefault();
         document.querySelectorAll('.payopt').forEach(function(x){ if (x.classList.contains('sel')) method = x.querySelector('.nm').textContent.trim(); });
         fetch('/api/juzhu/booking/pay', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, pay_method: method }) })
+          body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, pay_method: 'mock' }) })
           .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
           .then(function(res){
             if (!res.ok) { alert(res.d.error || '支付失败'); return; }

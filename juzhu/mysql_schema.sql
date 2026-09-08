@@ -64,6 +64,9 @@ CREATE TABLE IF NOT EXISTS projects (
   rating_submitted_at TEXT,
   rating_reviewed_at  TEXT,
   rating_note   TEXT,
+  status        VARCHAR(20) NOT NULL DEFAULT 'draft',
+  owner_vendor_id INT,
+  ext           TEXT,
   UNIQUE KEY uq_projects_channel_slug (channel, slug),
   KEY idx_projects_district (district_id, channel),
   KEY idx_projects_city (city_id),
@@ -88,6 +91,7 @@ CREATE TABLE IF NOT EXISTS units (
   rent_detail   TEXT,
   sort_order    INT NOT NULL DEFAULT 0,
   cover_image   TEXT,
+  ext           TEXT,
   UNIQUE KEY uq_units_project_slug (project_id, slug),
   KEY idx_units_project (project_id),
   CONSTRAINT fk_units_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -208,6 +212,11 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   sort_order INT DEFAULT 0,
   created_at TEXT,
   updated_at TEXT,
+  login_name VARCHAR(120),
+  password_hash VARCHAR(255),
+  review_status VARCHAR(20) NOT NULL DEFAULT 'approved',
+  review_note TEXT,
+  reviewed_at VARCHAR(32),
   KEY idx_jz_vendors_type (type, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -306,6 +315,38 @@ CREATE TABLE IF NOT EXISTS jz_sku_slots (
   KEY idx_jz_sku_slots_product (product_id, slot_date, start_time),
   CONSTRAINT fk_sku_slots_product FOREIGN KEY (product_id) REFERENCES jz_products(id),
   CONSTRAINT fk_sku_slots_worker FOREIGN KEY (worker_id) REFERENCES jz_workers(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===== 旅居预订订单 =====
+CREATE TABLE IF NOT EXISTS booking_orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_no VARCHAR(32) NOT NULL,
+  project_id INT NOT NULL,
+  unit_id INT,
+  channel VARCHAR(16) NOT NULL,
+  city_id INT,
+  owner_vendor_id INT NOT NULL,
+  user_id VARCHAR(64),
+  contact_name VARCHAR(64) NOT NULL,
+  contact_phone VARCHAR(32) NOT NULL,
+  checkin VARCHAR(10) NOT NULL,
+  checkout VARCHAR(10) NOT NULL,
+  nights INT NOT NULL,
+  price_total INT NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  pay_status VARCHAR(20),
+  pay_method VARCHAR(50),
+  pay_at VARCHAR(32),
+  idempotency_key VARCHAR(100),
+  payment_expires_at VARCHAR(32),
+  created_at VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
+  UNIQUE KEY uk_order_no (order_no),
+  UNIQUE KEY uk_bo_idempotency (idempotency_key),
+  KEY idx_bo_vendor (owner_vendor_id, status),
+  KEY idx_bo_project (project_id),
+  KEY idx_bo_user (user_id),
+  KEY idx_bo_pay (pay_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ===== GR 侧预约订单（跳转第三方小程序时生成） =====

@@ -228,14 +228,14 @@
   var SEG_BY_ID = {}; SEGS.forEach(function(s){ SEG_BY_ID[s.id] = s; });
   if (!SEG_BY_ID[SEG]) SEG = 'all';
 
-  // 专题入口（与 scripts/find-topic-seed.cjs 同一清单；bzf 为既有规则 15 专题）
-  var TOPICS = [
-    { slug: 'kangyang',  label: '康养度假', desc: '森林温泉 · 慢节奏疗愈', tag: '康养', fb: 's-stilt' },
-    { slug: 'houniao',   label: '候鸟过冬', desc: '温暖过冬 · 候鸟南飞', tag: '候鸟', fb: 's-wanfeng' },
-    { slug: 'bzf',       label: '保租房专区', desc: '国企持有 · 统一监管', tag: '保租房', fb: 's-city' },
-    { slug: 'qinzi',     label: '亲子研学', desc: '田园山林 · 自然课堂', tag: '亲子', fb: 's-country' },
-    { slug: 'zhengdong', label: '整栋包栋', desc: '家庭聚会 · 包栋院落', tag: '整栋', fb: 's-xijiang' },
-  ];
+  // 专题入口：读公开清单 /api/juzhu/topics（后台 juzhu-admin「内容」tab 维护，规则 19）；
+  // 本地 TOPIC_DESC 仅作缺省文案兜底，desc/cover 以 KV 下发为准
+  var TOPIC_DESC = {
+    houniao: '温暖过冬 · 候鸟南飞', kangyang: '森林温泉 · 慢节奏疗愈', bzf: '国企持有 · 统一监管',
+    qinzi: '田园山林 · 自然课堂', zhengdong: '家庭聚会 · 包栋院落',
+  };
+  var TOPIC_FB = ['s-stilt', 's-wanfeng', 's-city', 's-country', 's-xijiang'];
+  var TOPICS = [];   // [{slug,label,desc,cover_image,channel,tags}]
 
   // 筛选项：价格/评分仅居住族（stay）分段启用；档位按库内真实价格带设计
   var PRICE_OPTS = [
@@ -441,22 +441,32 @@
     });
   }
 
+  function topicMatches(t, p){
+    if (t.channel && p.channel !== t.channel) return false;
+    var pt = p.tags || [];
+    return (t.tags || []).every(function(tag){ return pt.indexOf(tag) >= 0; });
+  }
   function paintTopics(){
-    var show = SEG === 'all' && !KW;
-    topicsEl.style.display = show ? '' : 'none';
-    if (!show || !cat) return;
-    topicsEl.innerHTML = TOPICS.map(function(t){
-      var ps = (cat.projects || []).filter(function(p){ return (p.tags || []).indexOf(t.tag) >= 0; });
+    var show = SEG === 'all' && !KW && TOPICS.length && cat;
+    if (!show) { topicsEl.style.display = 'none'; return; }
+    var cards = TOPICS.map(function(t, i){
+      var ps = (cat.projects || []).filter(function(p){ return topicMatches(t, p); });
       if (!ps.length) return '';
-      var bg = ' class="' + t.fb + '"';   // .s-* 兜底类（自带 cover 背景）
-      for (var j = 0; j < ps.length; j++) {
-        if (ps[j].cover_image) { bg = ' style="background-image:url(' + esc(ps[j].cover_image) + ');background-size:cover;background-position:center;"'; break; }
+      var bg = '';
+      if (t.cover_image) bg = ' style="background-image:url(' + esc(t.cover_image) + ');background-size:cover;background-position:center;"';
+      else {
+        for (var j = 0; j < ps.length; j++) {
+          if (ps[j].cover_image) { bg = ' style="background-image:url(' + esc(ps[j].cover_image) + ');background-size:cover;background-position:center;"'; break; }
+        }
       }
+      if (!bg) bg = ' class="' + TOPIC_FB[i % TOPIC_FB.length] + '"';   // .s-* 兜底类（自带 cover 背景）
       return '<a class="tp" href="lvju-app-topic.html?topic=' + encodeURIComponent(t.slug) + '&city=' + encodeURIComponent(CITY) + '">' +
         '<div class="bg"' + bg + '></div>' +
         '<span class="rn">' + ps.length + ' 套在架</span>' +
-        '<div class="in"><b>' + esc(t.label) + '</b><small>' + esc(t.desc) + '</small></div></a>';
-    }).join('');
+        '<div class="in"><b>' + esc(t.label) + '</b><small>' + esc(t.desc || TOPIC_DESC[t.slug] || '编辑精选专题') + '</small></div></a>';
+    }).filter(Boolean);
+    topicsEl.style.display = cards.length ? '' : 'none';
+    topicsEl.innerHTML = cards.join('');
   }
 
   function paint(){
@@ -650,6 +660,11 @@
 
   syncClr();
   load();
+  // 专题清单与城市无关（计数走 catalog），启动拉一次即可
+  fetch('/api/juzhu/topics').then(function(r){ return r.json(); }).then(function(c){
+    TOPICS = c.topics || [];
+    paintTopics();
+  }).catch(function(){});
 })();
 </script>
 </body>

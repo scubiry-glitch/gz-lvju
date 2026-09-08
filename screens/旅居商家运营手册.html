@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>旅居商家运营手册 · 新居住开放平台</title>
+<style>
+  :root{
+    --bg:#f8fafc; --surface:#fff; --fg:#0f172a; --muted:#64748b;
+    --border:#e2e8f0; --line:#f1f5f9; --accent:#0f766e; --accent-deep:#134e4a; --accent-soft:#e6f4f2;
+    --ok:#16a34a; --warn:#ea580c; --danger:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+       line-height:1.7;font-size:15px;}
+  .console{display:grid;grid-template-columns:236px 1fr;min-height:100vh;}
+  .wrap{max-width:960px;margin:0 auto;padding:28px 26px 90px;}
+  @media (max-width:900px){ .console{grid-template-columns:1fr;} #side-nav{display:none;} .wrap{padding:20px 16px 70px;} }
+
+  .cover{background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;
+         border-radius:16px;padding:40px 38px;margin-bottom:24px;position:relative;overflow:hidden;}
+  .cover::after{content:"🐚";position:absolute;right:-6px;bottom:-22px;font-size:110px;opacity:.12;}
+  .cover h1{margin:0 0 8px;font-size:27px;letter-spacing:1px;}
+  .cover p{margin:4px 0;opacity:.92;font-size:14px;}
+  .cover .tag{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);
+              padding:2px 12px;border-radius:999px;font-size:12px;margin:10px 6px 0 0;}
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 24px;margin-bottom:24px;}
+  .toc h2{margin:0 0 10px;font-size:16px;}
+  .toc ol{margin:0;padding-left:22px;columns:2;column-gap:40px;font-size:14px;}
+  .toc a{color:var(--accent);text-decoration:none;} .toc a:hover{text-decoration:underline;}
+  h2.sec{font-size:21px;border-left:5px solid var(--accent);padding-left:12px;margin:42px 0 14px;scroll-margin-top:16px;}
+  h3{font-size:16.5px;margin:26px 0 10px;color:var(--accent-deep);}
+  p{margin:8px 0;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin:14px 0;}
+  .card.soft{background:var(--accent-soft);border-color:#b8ddd6;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:12px 0;background:var(--surface);}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--border);}
+  th{background:#f1f5f9;color:#334155;font-weight:600;}
+  code{background:#f1f5f9;border:1px solid var(--border);border-radius:5px;padding:1px 7px;font-size:12.5px;color:#0f766e;font-family:ui-monospace,Consolas,monospace;}
+  ul,ol{padding-left:24px;margin:8px 0;} li{margin:4px 0;}
+  .warn{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;font-size:13.5px;margin:12px 0;}
+  .warn b{color:#92400e;}
+  .ok{color:var(--ok);font-weight:600;} .bad{color:var(--danger);font-weight:600;}
+  .steps{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 22px;margin:12px 0;}
+  .steps ol{margin:0;}
+  .link-row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;}
+  .link-chip{display:inline-block;background:var(--accent-soft);border:1px solid #b8ddd6;color:#0f766e;
+             border-radius:999px;padding:4px 14px;font-size:12.5px;text-decoration:none;}
+  .link-chip:hover{background:#d5ebe7;}
+  .doc-foot{margin:30px 0 0;padding:16px 20px;background:var(--surface);border:1px solid var(--border);
+            border-radius:12px;font-size:12px;color:var(--muted);}
+  .doc-foot strong{color:var(--fg);}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="portal" data-active="lvju-manual"></div>
+
+  <div class="wrap">
+    <div class="cover">
+      <h1>旅居商家运营手册</h1>
+      <p>适用对象：旅居 / 民宿 / 长租商家 / 白名单运营商（房源业务线）· 平台运营方：贝壳旅居</p>
+      <p>覆盖入驻开通 → 房源上架 → 订单履约 → 结算对账 → 评级品控 → 违规治理 全流程</p>
+      <span class="tag">v1.0 · 2026-09</span>
+      <span class="tag">房源业务线 v2.0 接口</span>
+      <span class="tag">配套：旅居彩贝评级 5 维</span>
+      <span class="tag">仅供演示</span>
+    </div>
+
+    <div class="toc">
+      <h2>📑 目录</h2>
+      <ol>
+        <li><a href="#s1">入驻开通（账号 · 资质 · 密钥）</a></li>
+        <li><a href="#s2">房源上架规范</a></li>
+        <li><a href="#s3">订单履约与客诉配合</a></li>
+        <li><a href="#s4">结算与对账</a></li>
+        <li><a href="#s5">评级（旅居彩贝）与品控抽查</a></li>
+        <li><a href="#s6">违规与治理</a></li>
+        <li><a href="#s7">API 对接指引</a></li>
+        <li><a href="#s8">常见问题与入口汇总</a></li>
+      </ol>
+    </div>
+
+    <h2 class="sec" id="s1">1 · 入驻开通（账号 · 资质 · 密钥）</h2>
+    <h3>1.1 三步接入（API 商家）</h3>
+    <div class="steps">
+      <ol>
+        <li><b>领取凭证</b>：平台为商家配置接入密钥，线下下发 <code>vendor_id</code> + <code>hmac_key</code>；密钥等同密码，只放服务端。<a href="vendor-onboarding.html">自助入驻申请（原型）→</a></li>
+        <li><b>签名联通</b>：用在线调试台或回归脚本调通所属业务线的查询接口（HMAC-SHA256）。</li>
+        <li><b>创建并上架</b>：<code>projects/create</code> 建稿（默认不进 C 端，补户型与价格）→ 平台核验 → <code>projects/status</code> 上架。</li>
+      </ol>
+    </div>
+    <h3>1.2 入驻资料清单（资质上传）</h3>
+    <table>
+      <tr><th>资料</th><th>要求</th><th>必交</th></tr>
+      <tr><td>营业执照</td><td>在有效期内、经营范围含住宿 / 租赁经营</td><td class="ok">必交</td></tr>
+      <tr><td>经营许可（旅馆业特种行业许可 / 卫生许可）</td><td>按属地要求提供；民宿须有</td><td class="ok">必交</td></tr>
+      <tr><td>法人身份证</td><td>与营业执照法人一致</td><td class="ok">必交</td></tr>
+      <tr><td>消防 / 安全凭证</td><td>按属地要求</td><td>按需</td></tr>
+      <tr><td>结算账户</td><td>对公账户，户名与营业执照一致</td><td class="ok">必交</td></tr>
+      <tr><td>保证金</td><td>按房源规模分档（档位待定）</td><td class="ok">必缴</td></tr>
+    </table>
+    <p><b>审核时限：</b>资料齐全后 T+2 出结果；驳回有留痕理由与申诉通道。</p>
+    <div class="warn"><b>红线：</b>密钥不得写进前端 / App；发现泄露立即联系平台重签（重签吊销旧密钥）。</div>
+
+    <h2 class="sec" id="s2">2 · 房源上架规范</h2>
+    <h3>2.1 频道归属</h3>
+    <p>房源创建时须指定频道：<code>rental</code>（租赁住宿 = 长租 + 旅居，监管同口径）或 <code>minsu</code>（惠居民宿）。旅居视图只展示带<b>「旅居」</b>标签的 rental 房源；频道与标签由平台在核验时校准。</p>
+    <h3>2.2 信息与照片</h3>
+    <ul>
+      <li>位置 / 房型 / 面积 / 价格真实准确；一房一档。</li>
+      <li>照片 <b>≥ 8 张</b>，实拍、禁盗图禁过度修图（AI 图像查重会拦截「照骗」）。</li>
+      <li>按彩贝 5 维填写设施自查表（环境景观 / 服务品质 / 设施配套 / 交通区位 / 特色体验）。</li>
+      <li>周边玩法由平台运营配置（景区 / 商圈 / 美食 / 咖啡），商家可申报。</li>
+    </ul>
+    <h3>2.3 房态 · 连住 · 按晚预订</h3>
+    <ul>
+      <li>逐晚房态：<code>open / blocked / booked</code>；客户订单占用的夜晚自动锁定，任何接口不可改已订晚。</li>
+      <li>最短连住：rental 默认 <b>15 晚</b>、minsu 默认 <b>1 晚</b>，可在 ext 按项目覆盖（1–365）。</li>
+      <li><b>按晚预订开关</b>（<code>stay_bookable</code>）：缺省关闭 = 仅 <b>400 电话咨询</b>；开通后「无行 = 默认可订」才对外生效。逐晚价 / 关房在商家房态日历或 API 配置。</li>
+      <li>上下架：<code>draft / online / offline</code>；C 端只出 online，上下架最迟 15 秒生效。</li>
+    </ul>
+
+    <h2 class="sec" id="s3">3 · 订单履约与客诉配合</h2>
+    <ul>
+      <li><b>接单确认</b>：平台通过 Webhook 推送待确认订单，商家须在承诺时限内 <code>查单 / 确认 / 拒单</code>；拒单需留理由。</li>
+      <li><b>入住 / 离店</b>：电子凭证核验；房间与照片不符属重大客诉源，请在上架前自查。</li>
+      <li><b>取消 / 退款</b>：按平台政策分档执行（免费取消截止日待定）；购取消险客户享宽松退改，商家结算同步扣减。</li>
+      <li><b>客诉配合</b>：客诉经 <b>星云客服</b> 400 进线建工单 → 平台分派商家核实 → 商家 48 小时内反馈处理结果；整改情况进商家考核与评级。</li>
+    </ul>
+
+    <h2 class="sec" id="s4">4 · 结算与对账</h2>
+    <ul>
+      <li><b>资金存管</b>：客户房款经银行存管（贵州银行），平台不碰资金池。</li>
+      <li><b>结算周期</b>：入住确认后 <b>T+7</b> 结算至商家结算账户。</li>
+      <li><b>佣金</b>：暂定 <b>10%</b> 平台费用为基准，折扣按商务约定（差别化费率的配置化能力在建）。</li>
+      <li><b>对账</b>：平台对账日清；商家请按月核对结算单，差异 3 日内提出。</li>
+      <li><b>发票</b>：一期预留、三期完善；平台侧开具平台费发票。</li>
+    </ul>
+
+    <h2 class="sec" id="s5">5 · 评级（旅居彩贝）与品控抽查</h2>
+    <table>
+      <tr><th>维度</th><th>权重</th><th>要点</th></tr>
+      <tr><td>环境景观</td><td>22 分</td><td>自然 / 在地文化 / 信息真实度</td></tr>
+      <tr><td>服务品质</td><td>22 分</td><td>管家响应、安心保障、安维与保修</td></tr>
+      <tr><td>设施配套</td><td>24 分</td><td>客房硬件 / 智能设备 / 基础设施 / 包裹入住条件</td></tr>
+      <tr><td>交通区位</td><td>14 分</td><td>距景区距离 / 交通接驳 / 停车</td></tr>
+      <tr><td>特色体验</td><td>18 分</td><td>在地文化主题 / 民俗研学 / 康养 / 景区联动</td></tr>
+    </table>
+    <ul>
+      <li>评级从 <b>一彩贝</b> 到 <b>五彩贝</b>；上架预打分 → 存续期动态调级。</li>
+      <li><b>品控抽查</b>：平台客源管家存续期抽查（房源与实拍一致、服务履约），结果进评级与商家考核。</li>
+      <li>彩贝等级越高可享受的流量分发与差别化费率激励越多（能力在建）。</li>
+    </ul>
+
+    <h2 class="sec" id="s6">6 · 违规与治理</h2>
+    <table>
+      <tr><th>考核项</th><th>口径</th></tr>
+      <tr><td>咨询响应率</td><td>IM / 400 进线响应时限与响应率</td></tr>
+      <tr><td>确认接单率</td><td>订单确认时限内确认比例</td></tr>
+      <tr><td>客诉结案配合</td><td>48 小时内反馈、整改闭环</td></tr>
+    </table>
+    <p><b>违约梯度：</b>首次提醒 → 扣分降权 → 暂停接单 → 清退（旺季从重）。</p>
+    <div class="warn"><b>红线（直接清退项）：</b>引导客户绕开平台私下交易、照骗 / 虚假房源、泄露客户信息。</div>
+
+    <h2 class="sec" id="s7">7 · API 对接指引</h2>
+    <ul>
+      <li>路径前缀 <code>/api/juzhu/housing/vendor/*</code>，全部 POST、JSON；HMAC-SHA256 签名，与家政开放接口同一套密钥体系。</li>
+      <li>14 个接口：房源创建 / 更新 / 上下架 / 户型 / 逐晚房态 / 保险标识，订单履约（查单 / 确认 / 拒单）与 Webhook 事件。</li>
+      <li>数据归属隔离：按 <code>owner_vendor_id</code> 隔离，只能命中自己的房源。</li>
+      <li>联调环境：<code>https://sytest.meizu.life</code>；生产 Base 以平台接入单下发域名为准。</li>
+    </ul>
+    <div class="link-row">
+      <a class="link-chip" href="property-intake-api.html">房源接入 API（商家版 · 调试台）→</a>
+      <a class="link-chip" href="open-platform.html">开放平台门户 →</a>
+      <a class="link-chip" href="vendor-onboarding.html">商家入驻申请（原型）→</a>
+    </div>
+
+    <h2 class="sec" id="s8">8 · 常见问题与入口汇总</h2>
+    <ul>
+      <li>上架后 C 端搜不到？→ 检查 status 是否 online、按晚预订是否开通、频道与「旅居」标签是否正确（15 秒缓存）。</li>
+      <li>想改价但已订晚？→ 已订晚被订单锁定，只能改未订晚（逐晚房态）。</li>
+      <li>退款怎么算？→ 平台政策分档 + 商家在结算侧同步扣减；有争议走客诉工单仲裁。</li>
+    </ul>
+    <div class="link-row">
+      <a class="link-chip" href="open-faq.html">常见问题 FAQ →</a>
+      <a class="link-chip" href="lvju-rating-standard.html">旅居彩贝评级体系 →</a>
+      <a class="link-chip" href="../lvju-roadmap.html">一年迭代规划 →</a>
+    </div>
+
+    <div class="doc-foot">
+      <p><strong>旅居商家运营手册</strong>（旅居商家运营手册.html）· v1.0 · 2026-09 · 随功能迭代更新。手册描述目标流程与口径；标注「在建 / 待定」的能力以 <a href="../lvju-roadmap.html">一年迭代规划</a> stage-gate 为准。仅供演示。</p>
+    </div>
+  </div>
+</div>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

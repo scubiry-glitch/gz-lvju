@@ -5,6 +5,7 @@
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
+const MIN_PUBLISH_PHOTOS = 8;
 
 function reply(status, data) {
   return { status, data };
@@ -409,6 +410,23 @@ async function ownProject(conn, vendorId, pid) {
   return rows[0];
 }
 
+async function publishEligibility(conn, row) {
+  const [vendors] = await conn.execute('SELECT status, review_status FROM jz_vendors WHERE id=?', [row.owner_vendor_id]);
+  const vendor = vendors[0];
+  if (!vendor || vendor.status !== 'active' || (vendor.review_status && vendor.review_status !== 'approved')) {
+    return '商家尚未通过审核或已停用';
+  }
+  if (row.rating_status !== 'passed') return '房源审核/评级未通过，不能上架';
+  if (!row.price_from || row.price_from <= 0) return '上架前须设置 price_from（起价，元）';
+  const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [row.id]);
+  if (!u[0] || !Number(u[0].c)) return '上架前须至少创建 1 个户型（units/create）';
+  const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
+    WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
+  if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`;
+  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return '上架前须设置房源封面图';
+  return null;
+}
+
 async function vendorAllowedCityIds(conn, vendorId) {
   const ids = await vendorCityIds(conn, vendorId);
   return ids; // 空 = 未配置城市约束（不限制）
@@ -545,6 +563,7 @@ async function housingProjectsCreate(conn, body, vendorId) {
   if (['online', 'offline', 'draft'].indexOf(status) < 0) {
     return reply(400, { code: 400, message: 'status 须为 online / offline / draft（缺省 draft）' });
   }
+  if (status === 'online') return reply(400, { code: 400, message: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' });
   const slug = await uniqueProjectSlug(conn, channel, name, b.slug);
   const address = String(b.address || '').trim() || (city[0].name + ' · ' + name);
   const [r] = await conn.execute(
@@ -637,9 +656,8 @@ async function housingProjectsStatus(conn, body, vendorId) {
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   // 上架前置检查：无价格、无图片的房源不允许直接上架（C 端 catalog 只出 online）
   if (status === 'online') {
-    if (!row.price_from) return reply(400, { code: 400, message: '上架前须设置 price_from（起价，元）' });
-    const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [row.id]);
-    if (!u.length || !u[0].c) return reply(400, { code: 400, message: '上架前须至少创建 1 个户型（units/create）' });
+    const err = await publishEligibility(conn, row);
+    if (err) return reply(400, { code: 400, message: err });
   }
   await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, row.id]);
   return reply(200, { code: 0, message: 'success', id: row.id, status });
@@ -702,6 +720,32 @@ async function housingUnitsUpdate(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', unit: u[0] });
 }
 
+async function housingPhotosAdd(conn, body, vendorId) {
+  const b = body || {};
+  const projectId = parseInt(b.project_id, 10);
+  const unitId = b.unit_id == null || b.unit_id === '' ? null : parseInt(b.unit_id, 10);
+  const filePath = String(b.file_path || '').trim();
+  if (!projectId || !filePath || filePath.length > 500) return reply(400, { code: 400, message: 'project_id 与 file_path 必填（URL 长度 ≤500）' });
+  const [projects] = await conn.execute('SELECT id, owner_vendor_id FROM projects WHERE id=?', [projectId]);
+  if (!projects.length || projects[0].owner_vendor_id !== vendorId) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  let entityType = 'project';
+  let entityId = projectId;
+  if (unitId) {
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+    entityType = 'unit'; entityId = unitId;
+  }
+  const isCover = b.is_cover ? 1 : 0;
+  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+  const [next] = await conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+  const [r] = await conn.execute(
+    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)`,
+    [entityType, entityId, filePath, b.source_path || null, isCover, next[0].n]);
+  if (entityType === 'project' && isCover) await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
+  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
+  return reply(200, { code: 0, message: 'success', photo: photo[0] });
+}
+
 /** 房态批量设置：与 C/B 端同口径（已订晚不可改；open+无夜价=恢复默认价并删差异行） */
 async function housingStayCalendarSet(conn, body, vendorId) {
   const b = body || {};
@@ -709,12 +753,14 @@ async function housingStayCalendarSet(conn, body, vendorId) {
   const row = await ownProject(conn, vendorId, b.project_id);
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   const unitId = b.unit_id != null && b.unit_id !== '' ? parseInt(b.unit_id, 10) : 0;
+  if (!Number.isInteger(unitId) || unitId < 0) return reply(400, { code: 400, message: 'unit_id 须为非负整数' });
   const status = String(b.status || '');
-  const dates = Array.isArray(b.dates) ? b.dates.map(String).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+  const rawDates = Array.isArray(b.dates) ? b.dates.map(String) : [];
+  const dates = rawDates.filter((d) => stayCfg.isValidDateString(d));
   const price = (b.price_night === null || b.price_night === undefined || b.price_night === '') ? null : parseInt(b.price_night, 10);
   if (['open', 'blocked'].indexOf(status) < 0) return reply(400, { code: 400, message: 'status 须为 open / blocked（booked 由订单写入）' });
   if (price != null && !(price >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数或空' });
-  if (!dates.length) return reply(400, { code: 400, message: 'dates 必填（YYYY-MM-DD 数组，单次 ≤ 400 天）' });
+  if (!dates.length || dates.length !== rawDates.length) return reply(400, { code: 400, message: 'dates 必填且必须为真实有效的 YYYY-MM-DD 日期（单次 ≤ 400 天）' });
   if (dates.length > 400) return reply(400, { code: 400, message: '单次最多 400 天' });
   if (unitId) {
     const [u] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, row.id]);
@@ -770,7 +816,7 @@ function connRows(conn) {
 async function housingBookingsList(conn, body, vendorId) {
   const b = body || {};
   let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
-                    b.nights, b.price_total, b.status, b.pay_status, b.pay_method, b.pay_at, b.created_at,
+                    b.nights, b.price_total, b.status, b.pay_status, b.pay_method, b.pay_at, b.payment_expires_at, b.created_at,
                     b.contact_name, b.contact_phone, p.name AS project_name
              FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
              WHERE b.owner_vendor_id=?`;
@@ -806,29 +852,44 @@ async function housingBookingsDetail(conn, body, vendorId) {
 async function housingBookingsConfirm(conn, body, vendorId) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
-  const row = await ownBooking(conn, vendorId, b.id);
-  if (!row) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
-  if (row.status === 'cancelled') return reply(400, { code: 400, message: '订单已取消，不可再确认' });
+  await conn.beginTransaction();
+  const [lockedRows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(b.id, 10)]);
+  const row = lockedRows[0];
+  if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
+  if (row.status === 'pending' && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
+    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending'", [now, row.id]);
+    await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+    await conn.commit();
+    return reply(400, { code: 400, message: '待支付订单已过期并释放房态' });
+  }
+  if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再确认' }); }
   // 预付口径：minsu 单未支付不可确认生效（与 B 端工作台同口径）
   if (row.pay_status === 'unpaid') {
+    await conn.rollback();
     return reply(400, { code: 400, message: '租客尚未支付（收银台待付），支付完成后可确认生效' });
   }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   await conn.execute("UPDATE booking_orders SET status='confirmed', updated_at=? WHERE id=?", [now, row.id]);
+  await conn.commit();
   return reply(200, { code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'confirmed' });
 }
 
 async function housingBookingsCancel(conn, body, vendorId) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
-  const row = await ownBooking(conn, vendorId, b.id);
-  if (!row) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
-  if (row.status === 'cancelled') return reply(400, { code: 400, message: '订单已取消，不可再变更' });
+  await conn.beginTransaction();
+  const [lockedRows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(b.id, 10)]);
+  const row = lockedRows[0];
+  if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
+  if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再变更' }); }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const newPay = row.pay_status === 'paid' ? 'refunded' : row.pay_status;
   await conn.execute('UPDATE booking_orders SET status=?, pay_status=?, updated_at=? WHERE id=?', ['cancelled', newPay, now, row.id]);
   // 拒单/取消 → 释放房态（与 B 端工作台同口径）；已支付标记退款（模拟通道）
   await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+  await conn.commit();
   return reply(200, {
     code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'cancelled',
     pay_status: newPay || null,
@@ -843,6 +904,7 @@ async function housingStayCalendarQuery(conn, body, vendorId) {
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   const unitId = b.unit_id != null && b.unit_id !== '' ? parseInt(b.unit_id, 10) : 0;
   const mth = /^(\d{4})-(\d{2})$/.exec(String(b.month || '').trim());
+  if (mth && (parseInt(mth[2], 10) < 1 || parseInt(mth[2], 10) > 12)) return reply(400, { code: 400, message: 'month 须为 YYYY-MM 且月份有效' });
   const today = new Date();
   const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
   const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
@@ -887,6 +949,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/projects/update': housingProjectsUpdate,
   '/api/juzhu/housing/vendor/projects/status': housingProjectsStatus,
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
+  '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
   '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
   '/api/juzhu/housing/vendor/stay-calendar/query': housingStayCalendarQuery,
@@ -900,6 +963,11 @@ const HOUSING_ROUTES = {
 async function handleRequest(path, body, conn, vendors) {
   const auth = verifyVendorAuth(body, vendors);
   if (auth.error) return reply(401, { code: 401, message: auth.error });
+  const [vendorRows] = await conn.execute('SELECT status, review_status FROM jz_vendors WHERE id=?', [auth.vendorId]);
+  if (!vendorRows.length) return reply(401, { code: 401, message: '商家不存在' });
+  if (vendorRows[0].status !== 'active' || (vendorRows[0].review_status && vendorRows[0].review_status !== 'approved')) {
+    return reply(403, { code: 403, message: '商家未通过审核或已停用' });
+  }
   if (path === '/api/juzhu/callback') {
     return handleCallback(conn, body, auth.vendorId);
   }

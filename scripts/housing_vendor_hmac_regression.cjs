@@ -162,6 +162,15 @@ async function catalogEventually(base, projectId, citySlug, want) {
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'online' }));
   check('无起价上架被拒 400', r.status === 400, JSON.stringify(r.j));
 
+  // 审核闸与素材闸：回归脚本以平台审核结果作为测试前置，再通过开放接口登记 8 张外部图片。
+  await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [pid]);
+  for (let i = 0; i < 8; i++) {
+    r = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+      project_id: pid, file_path: `https://cdn.example.test/${RUN}-${i}.jpg`, is_cover: i === 0,
+    }));
+    check(`登记房源图片 ${i + 1}/8`, r.status === 200, JSON.stringify(r.j));
+  }
+
   // ── 3) 补价 + 追加户型 → 上架 → catalog 可见 ──
   await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, price_from: 2400 }));
   r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, {

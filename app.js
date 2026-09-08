@@ -601,6 +601,7 @@ function isCEndPublicApi(urlPath, method) {
     '/api/juzhu/gr/orders',
     '/api/juzhu/routes',
     '/api/juzhu/spots',
+    '/api/juzhu/topics',
   ]);
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
@@ -740,14 +741,15 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
 }
 
 function bookingPaymentExpired(row) {
-  return row && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
+  return row && row.status === 'pending' && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
     && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
 }
 
 async function expireBooking(conn, row) {
   if (!bookingPaymentExpired(row)) return false;
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending' AND pay_status='unpaid'", [now, row.id]);
+  const [updated] = await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending' AND pay_status='unpaid'", [now, row.id]);
+  if (!updated.affectedRows) return false;
   await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
   return true;
 }
@@ -2981,7 +2983,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const slug = String(r.key).replace(/^topic_/, '');
         let crit = {};
         try { crit = JSON.parse(r.value || '{}'); } catch (_) { crit = {}; }
-        return { slug, label: crit.label || slug, channel: crit.channel || null, tags: Array.isArray(crit.tags) ? crit.tags : [], enabled: crit.enabled !== false };
+        return { slug, label: crit.label || slug, channel: crit.channel || null, tags: Array.isArray(crit.tags) ? crit.tags : [], enabled: crit.enabled !== false, desc: crit.desc || '', cover_image: crit.cover_image || '' };
       }).sort((a, b) => a.slug.localeCompare(b.slug));
       return jsonReply(res, topics);
     }
@@ -2999,6 +3001,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!tags.length) return jsonReply(res, { error: '专题至少需要 1 个 tag 条件（专题=筛选条件，规则 15）' }, 400);
         const crit = { label, tags };
         if (body.channel) crit.channel = String(body.channel);
+        const desc = (body.desc || '').trim(); if (desc) crit.desc = desc;
+        const cover = (body.cover_image || '').trim(); if (cover) crit.cover_image = cover;
         // enabled 接受布尔 false / 0 / '0'（admin UI 传布尔，脚本可能传 0）
         crit.enabled = !(body.enabled === false || body.enabled === 0 || body.enabled === '0');
         const conn = await mysql2.createConnection(getDbConfig());
@@ -3903,7 +3907,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         try { crit = JSON.parse(kvRows[0].value || '{}'); } catch (_) { crit = {}; }
         // 专题下架 = crit.enabled === false（后台「内容」tab 可配），对外与 unknown topic 同响应，不泄露存在性
         if (crit.enabled === false) return jsonReply(res, { error: `unknown topic: ${qpTopic}` }, 404);
-        topicMeta = { topic: qpTopic, label: crit.label || qpTopic };
+        topicMeta = { topic: qpTopic, label: crit.label || qpTopic, desc: crit.desc || '' };
         if (crit.channel) { projSql += ' AND channel=?'; projParams.push(String(crit.channel)); }
         for (const t of (crit.tags || [])) {
           projSql += ' AND JSON_CONTAINS(tags, ?)';
@@ -4144,6 +4148,20 @@ async function handleApiDirect(urlPath, qs, req, res) {
       );
       rows.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
       return jsonReply(res, imgThumbs.mapThumbsDeep({ spots: rows }, 640));
+    }
+
+    // GET /api/juzhu/topics —— 房源专题公开清单（enabled；C 端找房枢纽「专题入口」消费）
+    if (urlPath === '/api/juzhu/topics' && req.method === 'GET') {
+      const rows = await queryRows("SELECT `key`, value FROM settings WHERE `key` LIKE 'topic\\_%'");
+      const topics = rows.map((r) => {
+        const slug = String(r.key).replace(/^topic_/, '');
+        let crit = {};
+        try { crit = JSON.parse(r.value || '{}'); } catch (_) { crit = {}; }
+        return { slug, label: crit.label || slug, channel: crit.channel || null,
+                 tags: Array.isArray(crit.tags) ? crit.tags : [], desc: crit.desc || '', cover_image: crit.cover_image || '' };
+      }).filter((t) => t.tags.length)
+        .sort((a, b) => a.slug.localeCompare(b.slug));
+      return jsonReply(res, { topics });
     }
 
     // GET /api/juzhu/spots/:id —— 周边玩法笔记详情（公网白名单，C 端 lvju-app-spot-post 页消费）
@@ -4724,8 +4742,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const o = rows[0];
       if (bookingPaymentExpired(o)) {
         const conn = await mysql2.createConnection(getDbConfig());
-        try { await conn.beginTransaction(); await expireBooking(conn, o); await conn.commit(); } finally { await conn.end(); }
-        o.status = 'cancelled'; o.pay_status = 'expired';
+        try {
+          await conn.beginTransaction();
+          const expired = await expireBooking(conn, o);
+          await conn.commit();
+          if (expired) { o.status = 'cancelled'; o.pay_status = 'expired'; }
+          else {
+            const latest = await queryRows('SELECT b.*, p.name AS project_name FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE b.id=? LIMIT 1', [o.id]);
+            if (latest.length) Object.assign(o, latest[0]);
+          }
+        } finally { await conn.end(); }
       }
       return jsonReply(res, {
         order: {
@@ -5215,15 +5241,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
         const body = await readBody(req);
         const pid = parseInt(body.project_id, 10);
-        const unitId = body.unit_id ? (parseInt(body.unit_id, 10) || 0) : 0;
+        const unitId = body.unit_id == null || body.unit_id === '' ? 0 : parseInt(body.unit_id, 10);
         const status = String(body.status || '');
-        const dates = Array.isArray(body.dates) ? body.dates.map(String).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)) : [];
+        const rawDates = Array.isArray(body.dates) ? body.dates.map(String) : [];
+        const dates = rawDates.filter((d) => stayCfg.isValidDateString(d));
         const priceRaw = body.price_night;
         const price = (priceRaw === null || priceRaw === undefined || priceRaw === '') ? null : parseInt(priceRaw, 10);
         if (!pid) return jsonReply(res, { error: 'project_id 必填' }, 400);
+        if (!Number.isInteger(unitId) || unitId < 0) return jsonReply(res, { error: 'unit_id 须为非负整数' }, 400);
         if (!['open', 'blocked'].includes(status)) return jsonReply(res, { error: 'status 须为 open/blocked（booked 由下单占用）' }, 400);
         if (price != null && !(price >= 0)) return jsonReply(res, { error: 'price_night 须为非负整数或空' }, 400);
-        if (!dates.length) return jsonReply(res, { error: 'dates 必填（YYYY-MM-DD 数组，单次 ≤ 400 天）' }, 400);
+        if (!dates.length || dates.length !== rawDates.length) return jsonReply(res, { error: 'dates 必填且必须为真实有效的 YYYY-MM-DD 日期（单次 ≤ 400 天）' }, 400);
         if (dates.length > 400) return jsonReply(res, { error: '单次最多 400 天' }, 400);
         const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
         if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);

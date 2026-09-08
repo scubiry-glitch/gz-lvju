@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>商家入驻受理 · 服务认证中台</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --surface:#fff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0;
+    --accent:#4f46e5; --accent-deep:#3730a3; --accent-soft:#eef2ff;
+    --ok:#16a34a; --warn:#ea580c; --danger:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.6;font-size:14px;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .crumb{font-size:12.5px;color:var(--muted);} .crumb b{color:var(--fg);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+  .full{grid-column:1/-1;}
+  @media (max-width:1023px){ .console{grid-template-columns:1fr;} .content{grid-template-columns:1fr;} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;background:var(--accent-soft);color:var(--accent-deep);font-weight:600;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .kpi{border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center;background:#fff;}
+  .kpi b{display:block;font-size:20px;} .kpi span{font-size:11px;color:var(--muted);}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .chips button{font:inherit;font-size:12.5px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 14px;cursor:pointer;color:var(--muted);}
+  .chips button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{background:#f8fafc;color:#334155;font-weight:600;font-size:11.5px;}
+  tbody tr{cursor:pointer;} tbody tr:hover td{background:var(--accent-soft);}
+  tbody tr.on td{background:var(--accent-soft);}
+  .badge{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;font-weight:600;}
+  .b-pending{background:#fef3c7;color:#92400e;} .b-reviewing{background:#dbeafe;color:#1d4ed8;}
+  .b-approved{background:#e7f6ec;color:#15803d;} .b-rejected{background:#fee2e2;color:#b91c1c;}
+  .drawer{position:fixed;top:0;right:-520px;width:500px;max-width:94vw;height:100vh;background:#fff;box-shadow:-8px 0 30px rgba(15,23,42,.15);z-index:50;transition:right .25s;overflow-y:auto;padding:20px 22px 40px;}
+  .drawer.open{right:0;}
+  .drawer h3{margin:0 0 4px;font-size:16px;} .drawer .no{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .kv{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+  .kv td{padding:6px 8px;border-bottom:1px solid #f1f5f9;} .kv td:first-child{color:var(--muted);width:96px;}
+  .field{margin:10px 0;}
+  .field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .field select,.field input,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13px;background:#fff;}
+  .field textarea{min-height:56px;}
+  .ck{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px dashed #f1f5f9;font-size:12.5px;}
+  .ck select{padding:3px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:12px;}
+  .actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+  .btn{font:inherit;font-size:13px;border:0;border-radius:9px;padding:9px 20px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;} .btn.okb{background:var(--ok);color:#fff;}
+  .btn.rejb{background:#fff;border:1px solid var(--danger);color:var(--danger);}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .empty{color:var(--muted);font-size:12.5px;padding:14px 4px;}
+  .note{font-size:11.5px;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:9px;padding:8px 12px;margin-top:10px;}
+  .terminal{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="vendor-onboarding"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / ⭐ 服务认证中台 / <b>商家入驻受理（房源）</b></div>
+      <div style="font-size:11.5px;color:var(--muted);">权限点：vendor.onboarding.review · 密钥发放走线下</div>
+    </div>
+    <div class="content">
+
+      <div class="card full">
+        <h3>受理概览 <span class="pill">vendor_onboarding</span></h3>
+        <div class="kpis">
+          <div class="kpi"><b id="kPending">0</b><span>待受理</span></div>
+          <div class="kpi"><b id="kReviewing">0</b><span>核验中</span></div>
+          <div class="kpi"><b id="kApproved">0</b><span>已通过</span></div>
+          <div class="kpi"><b id="kRejected">0</b><span>已驳回</span></div>
+        </div>
+        <div class="note" style="margin-top:12px;">真实流程：商家在 <b>开放平台 · 商家入驻申请</b> 提交（落库 vendor_onboarding）→ 本台受理 / 核验 / 通过 / 驳回（状态机 + 权限点 vendor.onboarding.review + 审计留痕）；通过后 <b>vendor_id + hmac_key 线下发放</b>，商家即可在开放平台自助建稿 → 平台核验 → projects/status 上架。</div>
+      </div>
+
+      <div class="card full">
+        <h3>申请单列表</h3>
+        <div class="chips" id="filterChips"></div>
+        <table>
+          <thead><tr><th>申请单号</th><th>企业</th><th>联系人</th><th>频道</th><th>规模</th><th>费率</th><th>状态</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>该状态下暂无申请单</div>
+      </div>
+
+      <div class="card full" id="detailCard" hidden>
+        <h3>申请单详情 <span class="pill" id="dStatus"></span></h3>
+        <div id="detailBody"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="drawer" id="drawer">
+  <h3 id="dvCompany">—</h3>
+  <div class="no" id="dvNo">—</div>
+  <table class="kv" id="dvBase"></table>
+  <div class="field"><label>核验清单（结果写入申请单留痕）</label><div id="dvChecklist"></div></div>
+  <div class="field"><label>费率折扣（%，0–10；基准 10%，留空 = 按基准）</label><input type="text" id="dvDiscount" placeholder="例：2"></div>
+  <div class="field"><label>审核意见 / 驳回理由（驳回必填）</label><textarea id="dvNote" placeholder="核验意见、驳回理由（留痕）"></textarea></div>
+  <div class="terminal" id="dvTerminal" hidden></div>
+  <div class="actions" id="dvActions"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let CUR = null;        // 当前详情申请单
+let FILTER = '';       // 状态过滤
+let CHECK = {};        // 核验清单草稿
+const CK_KEYS = ['工商核验', '经营许可', '法人实名', '黑名单校验', '地址实勘'];
+const CK_OPTS = ['待核', '通过', '复核中', '不通过'];
+const ST_LABEL = { pending:'待受理', reviewing:'核验中', approved:'已通过', rejected:'已驳回' };
+const ST_CLS = { pending:'b-pending', reviewing:'b-reviewing', approved:'b-approved', rejected:'b-rejected' };
+
+let toastTimer = null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
+
+function renderChips(){
+  const defs = [['','全部'],['pending','待受理'],['reviewing','核验中'],['approved','已通过'],['rejected','已驳回']];
+  $('filterChips').innerHTML = defs.map(d =>
+    '<button class="' + (FILTER===d[0]?'on':'') + '" data-s="' + d[0] + '">' + d[1] + '</button>').join('');
+  [...document.querySelectorAll('#filterChips button')].forEach(b =>
+    b.addEventListener('click', () => { FILTER = b.getAttribute('data-s'); renderChips(); load(); }));
+}
+
+async function load(){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendor-onboarding' + (FILTER ? '?status=' + FILTER : ''));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
+    load.cache = j.items || [];
+    const c = j.counts || {};
+    $('kPending').textContent = c.pending || 0;
+    $('kReviewing').textContent = c.reviewing || 0;
+    $('kApproved').textContent = c.approved || 0;
+    $('kRejected').textContent = c.rejected || 0;
+    $('rows').innerHTML = (j.items || []).map(o =>
+      '<tr data-id="' + o.id + '" class="' + (CUR && CUR.id === o.id ? 'on' : '') + '">' +
+      '<td>' + o.apply_no + '</td><td>' + esc(o.company) + '</td>' +
+      '<td>' + esc(o.contact) + ' · ' + esc(o.phone) + '</td>' +
+      '<td>' + esc((o.channels || '').split(',').join(' + ')) + '</td>' +
+      '<td>' + (o.house_count || 0) + ' 套</td>' +
+      '<td>' + (o.rate_discount != null ? '10−' + o.rate_discount : '10') + '%</td>' +
+      '<td><span class="badge ' + ST_CLS[o.status] + '">' + ST_LABEL[o.status] + '</span></td></tr>'
+    ).join('');
+    $('empty').hidden = !!(j.items && j.items.length);
+    [...document.querySelectorAll('#rows tr')].forEach(tr =>
+      tr.addEventListener('click', () => openDetail(parseInt(tr.getAttribute('data-id'), 10))));
+  } catch(e){ toast('加载失败：' + e.message); }
+}
+
+function openDetail(id){
+  const item = (load.cache || []).find(x => x.id === id);
+  if (!item) return;
+  CUR = item;
+  try { CHECK = item.checklist_json ? JSON.parse(item.checklist_json) : {}; } catch(e){ CHECK = {}; }
+  $('dvCompany').textContent = item.company;
+  $('dvNo').textContent = item.apply_no + ' · 提交 ' + (item.created_at || '-');
+  $('dStatus').textContent = ST_LABEL[item.status];
+  $('dStatus').className = 'pill ' + ST_CLS[item.status];
+  $('dvBase').innerHTML =
+    '<tr><td>联系人</td><td>' + esc(item.contact) + ' · ' + esc(item.phone) + '</td></tr>' +
+    '<tr><td>执照</td><td>' + esc(item.license_no || '-') + (item.license_valid ? ' · 有效期至 ' + esc(item.license_valid) : '') + '</td></tr>' +
+    '<tr><td>经营许可</td><td>' + esc(item.permit_type || '-') + '</td></tr>' +
+    '<tr><td>频道准入</td><td>' + esc((item.channels || '').split(',').join(' + ')) + '</td></tr>' +
+    '<tr><td>类目范围</td><td>' + esc(item.category_scope || '-') + '</td></tr>' +
+    '<tr><td>房源规模</td><td>' + (item.house_count || 0) + ' 套</td></tr>' +
+    '<tr><td>结算</td><td>' + esc(item.settle_bank || '-') + ' · ' + esc(item.settle_account || '-') + '</td></tr>' +
+    '<tr><td>保证金</td><td>' + esc(item.deposit_tier || '-') + '</td></tr>' +
+    '<tr><td>费率</td><td>基准 ' + item.rate_base + '%' + (item.rate_discount != null ? ' · 折扣 ' + item.rate_discount + '%' : '') + '</td></tr>';
+  $('dvChecklist').innerHTML = CK_KEYS.map(k =>
+    '<div class="ck"><span>' + k + '</span><select data-k="' + k + '">' +
+    CK_OPTS.map(o => '<option ' + ((CHECK[k] || '待核') === o ? 'selected' : '') + '>' + o + '</option>').join('') +
+    '</select></div>').join('');
+  $('dvDiscount').value = item.rate_discount != null ? item.rate_discount : '';
+  $('dvNote').value = item.review_note || '';
+  const term = $('dvTerminal');
+  if (item.status === 'approved' || item.status === 'rejected') {
+    term.hidden = false;
+    term.innerHTML = '<b>' + ST_LABEL[item.status] + '</b>' +
+      (item.reviewer ? ' · 审核人 ' + esc(item.reviewer) : '') +
+      (item.reviewed_at ? ' · ' + esc(item.reviewed_at) : '') +
+      (item.review_note ? '<br>意见：' + esc(item.review_note) : '');
+  } else { term.hidden = true; }
+  const acts = [];
+  if (item.status === 'pending') acts.push('<button class="btn pri" data-a="review">受理（转核验中）</button>');
+  if (item.status === 'pending' || item.status === 'reviewing') {
+    acts.push('<button class="btn okb" data-a="approve">通过</button>');
+    acts.push('<button class="btn rejb" data-a="reject">驳回</button>');
+  }
+  acts.push('<button class="btn ghost" data-a="close">收起</button>');
+  $('dvActions').innerHTML = acts.join('');
+  [...document.querySelectorAll('#dvActions button')].forEach(b => b.addEventListener('click', () => doAction(b.getAttribute('data-a'))));
+  $('detailCard').hidden = false;
+  $('drawer').classList.add('open');
+}
+
+async function doAction(action){
+  if (action === 'close') { $('drawer').classList.remove('open'); return; }
+  if (!CUR) return;
+  const note = $('dvNote').value.trim();
+  if (action === 'reject' && !note) { toast('驳回必须填写理由（留痕）'); return; }
+  const sel = {}; [...document.querySelectorAll('#dvChecklist select')].forEach(s => sel[s.getAttribute('data-k')] = s.value);
+  const body = { action, note, checklist: sel };
+  if (action === 'approve' && $('dvDiscount').value.trim() !== '') body.rate_discount = parseFloat($('dvDiscount').value) || 0;
+  try {
+    const r = await fetch('/api/juzhu/admin/vendor-onboarding/' + CUR.id + '/review', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
+    toast(j.message || '已更新');
+    $('drawer').classList.remove('open');
+    load();
+  } catch(e){ toast('操作失败：' + e.message); }
+}
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+load();
+window.addEventListener('pageshow', load);
+</script>
+</body>
+</html>

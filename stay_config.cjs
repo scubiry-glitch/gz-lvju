@@ -94,6 +94,17 @@ function stayDateList(checkin, checkout) {
   return out;
 }
 
+/** 严格校验 YYYY-MM-DD，拒绝 JS Date 会自动归一化的非法日期。 */
+function isValidDateString(value) {
+  const s = String(value || '').trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  return d <= last;
+}
+
 /**
  * 组装某月房态日历：无差异行 = open；blocked/booked 压过同日项目级 open；
  * 夜价覆盖户型级 > 项目级 > 默认。fetchRows(sql, params) → Promise<rows>，
@@ -149,6 +160,7 @@ module.exports = {
   minStayNightsOf,
   bookableOf,
   unitNightPrice,
+  isValidDateString,
   stayConfigOf,
   stayDateList,
   buildStayMonth,
