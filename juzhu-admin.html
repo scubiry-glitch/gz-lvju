@@ -124,7 +124,9 @@
   .pane-dict .main{max-width:1100px;margin:0 auto;}
   .hint{font-size:11px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
   body.api-off .subnav button:not(.on){opacity:.45;pointer-events:none;}
-  body.auth-locked .app-shell{visibility:hidden;}
+  body.auth-locked .app-shell, html.auth-pending .app-shell{visibility:hidden;}
+  /* 会话校验期间登录层不显示：已登录用户不再看到登录页一闪而过（html.auth-pending 由 <head> 内联脚本置位） */
+  html.auth-pending .login-mask{display:none;}
   .login-mask{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
     background:linear-gradient(160deg,#0b5d56 0%,#0f766e 45%,#134e4a 100%);}
   .login-mask[hidden]{display:none;}
@@ -288,6 +290,19 @@
 var API = '/api/juzhu/admin';
 var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false, spots: [], spotBindings: [], topics: [], routes: [], topicCat: null };
 
+// 已带会话 token 时，首帧前先收起登录层进入「校验中」中性态（auth-pending），
+// 等 checkAuth 出结果再亮对应界面——已登录用户不再看到登录页一闪而过；
+// 无 token / 未登录则保持登录页直显（body 缺省 auth-locked）。
+(function markAuthPending() {
+  try {
+    if ((window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('BZF_SESSION_TOKEN')) {
+      document.body.classList.remove('auth-locked');
+      document.body.classList.add('auth-pending');
+      document.getElementById('loginMask').hidden = true;
+    }
+  } catch (e) {}
+})();
+
 // 会话 token 统一走账号中心（BZF_SESSION_TOKEN，与 _console-login.js / 其他控制台共享），
 // 旧 JUZHU_ADMIN_TOKEN / JUZHU_API_KEY 已废止
 function getAuthToken() {
@@ -297,6 +312,7 @@ function setAuthToken(token) {
   if (window.BZF_CONSOLE) BZF_CONSOLE.setToken(token);
 }
 function showLogin(msg) {
+  document.body.classList.remove('auth-pending');
   document.body.classList.add('auth-locked');
   document.getElementById('loginMask').hidden = false;
   document.getElementById('loginErr').textContent = msg || '';
@@ -305,7 +321,7 @@ function showLogin(msg) {
   setTimeout(function(){ input.focus(); }, 50);
 }
 function hideLogin() {
-  document.body.classList.remove('auth-locked');
+  document.body.classList.remove('auth-locked', 'auth-pending');
   document.getElementById('loginMask').hidden = true;
   document.getElementById('loginErr').textContent = '';
 }
@@ -497,7 +513,12 @@ function switchTab(tab) {
   document.getElementById('paneAccounts').hidden = tab !== 'accounts';
   document.getElementById('paneAudit').hidden = tab !== 'audit';
   if (tab === 'dict') renderDictionary();
-  if (tab === 'spots') { renderSpots(); loadContentData(); }
+  if (tab === 'spots') {
+    // 记住上次停留的分区（#content-topics / #content-routes / #content-spots）
+    var m = /^#content-(topics|routes|spots)$/.exec(location.hash || '');
+    if (m && !state.contentSec) state.contentSec = m[1];
+    renderSpots(); loadContentData();
+  }
   if (tab === 'phone') renderConsultModes();
 }
 
@@ -849,19 +870,23 @@ function renderDictionary() {
 // ── 周边玩法维度（独立「周边」tab，规则 17）：景区/商圈/美食/咖啡字典 + 笔记编辑 ──
 /* ===== 内容域（规则 19）：专题（topic_* KV）+ 旅游路线（routes = spots 有序编排）=====
    与「周边玩法」同 tab 统筹：住（专题=房源集合）与玩（路线/地点=内容）在一个后台面里管。 */
+function loadTopicCat() {
+  // 专题在架数按所选城市 catalog 推导（缺省=项目 tab 当前城市）
+  var cityId = state.topicCity || (state.city && state.city.id);
+  var city = (state.cities || []).filter(function(c){ return Number(c.id) === Number(cityId); })[0] || state.city;
+  if (!city) { state.topicCat = null; return Promise.resolve(); }
+  // 注意：页内 API 常量是 /api/juzhu/admin（会话域），catalog 是公开白名单接口，必须走公开路径
+  return fetch('/api/juzhu/catalog?city=' + encodeURIComponent(city.slug || city.name) + '&lite=1')
+    .then(function(r){ return r.json(); })
+    .then(function(c){ state.topicCat = (c && c.projects) || []; })
+    .catch(function(){ state.topicCat = null; });
+}
 function loadContentData() {
   return Promise.all([
     api('/topics').then(function(t){ state.topics = t || []; }),
     api('/routes').then(function(r){ state.routes = r || []; }),
     (state.spots && state.spots.length) ? Promise.resolve() : api('/spots').then(function(s){ state.spots = s || []; }),
-    (function(){
-      var city = state.city;
-      if (!city) return Promise.resolve();
-      return fetch(API + '/catalog?city=' + encodeURIComponent(city.slug || city.name) + '&lite=1')
-        .then(function(r){ return r.json(); })
-        .then(function(c){ state.topicCat = (c && c.projects) || []; })
-        .catch(function(){ state.topicCat = null; });
-    })()
+    loadTopicCat()
   ]).then(renderSpots).catch(function(e){ toast('内容数据加载失败：' + e.message); });
 }
 function topicCount(t) {
@@ -898,8 +923,13 @@ function contentTopicsHtml() {
       '<button type="button" class="btn primary t_save">保存</button>'+
       (t.slug==='bzf'?'':'<button type="button" class="btn danger t_del">删</button>')+'</td></tr>' + tDescRow(t);
   }).join('');
-  return '<div class="card"><h2>房源专题（topic_*） <span class="badge" style="background:var(--gold)">'+(state.topics||[]).length+'</span></h2>'+
-    '<p class="hint">专题 = 房源筛选条件（频道选填 + tags 全部命中，规则 15）；slug 是 C 端深链 ?topic=。C 端找房枢纽「专题入口」与专题页 <b>实时读本清单</b>，这里建/改/下架立即生效。「启用」取消勾选并保存即下架（C 端 404）；「文案」里编辑入口简介与封面（封面留空=自动取首个命中房源封面）。在架数按当前城市 catalog 推导。<b>bzf（保租房专区）为既有契约，不可删除。</b></p>'+
+  return '<div class="card"><h2>房源专题（topic_*） <span class="badge" style="background:var(--gold)">'+(state.topics||[]).length+'</span>'+
+    '<span style="float:right;font-weight:400;font-size:12px;">在架城市 <select class="tcity">'+
+    (state.cities||[]).map(function(c){
+      var cur = state.topicCity || (state.city && state.city.id);
+      return '<option value="'+c.id+'"'+(Number(cur)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('') +'</select></span></h2>'+
+    '<p class="hint">专题 = 房源筛选条件（频道选填 + tags 全部命中，规则 15）；slug 是 C 端深链 ?topic=。C 端找房枢纽「专题入口」与专题页 <b>实时读本清单</b>，这里建/改/下架立即生效。「启用」取消勾选并保存即下架（C 端 404）；「文案」里编辑入口简介与封面（封面留空=自动取首个命中房源封面）。在架数按右上角所选城市 catalog 推导。<b>bzf（保租房专区）为既有契约，不可删除。</b></p>'+
     '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
       '<th>名称</th><th>Slug</th><th>频道</th><th>Tags 条件</th><th>在架</th><th>启用</th><th>操作</th>'+
     '</tr></thead><tbody id="topicRows">'+rows+
@@ -933,6 +963,7 @@ function cityNameOf(id) {
   return c ? c.name : '全省通用';
 }
 var routeDraft = null;   // 当前编辑中的路线工作副本（null=面板关闭）
+var routeDraftDirty = false;   // 面板有未保存改动（输入即置位，保存/关闭复位）
 function renderRouteEditor() {
   var box = document.getElementById('routeEditor');
   if (!box) return;
@@ -966,7 +997,12 @@ function renderRouteEditor() {
     routeDraft.stops.push({ spot_id: 0, note: '' });
     box.querySelector('.re_stops').innerHTML = stopsEditorHtml(routeDraft.stops);
   };
-  box.querySelector('.re_close').onclick = function() { routeDraft = null; renderRouteEditor(); renderSpots(); };
+  box.querySelector('.re_close').onclick = function() {
+    if (!guardRouteDirty()) return;
+    routeDraft = null; routeDraftDirty = false;
+    renderRouteEditor(); renderSpots();
+  };
+  box.oninput = function() { routeDraftDirty = true; };   // 面板任意输入即视为脏
   box.querySelector('.re_save').onclick = function() {
     syncDraftFromDom(box);
     var body = {
@@ -986,7 +1022,7 @@ function renderRouteEditor() {
       : api('/routes', { method:'POST', body: Object.assign({ slug: routeDraft.slug || null }, body) });
     p.then(function() {
       toast(routeDraft.id ? '路线已保存' : '路线已创建');
-      routeDraft = null;
+      routeDraft = null; routeDraftDirty = false;
       return loadContentData();
     }).catch(function(e){ toast('保存失败：'+e.message); });
   };
@@ -1038,6 +1074,18 @@ function contentRoutesHtml() {
     '<div id="routeEditor"></div>';
 }
 function wireContentCards(root) {
+  // ── 二级分区导航（专题/路线/周边，只渲染当前分区）──
+  root.querySelectorAll('.csec').forEach(function(btn) {
+    btn.onclick = function() {
+      var sec = btn.getAttribute('data-sec');
+      if (sec === state.contentSec) return;
+      if (!guardRouteDirty()) return;
+      state.contentSec = sec;
+      try { history.replaceState(null, '', '#content-' + sec); } catch (e) {}
+      renderSpots();
+    };
+  });
+  wireSpotsCards(root);
   // ── 专题 ──
   root.querySelectorAll('.t_copy').forEach(function(btn) {
     btn.onclick = function() {
@@ -1048,6 +1096,11 @@ function wireContentCards(root) {
       }
     };
   });
+  var tcity = root.querySelector('.tcity');
+  if (tcity) tcity.onchange = function() {
+    state.topicCity = this.value || null;
+    loadTopicCat().then(renderSpots);
+  };
   root.querySelectorAll('.t_save').forEach(function(btn) {
     btn.onclick = function() {
       var tr = btn.closest('tr');
@@ -1129,12 +1182,37 @@ function wireContentCards(root) {
   };
 }
 
+/* ===== 内容 tab 渲染：二级分区（房源专题 / 旅游路线 / 周边玩法），只渲染当前分区 ===== */
+function contentSecNavHtml(sec) {
+  var items = [
+    ['topics', '房源专题', (state.topics || []).length],
+    ['routes', '旅游路线', (state.routes || []).length],
+    ['spots', '周边玩法', (state.spots || []).length],
+  ];
+  return '<div style="display:flex;gap:8px;margin:0 0 12px;">' + items.map(function(it) {
+    return '<button type="button" class="btn ' + (sec === it[0] ? 'primary' : 'ghost') + ' csec" data-sec="' + it[0] + '">' +
+      it[1] + ' <b>' + it[2] + '</b></button>';
+  }).join('') + '</div>';
+}
+function guardRouteDirty() {
+  if (routeDraft && routeDraftDirty && !confirm('路线有未保存改动，离开将丢弃，确定？')) return false;
+  return true;
+}
 function renderSpots() {
   var root = document.getElementById('spotsRoot');
   if (!state.apiOk) {
     root.innerHTML = '<div class="empty">管理 API 未就绪，请刷新后重试</div>';
     return;
   }
+  var sec = state.contentSec || 'topics';
+  root.innerHTML = contentSecNavHtml(sec) +
+    (sec === 'topics' ? contentTopicsHtml() : sec === 'routes' ? contentRoutesHtml() : contentSpotsHtml());
+  if (sec === 'routes' && routeDraft) renderRouteEditor();
+  wireContentCards(root);
+}
+
+/* ===== 周边玩法（spots）：类型筛选 + 关键词过滤，行内编辑 + 笔记展开行 ===== */
+function contentSpotsHtml() {
   var cityList = (state.cities && state.cities.length) ? state.cities : (state.city ? [state.city] : []);
   var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
   var typeCounts = {};
@@ -1164,7 +1242,14 @@ function renderSpots() {
         '<b style="padding-top:6px;">门票</b><input class="s_ticket" value="'+esc(s.ticket||'')+'" placeholder="如：免费 / ¥110（含观光车）"/>'+
       '</div></td></tr>';
   }
-  var spotRows = (state.spots || []).map(function(s) {
+  var q = (state.spotQ || '').trim().toLowerCase();
+  var list = (state.spots || []).filter(function(s) {
+    if (state.spotType && s.type !== state.spotType) return false;
+    if (!q) return true;
+    var hay = [(s.name||''), (s.slug||''), (s.summary||''), tagsStr(s.tags)].join(' ').toLowerCase();
+    return hay.indexOf(q) >= 0;
+  });
+  var spotRows = list.map(function(s) {
     return '<tr data-sid="'+s.id+'">'+
       '<td><input class="s_name" value="'+esc(s.name||'')+'"/></td>'+
       '<td><select class="s_type">'+spotTypeOpts(s.type)+'</select></td>'+
@@ -1182,10 +1267,12 @@ function renderSpots() {
       '<button type="button" class="btn danger s_del">删</button></td></tr>' + spotNoteRow(s);
   }).join('');
 
-  root.innerHTML =
-    contentTopicsHtml() + contentRoutesHtml() +
-    '<div class="card"><h2>周边玩法（景区 / 商圈 / 美食 / 咖啡） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
-      '<p class="hint"><b>'+typeSummary+'</b> — C 端房源详情页「周边玩法」杂志区块与笔记详情页（lvju-app-spot-post）的数据源。城市选「全省通用」= 跨市目的地（如黄果树、西江），任何项目都可绑定；slug 是 C 端深链词汇（小写字母/数字/连字符，全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「笔记」里写正文 / 图集 / 攻略信息，正文留空则只显示导语；「链接」选填覆写深链。仍被项目绑定的地点不可删（先在「项目」tab 的项目编辑器里解除绑定）。</p>'+
+  return '<div class="card"><h2>周边玩法（景区 / 商圈 / 美食 / 咖啡） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
+      '<p class="hint"><b>'+typeSummary+'</b> — C 端房源详情页「周边玩法」杂志区块、玩法列表页与笔记详情页（lvju-app-spot-post）的数据源，也是旅游路线的站点来源。城市选「全省通用」= 跨市目的地（如黄果树、西江）；slug 是 C 端深链词汇（全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「笔记」里写正文 / 图集 / 攻略信息，正文留空则只显示导语。仍被项目绑定的地点不可删（先在「项目」tab 解除绑定）。</p>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">'+
+        '<select class="sf_type"><option value="">全部类型</option>'+spotTypeOpts(state.spotType)+'</select>'+
+        '<input class="sf_q" value="'+esc(state.spotQ||'')+'" placeholder="搜名称 / slug / 标签…" style="width:220px;"/>'+
+        '<span class="hint">显示 '+list.length+' / '+(state.spots||[]).length+'</span></div>'+
       '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
         '<th>名称</th><th>类型</th><th>城市</th><th>Slug</th><th>图标</th><th>封面路径</th><th>编辑导语</th><th>标签</th><th>链接</th><th>排序</th><th>启用</th><th>操作</th>'+
       '</tr></thead>'+
@@ -1204,7 +1291,8 @@ function renderSpots() {
         '<td class="acts"><button type="button" class="btn ghost" id="newSpotSave">+ 新增</button></td></tr>'+
       '</tbody></table></div>'+
     '</div>';
-
+}
+function wireSpotsCards(root) {
   function spotBodyFrom(tr, prefix) {
     var body = {
       name: tr.querySelector('.'+prefix+'name').value.trim(),
@@ -1232,6 +1320,16 @@ function renderSpots() {
     }
     return body;
   }
+  var sfType = root.querySelector('.sf_type');
+  if (sfType) sfType.onchange = function() { state.spotType = this.value; renderSpots(); };
+  var sfQ = root.querySelector('.sf_q');
+  if (sfQ) sfQ.oninput = function() {
+    state.spotQ = this.value;
+    var pos = this.selectionStart;
+    renderSpots();
+    var q2 = document.querySelector('.sf_q');
+    if (q2) { q2.focus(); try { q2.setSelectionRange(pos, pos); } catch (e) {} }
+  };
   root.querySelectorAll('.s_note').forEach(function(btn) {
     btn.onclick = function() {
       var noteRow = btn.closest('tr').nextElementSibling;
@@ -1270,7 +1368,6 @@ function renderSpots() {
       return loadDictionary();
     }).then(renderSpots).catch(function(e){ toast('添加失败：'+e.message); });
   };
-  wireContentCards(root);
 }
 
 function saveDistrictRow(tr) {
