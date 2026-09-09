@@ -1997,6 +1997,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
         channel_name: brand.name,
+        // C 端模拟登录开关：仅非生产（JUZHU_ENV != prod/production）开启；生产恒 false，C 端走 jsbridge3 真实登录
+        mock_login: !isProduction(),
       });
     }
 

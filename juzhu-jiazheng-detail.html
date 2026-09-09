@@ -248,7 +248,7 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=3"></script>
+<script src="screens/_jzapi.js?v=4"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -602,31 +602,34 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
-    // 登录拦截：App 内经 jsbridge3 获取用户身份，取不到（非 App 环境或未登录）不生成小程序链接
-    if (!JZ.userId() && !JZ.bridgeUserId()) {
-      toast('暂未登录，请登录后重试');
-      return;
-    }
-    // 显示 loading
-    var overlay = document.getElementById('loadingOverlay');
-    overlay.classList.add('on');
+    // 登录拦截：ensureUserId 统一身份（测试环境模拟登录 / 生产 App 内 jsbridge3），
+    // 取不到（非 App 环境或未登录）不生成小程序链接
+    JZ.ensureUserId().then(function(uid){
+      if (!uid) {
+        toast('暂未登录，请登录后重试');
+        return;
+      }
+      // 显示 loading
+      var overlay = document.getElementById('loadingOverlay');
+      overlay.classList.add('on');
 
-    // 调用后端生成微信小程序 URL Link
-    // C 端预约：wechat-link 匿名可调，勿依赖 localStorage API Key
-    fetch('/api/juzhu/jiazheng/wechat-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ product_id: product.id, user_id: JZ.userId() })
-    }).then(function(r){ return r.json(); })
-      .then(function(res){
-        overlay.classList.remove('on');
-        if (!res.ok) return toast(res.error || '生成预约链接失败');
-        // 跳转第三方小程序
-        window.location.href = res.url_link;
-      }).catch(function(err){
-        overlay.classList.remove('on');
-        toast('网络异常：' + (err.message || '请稍后重试'));
-      });
+      // 调用后端生成微信小程序 URL Link
+      // C 端预约：wechat-link 匿名可调，勿依赖 localStorage API Key
+      fetch('/api/juzhu/jiazheng/wechat-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: product.id, user_id: uid })
+      }).then(function(r){ return r.json(); })
+        .then(function(res){
+          overlay.classList.remove('on');
+          if (!res.ok) return toast(res.error || '生成预约链接失败');
+          // 跳转第三方小程序
+          window.location.href = res.url_link;
+        }).catch(function(err){
+          overlay.classList.remove('on');
+          toast('网络异常：' + (err.message || '请稍后重试'));
+        });
+    });
   });
 
   JZ.sku(slug, curVendor).then(function(res){

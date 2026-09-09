@@ -455,6 +455,44 @@
     return uid ? String(uid) : null;
   }
 
+  // ===== C 端统一身份入口（异步）：测试环境模拟登录 / 生产 jsbridge3 真实登录 =====
+  // 环境开关来自后端 /api/juzhu/settings 的 mock_login（服务端由 JUZHU_ENV 驱动，生产恒 false）：
+  //   mock_login=true（测试/本地）：不经 jsbridge3，直接使用模拟用户（共享订单池，便于联调）。
+  //     模拟 id 优先级：URL ?mock_uid=xxx > localStorage（含 BZF_JZ.setUserId 手动设置）> 默认 demo_user_001。
+  //   mock_login=false（生产/拉取失败）：走 bridgeUserId() 真实登录；取不到即未登录，
+  //     严禁模拟用户兜底（未登录态由页面处理：隐藏模块/提示登录）。
+  var MOCK_USER_DEFAULT = 'demo_user_001';
+  var _settingsEnvP = null;
+
+  function envSettings() {
+    if (window.JUZHU && typeof JUZHU.loadSettings === 'function') return JUZHU.loadSettings();
+    if (_settingsEnvP) return _settingsEnvP;
+    _settingsEnvP = fetch('/api/juzhu/settings')
+      .then(function (r) { return r.json(); })
+      .catch(function () { return {}; }); // 失败视为非 mock：按生产逻辑走，不模拟兜底
+    return _settingsEnvP;
+  }
+
+  function ensureUserId() {
+    return envSettings().then(function (s) {
+      if (s && s.mock_login) {
+        var q = '';
+        try { q = String(new URLSearchParams(location.search).get('mock_uid') || '').trim(); } catch (e) {}
+        if (q) return setUserId(q);           // URL 切换模拟身份（跨页面用 chainMockUser 传递）
+        return userId() || setUserId(MOCK_USER_DEFAULT); // 保持已设身份（含手动 setUserId），无则落默认
+      }
+      return bridgeUserId();
+    });
+  }
+
+  // 为 URL 追加 mock_uid 查询参数（模拟身份跨页链式传递，语义同 chainCity）
+  function chainMockUser(url) {
+    var uid = userId();
+    if (!uid) return url;
+    var sep = url.indexOf('?') >= 0 ? '&' : '?';
+    return url + sep + 'mock_uid=' + encodeURIComponent(uid);
+  }
+
   window.BZF_JZ = {
     STATUS: STATUS,
     ICON: ICON,
@@ -488,6 +526,8 @@
     userId: userId,
     setUserId: setUserId,
     bridgeUserId: bridgeUserId,
+    ensureUserId: ensureUserId,
+    chainMockUser: chainMockUser,
     regionCities: regionCities,
     regionCityTree: regionCityTree,
     regionProvinces: regionProvinces,
