@@ -321,6 +321,16 @@ async function handleCallback(conn, body, vendorId) {
   let order;
   if (parsed.status === 'paid') order = await grOrders.getOrderByRef(conn, parsed.orderRef);
   else order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
+  if (!order && parsed.status !== 'paid') {
+    // 容错：商家跳过 paid 回调直接推后续状态时，订单 vendor_oid 尚为 NULL 联合查询落空。
+    // 按 order_ref 回退 + vendor_id 归属校验（vendorId 来自 HMAC 验签，可信，防跨商家篡改他人订单），
+    // 命中则回填 vendor_oid 后按正常链路重查。
+    const fallback = await grOrders.getOrderByRef(conn, parsed.orderRef);
+    if (fallback && fallback.vendor_id === vendorId && !fallback.vendor_oid) {
+      await grOrders.backfillVendorOid(conn, parsed.orderRef, parsed.vendorOid, vendorId);
+      order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
+    }
+  }
   if (!order) return reply(404, { code: 404, message: '订单不存在' });
   await grOrders.updateOrderCallback(conn, {
     order_ref: parsed.orderRef,
