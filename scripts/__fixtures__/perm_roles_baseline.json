@@ -11,7 +11,8 @@
       "admin.read",
       "admin.write",
       "audit.read",
-      "rating.review"
+      "rating.review",
+      "vendor.onboarding.review"
     ]
   },
   "holding_viewer": {
@@ -30,6 +31,7 @@
       "order.dispatch",
       "org.read",
       "org.write",
+      "vendor.onboarding.review",
       "worker.manage"
     ]
   },

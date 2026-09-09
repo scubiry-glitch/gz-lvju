@@ -25,6 +25,15 @@
   .funnel-count{font-size:12px;color:var(--muted);width:40px;flex-shrink:0;}
   .funnel-total{font-size:12px;color:var(--muted);margin-top:4px;text-align:center;}
 
+  /* filters */
+  .filter-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);}
+  .filter-bar label{display:flex;align-items:center;gap:6px;}
+  .filter-bar select,.filter-bar input[type=date]{font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:#fff;color:var(--fg);}
+  .filter-bar .range-group{display:flex;gap:4px;}
+  .filter-bar .range-group .btn{font-size:11px;padding:4px 10px;}
+  .filter-bar .range-group .btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .filter-bar .sep{width:1px;height:20px;background:var(--border);}
+
   /* chart controls */
   .chart-ctl{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
   .chart-ctl .dim-group{display:flex;gap:4px;}
@@ -50,12 +59,31 @@
   <div id="side-nav" data-series="p" data-active="jz-order-overview"></div>
   <main class="main">
     <div class="top">
-      <div class="crumb">控制台 / × P 服务认证中台 / 居住服务 · 家政频道 / <b>服务订单概览</b></div>
+      <div class="crumb">控制台 / × P 服务认证中台 / 居住服务 · 本地生活 / <b>服务订单概览</b></div>
     </div>
     <div class="content">
 
       <div class="card">
-        <h3>今日订单状态漏斗 <span class="pill">实时</span></h3>
+        <h3>筛选</h3>
+        <div class="filter-bar">
+          <label>城市 <select id="fCity"><option value="">全部城市</option></select></label>
+          <label>商家 <select id="fVendor"><option value="">全部商家</option></select></label>
+          <span class="sep"></span>
+          <div class="range-group" id="rangeBtns">
+            <button class="btn on" data-range="today">今日</button>
+            <button class="btn" data-range="7d">近7天</button>
+            <button class="btn" data-range="15d">近15天</button>
+            <button class="btn" data-range="30d">近30天</button>
+            <button class="btn" data-range="month">本月</button>
+          </div>
+          <span class="sep"></span>
+          <label>自定义 <input type="date" id="fStart"> ~ <input type="date" id="fEnd"></label>
+          <button class="btn" id="fReset">重置</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>订单状态漏斗 <span class="pill">实时</span></h3>
         <div id="funnelDate" style="font-size:12px;color:var(--muted);margin-bottom:4px;"></div>
         <div class="funnel" id="funnel"></div>
       </div>
@@ -121,21 +149,68 @@
   let curDim = 'daily';
   let curStatus = 'pending';
 
+  // 筛选状态（start/end 空 = 默认今日，由服务端兜底）
+  const state = { city:'', vendor:'', start:'', end:'' };
+
+  function todayCst() { return new Date(Date.now() + 8*3600*1000).toISOString().slice(0,10); } // 北京日期，与服务端分桶同口径
+  function shiftCst(n) { return new Date(Date.now() + 8*3600*1000 + n*86400000).toISOString().slice(0,10); }
+
+  function presetRange(key) {
+    const today = todayCst();
+    if (key === '7d') return { start: shiftCst(-6), end: today };
+    if (key === '15d') return { start: shiftCst(-14), end: today };
+    if (key === '30d') return { start: shiftCst(-29), end: today };
+    if (key === 'month') return { start: today.slice(0,8) + '01', end: today };
+    return { start: today, end: today }; // today
+  }
+
+  function queryStr() {
+    const parts = [];
+    if (state.city) parts.push('city=' + encodeURIComponent(state.city));
+    if (state.vendor) parts.push('vendor_id=' + encodeURIComponent(state.vendor));
+    if (state.start && state.end) parts.push('start=' + state.start + '&end=' + state.end);
+    return parts.length ? '?' + parts.join('&') : '';
+  }
+
+  function fillSelect(sel, items) {
+    const cur = sel.value;
+    const first = sel.querySelector('option');
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    items.forEach(it => {
+      const o = document.createElement('option');
+      if (typeof it === 'string') { o.value = it; o.textContent = it; }
+      else { o.value = it.v; o.textContent = it.t; }
+      sel.appendChild(o);
+    });
+    // 保留当前选择；当前值已不在可选项里（如数据变化）则回落到全部
+    if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  }
+
+  function fillFilterOptions(opts) {
+    if (!opts) return;
+    fillSelect($('fCity'), opts.cities || []);
+    fillSelect($('fVendor'), (opts.vendors || []).map(v => ({ v: String(v.id), t: v.name || ('商家#' + v.id) })));
+  }
+
   async function load() {
     try {
-      const r = await fetch('/api/juzhu/jz/orders/overview');
+      const r = await fetch('/api/juzhu/jz/orders/overview' + queryStr());
       if (!r.ok) throw new Error('HTTP '+r.status);
       data = await r.json();
-      renderFunnel(data.funnel);
+      fillFilterOptions(data.filter_options);
+      renderFunnel(data.funnel, data.range);
       renderChart();
     } catch(e) {
       $('funnel').innerHTML = '<div class="loading">加载失败：'+e.message+'</div>';
     }
   }
 
-  function renderFunnel(funnel) {
-    const today = new Date().toISOString().slice(0,10);
-    $('funnelDate').textContent = '日期：' + today;
+  function renderFunnel(funnel, range) {
+    const r = range || {};
+    $('funnelDate').textContent = !r.end || r.start === r.end
+      ? '日期：' + (r.start || todayCst())
+      : '区间：' + r.start + ' ~ ' + r.end;
 
     const vals = STATUS_ORDER.map(s => funnel[s]||0);
     const max = Math.max(...vals, 1);
@@ -151,7 +226,7 @@
         <span class="funnel-count">${v}</span>
       </div>`;
     });
-    html += `<div class="funnel-total">今日共 ${total} 单</div>`;
+    html += `<div class="funnel-total">共 ${total} 单</div>`;
     $('funnel').innerHTML = html;
   }
 
@@ -203,11 +278,13 @@
       ctx.fillText(val, pad.left - 8, y + 4);
     }
 
-    // X labels
+    // X labels（桶多时抽稀，最多约 14 个）
     ctx.textAlign = 'center';
     ctx.fillStyle = '#64748b';
     const xStep = pw / Math.max(labels.length - 1, 1);
+    const labelStep = Math.ceil(labels.length / 14);
     labels.forEach((l, i) => {
+      if (i % labelStep !== 0 && i !== labels.length - 1) return;
       const x = pad.left + i * xStep;
       ctx.fillText(l, x, H - pad.bottom + 16);
     });
@@ -271,6 +348,50 @@
     });
 
     window.addEventListener('resize', renderChart);
+  })();
+
+  // bind filters
+  (function(){
+    $('fCity').onchange = function(){ state.city = this.value; load(); };
+    $('fVendor').onchange = function(){ state.vendor = this.value; load(); };
+
+    document.querySelectorAll('#rangeBtns .btn').forEach(b => {
+      b.onclick = function(){
+        document.querySelectorAll('#rangeBtns .btn').forEach(x=>x.classList.remove('on'));
+        this.classList.add('on');
+        const pr = presetRange(this.dataset.range);
+        state.start = pr.start; state.end = pr.end;
+        $('fStart').value = pr.start; $('fEnd').value = pr.end;
+        load();
+      };
+    });
+
+    const onCustomDate = function(){
+      const s = $('fStart').value, e = $('fEnd').value;
+      if (!s && !e) return;
+      state.start = s || e; state.end = e || s; // 只填一端则按单日处理
+      document.querySelectorAll('#rangeBtns .btn').forEach(x=>x.classList.remove('on'));
+      load();
+    };
+    $('fStart').onchange = onCustomDate;
+    $('fEnd').onchange = onCustomDate;
+
+    $('fReset').onclick = function(){
+      const pr = presetRange('today');
+      state.city = ''; state.vendor = '';
+      state.start = pr.start; state.end = pr.end;
+      $('fCity').value = ''; $('fVendor').value = '';
+      $('fStart').value = ''; $('fEnd').value = '';
+      document.querySelectorAll('#rangeBtns .btn').forEach(x=>x.classList.toggle('on', x.dataset.range === 'today'));
+      load();
+    };
+  })();
+
+  // 初始区间 = 今日（与服务端缺省一致），日期输入框同步显示
+  (function(){
+    const pr = presetRange('today');
+    state.start = pr.start; state.end = pr.end;
+    $('fStart').value = pr.start; $('fEnd').value = pr.end;
   })();
 
   load();

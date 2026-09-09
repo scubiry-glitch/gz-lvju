@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>贵州旅居 · 一年产品迭代规划（2026.09 – 2027.09）</title>
+<style>
+  :root{
+    --bg:#f6f8f7; --surface:#ffffff; --fg:#0f172a; --muted:#64748b;
+    --border:#e3e8e6;
+    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
+    --brand-soft:rgba(15,118,110,.12); --brand-soft:color-mix(in oklab, var(--brand) 12%, transparent);
+    --gold:#b45309; --gold-soft:rgba(180,83,9,.14); --gold-soft:color-mix(in oklab, var(--gold) 14%, transparent);
+    --ok:#16a34a; --ok-soft:rgba(22,163,74,.13); --ok-soft:color-mix(in oklab,var(--ok) 13%,transparent);
+    --warn:#ea580c; --danger:#dc2626; --danger-soft:rgba(220,38,38,.10); --danger-soft:color-mix(in oklab,var(--danger) 10%,transparent);
+    --r-sm:8px; --r-md:12px; --r-lg:16px;
+    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  a{color:var(--brand);text-decoration:none;}
+  h1,h2,h3,h4{margin:0;}
+  .container{max-width:1320px;margin:0 auto;padding:28px 22px 60px;}
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(135deg,var(--brand-deep) 0%,var(--brand) 55%,var(--brand-2) 120%);
+    color:#fff;border-radius:var(--r-lg);padding:30px 30px 26px;position:relative;overflow:hidden;margin-bottom:14px;
+  }
+  .hero::after{content:"🗓";position:absolute;right:-8px;bottom:-26px;font-size:140px;opacity:0.10;}
+  .hero .crumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .hero .crumbs a{background:rgba(255,255,255,0.16);color:#fff;font-size:12px;padding:5px 12px;border-radius:999px;}
+  .hero .crumbs a:hover{background:rgba(255,255,255,0.28);}
+  .hero h1{font-size:clamp(24px,3.2vw,32px);font-weight:700;letter-spacing:-0.01em;}
+  .hero .lead{font-size:14px;opacity:0.92;margin-top:8px;max-width:72ch;}
+  .hero .stamp{display:inline-flex;gap:6px;align-items:center;margin-top:14px;font-size:12px;background:rgba(255,255,255,0.14);padding:5px 12px;border-radius:999px;}
+
+  /* role nav */
+  .rolenav{position:sticky;top:0;z-index:40;background:rgba(246,248,247,.94);background:color-mix(in oklab,var(--bg) 88%,transparent);
+    backdrop-filter:blur(8px);display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;margin-bottom:18px;border-bottom:1px solid var(--border);}
+  .rolenav a{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--border);
+    padding:7px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;transition:all .15s;cursor:pointer;}
+  .rolenav a .n{width:18px;height:18px;border-radius:50%;background:var(--brand-soft);color:var(--brand);
+    display:grid;place-items:center;font-size:11px;font-weight:700;}
+  .rolenav a:hover,.rolenav a.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .rolenav a:hover .n,.rolenav a.active .n{background:rgba(255,255,255,0.25);color:#fff;}
+
+  /* section shell */
+  .sec{margin-bottom:44px;scroll-margin-top:64px;}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .sec-head .idx{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;
+    display:grid;place-items:center;font-weight:700;font-size:15px;flex-shrink:0;}
+  .sec-head h2{font-size:21px;font-weight:700;}
+  .sec-head .sub{font-size:13px;color:var(--muted);}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);}
+  .note{font-size:11px;color:var(--muted);}
+  .cap{color:var(--warn);}
+
+  /* ---------- season timeline ---------- */
+  .tl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:14px;overflow-x:auto;}
+  .tl{display:grid;grid-template-columns:repeat(13,minmax(72px,1fr));gap:3px;min-width:980px;}
+  .tl .m{font-size:10px;color:var(--muted);text-align:center;padding:2px 0;}
+  .tl .season{height:20px;border-radius:5px;font-size:9.5px;color:#fff;display:grid;place-items:center;white-space:nowrap;overflow:hidden;}
+  .s-off{background:#94a3b8;} .s-winter{background:#0b5d56;} .s-spring{background:#b45309;} .s-pre{background:#14b8a6;} .s-summer{background:#dc2626;} .s-review{background:#7c3aed;}
+  .tl .bar{height:26px;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    white-space:nowrap;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,.14);}
+  .bar.p1{background:#0d9488;} .bar.p2{background:#0b5d56;} .bar.p3{background:#b45309;} .bar.p4{background:#0f766e;} .bar.p5{background:linear-gradient(90deg,#0b5d56,#b45309);}
+  .tl .freeze{height:14px;border-radius:4px;font-size:9px;color:#fff;background:repeating-linear-gradient(45deg,#dc2626,#dc2626 4px,#f87171 4px,#f87171 8px);display:grid;place-items:center;}
+  .tl-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--muted);align-items:center;}
+  .tl-legend .sw{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+
+  /* ---------- phase summary cards ---------- */
+  .phasecards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:6px;}
+  .pcard{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);display:flex;flex-direction:column;}
+  .pcard .pt{padding:10px 12px;color:#fff;}
+  .pcard.p1 .pt{background:#0d9488;} .pcard.p2 .pt{background:#0b5d56;} .pcard.p3 .pt{background:#b45309;} .pcard.p4 .pt{background:#0f766e;} .pcard.p5 .pt{background:linear-gradient(120deg,#0b5d56,#b45309);}
+  .pcard .pt b{font-size:13.5px;display:block;} .pcard .pt span{font-size:10.5px;opacity:.9;}
+  .pcard .pb{padding:10px 12px;flex:1;}
+  .pcard .pb .k{font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:3px;}
+  .pcard .pb .v{font-size:11.5px;margin-bottom:8px;}
+  .pcard .north{font-size:11px;background:var(--gold-soft);color:var(--gold);border-radius:7px;padding:6px 9px;line-height:1.5;}
+  .pcard .north b{color:var(--gold);}
+
+  /* ---------- feature matrix ---------- */
+  .mx-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px 16px;overflow-x:auto;}
+  table.mx{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;font-size:11.5px;}
+  table.mx th,table.mx td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:middle;}
+  table.mx thead th{position:sticky;top:0;background:var(--surface);font-size:11px;color:var(--muted);z-index:2;border-bottom:2px solid var(--border);}
+  table.mx thead th.ph{color:#fff;text-align:center;border-radius:7px;padding:6px 4px;font-weight:700;}
+  table.mx th.dom{background:var(--brand-soft);color:var(--brand-deep);font-size:11px;font-weight:700;white-space:nowrap;border-radius:7px;}
+  table.mx td.dom{background:color-mix(in oklab, var(--brand-soft) 55%, transparent);color:var(--brand-deep);font-weight:700;white-space:nowrap;}
+  table.mx td.feat{color:var(--fg);}
+  table.mx td.feat small{display:block;color:var(--muted);font-size:10px;}
+  table.mx td.cell{text-align:center;white-space:nowrap;}
+  .mk{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;border-radius:999px;padding:2px 8px;line-height:1.5;}
+  .mk.main{background:var(--gold);color:#fff;font-weight:700;}
+  .mk.plus{background:var(--brand-soft);color:var(--brand-deep);font-weight:600;}
+  .mk.pre{background:transparent;border:1px dashed var(--muted);color:var(--muted);}
+  .mk.none{color:#cbd5e1;}
+  .mk.run{background:var(--ok-soft);color:var(--ok);font-weight:600;}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted);align-items:center;}
+
+  /* ---------- phase tabs ---------- */
+  .tabbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+  .tabbar button{font-family:var(--font);font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--surface);
+    color:var(--muted);padding:9px 16px;border-radius:999px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px;}
+  .tabbar button .dot{width:8px;height:8px;border-radius:50%;}
+  .tabbar button .tm{font-size:10px;font-weight:500;opacity:.75;}
+  .tabbar button:hover{border-color:var(--brand);color:var(--brand-deep);}
+  .tabbar button.active{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .ph-head{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:14px;}
+  .ph-head .hb{padding:14px 18px;color:#fff;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .ph-head.p1 .hb{background:#0d9488;} .ph-head.p2 .hb{background:#0b5d56;} .ph-head.p3 .hb{background:#b45309;} .ph-head.p4 .hb{background:#0f766e;} .ph-head.p5 .hb{background:linear-gradient(120deg,#0b5d56,#b45309);}
+  .ph-head .hb .no{font-size:22px;font-weight:800;opacity:.85;}
+  .ph-head .hb .tt b{font-size:17px;display:block;} .ph-head .hb .tt span{font-size:11.5px;opacity:.92;}
+  .ph-head .hb .anchor{margin-left:auto;font-size:11px;background:rgba(255,255,255,.16);padding:5px 12px;border-radius:999px;}
+  .ph-head .hb-body{padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;}
+  .scope-chip{font-size:11px;background:var(--brand-soft);color:var(--brand-deep);border-radius:999px;padding:3px 11px;}
+
+  /* three lenses */
+  .lenses{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+  .lens{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;display:flex;flex-direction:column;}
+  .lens .lh{padding:11px 14px;color:#fff;display:flex;align-items:center;gap:8px;}
+  .lens.u .lh{background:#0c4d44;} .lens.o .lh{background:#b45309;} .lens.c .lh{background:#1e40af;}
+  .lens .lh b{font-size:13.5px;} .lens .lh span{font-size:10px;opacity:.85;margin-left:auto;}
+  .lens ul{margin:0;padding:10px 14px 12px 28px;flex:1;}
+  .lens li{font-size:11.5px;margin-bottom:5px;}
+  .lens li b{color:var(--brand-deep);}
+  .lens li .new{font-size:9px;color:#fff;background:var(--gold);border-radius:4px;padding:0 5px;margin-left:4px;vertical-align:1px;}
+
+  /* stage gate */
+  .gate{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .gate .g{border-radius:var(--r-md);padding:11px 14px;font-size:11.5px;line-height:1.65;}
+  .gate .g.commit{background:var(--gold-soft);color:var(--gold);border:1px solid color-mix(in oklab,var(--gold) 30%,transparent);}
+  .gate .g.capbox{background:var(--brand-soft);color:var(--brand-deep);border:1px solid color-mix(in oklab,var(--brand) 25%,transparent);}
+  .gate .g b{display:block;font-size:12px;margin-bottom:3px;}
+  .gate .g.commit b{color:var(--gold);} .gate .g.capbox b{color:var(--brand-deep);}
+  .riskline{font-size:11px;background:var(--danger-soft);color:#991b1b;border-radius:var(--r-md);padding:9px 14px;line-height:1.6;}
+
+  /* cross-cutting */
+  .cross{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+  .xcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;}
+  .xcard h4{font-size:13.5px;margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+  .xcard ul{margin:0;padding-left:18px;}
+  .xcard li{font-size:11.5px;margin-bottom:4px;}
+  table.risk{width:100%;border-collapse:collapse;font-size:11.5px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;}
+  table.risk th,table.risk td{padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+  table.risk th{background:var(--brand-soft);color:var(--brand-deep);font-size:11px;}
+  .lv{font-size:10px;font-weight:700;border-radius:4px;padding:1px 7px;white-space:nowrap;}
+  .lv.hi{background:var(--danger-soft);color:var(--danger);} .lv.md{background:var(--gold-soft);color:var(--gold);} .lv.lo{background:var(--ok-soft);color:var(--ok);}
+
+  .footer{border-top:1px solid var(--border);margin-top:26px;padding-top:16px;font-size:11px;color:var(--muted);line-height:1.8;}
+
+  @media (max-width:1080px){
+    .phasecards{grid-template-columns:repeat(2,1fr);}
+    .lenses,.cross,.gate{grid-template-columns:1fr;}
+  }
+  @media (max-width:640px){
+    .container{padding-left:12px;padding-right:12px;}
+    .hero{padding:22px 18px 20px;}
+    .phasecards{grid-template-columns:1fr;}
+    .tabbar button{flex:1 1 100%;justify-content:center;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{scroll-behavior:auto!important;transition:none!important;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== HERO ===== -->
+  <div class="hero">
+    <div class="crumbs">
+      <a href="overview.html">📋 全站导航总览</a>
+      <a href="lvju-overview.html">🐚 旅居总览蓝图</a>
+      <a href="lvju-journey.html" style="background:rgba(255,255,255,.28);font-weight:600;">🧭 全链路旅程与需求范围</a>
+      <a href="lvju-rating-standard.html">⭐ 旅居彩贝评级</a>
+      <a href="lvju-app-home.html" style="background:var(--gold);color:#fff;font-weight:600;">📱 贝壳 APP·找房旅居频道主入口 ↗</a>
+    </div>
+    <h1>贵州旅居平台 · 一年产品迭代规划</h1>
+    <p class="lead">2026.09 – 2027.09 · 五期推进：交易闭环 → 体验内容 → 服务者评级 → 房源评级 → 生态扩品。
+       排期按旅居季节锚点倒排，每期设 stage-gate 出口标准；<b>推广性指标（全省房源数 / MAU / 一张网）均为政策推动后的上限假设，非承诺</b>，未达标则延期、缩范围、重做试点。</p>
+    <span class="stamp">🛡 贵州省住建厅指导 · 贝壳承建 · 北极星：试点城市入住间夜数 · 仅供演示</span>
+  </div>
+
+  <!-- ===== ROLE NAV ===== -->
+  <nav class="rolenav" id="rolenav">
+    <a href="#matrix" class="active"><span class="n">图</span>节奏与功能矩阵</a>
+    <a href="#phases" data-tab="p1"><span class="n">1</span>一期 · 交易闭环</a>
+    <a href="#phases" data-tab="p2"><span class="n">2</span>二期 · 体验内容</a>
+    <a href="#phases" data-tab="p3"><span class="n">3</span>三期 · 服务者评级</a>
+    <a href="#phases" data-tab="p4"><span class="n">4</span>四期 · 房源评级</a>
+    <a href="#phases" data-tab="p5"><span class="n">5</span>五期 · 生态扩品</a>
+    <a href="#cross"><span class="n">贯</span>贯穿线与风险</a>
+  </nav>
+
+  <!-- ===== §1 TIMELINE + MATRIX ===== -->
+  <section class="sec" id="matrix">
+    <div class="sec-head">
+      <div class="idx">一</div>
+      <h2>全年节奏 · 季节锚点与功能矩阵</h2>
+      <span class="sub">功能在旺季前 4–6 周就绪；旺季只上增量型 SKU，不动交易与订单模型</span>
+    </div>
+
+    <!-- season timeline -->
+    <div class="tl-wrap">
+      <div class="tl" id="tl">
+        <div class="m">26/09</div><div class="m">26/10</div><div class="m">26/11</div><div class="m">26/12</div><div class="m">27/01</div><div class="m">27/02</div><div class="m">27/03</div><div class="m">27/04</div><div class="m">27/05</div><div class="m">27/06</div><div class="m">27/07</div><div class="m">27/08</div><div class="m">27/09</div>
+        <div class="season s-off" style="grid-column:1/3;">筹备期</div>
+        <div class="season s-winter" style="grid-column:3/6;">温泉康养季 · 苗年侗年 · 春节</div>
+        <div class="season s-spring" style="grid-column:6/8;">杜鹃花期 · 暑期招商</div>
+        <div class="season s-pre" style="grid-column:8/10;">暑期前冲刺</div>
+        <div class="season s-summer" style="grid-column:11/13;">暑期避暑旺季</div>
+        <div class="season s-review" style="grid-column:13/14;">年度复盘</div>
+
+        <div class="bar p1" style="grid-column:1/4;">一期 · 交易闭环 MVP</div>
+        <div class="bar p2" style="grid-column:4/6;">二期 · 体验与内容</div>
+        <div class="bar p3" style="grid-column:6/8;">三期 · 服务者评级</div>
+        <div class="bar p4" style="grid-column:8/10;">四期 · 房源评级</div>
+        <div class="bar p5" style="grid-column:10/14;">五期 · 生态扩品（渠道分销等支线独立触发）</div>
+
+        <div style="grid-column:5/7;" class="freeze">❄ 春节康养高峰冻结 1/15–2/20（只热修）</div>
+        <div style="grid-column:8/11;" class="freeze">❄ 三/四期硬约束：4 月底 / 6 月底先后锁版本</div>
+        <div style="grid-column:11/13;" class="freeze">❄ 7/1–8/31 旺季冻结（只上增量 SKU）</div>
+        <div style="grid-column:13/14;" class="freeze">年度 stage-gate 评审</div>
+      </div>
+      <div class="tl-legend">
+        <span><span class="sw" style="background:#0b5d56"></span>康养季</span>
+        <span><span class="sw" style="background:#b45309"></span>花期/招商</span>
+        <span><span class="sw" style="background:#dc2626"></span>暑期旺季（冻结）</span>
+        <span class="note">铁律：三、四期 deadline 是硬约束（4 月底 / 6 月底锁版本）；每期上线后留 2 周运营调优周，只修问题不加功能。</span>
+      </div>
+    </div>
+
+    <!-- five phase summary cards -->
+    <div class="phasecards">
+      <div class="pcard p1">
+        <div class="pt"><b>一期 · 交易闭环 MVP</b><span>2026.09 – 11 中 · 10/15 一期呈现</span></div>
+        <div class="pb">
+          <div class="k">范围</div><div class="v">rental + minsu 两频道 · 单渠道（贝壳 APP/小程序）· 贵阳单城试点（0903 纪要）</div>
+          <div class="k">北极星</div>
+          <div class="north"><b>跑出基线：</b>泉湖标杆房源全链路贯通 → 10/20 后评估贵阳 BD 目标再扩量；漏斗/接通率/退改率基线供二期定目标</div>
+        </div>
+      </div>
+      <div class="pcard p2">
+        <div class="pt"><b>二期 · 体验与内容</b><span>2026.11 下 – 2027.01 · 康养季插件</span></div>
+        <div class="pb">
+          <div class="k">范围</div><div class="v">IM / VR / 保险 / 周边内容 / 券中心 —— 插件式增强，不动交易模型</div>
+          <div class="k">北极星</div>
+          <div class="north"><b>转化提升：</b>详情→下单转化率对比一期基线的环比提升幅度</div>
+        </div>
+      </div>
+      <div class="pcard p3">
+        <div class="pt"><b>三期 · 服务者评级</b><span>2027.02 – 04 中 · 杜鹃花期 · 培训先行</span></div>
+        <div class="pb">
+          <div class="k">范围</div><div class="v">L0–L7 持证定级 + 培训发证 + 派单/信用 + 责任险 —— 暑期服务承载力</div>
+          <div class="k">北极星</div>
+          <div class="north"><b>履约能力：</b>试点城市持证服务者 ≥500，派单履约率 ≥95%</div>
+        </div>
+      </div>
+      <div class="pcard p4">
+        <div class="pt"><b>四期 · 房源评级</b><span>2027.04 下 – 06 中 · 暑期招商杠杆 · 6月底锁版本</span></div>
+        <div class="pb">
+          <div class="k">范围</div><div class="v">彩贝评级 v2 + 公安/住建/保险核验 + 验真卡 —— 信任资产，分发的入场券</div>
+          <div class="k">北极星</div>
+          <div class="north"><b>信任覆盖：</b>在营房源验真覆盖率 ≥80%，认证房源成为暑期招商卖点</div>
+        </div>
+      </div>
+      <div class="pcard p5">
+        <div class="pt"><b>五期 · 生态扩品</b><span>2027.06 下 – 09 · 渠道分销变现</span></div>
+        <div class="pb">
+          <div class="k">范围</div><div class="v">渠道分销（OTA/社媒/异业/达人）· 置业导购萌芽 —— 支线独立触发</div>
+          <div class="k">北极星</div>
+          <div class="north"><b>渠道放大：</b>分销渠道订单占比 ≥10%（签约分销商 ≥20 家）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- feature matrix -->
+    <div class="mx-card" style="margin-top:14px;">
+      <div class="sec-head" style="margin-bottom:10px;">
+        <h3 style="font-size:15px;">🧩 整体功能矩阵图</h3>
+        <span class="sub">行 = 能力域 · 列 = 迭代期 · <span class="cap">金色 = 该期主建交付</span></span>
+      </div>
+      <table class="mx">
+        <thead>
+          <tr>
+            <th style="width:86px;">能力域</th>
+            <th>具体能力</th>
+            <th class="ph" style="background:#0d9488;width:118px;">一期<br><small style="font-weight:500;">交易闭环</small></th>
+            <th class="ph" style="background:#0b5d56;width:118px;">二期<br><small style="font-weight:500;">体验内容</small></th>
+            <th class="ph" style="background:#b45309;width:118px;">三期<br><small style="font-weight:500;">服务者评级</small></th>
+            <th class="ph" style="background:#0f766e;width:118px;">四期<br><small style="font-weight:500;">房源评级</small></th>
+            <th class="ph" style="background:linear-gradient(120deg,#0b5d56,#b45309);width:118px;">五期<br><small style="font-weight:500;">生态扩品</small></th>
+            <th class="ph" style="background:#475569;width:104px;">贯穿</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- A 交易闭环 -->
+          <tr><td class="dom">🛒 交易闭环</td>
+            <td class="feat">房源展示与图集<small>缩略图管线 .t240/.t640 · 每套 ≥8 图</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">持续</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">房态日历 + 最短连住<small>stay_calendar 三态 · stay_bookable 开关</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">持续</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">400 电话 · 虚拟号拨商家<small>实时绑号不缓存 · 号码不落端上</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk plus">◐ 录音质检+归因</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">全年战略能力</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">下单 → 支付（银行存管）→ 退款<small>订单状态机 · 电子凭证</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">旺季只热修</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">商家结算 · 分账 · 发票对账<small>佣金比例配置化 · 发票位预留</small></td>
+            <td class="cell"><span class="mk main">● 结算</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 发票/对账完善</span></td><td class="cell"><span class="mk plus">◐ 服务分账 T+7</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <!-- B 体验内容 -->
+          <tr><td class="dom">✨ 体验内容</td>
+            <td class="feat">IM 即时通讯<small>C ⇄ 商家 · 虚拟号协同 · 留痕 6 个月</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">VR / 720° 全景看房<small>高彩贝房源优先覆盖</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">保险（取消险/家财/换租/责任险）<small>INSURANCE_TYPES 枚举 · 持牌险企 API · 全链路分期落地</small></td>
+            <td class="cell"><span class="mk pre">○ 字段预留</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk plus">◐ 责任险兜底</span></td><td class="cell"><span class="mk plus">◐ 核验状态进卡片</span></td><td class="cell"><span class="mk plus">◐ 渠道保障权益包</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">周边内容（景区/美食/笔记）<small>spots 维度 + 小红书式笔记页</small></td>
+            <td class="cell"><span class="mk pre">○ 种子数据</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 内容挂分销渠道</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">适老化 / 银发适配<small>大字版 · 子女代订 · 电话兜底</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 增强</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <!-- C 信任资产 -->
+          <tr><td class="dom">🐚 房源评级</td>
+            <td class="feat">旅居彩贝评级<small>一期标签直显 → 四期引擎 v2 动态调级</small></td>
+            <td class="cell"><span class="mk pre">○ 标签</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 引擎 v2</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">动态复核</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">公安 / 住建 / 保险核验<small>接口不到位 → 平台自核+承诺书灰标</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">验真卡片 + 扫码验真<small>验证编号 · 一卡多用 · 公示门户</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 服务者持证卡</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">口径唯一</span></td></tr>
+          <!-- D 服务者评级 -->
+          <tr><td class="dom">🪪 服务者评级</td>
+            <td class="feat">服务者 L0–L7 分级认证<small>持证编号 + 验真 + 派单资格</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">月度滚动</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">培训机构 + 课程认证<small>T 招生/排课排考 ⇄ P 考务/结业/发证</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">派单引擎 + 信用引擎<small>按级派单 · 评价回流 · 服务工单与订单打通</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">复用 _jzapi 总线</span></td></tr>
+          <!-- E 生态扩品 -->
+          <tr><td class="dom">🌍 生态扩品</td>
+            <td class="feat">渠道分销网络<small>佣金 / 包销双模式（0903 纪要已列需求池）· 分销商入驻分级 · 渠道专属价与库存分发 · 对账</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk pre">○ 异业试水</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 分销物料开放</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">OTA 直连<small>同程/携程/途家/美团 · 中心库存防超卖</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk pre">◐ 中心库存设计</span></td><td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">社媒内容分发<small>抖音/小红书 · 内容即获客</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk pre">◐ 试点投放</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk main">● 规模化</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">异业合作<small>贵州银行分期 · 哈啰 · 联名权益</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 增强</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">置业导购萌芽<small>旅居客→新房/二手线索标记与归因 · 装修软装打包</small></td>
+            <td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk pre">○ 线索萌芽</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <!-- F 增长与商业化（贯穿） -->
+          <tr><td class="dom">🎯 增长商业化</td>
+            <td class="feat">优惠券 / 营销工具<small>券中心 · 钱包 · 套餐价 · 营销日历贯穿全年</small></td>
+            <td class="cell"><span class="mk plus">◐ 基础券</span></td><td class="cell"><span class="mk main">● 券中心+钱包</span></td><td class="cell"><span class="mk plus">◐ 服务体验券</span></td><td class="cell"><span class="mk plus">◐ 预售复购券</span></td><td class="cell"><span class="mk main">● 渠道/分销券</span></td><td class="cell"><span class="mk run">营销日历</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">差别化佣金 / 分账策略<small>费率跟着评级 / 等级 / 渠道走 · 配置化不硬编码</small></td>
+            <td class="cell"><span class="mk main">● 配置化地基</span></td><td class="cell"><span class="mk plus">◐ 活动/渠道费率</span></td><td class="cell"><span class="mk main">● 等级挂钩分账</span></td><td class="cell"><span class="mk main">● 评级挂钩费率</span></td><td class="cell"><span class="mk main">● 分销分级佣金</span></td><td class="cell"><span class="mk run">策略看板</span></td></tr>
+          <!-- H 全年贯穿线 -->
+          <tr><td class="dom">🧭 全年贯穿线</td>
+            <td class="feat">用户体验 · 体验主线<small>每期一个体验主题 · NPS 护栏 · 每期体验走查</small></td>
+            <td class="cell"><span class="mk main">● 首订链路</span></td><td class="cell"><span class="mk plus">◐ 体验分层</span></td><td class="cell"><span class="mk plus">◐ 信任可视化</span></td><td class="cell"><span class="mk main">● 服务过程可视</span></td><td class="cell"><span class="mk plus">◐ 全渠道一致</span></td><td class="cell"><span class="mk run">NPS 护栏</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">供给运营 · 供给主线<small>供给健康度看板 · 商家分层运营 · BD 产能配额</small></td>
+            <td class="cell"><span class="mk main">● 招商标杆 50 套</span></td><td class="cell"><span class="mk plus">◐ 内容与商家经营</span></td><td class="cell"><span class="mk plus">◐ 房源质量运营</span></td><td class="cell"><span class="mk main">● 服务者产能</span></td><td class="cell"><span class="mk plus">◐ 渠道供给</span></td><td class="cell"><span class="mk run">供给健康度</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">交易健壮性 · 交易主线<small>0 资损红线 · 幂等防重 · 对账日清 · 旺季压测</small></td>
+            <td class="cell"><span class="mk main">● 交易地基</span></td><td class="cell"><span class="mk plus">◐ 退改×保险联动</span></td><td class="cell"><span class="mk plus">◐ 防超卖模型</span></td><td class="cell"><span class="mk plus">◐ 履约兜底仲裁</span></td><td class="cell"><span class="mk main">● 多渠道一致</span></td><td class="cell"><span class="mk run">故障演练</span></td></tr>
+          <!-- G 底座合规 -->
+          <tr><td class="dom">🧱 底座合规</td>
+            <td class="feat">埋点与数据基线<small>浏览→下单→支付漏斗 · 无埋点不评估</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">北极星看板</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">客服与人工干预后台<small>改单/退款审核/投诉工单/紧急下架</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk plus">◐ SLA 工具</span></td><td class="cell"><span class="mk plus">◐ 服务投诉联动</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">处置率护栏</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">商家入驻全流程<small>签约/保证金/结算账户/HMAC 密钥发放</small></td>
+            <td class="cell"><span class="mk main">● 主建</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 自助化</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 分销商接入复用</span></td><td class="cell"><span class="mk none">—</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">等保三级 / ICP·EDI 许证<small>周期 2–3 个月 · 政府接口前置条件</small></td>
+            <td class="cell"><span class="mk plus">◐ 启动测评</span></td><td class="cell"><span class="mk plus">◐ 整改</span></td><td class="cell"><span class="mk main">● 完成拿证</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk run">年度复测</span></td></tr>
+          <tr><td class="dom"></td>
+            <td class="feat">监管大屏（G 端只读）<small>监管维度，不看一线工单（视角红线）</small></td>
+            <td class="cell"><span class="mk pre">○ 只读汇总</span></td><td class="cell"><span class="mk none">—</span></td><td class="cell"><span class="mk plus">◐ 服务履约</span></td><td class="cell"><span class="mk plus">◐ 达标率/验真</span></td><td class="cell"><span class="mk pre">○ 一张网·<span class="cap">上限假设</span></span></td><td class="cell"><span class="mk none">—</span></td></tr>
+        </tbody>
+      </table>
+      <div class="legend">
+        <span><span class="mk main">● 主建</span> 该期核心交付，进 stage-gate 出口标准</span>
+        <span><span class="mk plus">◐ 增强</span> 在已主建能力上迭代</span>
+        <span><span class="mk pre">○ 预留</span> 示意/设计/灰标，未承诺</span>
+        <span><span class="mk none">—</span> 不涉及</span>
+        <span><span class="mk run">持续</span> 贯穿全年运行项</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== §2 PHASE TABS ===== -->
+  <section class="sec" id="phases">
+    <div class="sec-head">
+      <div class="idx">二</div>
+      <h2>分阶段评估 · 用户价值-产品 / 平台运营 / 城市运营</h2>
+      <span class="sub">每个阶段一个 tab；三个视角各自回答「为什么做、做什么、靠什么落地」</span>
+    </div>
+
+    <div class="tabbar" id="tabbar" role="tablist" aria-label="迭代阶段">
+      <button id="tab-p1" class="active" type="button" role="tab" aria-selected="true" aria-controls="p1" data-tab="p1"><span class="dot" style="background:#0d9488"></span>一期 · 交易闭环 <span class="tm">26.09–11</span></button>
+      <button id="tab-p2" type="button" role="tab" aria-selected="false" aria-controls="p2" data-tab="p2"><span class="dot" style="background:#0b5d56"></span>二期 · 体验内容 <span class="tm">26.11–27.01</span></button>
+      <button id="tab-p3" type="button" role="tab" aria-selected="false" aria-controls="p3" data-tab="p3"><span class="dot" style="background:#b45309"></span>三期 · 服务者评级 <span class="tm">27.02–04</span></button>
+      <button id="tab-p4" type="button" role="tab" aria-selected="false" aria-controls="p4" data-tab="p4"><span class="dot" style="background:#0f766e"></span>四期 · 房源评级 <span class="tm">27.04–06</span></button>
+      <button id="tab-p5" type="button" role="tab" aria-selected="false" aria-controls="p5" data-tab="p5"><span class="dot" style="background:linear-gradient(90deg,#0b5d56,#b45309)"></span>五期 · 生态扩品 <span class="tm">27.06–09</span></button>
+    </div>
+
+    <!-- ============ P1 ============ -->
+    <div class="panel active" id="p1" role="tabpanel" aria-labelledby="tab-p1">
+      <div class="ph-head p1">
+        <div class="hb">
+          <span class="no">壹</span>
+          <div class="tt"><b>交易闭环 MVP —— 能住、能付、能结</b><span>2026.09 – 2026.11 中 · 约 10 周 + 2 周运营调优</span></div>
+          <span class="anchor">📍 硬节点：10/15 一期呈现 · 支付完成后 2 周内全面上线（0903 纪要）· 康养季前完成</span>
+        </div>
+        <div class="hb-body">
+          <span class="scope-chip">频道：rental + minsu</span><span class="scope-chip">渠道：贝壳 APP / 小程序 单渠道</span>
+          <span class="scope-chip">城市：贵阳单城（0903 纪要 · 10/20 后评估扩容）</span><span class="scope-chip">房源双模式：在线预订 / 400 电话咨询</span>
+        </div>
+      </div>
+      <div class="lenses">
+        <div class="lens u">
+          <div class="lh">👤 用户价值 · 产品<span>C 端 / 业主 / 商家</span></div>
+          <ul>
+            <li><b>旅居客：</b>房源展示与图集、详情、筛选（区域/价格/房型/彩贝标签）</li>
+            <li><b>旅居客：</b>房态日历 + 最短连住；未开通在线预订的房源一键 <b>400 虚拟号</b>拨商家（实时绑号、不缓存）</li>
+            <li><b>旅居客：</b>下单 → 支付（微信 + 银行存管）→ 取消/退款 → 订单状态机 → 电子凭证</li>
+            <li><b>营销基础</b>：新人首单券、拉新券发放（券位与核销埋点预留，差别化营销的起点）</li>
+            <li><b>业主：</b>批量导入、上下架、收益看板雏形、结算账单</li>
+            <li><b>商家：</b>订单确认、房态维护、按晚预订开关（缺省 false=仅电话）</li>
+          </ul>
+        </div>
+        <div class="lens o">
+          <div class="lh">⭐ 平台运营<span>中台能力建设</span></div>
+          <ul>
+            <li><b>商家入驻全流程</b><span class="new">易低估</span>：签约、保证金、结算账户收集、HMAC 密钥发放、入驻进度看板</li>
+            <li><b>客服与人工干预后台</b><span class="new">必答题</span>：改单、退款审核、投诉工单、紧急下架（投诉处置率指标的工具底座）</li>
+            <li><b>结算引擎</b>：一期费率暂定 <b>10%</b> 平台费用 + 折扣设计（0903 纪要），配置化不硬编码——差别化佣金的策略地基；发票与对账位预留</li>
+            <li><b>埋点与数据基线</b>：浏览→下单→支付漏斗；一期跑出基线，二期目标基于基线定</li>
+            <li><b>安全基线</b>：敏感路径拦截、密钥只进 .env、演示种子与真实数据隔离</li>
+          </ul>
+        </div>
+        <div class="lens c">
+          <div class="lh">🏙 城市运营<span>试点落地</span></div>
+          <ul>
+            <li><b>招商工具当产品需求</b><span class="new">冷启动</span>：快速录入向导、批量照片上传、AI 收益估算当业主招商钩子</li>
+            <li><b>两级目标</b>：标杆聚焦泉湖公园特色民宿（0903 纪要），50 套跑通全链路；10/20 后评估贵阳 BD 目标再定扩量节奏</li>
+            <li><b>政府背书杠杆</b>：王市长六件事督办、相关局长沟通（0903 纪要政府线）；BD 地推团队是供给瓶颈，配额到位</li>
+            <li><b>G 端只读汇总</b>：接入数 / GMV / 结算量 —— 监管维度，不看一线工单（视角红线）</li>
+            <li><b>等保三级测评启动</b><span class="new">周期长</span>：政府数据接口的前置条件，一期就要排队</li>
+          </ul>
+        </div>
+      </div>
+      <div class="gate">
+        <div class="g commit"><b>✅ 出口标准（承诺 · 试点期可控）</b>10/15 一期呈现 · 支付完成后 2 周内全面上线 · 支付成功率 ≥98% · 结算准确率 100%、0 资损 · 400 接通率 ≥90% · 泉湖标杆房源全链路贯通 · 漏斗/接通/退改基线产出 · 交易上线前完成对应小程序类目资质。<b>未达标 → 延期 / 缩范围 / 重做试点，不进二期。</b></div>
+        <div class="g capbox"><b>📈 上限假设（非承诺）</b>200 套房源接入、GMV 规模依赖招商传导与政策背书，仅作试点目标不作推广承诺；二期转化目标以一期基线为准，现在不拍数字。</div>
+      </div>
+      <div class="riskline">⚠ 风险与依赖：① 资金合规——一期即银行存管，不做资金池；② 招商不及预期→缩到 1 城 50 套先跑通；③ 小程序类目资质（ICP/EDI）是交易上线前置条件，必须在一期出口前拿到；等保三级测评可与后续整改并行推进。</div>
+    </div>
+
+    <!-- ============ P2 ============ -->
+    <div class="panel" id="p2" role="tabpanel" aria-labelledby="tab-p2" hidden>
+      <div class="ph-head p2">
+        <div class="hb">
+          <span class="no">贰</span>
+          <div class="tt"><b>体验与内容 —— 提转化，不改交易模型</b><span>2026.11 下 – 2027.01 · 约 10 周</span></div>
+          <span class="anchor">📍 季节锚点：康养季中上线低风险插件 · 春节前 IM/VR 就绪承接节后预订</span>
+        </div>
+        <div class="hb-body">
+          <span class="scope-chip">全部为插件式增强</span><span class="scope-chip">不动订单与资金模型</span>
+          <span class="scope-chip">内容即获客</span><span class="scope-chip">❄ 1/15–2/20 春节高峰冻结</span>
+        </div>
+      </div>
+      <div class="lenses">
+        <div class="lens u">
+          <div class="lh">👤 用户价值 · 产品<span>C 端 / 商家</span></div>
+          <ul>
+            <li><b>IM 即时通讯</b>：旅居客 ⇄ 商家，虚拟号协同、离线消息、合规留痕 6 个月</li>
+            <li><b>VR / 720° 全景</b>：高彩贝房源优先覆盖，作为房源质量加权项</li>
+            <li><b>保险</b>：取消险 / 家财险 / 换租险（复用 INSURANCE_TYPES），与退款规则联动——买了取消险享宽松退改</li>
+            <li><b>周边内容</b>：spots 规模化（景区/商圈/美食/咖啡 + 笔记页），笔记挂房源、内容即种草</li>
+            <li><b>银发适配</b><span class="new">差异化</span>：大字版、子女代订、电话客服兜底、月付慢长住</li>
+            <li><b>券中心 + 钱包 + 套餐价</b><span class="new">贯穿</span>：营销主战场，康养季首场券大促；差别化佣金释放的费率空间在这里变成用户让利</li>
+          </ul>
+        </div>
+        <div class="lens o">
+          <div class="lh">⭐ 平台运营<span>中台能力建设</span></div>
+          <ul>
+            <li><b>内容中台</b>：PGC → UGC 流程 + 内容审核（照骗/虚假宣传/广告法用词）</li>
+            <li><b>保险对接</b>：只与持牌险企 API 对接，平台仅投保分发，不碰精算、不碰牌照</li>
+            <li><b>客服 SLA 工具</b>：首响 ≤3 分钟的目标看板与排班</li>
+            <li><b>IM 合规</b>：记录留存、敏感词、未成年人保护</li>
+            <li><b>流量承接</b>：贝壳 APP 主入口流量位排期在二期前谈定，内容上线即有承接面</li>
+          </ul>
+        </div>
+        <div class="lens c">
+          <div class="lh">🏙 城市运营<span>试点落地</span></div>
+          <ul>
+            <li><b>康养季运营</b>：温泉 / 苗年侗年专题页 + 首场券大促，银发客群专属活动（康养季主力人群）</li>
+            <li><b>内容本地化</b>：贵阳/黔东南周边地点种子扩到试点全城，笔记与房源双向挂载</li>
+            <li><b>站外投放试点</b>：抖音/小红书小预算试投，验证内容→详情 CTR 再谈放量</li>
+            <li><b>VR 拍摄组织</b>：按城市排拍摄档期（供应商集中拍摄降本）</li>
+            <li><b>春节值班</b>：康养高峰冻结期客服与 400 兜底排班</li>
+          </ul>
+        </div>
+      </div>
+      <div class="gate">
+        <div class="g commit"><b>✅ 出口标准（承诺）</b>IM 人工首响 ≤3 分钟 · 高彩贝房源 VR 覆盖 ≥60% · 取消险投保率 ≥30% · 周边内容绑定房源 ≥80% · 详情→下单转化率对比一期基线的提升幅度达标。</div>
+        <div class="g capbox"><b>📈 上限假设（非承诺）</b>站外内容带来的 MAU / 站外流量规模依赖社媒平台与投放预算，属上限假设；内容转化数据仅作放量决策依据。</div>
+      </div>
+      <div class="riskline">⚠ 风险与依赖：① 保险精算与牌照——只做分销不分保；② 内容审核人力不足→先 PGC 收口，UGC 后置灰度；③ 春节冻结期发布窗口收窄→插件功能须 1 月上旬全量。</div>
+    </div>
+
+    <!-- ============ P3 ============ -->
+    <div class="panel" id="p3" role="tabpanel" aria-labelledby="tab-p3" hidden>
+      <div class="ph-head p3">
+        <div class="hb">
+          <span class="no">叁</span>
+          <div class="tt"><b>服务者评级 —— 把「人」变成基础设施</b><span>2027.02 – 2027.04 中 · 约 10 周 · 4 月底锁版本</span></div>
+          <span class="anchor">📍 季节锚点：杜鹃花期启动培训招生 · 培训产能先行，暑期服务承载力提前就绪</span>
+        </div>
+        <div class="hb-body">
+          <span class="scope-chip">L0–L7 分级认证</span><span class="scope-chip">培训发证闭环（T ⇄ P）</span>
+          <span class="scope-chip">派单 + 信用引擎</span><span class="scope-chip">服务者网络与家政频道合一</span>
+        </div>
+      </div>
+      <div class="lenses">
+        <div class="lens u">
+          <div class="lh">👤 用户价值 · 产品<span>C 端 / 服务者</span></div>
+          <ul>
+            <li><b>旅居客：</b>可查「持证管家」——L 等级、持证编号、验真、责任险兜底，住得放心留得住</li>
+            <li><b>旅居客：</b>订单 → 服务工单打通（家政/维修/管家/接送，复用 _jzapi 总线），评价回流</li>
+            <li><b>服务者：</b>实名持证上岗、按级派单、T+7 分账、信用分月度滚动升降级</li>
+            <li><b>服务商：</b>L5 商业认证、团队管理、批量承接</li>
+          </ul>
+        </div>
+        <div class="lens o">
+          <div class="lh">⭐ 平台运营<span>中台能力建设</span></div>
+          <ul>
+            <li><b>认证发证链路</b>：培训中心 → 题库机考 → 统一发证（持证编号 + 验真 + 派单资格）</li>
+            <li><b>T 端接入</b>：培训机构招生 / 排课排考 ⇄ 中台考务审批 / 结业核发 / 课程认证</li>
+            <li><b>派单引擎</b>：按等级分发 + 履约跟踪；<b>信用引擎</b>：客户评价→信用分→流量权重</li>
+            <li><b>等级挂钩分账</b><span class="new">贯穿</span>：派单分成随 L 等级与信用分浮动——等级越高分成越高（差别化佣金第二级）</li>
+            <li><b>一套服务者网络</b><span class="new">防重复建设</span>：与家政频道（jz_workers）共用体系与权限口径，不另起炉灶</li>
+            <li><b>责任险</b>：与二期保险通道复用，服务过程兜底</li>
+          </ul>
+        </div>
+        <div class="lens c">
+          <div class="lh">🏙 城市运营<span>试点落地</span></div>
+          <ul>
+            <li><b>持证规模</b>：试点城市持证服务者 ≥500、合作培训机构 ≥3 家（培训产能先于旺季）</li>
+            <li><b>承载力演练</b>：5–6 月完成旺季服务 SLA 压测（单量峰值 / 履约率 / 客服排班）</li>
+            <li><b>人社/住建联动</b>：职业资格库对接、白名单审定进公示门户</li>
+            <li><b>旺季纪律</b>：全平台 6 月底锁版本；7/1–8/31 冻结窗口制度化，只允许热修与增量 SKU</li>
+          </ul>
+        </div>
+      </div>
+      <div class="gate">
+        <div class="g commit"><b>✅ 出口标准（承诺）</b>试点城市持证服务者 ≥500 · 合作培训机构 ≥3 · 派单履约率 ≥95% · 服务彩贝均分 ≥4.5 · 4 月底版本冻结，5–6 月留旺季压测与补训缓冲。</div>
+        <div class="g capbox"><b>📈 上限假设（非承诺）</b>全省服务者规模、培训机构扩容速度依赖人社政策与培训产能传导，属上限假设；未达标先保试点城市旺季，不跨市铺开。</div>
+      </div>
+      <div class="riskline">⚠ 风险与依赖：① 培训产能不足→持证数是旺季最大瓶颈，三期 2 月开工即启动招生，5–6 月补训缓冲；② 双体系风险——与家政频道强行合一，宁可慢不可两套；③ 旺季发版风险→冻结窗口一票否决。</div>
+    </div>
+
+    <!-- ============ P4 ============ -->
+    <div class="panel" id="p4" role="tabpanel" aria-labelledby="tab-p4" hidden>
+      <div class="ph-head p4">
+        <div class="hb">
+          <span class="no">肆</span>
+          <div class="tt"><b>房源评级 —— 信任资产，分发的入场券</b><span>2027.04 下 – 2027.06 中 · 约 9 周 · 6 月底锁版本</span></div>
+          <span class="anchor">📍 季节锚点：暑期房源招商杠杆 · 旺季前信任资产就绪 · 硬 deadline 6 月底</span>
+        </div>
+        <div class="hb-body">
+          <span class="scope-chip">公安 / 住建 / 保险三路核验</span><span class="scope-chip">验证编号 + 验真卡 + 扫码</span>
+          <span class="scope-chip">彩贝评级引擎 v2</span><span class="scope-chip">电商法 38 条核验义务落地</span>
+        </div>
+      </div>
+      <div class="lenses">
+        <div class="lens u">
+          <div class="lh">👤 用户价值 · 产品<span>C 端 / 商家</span></div>
+          <ul>
+            <li><b>旅居客：</b>验真卡片（验证编号 + 扫码验真）、公安实名 / 住建产权租赁 / 保险投保「已核验」徽章</li>
+            <li><b>旅居客：</b>彩贝评级 v2 五维透明展示，评级可追溯、动态调级公示</li>
+            <li><b>一卡多用</b>：详情页 / 渠道分发页 / 扫码验真引用同一张卡片，口径唯一</li>
+            <li><b>商家：</b>认证房源=分发溢价与招商卖点；评级工作台（复核/申诉/调级）</li>
+          </ul>
+        </div>
+        <div class="lens o">
+          <div class="lh">⭐ 平台运营<span>中台能力建设</span></div>
+          <ul>
+            <li><b>核验对接</b>：公安（实名/治安备案）、住建（产权/租赁备案电子证照）、保险（投保状态）</li>
+            <li><b>灰标备选</b><span class="new">关键</span>：接口不到位时以「平台自核 + 商家承诺书」先行，徽章标「平台核验」，接口到位升级「已核验」</li>
+            <li><b>评级引擎 v2</b>：五维自动评分 → 抽检复核 → 动态调级 → 公示门户可查</li>
+            <li><b>评级挂钩差别化佣金</b><span class="new">贯穿</span>：高彩贝低费率、低彩贝高费率——让评级有直接经营价值（差别化佣金第三级）</li>
+            <li><b>真实性风控</b>：AI 图像查重防照骗 + 实地抽检（抽检成本进四期运营预算）</li>
+            <li><b>中心库存模型设计</b><span class="new">前置</span>：为五期 OTA 直连防超卖打地基；发票/对账在此期完善</li>
+          </ul>
+        </div>
+        <div class="lens c">
+          <div class="lh">🏙 城市运营<span>试点落地</span></div>
+          <ul>
+            <li><b>覆盖率冲刺</b>：在营房源验证编号覆盖 ≥80%，逐城清零</li>
+            <li><b>政企接口谈判</b>：凭等保三级报告 + 试点数据换公安/住建数据接口（等保已于三期完成拿证）</li>
+            <li><b>暑期招商</b>：以「认证房源 + 彩贝评级」为杠杆承接 5 月起的暑期房源招商，评级即卖点</li>
+            <li><b>公示门户</b>：公众可扫码查编号与核验状态，承接政府监督与媒体报道</li>
+          </ul>
+        </div>
+      </div>
+      <div class="gate">
+        <div class="g commit"><b>✅ 出口标准（承诺）</b>在营房源验真覆盖率 ≥80% 且可扫码 · 彩贝评级完成率 100%（在营）· 复核 SLA ≤5 个工作日 · 6 月底版本冻结（等保三级 + ICP/EDI 已于三期拿证）。</div>
+        <div class="g capbox"><b>📈 上限假设（非承诺）</b>政府数据接口的开通排期不可控（政策传导）——覆盖率指标以「平台自核灰标」口径先行统计，接口到位后切换为「已核验」口径并重算基线。</div>
+      </div>
+      <div class="riskline">⚠ 风险与依赖：① 政策传导→接口排期（高概率/极高影响）→灰标方案兜底；② 电商法资质核验是法定义务非卖点，出事平台连带；③ 实地抽检成本超预算→按彩贝分层抽检；④ 6 月底硬 deadline→评级引擎 5 月中封版，留复核缓冲。</div>
+    </div>
+
+    <!-- ============ P5 ============ -->
+    <div class="panel" id="p5" role="tabpanel" aria-labelledby="tab-p5" hidden>
+      <div class="ph-head p5">
+        <div class="hb">
+          <span class="no">伍</span>
+          <div class="tt"><b>生态扩品 —— 渠道分销 / 渠道放大 / 置业萌芽</b><span>2027.06 下 – 2027.09 · 暑期旺季 + 年度复盘</span></div>
+          <span class="anchor">📍 季节锚点：暑期旺季只上增量型 SKU，不动交易模型 · 9 月年度 stage-gate 评审</span>
+        </div>
+        <div class="hb-body">
+          <span class="scope-chip">渠道分销网络（OTA/社媒/异业/达人）</span><span class="scope-chip">OTA 直连（中心库存上线）</span>
+          <span class="scope-chip">社媒分发规模化</span><span class="scope-chip">置业导购萌芽（线索归因）</span>
+          <span class="scope-chip">三条支线按 stage-gate 独立触发</span>
+        </div>
+      </div>
+      <div class="lenses">
+        <div class="lens u">
+          <div class="lh">👤 用户价值 · 产品<span>C 端</span></div>
+          <ul>
+            <li><b>渠道分销</b>：OTA / 社媒达人 / 异业 / 企业渠道带客进来，同一中心库存、渠道专属价</li>
+            <li><b>分销权益</b>：渠道券 + 保障权益包（取消险/家财联名），分销商可自主组货分发</li>
+            <li><b>OTA 同价预订</b>：携程/同程/途家/美团渠道进来的旅居客同一库存同一价</li>
+            <li><b>置业导购萌芽</b>：旅居客 → 新房/二手线索标记与归因，装修软装「拎包入住」打包</li>
+          </ul>
+        </div>
+        <div class="lens o">
+          <div class="lh">⭐ 平台运营<span>中台能力建设</span></div>
+          <ul>
+            <li><b>分销商接入</b>：入驻/分级复用商家 HMAC 开放接口与入驻流程，零新协议</li>
+            <li><b>中心库存上线</b>：四期设计的 channel manager 投产，多渠道防超卖</li>
+            <li><b>分销运营</b><span class="new">贯穿</span>：差别化佣金分级费率（分销商分级定价）+ 渠道专属价 + 分销对账与反刷单</li>
+            <li><b>渠道分发放大</b>：验真+评级卡片嵌入 OTA/社媒/异业，转化回流房源库</li>
+            <li><b>商业化收口</b>：分销佣金差、渠道分发广告位、认证年费（SaaS 化）</li>
+            <li><b>年度复盘</b>：北极星（入住间夜）与护栏指标全年盘点，输出下一年 stage-gate 结论</li>
+          </ul>
+        </div>
+        <div class="lens c">
+          <div class="lh">🏙 城市运营<span>试点落地</span></div>
+          <ul>
+            <li><b>渠道签约</b>：签约分销渠道 ≥20 家（OTA/社媒达人/异业/企业，西江/黄果树/荔波带客优先），佣金与专属价谈判</li>
+            <li><b>旺季运营</b>：暑期增量活动（套餐/异业权益），冻结窗口内不发大功能</li>
+            <li><b>置业线索运营</b>：旅居客→购房线索移交新房/二手团队，装修服务打包进康养长住</li>
+            <li><b>复制评审</b>：年度 stage-gate 决定是否跨市复制（遵义/铜仁/安顺…）——不自动滚动</li>
+          </ul>
+        </div>
+      </div>
+      <div class="gate">
+        <div class="g commit"><b>✅ 出口标准（承诺）</b>分销网络上线（入驻/佣金/对账全链路）· 签约分销渠道 ≥20 家 · 分销渠道订单占比 ≥10% · 中心库存 0 超卖 · 北极星（入住间夜）年度复盘达标。</div>
+        <div class="g capbox"><b>📈 上限假设（非承诺 · 年度评审项）</b>OTA 渠道 GMV 占比 ≥15%（依赖商务谈判）· 全省一张网 / 全省房源数 / MAU（政策推动后的上限假设）· 跨市复制以年度 stage-gate 结论为准，不自动启动。</div>
+      </div>
+      <div class="riskline">⚠ 风险与依赖：① 旺季发版风险→只上增量功能；② 渠道价格/佣金体系混乱→差别化佣金策略引擎 + 渠道比价监控；③ OTA 谈判节奏不可控→支线独立触发；置业线索只记线索不计转化承诺。</div>
+    </div>
+  </section>
+
+  <!-- ===== §3 CROSS-CUTTING ===== -->
+  <section class="sec" id="cross">
+    <div class="sec-head">
+      <div class="idx">三</div>
+      <h2>贯穿线 · 机制 · 风险</h2>
+      <span class="sub">合规线 · 机制 · 复用 + 体验 / 供给 / 交易三条全年主线 · 风险表</span>
+    </div>
+    <div class="cross">
+      <div class="xcard">
+        <h4>📜 合规线（贯穿，一期启动）</h4>
+        <ul>
+          <li><b>等保三级</b>：一期启动测评、三期完成拿证——政府数据接口前置条件</li>
+          <li><b>ICP 经营许可 / EDI</b>：在线交易类目与小程序审核门槛</li>
+          <li><b>电商法 §38</b>：经营者资质核验是<b>法定义务</b>，四期「房源评级」按义务对待</li>
+          <li><b>个保法</b>：实名信息最小化存储、虚拟号录音与 IM 留痕合规</li>
+          <li><b>发票与对账</b>：一期预留发票位，四期完善</li>
+        </ul>
+      </div>
+      <div class="xcard">
+        <h4>⚙ 机制保障</h4>
+        <ul>
+          <li><b>北极星唯一</b>：试点城市入住间夜数；其余全降为护栏指标</li>
+          <li><b>旺季冻结窗口</b>：7/1–8/31 与 1/15–2/20，只允许热修与增量 SKU</li>
+          <li><b>stage-gate 评审会</b>：每期出口，产品+运营+政府方三方；结论只有「过 / 缩范围 / 延期」</li>
+          <li><b>运营调优周</b>：每期上线后 2 周只修问题不加功能</li>
+          <li><b>演示/产品分层</b>：静态原型是演示层，真小程序独立选型（Taro/uni-app/原生），边界写进文档</li>
+        </ul>
+      </div>
+      <div class="xcard">
+        <h4>♻ 存量复用（不重复造）</h4>
+        <ul>
+          <li>频道模型（rental/minsu、旅居=rental+「旅居」tag）、房态日历三态、INSURANCE_TYPES</li>
+          <li>spots 周边内容、_jzapi 家政总线、RATING_DIMS 频道评级口径</li>
+          <li>商家 HMAC 开放接口（五期分销商接入直接复用）</li>
+          <li>权限注册表（新 admin 路由必登记）与账号中心</li>
+          <li>newhouse/resale 频道 = 五期置业导购的现成底座</li>
+        </ul>
+      </div>
+    </div>
+    <div class="cross">
+      <div class="xcard">
+        <h4>👆 用户体验 · 全年主线</h4>
+        <ul>
+          <li><b>各期主题</b>：一期首订链路（≤4 步、失败兜底 400）→ 二期体验分层（适老化 / 内容 / IM）→ 三期信任可视化（验真卡 / 评级）→ 四期服务过程可视（工单 / 管家进度）→ 五期全渠道一致</li>
+          <li><b>护栏</b>：NPS / 链路完成率 / IM 首响不跌破基线，跌破即暂停新功能</li>
+          <li><b>性能预算</b>：首屏 ≤2s、图片走缩略图管线；每期上线前体验走查关键路径</li>
+        </ul>
+      </div>
+      <div class="xcard">
+        <h4>🏡 供给运营 · 全年主线</h4>
+        <ul>
+          <li><b>各期主题</b>：一期招商工具 + 50 套标杆 → 二期内容供给与商家经营看板 → 三期房源质量运营（评级辅导 / 焕新）→ 四期服务者产能（培训 / 持证）→ 五期渠道供给（分销商网络）</li>
+          <li><b>护栏</b>：供给健康度看板周更（在营 / 活跃 / 新增 / 流失）；商家按活跃度与彩贝分层</li>
+          <li><b>红线</b>：低质房源与服务者降权、限流乃至退出；招商 / 培训 / 渠道三条 BD 线按期配额</li>
+        </ul>
+      </div>
+      <div class="xcard">
+        <h4>🛒 交易健壮性 · 全年红线</h4>
+        <ul>
+          <li><b>各期主题</b>：一期交易地基（状态机 / 幂等 / 存管对账）→ 二期退改×保险联动 → 三期防超卖模型 → 四期履约兜底与仲裁 → 五期多渠道一致（0 超卖）</li>
+          <li><b>红线</b>：0 资损——支付 / 退款 / 分账对账日清，差异即熔断排查</li>
+          <li><b>降级预案</b>：支付故障→400 兜底；房态异常→暂停可订；旺季前压测 + 故障演练</li>
+        </ul>
+      </div>
+    </div>
+    <table class="risk">
+      <thead><tr><th style="width:34%;">风险</th><th style="width:16%;">概率 / 影响</th><th>应对</th></tr></thead>
+      <tbody>
+        <tr><td>政策传导 → 实际房源/接口接入不足</td><td><span class="lv hi">高 / 极高</span></td><td>试点自证 + 政企联合招商；推广性指标只作上限假设；接口灰标方案兜底</td></tr>
+        <tr><td>旺季发版引发交易故障</td><td><span class="lv md">中 / 极高</span></td><td>4 月底 / 6 月底锁版本；双冻结窗口；旺季只上增量 SKU</td></tr>
+        <tr><td>供给冷启动不及预期（招商慢）</td><td><span class="lv hi">高 / 高</span></td><td>招商工具产品化；50 套标杆先跑通；不及预期缩到 1 城</td></tr>
+        <tr><td>资金合规（存管/分账）</td><td><span class="lv lo">低 / 极高</span></td><td>一期即银行存管，不做资金池；佣金配置化</td></tr>
+        <tr><td>保险精算与牌照边界</td><td><span class="lv md">中 / 高</span></td><td>只与持牌险企 API 对接，平台仅投保分发</td></tr>
+        <tr><td>「照骗」与评价作弊损害口碑</td><td><span class="lv md">中 / 高</span></td><td>四期 AI 图像查重 + 分层实地抽检；评价反作弊与差评工单闭环</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="footer">
+    <p><strong>贵州旅居平台 · 一年产品迭代规划</strong>（lvju-roadmap.html）· 配套页：蓝图总览 <a href="lvju-overview.html">lvju-overview.html</a> · 全链路旅程与需求范围 <a href="lvju-journey.html">lvju-journey.html</a> · 评级体系 <a href="lvju-rating-standard.html">lvju-rating-standard.html</a> · 监管大屏 <a href="lvju-gov-dashboard-map.html">lvju-gov-dashboard-map.html</a></p>
+    <p style="margin-top:6px;">规划口径（一期范围对齐 0903 纪要：下单 · 支付 · 房源展示含照片 · 400 电话；10/15 呈现 · 支付后 2 周全量）：一期跑基线、二期提转化、三期强供给、四期立评级、五期渠道放大看 stage-gate。六条能力贯穿全链路、分期落地——营销：基础券→券中心→渠道券；佣金：配置化→等级挂钩→评级挂钩→分销分级；保险：字段预留→主建→责任险→核验卡→渠道权益包；体验：首订链路→体验分层→信任可视化→服务可视→全渠道一致；供给：招商标杆→内容与商家经营→质量运营→服务者产能→渠道供给；交易：状态机幂等→退改联动→防超卖模型→履约兜底→多渠道一致。所有推广性指标（全省房源数 / MAU / 一张网 / 跨市复制）均为<b>政策推动后的上限假设，非承诺</b>；每期出口未达标则延期、缩范围、重做试点。仅供演示。</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  // 角色导航锚点高亮
+  const links=[...document.querySelectorAll('.rolenav a')];
+  const phaseLinks=links.filter(a=>a.getAttribute('href')==='#phases');
+  function highlightPhase(id){
+    links.forEach(l=>l.classList.toggle('active', l.dataset.tab===id));
+  }
+  links.forEach(a=>a.addEventListener('click',e=>{
+    const href=a.getAttribute('href');
+    if(href==='#phases'){
+      const t=a.dataset.tab; if(t) activateTab(t,false);
+    }
+    const target=document.querySelector(href);
+    if(target){e.preventDefault();target.scrollIntoView({behavior:'smooth'});}
+  }));
+  const spySections=[
+    { el:document.querySelector('#matrix'), id:null },
+    { el:document.querySelector('#phases'), id:'phases' },
+    { el:document.querySelector('#cross'),  id:null },
+  ];
+  if('IntersectionObserver' in window){
+    const io=new IntersectionObserver(es=>{
+      es.forEach(en=>{
+        if(!en.isIntersecting)return;
+        if(en.target.id==='phases'){
+          // 阶段区：高亮当前激活 tab 对应的导航项（缺省一期）
+          const btn=document.querySelector('#tabbar button.active');
+          highlightPhase(btn?btn.dataset.tab:'p1');
+        }else{
+          links.forEach(l=>l.classList.toggle('active', l.getAttribute('href')==='#'+en.target.id));
+        }
+      });
+    },{rootMargin:'-45% 0px -50% 0px'});
+    spySections.forEach(x=>x.el&&io.observe(x.el));
+  }
+
+  // 阶段 tab 切换
+  const buttons=[...document.querySelectorAll('#tabbar button')];
+  function activateTab(id,scroll){
+    buttons.forEach(b=>{
+      const active=b.dataset.tab===id;
+      b.classList.toggle('active',active);
+      b.setAttribute('aria-selected',String(active));
+    });
+    document.querySelectorAll('.panel').forEach(p=>{
+      const active=p.id===id;
+      p.classList.toggle('active',active);
+      p.hidden=!active;
+    });
+    phaseLinks.forEach(l=>l.classList.toggle('active',l.dataset.tab===id));
+    if(history.replaceState){ history.replaceState(null,'','#phases-'+id); }
+    if(scroll){
+      document.getElementById('phases').scrollIntoView({behavior:'smooth'});
+    }
+  }
+  buttons.forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab,false)));
+
+  // 支持通过 URL 恢复阶段 tab（如 #phases-p3）
+  const initialTab=(location.hash.match(/^#phases-(p[1-5])$/)||[])[1];
+  if(initialTab) activateTab(initialTab,false);
+
+  // 矩阵列高亮：hover 期表头时整列提亮
+  document.querySelectorAll('table.mx thead th.ph').forEach((th,i)=>{
+    th.addEventListener('mouseenter',()=>{
+      document.querySelectorAll('table.mx tbody tr').forEach(tr=>{
+        const cell=tr.children[2+i]; if(cell)cell.style.background='color-mix(in oklab, var(--gold) 7%, transparent)';
+      });
+    });
+    th.addEventListener('mouseleave',()=>{
+      document.querySelectorAll('table.mx tbody td.cell').forEach(td=>td.style.background='');
+    });
+  });
+})();
+</script>
+</body>
+</html>

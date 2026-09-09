@@ -87,6 +87,15 @@
         <div class="note">需求类型：<span class="tags" style="display:inline-flex;"><span>保洁</span><span>维修</span><span>管家服务</span><span>送物</span><span>退住核验</span></span></div>
       </div>
 
+      <div class="card full" id="busCard" hidden>
+        <h3>实时工单 · 旅居客提交 <span class="pill">演示总线 · 本机</span></h3>
+        <table>
+          <thead><tr><th>工单号</th><th>类型</th><th>来源</th><th>房源 / 位置</th><th>期望</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="busRows"></tbody>
+        </table>
+        <div class="note">来源：<b>旅居 App「我的 · 服务工单」</b>（localStorage 演示总线 _orderbus，与下方 API 工单池并行展示、不混写）；派单按演示池轮转分配持证服务者。P 端操作需账号中心登录（未登录时登录层会自动弹出）。</div>
+      </div>
+
       <div class="card full">
         <h3>待派工单 <span class="pill">按优先级排序</span></h3>
         <table>
@@ -108,6 +117,7 @@
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
 <script src="_jzapi.js"></script>
+<script src="_orderbus.js"></script>
 <script>
 const JZ = window.BZF_JZ;
 const PRIO = { '保洁': 'b-hi', '维修': 'b-go', '搬家': 'b-go', '保姆': 'b-hi', '家政': '' };
@@ -174,6 +184,37 @@ function doDispatch(id) {
 JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
+
+/* ===== 实时工单（演示总线 _orderbus）：旅居 App「我的 · 服务工单」提交的真实工单 ===== */
+const BO = window.BZF_ORDERS;
+const BUS_CLS = { pending:'b-wait', dispatched:'b-go', accepted:'b-go', serving:'b-ok' };
+function renderBus() {
+  if (!BO) return;
+  const list = BO.all().filter(o => ['pending','dispatched','accepted','serving'].indexOf(o.status) >= 0);
+  document.getElementById('busCard').hidden = (list.length === 0);
+  document.getElementById('busRows').innerHTML = list.map(o => {
+    const st = BO.STATUS[o.status];
+    const act = o.status === 'pending'
+      ? '<a class="lnk" onclick="busDispatch(\'' + o.id + '\')">派单 →</a>'
+      : '<a class="lnk done">已派 ' + (o.worker ? BO.esc(o.worker.name) : '') + '</a>';
+    return '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
+      '<td>' + BO.esc(o.id) + '</td>' +
+      '<td>' + (BO.ICON[o.type] || '🧰') + ' ' + BO.esc(o.type) + '</td>' +
+      '<td>' + BO.esc(o.source) + ' <span class="badge b-live">实时</span></td>' +
+      '<td>' + BO.esc(o.house) + '</td>' +
+      '<td>' + BO.esc(o.expectTime || '-') + '</td>' +
+      '<td><span class="badge ' + (BUS_CLS[o.status] || 'b-wait') + '">' + st.admin + '</span></td>' +
+      '<td>' + act + '</td></tr>';
+  }).join('');
+}
+function busDispatch(id) {
+  const o = BO.dispatch(id);
+  if (o && o.worker) toast('已派单（演示总线）→ ' + o.worker.name + ' · ' + o.worker.level);
+  renderBus();
+}
+BO.onChange(renderBus);
+window.addEventListener('pageshow', renderBus);
+renderBus();
 </script>
 <script src="_nav.js"></script>
 </body>

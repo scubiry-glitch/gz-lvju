@@ -147,6 +147,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
     tags: ['演示', '回归'],
     min_stay_nights: 15,
     insurance: ['switch_rental', 'property'],
+    stay_bookable: true,
     units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }],
   }));
   check('create → 200 + draft + 默认不入 catalog', r.status === 200 && r.j.project && r.j.project.status === 'draft'
@@ -161,6 +162,15 @@ async function catalogEventually(base, projectId, citySlug, want) {
   // ── 2) 空价上架必须被拦截 ──
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'online' }));
   check('无起价上架被拒 400', r.status === 400, JSON.stringify(r.j));
+
+  // 审核闸与素材闸：回归脚本以平台审核结果作为测试前置，再通过开放接口登记 8 张外部图片。
+  await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [pid]);
+  for (let i = 0; i < 8; i++) {
+    r = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+      project_id: pid, file_path: `https://cdn.example.test/${RUN}-${i}.jpg`, is_cover: i === 0,
+    }));
+    check(`登记房源图片 ${i + 1}/8`, r.status === 200, JSON.stringify(r.j));
+  }
 
   // ── 3) 补价 + 追加户型 → 上架 → catalog 可见 ──
   await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, price_from: 2400 }));
@@ -253,12 +263,22 @@ async function catalogEventually(base, projectId, citySlug, want) {
   // 预付闭环：自建 minsu 演示房（新日历无历史占用），走 未支付拒确认 → 支付 → 确认 → 拒单退款
   r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
     name: RUN + '·回归演示民宿', channel: 'minsu', city_id: city.id, district_id: district.id,
-    price_from: 980, tags: ['演示'], min_stay_nights: 1,
+    price_from: 980, tags: ['演示'], min_stay_nights: 1, stay_bookable: true,
     units: [{ name: '庭院房', price_night: 980 }],
   }));
   const mid = r.j.project && r.j.project.id;
   check('创建 minsu 演示房 → 200', r.status === 200 && !!mid, JSON.stringify(r.j).slice(0, 120));
-  await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: mid, status: 'online' }));
+  if (mid) {
+    // 房源评级由平台审核接口维护；回归脚本只把演示房置为已通过，不绕过上架接口。
+    await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [mid]);
+    for (let i = 0; i < 8; i++) {
+      r = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+        project_id: mid, file_path: `https://cdn.example.test/${RUN}-minsu-${i}.jpg`, is_cover: i === 0,
+      }));
+      check(`登记民宿图片 ${i + 1}/8`, r.status === 200, JSON.stringify(r.j));
+    }
+    await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: mid, status: 'online' }));
+  }
   const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
   const mi1 = tmr.toISOString().slice(0, 10);
   const tmr2 = new Date(tmr); tmr2.setDate(tmr2.getDate() + 1);
@@ -272,13 +292,17 @@ async function catalogEventually(base, projectId, citySlug, want) {
     bkIds.push(bk3.j.order_no);
     r = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, { project_id: mid }));
     const found3 = (r.j.list || []).find((o) => o.order_no === bk3.j.order_no);
-    r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
-    check('minsu 未支付确认被拒 400', r.status === 400 && /未支付/.test(r.j.message || ''), JSON.stringify(r.j));
-    await call('/api/juzhu/booking/pay', { order_no: bk3.j.order_no, contact_phone: bkPhone, pay_method: 'online' });
-    r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
-    check('支付后确认 → confirmed', r.status === 200 && r.j.status === 'confirmed', JSON.stringify(r.j));
-    r = await call('/api/juzhu/housing/vendor/bookings/cancel', signed(vendor, { id: found3.id }));
-    check('已支付拒单 → refunded', r.status === 200 && r.j.pay_status === 'refunded', JSON.stringify(r.j));
+    if (!found3) {
+      check('minsu 订单可被商家查到', false, 'booking not found');
+    } else {
+      r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
+      check('minsu 未支付确认被拒 400', r.status === 400 && /未支付/.test(r.j.message || ''), JSON.stringify(r.j));
+      await call('/api/juzhu/booking/pay', { order_no: bk3.j.order_no, contact_phone: bkPhone, pay_method: 'online' });
+      r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found3.id }));
+      check('支付后确认 → confirmed', r.status === 200 && r.j.status === 'confirmed', JSON.stringify(r.j));
+      r = await call('/api/juzhu/housing/vendor/bookings/cancel', signed(vendor, { id: found3.id }));
+      check('已支付拒单 → refunded', r.status === 200 && r.j.pay_status === 'refunded', JSON.stringify(r.j));
+    }
   }
 
   // 客户侧取消一笔（webhook 的 cancelled 由客户动作触发；商家自己拒单不推给自己）
@@ -287,8 +311,12 @@ async function catalogEventually(base, projectId, citySlug, want) {
     contact_name: '履约回归', contact_phone: bkPhone,
   });
   check('客户再下一单（用于取消事件）', bk4.status === 200, JSON.stringify(bk4.j));
-  bkIds.push(bk4.j.order_no);
-  await call('/api/juzhu/booking/cancel', { order_no: bk4.j.order_no, contact_phone: bkPhone });
+  if (bk4.status === 200 && bk4.j && bk4.j.order_no) {
+    bkIds.push(bk4.j.order_no);
+    // 让本次取消事件首次投递返回 500，验证 webhook 重试链路。
+    failFirst.add('booking.cancelled');
+    await call('/api/juzhu/booking/cancel', { order_no: bk4.j.order_no, contact_phone: bkPhone });
+  }
 
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
@@ -304,7 +332,6 @@ async function catalogEventually(base, projectId, citySlug, want) {
       check('webhook 载荷不含明文手机号', !JSON.stringify(evCreated).includes(bkPhone), '');
     }
     // 首次 500 → 期待重试后仍送达（重试间隔 5s/30s/120s）：等到第 2 次投递落地再断言
-    failFirst.add('booking.cancelled');
     let cancelHits = [];
     const dl2 = Date.now() + 45000;
     while (Date.now() < dl2) {
@@ -329,9 +356,11 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('bookings/confirm 不存在 id → 404', r.status === 404, 'status=' + r.status);
   // 清理本节订单
   for (const id of bkIds) { /* 订单行随项目清理；9001 的单置 cancelled 释放房态 */ }
-  const om = bkIds.map(() => '?').join(',');
-  await conn.execute('DELETE FROM stay_calendar WHERE booking_id IN (SELECT id FROM (SELECT id FROM booking_orders WHERE order_no IN (' + om + ')) t)', bkIds);
-  await conn.execute('DELETE FROM booking_orders WHERE order_no IN (' + om + ')', bkIds);
+  if (bkIds.length) {
+    const om = bkIds.map(() => '?').join(',');
+    await conn.execute('DELETE FROM stay_calendar WHERE booking_id IN (SELECT id FROM (SELECT id FROM booking_orders WHERE order_no IN (' + om + ')) t)', bkIds);
+    await conn.execute('DELETE FROM booking_orders WHERE order_no IN (' + om + ')', bkIds);
+  }
   await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [mid]);
   await conn.execute('DELETE FROM units WHERE project_id=?', [mid]);
   await conn.execute('DELETE FROM projects WHERE id=?', [mid]);

@@ -443,6 +443,7 @@
   });
 
   document.getElementById('bSubmit').addEventListener('click', function(){
+    var submitBtn = document.getElementById('bSubmit');
     err.style.display = 'none';
     if (!curId) { showErr('房源未加载，请稍后再试'); return; }
     var ciV = document.getElementById('fIn').value, coV = document.getElementById('fOut').value;
@@ -454,14 +455,16 @@
       checkin: document.getElementById('fIn').value,
       checkout: document.getElementById('fOut').value,
       contact_name: document.getElementById('fName').value.trim(),
-      contact_phone: document.getElementById('fPhone').value.trim()
+      contact_phone: document.getElementById('fPhone').value.trim(),
+      idempotency_key: 'lvju-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
     };
+    submitBtn.disabled = true; submitBtn.style.opacity = '.55';
     var bHeaders = { 'Content-Type': 'application/json' };
     var bt = tok(); if (bt) bHeaders['Authorization'] = 'Bearer ' + bt;
     fetch('/api/juzhu/booking', { method: 'POST', headers: bHeaders, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
-        if (!res.ok) { showErr(res.j.error || '提交失败'); return; }
+        if (!res.ok) { submitBtn.disabled = false; submitBtn.style.opacity = ''; showErr(res.j.error || '提交失败'); return; }
         document.getElementById('okNo').textContent = res.j.order_no;
         // 民宿（minsu）为预付口径：提交成功后引导收银台支付；长租（rental）预订单走商家确认
         var payBtn = document.getElementById('okPay');

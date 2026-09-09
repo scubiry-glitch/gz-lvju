@@ -59,6 +59,7 @@ const PERMS = [
   { code: 'vendor.product.write', name: '商家商品维护', domain: 'vendor', action: 'write', desc: '商品/SKU 增删改', roles: ['vendor_owner'] },
   { code: 'vendor.worker.read',   name: '商家服务者只读', domain: 'vendor', action: 'read', desc: '花名册读取', roles: ['vendor_owner'] },
   { code: 'vendor.fund.read',     name: '商家资金只读', domain: 'vendor', action: 'read',  desc: '商家对账/佣金', roles: ['vendor_owner'] },
+  { code: 'vendor.onboarding.review', name: '商家入驻受理', domain: 'vendor', action: 'review', desc: '商家入驻申请单受理/核验/通过/驳回（服务认证中台）', roles: ['platform_op', 'operator_admin'] },
 ];
 
 /**
@@ -84,6 +85,14 @@ const ROUTES = [
   { method: 'PUT',    re: '^/api/juzhu/admin/spots/(\\d+)$', perm: 'house.write', act: 'spot.update', res: 'spots', idGroup: 1 },
   { method: 'DELETE', re: '^/api/juzhu/admin/spots/(\\d+)$', perm: 'house.write', act: 'spot.delete', res: 'spots', idGroup: 1 },
   { method: 'PUT',    re: '^/api/juzhu/admin/projects/(\\d+)/spots$', perm: 'house.write', act: 'project.spots.replace', res: 'projects', idGroup: 1 },
+  // 内容域（规则 19）：旅游路线 routes（spots 的有序编排）+ 房源专题 topic_*（settings KV，规则 15 筛选条件）
+  { method: 'GET',    re: '^/api/juzhu/admin/routes$', perm: 'admin.read', act: null, res: null },
+  { method: 'POST',   re: '^/api/juzhu/admin/routes$', perm: 'house.write', act: 'route.create', res: 'routes' },
+  { method: 'PUT',    re: '^/api/juzhu/admin/routes/(\\d+)$', perm: 'house.write', act: 'route.update', res: 'routes', idGroup: 1 },
+  { method: 'DELETE', re: '^/api/juzhu/admin/routes/(\\d+)$', perm: 'house.write', act: 'route.delete', res: 'routes', idGroup: 1 },
+  { method: 'GET',    re: '^/api/juzhu/admin/topics$', perm: 'admin.read', act: null, res: null },
+  { method: 'PUT',    re: '^/api/juzhu/admin/topics/([a-z0-9][a-z0-9-]*)$', perm: 'house.write', act: 'topic.upsert', res: 'settings' },
+  { method: 'DELETE', re: '^/api/juzhu/admin/topics/([a-z0-9][a-z0-9-]*)$', perm: 'house.write', act: 'topic.delete', res: 'settings' },
   // 房源 / 户型 / 图片
   { method: 'POST',   re: '^/api/juzhu/admin/projects$', perm: 'house.write', act: 'project.create', res: 'projects' },
   { method: 'PUT',    re: '^/api/juzhu/admin/projects/(\\d+)$', perm: 'house.write', act: 'project.update', res: 'projects', idGroup: 1 },
@@ -131,6 +140,9 @@ const ROUTES = [
   { method: 'GET',    re: '^/api/juzhu/admin/units/(\\d+)(/photos)?$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/(accounts|idp-configs)$', perm: 'admin.read', act: null, res: null },
   { method: 'GET',    re: '^/api/juzhu/admin/audit$', perm: 'audit.read', act: null, res: null },
+  // 商家入驻受理（服务认证中台）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendor-onboarding$', perm: 'vendor.onboarding.review', act: 'vendor.onboarding.list', res: 'vendor_onboarding' },
+  { method: 'POST',   re: '^/api/juzhu/admin/vendor-onboarding/(\\d+)/review$', perm: 'vendor.onboarding.review', act: 'vendor.onboarding.review', res: 'vendor_onboarding', idGroup: 1 },
   // 免闸：登录/会话检查
   { method: 'POST',   re: '^/api/juzhu/admin/auth/login$', exempt: true },
   { method: 'GET',    re: '^/api/juzhu/admin/auth/check$', exempt: true },

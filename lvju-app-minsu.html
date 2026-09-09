@@ -103,7 +103,20 @@
     projects = (cat.projects || []).filter(function(p){ return p.channel === 'minsu'; });
 
     if (!projects.length) {
-      document.getElementById('listingWrap').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在架民宿 · 托管商家录入并通过彩贝评级后自动上架</div>';
+      // 城市诊断：民宿房源目前集中在贵阳，其它城市（localStorage 切换器写入）会空是正常现象
+      if (CITY !== 'guiyang') {
+        var cityName = (cat.city && cat.city.name) || CITY;
+        document.getElementById('listingWrap').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:26px 16px;color:#9aa5a1;font-size:12px;line-height:1.8;">' +
+          '当前城市「' + esc(cityName) + '」暂无民宿 · 民宿房源目前集中在贵阳<br/>' +
+          '<a href="javascript:void(0)" id="goGuiyang" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">去贵阳看民宿</a></div>';
+        var go = document.getElementById('goGuiyang');
+        if (go) go.onclick = function(){
+          try { localStorage.setItem('bzf_jz_city', 'guiyang'); } catch (e) {}
+          location.href = location.pathname + '?city=guiyang';
+        };
+      } else {
+        document.getElementById('listingWrap').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">该频道暂无在架民宿 · 托管商家录入并通过彩贝评级后自动上架</div>';
+      }
       document.getElementById('sortNote').textContent = '0 栋在营';
       return;
     }
