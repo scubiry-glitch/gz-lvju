@@ -92,6 +92,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="screens/_console-login.js"></script>
 <script>
 var API = '/api/juzhu/admin';
 var unitId = null;
@@ -106,10 +107,21 @@ var AMENITY_CATALOG = [
   { id: 'induction', label: '电磁炉' }
 ];
 
-/* ── Auth helpers ── */
-var AUTH_TOKEN_KEY = 'JUZHU_ADMIN_TOKEN';
+/* ── Auth helpers ── 会话统一走账号中心（screens/_console-login.js，BZF_SESSION_TOKEN）；
+   全局 fetch 拦截已自动带 Bearer 并在 401 时原地弹登录层重放，页面不再自行跳转。
+   旧 JUZHU_ADMIN_TOKEN 仅做一次性迁移（juzhu-admin.html 同款口径）。 */
 function getAuthToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch(e) { return ''; }
+  try {
+    var t = (window.BZF_CONSOLE && BZF_CONSOLE.token && BZF_CONSOLE.token()) || '';
+    if (t) return t;
+    var old = localStorage.getItem('JUZHU_ADMIN_TOKEN') || '';
+    if (old && window.BZF_CONSOLE && BZF_CONSOLE.setToken) {
+      BZF_CONSOLE.setToken(old);
+      localStorage.removeItem('JUZHU_ADMIN_TOKEN');
+      return old;
+    }
+    return '';
+  } catch(e) { return ''; }
 }
 function authHeaders(extra) {
   var h = extra || {};
@@ -118,10 +130,8 @@ function authHeaders(extra) {
   return h;
 }
 function checkAuth() {
-  var token = getAuthToken();
-  if (!token) return Promise.resolve(false);
-  return fetch(API + '/auth/check', { headers: { 'Authorization': 'Bearer ' + token } })
-    .then(function(r) { return r.ok; }).catch(function() { return false; });
+  // 兼容保留：requireLogin 内部已做 /api/auth/me 校验，页面不再自行判定跳转
+  return getAuthToken() ? fetch(API + '/auth/check', { headers: authHeaders() }).then(function(r) { return r.ok; }).catch(function() { return false; }) : Promise.resolve(false);
 }
 
 /* ── API helpers ── */
@@ -634,14 +644,8 @@ function reloadPhotos() {
   });
 }
 
-// Go! — 先验证登录，未登录跳回管理首页
-checkAuth().then(function(ok) {
-  if (!ok) {
-    location.href = 'juzhu-admin.html';
-    return;
-  }
-  loadUnit();
-});
+// Go! — 账号中心统一登录门：未登录原地弹登录层，登录成功后原地加载（不再跳回列表页丢 unit_id）
+BZF_CONSOLE.requireLogin({ hint: '户型编辑后台' }).then(function() { loadUnit(); });
 </script>
 </body>
 </html>
