@@ -150,6 +150,7 @@
         ]},
         { name: '白名单运营商 · 日常运营', items: [
           { id: 'listing',         label: '房源上下架',       href: 'b-listing-mgmt.html',        icon: 'list' },
+          { id: 'go-live-check',   label: '上线完整性自查',   href: 'b-go-live-check.html',       icon: 'check' },
           { id: 'stay-calendar',   label: '房态日历 · 保障配置', href: 'b-stay-calendar.html',     icon: 'layout' },
           { id: 'intake-api',      label: '房源接入 API ↗',   href: 'property-intake-api.html',   icon: 'plug' },
           { id: 'rating-input',    label: '★ 好房子评级录入', href: 'b-house-rating-input.html',  icon: 'star', badge: 7, badgeKind: 'warn' },

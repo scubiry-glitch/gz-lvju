@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN" data-console-login="off">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>上线完整性自查 · 保租房 B 端</title>
+  <style>
+    :root {
+      --bg: #f3f4f6; --surface: #ffffff; --fg: #111111;
+      --muted: #6b7280; --border: #e5e7eb; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #16a34a; --warn: #ea580c; --danger: #dc2626; --gold: #b45309;
+      --radius-sm: 6px; --radius-md: 10px;
+      --font: system-ui, -apple-system, 'PingFang SC', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    button { font: inherit; cursor: pointer; border: 0; background: none; }
+    a { color: inherit; text-decoration: none; }
+
+    .console { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .main { padding: 22px 28px 40px; min-width: 0; }
+    .topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 22px; font-weight: 600; margin: 0; }
+    .btn { padding: 8px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-ghost { background: var(--surface); border: 1px solid var(--border); color: var(--fg); }
+    select, input[type=text], input[type=password] {
+      padding: 7px 10px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); font-size: 13px; color: var(--fg); font-family: var(--font);
+    }
+    .sess { margin-left: auto; font-size: 12px; color: var(--muted); border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); padding: 7px 12px; }
+    .sess a { color: var(--accent); margin-left: 6px; cursor: pointer; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 18px; margin-bottom: 14px; }
+    .card h3 { margin: 0 0 10px; font-size: 14px; }
+    .card .sub { font-size: 11.5px; color: var(--muted); margin: -6px 0 10px; }
+    .note { margin: 0 0 14px; padding: 10px 14px; background: var(--accent-soft); border-radius: var(--radius-md); font-size: 12.5px; color: #134e4a; }
+
+    .verdict { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .verdict .big { font-size: 40px; }
+    .verdict .t { font-size: 17px; font-weight: 700; }
+    .verdict .d { font-size: 12.5px; color: var(--muted); }
+    .ready-yes { border-left: 4px solid var(--success); }
+    .ready-no { border-left: 4px solid var(--danger); }
+
+    .ck { display: flex; gap: 10px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px dashed var(--border); }
+    .ck:last-child { border-bottom: 0; }
+    .ck .ic { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
+    .ck .bd { flex: 1; min-width: 0; }
+    .ck .nm { font-weight: 600; font-size: 13px; }
+    .ck .nm .tag { font-size: 10px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin-left: 8px; vertical-align: 1px; }
+    .tag-pass { background: color-mix(in oklab, var(--success) 12%, transparent); color: #15803d; }
+    .tag-warn { background: color-mix(in oklab, var(--warn) 14%, transparent); color: #9a3412; }
+    .tag-fail { background: color-mix(in oklab, var(--danger) 12%, transparent); color: #b91c1c; }
+    .ck .dt { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .ck .hn { font-size: 11.5px; color: #92400e; margin-top: 2px; }
+    .ck .fx { margin-left: auto; flex-shrink: 0; align-self: center; }
+    .fx a { font-size: 11.5px; color: var(--accent); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; background: var(--surface); white-space: nowrap; }
+    .fx a:hover { border-color: var(--accent); }
+    .group-t { font-size: 12px; font-weight: 700; color: var(--muted); margin: 14px 0 2px; letter-spacing: .5px; }
+
+    .gate { text-align: center; padding: 40px 20px; }
+    .gate .field { margin: 10px auto; max-width: 280px; }
+    .gate .field input { width: 100%; }
+    .gate .err { color: #991b1b; font-size: 12px; min-height: 18px; }
+    .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 26px; background: #111; color: #fff; font-size: 12.5px; padding: 9px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s; z-index: 50; pointer-events: none; }
+    .toast.on { opacity: .92; }
+    @media (max-width: 900px) { .console { grid-template-columns: 1fr; } .side { display: none; } }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="b" data-active="go-live-check"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>上线完整性自查</h1>
+      <a class="btn btn-ghost" href="b-listing-mgmt.html">← 房源列表</a>
+      <span class="sess" id="sess">会话检测中…</span>
+    </div>
+
+    <div class="note" id="note">
+      上线自查 = 商家开张前的完整性清单：<b>必须项</b>（资质 / 在营 / 结算账户 / 房源评级与上架 / 户型价格）全部通过才算就绪；
+      <b>建议项</b>（费率核定 / 按晚预订 / 取消政策 / 联系电话 / 开放接口 / 实拍图）不阻塞但影响经营效果。
+      数据由服务端一次聚合判定（<code>/api/juzhu/vendor/go-live-check</code>），商家只能看自己，平台可代查任意商家。
+    </div>
+
+    <div class="ctl" id="platCtl" style="display:none;margin-bottom:14px;">
+      <label style="color:var(--muted);font-size:12.5px;">代查商家</label>
+      <select id="fVendor" style="max-width:280px;"></select>
+      <button class="btn btn-ghost" id="recheck">重新自查</button>
+    </div>
+
+    <div class="card" id="gate" style="display:none;">
+      <div class="gate">
+        <div style="font-size:32px;">🔐</div>
+        <div style="font-weight:700;margin:6px 0 2px;">商家登录后查看自查结果</div>
+        <div style="font-size:12px;color:var(--muted);">输入商家 login_name 与密码（与 B 端房源管理同一账号）</div>
+        <div class="field"><input type="text" id="gName" placeholder="商家 login_name" /></div>
+        <div class="field"><input type="password" id="gPwd" placeholder="密码" /></div>
+        <div class="err" id="gErr"></div>
+        <button class="btn btn-primary" id="gGo">登录并自查</button>
+      </div>
+    </div>
+
+    <div id="result" style="display:none;">
+      <div class="card" id="verdictCard">
+        <div class="verdict">
+          <div class="big" id="vIcon">⏳</div>
+          <div>
+            <div class="t" id="vTitle">自查中…</div>
+            <div class="d" id="vDesc"></div>
+          </div>
+          <button class="btn btn-primary" id="vRecheck" style="margin-left:auto;">重新自查</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>检查清单</h3>
+        <div class="sub" id="listSub"></div>
+        <div class="group-t">必须项（全部通过才可上线）</div>
+        <div id="mustRows"></div>
+        <div class="group-t">建议项（不阻塞，影响经营效果）</div>
+        <div id="warnRows"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+/* 上线完整性自查：GET /api/juzhu/vendor/go-live-check（vendor=自己；platform 可 ?vendor_id= 代查）。
+   未登录 → 页内登录卡（POST /vendor/login，token 入 BZF_SESSION_TOKEN/JUZHU_VENDOR_TOKEN，与 B 端互通）；
+   html[data-console-login=off] = 登录态自管，401 交给本页 gate 而非控制台统一登录层（商家凭据在 jz_vendors，不在账号中心）。 */
+(function(){
+  var API = '/api/juzhu';
+  var state = { role: null, vendor: null, vid: 0 };
+
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function toast(m){
+    var t = $('toast'); t.textContent = m; t.classList.add('on');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('on'); }, 2400);
+  }
+
+  var STATE_META = {
+    pass: { ic: '✅', tag: '通过', cls: 'tag-pass' },
+    warn: { ic: '⚠️', tag: '建议', cls: 'tag-warn' },
+    fail: { ic: '⛔', tag: '未通过', cls: 'tag-fail' },
+  };
+  var LINK_LABEL = {
+    'p-vendor-onboarding.html': '入驻受理台', 'p-vendor-rates.html': '商家费率台',
+    'p-rating-review.html': '评级复核台', 'b-listing-mgmt.html': '房源管理',
+    'b-stay-calendar.html': '房态日历', 'property-intake-api.html': '开放平台',
+  };
+
+  function rowHtml(c){
+    var m = STATE_META[c.state] || STATE_META.warn;
+    var fix = (!c.state || c.state === 'pass') ? '' :
+      '<div class="fx">' + (c.link ? '<a href="' + esc(c.link) + '">去处理 · ' + esc(LINK_LABEL[c.link] || '前往') + '</a>' : '') + '</div>';
+    return '<div class="ck">' +
+      '<div class="ic">' + m.ic + '</div>' +
+      '<div class="bd"><div class="nm">' + esc(c.label) + '<span class="tag ' + m.cls + '">' + m.tag + '</span></div>' +
+      '<div class="dt">' + esc(c.detail || '') + '</div>' +
+      (c.hint ? '<div class="hn">→ ' + esc(c.hint) + '</div>' : '') + '</div>' + fix + '</div>';
+  }
+
+  function render(j){
+    state.vendor = j.vendor || null;
+    $('result').style.display = 'block';
+    $('gate').style.display = 'none';
+    var ready = j.ready;
+    $('verdictCard').className = 'card ' + (ready ? 'ready-yes' : 'ready-no');
+    $('vIcon').textContent = ready ? '✅' : (j.failed_count ? '⛔' : '⚠️');
+    $('vTitle').textContent = ready
+      ? '上线就绪 · ' + (j.vendor ? j.vendor.name : '')
+      : '还不具备上线条件 · ' + (j.vendor ? j.vendor.name : '');
+    $('vDesc').textContent = '必须项 ' + (j.required_count - j.failed_count) + '/' + j.required_count + ' 通过'
+      + (j.failed_count ? ' · ' + j.failed_count + ' 项未通过' : '')
+      + (j.warn_count ? ' · ' + j.warn_count + ' 项建议完善' : '');
+    var must = [], warn = [];
+    (j.checks || []).forEach(function(c){ (c.state === 'warn' ? warn : must).push(c); });
+    $('mustRows').innerHTML = must.map(rowHtml).join('') || '<div class="ck"><div class="bd">—</div></div>';
+    $('warnRows').innerHTML = warn.map(rowHtml).join('') || '<div class="ck"><div class="bd">无建议项 🎉</div></div>';
+    $('listSub').textContent = '自查时间 ' + new Date().toLocaleString('zh-CN') + ' · 判定口径见服务端聚合接口';
+  }
+
+  function setSess(j){
+    if (state.role === 'vendor') {
+      $('sess').innerHTML = '🏪 ' + esc(state.vendor ? state.vendor.name : '商家会话') + ' · <a id="logout">退出</a>';
+    } else if (state.role === 'platform') {
+      $('sess').innerHTML = '🛡 平台会话 · 全量代查';
+    }
+    var lo = $('logout');
+    if (lo) lo.onclick = function(){
+      try { localStorage.removeItem('BZF_SESSION_TOKEN'); localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){}
+      location.reload();
+    };
+  }
+
+  function load(){
+    var url = API + '/vendor/go-live-check' + (state.vid ? '?vendor_id=' + state.vid : '');
+    return fetch(url).then(function(r){
+      return r.json().then(function(j){ return { status: r.status, ok: r.ok, j: j }; });
+    }).then(function(res){
+      if (res.status === 401 || (res.j && res.j.error === 'unauthorized')) { showGate(); return null; }
+      if (!res.ok) {
+        // platform 未带 vendor_id → 先填商家下拉并自动选第一个，再自查
+        if (res.j && /vendor_id/.test(res.j.error || '')) return bootPlatform();
+        throw new Error(res.j.error || res.status);
+      }
+      state.role = res.j.role || 'vendor';
+      render(res.j);
+      setSess(res.j);
+      if (state.role === 'platform' && !$('fVendor').options.length) fillPlatformPicker();
+      return res.j;
+    }).catch(function(e){
+      $('result').style.display = 'block';
+      $('vIcon').textContent = '❓';
+      $('vTitle').textContent = '自查加载失败';
+      $('vDesc').textContent = e.message;
+      toast('加载失败：' + e.message);
+      return null;
+    });
+  }
+
+  /* ── 平台代查：商家下拉（admin/vendors active 清单）── */
+  function vendorOptions(arr){
+    return '<option value="">选择商家…</option>' + arr.map(function(v){
+      return '<option value="' + v.id + '"' + (state.vendor && state.vendor.id === v.id ? ' selected' : '') + '>' + esc(v.name) + ' #' + v.id + '</option>';
+    }).join('');
+  }
+  function fillPlatformPicker(){
+    $('platCtl').style.display = 'flex';
+    return fetch(API + '/admin/vendors?status=active').then(function(r){ return r.json(); }).then(function(list){
+      var arr = Array.isArray(list) ? list : [];
+      $('fVendor').innerHTML = vendorOptions(arr);
+      return arr;
+    }).catch(function(){ return []; });
+  }
+  function bootPlatform(){
+    if (state.vid) return load();   // 已带商家仍 400（如商家已删）→ 不再递归
+    state.role = 'platform';
+    $('sess').innerHTML = '🛡 平台会话 · 全量代查';
+    return fillPlatformPicker().then(function(arr){
+      if (!arr.length) { toast('暂无在营商家可代查'); return null; }
+      state.vid = arr[0].id;
+      $('fVendor').value = String(arr[0].id);
+      return load();
+    });
+  }
+  $('fVendor').onchange = function(){ state.vid = parseInt(this.value, 10) || 0; load(); };
+  $('recheck').onclick = $('vRecheck').onclick = function(){ load(); };
+
+  /* ── 未登录：页内商家登录 ── */
+  function showGate(){
+    $('gate').style.display = 'block';
+    $('result').style.display = 'none';
+    $('sess').textContent = '未登录';
+    $('gGo').onclick = function(){
+      var name = $('gName').value.trim(), pwd = $('gPwd').value;
+      if (!name || !pwd) { $('gErr').textContent = '请输入 login_name 与密码'; return; }
+      $('gErr').textContent = '';
+      fetch(API + '/vendor/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login_name: name, password: pwd }) })
+        .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
+        .then(function(res){
+          if (!res.ok || !res.j.token) { $('gErr').textContent = res.j.error || '登录失败'; return; }
+          try {
+            localStorage.setItem('BZF_SESSION_TOKEN', res.j.token);
+            localStorage.setItem('JUZHU_VENDOR_TOKEN', res.j.token);
+          } catch(e){}
+          toast('登录成功，正在自查…');
+          load();
+        })
+        .catch(function(){ $('gErr').textContent = '网络异常，请稍后再试'; });
+    };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

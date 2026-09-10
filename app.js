@@ -5397,6 +5397,123 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { role: 'vendor', vendor: Object.assign({}, v, { commission }) });
     }
 
+    // GET /api/juzhu/vendor/go-live-check —— 商家上线完整性自查（vendor=只看自己；platform 可 ?vendor_id=）
+    // 聚合一次算完：资质 / 在营 / 结算账户 / 费率 / 房源评级与上架 / 户型 / 按晚预订 / 取消政策 /
+    // 联系电话 / 开放接口密钥 / 实拍图。fail=阻塞上线；warn=建议完善（不阻塞）。
+    if (urlPath === '/api/juzhu/vendor/go-live-check' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const qp = new URLSearchParams(qs);
+      // vendor 会话一律只看自己（忽略 ?vendor_id=，杜绝越权探商家）
+      const vid = sess.role === 'vendor' ? sess.vendorId : (parseInt(qp.get('vendor_id') || '', 10) || 0);
+      if (!vid) return jsonReply(res, { error: 'platform 视角须带 ?vendor_id=' }, 400);
+      const vrows = await queryRows(
+        'SELECT id, name, type, status, review_status, reviewed_at, phone, hmac_key, commission_housing FROM jz_vendors WHERE id=?', [vid]);
+      if (!vrows.length) return jsonReply(res, { error: 'vendor not found' }, 404);
+      const v = vrows[0];
+      const checks = [];
+      const add = (key, label, ok, state, detail, hint, link) =>
+        checks.push({ key, label, state: ok ? 'pass' : (state || 'fail'), detail: detail || '', hint: hint || '', link: link || '' });
+
+      // ── 商家主体 ──
+      add('qualification', '资质审核通过', v.review_status === 'approved', 'fail',
+        '复审状态 ' + (v.review_status || '-') + (v.reviewed_at ? ' · ' + String(v.reviewed_at).slice(0, 10) : ''),
+        v.review_status === 'approved' ? '' : '在「商家入驻受理台」完成核验/复审', 'p-vendor-onboarding.html');
+      add('active', '商家在营', v.status === 'active', 'fail',
+        v.status === 'active' ? 'status=active' : '商家已停用（status=' + v.status + '）',
+        v.status === 'active' ? '' : '联系平台恢复在营');
+      // 结算账户：入驻申请单（approved）按 phone 匹配，取最近一单
+      let settle = null;
+      if (v.phone) {
+        const orows = await queryRows(
+          "SELECT settle_bank, settle_account, deposit_tier FROM vendor_onboarding WHERE phone=? AND status='approved' ORDER BY id DESC LIMIT 1", [v.phone]);
+        settle = orows[0] || null;
+      }
+      add('settlement', '绑定了结算账号', !!(settle && settle.settle_bank && settle.settle_account), 'fail',
+        settle && settle.settle_account ? (settle.settle_bank || '-') + ' · ' + String(settle.settle_account).replace(/(.{4})(.*)(.{3})/, '$1****$3') : '未绑定结算账户',
+        settle && settle.settle_account ? '' : '在入驻受理台补录对公结算账户（户名与营业执照一致）', 'p-vendor-onboarding.html');
+      // 费率：差异化 = pass；按基准 = warn（基准也是有效费率，不阻塞）
+      {
+        const srows = await queryRows('SELECT value FROM settings WHERE `key`=?', [vendorRate.defaultSettingKey('housing')]);
+        const base = vendorRate.effectiveRateOf(v, 'housing', { commission_housing_default: srows.length ? srows[0].value : '' });
+        add('commission', '设置了费率', v.commission_housing != null, 'warn',
+          v.commission_housing != null ? '差异化费率 ' + Number(v.commission_housing) + '%（房源预订档）' : '按全局基准 ' + base + '% 计',
+          v.commission_housing != null ? '' : '如需差异化费率，请平台在「商家费率」台核定', 'p-vendor-rates.html');
+      }
+
+      // ── 房源与可售性 ──
+      const projs = await queryRows(
+        'SELECT id, name, status, rating_status, contact_phone, ext FROM projects WHERE owner_vendor_id=?', [vid]);
+      const passed = projs.filter((p) => p.rating_status === 'passed');
+      const online = projs.filter((p) => p.status === 'online');
+      const sellable = projs.filter((p) => p.status === 'online' && p.rating_status === 'passed');
+      add('housing_approved', '房源审核通过', passed.length > 0, 'fail',
+        passed.length ? passed.length + ' 个房源已通过评级审核' : '尚无房源通过评级审核（rating_status=passed）',
+        passed.length ? '' : '在房源评级复核台提交/完成评级', 'p-rating-review.html');
+      add('housing_online', '房源已上架', online.length > 0, 'fail',
+        online.length ? online.length + ' 个房源在售（online）' : '房源未上架（draft/offline），C 端不可见',
+        online.length ? '' : '在房源管理页上架', 'b-listing-mgmt.html');
+      const sellIds = sellable.map((p) => p.id);
+      let unitCount = 0, cancelCount = 0;
+      if (sellIds.length) {
+        const ph = sellIds.map(() => '?').join(',');
+        const [urows] = await Promise.all([queryRows(
+          `SELECT id, ext FROM units WHERE project_id IN (${ph})`, sellIds)]);
+        unitCount = urows.length;
+        cancelCount = urows.filter((u) => {
+          try { const x = typeof u.ext === 'string' ? JSON.parse(u.ext) : (u.ext || {}); return !!(x && x.cancel_policy && x.cancel_policy.enabled); } catch (_) { return false; }
+        }).length;
+        add('units_complete', '户型与价格已配置', unitCount > 0, 'fail',
+          unitCount ? unitCount + ' 个在售户型' : '在售房源尚未配置户型与价格',
+          unitCount ? '' : '在房源管理页补户型', 'b-listing-mgmt.html');
+        const bookableN = sellable.filter((p) => {
+          try { const x = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); return !!(x && x.stay_bookable === true); } catch (_) { return false; }
+        }).length;
+        add('stay_bookable', '按晚预订已开通', bookableN > 0, 'warn',
+          bookableN ? bookableN + ' 个房源支持 C 端在线预订' : '未开通在线预订（仅 400 电话咨询）',
+          bookableN ? '' : '在房态日历页「按晚预订」开关开通', 'b-stay-calendar.html');
+        add('cancel_policy', '取消政策已配置', cancelCount > 0, 'warn',
+          cancelCount ? cancelCount + ' 个房型已配免费取消窗口' : '未配置取消政策（客户预订成功后不可自助取消）',
+          cancelCount ? '' : '在房态日历页「取消政策」卡按房型配置', 'b-stay-calendar.html');
+      } else {
+        add('units_complete', '户型与价格已配置', false, 'fail', '在售房源尚未配置户型与价格', '在房源管理页补户型', 'b-listing-mgmt.html');
+        add('stay_bookable', '按晚预订已开通', false, 'warn', '未开通在线预订（仅 400 电话咨询）', '在房态日历页「按晚预订」开关开通', 'b-stay-calendar.html');
+        add('cancel_policy', '取消政策已配置', false, 'warn', '未配置取消政策（客户预订成功后不可自助取消）', '在房态日历页「取消政策」卡按房型配置', 'b-stay-calendar.html');
+      }
+
+      // ── 联系与开放能力 ──
+      const hasContact = !!(v.phone || projs.some((p) => p.contact_phone));
+      add('contact', '联系电话可拨', hasContact, 'warn',
+        hasContact ? 'C 端拨号走虚拟号（TP 实时绑号，双方号码不外泄）' : '商家与房源均未登记联系电话',
+        hasContact ? '' : '在房源上配置咨询电话', 'b-listing-mgmt.html');
+      add('hmac', '开放接口密钥', !!v.hmac_key, 'warn',
+        v.hmac_key ? 'HMAC 密钥已配置（可对接开放接口）' : '未接入商家开放接口（密钥由平台线下发放）',
+        v.hmac_key ? '' : '对接文档见开放平台', 'property-intake-api.html');
+      let photoCount = 0;
+      if (sellIds.length) {
+        const ph = sellIds.map(() => '?').join(',');
+        const prows = await queryRows(
+          `SELECT COUNT(*) AS n FROM photos WHERE (entity_type='project' AND entity_id IN (${ph}))
+             OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id IN (${ph})))`,
+          [...sellIds, ...sellIds]);
+        photoCount = prows[0] ? Number(prows[0].n) : 0;
+      }
+      add('photos', '实拍图充足', photoCount >= 8, 'warn',
+        photoCount + ' 张实拍图（手册口径 ≥8 张）', photoCount >= 8 ? '' : '房源详情补足实拍图（AI 查重会拦截盗图）', 'b-listing-mgmt.html');
+
+      const failed = checks.filter((c) => c.state === 'fail');
+      const warns = checks.filter((c) => c.state === 'warn');
+      return jsonReply(res, {
+        role: sess.role,
+        vendor: { id: v.id, name: v.name, type: v.type, status: v.status, review_status: v.review_status },
+        ready: failed.length === 0,
+        required_count: checks.filter((c) => c.state !== 'warn').length,
+        failed_count: failed.length,
+        warn_count: warns.length,
+        checks,
+      });
+    }
+
     // GET /api/juzhu/vendor/projects（vendor 只见自己；platform 可 ?vendor_id= 过滤或全量）
     if (urlPath === '/api/juzhu/vendor/projects' && req.method === 'GET') {
       const sess = await requestSession(req);
