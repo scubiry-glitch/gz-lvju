@@ -3,8 +3,8 @@
  * scripts/housing_vendor_hmac_regression.cjs —— 房源开放接口 HMAC 全生命周期回归
  *
  * 走完整 HTTP 签名链路（vendor_id + timestamp + sign，密钥取库内 jz_vendors.hmac_key）：
- *   创建(草稿) → 补户型 → 上架前置拦截 → 设价后上架 → C 端 catalog 可见 →
- *   更新(保险/最短连住) → 房态关房/开房 → 下架 → catalog 不可见 → 越权负例 → 清理
+ *   创建(草稿) → 补户型 → 上架前置拦截 → 评级提审/状态开放端点 → 设价后上架 → C 端 catalog 可见 →
+ *   更新(保险/最短连住) → 房态关房/开房/夜价 → 下单逐晚计价（覆盖价参与合计） → 下架 → 越权负例 → 清理
  *
  * 用法：node scripts/housing_vendor_hmac_regression.cjs [base_url]   # 默认 http://127.0.0.1:8766
  * 凭证只读环境变量（MYSQL_* / JUZHU_DB_* / juzhu/.env.local），禁止写入仓库。
@@ -137,8 +137,16 @@ async function catalogEventually(base, projectId, citySlug, want) {
   const [districts] = await conn.execute('SELECT id FROM districts WHERE city_id=? ORDER BY id LIMIT 1', [city.id]);
   const district = districts[0];
 
+  // ── 0.5) 城市/行政区枚举（city_id / district_id 选值主数据）──
+  let r;
+  r = await call('/api/juzhu/housing/vendor/regions/list', signed(vendor, {}));
+  const rg = (r.j.list || []).find((c) => c.id === city.id);
+  check('regions/list → 200 + 含挂载城市', r.status === 200 && !!rg, JSON.stringify(r.j).slice(0, 160));
+  check('regions/list 城市下含行政区（district_id 可选值）', rg && (rg.districts || []).some((d) => d.id === district.id),
+    rg && JSON.stringify(rg.districts).slice(0, 160));
+
   // ── 1) 创建（缺省草稿，不上架）──
-  let r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
+  r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
     name: RUN + '·回归演示房源',
     channel: 'rental',
     city_id: city.id,
@@ -163,7 +171,24 @@ async function catalogEventually(base, projectId, citySlug, want) {
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'online' }));
   check('无起价上架被拒 400', r.status === 400, JSON.stringify(r.j));
 
-  // 审核闸与素材闸：回归脚本以平台审核结果作为测试前置，再通过开放接口登记 8 张外部图片。
+  // ── 2.5) 评级提审 / 审核状态（开放端点闭环；平台复核本身在管理台，脚本以 DB 置 passed 模拟复核结果）──
+  r = await call('/api/juzhu/housing/vendor/projects/rating/submit', signed(vendor, {
+    id: pid, dims: { comfort: 4.5, green: 4, tech: 9, safety: 4.5 },
+  }));
+  check('评级提审：越界维度被拒 400', r.status === 400, JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/projects/rating/submit', signed(vendor, {
+    id: pid, dims: { comfort: 4.5, green: 4, tech: 4.6, safety: 4.4 },
+  }));
+  check('评级提审 → 200 + pending + 评级编号', r.status === 200 && r.j.rating_status === 'pending'
+    && /^SY-RENT-\d+$/.test(r.j.rating_code || ''), JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/projects/rating/submit', signed(vendor, {
+    id: pid, dims: { comfort: 4.5, green: 4, tech: 4.6, safety: 4.4 },
+  }));
+  check('pending 中重复提审被拒 400', r.status === 400 && /复核队列/.test(r.j.message || ''), JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/projects/rating/status', signed(vendor, { id: pid }));
+  check('rating/status → pending + 自评分回读', r.status === 200 && r.j.rating_status === 'pending'
+    && r.j.dims && r.j.dims.comfort === 4.5 && (r.j.dims_meta || []).length === 4, JSON.stringify(r.j).slice(0, 200));
+  // 平台复核（管理台 POST /admin/ratings/:code/review）在本脚本里以 DB 置位模拟
   await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [pid]);
   for (let i = 0; i < 8; i++) {
     r = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
@@ -227,14 +252,22 @@ async function catalogEventually(base, projectId, citySlug, want) {
     return r;
   }
   // 下单（rental 演示房，最短连住已被改为 20 晚）
+  // 逐晚计价：给前两晚（12-20/12-21）设项目级覆盖价 399，其余 18 晚回落默认 80（2400/30）
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+    project_id: pid, dates: ['2026-12-20', '2026-12-21'], status: 'open', price_night: 399,
+  }));
+  check('下单前设夜价覆盖 2 晚 → 200', r.status === 200, JSON.stringify(r.j));
   let bk = await publicBooking(20, pid, 20);
   check('公开下单（20 晚）→ 200', bk.status === 200 && bk.j.order_no, JSON.stringify(bk.j));
   bkIds.push(bk.j.order_no);
+  check('下单逐晚计价：2 晚覆盖 399 + 18 晚默认 80 = 2238', bk.status === 200 && bk.j.price_total === 2238,
+    'price_total=' + (bk.j && bk.j.price_total) + '（旧口径应为 80×20=1600）');
   // 商家查单：可见、手机号掩码
   r = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, {}));
   const found = (r.j.list || []).find((o) => o.order_no === bk.j.order_no);
   check('bookings/list 可见本商家订单', r.status === 200 && found && found.status === 'pending', JSON.stringify(r.j).slice(0, 120));
   check('手机号掩码（不回明文）', found && /^139\*\*\*\*\d{4}$/.test(found.contact_phone), found && found.contact_phone);
+  check('商家查单价格快照 = 逐晚合计 2238', found && Number(found.price_total) === 2238, found && found.price_total);
   // 确认
   r = await call('/api/juzhu/housing/vendor/bookings/confirm', signed(vendor, { id: found.id }));
   check('bookings/confirm → confirmed', r.status === 200 && r.j.status === 'confirmed', JSON.stringify(r.j));
@@ -269,7 +302,8 @@ async function catalogEventually(base, projectId, citySlug, want) {
   const mid = r.j.project && r.j.project.id;
   check('创建 minsu 演示房 → 200', r.status === 200 && !!mid, JSON.stringify(r.j).slice(0, 120));
   if (mid) {
-    // 房源评级由平台审核接口维护；回归脚本只把演示房置为已通过，不绕过上架接口。
+    // 房源评级由平台审核接口维护（rental 演示房已在 §2.5 走过 rating/submit 端点闭环）；
+    // 此处只把演示房置为已通过，不绕过上架接口。
     await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [mid]);
     for (let i = 0; i < 8; i++) {
       r = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {

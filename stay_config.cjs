@@ -72,6 +72,34 @@ function bookableOf(proj) {
   return parseExtObj(proj && proj.ext)[STAY_BOOKABLE_KEY] === true;
 }
 
+/**
+ * 下单逐晚计价（2026-09-10）：每晚 = 日历覆盖价（户型级 > 项目级）否则默认夜价，
+ * 与 buildStayMonth 的覆盖优先级同口径（C 端日历/下单页展示的就是这套价）。
+ * fetchRows(sql, params) → Promise<rows>，由调用方注入连接池/连接。
+ * 返回 { prices: [逐晚价], total: 合计, default_night: 默认夜价 }。
+ */
+async function stayNightPrices(fetchRows, proj, unit, unitId, checkin, checkout) {
+  const dates = stayDateList(checkin, checkout);
+  const def = unitNightPrice(proj, unit) || 0;
+  const unitLevel = {};
+  const projLevel = {};
+  if (dates.length) {
+    const rows = await fetchRows(
+      `SELECT unit_id, stay_date, price_night FROM stay_calendar
+       WHERE project_id=? AND stay_date BETWEEN ? AND ? AND price_night IS NOT NULL
+         AND (unit_id=0 OR unit_id=?)`,
+      [proj.id, dates[0], dates[dates.length - 1], unitId || 0]
+    );
+    for (const r of rows) {
+      if (r.price_night == null) continue;
+      if (!r.unit_id) { if (projLevel[r.stay_date] == null) projLevel[r.stay_date] = r.price_night; }
+      else if (unitLevel[r.stay_date] == null) unitLevel[r.stay_date] = r.price_night;
+    }
+  }
+  const prices = dates.map((d) => (unitLevel[d] != null ? unitLevel[d] : (projLevel[d] != null ? projLevel[d] : def)) || 0);
+  return { prices, total: prices.reduce((a, b) => a + b, 0), default_night: def };
+}
+
 /** 项目房态配置（随 catalog / 项目详情 / 房态日历下发，含 bookable 能力位） */
 function stayConfigOf(proj) {
   const ins = insuranceOf(proj);
@@ -241,6 +269,7 @@ module.exports = {
   minStayNightsOf,
   bookableOf,
   unitNightPrice,
+  stayNightPrices,
   normalizeCancelPolicyInput,
   cancelPolicyOf,
   cancelDeadlineOf,

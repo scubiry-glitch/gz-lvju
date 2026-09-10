@@ -303,12 +303,11 @@ async function requestSession(req) {
   return null;
 }
 
-// 评级口径（维度键 + 评级编号前缀）按 channel 定义
-const RATING_DIMS = {
-  rental: ['comfort', 'green', 'tech', 'safety'], // 好房子 4 维
-  minsu: ['scenery', 'facilities', 'service', 'location', 'culture'], // 彩贝 5 维
-};
-const RATING_CODE_PREFIX = { rental: 'SY-RENT', minsu: 'MZ' };
+// 评级口径（维度键 + 评级编号前缀）单一数据源：rating_config.cjs
+// （B 端自评 / 平台复核与商家开放提审 vendor_api.cjs 共用同一份）
+const ratingCfg = require('./rating_config.cjs');
+const RATING_DIMS = ratingCfg.RATING_DIMS;
+const RATING_CODE_PREFIX = ratingCfg.RATING_CODE_PREFIX;
 
 // C 端涉写三路径（下单/支付/评价）——旧全局 key 的最后一处过渡放行，
 // 收紧由 settings.require_c_login 开关控制（requireCEndWrite）
@@ -707,6 +706,7 @@ const insuranceOf = stayCfg.insuranceOf;
 const minStayNightsOf = stayCfg.minStayNightsOf;
 const bookableOf = stayCfg.bookableOf;
 const unitNightPrice = stayCfg.unitNightPrice;
+const stayNightPrices = stayCfg.stayNightPrices;
 const stayConfigOf = stayCfg.stayConfigOf;
 const cancelPolicyOf = stayCfg.cancelPolicyOf;
 const cancelPolicyTextOf = stayCfg.cancelPolicyTextOf;
@@ -4914,16 +4914,18 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const bsess = await requestSession(req);
         if (bsess && bsess.account) bookingUserId = String(bsess.account.id);
       } catch (_) {}
-        let perNight = 0;
         let unitRow = null;
         if (unitId) {
           const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
           if (!us.length || us[0].project_id !== projectId) { await conn.rollback(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
           unitRow = us[0];
-          perNight = unitNightPrice(proj, us[0]);   // 夜价口径（规则15/16）单一数据源 stay_config.cjs
         }
-        if (!perNight) perNight = unitNightPrice(proj, null);
-        const priceTotal = perNight * nights;
+        // 逐晚计价（2026-09-10）：每晚 = 日历覆盖价（户型级 > 项目级）否则默认夜价，
+        // 单一数据源 stay_config.cjs，与 C 端日历/下单页展示同口径；price_total 为逐晚合计
+        //（价格未配置时合计为 0，沿用既有 0 元预订单口径，不在此处加新闸）
+        const nightCalc = await stayNightPrices(
+          async (sql, p) => (await conn.execute(sql, p))[0], proj, unitRow, unitId, checkin, checkout);
+        const priceTotal = nightCalc.total;
         // 佣金快照（规则 20）：按 owner 商家 housing 档生效费率锁定，调价不追溯；
         // 平台自营（无商家行）回落全局基准
         const [vrate] = proj.owner_vendor_id
@@ -4944,7 +4946,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
-        // 下单即占房态（stay_calendar booked 行，取消时释放）
+        // 下单即占房态（stay_calendar booked 行，取消时释放）。区间内 blocked/booked 已被上方冲突校验
+        // 拒绝，能走到这里的既有行只可能是商家 open 行（可能带夜价覆盖）：翻成 booked 并落 booking_id，
+        // price_night 覆盖保留（逐晚计价快照已按它合计）
         const stayDates = stayDateList(checkin, checkout);
         if (stayDates.length) {
           const nowSc = now;
@@ -4952,7 +4956,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.query(
             `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booking_id, updated_at)
              VALUES ${scVals.map(() => '(?,?,?,?,?,?,?)').join(',')}
-             ON DUPLICATE KEY UPDATE status=status`,
+             ON DUPLICATE KEY UPDATE status=VALUES(status), source=VALUES(source),
+               booking_id=VALUES(booking_id), updated_at=VALUES(updated_at)`,
             scVals.flat()
           );
         }

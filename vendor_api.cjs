@@ -5,6 +5,7 @@
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
+const ratingCfg = require('./rating_config.cjs');
 const MIN_PUBLISH_PHOTOS = 8;
 
 function reply(status, data) {
@@ -442,6 +443,30 @@ async function vendorAllowedCityIds(conn, vendorId) {
   return ids; // 空 = 未配置城市约束（不限制）
 }
 
+/** 城市/行政区枚举（city_id / district_id 选值主数据）：限商家开放城市；city_ids 空 = 不限（出全量） */
+async function housingRegionsList(conn, body, vendorId) {
+  const allowed = await vendorCityIds(conn, vendorId);
+  let cityRows;
+  if (allowed.length) {
+    const marks = allowed.map(() => '?').join(',');
+    [cityRows] = await conn.execute(`SELECT id, name, slug FROM cities WHERE id IN (${marks}) ORDER BY id`, allowed);
+  } else {
+    [cityRows] = await conn.execute('SELECT id, name, slug FROM cities ORDER BY id');
+  }
+  if (!cityRows.length) return reply(200, { code: 0, message: 'success', list: [], total: 0 });
+  const marks = cityRows.map(() => '?').join(',');
+  const [distRows] = await conn.execute(
+    `SELECT id, city_id, name, slug FROM districts WHERE city_id IN (${marks}) ORDER BY city_id, sort_order, id`,
+    cityRows.map((c) => c.id));
+  const list = cityRows.map((c) => ({ id: c.id, name: c.name, slug: c.slug, districts: [] }));
+  const byCity = new Map(list.map((c) => [c.id, c]));
+  for (const d of distRows) {
+    const c = byCity.get(d.city_id);
+    if (c) c.districts.push({ id: d.id, name: d.name, slug: d.slug });
+  }
+  return reply(200, { code: 0, message: 'success', list, total: list.length });
+}
+
 async function housingProjectOut(conn, row) {
   const out = stripContactPhone(Object.assign({}, row));
   Object.assign(out, stayCfg.stayConfigOf(row));
@@ -671,6 +696,59 @@ async function housingProjectsStatus(conn, body, vendorId) {
   }
   await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, row.id]);
   return reply(200, { code: 0, message: 'success', id: row.id, status });
+}
+
+// ── 评级提审 / 审核状态（rating_status：draft → pending → passed/rejected，平台复核唯一闸）──
+
+/** 提交评级自评并进入平台复核队列：dims 按频道全维度校验（rating_config 单一数据源）；pending 中不可重复提 */
+async function housingRatingSubmit(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  if (!ratingCfg.RATING_DIMS[row.channel]) {
+    return reply(400, { code: 400, message: '该频道暂不支持评级（支持 rental/minsu）' });
+  }
+  if (row.rating_status === 'pending') {
+    return reply(400, { code: 400, message: '已在平台复核队列中，请等待审核结果（rating/status 可查）' });
+  }
+  let dims;
+  try { dims = ratingCfg.normalizeDimsInput(row.channel, b.dims); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  let rating = {};
+  try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
+  rating.dims = dims;
+  rating.code = `${ratingCfg.RATING_CODE_PREFIX[row.channel] || 'SY'}-${row.id}`;
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  await conn.execute(
+    "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
+    [JSON.stringify(rating), now, row.id]);
+  return reply(200, {
+    code: 0, message: 'success', project_id: row.id,
+    rating_status: 'pending', rating_code: rating.code, dims,
+  });
+}
+
+/** 查审核状态：rating_status + 驳回原因（rating_note）+ 维度自评分与缺口，提审前可据此自检 */
+async function housingRatingStatus(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  let rating = {};
+  try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
+  const reqDims = ratingCfg.RATING_DIMS[row.channel] || [];
+  const dims = (rating.dims && typeof rating.dims === 'object' && !Array.isArray(rating.dims)) ? rating.dims : null;
+  return reply(200, {
+    code: 0, message: 'success', project_id: row.id, channel: row.channel,
+    rating_status: row.rating_status,
+    rating_code: rating.code || null,
+    dims, missing_dims: dims ? [] : reqDims,
+    dims_meta: ratingCfg.dimsMetaOf(row.channel),
+    note: row.rating_note || null,
+    submitted_at: row.rating_submitted_at || null,
+    reviewed_at: row.rating_reviewed_at || null,
+  });
 }
 
 async function housingUnitsCreate(conn, body, vendorId) {
@@ -966,11 +1044,14 @@ async function housingUnitsDelete(conn, body, vendorId) {
 }
 
 const HOUSING_ROUTES = {
+  '/api/juzhu/housing/vendor/regions/list': housingRegionsList,
   '/api/juzhu/housing/vendor/projects/list': housingProjectsList,
   '/api/juzhu/housing/vendor/projects/detail': housingProjectsDetail,
   '/api/juzhu/housing/vendor/projects/create': housingProjectsCreate,
   '/api/juzhu/housing/vendor/projects/update': housingProjectsUpdate,
   '/api/juzhu/housing/vendor/projects/status': housingProjectsStatus,
+  '/api/juzhu/housing/vendor/projects/rating/submit': housingRatingSubmit,
+  '/api/juzhu/housing/vendor/projects/rating/status': housingRatingStatus,
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
