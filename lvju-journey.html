@@ -153,6 +153,7 @@
   .rc.r{background:var(--danger-soft);color:var(--danger);}
   .rc.c{background:var(--brand-soft);color:var(--brand-deep);}
   .rc.i{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-weight:500;}
+  .zap{background:#fde68a !important;color:#92400e !important;font-weight:700;}
   table.raci thead small{display:block;font-size:9px;color:var(--muted);font-weight:500;line-height:1.3;}
 
   /* 节点截图 */
@@ -184,6 +185,55 @@
     .steps,.rev,.scope{grid-template-columns:1fr;}
     .jmap{grid-template-columns:repeat(4,1fr);}
   }
+
+  /* ================= v2 行式布局覆盖：一个环节一行（左文右图）+ 二级导航 ================= */
+  .subnav{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:54px;z-index:30;
+    background:color-mix(in oklab,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
+    padding:8px 10px;border:1px solid var(--border);border-radius:12px;}
+  .subnav a{font-size:12px;color:var(--muted);background:#fff;border:1px solid var(--border);
+    border-radius:999px;padding:4px 13px;text-decoration:none;white-space:nowrap;}
+  .subnav a:hover{border-color:var(--brand);color:var(--brand-deep);}
+  .subnav a.active{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;}
+
+  .steps,.rev,.side{display:flex;flex-direction:column;gap:18px;}
+  .step,.rflow,.scard{scroll-margin-top:118px;}
+  .step .sb,.rflow .rb,.scard .sb{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:8px 24px;align-items:start;padding-bottom:6px;}
+  /* 左列：文字说明 */
+  .step .sb>div:first-of-type,.rflow .rb>.fsteps{grid-column:1;grid-row:1;}
+  .rflow .rb>ul{grid-column:1;grid-row:2;}
+  .scard .sb>ul{grid-column:1;grid-row:1;}
+  .step .feat{grid-column:1;grid-row:2;}
+  .step .who,.rflow .who,.scard .who{grid-column:1;grid-row:3;}
+  .step .veh{grid-column:1;grid-row:4;}
+  .rflow .veh{grid-column:1;grid-row:4;}
+  /* 右列：截图 / 事实盒 */
+  .step .shots,.rflow .shots{grid-column:2;grid-row:1/5;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;}
+  .step .shots .d,.rflow .shots .d{width:calc(50% - 4px);height:126px;}
+  .step .shots .d img,.rflow .shots .d img{width:100%;height:126px;}
+  .step .shots .m,.rflow .shots .m{width:calc(33.33% - 6px);height:150px;}
+  .step .shots .m img,.rflow .shots .m img{width:100%;height:150px;}
+  .sidebox{grid-column:2;grid-row:1/5;background:#f8fafc;border:1px dashed var(--border);border-radius:10px;
+    padding:12px 14px;font-size:12px;color:var(--muted);align-self:start;}
+  .sidebox b{display:block;color:var(--fg);margin-bottom:4px;}
+  .sidebox .st-ok{color:var(--ok);font-weight:600;} .sidebox .st-tbd{color:var(--warn);font-weight:600;}
+  .sidebox .row{padding:5px 0;border-bottom:1px dashed var(--border);}
+  .sidebox .row:last-child{border-bottom:0;}
+  /* 交错：偶数行图左文右 */
+  @media (min-width:1024px){
+    .step:nth-of-type(even) .sb>div:first-of-type,.step:nth-of-type(even) .feat,
+    .step:nth-of-type(even) .who,.step:nth-of-type(even) .veh{grid-column:2;}
+    .step:nth-of-type(even) .sb>.shots{grid-column:1;grid-row:1/5;}
+    .rflow:nth-of-type(odd) .rb>.fsteps,.rflow:nth-of-type(odd) .rb>ul,
+    .rflow:nth-of-type(odd) .who,.rflow:nth-of-type(odd) .veh{grid-column:2;}
+    .rflow:nth-of-type(odd) .rb>.shots,.rflow:nth-of-type(odd) .sidebox{grid-column:1;grid-row:1/5;}
+  }
+  @media (max-width:1023px){
+    .step .sb,.rflow .rb,.scard .sb{grid-template-columns:1fr;}
+    .step .shots,.rflow .shots,.sidebox{grid-column:1 !important;grid-row:auto !important;}
+    .step:nth-of-type(even) .sb>*,.rflow:nth-of-type(odd) .rb>*{grid-column:1 !important;}
+  }
+  .jmap .j{cursor:pointer;}
+  .jmap .j.here{outline:3px solid #fff;outline-offset:-3px;}
 </style>
 </head>
 <body>
@@ -211,7 +261,8 @@
     <a href="#reverse"><span class="n">逆</span>逆向与异常流程</a>
     <a href="#side"><span class="n">支</span>体验支线功能</a>
     <a href="#raci"><span class="n">责</span>责任矩阵 RACI</a>
-    <a href="#confirm"><span class="n">确</span>范围边界与待确认</a>
+    <a href="#focus"><span class="n">⚡</span>重点关注</a>
+    <a href="#confirm"><span class="n">确</span>真实度 · 范围确认</a>
   </nav>
 
   <!-- ===== §1 ROLES ===== -->
@@ -271,6 +322,7 @@
               <li><b>房源实勘 / 拍照 / VR 拍摄排期</b></li>
               <li>商家培训、活跃度与分层运营</li>
               <li>房态价格催办与治理、房源焕新</li>
+              <li>退住核验 · 房源退出与在住安置</li>
               <li>商家违约违规处理与考核（响应率 / 接单率）</li>
               <li>异业 / 渠道合作接洽（银行 · 社媒 · OTA）</li>
             </ul>
@@ -350,18 +402,18 @@
     </div>
 
     <div class="jmap">
-      <div class="j jb1">① 商家入驻<small>招商 · 签约 · 开通</small></div>
-      <div class="j jb2">② 商家审核<small>集中审核 · 准入</small></div>
-      <div class="j jb3">③ 上架房源<small>实勘 · 录入 · 房态</small></div>
-      <div class="j jb4">④ 房源审核<small>真实 · 合规 · 评级</small></div>
-      <div class="j jb5">⑤ 用户浏览<small>筛选 · 详情 · 收藏</small></div>
-      <div class="j jb6">⑥ 下单<small>校验 · 锁房 · 协单</small></div>
-      <div class="j jb7">⑦ 支付<small>存管 · 凭证 · 对账</small></div>
+      <a class="j jb1" href="#f1">① 商家入驻<small>招商 · 签约 · 开通</small></a>
+      <a class="j jb2" href="#f2">② 商家审核<small>集中审核 · 准入</small></a>
+      <a class="j jb3" href="#f3">③ 上架房源<small>实勘 · 录入 · 房态</small></a>
+      <a class="j jb4" href="#f4">④ 房源审核<small>真实 · 合规 · 评级</small></a>
+      <a class="j jb5" href="#f5">⑤ 用户浏览<small>筛选 · 详情 · 收藏</small></a>
+      <a class="j jb6" href="#f6">⑥ 下单<small>校验 · 锁房 · 协单</small></a>
+      <a class="j jb7" href="#f7">⑦ 支付<small>存管 · 凭证 · 对账</small></a>
     </div>
 
     <div class="steps">
-      <div class="step">
-        <div class="sh jb1"><span class="no">①</span><b>商家入驻</b><span class="sla">资料齐 T+2 开通</span></div>
+      <div class="step" id="f1">
+        <div class="sh jb1"><span class="no">①</span><b>商家入驻</b><span class="sla zap">⚡ 重点关注</span><span class="sla">资料齐 T+2 开通</span></div>
         <div class="sb">
           <div>
             <div class="lab">功能范围</div>
@@ -378,8 +430,8 @@
           <div class="shots"><a class="d" href="screens/open-platform.html?region=gz_zj" target="_blank" title="新居住开放平台 · 商家统一入口（点击直达原型）"><img src="screens/shots/open-platform.jpg" alt="开放平台门户原型截图"></a><a class="d" href="screens/vendor-onboarding.html?region=gz_zj" target="_blank" title="商家入驻申请 · 真实提交落库（点击直达）"><img src="screens/shots/vendor-join.jpg" alt="商家入驻申请截图"></a><a class="d" href="screens/property-intake-api.html?region=gz_zj" target="_blank" title="房源接入 API · 商家版（点击直达原型）"><img src="screens/shots/intake-api.jpg" alt="房源接入API原型截图"></a></div>
         </div>
       </div>
-      <div class="step">
-        <div class="sh jb2"><span class="no">②</span><b>商家审核</b><span class="sla">T+2 出结果</span></div>
+      <div class="step" id="f2">
+        <div class="sh jb2"><span class="no">②</span><b>商家审核</b><span class="sla zap">⚡ 重点关注</span><span class="sla">T+2 出结果</span></div>
         <div class="sb">
           <div>
             <div class="lab">功能范围</div>
@@ -394,11 +446,11 @@
           <div class="feat"><b>特点：</b>资质核验是电商法 §38 的平台义务，不是卖点；一次审核 + 存续期年审</div>
           <div class="who"><span class="lab">负责</span><span class="rt ho">房源管家 · 集中审核主责</span><span class="rt cpo">产品运营 · 标准 / 复核仲裁</span><span class="rt cmo">商家运营 · 补材料协同</span></div>
           <div class="shots"><a class="d" href="screens/p-vendor-onboarding.html?region=gz_zj" target="_blank" title="服务认证中台 · 商家入驻受理工作台（真实流程，点击直达）"><img src="screens/shots/pv-onboarding.jpg" alt="商家入驻受理工作台截图"></a><a class="d" href="juzhu-admin.html" target="_blank" title="内容编辑后台 · 项目草稿审核 → 上架（点击直达，演示账号登录后可见）"><img src="screens/shots/admin-console.jpg" alt="内容编辑后台原型截图"></a><a class="d" href="juzhu-admin.html" target="_blank" title="项目编辑器 · 频道准入字段（点击直达）"><img src="screens/shots/admin-editor.jpg" alt="项目编辑器频道字段截图"></a></div>
-          <div class="veh" style="font-size:10px;color:var(--muted);">注：真实流程已上线 —— 申请落库（vendor_onboarding）→ 受理工作台受理 / 核验 / 通过 · 驳回（权限点 vendor.onboarding.review + 审计留痕）；通过后密钥（vendor_id + hmac_key）按线下流程发放；审核闸 = projects/create 建稿 → projects/status 上架。</div>
+          <div class="veh" style="font-size:10px;color:var(--muted);">注：真实流程已上线 —— 申请落库（vendor_onboarding）→ 受理工作台受理 / 核验 / 通过 · 驳回（权限点 vendor.onboarding.review + 审计留痕）；通过后密钥（vendor_id + hmac_key）按线下流程发放；审核闸 = projects/create 建稿 → projects/status 上架。品牌运营商（LV1–L3 跨市运营）不走本通道，另走白名单审定双审制（p-b-whitelist：贝壳初审 + 住建终审）。</div>
         </div>
       </div>
-      <div class="step">
-        <div class="sh jb3"><span class="no">③</span><b>上架房源</b><span class="sla">实勘后 T+1 录入</span></div>
+      <div class="step" id="f3">
+        <div class="sh jb3"><span class="no">③</span><b>上架房源</b><span class="sla zap">⚡ 重点关注</span><span class="sla">实勘后 T+1 录入</span></div>
         <div class="sb">
           <div>
             <div class="lab">功能范围</div>
@@ -414,7 +466,7 @@
           <div class="shots"><a class="d" href="screens/b-listing-mgmt.html?region=gz_zj" target="_blank" title="房源管理（点击直达原型）"><img src="screens/shots/listing-mgmt.jpg" alt="房源管理原型截图"></a><a class="d" href="screens/b-stay-calendar.html?region=gz_zj" target="_blank" title="房态日历（点击直达原型）"><img src="screens/shots/stay-calendar.jpg" alt="房态日历原型截图"></a></div>
         </div>
       </div>
-      <div class="step">
+      <div class="step" id="f4">
         <div class="sh jb4"><span class="no">④</span><b>房源审核</b><span class="sla">首审 T+1</span></div>
         <div class="sb">
           <div>
@@ -431,7 +483,7 @@
           <div class="shots"><a class="d" href="screens/p-rating-review.html?region=gz_zj" target="_blank" title="评级复核（点击直达原型）"><img src="screens/shots/rating-review.jpg" alt="评级复核原型截图"></a><a class="d" href="lvju-rating-standard.html" target="_blank" title="旅居住宿星级评价体系（点击直达）"><img src="screens/shots/rating-standard.jpg" alt="旅居星级标准原型截图"></a></div>
         </div>
       </div>
-      <div class="step">
+      <div class="step" id="f5">
         <div class="sh jb5"><span class="no">⑤</span><b>用户浏览</b><span class="sla">首屏 ≤2s</span></div>
         <div class="sb">
           <div>
@@ -447,7 +499,7 @@
           <div class="shots"><a class="m" href="lvju-app-home.html" target="_blank" title="App 首页（点击直达原型）"><img src="screens/shots/app-home.jpg" alt="App 首页原型截图"></a><a class="m" href="lvju-app-lvju.html" target="_blank" title="旅居列表（点击直达原型）"><img src="screens/shots/app-lvju.jpg" alt="旅居列表原型截图"></a><a class="m" href="lvju-app-detail.html" target="_blank" title="房源详情（点击直达原型）"><img src="screens/shots/app-detail.jpg" alt="房源详情原型截图"></a></div>
         </div>
       </div>
-      <div class="step">
+      <div class="step" id="f6">
         <div class="sh jb6"><span class="no">⑥</span><b>下单</b><span class="sla">漏斗日监测</span></div>
         <div class="sb">
           <div>
@@ -463,8 +515,8 @@
           <div class="shots"><a class="m" href="lvju-app-booking.html" target="_blank" title="预订页（点击直达原型）"><img src="screens/shots/app-booking.jpg" alt="预订页原型截图"></a></div>
         </div>
       </div>
-      <div class="step">
-        <div class="sh jb7"><span class="no">⑦</span><b>支付</b><span class="sla">成功率 ≥98% · 对账日清</span></div>
+      <div class="step" id="f7">
+        <div class="sh jb7"><span class="no">⑦</span><b>支付</b><span class="sla zap">⚡ 重点关注</span><span class="sla">成功率 ≥98% · 对账日清</span></div>
         <div class="sb">
           <div>
             <div class="lab">功能范围</div>
@@ -488,8 +540,19 @@
       <h2>逆向与异常流程 · 运营在场的四个场景</h2>
       <span class="sub">正向链路决定能不能成交，逆向链路决定会不会砸口碑——每个场景都写明运营角色怎么接</span>
     </div>
+    <div class="subnav" id="navRev">
+      <a href="#r1">↩ 取消订单</a>
+      <a href="#r2">⚠ 商家违约</a>
+      <a href="#r3">📞 客诉分级</a>
+      <a href="#r4">🛠 入住异常</a>
+      <a href="#r5">📅 改期 / 续住</a>
+      <a href="#r6">🏠 退住核验</a>
+      <a href="#r7">💳 支付异常</a>
+      <a href="#r8">⭐ 评价申诉</a>
+      <a href="#r9">🚪 房源退出</a>
+    </div>
     <div class="rev">
-      <div class="rflow">
+      <div class="rflow" id="r1">
         <div class="rh rf-r"><b>↩ 取消订单（用户发起）</b><span class="tag">审核 T+1 · 到账 T+3</span></div>
         <div class="rb">
           <div class="fsteps">
@@ -509,7 +572,7 @@
           <div class="shots"><a class="m" href="lvju-app-refund.html" target="_blank" title="退款页（点击直达原型）"><img src="screens/shots/app-refund.jpg" alt="退款页原型截图"></a></div>
         </div>
       </div>
-      <div class="rflow">
+      <div class="rflow" id="r2">
         <div class="rh rf-o"><b>⚠ 商家取消 / 无法履约（供给违约）</b><span class="tag">客户触达 ≤30min</span></div>
         <div class="rb">
           <div class="fsteps">
@@ -527,8 +590,8 @@
           <div class="who"><span class="lab">负责</span><span class="rt mo">商家运营 · 治理主责</span><span class="rt cco">客源管家 · 客户安置</span><span class="rt cpo">产品运营 · 兜底规则</span><span class="rt cfin">结算运营 · 违约金扣结</span></div>
         </div>
       </div>
-      <div class="rflow">
-        <div class="rh rf-p"><b>📞 客诉（分级处理）</b><span class="tag">首响 2h · 一般 48h 结案</span></div>
+      <div class="rflow" id="r3">
+        <div class="rh rf-p"><b>📞 客诉（分级处理）</b><span class="tag zap">⚡ 重点关注</span><span class="tag">首响 2h · 一般 48h 结案</span></div>
         <div class="rb">
           <div class="fsteps">
             <span class="f">400 进线 / 订单 / 12345 转办（星云客服承接）</span><span class="a">›</span>
@@ -548,7 +611,7 @@
           <div class="shots"><a class="d" href="screens/g-complaint.html?region=gz_zj" target="_blank" title="监管视角 · 投诉（点击直达原型）"><img src="screens/shots/gov-complaint.jpg" alt="监管投诉原型截图"></a></div>
         </div>
       </div>
-      <div class="rflow">
+      <div class="rflow" id="r4">
         <div class="rh rf-b"><b>🛠 入住中异常（房不符 / 设施故障）</b><span class="tag">响应 1h · 方案 4h</span></div>
         <div class="rb">
           <div class="fsteps">
@@ -567,6 +630,141 @@
           <div class="shots"><a class="m" href="lvju-app-me.html" target="_blank" title="App「我的 · 服务工单」（点击直达）"><img src="screens/shots/ticket-sheet.jpg" alt="App服务工单入口截图"></a><a class="m" href="lvju-app-ticket.html" target="_blank" title="工单详情页（点击直达）"><img src="screens/shots/ticket-detail.jpg" alt="工单详情页截图"></a><a class="d" href="screens/p-service-demand.html?region=gz_zj" target="_blank" title="服务工单池（点击直达原型）"><img src="screens/shots/service-demand.jpg" alt="服务工单池原型截图"></a></div>
         </div>
       </div>
+
+      <div class="rflow" id="r5">
+        <div class="rh rf-b"><b>📅 改期 / 续住（用户发起）</b><span class="tag">房态校验即时</span></div>
+        <div class="rb">
+          <div class="fsteps">
+            <span class="f">用户申请改期 / 续住</span><span class="a">›</span>
+            <span class="f">客源管家受理</span><span class="a">›</span>
+            <span class="f">新日期房态校验（可订 + 最短连住）</span><span class="a">›</span>
+            <span class="f">差价补 / 退（原路）</span><span class="a">›</span>
+            <span class="f">旧晚释放 · 新晚重锁</span><span class="a">›</span>
+            <span class="f">凭证更新</span>
+          </div>
+          <ul>
+            <li>续住优先原房原价延续（按续住日价格体系）；改期受房态与最短连住约束，无房时同级调剂</li>
+            <li>差价<b>多退少补</b>原路执行；改期记录进订单日志，中台工单池可见</li>
+          </ul>
+          <div class="who"><span class="lab">负责</span><span class="rt co">客源管家 · 受理主责</span><span class="rt cpo">产品运营 · 规则</span><span class="rt cfin">结算运营 · 差价执行</span><span class="rt cmo">商家运营 · 特殊协调</span></div>
+          <div class="sidebox">
+            <div class="row"><b>状态</b><span class="st-ok">规则已定义 · 流程待建（一期订单状态机扩展）</span></div>
+            <div class="row"><b>载体</b>订单详情页（改期入口）+ 房态日历校验</div>
+            <div class="row"><b>红线</b>改期不得绕过房态校验，防超卖</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rflow" id="r6">
+        <div class="rh rf-p"><b>🏠 退住核验（长租退住）</b><span class="tag">核验 T+1 · 押金 T+3</span></div>
+        <div class="rb">
+          <div class="fsteps">
+            <span class="f">退住申请</span><span class="a">›</span>
+            <span class="f">商家运营上门核验（物品 / 水电 / 卫生）</span><span class="a">›</span>
+            <span class="f">缺项扣减清单（拍照留痕）</span><span class="a">›</span>
+            <span class="f">押金结算</span><span class="a">›</span>
+            <span class="f">退住单完结</span><span class="a">›</span>
+            <span class="f">房源焕新再上架</span>
+          </div>
+          <ul>
+            <li>退住核验单进工单池（类型「退住核验」），与家政 / 维修工单同总线</li>
+            <li>扣减项<b>拍照留痕 + 客户确认</b>；焕新完成后彩贝评级复审，再挂回可订</li>
+          </ul>
+          <div class="who"><span class="lab">负责</span><span class="rt mo">商家运营 · 核验主责</span><span class="rt cco">客源管家 · 客户沟通</span><span class="rt cfin">结算运营 · 押金结算</span><span class="rt cho">房源管家 · 焕新复审</span></div>
+          <div class="sidebox">
+            <div class="row"><b>状态</b><span class="st-ok">工单类型已有 · 核验子流程待建</span></div>
+            <div class="row"><b>载体</b>服务工单池（p-service-demand）+ 工单详情页</div>
+            <div class="row"><b>依据</b>监管口径「退住 · 居住保障」（旅居总览 · 居住服务支柱）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rflow" id="r7">
+        <div class="rh rf-r"><b>💳 支付异常（失败 / 超时未支付）</b><span class="tag zap">⚡ 重点关注</span><span class="tag">超时 15min 关单</span></div>
+        <div class="rb">
+          <div class="fsteps">
+            <span class="f">支付失败 / 超时</span><span class="a">›</span>
+            <span class="f">自动关单 · 房态释放</span><span class="a">›</span>
+            <span class="f">失败原因回显（引导换支付方式）</span><span class="a">›</span>
+            <span class="f">客源管家催付触达</span><span class="a">›</span>
+            <span class="f">400 兜底重新下单</span>
+          </div>
+          <ul>
+            <li>关单前房态锁定、关单即释放——防占房；对账差异<b>即熔断排查</b>（0 资损红线）</li>
+            <li>催付触达：订阅消息 + 短信 + 400；不引导任何线下私下收款</li>
+          </ul>
+          <div class="who"><span class="lab">负责</span><span class="rt po">产品运营 · 链路与规则</span><span class="rt cco">客源管家 · 催付</span><span class="rt cfin">结算运营 · 对账</span></div>
+          <div class="sidebox">
+            <div class="row"><b>状态</b><span class="st-ok">关单 / 释放已上线（一期订单状态机）</span></div>
+            <div class="row"><b>载体</b>收银台（lvju-app-pay）· 对账日清</div>
+            <div class="row"><b>口径</b>交易健壮性主线 · 一期「交易地基」</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rflow" id="r8">
+        <div class="rh rf-p"><b>⭐ 评价申诉与差评处理</b><span class="tag">复核 5 个工作日</span></div>
+        <div class="rb">
+          <div class="fsteps">
+            <span class="f">商家申诉 / 差评产生</span><span class="a">›</span>
+            <span class="f">客源管家抽查复核（举证）</span><span class="a">›</span>
+            <span class="f">属实：评级修正 + 公示更新</span><span class="a">›</span>
+            <span class="f">不属实：驳回留痕</span><span class="a">›</span>
+            <span class="f">恶意评价治理</span>
+          </div>
+          <ul>
+            <li>申诉须举证（照片 / 工单记录）；复核结果进<b>彩贝动态调级</b>与公示口径</li>
+            <li>恶意差评 / 刷好评<b>双向治理</b>，命中风控的评价不参与均分</li>
+          </ul>
+          <div class="who"><span class="lab">负责</span><span class="rt co">客源管家 · 抽查复核主责</span><span class="rt cho">房源管家 · 评级修正</span><span class="rt cmo">商家运营 · 商家告知</span><span class="rt cpo">产品运营 · 公示口径</span></div>
+          <div class="sidebox">
+            <div class="row"><b>状态</b><span class="st-tbd">申诉通道待建（随三期评级工作台）</span></div>
+            <div class="row"><b>载体</b>评级复核（p-rating-review）· 公示门户</div>
+            <div class="row"><b>口径</b>「照骗」与评价作弊治理（风险表 · 中 / 高）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rflow" id="r9">
+        <div class="rh rf-o"><b>🚪 房源退出（商家解约 / 下架）</b><span class="tag">在住安置 T+3</span></div>
+        <div class="rb">
+          <div class="fsteps">
+            <span class="f">解约 / 下架申请</span><span class="a">›</span>
+            <span class="f">在住订单排查</span><span class="a">›</span>
+            <span class="f">未入住：直接下架</span><span class="a">›</span>
+            <span class="f">在住：安置或履约至退房</span><span class="a">›</span>
+            <span class="f">保证金清算</span><span class="a">›</span>
+            <span class="f">评级 / 验真卡下线</span>
+          </div>
+          <ul>
+            <li>退出即<b>验真卡与公示同步下线</b>，杜绝「已退出仍可订」；C 端 15 秒缓存刷新</li>
+            <li>违约退出走<b>违约梯度</b>（提醒 → 扣分 → 暂停 → 清退）；在住客户安置由客源管家闭环</li>
+          </ul>
+          <div class="who"><span class="lab">负责</span><span class="rt mo">商家运营 · 主责</span><span class="rt cpo">产品运营 · 下架规则</span><span class="rt cfin">结算运营 · 清算</span><span class="rt cco">客源管家 · 客户安置</span></div>
+          <div class="sidebox">
+            <div class="row"><b>状态</b><span class="st-ok">下架已上线（projects/status）· 清算流程待建</span></div>
+            <div class="row"><b>载体</b>房源管理（b-listing-mgmt）· projects/status 上下架</div>
+            <div class="row"><b>红线</b>退出房源必须同步下线验真卡与评级展示</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-top:18px;" id="focus">
+      <h3 style="margin:0 0 10px;font-size:15px;">⚡ 重点关注 · 环节与人员（对齐 0903 签约后 todo 纪要近期节点）</h3>
+      <table class="risk">
+        <thead><tr><th style="width:16%;">环节</th><th style="width:46%;">需要重点关注的事项</th><th style="width:24%;">角色 / 人员</th><th>纪要节点</th></tr></thead>
+        <tbody>
+          <tr><td><b>② 商家审核</b></td><td>「商家底线合作标准」落成受理工作台的核验清单 SOP；房源管家为新角色（集中审核），首月审核产能与驳回口径需演练</td><td>李月然（底线标准）· 房源管家</td><td>9/11</td></tr>
+          <tr><td><b>① 商家入驻</b></td><td>签约主体未定（贵州新旅居 / 更名后母公司）——申请单落库后合同与结算主体要挂对</td><td>严行 / 郭洁（子公司注册）· 李月然（合同版本）</td><td>9/18</td></tr>
+          <tr><td><b>⑦ 支付 + 结算</b></td><td>贵州银行支付协议与对账 / 分账口径对齐；结算运营为新角色，费率折扣核定规则待批</td><td>严行（银行对接）· 赵一濛（协议）· 结算运营</td><td>9/9 – 9/18</td></tr>
+          <tr><td><b>📞 客诉分级</b></td><td>星云进线已接；三级分级口径与 QA 答客问需向贵阳运营层宣导，客源管家 / 客服话术充电</td><td>严行 / 郭洁（QA 答客问）· 客源管家 · 星云</td><td>9/7</td></tr>
+          <tr><td><b>③ 实勘上架</b></td><td>实勘 / 拍照刚划归商家运营（组织调整）——「勘 → 录 → 审」流水线与泉湖 50 套标杆需合练</td><td>严行（泉湖标杆）· 商家运营 + 房源管家</td><td>10/15 前</td></tr>
+          <tr><td><b>④ 彩贝评级</b></td><td>旅居标准初设定稿后，房源管家评分 / 抽检才有执行依据（依赖项）</td><td>李月然 / 黄卉（标准初设）· 房源管家</td><td>9/30</td></tr>
+          <tr><td><b>产研资源</b></td><td>云端产研 +3.5 人 → 优先投缺口：费率配置、结算对账、改期 / 退住子流程</td><td>赵一濛（资源争取）· 产品运营</td><td>9/7</td></tr>
+          <tr><td><b>一期呈现</b></td><td>10/15 一期呈现 · 支付完成后 2 周内全量 · 10/20 后评估贵阳 BD 目标</td><td>王冠蘅 / 李月然 / 赵一濛 / 严行</td><td>10/15</td></tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -577,18 +775,29 @@
       <h2>体验支线功能 · 影响转化的「周边工程」</h2>
       <span class="sub">不直接成交，但决定成交顺不顺——同样明确范围、特点与归属期</span>
     </div>
+    <div class="subnav" id="navSide">
+      <a href="#x1">📝 帖子维护</a>
+      <a href="#x2">⭐ 收藏</a>
+      <a href="#x3">👥 联系人维护</a>
+      <a href="#x4">🔔 消息通知</a>
+      <a href="#x5">🐾 足迹与比价</a>
+      <a href="#x6">🧾 发票管理</a>
+      <a href="#x7">⭐ 评价管理</a>
+      <a href="#x8">🔎 搜索偏好与订阅</a>
+      <a href="#x9">👑 会员权益</a>
+    </div>
     <div class="side">
-      <div class="scard">
+      <div class="scard" id="x1">
         <div class="sh">📝 <b>帖子维护</b><span class="ph">二期主建 · 一期种子</span></div>
         <div class="sb">
           <ul>
             <li>范围：PGC 内容生产 → 审核（真实 / 版权 / 广告法）→ 上下架与专题组织 → 笔记挂房源 → 内容→详情 CTR 回流</li>
             <li>特点：内容即获客；一期 PGC 收口，UGC 二期灰度（审核人力先行）</li>
           </ul>
-          <div class="who"><span class="rt cnt">内容运营 · 主责</span><span class="rt cpo">产品运营 · 审核口径</span><span class="rt cbiz">商务 · 商务素材</span><span class="rt i">房源管家 · 房源挂载</span></div>
+          <div class="who"><span class="rt cnt">内容运营 · 主责</span><span class="rt cpo">产品运营 · 审核口径</span><span class="rt cmo">商家运营 · 商家素材</span><span class="rt i">房源管家 · 房源挂载</span></div>
         </div>
       </div>
-      <div class="scard">
+      <div class="scard" id="x2">
         <div class="sh">⭐ <b>收藏</b><span class="ph">一期基础 · 二期增强</span></div>
         <div class="sb">
           <ul>
@@ -598,7 +807,7 @@
           <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cco">客源管家 · 场景运营</span></div>
         </div>
       </div>
-      <div class="scard">
+      <div class="scard" id="x3">
         <div class="sh">👥 <b>联系人维护</b><span class="ph">一期入住人 · 二期常用</span></div>
         <div class="sb">
           <ul>
@@ -608,7 +817,7 @@
           <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cco">客源管家 · 回访名单</span></div>
         </div>
       </div>
-      <div class="scard">
+      <div class="scard" id="x4">
         <div class="sh">🔔 <b>消息通知</b><span class="ph">一期交易 · 二期营销</span></div>
         <div class="sb">
           <ul>
@@ -616,6 +825,61 @@
             <li>特点：重要交易通知不依赖单一通道；频控与免打扰，营销类默认关闭</li>
           </ul>
           <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt i">客源管家 · 知会</span></div>
+        </div>
+      </div>
+
+      <div class="scard" id="x5">
+        <div class="sh">🐾 <b>足迹与比价</b><span class="ph">一期基础</span></div>
+        <div class="sb">
+          <ul>
+            <li>范围：最近浏览 / 足迹地图、同档房源比价记录、浏览偏好画像（ Feed 排序输入）</li>
+            <li>特点：「看过的房」是复购与回访的第一线索；与收藏互补——收藏表意向、足迹表兴趣</li>
+          </ul>
+          <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cco">客源管家 · 回访线索</span></div>
+        </div>
+      </div>
+
+      <div class="scard" id="x6">
+        <div class="sh">🧾 <b>发票管理</b><span class="ph">一期预留 · 三期完善</span></div>
+        <div class="sb">
+          <ul>
+            <li>范围：发票抬头管理、开票申请与进度、平台费发票与房费发票口径区分</li>
+            <li>特点：B 端结算与政企客户刚需；一期仅预留发票位与抬头字段，开票自动化三期上</li>
+          </ul>
+          <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cfin">结算运营 · 开票协同</span></div>
+        </div>
+      </div>
+
+      <div class="scard" id="x7">
+        <div class="sh">⭐ <b>评价管理</b><span class="ph">一期随单 · 二期主建</span></div>
+        <div class="sb">
+          <ul>
+            <li>范围：我的评价（改 / 删窗口）、商家回复展示、差评申诉入口、评价反作弊标记</li>
+            <li>特点：评价是彩贝评级与商家考核的输入；申诉复核结果同步公示口径</li>
+          </ul>
+          <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cco">客源管家 · 抽查复核</span><span class="rt cho">房源管家 · 评级修正</span></div>
+        </div>
+      </div>
+
+      <div class="scard" id="x8">
+        <div class="sh">🔎 <b>搜索偏好与房源订阅</b><span class="ph">二期增强</span></div>
+        <div class="sb">
+          <ul>
+            <li>范围：目的地 / 预算 / 标签偏好设置、新上房源与降价订阅提醒、康养季主题订阅</li>
+            <li>特点：偏好即转化——订阅触达是银发客群「子女代订」的高频入口；触达走消息中心频控</li>
+          </ul>
+          <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt cco">客源管家 · 触达运营</span></div>
+        </div>
+      </div>
+
+      <div class="scard" id="x9">
+        <div class="sh">👑 <b>会员权益（旅居黑卡）</b><span class="ph">二期 · 待立项</span></div>
+        <div class="sb">
+          <ul>
+            <li>范围：会员等级与权益（全年 9 折 / 优先派管家 / 专属客服）、权益核销与对账、续费提醒</li>
+            <li>特点：优先派管家依赖四期派单引擎；权益履约涉及商家补贴分摊，立项前先算清账</li>
+          </ul>
+          <div class="who"><span class="rt po">产品运营 · 主责</span><span class="rt mo">商家运营 · 权益履约</span><span class="rt cfin">结算运营 · 补贴对账</span></div>
         </div>
       </div>
     </div>
@@ -648,16 +912,20 @@
           <tr><td class="act">🏬 后台开通与密钥 / 保证金<b>商家后台 · HMAC 密钥 · 结算账户</b></td><td class="c"><span class="rc i">I</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc i">I</span></td><td class="c">—</td></tr>
           <tr><td class="act">📋 准入标准 / 费率策略制定<b>电商法核验口径 · 差别化佣金地基</b></td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td></tr>
           <tr><td class="act">🏬 商家培训与活跃度分层<b>响应率 / 接单率考核</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c">—</td></tr>
+          <tr><td class="act">🚪 房源退出与在住安置<b>解约下架 · 保证金清算 · 验真卡下线</b></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td></tr>
           <tr class="grp"><td colspan="7">🏠 房源对象（实勘 → 审核 → 评级 → 抽查）</td></tr>
-          <tr><td class="act">🏠 房源实勘 / 拍摄 / 信息录入<b>≥8 图 · 设施自查表 · 房态与连住</b></td><td class="c"><span class="rc i">I</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c">—</td></tr>
+          <tr><td class="act">🏠 房源实勘 / 拍摄 / 信息录入<b>≥8 图 · 设施自查表 · 房态与连住</b></td><td class="c"><span class="rc i">I</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td></tr>
           <tr><td class="act">🏠 房源上架审核<b>照骗查重 · 图质 · 用词合规（集中审核）</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc r">R</span></td><td class="c">—</td></tr>
           <tr><td class="act">🏠 彩贝评级与动态调级<b>口径平台定 · 执行集中化</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc i">I</span></td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td></tr>
           <tr><td class="act">🔍 存续期抽查（品控）<b>房源与实拍一致 · 服务履约</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc r">R</span></td></tr>
+          <tr><td class="act">🏠 退住核验与焕新<b>物品 / 水电核验 · 押金结算 · 复审上架</b></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td></tr>
+          <tr><td class="act">🔍 评价申诉复核<b>举证 · 评级修正 · 公示口径</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc i">I</span></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc r">R</span></td></tr>
           <tr><td class="act">🏠 房态 / 价格维护与治理<b>商家自维护 · 商家运营催办</b></td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c">—</td></tr>
           <tr class="grp"><td colspan="7">🧳 客户对象（咨询 → 成交 → 服务）</td></tr>
-          <tr><td class="act">🧳 用户咨询接待与推荐带看<b>400 / IM · 虚拟号留痕</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc i">I</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
+          <tr><td class="act">🧳 用户咨询接待与推荐带看<b>400 / IM · 虚拟号留痕</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
           <tr><td class="act">🧳 下单协单与催付<b>锁房态 · 幂等防重 · 代客预填</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
           <tr><td class="act">🧳 取消 / 退款处理<b>政策分档 · 人工审 · 房态释放</b></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
+          <tr><td class="act">🧳 改期 / 续住处理<b>房态校验 · 差价补退 · 重锁</b></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
           <tr><td class="act">🧳 客诉受理 → 闭环<b>首响 2h · 星云承接进线 · 重大日清上报</b></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td></tr>
           <tr><td class="act">🧳 入住中异常与现场整改<b>服务工单 · 换房赔付 · 进评级</b></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc i">I</span></td><td class="c"><span class="rc c">C</span></td></tr>
           <tr class="grp"><td colspan="7">💰 资金对象（支付 → 结算）</td></tr>
@@ -666,7 +934,7 @@
           <tr class="grp"><td colspan="7">📝 内容与增长对象</td></tr>
           <tr><td class="act">📝 帖子（内容）生产与审核<b>PGC 收口 · UGC 二期灰度</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c">—</td></tr>
           <tr><td class="act">🤝 异业 / 渠道商务合作<b>银行分期 · 哈啰 · 社媒与 OTA 接洽</b></td><td class="c"><span class="rc c">C</span></td><td class="c">—</td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c">—</td></tr>
-          <tr><td class="act">✨ 收藏 / 联系人 / 通知等体验功能<b>功能建设与场景运营</b></td><td class="c"><span class="rc r">R</span></td><td class="c">—</td><td class="c"><span class="rc i">I</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc c">C</span></td></tr>
+          <tr><td class="act">✨ 体验支线功能（收藏 / 足迹 / 订阅 / 通知 / 会员 / 发票）<b>功能建设与场景运营</b></td><td class="c"><span class="rc r">R</span></td><td class="c"><span class="rc c">C</span></td><td class="c"><span class="rc i">I</span></td><td class="c">—</td><td class="c">—</td><td class="c"><span class="rc c">C</span></td></tr>
         </tbody>
       </table>
       <div class="legend2">
@@ -741,6 +1009,47 @@
     });
   },{rootMargin:'-45% 0px -50% 0px'});
   secs.forEach(s=>s&&io.observe(s));
+
+  /* ===== 二级导航：逆向 / 支线 chips + 正向 jmap 高亮 ===== */
+  function bindSubnav(navId){
+    var nav=document.getElementById(navId); if(!nav) return;
+    var chips=[...nav.querySelectorAll('a')];
+    chips.forEach(function(c){
+      c.addEventListener('click',function(e){
+        e.preventDefault();
+        var t=document.querySelector(c.getAttribute('href'));
+        if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    });
+    var cards=chips.map(function(c){ return document.querySelector(c.getAttribute('href')); }).filter(Boolean);
+    var io2=new IntersectionObserver(function(es){
+      es.forEach(function(en){
+        if(en.isIntersecting){
+          chips.forEach(function(c){ c.classList.toggle('active', c.getAttribute('href')==='#'+en.target.id); });
+        }
+      });
+    },{rootMargin:'-20% 0px -68% 0px'});
+    cards.forEach(function(c){ io2.observe(c); });
+  }
+  bindSubnav('navRev'); bindSubnav('navSide');
+
+  var tiles=[...document.querySelectorAll('.jmap .j')];
+  var fids=['f1','f2','f3','f4','f5','f6','f7'];
+  tiles.forEach(function(t,i){
+    t.addEventListener('click',function(){
+      var s=document.getElementById(fids[i]);
+      if(s) s.scrollIntoView({behavior:'smooth'});
+    });
+  });
+  var jio=new IntersectionObserver(function(es){
+    es.forEach(function(en){
+      if(en.isIntersecting){
+        var i=fids.indexOf(en.target.id);
+        tiles.forEach(function(t,j){ t.classList.toggle('here', j===i); });
+      }
+    });
+  },{rootMargin:'-25% 0px -65% 0px'});
+  fids.forEach(function(fid){ var e=document.getElementById(fid); if(e) jio.observe(e); });
 })();
 </script>
 </body>
