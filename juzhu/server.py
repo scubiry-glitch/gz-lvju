@@ -988,6 +988,8 @@ class Handler(SimpleHTTPRequestHandler):
                 "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
                 "show_life_service": settings.get("show_life_service", "1") == "1",
                 "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
+                # C 端模拟登录开关：仅非生产（JUZHU_ENV != prod/production）开启；生产恒 false（对齐 Node app.js）
+                "mock_login": not self._is_production(),
             })
 
         if path == "/api/juzhu/districts":
