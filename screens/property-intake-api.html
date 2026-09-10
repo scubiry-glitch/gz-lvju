@@ -513,9 +513,13 @@
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"list"</span>: [ {
   <span class="tok-key">"id"</span>: <span class="tok-num">36</span>, <span class="tok-key">"order_no"</span>: <span class="tok-str">"BKG-RENTAL-00036"</span>, <span class="tok-key">"project_name"</span>: <span class="tok-str">"观山湖·遇见旅居"</span>,
   <span class="tok-key">"checkin"</span>: <span class="tok-str">"2026-12-19"</span>, <span class="tok-key">"checkout"</span>: <span class="tok-str">"2027-01-08"</span>, <span class="tok-key">"nights"</span>: <span class="tok-num">20</span>,
-  <span class="tok-key">"price_total"</span>: <span class="tok-num">1600</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"pending"</span>, <span class="tok-key">"pay_status"</span>: <span class="tok-key">null</span>,
+  <span class="tok-key">"price_total"</span>: <span class="tok-num">1600</span>, <span class="tok-key">"commission_rate"</span>: <span class="tok-num">8.00</span>, <span class="tok-key">"commission_fee"</span>: <span class="tok-num">128.00</span>,
+  <span class="tok-key">"status"</span>: <span class="tok-str">"pending"</span>, <span class="tok-key">"pay_status"</span>: <span class="tok-key">null</span>,
   <span class="tok-key">"contact_name"</span>: <span class="tok-str">"张**"</span>, <span class="tok-key">"contact_phone"</span>: <span class="tok-str">"139****5678"</span>
 } ] }</code></pre>
+    <ul style="font-size:13.5px;">
+      <li><strong>佣金（规则 20）</strong>：<code>commission_rate</code> / <code>commission_fee</code> 为下单时锁定的费率与佣金快照（元），结算按快照执行、商家后续费率调整不追溯；未差异化商家按全局基准（缺省 10%）。</li>
+    </ul>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/detail</span><span class="desc">按 id 查单（owner 校验）</span></div>
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">36</span> } → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"booking"</span>: { <span class="tok-com">/* 同上，单条 */</span> } }</code></pre>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/confirm</span><span class="desc">确认生效</span></div>

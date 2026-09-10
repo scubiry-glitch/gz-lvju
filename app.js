@@ -696,6 +696,7 @@ function stripContactPhone(row) {
 // ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源：stay_config.cjs =====
 // 会话态接口（app.js）与商家 HMAC 开放接口（vendor_api.cjs）共用同一份口径
 const stayCfg = require('./stay_config.cjs');
+const vendorRate = require('./vendor_rate.cjs'); // 商家佣金费率（按业务线分档）单一数据源：vendor_rate.cjs
 const INSURANCE_TYPES = stayCfg.INSURANCE_TYPES;
 const INSURANCE_KEYS = stayCfg.INSURANCE_KEYS;
 const STAY_MIN_NIGHTS_DEFAULT = stayCfg.STAY_MIN_NIGHTS_DEFAULT;
@@ -1362,6 +1363,8 @@ async function ensureSchemaRun() {
         checkout VARCHAR(10) NOT NULL,
         nights INT NOT NULL,
         price_total INT NOT NULL,
+        commission_rate DECIMAL(5,2),
+        commission_fee DECIMAL(10,2),
         status VARCHAR(16) NOT NULL DEFAULT 'pending',
         pay_status VARCHAR(20),
         pay_method VARCHAR(50),
@@ -1460,6 +1463,8 @@ async function ensureSchemaRun() {
         ,review_status VARCHAR(20) NOT NULL DEFAULT 'approved'
         ,review_note TEXT
         ,reviewed_at VARCHAR(30)
+        ,commission_housing DECIMAL(5,2) DEFAULT NULL
+        ,commission_jiazheng DECIMAL(5,2) DEFAULT NULL
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS jz_products (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1776,6 +1781,8 @@ async function ensureSchemaRun() {
       ['show_city_switcher', '1'],
       ['show_life_service', '1'],
       ['channel_name', (channelBrand && channelBrand.DEFAULT_CHANNEL_NAME) || '新居住频道'],
+      ['commission_housing_default', '10.00'],   // 抽佣全局基准·房源预订（0903 纪要，规则 20）
+      ['commission_jiazheng_default', '10.00'],  // 抽佣全局基准·家政
     ];
     for (const [k, v] of settingSeeds) {
       await conn.execute(
@@ -1791,6 +1798,8 @@ async function ensureSchemaRun() {
       ['units', 'ext TEXT'],
       ['booking_orders', 'idempotency_key VARCHAR(100)'],
       ['booking_orders', 'payment_expires_at VARCHAR(32)'],
+      ['booking_orders', 'commission_rate DECIMAL(5,2)'],   // 下单锁定的商家生效费率快照（规则 20，调价不追溯）
+      ['booking_orders', 'commission_fee DECIMAL(10,2)'],
       ['jz_vendors', 'login_name VARCHAR(120)'],
       ['jz_vendors', 'password_hash VARCHAR(255)'],
       ['jz_vendors', "review_status VARCHAR(20) NOT NULL DEFAULT 'approved'"],
@@ -1805,6 +1814,8 @@ async function ensureSchemaRun() {
       ['jz_vendors', 'platform_certs TEXT'],
       ['jz_vendors', 'webhook_url VARCHAR(500)'],
       ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
+      ['jz_vendors', 'commission_housing DECIMAL(5,2)'],   // 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
+      ['jz_vendors', 'commission_jiazheng DECIMAL(5,2)'],  // 抽佣·家政档（本期仅配置，消费在家政结算）
       ['jz_products', 'city_id INT'],
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
@@ -2223,10 +2234,38 @@ async function handleApiDirect(urlPath, qs, req, res) {
           `UPDATE vendor_onboarding SET status=?, rate_discount=?, checklist_json=?, review_note=?, reviewer=?, reviewed_at=NOW() WHERE id=?`,
           [next, discount, checklist, String(body.note || '').slice(0, 500), String(reviewer).slice(0, 64), id]
         );
+        // 规则 20：审批通过即把核定费率回填商家（接通「申请单核定 → 商家费率」断桥）。
+        // 按 phone 单命中 active 商家才回填；未命中/多命中不阻塞，由「商家费率」台配置。
+        let backfillNote = '';
+        if (next === 'approved') {
+          const rateVal = Math.round((Math.max(0, (parseFloat(cur.rate_base) || 10) - (discount != null ? discount : 0))) * 100) / 100;
+          const vrows = await queryRows("SELECT id, name FROM jz_vendors WHERE phone=? AND status='active'", [cur.phone]);
+          if (vrows.length === 1) {
+            const chans = String(cur.channels || 'rental').split(',').map((c) => c.trim());
+            const bizCols = [];
+            if (chans.some((c) => c === 'rental' || c === 'minsu')) bizCols.push('commission_housing');
+            if (chans.some((c) => c === 'jiazheng')) bizCols.push('commission_jiazheng');
+            if (!bizCols.length) bizCols.push('commission_housing');   // 申请单频道缺省按房源档
+            await queryRows(
+              `UPDATE jz_vendors SET ${bizCols.map((c) => c + '=?').join(', ')} WHERE id=?`,
+              [...bizCols.map(() => rateVal), vrows[0].id]
+            );
+            backfillNote = '；费率已回填商家 ' + vrows[0].name + '（' + rateVal + '%）';
+            await authCenter.audit({
+              action: 'vendor.commission.update', resource: 'vendors', resourceId: String(vrows[0].id),
+              result: 'ok', after: Object.fromEntries(bizCols.map((c) => [c, rateVal])),
+              before: Object.fromEntries(bizCols.map((c) => [c, null])),
+            });
+          } else if (vrows.length > 1) {
+            backfillNote = '；按手机号命中多个商家，费率未自动回填（请在「商家费率」台配置）';
+          } else {
+            backfillNote = '；暂未找到匹配商家，费率请在「商家费率」台配置';
+          }
+        }
         const out = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
         return jsonReply(res, Object.assign({}, out[0], {
           message: next === 'approved'
-            ? '已通过。密钥（vendor_id + hmac_key）按线下流程发放；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '')
+            ? '已通过。密钥（vendor_id + hmac_key）按线下流程发放；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '') + backfillNote
             : (next === 'reviewing' ? '已转入核验中' : '已驳回（已留痕）'),
         }));
       }
@@ -2272,6 +2311,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
         channel_name: brand.name,
+        // 抽佣全局基准（规则 20）：商家未差异化时回落到这里
+        commission_housing_default: String(vendorRate.defaultRateOf(settingsMap, 'housing')),
+        commission_jiazheng_default: String(vendorRate.defaultRateOf(settingsMap, 'jiazheng')),
       });
     }
 
@@ -2443,6 +2485,146 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // GET /admin/vendors/rates —— 商家费率（两档）+ 全局基准（规则 20；权限点 admin.read）
+    if (urlPath === '/api/juzhu/admin/vendors/rates' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = `SELECT v.id, v.name, v.type, v.phone, v.status, v.review_status,
+                        v.commission_housing, v.commission_jiazheng, COUNT(p.id) AS project_count
+                 FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+                 WHERE 1=1`;
+      const params = [];
+      if (qp.get('status')) { sql += ' AND v.status=?'; params.push(qp.get('status')); }
+      sql += ' GROUP BY v.id, v.name, v.type, v.phone, v.status, v.review_status, v.commission_housing, v.commission_jiazheng ORDER BY v.id DESC LIMIT 500';
+      const rows = await queryRows(sql, params);
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const r of srows) settingsMap[r.key] = r.value;
+      const vendors = rows.map((v) => Object.assign({}, v, {
+        commission_housing: v.commission_housing == null ? null : Number(v.commission_housing),
+        commission_jiazheng: v.commission_jiazheng == null ? null : Number(v.commission_jiazheng),
+        commission_housing_effective: vendorRate.effectiveRateOf(v, 'housing', settingsMap),
+        commission_jiazheng_effective: vendorRate.effectiveRateOf(v, 'jiazheng', settingsMap),
+      }));
+      return jsonReply(res, {
+        defaults: {
+          housing: vendorRate.defaultRateOf(settingsMap, 'housing'),
+          jiazheng: vendorRate.defaultRateOf(settingsMap, 'jiazheng'),
+        },
+        vendors,
+      });
+    }
+
+    // PUT /admin/vendors/commission-defaults —— 抽佣全局基准（两键 KV；规则 20；权限点 vendor.fund.write）
+    // 与 PUT /admin/settings 并行写同一组 KV（那边挂 settings.write 给平台管理员）；null = 删除键回落内置 10。
+    if (urlPath === '/api/juzhu/admin/vendors/commission-defaults' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const out = {};
+      for (const biz of vendorRate.BIZLINES) {
+        const k = vendorRate.defaultSettingKey(biz);
+        if (!(biz in body) && !('commission_' + biz + '_default' in body)) continue;
+        const raw = (biz in body) ? body[biz] : body['commission_' + biz + '_default'];
+        let v;
+        try { v = vendorRate.normalizeRate(raw); } catch (e) { return jsonReply(res, { error: e.message }, 400); }
+        if (v == null) await queryRows('DELETE FROM settings WHERE `key`=?', [k]);
+        else await queryRows(
+          'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+          [k, String(v)]
+        );
+        out[biz] = v;
+      }
+      if (!Object.keys(out).length) return jsonReply(res, { error: '无可更新字段（housing / jiazheng）' }, 400);
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const rr of srows) settingsMap[rr.key] = rr.value;
+      return jsonReply(res, {
+        ok: true,
+        defaults: {
+          housing: vendorRate.defaultRateOf(settingsMap, 'housing'),
+          jiazheng: vendorRate.defaultRateOf(settingsMap, 'jiazheng'),
+        },
+      });
+    }
+
+    // GET /admin/vendors/commission-history —— 费率变更详单（规则 20；挂 vendor.fund.write，
+    // 不借道 /admin/audit 的 audit.read：看佣金历史不需要全站审计权限）
+    if (urlPath === '/api/juzhu/admin/vendors/commission-history' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT id, resource_id, role_code, before_json, after_json, created_at
+         FROM audit_log
+         WHERE action='vendor.commission.update' AND before_json IS NOT NULL
+         ORDER BY id DESC LIMIT 50`);
+      return jsonReply(res, {
+        items: rows.map((r0) => {
+          let before = {}, after = {};
+          try { before = JSON.parse(r0.before_json || '{}'); } catch (_) {}
+          try { after = JSON.parse(r0.after_json || '{}'); } catch (_) {}
+          return { id: r0.id, vendor_id: r0.resource_id, role_code: r0.role_code, created_at: r0.created_at, before, after };
+        }),
+      });
+    }
+
+    // PUT /admin/vendors/:id/commission —— 商家费率调整（两档；规则 20；权限点 vendor.fund.write）
+    // 口径：0-100 两位小数，null = 清除（回落全局基准）；调价不追溯，仅新订单生效。
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/commission$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        let nextHousing, nextJiazheng;
+        try {
+          if ('commission_housing' in body) nextHousing = vendorRate.normalizeRate(body.commission_housing);
+          if ('commission_jiazheng' in body) nextJiazheng = vendorRate.normalizeRate(body.commission_jiazheng);
+        } catch (e) { return jsonReply(res, { error: e.message }, 400); }
+        if (nextHousing === undefined && nextJiazheng === undefined) {
+          return jsonReply(res, { error: '无可更新字段（commission_housing / commission_jiazheng）' }, 400);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const vid = parseInt(m[1], 10);
+          const [rows] = await conn.execute(
+            'SELECT id, name, commission_housing, commission_jiazheng FROM jz_vendors WHERE id=?', [vid]);
+          if (!rows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          const cur = rows[0];
+          const num = (x) => (x == null ? null : Number(x));
+          const before = { commission_housing: num(cur.commission_housing), commission_jiazheng: num(cur.commission_jiazheng) };
+          const sets = [], vals = [];
+          if (nextHousing !== undefined) { sets.push('commission_housing=?'); vals.push(nextHousing); }
+          if (nextJiazheng !== undefined) { sets.push('commission_jiazheng=?'); vals.push(nextJiazheng); }
+          await conn.execute(
+            `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+          );
+          // 敏感商业条款变更：处理器内记 before/after（role.update 金标准），不只依赖 ROUTES 自动审计
+          const p = req.principal || {};
+          await authCenter.audit({
+            accountId: p.account && p.account.id,
+            principalType: 'account',
+            roles: p.roles,
+            action: 'vendor.commission.update',
+            resource: 'vendors',
+            resourceId: String(vid),
+            scopeLevel: authCenter.bestScopeLevel(p),
+            result: 'ok',
+            before,
+            after: {
+              commission_housing: nextHousing !== undefined ? nextHousing : before.commission_housing,
+              commission_jiazheng: nextJiazheng !== undefined ? nextJiazheng : before.commission_jiazheng,
+            },
+            ip: p.ip, ua: p.ua,
+          });
+          return jsonReply(res, {
+            ok: true,
+            vendor: {
+              id: vid, name: cur.name,
+              commission_housing: nextHousing !== undefined ? nextHousing : before.commission_housing,
+              commission_jiazheng: nextJiazheng !== undefined ? nextJiazheng : before.commission_jiazheng,
+            },
+          });
+        } finally { await conn.end(); }
+      }
+    }
+
     // PUT /admin/settings
     if (urlPath === '/api/juzhu/admin/settings' && req.method === 'PUT') {
       const body = await readBody(req);
@@ -2467,6 +2649,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
             await conn.execute(
               'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
               [k, v]
+            );
+          }
+        }
+        // 抽佣全局基准（规则 20）：0-100 两位小数；传 null/'' = 删除键（回落内置 10.00 兜底）
+        for (const biz of vendorRate.BIZLINES) {
+          const k = vendorRate.defaultSettingKey(biz);
+          if (k in body) {
+            let v;
+            try { v = vendorRate.normalizeRate(body[k]); } catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            if (v == null) await conn.execute('DELETE FROM settings WHERE `key`=?', [k]);
+            else await conn.execute(
+              'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+              [k, String(v)]
             );
           }
         }
@@ -4729,13 +4924,22 @@ async function handleApiDirect(urlPath, qs, req, res) {
         }
         if (!perNight) perNight = unitNightPrice(proj, null);
         const priceTotal = perNight * nights;
+        // 佣金快照（规则 20）：按 owner 商家 housing 档生效费率锁定，调价不追溯；
+        // 平台自营（无商家行）回落全局基准
+        const [vrate] = proj.owner_vendor_id
+          ? await conn.execute('SELECT commission_housing FROM jz_vendors WHERE id=?', [proj.owner_vendor_id])
+          : [[]];
+        const rate = vendorRate.effectiveRateOf(vrate[0] || null, 'housing',
+          { commission_housing_default: await settingValue(vendorRate.defaultSettingKey('housing')) });
+        const commissionFee = vendorRate.commissionAmountOf(priceTotal, rate);
         const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
         const paymentExpiresAt = proj.channel === 'minsu' ? new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ') : null;
         const tempOrderNo = `TMP-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`.slice(0, 32);
         const [ins] = await conn.execute(
-          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,status,pay_status,idempotency_key,payment_expires_at,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending',?,?,?,?,?)`,
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,commission_rate,commission_fee,status,pay_status,idempotency_key,payment_expires_at,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?)`,
           [tempOrderNo, projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal,
+           rate, commissionFee,
            proj.channel === 'minsu' ? 'unpaid' : null, idempotencyKey || null, paymentExpiresAt, now, now]
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
@@ -4764,6 +4968,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const cancelInfo = orderCancelInfoOf(cpUnit, { status: 'pending', checkin });
         return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights,
           payment_expires_at: paymentExpiresAt, pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
+          commission_rate: rate, commission_amount: commissionFee,   // 规则 20：下单锁定的佣金快照
           cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel });
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
@@ -4895,7 +5100,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const sess = await requestSession(req);
       if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
       let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
-                        b.nights, b.price_total, b.status, b.created_at,
+                        b.nights, b.price_total, b.commission_rate, b.commission_fee, b.status, b.created_at,
                         b.contact_name, b.contact_phone, p.name AS project_name, p.cover_image AS project_cover
                  FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE 1=1`;
       const params = [];
@@ -5153,9 +5358,23 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const sess = await requestSession(req);
       if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
       if (sess.role === 'platform') return jsonReply(res, { role: 'platform' });
-      const vrows = await queryRows('SELECT id, name, type, city_ids FROM jz_vendors WHERE id=?', [sess.vendorId]);
+      const vrows = await queryRows('SELECT id, name, type, city_ids, commission_housing, commission_jiazheng FROM jz_vendors WHERE id=?', [sess.vendorId]);
       if (!vrows.length) return jsonReply(res, { error: 'vendor not found' }, 404);
-      return jsonReply(res, { role: 'vendor', vendor: vrows[0] });
+      // 佣金商家只读可见（规则 20）：随发生效费率与是否差异化
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const r of srows) settingsMap[r.key] = r.value;
+      const v = vrows[0];
+      const isDef = (biz) => v['commission_' + biz] == null;
+      const commission = {};
+      for (const biz of vendorRate.BIZLINES) {
+        commission[biz] = {
+          rate: vendorRate.effectiveRateOf(v, biz, settingsMap),
+          is_default: isDef(biz),
+        };
+      }
+      return jsonReply(res, { role: 'vendor', vendor: Object.assign({}, v, { commission }) });
     }
 
     // GET /api/juzhu/vendor/projects（vendor 只见自己；platform 可 ?vendor_id= 过滤或全量）

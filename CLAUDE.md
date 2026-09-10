@@ -197,3 +197,13 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **公开接口（白名单 GET）**：`/api/juzhu/routes?city=`、`/api/juzhu/routes/:id`（站点水合附 spot 摘要卡）、`/api/juzhu/spots?city=&type=`（列表，此前只有 :id 详情）、`/api/juzhu/topics`（enabled 专题清单，含 label/desc/cover_image/tags/channel）。路线封面缺省回落首个有点位的封面，前端不必再兜底造图。**C 端专题入口必须读 `/api/juzhu/topics` 动态渲染，禁止硬编码专题清单**（后台建/删专题即时生效）；专题页存在性以服务端 KV 为准，本地 META 只做文案兜底。
 - **C 端接库页**：`lvju-app-routes.html`（路线卡 + 时间线，站点深链 `lvju-app-spot-post.html?id=`）、`lvju-app-spots.html`（玩法列表，类型筛选 chip 用接口下发的 `type_label`，**前端不得另造类型映射**）、`lvju-app-topic.html`（专题列表 + 底部「去哪玩」挂同城 routes/scenic spots）。
 - **种子**：`node scripts/find-topic-seed.cjs seed|clean`（topic KV）、`node scripts/routes-seed.cjs seed|clean`（3 条贵阳路线，站点复用 spots-seed 的 slug；幂等，clean 只删本脚本清单）。
+
+## 规则 20 · 商家佣金费率（按业务线分档，`jz_vendors` 两列 + 下单快照）
+
+**抽佣是平台收入条款，配置主体是平台（`vendor.fund.write`），商家只读；口径单一数据源 `vendor_rate.cjs`（app.js 与 vendor_api.cjs 共用，纯函数不连库）。（2026-09-09 拍板）**
+
+- **两层费率模型（按业务线分档）**：`jz_vendors.commission_housing`（房源预订 booking_orders）/ `commission_jiazheng`（家政 jz_orders，本期仅配置不消费——家政服务者个人分账走 L0-L7 矩阵另一套体系）。**生效费率 = 商家差异化列 → settings KV 全局基准（`commission_housing_default` / `commission_jiazheng_default`，种子 10.00，`PUT /admin/settings` 可改）→ 内置 10 兜底**；0-100 两位小数，NULL = 按基准。
+- **下单锁定快照（调价不追溯）**：`booking_orders.commission_rate` / `commission_fee` 在 `POST /api/juzhu/booking` 时按 owner 商家 housing 档生效费率写入，平台自营（无商家行）按基准；结算对账一律读快照，不要按结算时费率重算。
+- **写入口与审计**：`PUT /api/juzhu/admin/vendors/:id/commission`（ROUTES 挂 `vendor.fund.write`，act `vendor.commission.update`）+ 处理器内 before/after 审计（role.update 金标准）；入驻审批 `approve` 按 `rate_base−rate_discount` 折算、按 phone **单命中** active 商家回填对应档位（多命中/未命中不阻塞）。管理台：`screens/p-vendor-rates.html`（P 端「商家费率」，nav p 系列 B 组，`_nav.js` 已登记）；全局基准走既有 `PUT /admin/settings`（`settings.write`）。
+- **商家可见**：`GET /api/juzhu/vendor/me` 随发两档 `commission.{housing,jiazheng}.{rate,is_default}`；B 端 `b-listing-mgmt.html` 徽标展示房源档佣金；HMAC `bookings/list`·`bookings/detail` 与 B 端 `/vendor/booking/orders` 每单随发快照字段。**费率不经商家 HMAC 写通道**（`vendor_config.cjs` 进程缓存不受影响）。
+- **perm 基线**：新增 `vendor.fund.write`（domain vendor，roles platform_op/operator_admin）已入 `scripts/__fixtures__/perm_roles_baseline.json`；既有缺口（`GET /admin/vendors`、`PUT /admin/vendors/:id/review` 未登记 ROUTES、consult-mode 重复死规则）为已知债，动权限面前先跑 `node scripts/perm_registry_snapshot.cjs` 对照。

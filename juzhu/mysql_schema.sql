@@ -217,6 +217,8 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   review_status VARCHAR(20) NOT NULL DEFAULT 'approved',
   review_note TEXT,
   reviewed_at VARCHAR(32),
+  commission_housing DOUBLE DEFAULT NULL,   -- 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
+  commission_jiazheng DOUBLE DEFAULT NULL,  -- 抽佣·家政档（本期仅配置，消费在家政结算）
   KEY idx_jz_vendors_type (type, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -333,6 +335,8 @@ CREATE TABLE IF NOT EXISTS booking_orders (
   checkout VARCHAR(10) NOT NULL,
   nights INT NOT NULL,
   price_total INT NOT NULL,
+  commission_rate DOUBLE DEFAULT NULL,   -- 下单锁定的商家生效费率快照（规则 20，调价不追溯）
+  commission_fee DOUBLE DEFAULT NULL,    -- 快照佣金金额（元）
   status VARCHAR(16) NOT NULL DEFAULT 'pending',
   pay_status VARCHAR(20),
   pay_method VARCHAR(50),

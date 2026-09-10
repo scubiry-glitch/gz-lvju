@@ -205,7 +205,15 @@
   badge.style.cursor = 'pointer';
   topbar.appendChild(badge);
   function renderBadge(){
-    if (state.role === 'vendor') { badge.textContent = '🏪 ' + state.vendorName + '（商家）'; }
+    if (state.role === 'vendor') {
+      badge.textContent = '🏪 ' + state.vendorName + '（商家）';
+      // 佣金商家只读可见（规则 20）：房源预订档生效费率
+      get(API + '/vendor/me').then(function(j){
+        if (j && j.vendor && j.vendor.commission && j.vendor.commission.housing) {
+          badge.textContent = '🏪 ' + state.vendorName + '（商家 · 佣金 ' + j.vendor.commission.housing.rate + '%）';
+        }
+      }).catch(function(){});
+    }
     else if (state.role === 'platform') { badge.textContent = '🛡 平台（全量代管）'; }
     else { badge.textContent = '只读 · 点击登录'; }
   }

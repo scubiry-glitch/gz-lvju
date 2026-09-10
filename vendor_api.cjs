@@ -828,7 +828,8 @@ function connRows(conn) {
 async function housingBookingsList(conn, body, vendorId) {
   const b = body || {};
   let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
-                    b.nights, b.price_total, b.status, b.pay_status, b.pay_method, b.pay_at, b.payment_expires_at, b.created_at,
+                    b.nights, b.price_total, b.commission_rate, b.commission_fee,
+                    b.status, b.pay_status, b.pay_method, b.pay_at, b.payment_expires_at, b.created_at,
                     b.contact_name, b.contact_phone, p.name AS project_name
              FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
              WHERE b.owner_vendor_id=?`;

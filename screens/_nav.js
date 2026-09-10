@@ -226,6 +226,7 @@
           { id: 'b-standards',     label: '★ B 分级标准 + 星级评价', href: 'p-b-standards.html',         icon: 'layers', badge: 'NEW' },
           { id: 'b-whitelist',     label: '★ 白名单审定 + 同业开放', href: 'p-b-whitelist.html',         icon: 'check' },
           { id: 'vendor-onboarding', label: '商家入驻受理（房源）', href: 'p-vendor-onboarding.html',  icon: 'plug', perms: ['vendor.onboarding.review'] },
+          { id: 'vendor-rates',      label: '商家费率（抽佣分档）',   href: 'p-vendor-rates.html',      icon: 'coin', perms: ['vendor.fund.write'] },
           { id: 'rating-review',   label: '🐚 房源评级复核 · AI引擎', href: 'p-rating-review.html',       icon: 'star',   badge: '23' },
           { id: 'b-rating',        label: '好房子评级录入 ↗',        href: 'b-house-rating-input.html',  icon: 'star' },
           { id: 'b-console',       label: 'B 运营商工作台 ↗',        href: 'b-operator-console.html',    icon: 'home' },
