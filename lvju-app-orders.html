@@ -98,11 +98,13 @@
       '<div style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
       '<div style="font-size:12px;color:var(--muted);margin-top:2px;">联系人 ' + esc(o.contact_name) + ' · ' + esc(o.contact_phone_masked) + '</div>' +
       '<div style="font-size:13px;font-weight:700;color:var(--gold-deep);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
+      (o.cancel_policy_text ? '<div style="font-size:11px;color:var(--muted);margin-top:4px;">🕒 ' + esc(o.cancel_policy_text) + '</div>' : '') +
       (o.status === 'pending' && o.pay_status === 'unpaid'
         ? '<a href="' + payLink(o, document.getElementById('qPhone').value.trim()) + '" style="display:block;text-align:center;margin-top:8px;background:var(--brand-deep);color:#fff;font-size:12px;font-weight:700;border-radius:9px;padding:9px 0;text-decoration:none;">去支付 →</a>'
         : '') +
       (o.pay_status === 'paid' ? '<div style="font-size:11px;color:var(--success);margin-top:4px;">✓ 已支付' + (o.pay_method ? ' · ' + esc(o.pay_method) : '') + '</div>' : '');
-    document.getElementById('qCancel').style.display = o.status === 'pending' ? 'block' : 'none';
+    // 取消入口由服务端 can_cancel 驱动（免费取消窗口）；旧服务无该字段时回落「pending 可取消」
+    document.getElementById('qCancel').style.display = (o.status === 'pending' && o.can_cancel !== false) ? 'block' : 'none';
   }
   function msg(m, isErr){ var el = document.getElementById('qMsg'); el.textContent = m; el.style.color = isErr ? '#991b1b' : 'var(--muted)'; }
   function lookup(){
@@ -158,11 +160,12 @@
           '<div class="oi">' +
             '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +
             '<div class="meta">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
+            (o.cancel_policy_text ? '<div class="meta" style="color:#92400e;">🕒 ' + esc(o.cancel_policy_text) + '</div>' : '') +
             '<div class="amt">合计 <b>¥' + fmt(o.price_total) + '</b> · 订单号 …' + esc(o.order_no.slice(-4)) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="of">' +
-          (o.status === 'pending' ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
+          (o.status === 'pending' && o.can_cancel !== false ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
           (o.status === 'pending' && o.pay_status === 'unpaid' ? '<a href="' + payLink(o, o.contact_phone_raw) + '" style="color:var(--brand-deep);font-weight:700;cursor:pointer;">去支付 →</a>' : '') +
           '<a href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
           '<a class="primary" href="lvju-app-order-detail.html?order_no=' + encodeURIComponent(o.order_no) + '">订单详情</a>' +

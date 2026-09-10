@@ -278,6 +278,15 @@ async function catalogEventually(base, projectId, citySlug, want) {
       check(`登记民宿图片 ${i + 1}/8`, r.status === 200, JSON.stringify(r.j));
     }
     await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: mid, status: 'online' }));
+    // 客户免费取消窗口（房型级，2026-09-09 口径）：给演示房型配「入住当天 23:59 前」，
+    // 后续客户取消用例在任何时刻运行都落在窗口内；整栋单按项目首个房型政策回退。
+    const [mu] = await conn.execute('SELECT id FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [mid]);
+    if (mu.length) {
+      r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, {
+        id: mu[0].id, cancel_policy: { enabled: true, days_before: 0, cutoff_time: '23:59' },
+      }));
+      check('units/update 配置免费取消窗口 → 200', r.status === 200, JSON.stringify(r.j));
+    }
   }
   const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
   const mi1 = tmr.toISOString().slice(0, 10);

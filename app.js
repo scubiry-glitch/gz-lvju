@@ -706,7 +706,22 @@ const minStayNightsOf = stayCfg.minStayNightsOf;
 const bookableOf = stayCfg.bookableOf;
 const unitNightPrice = stayCfg.unitNightPrice;
 const stayConfigOf = stayCfg.stayConfigOf;
+const cancelPolicyOf = stayCfg.cancelPolicyOf;
+const cancelPolicyTextOf = stayCfg.cancelPolicyTextOf;
+const withCancelPolicy = stayCfg.withCancelPolicy;
+const orderCancelInfoOf = stayCfg.orderCancelInfoOf;
+const normalizeCancelPolicyInput = stayCfg.normalizeCancelPolicyInput;
 const stayDateList = stayCfg.stayDateList;
+/** 取消政策取数：有 unit 用该房型；整栋单（unit_id 空）按项目首个房型（sort_order 最小）政策执行，无房型从严。
+ *  fetchRows(sql, params) → rows，由调用方注入（conn 事务内 / queryRows 连接池）。 */
+async function cancelUnitRowFor(fetchRows, unitId, projectId) {
+  if (unitId) {
+    const rows = await fetchRows('SELECT id, ext FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    return rows[0] || null;
+  }
+  const rows = await fetchRows('SELECT id, ext FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [projectId]);
+  return rows[0] || null;
+}
 const MIN_PUBLISH_PHOTOS = 8;
 
 function parseExtSafe(value) {
@@ -3295,7 +3310,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
               'unit_spec','promo_price','sort_order','cover_image']) {
             if (col in body) put(col, body[col]);
           }
-          if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          if ('ext' in body) {
+            // 服务端兜底：ext.cancel_policy 过单一数据源校验，防管理端拼错口径（规则15 差异属性放 ext）
+            if (body.ext && typeof body.ext === 'object' && !Array.isArray(body.ext) && 'cancel_policy' in body.ext) {
+              try { body.ext.cancel_policy = body.ext.cancel_policy === null ? undefined : normalizeCancelPolicyInput(body.ext.cancel_policy); }
+              catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            }
+            put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          }
           if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('amenities' in body) put('amenities', body.amenities ? JSON.stringify(body.amenities) : null);
           if ('keeper' in body) put('keeper', body.keeper ? JSON.stringify(body.keeper) : null);
@@ -3968,7 +3990,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         districts: mapRows(districts, ['tags']),
         projects: mapRows(projects, ['tags', 'rating', 'ext']).map((p) =>
           Object.assign(stripContactPhone(p), stayConfigOf(p))),
-        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']).map((u) => withCancelPolicy(u)),
         photos,
         topic: topicMeta,
         stats: {
@@ -4208,7 +4230,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [proj.id]
         );
         parseJsonFields(proj, ['tags', 'rating']);
-        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
+        units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
         return jsonReply(res, imgThumbs.mapThumbsDeep({ project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos }, 640));
       }
     }
@@ -4233,7 +4255,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
           for (const uid of unitsParam) {
             const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [uid, pid]);
             if (!us.length) continue;
-            out.push(Object.assign({ unit_id: uid }, await buildStayMonth(prows[0], us[0], uid, y, mo)));
+            const up = cancelPolicyOf(us[0]);   // 房型级取消政策随月历下发（C 端房型卡直接用）
+            out.push(Object.assign({ unit_id: uid, cancel_policy: up, cancel_policy_text: cancelPolicyTextOf(up) },
+              await buildStayMonth(prows[0], us[0], uid, y, mo)));
           }
           return jsonReply(res, { project_id: pid, month: `${y}-${String(mo + 1).padStart(2, '0')}`, units: out });
         }
@@ -4244,10 +4268,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
           unit = us[0];
         }
         const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        const unitPolicy = unit ? cancelPolicyOf(unit) : null;
         return jsonReply(res, Object.assign({
           project_id: pid,
           unit_id: unitId,
-        }, cal, stayConfigOf(prows[0])));
+        }, cal, stayConfigOf(prows[0]), unitPolicy ? { cancel_policy: unitPolicy, cancel_policy_text: cancelPolicyTextOf(unitPolicy) } : {}));
       }
     }
 
@@ -4539,22 +4564,37 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized', message: '请先登录（贝壳 SDK 或手机号密码）' }, 401);
       const accPhone = sess.account.phone || '';
       const rows = await queryRows(
-        `SELECT b.id, b.order_no, b.project_id, b.channel, p.name AS project_name,
+        `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, p.name AS project_name,
                 b.checkin, b.checkout, b.nights, b.price_total, b.status, b.created_at,
                 b.pay_status, b.pay_method,
-                b.contact_name, b.contact_phone
+                b.contact_name, b.contact_phone, uu.ext AS unit_ext
          FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
+         LEFT JOIN units uu ON uu.id=b.unit_id
          WHERE b.user_id=? ${accPhone ? 'OR b.contact_phone=?' : ''}
          ORDER BY b.id DESC LIMIT 100`,
         accPhone ? [String(sess.account.id), accPhone] : [String(sess.account.id)]
       );
+      // 整栋单（unit_id 空）回退：取项目首个房型（sort_order 最小）的 ext 作为取消政策口径
+      const firstExtByProject = {};
+      const unitlessPids = [...new Set(rows.filter((o) => o.unit_id == null).map((o) => o.project_id))];
+      for (const upid of unitlessPids) {
+        const fu = await cancelUnitRowFor(queryRows, null, upid);
+        if (fu) firstExtByProject[upid] = fu.ext;
+      }
       return jsonReply(res, {
         role: sess.role,
-        items: rows.map((o) => Object.assign({}, o, {
-          contact_phone: maskPhoneStd(o.contact_phone),
-          contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
-          contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
-        })),
+        items: rows.map((o) => {
+          const cpUnit = o.unit_ext ? { ext: o.unit_ext } : (firstExtByProject[o.project_id] != null ? { ext: firstExtByProject[o.project_id] } : null);
+          const cancelInfo = orderCancelInfoOf(cpUnit, o);
+          return Object.assign({}, o, {
+            contact_phone: maskPhoneStd(o.contact_phone),
+            contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
+            contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
+            cancel_policy_text: cancelInfo.cancel_policy_text, // 退改口径随单下发，C 端取消按钮以 can_cancel 为准
+            cancel_deadline: cancelInfo.cancel_deadline,
+            can_cancel: cancelInfo.can_cancel,
+          });
+        }),
       });
     }
 
@@ -4680,9 +4720,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (bsess && bsess.account) bookingUserId = String(bsess.account.id);
       } catch (_) {}
         let perNight = 0;
+        let unitRow = null;
         if (unitId) {
           const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
           if (!us.length || us[0].project_id !== projectId) { await conn.rollback(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
+          unitRow = us[0];
           perNight = unitNightPrice(proj, us[0]);   // 夜价口径（规则15/16）单一数据源 stay_config.cjs
         }
         if (!perNight) perNight = unitNightPrice(proj, null);
@@ -4716,8 +4758,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
           channel: proj.channel, checkin: checkin, checkout: checkout,
           nights: nights, price_total: priceTotal, status: 'pending', pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
         });
+        // 下单即回显所选房型的退改口径（units.ext.cancel_policy，单一数据源 stay_config.cjs）；
+        // 整栋单（未选房型）按项目首个房型政策执行
+        const cpUnit = unitRow || await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], unitId, projectId);
+        const cancelInfo = orderCancelInfoOf(cpUnit, { status: 'pending', checkin });
         return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights,
-          payment_expires_at: paymentExpiresAt, pay_status: proj.channel === 'minsu' ? 'unpaid' : null });
+          payment_expires_at: paymentExpiresAt, pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
+          cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel });
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         if (e && e.code === 'ER_DUP_ENTRY' && idempotencyKey) {
@@ -4735,8 +4782,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const phone = String(body.contact_phone || '').trim();
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
       const rows = await queryRows(
-        `SELECT b.*, p.name AS project_name FROM booking_orders b
+        `SELECT b.*, p.name AS project_name, uu.ext AS unit_ext FROM booking_orders b
          LEFT JOIN projects p ON p.id=b.project_id
+         LEFT JOIN units uu ON uu.id=b.unit_id
          WHERE b.order_no=? AND b.contact_phone=? LIMIT 1`, [orderNo, phone]);
       if (!rows.length) return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404);
       const o = rows[0];
@@ -4748,11 +4796,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.commit();
           if (expired) { o.status = 'cancelled'; o.pay_status = 'expired'; }
           else {
-            const latest = await queryRows('SELECT b.*, p.name AS project_name FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE b.id=? LIMIT 1', [o.id]);
+            const latest = await queryRows('SELECT b.*, p.name AS project_name, uu.ext AS unit_ext FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id LEFT JOIN units uu ON uu.id=b.unit_id WHERE b.id=? LIMIT 1', [o.id]);
             if (latest.length) Object.assign(o, latest[0]);
           }
         } finally { await conn.end(); }
       }
+      // 退改口径随单下发（units.ext.cancel_policy；整栋单按项目首个房型政策执行）
+      const lookupUnit = o.unit_ext ? { ext: o.unit_ext } : await cancelUnitRowFor(queryRows, o.unit_id, o.project_id);
+      const cancelInfo = orderCancelInfoOf(lookupUnit, o);
       return jsonReply(res, {
         order: {
           id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
@@ -4760,6 +4811,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
           checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
           status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, payment_expires_at: o.payment_expires_at, created_at: o.created_at,
+          cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel,
         },
       });
     }
@@ -4777,6 +4829,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
         if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
         if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
+        // 免费取消窗口（房型维度 units.ext.cancel_policy，单一数据源 stay_config.cjs）：
+        // 窗口外 / 未启用一律不可取消不可退；商家侧（B 端 / HMAC）取消接口不受此闸约束
+        const cUnit = await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], rows[0].unit_id, rows[0].project_id);
+        const cInfo = orderCancelInfoOf(cUnit, rows[0]);
+        if (!cInfo.can_cancel) {
+          await conn.rollback();
+          const reason = cInfo.cancel_policy.enabled
+            ? `已超过免费取消截止时间（${cInfo.cancel_deadline}），不可取消`
+            : '该订单未开通免费取消，预订成功后不可取消';
+          return jsonReply(res, { error: reason, cancel_policy_text: cInfo.cancel_policy_text, cancel_deadline: cInfo.cancel_deadline }, 400);
+        }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
         // 已支付订单取消 → 标记退款（模拟退款通道；真实网关接入后走原路退回）
         const newPay = rows[0].pay_status === 'paid' ? 'refunded' : rows[0].pay_status;
@@ -5120,7 +5183,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           projectIds
         );
       }
-      units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
+      units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
       return jsonReply(res, {
         role: sess.role,
         projects: projects.map((p) => Object.assign(stripContactPhone(parseJsonFields(p, ['ext'])), stayConfigOf(p))),
@@ -5171,7 +5234,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            'SELECT u.id, p.owner_vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?',
+            'SELECT u.id, u.ext, p.owner_vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?',
             [uid]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
@@ -5185,6 +5248,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
             if (col in body) put(col, body[col]);
           }
           if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          if ('cancel_policy' in body) {
+            // 取消政策只合并 ext.cancel_policy 一键（保留 price_night 等既有键），口径单一数据源 stay_config.cjs；
+            // null = 清除（视为未开通，不可取消）
+            const ext = parseExtObj(rows[0].ext);
+            if (body.cancel_policy === null) delete ext.cancel_policy;
+            else {
+              try { ext.cancel_policy = normalizeCancelPolicyInput(body.cancel_policy); }
+              catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            }
+            put('ext', Object.keys(ext).length ? JSON.stringify(ext) : null);
+          }
           if (!sets.length) { conn.end(); return jsonReply(res, { error: '无可更新字段' }, 400); }
           vals.push(uid);
           await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, vals);

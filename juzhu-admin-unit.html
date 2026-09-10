@@ -47,7 +47,7 @@
   .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;}
   .detail-grid .full{grid-column:1/-1;}
   .detail-grid label{font-size:10px;color:var(--muted);display:block;margin-bottom:3px;font-weight:600;}
-  .detail-grid input,.detail-grid textarea{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;}
+  .detail-grid input,.detail-grid textarea,.detail-grid select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;}
   .detail-grid textarea{min-height:48px;resize:vertical;}
   .amenity-chks{display:flex;flex-wrap:wrap;gap:6px;}
   .amenity-chks label{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;cursor:pointer;}
@@ -350,6 +350,29 @@ function render() {
   html += '<button type="button" class="btn ghost ud_fee_add" style="margin-top:6px;">+ 添加费用项</button>';
   html += '</div>';
 
+  // ── 入住规则 · 取消政策（房型级，units.ext.cancel_policy；仅租赁/民宿频道） ──
+  if (project && (project.channel === 'rental' || project.channel === 'minsu')) {
+    var ux = parseJsonField(u.ext, {});
+    if (!ux || typeof ux !== 'object' || Array.isArray(ux)) ux = {};
+    var cp = (ux.cancel_policy && typeof ux.cancel_policy === 'object' && !Array.isArray(ux.cancel_policy)) ? ux.cancel_policy : {};
+    var days = cp.days_before == null ? 1 : cp.days_before;
+    var preset = [0, 1, 2, 3, 5, 7, 15, 30];
+    var dayOpts = preset.map(function(d) {
+      var t = d === 0 ? '入住当天' : (d === 1 ? '入住前一天' : '入住日前 ' + d + ' 天');
+      return '<option value="' + d + '"' + (String(d) === String(days) ? ' selected' : '') + '>' + t + '</option>';
+    }).join('');
+    if (preset.indexOf(Number(days)) < 0) dayOpts += '<option value="' + days + '" selected>入住日前 ' + esc(days) + ' 天</option>';
+    html += '<div class="card">';
+    html += '<h2>入住规则 · 取消政策 <span class="badge">房型级</span></h2>';
+    html += '<div class="hint" style="margin:0 0 8px;">免费取消窗口 = 入住日往前推 N 天的截止时刻；窗口外 / 未开通一律不可取消不可退。存 units.ext.cancel_policy（规则 15 不加列），C 端下单 / 取消实时校验，B 端房态页可同步配置。</div>';
+    html += '<div class="detail-grid">';
+    html += '<div><label>免费取消</label><select class="ud_cp_on"><option value="0"' + (cp.enabled ? '' : ' selected') + '>未开通（预订成功后不可取消）</option><option value="1"' + (cp.enabled ? ' selected' : '') + '>开通（窗口内可免费取消）</option></select></div>';
+    html += '<div><label>截止日</label><select class="ud_cp_days">' + dayOpts + '</select></div>';
+    html += '<div><label>截止时刻</label><input class="ud_cp_time" type="time" value="' + esc(cp.cutoff_time || '18:00') + '"/></div>';
+    html += '</div>';
+    html += '</div>';
+  }
+
   // ── Save all detail ──
   html += '<div class="card">';
   html += '<div class="bar" style="margin-top:0;">';
@@ -534,7 +557,7 @@ function collectDetail() {
     },
     other_fees: fees
   };
-  return {
+  var body = {
     name: document.getElementById('u_name').value.trim(),
     area_sqm: parseFloat(document.getElementById('u_area').value) || null,
     layout_label: document.getElementById('u_layout').value.trim() || null,
@@ -551,6 +574,21 @@ function collectDetail() {
     rent_detail: rd,
     cover_image: document.getElementById('u_cover').value.trim() || null
   };
+  // 入住规则 · 取消政策 → ext.cancel_policy（合并进已有 ext 整包提交，保留 price_night 等键，服务端兜底校验）
+  if (project && (project.channel === 'rental' || project.channel === 'minsu')) {
+    var cpOn = document.querySelector('.ud_cp_on');
+    if (cpOn) {
+      var ext = parseJsonField(unit.ext, {});
+      if (!ext || typeof ext !== 'object' || Array.isArray(ext)) ext = {};
+      ext.cancel_policy = {
+        enabled: cpOn.value === '1',
+        days_before: parseInt((document.querySelector('.ud_cp_days') || {}).value, 10) || 0,
+        cutoff_time: (document.querySelector('.ud_cp_time') || {}).value || '18:00'
+      };
+      body.ext = ext;
+    }
+  }
+  return body;
 }
 
 function bindPhotoEvents() {

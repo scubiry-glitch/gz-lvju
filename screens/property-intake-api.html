@@ -379,6 +379,7 @@
       <tr><td><code>price_total</code></td><td>int</td><td>★ 总价（元），<code>newhouse</code>/<code>resale</code> 频道用</td></tr>
       <tr><td><code>promo_price</code></td><td>int</td><td>★ 优惠价（元）</td></tr>
       <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>；<code>minsu</code> 频道预订按它计价</td></tr>
+      <tr><td><code>cancel_policy</code></td><td>object</td><td>★ 免费取消政策（房型级），写入 <code>units.ext.cancel_policy</code>：<code>{enabled, days_before, cutoff_time}</code>；免费取消窗口 = 入住日往前推 <code>days_before</code>（0-30，0=入住当天）天的 <code>cutoff_time</code>（HH:mm）时刻，窗口外 / 未开通一律不可取消不可退</td></tr>
       <tr><td><code>tags</code> / <code>amenities</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 配套枚举数组 / 房型说明 / 封面 / 排序</td></tr>
     </table>
 
@@ -474,10 +475,14 @@
   <span class="tok-key">"area_sqm"</span>: <span class="tok-num">68</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3200</span> }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-com">/*…*/</span> } }</code></pre>
 
-    <h3>4.7 更新户型（调价等）</h3>
+    <h3>4.7 更新户型（调价 / 取消政策等）</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
-<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span> }
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span>,
+  <span class="tok-key">"cancel_policy"</span>: { <span class="tok-key">"enabled"</span>: <span class="tok-str">true</span>, <span class="tok-key">"days_before"</span>: <span class="tok-num">1</span>, <span class="tok-key">"cutoff_time"</span>: <span class="tok-str">"18:00"</span> } }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…*/</span> } }</code></pre>
+    <ul style="font-size:13.5px;">
+      <li><strong>取消政策</strong>：传入 <code>cancel_policy</code>（非法 <code>days_before</code>/<code>cutoff_time</code> 返回 400）；传 <code>null</code> 清除（= 未开通，客户不可取消）。免费取消窗口 = 入住日往前推 <code>days_before</code> 天的 <code>cutoff_time</code> 时刻；客户在窗口内取消自动退款并释放房态。</li>
+    </ul>
 
     <h3>4.8 删除户型</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/delete</span><span class="desc">有关联订单或被占用晚时拒绝</span></div>
@@ -701,7 +706,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, stay_bookable: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200 },
-    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128 },
+    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
     '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null },
     '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
     '/api/juzhu/housing/vendor/units/delete': { id: 0 },

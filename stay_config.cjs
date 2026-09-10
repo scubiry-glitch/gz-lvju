@@ -83,6 +83,86 @@ function stayConfigOf(proj) {
   };
 }
 
+// 免费取消政策（2026-09-09，房型维度）：免费取消窗口 = 入住日往前推 days_before 天的
+// cutoff_time 时刻；窗口外 / 未启用一律不可取消不可退（硬截止，无扣款分档）。配置存
+// units.ext.cancel_policy（规则 15 差异属性放 ext 不加列），缺省从严 = 不可取消；
+// 商家侧（B 端 / HMAC）取消不受此闸约束，仅客户取消接口校验。
+const CANCEL_POLICY_DEFAULT = { days_before: 1, cutoff_time: '18:00' };
+const CANCEL_POLICY_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** 写入口校验：enabled 布尔、days_before 0-30 整数、cutoff_time 严格 HH:mm；非法抛 Error */
+function normalizeCancelPolicyInput(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('cancel_policy 须为对象');
+  const enabled = v.enabled === true || v.enabled === 'true';
+  const rawDays = v.days_before == null || v.days_before === '' ? CANCEL_POLICY_DEFAULT.days_before : parseInt(v.days_before, 10);
+  if (!Number.isInteger(rawDays) || rawDays < 0 || rawDays > 30) throw new Error('cancel_policy.days_before 须为 0-30 整数');
+  const time = v.cutoff_time == null || v.cutoff_time === '' ? CANCEL_POLICY_DEFAULT.cutoff_time : String(v.cutoff_time).trim();
+  if (!CANCEL_POLICY_TIME_RE.test(time)) throw new Error('cancel_policy.cutoff_time 须为 HH:mm（如 18:00）');
+  return { enabled, days_before: rawDays, cutoff_time: time };
+}
+
+function disabledCancelPolicy() {
+  return { enabled: false, days_before: CANCEL_POLICY_DEFAULT.days_before, cutoff_time: CANCEL_POLICY_DEFAULT.cutoff_time };
+}
+
+/** 房型的取消政策（唯一读取点）：缺省 / 配置损坏 → 未启用（从严） */
+function cancelPolicyOf(unit) {
+  const raw = parseExtObj(unit && unit.ext).cancel_policy;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return disabledCancelPolicy();
+  try { return normalizeCancelPolicyInput(raw); } catch (_) { return disabledCancelPolicy(); }
+}
+
+/** 免费取消截止时刻（本地时区 Date）；未启用或日期非法返回 null */
+function cancelDeadlineOf(policy, checkin) {
+  const p = policy || disabledCancelPolicy();
+  if (!p.enabled || !isValidDateString(checkin)) return null;
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(p.cutoff_time);
+  const d = new Date(checkin + 'T00:00:00');
+  d.setDate(d.getDate() - p.days_before);
+  d.setHours(parseInt(hm[1], 10), parseInt(hm[2], 10), 0, 0);
+  return d;
+}
+
+function fmtDeadline(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/** 客户是否仍在免费取消窗口内（now 缺省取当前时刻） */
+function freeCancelOpenOf(policy, checkin, now) {
+  const deadline = cancelDeadlineOf(policy, checkin);
+  return !!deadline && (now || new Date()) <= deadline;
+}
+
+/** 政策中文文案（服务端算好下发，前端不得自行拼口径） */
+function cancelPolicyTextOf(policy) {
+  const p = policy || disabledCancelPolicy();
+  if (!p.enabled) return '预订成功后不可取消';
+  const dayTxt = p.days_before === 0 ? '入住当天' : (p.days_before === 1 ? '入住前一天' : '入住日前 ' + p.days_before + ' 天');
+  return dayTxt + ' ' + p.cutoff_time + ' 前可免费取消，之后不可取消';
+}
+
+/** 给 unit 对象补 cancel_policy / cancel_policy_text（units 透出处统一走这里） */
+function withCancelPolicy(unit) {
+  const p = cancelPolicyOf(unit);
+  unit.cancel_policy = p;
+  unit.cancel_policy_text = cancelPolicyTextOf(p);
+  return unit;
+}
+
+/** 订单的取消判定（lookup / my / cancel 三处同口径）：unit 为空（整栋单）从严视为未启用 */
+function orderCancelInfoOf(unit, order, now) {
+  const policy = unit ? cancelPolicyOf(unit) : disabledCancelPolicy();
+  const deadline = cancelDeadlineOf(policy, order && order.checkin);
+  const open = !!deadline && (now || new Date()) <= deadline;
+  return {
+    cancel_policy: policy,
+    cancel_policy_text: cancelPolicyTextOf(policy),
+    cancel_deadline: deadline ? fmtDeadline(deadline) : null,
+    can_cancel: (order && order.status) === 'pending' && open,
+  };
+}
+
 /** 闭区间 [checkin, checkout) 的日期串列表（YYYY-MM-DD） */
 function stayDateList(checkin, checkout) {
   const out = [];
@@ -155,11 +235,19 @@ module.exports = {
   STAY_BOOKABLE_KEY,
   STAY_STATUS,
   HOUSING_CHANNELS,
+  CANCEL_POLICY_DEFAULT,
   parseExtObj,
   insuranceOf,
   minStayNightsOf,
   bookableOf,
   unitNightPrice,
+  normalizeCancelPolicyInput,
+  cancelPolicyOf,
+  cancelDeadlineOf,
+  freeCancelOpenOf,
+  cancelPolicyTextOf,
+  withCancelPolicy,
+  orderCancelInfoOf,
   isValidDateString,
   stayConfigOf,
   stayDateList,

@@ -64,6 +64,7 @@
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">订单号（请留存，配合手机号查单/取消）</div>
       <div class="no" id="okNo"></div>
       <div style="font-size:11px;color:var(--muted);margin-top:6px;">商家确认后订单生效 · 状态可在「订单」页查询</div>
+      <div style="font-size:11px;color:#92400e;margin-top:4px;" id="okCp"></div>
       <a id="okPay" href="#" style="display:none;margin:12px 6px 0 0;background:var(--brand-deep,#0f766e);color:#fff;font-size:13px;font-weight:700;text-decoration:none;border-radius:999px;padding:9px 22px;">立即支付 →</a>
       <a href="lvju-app-orders.html" style="display:inline-block;margin-top:9px;font-size:12px;font-weight:600;color:var(--brand-deep);text-decoration:none;border:1px solid var(--brand);border-radius:999px;padding:6px 16px;">去订单页查状态 →</a>
     </div>
@@ -107,6 +108,7 @@
         <input type="hidden" id="fIn" />
         <input type="hidden" id="fOut" />
         <div class="bfield" style="border-bottom:0;padding-top:9px;padding-bottom:9px;"><span class="l" style="flex:1;font-size:11.5px;color:#92400e;" id="stayNote">旅居房源须连续入住 · 连住 15 晚起</span></div>
+        <div class="bfield" style="border-bottom:0;padding-top:0;padding-bottom:9px;"><span class="l" style="flex:1;font-size:11.5px;color:var(--muted);" id="cpNote">🕒 退改规则加载中…</span></div>
         <div class="bfield"><span class="l">房型</span>
           <select id="fUnit" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"></select>
         </div>
@@ -251,6 +253,7 @@
 
   /* ── 房源 + 价格（总价按商家逐晚实价合计，与详情页日历同口径）── */
   var minNights = 15;     // 旅居口径连住下限（随项目下发，服务端同口径兜底）
+  var unitCp = {};        // 房型id -> 退改口径文案（units 接口随 cancel_policy 下发，前端不自行拼口径）
   var WK = ['日','一','二','三','四','五','六'];
   var nightCache = {};    // monthKey -> {date:day}（选中户型）
   var nightLoaded = '';
@@ -388,11 +391,13 @@
         var pn;
         if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
         else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
+        unitCp[u.id] = u.cancel_policy_text || '';   // 退改口径随 units 下发
         return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
       }).join('');
       var qUnit = parseInt(q.get('unit') || '', 10);
       if (qUnit) unitSel.value = String(qUnit);
       if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
+      updateCpNote();
       var ci = q.get('checkin'), co = q.get('checkout');
       if (ci) document.getElementById('fIn').value = ci;
       if (co) document.getElementById('fOut').value = co;
@@ -412,10 +417,19 @@
     });
   }
 
+  // 退改口径提示（随所选房型变化；未指定房型 = 整栋单，从严不可取消）
+  function updateCpNote(){
+    var el = document.getElementById('cpNote');
+    if (!el) return;
+    var uid = unitSel.value ? parseInt(unitSel.value, 10) : 0;
+    var t = (uid && unitCp[uid]) ? unitCp[uid] : '整栋预订未指定房型 · 未开通免费取消，提交后不可取消';
+    el.textContent = '🕒 退改：' + t;
+  }
   unitSel.addEventListener('change', function(){
     var o = unitSel.options[unitSel.selectedIndex];
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
     nightCache = {}; nightLoaded = '';                 // 房态/夜价按户型隔离
+    updateCpNote();
     calc();
     if (document.getElementById('nightList').style.display !== 'none') loadNightDetail();
   });
@@ -466,6 +480,8 @@
       .then(function(res){
         if (!res.ok) { submitBtn.disabled = false; submitBtn.style.opacity = ''; showErr(res.j.error || '提交失败'); return; }
         document.getElementById('okNo').textContent = res.j.order_no;
+        document.getElementById('okCp').textContent = res.j.cancel_policy_text
+          ? '🕒 ' + res.j.cancel_policy_text + (res.j.cancel_deadline ? '（截止 ' + res.j.cancel_deadline + '）' : '') : '';
         // 民宿（minsu）为预付口径：提交成功后引导收银台支付；长租（rental）预订单走商家确认
         var payBtn = document.getElementById('okPay');
         if (payBtn) {

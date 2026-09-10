@@ -703,16 +703,28 @@ async function housingUnitsUpdate(conn, body, vendorId) {
   }
   if (Object.prototype.hasOwnProperty.call(b, 'tags')) { sets.push('tags=?'); params.push(tagsToDb(b.tags)); }
   if (Object.prototype.hasOwnProperty.call(b, 'amenities')) { sets.push('amenities=?'); params.push(tagsToDb(b.amenities)); }
+  let extDirty = false;
+  const cur = stayCfg.parseExtObj(rows[0].ext);
   if (Object.prototype.hasOwnProperty.call(b, 'price_night')) {
-    const cur = stayCfg.parseExtObj(rows[0].ext);
     if (b.price_night === null || b.price_night === '') delete cur.price_night;
     else {
       const pn = parseInt(b.price_night, 10);
       if (!(pn >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数（元/晚）' });
       cur.price_night = pn;
     }
-    sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null);
+    extDirty = true;
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'cancel_policy')) {
+    // 免费取消政策（房型维度，免费取消窗口 = 入住日往前推 days_before 天的 cutoff_time）；
+    // 口径单一数据源 stay_config.cjs，非法值直接拒绝；null = 清除（视为未开通，不可取消）
+    if (b.cancel_policy === null) delete cur.cancel_policy;
+    else {
+      try { cur.cancel_policy = stayCfg.normalizeCancelPolicyInput(b.cancel_policy); }
+      catch (e) { return reply(400, { code: 400, message: e.message }); }
+    }
+    extDirty = true;
+  }
+  if (extDirty) { sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null); }
   if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
   params.push(rows[0].id);
   await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, params);

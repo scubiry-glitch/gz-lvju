@@ -472,7 +472,7 @@ window.__NEARBY_RENDER__ = (function(){
       if (p.channel === 'minsu') per = (+ex.price_night) || (p.price_from || 0);
       else if (u.rent_monthly) per = Math.max(1, Math.round(u.rent_monthly / 30));
       else if (p.price_from) per = Math.max(1, Math.round(p.price_from / 30));
-      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '' };
+      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '' };
     });
     document.getElementById('dUnitsBlock').style.display = '';
     // 评级维度
@@ -689,6 +689,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
         '<div class="rth' + (u.cover ? '' : ' g' + ((i % 6) + 1)) + '"' + (u.cover ? ' style="background-image:url(\'' + u.cover + '\')"' : '') + '></div>' +
         '<div class="rin"><div class="rnm">' + esc(u.name) + '</div>' +
         (meta ? '<div class="rmeta">' + esc(meta) + '</div>' : '') +
+        (u.cancel_text ? '<div class="rmeta" style="color:#0f766e;">🕒 ' + esc(u.cancel_text) + '</div>' : '') +
         '<div class="rtags">' + tags + '</div></div>' +
         '<div class="rbuy">' + right + '</div></div>';
     }).join('');
