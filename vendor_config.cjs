@@ -41,7 +41,7 @@ async function loadVendorConfigFromDb(getConn) {
     const conn = await getConn();
     try {
       const [rows] = await conn.execute(
-        "SELECT id, hmac_key, url_link, order_detail_url FROM jz_vendors " +
+        "SELECT id, hmac_key, url_link, order_detail_url, webhook_url FROM jz_vendors " +
         "WHERE hmac_key IS NOT NULL AND TRIM(hmac_key) <> ''"
       );
       const vendors = {};
@@ -50,6 +50,7 @@ async function loadVendorConfigFromDb(getConn) {
           key: String(r.hmac_key || '').trim(),
           url_link: String(r.url_link || '').trim(),
           order_detail_url: String(r.order_detail_url || '').trim(),
+          webhook_url: String(r.webhook_url || '').trim(),
         };
       }
       // 兼容迁移：hmac_secret.key 仍存在时导入（仅当表内该行 hmac_key 为空，不覆盖已有值；对齐 Python db.py）

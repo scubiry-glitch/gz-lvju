@@ -110,7 +110,7 @@
       <h1>运营总览</h1>
       <div class="range">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
-        本月 · 2026-06
+        <span id="dataRange">实时 · 连接新居住数据库</span>
       </div>
       <div class="user">
         <div class="avatar">王</div>
@@ -118,30 +118,30 @@
       </div>
     </div>
 
-    <!-- KPI -->
+    <!-- KPI · 全部来自 /api/juzhu/stats + /ratings，无 mock -->
     <div class="kpi-grid">
       <div class="kpi">
-        <div class="lbl">在管项目</div>
-        <div class="num">12</div>
-        <div class="delta up">↑ 2 本月新增</div>
+        <div class="lbl">在管项目（保租房）</div>
+        <div class="num" id="kpiProjects">—</div>
+        <div class="delta" id="kpiProjectsDelta"></div>
         <div class="spark"></div>
       </div>
       <div class="kpi">
-        <div class="lbl">在租房源 / 入住率</div>
-        <div class="num">3,842<small style="font-size: 14px; color: var(--muted);"> / 89.4%</small></div>
-        <div class="delta up">↑ 2.1 pp 环比</div>
+        <div class="lbl">房源规模（项目申报）</div>
+        <div class="num" id="kpiUnits">—</div>
+        <div class="delta" id="kpiUnitsDelta"></div>
         <div class="spark"></div>
       </div>
       <div class="kpi">
-        <div class="lbl">本月租金回收</div>
-        <div class="num">¥9.13<small style="font-size: 14px; color: var(--muted);"> M</small></div>
-        <div class="delta up">回款率 96.8%</div>
+        <div class="lbl">覆盖城市 / 行政区</div>
+        <div class="num" id="kpiCoverage">—</div>
+        <div class="delta" id="kpiCoverageDelta"></div>
         <div class="spark"></div>
       </div>
       <div class="kpi">
-        <div class="lbl">30 天内到期合同</div>
-        <div class="num">214</div>
-        <div class="delta dn">续约率 78%（低）</div>
+        <div class="lbl">好房子评级 · 已通过</div>
+        <div class="num" id="kpiRating">—</div>
+        <div class="delta" id="kpiRatingDelta"></div>
         <div class="spark"></div>
       </div>
     </div>
@@ -150,70 +150,23 @@
     <div class="row2">
       <div class="card">
         <div class="card-head">
-          <h3>项目运营表现</h3>
-          <div class="actions"><a href="#">查看全部 →</a></div>
+          <h3>行政区运营表现 · <span id="distSrc" style="font-weight:400;color:var(--muted);">/api/juzhu/districts</span></h3>
+          <div class="actions"><a href="b-listing-mgmt.html">房源明细 →</a></div>
         </div>
         <div class="card-body" style="padding: 0;">
           <table class="proj">
             <thead>
               <tr>
-                <th>项目</th>
-                <th>区域</th>
-                <th>房源</th>
-                <th>入住率</th>
-                <th>本月回款</th>
+                <th>行政区</th>
+                <th>城市</th>
+                <th>项目数</th>
+                <th>房源规模</th>
+                <th>均价（元/月）</th>
                 <th>状态</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td>梧桐公馆人才公寓</td>
-                <td>江宁区</td>
-                <td>620</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 96%"></div></div>96%</div></td>
-                <td>¥1.42 M</td>
-                <td><span class="pill ok">优秀</span></td>
-              </tr>
-              <tr>
-                <td>河西青年公寓</td>
-                <td>建邺区</td>
-                <td>480</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 92%"></div></div>92%</div></td>
-                <td>¥1.34 M</td>
-                <td><span class="pill ok">良好</span></td>
-              </tr>
-              <tr>
-                <td>龙江新青年社区</td>
-                <td>鼓楼区</td>
-                <td>360</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 88%"></div></div>88%</div></td>
-                <td>¥0.94 M</td>
-                <td><span class="pill ok">良好</span></td>
-              </tr>
-              <tr>
-                <td>南部新城人才家园</td>
-                <td>秦淮区</td>
-                <td>540</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 76%"></div></div>76%</div></td>
-                <td>¥1.06 M</td>
-                <td><span class="pill warn">需关注</span></td>
-              </tr>
-              <tr>
-                <td>仙林湖国际社区</td>
-                <td>栖霞区</td>
-                <td>420</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 64%"></div></div>64%</div></td>
-                <td>¥0.71 M</td>
-                <td><span class="pill danger">告警</span></td>
-              </tr>
-              <tr>
-                <td>江北未来谷公寓</td>
-                <td>江北新区</td>
-                <td>720</td>
-                <td><div class="rate"><div class="rate-track"><div class="rate-fill" style="width: 93%"></div></div>93%</div></td>
-                <td>¥1.81 M</td>
-                <td><span class="pill ok">优秀</span></td>
-              </tr>
+            <tbody id="distRows">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
             </tbody>
           </table>
         </div>
@@ -221,80 +174,143 @@
 
       <div class="card">
         <div class="card-head">
-          <h3>异常预警 <span style="color: var(--danger);">· 4</span></h3>
-          <div class="actions"><a href="#">全部</a></div>
+          <h3>评级与数据预警 · <span id="alertCnt" style="color: var(--danger);"></span></h3>
+          <div class="actions"><a href="p-rating-review.html">去复核 →</a></div>
         </div>
         <div class="card-body">
-          <ul class="alert-list">
-            <li class="alert-item">
-              <div class="alert-dot h"></div>
-              <div>
-                <div class="title">仙林湖项目空置 47 套超 30 天</div>
-                <div class="meta">建议下调挂牌价 5% · 立即处置</div>
-              </div>
-            </li>
-            <li class="alert-item">
-              <div class="alert-dot h"></div>
-              <div>
-                <div class="title">12 户欠租超 7 天</div>
-                <div class="meta">总额 ¥28,400 · 已发提醒</div>
-              </div>
-            </li>
-            <li class="alert-item">
-              <div class="alert-dot m"></div>
-              <div>
-                <div class="title">3 个合同 24h 内到期未续约</div>
-                <div class="meta">河西青年 / 龙江新青年</div>
-              </div>
-            </li>
-            <li class="alert-item">
-              <div class="alert-dot m"></div>
-              <div>
-                <div class="title">5 张工单超时未处理</div>
-                <div class="meta">已通知服务者主管</div>
-              </div>
-            </li>
-            <li class="alert-item">
-              <div class="alert-dot l"></div>
-              <div>
-                <div class="title">本月住建厅监管数据已同步</div>
-                <div class="meta">合规率 99.2% · 通过</div>
-              </div>
-            </li>
+          <ul class="alert-list" id="alertList">
+            <li class="alert-item"><div class="alert-dot l"></div><div><div class="title">加载中…</div></div></li>
           </ul>
         </div>
       </div>
     </div>
 
-    <!-- upcoming -->
+    <!-- city split -->
     <div class="card">
       <div class="card-head">
-        <h3>合同到期日历</h3>
-        <div class="actions"><a href="#">导出 Excel</a></div>
+        <h3>城市分布</h3>
+        <div class="actions"><a href="#" onclick="return false;" title="合同数据未入库（暂无合同表），到期为示例模块已下线">合同到期 · 待接入</a></div>
       </div>
       <div class="card-body">
-        <div class="upcoming">
-          <div class="up-box">
-            <div class="n">62</div>
-            <div class="l">未来 7 天到期</div>
-            <a class="a" href="#">提前致电 →</a>
-          </div>
-          <div class="up-box">
-            <div class="n">158</div>
-            <div class="l">未来 30 天到期</div>
-            <a class="a" href="#">发送续约链接 →</a>
-          </div>
-          <div class="up-box">
-            <div class="n">214</div>
-            <div class="l">未来 60 天到期</div>
-            <a class="a" href="#">规划替补房源 →</a>
-          </div>
+        <div class="upcoming" id="citySplit">
+          <div class="up-box"><div class="n">—</div><div class="l">加载中…</div></div>
         </div>
+      </div>
+    </div>
+
+    <!-- 运营商维度（持有方看绩效，不插手一线动作 · 规则 4） -->
+    <div class="card" style="margin-top:16px;">
+      <div class="card-head">
+        <h3>运营商在管规模 · <span id="opSrc" style="font-weight:400;color:var(--muted);">/api/juzhu/stats.operators</span></h3>
+        <div class="actions"><a href="b-listing-mgmt.html">房源明细 →</a></div>
+      </div>
+      <div class="card-body" style="padding: 0;">
+        <table class="proj">
+          <thead>
+            <tr><th>运营商 / 持有方</th><th>类型</th><th>在管项目</th><th>在管房源</th></tr>
+          </thead>
+          <tbody id="opRows">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">加载中…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </main>
 </div>
 <script src="_region.js?v=2"></script>
 <script src="_nav.js"></script>
+<script>
+(function(){
+  var API = '/api/juzhu';
+  function get(u){ return fetch(u).then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); }); }
+  function fmt(n){ return (n==null||isNaN(n)) ? '—' : Number(n).toLocaleString('zh-CN'); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  Promise.all([
+    get(API+'/stats'),
+    get(API+'/districts'),
+    get(API+'/cities'),
+    get(API+'/ratings').catch(function(){ return { items: [] }; })
+  ]).then(function(rs){
+    var stats=rs[0], districts=rs[1]||[], cities=rs[2]||[], rated=(rs[3].items||[]);
+    document.getElementById('dataRange').textContent = '实时 · 数据库已连接 · ' + districts.length + ' 行政区';
+
+    // KPI
+    document.getElementById('kpiProjects').textContent = fmt(stats.projects_rental != null ? stats.projects_rental : stats.projects_bzf);
+    document.getElementById('kpiProjectsDelta').textContent =
+      '运营商 ' + (stats.operators ? stats.operators.length : 0) + ' 家 · 另含卖旧买新 ' + fmt(stats.projects_trade) + ' 个';
+    document.getElementById('kpiProjectsDelta').className = 'delta up';
+    document.getElementById('kpiUnits').textContent = fmt(stats.units);
+    document.getElementById('kpiUnitsDelta').textContent = '覆盖 ' + (stats.districts||0) + ' 个行政区';
+    document.getElementById('kpiCoverage').textContent = (cities.length||0) + ' 城 / ' + (stats.districts||0) + ' 区';
+    document.getElementById('kpiCoverageDelta').textContent = cities.map(function(c){ return c.name; }).join(' · ');
+    document.getElementById('kpiCoverageDelta').className = 'delta up';
+    var pend = rated.filter(function(p){ return p.rating_status==='pending'; }).length;
+    var pass = rated.filter(function(p){ return p.rating_status==='passed'; }).length;
+    var rej  = rated.filter(function(p){ return p.rating_status==='rejected'; }).length;
+    var unrated = Math.max(0, (stats.projects_bzf||0) - rated.length);
+    document.getElementById('kpiRating').textContent = fmt(pass);
+    var rd = document.getElementById('kpiRatingDelta');
+    rd.textContent = '待复核 ' + pend + ' · 驳回 ' + rej + ' · 未启动 ' + unrated;
+    rd.className = 'delta ' + (unrated > 0 ? 'dn' : 'up');
+
+    // 行政区表（按房源规模倒序，取前 12）
+    var cityMap = {}; cities.forEach(function(c){ cityMap[c.id]=c.name; });
+    var rows = districts.slice().sort(function(a,b){ return (b.unit_count||0)-(a.unit_count||0); }).slice(0,12);
+    document.getElementById('distRows').innerHTML = rows.length ? rows.map(function(d){
+      return '<tr>'+
+        '<td><b>'+d.name+'</b></td>'+
+        '<td>'+(cityMap[d.city_id]||'—')+'</td>'+
+        '<td>'+fmt(d.project_count)+'</td>'+
+        '<td>'+fmt(d.unit_count)+'</td>'+
+        '<td>'+(d.avg_price?fmt(d.avg_price):'—')+'</td>'+
+        '<td>'+(d.is_hot ? '<span class="pill ok">热门</span>' : '<span class="pill" style="background:var(--bg);color:var(--muted);">常规</span>')+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">暂无行政区数据</td></tr>';
+
+    // 城市分布
+    var byCity = {};
+    districts.forEach(function(d){
+      var k=d.city_id; byCity[k]=byCity[k]||{p:0,u:0};
+      byCity[k].p += (d.project_count||0); byCity[k].u += (d.unit_count||0);
+    });
+    document.getElementById('citySplit').innerHTML = cities.map(function(c){
+      var v = byCity[c.id]||{p:0,u:0};
+      return '<div class="up-box"><div class="n" style="color:var(--accent);">'+fmt(v.p)+'</div>'+
+        '<div class="l">'+c.name+' · 项目</div>'+
+        '<div class="a" style="color:var(--muted);">房源规模 '+fmt(v.u)+'</div></div>';
+    }).join('') || '<div class="up-box"><div class="n">—</div><div class="l">暂无城市</div></div>';
+
+    // 运营商维度（stats.operators：platform=平台自营/国企持有方直营，housing_operator=白名单运营商）
+    var TYPE = { platform:'平台自营', housing_operator:'白名单运营商', lvju_host:'旅居托管' };
+    var ops = stats.operators || [];
+    document.getElementById('opRows').innerHTML = ops.length ? ops.map(function(o){
+      return '<tr>'+
+        '<td><b>'+esc(o.name)+'</b></td>'+
+        '<td>'+(TYPE[o.type]||esc(o.type||'—'))+'</td>'+
+        '<td>'+fmt(o.project_count)+'</td>'+
+        '<td>'+fmt(o.unit_count)+'</td>'+
+      '</tr>';
+    }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">暂无运营商数据</td></tr>';
+
+    // 预警（只列真实可算的信号）
+    var alerts = [];
+    if (pend > 0) alerts.push(['m','保租房评级待复核 '+pend+' 条','P 端复核后前台详情页生效']);
+    if (rej > 0) alerts.push(['h','评级驳回未整改 '+rej+' 个项目','B 端需重新自评并提交']);
+    if (unrated > 0) alerts.push(['h','保租房项目未启动好房子自评 '+unrated+' 个','在 b-listing-mgmt → 好房子评级录入 处理']);
+    if (!alerts.length) alerts.push(['l','评级状态健康','全部在管项目均有评级结论']);
+    alerts.push([null,'运营商工单 SLA 预警','待工单系统接入后按运营商维度展示，不在持有方大盘显示一线工单']);
+    document.getElementById('alertCnt').textContent = '· ' + (alerts.length-1);
+    document.getElementById('alertList').innerHTML = alerts.map(function(a){
+      return '<li class="alert-item"><div class="alert-dot '+(a[0]||'l')+'"></div><div>'+
+        '<div class="title">'+a[1]+'</div><div class="meta">'+a[2]+'</div></div></li>';
+    }).join('');
+  }).catch(function(e){
+    document.getElementById('dataRange').textContent = '数据库未连接';
+    document.getElementById('distRows').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API（/api/juzhu/stats · /districts）· 请确认服务已部署</td></tr>';
+    document.getElementById('alertList').innerHTML = '<li class="alert-item"><div class="alert-dot h"></div><div><div class="title">数据接口不可用</div><div class="meta">'+(e&&e.message||'')+'</div></div></li>';
+  });
+})();
+</script>
 </body>
 </html>

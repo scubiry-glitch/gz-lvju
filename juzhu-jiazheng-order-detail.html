@@ -45,7 +45,7 @@
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_jzapi.js?v=3"></script>
+<script src="screens/_jzapi.js?v=4"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -113,28 +113,31 @@
   var curOrder = null;
 
   function load(){
-    // 未登录（App 内取不到用户身份）：提示登录，不发请求
-    if (!JZ.userId() && !JZ.bridgeUserId()) {
-      document.getElementById('body').innerHTML =
-          '<div class="err">暂未登录，请登录后重试</div>';
-      return;
-    }
-    fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '?user_id=' + encodeURIComponent(JZ.userId()))
-      .then(function(r){ return r.json(); })
-      .then(function(res){
-        if (!res.ok || !res.order) {
-          document.getElementById('body').innerHTML =
-            '<div class="err">订单不存在或无权查看</div>';
-          return;
-        }
-        curOrder = res.order;
-        render(curOrder);
-        loadVendorDetail();
-      })
-      .catch(function(){
+    // 身份：ensureUserId 统一入口（测试环境模拟登录 / 生产 App 内 jsbridge3）；
+    // 取不到（非 App 环境或未登录）提示登录，不发请求
+    JZ.ensureUserId().then(function(uid){
+      if (!uid) {
         document.getElementById('body').innerHTML =
-          '<div class="err">加载失败，请稍后重试</div>';
-      });
+            '<div class="err">暂未登录，请登录后重试</div>';
+        return;
+      }
+      fetch('/api/juzhu/gr/orders/' + encodeURIComponent(orderRef) + '?user_id=' + encodeURIComponent(uid))
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          if (!res.ok || !res.order) {
+            document.getElementById('body').innerHTML =
+              '<div class="err">订单不存在或无权查看</div>';
+            return;
+          }
+          curOrder = res.order;
+          render(curOrder);
+          loadVendorDetail();
+        })
+        .catch(function(){
+          document.getElementById('body').innerHTML =
+            '<div class="err">加载失败，请稍后重试</div>';
+        });
+    });
   }
 
   function loadVendorDetail(){

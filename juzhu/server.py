@@ -988,6 +988,8 @@ class Handler(SimpleHTTPRequestHandler):
                 "show_city_switcher": settings.get("show_city_switcher", "1") == "1",
                 "show_life_service": settings.get("show_life_service", "1") == "1",
                 "channel_name": (settings.get("channel_name") or "").strip() or "新居住频道",
+                # C 端模拟登录开关：仅非生产（JUZHU_ENV != prod/production）开启；生产恒 false（对齐 Node app.js）
+                "mock_login": not self._is_production(),
             })
 
         if path == "/api/juzhu/districts":
@@ -1179,7 +1181,7 @@ WHERE c.enabled=1
     JOIN jz_products p ON p.channel_sku_id=s.id AND p.status='on'
     JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active'
     WHERE s.category_id=c.id
-      AND p.city_id=?
+      AND (p.city_id=? OR p.city_id IS NULL)
       AND (
         v.city_ids IS NULL OR TRIM(v.city_ids)=''
         OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%')
@@ -1240,7 +1242,7 @@ ORDER BY c.sort_order, c.id""", (int(city_id), str(city_id))
                         JOIN jz_vendors v2 ON v2.id=p2.vendor_id
                         WHERE p2.channel_sku_id=s.id AND p2.status='on'
                           AND v2.status='active'
-                          AND p2.city_id=?
+                          AND (p2.city_id=? OR p2.city_id IS NULL)
                           AND (
                             v2.city_ids IS NULL OR TRIM(v2.city_ids)=''
                             OR CONCAT(',', v2.city_ids, ',') LIKE CONCAT('%,', ?, ',%')

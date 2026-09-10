@@ -117,18 +117,94 @@
 
 `juzhu/server.py` 与线上 Node 入口 `app.js` 用仓库根做静态根时，**必须**拦截敏感路径：`.env*`、隐藏文件、`*.py`、`*.db`/`*.sqlite`、`*.sql`、`*.ini`、`config.ini`、`api_doc.md`、`package.json`、`README.md`、根目录 `app.js`/`scf_bootstrap`/`moma_*`、`.git` 等；`/juzhu/` 仅白名单 `app.js` / `cities.json` / `data.json` / `data-*.json`。禁止目录列表。生产设置 `JUZHU_ENV=production` 且显式配置 `JUZHU_API_KEY`、`JUZHU_ADMIN_PASSWORD`，禁止依赖代码内开发默认值。文档与页面不得写真实 vendor SECRET / DB 凭证 / Bearer token。MySQL 账号只进运行时环境变量 / 本地 `.env.*`（gitignore），**禁止**写进 `app.js` 源码默认值。
 
-## 规则 12 · 线上运行时纯 Node + MySQL；C 端保租房走 catalog
+## 规则 12 · 只用 Node（禁新增 Python）+ MySQL；C 端保租房走 catalog
 
-SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL，不再依赖 Python。
+**一切新增与改动只用 Node，不用 Python**（2026-09-04 拍板）：运行时、脚本、工具、迁移、单测一律 Node（`app.js` / `*.cjs`，Node 22+），**不得新增任何 Python 代码，也不再维护/扩展存量 Python**。`juzhu/server.py` 等 Python 文件仅作历史参考保留；此前由 Python 承担的本地联调与商家 HMAC 回归，改由 Node 侧脚本 / 直调接口完成。SCF 入口 `scf_bootstrap` → `app.js`，`/api/juzhu/*` 直连 MySQL。
 
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
-- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`）
+- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（家政）+ `/api/juzhu/housing/vendor/*`（房源，2026-09）（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`；文档页 `screens/property-intake-api.html` 含在线调试台，回归 `node scripts/housing_vendor_hmac_regression.cjs`）
+- **文档中心**：`screens/open-platform.html`（开放平台门户：接口文档 + 运营手册 + FAQ 汇总，nav 在 portal 系列「开放平台」组）；FAQ 在 `screens/open-faq.html`。手册只保留中文名版（`本地生活运营服务商操作手册.html` / `平台运营方操作手册.html`），英文别名副本已删。**不要链接 `api_doc.md` 等被静态服务拦截的文件**，对外一律引 HTML 文档页。
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
 - **SQLite 存量一次性导入**：`node migrate_to_mysql.cjs [sqlite.db]`（见 `docs/deploy.md`）
-- **Python `juzhu/server.py`**：线上不用；仅本地联调 / Python 单测，已改连同一 MySQL
+- **Python 存量**（`juzhu/server.py` 等）：仅作历史参考保留，不再运行 / 维护 / 扩展（见下方规则 14）
 
 ## 规则 13 · 频道名称单一数据源（`settings.channel_name`）
 
 C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全局设置 `channel_name`（默认 `新居住频道`），后台 `juzhu-admin.html`「设置」页可改。词干 = 去掉末尾「频道/专区」。页面不得再写死这组字眼。
+
+## 规则 14 · 脚本一律用 Node（mysql2），不用 Python
+
+一切数据库操作（DDL/DML/迁移/备份）、一次性脚本、数据验证脚本、联调与回归测试用 **Node + `mysql2`**（仓库已装依赖；`node -e` 或 `scripts/*.cjs`），**禁止**为跑 SQL 引入或编写 Python（pymysql 等）。与规则 12 同一口径：**只用 Node，Python 存量（`juzhu/server.py`、`juzhu/test_vendor_api.py` 等）仅作历史参考，不运行、不维护、不扩展**。连接配置只从环境变量读（`MYSQL_*` / `JUZHU_DB_*`），禁止把凭证写进脚本或仓库文件。
+
+## 规则 15 · 房源频道模型（channel / topic / 评级口径）
+
+**频道是业务类型，专题是筛选条件，两者不许混。**（2026-09-04 拍板）
+
+- `projects.channel ∈ rental(租赁住宿=长租+旅居，监管同口径) / minsu(惠居民宿) / newhouse(新房) / resale(二手) / trade(卖旧买新)`。
+  **`bzf`（保租房）不再是 channel** —— 它是一个专题（topic），定义存 `settings` KV（key `topic_bzf`，JSON 条件 `{channel:'rental', tags:['保租房']}`），查询走 `GET /api/juzhu/catalog?topic=bzf`。**禁止**在任何表/新代码里把 bzf 当 channel 写死。
+- 频道差异属性放 `projects.ext` / `units.ext`（JSON text），**不为单个频道加专用列、不建分表**。
+- **商家维度必挂**：`projects.owner_vendor_id`（NOT NULL，153=平台自营），商家接口 `/api/juzhu/vendor/*` 一律按它隔离。
+- **评级口径按频道**（服务端 `RATING_DIMS` 是单一数据源，前后端一致）：`rental`=好房子4维（comfort/green/tech/safety）、`minsu`=旅居彩贝5维（scenery/facilities/service/location/culture）、newhouse/resale 暂无。评级编号前缀：rental=`SY-RENT-`、minsu=`MZ-`（旧 `SY-BZF-` 兼容查询）。
+- 上下架 = `projects.status`（online/offline/draft）；C 端 catalog 只出 `online`。
+- 频道内视图区分：rental 频道内以 tag「旅居」区分两个 C 端视图——lvju-app-lvju 只出带「旅居」tag（山舍等旅居托管），lvju-app-changzu 排除「旅居」tag（保租房/长租公寓）。前端过滤（lvju-catalog requiredTag / 页面内 filter），不加服务端参数。
+- 演示数据：`node scripts/demo-listings.cjs seed|clean`（tag「演示」一键清理，禁止用真实商家名）；**演示项目/户型使用固定 id 段 9001-9006 / 9101-9109**，reseed 后直链不失效。
+- 旅居视图补充房源：`node scripts/lvju-stay-seed.cjs seed|clean`（山舍旅居托管 vendor，rental + 「旅居」tag + `stay_bookable`，与 #93/#94 同口径；幂等按 slug 判重，clean 只删脚本内 slug 清单，#93/#94 不动）。
+- 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），不与主服务 8766 抢端口。
+
+## 规则 16 · 房态日历 / 保险标识 / 最短连住（旅居短住口径）
+
+**逐晚库存与入住规则的单一数据源在服务端（`app.js`），页面不得各自硬编码口径。**（2026-09-05 拍板）
+
+- **房态**：`stay_calendar` 表只存差异行（`status: open/blocked/booked`、`price_night` 覆盖、`booking_id`），**无行 = 默认可订**；`unit_id=0` 表示项目级（整栋/不限房型）。`booked` 只由下单写入、取消自动释放，商家接口不可改已订晚。
+  - C 端公开读：`GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（含夜价/三态/最短连住/保险）
+  - 商家读写（会话态）：`GET|POST /api/juzhu/vendor/stay-calendar`；商家读写（HMAC 开放态）：`POST /api/juzhu/housing/vendor/stay-calendar`（owner 校验）
+- **最短连住**：`STAY_MIN_NIGHTS_DEFAULT`（rental=15 晚 / minsu=1）+ `projects.ext.min_stay_nights`（1-365，商家可覆盖）。**三处同口径校验**：C 端日历选段、下单页、`POST /api/juzhu/booking` 服务端兜底；改口径只改服务端常量或 ext，不要在前端另设数字。
+- **按晚预订能力开关（2026-09-05）**：能否在线预订 = `projects.ext.stay_bookable === true`（`stay_config.cjs bookableOf()` 唯一判断，随 `stayConfigOf()` 以 `bookable` 下发 catalog/详情/units/日历），**缺省 false = 仅 400 电话咨询**；tag/频道不参与判断（仅保留 channel∈rental/minsu 粗门）。「维护房态」= B 端 `b-stay-calendar.html` 的「按晚预订」开关（vendor PUT / HMAC `projects/update` 均可写）；admin 台 `juzhu-admin.html` 项目编辑器的「按晚预订 · 入住规则与保障」区块亦可配 `stay_bookable`/`min_stay_nights`/`insurance` 三项（`PUT /admin/projects/:id` 写 ext，2026-09-06 起；逐晚房态/夜价仍在 B 端）。开通后「无行=默认可订」才对外生效；迁移/回填 `node scripts/stay-bookable-init.cjs`（备份 `stay_calendar_bak_20260905`、清 rental 房态、按已开通项目重建 booked 行）。
+- **保险标识**：`INSURANCE_TYPES`（`switch_rental` 换租保险 / `hotel_cancel` 酒店取消险 / `property` 财产保险）是唯一枚举，存 `projects.ext.insurance`（key 数组），商家经 `PUT /api/juzhu/vendor/projects/:id` 配置；catalog/项目详情按 `insurance_types` 下发（含 label/icon），C 端直接渲染，**不要再造一份中文名映射**。
+- **免费取消政策（2026-09-09，房型维度）**：`units.ext.cancel_policy = {enabled, days_before, cutoff_time}`（免费取消窗口 = 入住日往前推 `days_before`（0-30，0=入住当天）天的 `cutoff_time` 时刻，缺省 `1 天 18:00`）。**缺省从严 = 未开通即不可取消不可退**（硬截止，无扣款分档）。口径单一数据源 `stay_config.cjs`（`cancelPolicyOf / cancelDeadlineOf / freeCancelOpenOf / cancelPolicyTextOf / orderCancelInfoOf`），政策中文文案服务端算好随接口下发（`cancel_policy_text`），**前端不得自行拼口径**。客户取消闸只在 `POST /api/juzhu/booking/cancel`（窗口外 400）；商家侧取消（B 端 `PUT /vendor/orders/:id`、HMAC `bookings/cancel`）**不受此闸约束**；整栋单（`unit_id` 为空）按项目首个房型（sort_order 最小）的政策回退执行，项目无房型才从严不可取消。配置写入口：B 端房态页「取消政策」卡（vendor `PUT /units/:id` 专用键，read-modify-write 保住 `price_night`）、admin `juzhu-admin-unit.html`（`PUT /admin/units/:id` ext 合并）、HMAC `units/update`。`booking/my` / `booking/lookup` 每单随下发 `can_cancel / cancel_policy_text / cancel_deadline`，C 端取消按钮以 `can_cancel` 为准。回填 `node scripts/cancel-policy-init.cjs`（给已开通项目预配默认政策）。
+- **回填工具**：`node scripts/stay-calendar-init.cjs`（保险缺配置按频道默认补齐 + 存量订单重建为 booked 行，幂等可重跑）。
+- 入口页：B 端 `screens/b-stay-calendar.html`（房态月历 + 批量关房/夜价 + 连住与保险配置 + 房型级取消政策），C 端 `lvju-app-lvju.html`（连续时间段选择）→ `lvju-app-detail.html`（房态日历）→ `lvju-app-booking.html`。
+
+## 规则 17 · 周边玩法维度（`spots` / `project_spots`）
+
+**C 端房源详情页「周边玩法」杂志区块与笔记详情页的数据只来自 `spots`（维度字典）+ `project_spots`（项目绑定），页面不得硬编码 mock。**（2026-09-06 拍板）
+
+- **维度**：`type ∈ scenic(景区) / biz(商圈) / food(美食) / cafe(咖啡)`（枚举与中文名收口在 `app.js` 的 `SPOT_TYPES` / `SPOT_TYPE_LABELS`，`type_label` 随接口下发，前端不得另造映射）；`city_id NULL = 全省通用`（跨市目的地如黄果树/西江，任何项目可绑）；`slug` 全局唯一（`uk_spot_slug`，小写字母/数字/连字符）；`summary` 为导语；`body` 为小红书式笔记正文（空行分段，空则前台回落 summary）；`photos` 为 JSON 图集（与封面合成轮播）；`address / duration / ticket` 为攻略信息（笔记页「去之前」卡，缺省不占行）；`cover_image` 填 `assets/` 下 jpg/png（≥60KB，缩略图管线自动出 .t240/.t640）。
+- **后台配置**：`juzhu-admin.html` 独立「周边」tab（`renderSpots`，2026-09-06 从字典 tab 迁出；导航为 项目/周边/字典/设置/账号/审计）配维度（行内「笔记」按钮展开正文/图集/攻略编辑，随主行一起保存）；项目编辑器（「项目」tab）「周边玩法」卡绑定（草稿存 `state.spotBindings`，单次 `PUT /admin/projects/:id/spots` 整体替换，≤12 条）。写路由走 **`house.write`**（dict.write 未授予任何角色，勿用）；被绑定的地点不可删。
+- **C 端渲染**：公开 `GET /api/juzhu/projects/:id` 随行下发 `spots`（enabled=1，SQL 已按 景区→商圈→美食→咖啡+sort 排定）；第 1 条 = 封面故事大卡，其余按维度分组编辑行；**绑定空 → 整块隐藏**，不得回落静态演示内容。深链顺序：`spot.link`（admin 覆写逃生口，缺省不填）→ **笔记详情页 `lvju-app-spot-post.html?id=`**（小红书式：图集轮播 + 编辑部行 + 正文 + #标签 + 攻略卡 + 相关笔记，数据来自公开 `GET /api/juzhu/spots/:id`，related 同类优先补齐同城市/通用）；`lvju-app-spot-detail.html` 仅保留旧 5 词条静态页。
+- **样例数据**：`node scripts/spots-seed.cjs seed|clean`（贵阳 25 地点：景区/商圈/美食/咖啡，**旅居 8 项目全绑定** #93/#94/9036-9041 各一组「本地景区 + 本地商圈/美食 + 远途一日」，每地点带正文/图集/攻略；clean 只删脚本内 slug 清单与其绑定行）。
+
+## 规则 18 · 权限点注册表单一数据源（`perm_registry.cjs`）+ 账号中心
+
+**admin 域接口的权限与审计只走 `perm_registry.cjs`（权限点注册表），不得在路由里手写权限闸。**（2026-09-06 拍板）
+
+- **PERMS**（权限点目录：code/中文名/domain/建议角色）与 **ROUTES**（admin 域路由 → 权限点 + 细粒度审计 action 映射）都在注册表里。内置角色的 `permissions` 由注册表折叠（`auth_center.cjs` 只留 code/name 权威清单），**改角色权限面先改注册表**，再跑 `node scripts/perm_registry_snapshot.cjs`（与基线快照逐条 diff，防漂移）+ `node scripts/perm_roles_resync.cjs`（写回库内 builtin=1 行；builtin=0 自定义角色永不触碰）。
+- **新增 admin 路由必须同步在 ROUTES 登记**（method/re/perm/act/res/idGroup），正则锚定 `^...$`；漏登记的写路由会走「账号主体 + admin.write」兜底闸，漏登记的 GET 不做权限点校验。自定义角色（B5 roles CRUD）的 permissions 只能是注册表已注册点子集，`'*'` 仅限内置 platform_admin。
+- **数据权限（scope）**：五档 `self < vendor < org < city < all`，存 `account_roles.scope`（JSON）。**city 档 `city_ids` 是显式授权**（账号中心「数据权限」抽屉配置），`orgs.city_ids` 只做 UI「按机构带出」初值，禁止在服务端做隐式推导（机构经营城市变动不得无审计地改变授权面）。全局读接口（org/report、admin/projects、staff）按 `scopeOf()/scopeCitySql()` 行级过滤；scope/角色变更即吊销该账号全部会话。
+- **过渡开关 `settings.perm_strict`**：`0`（缺省）时持旧 `admin.write` 的账号仍可过任意权限点闸（不断崖）；`1` 严格按注册表收口（platform_op 不再有管理写权限）。**新写路由不要依赖该别名**。
+- **登录防爆破**：`login_throttle` 表两级节流（ident 连错 5 次锁 30 分钟、IP 30 次/10min，env `AUTH_LOCK_*` 可调）；账号不存在也计失败并落审计（`audit_log.result` 列区分 ok/fail）。admin 登录必须显式 login_name（「只传 password 默认唯一管理员」已移除）。密码哈希 `scrypt$salt$hash`，存量 sha256 行登录时懒升级。
+- **账号中心页面**：`screens/account-center.html`（P 端，功能权限+数据权限+账号+审计+IdP 六 tab）是账号/权限唯一管理入口；`juzhu-admin.html` 账号/审计 tab 只留迁移卡。`_nav.js` item 支持可选 `perms: [...]`（任一命中即显示；**未登录/演示态一律全显**，保静态演示页基线观感）；`mount()` 幂等可重入，暴露 `BZF_NAV.refresh/hydrate`。
+- **回归**：`scripts/perm_gate_regression.cjs`（权限矩阵）/ `auth_security_regression.cjs`（防爆破+scrypt+TTL）/ `scope_regression.cjs`（行级过滤）/ `iam_api_regression.cjs`（账号中心 API）四条全绿才算过。
+- **商家登录并入账号中心（2026-09-09）**：商家凭据 = `accounts` 行（`principal_type='user'` + `vendor_id` 绑定 + `vendor_owner` 角色，scope 自动 `{level:'vendor'}`），`POST /vendor/login` 只是别名（返回体形状不变，B 端页面零改动）：有账号走 `loginWithPassword` 统一链，无账号且 `jz_vendors` bcrypt 命中则懒建档（密码重哈希 scrypt）。`verifyPassword` 支持 bcrypt 遗留格式（`$2a$/$2b$/$2y$`，登录一次懒升级 scrypt）。批量预迁移 `node scripts/vendor_accounts_migrate.cjs [--dry]`；旧 HMAC 自证 token（`verifyVendorLoginToken`）仅宽限至自然过期、不再签发；`jz_vendors.password_hash` 冻结（仅兜底路径读一次），改密/停用商家账号在 IAM 走 `updateAccount`（自动吊销会话）。回归 `node scripts/vendor_login_migration_regression.cjs`。
+
+## 规则 19 · 内容域统筹（专题 / 路线 / 周边玩法，一个后台面）
+
+**「住」的房源集合与「玩」的内容编排同属内容域，后台统一在 `juzhu-admin.html`「内容」tab（原「周边」tab 升级），C 端各页只读接口，不得硬编码。**（2026-09-09 拍板）
+
+- **三层模型**：内容原子 = `spots`（地点 + 笔记，规则 17 单一数据源）→ 内容编排 = `routes`（spots 的有序串联，`stops` JSON `[{spot_id, note}]`，**不复制正文**）→ 房源集合 = `topic_*`（settings KV 筛选条件，规则 15）。`routes.city_id NULL = 全省通用`，与 spots 同口径。
+- **后台**：内容 tab 二级分区（专题/路线/周边 chips 带计数，只渲染当前分区，hash 记忆）= 房源专题（KV CRUD + 在架城市切换 + 行内编辑 + 「文案」展开行简介/封面）+ 旅游路线（主从式：列表 + 全宽编辑面板，站点编辑器 ≤12 站排序加行程提示）+ 周边玩法（表格只做管理视图：快捷排序/上架开关；编辑与新建进单页面板，封面/图集实时预览 + 笔记正文；面板均带脏态守卫）。admin 接口：`GET/POST/PUT/DELETE /api/juzhu/admin/routes*`、`GET /api/juzhu/admin/topics`、`PUT|DELETE /api/juzhu/admin/topics/:slug`，全部登记 `perm_registry.ROUTES`（写 = `house.write`，读 = `admin.read`）。**`topic_bzf` 是保租房专区既有契约：可编辑/下架，禁止删除（服务端硬闸）**。专题下架（`enabled:false`）后 `catalog?topic=` 立即 404（服务端同响应不泄露存在性 + `catalogMemoInvalidateTopics()` 清缓存）。
+- **公开接口（白名单 GET）**：`/api/juzhu/routes?city=`、`/api/juzhu/routes/:id`（站点水合附 spot 摘要卡）、`/api/juzhu/spots?city=&type=`（列表，此前只有 :id 详情）、`/api/juzhu/topics`（enabled 专题清单，含 label/desc/cover_image/tags/channel）。路线封面缺省回落首个有点位的封面，前端不必再兜底造图。**C 端专题入口必须读 `/api/juzhu/topics` 动态渲染，禁止硬编码专题清单**（后台建/删专题即时生效）；专题页存在性以服务端 KV 为准，本地 META 只做文案兜底。
+- **C 端接库页**：`lvju-app-routes.html`（路线卡 + 时间线，站点深链 `lvju-app-spot-post.html?id=`）、`lvju-app-spots.html`（玩法列表，类型筛选 chip 用接口下发的 `type_label`，**前端不得另造类型映射**）、`lvju-app-topic.html`（专题列表 + 底部「去哪玩」挂同城 routes/scenic spots）。
+- **种子**：`node scripts/find-topic-seed.cjs seed|clean`（topic KV）、`node scripts/routes-seed.cjs seed|clean`（3 条贵阳路线，站点复用 spots-seed 的 slug；幂等，clean 只删本脚本清单）。
+
+## 规则 20 · 商家佣金费率（按业务线分档，`jz_vendors` 两列 + 下单快照）
+
+**抽佣是平台收入条款，配置主体是平台（`vendor.fund.write`），商家只读；口径单一数据源 `vendor_rate.cjs`（app.js 与 vendor_api.cjs 共用，纯函数不连库）。（2026-09-09 拍板）**
+
+- **两层费率模型（按业务线分档）**：`jz_vendors.commission_housing`（房源预订 booking_orders）/ `commission_jiazheng`（家政 jz_orders，本期仅配置不消费——家政服务者个人分账走 L0-L7 矩阵另一套体系）。**生效费率 = 商家差异化列 → settings KV 全局基准（`commission_housing_default` / `commission_jiazheng_default`，种子 10.00，`PUT /admin/settings` 可改）→ 内置 10 兜底**；0-100 两位小数，NULL = 按基准。
+- **下单锁定快照（调价不追溯）**：`booking_orders.commission_rate` / `commission_fee` 在 `POST /api/juzhu/booking` 时按 owner 商家 housing 档生效费率写入，平台自营（无商家行）按基准；结算对账一律读快照，不要按结算时费率重算。
+- **写入口与审计**：`PUT /api/juzhu/admin/vendors/:id/commission`（ROUTES 挂 `vendor.fund.write`，act `vendor.commission.update`）+ 处理器内 before/after 审计（role.update 金标准）；入驻审批 `approve` 按 `rate_base−rate_discount` 折算、按 phone **单命中** active 商家回填对应档位（多命中/未命中不阻塞）。管理台：`screens/p-vendor-rates.html`（P 端「商家费率」，nav p 系列 B 组，`_nav.js` 已登记）；全局基准走既有 `PUT /admin/settings`（`settings.write`）。
+- **商家可见**：`GET /api/juzhu/vendor/me` 随发两档 `commission.{housing,jiazheng}.{rate,is_default}`；B 端 `b-listing-mgmt.html` 徽标展示房源档佣金；HMAC `bookings/list`·`bookings/detail` 与 B 端 `/vendor/booking/orders` 每单随发快照字段。**费率不经商家 HMAC 写通道**（`vendor_config.cjs` 进程缓存不受影响）。
+- **perm 基线**：新增 `vendor.fund.write`（domain vendor，roles platform_op/operator_admin）已入 `scripts/__fixtures__/perm_roles_baseline.json`；既有缺口（`GET /admin/vendors`、`PUT /admin/vendors/:id/review` 未登记 ROUTES、consult-mode 重复死规则）为已知债，动权限面前先跑 `node scripts/perm_registry_snapshot.cjs` 对照。

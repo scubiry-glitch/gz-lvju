@@ -129,7 +129,7 @@ window.JUZHU = (function () {
 
   function load(opts) {
     opts = opts || {};
-    if (cache) return Promise.resolve(cache);
+    if (cache && !opts.fresh) return Promise.resolve(cache);   // fresh=true: 换城后强制重拉 catalog
     var lite = !!opts.lite;
     return loadFromCatalog(lite).catch(function () {
       return loadFromJson();
@@ -422,7 +422,7 @@ window.JUZHU = (function () {
     if (district.managed_unit_count != null && district.managed_unit_count !== '') {
       return Number(district.managed_unit_count) || 0;
     }
-    return projects({ channel: 'bzf', district_id: district.id })
+    return projects({ channel: 'rental', district_id: district.id }).filter(function(p){ return (p.tags || []).indexOf('保租房') >= 0; })
       .reduce(function(sum, p) { return sum + managedUnits(p); }, 0);
   }
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-console-login="off">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -57,6 +57,11 @@
   .tbl .acts{white-space:nowrap;}
   .tbl .acts button{padding:4px 8px;font-size:11px;margin-left:4px;}
   .tbl tr.on td{background:color-mix(in oklab,var(--brand) 8%,#fff);}
+  /* 周边绑定添加行（规则 17） */
+  .ps-add{display:flex;gap:8px;align-items:center;margin:10px 0 12px;flex-wrap:wrap;}
+  .ps-add select{padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:240px;}
+  .ps-add input{padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;}
+  #psPickNote{min-width:200px;}
   .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
     font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
   .toast.show{opacity:1;}
@@ -119,7 +124,9 @@
   .pane-dict .main{max-width:1100px;margin:0 auto;}
   .hint{font-size:11px;color:var(--muted);line-height:1.5;margin:6px 0 0;}
   body.api-off .subnav button:not(.on){opacity:.45;pointer-events:none;}
-  body.auth-locked .app-shell{visibility:hidden;}
+  body.auth-locked .app-shell, html.auth-pending .app-shell{visibility:hidden;}
+  /* 会话校验期间登录层不显示：已登录用户不再看到登录页一闪而过（html.auth-pending 由 <head> 内联脚本置位） */
+  html.auth-pending .login-mask{display:none;}
   .login-mask{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
     background:linear-gradient(160deg,#0b5d56 0%,#0f766e 45%,#134e4a 100%);}
   .login-mask[hidden]{display:none;}
@@ -131,15 +138,33 @@
   .login-card .bar{margin-top:16px;}
   .login-card .bar .btn{width:100%;padding:10px;}
 </style>
+<script>
+/* 已带会话 token 时，在解析出任何可见内容之前先把登录层收起（html.auth-pending），
+   等 checkAuth 出结果再亮对应界面——已登录用户打开后台不再看到登录页一闪而过。
+   必须放 head：放页面底部的话，上方外链脚本（_console-login.js 等）取回期间
+   渲染进程可能先画出登录层，闪光依旧随机出现。
+   token key 与 screens/_console-login.js 的 TOKEN_KEY 一致（JUZHU_ADMIN_TOKEN 为旧键，底部脚本会迁移）。 */
+(function hideMaskEarly() {
+  try {
+    if (localStorage.getItem('BZF_SESSION_TOKEN') || localStorage.getItem('JUZHU_ADMIN_TOKEN')) {
+      document.documentElement.classList.add('auth-pending');
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body class="auth-locked">
 <div class="login-mask" id="loginMask">
   <form class="login-card" id="loginForm" autocomplete="on">
     <h2>内容编辑后台</h2>
-    <p class="sub">请输入登录密码后继续</p>
+    <p class="sub">请输入账号与密码后继续（账号中心统一登录）</p>
+    <div class="fld">
+      <label for="loginUser">账号</label>
+      <input type="text" id="loginUser" name="username" required autofocus placeholder="登录账号 / 手机号" />
+    </div>
     <div class="fld">
       <label for="loginPassword">密码</label>
-      <input type="password" id="loginPassword" name="password" required autofocus placeholder="登录密码" />
+      <input type="password" id="loginPassword" name="password" required placeholder="登录密码" />
     </div>
     <p class="err" id="loginErr" aria-live="polite"></p>
     <div class="bar">
@@ -163,12 +188,40 @@
 <div class="warn" id="apiWarn" hidden>无法连接管理 API。请确认已登录，并刷新页面重试。</div>
 
 <nav class="subnav" id="subnav">
-  <button type="button" data-tab="phone">设置</button>
+  <button type="button" class="on" data-tab="content">项目</button>
+  <button type="button" data-tab="spots">内容</button>
   <button type="button" data-tab="dict">字典</button>
-  <button type="button" class="on" data-tab="content">内容</button>
+  <button type="button" data-tab="phone">设置</button>
+  <button type="button" data-tab="accounts">账号</button>
+  <button type="button" data-tab="audit">审计</button>
 </nav>
 
+
+<div id="paneAccounts" class="pane-main" hidden>
+  <div class="card">
+    <h2>账号与权限已迁移至账号中心</h2>
+    <p class="hint">账号 / 角色 / 权限矩阵 / 数据权限（scope）/ 审计 / IdP 配置已统一收敛到 P 端「账号中心」（同一账号会话，无需重复登录）。本页保留内容编辑职责。</p>
+    <div class="bar" style="margin-top:14px;">
+      <a class="btn primary" href="screens/account-center.html" target="_blank">打开账号中心 ↗</a>
+    </div>
+  </div>
+</div>
+<div id="paneAudit" class="pane-main" hidden>
+  <div class="card">
+    <h2>审计查询已迁移至账号中心</h2>
+    <p class="hint">审计日志（audit_log）现支持 action 前缀 / result / 时间范围 / IP 过滤与翻页，统一在账号中心「审计」页查询。</p>
+    <div class="bar" style="margin-top:14px;">
+      <a class="btn primary" href="screens/account-center.html" target="_blank">打开账号中心 ↗</a>
+    </div>
+  </div>
+</div>
+
 <div id="panePhone" class="pane-main pane-phone" hidden>
+  <div class="card" id="consultCard">
+    <h2>商家咨询方式</h2>
+    <p class="hint">商家维度控制 C 端房源详情页左下角咨询入口的优先展示（仅对已开通按晚预订的项目生效）。<strong>咨询顾问</strong> = 400 虚拟号专线（与保租房咨询同链路，缺省）；<strong>AI 咨询</strong> = 智能 agent 入口（上线后再切换）。保存后 C 端实时读取。</p>
+    <div id="consultList" style="margin-top:6px;"></div>
+  </div>
   <div class="card">
     <h2>频道名称</h2>
     <p class="hint">用于 C 端首页主标题、导航副标题、家政页等。去掉末尾「频道 / 专区」后的词干用于短标题（如后台顶栏）。保存后立即生效。</p>
@@ -208,6 +261,10 @@
   </div>
 </div>
 
+<div id="paneSpots" class="pane-main" hidden>
+  <div class="main" id="spotsRoot"></div>
+</div>
+
 <div id="paneDict" class="pane-main pane-dict" hidden>
   <div class="main" id="dictRoot"></div>
 </div>
@@ -242,29 +299,30 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="screens/_console-login.js"></script>
 <script>
 var API = '/api/juzhu/admin';
-var AUTH_TOKEN_KEY = 'JUZHU_ADMIN_TOKEN';
-var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false };
+var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false, spots: [], spotBindings: [], topics: [], routes: [], topicCat: null };
 
+// 会话 token 统一走账号中心（BZF_SESSION_TOKEN，与 _console-login.js / 其他控制台共享），
+// 旧 JUZHU_ADMIN_TOKEN / JUZHU_API_KEY 已废止
 function getAuthToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY) || ''; } catch (e) { return ''; }
+  return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || '';
 }
 function setAuthToken(token) {
-  try {
-    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
-    else localStorage.removeItem(AUTH_TOKEN_KEY);
-  } catch (e) {}
+  if (window.BZF_CONSOLE) BZF_CONSOLE.setToken(token);
 }
 function showLogin(msg) {
+  document.documentElement.classList.remove('auth-pending');
   document.body.classList.add('auth-locked');
   document.getElementById('loginMask').hidden = false;
   document.getElementById('loginErr').textContent = msg || '';
-  var input = document.getElementById('loginPassword');
+  var input = document.getElementById('loginUser') || document.getElementById('loginPassword');
   input.value = '';
   setTimeout(function(){ input.focus(); }, 50);
 }
 function hideLogin() {
+  document.documentElement.classList.remove('auth-pending');
   document.body.classList.remove('auth-locked');
   document.getElementById('loginMask').hidden = true;
   document.getElementById('loginErr').textContent = '';
@@ -284,11 +342,11 @@ function checkAuth() {
     return false;
   });
 }
-function login(password) {
+function login(account, password) {
   return fetch(API + '/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: password })
+    body: JSON.stringify({ login_name: account, password: password })
   }).then(function(r) {
     return r.text().then(function(text) {
       var data = {};
@@ -299,6 +357,7 @@ function login(password) {
         }
         throw new Error('登录失败（HTTP ' + r.status + '）');
       }
+      if (r.status === 429) throw new Error((data && data.error || '尝试过于频繁') + (data.retry_after ? '，请 ' + Math.ceil(data.retry_after / 60) + ' 分钟后再试' : ''));
       if (!r.ok) throw new Error((data && (data.error || data.message)) || '登录失败');
       if (!data.token) throw new Error('登录失败：未返回凭证');
       setAuthToken(data.token);
@@ -322,23 +381,30 @@ function bootApp() {
 
 document.getElementById('loginForm').onsubmit = function(e) {
   e.preventDefault();
+  var acc = document.getElementById('loginUser').value.trim();
   var pwd = document.getElementById('loginPassword').value;
   var err = document.getElementById('loginErr');
   var btn = document.getElementById('btnLogin');
   err.textContent = '';
+  if (!acc) { err.textContent = '请输入账号'; return; }
   btn.disabled = true;
-  login(pwd).then(function() {
+  login(acc, pwd).then(function() {
     return bootApp();
   }).catch(function(ex) {
-    err.textContent = ex.message || '密码错误';
+    err.textContent = ex.message || '账号或密码错误';
   }).then(function() {
     btn.disabled = false;
   });
 };
 
 document.getElementById('btnLogout').onclick = function() {
+  var t = getAuthToken();
   setAuthToken('');
-  showLogin('');
+  if (t && window.BZF_CONSOLE) {
+    // 服务端吊销会话；失败不影响本地登出
+    fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + t } }).catch(function(){});
+  }
+  showLogin('已退出');
 };
 
 // 当前编辑城市：URL ?city=（slug 或名称）优先，缺省为 cities[0]
@@ -412,7 +478,7 @@ function parseKeeper(u) {
 function channelLabel(id) {
   var c = (state.channels || []).find(function(x){ return x.id === id; });
   if (c) return c.label;
-  return id === 'trade' ? '卖旧买新' : '保租房';
+  return ({ rental:'租赁住宿', minsu:'民宿民宿', newhouse:'新房', resale:'二手', trade:'卖旧买新' })[id] || id;
 }
 
 function channelOptions(selected, includeAll) {
@@ -422,7 +488,8 @@ function channelOptions(selected, includeAll) {
     html += '<option value="'+c.id+'"'+(selected===c.id?' selected':'')+'>'+esc(c.label)+'</option>';
   });
   if (!state.channels || !state.channels.length) {
-    html += '<option value="bzf"'+(selected==='bzf'?' selected':'')+'>保租房</option>';
+    html += '<option value="rental"'+(selected==='rental'?' selected':'')+'>租赁住宿</option>';
+    html += '<option value="minsu"'+(selected==='minsu'?' selected':'')+'>民宿民宿</option>';
     html += '<option value="trade"'+(selected==='trade'?' selected':'')+'>卖旧买新</option>';
   }
   return html;
@@ -442,10 +509,48 @@ function switchTab(tab) {
     b.classList.toggle('on', b.dataset.tab === tab);
   });
   document.getElementById('panePhone').hidden = tab !== 'phone';
+  document.getElementById('paneSpots').hidden = tab !== 'spots';
   document.getElementById('paneDict').hidden = tab !== 'dict';
   document.getElementById('paneContent').hidden = tab !== 'content';
+  document.getElementById('paneAccounts').hidden = tab !== 'accounts';
+  document.getElementById('paneAudit').hidden = tab !== 'audit';
   if (tab === 'dict') renderDictionary();
+  if (tab === 'spots') {
+    // 记住上次停留的分区（#content-topics / #content-routes / #content-spots）
+    var m = /^#content-(topics|routes|spots)$/.exec(location.hash || '');
+    if (m && !state.contentSec) state.contentSec = m[1];
+    renderSpots(); loadContentData();
+  }
+  if (tab === 'phone') renderConsultModes();
 }
+
+// ── 商家咨询方式（jz_vendors.consult_mode，商家维度）──
+function renderConsultModes(){
+  var VTYPE = { platform: '平台自营', housing_operator: '房源运营商', lvju_host: '旅居托管', homestay: '民宿' };
+  api('/vendors/consult').then(function(list){
+    document.getElementById('consultList').innerHTML = !list || !list.length
+      ? '<p class="hint">暂无在职商家</p>'
+      : '<table class="tbl"><thead><tr><th>商家</th><th>类型</th><th>房源项目</th><th>咨询方式</th></tr></thead><tbody>' +
+        list.map(function(v){
+          return '<tr><td>'+esc(v.name)+'</td><td>'+esc(VTYPE[v.type]||v.type||'—')+'</td><td>'+v.project_count+'</td>'+
+            '<td><select data-consult="'+v.id+'">'+
+              '<option value="consultant"'+(v.consult_mode==='consultant'?' selected':'')+'>咨询顾问（400 虚拟号）</option>'+
+              '<option value="ai"'+(v.consult_mode==='ai'?' selected':'')+'>AI 咨询（未上线）</option>'+
+            '</select></td></tr>';
+        }).join('') + '</tbody></table>';
+    document.querySelectorAll('#consultList select[data-consult]').forEach(function(sel){
+      sel.onchange = function(){
+        api('/vendors/'+sel.dataset.consult+'/consult-mode', { method:'PUT', body:{ consult_mode: sel.value } })
+          .then(function(){ toast('咨询方式已更新'); })
+          .catch(function(e){ toast('保存失败：'+e.message); renderConsultModes(); });
+      };
+    });
+  }).catch(function(err){ document.getElementById('consultList').textContent = '加载失败：'+err.message; });
+}
+
+
+// ── 账号/审计已迁移至账号中心（screens/account-center.html），此处仅保留迁移卡 ──
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
 document.getElementById('subnav').onclick = function(e) {
   var btn = e.target.closest('button[data-tab]');
@@ -461,28 +566,23 @@ function toast(msg) {
   setTimeout(function(){ el.classList.remove('show'); }, 2400);
 }
 
-function getApiKey() {
-  try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e) { return ''; }
-}
+// 旧全局 API Key 通道已废止：管理台只认账号会话 token（BZF_SESSION_TOKEN）
 
 function api(path, opts) {
   opts = opts || {};
   var headers = opts.body ? {'Content-Type':'application/json'} : {};
   var token = getAuthToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
   return fetch(API + path, {
     method: opts.method || 'GET',
     headers: headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined
   }).then(function(r) {
     if (r.status === 401) {
-      var newKey = prompt('API Key 无效或未配置，请输入有效 Key：');
-      if (newKey !== null && String(newKey).trim()) {
-        try { localStorage.setItem('JUZHU_API_KEY', String(newKey).trim()); } catch(e) {}
-      }
-      throw new Error('认证失败，请配置有效 API Key 后重试');
+      // 会话失效：清 token 回登录层（不走 prompt/Key 兜底）
+      setAuthToken('');
+      showLogin('登录已失效，请重新登录');
+      throw new Error('登录已失效，请重新登录');
     }
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
@@ -493,9 +593,12 @@ function uploadForm(path, formData) {
   var headers = {};
   var token = getAuthToken();
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  var key = getApiKey();
-  if (key) headers['X-API-Key'] = key;
   return fetch(API + path, { method: 'POST', headers: headers, body: formData }).then(function(r) {
+    if (r.status === 401) {
+      setAuthToken('');
+      showLogin('登录已失效，请重新登录');
+      throw new Error('登录已失效，请重新登录');
+    }
     if (!r.ok) return r.json().then(function(e){ throw new Error(e.error || r.statusText); });
     return r.json();
   });
@@ -597,6 +700,7 @@ function loadDictionary() {
     state.city = d.city || null;
     state.districts = d.districts || [];
     state.channels = d.channels || [];
+    state.spots = d.spots || [];
     if (d.cities && d.cities.length) fillCitySwitch(d.cities);
     document.body.classList.remove('api-off');
     document.getElementById('apiWarn').hidden = true;
@@ -643,7 +747,7 @@ function renderDictionary() {
       '<td class="acts"><button type="button" class="btn primary d_save">保存</button>'+
       '<button type="button" class="btn danger d_del">删</button></td></tr>';
   }).join('');
-
+  // 周边玩法维度已迁至独立「周边」tab（renderSpots，2026-09-06）：字典回归城市/频道/行政区
   root.innerHTML =
     '<div class="card"><h2>城市 <span class="badge">'+cityList.length+'</span></h2>'+
       '<p class="hint">顶部切换器选择当前编辑城市（高亮行）。名称与 slug 全局唯一；仍有行政区或项目的城市不可删，且至少保留一座。</p>'+
@@ -765,6 +869,617 @@ function renderDictionary() {
   };
 }
 
+// ── 周边玩法维度（独立「周边」tab，规则 17）：景区/商圈/美食/咖啡字典 + 笔记编辑 ──
+/* ===== 内容域（规则 19）：专题（topic_* KV）+ 旅游路线（routes = spots 有序编排）=====
+   与「周边玩法」同 tab 统筹：住（专题=房源集合）与玩（路线/地点=内容）在一个后台面里管。 */
+function loadTopicCat() {
+  // 专题在架数按所选城市 catalog 推导（缺省=项目 tab 当前城市）
+  var cityId = state.topicCity || (state.city && state.city.id);
+  var city = (state.cities || []).filter(function(c){ return Number(c.id) === Number(cityId); })[0] || state.city;
+  if (!city) { state.topicCat = null; return Promise.resolve(); }
+  // 注意：页内 API 常量是 /api/juzhu/admin（会话域），catalog 是公开白名单接口，必须走公开路径
+  return fetch('/api/juzhu/catalog?city=' + encodeURIComponent(city.slug || city.name) + '&lite=1')
+    .then(function(r){ return r.json(); })
+    .then(function(c){ state.topicCat = (c && c.projects) || []; })
+    .catch(function(){ state.topicCat = null; });
+}
+function loadContentData() {
+  return Promise.all([
+    api('/topics').then(function(t){ state.topics = t || []; }),
+    api('/routes').then(function(r){ state.routes = r || []; }),
+    (state.spots && state.spots.length) ? Promise.resolve() : api('/spots').then(function(s){ state.spots = s || []; }),
+    loadTopicCat()
+  ]).then(renderSpots).catch(function(e){ toast('内容数据加载失败：' + e.message); });
+}
+function topicCount(t) {
+  if (!state.topicCat) return null;
+  return state.topicCat.filter(function(p){
+    if (t.channel && p.channel !== t.channel) return false;
+    var pt = p.tags || [];
+    return (t.tags || []).every(function(tag){ return pt.indexOf(tag) >= 0; });
+  }).length;
+}
+function channelOpts(sel) {
+  var CH = [['', '不限频道'], ['rental', '长租 rental'], ['minsu', '民宿 minsu'], ['newhouse', '新房 newhouse'], ['resale', '二手 resale'], ['trade', '卖旧买新 trade']];
+  return CH.map(function(c){ return '<option value="'+c[0]+'"'+((sel||'')===c[0]?' selected':'')+'>'+c[1]+'</option>'; }).join('');
+}
+function tDescRow(t) {
+  return '<tr class="t_desc_row" style="display:none;"><td colspan="7" style="background:#fafcfb;">'+
+    '<div style="display:grid;grid-template-columns:90px 1fr;gap:8px 10px;align-items:start;font-size:12px;">'+
+      '<b style="padding-top:6px;">入口简介</b><textarea class="t_desc" rows="2" placeholder="显示在 C 端专题入口卡片（一句话卖点）">'+esc(t.desc||'')+'</textarea>'+
+      '<b style="padding-top:6px;">入口封面</b><input class="t_cover" value="'+esc(t.cover_image||'')+'" placeholder="assets/lvju/xx.jpg（留空=自动取首个命中房源封面）"/>'+
+    '</div></td></tr>';
+}
+function contentTopicsHtml() {
+  var counts = (state.topics || []).map(topicCount);
+  var rows = (state.topics || []).map(function(t, i) {
+    var cnt = counts[i];
+    return '<tr data-slug="'+esc(t.slug)+'">'+
+      '<td><input class="t_label" value="'+esc(t.label||'')+'"/></td>'+
+      '<td><input class="t_slug" value="'+esc(t.slug)+'" readonly style="color:#8a958f;"/></td>'+
+      '<td><select class="t_channel">'+channelOpts(t.channel)+'</select></td>'+
+      '<td><input class="t_tags" value="'+esc((t.tags||[]).join(', '))+'" placeholder="逗号分隔，全部命中"/></td>'+
+      '<td>'+(cnt==null?'—':cnt+' 套')+'</td>'+
+      '<td><input class="t_en" type="checkbox"'+(t.enabled!==false?' checked':'')+'/></td>'+
+      '<td class="acts"><button type="button" class="btn ghost t_copy">文案</button>'+
+      '<button type="button" class="btn primary t_save">保存</button>'+
+      (t.slug==='bzf'?'':'<button type="button" class="btn danger t_del">删</button>')+'</td></tr>' + tDescRow(t);
+  }).join('');
+  return '<div class="card"><h2>房源专题（topic_*） <span class="badge" style="background:var(--gold)">'+(state.topics||[]).length+'</span>'+
+    '<span style="float:right;font-weight:400;font-size:12px;">在架城市 <select class="tcity">'+
+    (state.cities||[]).map(function(c){
+      var cur = state.topicCity || (state.city && state.city.id);
+      return '<option value="'+c.id+'"'+(Number(cur)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('') +'</select></span></h2>'+
+    '<p class="hint">专题 = 房源筛选条件（频道选填 + tags 全部命中，规则 15）；slug 是 C 端深链 ?topic=。C 端找房枢纽「专题入口」与专题页 <b>实时读本清单</b>，这里建/改/下架立即生效。「启用」取消勾选并保存即下架（C 端 404）；「文案」里编辑入口简介与封面（封面留空=自动取首个命中房源封面）。在架数按右上角所选城市 catalog 推导。<b>bzf（保租房专区）为既有契约，不可删除。</b></p>'+
+    '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
+      '<th>名称</th><th>Slug</th><th>频道</th><th>Tags 条件</th><th>在架</th><th>启用</th><th>操作</th>'+
+    '</tr></thead><tbody id="topicRows">'+rows+
+      '<tr class="new"><td><input class="n_label" placeholder="如：温泉疗愈"/></td>'+
+      '<td><input class="n_slug" placeholder="wenquan（留空自动）"/></td>'+
+      '<td><select class="n_channel">'+channelOpts('')+'</select></td>'+
+      '<td><input class="n_tags" placeholder="逗号分隔"/></td>'+
+      '<td></td><td></td>'+
+      '<td class="acts"><button type="button" class="btn ghost" id="newTopicSave">+ 新增</button></td></tr>'+
+    '</tbody></table></div></div>';
+}
+function stopsEditorHtml(stops) {
+  var opts = function(sel) {
+    return '<option value="">选地点…</option>' + (state.spots||[]).map(function(s){
+      return '<option value="'+s.id+'"'+(Number(sel)===Number(s.id)?' selected':'')+'>'+esc((s.icon?s.icon+' ':'')+(s.name||''))+'</option>';
+    }).join('');
+  };
+  if (!(stops||[]).length) return '<div class="hint" style="margin:4px 0;">暂无站点，点「+ 添加站点」（≤12 站）</div>';
+  return (stops||[]).map(function(s, i) {
+    return '<div class="stp" style="display:flex;gap:6px;align-items:center;margin:4px 0;">'+
+      '<span style="width:20px;text-align:right;color:#8a958f;font-size:12px;">'+(i+1)+'.</span>'+
+      '<select class="stp_spot" style="flex:0 0 220px;">'+opts(s.spot_id)+'</select>'+
+      '<input class="stp_note" value="'+esc(s.note||'')+'" placeholder="行程提示（如：Day1 下午 · 古镇石板街）" style="flex:1;"/>'+
+      '<button type="button" class="btn ghost stp_up"'+(i===0?' disabled':'')+'>↑</button>'+
+      '<button type="button" class="btn ghost stp_dn"'+(i===(stops||[]).length-1?' disabled':'')+'>↓</button>'+
+      '<button type="button" class="btn danger stp_rm">移除</button></div>';
+  }).join('');
+}
+function cityNameOf(id) {
+  var c = (state.cities || []).filter(function(x){ return Number(x.id) === Number(id); })[0];
+  return c ? c.name : '全省通用';
+}
+var routeDraft = null;   // 当前编辑中的路线工作副本（null=面板关闭）
+var routeDraftDirty = false;   // 面板有未保存改动（输入即置位，保存/关闭复位）
+function renderRouteEditor() {
+  var box = document.getElementById('routeEditor');
+  if (!box) return;
+  if (!routeDraft) { box.innerHTML = ''; return; }
+  var cityOpts = '<option value="">全省通用</option>' + (state.cities||[]).map(function(c){
+    return '<option value="'+c.id+'"'+(Number(routeDraft.city_id)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+  }).join('');
+  box.innerHTML = '<div class="card" style="border:2px solid var(--brand);margin-top:12px;">'+
+    '<h2>编辑路线 · '+esc(routeDraft.name||'(未命名)')+' <span style="color:#8a958f;font-size:11px;font-weight:400;">slug: '+esc(routeDraft.slug||'(创建时自动生成)')+'</span></h2>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 110px 110px 1.4fr;gap:8px 10px;font-size:12px;align-items:end;">'+
+      '<label>名称<input class="re_name" value="'+esc(routeDraft.name||'')+'" placeholder="如：筑城慢享 · 古镇两日"/></label>'+
+      '<label>城市<select class="re_city">'+cityOpts+'</select></label>'+
+      '<label>天数<input class="re_days" type="number" min="1" max="30" value="'+(routeDraft.days||1)+'"/></label>'+
+      '<label>排序<input class="re_sort" type="number" value="'+(routeDraft.sort_order||0)+'"/></label>'+
+      '<label>封面路径<input class="re_cover" value="'+esc(routeDraft.cover_image||'')+'" placeholder="assets/lvju/xx.jpg（留空=取首站封面）"/></label>'+
+      '<label style="grid-column:1/-1;">简介<textarea class="re_summary" rows="2" placeholder="一句话行程卖点，显示在 C 端路线卡头部">'+esc(routeDraft.summary||'')+'</textarea></label>'+
+    '</div>'+
+    '<label style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;"><input class="re_en" type="checkbox"'+(routeDraft.enabled!==0?' checked':'')+'/> 上架（C 端可见）</label>'+
+    '<div style="margin-top:10px;"><b style="font-size:12px;">站点编排（≤12 站，自上而下即行程顺序；站点正文/图集在「周边玩法」维护）</b>'+
+      '<div class="re_stops">'+stopsEditorHtml(routeDraft.stops)+'</div>'+
+      '<div style="margin-top:6px;display:flex;gap:8px;align-items:center;">'+
+        '<button type="button" class="btn ghost re_add">+ 添加站点</button>'+
+        '<button type="button" class="btn primary re_save">保存路线</button>'+
+        '<button type="button" class="btn ghost re_close">关闭</button>'+
+        '<span class="hint">改动需点「保存路线」才生效</span></div>'+
+    '</div></div>';
+  // 接线（面板每次重渲染都是新节点，直接赋 onclick）
+  box.querySelector('.re_add').onclick = function() {
+    syncDraftFromDom(box);
+    if (routeDraft.stops.length >= 12) { toast('单条路线最多 12 站'); return; }
+    routeDraft.stops.push({ spot_id: 0, note: '' });
+    box.querySelector('.re_stops').innerHTML = stopsEditorHtml(routeDraft.stops);
+  };
+  box.querySelector('.re_close').onclick = function() {
+    if (!guardRouteDirty()) return;
+    routeDraft = null; routeDraftDirty = false;
+    renderRouteEditor(); renderSpots();
+  };
+  box.oninput = function() { routeDraftDirty = true; };   // 面板任意输入即视为脏
+  box.querySelector('.re_save').onclick = function() {
+    syncDraftFromDom(box);
+    var body = {
+      name: box.querySelector('.re_name').value.trim(),
+      city_id: box.querySelector('.re_city').value || null,
+      days: +box.querySelector('.re_days').value || 1,
+      sort_order: +box.querySelector('.re_sort').value || 0,
+      cover_image: box.querySelector('.re_cover').value.trim() || null,
+      summary: box.querySelector('.re_summary').value.trim() || null,
+      enabled: box.querySelector('.re_en').checked ? 1 : 0,
+      stops: routeDraft.stops.filter(function(s){ return s.spot_id; })
+    };
+    if (!body.name) { toast('路线名称不能为空'); return; }
+    if (!body.stops.length) { toast('至少添加 1 个站点'); return; }
+    var p = routeDraft.id
+      ? api('/routes/' + routeDraft.id, { method:'PUT', body: body })
+      : api('/routes', { method:'POST', body: Object.assign({ slug: routeDraft.slug || null }, body) });
+    p.then(function() {
+      toast(routeDraft.id ? '路线已保存' : '路线已创建');
+      routeDraft = null; routeDraftDirty = false;
+      return loadContentData();
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+  box.querySelector('.re_stops').onclick = function(e) {
+    var row = e.target.closest('.stp');
+    if (!row) return;
+    var all = Array.from(this.querySelectorAll('.stp'));
+    var i = all.indexOf(row);
+    syncDraftFromDom(box);
+    if (e.target.closest('.stp_up') && i > 0) {
+      var t = routeDraft.stops[i]; routeDraft.stops[i] = routeDraft.stops[i-1]; routeDraft.stops[i-1] = t;
+    } else if (e.target.closest('.stp_dn') && i > -1 && i < routeDraft.stops.length - 1) {
+      var t2 = routeDraft.stops[i]; routeDraft.stops[i] = routeDraft.stops[i+1]; routeDraft.stops[i+1] = t2;
+    } else if (e.target.closest('.stp_rm')) {
+      routeDraft.stops.splice(i, 1);
+    } else return;
+    this.innerHTML = stopsEditorHtml(routeDraft.stops);
+  };
+}
+function syncDraftFromDom(box) {
+  // 结构性操作（加站/排序/移除）前，先把 DOM 里未保存的选点/提示写回工作副本，避免丢输入
+  if (!routeDraft) return;
+  Array.from(box.querySelectorAll('.stp')).forEach(function(el, i) {
+    if (!routeDraft.stops[i]) return;
+    routeDraft.stops[i].spot_id = parseInt(el.querySelector('.stp_spot').value, 10) || 0;
+    routeDraft.stops[i].note = el.querySelector('.stp_note').value.trim();
+  });
+}
+function contentRoutesHtml() {
+  var rows = (state.routes || []).map(function(r) {
+    var stops = Array.isArray(r.stops) ? r.stops : (function(){ try { return JSON.parse(r.stops||'[]'); } catch(e){ return []; } })();
+    var editing = routeDraft && Number(routeDraft.id) === Number(r.id);
+    return '<tr data-rid="'+r.id+'"'+(editing?' style="outline:2px solid var(--brand);"':'')+'>'+
+      '<td><b>'+esc(r.name||'')+'</b>'+(editing?' <span class="badge" style="background:var(--brand)">编辑中</span>':'')+'</td>'+
+      '<td>'+esc(cityNameOf(r.city_id))+'</td>'+
+      '<td>'+(r.days||1)+' 天</td>'+
+      '<td><b>'+(stops||[]).length+'</b> 站</td>'+
+      '<td>'+(r.enabled!==0?'<span style="color:var(--brand-deep);">上架</span>':'<span style="color:#b45309;">下架</span>')+'</td>'+
+      '<td class="acts"><button type="button" class="btn primary r_edit">编辑</button>'+
+      '<button type="button" class="btn danger r_del">删</button></td></tr>';
+  }).join('');
+  return '<div class="card"><h2>旅游路线（routes） <span class="badge" style="background:var(--gold)">'+(state.routes||[]).length+'</span></h2>'+
+    '<p class="hint">路线 = 周边地点的有序编排（站点正文/图集在「周边玩法」维护，这里管简介、封面、顺序与行程提示）；C 端 lvju-app-routes 列表与专题页「去哪玩」消费。点「编辑」在下方展开完整编辑面板；城市「全省通用」= 跨市路线。</p>'+
+    '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
+      '<th>名称</th><th>城市</th><th>天数</th><th>站点</th><th>状态</th><th>操作</th>'+
+    '</tr></thead><tbody id="routeRows">'+rows+
+      '<tr class="new"><td colspan="6"><button type="button" class="btn ghost" id="newRouteSave">+ 新建路线</button>　<span class="hint">创建后自动展开编辑面板（名称/简介/封面/站点编排一次完成）</span></td></tr>'+
+    '</tbody></table></div></div>'+
+    '<div id="routeEditor"></div>';
+}
+function wireContentCards(root) {
+  // ── 二级分区导航（专题/路线/周边，只渲染当前分区）──
+  root.querySelectorAll('.csec').forEach(function(btn) {
+    btn.onclick = function() {
+      var sec = btn.getAttribute('data-sec');
+      if (sec === state.contentSec) return;
+      if (!guardRouteDirty() || !guardSpotDirty()) return;
+      state.contentSec = sec;
+      try { history.replaceState(null, '', '#content-' + sec); } catch (e) {}
+      renderSpots();
+    };
+  });
+  wireSpotsCards(root);
+  // ── 专题 ──
+  root.querySelectorAll('.t_copy').forEach(function(btn) {
+    btn.onclick = function() {
+      var row = btn.closest('tr').nextElementSibling;
+      if (row && row.classList.contains('t_desc_row')) {
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+        btn.textContent = row.style.display === 'none' ? '文案' : '收起';
+      }
+    };
+  });
+  var tcity = root.querySelector('.tcity');
+  if (tcity) tcity.onchange = function() {
+    state.topicCity = this.value || null;
+    loadTopicCat().then(renderSpots);
+  };
+  root.querySelectorAll('.t_save').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      var tags = tr.querySelector('.t_tags').value.split(/[,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+      var body = {
+        label: tr.querySelector('.t_label').value.trim(),
+        tags: tags,
+        channel: tr.querySelector('.t_channel').value || null,
+        enabled: tr.querySelector('.t_en').checked
+      };
+      var descRow = tr.nextElementSibling;
+      if (descRow && descRow.classList.contains('t_desc_row')) {
+        body.desc = descRow.querySelector('.t_desc').value.trim();
+        body.cover_image = descRow.querySelector('.t_cover').value.trim();
+      }
+      api('/topics/' + tr.dataset.slug, { method:'PUT', body: body }).then(function() {
+        toast('专题已保存' + (body.enabled ? '' : '（已下架）'));
+        return loadContentData();
+      }).catch(function(e){ toast('保存失败：'+e.message); });
+    };
+  });
+  root.querySelectorAll('.t_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      if (!confirm('删除专题「'+tr.querySelector('.t_label').value+'」？C 端深链将立即 404。')) return;
+      api('/topics/' + tr.dataset.slug, { method:'DELETE' }).then(function() {
+        toast('专题已删除');
+        return loadContentData();
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
+  var newTopic = document.getElementById('newTopicSave');
+  if (newTopic) newTopic.onclick = function() {
+    var tr = newTopic.closest('tr');
+    var tags = tr.querySelector('.n_tags').value.split(/[,，]/).map(function(x){ return x.trim(); }).filter(Boolean);
+    api('/topics/' + (tr.querySelector('.n_slug').value.trim() || 'topic-' + Date.now().toString(36)), { method:'PUT', body: {
+      label: tr.querySelector('.n_label').value.trim(), tags: tags,
+      channel: tr.querySelector('.n_channel').value || null, enabled: true
+    }}).then(function() {
+      toast('专题已创建');
+      return loadContentData();
+    }).catch(function(e){ toast('创建失败：'+e.message); });
+  };
+  // ── 路线（主从：紧凑列表 + 全宽编辑面板）──
+  root.querySelectorAll('.r_edit').forEach(function(btn) {
+    btn.onclick = function() {
+      var rid = Number(btn.closest('tr').dataset.rid);
+      var r = (state.routes || []).filter(function(x){ return Number(x.id) === rid; })[0];
+      if (!r) return;
+      routeDraft = JSON.parse(JSON.stringify(r));
+      if (!Array.isArray(routeDraft.stops)) routeDraft.stops = [];
+      renderSpots();
+      renderRouteEditor();
+      var box = document.getElementById('routeEditor');
+      if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+  root.querySelectorAll('.r_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      var rid = Number(tr.dataset.rid);
+      var r = (state.routes || []).filter(function(x){ return Number(x.id) === rid; })[0] || {};
+      if (!confirm('删除路线「'+(r.name||'')+'」？C 端将立即不再展示。')) return;
+      api('/routes/' + rid, { method:'DELETE' }).then(function() {
+        if (routeDraft && Number(routeDraft.id) === rid) routeDraft = null;
+        toast('路线已删除');
+        return loadContentData();
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
+  var newRoute = document.getElementById('newRouteSave');
+  if (newRoute) newRoute.onclick = function() {
+    routeDraft = { id: 0, slug: null, name: '', summary: '', cover_image: '',
+      city_id: (state.city && state.city.id) || null, days: 1, sort_order: 999, enabled: 1, stops: [] };
+    renderSpots();
+    renderRouteEditor();
+    var box = document.getElementById('routeEditor');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+}
+
+/* ===== 内容 tab 渲染：二级分区（房源专题 / 旅游路线 / 周边玩法），只渲染当前分区 ===== */
+function contentSecNavHtml(sec) {
+  var items = [
+    ['topics', '房源专题', (state.topics || []).length],
+    ['routes', '旅游路线', (state.routes || []).length],
+    ['spots', '周边玩法', (state.spots || []).length],
+  ];
+  return '<div style="display:flex;gap:8px;margin:0 0 12px;">' + items.map(function(it) {
+    return '<button type="button" class="btn ' + (sec === it[0] ? 'primary' : 'ghost') + ' csec" data-sec="' + it[0] + '">' +
+      it[1] + ' <b>' + it[2] + '</b></button>';
+  }).join('') + '</div>';
+}
+function guardRouteDirty() {
+  if (routeDraft && routeDraftDirty && !confirm('路线有未保存改动，离开将丢弃，确定？')) return false;
+  return true;
+}
+function guardSpotDirty() {
+  if (spotDraft && spotDraftDirty && !confirm('地点有未保存改动，离开将丢弃，确定？')) return false;
+  return true;
+}
+function renderSpots() {
+  var root = document.getElementById('spotsRoot');
+  if (!state.apiOk) {
+    root.innerHTML = '<div class="empty">管理 API 未就绪，请刷新后重试</div>';
+    return;
+  }
+  var sec = state.contentSec || 'topics';
+  root.innerHTML = contentSecNavHtml(sec) +
+    (sec === 'topics' ? contentTopicsHtml() : sec === 'routes' ? contentRoutesHtml() : contentSpotsHtml());
+  if (sec === 'routes' && routeDraft) renderRouteEditor();
+  if (sec === 'spots' && spotDraft) renderSpotEditor();
+  wireContentCards(root);
+}
+
+/* ===== 周边玩法（spots）：表格做管理视图（快捷排序/上架开关），编辑/新建进单页面板 ===== */
+var spotDraft = null;      // 当前编辑中的地点工作副本（null=面板关闭）
+var spotDraftDirty = false;
+function spotDraftBody(box) {
+  // 面板 → 全量 body（与 /admin/spots PUT 字段一致，含笔记五项）
+  var photos = box.querySelector('.se_photos').value.split(/[,，\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  return {
+    name: box.querySelector('.se_name').value.trim(),
+    type: box.querySelector('.se_type').value,
+    city_id: box.querySelector('.se_city').value || null,
+    slug: box.querySelector('.se_slug').value.trim() || null,
+    icon: box.querySelector('.se_icon').value.trim() || null,
+    cover_image: box.querySelector('.se_cover').value.trim() || null,
+    summary: box.querySelector('.se_sum').value.trim() || null,
+    tags: box.querySelector('.se_tags').value.split(/[,，]/).map(function(x){ return x.trim(); }).filter(Boolean),
+    link: box.querySelector('.se_link').value.trim() || null,
+    sort_order: +box.querySelector('.se_sort').value || 0,
+    enabled: box.querySelector('.se_en').checked ? 1 : 0,
+    body: box.querySelector('.se_body').value.trim() || null,
+    photos: photos,
+    address: box.querySelector('.se_address').value.trim() || null,
+    duration: box.querySelector('.se_duration').value.trim() || null,
+    ticket: box.querySelector('.se_ticket').value.trim() || null
+  };
+}
+function renderSpotEditor() {
+  var box = document.getElementById('spotEditor');
+  if (!box) return;
+  if (!spotDraft) { box.innerHTML = ''; return; }
+  var d = spotDraft;
+  var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+  var typeOpts = Object.keys(SPOT_TYPE_LABEL).map(function(k){
+    return '<option value="'+k+'"'+(d.type===k?' selected':'')+'>'+SPOT_TYPE_LABEL[k]+'</option>';
+  }).join('');
+  var cityOpts = '<option value="">全省通用</option>' + (state.cities||[]).map(function(c){
+    return '<option value="'+c.id+'"'+(Number(d.city_id)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+  }).join('');
+  var photos = Array.isArray(d.photos) ? d.photos : (function(){ try { return JSON.parse(d.photos||'[]'); } catch(e){ return []; } })();
+  box.innerHTML = '<div class="card" style="border:2px solid var(--brand);margin-top:12px;">'+
+    '<h2>'+(d.id ? '编辑地点 · '+esc(d.name||'') : '新建地点')+' <span style="color:#8a958f;font-size:11px;font-weight:400;">slug: '+esc(d.slug||'(创建时自动生成)')+'</span></h2>'+
+    '<div style="display:grid;grid-template-columns:1.2fr 110px 1fr 1fr 110px;gap:8px 10px;font-size:12px;align-items:end;">'+
+      '<label>名称<input class="se_name" value="'+esc(d.name||'')+'" placeholder="如：青岩古镇"/></label>'+
+      '<label>类型<select class="se_type">'+typeOpts+'</select></label>'+
+      '<label>城市<select class="se_city">'+cityOpts+'</select></label>'+
+      '<label>Slug<input class="se_slug" value="'+esc(d.slug||'')+'" placeholder="qingyan-ancient-town（深链词汇）"/></label>'+
+      '<label>排序<input class="se_sort" type="number" value="'+(d.sort_order||0)+'"/></label>'+
+      '<label>图标<input class="se_icon" value="'+esc(d.icon||'')+'" placeholder="🏮"/></label>'+
+      '<label style="grid-column:3/6;">编辑导语<input class="se_sum" value="'+esc(d.summary||'')+'" placeholder="杂志口吻，一两句（列表卡与笔记页导语）"/></label>'+
+      '<label style="grid-column:1/3;">封面路径<input class="se_cover" value="'+esc(d.cover_image||'')+'" placeholder="assets/lvju/xx.jpg"/></label>'+
+      '<label>标签<input class="se_tags" value="'+esc(tagsStr(d.tags))+'" placeholder="5A 级, 明清石巷"/></label>'+
+      '<label>链接<input class="se_link" value="'+esc(d.link||'')+'" placeholder="选填覆写深链"/></label>'+
+      '<label style="display:inline-flex;align-items:center;gap:6px;"><input class="se_en" type="checkbox"'+(d.enabled!==0?' checked':'')+'/> 上架</label>'+
+    '</div>'+
+    '<div style="display:flex;gap:14px;margin-top:8px;align-items:flex-start;">'+
+      '<div><span class="hint" style="display:block;margin-bottom:3px;">封面预览</span><div class="se_cover_pv">'+(d.cover_image?'<img src="'+esc(d.cover_image)+'" style="max-height:76px;border-radius:8px;"/>':'<span class="hint">无</span>')+'</div></div>'+
+      '<div style="flex:1;"><span class="hint" style="display:block;margin-bottom:3px;">图集预览（随路径输入实时刷新）</span><div class="se_photos_pv" style="display:flex;gap:6px;flex-wrap:wrap;">'+
+        (photos.length ? photos.map(function(u){ return '<img src="'+esc(u)+'" style="height:56px;border-radius:6px;" onerror="this.style.opacity=.25;"/>'; }).join('') : '<span class="hint">无</span>')+
+      '</div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:90px 1fr;gap:8px 10px;font-size:12px;margin-top:10px;align-items:start;">'+
+      '<b style="padding-top:6px;">笔记正文</b><textarea class="se_body" rows="7" placeholder="小红书式正文，空行分段；留空则前台只显示导语">'+esc(d.body||'')+'</textarea>'+
+      '<b style="padding-top:6px;">图集路径</b><input class="se_photos" value="'+esc(photos.join(', '))+'" placeholder="assets/lvju/a.jpg, assets/lvju/b.jpg（逗号分隔，含封面共 2-4 张效果最佳）"/>'+
+      '<b style="padding-top:6px;">攻略信息</b><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
+        '<input class="se_address" value="'+esc(d.address||'')+'" placeholder="地址：贵阳市花溪区青岩镇北街"/>'+
+        '<input class="se_duration" value="'+esc(d.duration||'')+'" placeholder="建议停留：半天 / 2 小时"/>'+
+        '<input class="se_ticket" value="'+esc(d.ticket||'')+'" placeholder="门票：免费 / ¥110"/>'+
+      '</div></div>'+
+    '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">'+
+      '<button type="button" class="btn primary se_save">保存地点</button>'+
+      '<button type="button" class="btn ghost se_close">关闭</button>'+
+      '<span class="hint">改动需点「保存地点」才生效</span></div>'+
+    '</div>';
+  // 接线（面板每次重渲染都是新节点）
+  box.oninput = function(ev) {
+    spotDraftDirty = true;
+    var t = ev.target;
+    if (t && (t.classList.contains('se_cover') || t.classList.contains('se_photos'))) syncSpotPreview(this);
+  };
+  box.querySelector('.se_close').onclick = function() {
+    if (!guardSpotDirty()) return;
+    spotDraft = null; spotDraftDirty = false;
+    renderSpotEditor(); renderSpots();
+  };
+  box.querySelector('.se_save').onclick = function() {
+    var body = spotDraftBody(box);
+    if (!body.name) { toast('地点名称不能为空'); return; }
+    var p = spotDraft.id
+      ? api('/spots/' + spotDraft.id, { method:'PUT', body: body })
+      : api('/spots', { method:'POST', body: body });
+    p.then(function(res) {
+      toast(spotDraft.id ? '地点已保存' : '地点已创建');
+      if (res && res.spot) {
+        var idx = (state.spots || []).findIndex(function(s){ return Number(s.id) === Number(res.spot.id); });
+        if (idx >= 0) state.spots[idx] = res.spot; else state.spots.push(res.spot);
+      }
+      spotDraft = null; spotDraftDirty = false;
+      renderSpots();
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+}
+function syncSpotPreview(box) {
+  var cov = box.querySelector('.se_cover').value.trim();
+  box.querySelector('.se_cover_pv').innerHTML = cov ? '<img src="'+esc(cov)+'" style="max-height:76px;border-radius:8px;" onerror="this.style.opacity=.25;"/>' : '<span class="hint">无</span>';
+  var ph = box.querySelector('.se_photos').value.split(/[,，\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+  box.querySelector('.se_photos_pv').innerHTML = ph.length
+    ? ph.map(function(u){ return '<img src="'+esc(u)+'" style="height:56px;border-radius:6px;" onerror="this.style.opacity=.25;"/>'; }).join('')
+    : '<span class="hint">无</span>';
+}
+function contentSpotsHtml() {
+  var cityList = (state.cities && state.cities.length) ? state.cities : (state.city ? [state.city] : []);
+  var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+  var typeCounts = {};
+  (state.spots || []).forEach(function(s){ typeCounts[s.type] = (typeCounts[s.type] || 0) + 1; });
+  var typeSummary = Object.keys(SPOT_TYPE_LABEL).map(function(k){
+    return SPOT_TYPE_LABEL[k] + ' ' + (typeCounts[k] || 0);
+  }).join(' · ');
+  function spotTypeOpts(sel) {
+    return Object.keys(SPOT_TYPE_LABEL).map(function(k){
+      return '<option value="'+k+'"'+(sel===k?' selected':'')+'>'+SPOT_TYPE_LABEL[k]+'</option>';
+    }).join('');
+  }
+  function spotCityOpts(cityId) {
+    return '<option value="">全省通用</option>' + cityList.map(function(c) {
+      return '<option value="'+c.id+'"'+(Number(cityId)===Number(c.id)?' selected':'')+'>'+esc(c.name)+'</option>';
+    }).join('');
+  }
+  // 笔记/封面/导语等富内容在下方「编辑面板」维护；表格只做管理视图（快捷排序与上架开关）
+  var q = (state.spotQ || '').trim().toLowerCase();
+  var list = (state.spots || []).filter(function(s) {
+    if (state.spotType && s.type !== state.spotType) return false;
+    if (!q) return true;
+    var hay = [(s.name||''), (s.slug||''), (s.summary||''), tagsStr(s.tags)].join(' ').toLowerCase();
+    return hay.indexOf(q) >= 0;
+  });
+  var spotRows = list.map(function(s) {
+    var editing = spotDraft && Number(spotDraft.id) === Number(s.id);
+    return '<tr data-sid="'+s.id+'"'+(editing?' style="outline:2px solid var(--brand);"':'')+'>'+
+      '<td><b>'+esc(s.name||'')+'</b>'+(editing?' <span class="badge" style="background:var(--brand)">编辑中</span>':'')+'</td>'+
+      '<td>'+esc(SPOT_TYPE_LABEL[s.type]||s.type)+'</td>'+
+      '<td>'+esc(s.city_id ? ((state.cities||[]).filter(function(c){ return Number(c.id)===Number(s.city_id); })[0]||{}).name||'—' : '全省通用')+'</td>'+
+      '<td style="color:#8a958f;">'+esc(s.slug||'')+'</td>'+
+      '<td><input class="s_sort" type="number" value="'+(s.sort_order||0)+'" style="width:56px;" title="改完失焦/回车即保存"/></td>'+
+      '<td><input class="s_en" type="checkbox"'+(s.enabled!==0?' checked':'')+' title="勾选即上架，取消即下架"/></td>'+
+      '<td class="acts"><button type="button" class="btn primary s_edit">编辑</button>'+
+      '<button type="button" class="btn danger s_del">删</button></td></tr>';
+  }).join('');
+
+  return '<div class="card"><h2>周边玩法（景区 / 商圈 / 美食 / 咖啡） <span class="badge" style="background:var(--gold)">'+(state.spots||[]).length+'</span></h2>'+
+      '<p class="hint"><b>'+typeSummary+'</b> — C 端房源详情页「周边玩法」杂志区块、玩法列表页与笔记详情页（lvju-app-spot-post）的数据源，也是旅游路线的站点来源。城市选「全省通用」= 跨市目的地（如黄果树、西江）；slug 是 C 端深链词汇（全局唯一）；封面填 assets/ 下的 jpg/png 路径（缩略图自动生成）；「笔记」里写正文 / 图集 / 攻略信息，正文留空则只显示导语。仍被项目绑定的地点不可删（先在「项目」tab 解除绑定）。</p>'+
+      '<div style="display:flex;gap:8px;align-items:center;margin:0 0 10px;">'+
+        '<select class="sf_type"><option value="">全部类型</option>'+spotTypeOpts(state.spotType)+'</select>'+
+        '<input class="sf_q" value="'+esc(state.spotQ||'')+'" placeholder="搜名称 / slug / 标签…" style="width:220px;"/>'+
+        '<span class="hint">显示 '+list.length+' / '+(state.spots||[]).length+'</span></div>'+
+      '<div style="overflow-x:auto;"><table class="tbl"><thead><tr>'+
+        '<th>名称</th><th>类型</th><th>城市</th><th>Slug</th><th>排序</th><th>上架</th><th>操作</th>'+
+      '</tr></thead>'+
+      '<tbody id="spotRows">'+spotRows+
+        '<tr class="new"><td colspan="7"><button type="button" class="btn ghost" id="newSpotSave">+ 新建地点</button>　<span class="hint">新建与编辑都在下方面板完成（全字段 + 封面/图集实时预览 + 笔记正文）</span></td></tr>'+
+      '</tbody></table></div>'+
+      '<div id="spotEditor"></div>'+
+    '</div>';
+}
+function wireSpotsCards(root) {
+  // 从 state 行构造全量 body（快捷排序/开关走整条 PUT，避免覆盖其他字段）
+  function spotBodyOf(s, patch) {
+    var ph = Array.isArray(s.photos) ? s.photos : (typeof s.photos === 'string' && s.photos ? (function(){ try { return JSON.parse(s.photos); } catch(e){ return []; } })() : []);
+    var b = {
+      name: s.name || '', type: s.type || 'scenic', city_id: s.city_id || null,
+      slug: s.slug || null, icon: s.icon || null, cover_image: s.cover_image || null,
+      summary: s.summary || null, tags: Array.isArray(s.tags) ? s.tags : [],
+      link: s.link || null, sort_order: s.sort_order || 0,
+      enabled: s.enabled !== 0 ? 1 : 0,
+      body: s.body || null, photos: ph, address: s.address || null,
+      duration: s.duration || null, ticket: s.ticket || null
+    };
+    return Object.assign(b, patch || {});
+  }
+  function spotById(id) {
+    return (state.spots || []).filter(function(s){ return Number(s.id) === Number(id); })[0];
+  }
+  var sfType = root.querySelector('.sf_type');
+  if (sfType) sfType.onchange = function() { state.spotType = this.value; renderSpots(); };
+  var sfQ = root.querySelector('.sf_q');
+  if (sfQ) sfQ.oninput = function() {
+    state.spotQ = this.value;
+    var pos = this.selectionStart;
+    renderSpots();
+    var q2 = document.querySelector('.sf_q');
+    if (q2) { q2.focus(); try { q2.setSelectionRange(pos, pos); } catch (e) {} }
+  };
+  // 快捷排序：失焦/回车即保存
+  root.querySelectorAll('.s_sort').forEach(function(inp) {
+    inp.onchange = function() {
+      var tr = inp.closest('tr');
+      var s = spotById(tr.dataset.sid);
+      if (!s) return;
+      var v = +inp.value || 0;
+      if (v === (s.sort_order || 0)) return;
+      api('/spots/' + s.id, { method:'PUT', body: spotBodyOf(s, { sort_order: v }) }).then(function(res) {
+        if (res && res.spot) {
+          var idx = state.spots.indexOf(s);
+          if (idx >= 0) state.spots[idx] = res.spot;
+        }
+        toast('排序已保存');
+      }).catch(function(e){ toast('保存失败：'+e.message); renderSpots(); });
+    };
+  });
+  // 快捷上架开关：勾选即保存
+  root.querySelectorAll('.s_en').forEach(function(cb) {
+    cb.onchange = function() {
+      var tr = cb.closest('tr');
+      var s = spotById(tr.dataset.sid);
+      if (!s) return;
+      api('/spots/' + s.id, { method:'PUT', body: spotBodyOf(s, { enabled: cb.checked ? 1 : 0 }) }).then(function(res) {
+        if (res && res.spot) {
+          var idx = state.spots.indexOf(s);
+          if (idx >= 0) state.spots[idx] = res.spot;
+        }
+        toast(cb.checked ? '已上架' : '已下架');
+      }).catch(function(e){ toast('操作失败：'+e.message); renderSpots(); });
+    };
+  });
+  // 编辑 / 新建 → 单页面板
+  root.querySelectorAll('.s_edit').forEach(function(btn) {
+    btn.onclick = function() {
+      var s = spotById(btn.closest('tr').dataset.sid);
+      if (!s) return;
+      spotDraft = JSON.parse(JSON.stringify(s));
+      if (!Array.isArray(spotDraft.photos)) spotDraft.photos = [];
+      spotDraftDirty = false;
+      renderSpots();
+      renderSpotEditor();
+      var box = document.getElementById('spotEditor');
+      if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
+  root.querySelectorAll('.s_del').forEach(function(btn) {
+    btn.onclick = function() {
+      var tr = btn.closest('tr');
+      var s = spotById(tr.dataset.sid) || {};
+      if (!confirm('确定删除地点「'+(s.name||'')+'」？仍被项目绑定的地点不可删。')) return;
+      api('/spots/'+tr.dataset.sid, { method:'DELETE' }).then(function() {
+        toast('地点已删除');
+        if (spotDraft && Number(spotDraft.id) === Number(tr.dataset.sid)) { spotDraft = null; spotDraftDirty = false; }
+        state.spots = (state.spots || []).filter(function(x){ return Number(x.id) !== Number(tr.dataset.sid); });
+        renderSpots();
+      }).catch(function(e){ toast('删除失败：'+e.message); });
+    };
+  });
+  var newSpotBtn = document.getElementById('newSpotSave');
+  if (newSpotBtn) newSpotBtn.onclick = function() {
+    spotDraft = { id: 0, name: '', type: 'scenic', city_id: (state.city && state.city.id) || null,
+      slug: '', icon: '', cover_image: '', summary: '', tags: [], link: '', sort_order: 999,
+      enabled: 1, body: '', photos: [], address: '', duration: '', ticket: '' };
+    spotDraftDirty = false;
+    renderSpots();
+    renderSpotEditor();
+    var box = document.getElementById('spotEditor');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+}
+
 function saveDistrictRow(tr) {
   var id = tr.dataset.did;
   return api('/districts/'+id, { method:'PUT', body: {
@@ -805,10 +1520,11 @@ function renderProjectList() {
   box.innerHTML = state.projects.map(function(p) {
     var on = state.current && state.current.id === p.id ? ' on' : '';
     var ch = channelLabel(p.channel);
-    var managed = p.channel === 'bzf' ? (' · 房源量 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
+    var managed = p.channel !== 'trade' ? (' · 房源量 '+(p.managed_unit_count!=null?p.managed_unit_count:(p.unit_count||0))) : '';
+    var vendor = p.vendor_name ? (' · 🏪 ' + esc(p.vendor_name)) : '';
     return '<button type="button" class="'+on.trim()+'" data-id="'+p.id+'">'+
       '<div class="nm">'+p.name+'</div>'+
-      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+'</div></button>';
+      '<div class="meta">'+ch+' · '+(p.district_name||'—')+' · '+p.unit_count+' 户型'+managed+vendor+'</div></button>';
   }).join('');
   box.querySelectorAll('button[data-id]').forEach(function(btn) {
     btn.onclick = function(){ openProject(+btn.dataset.id); };
@@ -822,13 +1538,107 @@ function openProject(id, expandedAfter) {
   } else {
     state.expandedUnit = null;
   }
-  api('/projects/'+id).then(function(res) {
-    state.current = res.project;
-    state.units = res.units || [];
-    state.photos = res.photos || [];
-    renderProjectList();
-    renderEditor();
+  // 周边绑定（规则 17）与项目主档并行拉取；字典未就绪时兜底再拉一次 spots
+  Promise.all([api('/projects/'+id), api('/projects/'+id+'/spots')]).then(function(rs) {
+    state.current = rs[0].project;
+    state.units = rs[0].units || [];
+    state.photos = rs[0].photos || [];
+    state.spotBindings = (rs[1] && rs[1].bindings) || [];
+    var ready = state.spots && state.spots.length
+      ? Promise.resolve()
+      : api('/spots').then(function(list){ state.spots = Array.isArray(list) ? list : ((list && list.spots) || []); });
+    return ready.then(function() {
+      renderProjectList();
+      renderEditor();
+    });
   }).catch(function(e){ toast('加载失败：'+e.message); });
+}
+
+// ── 周边玩法 · 项目绑定（规则 17）：草稿存 state.spotBindings，单次 PUT 整体替换 ──
+function spotsCardHtml(p) {
+  var b = state.spotBindings || [];
+  var byId = {};
+  (state.spots || []).forEach(function(s){ byId[s.id] = s; });
+  var unpicked = (state.spots || []).filter(function(s){
+    return !b.some(function(x){ return Number(x.spot_id) === Number(s.id); });
+  });
+  function opt(s) {
+    return '<option value="'+s.id+'">['+(s.type==='biz'?'商圈':'景区')+'] '+esc(s.name||s.slug)+' · '+(s.city_id?'':'全省通用')+'</option>';
+  }
+  return '<div class="card" id="spotsCard">'+
+    '<h2>周边玩法（景区 / 商圈）<span class="badge" style="background:var(--gold)" id="psCount">'+b.length+'</span></h2>'+
+    '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">C 端详情页「周边玩法」杂志区块按此渲染：第一条为封面故事大卡，其余按 景区→商圈→美食→咖啡 分组。「编辑行文」写步程/车程与推荐理由（如：步行 5 分钟 · 古镇北门）。列表整体一次保存（覆盖该项目的全部绑定）；跨市目的地（黄果树、西江等）在「周边」tab 存为全省通用。地点维度的增删改在 <a href="javascript:void(0)" id="psGotoDict">周边 tab</a>。</p>'+
+    '<div class="ps-add"><select id="psPick">'+
+      (unpicked.length ? unpicked.map(opt).join('') : '<option value="">（字典里的地点都已绑定）</option>')+
+      '</select>'+
+      '<input id="psPickNote" placeholder="编辑行文：步行 5 分钟"/>'+
+      '<input id="psPickSort" type="number" value="'+(b.length ? Math.max.apply(null, b.map(function(x){ return +x.sort_order||0; })) + 10 : 10)+'" style="width:70px;"/>'+
+      '<button type="button" class="btn ghost" id="psAdd">+ 加入</button></div>'+
+    '<table class="tbl"><thead><tr><th>名称</th><th>类型</th><th>编辑行文</th><th>排序</th><th>操作</th></tr></thead>'+
+    '<tbody id="psRows">'+ b.map(function(x){
+        var s = byId[x.spot_id] || {};
+        return '<tr data-spot-id="'+x.spot_id+'"><td>'+esc(s.name || ('未知 #'+x.spot_id))+'</td>'+
+          '<td>'+(s.type==='biz'?'商圈':'景区')+'</td>'+
+          '<td><input class="ps_note" value="'+esc(x.note||'')+'"/></td>'+
+          '<td><input class="ps_sort" type="number" value="'+(x.sort_order||0)+'" style="width:70px;"/></td>'+
+          '<td class="acts"><button type="button" class="btn danger ps_rm">移除</button></td></tr>';
+      }).join('') + (b.length ? '' : '<tr><td colspan="5" style="color:var(--muted);font-size:12px;">尚未绑定。C 端详情页将不展示「周边玩法」区块。</td></tr>')+'</tbody></table>'+
+    '<div class="bar"><button type="button" class="btn primary" id="psSave">保存周边绑定</button>'+
+      '<a class="btn ghost" target="_blank" href="lvju-app-detail.html?id='+p.id+'">前台预览 ›</a></div></div>';
+}
+
+function bindSpotsCard(p) {
+  var card = document.getElementById('spotsCard');
+  if (!card) return;
+  function rerenderCard() {
+    card.outerHTML = spotsCardHtml(p);
+    bindSpotsCard(p);
+  }
+  var add = document.getElementById('psAdd');
+  if (add) add.onclick = function() {
+    var pick = document.getElementById('psPick');
+    if (!pick || !pick.value) { toast('没有可添加的地点'); return; }
+    state.spotBindings = (state.spotBindings || []).concat([{
+      spot_id: Number(pick.value),
+      note: document.getElementById('psPickNote').value.trim(),
+      sort_order: Number(document.getElementById('psPickSort').value) || 0
+    }]);
+    rerenderCard();
+  };
+  card.querySelectorAll('.ps_rm').forEach(function(btn) {
+    btn.onclick = function() {
+      var sid = Number(btn.closest('tr').dataset.spotId);
+      state.spotBindings = (state.spotBindings || []).filter(function(x){ return Number(x.spot_id) !== sid; });
+      rerenderCard();
+    };
+  });
+  // 行文/排序即时回写草稿（不重渲染，避免输入丢焦点）
+  card.querySelectorAll('tr[data-spot-id]').forEach(function(tr) {
+    var sid = Number(tr.dataset.spotId);
+    var note = tr.querySelector('.ps_note'), sort = tr.querySelector('.ps_sort');
+    if (note) note.oninput = function() {
+      var it = (state.spotBindings || []).find(function(x){ return Number(x.spot_id) === sid; });
+      if (it) it.note = note.value;
+    };
+    if (sort) sort.oninput = function() {
+      var it = (state.spotBindings || []).find(function(x){ return Number(x.spot_id) === sid; });
+      if (it) it.sort_order = Number(sort.value) || 0;
+    };
+  });
+  var save = document.getElementById('psSave');
+  if (save) save.onclick = function() {
+    var bindings = (state.spotBindings || []).map(function(x){
+      return { spot_id: x.spot_id, note: (x.note || '').trim(), sort_order: Number(x.sort_order) || 0 };
+    });
+    api('/projects/'+p.id+'/spots', { method:'PUT', body: { bindings: bindings } }).then(function(res) {
+      state.spotBindings = (res && res.bindings) || bindings;
+      var cnt = document.getElementById('psCount');
+      if (cnt) cnt.textContent = state.spotBindings.length;
+      toast('周边绑定已保存');
+    }).catch(function(e){ toast('保存失败：'+e.message); });
+  };
+  var goto_ = document.getElementById('psGotoDict');
+  if (goto_) goto_.onclick = function() { switchTab('spots'); };
 }
 
 function photosOf(unitId) {
@@ -900,7 +1710,7 @@ function createProject() {
   if (!name) { toast('请填写项目名称'); return; }
   var channel = document.getElementById('n_channel').value;
   var district_id = document.getElementById('n_district').value;
-  if (channel === 'bzf' && !district_id) { toast('保租房须选择行政区'); return; }
+  if (channel !== 'trade' && !district_id) { toast('房源项目须选择行政区'); return; }
 
   var body = {
     name: name,
@@ -929,8 +1739,9 @@ function numValFrom(id) {
   return v === '' ? null : +v;
 }
 
-function ratingCode(id) {
-  return 'SY-BZF-' + String(id).padStart(5, '0');
+function ratingCode(id, channel) {
+  var prefix = ({ rental:'SY-RENT', minsu:'MZ' })[channel || 'rental'] || 'SY-RENT';
+  return prefix + '-' + String(id).padStart(5, '0');
 }
 
 var RATING_STATUS = { draft:'草稿', pending:'待复核', passed:'已通过', rejected:'已驳回' };
@@ -940,19 +1751,38 @@ var RATING_DIMS = [
   { key:'tech', label:'科技' },
   { key:'safety', label:'安全' }
 ];
+// 评级口径按频道（与服务端 RATING_DIMS 一致）：rental=好房子4维，minsu=彩贝5维
+var RATING_DIMS_BY_CH = {
+  rental: RATING_DIMS,
+  minsu: [
+    { key:'scenery', label:'环境景观' },
+    { key:'facilities', label:'设施配套' },
+    { key:'service', label:'服务品质' },
+    { key:'location', label:'区位交通' },
+    { key:'culture', label:'在地体验' }
+  ]
+};
+function dimsFor(channel) {
+  return RATING_DIMS_BY_CH[channel] || RATING_DIMS;
+}
+function ratingDimsTitle(channel) {
+  return channel === 'minsu' ? '彩贝评级（5 维）' : '好房子评级（4 维）';
+}
 
 function parseRating(p) {
   var r = p.rating;
-  if (!r) return { dims:{ comfort:4, green:4, tech:4, safety:4 }, checked:47, total:55 };
+  var dimsDef = dimsFor(p.channel);
+  if (!r) { r = { dims:{} }; }
   if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
-  r.dims = r.dims || { comfort:4, green:4, tech:4, safety:4 };
+  r.dims = r.dims || {};
+  dimsDef.forEach(function(d){ if (r.dims[d.key] == null) r.dims[d.key] = 4; });
   r.checked = r.checked != null ? r.checked : 47;
   r.total = r.total != null ? r.total : 55;
   return r;
 }
 
 function summarizeDims(dims) {
-  var vals = RATING_DIMS.map(function(d){ return +dims[d.key]; }).filter(function(v){ return !isNaN(v); });
+  var vals = dimsFor(state.current && state.current.channel).map(function(d){ return +dims[d.key]; }).filter(function(v){ return !isNaN(v); });
   var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 3;
   var stars = Math.min(5, Math.max(1, Math.round(avg)));
   return { stars: stars, score: Math.round(avg/5*100) };
@@ -960,7 +1790,7 @@ function summarizeDims(dims) {
 
 function collectRatingFromForm() {
   var dims = {};
-  RATING_DIMS.forEach(function(d){
+  dimsFor(state.current.channel).forEach(function(d){
     dims[d.key] = parseFloat(document.getElementById('r_'+d.key).value) || 0;
   });
   var sum = summarizeDims(dims);
@@ -970,7 +1800,7 @@ function collectRatingFromForm() {
     score: sum.score,
     checked: +document.getElementById('r_checked').value || 47,
     total: +document.getElementById('r_total').value || 55,
-    code: ratingCode(state.current.id)
+    code: ratingCode(state.current.id, state.current.channel)
   };
 }
 
@@ -993,13 +1823,14 @@ function renderEditor() {
 
   if (!isTrade) {
     var locked = rs === 'pending' || rs === 'passed';
-    var dimInputs = RATING_DIMS.map(function(d){
+    var dimsDef = dimsFor(p.channel);
+    var dimInputs = dimsDef.map(function(d){
       return '<div><label>'+d.label+'</label><input id="r_'+d.key+'" type="number" step="0.1" min="1" max="5" value="'+(rating.dims[d.key]||4)+'" '+(locked?'disabled':'')+'/></div>';
     }).join('');
-    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id));
+    var reviewLink = 'screens/p-rating-detail.html?id='+encodeURIComponent(ratingCode(p.id, p.channel));
     ratingCard =
       '<div class="card" id="ratingCard">'+
-        '<h2>好房子评级 <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
+        '<h2>'+ratingDimsTitle(p.channel)+' <span class="rating-status '+rs+'">'+RATING_STATUS[rs]+'</span></h2>'+
         '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">运营自评 → 提交中台复核 → 通过后前台详情页展示。复核入口：<a href="'+reviewLink+'" target="_blank">p-rating-review</a></p>'+
         '<div class="dim-grid">'+dimInputs+'</div>'+
         '<div class="grid" style="margin-top:12px;">'+
@@ -1014,6 +1845,37 @@ function renderEditor() {
           (rs === 'passed' ? '<a class="btn ghost" href="'+reviewLink+'" target="_blank">查看复核记录 ›</a>' : '')+
         '</div>'+
         (p.rating_note ? '<p style="font-size:11px;color:#991b1b;margin:10px 0 0;">复核意见：'+esc(p.rating_note)+'</p>' : '')+
+      '</div>';
+  }
+
+  // 按晚预订 · 入住规则与保障（写 projects.ext，规则15/16 不加列；校验口径与服务端 vendor PUT 一致）
+  var stayCard = '';
+  if (p.channel === 'rental' || p.channel === 'minsu') {
+    var ext = {};
+    try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
+    var defNights = p.channel === 'minsu' ? 1 : 15;   // 与服务端 STAY_MIN_NIGHTS_DEFAULT 一致
+    var insOn = Array.isArray(ext.insurance) ? ext.insurance : [];
+    // 与服务端 stay_config.cjs INSURANCE_TYPES 同一枚举（label/icon 单一数据源在服务端）
+    var INSURANCES = [
+      { key: 'switch_rental', icon: '🔄', label: '换租保险', desc: '租期到期换租衔接期，房租损失与搬迁费用有保障' },
+      { key: 'hotel_cancel', icon: '🏨', label: '酒店取消险', desc: '行程变更按规则取消，未入住房费可退' },
+      { key: 'property', icon: '🛡', label: '财产保险', desc: '入住期间屋内财产与房屋主体意外损坏在保' }
+    ];
+    stayCard =
+      '<div class="card" id="stayCard">'+
+        '<h2>按晚预订 · 入住规则与保障 <span class="rating-status '+(ext.stay_bookable ? 'passed' : 'draft')+'" id="p_bookable_st">'+(ext.stay_bookable ? '🟢 在线预订' : '⚪ 仅 400 电话咨询')+'</span></h2>'+
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">开通 = C 端详情展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询（缺省关闭）。逐晚房态 / 夜价在 <a href="screens/b-stay-calendar.html?project='+p.id+'" target="_blank">运营工作台 · 房态日历</a> 维护；保存后 C 端即时生效。</p>'+
+        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="p_bookable" '+(ext.stay_bookable?'checked':'')+' style="margin-top:2px;"/>'+
+          '<span><b>🟢 按晚预订（日历选房 + 在线下单）</b><br><span style="font-size:11px;color:var(--muted);">旅居 / 民宿频道可开；保租房默认不开（保持 400 咨询）</span></span></label>'+
+        '<div class="grid" style="margin-top:10px;">'+
+          '<div class="fld"><label>最短连住（晚，留空 = 频道默认 '+defNights+'）</label><input id="p_minstay" type="number" min="1" max="365" value="'+(ext.min_stay_nights||'')+'" placeholder="'+defNights+'"/></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:16px;flex-wrap:wrap;">'+
+          INSURANCES.map(function(t){
+            return '<label style="display:flex;align-items:flex-start;gap:6px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="p_ins" value="'+t.key+'" '+(insOn.indexOf(t.key)>=0?'checked':'')+' style="margin-top:2px;"/>'+
+              '<span>'+t.icon+' '+t.label+'<br><span style="font-size:10.5px;color:var(--muted);">'+t.desc+'</span></span></label>';
+          }).join('')+
+        '</div>'+
       '</div>';
   }
 
@@ -1041,6 +1903,8 @@ function renderEditor() {
         '<button class="btn danger" type="button" id="delProj">删除项目</button>'+
       '</div>'+
     '</div>'+
+    stayCard+
+    spotsCardHtml(p)+
     ratingCard+
     '<div class="card">'+
       '<h2>房源 / 户型 <span class="badge" style="background:var(--gold)">'+state.units.length+'</span></h2>'+
@@ -1062,6 +1926,14 @@ function renderEditor() {
   document.getElementById('delProj').onclick = deleteProject;
   document.getElementById('addUnit').onclick = addUnit;
   renderUnits(isTrade);
+  bindSpotsCard(p);
+  if (stayCard) {   // 开关切换即时刷新徽标
+    var bkEl = document.getElementById('p_bookable'), bkSt = document.getElementById('p_bookable_st');
+    if (bkEl && bkSt) bkEl.onchange = function(){
+      bkSt.textContent = bkEl.checked ? '🟢 在线预订' : '⚪ 仅 400 电话咨询';
+      bkSt.className = 'rating-status ' + (bkEl.checked ? 'passed' : 'draft');
+    };
+  }
 
   if (!isTrade) {
     RATING_DIMS.forEach(function(d){
@@ -1098,7 +1970,7 @@ function submitRating() {
     return api('/projects/'+state.current.id+'/rating/submit', { method:'POST' });
   }).then(function(res) {
     state.current = res.project;
-    toast('已提交中台复核 · '+ratingCode(res.project.id));
+    toast('已提交中台复核 · '+ratingCode(res.project.id, res.project.channel));
     renderEditor();
   }).catch(function(e){ toast('提交失败：'+e.message); });
 }
@@ -1408,6 +2280,23 @@ function saveProject() {
   if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
   else body.managed_unit_count = numVal('p_managed');
 
+  // 按晚预订/最短连住/保险 → projects.ext（整包替换前先合并旧 ext，避免覆盖未知键；
+  // 校验与服务端 vendor PUT /projects/:id 同口径：连住 1-365，保险仅限服务端枚举）
+  if (document.getElementById('p_bookable')) {
+    var ext = {};
+    try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
+    ext.stay_bookable = document.getElementById('p_bookable').checked;
+    var mnV = document.getElementById('p_minstay').value.trim();
+    if (mnV === '') { delete ext.min_stay_nights; }
+    else {
+      var mnN = parseInt(mnV, 10);
+      if (!(mnN >= 1 && mnN <= 365)) { toast('最短连住须为 1-365 的整数'); return; }
+      ext.min_stay_nights = mnN;
+    }
+    ext.insurance = Array.prototype.map.call(document.querySelectorAll('.p_ins:checked'), function(cb){ return cb.value; });
+    body.ext = ext;
+  }
+
   api('/projects/'+p.id, { method:'PUT', body: body }).then(function(res) {
     state.current = res.project;
     toast('项目已保存');
@@ -1542,6 +2431,15 @@ function debounce(fn, ms) {
   var t;
   return function() { clearTimeout(t); t = setTimeout(fn, ms); };
 }
+
+// 旧 token 一次性迁移：JUZHU_ADMIN_TOKEN 本就是账号中心会话，平移到共享 key，避免全体被登出
+(function migrateLegacyToken() {
+  try {
+    var old = localStorage.getItem('JUZHU_ADMIN_TOKEN');
+    if (old && !localStorage.getItem('BZF_SESSION_TOKEN')) BZF_CONSOLE.setToken(old);
+    localStorage.removeItem('JUZHU_ADMIN_TOKEN');
+  } catch (e) {}
+})();
 
 checkAuth().then(function(ok) {
   if (ok) return bootApp();

@@ -135,6 +135,17 @@ async function getOrderByRefAndVendor(conn, orderRef, vendorOid) {
   return rows[0] || null;
 }
 
+// 商家跳过 paid 回调直接推 assigned/serving/... 时，pending 单的 vendor_oid 还是 NULL，
+// 联合查询落空。此处按 order_ref + vendor_id 归属回填 vendor_oid（仅命中 NULL 行，不覆盖已有值），
+// 使后续状态推进按正常链路命中。
+async function backfillVendorOid(conn, orderRef, vendorOid, vendorId) {
+  const [ret] = await conn.execute(
+    'UPDATE gr_orders SET vendor_oid=?, updated_at=? WHERE order_ref=? AND vendor_id=? AND vendor_oid IS NULL',
+    [vendorOid, nowCst(), orderRef, vendorId]
+  );
+  return ret.affectedRows > 0;
+}
+
 function validateCallbackBody(body) {
   const orderRef = String((body && body.order_ref) || '').trim();
   const vendorOid = String((body && (body.vendor_oid || body.lailai_oid)) || '').trim();
@@ -234,6 +245,7 @@ module.exports = {
   getUserOrder,
   getOrderByRef,
   getOrderByRefAndVendor,
+  backfillVendorOid,
   validateCallbackBody,
   updateOrderCallback,
 };

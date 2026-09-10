@@ -64,6 +64,9 @@ CREATE TABLE IF NOT EXISTS projects (
   rating_submitted_at TEXT,
   rating_reviewed_at  TEXT,
   rating_note   TEXT,
+  status        VARCHAR(20) NOT NULL DEFAULT 'draft',
+  owner_vendor_id INT,
+  ext           TEXT,
   UNIQUE KEY uq_projects_channel_slug (channel, slug),
   KEY idx_projects_district (district_id, channel),
   KEY idx_projects_city (city_id),
@@ -88,6 +91,7 @@ CREATE TABLE IF NOT EXISTS units (
   rent_detail   TEXT,
   sort_order    INT NOT NULL DEFAULT 0,
   cover_image   TEXT,
+  ext           TEXT,
   UNIQUE KEY uq_units_project_slug (project_id, slug),
   KEY idx_units_project (project_id),
   CONSTRAINT fk_units_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -208,6 +212,13 @@ CREATE TABLE IF NOT EXISTS jz_vendors (
   sort_order INT DEFAULT 0,
   created_at TEXT,
   updated_at TEXT,
+  login_name VARCHAR(120),
+  password_hash VARCHAR(255),
+  review_status VARCHAR(20) NOT NULL DEFAULT 'approved',
+  review_note TEXT,
+  reviewed_at VARCHAR(32),
+  commission_housing DOUBLE DEFAULT NULL,   -- 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
+  commission_jiazheng DOUBLE DEFAULT NULL,  -- 抽佣·家政档（本期仅配置，消费在家政结算）
   KEY idx_jz_vendors_type (type, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -308,6 +319,40 @@ CREATE TABLE IF NOT EXISTS jz_sku_slots (
   CONSTRAINT fk_sku_slots_worker FOREIGN KEY (worker_id) REFERENCES jz_workers(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ===== 旅居预订订单 =====
+CREATE TABLE IF NOT EXISTS booking_orders (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  order_no VARCHAR(32) NOT NULL,
+  project_id INT NOT NULL,
+  unit_id INT,
+  channel VARCHAR(16) NOT NULL,
+  city_id INT,
+  owner_vendor_id INT NOT NULL,
+  user_id VARCHAR(64),
+  contact_name VARCHAR(64) NOT NULL,
+  contact_phone VARCHAR(32) NOT NULL,
+  checkin VARCHAR(10) NOT NULL,
+  checkout VARCHAR(10) NOT NULL,
+  nights INT NOT NULL,
+  price_total INT NOT NULL,
+  commission_rate DOUBLE DEFAULT NULL,   -- 下单锁定的商家生效费率快照（规则 20，调价不追溯）
+  commission_fee DOUBLE DEFAULT NULL,    -- 快照佣金金额（元）
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  pay_status VARCHAR(20),
+  pay_method VARCHAR(50),
+  pay_at VARCHAR(32),
+  idempotency_key VARCHAR(100),
+  payment_expires_at VARCHAR(32),
+  created_at VARCHAR(32) NOT NULL,
+  updated_at VARCHAR(32) NOT NULL,
+  UNIQUE KEY uk_order_no (order_no),
+  UNIQUE KEY uk_bo_idempotency (idempotency_key),
+  KEY idx_bo_vendor (owner_vendor_id, status),
+  KEY idx_bo_project (project_id),
+  KEY idx_bo_user (user_id),
+  KEY idx_bo_pay (pay_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ===== GR 侧预约订单（跳转第三方小程序时生成） =====
 
 CREATE TABLE IF NOT EXISTS gr_orders (
@@ -330,4 +375,120 @@ CREATE TABLE IF NOT EXISTS gr_orders (
   created_at      VARCHAR(32) NOT NULL,
   updated_at      VARCHAR(32),
   KEY idx_gr_orders_vendor (vendor_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- 账号与权限中心（阶段1，docs/account-and-auth-design.md §3.1）
+-- 运行时由 app.js ensureSchema → auth_center.ensureAuthSchema 幂等创建；
+-- 此处为同构 DDL 备份（新环境可整文件执行）。
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS orgs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_no VARCHAR(32) NOT NULL UNIQUE,
+  org_type VARCHAR(16) NOT NULL,              -- holding|operator|vendor|labor|material|training|bank|gov|platform
+  name VARCHAR(128) NOT NULL,
+  city_ids TEXT,
+  status VARCHAR(16) NOT NULL DEFAULT 'active',
+  whitelist_id INT NULL,
+  idp_issuer VARCHAR(255) NULL,               -- gov/bank 独立 IdP（阶段3 对接，字段先就位）
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  KEY idx_org_type (org_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 登录身份：人/机器共用；任意主体原生多账号（无主/子层级）
+CREATE TABLE IF NOT EXISTS accounts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_id INT NULL,
+  vendor_id INT NULL,                          -- 商家直连 jz_vendors.id
+  worker_id INT NULL,                          -- 服务者绑定 jz_workers.id（阶段2）
+  principal_type VARCHAR(8) NOT NULL DEFAULT 'user',  -- user|machine
+  login_name VARCHAR(64) NULL,
+  phone VARCHAR(32) NULL,
+  password_hash VARCHAR(200) NULL,             -- 新写 scrypt$<salt>$<hash>（≈168 字符）；存量 salt:sha256(salt:pwd) 登录时懒升级；IdP 联邦账号恒 NULL
+  api_key_hash VARCHAR(128) NULL,              -- 机器 Key 只存哈希
+  idp_type VARCHAR(16) NULL,                   -- local|oidc|saml|wechat|sms
+  idp_subject VARCHAR(128) NULL,
+  display_name VARCHAR(64),
+  status VARCHAR(16) NOT NULL DEFAULT 'active',  -- active|locked|disabled（locked 由登录防爆破自动置位/到期自动解锁）
+  failed_login_count INT NOT NULL DEFAULT 0,   -- 连续失败计数（成功登录清零）
+  locked_until VARCHAR(32) NULL,               -- ISO8601；NULL=未锁
+  last_failed_at VARCHAR(32) NULL,
+  last_login_at VARCHAR(32),
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  UNIQUE KEY uk_login_name (login_name),
+  UNIQUE KEY uk_idp (idp_type, idp_subject),
+  KEY idx_acc_vendor (vendor_id), KEY idx_acc_org (org_id), KEY idx_acc_phone (phone),
+  KEY idx_acc_apikey (api_key_hash(64)), KEY idx_acc_worker (worker_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 登录防爆破节流：ident（login_name/phone 维度，账号不存在也拦枚举）+ ip 两类桶
+CREATE TABLE IF NOT EXISTS login_throttle (
+  bucket VARCHAR(80) PRIMARY KEY,              -- sha256(kind:identifier)
+  kind VARCHAR(8) NOT NULL,                    -- ident|ip
+  fail_count INT NOT NULL DEFAULT 0,
+  window_start VARCHAR(32) NULL,
+  locked_until VARCHAR(32) NULL,
+  updated_at VARCHAR(32) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS roles (
+  role_code VARCHAR(32) PRIMARY KEY,
+  name VARCHAR(64) NOT NULL,
+  permissions TEXT NOT NULL,                   -- JSON 数组；'*'=全权
+  builtin TINYINT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS account_roles (
+  account_id INT NOT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  scope TEXT NULL,                             -- {"level":"vendor|org|city|self|all"}（5.7 TEXT 不能带 DEFAULT）
+  PRIMARY KEY (account_id, role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  jti VARCHAR(64) NOT NULL UNIQUE,
+  token_hash VARCHAR(128) NOT NULL,
+  account_id INT NOT NULL,
+  expires_at BIGINT NOT NULL,
+  revoked_at BIGINT NULL,
+  ua VARCHAR(255), ip VARCHAR(64), created_at VARCHAR(32),
+  KEY idx_sess_account (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  account_id INT NULL,
+  principal_type VARCHAR(16),
+  role_code VARCHAR(128),                      -- 多角色逗号拼接，放宽避免静默写失败
+  action VARCHAR(64) NOT NULL,
+  resource VARCHAR(128),
+  resource_id VARCHAR(64),
+  scope_level VARCHAR(16),
+  result VARCHAR(8) NULL,                      -- ok|fail（登录失败/锁定审计靠它区分）
+  before_json LONGTEXT, after_json LONGTEXT,
+  ip VARCHAR(64), ua VARCHAR(255),
+  created_at VARCHAR(32),
+  KEY idx_audit_time (id), KEY idx_audit_account (account_id, id),
+  KEY idx_audit_action (action, id), KEY idx_audit_created (created_at, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- jz_vendors 渐进迁移：回填 org_id（列已存在则忽略报错）
+-- ALTER TABLE jz_vendors ADD COLUMN org_id INT NULL;
+
+-- 账号中心 · IdP 联邦配置（阶段3，§4.6）：一组织一 IdP；client_secret 只在服务端
+CREATE TABLE IF NOT EXISTS idp_configs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  org_no VARCHAR(32) NOT NULL UNIQUE,
+  idp_type VARCHAR(16) NOT NULL DEFAULT 'oidc',
+  issuer VARCHAR(255) NOT NULL,
+  client_id VARCHAR(128) NOT NULL,
+  client_secret TEXT NULL,
+  role_code VARCHAR(32) NOT NULL,
+  scope VARCHAR(255) NOT NULL DEFAULT 'openid profile',
+  jit_enabled TINYINT NOT NULL DEFAULT 1,
+  enabled TINYINT NOT NULL DEFAULT 1,
+  created_at VARCHAR(32), updated_at VARCHAR(32),
+  KEY idx_idp_org (org_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -105,6 +105,9 @@ h1,h2,h3,h4{margin:0;}
 .lrow .pr b{color:var(--gold-deep);font-size:17px;font-family:var(--serif);}
 .lrow .pr b small{font-size:10px;color:var(--muted);font-weight:400;font-family:var(--font);}
 .lrow .pr .unit{font-size:10px;color:var(--muted);}
+/* 预订/咨询角标：开通过按晚预订 = 实心「预订」；未开通 = 琥珀「📞 咨询」（口径 2026-09-05） */
+.lrow .pr .bk{font-size:10px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:3px 10px;border-radius:999px;}
+.mcard .pr .bk.tel,.lrow .pr .bk.tel{color:#92400e;background:#fef3c7;}
 
 /* ---------- tiles grid (内容服务 / 便民) ---------- */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;padding:0 18px;}

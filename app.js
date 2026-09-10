@@ -3,6 +3,19 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
+const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
+const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
+const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
+const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
+authCenter.init({
+  query: (sql, params) => queryRows(sql, params),
+  exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
+  jsonReply,
+  expectedApiKey,
+  expectedAdminPassword,
+  isProduction,
+});
 
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
@@ -50,6 +63,8 @@ let mysql2 = null;
 try { mysql2 = require('mysql2/promise'); } catch (_) {}
 let jzSeedAll = null;
 try { jzSeedAll = require('./jz_seed.cjs').seedAll; } catch (_) {}
+let staffSeedAll = null;
+try { staffSeedAll = require('./staff_seed.cjs').seedAll; } catch (_) {}
 let housingSeedAll = null;
 let housingBackfillPhotos = null;
 let housingParseJsonField = null;
@@ -75,6 +90,9 @@ let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 let vendorApi = null;
 try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
+// 商家 HMAC-SHA256 签名（平台 → 商家方向的 urllink / order_detail 用）
+let hmacAuth = null;
+try { hmacAuth = require('./hmac_auth.cjs'); } catch (_) {}
 
 // 商家配置统一从 jz_vendors 表读取（懒加载缓存；对齐 Python jiazheng_api._load_vendor_config）
 async function getVendorConfig() {
@@ -102,7 +120,8 @@ function getDbConfig() {
     user,
     password,
     charset: 'utf8mb4',
-    collation: 'utf8mb4_general_ci',
+    // 注意：不要传 collation 连接选项——mysql2 不支持，会在每次建连时刷屏
+    // "Ignoring invalid configuration option ... collation" 警告（charset=utf8mb4 默认即该排序规则）
     connectTimeout: 8000,
     decimalNumbers: true,
   };
@@ -218,20 +237,323 @@ function verifyAdminLoginToken(token) {
   return crypto.timingSafeEqual(sigBuf, expBuf);
 }
 
-function isAdminSessionAuthorized(req) {
-  if (apiKeyMatches(providedApiKey(req), expectedApiKey())) return true;
-  return verifyAdminLoginToken(extractBearerToken(req));
+async function isAdminSessionAuthorized(req) {
+  // 凭据解析统一走账号中心（X-API-Key 或「Bearer <非会话串>」都认，见 auth_center.apiKeyOf）
+  const key = authCenter.apiKeyOf(req);
+  if (key && apiKeyMatches(key, expectedApiKey())) return true;
+  const bearer = extractBearerToken(req);
+  if (verifyAdminLoginToken(bearer)) return true; // 旧 admin token（过渡兼容）
+  const sess = await authCenter.verifySessionToken(bearer).catch(() => null);
+  return !!(sess && sess.account);
 }
 
-function requireApiKey(req, res) {
-  const expected = expectedApiKey();
+// ===== vendor（商家）会话：role=vendor，token 形如 exp.vendorId.sig =====
+function vendorTokenSecret() {
+  return (process.env.JUZHU_VENDOR_SECRET || '').trim() || expectedAdminPassword() || 'jz-vendor-dev-secret';
+}
+
+function verifyVendorLoginToken(token) {
+  const secret = vendorTokenSecret();
+  if (!token) return null;
+  const parts = String(token).split('.');
+  if (parts.length !== 3) return null;
+  const exp = parseInt(parts[0], 10);
+  const vid = parseInt(parts[1], 10);
+  if (!exp || !vid || Date.now() / 1000 > exp) return null;
+  const expectedSig = crypto.createHmac('sha256', secret).update(`${parts[0]}.${parts[1]}`).digest('hex');
+  const sigBuf = Buffer.from(parts[2] || '', 'hex');
+  const expBuf = Buffer.from(expectedSig, 'hex');
+  if (sigBuf.length !== expBuf.length) return false;
+  if (!crypto.timingSafeEqual(sigBuf, expBuf)) return null;
+  return { role: 'vendor', vendorId: vid };
+}
+
+// 统一会话：vendor token 最先判定（token 自证，纯函数无共享状态，杜绝被误判为 platform），
+// 其次账号中心主体，再次 admin 会话/全局 Key（过渡）
+async function requestSession(req) {
+  const vtok = verifyVendorLoginToken(extractBearerToken(req));
+  if (vtok) return vtok;
+  try {
+    const principal = await authCenter.principalOf(req);
+    if (principal && principal.type === 'account') {
+      const perms = authCenter.permissionsOf(principal);
+      // 真平台主体：'*' 全权，或（无商家/机构绑定的）平台管理读账号。
+      // 有 vendor_id 的账号即使带 admin.read（如 operator_admin）也按 vendor 归属隔离，
+      // 防止运营商账号借管理读权限看到全部项目。
+      const isTruePlatform = perms.has('*') ||
+        (perms.has(authCenter.P.ADMIN_READ) && !principal.account.vendor_id && !principal.account.org_id);
+      if (isTruePlatform) {
+        return { role: 'platform', account: principal.account, roles: principal.roles, principal };
+      }
+      if (principal.account.vendor_id) {
+        return { role: 'vendor', vendorId: principal.account.vendor_id, account: principal.account, roles: principal.roles, principal };
+      }
+      // 其余账号角色（user 租客等）→ 登录用户
+      return { role: 'user', account: principal.account, roles: principal.roles, principal };
+      if (perms.has(authCenter.P.ADMIN_READ)) {
+        // 有机构绑定的管理读账号（gov/bank/holding 等）：读按平台，写仍由权限闸收紧
+        return { role: 'platform', account: principal.account, roles: principal.roles, principal };
+      }
+    }
+  } catch (_) { /* 账号库暂不可用时退回旧通道 */ }
+  // 兜底仅限旧式 admin token（账号中心之前的会话）。
+  // 不能用 isAdminSessionAuthorized：它接受一切合法账号会话，会把 gov_viewer 等
+  // 非平台账号在这里升格成 platform（越权看全量）——账号主体已在上方按角色判定。
+  if (verifyAdminLoginToken(extractBearerToken(req))) return { role: 'platform' };
+  return null;
+}
+
+// 评级口径（维度键 + 评级编号前缀）按 channel 定义
+const RATING_DIMS = {
+  rental: ['comfort', 'green', 'tech', 'safety'], // 好房子 4 维
+  minsu: ['scenery', 'facilities', 'service', 'location', 'culture'], // 彩贝 5 维
+};
+const RATING_CODE_PREFIX = { rental: 'SY-RENT', minsu: 'MZ' };
+
+// C 端涉写三路径（下单/支付/评价）——旧全局 key 的最后一处过渡放行，
+// 收紧由 settings.require_c_login 开关控制（requireCEndWrite）
+const C_WRITE_PATH_RE = /^\/api\/juzhu\/jiazheng\/orders(\/[^/]+\/(pay|rate))?$/;
+
+async function requireApiKey(req, res, urlPath) {
+  // 通道1（唯一）：账号中心（Bearer 会话 或 机器账号 API Key）。
+  // 旧全局 JUZHU_API_KEY 已全面停用——管理面一律拒绝；仅 C 端涉写三路径过渡期保留。
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    req.principal = principal;
+    return true;
+  }
   const provided = providedApiKey(req);
-  if (apiKeyMatches(provided, expected)) return true;
+  if (provided && apiKeyMatches(provided, expectedApiKey())
+      && req.method === 'POST' && urlPath && C_WRITE_PATH_RE.test(urlPath.replace(/\/+$/, ''))) {
+    req.principal = { type: 'legacy' };
+    return true;
+  }
   jsonReply(res, {
     error: 'unauthorized',
-    message: `请通过 Authorization: Bearer <${API_KEY_ENV}> 或 X-API-Key 传入有效 API Key`,
+    message: '请先用账号登录（POST /api/auth/login → Authorization: Bearer <token>）；机器对接用机器账号 API Key',
   }, 401);
   return false;
+}
+
+async function settingValue(key) {
+  try {
+    const rows = await queryRows('SELECT value FROM settings WHERE `key`=? LIMIT 1', [key]);
+    return rows.length ? String(rows[0].value == null ? '' : rows[0].value) : '';
+  } catch (_) { return ''; }
+}
+
+/**
+ * C 端涉写闸（下单/支付/评价）：
+ * - 账号主体且具备 perm（或 '*'）→ 通过
+ * - settings.require_c_login=1（试点收紧开关）→ 其余凭据（匿名/旧 key）一律 401
+ * - 默认 off → 保持既有演示行为不破坏
+ */
+async function requireCEndWrite(req, res, perm) {
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account' && authCenter.hasPermission(principal, perm)) {
+    req.principal = principal;
+    return true;
+  }
+  if ((await settingValue('require_c_login')) === '1') {
+    jsonReply(res, { error: 'unauthorized', message: '涉写操作须登录本人账号（POST /api/auth/login）' }, 401);
+    return false;
+  }
+  req.principal = principal; // off：保持现状（可能为 legacy/匿名）
+  return true;
+}
+
+/** 运营动作闸（派单/推进）：平台主体或具备 order.dispatch 的账号；worker 等其他账号 403 */
+async function requireDispatchPerm(req, res) {
+  const principal = (req.principal && req.principal.type === 'account')
+    ? req.principal
+    : await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    if (authCenter.hasPermission(principal, 'order.dispatch') || authCenter.hasPermission(principal, '*')) {
+      req.principal = principal;
+      return true;
+    }
+    jsonReply(res, { error: 'forbidden', message: '当前账号无派单/推进权限（order.dispatch）' }, 403);
+    return false;
+  }
+  if (principal && principal.type === 'legacy') {
+    jsonReply(res, { error: 'forbidden', message: '旧 API Key 已停用：派单请用运营账号登录（POST /api/auth/login）' }, 403);
+    return false;
+  }
+  jsonReply(res, { error: 'unauthorized', message: '须管理凭证（运营账号会话或机器账号 Key）' }, 401);
+  return false;
+}
+
+/** 工单读取闸：非管理账号（如 worker）只见本人；无 worker 绑定即 403 */
+async function restrictOrdersRead(req, res) {
+  const principal = req.principal;
+  if (principal && principal.type === 'account' &&
+      !authCenter.hasPermission(principal, '*') && !authCenter.hasPermission(principal, authCenter.P.ADMIN_READ)) {
+    if (!principal.account.worker_id) {
+      jsonReply(res, { error: 'forbidden', message: '当前账号无工单列表读取权限' }, 403);
+      return null;
+    }
+    return String(principal.account.worker_id); // worker 只见派给自己的
+  }
+  return undefined; // 平台/legacy → 不限
+}
+
+/** 账号主体的运营写动作 → audit_log（legacy/匿名不记） */
+async function auditIfAccount(req, action, resource, resourceId, after) {
+  const p = req.principal;
+  if (p && p.type === 'account') {
+    await authCenter.audit({
+      accountId: p.account.id, principalType: 'account', roles: p.roles,
+      action, resource, resourceId, scopeLevel: authCenter.bestScopeLevel(p),
+      after, ip: p.ip, ua: p.ua,
+    });
+  }
+}
+
+/** 通用权限闸：账号 + 指定权限（admin 域入口闸与运营写面统一走这里；legacy key 一律 403）
+ *  过渡开关 settings.perm_strict != '1' 时，持有旧 admin.write 的账号仍放行（不断崖）；
+ *  B7 翻 '1' 后按 perm_registry 权限点严格收口。 */
+let _permStrictCache = { v: '0', at: 0 };
+async function permStrictMode() {
+  if (Date.now() - _permStrictCache.at > 10000) {
+    _permStrictCache = { v: (await settingValue('perm_strict')) || '0', at: Date.now() };
+  }
+  return _permStrictCache.v;
+}
+
+async function requireAnyPerm(req, res, perms, label) {
+  const principal = (req.principal && req.principal.type === 'account')
+    ? req.principal
+    : await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    let ok = (perms || []).some((p) => authCenter.hasPermission(principal, p)) || authCenter.hasPermission(principal, '*');
+    if (!ok && (await permStrictMode()) !== '1' && authCenter.hasPermission(principal, authCenter.P.ADMIN_WRITE)) ok = true;
+    if (ok) {
+      req.principal = principal;
+      return true;
+    }
+    jsonReply(res, { error: 'forbidden', message: '当前账号无' + label + '权限（' + (perms || []).join('/') + '）' }, 403);
+    return false;
+  }
+  if (principal && principal.type === 'legacy') {
+    jsonReply(res, { error: 'forbidden', message: '旧 API Key 已停用：请用运营账号登录（POST /api/auth/login）' }, 403);
+    return false;
+  }
+  jsonReply(res, { error: 'unauthorized', message: '须运营凭证（账号会话或机器账号 Key）' }, 401);
+  return false;
+}
+
+/** 通用权限闸：账号 + 指定权限（admin 域入口闸与运营写面统一走这里；legacy key 一律 403）
+ *  过渡开关 settings.perm_strict != '1' 时，持有旧 admin.write 的账号仍放行（不断崖）；
+ *  B7 翻 '1' 后按 perm_registry 权限点严格收口。 */
+async function requirePerm(req, res, perm, label) {
+  return requireAnyPerm(req, res, [perm], label);
+}
+
+/**
+ * 评级提交闸（POST /admin/projects/:id/rating/submit，原 isAdminAuthExempt 裸豁免收口）：
+ * - 账号中心主体：须 rating.write（商家自报）/ house.write（运营商录入）/ rating.review / '*'；
+ *   vendor 绑定账号的归属（owner_vendor_id）由处理器内既有校验兜底。
+ * - 旧 vendor 会话 / 旧平台凭据：维持处理器内 requestSession + requireApiKey 双通道把关（行为不变）。
+ */
+async function guardRatingSubmit(req, res) {
+  const principal = await authCenter.principalOf(req).catch(() => null);
+  if (principal && principal.type === 'account') {
+    const perms = authCenter.permissionsOf(principal);
+    const ok = perms.has('*') || perms.has('rating.write') || perms.has('house.write') || perms.has('rating.review') ||
+      ((await permStrictMode()) !== '1' && perms.has(authCenter.P.ADMIN_WRITE));
+    if (!ok) {
+      jsonReply(res, { error: 'forbidden', message: '当前账号无评级提交权限（rating.write / house.write）' }, 403);
+      return false;
+    }
+    req.principal = principal;
+    return true;
+  }
+  // 旧通道凭据（vendor token / 旧 admin token / 全局 Key）→ 放行到处理器内 owner_vendor_id 归属把关；
+  // 真匿名在此 401，避免泄漏「项目是否存在」
+  const bearer = extractBearerToken(req);
+  const legacyCred = verifyVendorLoginToken(bearer) || verifyAdminLoginToken(bearer) ||
+    apiKeyMatches(providedApiKey(req), expectedApiKey());
+  if (!legacyCred) {
+    jsonReply(res, { error: 'unauthorized', message: '评级提交须登录（POST /api/auth/login）' }, 401);
+    return false;
+  }
+  return true;
+}
+
+// ===== 运营商员工花名册（operator_staff）字段校验与工号生成 =====
+const STAFF_LEVELS = ['L1', 'L2', 'L3', 'L4'];
+const STAFF_STATUS = ['active', 'observe', 'train', 'leave', 'off'];
+
+/** 校验花名册字段；partial=true 时只取 body 里出现的键（PUT 部分更新） */
+function validateStaff(body, opts) {
+  const partial = !!(opts && opts.partial);
+  const b = body || {};
+  const has = (k) => Object.prototype.hasOwnProperty.call(b, k);
+  const out = {};
+  if (has('name') || !partial) {
+    const name = String(b.name || '').trim();
+    if (!name) return { error: '姓名必填' };
+    if (name.length > 100) return { error: '姓名过长（≤100 字）' };
+    out.name = name;
+  }
+  if (has('emp_no')) {
+    const v = String(b.emp_no || '').trim();
+    if (v.length > 30) return { error: '工号过长（≤30 字符）' };
+    out.emp_no = v || null;
+  }
+  if (has('phone') || !partial) {
+    const v = String(b.phone || '').trim();
+    if (v && !/^\d{11}$/.test(v)) return { error: '手机号须为 11 位数字' };
+    out.phone = v || null;
+  }
+  if (has('level') || !partial) {
+    const v = String(b.level || 'L2');
+    if (!STAFF_LEVELS.includes(v)) return { error: '等级仅支持 L1-L4' };
+    out.level = v;
+  }
+  if (has('role') || !partial) out.role = String(b.role || '').trim() || null;
+  if (has('station') || !partial) out.station = String(b.station || '').trim() || null;
+  if (has('month_orders') || !partial) {
+    const raw = b.month_orders;
+    const n = (raw === undefined || raw === null || raw === '') ? 0 : parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 9999) return { error: '本月单量须为 0-9999 整数' };
+    out.month_orders = n;
+  }
+  if (has('rating') || !partial) {
+    const raw = b.rating;
+    const r = (raw === undefined || raw === null || raw === '') ? 0 : Number(raw);
+    if (!Number.isFinite(r) || r < 0 || r > 5) return { error: '客评须为 0-5' };
+    out.rating = r;
+  }
+  if (has('contract_type') || !partial) {
+    const v = String(b.contract_type || '正式');
+    if (!['正式', '试用'].includes(v)) return { error: '合同类型仅支持 正式/试用' };
+    out.contract_type = v;
+  }
+  if (has('contract_end') || !partial) {
+    const v = b.contract_end ? String(b.contract_end).trim() : '';
+    if (v && !/^\d{4}-\d{2}$/.test(v)) return { error: '合同到期格式须为 YYYY-MM' };
+    out.contract_end = v || null;
+  }
+  if (has('status') || !partial) {
+    const v = String(b.status || 'active');
+    if (!STAFF_STATUS.includes(v)) return { error: '状态枚举非法' };
+    out.status = v;
+  }
+  if (has('can_extra') || !partial) out.can_extra = b.can_extra ? 1 : 0;
+  if (has('note') || !partial) out.note = String(b.note || '').trim() || null;
+  return { row: out };
+}
+
+/** 按当前年段生成 EMP-YYYY-NNNN（取该年段最大序号 +1；撞号由调用方重试） */
+async function nextEmpNo(conn) {
+  const prefix = 'EMP-' + new Date().getFullYear() + '-';
+  const [rows] = await conn.execute(
+    'SELECT COALESCE(MAX(CAST(RIGHT(emp_no, 4) AS UNSIGNED)), 0) AS m FROM operator_staff WHERE emp_no LIKE ?',
+    [prefix + '%']
+  );
+  const base = (rows[0] && rows[0].m) || 0;
+  return prefix + String(base + 1).padStart(4, '0');
 }
 
 const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url'];
@@ -249,7 +571,7 @@ function stripVendorSecrets(obj) {
 function isVendorHmacPath(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || '').toUpperCase();
-  return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/'));
+  return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/') || p.startsWith('/api/juzhu/housing/vendor/'));
 }
 
 /**
@@ -259,7 +581,12 @@ function isVendorHmacPath(urlPath, method) {
 function isCEndPublicApi(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
+  if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
+  if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
+  // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
+  if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
+  if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
   if (m !== 'GET') return false;
   const exact = new Set([
     '/api/juzhu/catalog',
@@ -273,10 +600,17 @@ function isCEndPublicApi(urlPath, method) {
     '/api/juzhu/jiazheng/skus',
     '/api/juzhu/jiazheng/workers',
     '/api/juzhu/gr/orders',
+    '/api/juzhu/routes',
+    '/api/juzhu/spots',
+    '/api/juzhu/topics',
   ]);
   if (exact.has(p)) return true;
   if (/^\/api\/juzhu\/districts\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/spots\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/routes\/\d+$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/\d+\/stay-calendar$/.test(p)) return true;
+  if (/^\/api\/juzhu\/projects\/[^/]+\/units$/.test(p)) return true;
   if (/^\/api\/juzhu\/projects\/\d+\/virtual-phone$/.test(p)) return true;
   if (/^\/api\/juzhu\/units\/\d+$/.test(p)) return true;
   if (/^\/api\/juzhu\/units\/\d+\/photos$/.test(p)) return true;
@@ -288,27 +622,43 @@ function isCEndPublicApi(urlPath, method) {
   return false;
 }
 
-function assertApiAuthorized(urlPath, req, res) {
+async function assertApiAuthorized(urlPath, req, res) {
   if (isAdminAuthExempt(urlPath, req.method)) return true;
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (p.startsWith(ADMIN_PREFIX)) return true;
+  if (p.startsWith('/api/juzhu/vendor')) {
+    if (p === '/api/juzhu/vendor/login' && req.method === 'POST') return true;
+    // 无任何凭据 → 直接 401（不进会话判定链，杜绝匿名被兜底成主体）
+    const hasCred = String((req.headers && req.headers.authorization) || '').trim()
+      || String((req.headers && (req.headers['x-api-key'] || req.headers['X-API-Key'])) || '').trim();
+    if (!hasCred) {
+      jsonReply(res, { error: 'unauthorized', message: '商家请先 POST /api/juzhu/vendor/login 或 /api/auth/login 获取 token' }, 401);
+      return false;
+    }
+    if (await requestSession(req)) return true;
+    jsonReply(res, { error: 'unauthorized', message: '商家凭据无效或已过期，请重新 POST /api/juzhu/vendor/login' }, 401);
+    return false;
+  }
   if (isVendorHmacPath(urlPath, req.method)) return true;
   if (isCEndPublicApi(urlPath, req.method)) return true;
-  return requireApiKey(req, res);
+  return requireApiKey(req, res, urlPath);
 }
 
 function isAdminAuthExempt(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (p === `${ADMIN_PREFIX}/auth/login` && method === 'POST') return true;
   if (p === `${ADMIN_PREFIX}/auth/check` && method === 'GET') return true;
+  // 商家提交自己项目评级：认证层放行旧 vendor 会话（vendor token 不在 isAdminSessionAuthorized 内），
+  // 权限层由 perm_registry 路由的 guard:'ratingSubmit'（guardRatingSubmit）+ 处理器内 owner_vendor_id 把关
+  if (method === 'POST' && /^\/api\/juzhu\/admin\/projects\/\d+\/rating\/submit$/.test(p)) return true;
   return false;
 }
 
-function assertAdminAuthorized(urlPath, req, res) {
+async function assertAdminAuthorized(urlPath, req, res) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   if (!p.startsWith(ADMIN_PREFIX)) return true;
   if (isAdminAuthExempt(p, req.method)) return true;
-  if (isAdminSessionAuthorized(req)) return true;
+  if (await isAdminSessionAuthorized(req)) return true;
   jsonReply(res, {
     error: 'unauthorized',
     message: '请先登录，或通过 X-API-Key / Authorization Bearer 传入有效 API Key',
@@ -344,6 +694,175 @@ function stripContactPhone(row) {
   return out;
 }
 
+// ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源：stay_config.cjs =====
+// 会话态接口（app.js）与商家 HMAC 开放接口（vendor_api.cjs）共用同一份口径
+const stayCfg = require('./stay_config.cjs');
+const vendorRate = require('./vendor_rate.cjs'); // 商家佣金费率（按业务线分档）单一数据源：vendor_rate.cjs
+const INSURANCE_TYPES = stayCfg.INSURANCE_TYPES;
+const INSURANCE_KEYS = stayCfg.INSURANCE_KEYS;
+const STAY_MIN_NIGHTS_DEFAULT = stayCfg.STAY_MIN_NIGHTS_DEFAULT;
+const STAY_STATUS = stayCfg.STAY_STATUS;
+const parseExtObj = stayCfg.parseExtObj;
+const insuranceOf = stayCfg.insuranceOf;
+const minStayNightsOf = stayCfg.minStayNightsOf;
+const bookableOf = stayCfg.bookableOf;
+const unitNightPrice = stayCfg.unitNightPrice;
+const stayConfigOf = stayCfg.stayConfigOf;
+const cancelPolicyOf = stayCfg.cancelPolicyOf;
+const cancelPolicyTextOf = stayCfg.cancelPolicyTextOf;
+const withCancelPolicy = stayCfg.withCancelPolicy;
+const orderCancelInfoOf = stayCfg.orderCancelInfoOf;
+const normalizeCancelPolicyInput = stayCfg.normalizeCancelPolicyInput;
+const stayDateList = stayCfg.stayDateList;
+/** 取消政策取数：有 unit 用该房型；整栋单（unit_id 空）按项目首个房型（sort_order 最小）政策执行，无房型从严。
+ *  fetchRows(sql, params) → rows，由调用方注入（conn 事务内 / queryRows 连接池）。 */
+async function cancelUnitRowFor(fetchRows, unitId, projectId) {
+  if (unitId) {
+    const rows = await fetchRows('SELECT id, ext FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    return rows[0] || null;
+  }
+  const rows = await fetchRows('SELECT id, ext FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [projectId]);
+  return rows[0] || null;
+}
+const MIN_PUBLISH_PHOTOS = 8;
+
+function parseExtSafe(value) {
+  if (value == null || value === '') return {};
+  if (typeof value === 'object') return value;
+  try { const v = JSON.parse(value); return v && typeof v === 'object' ? v : {}; } catch (_) { return {}; }
+}
+
+async function projectPublishEligibility(conn, projectId, vendorId) {
+  const [rows] = await conn.execute(
+    `SELECT p.*, v.status AS vendor_status, v.review_status AS vendor_review_status
+       FROM projects p LEFT JOIN jz_vendors v ON v.id=p.owner_vendor_id WHERE p.id=?`, [projectId]);
+  if (!rows.length) return { ok: false, error: '房源不存在', status: 404 };
+  const p = rows[0];
+  if (vendorId != null && Number(p.owner_vendor_id) !== Number(vendorId)) return { ok: false, error: '无权操作该房源', status: 403 };
+  if (!p.owner_vendor_id || p.vendor_status !== 'active' || (p.vendor_review_status && p.vendor_review_status !== 'approved')) {
+    return { ok: false, error: '商家尚未通过审核或已停用', status: 400 };
+  }
+  if (p.rating_status !== 'passed') return { ok: false, error: '房源审核/评级未通过，不能上架', status: 400 };
+  if (!p.price_from || p.price_from <= 0) return { ok: false, error: '上架前须设置 price_from（起价，元）', status: 400 };
+  const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [p.id]);
+  if (!u[0] || !Number(u[0].c)) return { ok: false, error: '上架前须至少创建 1 个户型（units/create）', status: 400 };
+  const [ph] = await conn.execute(
+    `SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
+       WHERE (entity_type='project' AND entity_id=?)
+          OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [p.id, p.id]);
+  if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) {
+    return { ok: false, error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`, status: 400 };
+  }
+  if (!p.cover_image && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
+  return { ok: true, project: p, ext: parseExtSafe(p.ext) };
+}
+
+function bookingPaymentExpired(row) {
+  return row && row.status === 'pending' && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
+    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
+}
+
+async function expireBooking(conn, row) {
+  if (!bookingPaymentExpired(row)) return false;
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const [updated] = await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending' AND pay_status='unpaid'", [now, row.id]);
+  if (!updated.affectedRows) return false;
+  await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+  return true;
+}
+
+async function cleanupExpiredBookingOrders() {
+  let conn;
+  try {
+    conn = await getPool().getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.execute(
+      `SELECT * FROM booking_orders
+         WHERE channel='minsu' AND status='pending' AND pay_status='unpaid'
+           AND payment_expires_at IS NOT NULL AND payment_expires_at <= UTC_TIMESTAMP()
+         ORDER BY id LIMIT 100 FOR UPDATE`);
+    if (!rows.length) { await conn.commit(); return; }
+    for (const row of rows) await expireBooking(conn, row);
+    await conn.commit();
+  } catch (e) {
+    if (conn) { try { await conn.rollback(); } catch (_) {} }
+    if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(e && e.code)) console.warn('cleanupExpiredBookingOrders:', e.message);
+  } finally { if (conn) conn.release(); }
+}
+
+// ===== 商家 Webhook 推送（平台 → 商家，HMAC 签名与开放接口同算法）=====
+// 事件：booking.created / booking.paid / booking.cancelled。只通知不担保必达：
+// 重试 3 次（5s/30s/120s）仍失败即放弃，商家以 bookings/list 拉取对账兜底。
+const WEBHOOK_RETRY_DELAYS = [5000, 30000, 120000];
+
+function webhookSign(secretKey, payload, timestamp) {
+  const hmacAuth = require('./hmac_auth.cjs');
+  const flat = hmacAuth.flattenAndFilter(payload);
+  flat.timestamp = String(timestamp);
+  return require('crypto').createHmac('sha256', secretKey)
+    .update(hmacAuth.buildStringToSign(flat), 'utf8').digest('hex');
+}
+
+async function deliverWebhook(vendor, event, data, attempt) {
+  const n = attempt || 0;
+  let res = null;
+  try {
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 5000);
+    res = await fetch(vendor.webhook_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      signal: ac.signal,
+    }).finally(() => clearTimeout(timer));
+  } catch (_) { res = null; }
+  if (res && res.ok) {
+    console.log('[webhook] delivered', event, 'vendor#' + data.vendor_id, 'attempt', n + 1);
+    return;
+  }
+  if (n < WEBHOOK_RETRY_DELAYS.length) {
+    setTimeout(() => {
+      deliverWebhook(vendor, event, data, n + 1).catch(() => {});
+    }, WEBHOOK_RETRY_DELAYS[n]);
+  } else {
+    console.warn('[webhook] give up', event, 'vendor#' + data.vendor_id, 'after', n + 1, 'attempts');
+  }
+}
+
+/** 下发商家 webhook：签名体 = 事件 + 订单数据（不含 sign），同开放接口算法 */
+function notifyVendorBooking(vendorId, event, order) {
+  (async () => {
+    // 推送前直读商家行（不走 getVendorConfig 进程缓存）：webhook_url 配置即时生效
+    const conn = await mysql2.createConnection(getDbConfig());
+    let v = null;
+    try {
+      const [rows] = await conn.execute('SELECT id, hmac_key, webhook_url FROM jz_vendors WHERE id=?', [vendorId]);
+      v = rows[0] || null;
+    } finally { await conn.end(); }
+    if (!v || !v.webhook_url || !v.hmac_key) return;   // 未配置 = 不推送
+    const ts = Date.now();
+    const payload = { event, vendor_id: vendorId, order };
+    const body = {
+      event,
+      vendor_id: vendorId,
+      order,
+      timestamp: ts,
+      sign: webhookSign(v.hmac_key, payload, ts),
+    };
+    deliverWebhook(v, event, body, 0).catch(() => {});
+  })().catch((e) => console.warn('[webhook] notify error:', e.message));
+}
+
+/** 组装某月房态日历（规则见 stay_config.buildStayMonth；行读取走连接池） */
+function buildStayMonth(proj, unit, unitId, y, mo) {
+  return stayCfg.buildStayMonth(queryRows, proj, unit, unitId, y, mo);
+}
+
+module.exports.stayConfigOf = stayConfigOf;
+module.exports.unitNightPrice = unitNightPrice;
+module.exports.stayDateList = stayDateList;
+module.exports.INSURANCE_TYPES = INSURANCE_TYPES;
+
 module.exports.isPublicStatic = isPublicStatic;
 module.exports.isProduction = isProduction;
 module.exports.expectedApiKey = expectedApiKey;
@@ -376,12 +895,34 @@ function getPool() {
   return _pool;
 }
 
+/** 连接类错误（连接池半开/被远端关闭/短暂不可达）→ 换连接重试一次；业务错误不重试 */
+const DB_RETRYABLE = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR'];
+async function withDbRetry(fn) {
+  try {
+    return await fn();
+  } catch (e) {
+    const code = e && (e.code || e.errno);
+    const fatal = e && e.fatal === true;
+    if (!DB_RETRYABLE.includes(code) && !fatal) throw e;
+    await new Promise((r) => setTimeout(r, 250));
+    return fn();
+  }
+}
+
 async function queryRows(sql, params) {
-  const [rows] = await getPool().execute(sql, params || []);
-  return rows;
+  return withDbRetry(async () => {
+    const [rows] = await getPool().execute(sql, params || []);
+    return rows;
+  });
 }
 
 const CATALOG_TTL_MS = 15000;
+// 专题（topic_*）上下架/删除后立即失效 topic 缓存，不让 C 端在 TTL 窗口内看到已下架专题
+function catalogMemoInvalidateTopics() {
+  for (const key of Array.from(catalogMemo.keys())) {
+    if (key.includes('|t=')) catalogMemo.delete(key);
+  }
+}
 const catalogMemo = new Map();
 function catalogMemoGet(key) {
   const hit = catalogMemo.get(key);
@@ -613,6 +1154,12 @@ function maskPhone(phone) {
   return '匿名用户';
 }
 
+// 标准打码：138****1234（预订响应/列表一律用它，规则10：完整手机号只入库不回显）
+function maskPhoneStd(phone) {
+  const s = String(phone || '').trim();
+  return /^\d{11}$/.test(s) ? s.slice(0, 3) + '****' + s.slice(7) : s.slice(0, 3) + '****';
+}
+
 function reviewReply(vendorName, score) {
   if (score >= 5) return (vendorName || '商家') + '：感谢认可，我们会继续按认证标准完成每次上门服务。';
   if (score >= 4) return (vendorName || '商家') + '：感谢反馈，我们会继续优化服务细节与响应体验。';
@@ -698,6 +1245,54 @@ async function ensureSchemaRun() {
         bg_class VARCHAR(50),
         UNIQUE KEY uk_city_slug (city_id, slug)
       ) CHARSET=utf8mb4`,
+      // 周边玩法维度（规则 17）：商圈/景区字典 + 项目绑定。city_id NULL = 全省通用（跨市目的地）；
+      // slug 全局唯一（uk_spot_slug），是 C 端深链词汇（lvju-app-spot-detail.html?spot=）。
+      `CREATE TABLE IF NOT EXISTS spots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        city_id INT NULL,
+        type VARCHAR(20) NOT NULL DEFAULT 'scenic',
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) NOT NULL,
+        icon VARCHAR(16),
+        cover_image VARCHAR(500),
+        summary TEXT,
+        body TEXT,
+        photos TEXT,
+        address VARCHAR(200),
+        duration VARCHAR(40),
+        ticket VARCHAR(40),
+        tags TEXT,
+        link VARCHAR(500),
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        UNIQUE KEY uk_spot_slug (slug),
+        KEY idx_spot_city (city_id, type, sort_order)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS project_spots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        project_id INT NOT NULL,
+        spot_id INT NOT NULL,
+        note VARCHAR(120),
+        sort_order INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uk_proj_spot (project_id, spot_id),
+        KEY idx_ps_spot (spot_id)
+      ) CHARSET=utf8mb4`,
+      // 内容编排（旅游路线）：spots 的有序串联。stops 为 JSON [{spot_id, note}]，站点内容仍在 spots
+      // 单一数据源里（规则 17）；city_id NULL = 全省通用，与 spots 同口径。
+      `CREATE TABLE IF NOT EXISTS routes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        city_id INT NULL,
+        slug VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        summary TEXT,
+        cover_image VARCHAR(500),
+        days INT NOT NULL DEFAULT 1,
+        stops TEXT,
+        sort_order INT NOT NULL DEFAULT 0,
+        enabled TINYINT NOT NULL DEFAULT 1,
+        UNIQUE KEY uk_route_slug (slug),
+        KEY idx_route_city (city_id, sort_order)
+      ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS projects (
         id INT AUTO_INCREMENT PRIMARY KEY,
         city_id INT NOT NULL,
@@ -720,6 +1315,9 @@ async function ensureSchemaRun() {
         rating_submitted_at VARCHAR(30),
         rating_reviewed_at VARCHAR(30),
         rating_note TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        owner_vendor_id INT,
+        ext TEXT,
         UNIQUE KEY uk_channel_slug (channel, slug)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS units (
@@ -739,7 +1337,62 @@ async function ensureSchemaRun() {
         rent_detail TEXT,
         sort_order INT NOT NULL DEFAULT 0,
         cover_image VARCHAR(500),
+        ext TEXT,
         UNIQUE KEY uk_project_slug (project_id, slug)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS booking_contacts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id VARCHAR(64) NOT NULL,
+        name VARCHAR(64) NOT NULL,
+        phone VARCHAR(32) NOT NULL,
+        created_at VARCHAR(32) NOT NULL,
+        KEY idx_bc_user (user_id),
+        UNIQUE KEY uk_bc_user_phone (user_id, phone)
+      ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS booking_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_no VARCHAR(32) NOT NULL,
+        project_id INT NOT NULL,
+        unit_id INT,
+        channel VARCHAR(16) NOT NULL,
+        city_id INT,
+        owner_vendor_id INT NOT NULL,
+        user_id VARCHAR(64),
+        contact_name VARCHAR(64) NOT NULL,
+        contact_phone VARCHAR(32) NOT NULL,
+        checkin VARCHAR(10) NOT NULL,
+        checkout VARCHAR(10) NOT NULL,
+        nights INT NOT NULL,
+        price_total INT NOT NULL,
+        commission_rate DECIMAL(5,2),
+        commission_fee DECIMAL(10,2),
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        pay_status VARCHAR(20),
+        pay_method VARCHAR(50),
+        pay_at VARCHAR(30),
+        idempotency_key VARCHAR(100),
+        payment_expires_at VARCHAR(32),
+        created_at VARCHAR(32) NOT NULL,
+        updated_at VARCHAR(32) NOT NULL,
+        UNIQUE KEY uk_order_no (order_no),
+        KEY idx_bo_vendor (owner_vendor_id, status),
+        KEY idx_bo_project (project_id),
+        KEY idx_bo_user (user_id)
+        ,UNIQUE KEY uk_bo_idempotency (idempotency_key)
+      ) CHARSET=utf8mb4`,
+      // 房态日历：只存差异行（关房/已订/夜价覆盖），无行 = 可订；unit_id=0 为项目级（整栋/不限房型）
+      `CREATE TABLE IF NOT EXISTS stay_calendar (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        project_id INT NOT NULL,
+        unit_id INT NOT NULL DEFAULT 0,
+        stay_date VARCHAR(10) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'open',
+        price_night INT,
+        source VARCHAR(16) NOT NULL DEFAULT 'vendor',
+        booking_id INT,
+        updated_at VARCHAR(32),
+        UNIQUE KEY uk_sc (project_id, unit_id, stay_date),
+        KEY idx_sc_range (project_id, stay_date)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS photos (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -806,6 +1459,13 @@ async function ensureSchemaRun() {
         sort_order INT DEFAULT 0,
         created_at VARCHAR(30),
         updated_at VARCHAR(30)
+        ,login_name VARCHAR(120)
+        ,password_hash VARCHAR(255)
+        ,review_status VARCHAR(20) NOT NULL DEFAULT 'approved'
+        ,review_note TEXT
+        ,reviewed_at VARCHAR(30)
+        ,commission_housing DECIMAL(5,2) DEFAULT NULL
+        ,commission_jiazheng DECIMAL(5,2) DEFAULT NULL
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS jz_products (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -938,6 +1598,56 @@ async function ensureSchemaRun() {
         KEY idx_gr_orders_vendor (vendor_id),
         KEY idx_gr_orders_user (user_id)
       ) CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS operator_staff (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        emp_no VARCHAR(30) NULL,
+        name VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) NULL,
+        level VARCHAR(10) DEFAULT 'L2',
+        \`role\` VARCHAR(50) NULL,
+        station VARCHAR(100) NULL,
+        month_orders INT DEFAULT 0,
+        rating DECIMAL(3,2) DEFAULT 0,
+        contract_type VARCHAR(10) DEFAULT '正式',
+        contract_end VARCHAR(10) NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        can_extra TINYINT DEFAULT 0,
+        note VARCHAR(200) NULL,
+        org_id INT NULL,                       -- 归属机构（scope 行级过滤用；NULL=平台级，全员可见）
+        vendor_id INT NULL,                    -- 归属运营商（同上）
+        created_at VARCHAR(30),
+        updated_at VARCHAR(30),
+        UNIQUE KEY uk_staff_emp_no (emp_no)
+      ) CHARSET=utf8mb4`,
+      // 商家入驻申请单（服务认证中台受理；真实流程：申请落库 → 受理 → 通过/驳回）
+      `CREATE TABLE IF NOT EXISTS vendor_onboarding (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        apply_no VARCHAR(32) NOT NULL,
+        company VARCHAR(160) NOT NULL,
+        contact VARCHAR(64) NOT NULL,
+        phone VARCHAR(32) NOT NULL,
+        license_no VARCHAR(64) DEFAULT '',
+        license_valid VARCHAR(32) DEFAULT '',
+        permit_type VARCHAR(32) DEFAULT '',
+        channels VARCHAR(64) DEFAULT 'rental',
+        category_scope VARCHAR(255) DEFAULT '',
+        house_count INT DEFAULT 0,
+        settle_bank VARCHAR(120) DEFAULT '',
+        settle_account VARCHAR(64) DEFAULT '',
+        deposit_tier VARCHAR(32) DEFAULT '',
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        rate_base DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+        rate_discount DECIMAL(5,2) DEFAULT NULL,
+        checklist_json TEXT,
+        review_note VARCHAR(500) DEFAULT '',
+        reviewer VARCHAR(64) DEFAULT '',
+        reviewed_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_vo_status (status),
+        INDEX idx_vo_no (apply_no),
+        INDEX idx_vo_phone (phone)
+      ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
       await conn.execute(ddl);
@@ -1032,11 +1742,7 @@ async function ensureSchemaRun() {
       [5114,147,38,'家具回收 · 套装','大件清运',0],
       [5115,148,39,'社区团购 · 日配','生鲜果蔬',0],
       [5116,148,40,'便民代办 · 跑腿','取送代缴',29],
-      // 搬家 / 保姆：保证城市过滤后类目仍可见
-      [5151,151,6,'居民搬家 · 同城','金杯车·2名师傅',398],
-      [5152,151,7,'日式搬家 · 全包','打包收纳+还原',1680],
-      [5153,151,17,'长途搬家 · 跨城','厢式货车',1200],
-      [5154,151,18,'钢琴搬运 · 专业','立式/三角可接',800],
+      // 保姆：保证城市过滤后类目仍可见（搬家用蓝犀牛 v42 联调商品，不再内置 seed）
       [5251,152,8,'钟点工 · 3小时','做饭保洁',128],
       [5252,152,9,'育儿嫂 · 住家','持证育儿',8800],
       [5253,152,21,'住家保姆 · 全职','做饭保洁照护',6800],
@@ -1052,11 +1758,14 @@ async function ensureSchemaRun() {
           JSON.stringify(['本地生活', '可预约']), skuId, pid]
       );
     }
-    // 初始化 channels 种子数据
+    // 初始化 channels 种子数据（bzf 已转为 topic，不再作为 channel —— 见 CLAUDE.md 房源库通用化）
     const channelSeeds = [
-      ['bzf', '保租房专区', 1],
+      ['rental', '长租', 0],
       ['trade', '卖旧买新专区', 2],
       ['jiazheng', '生活服务专区', 3],
+      ['minsu', '民宿', 4],
+      ['newhouse', '新房', 5],
+      ['resale', '二手', 6],
     ];
     for (const [id, label, order] of channelSeeds) {
       await conn.execute(
@@ -1069,6 +1778,8 @@ async function ensureSchemaRun() {
       ['show_city_switcher', '1'],
       ['show_life_service', '1'],
       ['channel_name', (channelBrand && channelBrand.DEFAULT_CHANNEL_NAME) || '新居住频道'],
+      ['commission_housing_default', '10.00'],   // 抽佣全局基准·房源预订（0903 纪要，规则 20）
+      ['commission_jiazheng_default', '10.00'],  // 抽佣全局基准·家政
     ];
     for (const [k, v] of settingSeeds) {
       await conn.execute(
@@ -1078,6 +1789,19 @@ async function ensureSchemaRun() {
     }
     // 旧库 CREATE TABLE IF NOT EXISTS 不会补列；导入/查询前先对齐
     const extraCols = [
+      ['projects', "status VARCHAR(20) NOT NULL DEFAULT 'draft'"],
+      ['projects', 'owner_vendor_id INT'],
+      ['projects', 'ext TEXT'],
+      ['units', 'ext TEXT'],
+      ['booking_orders', 'idempotency_key VARCHAR(100)'],
+      ['booking_orders', 'payment_expires_at VARCHAR(32)'],
+      ['booking_orders', 'commission_rate DECIMAL(5,2)'],   // 下单锁定的商家生效费率快照（规则 20，调价不追溯）
+      ['booking_orders', 'commission_fee DECIMAL(10,2)'],
+      ['jz_vendors', 'login_name VARCHAR(120)'],
+      ['jz_vendors', 'password_hash VARCHAR(255)'],
+      ['jz_vendors', "review_status VARCHAR(20) NOT NULL DEFAULT 'approved'"],
+      ['jz_vendors', 'review_note TEXT'],
+      ['jz_vendors', 'reviewed_at VARCHAR(30)'],
       ['jz_vendors', 'city_ids TEXT'],
       ['jz_vendors', 'district_id INT'],
       ['jz_vendors', 'phone VARCHAR(50)'],
@@ -1085,6 +1809,10 @@ async function ensureSchemaRun() {
       ['jz_vendors', 'vendor_no VARCHAR(100)'],
       ['jz_vendors', 'whitelist_id INT'],
       ['jz_vendors', 'platform_certs TEXT'],
+      ['jz_vendors', 'webhook_url VARCHAR(500)'],
+      ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
+      ['jz_vendors', 'commission_housing DECIMAL(5,2)'],   // 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
+      ['jz_vendors', 'commission_jiazheng DECIMAL(5,2)'],  // 抽佣·家政档（本期仅配置，消费在家政结算）
       ['jz_products', 'city_id INT'],
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
@@ -1117,6 +1845,10 @@ async function ensureSchemaRun() {
     if (jzSeedAll) {
       try { await jzSeedAll(conn); } catch (e) { console.warn('jzSeedAll warn:', e.message); }
     }
+    // 运营商员工花名册种子（INSERT IGNORE + uk_staff_emp_no 幂等，多实例并发安全）
+    if (staffSeedAll) {
+      try { await staffSeedAll(conn); } catch (e) { console.warn('staffSeedAll warn:', e.message); }
+    }
     await ensureGrOrdersShape(conn);
     try {
       await conn.execute('ALTER TABLE gr_orders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
@@ -1124,26 +1856,50 @@ async function ensureSchemaRun() {
     // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
     const migrations = [
       "ALTER TABLE projects ADD COLUMN contact_phone VARCHAR(50)",
-      // 区级「房源量」= 下属保租项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
+      "ALTER TABLE booking_orders ADD UNIQUE KEY uk_bo_idempotency (idempotency_key)",
+      // 旧版种子在 status=online 时尚未落 rating_status；仅回填历史在线数据，新建房源仍默认为 draft。
+      "UPDATE projects SET rating_status='passed' WHERE status='online' AND (rating_status IS NULL OR rating_status='draft')",
+      // 周边玩法笔记化（2026-09-06）：正文/图集/攻略信息（旧库 spots 补列，新库 DDL 已含）
+      "ALTER TABLE spots ADD COLUMN body TEXT",
+      "ALTER TABLE spots ADD COLUMN photos TEXT",
+      "ALTER TABLE spots ADD COLUMN address VARCHAR(200)",
+      "ALTER TABLE spots ADD COLUMN duration VARCHAR(40)",
+      "ALTER TABLE spots ADD COLUMN ticket VARCHAR(40)",
+      // 预订订单归属（登录用户；老订单 user_id 为空，可按登录账号手机号认领）
+      "ALTER TABLE booking_orders ADD COLUMN user_id VARCHAR(64)",
+      "ALTER TABLE booking_orders ADD KEY idx_bo_user (user_id)",
+      // 支付（阶段3 旅居收银台）：minsu=unpaid/paid/refunded；rental 预订单 NULL（不涉及）
+      "ALTER TABLE booking_orders ADD COLUMN pay_status VARCHAR(20)",
+      "ALTER TABLE booking_orders ADD COLUMN pay_method VARCHAR(50)",
+      "ALTER TABLE booking_orders ADD COLUMN pay_at VARCHAR(30)",
+      "ALTER TABLE booking_orders ADD KEY idx_bo_pay (pay_status)",
+      // 区级「房源量」= 下属租赁住宿项目 managed_unit_count 加总（勿用户型×40 覆盖真实在管套数）
       `UPDATE districts d
          SET managed_unit_count = (
            SELECT COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0)
-           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'rental'
          ),
          unit_count = (
            SELECT COALESCE(SUM(p.unit_count), 0)
-           FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+           FROM projects p WHERE p.district_id = d.id AND p.channel = 'rental'
          ),
          project_count = (
-           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'rental'
          ),
          has_projects = CASE WHEN (
-           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'bzf'
+           SELECT COUNT(*) FROM projects p WHERE p.district_id = d.id AND p.channel = 'rental'
          ) > 0 THEN 1 ELSE 0 END`,
     ];
     for (const sql of migrations) {
       try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
     }
+    // 花名册归属列（scope 行级过滤；NULL=平台级）——存量表渐进补列
+    try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN org_id INT NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN vendor_id INT NULL'); } catch (_) {}
+    // 账号与权限中心：orgs/accounts/roles/account_roles/sessions/audit_log + 角色种子 + platform_admin 引导
+    await authCenter.ensureAuthSchema(conn);
+    // 审计留存（默认 180 天，AUDIT_RETENTION_DAYS 可调）
+    await authCenter.cleanupAudit().catch((e) => console.warn('cleanupAudit warn:', e.message));
     schemaEnsured = true;
   } finally {
     await conn.end();
@@ -1173,6 +1929,7 @@ function readBody(req) {
     req.on('data', chunk => { data += chunk; });
     req.on('end', () => {
       req._rawBody = data;
+      reqLogBody(data);
       try { resolve(data ? JSON.parse(data) : {}); }
       catch (e) { resolve({}); }
     });
@@ -1314,13 +2071,56 @@ async function syncUnitCover(conn, unitId) {
 async function handleApiDirect(urlPath, qs, req, res) {
   try {
     // /api/juzhu/admin/* 全方法强制 API Key（与 juzhu/server.py 对齐；auth/login|check 除外）
-    if (!assertAdminAuthorized(urlPath, req, res)) return;
-    if (!assertApiAuthorized(urlPath, req, res)) return;
+    if (!(await assertAdminAuthorized(urlPath, req, res))) return;
+    if (!(await assertApiAuthorized(urlPath, req, res))) return;
+
+    // ── 账号中心权限闸（perm_registry.cjs 单一数据源）：admin 域按路由细粒度校验 + 细粒度审计 ──
+    // 写操作不再一刀切 admin.write（project.update / account.create / settings.update ...），
+    // GET 亦收口（dictionary/cities/projects 等此前对旧全局 key 无任何权限要求）。
+    if (urlPath.startsWith(ADMIN_PREFIX)) {
+      const rule = permRegistry.match(urlPath, req.method);
+      if (rule && rule.guard === 'ratingSubmit') {
+        // 评级提交双通道：账号主体按权限点，旧 vendor 会话由处理器内 owner_vendor_id 把关
+        if (!(await guardRatingSubmit(req, res))) return;
+      } else if (rule && !rule.exempt) {
+        if (!(await requirePerm(req, res, rule.perm, permRegistry.labelOf(rule.perm)))) return;
+        if (req.method !== 'GET') {
+          const p = req.principal;
+          if (p && p.type === 'account') {
+            const m = urlPath.match(new RegExp(rule.re));
+            await authCenter.audit({
+              accountId: p.account.id, principalType: 'account', roles: p.roles,
+              action: rule.act || rule.perm, resource: rule.res || 'admin',
+              resourceId: rule.idGroup != null && m ? m[rule.idGroup] : null,
+              scopeLevel: authCenter.bestScopeLevel(p), ip: p.ip, ua: p.ua,
+            });
+          }
+        }
+      } else if (!rule && req.method !== 'GET') {
+        // 未注册写路由回退旧行为：账号主体 + admin.write（新路由必须先进 perm_registry.ROUTES）
+        const wp = await authCenter.principalOf(req).catch(() => null);
+        if (!wp || wp.type === 'legacy') {
+          return jsonReply(res, {
+            error: 'forbidden',
+            message: '旧全局 API Key 对管理域只读；请用管理员账号登录（POST /api/auth/login → Authorization: Bearer <token>）',
+          }, 403);
+        }
+        if (!authCenter.hasPermission(wp, authCenter.P.ADMIN_WRITE)) {
+          return jsonReply(res, { error: 'forbidden', message: '当前账号无管理写权限（admin.write）' }, 403);
+        }
+        req.principal = wp;
+        await authCenter.audit({
+          accountId: wp.account.id, principalType: 'account', roles: wp.roles,
+          action: 'admin.write', resource: urlPath, scopeLevel: authCenter.bestScopeLevel(wp),
+          ip: wp.ip, ua: wp.ua,
+        });
+      }
+    }
 
     await ensureSchema();
 
-    // ===== 商家 HMAC 开放接口（api_doc.md）=====
-    if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/'))) {
+    // ===== 商家 HMAC 开放接口（api_doc.md：家政 /api/juzhu/jiazheng/vendor/*；房源 /api/juzhu/housing/vendor/*）=====
+    if (req.method === 'POST' && (urlPath === '/api/juzhu/callback' || urlPath.startsWith('/api/juzhu/jiazheng/vendor/') || urlPath.startsWith('/api/juzhu/housing/vendor/'))) {
       if (!vendorApi) return jsonReply(res, { code: 500, message: 'vendor_api module missing' }, 500);
       const body = await readBody(req);
       const vendors = await getVendorConfig();
@@ -1332,6 +2132,140 @@ async function handleApiDirect(urlPath, qs, req, res) {
         return jsonReply(res, { code: 500, message: String(e.message || e) }, 500);
       } finally {
         await conn.end();
+      }
+    }
+
+    // ===== 商家入驻申请（服务认证中台受理）：公开提交 + 进度查询 + admin 受理（权限点 vendor.onboarding.review）=====
+
+    // POST /api/juzhu/onboarding/apply —— 公开提交（申请人尚无凭据；白名单见 isCEndPublicApi）
+    if (urlPath === '/api/juzhu/onboarding/apply' && req.method === 'POST') {
+      await ensureSchema();
+      const body = await readBody(req);
+      const company = String(body.company || '').trim();
+      const contact = String(body.contact || '').trim();
+      const phone = String(body.phone || '').trim();
+      if (!company || !contact || !phone) return jsonReply(res, { error: 'bad request', message: '企业名称 / 联系人 / 手机号 必填' }, 400);
+      if (company.length > 160 || contact.length > 64 || phone.length > 32) return jsonReply(res, { error: 'bad request', message: '字段超长' }, 400);
+      const channels = String(body.channels || 'rental').split(',').map(s => s.trim()).filter(s => ['rental', 'minsu'].includes(s)).join(',') || 'rental';
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [r] = await conn.execute(
+          `INSERT INTO vendor_onboarding
+             (apply_no, company, contact, phone, license_no, license_valid, permit_type,
+              channels, category_scope, house_count, settle_bank, settle_account, deposit_tier, status, rate_base)
+           VALUES ('', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 10.00)`,
+          [company, contact, phone,
+           String(body.license_no || '').slice(0, 64), String(body.license_valid || '').slice(0, 32),
+           String(body.permit_type || '').slice(0, 32), channels,
+           String(body.category_scope || '').slice(0, 255),
+           Math.max(0, Math.min(9999, parseInt(body.house_count, 10) || 0)),
+           String(body.settle_bank || '').slice(0, 120), String(body.settle_account || '').slice(0, 64),
+           String(body.deposit_tier || '').slice(0, 32)]
+        );
+        const applyNo = 'GZ-RZ-' + new Date().getFullYear() + '-' + String(r.insertId).padStart(5, '0');
+        await conn.execute('UPDATE vendor_onboarding SET apply_no=? WHERE id=?', [applyNo, r.insertId]);
+        return jsonReply(res, { apply_no: applyNo, status: 'pending', message: '已受理登记，资料齐全后 T+2 出审核结果' }, 200);
+      } catch (e) {
+        return jsonReply(res, { error: 'server error', message: String(e.message || e) }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // GET /api/juzhu/onboarding/status?no=&phone= —— 进度查询（须单号+手机号双匹配，防枚举）
+    if (urlPath === '/api/juzhu/onboarding/status' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const no = (qp.get('no') || '').trim();
+      const phone = (qp.get('phone') || '').trim();
+      if (!no || !phone) return jsonReply(res, { error: 'bad request', message: '请提供申请单号与手机号' }, 400);
+      const rows = await queryRows(
+        'SELECT apply_no, company, status, channels, review_note, reviewer, reviewed_at, created_at FROM vendor_onboarding WHERE apply_no=? AND phone=? LIMIT 1',
+        [no, phone]
+      );
+      if (!rows.length) return jsonReply(res, { error: 'not found', message: '未找到匹配的申请单（请核对单号与手机号）' }, 404);
+      return jsonReply(res, rows[0]);
+    }
+
+    // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
+    if (urlPath === '/api/juzhu/admin/vendor-onboarding' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const st = (qp.get('status') || '').trim();
+      const sql = 'SELECT * FROM vendor_onboarding' + (st ? ' WHERE status=?' : '') + ' ORDER BY created_at DESC LIMIT 200';
+      const rows = await queryRows(sql, st ? [st] : []);
+      const byStatus = await queryRows('SELECT status, COUNT(*) AS c FROM vendor_onboarding GROUP BY status');
+      const counts = {}; byStatus.forEach(r => { counts[r.status] = r.c; });
+      return jsonReply(res, { items: rows, counts: counts });
+    }
+
+    // POST /api/juzhu/admin/vendor-onboarding/:id/review —— 受理 / 通过 / 驳回（状态机 + 审计由权限闸记录）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendor-onboarding\/(\d+)\/review$/);
+      if (m && req.method === 'POST') {
+        await ensureSchema();
+        const id = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const action = String(body.action || '').trim();
+        if (!['review', 'approve', 'reject'].includes(action)) return jsonReply(res, { error: 'bad request', message: 'action 须为 review / approve / reject' }, 400);
+        const rows = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        const cur = rows[0];
+        if (cur.status === 'approved' || cur.status === 'rejected') return jsonReply(res, { error: 'conflict', message: '该申请单已终审（' + cur.status + '），不可再变更' }, 409);
+        let next;
+        if (action === 'review') {
+          if (cur.status !== 'pending') return jsonReply(res, { error: 'conflict', message: '仅待受理单可转核验中' }, 409);
+          next = 'reviewing';
+        } else if (action === 'approve') {
+          next = 'approved';
+        } else {
+          next = 'rejected';
+          if (!String(body.note || '').trim()) return jsonReply(res, { error: 'bad request', message: '驳回必须填写理由（留痕）' }, 400);
+        }
+        const reviewer = (req.principal && req.principal.account && (req.principal.account.name || req.principal.account.login_name)) || '';
+        let discount = null;
+        if (action === 'approve' && body.rate_discount !== undefined && body.rate_discount !== null && body.rate_discount !== '') {
+          discount = Math.max(0, Math.min(10, parseFloat(body.rate_discount) || 0));
+        }
+        const checklist = body.checklist ? String(JSON.stringify(body.checklist)).slice(0, 2000) : (cur.checklist_json || null);
+        await queryRows(
+          `UPDATE vendor_onboarding SET status=?, rate_discount=?, checklist_json=?, review_note=?, reviewer=?, reviewed_at=NOW() WHERE id=?`,
+          [next, discount, checklist, String(body.note || '').slice(0, 500), String(reviewer).slice(0, 64), id]
+        );
+        // 规则 20：审批通过即把核定费率回填商家（接通「申请单核定 → 商家费率」断桥）。
+        // 按 phone 单命中 active 商家才回填；未命中/多命中不阻塞，由「商家费率」台配置。
+        let backfillNote = '';
+        if (next === 'approved') {
+          const rateVal = Math.round((Math.max(0, (parseFloat(cur.rate_base) || 10) - (discount != null ? discount : 0))) * 100) / 100;
+          const vrows = await queryRows("SELECT id, name FROM jz_vendors WHERE phone=? AND status='active'", [cur.phone]);
+          if (vrows.length === 1) {
+            const chans = String(cur.channels || 'rental').split(',').map((c) => c.trim());
+            const bizCols = [];
+            if (chans.some((c) => c === 'rental' || c === 'minsu')) bizCols.push('commission_housing');
+            if (chans.some((c) => c === 'jiazheng')) bizCols.push('commission_jiazheng');
+            if (!bizCols.length) bizCols.push('commission_housing');   // 申请单频道缺省按房源档
+            await queryRows(
+              `UPDATE jz_vendors SET ${bizCols.map((c) => c + '=?').join(', ')} WHERE id=?`,
+              [...bizCols.map(() => rateVal), vrows[0].id]
+            );
+            backfillNote = '；费率已回填商家 ' + vrows[0].name + '（' + rateVal + '%）';
+            await authCenter.audit({
+              action: 'vendor.commission.update', resource: 'vendors', resourceId: String(vrows[0].id),
+              result: 'ok', after: Object.fromEntries(bizCols.map((c) => [c, rateVal])),
+              before: Object.fromEntries(bizCols.map((c) => [c, null])),
+            });
+          } else if (vrows.length > 1) {
+            backfillNote = '；按手机号命中多个商家，费率未自动回填（请在「商家费率」台配置）';
+          } else {
+            backfillNote = '；暂未找到匹配商家，费率请在「商家费率」台配置';
+          }
+        }
+        const out = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
+        return jsonReply(res, Object.assign({}, out[0], {
+          message: next === 'approved'
+            ? '已通过。密钥（vendor_id + hmac_key）按线下流程发放；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '') + backfillNote
+            : (next === 'reviewing' ? '已转入核验中' : '已驳回（已留痕）'),
+        }));
       }
     }
 
@@ -1347,7 +2281,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
         ? await queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id])
         : [];
       const channels = await queryRows('SELECT * FROM channels ORDER BY sort_order, id');
-      return jsonReply(res, { city, cities: allCities, districts, channels });
+      // 周边玩法维度（规则 17）：不按城市过滤——绑定 picker 需要全省通用（city_id NULL）与跨市目的地
+      const spots = await queryRows('SELECT * FROM spots ORDER BY type, sort_order, id');
+      spots.forEach((r) => parseJsonFields(r, ['tags']));
+      return jsonReply(res, { city, cities: allCities, districts, channels, spots });
     }
 
     if (urlPath === '/api/juzhu/admin/cities' && req.method === 'GET') {
@@ -1372,16 +2309,40 @@ async function handleApiDirect(urlPath, qs, req, res) {
         show_city_switcher: settingsMap.show_city_switcher !== '0',
         show_life_service: settingsMap.show_life_service !== '0',
         channel_name: brand.name,
+        // 抽佣全局基准（规则 20）：商家未差异化时回落到这里
+        commission_housing_default: String(vendorRate.defaultRateOf(settingsMap, 'housing')),
+        commission_jiazheng_default: String(vendorRate.defaultRateOf(settingsMap, 'jiazheng')),
+        // C 端模拟登录开关：仅非生产（JUZHU_ENV != prod/production）开启；生产恒 false，C 端走 jsbridge3 真实登录
+        mock_login: !isProduction(),
       });
     }
 
     if (urlPath === '/api/juzhu/admin/projects' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
-      let sql = 'SELECT p.*, d.name AS district_name FROM projects p LEFT JOIN districts d ON d.id=p.district_id WHERE 1=1';
+      let sql = 'SELECT p.*, d.name AS district_name, v.name AS vendor_name FROM projects p'
+        + ' LEFT JOIN districts d ON d.id=p.district_id'
+        + ' LEFT JOIN jz_vendors v ON v.id=p.owner_vendor_id WHERE 1=1';
       const params = [];
+      // scope 行级过滤（不可被 query 参数绕过；QS 显式条件与 scope 取交集，窄者胜）：
+      // city → city_id IN；org → 本机构下商家；vendor → 本商家；self 档不放行管理列表
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (principal && principal.type === 'account') {
+        const scope = authCenter.scopeOf(principal);
+        if (scope.level === 'city') {
+          const cs = authCenter.scopeCitySql(scope, 'p.city_id');
+          sql += cs.sql; params.push(...cs.params);
+        } else if (scope.level === 'org' && scope.orgId != null) {
+          sql += ' AND p.owner_vendor_id IN (SELECT id FROM jz_vendors WHERE org_id=?)'; params.push(scope.orgId);
+        } else if (scope.level === 'vendor' && scope.vendorId != null) {
+          sql += ' AND p.owner_vendor_id=?'; params.push(scope.vendorId);
+        } else if (scope.level !== 'all') {
+          return jsonReply(res, { error: 'forbidden', message: '当前账号数据范围不足（' + scope.level + ' 档）' }, 403);
+        }
+      }
       if (qp.get('city_id')) { sql += ' AND p.city_id=?'; params.push(parseInt(qp.get('city_id'))); }
       if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
       if (qp.get('district_id')) { sql += ' AND p.district_id=?'; params.push(parseInt(qp.get('district_id'))); }
+      if (qp.get('vendor_id')) { sql += ' AND p.owner_vendor_id=?'; params.push(parseInt(qp.get('vendor_id'))); }
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
       sql += ' ORDER BY p.channel, p.sort_order, p.id';
       const rows = await queryRows(sql, params);
@@ -1401,7 +2362,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(projs[0], ['tags', 'rating']);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
-        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail']));
+        units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
         const photos = await queryRows(
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order, id",
           [pid]
@@ -1425,14 +2386,244 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     if (urlPath === '/api/juzhu/stats' && req.method === 'GET') {
-      const [d] = await queryRows('SELECT COUNT(*) AS c FROM districts');
-      const [pb] = await queryRows("SELECT COUNT(*) AS c FROM projects WHERE channel='bzf'");
+      const [d] = await queryRows("SELECT COUNT(*) AS c FROM districts");
+      const [pb] = await queryRows("SELECT COUNT(*) AS c FROM projects WHERE channel IN ('rental','minsu')");
       const [pt] = await queryRows("SELECT COUNT(*) AS c FROM projects WHERE channel='trade'");
-      const [u] = await queryRows("SELECT COALESCE(SUM(managed_unit_count), 0) AS c FROM projects WHERE channel='bzf'");
-      return jsonReply(res, { districts: d.c, projects_bzf: pb.c, projects_trade: pt.c, units: u.c });
+      const [u] = await queryRows("SELECT COALESCE(SUM(managed_unit_count), 0) AS c FROM projects WHERE channel IN ('rental','minsu')");
+      // 运营商维度（持有方资管大盘用）：仅持有 report.read 的账号会话可见——
+      // 匿名/旧 Key 消费方（C 端/B 端演示页）拿降级响应，不再泄漏商家明细
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      const isAccount = principal && principal.type === 'account';
+      const canSeeOperators = isAccount &&
+        (authCenter.hasPermission(principal, 'report.read') || authCenter.hasPermission(principal, '*'));
+      let operators = [];
+      let degraded = true;
+      if (canSeeOperators) {
+        const scope = authCenter.scopeOf(principal);
+        const cityJoin = authCenter.scopeCitySql(scope, 'p.city_id');
+        operators = await queryRows(
+          `SELECT v.id, v.name, v.type, COUNT(p.id) AS project_count,
+                  COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0) AS unit_count
+           FROM jz_vendors v
+           LEFT JOIN projects p ON p.owner_vendor_id = v.id AND p.channel IN ('rental','minsu')${cityJoin.sql}
+           WHERE v.type IN ('platform','housing_operator','lvju_host')
+           GROUP BY v.id, v.name, v.type ORDER BY project_count DESC, v.id`,
+          cityJoin.params
+        );
+        degraded = false;
+      }
+      return jsonReply(res, {
+        districts: d.c,
+        projects_rental: pb.c,
+        projects_bzf: pb.c, // 旧字段别名（历史消费方兼容）
+        projects_trade: pt.c,
+        units: u.c,
+        operators,
+        degraded, // true = 匿名/无 report.read，operators 已剥离
+      });
     }
 
     // ===== 写操作接口 =====
+
+    // GET /admin/vendors/consult —— 商家维度咨询方式（C 端详情页左下角咨询入口优先级）
+    if (urlPath === '/api/juzhu/admin/vendors' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = 'SELECT id, type, name, phone, city_ids, status, review_status, review_note, reviewed_at, created_at, updated_at FROM jz_vendors WHERE 1=1';
+      const params = [];
+      if (qp.get('review_status')) { sql += ' AND review_status=?'; params.push(qp.get('review_status')); }
+      if (qp.get('status')) { sql += ' AND status=?'; params.push(qp.get('status')); }
+      sql += ' ORDER BY id DESC LIMIT 500';
+      return jsonReply(res, await queryRows(sql, params));
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/review$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const reviewStatus = String(body.review_status || '').trim();
+        if (!['reviewing', 'approved', 'rejected'].includes(reviewStatus)) return jsonReply(res, { error: 'review_status 须为 reviewing/approved/rejected' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          const nextStatus = reviewStatus === 'approved' ? 'active' : (reviewStatus === 'rejected' ? 'suspended' : 'active');
+          const [r] = await conn.execute(
+            'UPDATE jz_vendors SET review_status=?, review_note=?, reviewed_at=?, status=?, updated_at=? WHERE id=?',
+            [reviewStatus, String(body.review_note || '').trim().slice(0, 1000) || null, now, nextStatus, now, parseInt(m[1], 10)]
+          );
+          if (!r.affectedRows) return jsonReply(res, { error: '商家不存在' }, 404);
+          return jsonReply(res, { ok: true, id: parseInt(m[1], 10), review_status: reviewStatus, status: nextStatus });
+        } finally { await conn.end(); }
+      }
+    }
+
+    if (urlPath === '/api/juzhu/admin/vendors/consult' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT v.id, v.name, v.type, v.consult_mode, COUNT(p.id) AS project_count
+         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+         WHERE v.status='active'
+         GROUP BY v.id, v.name, v.type, v.consult_mode
+         HAVING project_count > 0
+         ORDER BY project_count DESC, v.id`);
+      return jsonReply(res, rows.map((v) => Object.assign(v, { consult_mode: v.consult_mode || 'consultant' })));
+    }
+
+    // PUT /admin/vendors/:id/consult-mode —— 切换商家咨询方式（consultant=咨询顾问/400 虚拟号；ai=AI 咨询，上线前勿切）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/consult-mode$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const mode = String(body.consult_mode || '').trim();
+        if (!['consultant', 'ai'].includes(mode)) return jsonReply(res, { error: 'consult_mode 仅支持 consultant / ai' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute(
+            'UPDATE jz_vendors SET consult_mode=?, updated_at=? WHERE id=?',
+            [mode, new Date().toISOString().slice(0, 19).replace('T', ' '), parseInt(m[1], 10)]
+          );
+          if (!r.affectedRows) return jsonReply(res, { error: 'not found' }, 404);
+          return jsonReply(res, { ok: true, id: parseInt(m[1], 10), consult_mode: mode });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // GET /admin/vendors/rates —— 商家费率（两档）+ 全局基准（规则 20；权限点 admin.read）
+    if (urlPath === '/api/juzhu/admin/vendors/rates' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = `SELECT v.id, v.name, v.type, v.phone, v.status, v.review_status,
+                        v.commission_housing, v.commission_jiazheng, COUNT(p.id) AS project_count
+                 FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id
+                 WHERE 1=1`;
+      const params = [];
+      if (qp.get('status')) { sql += ' AND v.status=?'; params.push(qp.get('status')); }
+      sql += ' GROUP BY v.id, v.name, v.type, v.phone, v.status, v.review_status, v.commission_housing, v.commission_jiazheng ORDER BY v.id DESC LIMIT 500';
+      const rows = await queryRows(sql, params);
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const r of srows) settingsMap[r.key] = r.value;
+      const vendors = rows.map((v) => Object.assign({}, v, {
+        commission_housing: v.commission_housing == null ? null : Number(v.commission_housing),
+        commission_jiazheng: v.commission_jiazheng == null ? null : Number(v.commission_jiazheng),
+        commission_housing_effective: vendorRate.effectiveRateOf(v, 'housing', settingsMap),
+        commission_jiazheng_effective: vendorRate.effectiveRateOf(v, 'jiazheng', settingsMap),
+      }));
+      return jsonReply(res, {
+        defaults: {
+          housing: vendorRate.defaultRateOf(settingsMap, 'housing'),
+          jiazheng: vendorRate.defaultRateOf(settingsMap, 'jiazheng'),
+        },
+        vendors,
+      });
+    }
+
+    // PUT /admin/vendors/commission-defaults —— 抽佣全局基准（两键 KV；规则 20；权限点 vendor.fund.write）
+    // 与 PUT /admin/settings 并行写同一组 KV（那边挂 settings.write 给平台管理员）；null = 删除键回落内置 10。
+    if (urlPath === '/api/juzhu/admin/vendors/commission-defaults' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const out = {};
+      for (const biz of vendorRate.BIZLINES) {
+        const k = vendorRate.defaultSettingKey(biz);
+        if (!(biz in body) && !('commission_' + biz + '_default' in body)) continue;
+        const raw = (biz in body) ? body[biz] : body['commission_' + biz + '_default'];
+        let v;
+        try { v = vendorRate.normalizeRate(raw); } catch (e) { return jsonReply(res, { error: e.message }, 400); }
+        if (v == null) await queryRows('DELETE FROM settings WHERE `key`=?', [k]);
+        else await queryRows(
+          'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+          [k, String(v)]
+        );
+        out[biz] = v;
+      }
+      if (!Object.keys(out).length) return jsonReply(res, { error: '无可更新字段（housing / jiazheng）' }, 400);
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const rr of srows) settingsMap[rr.key] = rr.value;
+      return jsonReply(res, {
+        ok: true,
+        defaults: {
+          housing: vendorRate.defaultRateOf(settingsMap, 'housing'),
+          jiazheng: vendorRate.defaultRateOf(settingsMap, 'jiazheng'),
+        },
+      });
+    }
+
+    // GET /admin/vendors/commission-history —— 费率变更详单（规则 20；挂 vendor.fund.write，
+    // 不借道 /admin/audit 的 audit.read：看佣金历史不需要全站审计权限）
+    if (urlPath === '/api/juzhu/admin/vendors/commission-history' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT id, resource_id, role_code, before_json, after_json, created_at
+         FROM audit_log
+         WHERE action='vendor.commission.update' AND before_json IS NOT NULL
+         ORDER BY id DESC LIMIT 50`);
+      return jsonReply(res, {
+        items: rows.map((r0) => {
+          let before = {}, after = {};
+          try { before = JSON.parse(r0.before_json || '{}'); } catch (_) {}
+          try { after = JSON.parse(r0.after_json || '{}'); } catch (_) {}
+          return { id: r0.id, vendor_id: r0.resource_id, role_code: r0.role_code, created_at: r0.created_at, before, after };
+        }),
+      });
+    }
+
+    // PUT /admin/vendors/:id/commission —— 商家费率调整（两档；规则 20；权限点 vendor.fund.write）
+    // 口径：0-100 两位小数，null = 清除（回落全局基准）；调价不追溯，仅新订单生效。
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/commission$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        let nextHousing, nextJiazheng;
+        try {
+          if ('commission_housing' in body) nextHousing = vendorRate.normalizeRate(body.commission_housing);
+          if ('commission_jiazheng' in body) nextJiazheng = vendorRate.normalizeRate(body.commission_jiazheng);
+        } catch (e) { return jsonReply(res, { error: e.message }, 400); }
+        if (nextHousing === undefined && nextJiazheng === undefined) {
+          return jsonReply(res, { error: '无可更新字段（commission_housing / commission_jiazheng）' }, 400);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const vid = parseInt(m[1], 10);
+          const [rows] = await conn.execute(
+            'SELECT id, name, commission_housing, commission_jiazheng FROM jz_vendors WHERE id=?', [vid]);
+          if (!rows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          const cur = rows[0];
+          const num = (x) => (x == null ? null : Number(x));
+          const before = { commission_housing: num(cur.commission_housing), commission_jiazheng: num(cur.commission_jiazheng) };
+          const sets = [], vals = [];
+          if (nextHousing !== undefined) { sets.push('commission_housing=?'); vals.push(nextHousing); }
+          if (nextJiazheng !== undefined) { sets.push('commission_jiazheng=?'); vals.push(nextJiazheng); }
+          await conn.execute(
+            `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+          );
+          // 敏感商业条款变更：处理器内记 before/after（role.update 金标准），不只依赖 ROUTES 自动审计
+          const p = req.principal || {};
+          await authCenter.audit({
+            accountId: p.account && p.account.id,
+            principalType: 'account',
+            roles: p.roles,
+            action: 'vendor.commission.update',
+            resource: 'vendors',
+            resourceId: String(vid),
+            scopeLevel: authCenter.bestScopeLevel(p),
+            result: 'ok',
+            before,
+            after: {
+              commission_housing: nextHousing !== undefined ? nextHousing : before.commission_housing,
+              commission_jiazheng: nextJiazheng !== undefined ? nextJiazheng : before.commission_jiazheng,
+            },
+            ip: p.ip, ua: p.ua,
+          });
+          return jsonReply(res, {
+            ok: true,
+            vendor: {
+              id: vid, name: cur.name,
+              commission_housing: nextHousing !== undefined ? nextHousing : before.commission_housing,
+              commission_jiazheng: nextJiazheng !== undefined ? nextJiazheng : before.commission_jiazheng,
+            },
+          });
+        } finally { await conn.end(); }
+      }
+    }
 
     // PUT /admin/settings
     if (urlPath === '/api/juzhu/admin/settings' && req.method === 'PUT') {
@@ -1458,6 +2649,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
             await conn.execute(
               'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
               [k, v]
+            );
+          }
+        }
+        // 抽佣全局基准（规则 20）：0-100 两位小数；传 null/'' = 删除键（回落内置 10.00 兜底）
+        for (const biz of vendorRate.BIZLINES) {
+          const k = vendorRate.defaultSettingKey(biz);
+          if (k in body) {
+            let v;
+            try { v = vendorRate.normalizeRate(body[k]); } catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            if (v == null) await conn.execute('DELETE FROM settings WHERE `key`=?', [k]);
+            else await conn.execute(
+              'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+              [k, String(v)]
             );
           }
         }
@@ -1700,21 +2904,371 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 周边玩法字典（spots / project_spots，规则 17）=====
+    // SPOT_TYPES 单一数据源：scenic=景区 | biz=商圈（可扩展；改这里别在页面另造枚举）
+    const SPOT_TYPES = ['scenic', 'biz', 'food', 'cafe'];
+    const SPOT_TYPE_LABELS = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+    const SPOT_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+
+    // GET /admin/spots（字典全量；?type=&city_id= 可选过滤）
+    if (urlPath === '/api/juzhu/admin/spots' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const conds = [], params = [];
+      if (qp.get('type')) { conds.push('type=?'); params.push(qp.get('type')); }
+      if (qp.get('city_id')) { conds.push('city_id=?'); params.push(parseInt(qp.get('city_id'))); }
+      const rows = await queryRows(
+        'SELECT * FROM spots' + (conds.length ? ' WHERE ' + conds.join(' AND ') : '') + ' ORDER BY type, sort_order, id',
+        params
+      );
+      rows.forEach((r) => parseJsonFields(r, ['tags']));
+      return jsonReply(res, rows);
+    }
+
+    // POST /admin/spots
+    if (urlPath === '/api/juzhu/admin/spots' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = (body.name || '').trim();
+      if (!name) return jsonReply(res, { error: '名称不能为空' }, 400);
+      const type = body.type || 'scenic';
+      if (!SPOT_TYPES.includes(type)) return jsonReply(res, { error: 'type 须为 ' + SPOT_TYPES.join('/') }, 400);
+      let slug = (body.slug || '').trim();
+      if (!slug) slug = 'spot-' + Date.now().toString(36);
+      if (!SPOT_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [dup] = await conn.execute('SELECT id FROM spots WHERE slug=?', [slug]);
+        if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+        await conn.execute(
+          'INSERT INTO spots(city_id, type, name, slug, icon, cover_image, summary, body, photos, address, duration, ticket, tags, link, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          [body.city_id ? parseInt(body.city_id) : null, type, name, slug,
+           (body.icon || '').trim() || null, (body.cover_image || '').trim() || null,
+           (body.summary || '').trim() || null,
+           (body.body || '').trim() || null,
+           Array.isArray(body.photos) ? JSON.stringify(body.photos) : null,
+           (body.address || '').trim() || null, (body.duration || '').trim() || null,
+           (body.ticket || '').trim() || null,
+           Array.isArray(body.tags) ? JSON.stringify(body.tags) : null,
+           (body.link || '').trim() || null, parseInt(body.sort_order) || 999,
+           body.enabled === 0 || body.enabled === '0' ? 0 : 1]
+        );
+        const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+        const [rows] = await conn.execute('SELECT * FROM spots WHERE id=?', [r[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, spot: rows[0] }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/spots/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/spots\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const sid = parseInt(m[1]);
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [existing] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '地点不存在' }, 404); }
+          if (body.type != null && !SPOT_TYPES.includes(body.type)) {
+            conn.end(); return jsonReply(res, { error: 'type 须为 ' + SPOT_TYPES.join('/') }, 400);
+          }
+          const mapping = { name: 'name', slug: 'slug', type: 'type', city_id: 'city_id', icon: 'icon',
+            cover_image: 'cover_image', summary: 'summary', body: 'body', photos: 'photos',
+            address: 'address', duration: 'duration', ticket: 'ticket',
+            tags: 'tags', link: 'link', sort_order: 'sort_order', enabled: 'enabled' };
+          const fields = [], params = [];
+          for (const [key, col] of Object.entries(mapping)) {
+            if (!(key in body)) continue;
+            let val = body[key];
+            if (key === 'sort_order') val = parseInt(val) || 0;
+            else if (key === 'enabled') val = (val === 0 || val === '0') ? 0 : 1;
+            else if (key === 'city_id') val = val ? parseInt(val) : null;
+            else if (key === 'tags' || key === 'photos') val = Array.isArray(val) ? JSON.stringify(val) : (val || null);
+            else if (typeof val === 'string') val = val.trim() || null;
+            if (key === 'slug' && val && !SPOT_SLUG_RE.test(val)) {
+              conn.end(); return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+            }
+            fields.push(`${col}=?`); params.push(val);
+          }
+          if (!fields.length) { conn.end(); return jsonReply(res, { error: '无更新字段' }, 400); }
+          if (body.slug != null) {
+            const [dup] = await conn.execute('SELECT id FROM spots WHERE slug=? AND id<>?', [body.slug, sid]);
+            if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+          }
+          params.push(sid);
+          await conn.execute(`UPDATE spots SET ${fields.join(', ')} WHERE id=?`, params);
+          await conn.commit();
+          const [rows] = await conn.execute('SELECT * FROM spots WHERE id=?', [sid]);
+          return jsonReply(res, { ok: true, spot: rows[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/spots/:id（被项目绑定中则拒绝，先在项目里解除绑定）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/spots\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const sid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cnt] = await conn.execute('SELECT COUNT(*) AS c FROM project_spots WHERE spot_id=?', [sid]);
+          if (cnt[0].c > 0) { conn.end(); return jsonReply(res, { error: `该地点仍被 ${cnt[0].c} 个项目绑定，请先在项目里解除绑定` }, 400); }
+          const [existing] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!existing.length) { conn.end(); return jsonReply(res, { error: '地点不存在' }, 404); }
+          await conn.execute('DELETE FROM spots WHERE id=?', [sid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /admin/projects/:id/spots（绑定列表） / PUT（整体替换绑定）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/projects\/(\d+)\/spots$/);
+      if (m && (req.method === 'GET' || req.method === 'PUT')) {
+        const pid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          if (req.method === 'GET') {
+            const [rows] = await conn.execute(
+              'SELECT ps.spot_id, ps.note, ps.sort_order, s.name, s.type, s.icon, s.slug, s.cover_image ' +
+              'FROM project_spots ps JOIN spots s ON s.id=ps.spot_id WHERE ps.project_id=? ORDER BY ps.sort_order, ps.id', [pid]);
+            return jsonReply(res, { ok: true, bindings: rows });
+          }
+          // PUT：整体替换（草稿式编辑，一次保存全量提交；会覆盖同项目的并发编辑）
+          const body = await readBody(req);
+          const list = Array.isArray(body.bindings) ? body.bindings : [];
+          if (list.length > 12) return jsonReply(res, { error: '最多绑定 12 处（保持 C 端区块克制）' }, 400);
+          const seen = new Set();
+          for (const b of list) {
+            const sid = parseInt(b && b.spot_id, 10);
+            if (!sid) return jsonReply(res, { error: 'bindings 里存在无效 spot_id' }, 400);
+            if (seen.has(sid)) return jsonReply(res, { error: '同一地点重复绑定' }, 400);
+            seen.add(sid);
+          }
+          for (const sid of seen) {
+            const [ex] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+            if (!ex.length) return jsonReply(res, { error: `地点 #${sid} 不存在` }, 400);
+          }
+          await conn.beginTransaction();
+          await conn.execute('DELETE FROM project_spots WHERE project_id=?', [pid]);
+          for (const b of list) {
+            await conn.execute(
+              'INSERT INTO project_spots(project_id, spot_id, note, sort_order) VALUES (?,?,?,?)',
+              [pid, parseInt(b.spot_id, 10), ((b.note || '') + '').trim().slice(0, 120) || null, parseInt(b.sort_order) || 0]);
+          }
+          await conn.commit();
+          const [rows] = await conn.execute(
+            'SELECT ps.spot_id, ps.note, ps.sort_order, s.name, s.type FROM project_spots ps JOIN spots s ON s.id=ps.spot_id WHERE ps.project_id=? ORDER BY ps.sort_order, ps.id', [pid]);
+          return jsonReply(res, { ok: true, bindings: rows });
+        } catch (e) {
+          try { await conn.rollback(); } catch (_) {}
+          throw e;
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // ===== 内容域：旅游路线（routes）+ 房源专题（settings KV topic_*）=====
+    // 与 spots 同属内容编辑口径（house.write，规则 17/18）；专题 = 房源筛选条件（规则 15），
+    // 路线 = spots 的有序编排（站点内容仍在 spots 单一数据源，不复制正文）。
+    const ROUTE_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+    const TOPIC_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,58}$/;
+
+    // GET /admin/routes（全量含未上架；?city_id= 可选过滤）
+    if (urlPath === '/api/juzhu/admin/routes' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const rows = qp.get('city_id')
+        ? await queryRows('SELECT * FROM routes WHERE city_id=? OR city_id IS NULL ORDER BY sort_order, id', [parseInt(qp.get('city_id'))])
+        : await queryRows('SELECT * FROM routes ORDER BY sort_order, id');
+      rows.forEach((r) => { try { r.stops = r.stops ? JSON.parse(r.stops) : []; } catch (_) { r.stops = []; } });
+      return jsonReply(res, rows);
+    }
+
+    // POST /admin/routes
+    if (urlPath === '/api/juzhu/admin/routes' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = (body.name || '').trim();
+      if (!name) return jsonReply(res, { error: '路线名称不能为空' }, 400);
+      let slug = (body.slug || '').trim();
+      if (!slug) slug = 'route-' + Date.now().toString(36);
+      if (!ROUTE_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+      const stops = Array.isArray(body.stops) ? body.stops : [];
+      if (stops.length > 12) return jsonReply(res, { error: '单条路线最多 12 个点位（保持行程克制）' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [dup] = await conn.execute('SELECT id FROM routes WHERE slug=?', [slug]);
+        if (dup.length) { conn.end(); return jsonReply(res, { error: 'slug 已存在' }, 400); }
+        for (const s of stops) {
+          const sid = parseInt(s && s.spot_id, 10);
+          if (!sid) { conn.end(); return jsonReply(res, { error: 'stops 里存在无效 spot_id' }, 400); }
+          const [ex] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: `点位 #${sid} 不存在` }, 400); }
+        }
+        await conn.execute(
+          'INSERT INTO routes(city_id, slug, name, summary, cover_image, days, stops, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?)',
+          [body.city_id ? parseInt(body.city_id) : null, slug, name,
+           (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
+           Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+           JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+           parseInt(body.sort_order) || 999,
+           (body.enabled === false || body.enabled === 0 || body.enabled === '0') ? 0 : 1]
+        );
+        const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+        const [rows] = await conn.execute('SELECT * FROM routes WHERE id=?', [r[0].id]);
+        await conn.commit();
+        return jsonReply(res, { ok: true, route: rows[0] }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // PUT /admin/routes/:id（全量更新）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/routes\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const rid = parseInt(m[1]);
+        const body = await readBody(req);
+        const name = (body.name || '').trim();
+        if (!name) return jsonReply(res, { error: '路线名称不能为空' }, 400);
+        const stops = Array.isArray(body.stops) ? body.stops : [];
+        if (stops.length > 12) return jsonReply(res, { error: '单条路线最多 12 个点位（保持行程克制）' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [ex] = await conn.execute('SELECT id FROM routes WHERE id=?', [rid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: '路线不存在' }, 404); }
+          for (const s of stops) {
+            const sid = parseInt(s && s.spot_id, 10);
+            if (!sid) { conn.end(); return jsonReply(res, { error: 'stops 里存在无效 spot_id' }, 400); }
+            const [sp] = await conn.execute('SELECT id FROM spots WHERE id=?', [sid]);
+            if (!sp.length) { conn.end(); return jsonReply(res, { error: `点位 #${sid} 不存在` }, 400); }
+          }
+          await conn.execute(
+            'UPDATE routes SET city_id=?, name=?, summary=?, cover_image=?, days=?, stops=?, sort_order=?, enabled=? WHERE id=?',
+            [body.city_id ? parseInt(body.city_id) : null, name,
+             (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
+             Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+             JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+             parseInt(body.sort_order) || 999,
+             (body.enabled === false || body.enabled === 0 || body.enabled === '0') ? 0 : 1,
+             rid]
+          );
+          const [rows] = await conn.execute('SELECT * FROM routes WHERE id=?', [rid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true, route: rows[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/routes/:id
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/routes\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const rid = parseInt(m[1]);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [ex] = await conn.execute('SELECT id FROM routes WHERE id=?', [rid]);
+          if (!ex.length) { conn.end(); return jsonReply(res, { error: '路线不存在' }, 404); }
+          await conn.execute('DELETE FROM routes WHERE id=?', [rid]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // GET /admin/topics —— settings KV topic_* 清单（slug/label/channel/tags/enabled）
+    if (urlPath === '/api/juzhu/admin/topics' && req.method === 'GET') {
+      const rows = await queryRows("SELECT `key`, value FROM settings WHERE `key` LIKE 'topic\\_%'");
+      const topics = rows.map((r) => {
+        const slug = String(r.key).replace(/^topic_/, '');
+        let crit = {};
+        try { crit = JSON.parse(r.value || '{}'); } catch (_) { crit = {}; }
+        return { slug, label: crit.label || slug, channel: crit.channel || null, tags: Array.isArray(crit.tags) ? crit.tags : [], enabled: crit.enabled !== false, desc: crit.desc || '', cover_image: crit.cover_image || '' };
+      }).sort((a, b) => a.slug.localeCompare(b.slug));
+      return jsonReply(res, topics);
+    }
+
+    // PUT /admin/topics/:slug（upsert；专题 = 房源筛选条件，tags 至少 1 个）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/topics\/([a-z0-9][a-z0-9-]*)$/);
+      if (m && req.method === 'PUT') {
+        const slug = m[1];
+        if (!TOPIC_SLUG_RE.test(slug)) return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符' }, 400);
+        const body = await readBody(req);
+        const label = (body.label || '').trim();
+        if (!label) return jsonReply(res, { error: '专题名称不能为空' }, 400);
+        const tags = Array.isArray(body.tags) ? body.tags.map((t) => String(t || '').trim()).filter(Boolean) : [];
+        if (!tags.length) return jsonReply(res, { error: '专题至少需要 1 个 tag 条件（专题=筛选条件，规则 15）' }, 400);
+        const crit = { label, tags };
+        if (body.channel) crit.channel = String(body.channel);
+        const desc = (body.desc || '').trim(); if (desc) crit.desc = desc;
+        const cover = (body.cover_image || '').trim(); if (cover) crit.cover_image = cover;
+        // enabled 接受布尔 false / 0 / '0'（admin UI 传布尔，脚本可能传 0）
+        crit.enabled = !(body.enabled === false || body.enabled === 0 || body.enabled === '0');
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.execute(
+            'INSERT INTO settings(`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)',
+            ['topic_' + slug, JSON.stringify(crit)]
+          );
+          await conn.commit();
+          catalogMemoInvalidateTopics();
+          return jsonReply(res, { ok: true, topic: { slug, label, channel: crit.channel || null, tags, enabled: crit.enabled } });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
+    // DELETE /admin/topics/:slug（bzf 保租房专区是规则 15 既有契约，禁止删除）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/topics\/([a-z0-9][a-z0-9-]*)$/);
+      if (m && req.method === 'DELETE') {
+        if (m[1] === 'bzf') return jsonReply(res, { error: 'topic_bzf 是保租房专区既有契约（规则 15），不可删除；可编辑或下架' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute('DELETE FROM settings WHERE `key`=?', ['topic_' + m[1]]);
+          if (!r.affectedRows) { conn.end(); return jsonReply(res, { error: '专题不存在' }, 404); }
+          await conn.commit();
+          catalogMemoInvalidateTopics();
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
     // POST /admin/projects
     if (urlPath === '/api/juzhu/admin/projects' && req.method === 'POST') {
       const body = await readBody(req);
       const name = (body.name || '').trim();
-      const channel = body.channel || 'bzf';
+      const channel = body.channel || 'rental';
+      const HOUSING_CHANNELS = ['rental', 'minsu', 'newhouse', 'resale'];
       if (!name) return jsonReply(res, { error: '项目名称不能为空' }, 400);
-      if (!['bzf', 'trade'].includes(channel)) return jsonReply(res, { error: 'channel 须为 bzf 或 trade' }, 400);
+      if (!HOUSING_CHANNELS.includes(channel) && channel !== 'trade') {
+        return jsonReply(res, { error: 'channel 须为 rental/minsu/newhouse/resale/trade' }, 400);
+      }
+      if (['rental', 'minsu'].includes(channel) && String(body.status || '').toLowerCase() === 'online') {
+        return jsonReply(res, { error: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' }, 400);
+      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const resolved = await resolveBodyCityId(conn, body, '未配置城市');
         if (resolved.error) { conn.end(); return jsonReply(res, { error: resolved.error }, resolved.status); }
         const cityId = resolved.cityId;
         let districtId = body.district_id || null;
-        if (channel === 'bzf') {
-          if (!districtId) { conn.end(); return jsonReply(res, { error: '保租房项目须选择行政区' }, 400); }
+        if (HOUSING_CHANNELS.includes(channel)) {
+          if (!districtId) { conn.end(); return jsonReply(res, { error: '房源项目须选择行政区' }, 400); }
           const [d] = await conn.execute('SELECT id FROM districts WHERE id=? AND city_id=?', [districtId, cityId]);
           if (!d.length) { conn.end(); return jsonReply(res, { error: '行政区不存在或不属于当前城市' }, 400); }
         } else {
@@ -1739,6 +3293,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
           conn.end();
           return jsonReply(res, { error: e.message }, 400);
         }
+        let ownerVendorId = null;
+        if (body.owner_vendor_id != null && body.owner_vendor_id !== '') {
+          const [v] = await conn.execute('SELECT id FROM jz_vendors WHERE id=?', [parseInt(body.owner_vendor_id, 10)]);
+          if (!v.length) { conn.end(); return jsonReply(res, { error: '商家不存在' }, 400); }
+          ownerVendorId = parseInt(body.owner_vendor_id, 10);
+        }
         await conn.execute(
           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
             sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
@@ -1751,6 +3311,15 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
         const pid = r[0].id;
+        if (ownerVendorId != null || body.status != null || body.ext != null) {
+          await conn.execute(
+            'UPDATE projects SET owner_vendor_id=COALESCE(?, owner_vendor_id), status=COALESCE(?, status), ext=COALESCE(?, ext) WHERE id=?',
+            [ownerVendorId,
+             body.status != null ? String(body.status) : null,
+             body.ext != null ? JSON.stringify(body.ext) : null,
+             pid]
+          );
+        }
         if (districtId) await syncDistrictStats(conn, districtId);
         await conn.commit();
         const [projs] = await conn.execute(
@@ -1783,8 +3352,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
             put('slug', body.slug);
           }
           for (const col of ['address', 'cover_image', 'sort_order', 'price_from',
-              'is_featured', 'featured_rank', 'old_house_hint']) {
+              'is_featured', 'featured_rank', 'old_house_hint', 'status']) {
             if (col in body) put(col, body[col]);
+          }
+          if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          if ('owner_vendor_id' in body) {
+            const val = body.owner_vendor_id;
+            if (val === null || val === '') { conn.end(); return jsonReply(res, { error: 'owner_vendor_id 不可为空（商家维度必挂）' }, 400); }
+            const [v] = await conn.execute('SELECT id FROM jz_vendors WHERE id=?', [parseInt(val, 10)]);
+            if (!v.length) { conn.end(); return jsonReply(res, { error: '商家不存在' }, 400); }
+            put('owner_vendor_id', parseInt(val, 10));
           }
           try {
             const contactPhone = contactPhoneFromBody(body);
@@ -1927,6 +3504,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
           for (const col of ['area_sqm','layout_label','rent_monthly','price_total',
               'unit_spec','promo_price','sort_order','cover_image']) {
             if (col in body) put(col, body[col]);
+          }
+          if ('ext' in body) {
+            // 服务端兜底：ext.cancel_policy 过单一数据源校验，防管理端拼错口径（规则15 差异属性放 ext）
+            if (body.ext && typeof body.ext === 'object' && !Array.isArray(body.ext) && 'cancel_policy' in body.ext) {
+              try { body.ext.cancel_policy = body.ext.cancel_policy === null ? undefined : normalizeCancelPolicyInput(body.ext.cancel_policy); }
+              catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            }
+            put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
           }
           if ('tags' in body) put('tags', encodeTags(body.tags));
           if ('amenities' in body) put('amenities', body.amenities ? JSON.stringify(body.amenities) : null);
@@ -2107,19 +3692,24 @@ async function handleApiDirect(urlPath, qs, req, res) {
           const [rows] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const proj = rows[0];
-          if (proj.channel !== 'bzf') { conn.end(); return jsonReply(res, { error: '仅保租房项目可提交好房子评级' }, 400); }
+          // 权限：房主 vendor 或 platform（admin 会话/API Key）
+          const sess = await requestSession(req);
+          const owns = sess && sess.role === 'vendor' && proj.owner_vendor_id === sess.vendorId;
+          if (!owns && !(await requireApiKey(req, res))) return;
+          const dimsReq = RATING_DIMS[proj.channel];
+          if (!dimsReq) { conn.end(); return jsonReply(res, { error: '该频道暂不支持评级（支持 rental/minsu）' }, 400); }
           if (proj.rating_status === 'pending') { conn.end(); return jsonReply(res, { error: '已在复核队列中' }, 400); }
           let rating = {};
           if (proj.rating) {
             try { rating = JSON.parse(proj.rating); } catch (_) { rating = {}; }
           }
           const dims = rating.dims || {};
-          if (!['comfort','green','tech','safety'].every(k => dims[k] != null)) {
+          if (!dimsReq.every(k => dims[k] != null)) {
             conn.end();
-            return jsonReply(res, { error: '请先保存四维度自评分' }, 400);
+            return jsonReply(res, { error: `请先保存 ${dimsReq.length} 维自评分（${proj.channel} 口径）` }, 400);
           }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-          rating.code = `SY-BZF-${pid}`;
+          rating.code = `${RATING_CODE_PREFIX[proj.channel] || 'SY'}-${pid}`;
           await conn.execute(
             "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
             [JSON.stringify(rating), now, pid]
@@ -2433,10 +4023,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/jiazheng/orders （须 API Key；phone 仅作过滤）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
+      const workerFilter = await restrictOrdersRead(req, res);
+      if (workerFilter === null) return;
       const phone = (qp.get('phone') || '').trim();
       let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
                  LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
       const params = [];
+      if (workerFilter) { sql += " AND o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json) AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id'))=?"; params.push(workerFilter); }
       if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
       if (qp.get('status')) {
         const statuses = qp.get('status').split(',').filter(Boolean);
@@ -2447,15 +4040,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       if (qp.get('pay_status')) { sql += ' AND o.pay_status=?'; params.push(qp.get('pay_status')); }
       const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
-      sql += ' ORDER BY o.created_at DESC LIMIT ?';
-      params.push(limit);
+      sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
       return jsonReply(res, { items: rows });
     }
 
     // GET /api/juzhu/jiazheng/orders/stats （需 API Key，必须在 orders/:id 之前）
     if (urlPath === '/api/juzhu/jiazheng/orders/stats' && req.method === 'GET') {
-      if (!requireApiKey(req, res)) return;
+      if (!(await requireApiKey(req, res))) return;
+      const wf = await restrictOrdersRead(req, res);
+      if (wf !== undefined) return jsonReply(res, { error: 'forbidden', message: '统计仅管理账号可见' }, 403);
       const [pendingR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='pending'");
       const [dispatchedR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='dispatched'");
       const [doneR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='done' OR status='rated'");
@@ -2469,6 +4063,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
       if (m && req.method === 'GET') {
+        const workerFilter = await restrictOrdersRead(req, res);
+        if (workerFilter === null) return;
         const orderId = m[1];
         const rows = await queryRows(
           `SELECT o.*, s.name AS sku_name FROM jz_orders o
@@ -2476,6 +4072,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
           [orderId]
         );
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (workerFilter) {
+          let mine = false;
+          try { mine = rows[0].worker_json && String(JSON.parse(rows[0].worker_json).id) === workerFilter; } catch (_) {}
+          if (!mine) return jsonReply(res, { error: 'forbidden', message: '非派给你的工单' }, 403);
+        }
         return jsonReply(res, rows[0]);
       }
     }
@@ -2494,7 +4095,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const qp = new URLSearchParams(qs);
       const cityKey = (qp.get('city') || '').trim();
       const lite = qp.get('lite') === '1' || qp.get('lite') === 'true';
-      const memoKey = (lite ? 'L:' : 'F:') + (cityKey || '_');
+      const qpChannel = (qp.get('channel') || '').trim();
+      const qpTopic = (qp.get('topic') || '').trim();
+      const memoKey = (lite ? 'L:' : 'F:') + (cityKey || '_')
+        + (qpChannel ? `|c=${qpChannel}` : '') + (qpTopic ? `|t=${qpTopic}` : '');
       const cached = catalogMemoGet(memoKey);
       if (cached) return jsonReply(res, cached);
       let cities = [];
@@ -2509,10 +4113,32 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
       const city = cities[0];
+      // channel / topic 过滤（topic 定义存 settings KV：topic_<slug>；qpChannel/qpTopic 已在上方解析）
+      let projSql = "SELECT * FROM projects WHERE city_id=? AND status='online' AND rating_status='passed'";
+      const projParams = [city.id];
+      let topicMeta = null;
+      if (qpTopic) {
+        const kvRows = await queryRows('SELECT value FROM settings WHERE `key`=?', [`topic_${qpTopic}`]);
+        if (!kvRows.length) return jsonReply(res, { error: `unknown topic: ${qpTopic}` }, 404);
+        let crit = {};
+        try { crit = JSON.parse(kvRows[0].value || '{}'); } catch (_) { crit = {}; }
+        // 专题下架 = crit.enabled === false（后台「内容」tab 可配），对外与 unknown topic 同响应，不泄露存在性
+        if (crit.enabled === false) return jsonReply(res, { error: `unknown topic: ${qpTopic}` }, 404);
+        topicMeta = { topic: qpTopic, label: crit.label || qpTopic, desc: crit.desc || '' };
+        if (crit.channel) { projSql += ' AND channel=?'; projParams.push(String(crit.channel)); }
+        for (const t of (crit.tags || [])) {
+          projSql += ' AND JSON_CONTAINS(tags, ?)';
+          projParams.push(JSON.stringify(t));
+        }
+      } else if (qpChannel) {
+        projSql += ' AND channel=?';
+        projParams.push(qpChannel);
+      }
+      projSql += ' ORDER BY channel, sort_order, id';
       const [channels, districts, projects] = await Promise.all([
-        queryRows('SELECT * FROM channels ORDER BY sort_order, id'),
+        queryRows('SELECT * FROM channels WHERE enabled=1 ORDER BY sort_order, id'),
         queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]),
-        queryRows('SELECT * FROM projects WHERE city_id=? ORDER BY channel, sort_order, id', [city.id]),
+        queryRows(projSql, projParams),
       ]);
       const projectIds = projects.map((p) => p.id);
       let units = [];
@@ -2557,32 +4183,37 @@ async function handleApiDirect(urlPath, qs, req, res) {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
-        projects: mapRows(projects, ['tags', 'rating']).map(stripContactPhone),
-        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail']),
+        projects: mapRows(projects, ['tags', 'rating', 'ext']).map((p) =>
+          Object.assign(stripContactPhone(p), stayConfigOf(p))),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']).map((u) => withCancelPolicy(u)),
         photos,
+        topic: topicMeta,
         stats: {
           district_count: districts.length,
-          project_count_bzf: projects.filter((p) => p.channel === 'bzf').length,
+          project_count_rental: projects.filter((p) => p.channel === 'rental').length,
+          project_count_bzf: projects.filter((p) => p.channel === 'rental').length, // 旧字段别名
           project_count_trade: projects.filter((p) => p.channel === 'trade').length,
-          // 房源量 = 保租项目在管套数合计（不是户型条数）
+          // 房源量 = 租赁住宿项目在管套数合计（不是户型条数）
           unit_count: projects
-            .filter((p) => p.channel === 'bzf')
+            .filter((p) => p.channel === 'rental' || p.channel === 'minsu')
             .reduce((sum, p) => sum + (Number(p.managed_unit_count != null ? p.managed_unit_count : p.unit_count) || 0), 0),
         },
       };
       if (housingHydrateCoverFields) housingHydrateCoverFields(catalog);
+      imgThumbs.mapThumbsDeep(catalog, 640);   // C 端图片缩略图（原图保留，admin 端不受影响）
       catalogMemoSet(memoKey, catalog);
       return jsonReply(res, catalog);
     }
 
-    // GET /api/juzhu/ratings（按 rating_status 列出保租房评级）
+    // GET /api/juzhu/ratings（按 rating_status 列出评级；口径含 rental=好房子 / minsu=彩贝）
     if (urlPath === '/api/juzhu/ratings' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
       let sql = `SELECT p.*, d.name AS district_name FROM projects p
                  LEFT JOIN districts d ON d.id=p.district_id
-                 WHERE p.channel='bzf' AND p.rating_status IN ('pending','passed','rejected')`;
+                 WHERE p.channel IN ('rental','minsu') AND p.rating_status IN ('pending','passed','rejected')`;
       const params = [];
       if (qp.get('status')) { sql += ' AND p.rating_status=?'; params.push(qp.get('status')); }
+      if (qp.get('channel')) { sql += ' AND p.channel=?'; params.push(qp.get('channel')); }
       sql += " ORDER BY COALESCE(p.rating_submitted_at,'') DESC, p.id";
       const rows = await queryRows(sql, params);
       return jsonReply(res, rows.map(stripContactPhone));
@@ -2593,13 +4224,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const m = urlPath.match(/^\/api\/juzhu\/ratings\/([^/]+)$/);
       if (m && req.method === 'GET') {
         const code = decodeURIComponent(m[1]);
-        // code 格式 SY-BZF-{id}，直接按 id 查
+        // code 格式 <前缀>-{id}（SY-BZF-/SY-RENT-/MZ-），直接按 id 查
         const idMatch = code.match(/-(\d+)$/);
         let proj = null;
         if (idMatch) {
           const rows = await queryRows(
             `SELECT p.*, d.name AS district_name FROM projects p
-             LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=? AND p.channel='bzf'`,
+             LEFT JOIN districts d ON d.id=p.district_id WHERE p.id=?`,
             [parseInt(idMatch[1])]
           );
           if (rows.length) proj = rows[0];
@@ -2627,7 +4258,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!dists.length) return jsonReply(res, { error: 'not found' }, 404);
         const dist = dists[0];
         const projects = await queryRows(
-          "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='bzf' ORDER BY sort_order",
+          "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured FROM projects WHERE district_id=? AND channel='rental' AND status='online' AND rating_status='passed' ORDER BY sort_order",
           [dist.id]
         );
         projects.forEach(r => parseJsonFields(r, ['tags']));
@@ -2643,12 +4274,136 @@ async function handleApiDirect(urlPath, qs, req, res) {
         // slug 可能是纯数字（id），兼容两种查询
         const isId = /^\d+$/.test(slug);
         const sql = isId
-          ? 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE id=?'
-          : 'SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating FROM projects WHERE slug=?';
+          ? "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE id=? AND status='online' AND rating_status='passed'"
+          : "SELECT id,name,slug,cover_image,address,tags,sort_order,unit_count,managed_unit_count,price_from,is_featured,channel,district_id,rating_status,rating,ext,status,owner_vendor_id FROM projects WHERE slug=? AND status='online' AND rating_status='passed'";
         const rows = await queryRows(sql, [isId ? parseInt(slug) : slug]);
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(rows[0], ['tags', 'rating']);
-        return jsonReply(res, rows[0]);
+        // 周边玩法（规则 17）：随项目下发绑定的维度地点（enabled=1，景区→商圈→美食→咖啡 分组序由 SQL 排定）
+        const spots = await queryRows(
+          "SELECT s.id,s.type,s.name,s.slug,s.icon,s.cover_image,s.summary,s.tags,s.link,ps.note " +
+          'FROM project_spots ps JOIN spots s ON s.id=ps.spot_id ' +
+          'WHERE ps.project_id=? AND s.enabled=1 ' +
+          "ORDER BY FIELD(s.type,'scenic','biz','food','cafe'), ps.sort_order, s.sort_order, s.id",
+          [rows[0].id]
+        );
+        spots.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
+        // 商家维度咨询优先展示模式（jz_vendors.consult_mode，缺省 consultant）
+        const vrows = rows[0].owner_vendor_id
+          ? await queryRows('SELECT consult_mode FROM jz_vendors WHERE id=?', [rows[0].owner_vendor_id])
+          : [];
+        return jsonReply(res, imgThumbs.mapThumbsDeep(
+          Object.assign(rows[0], stayConfigOf(rows[0]), {
+            consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant',
+            spots
+          }), 640));
+      }
+    }
+
+    // ===== 内容域公开读（旅游路线 + 周边玩法列表，公网白名单）=====
+    // 路线站点水合：stops JSON [{spot_id, note}] → 附 spot 摘要卡（正文仍在 spots，笔记页深链按 spot.id）
+    const hydrateRouteStops = async (rows) => {
+      rows.forEach((r) => { try { r.stops = r.stops ? JSON.parse(r.stops) : []; } catch (_) { r.stops = []; } });
+      const ids = [];
+      rows.forEach((r) => r.stops.forEach((s) => { const id = parseInt(s.spot_id, 10); if (id && ids.indexOf(id) < 0) ids.push(id); }));
+      const smap = {};
+      if (ids.length) {
+        const sp = await queryRows('SELECT id,type,name,slug,icon,cover_image,summary,address,duration,ticket FROM spots WHERE enabled=1 AND id IN (' + ids.map(() => '?').join(',') + ')', ids);
+        sp.forEach((s) => { s.type_label = SPOT_TYPE_LABELS[s.type] || s.type; smap[s.id] = s; });
+      }
+      rows.forEach((r) => {
+        r.stop_count = r.stops.length;
+        r.stops = r.stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10) || 0, note: s.note || '', spot: smap[parseInt(s.spot_id, 10)] || null }));
+      });
+      return rows;
+    };
+
+    // GET /api/juzhu/routes?city= —— 路线列表（enabled；city 匹配或全省通用；未知城市回落通用路线不报错）
+    if (urlPath === '/api/juzhu/routes' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const cityKey = (qp.get('city') || '').trim();
+      let cityId = null;
+      if (cityKey) {
+        const cities = await queryRows('SELECT id FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+        cityId = cities.length ? cities[0].id : null;
+      }
+      const rows = await queryRows(
+        'SELECT * FROM routes WHERE enabled=1 AND (city_id IS NULL' + (cityId ? ' OR city_id=?' : '') + ') ORDER BY sort_order, id',
+        cityId ? [cityId] : []
+      );
+      await hydrateRouteStops(rows);
+      return jsonReply(res, imgThumbs.mapThumbsDeep({ routes: rows }, 640));
+    }
+
+    // GET /api/juzhu/routes/:id —— 路线详情
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/routes\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const rows = await queryRows('SELECT * FROM routes WHERE id=? AND enabled=1', [parseInt(m[1])]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        await hydrateRouteStops(rows);
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ route: rows[0] }, 640));
+      }
+    }
+
+    // GET /api/juzhu/spots?city=&type= —— 周边玩法列表（C 端 lvju-app-spots 列表页消费；city_id NULL = 全省通用）
+    if (urlPath === '/api/juzhu/spots' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const conds = ['enabled=1'], params = [];
+      if (qp.get('type')) { conds.push('type=?'); params.push(qp.get('type')); }
+      const cityKey = (qp.get('city') || '').trim();
+      let cityId = null;
+      if (cityKey) {
+        const cities = await queryRows('SELECT id FROM cities WHERE slug=? OR name=? ORDER BY id LIMIT 1', [cityKey, cityKey]);
+        cityId = cities.length ? cities[0].id : null;
+      }
+      if (cityId) { conds.push('(city_id=? OR city_id IS NULL)'); params.push(cityId); }
+      const rows = await queryRows(
+        'SELECT id,type,name,slug,icon,cover_image,summary,address,duration,ticket,tags FROM spots WHERE ' + conds.join(' AND ') +
+        " ORDER BY FIELD(type,'scenic','biz','food','cafe'), sort_order, id",
+        params
+      );
+      rows.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
+      return jsonReply(res, imgThumbs.mapThumbsDeep({ spots: rows }, 640));
+    }
+
+    // GET /api/juzhu/topics —— 房源专题公开清单（enabled；C 端找房枢纽「专题入口」消费）
+    if (urlPath === '/api/juzhu/topics' && req.method === 'GET') {
+      const rows = await queryRows("SELECT `key`, value FROM settings WHERE `key` LIKE 'topic\\_%'");
+      const topics = rows.map((r) => {
+        const slug = String(r.key).replace(/^topic_/, '');
+        let crit = {};
+        try { crit = JSON.parse(r.value || '{}'); } catch (_) { crit = {}; }
+        return { slug, label: crit.label || slug, channel: crit.channel || null,
+                 tags: Array.isArray(crit.tags) ? crit.tags : [], desc: crit.desc || '', cover_image: crit.cover_image || '' };
+      }).filter((t) => t.tags.length)
+        .sort((a, b) => a.slug.localeCompare(b.slug));
+      return jsonReply(res, { topics });
+    }
+
+    // GET /api/juzhu/spots/:id —— 周边玩法笔记详情（公网白名单，C 端 lvju-app-spot-post 页消费）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/spots\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        const sid = parseInt(m[1]);
+        const rows = await queryRows('SELECT * FROM spots WHERE id=? AND enabled=1', [sid]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        parseJsonFields(rows[0], ['tags', 'photos']);
+        rows[0].type_label = SPOT_TYPE_LABELS[rows[0].type] || rows[0].type;
+        // 相关笔记：同类优先，不足 3 条时以同城市/全省通用补齐（不做跨类凑数误导）
+        let related = await queryRows(
+          'SELECT id,type,name,slug,icon,cover_image,summary,tags FROM spots WHERE enabled=1 AND id<>? AND type=? ORDER BY sort_order, id LIMIT 4',
+          [sid, rows[0].type]
+        );
+        if (related.length < 3) {
+          const extra = await queryRows(
+            "SELECT id,type,name,slug,icon,cover_image,summary,tags FROM spots WHERE enabled=1 AND id<>? AND type<>? AND (city_id=? OR city_id IS NULL) ORDER BY FIELD(type,'scenic','biz','food','cafe'), sort_order, id LIMIT 4",
+            [sid, rows[0].type, rows[0].city_id]
+          );
+          related = related.concat(extra).slice(0, 4);
+        }
+        related.forEach((r) => { parseJsonFields(r, ['tags']); r.type_label = SPOT_TYPE_LABELS[r.type] || r.type; });
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ spot: rows[0], related }, 640));
       }
     }
 
@@ -2658,7 +4413,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'GET') {
         const slug = decodeURIComponent(m[1]);
         const isId = /^\d+$/.test(slug);
-        const projSql = isId ? 'SELECT * FROM projects WHERE id=?' : 'SELECT * FROM projects WHERE slug=?';
+        const projSql = isId
+          ? "SELECT * FROM projects WHERE id=? AND status='online' AND rating_status='passed'"
+          : "SELECT * FROM projects WHERE slug=? AND status='online' AND rating_status='passed'";
         const projs = await queryRows(projSql, [isId ? parseInt(slug) : slug]);
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         const proj = projs[0];
@@ -2667,39 +4424,1372 @@ async function handleApiDirect(urlPath, qs, req, res) {
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
           [proj.id]
         );
-        return jsonReply(res, { project: stripContactPhone(proj), units, photos });
+        parseJsonFields(proj, ['tags', 'rating']);
+        units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
+        return jsonReply(res, imgThumbs.mapThumbsDeep({ project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos }, 640));
+      }
+    }
+
+    // GET /api/juzhu/projects/:id/stay-calendar?month=YYYY-MM&unit_id= —— 房态日历（公开，无 PII）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/projects\/(\d+)\/stay-calendar$/);
+      if (m && req.method === 'GET') {
+        const pid = parseInt(m[1], 10);
+        const qp = new URLSearchParams(qs);
+        const unitId = qp.get('unit_id') ? parseInt(qp.get('unit_id'), 10) || 0 : 0;
+        const mth = /^(\d{4})-(\d{2})$/.exec((qp.get('month') || '').trim());
+        const today = new Date();
+        const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
+        const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
+        const prows = await queryRows("SELECT * FROM projects WHERE id=? AND status='online' AND rating_status='passed'", [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        // units=u1,u2 批量形状：一次返回该月多个户型的房态（C 端详情页整月横滚用，省 (N-1)/N 请求）
+        const unitsParam = (qp.get('units') || '').split(',').map((x) => parseInt(x, 10)).filter((x) => x > 0).slice(0, 10);
+        if (unitsParam.length) {
+          const out = [];
+          for (const uid of unitsParam) {
+            const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [uid, pid]);
+            if (!us.length) continue;
+            const up = cancelPolicyOf(us[0]);   // 房型级取消政策随月历下发（C 端房型卡直接用）
+            out.push(Object.assign({ unit_id: uid, cancel_policy: up, cancel_policy_text: cancelPolicyTextOf(up) },
+              await buildStayMonth(prows[0], us[0], uid, y, mo)));
+          }
+          return jsonReply(res, { project_id: pid, month: `${y}-${String(mo + 1).padStart(2, '0')}`, units: out });
+        }
+        let unit = null;
+        if (unitId) {
+          const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          unit = us[0];
+        }
+        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        const unitPolicy = unit ? cancelPolicyOf(unit) : null;
+        return jsonReply(res, Object.assign({
+          project_id: pid,
+          unit_id: unitId,
+        }, cal, stayConfigOf(prows[0]), unitPolicy ? { cancel_policy: unitPolicy, cancel_policy_text: cancelPolicyTextOf(unitPolicy) } : {}));
       }
     }
 
     // ===== admin auth 接口 =====
 
-    // POST /api/juzhu/admin/auth/login
+    // POST /api/juzhu/admin/auth/login —— 走账号中心（accounts 表）
+    // 必须显式 login_name（旧「只传 password 默认唯一 platform_admin」已移除：可被探测账号存在性）
     if (urlPath === '/api/juzhu/admin/auth/login' && req.method === 'POST') {
       const body = await readBody(req);
-      const pwd = (body.password || '').trim();
-      const expected = expectedAdminPassword();
-      if (!pwd || !expected || !crypto.timingSafeEqual(
-        crypto.createHash('sha256').update(pwd).digest(),
-        crypto.createHash('sha256').update(expected).digest()
-      )) {
-        return jsonReply(res, { error: '密码错误' }, 401);
-      }
-      const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
-      const sig = crypto.createHmac('sha256', expected).update(String(exp)).digest('hex');
-      return jsonReply(res, { token: `${exp}.${sig}`, expires_at: new Date(exp * 1000).toISOString() });
+      const idName = String(body.login_name || body.username || '').trim();
+      const pwd = String(body.password || '');
+      if (!idName) return jsonReply(res, { error: '请输入账号' }, 400);
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
+      const out = await authCenter.loginWithPassword(idName, pwd, ip, req.headers['user-agent'] || '', { ttlSeconds: authCenter.SESSION_TTL.human_admin });
+      if (out.error) return jsonReply(res, { error: out.error, retry_after: out.retry_after }, out.throttled ? 429 : 401);
+      return jsonReply(res, {
+        token: out.token,
+        expires_at: out.expires_at,
+        account: out.account,
+        roles: out.roles.map((r) => r.role_code),
+      });
     }
 
     // GET /api/juzhu/admin/auth/check
     if (urlPath === '/api/juzhu/admin/auth/check' && req.method === 'GET') {
       const token = extractBearerToken(req);
-      if (!verifyAdminLoginToken(token)) return jsonReply(res, { ok: false }, 401);
-      const exp = parseInt(token.split('.')[0], 10);
-      return jsonReply(res, { ok: true, expires_at: new Date(exp * 1000).toISOString() });
+      const sess = await authCenter.verifySessionToken(token).catch(() => null);
+      if (sess) {
+        return jsonReply(res, {
+          ok: true,
+          account: sess.account,
+          roles: sess.roles.map((r) => r.role_code),
+          permissions: [...authCenter.permissionsOf({ roles: sess.roles })],
+        });
+      }
+      if (verifyAdminLoginToken(token)) {
+        const exp = parseInt(token.split('.')[0], 10);
+        return jsonReply(res, { ok: true, legacy: true, expires_at: new Date(exp * 1000).toISOString() });
+      }
+      return jsonReply(res, { ok: false }, 401);
+    }
+
+    // ===== 账号中心管理（platform_admin；原生多账号：任何主体直接挂 N 个 account）=====
+
+    // ===== IdP 联邦配置（platform_admin；secret 只写不读）=====
+    // GET /api/juzhu/admin/idp-configs（权限已由入口闸按 perm_registry 校验：admin.read）
+    if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.listIdpConfigs());
+    }
+    // PUT /api/juzhu/admin/idp-configs —— 新建/更新（body.org_no 为主键维度；client_secret 缺省=不改）
+    if (urlPath === '/api/juzhu/admin/idp-configs' && req.method === 'PUT') {
+      const body = await readBody(req);
+      const wp = req.principal;
+      const out = await authCenter.upsertIdpConfig(body, {
+        accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+        ip: wp && wp.ip, ua: wp && wp.ua,
+      });
+      if (out.error) return jsonReply(res, { error: out.error }, 400);
+      return jsonReply(res, out);
+    }
+
+    // GET /api/juzhu/admin/accounts?vendor_id=&org_id=&principal_type=
+    // （权限已由入口闸按 perm_registry 校验：admin.read；旧全局 Key 在闸上已 403）
+    if (urlPath === '/api/juzhu/admin/accounts' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.listAccounts(Object.fromEntries(new URLSearchParams(qs))));
+    }
+
+    // POST /api/juzhu/admin/accounts —— 创建账号（写操作已由入口闸要求 admin.write）
+    if (urlPath === '/api/juzhu/admin/accounts' && req.method === 'POST') {
+      const body = await readBody(req);
+      const wp = req.principal;
+      const out = await authCenter.createAccount(body, {
+        accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+        ip: wp && wp.ip, ua: wp && wp.ua,
+      });
+      if (out.error) return jsonReply(res, { error: out.error }, 400);
+      return jsonReply(res, out, 201);
+    }
+
+    // PUT /api/juzhu/admin/accounts/:id —— 改资料/状态/角色/密码（密码或停用会吊销全部会话）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/accounts\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const wp = req.principal;
+        const out = await authCenter.updateAccount(parseInt(m[1], 10), body, {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        if (out.error) return jsonReply(res, { error: out.error }, out.error === '账号不存在' ? 404 : 400);
+        return jsonReply(res, out);
+      }
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/accounts\/(\d+)\/api-key$/);
+      if (m && req.method === 'POST') {
+        const wp = req.principal;
+        const out = await authCenter.issueApiKey(parseInt(m[1], 10), {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        if (out.error) return jsonReply(res, { error: out.error }, 404);
+        return jsonReply(res, out);
+      }
+    }
+
+    // ===== 账号中心管理面（B5）：permissions / overview / roles / orgs / sessions =====
+    // （各路由权限已由入口闸按 perm_registry 校验，见 ROUTES IAM 管理面段）
+
+    // GET /admin/permissions —— 权限点目录 + 角色赋值矩阵（账号中心「功能权限」页数据源）
+    if (urlPath === '/api/juzhu/admin/permissions' && req.method === 'GET') {
+      const roles = await authCenter.listRoles();
+      return jsonReply(res, {
+        perms: permRegistry.PERMS,
+        roles: roles.map((r) => ({ role_code: r.role_code, name: r.name, builtin: r.builtin, account_count: r.account_count, permissions: r.permissions })),
+      });
+    }
+
+    // GET /admin/iam/overview —— 总览卡片
+    if (urlPath === '/api/juzhu/admin/iam/overview' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.iamOverview());
+    }
+
+    // 角色 CRUD
+    if (urlPath === '/api/juzhu/admin/roles' && req.method === 'GET') {
+      return jsonReply(res, await authCenter.listRoles());
+    }
+    if (urlPath === '/api/juzhu/admin/roles' && req.method === 'POST') {
+      const body = await readBody(req);
+      const wp = req.principal;
+      const out = await authCenter.createRole(body, {
+        accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+        ip: wp && wp.ip, ua: wp && wp.ua,
+      });
+      if (out.error) return jsonReply(res, { error: out.error }, 400);
+      return jsonReply(res, out);
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/roles\/([^/]+)$/);
+      if (m && (req.method === 'PUT' || req.method === 'DELETE')) {
+        const body = req.method === 'PUT' ? await readBody(req) : {};
+        const wp = req.principal;
+        const ctx = {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        };
+        const out = req.method === 'PUT'
+          ? await authCenter.updateRole(decodeURIComponent(m[1]), body, ctx)
+          : await authCenter.deleteRole(decodeURIComponent(m[1]), ctx);
+        if (out.error) return jsonReply(res, { error: out.error }, 400);
+        return jsonReply(res, out);
+      }
+    }
+
+    // orgs：数据权限配置的机构下拉 + city_ids 维护
+    if (urlPath === '/api/juzhu/admin/orgs' && req.method === 'GET') {
+      const orgs = await authCenter.listOrgs();
+      return jsonReply(res, orgs.map((o) => Object.assign(o, { city_ids: (() => { try { return JSON.parse(o.city_ids || '[]'); } catch (_) { return []; } })() })));
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/orgs\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        const wp = req.principal;
+        // org.write 非平台主体（有 org 绑定）只能维护本机构
+        const isPlatform = wp && wp.type === 'account' && (authCenter.hasPermission(wp, '*') ||
+          (!wp.account.org_id && !wp.account.vendor_id));
+        if (wp && wp.type === 'account' && !isPlatform && Number(wp.account.org_id) !== parseInt(m[1], 10)) {
+          return jsonReply(res, { error: 'forbidden', message: '只能维护本机构信息' }, 403);
+        }
+        const out = await authCenter.updateOrg(parseInt(m[1], 10), body, {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        if (out.error) return jsonReply(res, { error: out.error }, 400);
+        return jsonReply(res, out);
+      }
+    }
+
+    // 会话管理：列表 / 全部下线 / 单会话下线
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/accounts\/(\d+)\/sessions$/);
+      if (m && req.method === 'GET') return jsonReply(res, await authCenter.listSessions(parseInt(m[1], 10)));
+      if (m && req.method === 'DELETE') {
+        const wp = req.principal;
+        const out = await authCenter.revokeAccountSessions(parseInt(m[1], 10), {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        return jsonReply(res, out);
+      }
+    }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/sessions\/([^/]+)$/);
+      if (m && req.method === 'DELETE') {
+        const wp = req.principal;
+        const out = await authCenter.revokeSessionByJti(decodeURIComponent(m[1]), {
+          accountId: wp && wp.account && wp.account.id, principalType: 'account', roles: wp && wp.roles,
+          ip: wp && wp.ip, ua: wp && wp.ua,
+        });
+        return jsonReply(res, out);
+      }
+    }
+
+    // GET /api/juzhu/admin/audit?limit=&action=&account_id=&resource=&result=&from=&to=&ip=&before_id=
+    // （权限已由入口闸按 perm_registry 校验：audit.read）
+    if (urlPath === '/api/juzhu/admin/audit' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const limit = Math.min(parseInt(qp.get('limit') || '100', 10) || 100, 500);
+      const where = [];
+      const params = [];
+      if (qp.get('action')) { where.push('action LIKE ?'); params.push(qp.get('action') + '%'); }
+      if (qp.get('account_id')) { where.push('account_id=?'); params.push(parseInt(qp.get('account_id'), 10)); }
+      if (qp.get('resource')) { where.push('resource=?'); params.push(qp.get('resource')); }
+      if (qp.get('result')) { where.push('result=?'); params.push(qp.get('result')); }
+      if (qp.get('ip')) { where.push('ip=?'); params.push(qp.get('ip')); }
+      if (qp.get('from')) { where.push('created_at>=?'); params.push(qp.get('from')); }
+      if (qp.get('to')) { where.push('created_at<=?'); params.push(qp.get('to')); }
+      if (qp.get('before_id')) { where.push('id<?'); params.push(parseInt(qp.get('before_id'), 10)); }
+      const rows = await queryRows(
+        `SELECT * FROM audit_log ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY id DESC LIMIT ${limit}`,
+        params
+      );
+      return jsonReply(res, rows);
+    }
+
+    // ===== C 端登录（租客）：贝壳 SDK 默认 + 密码兜底（JIT 建档，role=user）=====
+
+    // POST /api/juzhu/auth/tenant —— 手机号+密码；首登自动建档（真实凭证，生产可用）
+    if (urlPath === '/api/juzhu/auth/tenant' && req.method === 'POST') {
+      const body = await readBody(req);
+      const phone = String(body.phone || '').trim();
+      const password = String(body.password || '');
+      const name = String(body.name || '').trim();
+      if (!/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '手机号格式不对' }, 400);
+      if (password.length < 8) return jsonReply(res, { error: '密码至少 8 位' }, 400);
+      const loginName = 'u' + phone;
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      const ua2 = req.headers['user-agent'] || '';
+      const dup = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      if (!dup.length) {
+        const created = await authCenter.createAccount({
+          login_name: loginName, password, roles: ['user'], principal_type: 'user',
+          phone, display_name: name || ('租客' + phone.slice(-4)),
+        }, { ip, ua: ua2 });
+        if (created.error) return jsonReply(res, { error: created.error }, 400);
+        // 新建档即已持有本人密码，直接发会话（避免再走一次登录把一次请求计成两次失败）
+        const sess = await authCenter.createSession(created.account.id, ip, ua2);
+        return jsonReply(res, { ok: true, token: sess.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: created.account.display_name });
+      }
+      // 已有账号：校验密码（防他人抢注覆盖）；只调一次，带真实 ip/ua 保证审计与节流计数准确
+      const login = await authCenter.loginWithPassword(phone, password, ip, ua2);
+      if (login.error) {
+        if (login.throttled) return jsonReply(res, { error: login.error, retry_after: login.retry_after }, 429);
+        return jsonReply(res, { error: '该手机号已注册，密码不对' }, 401);
+      }
+      return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
+    }
+
+    // POST /api/juzhu/auth/beike —— 贝壳 SDK 登录换会话（App 内 jsbridge getUserInfo 回传）
+    // ⚠ 生产环境必须接入真实 SDK 验签（app_id/secret 或 OIDC），当前仅非生产开放（出边界）
+    if (urlPath === '/api/juzhu/auth/beike' && req.method === 'POST') {
+      if (isProduction()) return jsonReply(res, { error: '生产环境暂未接入贝壳 SDK 验签，请用密码登录' }, 501);
+      const body = await readBody(req);
+      const uid = String(body.uid || '').trim();
+      const phone = String(body.phone || '').trim();
+      const name = String(body.name || '').trim();
+      if (!uid || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: 'uid 与手机号必填' }, 400);
+      const loginName = 'bk' + uid;
+      let accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      if (!accRows.length) {
+        const created = await authCenter.createAccount({
+          login_name: loginName, password: 'bk-' + crypto.randomBytes(12).toString('hex'),
+          roles: ['user'], principal_type: 'user', phone,
+          display_name: name || ('贝壳用户' + uid.slice(-4)),
+        }, { ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ua: req.headers['user-agent'] || '' });
+        if (created.error) return jsonReply(res, { error: created.error }, 400);
+      } else {
+        await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone) WHERE id=?', [phone, accRows[0].id]).catch(() => {});
+      }
+      accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      const sess = await authCenter.createSession(accRows[0].id, (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), req.headers['user-agent'] || '');
+      return jsonReply(res, { ok: true, token: sess.token, role: 'user', expires_at: sess.expires_at });
+    }
+
+    // GET /api/juzhu/booking/my —— 我的预订（登录会话；按 user_id + 账号手机号认领）
+    if (urlPath === '/api/juzhu/booking/my' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized', message: '请先登录（贝壳 SDK 或手机号密码）' }, 401);
+      const accPhone = sess.account.phone || '';
+      const rows = await queryRows(
+        `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, p.name AS project_name,
+                b.checkin, b.checkout, b.nights, b.price_total, b.status, b.created_at,
+                b.pay_status, b.pay_method,
+                b.contact_name, b.contact_phone, uu.ext AS unit_ext
+         FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
+         LEFT JOIN units uu ON uu.id=b.unit_id
+         WHERE b.user_id=? ${accPhone ? 'OR b.contact_phone=?' : ''}
+         ORDER BY b.id DESC LIMIT 100`,
+        accPhone ? [String(sess.account.id), accPhone] : [String(sess.account.id)]
+      );
+      // 整栋单（unit_id 空）回退：取项目首个房型（sort_order 最小）的 ext 作为取消政策口径
+      const firstExtByProject = {};
+      const unitlessPids = [...new Set(rows.filter((o) => o.unit_id == null).map((o) => o.project_id))];
+      for (const upid of unitlessPids) {
+        const fu = await cancelUnitRowFor(queryRows, null, upid);
+        if (fu) firstExtByProject[upid] = fu.ext;
+      }
+      return jsonReply(res, {
+        role: sess.role,
+        items: rows.map((o) => {
+          const cpUnit = o.unit_ext ? { ext: o.unit_ext } : (firstExtByProject[o.project_id] != null ? { ext: firstExtByProject[o.project_id] } : null);
+          const cancelInfo = orderCancelInfoOf(cpUnit, o);
+          return Object.assign({}, o, {
+            contact_phone: maskPhoneStd(o.contact_phone),
+            contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
+            contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
+            cancel_policy_text: cancelInfo.cancel_policy_text, // 退改口径随单下发，C 端取消按钮以 can_cancel 为准
+            cancel_deadline: cancelInfo.cancel_deadline,
+            can_cancel: cancelInfo.can_cancel,
+          });
+        }),
+      });
+    }
+
+    // ===== 联系人簿（booking_contacts，登录用户自己的常用联系人）=====
+
+    // GET /api/juzhu/booking/contacts —— 我的联系人（本人视角，手机号不脱敏）
+    if (urlPath === '/api/juzhu/booking/contacts' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const rows = await queryRows(
+        'SELECT id, name, phone FROM booking_contacts WHERE user_id=? ORDER BY id DESC LIMIT 20',
+        [String(sess.account.id)]
+      );
+      return jsonReply(res, { items: rows });
+    }
+
+    // POST /api/juzhu/booking/contacts —— 新增联系人（本人，上限 20）
+    if (urlPath === '/api/juzhu/booking/contacts' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const phone = String(body.phone || '').trim();
+      if (!name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '姓名与 11 位手机号为必填' }, 400);
+      const cntRows = await queryRows('SELECT COUNT(*) AS n FROM booking_contacts WHERE user_id=?', [String(sess.account.id)]);
+      if (cntRows[0].n >= 20) return jsonReply(res, { error: '联系人最多 20 个' }, 400);
+      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const [r] = await conn.execute(
+          'INSERT INTO booking_contacts(user_id,name,phone,created_at) VALUES (?,?,?,?)',
+          [String(sess.account.id), name, phone, now]
+        );
+        await conn.commit();
+        return jsonReply(res, { ok: true, id: r.insertId, name, phone });
+      } finally { await conn.end(); }
+    }
+
+    // DELETE /api/juzhu/booking/contacts/:id —— 删除本人联系人
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/booking\/contacts\/(\d+)$/);
+      if (m && req.method === 'DELETE') {
+        const sess = await requestSession(req);
+        if (!sess || !sess.account) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [r] = await conn.execute(
+            'DELETE FROM booking_contacts WHERE id=? AND user_id=?',
+            [parseInt(m[1], 10), String(sess.account.id)]
+          );
+          await conn.commit();
+          return jsonReply(res, { ok: r.affectedRows > 0 });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 旅居预订（booking_orders）：C 端公开下单/查单/取消 + 商家确认 =====
+
+    // POST /api/juzhu/booking —— 公开下单（规则10：手机号只入库，响应不回显）
+    if (urlPath === '/api/juzhu/booking' && req.method === 'POST') {
+      const body = await readBody(req);
+      const projectId = parseInt(body.project_id, 10);
+      const unitId = body.unit_id == null || body.unit_id === '' ? null : parseInt(body.unit_id, 10);
+      const name = String(body.contact_name || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      const checkin = String(body.checkin || '').trim();
+      const checkout = String(body.checkout || '').trim();
+      const idempotencyKey = String(body.idempotency_key || req.headers['idempotency-key'] || '').trim().slice(0, 100);
+      if (!projectId || !name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '项目、联系人、11 位手机号为必填' }, 400);
+      if (unitId !== null && (!Number.isInteger(unitId) || unitId <= 0)) return jsonReply(res, { error: 'unit_id 须为正整数' }, 400);
+      if (!stayCfg.isValidDateString(checkin) || !stayCfg.isValidDateString(checkout)) return jsonReply(res, { error: '日期须为真实有效的 YYYY-MM-DD' }, 400);
+      const nights = Math.round((new Date(checkout) - new Date(checkin)) / 864e5);
+      if (!(nights >= 1)) return jsonReply(res, { error: '离店须晚于入住至少 1 晚' }, 400);
+      if (new Date(checkin) < new Date(new Date().toDateString())) return jsonReply(res, { error: '入住日期不能早于今天' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        await conn.beginTransaction();
+        if (idempotencyKey) {
+          const [existing] = await conn.execute('SELECT * FROM booking_orders WHERE idempotency_key=? LIMIT 1 FOR UPDATE', [idempotencyKey]);
+          if (existing.length) {
+            await conn.commit();
+            return jsonReply(res, { ok: true, order_no: existing[0].order_no, nights: existing[0].nights,
+              price_total: existing[0].price_total, status: existing[0].status, pay_status: existing[0].pay_status,
+              idempotent_replay: true });
+          }
+        }
+        const [projs] = await conn.execute('SELECT id, name, channel, status, rating_status, price_from, owner_vendor_id, city_id, ext, tags FROM projects WHERE id=? FOR UPDATE', [projectId]);
+        const proj = projs[0];
+        if (!proj) { await conn.rollback(); return jsonReply(res, { error: '项目不存在' }, 404); }
+        if (!['rental', 'minsu'].includes(proj.channel)) { await conn.rollback(); return jsonReply(res, { error: '该频道不支持预订（仅 rental/minsu）' }, 400); }
+        if (proj.status !== 'online' || proj.rating_status !== 'passed') { await conn.rollback(); return jsonReply(res, { error: '房源未通过审核或已下架，暂不可预订' }, 400); }
+        // 在线预订 = 项目已开通（projects.ext.stay_bookable，B 端房态页「按晚预订」开关）；
+        // 口径（2026-09-05）：默认一律仅 400 电话咨询，开通后 minsu 走预付收银台、
+        // rental 走预订单；tag 不参与判断，购房类频道（newhouse/resale/trade）不可订
+        if (!bookableOf(proj)) { await conn.rollback(); return jsonReply(res, { error: '该项目未开通在线预订，请拨打页面咨询电话' }, 400); }
+        // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
+        const minNights = minStayNightsOf(proj);
+        if (nights < minNights) {
+          await conn.rollback();
+          return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
+        }
+        // 事务内锁项目行，清理已过期的 mock 待支付订单后再复核房态，避免并发双订。
+        const [stale] = await conn.execute(
+          `SELECT DISTINCT b.* FROM booking_orders b JOIN stay_calendar s ON s.booking_id=b.id
+             WHERE b.project_id=? AND b.status='pending' AND b.pay_status='unpaid' AND b.payment_expires_at IS NOT NULL
+               AND s.status='booked' AND s.stay_date >= ? AND s.stay_date < ? FOR UPDATE`, [projectId, checkin, checkout]);
+        for (const old of stale) await expireBooking(conn, old);
+        // 房态冲突校验：unit 未指定 = 整栋/不限房型 → 全项目任一晚被占即拒；指定户型 → 项目级 + 该户型
+        const [conflicts] = await conn.execute(
+          `SELECT stay_date, unit_id, status FROM stay_calendar
+           WHERE project_id=? AND status IN ('blocked','booked') AND stay_date >= ? AND stay_date < ?
+           ${unitId ? 'AND unit_id IN (0, ?)' : ''} ORDER BY stay_date LIMIT 1`,
+          unitId ? [projectId, checkin, checkout, unitId] : [projectId, checkin, checkout]
+        );
+        if (conflicts.length) {
+          await conn.rollback();
+          return jsonReply(res, { error: `所选日期 ${conflicts[0].stay_date} 已被预订或已关房，请换时段`, conflict_date: conflicts[0].stay_date }, 400);
+        }
+      // 登录用户下单 → 订单归属（未登录则 user_id 为空，可后续按手机号认领）
+      let bookingUserId = null;
+      try {
+        const bsess = await requestSession(req);
+        if (bsess && bsess.account) bookingUserId = String(bsess.account.id);
+      } catch (_) {}
+        let perNight = 0;
+        let unitRow = null;
+        if (unitId) {
+          const [us] = await conn.execute('SELECT id, project_id, rent_monthly, ext FROM units WHERE id=?', [unitId]);
+          if (!us.length || us[0].project_id !== projectId) { await conn.rollback(); return jsonReply(res, { error: '户型不存在或不属于该项目' }, 400); }
+          unitRow = us[0];
+          perNight = unitNightPrice(proj, us[0]);   // 夜价口径（规则15/16）单一数据源 stay_config.cjs
+        }
+        if (!perNight) perNight = unitNightPrice(proj, null);
+        const priceTotal = perNight * nights;
+        // 佣金快照（规则 20）：按 owner 商家 housing 档生效费率锁定，调价不追溯；
+        // 平台自营（无商家行）回落全局基准
+        const [vrate] = proj.owner_vendor_id
+          ? await conn.execute('SELECT commission_housing FROM jz_vendors WHERE id=?', [proj.owner_vendor_id])
+          : [[]];
+        const rate = vendorRate.effectiveRateOf(vrate[0] || null, 'housing',
+          { commission_housing_default: await settingValue(vendorRate.defaultSettingKey('housing')) });
+        const commissionFee = vendorRate.commissionAmountOf(priceTotal, rate);
+        const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
+        const paymentExpiresAt = proj.channel === 'minsu' ? new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ') : null;
+        const tempOrderNo = `TMP-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`.slice(0, 32);
+        const [ins] = await conn.execute(
+          `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,price_total,commission_rate,commission_fee,status,pay_status,idempotency_key,payment_expires_at,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?)`,
+          [tempOrderNo, projectId, unitId, proj.channel, proj.city_id, proj.owner_vendor_id, bookingUserId, name, phone, checkin, checkout, nights, priceTotal,
+           rate, commissionFee,
+           proj.channel === 'minsu' ? 'unpaid' : null, idempotencyKey || null, paymentExpiresAt, now, now]
+        );
+        const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
+        await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
+        // 下单即占房态（stay_calendar booked 行，取消时释放）
+        const stayDates = stayDateList(checkin, checkout);
+        if (stayDates.length) {
+          const nowSc = now;
+          const scVals = stayDates.map((d) => [projectId, unitId || 0, d, 'booked', 'booking', ins.insertId, nowSc]);
+          await conn.query(
+            `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booking_id, updated_at)
+             VALUES ${scVals.map(() => '(?,?,?,?,?,?,?)').join(',')}
+             ON DUPLICATE KEY UPDATE status=status`,
+            scVals.flat()
+          );
+        }
+        await conn.commit();
+        notifyVendorBooking(proj.owner_vendor_id, 'booking.created', {
+          order_no: orderNo, project_id: projectId, unit_id: unitId || null,
+          channel: proj.channel, checkin: checkin, checkout: checkout,
+          nights: nights, price_total: priceTotal, status: 'pending', pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
+        });
+        // 下单即回显所选房型的退改口径（units.ext.cancel_policy，单一数据源 stay_config.cjs）；
+        // 整栋单（未选房型）按项目首个房型政策执行
+        const cpUnit = unitRow || await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], unitId, projectId);
+        const cancelInfo = orderCancelInfoOf(cpUnit, { status: 'pending', checkin });
+        return jsonReply(res, { ok: true, order_no: orderNo, nights, price_total: priceTotal, min_stay_nights: minNights,
+          payment_expires_at: paymentExpiresAt, pay_status: proj.channel === 'minsu' ? 'unpaid' : null,
+          commission_rate: rate, commission_amount: commissionFee,   // 规则 20：下单锁定的佣金快照
+          cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel });
+      } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        if (e && e.code === 'ER_DUP_ENTRY' && idempotencyKey) {
+          const [existing] = await conn.execute('SELECT * FROM booking_orders WHERE idempotency_key=? LIMIT 1', [idempotencyKey]);
+          if (existing.length) return jsonReply(res, { ok: true, order_no: existing[0].order_no, status: existing[0].status, pay_status: existing[0].pay_status, idempotent_replay: true });
+        }
+        throw e;
+      } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/booking/lookup —— order_no + 手机号 双因子查单（规则9：禁止 ?phone= 匿名旁路）
+    if (urlPath === '/api/juzhu/booking/lookup' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const rows = await queryRows(
+        `SELECT b.*, p.name AS project_name, uu.ext AS unit_ext FROM booking_orders b
+         LEFT JOIN projects p ON p.id=b.project_id
+         LEFT JOIN units uu ON uu.id=b.unit_id
+         WHERE b.order_no=? AND b.contact_phone=? LIMIT 1`, [orderNo, phone]);
+      if (!rows.length) return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404);
+      const o = rows[0];
+      if (bookingPaymentExpired(o)) {
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.beginTransaction();
+          const expired = await expireBooking(conn, o);
+          await conn.commit();
+          if (expired) { o.status = 'cancelled'; o.pay_status = 'expired'; }
+          else {
+            const latest = await queryRows('SELECT b.*, p.name AS project_name, uu.ext AS unit_ext FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id LEFT JOIN units uu ON uu.id=b.unit_id WHERE b.id=? LIMIT 1', [o.id]);
+            if (latest.length) Object.assign(o, latest[0]);
+          }
+        } finally { await conn.end(); }
+      }
+      // 退改口径随单下发（units.ext.cancel_policy；整栋单按项目首个房型政策执行）
+      const lookupUnit = o.unit_ext ? { ext: o.unit_ext } : await cancelUnitRowFor(queryRows, o.unit_id, o.project_id);
+      const cancelInfo = orderCancelInfoOf(lookupUnit, o);
+      return jsonReply(res, {
+        order: {
+          id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
+          project_name: o.project_name,
+          contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
+          checkin: o.checkin, checkout: o.checkout, nights: o.nights, price_total: o.price_total,
+          status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, payment_expires_at: o.payment_expires_at, created_at: o.created_at,
+          cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel,
+        },
+      });
+    }
+
+    // POST /api/juzhu/booking/cancel —— 用户取消自己的 pending
+    if (urlPath === '/api/juzhu/booking/cancel' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1 FOR UPDATE', [orderNo, phone]);
+        if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
+        if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
+        // 免费取消窗口（房型维度 units.ext.cancel_policy，单一数据源 stay_config.cjs）：
+        // 窗口外 / 未启用一律不可取消不可退；商家侧（B 端 / HMAC）取消接口不受此闸约束
+        const cUnit = await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], rows[0].unit_id, rows[0].project_id);
+        const cInfo = orderCancelInfoOf(cUnit, rows[0]);
+        if (!cInfo.can_cancel) {
+          await conn.rollback();
+          const reason = cInfo.cancel_policy.enabled
+            ? `已超过免费取消截止时间（${cInfo.cancel_deadline}），不可取消`
+            : '该订单未开通免费取消，预订成功后不可取消';
+          return jsonReply(res, { error: reason, cancel_policy_text: cInfo.cancel_policy_text, cancel_deadline: cInfo.cancel_deadline }, 400);
+        }
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        // 已支付订单取消 → 标记退款（模拟退款通道；真实网关接入后走原路退回）
+        const newPay = rows[0].pay_status === 'paid' ? 'refunded' : rows[0].pay_status;
+        await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status=?, updated_at=? WHERE id=?", [newPay, now, rows[0].id]);
+        // 释放房态
+        await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
+        await conn.commit();
+        notifyVendorBooking(rows[0].owner_vendor_id, 'booking.cancelled', {
+          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
+          nights: rows[0].nights, price_total: rows[0].price_total,
+          status: 'cancelled', pay_status: newPay || null, cancel_by: 'customer',
+        });
+        return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
+      } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/booking/pay —— 收银台支付（双因子：order_no + contact_phone；模拟通道，网关接入后替换）
+    if (urlPath === '/api/juzhu/booking/pay' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      const payMethod = String(body.pay_method || 'online').slice(0, 50);
+      if (!['online', 'wechat', 'alipay', 'mock'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1 FOR UPDATE', [orderNo, phone]);
+        if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
+        if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
+        if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '订单已取消或已完结，无法支付' }, 400); }
+        if (rows[0].pay_status === 'paid') {
+          await conn.commit();
+          return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status, idempotent_replay: true });
+        }
+        if (rows[0].pay_status !== 'unpaid') { await conn.rollback(); return jsonReply(res, { error: '该订单不在待支付状态（当前：' + (rows[0].pay_status || '无需支付）') }, 400); }
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
+        await conn.commit();
+        notifyVendorBooking(rows[0].owner_vendor_id, 'booking.paid', {
+          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
+          nights: rows[0].nights, price_total: rows[0].price_total,
+          status: rows[0].status, pay_status: 'paid', pay_method: payMethod, pay_at: now,
+        });
+        return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status });
+      } finally { await conn.end(); }
+    }
+
+    // GET /api/juzhu/vendor/booking/orders —— vendor 只见自己；platform 全量（可 ?status=）
+    if (urlPath === '/api/juzhu/vendor/booking/orders' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
+                        b.nights, b.price_total, b.commission_rate, b.commission_fee, b.status, b.created_at,
+                        b.contact_name, b.contact_phone, p.name AS project_name, p.cover_image AS project_cover
+                 FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id WHERE 1=1`;
+      const params = [];
+      if (sess.role === 'vendor') { sql += ' AND b.owner_vendor_id=?'; params.push(sess.vendorId); }
+      const bqp = new URLSearchParams(qs);
+      if (bqp.get('status')) { sql += ' AND b.status=?'; params.push(bqp.get('status')); }
+      sql += ' ORDER BY b.id DESC LIMIT 200';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, {
+        role: sess.role,
+        items: rows.map((o) => Object.assign({}, o, { contact_phone: maskPhoneStd(o.contact_phone) })),
+      });
+    }
+
+    // POST /api/juzhu/vendor/booking/:id/status —— 商家确认/取消（owner 校验）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/booking\/(\d+)\/status$/);
+      if (m && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        const status = String(body.status || '');
+        if (!['confirmed', 'cancelled'].includes(status)) return jsonReply(res, { error: 'status 须为 confirmed/cancelled' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.beginTransaction();
+          const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(m[1], 10)]);
+          if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: 'not found' }, 404); }
+          if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
+            await conn.rollback();
+            return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
+          }
+          if (bookingPaymentExpired(rows[0])) {
+            await expireBooking(conn, rows[0]);
+            await conn.commit();
+            return jsonReply(res, { error: '待支付订单已过期并释放房态' }, 400);
+          }
+          if (rows[0].status === 'cancelled') { await conn.rollback(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
+          // 预付口径：minsu 单 pay_status='unpaid' 时租客未支付，不可确认生效
+          if (status === 'confirmed' && rows[0].pay_status === 'unpaid') {
+            await conn.rollback();
+            return jsonReply(res, { error: '租客尚未支付（收银台待付），支付完成后可确认生效' }, 400);
+          }
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          await conn.execute('UPDATE booking_orders SET status=?, updated_at=? WHERE id=?', [status, now, rows[0].id]);
+          // 商家拒单 → 释放房态；确认则保留 booked 行
+          if (status === 'cancelled') {
+            await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [rows[0].id]);
+          }
+          await conn.commit();
+          return jsonReply(res, { ok: true, order_no: rows[0].order_no, status });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 商家后台（vendor-admin，账号中心会话，scope=vendor；与 /api/juzhu/vendor/* 并存）=====
+    if (urlPath.startsWith('/api/juzhu/vendor-admin/')) {
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account') {
+        return jsonReply(res, { error: 'unauthorized', message: '请用商家账号登录（POST /api/auth/login）' }, 401);
+      }
+      const sub = urlPath.slice('/api/juzhu/'.length).replace(/\/+$/, '');
+      const need = {
+        'vendor-admin/summary': authCenter.P.VENDOR_SUMMARY,
+        'vendor-admin/orders': authCenter.P.VENDOR_ORDER_READ,
+        'vendor-admin/products': authCenter.P.VENDOR_PRODUCT_READ,
+      }[sub];
+      if (!need || !authCenter.hasPermission(principal, need)) {
+        return jsonReply(res, { error: 'forbidden', message: '当前账号无该权限' }, 403);
+      }
+      const vid = principal.account.vendor_id;
+      if (!vid) return jsonReply(res, { error: 'forbidden', message: '当前账号未绑定商家' }, 403);
+      if (sub === 'vendor-admin/summary') {
+        const vs = await queryRows('SELECT id, type, name, logo, rating, review_count, status, vendor_no FROM jz_vendors WHERE id=?', [vid]);
+        const byStatus = await queryRows('SELECT status, COUNT(*) n FROM gr_orders WHERE vendor_id=? GROUP BY status', [vid]);
+        const [pc] = await queryRows('SELECT COUNT(*) n FROM jz_products WHERE vendor_id=?', [vid]);
+        const [wc] = await queryRows('SELECT COUNT(*) n FROM jz_workers WHERE vendor_id=?', [vid]);
+        return jsonReply(res, {
+          vendor: stripVendorSecrets(vs[0] || null),
+          stats: { orders_by_status: byStatus, products: pc.n, workers: wc.n },
+          permissions: [...authCenter.permissionsOf(principal)],
+          scope: authCenter.bestScopeLevel(principal),
+        });
+      }
+      if (sub === 'vendor-admin/orders') {
+        const qp = new URLSearchParams(qs);
+        const status = (qp.get('status') || '').trim();
+        const rows = status
+          ? await queryRows('SELECT * FROM gr_orders WHERE vendor_id=? AND status=? ORDER BY id DESC LIMIT 200', [vid, status])
+          : await queryRows('SELECT * FROM gr_orders WHERE vendor_id=? ORDER BY id DESC LIMIT 200', [vid]);
+        return jsonReply(res, rows);
+      }
+      if (sub === 'vendor-admin/products') {
+        const rows = await queryRows('SELECT * FROM jz_products WHERE vendor_id=? ORDER BY sort_order, id LIMIT 200', [vid]);
+        return jsonReply(res, rows);
+      }
+    }
+
+    // ===== 服务者（S 端）接口：worker 会话，scope=self 只碰本人名下工单 =====
+
+    // GET /api/juzhu/s/orders —— 派给我的工单（worker_json.id = 绑定 worker_id）
+    if (urlPath === '/api/juzhu/s/orders' && req.method === 'GET') {
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account') {
+        return jsonReply(res, { error: 'unauthorized', message: '请用服务者账号登录（POST /api/auth/login）' }, 401);
+      }
+      const wid = principal.account.worker_id;
+      if (!wid) return jsonReply(res, { error: 'forbidden', message: '当前账号未绑定服务者（worker_id）' }, 403);
+      const rows = await queryRows(
+        `SELECT o.id, o.sku_id, o.type, o.house, o.expect_time, o.status, o.pay_status, o.worker_json,
+                o.created_at, o.updated_at, o.log_json, s.name AS sku_name
+         FROM jz_orders o LEFT JOIN jz_skus s ON s.id = o.sku_id
+         WHERE o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json)
+           AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id')) = ?
+         ORDER BY o.created_at DESC LIMIT 200`,
+        [String(wid)]
+      );
+      return jsonReply(res, { items: rows, worker_id: wid });
+    }
+
+    // POST /api/juzhu/s/orders/:id/advance —— 本人名下工单推进（accepted→serving→done 封顶；评价归客户）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/s\/orders\/([^/]+)\/advance$/);
+      if (m && req.method === 'POST') {
+        const principal = await authCenter.principalOf(req).catch(() => null);
+        if (!principal || principal.type !== 'account') {
+          return jsonReply(res, { error: 'unauthorized', message: '请用服务者账号登录' }, 401);
+        }
+        const wid = principal.account.worker_id;
+        if (!wid) return jsonReply(res, { error: 'forbidden', message: '当前账号未绑定服务者' }, 403);
+        const orderId = m[1];
+        const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          const order = rows[0];
+          // scope=self：只能推进派给自己的工单
+          let mine = false;
+          try { mine = order.worker_json && JSON.parse(order.worker_json) && String(JSON.parse(order.worker_json).id) === String(wid); } catch (_) {}
+          if (!mine) { conn.end(); return jsonReply(res, { error: 'forbidden', message: '非派给你的工单' }, 403); }
+          const curIdx = STATUS_ORDER.indexOf(order.status);
+          if (curIdx === -1 || order.status === 'pending') { conn.end(); return jsonReply(res, { error: '当前状态不可推进' }, 400); }
+          if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
+          const nextStatus = STATUS_ORDER[curIdx + 1];
+          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          let log = [];
+          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
+          log.push({ at: now, action: 'advance', by: 'worker:' + wid, from: order.status, to: nextStatus });
+          await conn.execute(
+            'UPDATE jz_orders SET status=?, updated_at=?, log_json=? WHERE id=?',
+            [nextStatus, now, JSON.stringify(log), orderId]
+          );
+          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          await authCenter.audit({
+            accountId: principal.account.id, principalType: 'account', roles: principal.roles,
+            action: 's.order.advance', resource: 'jz_orders', resourceId: String(orderId), scopeLevel: 'self',
+            after: { status: nextStatus }, ip: principal.ip, ua: principal.ua,
+          });
+          return jsonReply(res, { ok: true, order: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 持有方/机构只读视角（B 端资管；holding_viewer 只读，无任何运营动作）=====
+    // GET /api/juzhu/org/report —— 资管大盘聚合（只读；按账号 scope 过滤：city 档只见授权城市，all 全量）
+    if (urlPath === '/api/juzhu/org/report' && req.method === 'GET') {
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account' ||
+          !(authCenter.hasPermission(principal, 'report.read') || authCenter.hasPermission(principal, '*'))) {
+        return jsonReply(res, { error: 'forbidden', message: '需持有方/平台只读账号（report.read）' }, 403);
+      }
+      // scope 收口（规则 4）：持有方/监管按授权城市看数，不得因 report.read 看全平台
+      const scope = authCenter.scopeOf(principal);
+      if (scope.level !== 'all' && scope.level !== 'city') {
+        return jsonReply(res, { error: 'forbidden', message: '报表按 city/all 数据范围开放（当前 ' + scope.level + ' 档）' }, 403);
+      }
+      const citySql = authCenter.scopeCitySql(scope, 'p.city_id');
+      const citySqlPlain = authCenter.scopeCitySql(scope, 'city_id');
+      const byChannel = await queryRows(
+        `SELECT channel, COUNT(*) projects, COALESCE(SUM(COALESCE(managed_unit_count, unit_count)),0) units
+         FROM projects WHERE 1=1${citySqlPlain.sql} GROUP BY channel ORDER BY channel`,
+        citySqlPlain.params
+      );
+      // city 档口径：只统计在该市有项目的机构类型
+      const vendorsByType = await queryRows(
+        `SELECT v.type, COUNT(DISTINCT v.id) n FROM jz_vendors v
+         JOIN projects p ON p.owner_vendor_id = v.id WHERE v.status='active'${citySql.sql}
+         GROUP BY v.type ORDER BY n DESC`,
+        citySql.params
+      );
+      // jz_orders 与城市/项目无直接外键（经 sku 间接归属），city 档诚实降级为空集（试点口径）
+      const ordersByStatus = scope.level === 'all'
+        ? await queryRows('SELECT status, COUNT(*) n FROM jz_orders GROUP BY status ORDER BY n DESC')
+        : [];
+      const operators = await queryRows(
+        `SELECT v.id, v.name, v.type, COUNT(p.id) project_count
+         FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id${citySql.sql}
+         WHERE v.type IN ('platform','housing_operator','lvju_host')
+         GROUP BY v.id, v.name, v.type ORDER BY project_count DESC LIMIT 20`,
+        citySql.params
+      );
+      return jsonReply(res, {
+        view: 'holding', readonly: true,
+        scope: { level: scope.level, city_ids: scope.cityIds || null },
+        generated_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+        housing: { by_channel: byChannel },
+        vendors: { by_type: vendorsByType },
+        orders: scope.level === 'all' ? { by_status: ordersByStatus } : { by_status: [], note: 'city 口径暂不提供工单聚合（试点范围）' },
+        operators,
+      });
+    }
+
+    // ===== 商家（vendor）接口：role=vendor 会话，一律按 owner_vendor_id 隔离 =====
+
+    // POST /api/juzhu/vendor/login —— 商家登录（2026-09-09 并入账号中心：本路由只是别名，返回体形状不变，B 端页面零改动）
+    // 凭据在 accounts（vendor_id 绑定 + vendor_owner 角色，scrypt）：
+    // ① accounts 有账号 → authCenter.loginWithPassword 统一链（ident+ip 双维节流 / 锁定 / bcrypt 遗留哈希懒升级 / auth.login 审计）；
+    // ② 迁移未跑的兜底：jz_vendors 命中且 bcrypt 校验通过 → createAccount 建档（密码重哈希 scrypt）+ createSession；
+    // ③ 旧 HMAC 自证 token（verifyVendorLoginToken）仅宽限校验至自然过期，本路由不再签发；
+    // ④ jz_vendors.password_hash 冻结：仅 ② 的兜底校验读取一次。
+    if (urlPath === '/api/juzhu/vendor/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = String(body.login_name || '').trim();
+      const pwd = String(body.password || '');
+      if (!name || !pwd) return jsonReply(res, { error: 'login_name/password 必填' }, 400);
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      const ua = req.headers['user-agent'] || '';
+      // 统一收口：会话主体必须绑商家且商家在营 → 组装原形状返回体 + auth.vendor.login 审计
+      const finish = async (account, token, expiresAt) => {
+        if (!account || !account.vendor_id) return jsonReply(res, { error: '非商家账号，请从控制台登录' }, 403);
+        const vrows = await queryRows('SELECT id, name, type, status FROM jz_vendors WHERE id=? LIMIT 1', [account.vendor_id]);
+        const v = vrows[0];
+        if (!v) return jsonReply(res, { error: '绑定的商家不存在' }, 403);
+        if (v.status !== 'active') return jsonReply(res, { error: '商家已停用' }, 403);
+        await authCenter.audit({ accountId: account.id, principalType: 'user', action: 'auth.vendor.login', resource: 'vendor', resourceId: String(v.id), result: 'ok', ip, ua });
+        return jsonReply(res, { token, role: 'vendor', expires_at: expiresAt, vendor: { id: v.id, name: v.name, type: v.type } });
+      };
+      // ① 账号中心统一链
+      const arows = await queryRows("SELECT id FROM accounts WHERE login_name=? AND principal_type='user' LIMIT 1", [name]);
+      if (arows.length) {
+        const lr = await authCenter.loginWithPassword(name, pwd, ip, ua);
+        if (lr.throttled) return jsonReply(res, { error: lr.error, retry_after: lr.retry_after }, 429);
+        if (lr.error || !lr.token) return jsonReply(res, { error: lr.error || '账号或密码错误' }, 401);
+        return await finish(lr.account, lr.token, lr.expires_at);
+      }
+      // ② 兜底懒建档：accounts 无行但商家表命中（老凭据校验通过即并入账号中心）
+      const vrows = await queryRows(
+        'SELECT id, name, type, status, phone, password_hash FROM jz_vendors WHERE login_name=? LIMIT 1',
+        [name]
+      );
+      const v = vrows[0];
+      if (!v || !v.password_hash) {
+        await authCenter.throttleFail('ident', name);
+        return jsonReply(res, { error: '账号或密码错误' }, 401);
+      }
+      if (v.status !== 'active') return jsonReply(res, { error: '商家已停用' }, 403);
+      let pwdOk = false;
+      try { pwdOk = bcrypt.compareSync(pwd, v.password_hash); } catch (_) { pwdOk = false; }
+      if (!pwdOk) {
+        await authCenter.throttleFail('ident', name);
+        return jsonReply(res, { error: '账号或密码错误' }, 401);
+      }
+      const created = await authCenter.createAccount({
+        login_name: name, password: pwd, roles: ['vendor_owner'], principal_type: 'user',
+        vendor_id: v.id, display_name: v.name, phone: v.phone || null,
+      }, { accountId: null, ip, ua });
+      if (!created || !created.account) return jsonReply(res, { error: (created && created.error) || '商家账号建档失败' }, 400);
+      const sess = await authCenter.createSession(created.account.id, ip, ua);
+      return await finish(created.account, sess.token, sess.expires_at);
+    }
+
+    // GET /api/juzhu/vendor/me（vendor 或 platform）
+    if (urlPath === '/api/juzhu/vendor/me' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      if (sess.role === 'platform') return jsonReply(res, { role: 'platform' });
+      const vrows = await queryRows('SELECT id, name, type, city_ids, commission_housing, commission_jiazheng FROM jz_vendors WHERE id=?', [sess.vendorId]);
+      if (!vrows.length) return jsonReply(res, { error: 'vendor not found' }, 404);
+      // 佣金商家只读可见（规则 20）：随发生效费率与是否差异化
+      const srows = await queryRows('SELECT `key`, value FROM settings WHERE `key` IN (?, ?)',
+        [vendorRate.defaultSettingKey('housing'), vendorRate.defaultSettingKey('jiazheng')]);
+      const settingsMap = {};
+      for (const r of srows) settingsMap[r.key] = r.value;
+      const v = vrows[0];
+      const isDef = (biz) => v['commission_' + biz] == null;
+      const commission = {};
+      for (const biz of vendorRate.BIZLINES) {
+        commission[biz] = {
+          rate: vendorRate.effectiveRateOf(v, biz, settingsMap),
+          is_default: isDef(biz),
+        };
+      }
+      return jsonReply(res, { role: 'vendor', vendor: Object.assign({}, v, { commission }) });
+    }
+
+    // GET /api/juzhu/vendor/go-live-check —— 商家上线完整性自查（vendor=只看自己；platform 可 ?vendor_id=）
+    // 聚合一次算完：资质 / 在营 / 结算账户 / 费率 / 房源评级与上架 / 户型 / 按晚预订 / 取消政策 /
+    // 联系电话 / 开放接口密钥 / 实拍图。fail=阻塞上线；warn=建议完善（不阻塞）。
+    if (urlPath === '/api/juzhu/vendor/go-live-check' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const qp = new URLSearchParams(qs);
+      // vendor 会话一律只看自己（忽略 ?vendor_id=，杜绝越权探商家）
+      const vid = sess.role === 'vendor' ? sess.vendorId : (parseInt(qp.get('vendor_id') || '', 10) || 0);
+      if (!vid) return jsonReply(res, { error: 'platform 视角须带 ?vendor_id=' }, 400);
+      const vrows = await queryRows(
+        'SELECT id, name, type, status, review_status, reviewed_at, phone, hmac_key, commission_housing FROM jz_vendors WHERE id=?', [vid]);
+      if (!vrows.length) return jsonReply(res, { error: 'vendor not found' }, 404);
+      const v = vrows[0];
+      const checks = [];
+      const add = (key, label, ok, state, detail, hint, link) =>
+        checks.push({ key, label, state: ok ? 'pass' : (state || 'fail'), detail: detail || '', hint: hint || '', link: link || '' });
+
+      // ── 商家主体 ──
+      add('qualification', '资质审核通过', v.review_status === 'approved', 'fail',
+        '复审状态 ' + (v.review_status || '-') + (v.reviewed_at ? ' · ' + String(v.reviewed_at).slice(0, 10) : ''),
+        v.review_status === 'approved' ? '' : '在「商家入驻受理台」完成核验/复审', 'p-vendor-onboarding.html');
+      add('active', '商家在营', v.status === 'active', 'fail',
+        v.status === 'active' ? 'status=active' : '商家已停用（status=' + v.status + '）',
+        v.status === 'active' ? '' : '联系平台恢复在营');
+      // 结算账户：入驻申请单（approved）按 phone 匹配，取最近一单
+      let settle = null;
+      if (v.phone) {
+        const orows = await queryRows(
+          "SELECT settle_bank, settle_account, deposit_tier FROM vendor_onboarding WHERE phone=? AND status='approved' ORDER BY id DESC LIMIT 1", [v.phone]);
+        settle = orows[0] || null;
+      }
+      add('settlement', '绑定了结算账号', !!(settle && settle.settle_bank && settle.settle_account), 'fail',
+        settle && settle.settle_account ? (settle.settle_bank || '-') + ' · ' + String(settle.settle_account).replace(/(.{4})(.*)(.{3})/, '$1****$3') : '未绑定结算账户',
+        settle && settle.settle_account ? '' : '在入驻受理台补录对公结算账户（户名与营业执照一致）', 'p-vendor-onboarding.html');
+      // 费率：差异化 = pass；按基准 = warn（基准也是有效费率，不阻塞）
+      {
+        const srows = await queryRows('SELECT value FROM settings WHERE `key`=?', [vendorRate.defaultSettingKey('housing')]);
+        const base = vendorRate.effectiveRateOf(v, 'housing', { commission_housing_default: srows.length ? srows[0].value : '' });
+        add('commission', '设置了费率', v.commission_housing != null, 'warn',
+          v.commission_housing != null ? '差异化费率 ' + Number(v.commission_housing) + '%（房源预订档）' : '按全局基准 ' + base + '% 计',
+          v.commission_housing != null ? '' : '如需差异化费率，请平台在「商家费率」台核定', 'p-vendor-rates.html');
+      }
+
+      // ── 房源与可售性 ──
+      const projs = await queryRows(
+        'SELECT id, name, status, rating_status, contact_phone, ext FROM projects WHERE owner_vendor_id=?', [vid]);
+      const passed = projs.filter((p) => p.rating_status === 'passed');
+      const online = projs.filter((p) => p.status === 'online');
+      const sellable = projs.filter((p) => p.status === 'online' && p.rating_status === 'passed');
+      add('housing_approved', '房源审核通过', passed.length > 0, 'fail',
+        passed.length ? passed.length + ' 个房源已通过评级审核' : '尚无房源通过评级审核（rating_status=passed）',
+        passed.length ? '' : '在房源评级复核台提交/完成评级', 'p-rating-review.html');
+      add('housing_online', '房源已上架', online.length > 0, 'fail',
+        online.length ? online.length + ' 个房源在售（online）' : '房源未上架（draft/offline），C 端不可见',
+        online.length ? '' : '在房源管理页上架', 'b-listing-mgmt.html');
+      const sellIds = sellable.map((p) => p.id);
+      let unitCount = 0, cancelCount = 0;
+      if (sellIds.length) {
+        const ph = sellIds.map(() => '?').join(',');
+        const [urows] = await Promise.all([queryRows(
+          `SELECT id, ext FROM units WHERE project_id IN (${ph})`, sellIds)]);
+        unitCount = urows.length;
+        cancelCount = urows.filter((u) => {
+          try { const x = typeof u.ext === 'string' ? JSON.parse(u.ext) : (u.ext || {}); return !!(x && x.cancel_policy && x.cancel_policy.enabled); } catch (_) { return false; }
+        }).length;
+        add('units_complete', '户型与价格已配置', unitCount > 0, 'fail',
+          unitCount ? unitCount + ' 个在售户型' : '在售房源尚未配置户型与价格',
+          unitCount ? '' : '在房源管理页补户型', 'b-listing-mgmt.html');
+        const bookableN = sellable.filter((p) => {
+          try { const x = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); return !!(x && x.stay_bookable === true); } catch (_) { return false; }
+        }).length;
+        add('stay_bookable', '按晚预订已开通', bookableN > 0, 'warn',
+          bookableN ? bookableN + ' 个房源支持 C 端在线预订' : '未开通在线预订（仅 400 电话咨询）',
+          bookableN ? '' : '在房态日历页「按晚预订」开关开通', 'b-stay-calendar.html');
+        add('cancel_policy', '取消政策已配置', cancelCount > 0, 'warn',
+          cancelCount ? cancelCount + ' 个房型已配免费取消窗口' : '未配置取消政策（客户预订成功后不可自助取消）',
+          cancelCount ? '' : '在房态日历页「取消政策」卡按房型配置', 'b-stay-calendar.html');
+      } else {
+        add('units_complete', '户型与价格已配置', false, 'fail', '在售房源尚未配置户型与价格', '在房源管理页补户型', 'b-listing-mgmt.html');
+        add('stay_bookable', '按晚预订已开通', false, 'warn', '未开通在线预订（仅 400 电话咨询）', '在房态日历页「按晚预订」开关开通', 'b-stay-calendar.html');
+        add('cancel_policy', '取消政策已配置', false, 'warn', '未配置取消政策（客户预订成功后不可自助取消）', '在房态日历页「取消政策」卡按房型配置', 'b-stay-calendar.html');
+      }
+
+      // ── 联系与开放能力 ──
+      const hasContact = !!(v.phone || projs.some((p) => p.contact_phone));
+      add('contact', '联系电话可拨', hasContact, 'warn',
+        hasContact ? 'C 端拨号走虚拟号（TP 实时绑号，双方号码不外泄）' : '商家与房源均未登记联系电话',
+        hasContact ? '' : '在房源上配置咨询电话', 'b-listing-mgmt.html');
+      add('hmac', '开放接口密钥', !!v.hmac_key, 'warn',
+        v.hmac_key ? 'HMAC 密钥已配置（可对接开放接口）' : '未接入商家开放接口（密钥由平台线下发放）',
+        v.hmac_key ? '' : '对接文档见开放平台', 'property-intake-api.html');
+      let photoCount = 0;
+      if (sellIds.length) {
+        const ph = sellIds.map(() => '?').join(',');
+        const prows = await queryRows(
+          `SELECT COUNT(*) AS n FROM photos WHERE (entity_type='project' AND entity_id IN (${ph}))
+             OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id IN (${ph})))`,
+          [...sellIds, ...sellIds]);
+        photoCount = prows[0] ? Number(prows[0].n) : 0;
+      }
+      add('photos', '实拍图充足', photoCount >= 8, 'warn',
+        photoCount + ' 张实拍图（手册口径 ≥8 张）', photoCount >= 8 ? '' : '房源详情补足实拍图（AI 查重会拦截盗图）', 'b-listing-mgmt.html');
+
+      const failed = checks.filter((c) => c.state === 'fail');
+      const warns = checks.filter((c) => c.state === 'warn');
+      return jsonReply(res, {
+        role: sess.role,
+        vendor: { id: v.id, name: v.name, type: v.type, status: v.status, review_status: v.review_status },
+        ready: failed.length === 0,
+        required_count: checks.filter((c) => c.state !== 'warn').length,
+        failed_count: failed.length,
+        warn_count: warns.length,
+        checks,
+      });
+    }
+
+    // GET /api/juzhu/vendor/projects（vendor 只见自己；platform 可 ?vendor_id= 过滤或全量）
+    if (urlPath === '/api/juzhu/vendor/projects' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+      let sql = `SELECT p.*, d.name AS district_name, v.name AS vendor_name
+                 FROM projects p
+                 LEFT JOIN districts d ON d.id=p.district_id
+                 LEFT JOIN jz_vendors v ON v.id=p.owner_vendor_id
+                 WHERE 1=1`;
+      const params = [];
+      if (sess.role === 'vendor') { sql += ' AND p.owner_vendor_id=?'; params.push(sess.vendorId); }
+      const vqp = new URLSearchParams(qs);
+      if (vqp.get('vendor_id')) { sql += ' AND p.owner_vendor_id=?'; params.push(parseInt(vqp.get('vendor_id'), 10)); }
+      if (vqp.get('channel')) { sql += ' AND p.channel=?'; params.push(vqp.get('channel')); }
+      if (vqp.get('city_id')) { sql += ' AND p.city_id=?'; params.push(parseInt(vqp.get('city_id'), 10)); }
+      sql += ' ORDER BY p.channel, p.sort_order, p.id';
+      const projects = await queryRows(sql, params);
+      const projectIds = projects.map((p) => p.id);
+      let units = [];
+      if (projectIds.length) {
+        units = await queryRows(
+          `SELECT * FROM units WHERE project_id IN (${projectIds.map(() => '?').join(',')}) ORDER BY sort_order, id`,
+          projectIds
+        );
+      }
+      units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
+      return jsonReply(res, {
+        role: sess.role,
+        projects: projects.map((p) => Object.assign(stripContactPhone(parseJsonFields(p, ['ext'])), stayConfigOf(p))),
+        units,
+      });
+    }
+
+    // POST /api/juzhu/vendor/projects/:id/status（下架/上架：status online|offline|draft）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/projects\/(\d+)\/status$/);
+      if (m && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const pid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const status = String(body.status || '');
+        if (!['online', 'offline', 'draft'].includes(status)) {
+          return jsonReply(res, { error: 'status 须为 online/offline/draft' }, 400);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
+            conn.end();
+            return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+          }
+          if (status === 'online') {
+            const eligibility = await projectPublishEligibility(conn, pid, sess.role === 'vendor' ? sess.vendorId : null);
+            if (!eligibility.ok) return jsonReply(res, { error: eligibility.error }, eligibility.status || 400);
+          }
+          await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, pid]);
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT id, name, status FROM projects WHERE id=?', [pid]);
+          return jsonReply(res, { ok: true, project: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // PUT /api/juzhu/vendor/units/:id（商家调价/改户型：限自己项目下的户型，且仅价格展示字段）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/units\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const uid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute(
+            'SELECT u.id, u.ext, p.owner_vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?',
+            [uid]
+          );
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
+            conn.end();
+            return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+          }
+          const sets = [], vals = [];
+          const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          for (const col of ['rent_monthly', 'promo_price', 'layout_label', 'unit_spec', 'sort_order']) {
+            if (col in body) put(col, body[col]);
+          }
+          if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          if ('cancel_policy' in body) {
+            // 取消政策只合并 ext.cancel_policy 一键（保留 price_night 等既有键），口径单一数据源 stay_config.cjs；
+            // null = 清除（视为未开通，不可取消）
+            const ext = parseExtObj(rows[0].ext);
+            if (body.cancel_policy === null) delete ext.cancel_policy;
+            else {
+              try { ext.cancel_policy = normalizeCancelPolicyInput(body.cancel_policy); }
+              catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            }
+            put('ext', Object.keys(ext).length ? JSON.stringify(ext) : null);
+          }
+          if (!sets.length) { conn.end(); return jsonReply(res, { error: '无可更新字段' }, 400); }
+          vals.push(uid);
+          await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, vals);
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
+          return jsonReply(res, { ok: true, unit: updated[0] });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // GET /api/juzhu/vendor/stay-calendar?project_id=&unit_id=&month= —— 商家房态日历（owner 校验）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/stay-calendar$/);
+      if (m && req.method === 'GET') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const vqp = new URLSearchParams(qs);
+        const pid = parseInt(vqp.get('project_id') || '', 10);
+        if (!pid) return jsonReply(res, { error: 'project_id 必填' }, 400);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        const unitId = vqp.get('unit_id') ? (parseInt(vqp.get('unit_id'), 10) || 0) : 0;
+        const mth = /^(\d{4})-(\d{2})$/.exec((vqp.get('month') || '').trim());
+        const today = new Date();
+        const y = mth ? parseInt(mth[1], 10) : today.getFullYear();
+        const mo = mth ? (parseInt(mth[2], 10) - 1) : today.getMonth();
+        let unit = null;
+        if (unitId) {
+          const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          unit = us[0];
+        }
+        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        return jsonReply(res, Object.assign({
+          role: sess.role,
+          project_id: pid,
+          project_name: prows[0].name,
+          unit_id: unitId,
+          writable: true,
+        }, cal, stayConfigOf(prows[0])));
+      }
+    }
+
+    // POST /api/juzhu/vendor/stay-calendar —— 批量设置房态/夜价
+    // body: { project_id, unit_id?, dates: ['YYYY-MM-DD'...], status: 'open'|'blocked', price_night?: number|null }
+    //   blocked=关房；open + price_night=开房并设夜价；open 无 price_night=恢复默认（删差异行）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/stay-calendar$/);
+      if (m && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        const pid = parseInt(body.project_id, 10);
+        const unitId = body.unit_id == null || body.unit_id === '' ? 0 : parseInt(body.unit_id, 10);
+        const status = String(body.status || '');
+        const rawDates = Array.isArray(body.dates) ? body.dates.map(String) : [];
+        const dates = rawDates.filter((d) => stayCfg.isValidDateString(d));
+        const priceRaw = body.price_night;
+        const price = (priceRaw === null || priceRaw === undefined || priceRaw === '') ? null : parseInt(priceRaw, 10);
+        if (!pid) return jsonReply(res, { error: 'project_id 必填' }, 400);
+        if (!Number.isInteger(unitId) || unitId < 0) return jsonReply(res, { error: 'unit_id 须为非负整数' }, 400);
+        if (!['open', 'blocked'].includes(status)) return jsonReply(res, { error: 'status 须为 open/blocked（booked 由下单占用）' }, 400);
+        if (price != null && !(price >= 0)) return jsonReply(res, { error: 'price_night 须为非负整数或空' }, 400);
+        if (!dates.length || dates.length !== rawDates.length) return jsonReply(res, { error: 'dates 必填且必须为真实有效的 YYYY-MM-DD 日期（单次 ≤ 400 天）' }, 400);
+        if (dates.length > 400) return jsonReply(res, { error: '单次最多 400 天' }, 400);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        if (unitId) {
+          const us = await queryRows('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, pid]);
+          if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          // 已被订单占用的晚不可改（须先取消订单）
+          const [booked] = await conn.execute(
+            `SELECT stay_date FROM stay_calendar WHERE project_id=? AND unit_id IN (0, ?)
+             AND status='booked' AND stay_date IN (${dates.map(() => '?').join(',')})`,
+            [pid, unitId, ...dates]
+          );
+          if (booked.length) {
+            return jsonReply(res, { error: `以下日期已有预订占用，须先取消订单：${booked.map((r) => r.stay_date).join('、')}` }, 400);
+          }
+          let affected = 0;
+          if (status === 'blocked') {
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            for (const d of dates) {
+              const [r] = await conn.execute(
+                `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+                 VALUES (?,?,?,'blocked',?,'vendor',?)
+                 ON DUPLICATE KEY UPDATE status='blocked', source='vendor', booking_id=NULL, updated_at=VALUES(updated_at)`,
+                [pid, unitId, d, price, now]
+              );
+              affected += r.affectedRows || 0;
+            }
+          } else if (price != null) {
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            for (const d of dates) {
+              const [r] = await conn.execute(
+                `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
+                 VALUES (?,?,?,'open',?,'vendor',?)
+                 ON DUPLICATE KEY UPDATE status='open', price_night=VALUES(price_night), updated_at=VALUES(updated_at)`,
+                [pid, unitId, d, price, now]
+              );
+              affected += r.affectedRows || 0;
+            }
+          } else {
+            // 恢复默认：删差异行
+            const [r] = await conn.execute(
+              `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND status IN ('open','blocked')
+               AND stay_date IN (${dates.map(() => '?').join(',')})`,
+              [pid, unitId, ...dates]
+            );
+            affected = r.affectedRows || 0;
+          }
+          await conn.commit();
+          return jsonReply(res, { ok: true, project_id: pid, unit_id: unitId, status, price_night: price, dates: dates.length, affected });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // PUT /api/juzhu/vendor/projects/:id —— 商家配置房源保障/连住规则/按晚预订开关（写 projects.ext，规则15 不加列）
+    // body: { insurance?: ['switch_rental'|'hotel_cancel'|'property'], min_stay_nights?: 1-365, stay_bookable?: bool }
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/vendor\/projects\/(\d+)$/);
+      if (m && req.method === 'PUT') {
+        const sess = await requestSession(req);
+        if (!sess) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const pid = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const prows = await queryRows('SELECT * FROM projects WHERE id=?', [pid]);
+        if (!prows.length) return jsonReply(res, { error: 'not found' }, 404);
+        if (sess.role === 'vendor' && prows[0].owner_vendor_id !== sess.vendorId) {
+          return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
+        }
+        const ext = parseExtObj(prows[0].ext);
+        if ('insurance' in body) {
+          if (body.insurance === null || body.insurance === '') { ext.insurance = []; }
+          else if (Array.isArray(body.insurance)) {
+            ext.insurance = body.insurance.map(String).filter((k) => INSURANCE_KEYS.includes(k));
+          } else return jsonReply(res, { error: 'insurance 须为标识数组：' + INSURANCE_KEYS.join('/') }, 400);
+        }
+        if ('min_stay_nights' in body) {
+          if (body.min_stay_nights === null || body.min_stay_nights === '') { delete ext.min_stay_nights; }
+          else {
+            const v = parseInt(body.min_stay_nights, 10);
+            if (!(v >= 1 && v <= 365)) return jsonReply(res, { error: 'min_stay_nights 须为 1-365 的整数' }, 400);
+            ext.min_stay_nights = v;
+          }
+        }
+        if ('stay_bookable' in body) {
+          // 「按晚预订」开关（口径 2026-09-05）：开通 = C 端日历选房 + 在线下单；关闭 = 仅 400 电话咨询
+          ext.stay_bookable = body.stay_bookable === true || body.stay_bookable === 'true' || body.stay_bookable === 1;
+        }
+        if (!('insurance' in body) && !('min_stay_nights' in body) && !('stay_bookable' in body)) {
+          return jsonReply(res, { error: '无可更新字段（insurance / min_stay_nights / stay_bookable）' }, 400);
+        }
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          await conn.execute('UPDATE projects SET ext=? WHERE id=?', [JSON.stringify(ext), pid]);
+          await conn.commit();
+          const [updated] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
+          return jsonReply(res, { ok: true, project: Object.assign(stripContactPhone(updated[0]), stayConfigOf(updated[0])) });
+        } finally { await conn.end(); }
+      }
     }
 
     // GET /api/juzhu/admin/districts（admin 前缀，需鉴权）
     if (urlPath === '/api/juzhu/admin/districts' && req.method === 'GET') {
-      if (!requireApiKey(req, res)) return;
+      if (!(await requireApiKey(req, res))) return;
       const rows = await queryRows('SELECT * FROM districts ORDER BY sort_order');
       return jsonReply(res, rows);
     }
@@ -2708,7 +5798,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/admin\/ratings\/([^/]+)\/review$/);
       if (m && req.method === 'POST') {
-        if (!requireApiKey(req, res)) return;
+        if (!(await requireApiKey(req, res))) return;
         const code = decodeURIComponent(m[1]);
         const idMatch = code.match(/-(\d+)$/);
         if (!idMatch) return jsonReply(res, { error: 'invalid code' }, 400);
@@ -2716,7 +5806,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT * FROM projects WHERE id=? AND channel=? AND rating_status=?', [pid, 'bzf', 'pending']);
+          const [rows] = await conn.execute('SELECT * FROM projects WHERE id=? AND rating_status=?', [pid, 'pending']);
           if (!rows.length) return jsonReply(res, { error: 'not found or not pending' }, 404);
           const action = body.action === 'pass' ? 'passed' : 'rejected';
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -2739,6 +5829,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     // POST /api/juzhu/jiazheng/orders（下单）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'POST') {
+      if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
       const body = await readBody(req);
       const productId = body.product_id || body.sku_id;
       if (!productId) return jsonReply(res, { error: 'product_id 必填' }, 400);
@@ -2781,6 +5872,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/pay$/);
       if (m && req.method === 'POST') {
+        if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
@@ -2815,7 +5907,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/dispatch$/);
       if (m && req.method === 'POST') {
-        if (!requireApiKey(req, res)) return;
+        if (!(await requireDispatchPerm(req, res))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
@@ -2836,6 +5928,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             [worker ? JSON.stringify(worker) : null, now, JSON.stringify(log), orderId]
           );
           await conn.commit();
+          await auditIfAccount(req, 'order.dispatch', 'jz_orders', String(orderId), { worker });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           return jsonReply(res, { ok: true, order: updated[0] });
         } finally { await conn.end(); }
@@ -2846,7 +5939,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/advance$/);
       if (m && req.method === 'POST') {
-        if (!requireApiKey(req, res)) return;
+        if (!(await requireDispatchPerm(req, res))) return;
         const orderId = m[1];
         const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
         const conn = await mysql2.createConnection(getDbConfig());
@@ -2868,6 +5961,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             [nextStatus, now, JSON.stringify(log), orderId]
           );
           await conn.commit();
+          await auditIfAccount(req, 'order.advance', 'jz_orders', String(orderId), { from: order.status, to: nextStatus });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           return jsonReply(res, { ok: true, order: updated[0] });
         } finally { await conn.end(); }
@@ -2878,6 +5972,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/rate$/);
       if (m && req.method === 'POST') {
+        if (!(await requireCEndWrite(req, res, authCenter.P.RATING_WRITE))) return;
         const orderId = m[1];
         const body = await readBody(req);
         const score = parseInt(body.score);
@@ -2960,14 +6055,23 @@ async function handleApiDirect(urlPath, qs, req, res) {
           error: `vendor_id=${vendorId} 未配置 url_link，请检查 jz_vendors 表配置`,
         }, 500);
       }
+      if (!hmacAuth || !vendor.key) {
+        return jsonReply(res, {
+          ok: false,
+          error: `vendor_id=${vendorId} 未配置 hmac_key，无法按文档带签名调用 url_link`,
+        }, 500);
+      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const orderRef = await grOrders.generateOrderRef(conn);
-        const outbound = await outboundJson('POST', vendor.url_link, {
+        // 平台 → 商家 urllink：按 api_doc.md 加 HMAC-SHA256 签名（vendor_id 必带）
+        const linkBody = hmacAuth.generateSignature(vendor.key, {
+          vendor_id: Number(vendorId),
           path: pagePath,
           query: productQuery,
           order_ref: orderRef,
-        }, 10000);
+        });
+        const outbound = await outboundJson('POST', vendor.url_link, linkBody, 10000);
         if (!outbound.json || outbound.json.code !== 200) {
           return jsonReply(res, { ok: false, error: (outbound.json && outbound.json.msg) || 'URL Link 生成失败' }, 502);
         }
@@ -3015,10 +6119,23 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
           if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
           const vendors = await getVendorConfig();
-          const detailUrl = (vendors[String(order.vendor_id)] || {}).order_detail_url || '';
+          const vendor = vendors[String(order.vendor_id)] || {};
+          const detailUrl = vendor.order_detail_url || '';
           if (!detailUrl) return jsonReply(res, { ok: false, error: '商家未配置订单详情接口' });
+          if (!hmacAuth || !vendor.key) {
+            return jsonReply(res, { ok: false, error: `vendor_id=${order.vendor_id} 未配置 hmac_key，无法按文档带签名调用订单详情` });
+          }
+          // 平台 → 商家 order_detail（GET）：按 api_doc.md 把 vendor_id / timestamp / sign 一并放在 query string
+          // 商家侧按相同规则（递归展平→去空→字典序→HMAC-SHA256）验签
+          const signed = hmacAuth.generateSignature(vendor.key, {
+            vendor_id: Number(order.vendor_id),
+            order_ref: orderRef,
+          });
+          const qsParts = Object.entries(signed).map(([k, v]) =>
+            encodeURIComponent(k) + '=' + encodeURIComponent(v)
+          ).join('&');
           const sep = detailUrl.includes('?') ? '&' : '?';
-          const url = detailUrl + sep + 'order_ref=' + encodeURIComponent(orderRef);
+          const url = detailUrl + sep + qsParts;
           const outbound = await outboundJson('GET', url, null, 5000);
           if (!outbound.json || outbound.json.code !== 200 || !outbound.json.data) {
             return jsonReply(res, { ok: false, error: '商家未返回订单详情' });
@@ -3182,22 +6299,101 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     // GET /api/juzhu/jz/orders
     if (urlPath === '/api/juzhu/jz/orders' && req.method === 'GET') {
-      if (!requireApiKey(req, res)) return;
+      if (!(await requireApiKey(req, res))) return;
       const qp = new URLSearchParams(qs);
       let sql = 'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1';
       const params = [];
       if (qp.get('status')) { sql += ' AND o.status=?'; params.push(qp.get('status')); }
       const limit = Math.min(parseInt(qp.get('limit') || '50'), 200);
-      sql += ' ORDER BY o.created_at DESC LIMIT ?'; params.push(limit);
+      sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
       return jsonReply(res, { list: rows });
+    }
+
+    // GET /api/juzhu/jz/orders/overview —— gr_orders 指标概览（漏斗 + 日/月趋势；支持 city/vendor_id/start/end 筛选；必须在 orders/:id 之前）
+    if (urlPath === '/api/juzhu/jz/orders/overview' && req.method === 'GET') {
+      if (!(await requireApiKey(req, res))) return;
+      const STATUSES = ['pending', 'paid', 'assigned', 'serving', 'completed', 'cancelled'];
+      // gr_orders.created_at 以北京时间字符串（YYYY-MM-DD HH:MM:SS）落库，分桶按北京日期（对齐 gr_orders.cjs cstParts）
+      const p2 = (n) => String(n).padStart(2, '0');
+      const cstDay = (offsetDays) => {
+        const d = new Date(Date.now() + 8 * 60 * 60 * 1000 + offsetDays * 86400000);
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+      };
+      const dayShift = (iso, n) => {
+        const d = new Date(Date.parse(iso + 'T00:00:00Z') + n * 86400000);
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+      };
+      const monthOf = (iso) => iso.slice(0, 7);
+      const monthShift = (ym, n) => {
+        const [y, m] = ym.split('-').map(Number);
+        const d = new Date(Date.UTC(y, m - 1 + n, 1));
+        return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}`;
+      };
+      const blankRow = (key, val) => {
+        const row = {};
+        row[key] = val;
+        STATUSES.forEach((s) => { row[s] = 0; });
+        return row;
+      };
+
+      // 区间参数（YYYY-MM-DD 闭区间；缺省 = 今日）；ISO 日期字符串序 = 时间序
+      const qp = new URLSearchParams(qs);
+      const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      let start = RE_DATE.test(qp.get('start') || '') ? qp.get('start') : cstDay(0);
+      let end = RE_DATE.test(qp.get('end') || '') ? qp.get('end') : start;
+      if (start > end) { const t = start; start = end; end = t; }
+      // 桶上限：按日最多 92 桶（超出取区间尾段），按月最多 24 桶
+      const spanDays = Math.floor((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+      const dailyFrom = dayShift(end, -(Math.min(spanDays, 92) - 1));
+      const monthlyFrom = monthOf(start) > monthShift(monthOf(end), -23) ? monthOf(start) : monthShift(monthOf(end), -23);
+
+      // 筛选条件（vendor_id=0 表示未关联商家的单）
+      const where = ['created_at >= ?', 'created_at < ?'];
+      const params = [start + ' 00:00:00', dayShift(end, 1) + ' 00:00:00'];
+      const city = (qp.get('city') || '').trim();
+      if (city) { where.push('city=?'); params.push(city); }
+      const vendorRaw = (qp.get('vendor_id') || '').trim();
+      if (vendorRaw === '0') where.push('vendor_id IS NULL');
+      else if (/^\d+$/.test(vendorRaw)) { where.push('vendor_id=?'); params.push(parseInt(vendorRaw, 10)); }
+      const whereSql = 'WHERE ' + where.join(' AND ');
+
+      const funnel = {};
+      STATUSES.forEach((s) => { funnel[s] = 0; });
+      const daily = [];
+      for (let d = dailyFrom; d <= end; d = dayShift(d, 1)) daily.push(blankRow('date', d));
+      const monthly = [];
+      for (let m = monthlyFrom; m <= monthOf(end); m = monthShift(m, 1)) monthly.push(blankRow('month', m));
+      // created_at 为定宽字符串，LEFT() 直接分桶；三条聚合代替逐状态逐桶查询
+      const buckets = await Promise.all([
+        queryRows(`SELECT status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY status`, params),
+        queryRows(`SELECT LEFT(created_at,10) AS d, status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY LEFT(created_at,10), status`, params),
+        queryRows(`SELECT LEFT(created_at,7) AS m, status, COUNT(*) AS c FROM gr_orders ${whereSql} GROUP BY LEFT(created_at,7), status`, params),
+      ]);
+      buckets[0].forEach((r) => { if (funnel[r.status] != null) funnel[r.status] = r.c; });
+      const dailyIdx = {};
+      daily.forEach((r) => { dailyIdx[r.date] = r; });
+      buckets[1].forEach((r) => { if (dailyIdx[r.d] && dailyIdx[r.d][r.status] != null) dailyIdx[r.d][r.status] = r.c; });
+      const monthlyIdx = {};
+      monthly.forEach((r) => { monthlyIdx[r.month] = r; });
+      buckets[2].forEach((r) => { if (monthlyIdx[r.m] && monthlyIdx[r.m][r.status] != null) monthlyIdx[r.m][r.status] = r.c; });
+
+      // 筛选下拉数据源：城市取单内实际出现值（空表回落 cities 表），商家取 jz_vendors 全量
+      const cityRows = await queryRows("SELECT DISTINCT city FROM gr_orders WHERE city IS NOT NULL AND city<>'' ORDER BY city LIMIT 50");
+      let cities = cityRows.map((r) => r.city);
+      if (!cities.length) {
+        cities = (await queryRows('SELECT name FROM cities ORDER BY id LIMIT 30')).map((r) => r.name);
+      }
+      const vendors = (await queryRows('SELECT id, name FROM jz_vendors ORDER BY id LIMIT 200'))
+        .map((r) => ({ id: r.id, name: r.name }));
+      return jsonReply(res, { funnel, daily, monthly, range: { start, end }, filter_options: { cities, vendors } });
     }
 
     // GET /api/juzhu/jz/orders/:id
     {
       const m = urlPath.match(/^\/api\/juzhu\/jz\/orders\/([^/]+)$/);
       if (m && req.method === 'GET') {
-        if (!requireApiKey(req, res)) return;
+        if (!(await requireApiKey(req, res))) return;
         const rows = await queryRows(
           'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?',
           [m[1]]
@@ -3263,6 +6459,130 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // ===== 运营商员工花名册（operator_staff）=====
+    // 读：org.read（持有方/机构只读）或 worker.manage（运营商管理）；写：worker.manage + audit_log
+    // 行级（scope）：org 档只见自家 + 平台级（org_id IS NULL）；vendor 档同理按 vendor_id；
+    // city 档无城市映射，只见平台级行；all 档全量
+    if (urlPath === '/api/juzhu/staff' && req.method === 'GET') {
+      if (!(await requireAnyPerm(req, res, ['org.read', 'worker.manage'], '花名册'))) return;
+      const principal = req.principal;
+      const scope = authCenter.scopeOf(principal);
+      let where = '';
+      const params = [];
+      if (scope.level === 'org' && scope.orgId != null) { where = ' WHERE (org_id=? OR org_id IS NULL)'; params.push(scope.orgId); }
+      else if (scope.level === 'vendor' && scope.vendorId != null) { where = ' WHERE (vendor_id=? OR vendor_id IS NULL)'; params.push(scope.vendorId); }
+      else if (scope.level === 'self') { where = ' WHERE phone=? AND phone IS NOT NULL'; params.push(String((principal.account || {}).phone || '')); }
+      else if (scope.level !== 'all') { where = ' WHERE org_id IS NULL AND vendor_id IS NULL'; }
+      const rows = await queryRows(`SELECT * FROM operator_staff${where} ORDER BY level DESC, month_orders DESC, id ASC`, params);
+      return jsonReply(res, { list: rows, scope: scope.level });
+    }
+
+    if (urlPath === '/api/juzhu/staff' && req.method === 'POST') {
+      if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+      const body = await readBody(req);
+      const v = validateStaff(body, { partial: false });
+      if (v.error) return jsonReply(res, { error: v.error }, 400);
+      const clientEmpNo = (body.emp_no || '').trim() || null;
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const now = new Date().toISOString().slice(0, 19);
+        const ins = 'INSERT INTO operator_staff (emp_no,name,phone,level,`role`,station,month_orders,rating,contract_type,contract_end,status,can_extra,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+        let row = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const empNo = clientEmpNo || (await nextEmpNo(conn));
+          row = { ...v.row, emp_no: empNo, created_at: now, updated_at: now };
+          try {
+            const [ret] = await conn.execute(ins, [
+              row.emp_no, row.name, row.phone, row.level, row.role, row.station, row.month_orders, row.rating,
+              row.contract_type, row.contract_end, row.status, row.can_extra, row.note, row.created_at, row.updated_at,
+            ]);
+            row.id = ret.insertId;
+            break;
+          } catch (e) {
+            if (e && e.code === 'ER_DUP_ENTRY') {
+              if (clientEmpNo) return jsonReply(res, { error: '工号已存在：' + clientEmpNo }, 400);
+              if (attempt === 3) return jsonReply(res, { error: '工号生成冲突，请重试' }, 500);
+              continue;
+            }
+            throw e;
+          }
+        }
+        await conn.commit();
+        await auditIfAccount(req, 'staff.create', 'operator_staff', String(row.id), row);
+        return jsonReply(res, { ok: true, staff: row }, 201);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/staff\/(\d+)$/);
+      if (m && req.method === 'GET') {
+        if (!(await requireAnyPerm(req, res, ['org.read', 'worker.manage'], '花名册'))) return;
+        const rows = await queryRows('SELECT * FROM operator_staff WHERE id=?', [parseInt(m[1], 10)]);
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        // 行级 scope：同列表口径（org/vendor 只见自家 + 平台级）
+        const scope = authCenter.scopeOf(req.principal);
+        const r = rows[0];
+        if (scope.level === 'org' && scope.orgId != null && r.org_id != null && Number(r.org_id) !== scope.orgId) {
+          return jsonReply(res, { error: 'forbidden', message: '超出当前账号数据范围' }, 403);
+        }
+        if (scope.level === 'vendor' && scope.vendorId != null && r.vendor_id != null && Number(r.vendor_id) !== scope.vendorId) {
+          return jsonReply(res, { error: 'forbidden', message: '超出当前账号数据范围' }, 403);
+        }
+        return jsonReply(res, r);
+      }
+      if (m && req.method === 'PUT') {
+        if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+        const id = parseInt(m[1], 10);
+        const body = await readBody(req);
+        const v = validateStaff(body, { partial: true });
+        if (v.error) return jsonReply(res, { error: v.error }, 400);
+        if (!Object.keys(v.row).length) return jsonReply(res, { error: '无可更新字段' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cur] = await conn.execute('SELECT * FROM operator_staff WHERE id=?', [id]);
+          if (!cur.length) return jsonReply(res, { error: 'not found' }, 404);
+          const sets = [];
+          const params = [];
+          for (const k of Object.keys(v.row)) {
+            sets.push((k === 'role' ? '`role`' : k) + '=?');
+            params.push(v.row[k]);
+          }
+          sets.push('updated_at=?');
+          params.push(new Date().toISOString().slice(0, 19));
+          params.push(id);
+          try {
+            await conn.execute('UPDATE operator_staff SET ' + sets.join(', ') + ' WHERE id=?', params);
+          } catch (e) {
+            if (e && e.code === 'ER_DUP_ENTRY') return jsonReply(res, { error: '工号已存在' }, 400);
+            throw e;
+          }
+          await conn.commit();
+          const after = await queryRows('SELECT * FROM operator_staff WHERE id=?', [id]);
+          await auditIfAccount(req, 'staff.update', 'operator_staff', String(id), after[0]);
+          return jsonReply(res, { ok: true, staff: after[0] });
+        } finally {
+          await conn.end();
+        }
+      }
+      if (m && req.method === 'DELETE') {
+        if (!(await requirePerm(req, res, 'worker.manage', '花名册维护'))) return;
+        const id = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [cur] = await conn.execute('SELECT * FROM operator_staff WHERE id=?', [id]);
+          if (!cur.length) return jsonReply(res, { error: 'not found' }, 404);
+          await conn.execute('DELETE FROM operator_staff WHERE id=?', [id]);
+          await conn.commit();
+          await auditIfAccount(req, 'staff.delete', 'operator_staff', String(id), cur[0]);
+          return jsonReply(res, { ok: true, id });
+        } finally {
+          await conn.end();
+        }
+      }
+    }
+
     // 未匹配：返回 404
     return jsonReply(res, { error: '接口不存在', path: urlPath, method: req.method }, 404);
   } catch (e) {
@@ -3291,24 +6611,254 @@ const mimeTypes = {
   '.pdf': 'application/pdf',
 };
 
+// ===== /api/auth/* —— 账号中心轻路由（登录 / 登出 / 身份 / IdP 联邦），不属于 juzhu 域 =====
+
+// OIDC authorize 流程的 state → {nonce, verifier, exp}（单进程内存态，10 分钟单次消费）
+const idpStates = new Map();
+function idpStatePut(state, val) {
+  idpStates.set(state, Object.assign({ exp: Date.now() + 10 * 60 * 1000 }, val));
+  if (idpStates.size > 500) for (const [k, v] of idpStates) if (Date.now() > v.exp) idpStates.delete(k);
+}
+function idpStateTake(state) {
+  const v = idpStates.get(state);
+  if (!v || Date.now() > v.exp) { idpStates.delete(state); return null; }
+  idpStates.delete(state);
+  return v;
+}
+
+async function handleAuthRoutes(rawPath, qs, req, res) {
+  const p = rawPath.replace(/\/+$/, '') || '/';
+  try {
+    // ── IdP 联邦（阶段3 §4.6）：GET /api/auth/idp/login?org=<org_no>[&redirect_uri=] ──
+    if (p === '/api/auth/idp/login' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const orgNo = (qp.get('org') || '').trim();
+      const cfg = await authCenter.getIdpConfig(orgNo);
+      if (!cfg) return jsonReply(res, { error: 'not found', message: '组织未配置或未启用 IdP: ' + orgNo }, 404);
+      const base = 'http' + (req.headers['x-forwarded-proto'] === 'https' ? 's' : '') + '://' + (req.headers['x-forwarded-host'] || req.headers.host);
+      const redirectUri = base + '/api/auth/idp/callback';
+      const built = await idpOidc.buildAuthUrl(cfg, redirectUri);
+      idpStatePut(built.state, { nonce: built.nonce, verifier: built.verifier, org_no: orgNo, redirect_uri: redirectUri, next: (qp.get('next') || '').slice(0, 200) });
+      res.writeHead(302, { Location: built.url });
+      res.end();
+      return;
+    }
+    // ── GET /api/auth/idp/callback?code&state → 验签 → 匹配/JIT → 会话 ──
+    if (p === '/api/auth/idp/callback' && req.method === 'GET') {
+      await ensureSchema();
+      const qp = new URLSearchParams(qs);
+      const st = idpStateTake(qp.get('state') || '');
+      if (!st) return jsonReply(res, { error: 'invalid_state', message: 'state 无效或已过期' }, 400);
+      if (qp.get('error')) return jsonReply(res, { error: qp.get('error'), message: qp.get('error_description') || '' }, 401);
+      const cfg = await authCenter.getIdpConfig(st.org_no);
+      if (!cfg) return jsonReply(res, { error: 'not found', message: 'IdP 配置已停用' }, 404);
+      let claims;
+      try {
+        claims = await idpOidc.exchangeAndVerify(cfg, {
+          code: qp.get('code'), nonce: st.nonce, verifier: st.verifier, redirectUri: st.redirect_uri,
+        });
+      } catch (e) {
+        return jsonReply(res, { error: 'idp_verify_failed', message: String(e.message || e) }, 401);
+      }
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
+      const ua = req.headers['user-agent'] || '';
+      const full = await authCenter.resolveIdpAccount(cfg, claims, {
+        accountId: null, principalType: 'idp', ip, ua,
+      });
+      if (!full) return jsonReply(res, { error: 'forbidden', message: 'JIT 建档未开启且无匹配账号' }, 403);
+      const sess = await authCenter.createSession(full.account.id, ip, ua, { ttlSeconds: authCenter.SESSION_TTL.idp });
+      await authCenter.audit({
+        accountId: full.account.id, principalType: 'idp', roles: full.roles,
+        action: 'auth.idp.login', resource: 'idp_configs', resourceId: st.org_no,
+        scopeLevel: authCenter.bestScopeLevel(full), ip, ua,
+      });
+      if (st.next && /^\/[^/]/.test(st.next)) {
+        res.writeHead(302, { Location: st.next + (st.next.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(sess.token) });
+        res.end();
+        return;
+      }
+      return jsonReply(res, {
+        token: sess.token,
+        expires_at: sess.expires_at,
+        account: full.account,
+        roles: full.roles.map((r) => r.role_code),
+        permissions: [...authCenter.permissionsOf(full)],
+        idp: { org_no: st.org_no, sub: claims.sub },
+      });
+    }
+    if (p === '/api/auth/login' && req.method === 'POST') {
+      await ensureSchema();
+      const body = await readBody(req);
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || (req.socket && req.socket.remoteAddress) || '';
+      const out = await authCenter.loginWithPassword(
+        body.login_name || body.username || body.phone,
+        body.password,
+        ip,
+        req.headers['user-agent'] || ''
+      );
+      if (out.error) return jsonReply(res, { error: out.error, retry_after: out.retry_after }, out.throttled ? 429 : 401);
+      return jsonReply(res, {
+        token: out.token,
+        expires_at: out.expires_at,
+        account: out.account,
+        roles: out.roles.map((r) => r.role_code),
+        permissions: [...authCenter.permissionsOf({ roles: out.roles })],
+      });
+    }
+    if (p === '/api/auth/logout' && req.method === 'POST') {
+      const ok = await authCenter.revokeSession(authCenter.bearerToken(req));
+      return jsonReply(res, { ok });
+    }
+    if (p === '/api/auth/me' && req.method === 'GET') {
+      await ensureSchema();
+      const principal = await authCenter.principalOf(req).catch(() => null);
+      if (!principal || principal.type !== 'account') return jsonReply(res, { error: 'unauthorized' }, 401);
+      return jsonReply(res, {
+        account: principal.account,
+        roles: principal.roles.map((r) => ({ role_code: r.role_code, scope: r.scope })),
+        permissions: [...authCenter.permissionsOf(principal)],
+        scope: authCenter.bestScopeLevel(principal),
+      });
+    }
+    return jsonReply(res, { error: 'not found' }, 404);
+  } catch (e) {
+    return jsonReply(res, { error: String(e.message || e) }, 500);
+  }
+}
+// ================= 每请求日志（对齐 Python juzhu/server.py 分段格式） =================
+// 详细模式（默认）：每请求打印 分隔线 + #编号 时间 [类别] 方法 URI + query/headers + 请求体 + 响应状态与返回体；
+// 简洁模式（JUZHU_LOG_DETAIL=false/0/off）：每请求仅一行「时间 方法 URI」。
+const LOG_SEP = '='.repeat(80);
+const LOG_BODY_LIMIT = 2000;   // 请求体/返回体打印截断长度（字符）
+let reqSeq = 0;
+
+function logDetailOn() {
+  const v = (process.env.JUZHU_LOG_DETAIL || 'true').trim().toLowerCase();
+  return !(v === '0' || v === 'false' || v === 'off' || v === 'no');
+}
+
+function logTs() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// 入站请求分类：商家回调/商家 vendor 接口调用我们 → [商家→平台]；其余 → [其它]
+function reqLogCategory(path) {
+  return (path === '/api/juzhu/callback' || path.startsWith('/api/juzhu/jiazheng/vendor/')) ? '商家→平台' : '其它';
+}
+
+// 请求开始：详细模式打印分段头；简洁模式只打印接口 URI
+function reqLogBegin(req, rawPath, qs) {
+  reqSeq += 1;
+  const uri = rawPath + (qs ? '?' + qs : '');
+  if (!logDetailOn()) {
+    console.log(`${logTs()} ${req.method} ${uri}`);
+    return;
+  }
+  const lines = [LOG_SEP, `#${reqSeq} ${logTs()} [${reqLogCategory(rawPath)}] ${req.method} ${uri}`];
+  if (qs) lines.push(`  >> 参数(query): ${qs}`);
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    lines.push(`  >> 参数(headers): content-type=${req.headers['content-type'] || '-'}, content-length=${req.headers['content-length'] || 0}`);
+  }
+  console.log(lines.join('\n'));
+}
+
+// 请求体（JSON）原文打印：与 Python _body() 一致，超长截断
+function reqLogBody(rawBody) {
+  if (!logDetailOn() || !rawBody) return;
+  const text = String(rawBody);
+  const body = text.length > LOG_BODY_LIMIT ? `${text.slice(0, LOG_BODY_LIMIT)}…[截断，共 ${text.length} 字符]` : text;
+  console.log(`  >> 参数(body): ${body.replace(/\n/g, '\n  | ')}`);
+}
+
+// 响应完成：包装 res 收集返回体（仅 /api/juzhu），finish 时打印状态码/大小/耗时/返回体
+function resLogWrap(req, res) {
+  const started = Date.now();
+  let size = 0;
+  let body = '';
+  let bodyTruncated = false;
+  let contentType = null;
+  // finish 后 getHeader 已取不到，需在 writeHead/setHeader 时提前记录 content-type
+  const origWriteHead = res.writeHead.bind(res);
+  res.writeHead = (code, headers) => {
+    if (Array.isArray(headers)) {
+      for (let i = 0; i < headers.length; i += 2) {
+        if (String(headers[i]).toLowerCase() === 'content-type') contentType = headers[i + 1];
+      }
+    } else if (headers) {
+      contentType = headers['Content-Type'] || headers['content-type'] || contentType;
+    }
+    return origWriteHead(code, headers);
+  };
+  const origSetHeader = res.setHeader.bind(res);
+  res.setHeader = (name, value) => {
+    if (String(name).toLowerCase() === 'content-type') contentType = value;
+    return origSetHeader(name, value);
+  };
+  const collect = (chunk) => {
+    if (chunk == null) return;
+    size += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+    if (bodyTruncated || body.length >= LOG_BODY_LIMIT) return;
+    const s = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+    body += s;
+    if (body.length > LOG_BODY_LIMIT) {
+      body = body.slice(0, LOG_BODY_LIMIT);
+      bodyTruncated = true;
+    }
+  };
+  const origWrite = res.write.bind(res);
+  res.write = (chunk, enc, cb) => { collect(chunk); return origWrite(chunk, enc, cb); };
+  const origEnd = res.end.bind(res);
+  res.end = (chunk, enc, cb) => { collect(chunk); return origEnd(chunk, enc, cb); };
+  res.on('finish', () => {
+    if (!logDetailOn()) return;
+    const ct = contentType || res.getHeader('content-type') || '-';
+    const lines = [`  << 状态: ${res.statusCode} · ${size}B · ${Date.now() - started}ms · ${ct}`];
+    if (body.length || bodyTruncated) {
+      let text = body;
+      if (bodyTruncated) text += `…[截断，共 ${size} 字节]`;
+      lines.push(`  << 返回: ${text.replace(/\n/g, '\n  | ')}`);
+    }
+    console.log(lines.join('\n'));
+  });
+  // 兜底：连接中断且未正常结束（无响应体/超时）时也留痕
+  res.on('close', () => {
+    if (!res.writableFinished && logDetailOn()) {
+      console.log(`  << 状态: 连接中断（未完成响应）· ${Date.now() - started}ms`);
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
 
+  // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
+  const apiReq = rawPath.startsWith('/api/juzhu');
+  reqLogBegin(req, rawPath, qs);
+  if (apiReq) resLogWrap(req, res);
+
   // CORS preflight
-  if (req.method === 'OPTIONS' && rawPath.startsWith('/api/juzhu')) {
+  if (req.method === 'OPTIONS' && (rawPath.startsWith('/api/juzhu') || rawPath.startsWith('/api/auth'))) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Session-Token',
     });
     res.end();
     return;
   }
 
   // /api/juzhu/* 直接走 Node.js MySQL 实现
-  if (rawPath.startsWith('/api/juzhu')) {
+  if (apiReq) {
     return handleApiDirect(rawPath, qs, req, res);
+  }
+
+  // /api/auth/* —— 账号中心登录/登出/身份（handleApiDirect 之外的独立轻路由）
+  if (rawPath.startsWith('/api/auth')) {
+    return handleAuthRoutes(rawPath, qs, req, res);
   }
 
   if (!isPublicStatic(rawPath)) {
@@ -3362,6 +6912,8 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
+  const bookingExpiryTimer = setInterval(() => cleanupExpiredBookingOrders().catch(() => {}), 60 * 1000);
+  bookingExpiryTimer.unref();
   const envName = (process.env.JUZHU_ENV || 'dev').trim().toLowerCase();
   const apiKey = (process.env[API_KEY_ENV] || '').trim();
   if (envName === 'prod' || envName === 'production') {
@@ -3379,5 +6931,7 @@ if (require.main === module) {
     console.log('static: blocked .env / source / deploy artifacts / API docs');
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
+    // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
+    imgThumbs.initBackground();
   });
 }

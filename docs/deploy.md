@@ -2,6 +2,8 @@
 
 线上运行时是 **纯 Node + MySQL**：SCF 入口 `scf_bootstrap` → `node app.js`，`/api/juzhu/*` 直连 MySQL，**不再依赖 Python**。
 
+> **前后端分离部署**：静态前端（nginx 直服务，无需 Node）与后端 API（`node app.js` + MySQL）分开部署，二者只经 `/api/` 反代耦合，可分机放置、独立发布。分机/分进程部署见 **§4**。
+
 ## 1. 启动
 
 ```bash
@@ -50,12 +52,121 @@ node migrate_to_mysql.cjs /path/to/juzhu.db
 
 ## 3. Python `juzhu/server.py` 还用吗？
 
-**线上不用。** `scf_bootstrap` 只 `exec node app.js`。
+**不用（含本地）。** `scf_bootstrap` 只 `exec node app.js`。按 CLAUDE.md 规则 12/14（2026-09-04 拍板：只用 Node，不用 Python），Python 存量（`juzhu/server.py`、`juzhu/test_vendor_api.py`、`dbconn.py` 等）**仅作历史参考保留，不运行、不维护、不扩展**：
 
-`juzhu/server.py` 保留为：
+- 本地联调 → 直接跑 `node app.js`（同一路径，见 §4.2）
+- 商家 HMAC 回归 → 用 Node 脚本直调开放接口，不用 `juzhu/test_vendor_api.py`
+- 新接口与种子以 Node 为准，任何新代码不得引入 Python
 
-- 本地/历史联调（端口 8765）
-- Python 单测与商家 HMAC 回归脚本（`juzhu/test_vendor_api.py` 等）
-- 已通过 `dbconn.py` 改连 **同一套 MySQL**，不再读写 `juzhu.db`
+## 4. 前后端分离部署（静态站 + Node API 分开）
 
-新接口与种子以 Node 为准。不要在 SCF 部署里再启 Python。
+架构上只有两块，互相之间**唯一的耦合点是 `/api/` 反代**：
+
+```
+┌─ 前端（静态，无状态，不需要 Node）─┐     ┌─ 后端（Node API + MySQL）──────┐
+│ nginx root → 静态目录（HTML/JS/JSON）│ ──→ │ node app.js（监听 127.0.0.1:N）│ ──→ MySQL
+│ 浏览器直接访问，页面内 fetch('/api/…')│     │ 规则12：唯一运行时，无 Python   │
+└──────────────────────────────────┘     └───────────────────────────────┘
+```
+
+### 4.1 前端（静态站）部署
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name <your-domain>;
+    root /srv/sy-web;                 # 静态产物目录（仓库的页面与 screens/ 等）
+    index index.html;
+    charset utf-8;
+    autoindex off;                    # 规则11：禁止目录列表
+
+    # 规则11：源码/密钥/部署产物必须拦截（完整清单见 §11 与本仓库
+    # /etc/nginx/conf.d/sytest.meizu.life.conf 的现行实现）
+    location ~ /\.(?!well-known) { deny all; }        # .env* .git
+    location = /app.js       { deny all; }            # 根 Node 入口
+    location = /runtime.env  { deny all; }
+    location = /package.json { deny all; }
+    location ~* \.(py|db|sql|ini|cjs|mjs|sh)$ { deny all; }
+    # 若把 /juzhu/ 目录也放进来：仅白名单 app.js / cities.json / data.json / data-*.json
+
+    location ^~ /api/ {               # 唯一耦合点：反代到后端
+        proxy_pass http://127.0.0.1:8766;   # 后端与本机同机时；分机换成内网 IP
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+- 前端是**纯静态产物**：`rsync`/CI 上传 → reload 即发布，可独立回滚（保留上一版目录软链切换）。
+- 页面调 API 用**相对路径** `/api/…`（现有 `_jzapi.js` 即如此），同域反代免 CORS；若前后端确需跨域，由后端加 CORS 白名单，不在前端写死绝对后端地址。
+
+### 4.2 后端（Node API）部署
+
+```bash
+npm install                       # mysql2（生产依赖）
+export MYSQL_HOST=... MYSQL_PORT=3306 MYSQL_DB=juzhu MYSQL_USER=... MYSQL_PASSWORD=...
+export JUZHU_API_KEY='<生产密钥>'    # 禁止 dev-juzhu-key
+export JUZHU_ADMIN_PASSWORD='<生产密码>'
+export JUZHU_ENV=production
+PORT=8766 node app.js             # 只监听 127.0.0.1，由 nginx/网关对外
+```
+
+要点：
+
+- **后端可单独换端口/单独重启**，前端零改动（反代地址改一行）。端口冲突时换 `PORT` 即可，8765 在本机已被其它服务占用，现用 **8766**。
+- 进程守护建议 systemd（`setsid nohup` 仅适合临时）：
+
+```ini
+# /etc/systemd/system/juzhu-api.service
+[Service]
+WorkingDirectory=/srv/sy-api
+EnvironmentFile=/srv/sy-api/runtime.env          # 权限 600，不入 git
+ExecStart=/usr/bin/node app.js
+Environment=PORT=8766
+Restart=always
+User=www
+```
+
+- 分机部署时：后端机只开 `127.0.0.1`（同机反代）或内网安全组（跨机反代），**绝不经公网直连**；MySQL 账号只授后端机来源 IP。
+- 健康检查：`curl -s http://127.0.0.1:8766/api/juzhu/catalog?city=<slug>&lite=1` 返回 200 JSON；冷启动首跑 `ensureSchema` 可能耗时数分钟（弱网远程库更明显），期间 API 挂起属正常，等日志 `ensureSchema done`。
+
+### 4.3 本仓库预览环境（现况参考，2026-09-04）
+
+| 项 | 值 |
+|---|---|
+| 前端 | nginx `sytest.meizu.life`，root 直服务本仓库 `/proweb/run/sy`（改动即生效） |
+| 后端 | `node app.js`，`PORT=8766`，setsid 裸进程（重启机器不自拉） |
+| MySQL | 远程测试库（`juzhu/.env.local` 配置，gitignored），启动前 `set -a; . juzhu/.env.local; set +a` |
+| 日志 | `/var/log/juzhu-api.log` |
+| nginx conf | `/etc/nginx/conf.d/sytest.meizu.life.conf`（改前备份 `.bak.20260904-pre-mysql`） |
+
+## 5. 房源频道模型与新端点速查（2026-09-04，详见 CLAUDE.md 规则 15）
+
+- 频道：`projects.channel ∈ rental/minsu/newhouse/resale/trade`；**bzf 是 topic 不是 channel**（`settings` KV `topic_bzf`）。
+- catalog：`GET /api/juzhu/catalog?city=&channel=&topic=`（三参可组合；`?topic=bzf` = 保租房专题）；只返回 `status='online'`。
+- 商家端（Bearer 会话，按 `owner_vendor_id` 隔离）：
+  - `POST /api/juzhu/vendor/login`（login_name + password）
+  - `GET  /api/juzhu/vendor/projects`（vendor 只见自己；platform 全量，可 `?vendor_id=`）
+  - `PUT  /api/juzhu/vendor/units/:id`、`POST /api/juzhu/vendor/projects/:id/status`（online/offline/draft）
+- 评级：`GET /api/juzhu/ratings?status=&channel=`、`POST /api/juzhu/admin/ratings/:code/review`（platform）；
+  口径 rental=好房子4维 / minsu=彩贝5维，编号前缀 `SY-RENT-` / `MZ-`（旧 `SY-BZF-` 兼容）。
+- 项目详情（C 端公开）：`GET /api/juzhu/projects/:id_or_slug` + `GET /api/juzhu/projects/:id/units`。
+- 房态/保险/连住（2026-09-05，详见 CLAUDE.md 规则 16）：
+  - `GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（公开，逐晚房态/夜价/三态）
+  - `GET|POST /api/juzhu/vendor/stay-calendar`（商家查/关房/开房/设夜价，已订晚不可改）
+  - `PUT /api/juzhu/vendor/projects/:id`（ext：`insurance` 三类标识 + `min_stay_nights`）
+  - `POST /api/juzhu/booking` 下单即锁房（stay_calendar booked），取消自动释放；最短连住服务端兜底
+  - 回填：`node scripts/stay-calendar-init.cjs`；管理页：`screens/b-stay-calendar.html`
+- 房源开放接口（2026-09-09，商家 HMAC，与家政同机制）：
+  - 前缀 `/api/juzhu/housing/vendor/*`（projects list/detail/create/update/status + units create/update + stay-calendar/set），实现 `vendor_api.cjs` `HOUSING_ROUTES`
+  - 签名同 `hmac_auth.cjs`；文档页 `screens/property-intake-api.html`（v2.0，含在线调试台）；回归 `node scripts/housing_vendor_hmac_regression.cjs`
+  - 单一数据源 `stay_config.cjs`（INSURANCE_TYPES / 最短连住 / 夜价口径），app.js 与 vendor_api.cjs 共用
+
+## 6. 演示与测试数据（本地库）
+
+- 演示项目：`node scripts/demo-listings.cjs seed|clean`（tag「演示」，含 minsu/newhouse/resale 各 2 个 + 户型）。
+- 验收残留清理：`node scripts/demo-listings.cjs clean-test`（测试商家 vendor_a/b、项目 104/105 及评级记录）。
+- 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），与主服务 8766 隔离。

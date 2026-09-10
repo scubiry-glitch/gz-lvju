@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>工单详情 · 贝壳找房旅居</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  .tk-hero{margin:0 16px 12px;border-radius:14px;padding:18px 16px;background:linear-gradient(135deg,var(--brand-deep,#0b5d56),var(--brand,#0f766e));color:#fff;}
+  .tk-hero .row1{display:flex;align-items:center;gap:10px;}
+  .tk-hero .ic{font-size:26px;}
+  .tk-hero .ty{font-size:16px;font-weight:700;flex:1;}
+  .tk-hero .st{font-size:12px;background:rgba(255,255,255,.18);border-radius:999px;padding:3px 12px;}
+  .tk-hero .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.25);margin-top:14px;overflow:hidden;}
+  .tk-hero .bar i{display:block;height:100%;border-radius:3px;background:#fbbf24;transition:width .3s;}
+  .tk-hero .pct{display:flex;justify-content:space-between;font-size:10.5px;opacity:.85;margin-top:5px;}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;margin:0 16px 12px;padding:14px 15px;}
+  .card h3{margin:0 0 10px;font-size:13.5px;color:var(--fg);display:flex;align-items:center;gap:6px;}
+  .kv{display:flex;font-size:12.5px;padding:4px 0;}
+  .kv .k{width:76px;color:var(--muted);flex-shrink:0;}
+  .kv .v{flex:1;color:var(--fg);}
+  .desc{font-size:13px;background:#f8fafc;border-radius:9px;padding:10px 12px;}
+  .worker{display:flex;align-items:center;gap:10px;background:#f0fdfa;border:1px solid #b8ddd6;border-radius:10px;padding:10px 12px;}
+  .worker .av{width:38px;height:38px;border-radius:50%;background:var(--brand,#0f766e);color:#fff;display:grid;place-items:center;font-weight:700;}
+  .worker b{font-size:13px;} .worker .lv{font-size:10.5px;color:var(--accent-deep,#0b5d56);background:#fff;border-radius:999px;padding:1px 8px;margin-left:5px;}
+  .worker .tags{font-size:11px;color:var(--muted);}
+  .tl{position:relative;padding-left:22px;}
+  .tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border);}
+  .tl .nd{position:relative;padding:0 0 14px;}
+  .tl .nd::before{content:"";position:absolute;left:-19px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--border);}
+  .tl .nd.hit::before{background:var(--brand,#0f766e);box-shadow:0 0 0 3px #e6f4f2;}
+  .tl .nd .t{font-size:12.5px;font-weight:600;}
+  .tl .nd.hit .t{color:var(--brand-deep,#0b5d56);}
+  .tl .nd .a{font-size:11px;color:var(--muted);}
+  .tl .nd.dim{opacity:.45;}
+  .stars{display:flex;gap:6px;font-size:26px;line-height:1;cursor:pointer;}
+  .stars .star{color:var(--border);} .stars .star.on{color:#f5a623;}
+  .rate-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;}
+  .rate-tags span{border:1px solid var(--border);border-radius:999px;padding:3px 11px;font-size:11.5px;cursor:pointer;color:var(--muted);}
+  .rate-tags span.on{background:#e6f4f2;border-color:var(--brand,#0f766e);color:var(--brand-deep,#0b5d56);}
+  .btnrow{display:flex;gap:9px;margin-top:12px;}
+  .btnrow button,.btnrow a{flex:1;font:inherit;font-size:13px;border-radius:10px;padding:10px 0;text-align:center;text-decoration:none;cursor:pointer;}
+  .b-danger{background:#fff;border:1px solid var(--danger);color:var(--danger);}
+  .b-tel{background:#e6f4f2;border:1px solid #b8ddd6;color:var(--accent-deep,#0b5d56);}
+  .b-go{background:var(--brand,#0f766e);color:#fff;border:0;}
+  .empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:13px;}
+  .empty .e{font-size:42px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="appbar ghost">
+      <span class="bk" onclick="location.href='lvju-app-me.html'">‹</span>
+      <div class="ttl">工单详情</div>
+      <div class="act"><span>🛠</span></div>
+    </div>
+
+    <div id="app">
+      <div class="empty" id="empty" hidden><div class="e">🧾</div>未找到工单<br><span style="font-size:11px;">可能已被撤销，或链接参数有误</span><div style="margin-top:16px;"><a class="btnrow" style="display:inline-flex;gap:0;" href="lvju-app-me.html"><button class="b-go" style="padding:9px 22px;">返回「我的」</button></a></div></div>
+
+      <div id="detail" hidden>
+        <!-- 状态 hero -->
+        <div class="tk-hero">
+          <div class="row1">
+            <span class="ic" id="hIcon">🔧</span>
+            <span class="ty" id="hType">报修</span>
+            <span class="st" id="hStatus">待派单</span>
+          </div>
+          <div class="bar"><i id="hBar" style="width:15%"></i></div>
+          <div class="pct"><span id="hStep">第 1 / 6 步</span><span id="hPct">15%</span></div>
+        </div>
+
+        <!-- 服务者 -->
+        <div class="card" id="wCard" hidden>
+          <h3>🧑‍🔧 服务者</h3>
+          <div class="worker" id="wBody"></div>
+        </div>
+
+        <!-- 工单信息 -->
+        <div class="card">
+          <h3>📄 工单信息 <span style="margin-left:auto;font-weight:400;font-size:10.5px;color:var(--muted);" id="feeTxt"></span></h3>
+          <div class="desc" id="dDesc"></div>
+          <div style="margin-top:10px;">
+            <div class="kv"><span class="k">工单号</span><span class="v" id="dId"></span></div>
+            <div class="kv"><span class="k">提交时间</span><span class="v" id="dCreated"></span></div>
+            <div class="kv"><span class="k">期望上门</span><span class="v" id="dExpect"></span></div>
+            <div class="kv"><span class="k">房源 / 位置</span><span class="v" id="dHouse"></span></div>
+            <div class="kv"><span class="k">联系电话</span><span class="v" id="dPhone"></span></div>
+            <div class="kv"><span class="k">来源</span><span class="v" id="dSource"></span></div>
+          </div>
+        </div>
+
+        <!-- 进度时间轴 -->
+        <div class="card">
+          <h3>📍 工单进度</h3>
+          <div class="tl" id="timeline"></div>
+        </div>
+
+        <!-- 评价 -->
+        <div class="card" id="rateCard" hidden>
+          <h3>✍️ 评价本次服务</h3>
+          <div class="stars" id="rateStars">
+            <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
+          </div>
+          <div class="rate-tags" id="rateTags"></div>
+          <div style="margin-top:10px;"><textarea id="rateText" placeholder="说两句服务体验（选填）" style="width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;min-height:54px;"></textarea></div>
+          <div class="btnrow"><button class="b-go" id="btnRate">提交评价</button></div>
+        </div>
+        <div class="card" id="ratedCard" hidden>
+          <h3>⭐ 我的评价</h3>
+          <div id="ratedBody" style="font-size:12.5px;"></div>
+        </div>
+
+        <!-- 操作 -->
+        <div class="card">
+          <h3>需要帮助？</h3>
+          <div class="btnrow">
+            <button class="b-danger" id="btnCancel" hidden>取消工单</button>
+            <a class="b-tel" id="btnTel" href="tel:4009006688">📞 400 客服</a>
+            <a class="b-tel" href="lvju-app-me.html" style="flex:0 0 92px;">返回我的</a>
+          </div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">待派单阶段可取消；派单后如需改期 / 取消，请通过 400 客服或旅居管家协调。进度由中台实时推进，本页自动回显。</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:10px;"></div>
+  </div>
+
+  <div class="tabbar">
+    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
+    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
+    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
+    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
+    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+  </div>
+</div>
+
+<script src="screens/_orderbus.js"></script>
+<script>
+(function(){
+  var BO = window.BZF_ORDERS;
+  var esc = BO.esc;
+  var $ = function(id){ return document.getElementById(id); };
+  var id = new URLSearchParams(location.search).get('id') || '';
+  var cur = null;
+
+  function get400(){
+    try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
+    try { return localStorage.getItem('BZF_LVJU_400') || '400-900-6688'; } catch(e){ return '400-900-6688'; }
+  }
+  function telHref(n){ return 'tel:' + String(n).replace(/[^0-9+]/g,''); }
+
+  function render(){
+    var o = BO.get(id);
+    if (!o) { $('empty').hidden = false; $('detail').hidden = true; return; }
+    cur = o;
+    $('empty').hidden = true; $('detail').hidden = false;
+    var st = BO.STATUS[o.status];
+    $('hIcon').textContent = BO.ICON[o.type] || '🧰';
+    $('hType').textContent = o.type + (o.category ? ' · ' + o.category : '');
+    $('hStatus').textContent = st.c;
+    $('hBar').style.width = st.pct + '%';
+    $('hPct').textContent = st.pct + '%';
+    $('hStep').textContent = '第 ' + (st.step + 1) + ' / ' + BO.ORDER.length + ' 步';
+    $('dDesc').textContent = o.desc || '-';
+    $('dId').textContent = o.id;
+    $('dCreated').textContent = o.createdLabel || '-';
+    $('dExpect').textContent = o.expectTime || '尽快';
+    $('dHouse').textContent = o.house || '-';
+    $('dPhone').textContent = o.phone || '-';
+    $('dSource').textContent = o.source || '-';
+    $('feeTxt').textContent = '服务费基准 ¥' + (BO.FEE[o.type] || BO.FEE['其他']) + ' 起（以实际结算为准）';
+
+    // 服务者
+    if (o.worker) {
+      $('wCard').hidden = false;
+      $('wBody').innerHTML = '<span class="av">' + BO.esc(o.worker.name.slice(0,1)) + '</span>' +
+        '<span style="flex:1;"><b>' + BO.esc(o.worker.name) + '</b><span class="lv">' + BO.esc(o.worker.level) + '</span>' +
+        '<div class="tags">持证上岗 · 已投保' + ((o.worker.tags && o.worker.tags.length) ? ' · ' + o.worker.tags.map(BO.esc).join(' / ') : '') + '</div></span>';
+    } else { $('wCard').hidden = true; }
+
+    // 时间轴
+    var hitSet = {}; (o.log || []).forEach(function(l){ hitSet[l.s] = l; });
+    $('timeline').innerHTML = BO.ORDER.map(function(s){
+      var hit = hitSet[s];
+      var cls = 'nd' + (hit ? ' hit' : '');
+      if (!hit && BO.STATUS[s].step > BO.STATUS[o.status].step) cls += ' dim';
+      return '<div class="' + cls + '"><div class="t">' + BO.STATUS[s].c + '</div><div class="a">' + (hit ? hit.at : '待推进') + '</div></div>';
+    }).join('');
+
+    // 操作区
+    $('btnCancel').hidden = (o.status !== 'pending');
+    var rc = $('rateCard'), rdc = $('ratedCard');
+    if (o.status === 'done') { rc.hidden = false; rdc.hidden = true; }
+    else if (o.status === 'rated' && o.rating) {
+      rc.hidden = true; rdc.hidden = false;
+      $('ratedBody').innerHTML = '<span style="color:#f5a623;">' + '★'.repeat(o.rating.score) + '☆'.repeat(5 - o.rating.score) + '</span>' +
+        ((o.rating.tags && o.rating.tags.length) ? ' · ' + o.rating.tags.map(esc).join(' / ') : '') +
+        (o.rating.text ? '<div style="margin-top:4px;">' + esc(o.rating.text) + '</div>' : '');
+    } else { rc.hidden = true; rdc.hidden = true; }
+
+    $('btnTel').setAttribute('href', telHref(get400()));
+  }
+  function get400(){
+    try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
+    try { return localStorage.getItem('BZF_LVJU_400') || '400-900-6688'; } catch(e){ return '400-900-6688'; }
+  }
+
+  // 取消（仅待派单）：撤回演示总线工单
+  $('btnCancel').addEventListener('click', function(){
+    if (!cur) return;
+    if (!confirm('确定取消该工单吗？取消后中台工单池同步移除。')) return;
+    try {
+      localStorage.setItem('bzf_orders', JSON.stringify(BO.all().filter(function(o){ return o.id !== id; })));
+    } catch(e){}
+    location.href = 'lvju-app-me.html';
+  });
+
+  // 评价
+  var rateScore = 0, rateTags = [];
+  var TAGS = ['准时守约', '服务细致', '沟通顺畅', '干净整洁', '专业靠谱'];
+  [...document.querySelectorAll('#rateStars .star')].forEach(function(st, i, arr){
+    st.addEventListener('click', function(){
+      rateScore = parseInt(st.getAttribute('data-v'), 10);
+      arr.forEach(function(x){ x.classList.toggle('on', parseInt(x.getAttribute('data-v'),10) <= rateScore); });
+    });
+  });
+  $('rateTags').innerHTML = TAGS.map(function(t){ return '<span data-t="' + t + '">' + t + '</span>'; }).join('');
+  [...document.querySelectorAll('#rateTags span')].forEach(function(s){
+    s.addEventListener('click', function(){
+      var t = s.getAttribute('data-t');
+      if (rateTags.includes(t)) { rateTags = rateTags.filter(x => x !== t); s.classList.remove('on'); }
+      else { rateTags.push(t); s.classList.add('on'); }
+    });
+  });
+  $('btnRate').addEventListener('click', function(){
+    if (!rateScore) { alert('请先点选星级'); return; }
+    BO.rate(id, { score: rateScore, tags: rateTags, text: $('rateText').value.trim() });
+    render();
+  });
+
+  BO.onChange(render);
+  window.addEventListener('pageshow', render);
+  render();
+})();
+</script>
+</body>
+</html>

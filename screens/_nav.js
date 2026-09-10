@@ -56,6 +56,49 @@
 
   // ============ 6 系列定义（单一数据源） ============
   const SERIES = {
+    // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
+    lvju: {
+      name: '旅居找房 App（C 端）', short: '旅居 · C 端移动原型', icon: '🏔',
+      primary: '#0c4d44', primaryDeep: '#07352f',
+      user: { avatar: '旅', name: '旅居客', org: '贝壳旅居 · 贵州' },
+      mobile: true,
+      groups: [
+        { name: '找房 · 全频道', items: [
+          { id: 'search',  label: '找房枢纽（全频道搜索）', href: 'lvju-app-search.html', icon: 'search' },
+          { id: 'topic',   label: '找房专题（候鸟·康养·亲子·整栋）', href: 'lvju-app-topic.html?topic=kangyang', icon: 'grid' },
+          { id: 'home',    label: '频道首页',       href: 'lvju-app-home-demo.html', icon: 'home' },
+          { id: 'lvju',    label: '旅居（短住·候鸟·康养）', href: 'lvju-app-lvju.html',    icon: 'home' },
+          { id: 'minsu',   label: '民宿（整栋·星级·管家）', href: 'lvju-app-minsu.html',   icon: 'home' },
+          { id: 'changzu', label: '长租（整租·合租·月付）', href: 'lvju-app-changzu.html', icon: 'list' },
+          { id: 'newhouse',label: '新房（楼盘·特价房）',   href: 'lvju-app-newhouse.html',icon: 'grid' },
+          { id: 'resale',  label: '二手（在售·真房源）',   href: 'lvju-app-resale.html',  icon: 'grid' },
+        ]},
+        { name: '房源详情（接库）', items: [
+          { id: 'detail',          label: '房源详情 · 通用',   href: 'lvju-app-detail.html',         icon: 'list' },
+          { id: 'newhouse-detail', label: '新房详情',          href: 'lvju-app-newhouse-detail.html', icon: 'grid' },
+          { id: 'resale-detail',   label: '二手详情（一房一档）', href: 'lvju-app-resale-detail.html',  icon: 'grid' },
+        ]},
+        { name: '交易与我的', items: [
+          { id: 'booking', label: '预订',   href: 'lvju-app-booking.html', icon: 'home' },
+          { id: 'orders',  label: '订单',   href: 'lvju-app-orders.html',  icon: 'list' },
+          { id: 'me',      label: '我的',   href: 'lvju-app-me.html',      icon: 'user' },
+        ]},
+        { name: '标准与验真', items: [
+          { id: 'rating-standard', label: '旅居星级标准', href: 'lvju-rating-standard.html', icon: 'award' },
+          { id: 'overview',        label: '旅居总览蓝图', href: 'lvju-overview.html',        icon: 'grid' },
+          { id: 'roadmap',         label: '一年迭代规划（五期 · 功能矩阵）', href: 'lvju-roadmap.html', icon: 'chart' },
+          { id: 'journey',         label: '全链路旅程与需求范围', href: 'lvju-journey.html', icon: 'map' },
+        ]},
+      ],
+      tabbar: [
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: '🏠' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',   icon: '🔎' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: '📖' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: '🧾' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: '👤' },
+      ],
+    },
+
     g: {
       name: R.deptName + '监管端', short: R.channel + ' · G 端', icon: '⚖',
       primary: '#1e40af', primaryDeep: '#1e3a8a',
@@ -89,6 +132,10 @@
         { name: '政策法规', items: [
           { id: 'policy', label: '政策发布', href: 'g-policy.html', icon: 'file' },
         ]},
+        { name: '签批与个人 · 移动端', items: [
+          { id: 'approval', label: '待我签批 · 移动端', href: 'g-approval.html', icon: 'check', badge: 5 },
+          { id: 'me',       label: '个人中心 · 移动端', href: 'g-me.html',       icon: 'user' },
+        ]},
       ],
     },
 
@@ -97,29 +144,30 @@
       primary: '#0f766e', primaryDeep: '#134e4a',
       user: { avatar: '李', name: '李资管总监', org: R.soe.full + ' · 资管视角' },
       groups: [
-        { name: '国企资管视角（持有方）', items: [
+        { name: '国企持有方 · 资管视角', items: [
           { id: 'console',   label: '资管大盘（入住率/收入）', href: 'b-operator-console.html', icon: 'home' },
           { id: 'occupancy', label: '运营商绩效与 SLA',        href: 'b-occupancy.html',        icon: 'pulse' },
         ]},
-        { name: '运营商工作台（白名单机构使用）', items: [
+        { name: '白名单运营商 · 日常运营', items: [
           { id: 'listing',         label: '房源上下架',       href: 'b-listing-mgmt.html',        icon: 'list' },
+          { id: 'go-live-check',   label: '上线完整性自查',   href: 'b-go-live-check.html',       icon: 'check' },
+          { id: 'stay-calendar',   label: '房态日历 · 保障配置', href: 'b-stay-calendar.html',     icon: 'layout' },
           { id: 'intake-api',      label: '房源接入 API ↗',   href: 'property-intake-api.html',   icon: 'plug' },
           { id: 'rating-input',    label: '★ 好房子评级录入', href: 'b-house-rating-input.html',  icon: 'star', badge: 7, badgeKind: 'warn' },
-          { id: 'dispatch',        label: '派单看板',         href: 'b-dispatch-board.html',      icon: 'radio' },
           { id: 'staff',           label: '员工花名册',       href: 'b-staff-roster.html',        icon: 'user' },
           { id: 'perf-renewal',    label: '绩效与续约',       href: 'b-perf-renewal.html',       icon: 'pulse' },
         ]},
-        { name: '业主托管', items: [
-          { id: 'landlord', label: '业主端', href: 'landlord.html', icon: 'home' },
+        { name: '🏠 家政 · 本地生活（运营商作业）', items: [
+          { id: 'jz-order-overview', label: '服务订单概览 ↗',     href: 'p-jz-order-overview.html', icon: 'chart' },
+          { id: 'jz-product',        label: '★ 商家 SKU（产品）', href: 'p-jz-product.html',        icon: 'box' },
+          { id: 'jz-schedule',       label: '★ SKU 排班',         href: 'p-jz-schedule.html',       icon: 'pulse' },
+          { id: 'jz-worker',         label: '★ 服务者管理',       href: 'p-jz-worker.html',         icon: 'user' },
+          { id: 'dispatch',          label: '派单看板',           href: 'b-dispatch-board.html',    icon: 'radio' },
         ]},
-        { name: '生态联动', items: [
-          { id: 'pconsole', label: '服务认证中台 ↗', href: 'p-console.html',  icon: 'star' },
-          { id: 'gov',      label: R.deptName + '监管 ↗',   href: 'gov-admin.html',  icon: 'award' },
-        ]},
-        { name: '🏠 居住服务 · 家政频道', items: [
-          { id: 'jz-product',  label: '★ 商家 SKU（产品）',  href: 'p-jz-product.html',  icon: 'box' },
-          { id: 'jz-schedule', label: '★ SKU 排班',          href: 'p-jz-schedule.html', icon: 'pulse' },
-          { id: 'jz-worker',   label: '★ 服务者管理',       href: 'p-jz-worker.html',   icon: 'user' },
+        { name: '业主与生态', items: [
+          { id: 'landlord', label: '业主端',              href: 'landlord.html',  icon: 'home' },
+          { id: 'pconsole', label: '服务认证中台 ↗',      href: 'p-console.html', icon: 'star' },
+          { id: 'gov',      label: R.deptName + '监管 ↗', href: 'gov-admin.html', icon: 'award' },
         ]},
       ],
     },
@@ -157,10 +205,10 @@
           { id: 'cert-issue',      label: '发证管理 · 跨 5 类',  href: 'p-cert-issue.html',    icon: 'file',     badge: '2.4k' },
           { id: 'credit-engine',   label: '信用规则引擎',        href: 'p-credit-engine.html', icon: 'cpu',      badge: '42' },
           { id: 'data-hub',        label: '数据中台',            href: 'p-data-hub.html',      icon: 'plug',     badge: '24/7' },
-          { id: 'permissions',     label: '权限 RBAC',           href: 'p-permissions.html',   icon: 'user',     badge: 'RBAC' },
+          { id: 'account-center',  label: '账号中心',            href: 'account-center.html',  icon: 'user',     badge: 'IAM', perms: ['iam.read', 'audit.read'] },
           { id: 'workflow',        label: 'BPMN 工作流引擎',     href: 'p-workflow.html',      icon: 'layers',   badge: '18' },
-          { id: 'webhooks',        label: '事件总线 · Webhook',  href: 'p-webhooks.html',      icon: 'radio',    badge: '38' },
-          { id: 'api-gateway',     label: 'API 网关',            href: 'p-api-gateway.html',   icon: 'settings', badge: '86' },
+          { id: 'webhooks',        label: '事件总线 · Webhook',  href: 'p-webhooks.html',      icon: 'radio',    badge: '38', perms: ['admin.read'] },
+          { id: 'api-gateway',     label: 'API 网关',            href: 'p-api-gateway.html',   icon: 'settings', badge: '86', perms: ['admin.read'] },
           { id: 'notifications',   label: '通知中心',            href: 'p-notifications.html', icon: 'bell',     badge: '86' },
           { id: 'insurance',       label: '履约保障 · 责任险',   href: 'p-insurance.html',     icon: 'check' },
         ]},
@@ -178,6 +226,8 @@
         { name: '🏬 × B 白名单运营商', items: [
           { id: 'b-standards',     label: '★ B 分级标准 + 星级评价', href: 'p-b-standards.html',         icon: 'layers', badge: 'NEW' },
           { id: 'b-whitelist',     label: '★ 白名单审定 + 同业开放', href: 'p-b-whitelist.html',         icon: 'check' },
+          { id: 'vendor-onboarding', label: '商家入驻受理（房源）', href: 'p-vendor-onboarding.html',  icon: 'plug', perms: ['vendor.onboarding.review'] },
+          { id: 'vendor-rates',      label: '商家费率（抽佣分档）',   href: 'p-vendor-rates.html',      icon: 'coin', perms: ['vendor.fund.write'] },
           { id: 'rating-review',   label: '🐚 房源评级复核 · AI引擎', href: 'p-rating-review.html',       icon: 'star',   badge: '23' },
           { id: 'b-rating',        label: '好房子评级录入 ↗',        href: 'b-house-rating-input.html',  icon: 'star' },
           { id: 'b-console',       label: 'B 运营商工作台 ↗',        href: 'b-operator-console.html',    icon: 'home' },
@@ -277,8 +327,16 @@
           { id: 'index',  label: '公示门户首页', href: 'portal-index.html',  icon: 'search' },
           { id: 'verify', label: '扫码验真详情', href: 'portal-verify.html', icon: 'check' },
         ]},
-        { name: '对外开放规范', items: [
-          { id: 'intake-api', label: '房源接入 API', href: 'property-intake-api.html', icon: 'plug' },
+        { name: '开放平台（接口 · 手册 · FAQ）', items: [
+          { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
+          { id: 'vendor-onboarding', label: '商家入驻申请', href: 'vendor-onboarding.html',    icon: 'user' },
+          { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
+          { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
+          { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
+          { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },
+          { id: 'lvju-manual',   label: '旅居商家运营手册',     href: '旅居商家运营手册.html',          icon: 'book' },
+          { id: 'platform-manual', label: '平台运营手册',       href: '平台运营方操作手册.html',        icon: 'book' },
+          { id: 'open-faq',      label: '常见问题 FAQ',         href: 'open-faq.html',                 icon: 'check' },
         ]},
       ],
     },
@@ -442,6 +500,33 @@
     return base + href;
   }
 
+  // ============ 权限裁剪 + 登录态 ============
+  // item 可选 perms: ['admin.read']——任一命中即显示；不写 perms 永远显示。
+  // 未登录/演示态（BZF_NAV_CAN 未注入）一律全显，保住 125 张静态演示页基线观感。
+  function visibleItems(g) {
+    const can = window.BZF_NAV_CAN;
+    if (!can || !g.items.some(it => it.perms)) return g.items;
+    return g.items.filter(it => !it.perms || it.perms.some(p => {
+      try { return !!can(p); } catch (_) { return true; }
+    }));
+  }
+
+  function userBoxHtml(S) {
+    const me = window.BZF_NAV_USER;
+    if (me && me.account) {
+      const name = me.account.display_name || me.account.login_name || ('#' + (me.account.id || ''));
+      const org = (me.roles || []).map(r => r.role_code || r).join('/') || me.account.principal_type || '';
+      return `<div class="nv-user" data-nv-logout="1" style="cursor:pointer" title="点击退出登录">
+          <div class="nv-avatar">${(name[0] || '?').toUpperCase()}</div>
+          <div class="nv-uinfo"><div class="nv-uname">${name}</div><div class="nv-uorg">${org} · 退出 ↩</div></div>
+        </div>`;
+    }
+    return `<div class="nv-user">
+        <div class="nv-avatar">${S.user.avatar}</div>
+        <div class="nv-uinfo"><div class="nv-uname">${S.user.name}</div><div class="nv-uorg">${S.user.org}</div></div>
+      </div>`;
+  }
+
   // ============ render desktop sidebar ============
   function renderSidebar(seriesKey, activeId, base) {
     const S = SERIES[seriesKey];
@@ -450,13 +535,15 @@
       // 当前 active 项是否在此组内：若是，即使 collapsed 默认也展开
       const hasActive = activeId && g.items.some(it => it.id === activeId);
       const startOpen = !g.collapsed || hasActive;
-      const items = g.items.map(it => {
+      const items = visibleItems(g).map(it => {
         const isActive = it.id === activeId ? ' active' : '';
         const badge = it.badge != null
           ? `<span class="nv-badge${it.badgeKind ? ' ' + it.badgeKind : ''}">${it.badge}</span>` : '';
         return `<a class="nv-link${isActive}" href="${resolveHref(it.href, base)}">${ico(it.icon)}<span class="nv-name">${it.label}</span>${badge}</a>`;
       }).join('');
+      // 带 perms 的组被裁空则整组不出（无 perms 组不受影响）
       if (!g.name) return items;
+      if (g.items.some(it => it.perms) && !visibleItems(g).length) return '';
       if (g.collapsed) {
         const gid = `nvg-${seriesKey}-${gi}`;
         return `<div class="nv-group nv-group-toggle${startOpen ? ' open' : ''}" data-gid="${gid}">${g.name}<span class="nv-caret">▸</span></div>
@@ -471,10 +558,7 @@
           <div class="nv-bname">${S.name}<span class="nv-bsub">${S.short || ''}</span></div>
         </div>
         <div class="nv-nav">${groupsHtml}</div>
-        <div class="nv-user">
-          <div class="nv-avatar">${S.user.avatar}</div>
-          <div class="nv-uinfo"><div class="nv-uname">${S.user.name}</div><div class="nv-uorg">${S.user.org}</div></div>
-        </div>
+        ${userBoxHtml(S)}
         <a class="nv-overview-link" href="../overview.html">📋 全站导航总览 →</a>
       </aside>
     `;
@@ -491,21 +575,63 @@
         h.classList.toggle('open', !open);
       });
     });
+    (root || document).querySelectorAll('[data-nv-logout]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (window.BZF_CONSOLE && BZF_CONSOLE.logout) BZF_CONSOLE.logout();
+        else location.reload();
+      });
+    });
   }
+  // 幂等可重入：首次替换 #side-nav 占位 div；refresh 时按 data-nav-meta 重渲染
   function mount() {
     injectStyles();
+    const targets = [];
     document.querySelectorAll('#side-nav').forEach(el => {
-      el.outerHTML = renderSidebar(el.dataset.series, el.dataset.active, el.dataset.base);
+      targets.push({ el, meta: { series: el.dataset.series, active: el.dataset.active, base: el.dataset.base } });
     });
+    document.querySelectorAll('aside[data-nav-meta]').forEach(el => {
+      let meta = {};
+      try { meta = JSON.parse(el.dataset.navMeta || '{}'); } catch (_) {}
+      targets.push({ el, meta });
+    });
+    for (const t of targets) {
+      const holder = document.createElement('div');
+      holder.innerHTML = renderSidebar(t.meta.series, t.meta.active, t.meta.base);
+      const fresh = holder.firstElementChild;
+      if (!fresh) continue;
+      fresh.dataset.navMeta = JSON.stringify(t.meta);
+      t.el.replaceWith(fresh);
+    }
     bindGroupToggle();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
-  } else {
-    mount();
+  // 已持有会话 token 时拉取 /api/auth/me：注入权限裁剪器 + 真实用户盒并重渲染。
+  // 只在「已有 token」时才请求——绝不在静态演示页主动弹登录门（那是 _console-login 的职责）。
+  function hydrateUser() {
+    let t = '';
+    try { t = (window.BZF_CONSOLE && BZF_CONSOLE.token && BZF_CONSOLE.token()) || ''; } catch (_) {}
+    if (!t) return;
+    fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + t } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(me => {
+        if (!me || !me.account) return;
+        window.BZF_NAV_USER = me;
+        window.BZF_NAV_CAN = function (perm) {
+          var ps = me.permissions || [];
+          return ps.indexOf('*') >= 0 || ps.indexOf(perm) >= 0; // '*' 全权（platform_admin）
+        };
+        mount();
+      })
+      .catch(() => {});
   }
 
-  // 暴露元数据供 overview.html 等使用
-  window.BZF_NAV = { SERIES, renderSidebar };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { mount(); hydrateUser(); });
+  } else {
+    mount();
+    hydrateUser();
+  }
+
+  // 暴露元数据供 overview.html 等使用；refresh 供登录后重渲染；hydrate 供登录门回调
+  window.BZF_NAV = { SERIES, renderSidebar, mount, refresh: mount, hydrate: hydrateUser };
 })();

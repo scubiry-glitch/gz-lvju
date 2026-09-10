@@ -412,7 +412,7 @@ POST /api/juzhu/jiazheng/vendor/skus/list
 | `name` | string | SPU 名称 |
 | `slug` | string | URL 友好标识 |
 | `spec` | string | 规格描述 |
-| `price_from` | integer | 参考起价（分） |
+| `price_from` | integer | 参考起价（元；平台侧 SPU 数据，非商家写入字段） |
 | `price_unit` | string | 计价单位 |
 | `duration_min` | integer | 标准时长（分钟） |
 | `tags` | string | 标签（逗号分隔） |
@@ -882,6 +882,33 @@ curl -G https://test-domain/mall/beike/juzhu/order/detail \
 
 ---
 
+## 5.9 房源开放接口（housing，2026-09 增补）
+
+复用本文档第 2 节的同一套 HMAC-SHA256 签名（同密钥体系 `jz_vendors.hmac_key`、同 sign/timestamp 约定），路径前缀换为 `/api/juzhu/housing/vendor/*`，全部 `POST` JSON，响应 `{code, message, ...}`（成功 code=0）。
+
+| 接口 | 说明 |
+|------|------|
+| `/api/juzhu/housing/vendor/projects/list` | 本商家房源列表（可按 channel/status/city_id/keyword 过滤，≤200 条） |
+| `/api/juzhu/housing/vendor/projects/detail` | 房源详情 + 户型明细 |
+| `/api/juzhu/housing/vendor/projects/create` | 创建房源（默认 `draft` 不入 C 端；可带 `units` 一次建全；`contact_phone` 仅入库不回显） |
+| `/api/juzhu/housing/vendor/projects/update` | 按 id 增量更新（价格/地址/标签/保险/最短连住等；`city_id`/`channel` 不可改） |
+| `/api/juzhu/housing/vendor/projects/status` | 上下架：`online` / `offline` / `draft`（上架前置：已有 `price_from` 且 ≥1 个户型） |
+| `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext`） |
+| `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价等） |
+| `/api/juzhu/housing/vendor/units/delete` | 删除户型（有关联订单或被占用晚时拒绝） |
+| `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房 / `open` 开房（可带 `price_night` 覆盖或恢复默认）；已订晚不可改 |
+| `/api/juzhu/housing/vendor/stay-calendar/query` | 商家视角逐晚房态查询（含占用来源/关联订单、最短连住、保险） |
+| `/api/juzhu/housing/vendor/bookings/list` | 本商家订单（status/pay_status/project_id 过滤，≤200 条；手机号掩码） |
+| `/api/juzhu/housing/vendor/bookings/detail` | 按 id 查单（owner 校验） |
+| `/api/juzhu/housing/vendor/bookings/confirm` | 确认订单（`pay_status='unpaid'` 不可确认；确认后订单生效） |
+| `/api/juzhu/housing/vendor/bookings/cancel` | 拒单/取消（自动释放房态；已支付标记 `refunded`） |
+
+字段字典、上架语义（C 端 catalog 只出 `online`，≤15s 缓存）、保险标识枚举（`switch_rental`/`hotel_cancel`/`property`）、最短连住（缺省 rental=15 晚）与完整示例见线上文档页 `screens/property-intake-api.html`（含可直接调用的在线调试台）。
+
+回归：`node scripts/housing_vendor_hmac_regression.cjs [base_url]`（创建→上架→C 端可见→更新→房态→下架→越权负例→清理，全链路真实签名）。
+
+---
+
 ## 6. 参考实现（Python）
 
 ```python
@@ -976,3 +1003,48 @@ resp = auth.post(f"{BASE}/api/juzhu/callback", {
 })
 print(resp)
 ```
+
+---
+
+## 账号与权限中心（阶段 1–3，docs/account-and-auth-design.md）
+
+> 2026-09-04 起：**旧全局 `JUZHU_API_KEY` 已在管理面全面停用**——所有管理/控制台接口只认
+> 账号会话（`Authorization: Bearer <token>`）或机器账号 API Key（`X-API-Key`，`jzk_` 开头）。
+> 唯一过渡保留：C 端下单/支付/评价三路径按 `settings.require_c_login` 开关（现 off）。
+
+### 认证
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| POST | `/api/auth/login` | 匿名 | `{login_name\|phone, password}` → `{token, expires_at, account, roles, permissions}`；token 30 天，存 sessions 表可吊销 |
+| POST | `/api/auth/logout` | 会话 | 吊销当前会话 |
+| GET | `/api/auth/me` | 会话 | `{account, roles[{role_code,scope}], permissions[], scope}` |
+| GET | `/api/auth/idp/login?org=<org_no>[&next=]` | 匿名 | OIDC 联邦登录：302 到该组织 IdP（state+nonce+PKCE S256） |
+| GET | `/api/auth/idp/callback?code&state` | 匿名 | 验签（RS256/JWKS）→ `(idp_type,idp_subject)` 匹配 → 未命中且 JIT 开则自动建档 → 发会话 |
+| POST | `/api/juzhu/vendor/login` | 匿名 | 商家单凭据登录（过渡兼容；推荐用账号登录） |
+
+### 管理（需 platform_admin 或对应权限）
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| GET/POST | `/api/juzhu/admin/accounts` | admin.read / admin.write | 账号列表（`?vendor_id=&org_id=&principal_type=`）/ 创建（原生多账号：org_id、vendor_id、worker_id 任选绑定 + roles[]） |
+| PUT | `/api/juzhu/admin/accounts/:id` | admin.write | 改资料/状态/角色/重置密码（停用或改密自动吊销全部会话） |
+| POST | `/api/juzhu/admin/accounts/:id/api-key` | admin.write | 签发机器 Key（明文仅返回一次） |
+| GET | `/api/juzhu/admin/audit?limit=&action=&account_id=` | audit.read | 审计日志（管理写操作/登录/IdP 事件；留存 180 天） |
+| GET/PUT | `/api/juzhu/admin/idp-configs` | admin.read / admin.write | OIDC 配置（issuer/client_id/role_code/JIT；secret 只写不读，回 `has_secret`） |
+
+### 角色 → 数据范围（scope）
+
+`self`（worker/user）< `vendor`（商家账号，绑定 vendor_id）< `org`（机构绑定）< `city` < `all`（platform_admin）。
+内置角色：`platform_admin(*)`、`platform_op`、`holding_viewer(只读)`、`operator_admin/dispatcher/housekeeper`、
+`gov_viewer(只读)`、`bank_viewer(只读)`、`vendor_owner/operator`、`worker`、`user`。
+
+### 服务者 / 持有方 / 商家后台（会话）
+
+| 方法 | 路径 | 主体 | 说明 |
+|---|---|---|---|
+| GET | `/api/juzhu/s/orders` | worker 会话 | 派给自己的工单（worker_json.id 匹配） |
+| POST | `/api/juzhu/s/orders/:id/advance` | worker 会话 | 本人工单推进（done 封顶） |
+| GET | `/api/juzhu/org/report` | report.read | 持有方只读资管聚合 |
+| GET | `/api/juzhu/vendor-admin/summary\|orders\|products` | vendor 角色 | 商家后台（scope=vendor 隔离） |
+| GET | `/api/juzhu/vendor/projects` | vendor/platform | vendor 只见 `owner_vendor_id`=自己；operator 账号按 vendor_id 隔离 |

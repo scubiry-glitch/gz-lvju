@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>商家入驻申请 · 新居住开放平台</title>
+<style>
+  :root{
+    --bg:#f8fafc; --surface:#fff; --fg:#0f172a; --muted:#64748b;
+    --border:#e2e8f0; --accent:#0f766e; --accent-deep:#134e4a; --accent-soft:#e6f4f2;
+    --ok:#16a34a; --warn:#ea580c; --danger:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.65;font-size:14.5px;}
+  .console{display:grid;grid-template-columns:236px 1fr;min-height:100vh;}
+  @media (max-width:900px){ .console{grid-template-columns:1fr;} #side-nav{display:none;} }
+  .wrap{max-width:980px;margin:0 auto;padding:26px 24px 90px;}
+
+  .doc-nav{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .doc-nav h1{font-size:20px;margin:0;}
+  .doc-nav .ver{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px 10px;background:#fff;}
+
+  .hero{background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;border-radius:14px;padding:24px 26px;margin-bottom:18px;}
+  .hero h2{margin:0 0 6px;font-size:20px;}
+  .hero p{margin:3px 0;font-size:13px;opacity:.92;}
+  .hero .badge{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:999px;font-size:11.5px;padding:2px 11px;margin:8px 6px 0 0;}
+
+  .stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;}
+  .stepper .st{background:#fff;border:1px solid var(--border);border-radius:9px;padding:8px 6px;text-align:center;font-size:12px;color:var(--muted);}
+  .stepper .st b{display:block;font-size:12.5px;color:var(--fg);}
+  .stepper .st.on{border-color:var(--accent);background:var(--accent-soft);}
+  @media (max-width:720px){ .stepper{grid-template-columns:repeat(2,1fr);} .row2{grid-template-columns:1fr !important;} .upgrid{grid-template-columns:1fr !important;} }
+
+  .panel{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:14px;}
+  .panel h3{margin:0 0 12px;font-size:15.5px;color:var(--accent-deep);}
+  .fld{margin-bottom:12px;}
+  .fld label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .fld input[type=text],.fld input[type=tel],.fld select{width:100%;max-width:460px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;background:#fff;}
+  .fld .hint{font-size:11px;color:var(--muted);margin-top:3px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .upgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .up{border:1px dashed #94a3b8;border-radius:10px;padding:12px 14px;background:#f8fafc;}
+  .up.done{border:1px solid #b8ddd6;background:var(--accent-soft);}
+  .up .nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .up .st{font-size:11px;margin-top:4px;}
+  .up.done .st{color:var(--ok);} .up:not(.done) .st{color:var(--muted);}
+  .pill{display:inline-block;font-size:11px;border-radius:999px;padding:2px 10px;}
+  .pill.ok{background:#e7f6ec;color:var(--ok);} .pill.off{background:#f1f5f9;color:var(--muted);}
+  .btn{font:inherit;font-size:13.5px;border:0;border-radius:9px;padding:9px 22px;cursor:pointer;}
+  .btn.primary{background:var(--accent);color:#fff;}
+  .btn.primary:disabled{opacity:.5;cursor:default;}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .note{font-size:11.5px;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:9px;padding:8px 12px;margin-top:10px;}
+  .msg{border-radius:9px;padding:9px 12px;font-size:12.5px;margin-top:10px;}
+  .msg.ok{background:#e7f6ec;color:#15803d;} .msg.err{background:#fee2e2;color:#b91c1c;}
+  .stq{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:14px;}
+  .stq table{width:100%;border-collapse:collapse;font-size:13px;}
+  .stq td{padding:7px 10px;border-bottom:1px solid var(--line,#f1f5f9);}
+  .stq td:first-child{color:var(--muted);width:110px;}
+  .status-pill{display:inline-block;font-size:12px;border-radius:999px;padding:3px 12px;font-weight:600;}
+  .status-pending{background:#fef3c7;color:#92400e;} .status-reviewing{background:#dbeafe;color:#1d4ed8;}
+  .status-approved{background:#e7f6ec;color:#15803d;} .status-rejected{background:#fee2e2;color:#b91c1c;}
+  .doc-foot{margin:26px 0 0;padding:14px 18px;background:#fff;border:1px solid var(--border);border-radius:12px;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="portal" data-active="vendor-onboarding"></div>
+
+  <div class="wrap">
+    <div class="doc-nav">
+      <a href="portal-index.html" style="display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid var(--border);text-decoration:none;color:var(--fg);">←</a>
+      <h1>商家入驻申请</h1>
+      <span class="ver">onboarding v1.0 · 2026-09 · 真实提交</span>
+    </div>
+
+    <div class="hero">
+      <h2>旅居商家入驻 · 开通与资质提交</h2>
+      <p>面向<b>旅居 / 民宿 / 长租商家与白名单运营商</b>。四步完成：注册开通 → 上传资质 → 结算与保证金 → 提交审核；资料齐全后 <b>T+2</b> 出审核结果。审核通过后发放 <code>vendor_id + hmac_key</code>，即可在开放平台自助维护房源。</p>
+      <span class="badge">申请落库 · 可查进度</span>
+      <span class="badge">服务认证中台受理</span>
+      <span class="badge">资质人工复核</span>
+      <span class="badge">频道准入 rental / minsu</span>
+      <span class="badge">佣金基准 10% · 折扣另批</span>
+    </div>
+
+    <div class="stepper">
+      <div class="st on"><b>① 注册开通</b>账号 · 联系人</div>
+      <div class="st on"><b>② 上传资质</b>执照 · 许可 · 法人</div>
+      <div class="st on"><b>③ 结算与保证金</b>账户 · 分档</div>
+      <div class="st"><b>④ 提交审核</b>T+2 出结果</div>
+    </div>
+
+    <div class="panel">
+      <h3>① 注册开通</h3>
+      <div class="row2">
+        <div class="fld"><label>登录账号（手机号）*</label><input type="tel" id="fLogin" maxlength="20" placeholder="商家后台登录名"></div>
+        <div class="fld"><label>企业名称（与执照一致）*</label><input type="text" id="fCompany" maxlength="160" placeholder="××旅居服务有限公司"></div>
+        <div class="fld"><label>联系人 / 商务对接人 *</label><input type="text" id="fContact" maxlength="64"></div>
+        <div class="fld"><label>联系电话 *</label><input type="tel" id="fPhone" maxlength="20"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>② 上传资质（线下交件 · 此处登记信息）</h3>
+      <div class="row2">
+        <div class="fld"><label>统一社会信用代码</label><input type="text" id="fLicense" maxlength="64" placeholder="9152……"></div>
+        <div class="fld"><label>执照有效期至</label><input type="text" id="fLicenseValid" maxlength="32" placeholder="2029-06-30"></div>
+        <div class="fld"><label>经营许可类型</label><select id="fPermit"><option value="">无 / 待定</option><option>卫生许可</option><option>旅宿 / 特种行业许可</option><option>消防验收凭证</option></select></div>
+        <div class="fld"><label>首期房源规模（套）</label><input type="text" id="fHouse" maxlength="6" value="0"></div>
+      </div>
+      <div class="note">证照文件线下交由商家运营（实勘时收取）；此处登记关键信息，平台按「工商 / 许可 / 法人 / 黑名单 / 实勘」清单核验。</div>
+    </div>
+
+    <div class="panel">
+      <h3>③ 经营与结算</h3>
+      <div class="row2">
+        <div class="fld"><label>频道准入（可多选）</label><select id="fChannels"><option value="rental">rental · 租赁住宿（旅居打标）</option><option value="rental,minsu">rental + minsu · 租赁住宿 + 惠居民宿</option><option value="minsu">minsu · 惠居民宿</option></select></div>
+        <div class="fld"><label>类目与经营范围</label><input type="text" id="fCategory" maxlength="255" placeholder="民宿整栋 / 旅居托管 / 长租公寓"></div>
+        <div class="fld"><label>结算银行</label><input type="text" id="fBank" maxlength="120" placeholder="贵州银行"></div>
+        <div class="fld"><label>结算账户（对公）</label><input type="text" id="fAccount" maxlength="64" placeholder="5201 **** 8866"></div>
+        <div class="fld"><label>保证金档位</label><select id="fDeposit"><option>≤50 套（档位待商务确认）</option><option>51–200 套</option><option>＞200 套</option></select></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>④ 提交审核</h3>
+      <ul style="font-size:13px;margin:0 0 12px;padding-left:20px;">
+        <li>已确认企业信息与执照一致、资质真实有效</li>
+        <li>已阅读并同意《旅居商家合作协议》与《商家运营规范》</li>
+        <li>佣金基准 10%（0903 纪要），折扣按商务约定另行审批</li>
+      </ul>
+      <button class="btn primary" id="btnSubmit">提交审核（落库受理）</button>
+      <div id="submitMsg"></div>
+    </div>
+
+    <div class="stq">
+      <h3 style="margin:0 0 10px;font-size:15px;color:var(--accent-deep);">📈 申请进度查询</h3>
+      <div class="row2">
+        <div class="fld" style="margin:0;"><label>申请单号</label><input type="text" id="qNo" placeholder="GZ-RZ-2026-00001"></div>
+        <div class="fld" style="margin:0;"><label>手机号（提交时填写）</label><input type="tel" id="qPhone" placeholder="138****"></div>
+      </div>
+      <button class="btn ghost" id="btnQuery" style="margin-top:10px;">查询进度</button>
+      <div id="qResult" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="doc-foot">
+      <p><strong>商家入驻申请</strong>（vendor-onboarding.html）· 与 <a href="open-platform.html">开放平台门户</a> / <a href="旅居商家运营手册.html">旅居商家运营手册</a> / <a href="p-vendor-onboarding.html">中台受理工作台</a> 配套。受理 / 核验 / 通过 / 驳回在服务认证中台完成（权限点 vendor.onboarding.review）；密钥审核通过后线下发放。仅供演示。</p>
+    </div>
+  </div>
+</div>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var msgTimer = null;
+  function showMsg(el, ok, text){
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+    el.textContent = text; el.hidden = false;
+    clearTimeout(msgTimer); msgTimer = setTimeout(function(){ el.hidden = true; }, 5000);
+  }
+
+  $('btnSubmit').addEventListener('click', function(){
+    var btn = this;
+    var payload = {
+      login_account: $('fLogin').value.trim(),
+      company: $('fCompany').value.trim(),
+      contact: $('fContact').value.trim(),
+      phone: $('fPhone').value.trim(),
+      license_no: $('fLicense').value.trim(),
+      license_valid: $('fLicenseValid').value.trim(),
+      permit_type: $('fPermit').value,
+      channels: $('fChannels').value,
+      category_scope: $('fCategory').value.trim(),
+      house_count: parseInt($('fHouse').value, 10) || 0,
+      settle_bank: $('fBank').value.trim(),
+      settle_account: $('fAccount').value.trim(),
+      deposit_tier: $('fDeposit').value
+    };
+    if (!payload.company || !payload.contact || !payload.phone) {
+      return showMsg($('submitMsg'), false, '企业名称 / 联系人 / 手机号 为必填');
+    }
+    btn.disabled = true; btn.textContent = '提交中…';
+    fetch('/api/juzhu/onboarding/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+      .then(function(r){ return r.json().then(function(j){ return { status: r.status, j: j }; }); })
+      .then(function(r){
+        btn.disabled = false; btn.textContent = '提交审核（落库受理）';
+        if (r.status === 200) {
+          $('qNo').value = r.j.apply_no; $('qPhone').value = payload.phone;
+          showMsg($('submitMsg'), true, '✓ 已受理 · 申请单号 ' + r.j.apply_no + '（' + r.j.message + '）。可凭单号 + 手机号在下方查询进度。');
+        } else {
+          showMsg($('submitMsg'), false, '✗ ' + (r.j && r.j.message || ('HTTP ' + r.status)));
+        }
+      })
+      .catch(function(e){ btn.disabled = false; btn.textContent = '提交审核（落库受理）'; showMsg($('submitMsg'), false, '✗ 网络异常：' + e.message); });
+  });
+
+  $('btnQuery').addEventListener('click', function(){
+    var no = $('qNo').value.trim(), ph = $('qPhone').value.trim();
+    if (!no || !ph) { $('qResult').innerHTML = '<div class="msg err">请填写申请单号与手机号</div>'; return; }
+    fetch('/api/juzhu/onboarding/status?no=' + encodeURIComponent(no) + '&phone=' + encodeURIComponent(ph))
+      .then(function(r){ return r.json().then(function(j){ return { status: r.status, j: j }; }); })
+      .then(function(r){
+        if (r.status !== 200) { $('qResult').innerHTML = '<div class="msg err">✗ ' + (r.j && r.j.message || '查询失败') + '</div>'; return; }
+        var j = r.j;
+        $('qResult').innerHTML =
+          '<table>' +
+          '<tr><td>申请单号</td><td><b>' + j.apply_no + '</b></td></tr>' +
+          '<tr><td>企业</td><td>' + j.company + '</td></tr>' +
+          '<tr><td>状态</td><td><span class="status-pill status-' + j.status + '">' +
+            ({pending:'待受理',reviewing:'核验中',approved:'已通过',rejected:'已驳回'}[j.status] || j.status) + '</span></td></tr>' +
+          (j.review_note ? '<tr><td>审核意见</td><td>' + j.review_note + (j.reviewer ? '（' + j.reviewer + '）' : '') + '</td></tr>' : '') +
+          '<tr><td>提交时间</td><td>' + (j.created_at || '-') + '</td></tr>' +
+          '</table>';
+      })
+      .catch(function(e){ $('qResult').innerHTML = '<div class="msg err">✗ 网络异常：' + e.message + '</div>'; });
+  });
+})();
+</script>
+</body>
+</html>

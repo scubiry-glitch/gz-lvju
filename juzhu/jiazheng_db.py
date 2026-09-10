@@ -288,7 +288,7 @@ def list_channel_sku_products(conn, sku_id, vendor_id=None, city_id=None):
     city_params = []
     if city_id is not None:
         # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
-        city_filter = (" AND p.city_id=? "
+        city_filter = (" AND (p.city_id=? OR p.city_id IS NULL) "
                        "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
                        "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
         city_params = [int(city_id), str(city_id)]
@@ -996,7 +996,7 @@ def list_channel_sku_vendors(conn, sku_id, city_id=None):
     city_params = []
     if city_id is not None:
         # 双维度过滤：商品 city_id 命中 且 商家 city_ids 声明服务该城（city_ids 为空视为全省可约）
-        city_filter = (" AND p.city_id=? "
+        city_filter = (" AND (p.city_id=? OR p.city_id IS NULL) "
                        "AND (v.city_ids IS NULL OR TRIM(v.city_ids)='' "
                        "OR CONCAT(',', v.city_ids, ',') LIKE CONCAT('%,', ?, ',%'))")
         city_params = [int(city_id), str(city_id)]

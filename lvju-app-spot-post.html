@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>周边笔记 · 贝壳旅居·内容服务</title>
+<link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* 周边玩法 · 笔记详情（小红书式：图集在前 + 编辑部行 + 正文 + 标签 + 攻略卡 + 相关笔记） */
+  body{background:#fff;}
+  .app{background:#fff;max-width:480px;}
+  .scr{padding:0 !important;}
+  /* 图集轮播（scroll-snap 横滑 + 计数 + 圆点） */
+  .gal{position:relative;height:340px;background:#0c1512;overflow:hidden;}
+  .gal .strip{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;}
+  .gal .strip::-webkit-scrollbar{display:none;}
+  .gal .cell{flex:0 0 100%;height:100%;scroll-snap-align:center;background:center/cover no-repeat;}
+  .gal .bk{position:absolute;top:14px;left:12px;z-index:3;width:34px;height:34px;border-radius:50%;background:rgba(8,18,16,.45);backdrop-filter:blur(6px);color:#fff;display:grid;place-items:center;font-size:18px;text-decoration:none;border:1px solid rgba(255,255,255,.18);}
+  .gal .cnt{position:absolute;top:20px;right:14px;z-index:3;font-size:11px;color:#fff;background:rgba(8,18,16,.45);backdrop-filter:blur(6px);padding:3px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.18);}
+  .gal .dots{position:absolute;bottom:12px;left:0;right:0;z-index:3;display:flex;gap:5px;justify-content:center;}
+  .gal .dots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.45);transition:.2s;}
+  .gal .dots i.on{background:#fff;width:14px;border-radius:3px;}
+  /* 编辑部行 + 标题 */
+  .hd{padding:16px 18px 0;}
+  .editor{display:flex;align-items:center;gap:10px;}
+  .editor .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand-soft),var(--gold-soft));display:grid;place-items:center;font-size:19px;flex-shrink:0;border:1px solid var(--border);}
+  .editor .nm{font-size:13px;font-weight:700;color:var(--ink);}
+  .editor .sub{font-size:10.5px;color:var(--muted);margin-top:1px;}
+  .editor .foll{margin-left:auto;font-size:11px;font-weight:700;color:var(--brand-deep);background:var(--brand-soft);padding:5px 14px;border-radius:999px;cursor:pointer;border:0;}
+  .editor .foll.on{background:#f1f4f3;color:var(--muted);}
+  .pt{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--ink);line-height:1.35;margin-top:13px;}
+  .pmeta{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:10.5px;color:var(--muted);}
+  .pmeta .ty{font-weight:700;color:var(--gold-deep);background:var(--gold-soft);padding:2px 9px;border-radius:6px;}
+  /* 正文 */
+  .body{padding:12px 18px 0;font-size:13.5px;line-height:1.95;color:#28322e;}
+  .body p{margin:0 0 12px;}
+  .tagsrow{display:flex;flex-wrap:wrap;gap:6px 14px;padding:2px 18px 0;}
+  .tagsrow a{font-size:12.5px;font-weight:600;color:#2563eb;text-decoration:none;}
+  /* 攻略信息卡 */
+  .guide{margin:16px 18px 0;background:#f7faf9;border:1px solid var(--border);border-radius:14px;padding:13px 15px;}
+  .guide .gt{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--brand-deep);margin-bottom:9px;}
+  .guide .row{display:flex;gap:9px;font-size:12.5px;color:#28322e;padding:4px 0;align-items:baseline;}
+  .guide .row .k{color:var(--muted);flex-shrink:0;width:58px;font-size:11.5px;}
+  /* 相关笔记 */
+  .rel{padding:20px 0 8px;}
+  .rel .rt{display:flex;align-items:center;gap:8px;padding:0 18px 11px;font-size:10px;letter-spacing:.2em;font-weight:700;color:var(--brand-deep);}
+  .rel .rt .bar{width:3px;height:13px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
+  .rel .strip{display:flex;gap:11px;overflow-x:auto;padding:0 18px 6px;scrollbar-width:none;}
+  .rel .strip::-webkit-scrollbar{display:none;}
+  .rel a.rc{flex:0 0 128px;text-decoration:none;}
+  .rel a.rc .im{height:96px;border-radius:12px;background:#eef2f1 center/cover;position:relative;}
+  .rel a.rc .im .ty{position:absolute;left:7px;top:7px;font-size:9px;font-weight:700;color:#fff;background:rgba(8,18,16,.5);backdrop-filter:blur(4px);padding:2px 7px;border-radius:999px;}
+  .rel a.rc .nm{font-size:12px;font-weight:700;color:var(--ink);margin-top:7px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-family:var(--serif);}
+  .rel a.rc .sm{font-size:10.5px;color:var(--muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5;}
+  /* 底部操作栏 */
+  .obar{position:sticky;bottom:0;z-index:9;background:#fff;border-top:1px solid var(--border);display:flex;gap:9px;padding:10px 14px max(10px,env(safe-area-inset-bottom));}
+  .obar button{flex:1;border:1px solid var(--border);background:#fff;border-radius:999px;padding:10px 0;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer;}
+  .obar button.star.on{background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;border-color:transparent;}
+  .obar button.pri{flex:1.6;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;border-color:transparent;text-decoration:none;display:grid;place-items:center;}
+  .miss{margin:40px 18px;text-align:center;color:var(--muted);font-size:13px;line-height:2;}
+  .miss a{color:var(--brand);font-weight:700;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="scr">
+    <div class="gal" id="gal">
+      <div class="strip" id="galStrip"></div>
+      <a class="bk" id="bkBtn" href="lvju-app-spots.html">‹</a>
+      <span class="cnt" id="galCnt" style="display:none;">1/1</span>
+      <div class="dots" id="galDots"></div>
+    </div>
+
+    <div class="hd">
+      <div class="editor">
+        <div class="av" id="pAv">🧭</div>
+        <div>
+          <div class="nm">旅居在地笔记</div>
+          <div class="sub">山舍编辑部 · 实地探访整理</div>
+        </div>
+        <button class="foll" id="pFoll" type="button">＋ 关注</button>
+      </div>
+      <div class="pt" id="pTitle">加载中…</div>
+      <div class="pmeta" id="pMeta"></div>
+    </div>
+
+    <div class="body" id="pBody"></div>
+    <div class="tagsrow" id="pTags"></div>
+    <div class="guide" id="pGuide" style="display:none;">
+      <div class="gt">去之前 · 攻略信息</div>
+      <div id="pGuideRows"></div>
+    </div>
+
+    <div class="rel" id="pRel" style="display:none;">
+      <div class="rt"><span class="bar"></span>相关笔记 · RELATED</div>
+      <div class="strip" id="pRelStrip"></div>
+    </div>
+
+    <div style="height:76px;"></div>
+  </div>
+
+  <div class="obar">
+    <button class="star" id="pStar" type="button">♡ 收藏</button>
+    <button id="pShare" type="button">↗ 分享</button>
+    <a class="pri" id="pNav" href="lvju-app-map.html">🧭 去这里</a>
+  </div>
+</div>
+<script>
+/* 周边玩法 · 笔记详情：GET /api/juzhu/spots/:id（公网白名单，规则 17）。
+   图集 = cover_image + photos；正文 body 分段（空则回落 summary）；
+   收藏落 localStorage（原型态，无后端）；分享走 navigator.share / 剪贴板。 */
+(function(){
+  var q = new URLSearchParams(location.search);
+  var id = parseInt(q.get('id') || '', 10);
+  var $ = function(i){ return document.getElementById(i); };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  if (!id) { miss('缺少笔记 id · 从房源详情页「周边玩法」点进来即可'); return; }
+  fetch('/api/juzhu/spots/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }).then(render)
+    .catch(function(){ miss('笔记不存在或已下架'); });
+
+  function miss(msg){
+    document.querySelector('.scr').innerHTML =
+      '<div class="miss">' + esc(msg) + '<br/><a href="lvju-app-spots.html">去「周边玩法」看看 ›</a></div>';
+  }
+
+  function render(d){
+    var s = d.spot || {};
+    var rel = d.related || [];
+    var imgs = [];
+    if (s.cover_image) imgs.push(s.cover_image);
+    (Array.isArray(s.photos) ? s.photos : []).forEach(function(u){ if (u && imgs.indexOf(u) < 0) imgs.push(u); });
+    if (!imgs.length) imgs.push('assets/lvju/countryside.jpg');
+
+    document.title = s.name + ' · 周边笔记 · 贝壳旅居';
+    $('pTitle').textContent = s.name || '';
+    $('pAv').textContent = s.icon || '🧭';
+    $('pMeta').innerHTML =
+      '<span class="ty">' + esc(s.type_label || '周边') + '</span>' +
+      (s.city_id === null || s.city_id == null ? '<span>全省 · 跨市目的地</span>' : '<span>本地 · 值得专程去</span>');
+
+    // 图集
+    var strip = $('galStrip');
+    strip.innerHTML = imgs.map(function(u){ return '<div class="cell" style="background-image:url(' + esc(u) + ')"></div>'; }).join('');
+    var dots = $('galDots');
+    if (imgs.length > 1) {
+      dots.innerHTML = imgs.map(function(_, i){ return '<i class="' + (i === 0 ? 'on' : '') + '"></i>'; }).join('');
+      $('galCnt').textContent = '1/' + imgs.length;
+      $('galCnt').style.display = '';
+      strip.addEventListener('scroll', function(){
+        var i = Math.round(strip.scrollLeft / strip.clientWidth);
+        i = Math.max(0, Math.min(imgs.length - 1, i));
+        dots.querySelectorAll('i').forEach(function(d2, j){ d2.classList.toggle('on', j === i); });
+        $('galCnt').textContent = (i + 1) + '/' + imgs.length;
+      }, { passive: true });
+    }
+
+    // 正文：body 分段，空则回落 summary
+    var text = (s.body || '').trim() || s.summary || '';
+    $('pBody').innerHTML = text.split(/\n+/).filter(Boolean).map(function(p){ return '<p>' + esc(p) + '</p>'; }).join('');
+
+    // 标签
+    var tags = Array.isArray(s.tags) ? s.tags : [];
+    $('pTags').innerHTML = tags.map(function(t){ return '<a href="lvju-app-spots.html">#' + esc(t) + '</a>'; }).join('');
+
+    // 攻略卡（地址/建议停留/门票，字段缺省则不占行）
+    var rows = [['📍 地址', s.address], ['⏱ 建议停留', s.duration], ['🎫 门票', s.ticket]].filter(function(r){ return r[1]; });
+    if (rows.length) {
+      $('pGuide').style.display = '';
+      $('pGuideRows').innerHTML = rows.map(function(r){
+        return '<div class="row"><span class="k">' + r[0] + '</span><span>' + esc(r[1]) + '</span></div>';
+      }).join('');
+    }
+
+    // 相关笔记
+    if (rel.length) {
+      $('pRel').style.display = '';
+      $('pRelStrip').innerHTML = rel.map(function(r){
+        return '<a class="rc" href="lvju-app-spot-post.html?id=' + r.id + '">' +
+          '<div class="im" style="background-image:url(' + esc(r.cover_image || '') + ')"><span class="ty">' + esc(r.type_label || '') + '</span></div>' +
+          '<div class="nm">' + esc(r.name) + '</div>' +
+          '<div class="sm">' + esc(r.summary || '') + '</div></a>';
+      }).join('');
+    }
+
+    // 返回：有来路回退，否则去房源/列表
+    var bk = $('bkBtn');
+    bk.onclick = function(ev){ ev.preventDefault(); if (history.length > 1) history.back(); else location.href = 'lvju-app-spots.html'; };
+
+    // 收藏（原型态：localStorage）
+    var KEY = 'bzf_spot_star';
+    var store = {};
+    try { store = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { store = {}; }
+    var star = $('pStar');
+    function paintStar(){ var on = !!store[id]; star.textContent = (on ? '★ 已收藏' : '♡ 收藏'); star.classList.toggle('on', on); }
+    paintStar();
+    star.onclick = function(){ store[id] = !store[id]; if (!store[id]) delete store[id];
+      try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} paintStar(); };
+
+    // 关注（演示态按钮）
+    var foll = $('pFoll');
+    foll.onclick = function(){ var on = foll.classList.toggle('on'); foll.textContent = on ? '已关注' : '＋ 关注'; };
+
+    // 分享
+    $('pShare').onclick = function(){
+      var url = location.href;
+      if (navigator.share) navigator.share({ title: s.name || '周边笔记', url: url }).catch(function(){});
+      else if (navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ $('pShare').textContent = '✓ 链接已复制'; setTimeout(function(){ $('pShare').textContent = '↗ 分享'; }, 1600); }).catch(function(){});
+    };
+  }
+})();
+</script>
+</body>
+</html>

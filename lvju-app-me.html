@@ -5,6 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>我的 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<style>
+  /* —— 底部抽屉（服务工单 / 400 客服）—— */
+  .mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+  .mask[hidden]{display:none;}
+  .sheet{width:100%;max-width:430px;background:#fff;border-radius:18px 18px 0 0;padding:16px 16px 28px;max-height:84vh;overflow:auto;}
+  .sheet h3{margin:0 0 12px;font-size:16px;display:flex;justify-content:space-between;align-items:center;color:var(--fg);}
+  .sheet h3 .x{font-style:normal;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;}
+  .tchip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:5px 13px;font-size:12.5px;margin:0 6px 8px 0;cursor:pointer;background:#fff;color:var(--fg);}
+  .tchip.on{background:#e6f4f2;border-color:var(--brand,#0f766e);color:var(--brand-deep,#0b5d56);font-weight:600;}
+  .sheet textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;min-height:60px;}
+  .sheet select,.sheet input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font:inherit;font-size:13px;background:#fff;}
+  .sheet .lb{font-size:11.5px;color:var(--muted);margin:10px 0 5px;}
+  .sheet .go{width:100%;border:0;border-radius:11px;padding:11px 0;font:inherit;font-size:14px;font-weight:600;background:var(--brand,#0f766e);color:#fff;margin-top:12px;}
+  .sheet .ghost{width:100%;border:1px solid var(--border);border-radius:11px;padding:9px 0;font:inherit;font-size:13px;background:#fff;color:var(--fg);margin-top:8px;display:block;text-align:center;text-decoration:none;}
+  .tkok{background:#e7f6ec;color:#15803d;border-radius:9px;padding:8px 11px;font-size:12px;margin-top:10px;}
+  .tk{display:flex;gap:9px;padding:9px 0;border-bottom:1px dashed var(--border);align-items:flex-start;}
+  .tk .ic{font-size:17px;line-height:1.3;}
+  .tk .meta{flex:1;font-size:12px;color:var(--muted);}
+  .tk .meta b{display:block;font-size:12.5px;color:var(--fg);}
+  .tk .st{font-size:10.5px;border-radius:999px;padding:2px 8px;white-space:nowrap;}
+  .st-pending{background:#fef3c7;color:#92400e;} .st-dispatched,.st-accepted{background:#dbeafe;color:#1d4ed8;}
+  .st-serving{background:#e6f4f2;color:#0b5d56;} .st-done,.st-rated{background:#e7f6ec;color:#16a34a;}
+  .dial{display:flex;align-items:center;gap:12px;background:#e6f4f2;border-radius:12px;padding:14px;margin-bottom:12px;}
+  .dial .num{font-size:21px;font-weight:800;color:#0b5d56;letter-spacing:.5px;}
+  .dial .sub{font-size:11px;color:var(--muted);}
+  .dial a.call{margin-left:auto;background:var(--brand,#0f766e);color:#fff;text-decoration:none;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -57,6 +84,8 @@
     </div>
 
     <div class="menu">
+      <a href="javascript:void(0)" id="mTicket"><span class="ic">🛠</span>服务工单<span class="tip" id="ticketTip">报修 · 保洁 · 管家</span><span class="ar">›</span></a>
+      <a href="javascript:void(0)" id="m400"><span class="ic">📞</span>400 在线客服<span class="tip" id="t400">热线 400-900-6688</span><span class="ar">›</span></a>
       <a href="lvju-rating-standard.html"><span class="ic">⭐</span>旅居星级评价体系<span class="ar">›</span></a>
       <a href="screens/portal-index.html"><span class="ic">🔍</span>验真公示门户<span class="ar">›</span></a>
       <a href="lvju-app-service.html"><span class="ic">🎧</span>客服中心 · 12301<span class="ar">›</span></a>
@@ -73,11 +102,195 @@
 
   <div class="tabbar">
     <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-lvju.html"><span class="ti">🔎</span>找房</a>
+    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
     <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
     <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
     <a class="on"><span class="ti">👤</span>我的</a>
   </div>
+
+  <!-- ===== 遮罩 + 底部抽屉 ===== -->
+  <div class="mask" id="mask" hidden>
+    <!-- 服务工单 -->
+    <div class="sheet" id="sheetTicket" hidden>
+      <h3>🛠 服务工单 <i class="x" id="closeT">✕</i></h3>
+      <div class="lb">服务类型 <span style="color:#94a3b8;">（点「＋ 自定义」可新增）</span></div>
+      <div id="typeChips"></div>
+      <div id="customRow" hidden style="background:#f8fafc;border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+        <input type="text" id="customName" maxlength="8" placeholder="自定义类型名（≤8 字，例：泳池清洁）" style="margin-bottom:8px;">
+        <div class="lb" style="margin:2px 0 4px;">选个图标</div>
+        <div id="customIcons" style="display:flex;gap:6px;font-size:18px;flex-wrap:wrap;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="go" id="btnCustomAdd" style="margin:0;flex:1;">添加</button>
+          <button class="ghost" id="btnCustomCancel" style="margin:0;flex:0 0 72px;">取消</button>
+        </div>
+      </div>
+      <div class="lb">问题描述</div>
+      <textarea id="tkDesc" placeholder="例：热水器不出热水，麻烦尽快上门"></textarea>
+      <div class="lb">期望上门</div>
+      <select id="tkTime">
+        <option>今天下午</option><option>明天上午</option><option>明天下午</option><option>周末均可</option>
+      </select>
+      <button class="go" id="btnSubmit">提交工单 · 同步中台派单</button>
+      <div class="tkok" id="tkOk" hidden></div>
+      <div class="lb" style="margin-top:14px;">我的工单 <span style="color:#94a3b8;">（点击条目看详情 / 进度 / 评价）</span></div>
+      <div id="mine"></div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">工单实时进入中台「服务需求 · 工单池」（p-service-demand），派单 / 履约状态在此回显。</div>
+    </div>
+
+    <!-- 400 在线客服 -->
+    <div class="sheet" id="sheet400" hidden>
+      <h3>📞 400 在线客服 <i class="x" id="close4">✕</i></h3>
+      <div class="dial">
+        <div>
+          <div class="num" id="dialNum">400-900-6688</div>
+          <div class="sub">旅居服务热线 · 人工客服</div>
+        </div>
+        <a class="call" id="dialBtn" href="tel:4009006688">立即拨打</a>
+      </div>
+      <div class="lb">热线号码配置</div>
+      <input type="text" id="cfg400" placeholder="例：400-900-6688" />
+      <button class="go" id="btnSave400">保存号码配置</button>
+      <div class="tkok" id="cfgMsg" hidden>✓ 已保存，本机立即生效（URL 参数 ?400= 优先级更高）</div>
+      <button class="ghost" id="btnCopy400">复制号码</button>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">优先级：URL <code>?400=</code> &gt; 本机配置（localStorage BZF_LVJU_400）&gt; 默认号码。线上由平台设置统一下发。</div>
+    </div>
+  </div>
 </div>
+
+<script src="screens/_orderbus.js"></script>
+<script>
+(function(){
+  var BO = window.BZF_ORDERS;
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ================= 400 在线客服（电话可配置） ================= */
+  var DEFAULT_400 = '400-900-6688';
+  function get400(){
+    try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
+    try { return localStorage.getItem('BZF_LVJU_400') || DEFAULT_400; } catch(e){ return DEFAULT_400; }
+  }
+  function telHref(n){ return 'tel:' + String(n).replace(/[^0-9+]/g,''); }
+  function paint400(){
+    var n = get400();
+    $('t400').textContent = '热线 ' + n;
+    $('dialNum').textContent = n;
+    $('dialBtn').setAttribute('href', telHref(n));
+    $('cfg400').value = n;
+  }
+  $('btnSave400').addEventListener('click', function(){
+    var v = $('cfg400').value.trim();
+    if (!v) return;
+    try { localStorage.setItem('BZF_LVJU_400', v); } catch(e){}
+    paint400();
+    $('cfgMsg').hidden = false;
+    setTimeout(function(){ $('cfgMsg').hidden = true; }, 2600);
+  });
+  $('btnCopy400').addEventListener('click', function(){
+    var n = get400();
+    if (navigator.clipboard) { navigator.clipboard.writeText(n); }
+    else { var i=document.createElement('input'); i.value=n; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
+    $('btnCopy400').textContent = '已复制 ✓';
+    setTimeout(function(){ $('btnCopy400').textContent = '复制号码'; }, 1600);
+  });
+
+  /* ================= 服务工单（真实工单 · _orderbus 总线） ================= */
+  var BASE_TYPES = ['报修','保洁','管家','送物','家电安装','除螨消杀','接送','其他'];
+  var ICONS = { '报修':'🔧','保洁':'🧹','管家':'🛎','送物':'📦','家电安装':'🔌','除螨消杀':'🧴','接送':'🚗','其他':'🧰' };
+  var CUSTOM_EMOJIS = ['🧰','🔧','🛒','🚗','🧴','🎨','🌿','🏊'];
+  var TYPE_STORE = 'BZF_LVJU_TICKET_TYPES';
+  var curType = '报修', customIcon = '🧰';
+
+  function customTypes(){
+    try { return JSON.parse(localStorage.getItem(TYPE_STORE) || '[]'); } catch(e){ return []; }
+  }
+  function allTypes(){
+    return BASE_TYPES.concat(customTypes().map(function(c){ return c.n; }));
+  }
+  function iconOf(t){
+    var c = customTypes().find(function(x){ return x.n === t; });
+    return (c && c.e) || ICONS[t] || '🧰';
+  }
+  function renderChips(){
+    var types = allTypes();
+    $('typeChips').innerHTML = types.map(function(t){
+      return '<span class="tchip' + (t===curType?' on':'') + '" data-t="' + t + '">' + iconOf(t) + ' ' + t + '</span>';
+    }).join('') + '<span class="tchip" id="chipCustom" style="border-style:dashed;color:var(--muted);">＋ 自定义</span>';
+    Array.prototype.forEach.call(document.querySelectorAll('#typeChips .tchip'), function(c){
+      c.addEventListener('click', function(){
+        var t = c.getAttribute('data-t');
+        if (!t) { openCustom(); return; }
+        curType = t; renderChips();
+      });
+    });
+  }
+  function openCustom(){
+    $('customRow').hidden = false;
+    $('customName').value = '';
+    customIcon = CUSTOM_EMOJIS[0];
+    $('customIcons').innerHTML = CUSTOM_EMOJIS.map(function(e, i){
+      return '<span data-e="' + e + '" style="cursor:pointer;' + (i===0 ? 'outline:2px solid var(--brand,#0f766e);border-radius:6px;' : '') + '">' + e + '</span>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#customIcons span'), function(s){
+      s.addEventListener('click', function(){
+        customIcon = s.getAttribute('data-e');
+        Array.prototype.forEach.call(document.querySelectorAll('#customIcons span'), function(x){ x.style.outline = 'none'; });
+        s.style.outline = '2px solid var(--brand,#0f766e)';
+      });
+    });
+    $('customName').focus();
+  }
+  $('btnCustomAdd').addEventListener('click', function(){
+    var n = $('customName').value.trim();
+    if (!n) { $('customName').focus(); return; }
+    var list = customTypes();
+    if (!list.find(function(x){ return x.n === n; }) && !BASE_TYPES.includes(n)) {
+      list.push({ n: n, e: customIcon });
+      try { localStorage.setItem(TYPE_STORE, JSON.stringify(list)); } catch(e){}
+    }
+    curType = n;
+    $('customRow').hidden = true;
+    renderChips();
+  });
+  $('btnCustomCancel').addEventListener('click', function(){ $('customRow').hidden = true; });
+
+  function renderMine(){
+    var list = BO.all().filter(function(o){ return String(o.source||'').indexOf('旅居客 App') === 0; }).slice(-10).reverse();
+    $('mine').innerHTML = list.length ? list.map(function(o){
+      var st = BO.STATUS[o.status];
+      return '<a class="tk" href="lvju-app-ticket.html?id=' + encodeURIComponent(o.id) + '" style="text-decoration:none;color:inherit;cursor:pointer;">' +
+        '<span class="ic">' + iconOf(o.type) + '</span>' +
+        '<span class="meta"><b>' + BO.esc(o.desc) + '</b>' + BO.esc(o.id) + ' · ' + BO.esc(o.createdLabel) +
+        ' · 期望 ' + BO.esc(o.expectTime || '尽快') + '</span>' +
+        '<span class="st st-' + o.status + '">' + st.c + '</span></a>';
+    }).join('') : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">暂无工单，提交后实时进入中台工单池</div>';
+    var openN = BO.all().filter(function(o){ return ['pending','dispatched','accepted','serving'].indexOf(o.status) >= 0; }).length;
+    $('ticketTip').textContent = openN ? (openN + ' 单进行中') : '报修 · 保洁 · 管家';
+  }
+  $('btnSubmit').addEventListener('click', function(){
+    var desc = $('tkDesc').value.trim() || (curType + '服务需求');
+    var o = BO.create({
+      type: curType,
+      desc: desc,
+      house: '我的旅居 · 贵阳',
+      phone: '138****6688',
+      expectTime: $('tkTime').value,
+      source: '旅居客 App · 我的'
+    });
+    location.href = 'lvju-app-ticket.html?id=' + encodeURIComponent(o.id);
+  });
+
+  /* ================= 抽屉开合 ================= */
+  var mask = $('mask');
+  function open(id){ mask.hidden = false; $('sheetTicket').hidden = (id !== 'sheetTicket'); $('sheet400').hidden = (id !== 'sheet400'); }
+  function close(){ mask.hidden = true; }
+  $('mTicket').addEventListener('click', function(){ open('sheetTicket'); renderChips(); renderMine(); });
+  $('m400').addEventListener('click', function(){ paint400(); open('sheet400'); });
+  $('closeT').addEventListener('click', close);
+  $('close4').addEventListener('click', close);
+  mask.addEventListener('click', function(e){ if (e.target === mask) close(); });
+
+  paint400();
+})();
+</script>
 </body>
 </html>

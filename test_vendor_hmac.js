@@ -90,7 +90,9 @@ function testUnknownRoute() {
   const secret = 'k1';
   const vendors = { '41': { key: secret } };
   const signed = hmac.generateSignature(secret, { vendor_id: 41 });
-  return vendorApi.handleRequest('/api/juzhu/jiazheng/vendor/nope', signed, {}, vendors).then((out) => {
+  // handleRequest 分发前有商家审核门（查 jz_vendors）：mock conn 返回 active 商家行
+  const conn = { execute: async () => [[{ status: 'active', review_status: 'approved' }]] };
+  return vendorApi.handleRequest('/api/juzhu/jiazheng/vendor/nope', signed, conn, vendors).then((out) => {
     assert.strictEqual(out.status, 404);
     assert.strictEqual(out.data.code, 404);
     console.log('[PASS] testUnknownRoute');
