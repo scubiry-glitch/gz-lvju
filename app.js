@@ -5316,41 +5316,61 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     // ===== 商家（vendor）接口：role=vendor 会话，一律按 owner_vendor_id 隔离 =====
 
-    // POST /api/juzhu/vendor/login
+    // POST /api/juzhu/vendor/login —— 商家登录（2026-09-09 并入账号中心：本路由只是别名，返回体形状不变，B 端页面零改动）
+    // 凭据在 accounts（vendor_id 绑定 + vendor_owner 角色，scrypt）：
+    // ① accounts 有账号 → authCenter.loginWithPassword 统一链（ident+ip 双维节流 / 锁定 / bcrypt 遗留哈希懒升级 / auth.login 审计）；
+    // ② 迁移未跑的兜底：jz_vendors 命中且 bcrypt 校验通过 → createAccount 建档（密码重哈希 scrypt）+ createSession；
+    // ③ 旧 HMAC 自证 token（verifyVendorLoginToken）仅宽限校验至自然过期，本路由不再签发；
+    // ④ jz_vendors.password_hash 冻结：仅 ② 的兜底校验读取一次。
     if (urlPath === '/api/juzhu/vendor/login' && req.method === 'POST') {
       const body = await readBody(req);
       const name = String(body.login_name || '').trim();
       const pwd = String(body.password || '');
       if (!name || !pwd) return jsonReply(res, { error: 'login_name/password 必填' }, 400);
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-      // 商家登录同走登录节流（ident 维度带 v: 前缀与账号中心隔离）
-      const vHit = await authCenter.throttleCheck('ident', 'v:' + name);
-      if (vHit.locked) return jsonReply(res, { error: '密码错误次数过多，账号已临时锁定', retry_after: vHit.retry_after }, 429);
+      const ua = req.headers['user-agent'] || '';
+      // 统一收口：会话主体必须绑商家且商家在营 → 组装原形状返回体 + auth.vendor.login 审计
+      const finish = async (account, token, expiresAt) => {
+        if (!account || !account.vendor_id) return jsonReply(res, { error: '非商家账号，请从控制台登录' }, 403);
+        const vrows = await queryRows('SELECT id, name, type, status FROM jz_vendors WHERE id=? LIMIT 1', [account.vendor_id]);
+        const v = vrows[0];
+        if (!v) return jsonReply(res, { error: '绑定的商家不存在' }, 403);
+        if (v.status !== 'active') return jsonReply(res, { error: '商家已停用' }, 403);
+        await authCenter.audit({ accountId: account.id, principalType: 'user', action: 'auth.vendor.login', resource: 'vendor', resourceId: String(v.id), result: 'ok', ip, ua });
+        return jsonReply(res, { token, role: 'vendor', expires_at: expiresAt, vendor: { id: v.id, name: v.name, type: v.type } });
+      };
+      // ① 账号中心统一链
+      const arows = await queryRows("SELECT id FROM accounts WHERE login_name=? AND principal_type='user' LIMIT 1", [name]);
+      if (arows.length) {
+        const lr = await authCenter.loginWithPassword(name, pwd, ip, ua);
+        if (lr.throttled) return jsonReply(res, { error: lr.error, retry_after: lr.retry_after }, 429);
+        if (lr.error || !lr.token) return jsonReply(res, { error: lr.error || '账号或密码错误' }, 401);
+        return await finish(lr.account, lr.token, lr.expires_at);
+      }
+      // ② 兜底懒建档：accounts 无行但商家表命中（老凭据校验通过即并入账号中心）
       const vrows = await queryRows(
-        'SELECT id, name, type, status, password_hash FROM jz_vendors WHERE login_name=? LIMIT 1',
+        'SELECT id, name, type, status, phone, password_hash FROM jz_vendors WHERE login_name=? LIMIT 1',
         [name]
       );
       const v = vrows[0];
       if (!v || !v.password_hash) {
-        await authCenter.throttleFail('ident', 'v:' + name);
+        await authCenter.throttleFail('ident', name);
         return jsonReply(res, { error: '账号或密码错误' }, 401);
       }
       if (v.status !== 'active') return jsonReply(res, { error: '商家已停用' }, 403);
-      if (!bcrypt.compareSync(pwd, v.password_hash)) {
-        const hit = await authCenter.throttleFail('ident', 'v:' + name);
-        if (hit.locked) return jsonReply(res, { error: '密码错误次数过多，账号已临时锁定', retry_after: undefined }, 429);
+      let pwdOk = false;
+      try { pwdOk = bcrypt.compareSync(pwd, v.password_hash); } catch (_) { pwdOk = false; }
+      if (!pwdOk) {
+        await authCenter.throttleFail('ident', name);
         return jsonReply(res, { error: '账号或密码错误' }, 401);
       }
-      await authCenter.throttleClear('ident', 'v:' + name);
-      const exp = Math.floor(Date.now() / 1000) + 30 * 86400;
-      const sig = crypto.createHmac('sha256', vendorTokenSecret()).update(`${exp}.${v.id}`).digest('hex');
-      await authCenter.audit({ action: 'auth.vendor.login', resource: 'vendor', resourceId: String(v.id), result: 'ok', ip, ua: req.headers['user-agent'] || '' });
-      return jsonReply(res, {
-        token: `${exp}.${v.id}.${sig}`,
-        role: 'vendor',
-        expires_at: new Date(exp * 1000).toISOString(),
-        vendor: { id: v.id, name: v.name, type: v.type },
-      });
+      const created = await authCenter.createAccount({
+        login_name: name, password: pwd, roles: ['vendor_owner'], principal_type: 'user',
+        vendor_id: v.id, display_name: v.name, phone: v.phone || null,
+      }, { accountId: null, ip, ua });
+      if (!created || !created.account) return jsonReply(res, { error: (created && created.error) || '商家账号建档失败' }, 400);
+      const sess = await authCenter.createSession(created.account.id, ip, ua);
+      return await finish(created.account, sess.token, sess.expires_at);
     }
 
     // GET /api/juzhu/vendor/me（vendor 或 platform）

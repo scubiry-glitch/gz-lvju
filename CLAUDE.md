@@ -187,6 +187,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **登录防爆破**：`login_throttle` 表两级节流（ident 连错 5 次锁 30 分钟、IP 30 次/10min，env `AUTH_LOCK_*` 可调）；账号不存在也计失败并落审计（`audit_log.result` 列区分 ok/fail）。admin 登录必须显式 login_name（「只传 password 默认唯一管理员」已移除）。密码哈希 `scrypt$salt$hash`，存量 sha256 行登录时懒升级。
 - **账号中心页面**：`screens/account-center.html`（P 端，功能权限+数据权限+账号+审计+IdP 六 tab）是账号/权限唯一管理入口；`juzhu-admin.html` 账号/审计 tab 只留迁移卡。`_nav.js` item 支持可选 `perms: [...]`（任一命中即显示；**未登录/演示态一律全显**，保静态演示页基线观感）；`mount()` 幂等可重入，暴露 `BZF_NAV.refresh/hydrate`。
 - **回归**：`scripts/perm_gate_regression.cjs`（权限矩阵）/ `auth_security_regression.cjs`（防爆破+scrypt+TTL）/ `scope_regression.cjs`（行级过滤）/ `iam_api_regression.cjs`（账号中心 API）四条全绿才算过。
+- **商家登录并入账号中心（2026-09-09）**：商家凭据 = `accounts` 行（`principal_type='user'` + `vendor_id` 绑定 + `vendor_owner` 角色，scope 自动 `{level:'vendor'}`），`POST /vendor/login` 只是别名（返回体形状不变，B 端页面零改动）：有账号走 `loginWithPassword` 统一链，无账号且 `jz_vendors` bcrypt 命中则懒建档（密码重哈希 scrypt）。`verifyPassword` 支持 bcrypt 遗留格式（`$2a$/$2b$/$2y$`，登录一次懒升级 scrypt）。批量预迁移 `node scripts/vendor_accounts_migrate.cjs [--dry]`；旧 HMAC 自证 token（`verifyVendorLoginToken`）仅宽限至自然过期、不再签发；`jz_vendors.password_hash` 冻结（仅兜底路径读一次），改密/停用商家账号在 IAM 走 `updateAccount`（自动吊销会话）。回归 `node scripts/vendor_login_migration_regression.cjs`。
 
 ## 规则 19 · 内容域统筹（专题 / 路线 / 周边玩法，一个后台面）
 
