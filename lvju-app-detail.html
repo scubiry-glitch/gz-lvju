@@ -129,6 +129,7 @@
   .cd.noslot{cursor:default;background:#f7f8f8;}
   .cd.noslot .dn{color:#c3ccc8;font-weight:500;}
   .cd.noslot .dp{color:#e0a3a3;}
+  .cd.low .dp{color:#b45309;font-weight:600;}   /* 仅剩 1-2 间：稀缺提示 */
   .cd.dis{cursor:default;}
   .cd.dis .dn{color:#ccd4d0;font-weight:500;}
   .cd.dis .dp{color:#ccd4d0;}
@@ -652,23 +653,26 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   function dayPrice(d){ var inf = dayInfo(d); return (inf && inf.price) ? inf.price : ((live && live.basePrice) ? live.basePrice : demoPrice(d)); }
   function nights(){ return (ci && co) ? Math.round((co - ci) / 864e5) : 0; }
   function total(){ var t=0; if (ci && co) { var d = new Date(ci); while (d < co) { t += dayPrice(d); d.setDate(d.getDate()+1); } } return t; }
-  // 指定户型在所选区间的实价合计：est=该区间房态未全部到位（回退晚均价估）；blocked=含已订/关房（不可订）
+  // 指定户型在所选区间的实价合计：est=该区间房态未全部到位（回退晚均价估）；blocked=含已订/关房（不可订）；
+  // minRem=区间内最小剩余间数（多间库存 2026-09-10，供下单页间数上限）
   function unitTotal(uid){
     var per = 0;
     (live.units || []).forEach(function(u){ if (u.id === uid) per = u.per || 0; });
     if (!per) per = live.basePrice || 0;
-    var t = 0, est = false, blocked = false;
+    var t = 0, est = false, blocked = false, minRem = Infinity;
     if (ci && co) {
       var d = new Date(ci);
       while (d < co) {
         var inf = dayInfoOf(d, uid);
         if (!inf) est = true;
         else if (inf.status === 'booked' || inf.status === 'blocked') blocked = true;
+        else if (inf.remaining != null) minRem = Math.min(minRem, inf.remaining);
         t += (inf && inf.price) ? inf.price : per;
         d.setDate(d.getDate() + 1);
       }
     }
-    return { t: t, est: est, blocked: blocked };
+    if (!isFinite(minRem)) minRem = null;
+    return { t: t, est: est, blocked: blocked, minRem: minRem };
   }
 
   /* ---------- 房型卡 ---------- */
@@ -785,7 +789,8 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     }
     var lg = document.createElement('div');
     lg.className = 'cs-legend';
-    lg.innerHTML = '<span><i style="background:#f7f8f8;border:1px solid var(--border);"></i>已订 / 关房</span>' +
+    lg.innerHTML = '<span><i style="background:#f7f8f8;border:1px solid var(--border);"></i>已订满 / 关房</span>' +
+      '<span><i style="background:#fef3c7;border:1px solid #f59e0b;"></i>仅剩少量</span>' +
       '<span><i style="background:var(--brand-soft);"></i>已选连住</span>' +
       '<span><i style="background:linear-gradient(135deg,var(--brand),var(--brand-deep));border-radius:50%;"></i>入住 / 离店</span>';
     months.appendChild(lg);
@@ -799,7 +804,9 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     mo.cells.forEach(function(c){
       var d = c.d, k = key(d), inf = dayInfo(d);
       var past = d < TODAY, beyond = d > MAX;
-      var noslot = inf && (inf.status === 'booked' || inf.status === 'blocked');
+      var noslot = inf && (inf.status === 'booked' || inf.status === 'blocked' || (inf.remaining != null && inf.remaining <= 0));
+      // 低库存稀缺态（多间库存 2026-09-10）：已被订走部分、且剩余 1-2 间 → 「仅剩X间」
+      var low = inf && !noslot && inf.remaining != null && inf.remaining > 0 && inf.remaining <= 2 && inf.remaining < inf.qty;
       var dis = ci && !co && !past && !noslot && !beyond && d < minCo && k !== key(ci);
       var isCi = ci && k === key(ci), isCo = co && k === key(co);
       var cl = 'cd';
@@ -807,13 +814,15 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
       if (k === tKey) cl += ' tdy';
       if (past) cl += ' past';
       else if (noslot) cl += ' noslot';
+      else if (low) cl += ' low';
       else if (beyond || dis) cl += ' dis';
       if (isCi || isCo) cl += ' end';
       else if (ci && co && d > ci && d < co) cl += ' range';
       c.el.className = cl;
       c.dp.textContent = isCi ? '入住' : isCo ? '离店'
         : past ? ''
-        : noslot ? (inf.status === 'booked' ? '已订' : '关房')
+        : noslot ? (inf.status === 'blocked' ? '关房' : '已订满')
+        : low ? '仅剩' + inf.remaining + '间'
         : k === tKey ? '今天'
         : dis ? '不满' + minNights() + '晚'
         : '¥' + ((inf && inf.price) || dayPrice(d));

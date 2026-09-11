@@ -350,7 +350,7 @@ function render() {
   html += '<button type="button" class="btn ghost ud_fee_add" style="margin-top:6px;">+ 添加费用项</button>';
   html += '</div>';
 
-  // ── 入住规则 · 取消政策（房型级，units.ext.cancel_policy；仅租赁/民宿频道） ──
+  // ── 入住规则 · 库存与取消政策（房型级；仅租赁/民宿频道） ──
   if (project && (project.channel === 'rental' || project.channel === 'minsu')) {
     var ux = parseJsonField(u.ext, {});
     if (!ux || typeof ux !== 'object' || Array.isArray(ux)) ux = {};
@@ -363,9 +363,10 @@ function render() {
     }).join('');
     if (preset.indexOf(Number(days)) < 0) dayOpts += '<option value="' + days + '" selected>入住日前 ' + esc(days) + ' 天</option>';
     html += '<div class="card">';
-    html += '<h2>入住规则 · 取消政策 <span class="badge">房型级</span></h2>';
-    html += '<div class="hint" style="margin:0 0 8px;">免费取消窗口 = 入住日往前推 N 天的截止时刻；窗口外 / 未开通一律不可取消不可退。存 units.ext.cancel_policy（规则 15 不加列），C 端下单 / 取消实时校验，B 端房态页可同步配置。</div>';
+    html += '<h2>入住规则 · 库存与取消政策 <span class="badge">房型级</span></h2>';
+    html += '<div class="hint" style="margin:0 0 8px;">总间数 = 该房型同规格可订单元数（多间库存，缺省 1；逐晚放出间数与房态在 B 端房态页维护）。免费取消窗口 = 入住日往前推 N 天的截止时刻；窗口外 / 未开通一律不可取消不可退。取消政策存 units.ext.cancel_policy（规则 15 不加列），C 端下单 / 取消实时校验。</div>';
     html += '<div class="detail-grid">';
+    html += '<div><label>总间数</label><input class="ud_total_qty" type="number" min="1" max="999" value="' + (parseInt(u.total_qty, 10) || 1) + '"/></div>';
     html += '<div><label>免费取消</label><select class="ud_cp_on"><option value="0"' + (cp.enabled ? '' : ' selected') + '>未开通（预订成功后不可取消）</option><option value="1"' + (cp.enabled ? ' selected' : '') + '>开通（窗口内可免费取消）</option></select></div>';
     html += '<div><label>截止日</label><select class="ud_cp_days">' + dayOpts + '</select></div>';
     html += '<div><label>截止时刻</label><input class="ud_cp_time" type="time" value="' + esc(cp.cutoff_time || '18:00') + '"/></div>';
@@ -574,8 +575,14 @@ function collectDetail() {
     rent_detail: rd,
     cover_image: document.getElementById('u_cover').value.trim() || null
   };
-  // 入住规则 · 取消政策 → ext.cancel_policy（合并进已有 ext 整包提交，保留 price_night 等键，服务端兜底校验）
+  // 入住规则 · 库存与取消政策：total_qty 走列（多间库存 2026-09-10），cancel_policy → ext.cancel_policy
+  // （合并进已有 ext 整包提交，保留 price_night 等键，服务端兜底校验）
   if (project && (project.channel === 'rental' || project.channel === 'minsu')) {
+    var tqEl = document.querySelector('.ud_total_qty');
+    if (tqEl) {
+      var tq = parseInt(tqEl.value, 10);
+      if (tq >= 1 && tq <= 999) body.total_qty = tq;
+    }
     var cpOn = document.querySelector('.ud_cp_on');
     if (cpOn) {
       var ext = parseJsonField(unit.ext, {});

@@ -112,6 +112,9 @@
         <div class="bfield"><span class="l">房型</span>
           <select id="fUnit" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"></select>
         </div>
+        <div class="bfield" id="roomsRow" style="display:none;"><span class="l">间数</span>
+          <select id="fRooms" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"><option value="1">1 间</option></select>
+        </div>
       </div>
 
       <div class="seg">入住人 / 联系方式</div>
@@ -161,6 +164,7 @@
   var CITY = q.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
   var err = document.getElementById('bErr');
   var unitSel = document.getElementById('fUnit');
+  var roomsSel = document.getElementById('fRooms');
   var perNight = 0;
   var curId = 0;
   var curChannel = '';
@@ -271,29 +275,60 @@
     var mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     var m = nightCache[mk];
     var inf = m ? (m[iso(d)] || null) : null;
-    return { price: (inf && inf.price) ? inf.price : perNight, booked: !!(inf && (inf.status === 'booked' || inf.status === 'blocked')) };
+    return { price: (inf && inf.price) ? inf.price : perNight,
+      booked: !!(inf && (inf.status === 'booked' || inf.status === 'blocked' || (inf.remaining != null && inf.remaining <= 0))) };
+  }
+  // 间数（多间库存 2026-09-10）：上限 = 房型总间数与选段内最小剩余的较小者；整栋单（不限房型）恒 1 间
+  function curUnitQty(){
+    var o = unitSel.options[unitSel.selectedIndex];
+    return o && o.dataset && o.dataset.qty ? (parseInt(o.dataset.qty, 10) || 1) : 1;
+  }
+  function minRemaining(){
+    var r = rangeNights();
+    if (!r.n) return null;
+    var min = null;
+    r.list.forEach(function(d){
+      var mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      var m = nightCache[mk];
+      var inf = m ? (m[iso(d)] || null) : null;
+      if (inf && inf.remaining != null) min = (min == null) ? inf.remaining : Math.min(min, inf.remaining);
+    });
+    return min;
+  }
+  function refreshRooms(){
+    var qty = curUnitQty();
+    var min = minRemaining();
+    var max = Math.max(1, Math.min(qty, min == null ? qty : Math.max(min, 1)));
+    var cur = parseInt(roomsSel.value, 10) || 1;
+    var html = '';
+    for (var i = 1; i <= max; i++) html += '<option value="' + i + '">' + i + ' 间</option>';
+    roomsSel.innerHTML = html;
+    roomsSel.value = String(Math.min(cur, max));
+    document.getElementById('roomsRow').style.display = unitSel.value ? '' : 'none';
   }
   function calc(){
     var r = rangeNights();
     var n = r.n;
+    var rooms = parseInt(roomsSel.value, 10) || 1;
     var short_ = (n >= 1 && n < minNights);
     var sum = 0, est = false;
     r.list.forEach(function(d){ var dp = dayPriceAt(d); if (!dp.price) est = true; sum += dp.price || perNight || 0; });
+    sum = sum * rooms;                                 // 多间库存：单间逐晚合计 × 间数（服务端同口径）
     var ok = (n >= minNights);
     var ciV0 = document.getElementById('fIn').value, coV0 = document.getElementById('fOut').value;
     document.getElementById('pLine').textContent = ok
-      ? ('房费 ' + mds(new Date(ciV0 + 'T00:00:00')) + ' – ' + mds(new Date(coV0 + 'T00:00:00')) + ' · ' + n + ' 晚')
-      : ('房费 ¥' + fmt(perNight) + ' × ' + (n > 0 ? n : '—') + ' 晚');
+      ? ('房费 ' + mds(new Date(ciV0 + 'T00:00:00')) + ' – ' + mds(new Date(coV0 + 'T00:00:00')) + ' · ' + n + ' 晚' + (rooms > 1 ? ' × ' + rooms + ' 间' : ''))
+      : ('房费 ¥' + fmt(perNight) + ' × ' + (n > 0 ? n : '—') + ' 晚' + (rooms > 1 ? ' × ' + rooms + ' 间' : ''));
     var totTxt = (ok && sum) ? '¥' + fmt(sum) : '—';
     document.getElementById('pTotal').textContent = totTxt;
     document.getElementById('pSum').textContent = totTxt;
     document.getElementById('pNote').textContent = est ? '按晚均价估算 · 逐晚实价加载中' : '与详情页日历实价同口径';
     document.querySelector('#cTotal b').textContent = totTxt;
     document.querySelector('#cTotal span').textContent =
-      short_ ? '连住不足 ' + minNights + ' 晚' : (n >= 1 ? '共 ' + n + ' 晚' : '待选日期');
+      short_ ? '连住不足 ' + minNights + ' 晚' : (n >= 1 ? '共 ' + n + ' 晚' + (rooms > 1 ? ' · ' + rooms + ' 间' : '') : '待选日期');
     var note = document.getElementById('stayNote');
     if (short_) note.textContent = '⚠ 该房源须连续入住 ≥ ' + minNights + ' 晚，当前 ' + n + ' 晚';
-    else note.textContent = '总价按商家逐晚实价合计 · 连住 ' + minNights + ' 晚起';
+    else note.textContent = '总价按商家逐晚实价合计 × 间数 · 连住 ' + minNights + ' 晚起';
     renderConfirm();
   }
   // 确认条（只读日期 + 修改回详情日历）
@@ -328,8 +363,9 @@
       var box = document.getElementById('nightList');
       box.innerHTML = r.list.map(function(d){
         var dp = dayPriceAt(d);
-        return '<div class="nrow"><span class="d">' + mds(d) + ' 周' + WK[d.getDay()] + (dp.booked ? ' · 已订' : '') + '</span><span class="p' + (dp.booked ? ' hi' : '') + '">¥' + fmt(dp.price || perNight) + '</span></div>';
+        return '<div class="nrow"><span class="d">' + mds(d) + ' 周' + WK[d.getDay()] + (dp.booked ? ' · 已订满' : '') + '</span><span class="p' + (dp.booked ? ' hi' : '') + '">¥' + fmt(dp.price || perNight) + '</span></div>';
       }).join('');
+      refreshRooms();   // 逐晚剩余到位后收敛间数上限（多间库存 2026-09-10）
       calc();
     });
   }
@@ -392,12 +428,13 @@
         if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
         else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
         unitCp[u.id] = u.cancel_policy_text || '';   // 退改口径随 units 下发
-        return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
+        return '<option value="' + u.id + '" data-per="' + pn + '" data-qty="' + (parseInt(u.total_qty, 10) || 1) + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '（' + (parseInt(u.total_qty, 10) || 1) + ' 间）</option>';
       }).join('');
       var qUnit = parseInt(q.get('unit') || '', 10);
       if (qUnit) unitSel.value = String(qUnit);
       if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
       updateCpNote();
+      refreshRooms();
       var ci = q.get('checkin'), co = q.get('checkout');
       if (ci) document.getElementById('fIn').value = ci;
       if (co) document.getElementById('fOut').value = co;
@@ -429,7 +466,9 @@
     var o = unitSel.options[unitSel.selectedIndex];
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
     nightCache = {}; nightLoaded = '';                 // 房态/夜价按户型隔离
+    roomsSel.value = '1';                              // 换房型间数回 1，再按新房型总间数重建
     updateCpNote();
+    refreshRooms();
     calc();
     if (document.getElementById('nightList').style.display !== 'none') loadNightDetail();
   });
@@ -466,6 +505,7 @@
     var body = {
       project_id: curId,
       unit_id: unitSel.value ? parseInt(unitSel.value, 10) : null,
+      rooms: parseInt(roomsSel.value, 10) || 1,          // 多间库存 2026-09-10（整栋单服务端强制 1）
       checkin: document.getElementById('fIn').value,
       checkout: document.getElementById('fOut').value,
       contact_name: document.getElementById('fName').value.trim(),
@@ -504,8 +544,9 @@
   var isRetry = false;
   var qid = parseInt(q.get('id') || '', 10);
   function boot(){
-    document.getElementById('fIn').addEventListener('change', calc);
-    document.getElementById('fOut').addEventListener('change', calc);
+    document.getElementById('fIn').addEventListener('change', function(){ refreshRooms(); calc(); });
+    document.getElementById('fOut').addEventListener('change', function(){ refreshRooms(); calc(); });
+    roomsSel.addEventListener('change', calc);           // 间数变化 → 合计 × 间数
     document.getElementById('cSel').addEventListener('change', applyContact);
     checkMe().then(function(acc){
       if (!acc) {

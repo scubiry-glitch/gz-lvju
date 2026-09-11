@@ -89,9 +89,9 @@
     </div>
 
     <div class="note" id="note">
-      房态日历 = 逐晚库存：<b>可订 / 关房 / 已订</b> 三态 + 夜价覆盖；无差异行即默认「可订」（仅对已开通项目生效）。
+      房态日历 = 逐晚库存（多间口径）：<b>总间数</b>（房型级，admin/开放接口可配）− <b>已订</b>（订单自动占用，取消自动释放）= <b>剩余</b>；
+      商家可按晚设「<b>放出间数</b>」覆盖总间数、关房、夜价；无差异行即默认「可订 · 放出 = 总间数」（仅对已开通项目生效）。
       <b>按晚预订</b>为项目级开关（projects.ext.stay_bookable）：未开通项目 C 端仅 400 电话咨询，开通后才支持日历选房 + 在线下单（缺省关闭）。
-      C 端详情日历实时读本页数据；<b>已订</b> 由客户订单自动占用（取消自动释放），商家只能改「关房 / 开房 / 夜价」。
       旅居口径<b>连住 15 晚起</b>（可按项目调整），下单时 C/B/服务端三处同口径校验。
     </div>
 
@@ -115,8 +115,8 @@
           <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载中…</div>
         </div>
         <div class="legend">
-          <span><i style="background:#fff;border:1px solid var(--border);"></i>可订（默认）</span>
-          <span><i style="background:#fdecec;"></i>已订 · 订单占用</span>
+          <span><i style="background:#fff;border:1px solid var(--border);"></i>可订（剩 X / 放出 N 间）</span>
+          <span><i style="background:#fdecec;"></i>已订满 · 订单占用</span>
           <span><i style="background:#f1f5f4;"></i>关房（商家）</span>
           <span><i style="background:#fafafa;"></i>已过</span>
         </div>
@@ -124,8 +124,8 @@
 
       <div>
         <div class="card" style="margin-bottom:14px;">
-          <h3>批量设置房态 / 夜价</h3>
-          <div class="sub">关房 = 不对 C 端可订；开房并填夜价 = 覆盖默认价；开房不填价 = 恢复默认价</div>
+          <h3>批量设置房态 / 夜价 / 放出间数</h3>
+          <div class="sub">关房 = 不对 C 端可订（已订晚不可关）；夜价 / 放出间数按晚覆盖（留空 = 恢复默认：价回默认、放出 = 总间数）</div>
           <div class="frow"><label>起</label><input type="date" id="bFrom" /> <label>止</label><input type="date" id="bTo" /></div>
           <div class="frow">
             <label>动作</label>
@@ -134,6 +134,7 @@
               <option value="open">开房</option>
             </select>
             <input type="number" id="bPrice" placeholder="夜价覆盖（元/晚）" min="0" style="width:150px;" />
+            <input type="number" id="bQty" placeholder="放出间数（≤总间数）" min="1" max="999" style="width:150px;" />
           </div>
           <div class="frow">
             <button class="btn btn-primary" id="bApply">应用到所选日期</button>
@@ -271,7 +272,7 @@
     var fu = $('fUnit');
     var us = state.units.filter(function(u){ return u.project_id === state.pid; });
     fu.innerHTML = '<option value="">整栋 / 不限房型</option>' + us.map(function(u){
-      return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'</option>';
+      return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'（'+(parseInt(u.total_qty,10)||1)+' 间）</option>';
     }).join('');
     state.unitId = 0;
   }
@@ -319,16 +320,21 @@
         ' · ' + (p && p.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
         ' · 最短连住 ' + (j.min_stay_nights || state.cfg.min_stay_nights) + ' 晚 · 保障 ' +
         ((j.insurance_types || []).map(function(t){ return t.short; }).join('/') || '未配置');
-      var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订', ''], past: ['—', ''] };
+      var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订满', ''], past: ['—', ''] };
       var html = ['日','一','二','三','四','五','六'].map(function(w){ return '<div class="wk">'+w+'</div>'; }).join('');
       var first = new Date(parseInt(state.month.slice(0,4), 10), parseInt(state.month.slice(5,7), 10) - 1, 1);
       for (var i = 0; i < first.getDay(); i++) html += '<div class="cell blank"></div>';
       days.forEach(function(d){
         var st = ST[d.status] ? d.status : 'open';
+        // 多间库存：放出 >1 间时展示「剩 X / 放出 N」；单间房型保持原三态文案
+        var multi = (parseInt(d.qty, 10) || 1) > 1;
+        var stText = ST[st][0];
+        if (st === 'open') stText = multi ? '剩 ' + (d.remaining || 0) + '/' + d.qty + ' 间' : '可订';
+        else if (st === 'booked') stText = multi ? '剩 0/' + d.qty + ' 间' : '已订';
         var cls = 'cell ' + st + (state.writable && (st === 'open' || st === 'blocked') ? ' writable' : '');
         html += '<div class="' + cls + '" data-date="' + d.date + '" data-status="' + st + '">' +
           '<div class="dn">' + parseInt(d.date.slice(8,10), 10) + '</div>' +
-          '<span class="st">' + ST[st][0] + '</span>' +
+          '<span class="st">' + stText + '</span>' +
           (d.price ? '<div class="pr">¥' + fmt(d.price) + '</div>' : '') +
           '</div>';
       });
@@ -350,11 +356,16 @@
     });
   }
 
-  function setStay(dates, status, price){
+  function setStay(dates, status, price, qty){
     return fetch(API + '/vendor/stay-calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: state.pid, unit_id: state.unitId || null, dates: dates, status: status, price_night: price }) })
+      body: JSON.stringify({ project_id: state.pid, unit_id: state.unitId || null, dates: dates, status: status, price_night: price, qty: qty }) })
       .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
-      .then(function(j){ toast('已' + (status === 'blocked' ? '关房' : '开放') + ' ' + j.dates + ' 晚' + (price != null ? ' · 夜价 ¥' + fmt(price) : '')); renderCal(); })
+      .then(function(j){
+        toast('已' + (status === 'blocked' ? '关房' : '开放') + ' ' + j.dates + ' 晚' +
+          (price != null ? ' · 夜价 ¥' + fmt(price) : '') +
+          (qty != null ? ' · 放出 ' + qty + ' 间' : ''));
+        renderCal();
+      })
       .catch(function(e){ toast('操作失败：' + e.message); });
   }
 
@@ -371,7 +382,14 @@
     var priceRaw = $('bPrice').value.trim();
     var price = (status === 'open' && priceRaw !== '') ? parseInt(priceRaw, 10) : null;
     if (price != null && !(price >= 0)) { toast('夜价须为非负整数'); return; }
-    setStay(dates, status, price);
+    // 放出间数（多间库存 2026-09-10）：仅房型级 + 开房时可设；留空 = 该字段恢复默认
+    var qty = null;
+    var qtyRaw = $('bQty').value.trim();
+    if (status === 'open' && qtyRaw !== '' && state.unitId) {
+      qty = parseInt(qtyRaw, 10);
+      if (!(qty >= 1 && qty <= 999)) { toast('放出间数须为 1-999 的整数'); return; }
+    }
+    setStay(dates, status, price, qty);
   };
 
   /* ── 规则与保障 ── */
