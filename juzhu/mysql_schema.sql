@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS units (
   tags          TEXT,
   unit_spec     TEXT,
   promo_price   INT,
+  total_qty     INT NOT NULL DEFAULT 1,
   amenities     TEXT,
   keeper        TEXT,
   rent_detail   TEXT,

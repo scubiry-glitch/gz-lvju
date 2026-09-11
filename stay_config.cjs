@@ -72,6 +72,35 @@ function bookableOf(proj) {
   return parseExtObj(proj && proj.ext)[STAY_BOOKABLE_KEY] === true;
 }
 
+// ===== 多间库存口径（2026-09-10，docs/stay-multi-qty-design.md）=====
+// unit = 同规格房型 × N 间（units.total_qty，缺省 1 = 旧行为）；stay_calendar.qty 为
+// 商家按晚「放出间数」覆盖；booked_qty 为该晚已订间数。stored status 只写 open/blocked，
+// booked 是 remaining<=0 的派生态（buildStayMonth 输出，不落库）。
+
+/** 房型总间数：units.total_qty，缺省/非法回 1（存量全兼容），上限 999 */
+function totalQtyOf(unit) {
+  const v = parseInt(unit && unit.total_qty, 10);
+  if (!(v >= 1)) return 1;
+  return Math.min(v, 999);
+}
+
+/** 某晚「放出间数」：差异行 qty 覆盖 > units.total_qty；项目级行（unit_id=0，整栋）容量恒 1 */
+function effectiveQtyOf(row, unit) {
+  if (row && row.qty != null) {
+    const q = parseInt(row.qty, 10);
+    if (q >= 0) return Math.min(q, 999);
+  }
+  return row && Number(row.unit_id) === 0 ? 1 : totalQtyOf(unit);
+}
+
+/** 某晚剩余可订间数：关房 / legacy booked 行（迁移前的整行占用）→ 0；否则 max(0, 放出 − 已订) */
+function remainingOf(row, unit) {
+  if (!row) return totalQtyOf(unit);
+  if (row.status === 'blocked' || row.status === 'booked') return 0;
+  const booked = parseInt(row.booked_qty, 10) || 0;
+  return Math.max(0, effectiveQtyOf(row, unit) - booked);
+}
+
 /**
  * 下单逐晚计价（2026-09-10）：每晚 = 日历覆盖价（户型级 > 项目级）否则默认夜价，
  * 与 buildStayMonth 的覆盖优先级同口径（C 端日历/下单页展示的就是这套价）。
@@ -214,9 +243,11 @@ function isValidDateString(value) {
 }
 
 /**
- * 组装某月房态日历：无差异行 = open；blocked/booked 压过同日项目级 open；
- * 夜价覆盖户型级 > 项目级 > 默认。fetchRows(sql, params) → Promise<rows>，
- * 由调用方注入（app.js 连接池 / vendor_api.cjs HMAC 连接）。
+ * 组装某月房态日历：无差异行 = open（放出间数 = units.total_qty）；
+ * 本层差异行给出 qty 覆盖 / 已订间数，项目级行（unit_id=0，整栋）关房或被订时压制全天；
+ * 夜价覆盖户型级 > 项目级 > 默认。status 为派生态：remaining<=0 → booked（多间库存，
+ * 2026-09-10）；legacy 整行 booked（迁移前）按占满防御处理。
+ * fetchRows(sql, params) → Promise<rows>，由调用方注入（app.js 连接池 / vendor_api.cjs HMAC 连接）。
  */
 async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
   const pad2 = (n) => String(n).padStart(2, '0');
@@ -224,13 +255,15 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
   const lastDay = new Date(y, mo + 1, 0).getDate();
   const last = y + '-' + pad2(mo + 1) + '-' + String(lastDay).padStart(2, '0');
   const scRows = await fetchRows(
-    `SELECT unit_id, stay_date, status, price_night, source, booking_id FROM stay_calendar
+    `SELECT unit_id, stay_date, status, price_night, source, booking_id, qty, booked_qty FROM stay_calendar
      WHERE project_id=? AND stay_date BETWEEN ? AND ? AND (unit_id=0 OR unit_id=?) ORDER BY stay_date, unit_id`,
     [proj.id, first, last, unitId]
   );
   const today = new Date();
   const todayKey = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
   const defPrice = unitNightPrice(proj, unit);
+  // 基准放出间数：unit 级 = units.total_qty；项目级日历（unitId=0，整栋）恒 1
+  const baseQty = Number(unitId) > 0 ? totalQtyOf(unit) : 1;
   const days = [];
   for (let dd = 1; dd <= lastDay; dd++) {
     const ds = y + '-' + pad2(mo + 1) + '-' + String(dd).padStart(2, '0');
@@ -239,21 +272,70 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
     let price = defPrice;
     let source = null;
     let bookingId = null;
+    let qty = baseQty;      // 放出间数（差异行 qty 覆盖基准）
+    let bookedQty = 0;      // 已订间数
     for (const r of scRows) {
       if (r.stay_date !== ds) continue;
-      if (r.status === 'booked') { status = 'booked'; source = r.source; bookingId = r.booking_id || null; }
-      else if (r.status === 'blocked' && status !== 'booked') { status = 'blocked'; source = r.source; }
+      // legacy 防御：迁移前的 booked 行无 booked_qty，视为占满
+      const rBooked = Math.max(parseInt(r.booked_qty, 10) || 0, r.status === 'booked' ? 1 : 0);
+      if (Number(r.unit_id) === Number(unitId)) {
+        if (r.qty != null) qty = Math.max(0, parseInt(r.qty, 10) || 0);
+        bookedQty = Math.max(bookedQty, rBooked);
+        if (r.status === 'blocked') { status = 'blocked'; source = r.source; }
+        else if (r.status === 'booked') { status = 'booked'; source = r.source; }
+        else if (r.source) source = r.source;
+        if (r.booking_id) bookingId = bookingId || r.booking_id;   // 首个占用订单 id（仅展示线索）
+      } else if (r.status === 'blocked' && status !== 'booked') {
+        status = 'blocked'; source = r.source;               // 项目级关房压过本层 open
+      } else if (rBooked > 0) {
+        status = 'booked'; source = r.source;                // 整栋被订 → 该 unit 当晚不可订
+        bookingId = bookingId || r.booking_id || null;
+      }
       if (r.price_night != null && (r.unit_id === unitId || price === defPrice)) price = r.price_night;
     }
+    const remaining = status === 'blocked' ? 0 : Math.max(0, qty - bookedQty);
+    if (status !== 'blocked' && remaining <= 0) status = 'booked';
     days.push({
       date: ds,
       status: k < todayKey ? 'past' : status,
       price: price || null,
       source: k < todayKey ? null : source,
       booking_id: bookingId,
+      qty: qty != null ? qty : null,
+      booked_qty: bookedQty,
+      remaining,
     });
   }
   return { month: y + '-' + pad2(mo + 1), base_price_night: defPrice || null, days };
+}
+
+/**
+ * 释放订单占用的逐晚库存（多间口径，2026-09-10）：按订单自身区间对 booked_qty 对称递减
+ * （不依赖 booking_id——多间下一行可被多单占用），纯占用行删行；商家差异行
+ * （price_night / qty / blocked）原地保留，修掉旧「DELETE WHERE booking_id」连带清夜价的副作用。
+ * execute(sql, params) → ResultSetHeader，由调用方注入（事务内 conn.execute 取 [0]）。
+ * opts: { project_id, unit_id, rooms, checkin, checkout, now? }；返回删除的纯占用行数。
+ */
+async function releaseStayQty(execute, opts) {
+  const o = opts || {};
+  if (!o.project_id || !isValidDateString(o.checkin) || !isValidDateString(o.checkout)) return 0;
+  const unitId = parseInt(o.unit_id, 10) || 0;
+  const rooms = Math.min(999, Math.max(1, parseInt(o.rooms, 10) || 1));
+  const now = o.now || new Date().toISOString().slice(0, 19).replace('T', ' ');
+  await execute(
+    `UPDATE stay_calendar SET
+       booked_qty = IF(status='booked', GREATEST(booked_qty, 1) - ?, GREATEST(booked_qty - ?, 0)),
+       status = IF(status='booked', 'open', status),
+       updated_at = ?
+     WHERE project_id=? AND unit_id=? AND stay_date>=? AND stay_date<?`,
+    [rooms, rooms, now, o.project_id, unitId, o.checkin, o.checkout]
+  );
+  const delRes = await execute(
+    `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND stay_date>=? AND stay_date<?
+       AND booked_qty=0 AND status='open' AND source='booking' AND price_night IS NULL AND qty IS NULL`,
+    [o.project_id, unitId, o.checkin, o.checkout]
+  );
+  return (delRes && delRes.affectedRows) || 0;
 }
 
 module.exports = {
@@ -268,6 +350,9 @@ module.exports = {
   insuranceOf,
   minStayNightsOf,
   bookableOf,
+  totalQtyOf,
+  effectiveQtyOf,
+  remainingOf,
   unitNightPrice,
   stayNightPrices,
   normalizeCancelPolicyInput,
@@ -281,4 +366,5 @@ module.exports = {
   stayConfigOf,
   stayDateList,
   buildStayMonth,
+  releaseStayQty,
 };
