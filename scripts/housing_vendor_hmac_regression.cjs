@@ -297,7 +297,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
     name: RUN + '·回归演示民宿', channel: 'minsu', city_id: city.id, district_id: district.id,
     price_from: 980, tags: ['演示'], min_stay_nights: 1, stay_bookable: true,
-    units: [{ name: '庭院房', price_night: 980 }],
+    units: [{ name: '庭院房', price_night: 980, total_qty: 2 }],   // 多间库存：2 间（2026-09-10）
   }));
   const mid = r.j.project && r.j.project.id;
   check('创建 minsu 演示房 → 200', r.status === 200 && !!mid, JSON.stringify(r.j).slice(0, 120));
@@ -347,6 +347,69 @@ async function catalogEventually(base, projectId, citySlug, want) {
       check('已支付拒单 → refunded', r.status === 200 && r.j.pay_status === 'refunded', JSON.stringify(r.j));
     }
   }
+
+  // ── 5.7) 多间库存（2026-09-10）：total_qty=2 房型 → 剩余下发 / qty 覆盖 / 满房派生 booked / 释放回补 ──
+  // 注意查询口径：带 unit_id 才是房型视角（放出 = total_qty）；不带 = 整栋项目级（容量恒 1）
+  const [mu5] = await conn.execute('SELECT id FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [mid]);
+  const muId5 = mu5.length ? mu5[0].id : null;
+  const mkT = mi1.slice(0, 7);
+  const qUnitDay = async () => {
+    const res = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: mid, unit_id: muId5, month: mkT }));
+    return ((res.j || {}).days || []).find((d) => d.date === mi1) || null;
+  };
+  // 前序 bk3（整栋单）已被商家拒单释放：unit 视角放出间数 = 总间数 2
+  const dAfterRel = await qUnitDay();
+  check('拒单释放后 remaining 回补 = 2（总间数）', dAfterRel && dAfterRel.remaining === 2 && dAfterRel.qty === 2 && dAfterRel.status === 'open',
+    JSON.stringify(dAfterRel));
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+    project_id: mid, unit_id: muId5, dates: [mi1], status: 'open', qty: 1,
+  }));
+  check('设放出间数 qty=1 → 200', r.status === 200, JSON.stringify(r.j));
+  const dQty = await qUnitDay();
+  check('qty 覆盖生效：remaining=1 / qty=1', dQty && dQty.remaining === 1 && dQty.qty === 1, JSON.stringify(dQty));
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+    project_id: mid, unit_id: muId5, dates: [mi1], status: 'open', qty: 0,
+  }));
+  check('qty=0 → 400（须为 1-999）', r.status === 400, JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: muId5, total_qty: 0 }));
+  check('units/update total_qty=0 → 400', r.status === 400, JSON.stringify(r.j));
+  // qty=1 下：订 2 间被拒（超出剩余），订 1 间成功（价 = 夜价 980 × 2 晚 × 1 间）
+  const bk5 = await call('/api/juzhu/booking', {
+    project_id: mid, unit_id: muId5, rooms: 2, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
+    contact_name: '多间回归', contact_phone: bkPhone,
+  });
+  check('qty=1 时订 2 间 → 400（超出剩余）', bk5.status === 400 && bk5.j.remaining === 1, JSON.stringify(bk5.j));
+  const bk5b = await call('/api/juzhu/booking', {
+    project_id: mid, unit_id: muId5, rooms: 1, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
+    contact_name: '多间回归', contact_phone: bkPhone,
+  });
+  check('qty=1 下订 1 间 → 200（price=980×1 晚×1 间）', bk5b.status === 200 && bk5b.j.rooms === 1 && bk5b.j.price_total === 980,
+    JSON.stringify(bk5b.j));
+  if (bk5b.status === 200) {
+    bkIds.push(bk5b.j.order_no);
+    const dFull = await qUnitDay();
+    check('订满后派生 booked（remaining=0 / booked_qty=1）', dFull && dFull.status === 'booked' && dFull.remaining === 0 && Number(dFull.booked_qty) === 1,
+      JSON.stringify(dFull));
+    const bk6 = await call('/api/juzhu/booking', {
+      project_id: mid, unit_id: muId5, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
+      contact_name: '多间回归', contact_phone: bkPhone,
+    });
+    check('满房后再订 1 间 → 400', bk6.status === 400, JSON.stringify(bk6.j));
+    const lv = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, { project_id: mid }));
+    const found5 = (lv.j.list || []).find((o) => o.order_no === bk5b.j.order_no);
+    r = await call('/api/juzhu/housing/vendor/bookings/cancel', signed(vendor, { id: found5.id }));
+    check('商家取消多间单 → cancelled', r.status === 200, JSON.stringify(r.j));
+    const dRel = await qUnitDay();
+    check('取消后 booked_qty 归零回 open（qty=1 覆盖保留）', dRel && dRel.status === 'open' && Number(dRel.booked_qty) === 0 && dRel.remaining === 1 && dRel.qty === 1,
+      JSON.stringify(dRel));
+  }
+  // 恢复默认（清 qty 覆盖）：纯差异行删行 → 回落总间数
+  r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+    project_id: mid, unit_id: muId5, dates: [mi1], status: 'open',
+  }));
+  check('恢复默认（清 qty 覆盖）→ 200', r.status === 200, JSON.stringify(r.j));
+  const dClr = await qUnitDay();
+  check('恢复默认后 remaining=2（总间数）', dClr && dClr.remaining === 2 && dClr.qty === 2, JSON.stringify(dClr));
 
   // 客户侧取消一笔（webhook 的 cancelled 由客户动作触发；商家自己拒单不推给自己）
   const bk4 = await call('/api/juzhu/booking', {

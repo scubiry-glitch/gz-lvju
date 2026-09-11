@@ -371,7 +371,7 @@
     </table>
 
     <h3>3.2 户型（units）</h3>
-    <p>户型 = 房源下的<strong>实体售卖库存单元</strong>：预订、逐晚房态、免费取消政策都挂在户型维度；整栋 / 不限房型走项目级（<code>unit_id=0</code>）。<code>projects/create</code> 可带 <code>units[]</code> 一次建全，后续 <code>units/create</code> 追加。</p>
+    <p>户型 = 房源下的<strong>实体售卖库存单元</strong>：预订、逐晚房态、免费取消政策都挂在户型维度；整栋 / 不限房型走项目级（<code>unit_id=0</code>）。同规格房型多间库存用 <code>total_qty</code> 表达（<strong>多间口径 2026-09-10</strong>：房型 × N 间，按晚扣减、售满即关，不区分具体房间号）。<code>projects/create</code> 可带 <code>units[]</code> 一次建全，后续 <code>units/create</code> 追加。</p>
     <table>
       <tr><th>字段</th><th>类型</th><th>说明</th></tr>
       <tr><td><code>project_id</code></td><td>int</td><td class="req">★必填</td>所属房源 id</td></tr>
@@ -381,6 +381,7 @@
       <tr><td><code>rent_monthly</code></td><td>int</td><td>★ 月租（元/月），照实传贵方月租即可；<strong>月租→夜价的 <code>/30</code> 折算发生在平台侧</strong>（C 端按晚售卖口径），rental 频道默认夜价 = <code>round(月租/30)</code>，并作为下单兜底价</td></tr>
       <tr><td><code>price_total</code></td><td>int</td><td>★ 总价（元），<code>newhouse</code>/<code>resale</code> 频道用</td></tr>
       <tr><td><code>promo_price</code></td><td>int</td><td>★ 优惠价（元）。当前为<strong>展示位</strong>：C 端据此打「首月特惠」标签，<strong>不参与订单计价</strong>（营销价真实成交需另行排期）</td></tr>
+      <tr><td><code>total_qty</code></td><td>int</td><td>★ <strong>总间数</strong>（1-999，缺省 1）。该房型同规格可订单元数：每晚可订量 = <code>total_qty</code> − 当晚已订（可用 <code>stay-calendar/set</code> 的 <code>qty</code> 按晚覆盖放出间数，见 5.1）；下单可选多间（<code>rooms</code>），订单金额按 <code>逐晚价 × 间数</code> 计。<strong>调低不得低于未来晚已订间数</strong>，否则 400</td></tr>
       <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>；<strong>仅 <code>minsu</code> 频道参与计价</strong>（缺省回落 <code>price_from</code>）。<code>rental</code> 频道忽略它，夜价一律 <code>月租/30</code> + 日历逐晚覆盖</td></tr>
       <tr><td><code>cancel_policy</code></td><td>object</td><td>★ 免费取消政策（房型级），写入 <code>units.ext.cancel_policy</code>：<code>{enabled, days_before, cutoff_time}</code>；免费取消窗口 = 入住日往前推 <code>days_before</code>（0-30，0=入住当天）天的 <code>cutoff_time</code>（HH:mm）时刻，窗口外 / 未开通一律不可取消不可退</td></tr>
       <tr><td><code>tags</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 房型说明 / 封面 / 排序（<code>sort_order</code> 升序展示，缺省 99，用于主推房型排前）</td></tr>
@@ -393,19 +394,21 @@
       不传 = C 端回落展示全部 10 项；传未知 id 不渲染。枚举字典化（随接口下发）在平台排期内。
     </div>
 
-    <h3>3.3 房态日历（逐晚库存）</h3>
+    <h3>3.3 房态日历（逐晚库存 × 间数）</h3>
     <table>
       <tr><th>字段</th><th>说明</th></tr>
-      <tr><td><code>project_id</code> + <code>unit_id</code></td><td>库存归属；<code>unit_id=0</code> 或缺省表示项目级（整栋 / 不限房型）。下单冲突口径：整栋单查全项目任一户型，指定户型单查「项目级 + 该户型」</td></tr>
+      <tr><td><code>project_id</code> + <code>unit_id</code></td><td>库存归属；<code>unit_id=0</code> 或缺省表示项目级（整栋 / 不限房型，容量恒 1）。下单冲突口径：整栋单查全项目任一户型，指定户型单查「项目级 + 该户型」</td></tr>
       <tr><td><code>stay_date</code></td><td>晚（YYYY-MM-DD，入住当晚）。<strong>写入窗口</strong>：单次 ≤ 400 晚、可多次滚动写更远（存储无总上限）；<strong>C 端日历可订窗口 = 当月起 12 个月</strong>，建议对账口径与其对齐</td></tr>
-      <tr><td><code>status</code></td><td><code>open</code> 可订（默认，<strong>未设置过的晚即可订</strong>）/ <code>blocked</code> 关房（商家）/ <code>booked</code> 已订（平台订单写入，接口不可改，取消自动释放）</td></tr>
-      <tr><td><code>price_night</code></td><td>当晚价格覆盖（元），未覆盖回落默认夜价；<strong>户型级 &gt; 项目级 &gt; 默认</strong>。2026-09-10 起<strong>参与下单计价</strong>：订单金额 = 逐晚（覆盖价 || 默认夜价）合计，与 C 端日历展示同口径——周末 / 节假日分档即按日期批量覆盖实现</td></tr>
+      <tr><td><code>qty</code></td><td>★ <strong>放出间数覆盖</strong>（1-999；多间口径 2026-09-10）。该晚实际投放的可订间数；不传 / 传 <code>null</code> = 用房型 <code>total_qty</code>。项目级（<code>unit_id=0</code>）不收 <code>qty</code>。<strong>不得低于该晚已订间数</strong>（<code>booked_qty</code>），否则 400</td></tr>
+      <tr><td><code>status</code></td><td><code>open</code> 可订（默认，<strong>未设置过的晚即可订，放出 = total_qty</strong>）/ <code>blocked</code> 关房（商家；<strong>已订晚 <code>booked_qty&gt;0</code> 不可关房</strong>，须先取消订单）/<code>booked</code> 已订满——<strong>2026-09-10 起为派生态</strong>（剩余 <code>remaining ≤ 0</code> 时出参给出），由平台订单占用计数自动产生，取消自动释放，接口不可直接写</td></tr>
+      <tr><td><code>booked_qty</code> / <code>remaining</code></td><td><strong>出参随日历查询下发</strong>：该晚已订间数 / 剩余可订间数（<code>max(0, qty||total_qty − booked_qty)</code>，关房为 0）。多间房型当晚 <code>0 &lt; remaining &lt; qty</code> 时状态仍为 <code>open</code>——<strong>部分可订</strong>，C 端展示「仅剩 X 间」</td></tr>
+      <tr><td><code>price_night</code></td><td>当晚价格覆盖（元），未覆盖回落默认夜价；<strong>户型级 &gt; 项目级 &gt; 默认</strong>。2026-09-10 起<strong>参与下单计价</strong>：订单金额 = 逐晚（覆盖价 || 默认夜价）合计 × 间数，与 C 端日历展示同口径——周末 / 节假日分档即按日期批量覆盖实现</td></tr>
     </table>
     <div class="callout info">
-      <strong>status 与价格相互独立，不须同时传：</strong><code>blocked</code>＝关房（可带价可不带）；<code>open</code> + <code>price_night</code>＝覆盖价（只改价不改态也这样传）；<code>open</code> + <code>price_night:null</code>＝恢复默认价并清除差异行。一次调用一个 status 作用于整批 <code>dates</code>。
+      <strong>status / 价格 / 间数三者相互独立，不须同时传：</strong><code>blocked</code>＝关房（可带价可不带；已订晚不可关）；<code>open</code> + <code>price_night</code> 和/或 <code>qty</code>＝覆盖价 / 放出间数（只改其一就只传其一，另一个保持原值）；<code>open</code> 且价、间数均不传＝恢复默认（清差异行；<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>）。一次调用一个 status 作用于整批 <code>dates</code>。
     </div>
     <div class="callout info">
-      <strong>验收工具：</strong><code>GET /api/juzhu/projects/{id}/stay-calendar?month=YYYY-MM&amp;unit_id=</code>（公开只读，用于上下架 / 房态验收）返回逐晚三态 + 价格 + 最短连住 + 保险标识，与 C 端日历渲染一致。
+      <strong>验收工具：</strong><code>GET /api/juzhu/projects/{id}/stay-calendar?month=YYYY-MM&amp;unit_id=</code>（公开只读，用于上下架 / 房态验收）返回逐晚三态 + 价格 + <code>qty/booked_qty/remaining</code> 间数 + 最短连住 + 保险标识，与 C 端日历渲染一致。
     </div>
   </section>
 
@@ -495,16 +498,17 @@
     <h3>4.7 新增户型</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/create</span><span class="desc">向已有房源追加户型</span></div>
 <pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"name"</span>: <span class="tok-str">"两居 68㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"2室1厅"</span>,
-  <span class="tok-key">"area_sqm"</span>: <span class="tok-num">68</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3200</span> }
+  <span class="tok-key">"area_sqm"</span>: <span class="tok-num">68</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3200</span>, <span class="tok-key">"total_qty"</span>: <span class="tok-num">3</span> }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-com">/*…*/</span> } }</code></pre>
 
-    <h3>4.8 更新户型（调价 / 取消政策等）</h3>
+    <h3>4.8 更新户型（调价 / 间数 / 取消政策等）</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
-<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span>,
+<pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span>, <span class="tok-key">"total_qty"</span>: <span class="tok-num">5</span>,
   <span class="tok-key">"cancel_policy"</span>: { <span class="tok-key">"enabled"</span>: <span class="tok-str">true</span>, <span class="tok-key">"days_before"</span>: <span class="tok-num">1</span>, <span class="tok-key">"cutoff_time"</span>: <span class="tok-str">"18:00"</span> } }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…*/</span> } }</code></pre>
     <ul style="font-size:13.5px;">
       <li><strong>取消政策</strong>：传入 <code>cancel_policy</code>（非法 <code>days_before</code>/<code>cutoff_time</code> 返回 400）；传 <code>null</code> 清除（= 未开通，客户不可取消）。免费取消窗口 = 入住日往前推 <code>days_before</code> 天的 <code>cutoff_time</code> 时刻；客户在窗口内取消自动退款并释放房态。</li>
+      <li><strong>总间数（多间口径 2026-09-10）</strong>：<code>total_qty</code> 须为 1-999；调低到低于未来晚已订间数会返回 400（先处理订单再缩容）。</li>
     </ul>
 
     <h3>4.9 删除户型</h3>
@@ -513,14 +517,16 @@
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span> }</code></pre>
 
     <h3>4.10 房态查询（商家视角）</h3>
-    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/query</span><span class="desc">逐晚三态 + 占用来源 + 最短连住/保险</span></div>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/query</span><span class="desc">逐晚三态 + 间数（qty/booked_qty/remaining） + 占用来源 + 最短连住/保险</span></div>
 <pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>, <span class="tok-key">"month"</span>: <span class="tok-str">"2026-12"</span> }
 → 200 {
   <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"month"</span>: <span class="tok-str">"2026-12"</span>, <span class="tok-key">"base_price_night"</span>: <span class="tok-num">80</span>,
   <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>, <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],
   <span class="tok-key">"days"</span>: [
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-19"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"booked"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span>, <span class="tok-key">"source"</span>: <span class="tok-str">"booking"</span>, <span class="tok-key">"booking_id"</span>: <span class="tok-num">36</span> },
-    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-20"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span> }
+    <span class="tok-com">// 多间口径：房型 total_qty=3，19 晚被订 2 间（部分可订），20 晚已关房</span>
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-19"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span>, <span class="tok-key">"qty"</span>: <span class="tok-num">3</span>, <span class="tok-key">"booked_qty"</span>: <span class="tok-num">2</span>, <span class="tok-key">"remaining"</span>: <span class="tok-num">1</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-20"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span>, <span class="tok-key">"qty"</span>: <span class="tok-num">3</span>, <span class="tok-key">"booked_qty"</span>: <span class="tok-num">0</span>, <span class="tok-key">"remaining"</span>: <span class="tok-num">0</span> },
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-21"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"price"</span>: <span class="tok-num">80</span>, <span class="tok-key">"qty"</span>: <span class="tok-num">3</span>, <span class="tok-key">"booked_qty"</span>: <span class="tok-num">0</span>, <span class="tok-key">"remaining"</span>: <span class="tok-num">3</span> }
   ]
 }</code></pre>
     <h3>4.11 房源图片（图集）</h3>
@@ -630,20 +636,22 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   <section id="calendar">
     <h2><span class="num">6</span> 房态日历与短住规则</h2>
 
-    <h3>5.1 批量设置房态 / 夜价</h3>
-    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/set</span><span class="desc">关房 / 开房 / 夜价覆盖，单次 ≤ 400 晚</span></div>
+    <h3>5.1 批量设置房态 / 夜价 / 放出间数</h3>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/stay-calendar/set</span><span class="desc">关房 / 开房 / 夜价覆盖 / 放出间数覆盖（多间口径 2026-09-10），单次 ≤ 400 晚</span></div>
 <pre><code>{
   <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
-  <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>,                        <span class="tok-com">// 0 或缺省 = 项目级（整栋 / 不限房型）</span>
+  <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>,                        <span class="tok-com">// 0 或缺省 = 项目级（整栋 / 不限房型，容量恒 1）</span>
   <span class="tok-key">"dates"</span>: [<span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"2026-12-11"</span>],
   <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// blocked 关房；open 开房</span>
-  <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>                  <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 恢复默认</span>
+  <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>,                 <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 不改价</span>
+  <span class="tok-key">"qty"</span>: <span class="tok-key">null</span>                          <span class="tok-com">// ★ 放出间数覆盖（1-999，仅房型级）：open + qty = 该晚只放 N 间；不传 = 用 total_qty</span>
 }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"affected"</span>: <span class="tok-num">2</span>, <span class="tok-key">"dates"</span>: <span class="tok-num">2</span> }</code></pre>
     <ul style="font-size:13.5px;">
-      <li><strong>已订晚不可改</strong>：区间内有 <code>booked</code>（订单占用）返回 400 并列出日期，须先取消订单。</li>
-      <li>未设置过的晚天然可订；「恢复默认价」= 清除该晚价格覆盖，回落默认夜价。</li>
-      <li><strong>覆盖价参与下单计价</strong>（2026-09-10 起）：订单金额 = 逐晚「覆盖价 || 默认夜价」合计。周末 / 节假日分档 = 把对应日期批量 <code>open + price_night</code>；平日不传即回落默认。订单占用的晚翻为 <code>booked</code> 时保留当晚覆盖价，取消释放后该晚差异行随之清除（须重设）。</li>
+      <li><strong>已订晚（<code>booked_qty&gt;0</code>）不可关房</strong>：返回 400 并列出日期，须先取消订单；改价 / 调 <code>qty</code>（≥ 已订间数）不受限。</li>
+      <li>未设置过的晚天然可订、放出 = 房型 <code>total_qty</code>；「恢复默认」= status=open 且价、<code>qty</code> 均不传：清除差异行，<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>。</li>
+      <li><strong>qty 与已订（多间口径 2026-09-10）</strong>：<code>qty</code> 低于该晚已订间数返回 400（先取消订单或调高）；<code>qty</code> 改变只影响当晚可订余量，已订单不受影响。剩余 = <code>max(0, qty||total_qty − booked_qty)</code>。</li>
+      <li><strong>覆盖价参与下单计价</strong>（2026-09-10 起）：订单金额 = 逐晚「覆盖价 || 默认夜价」合计 × 间数。周末 / 节假日分档 = 把对应日期批量 <code>open + price_night</code>；平日不传即回落默认。订单占用不清除当晚覆盖价，取消释放后商家差异行（价 / qty / 关房）原样保留。</li>
       <li><strong>可订窗口</strong>：单次 ≤ 400 晚、可滚动写更远；C 端日历展示当月起 12 个月，建议按「未来 12 个月」滚动维护。</li>
     </ul>
 
@@ -802,9 +810,9 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     },
     '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, stay_bookable: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
-    '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200 },
-    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
-    '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null },
+    '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
+    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
+    '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null, qty: null },
     '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
     '/api/juzhu/housing/vendor/units/delete': { id: 0 },
     '/api/juzhu/housing/vendor/bookings/list': { status: 'pending' },
