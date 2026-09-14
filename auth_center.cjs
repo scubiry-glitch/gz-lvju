@@ -11,6 +11,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');   // 遗留商家口令（jz_vendors bcrypt）校验，登录时懒升级 scrypt
 
 // ── 内置角色（首版 12 个，宁少勿多）──
 // code/name 的权威清单在这里；permissions 由 perm_registry.cjs（权限点注册表）折叠，
@@ -97,7 +98,7 @@ function hashPassword(pwd, salt) {
   });
 }
 
-/** 返回 {ok, needRehash}：scrypt$ 前缀走 scrypt；存量 salt:sha256(salt:pwd) 走旧逻辑并标记需升级 */
+/** 返回 {ok, needRehash}：scrypt$ 前缀走 scrypt；存量 bcrypt（商家迁入）与 salt:sha256(salt:pwd) 走旧逻辑并标记需升级 */
 function verifyPassword(pwd, stored) {
   if (!pwd || !stored) return Promise.resolve({ ok: false, needRehash: false });
   if (String(stored).startsWith('scrypt$')) {
@@ -111,6 +112,12 @@ function verifyPassword(pwd, stored) {
         resolve({ ok: key.length === b.length && crypto.timingSafeEqual(key, b), needRehash: false });
       });
     });
+  }
+  // 遗留 bcrypt（jz_vendors 商家口令迁入，$2a$/$2b$/$2y$ 前缀）：校验通过即懒升级 scrypt
+  if (/^\$2[aby]\$/.test(String(stored))) {
+    let ok = false;
+    try { ok = bcrypt.compareSync(String(pwd), String(stored)); } catch (_) { ok = false; }
+    return Promise.resolve({ ok, needRehash: ok });
   }
   if (String(stored).indexOf(':') < 0) return Promise.resolve({ ok: false, needRehash: false });
   const [salt, hash] = String(stored).split(':');

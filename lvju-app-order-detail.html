@@ -93,11 +93,15 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   var orderNo = q.get('order_no') || '';
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
-  var ST = { pending: ['待商家确认', '资金到账后商家确认，确认前可免费取消'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'] };
+  var ST = { pending: ['待商家确认', '退改口径见下方提示'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'] };
   function render(o){
     var st = ST[o.status] || [o.status, ''];
+    // 退改口径随单下发（units.ext.cancel_policy；旧服务无此字段时回落静态文案）
+    var sub = o.cancel_policy_text
+      ? esc(o.checkin) + ' 入住 · 🕒 ' + esc(o.cancel_policy_text) + (o.can_cancel === false && o.status === 'pending' ? ' · 已不可取消' : '')
+      : esc(o.checkin) + ' 入住 · ' + st[1];
     document.getElementById('dState').textContent = st[0];
-    document.getElementById('dStateSub').textContent = esc(o.checkin) + ' 入住 · ' + st[1];
+    document.getElementById('dStateSub').textContent = sub;
     document.getElementById('dKvState').textContent = st[0];
     document.getElementById('dName').textContent = o.project_name || ('项目#' + o.project_id);
     document.getElementById('dMeta').textContent = o.channel === 'minsu' ? '民宿 · 整栋/庭院' : '租赁住宿';
@@ -113,7 +117,8 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     document.getElementById('dCreated').textContent = (o.created_at || '').replace('T', ' ').slice(0, 16) || '—';
     document.getElementById('dHouseLink').href = 'lvju-app-detail.html?id=' + o.project_id;
     var cancel = document.getElementById('dCancel');
-    if (o.status !== 'pending') cancel.style.display = 'none';
+    // 取消入口由服务端 can_cancel 驱动（免费取消窗口）；旧服务无该字段时回落「pending 可取消」
+    if (o.status !== 'pending' || o.can_cancel === false) cancel.style.display = 'none';
     cancel.onclick = function(){
       if (!confirm('确定取消订单 ' + o.order_no + ' 吗？')) return;
       fetch('/api/juzhu/booking/cancel', { method:'POST', headers:{'Content-Type':'application/json'},

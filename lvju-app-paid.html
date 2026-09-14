@@ -63,13 +63,17 @@
     var bNo = q.get('order_no') || '', bPhone = q.get('phone') || '';
     document.querySelector('.ttl').textContent = '支付完成';
     document.getElementById('okTitle').textContent = '支付成功';
-    document.getElementById('okDesc').innerHTML = '资金已存管冻结，商家确认后订单生效<br>可随时在「订单」页查看状态或申请取消';
+    document.getElementById('okDesc').innerHTML = '资金已存管冻结，商家确认后订单生效<br>退改按房型取消政策执行，可在「订单」页查看或取消';
     if (bNo && bPhone) {
       fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) })
         .then(function(r){ return r.json(); })
         .then(function(d){
           var o = d.order || {};
+          if (o.cancel_policy_text) {
+            // textContent 赋值（页面无 esc helper；政策文案为服务端下发非用户输入）
+            document.getElementById('okDesc').textContent = '资金已存管冻结，商家确认后订单生效 · 🕒 ' + o.cancel_policy_text;
+          }
           document.getElementById('svcName').textContent = o.project_name || '旅居预订';
           document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
           document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · 已支付 · 待商家确认';

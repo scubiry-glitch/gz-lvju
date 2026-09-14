@@ -5,6 +5,7 @@
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
+const ratingCfg = require('./rating_config.cjs');
 const MIN_PUBLISH_PHOTOS = 8;
 
 function reply(status, data) {
@@ -442,6 +443,30 @@ async function vendorAllowedCityIds(conn, vendorId) {
   return ids; // 空 = 未配置城市约束（不限制）
 }
 
+/** 城市/行政区枚举（city_id / district_id 选值主数据）：限商家开放城市；city_ids 空 = 不限（出全量） */
+async function housingRegionsList(conn, body, vendorId) {
+  const allowed = await vendorCityIds(conn, vendorId);
+  let cityRows;
+  if (allowed.length) {
+    const marks = allowed.map(() => '?').join(',');
+    [cityRows] = await conn.execute(`SELECT id, name, slug FROM cities WHERE id IN (${marks}) ORDER BY id`, allowed);
+  } else {
+    [cityRows] = await conn.execute('SELECT id, name, slug FROM cities ORDER BY id');
+  }
+  if (!cityRows.length) return reply(200, { code: 0, message: 'success', list: [], total: 0 });
+  const marks = cityRows.map(() => '?').join(',');
+  const [distRows] = await conn.execute(
+    `SELECT id, city_id, name, slug FROM districts WHERE city_id IN (${marks}) ORDER BY city_id, sort_order, id`,
+    cityRows.map((c) => c.id));
+  const list = cityRows.map((c) => ({ id: c.id, name: c.name, slug: c.slug, districts: [] }));
+  const byCity = new Map(list.map((c) => [c.id, c]));
+  for (const d of distRows) {
+    const c = byCity.get(d.city_id);
+    if (c) c.districts.push({ id: d.id, name: d.name, slug: d.slug });
+  }
+  return reply(200, { code: 0, message: 'success', list, total: list.length });
+}
+
 async function housingProjectOut(conn, row) {
   const out = stripContactPhone(Object.assign({}, row));
   Object.assign(out, stayCfg.stayConfigOf(row));
@@ -515,6 +540,11 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
   const name = String((u && u.name) || '').trim();
   if (!name) throw new Error('户型 name 必填');
   const slug = await uniqueUnitSlug(conn, projectId, name, u.slug);
+  let totalQty = 1;
+  if (u.total_qty != null && u.total_qty !== '') {
+    totalQty = parseInt(u.total_qty, 10);
+    if (!(totalQty >= 1 && totalQty <= 999)) throw new Error('units[].total_qty（总间数）须为 1-999 的整数');
+  }
   let ext = {};
   if (u.price_night != null && u.price_night !== '') {
     const pn = parseInt(u.price_night, 10);
@@ -523,8 +553,8 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
   }
   const [r] = await conn.execute(
     `INSERT INTO units(project_id, name, slug, area_sqm, layout_label, rent_monthly, price_total,
-       tags, unit_spec, promo_price, amenities, sort_order, cover_image, ext)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       tags, unit_spec, promo_price, total_qty, amenities, sort_order, cover_image, ext)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       projectId, name, slug,
       u.area_sqm == null || u.area_sqm === '' ? null : Number(u.area_sqm),
@@ -533,6 +563,7 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
       u.price_total == null || u.price_total === '' ? null : parseInt(u.price_total, 10),
       tagsToDb(u.tags), u.unit_spec || null,
       u.promo_price == null || u.promo_price === '' ? null : parseInt(u.promo_price, 10),
+      totalQty,
       tagsToDb(u.amenities),
       u.sort_order == null || u.sort_order === '' ? 99 : parseInt(u.sort_order, 10),
       u.cover_image || null,
@@ -673,6 +704,59 @@ async function housingProjectsStatus(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', id: row.id, status });
 }
 
+// ── 评级提审 / 审核状态（rating_status：draft → pending → passed/rejected，平台复核唯一闸）──
+
+/** 提交评级自评并进入平台复核队列：dims 按频道全维度校验（rating_config 单一数据源）；pending 中不可重复提 */
+async function housingRatingSubmit(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  if (!ratingCfg.RATING_DIMS[row.channel]) {
+    return reply(400, { code: 400, message: '该频道暂不支持评级（支持 rental/minsu）' });
+  }
+  if (row.rating_status === 'pending') {
+    return reply(400, { code: 400, message: '已在平台复核队列中，请等待审核结果（rating/status 可查）' });
+  }
+  let dims;
+  try { dims = ratingCfg.normalizeDimsInput(row.channel, b.dims); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  let rating = {};
+  try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
+  rating.dims = dims;
+  rating.code = `${ratingCfg.RATING_CODE_PREFIX[row.channel] || 'SY'}-${row.id}`;
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  await conn.execute(
+    "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
+    [JSON.stringify(rating), now, row.id]);
+  return reply(200, {
+    code: 0, message: 'success', project_id: row.id,
+    rating_status: 'pending', rating_code: rating.code, dims,
+  });
+}
+
+/** 查审核状态：rating_status + 驳回原因（rating_note）+ 维度自评分与缺口，提审前可据此自检 */
+async function housingRatingStatus(conn, body, vendorId) {
+  const b = body || {};
+  if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const row = await ownProject(conn, vendorId, b.id);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  let rating = {};
+  try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
+  const reqDims = ratingCfg.RATING_DIMS[row.channel] || [];
+  const dims = (rating.dims && typeof rating.dims === 'object' && !Array.isArray(rating.dims)) ? rating.dims : null;
+  return reply(200, {
+    code: 0, message: 'success', project_id: row.id, channel: row.channel,
+    rating_status: row.rating_status,
+    rating_code: rating.code || null,
+    dims, missing_dims: dims ? [] : reqDims,
+    dims_meta: ratingCfg.dimsMetaOf(row.channel),
+    note: row.rating_note || null,
+    submitted_at: row.rating_submitted_at || null,
+    reviewed_at: row.rating_reviewed_at || null,
+  });
+}
+
 async function housingUnitsCreate(conn, body, vendorId) {
   const b = body || {};
   if (!b.project_id) return reply(400, { code: 400, message: '缺少 project_id 参数' });
@@ -711,18 +795,40 @@ async function housingUnitsUpdate(conn, body, vendorId) {
       sets.push('`' + col + '`=?'); params.push(b[col] == null || b[col] === '' ? null : parseInt(b[col], 10));
     }
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'total_qty')) {
+    // 总间数（多间库存 2026-09-10）：1-999；不得低于未来晚已订间数（否则隐性超售）
+    const tq = parseInt(b.total_qty, 10);
+    if (!(tq >= 1 && tq <= 999)) return reply(400, { code: 400, message: 'total_qty（总间数）须为 1-999 的整数' });
+    const [bmax] = await conn.execute(
+      `SELECT COALESCE(MAX(GREATEST(booked_qty, status='booked')), 0) AS m FROM stay_calendar
+       WHERE unit_id=? AND stay_date>=CURDATE()`, [rows[0].id]);
+    if (Number(bmax[0].m) > tq) return reply(400, { code: 400, message: `未来已有晚的已订间数达 ${bmax[0].m}，total_qty 不得低于该值` });
+    sets.push('`total_qty`=?'); params.push(tq);
+  }
   if (Object.prototype.hasOwnProperty.call(b, 'tags')) { sets.push('tags=?'); params.push(tagsToDb(b.tags)); }
   if (Object.prototype.hasOwnProperty.call(b, 'amenities')) { sets.push('amenities=?'); params.push(tagsToDb(b.amenities)); }
+  let extDirty = false;
+  const cur = stayCfg.parseExtObj(rows[0].ext);
   if (Object.prototype.hasOwnProperty.call(b, 'price_night')) {
-    const cur = stayCfg.parseExtObj(rows[0].ext);
     if (b.price_night === null || b.price_night === '') delete cur.price_night;
     else {
       const pn = parseInt(b.price_night, 10);
       if (!(pn >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数（元/晚）' });
       cur.price_night = pn;
     }
-    sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null);
+    extDirty = true;
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'cancel_policy')) {
+    // 免费取消政策（房型维度，免费取消窗口 = 入住日往前推 days_before 天的 cutoff_time）；
+    // 口径单一数据源 stay_config.cjs，非法值直接拒绝；null = 清除（视为未开通，不可取消）
+    if (b.cancel_policy === null) delete cur.cancel_policy;
+    else {
+      try { cur.cancel_policy = stayCfg.normalizeCancelPolicyInput(b.cancel_policy); }
+      catch (e) { return reply(400, { code: 400, message: e.message }); }
+    }
+    extDirty = true;
+  }
+  if (extDirty) { sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null); }
   if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
   params.push(rows[0].id);
   await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, params);
@@ -756,7 +862,8 @@ async function housingPhotosAdd(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', photo: photo[0] });
 }
 
-/** 房态批量设置：与 C/B 端同口径（已订晚不可改；open+无夜价=恢复默认价并删差异行） */
+/** 房态批量设置：与 C/B 端同口径（多间库存 2026-09-10：已订晚 booked_qty>0 不可关房；
+ *  open+price/qty=设覆盖，qty 不得低于已订；open 无 price 无 qty=恢复默认，占用行保留计数清覆盖） */
 async function housingStayCalendarSet(conn, body, vendorId) {
   const b = body || {};
   if (!b.project_id) return reply(400, { code: 400, message: '缺少 project_id 参数' });
@@ -768,8 +875,11 @@ async function housingStayCalendarSet(conn, body, vendorId) {
   const rawDates = Array.isArray(b.dates) ? b.dates.map(String) : [];
   const dates = rawDates.filter((d) => stayCfg.isValidDateString(d));
   const price = (b.price_night === null || b.price_night === undefined || b.price_night === '') ? null : parseInt(b.price_night, 10);
-  if (['open', 'blocked'].indexOf(status) < 0) return reply(400, { code: 400, message: 'status 须为 open / blocked（booked 由订单写入）' });
+  const qty = (b.qty === null || b.qty === undefined || b.qty === '') ? null : parseInt(b.qty, 10);
+  if (['open', 'blocked'].indexOf(status) < 0) return reply(400, { code: 400, message: 'status 须为 open / blocked（booked 为剩余售罄的派生态，由订单占用）' });
   if (price != null && !(price >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数或空' });
+  if (qty != null && (!(qty >= 1) || qty > 999)) return reply(400, { code: 400, message: 'qty（放出间数）须为 1-999 的整数或空' });
+  if (qty != null && !unitId) return reply(400, { code: 400, message: '项目级（不限房型）容量恒 1，不支持 qty 覆盖' });
   if (!dates.length || dates.length !== rawDates.length) return reply(400, { code: 400, message: 'dates 必填且必须为真实有效的 YYYY-MM-DD 日期（单次 ≤ 400 天）' });
   if (dates.length > 400) return reply(400, { code: 400, message: '单次最多 400 天' });
   if (unitId) {
@@ -777,11 +887,18 @@ async function housingStayCalendarSet(conn, body, vendorId) {
     if (!u.length) return reply(400, { code: 400, message: 'unit_id 不存在或不属于该房源' });
   }
   const marks = dates.map(() => '?').join(',');
+  // 已订晚保护（多间口径）：booked_qty>0 的晚不可关房；qty 不得低于该晚已订间数
   const [booked] = await conn.execute(
-    `SELECT stay_date FROM stay_calendar WHERE project_id=? AND unit_id IN (0, ?)
-     AND status='booked' AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
-  if (booked.length) {
+    `SELECT stay_date, booked_qty, status FROM stay_calendar WHERE project_id=? AND unit_id IN (0, ?)
+     AND (booked_qty>0 OR status='booked') AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
+  if (status === 'blocked' && booked.length) {
     return reply(400, { code: 400, message: '以下日期已有预订占用，须先取消订单：' + booked.map((r) => r.stay_date).join('、') });
+  }
+  if (qty != null) {
+    const over = booked.filter((r) => Math.max(parseInt(r.booked_qty, 10) || 0, r.status === 'booked' ? 1 : 0) > qty);
+    if (over.length) {
+      return reply(400, { code: 400, message: `以下日期已订间数超过放出间数 ${qty}，须先取消订单或调高 qty：` + over.map((r) => r.stay_date).join('、') });
+    }
   }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   let affected = 0;
@@ -790,26 +907,36 @@ async function housingStayCalendarSet(conn, body, vendorId) {
       const [r] = await conn.execute(
         `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
          VALUES (?,?,?,'blocked',?,'vendor',?)
-         ON DUPLICATE KEY UPDATE status='blocked', source='vendor', booking_id=NULL, updated_at=VALUES(updated_at)`,
+         ON DUPLICATE KEY UPDATE status='blocked', source='vendor', updated_at=VALUES(updated_at)`,
         [row.id, unitId, d, price, now]);
       affected += r.affectedRows || 0;
     }
-  } else if (price != null) {
+  } else if (price != null || qty != null) {
+    // 设覆盖价 / 放出间数（彼此独立，只写传入的字段）
     for (const d of dates) {
       const [r] = await conn.execute(
-        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, updated_at)
-         VALUES (?,?,?,'open',?,'vendor',?)
-         ON DUPLICATE KEY UPDATE status='open', price_night=VALUES(price_night), updated_at=VALUES(updated_at)`,
-        [row.id, unitId, d, price, now]);
+        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, qty, source, updated_at)
+         VALUES (?,?,?,'open',?,?,'vendor',?)
+         ON DUPLICATE KEY UPDATE status='open', source='vendor',
+           ${price != null ? 'price_night=VALUES(price_night),' : ''}
+           ${qty != null ? 'qty=VALUES(qty),' : ''}
+           updated_at=VALUES(updated_at)`,
+        [row.id, unitId, d, price, qty, now]);
       affected += r.affectedRows || 0;
     }
   } else {
+    // 恢复默认：纯差异行删行；有占用的行保留计数，仅清 price/qty 回默认
     const [r] = await conn.execute(
       `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND status IN ('open','blocked')
-       AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
+       AND booked_qty=0 AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
     affected = r.affectedRows || 0;
+    const [r2] = await conn.execute(
+      `UPDATE stay_calendar SET price_night=NULL, qty=NULL, updated_at=?
+       WHERE project_id=? AND unit_id=? AND booked_qty>0 AND stay_date IN (${marks})`,
+      [now, row.id, unitId, ...dates]);
+    affected += r2.affectedRows || 0;
   }
-  return reply(200, { code: 0, message: 'success', project_id: row.id, unit_id: unitId, status, price_night: price, dates: dates.length, affected });
+  return reply(200, { code: 0, message: 'success', project_id: row.id, unit_id: unitId, status, price_night: price, qty, dates: dates.length, affected });
 }
 
 // ── 订单履约：商家查单 / 确认 / 拒单（与 B 端会话接口同库同口径）──
@@ -826,7 +953,8 @@ function connRows(conn) {
 async function housingBookingsList(conn, body, vendorId) {
   const b = body || {};
   let sql = `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, b.checkin, b.checkout,
-                    b.nights, b.price_total, b.status, b.pay_status, b.pay_method, b.pay_at, b.payment_expires_at, b.created_at,
+                    b.nights, b.rooms, b.price_total, b.commission_rate, b.commission_fee,
+                    b.status, b.pay_status, b.pay_method, b.pay_at, b.payment_expires_at, b.created_at,
                     b.contact_name, b.contact_phone, p.name AS project_name
              FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
              WHERE b.owner_vendor_id=?`;
@@ -870,7 +998,7 @@ async function housingBookingsConfirm(conn, body, vendorId) {
     && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending'", [now, row.id]);
-    await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+    await stayCfg.releaseStayQty(connRows(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
     await conn.commit();
     return reply(400, { code: 400, message: '待支付订单已过期并释放房态' });
   }
@@ -897,8 +1025,8 @@ async function housingBookingsCancel(conn, body, vendorId) {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const newPay = row.pay_status === 'paid' ? 'refunded' : row.pay_status;
   await conn.execute('UPDATE booking_orders SET status=?, pay_status=?, updated_at=? WHERE id=?', ['cancelled', newPay, now, row.id]);
-  // 拒单/取消 → 释放房态（与 B 端工作台同口径）；已支付标记退款（模拟通道）
-  await conn.execute("DELETE FROM stay_calendar WHERE booking_id=? AND source='booking'", [row.id]);
+  // 拒单/取消 → 释放库存（多间口径 2026-09-10：递减 booked_qty，商家差异行保留；与 B 端工作台同口径）
+  await stayCfg.releaseStayQty(connRows(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
   await conn.commit();
   return reply(200, {
     code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'cancelled',
@@ -944,7 +1072,7 @@ async function housingUnitsDelete(conn, body, vendorId) {
   const uid = rows[0].id, pid = rows[0].project_id;
   const [orders] = await conn.execute('SELECT COUNT(*) AS c FROM booking_orders WHERE unit_id=?', [uid]);
   if (orders[0].c > 0) return reply(400, { code: 400, message: '该户型已有 ' + orders[0].c + ' 笔订单关联，不可删除（可先下架房源）' });
-  const [booked] = await conn.execute("SELECT COUNT(*) AS c FROM stay_calendar WHERE unit_id=? AND status='booked'", [uid]);
+  const [booked] = await conn.execute("SELECT COUNT(*) AS c FROM stay_calendar WHERE unit_id=? AND (booked_qty>0 OR status='booked')", [uid]);
   if (booked[0].c > 0) return reply(400, { code: 400, message: '该户型仍有被占用晚，须先取消相关订单' });
   await conn.execute('DELETE FROM stay_calendar WHERE unit_id=?', [uid]);
   await conn.execute('DELETE FROM units WHERE id=?', [uid]);
@@ -953,11 +1081,14 @@ async function housingUnitsDelete(conn, body, vendorId) {
 }
 
 const HOUSING_ROUTES = {
+  '/api/juzhu/housing/vendor/regions/list': housingRegionsList,
   '/api/juzhu/housing/vendor/projects/list': housingProjectsList,
   '/api/juzhu/housing/vendor/projects/detail': housingProjectsDetail,
   '/api/juzhu/housing/vendor/projects/create': housingProjectsCreate,
   '/api/juzhu/housing/vendor/projects/update': housingProjectsUpdate,
   '/api/juzhu/housing/vendor/projects/status': housingProjectsStatus,
+  '/api/juzhu/housing/vendor/projects/rating/submit': housingRatingSubmit,
+  '/api/juzhu/housing/vendor/projects/rating/status': housingRatingStatus,
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,

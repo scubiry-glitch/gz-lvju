@@ -95,7 +95,7 @@ async function main() {
     if (bookSet.size) {
       const ph = Array.from(bookSet).map(() => '?').join(',');
       const [orders] = await conn.execute(
-        `SELECT id, project_id, unit_id, checkin, checkout FROM booking_orders
+        `SELECT id, project_id, unit_id, checkin, checkout, rooms FROM booking_orders
          WHERE status IN ('pending','confirmed') AND project_id IN (${ph})`,
         Array.from(bookSet)
       );
@@ -105,11 +105,13 @@ async function main() {
         const end = new Date(o.checkout + 'T00:00:00');
         for (let d = new Date(start); d < end && nights < 36500; d.setDate(d.getDate() + 1)) {
           const ds = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+          // 多间口径（2026-09-10）：占用 = booked_qty 计数，stored status 只写 open（booked 为派生态）
           await conn.execute(
-            `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, booking_id, updated_at)
-             VALUES (?,?,?,'booked',NULL,'booking',?,?)
-             ON DUPLICATE KEY UPDATE status='booked', source='booking', booking_id=VALUES(booking_id), updated_at=VALUES(updated_at)`,
-            [o.project_id, o.unit_id || 0, ds, o.id, now]
+            `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booked_qty, booking_id, updated_at)
+             VALUES (?,?,?,'open','booking',?,?,?)
+             ON DUPLICATE KEY UPDATE booked_qty=booked_qty+VALUES(booked_qty), source='booking',
+               booking_id=COALESCE(booking_id, VALUES(booking_id)), updated_at=VALUES(updated_at)`,
+            [o.project_id, o.unit_id || 0, ds, Math.max(1, o.rooms || 1), o.id, now]
           );
           nights++;
         }

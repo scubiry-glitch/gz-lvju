@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>商家费率（抽佣分档）· 服务认证中台</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --surface:#fff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0;
+    --accent:#4f46e5; --accent-deep:#3730a3; --accent-soft:#eef2ff;
+    --ok:#16a34a; --warn:#ea580c; --danger:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.6;font-size:14px;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .crumb{font-size:12.5px;color:var(--muted);} .crumb b{color:var(--fg);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  @media (max-width:1023px){ .console{grid-template-columns:1fr;} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;background:var(--accent-soft);color:var(--accent-deep);font-weight:600;}
+  .note{font-size:11.5px;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:9px;padding:8px 12px;margin-top:10px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{background:#f8fafc;color:#334155;font-weight:600;font-size:11.5px;}
+  tbody tr:hover td{background:var(--accent-soft);}
+  .rate-in{width:84px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;font:inherit;font-size:12.5px;text-align:right;background:#fff;}
+  .rate-in.diff{border-color:var(--gold);background:#fffbeb;}
+  .badge{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;font-weight:600;}
+  .b-active{background:#e7f6ec;color:#15803d;} .b-suspended{background:#fee2e2;color:#b91c1c;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .chips button{font:inherit;font-size:12.5px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 14px;cursor:pointer;color:var(--muted);}
+  .chips button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  .btn{font:inherit;font-size:12.5px;border:0;border-radius:8px;padding:7px 16px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .empty{color:var(--muted);font-size:12.5px;padding:14px 4px;}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .diff-tag{font-size:10px;color:var(--gold);font-weight:600;}
+  .hist-del{color:#b91c1c;text-decoration:line-through;} .hist-add{color:#15803d;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="vendor-rates"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / ⭐ 服务认证中台 / <b>商家费率（抽佣分档）</b></div>
+      <div style="font-size:11.5px;color:var(--muted);">读 admin.read · 写 vendor.fund.write · 审计 vendor.commission.update</div>
+    </div>
+    <div class="content">
+
+      <div class="card">
+        <h3>全局基准 <span class="pill">settings KV</span></h3>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;">
+          <div>
+            <label style="display:block;font-size:11.5px;color:var(--muted);">房源预订基准（%）</label>
+            <input class="rate-in" id="defHousing" placeholder="10.00" />
+          </div>
+          <div>
+            <label style="display:block;font-size:11.5px;color:var(--muted);">家政基准（%）</label>
+            <input class="rate-in" id="defJiazheng" placeholder="10.00" />
+          </div>
+          <button class="btn pri" id="saveDefaults">保存基准</button>
+          <span style="font-size:11.5px;color:var(--muted);" id="defHint"></span>
+        </div>
+        <div class="note">两层口径（规则 20）：<b>生效费率 = 商家差异化列 → 全局基准 → 内置 10%</b>。
+          商家未差异化时按基准计；<b>调价不追溯</b>——订单在下单时锁定费率快照（booking_orders.commission_rate / commission_fee），仅新订单生效。
+          家政服务者个人分账走 L0–L7 矩阵（派单交易域），不归本台。</div>
+      </div>
+
+      <div class="card">
+        <h3>商家费率 <span class="pill">jz_vendors.commission_housing / commission_jiazheng</span></h3>
+        <div class="chips" id="filterChips"></div>
+        <table>
+          <thead><tr><th>商家</th><th>类型</th><th>在管项目</th><th>房源预订档</th><th>家政档</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>暂无商家</div>
+        <div class="note">输入框留空 = 回落全局基准；金色边框 = 已差异化。调整即时生效于新订单，历史订单不变。</div>
+      </div>
+
+      <div class="card">
+        <h3>变更历史 <span class="pill">audit_log · vendor.commission.update</span></h3>
+        <table>
+          <thead><tr><th>时间</th><th>商家</th><th>变更</th><th>操作人</th></tr></thead>
+          <tbody id="histRows"></tbody>
+        </table>
+        <div class="empty" id="histEmpty" hidden>暂无变更记录</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+/* 商家费率（抽佣分档，规则 20）：
+   GET  /api/juzhu/admin/vendors/rates                 （admin.read）基准 + 商家两档
+   PUT  /api/juzhu/admin/vendors/:id/commission        （vendor.fund.write）两档差异化，null=回落基准
+   PUT  /api/juzhu/admin/vendors/commission-defaults   （vendor.fund.write）全局基准两键
+   GET  /api/juzhu/admin/vendors/commission-history（vendor.fund.write）变更详单 */
+const $ = id => document.getElementById(id);
+let FILTER = '';
+let CACHE = [];     // 商家行缓存
+let DEFAULTS = { housing: 10, jiazheng: 10 };
+const VTYPE = { platform: '平台自营', housing_operator: '房源运营商', lvju_host: '旅居房东', homestay: '民宿房东', homestay_ops: '民宿运营' };
+
+let toastTimer = null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+function fmtRate(v){ return (v==null||isNaN(v)) ? '—' : Number(v) + '%'; }
+
+function renderChips(){
+  const defs = [['','全部'],['active','在营'],['suspended','停用']];
+  $('filterChips').innerHTML = defs.map(d =>
+    '<button class="' + (FILTER===d[0]?'on':'') + '" data-s="' + d[0] + '">' + d[1] + '</button>').join('');
+  [...document.querySelectorAll('#filterChips button')].forEach(b =>
+    b.addEventListener('click', () => { FILTER = b.getAttribute('data-s'); renderChips(); load(); }));
+}
+
+async function load(){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/rates' + (FILTER ? '?status=' + FILTER : ''));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    CACHE = j.vendors || [];
+    DEFAULTS = j.defaults || { housing: 10, jiazheng: 10 };
+    $('defHousing').value = DEFAULTS.housing;
+    $('defJiazheng').value = DEFAULTS.jiazheng;
+    $('defHint').textContent = '当前基准：房源预订 ' + fmtRate(DEFAULTS.housing) + ' · 家政 ' + fmtRate(DEFAULTS.jiazheng);
+    $('rows').innerHTML = CACHE.map(v =>
+      '<tr data-id="' + v.id + '">' +
+      '<td><b>' + esc(v.name) + '</b><span style="color:var(--muted);"> #' + v.id + '</span></td>' +
+      '<td>' + esc(VTYPE[v.type] || v.type || '-') + '</td>' +
+      '<td>' + (v.project_count || 0) + ' 个</td>' +
+      '<td><input class="rate-in' + (v.commission_housing != null ? ' diff' : '') + '" id="h_' + v.id + '" placeholder="基准 ' + fmtRate(v.commission_housing_effective) + '" value="' + (v.commission_housing != null ? v.commission_housing : '') + '" />' +
+        (v.commission_housing != null ? ' <span class="diff-tag">差异化</span>' : '') + '</td>' +
+      '<td><input class="rate-in' + (v.commission_jiazheng != null ? ' diff' : '') + '" id="j_' + v.id + '" placeholder="基准 ' + fmtRate(v.commission_jiazheng_effective) + '" value="' + (v.commission_jiazheng != null ? v.commission_jiazheng : '') + '" />' +
+        (v.commission_jiazheng != null ? ' <span class="diff-tag">差异化</span>' : '') + '</td>' +
+      '<td><span class="badge ' + (v.status === 'active' ? 'b-active' : 'b-suspended') + '">' + (v.status === 'active' ? '在营' : '停用') + '</span></td>' +
+      '<td><button class="btn pri" data-save="' + v.id + '">保存</button></td></tr>'
+    ).join('');
+    $('empty').hidden = !!CACHE.length;
+    [...document.querySelectorAll('[data-save]')].forEach(b =>
+      b.addEventListener('click', () => saveVendor(parseInt(b.getAttribute('data-save'), 10))));
+  } catch(e){ toast('加载失败：' + e.message); }
+}
+
+async function saveVendor(id){
+  const h = $('h_' + id).value.trim(), jz = $('j_' + id).value.trim();
+  if (h && isNaN(parseFloat(h))) { toast('房源档费率须为 0-100 数字'); return; }
+  if (jz && isNaN(parseFloat(jz))) { toast('家政档费率须为 0-100 数字'); return; }
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + id + '/commission', { method:'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commission_housing: h === '' ? null : parseFloat(h), commission_jiazheng: jz === '' ? null : parseFloat(jz) }) });
+    const jj = await r.json();
+    if (!r.ok) throw new Error(jj.error || ('HTTP ' + r.status));
+    toast('已保存：房源预订 ' + fmtRate(jj.vendor.commission_housing) + ' · 家政 ' + fmtRate(jj.vendor.commission_jiazheng) + '（新订单生效）');
+    await load(); await loadHistory();
+  } catch(e){ toast('保存失败：' + e.message); }
+}
+
+$('saveDefaults').onclick = async function(){
+  const h = $('defHousing').value.trim(), jz = $('defJiazheng').value.trim();
+  for (const [k, v] of [['房源预订', h], ['家政', jz]]) {
+    if (v && (isNaN(parseFloat(v)) || parseFloat(v) < 0 || parseFloat(v) > 100)) { toast(k + '基准须为 0-100 数字'); return; }
+  }
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/commission-defaults', { method:'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ housing: h === '' ? null : parseFloat(h), jiazheng: jz === '' ? null : parseFloat(jz) }) });
+    const jj = await r.json();
+    if (!r.ok) throw new Error(jj.error || ('HTTP ' + r.status));
+    await load();
+    toast('全局基准已保存：房源预订 ' + fmtRate(DEFAULTS.housing) + ' · 家政 ' + fmtRate(DEFAULTS.jiazheng));
+  } catch(e){ toast('保存失败：' + e.message); }
+};
+
+async function loadHistory(){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/commission-history');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const rows = j.items || [];
+    $('histRows').innerHTML = rows.map(x => {
+      const seg = (k, label) => {
+        const b = x.before ? x.before[k] : undefined, a = x.after ? x.after[k] : undefined;
+        if (b === undefined && a === undefined) return '';
+        const bs = b == null ? '<span style="color:var(--muted);">基准</span>' : '<span class="hist-del">' + b + '%</span>';
+        const as = a == null ? '<span style="color:var(--muted);">基准</span>' : '<span class="hist-add">' + a + '%</span>';
+        return '<div>' + label + '：' + bs + ' → ' + as + '</div>';
+      };
+      return '<tr><td>' + esc((x.created_at || '').replace('T', ' ').slice(0, 19)) + '</td>' +
+        '<td>' + esc(x.vendor_id ? '商家 #' + x.vendor_id : '-') + '</td>' +
+        '<td>' + (seg('commission_housing', '房源预订') + seg('commission_jiazheng', '家政') || '—') + '</td>' +
+        '<td>' + esc(x.role_code || '-') + '</td></tr>';
+    }).join('');
+    $('histEmpty').hidden = !!rows.length;
+  } catch(e){ /* 历史加载失败不阻塞主表 */ }
+}
+
+renderChips();
+BZF_CONSOLE.requireLogin({ hint: '商家费率管理台（vendor.fund.write）' }).then(function(){
+  load(); loadHistory();
+});
+</script>
+</body>
+</html>
