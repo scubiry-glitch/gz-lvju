@@ -104,6 +104,10 @@
       ['支付时间', fmtTime(o.paid_at)],
       ['完成时间', fmtTime(o.completed_at)]
     ];
+    // 已完成/已取消订单：隐藏服务人员信息（姓名/电话），保护服务者信息不被订单列表回溯查看
+    if (o.status === 'completed' || o.status === 'cancelled') {
+      rows = rows.filter(function(r){ return r[0] !== '服务者'; });
+    }
     html += '<div class="info">' + rows.map(function(r){
       return '<div class="row"><span class="k">' + r[0] + '</span><span class="v">' + esc(r[1]) + '</span></div>';
     }).join('') + '</div>';
