@@ -3641,24 +3641,35 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const cityName = (qp.get('city') || '').trim();
       const categoryId = (qp.get('category') || '').trim();
       const q = (qp.get('q') || '').trim();
-      let sql = `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
-                   (SELECT MIN(p.price) FROM jz_products p
-                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
-                 FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
-                 WHERE s.enabled=1 AND c.enabled=1
-                   AND EXISTS (SELECT 1 FROM jz_products p WHERE p.channel_sku_id=s.id AND p.status='on')`;
       const params = [];
+      // 城市口径（双维度，与详情接口 /skus/:slug 完全对齐）：商品 p.city_id 归属当前城市 + 商家 active 且 city_ids 命中。
+      // 只按 vendor 维度过滤会把全国投放商家（city_ids 空）其他城市的商品混进最低价，
+      // 造成列表价（如 96）与详情页实际可选商品价（106）不一致。
+      let priceAggJoin = '';
+      let cityExists = '';
       if (cityName) {
         const tokens = await cityMatchTokens(cityName);
-        sql += ` AND EXISTS (
+        const cityRows = await queryRows('SELECT id FROM cities WHERE name=? OR slug=? LIMIT 1', [cityName, cityName]);
+        const cityId = cityRows.length ? cityRows[0].id : null;
+        if (cityId !== null) {
+          priceAggJoin = `JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active' AND p.city_id=${Number(cityId)} AND ${cityIdsClause('v', tokens)}`;
+          cityExists = ` AND EXISTS (
                   SELECT 1 FROM jz_products p2
                   JOIN jz_vendors v2 ON v2.id=p2.vendor_id
                   WHERE p2.channel_sku_id=s.id AND p2.status='on'
-                    AND v2.status='active'
+                    AND v2.status='active' AND p2.city_id=${Number(cityId)}
                     AND ${cityIdsClause('v2', tokens)}
                 )`;
-        params.push(...tokens);
+          // 占位符按 SQL 中出现顺序绑定：SELECT 子查询里的 tokens 在前，WHERE EXISTS 的在后
+          params.push(...tokens, ...tokens);
+        }
       }
+      let sql = `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                   (SELECT MIN(p.price) FROM jz_products p ${priceAggJoin}
+                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+                 FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+                 WHERE s.enabled=1 AND c.enabled=1
+                   AND EXISTS (SELECT 1 FROM jz_products p WHERE p.channel_sku_id=s.id AND p.status='on')${cityExists}`;
       if (categoryId) { sql += ' AND s.category_id=?'; params.push(categoryId); }
       if (q) {
         sql += ' AND (s.name LIKE ? OR s.spec LIKE ?)';
@@ -3676,18 +3687,6 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/skus\/([^/]+)$/);
       if (m && req.method === 'GET') {
         const slug = decodeURIComponent(m[1]);
-        const skus = await queryRows(
-          `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
-                  (SELECT MIN(p.price) FROM jz_products p
-                   WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
-           FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
-           WHERE s.slug=? AND s.enabled=1 AND c.enabled=1`,
-          [slug]
-        );
-        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
-        const item = skus[0];
-        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice']);
-
         const qp = new URLSearchParams(qs);
         const vendorId = qp.get('vendor') ? parseInt(qp.get('vendor')) : null;
         const cityName = (qp.get('city') || '').trim();
@@ -3696,6 +3695,26 @@ async function handleApiDirect(urlPath, qs, req, res) {
           const cityRows = await queryRows('SELECT id FROM cities WHERE name=? OR slug=? LIMIT 1', [cityName, cityName]);
           if (cityRows.length) cityId = cityRows[0].id;
         }
+        // product_min_price 与列表接口 /skus 同口径（双维度城市过滤），
+        // 避免对外契约字段返回跨城市价格
+        let minPriceJoin = '';
+        const minPriceParams = [];
+        if (cityId !== null) {
+          const tokens = await cityMatchTokens(cityName);
+          minPriceJoin = `JOIN jz_vendors v ON v.id=p.vendor_id AND v.status='active' AND p.city_id=${Number(cityId)} AND ${cityIdsClause('v', tokens)}`;
+          minPriceParams.push(...tokens);
+        }
+        const skus = await queryRows(
+          `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
+                  (SELECT MIN(p.price) FROM jz_products p ${minPriceJoin}
+                   WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+           FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
+           WHERE s.slug=? AND s.enabled=1 AND c.enabled=1`,
+          [...minPriceParams, slug]
+        );
+        if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
+        const item = skus[0];
+        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice']);
 
         // products：同 SPU 全部上架商品（双维度城市过滤，对齐 Python list_channel_sku_products）
         let prodSql = `SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
