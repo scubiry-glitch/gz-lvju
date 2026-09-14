@@ -1006,6 +1006,20 @@ function outboundJson(method, urlStr, body, timeoutMs) {
   return new Promise((resolve, reject) => {
     let parsed;
     try { parsed = new URL(urlStr); } catch (e) { reject(e); return; }
+    // 出站请求日志：对齐入站分段格式，类别 [平台→商家]，共用编号便于链路追踪
+    const seq = ++reqSeq;
+    const started = Date.now();
+    if (logDetailOn()) {
+      const lines = [LOG_SEP, `#${seq} ${logTs()} [平台→商家] ${method} ${urlStr}`];
+      if (body != null) {
+        const text = JSON.stringify(body);
+        const shown = text.length > LOG_BODY_LIMIT ? `${text.slice(0, LOG_BODY_LIMIT)}…[截断，共 ${text.length} 字符]` : text;
+        lines.push(`  >> 参数(body): ${shown.replace(/\n/g, '\n  | ')}`);
+      }
+      console.log(lines.join('\n'));
+    } else {
+      console.log(`${logTs()} [平台→商家] ${method} ${urlStr}`);
+    }
     const lib = parsed.protocol === 'https:' ? https : http;
     const payload = body != null ? JSON.stringify(body) : undefined;
     const req = lib.request({
@@ -1023,12 +1037,21 @@ function outboundJson(method, urlStr, body, timeoutMs) {
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const text = Buffer.concat(chunks).toString('utf8');
+        if (logDetailOn()) {
+          const size = Buffer.byteLength(text);
+          const shown = text.length > LOG_BODY_LIMIT ? `${text.slice(0, LOG_BODY_LIMIT)}…[截断，共 ${size} 字节]` : text;
+          console.log(`  << 状态: ${res.statusCode} · ${size}B · ${Date.now() - started}ms\n  << 返回: ${shown.replace(/\n/g, '\n  | ')}`);
+        }
         try { resolve({ status: res.statusCode, json: JSON.parse(text), text }); }
         catch (_) { resolve({ status: res.statusCode, json: null, text }); }
       });
     });
     req.setTimeout(timeoutMs || 10000, () => { req.destroy(new Error('timeout')); });
-    req.on('error', reject);
+    req.on('error', (e) => {
+      // 出站失败/超时也留痕：入站侧只能看到 502，原因链在这里
+      if (logDetailOn()) console.log(`  << 状态: 出站失败 · ${Date.now() - started}ms · ${e.message}`);
+      reject(e);
+    });
     if (payload) req.write(payload);
     req.end();
   });
