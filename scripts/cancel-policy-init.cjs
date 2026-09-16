@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // cancel-policy-init.cjs — 房型级「免费取消政策」预配（口径 2026-09-09，幂等可重跑）
 //
-// 给「已开通按晚预订」项目（projects.ext.stay_bookable=true，rental/minsu）下的全部房型
+// 给已配置交易能力（online_booking / online_payment 至少一项为 true）的 rental/minsu 项目下全部房型
 // 补默认政策：units.ext.cancel_policy = {enabled:true, days_before:1, cutoff_time:'18:00'}
 //   = 「入住前一天 18:00 前可免费取消，之后不可取消」（stay_config.cjs CANCEL_POLICY_DEFAULT 同口径）。
 // 缺省从严 = 未开通即不可取消；本脚本只为存量已开通项目兜底演示/续用体验，
@@ -63,9 +63,9 @@ async function main() {
   try {
     const [projs] = await conn.execute(
       "SELECT id, name FROM projects WHERE channel IN ('rental','minsu')" +
-      ' AND JSON_VALID(ext) AND JSON_EXTRACT(ext,\'$.stay_bookable\')=true'
+      ' AND JSON_VALID(ext) AND (JSON_EXTRACT(ext,\'$.online_booking\')=true OR JSON_EXTRACT(ext,\'$.online_payment\')=true)'
     );
-    console.log(`已开通按晚预订项目: ${projs.length} 个（${mode}）`);
+    console.log(`已配置房源交易能力项目: ${projs.length} 个（${mode}）`);
     let seeded = 0, cleaned = 0, kept = 0;
     for (const p of projs) {
       const [units] = await conn.execute('SELECT id, name, ext FROM units WHERE project_id=?', [p.id]);

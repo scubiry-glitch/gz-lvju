@@ -10,14 +10,18 @@ const INSURANCE_TYPES = [
 ];
 const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
 
-// 最短连住晚数（详情日历与下单共同校验）：rental 旅居/长租 15 晚起住，minsu 惠民短住 1 晚起；
-// 商家可在 projects.ext.min_stay_nights 覆盖（1–365）
-const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 1 };
+// 最短连住晚数（详情日历与下单共同校验）：rental 旅居/长租、minsu 惠民民宿均默认 15 晚起住；
+// 商家可在 projects.ext.min_stay_nights 覆盖（rental 1–365；minsu 15–365）
+const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 15 };
+// 民宿不允许用房源级覆盖降到 15 晚以下；rental 保留既有 1–365 晚覆盖能力。
+const STAY_MIN_NIGHTS_MIN = { rental: 1, minsu: 15 };
 
-// 在线预订能力开关（口径 2026-09-05）：默认一律仅 400 电话咨询；项目开通
-// （projects.ext.stay_bookable === true，B 端房态页「按晚预订」开关）后才支持
-// 日历选房 + 在线下单。tag 不参与判断；「无行=默认可订」仅在已开通项目上生效。
+// 房源交易能力（口径 2026-09-16）：online_booking=在线预订、商家确认后线下收款；
+// online_payment=在线支付、支付后商家确认。两项独立配置且至少开一项，不再按频道分流。
+// stay_bookable 仅保留为旧数据/旧客户端兼容键，新写入会归一化为上面两个键。
 const STAY_BOOKABLE_KEY = 'stay_bookable';
+const ONLINE_BOOKING_KEY = 'online_booking';
+const ONLINE_PAYMENT_KEY = 'online_payment';
 
 // 房态：open 可订 / blocked 关房（商家手工） / booked 已订（下单占用）
 const STAY_STATUS = { OPEN: 'open', BLOCKED: 'blocked', BOOKED: 'booked' };
@@ -46,9 +50,18 @@ function insuranceOf(proj) {
 
 function minStayNightsOf(proj) {
   const raw = parseInt(parseExtObj(proj && proj.ext).min_stay_nights, 10);
+  const floor = STAY_MIN_NIGHTS_MIN[(proj && proj.channel)] || 1;
   let v = Number.isFinite(raw) ? raw : (STAY_MIN_NIGHTS_DEFAULT[(proj && proj.channel)] || 1);
-  if (!(v >= 1)) v = 1;
+  if (!(v >= floor)) v = floor;
   return Math.min(v, 365);
+}
+
+/** 写入口校验：minsu 最低 15 晚，其他频道沿用 1 晚下限。 */
+function normalizeMinStayNightsInput(value, channel) {
+  const floor = STAY_MIN_NIGHTS_MIN[channel] || 1;
+  const v = parseInt(value, 10);
+  if (!(v >= floor && v <= 365)) throw new Error(`min_stay_nights 须为 ${floor}-365 的整数`);
+  return v;
 }
 
 /** 项目/户型夜价默认口径（规则15）：minsu=units.ext.price_night / price_from；rental=月租/30 折算 */
@@ -67,9 +80,65 @@ function unitNightPrice(proj, unit) {
   return p.channel === 'minsu' ? base : Math.max(1, Math.round(base / 30));
 }
 
-/** 项目是否已开通在线预订（唯一判断点，booking / 页面 CTA 均以此为准） */
+function boolCapability(v) {
+  return v === true || v === 'true' || v === 1 || v === '1';
+}
+
+/**
+ * 房源交易能力。新字段存在时完全按房源配置；旧数据仅在兼容分支按原频道还原旧行为：
+ * minsu+stay_bookable → 在线支付，rental+stay_bookable → 在线预订；旧关闭/缺省 → 在线预订。
+ * 存量迁移完成后运行态不再依赖频道。
+ */
+function transactionCapabilitiesOf(proj) {
+  const p = proj || {};
+  if (!['rental', 'minsu'].includes(p.channel)) return { online_booking: false, online_payment: false };
+  const ext = parseExtObj(p.ext);
+  const hasBooking = Object.prototype.hasOwnProperty.call(ext, ONLINE_BOOKING_KEY);
+  const hasPayment = Object.prototype.hasOwnProperty.call(ext, ONLINE_PAYMENT_KEY);
+  if (hasBooking || hasPayment) {
+    return { online_booking: boolCapability(ext[ONLINE_BOOKING_KEY]), online_payment: boolCapability(ext[ONLINE_PAYMENT_KEY]) };
+  }
+  if (boolCapability(ext[STAY_BOOKABLE_KEY])) {
+    return p.channel === 'minsu'
+      ? { online_booking: false, online_payment: true }
+      : { online_booking: true, online_payment: false };
+  }
+  return { online_booking: true, online_payment: false };
+}
+
+/** 将请求中的能力字段合并到 ext 并强制至少开启一项；同时移除旧 stay_bookable。 */
+function applyTransactionCapabilities(extValue, input, channel) {
+  const ext = Object.assign({}, parseExtObj(extValue));
+  if (!['rental', 'minsu'].includes(channel)) return ext;
+  const body = input || {};
+  const current = transactionCapabilitiesOf({ channel, ext });
+  let onlineBooking = current.online_booking;
+  let onlinePayment = current.online_payment;
+  if (Object.prototype.hasOwnProperty.call(body, ONLINE_BOOKING_KEY)) onlineBooking = boolCapability(body[ONLINE_BOOKING_KEY]);
+  if (Object.prototype.hasOwnProperty.call(body, ONLINE_PAYMENT_KEY)) onlinePayment = boolCapability(body[ONLINE_PAYMENT_KEY]);
+  // 旧客户端兼容：沿用旧频道含义还原（minsu=在线支付，rental=在线预订）。
+  if (Object.prototype.hasOwnProperty.call(body, STAY_BOOKABLE_KEY)
+    && !Object.prototype.hasOwnProperty.call(body, ONLINE_BOOKING_KEY)
+    && !Object.prototype.hasOwnProperty.call(body, ONLINE_PAYMENT_KEY)) {
+    if (boolCapability(body[STAY_BOOKABLE_KEY])) {
+      onlineBooking = channel !== 'minsu';
+      onlinePayment = channel === 'minsu';
+    } else {
+      onlineBooking = false;
+      onlinePayment = false;
+    }
+  }
+  if (!onlineBooking && !onlinePayment) throw new Error('在线预订与在线支付至少须开启一项');
+  ext[ONLINE_BOOKING_KEY] = onlineBooking;
+  ext[ONLINE_PAYMENT_KEY] = onlinePayment;
+  delete ext[STAY_BOOKABLE_KEY];
+  return ext;
+}
+
+/** 兼容能力位：任一交易方式开启即可展示日历并进入下单页。 */
 function bookableOf(proj) {
-  return parseExtObj(proj && proj.ext)[STAY_BOOKABLE_KEY] === true;
+  const caps = transactionCapabilitiesOf(proj);
+  return caps.online_booking || caps.online_payment;
 }
 
 // ===== 多间库存口径（2026-09-10，docs/stay-multi-qty-design.md）=====
@@ -132,8 +201,11 @@ async function stayNightPrices(fetchRows, proj, unit, unitId, checkin, checkout)
 /** 项目房态配置（随 catalog / 项目详情 / 房态日历下发，含 bookable 能力位） */
 function stayConfigOf(proj) {
   const ins = insuranceOf(proj);
+  const caps = transactionCapabilitiesOf(proj);
   return {
-    bookable: bookableOf(proj),
+    bookable: caps.online_booking || caps.online_payment,
+    online_booking: caps.online_booking,
+    online_payment: caps.online_payment,
     min_stay_nights: minStayNightsOf(proj),
     insurance: ins,
     insurance_types: INSURANCE_TYPES.filter((t) => ins.includes(t.key)),
@@ -342,13 +414,19 @@ module.exports = {
   INSURANCE_TYPES,
   INSURANCE_KEYS,
   STAY_MIN_NIGHTS_DEFAULT,
+  STAY_MIN_NIGHTS_MIN,
   STAY_BOOKABLE_KEY,
+  ONLINE_BOOKING_KEY,
+  ONLINE_PAYMENT_KEY,
   STAY_STATUS,
   HOUSING_CHANNELS,
   CANCEL_POLICY_DEFAULT,
   parseExtObj,
   insuranceOf,
   minStayNightsOf,
+  normalizeMinStayNightsInput,
+  transactionCapabilitiesOf,
+  applyTransactionCapabilities,
   bookableOf,
   totalQtyOf,
   effectiveQtyOf,

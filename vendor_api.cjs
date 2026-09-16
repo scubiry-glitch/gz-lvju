@@ -507,8 +507,8 @@ async function housingProjectsDetail(conn, body, vendorId) {
 }
 
 /** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错 */
-function extFromBody(body, baseExt) {
-  const ext = stayCfg.parseExtObj(baseExt);
+function extFromBody(body, baseExt, channel) {
+  let ext = Object.assign({}, stayCfg.parseExtObj(baseExt));
   if (Object.prototype.hasOwnProperty.call(body, 'insurance')) {
     if (body.insurance === null || body.insurance === '') ext.insurance = [];
     else if (Array.isArray(body.insurance)) {
@@ -520,16 +520,10 @@ function extFromBody(body, baseExt) {
   if (Object.prototype.hasOwnProperty.call(body, 'min_stay_nights')) {
     if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
     else {
-      const v = parseInt(body.min_stay_nights, 10);
-      if (!(v >= 1 && v <= 365)) throw new Error('min_stay_nights 须为 1-365 的整数');
-      ext.min_stay_nights = v;
+      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, channel);
     }
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'stay_bookable')) {
-    // 「按晚预订」开关：开通后 C 端支持日历选房 + 在线下单；关闭 = 仅 400 电话咨询
-    if (body.stay_bookable === null || body.stay_bookable === '') delete ext.stay_bookable;
-    else ext.stay_bookable = body.stay_bookable === true || body.stay_bookable === 'true' || body.stay_bookable === 1;
-  }
+  ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
   return ext;
 }
 
@@ -598,7 +592,7 @@ async function housingProjectsCreate(conn, body, vendorId) {
   try { contactPhone = phoneFromBody(b.contact_phone); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   let ext;
-  try { ext = extFromBody(b, {}); }
+  try { ext = extFromBody(b, {}, channel); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const status = b.status == null || b.status === '' ? 'draft' : String(b.status);
   if (['online', 'offline', 'draft'].indexOf(status) < 0) {
@@ -662,9 +656,10 @@ async function housingProjectsUpdate(conn, body, vendorId) {
     catch (e) { return reply(400, { code: 400, message: e.message }); }
   }
   if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
+    || Object.prototype.hasOwnProperty.call(b, 'online_booking') || Object.prototype.hasOwnProperty.call(b, 'online_payment')
     || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')) {
     let ext;
-    try { ext = extFromBody(b, row.ext); }
+    try { ext = extFromBody(b, row.ext, row.channel); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
     sets.push('ext=?'); params.push(JSON.stringify(ext));
   }
@@ -994,7 +989,7 @@ async function housingBookingsConfirm(conn, body, vendorId) {
   const [lockedRows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(b.id, 10)]);
   const row = lockedRows[0];
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
-  if (row.status === 'pending' && row.channel === 'minsu' && row.pay_status === 'unpaid' && row.payment_expires_at
+  if (row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
     && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending'", [now, row.id]);
@@ -1003,7 +998,7 @@ async function housingBookingsConfirm(conn, body, vendorId) {
     return reply(400, { code: 400, message: '待支付订单已过期并释放房态' });
   }
   if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再确认' }); }
-  // 预付口径：minsu 单未支付不可确认生效（与 B 端工作台同口径）
+  // 在线支付单未支付不可确认生效（与 B 端工作台同口径）
   if (row.pay_status === 'unpaid') {
     await conn.rollback();
     return reply(400, { code: 400, message: '租客尚未支付（收银台待付），支付完成后可确认生效' });

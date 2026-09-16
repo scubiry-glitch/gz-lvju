@@ -34,8 +34,10 @@ const DEMO = [
     id: 9001, channel: 'minsu', slug: 'demo-minsu-xingkong', name: '示例·星空整栋民宿',
     address: '观山湖区 · 示例景区东门', price_from: 980, featured: 1,
     units: [
-      { id: 9101, name: '整栋 · 6 室', layout_label: '6室3卫', area_sqm: 260, rent_monthly: 19600, price_night: 1960, tags: ['整栋包栋', '管家服务'] },
-      { id: 9102, name: '庭院大床房', layout_label: '1室1卫', area_sqm: 32, price_night: 980, tags: ['含双早', '庭院'] },
+      { id: 9101, name: '整栋 · 6 室', layout_label: '6室2厅3卫1厨1院', area_sqm: 260, rent_monthly: 19600, price_night: 1960, tags: ['整栋包栋', '管家服务'],
+        profile: { introduction: '独立庭院连接客厅与餐厨空间，六间卧室分布在两层，适合多家庭同行、朋友聚会和小型团建。整栋独享，入住期间由旅居管家提供到店与行程协助。', area_type: 'building', shared_spaces: '整栋独享，无对外共享空间', window_type: 'exterior', window_count: 14, window_openable: true, max_guests: 12, max_adults: 12, max_children: 6, child_age_policy: '0-17 岁儿童可入住，须由监护人陪同', extra_guest_policy: '标准入住 12 人，不提供加床；早餐按订单所含份数提供', beds: '卧室1-4：各1张1.8×2.0m大床；卧室5-6：各2张1.2×2.0m单人床', bath_hot_water: '3间独立淋浴间 · 24小时热水', kitchen: '独立厨房，可做饭；提供基础厨具、餐具与冰箱', smoking: 'designated', climate: '全部卧室与客厅配空调，冬季提供地暖', network: '全屋免费 Wi-Fi', cleaning_frequency: '一客一扫；连住期间每3天清洁一次', linen_frequency: '一客一换；连住期间每7天更换', feature_image: '/assets/juzhu/sy/units/bzf/CCB建融家园中华路店/56平_0.jpg', feature_image_caption: '客房采光充足，床品按一客一换标准布置' } },
+      { id: 9102, name: '庭院大床房', layout_label: '1室1卫', area_sqm: 32, price_night: 980, tags: ['含双早', '庭院'],
+        profile: { introduction: '一层庭院侧大床房，室内动线紧凑，推窗可见庭院绿植，适合情侣或带一名儿童的家庭。', area_type: 'usable', shared_spaces: '与住客共享庭院和早餐厅', window_type: 'exterior', window_count: 2, window_openable: true, max_guests: 2, max_adults: 2, max_children: 1, child_age_policy: '0-12 岁儿童可入住', extra_guest_policy: '不支持加床；6 岁以下儿童与成人同床免费', beds: '1张1.8×2.0m大床', bath_hot_water: '独立淋浴 · 24小时热水', kitchen: '不可做饭，可使用公共饮水区', smoking: 'no', climate: '房间配冷暖空调', network: '免费 Wi-Fi', cleaning_frequency: '一客一扫；连住期间每3天清洁一次', linen_frequency: '一客一换；连住期间每7天更换', feature_image: '/assets/juzhu/sy/units/bzf/CCB建融家园中华路店/30平_0.jpeg', feature_image_caption: '庭院大床房 · 独立卫浴与自然采光' } },
     ],
   },
   {
@@ -155,10 +157,11 @@ async function seed(db, bcrypt) {
   let nProj = 0, nUnits = 0;
   for (const item of DEMO) {
     const districtKey = DISTRICT_NAMES.find((dn) => (item.address || '').includes(dn));
-    // 项目级 ext：minsu 演示单开通「按晚预订」（stay_bookable，口径 2026-09-05）+ 保险默认；其余频道缺省仅电话咨询
+    // 项目级 ext：交易方式按房源配置；#9001 双开供 C 端选择演示，其余民宿沿用在线支付模式。
     const pext = {};
     if (item.channel === 'minsu') {
-      pext.stay_bookable = true;
+      pext.online_booking = item.id === 9001;
+      pext.online_payment = true;
       pext.insurance = ['hotel_cancel', 'property'];
     }
     const [r] = await db.execute(
@@ -175,6 +178,7 @@ async function seed(db, bcrypt) {
     for (const u of item.units || []) {
       const ext = {};
       if (u.price_night) ext.price_night = u.price_night;
+      if (u.profile) ext.room_profile = u.profile;
       await db.execute(
         `INSERT INTO units(id,project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,tags,ext)
          VALUES (?,?,?,?,?,?,?,?,?,?)`,
