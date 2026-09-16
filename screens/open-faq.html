@@ -191,7 +191,7 @@
     <details>
       <summary><span class="q">Q13</span>客户下了单，商家怎么接单？</summary>
       <div class="a">
-        <p>两条路：<strong>① Webhook 事件推送（推荐）</strong>——在接入单里提供通知 URL，客户下单 / 支付 / 取消时平台主动推 HMAC 签名事件（<code>booking.created / booking.paid / booking.cancelled</code>），收到先验签（同一套算法）再处理，5s 内回 2xx 即送达，失败自动重试 3 次；<strong>② 拉取兜底</strong>——<code>bookings/list</code> 定时拉 <code>status='pending'</code> 对账（建议每分钟）。拿到订单后 <code>bookings/confirm</code> 确认或 <code>bookings/cancel</code> 拒单（拒单自动释放房态）；民宿民宿预付单未支付时确认会被拒。联系人手机号只回掩码。</p>
+        <p>两条路：<strong>① Webhook 事件推送（推荐）</strong>——在接入单里提供通知 URL，客户下单 / 支付 / 取消时平台主动推 HMAC 签名事件（<code>booking.created / booking.paid / booking.cancelled</code>），收到先验签（同一套算法）再处理，5s 内回 2xx 即送达，失败自动重试 3 次；<strong>② 拉取兜底</strong>——<code>bookings/list</code> 定时拉 <code>status='pending'</code> 对账（建议每分钟）。拿到订单后 <code>bookings/confirm</code> 确认或 <code>bookings/cancel</code> 拒单（拒单自动释放房态）；在线支付单未支付时确认会被拒。联系人手机号只回掩码。</p>
         <p class="tip">订单详情见 <a href="property-intake-api.html#fulfill">房源接入 API §5 订单履约</a>，可用页内调试台直接试。</p>
       </div>
     </details>
@@ -224,7 +224,7 @@
     <details>
       <summary><span class="q">Q14</span>最短连住是多少？在哪生效？</summary>
       <div class="a">
-        <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=1</code> 晚；商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400，改口径只需改服务端常量或该字段，不需要改页面。</p>
+        <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=15</code> 晚（民宿）。商家可用 <code>ext.min_stay_nights</code> 按房源覆盖：rental 为 1–365 晚，minsu 为 15–365 晚、不得低于 15 晚。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400，改口径只需改服务端常量或该字段，不需要改页面。</p>
       </div>
     </details>
 

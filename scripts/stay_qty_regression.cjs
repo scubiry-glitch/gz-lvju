@@ -75,7 +75,7 @@ async function seedProject(conn) {
      VALUES (?,?,?,?,?,?,?,?,?,?, 'passed', 'online', 153, ?)`,
     [city.id, district.id, 'rental', RUN + '·多间回归房', 'qty-reg-' + process.pid, '回归测试地址',
       JSON.stringify(['演示']), 99, 2, 3000,
-      JSON.stringify({ stay_bookable: true, min_stay_nights: 1, insurance: ['property'] })]);
+      JSON.stringify({ online_booking: true, online_payment: false, min_stay_nights: 1, insurance: ['property'] })]);
   const pid = ins.insertId;
   const mkUnit = async (name, slug, qty) => {
     const [u] = await conn.execute(

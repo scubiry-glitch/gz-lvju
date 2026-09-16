@@ -2,7 +2,7 @@
 
 > 起于「保租房四方共建」，已生长为覆盖 **保租房 / 新居住 / 旅居 / 家政** 的可点击原型 + 可运行服务：
 > 静态页面群（~200 页）叠加 **共享导航总线 / 工单总线 / 地域配置**，后端为 **Node 22+ 单入口 `app.js`（`/api/juzhu/*` 直连 MySQL）**，
-> 含房源频道与按晚预订、房型级免费取消、商家 HMAC 开放接口、商家佣金费率、账号中心 IAM、内容域（专题/路线/周边玩法）。
+> 含房源频道与房源级在线预订/在线支付、房型级免费取消、商家 HMAC 开放接口、商家佣金费率、账号中心 IAM、内容域（专题/路线/周边玩法）。
 > 用于需求评审、政府方演示与研发对齐。
 
 **保租房四方共建框架（仍然成立）**：住建厅 × 江苏银行 × 国企持有方（+ 白名单运营商：自如/龙湖/华润/招商/贝壳省心租 等同业）× 贝壳租房
@@ -71,7 +71,7 @@
 | 模块 | 职责 |
 |---|---|
 | `app.js` | 路由总入口：C 端 catalog/详情/日历/预订/取消、admin 域、vendor 会话域、静态服务（拦截 `.env*`/`*.sql` 等敏感路径） |
-| `stay_config.cjs` | 房态/按晚预订/保险/最短连住/**房型级免费取消政策**口径单一数据源（纯函数，app.js 与 vendor_api 共用） |
+| `stay_config.cjs` | 房态/在线预订与支付能力/保险/最短连住/**房型级免费取消政策**口径单一数据源（纯函数，app.js 与 vendor_api 共用） |
 | `vendor_rate.cjs` | 商家佣金费率（按业务线分档）单一数据源；生效费率 = 商家差异化列 → settings KV 基准 → 内置 10 兜底 |
 | `vendor_api.cjs` + `hmac_auth.cjs` + `vendor_config.cjs` | 商家 HMAC 开放接口（房源建稿/上下架/房态/订单，owner 校验） |
 | `auth_center.cjs` + `perm_registry.cjs` | 账号中心：会话/密码（scrypt，bcrypt 遗留懒升级）/节流 + 权限点注册表（PERMS/ROUTES）与审计 |
@@ -108,7 +108,7 @@ REST 双轨：C 端工单 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）�
 
 - schema：[`juzhu/mysql_schema.sql`](juzhu/mysql_schema.sql)（运行时 `app.js` `ensureSchema` 自动补列/补表）；SQLite 存量一次性导入 `node migrate_to_mysql.cjs [sqlite.db]`
 - 频道模型（规则 15）：`projects.channel ∈ rental/minsu/newhouse/resale/trade`；`bzf` 是专题（settings KV）不是 channel；频道差异属性放 `ext` JSON，不加列不分表；商家维度必挂 `owner_vendor_id`
-- 预订链路：房态日历（`stay_calendar` 无行=默认可订，开通 `stay_bookable` 才生效）→ 最短连住 → **房型级免费取消政策**（`units.ext.cancel_policy`，缺省从严不可取消）→ 下单锁定**佣金快照**（调价不追溯）
+- 预订链路：房态日历（`stay_calendar` 无行=默认可订）→ 房源交易能力（`online_booking` / `online_payment` 至少一项）→ 最短连住 → **房型级免费取消政策**（`units.ext.cancel_policy`，缺省从严不可取消）→ 下单锁定**佣金快照**（调价不追溯）
 - 内容域（规则 19）：`spots`（地点+笔记）→ `routes`（站点串联）→ `topic_*`（房源集合 KV），后台统一在 `juzhu-admin.html`「内容」tab
 - 权限（规则 18）：五档数据权限 `self < vendor < org < city < all`；过渡开关 `settings.perm_strict`；登录防爆破 `login_throttle`
 

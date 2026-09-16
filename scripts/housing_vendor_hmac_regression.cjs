@@ -155,7 +155,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
     tags: ['演示', '回归'],
     min_stay_nights: 15,
     insurance: ['switch_rental', 'property'],
-    stay_bookable: true,
+    online_booking: true, online_payment: false,
     units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }],
   }));
   check('create → 200 + draft + 默认不入 catalog', r.status === 200 && r.j.project && r.j.project.status === 'draft'
@@ -296,7 +296,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   // 预付闭环：自建 minsu 演示房（新日历无历史占用），走 未支付拒确认 → 支付 → 确认 → 拒单退款
   r = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
     name: RUN + '·回归演示民宿', channel: 'minsu', city_id: city.id, district_id: district.id,
-    price_from: 980, tags: ['演示'], min_stay_nights: 1, stay_bookable: true,
+    price_from: 980, tags: ['演示'], min_stay_nights: 15, online_booking: false, online_payment: true,
     units: [{ name: '庭院房', price_night: 980, total_qty: 2 }],   // 多间库存：2 间（2026-09-10）
   }));
   const mid = r.j.project && r.j.project.id;
@@ -324,13 +324,13 @@ async function catalogEventually(base, projectId, citySlug, want) {
   }
   const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
   const mi1 = tmr.toISOString().slice(0, 10);
-  const tmr2 = new Date(tmr); tmr2.setDate(tmr2.getDate() + 1);
+  const tmr2 = new Date(tmr); tmr2.setDate(tmr2.getDate() + 15);
   const bk3 = await call('/api/juzhu/booking', {
     project_id: mid, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
     contact_name: '履约回归', contact_phone: bkPhone,
   });
   if (bk3.status !== 200) {
-    check('minsu 预付闭环（下单）', false, JSON.stringify(bk3.j).slice(0, 160));
+    check('在线支付闭环（下单）', false, JSON.stringify(bk3.j).slice(0, 160));
   } else {
     bkIds.push(bk3.j.order_no);
     r = await call('/api/juzhu/housing/vendor/bookings/list', signed(vendor, { project_id: mid }));
@@ -373,7 +373,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('qty=0 → 400（须为 1-999）', r.status === 400, JSON.stringify(r.j));
   r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: muId5, total_qty: 0 }));
   check('units/update total_qty=0 → 400', r.status === 400, JSON.stringify(r.j));
-  // qty=1 下：订 2 间被拒（超出剩余），订 1 间成功（价 = 夜价 980 × 2 晚 × 1 间）
+  // qty=1 下：订 2 间被拒（超出剩余），订 1 间成功（价 = 夜价 980 × 15 晚 × 1 间）
   const bk5 = await call('/api/juzhu/booking', {
     project_id: mid, unit_id: muId5, rooms: 2, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
     contact_name: '多间回归', contact_phone: bkPhone,
@@ -383,7 +383,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
     project_id: mid, unit_id: muId5, rooms: 1, checkin: mi1, checkout: tmr2.toISOString().slice(0, 10),
     contact_name: '多间回归', contact_phone: bkPhone,
   });
-  check('qty=1 下订 1 间 → 200（price=980×1 晚×1 间）', bk5b.status === 200 && bk5b.j.rooms === 1 && bk5b.j.price_total === 980,
+  check('qty=1 下订 1 间 → 200（price=980×15 晚×1 间）', bk5b.status === 200 && bk5b.j.rooms === 1 && bk5b.j.price_total === 14700,
     JSON.stringify(bk5b.j));
   if (bk5b.status === 200) {
     bkIds.push(bk5b.j.order_no);

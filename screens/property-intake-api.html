@@ -366,7 +366,7 @@
       <tr><td><code>contact_phone</code></td><td>string</td><td>★ 真实联系电话，<strong>11 位手机号</strong>（<code>1</code> 开头；400 号码不接受）。仅入库用于 C 端拨号的虚拟号实时绑定，任何查询接口不回显；可经 <code>projects/update</code> 更新</td></tr>
       <tr><td><code>owner_vendor_id</code></td><td>int</td><td>数据归属商家（签名商家自动写入，不可改）。所有接口按它做行级隔离；订单佣金快照按它取商家档费率</td></tr>
       <tr><td><code>status</code></td><td>string</td><td>★ <code>draft</code> 草稿（默认，新建强制）/ <code>online</code> 上架 / <code>offline</code> 下架</td></tr>
-      <tr><td><code>ext</code></td><td>object</td><td>★ 频道差异属性：<code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，见 5.2）+ <code>stay_bookable</code>（按晚预订开关，见 5.3，缺省 false = 仅 400 电话咨询）</td></tr>
+      <tr><td><code>ext</code></td><td>object</td><td>★ 房源能力与差异属性：<code>online_booking</code>（在线预订）+ <code>online_payment</code>（在线支付，两项至少开启一项，见 5.3）+ <code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，见 5.2）</td></tr>
       <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>审核/评级位：<code>draft → pending → passed / rejected</code>。<strong>passed 是上架前置</strong>；提审走 <code>projects/rating/submit</code>、进度与驳回原因走 <code>projects/rating/status</code>（4.12），列表/详情出参也随行返回</td></tr>
     </table>
 
@@ -482,7 +482,8 @@
   <span class="tok-key">"tags"</span>: [<span class="tok-str">"旅居"</span>, <span class="tok-str">"近地铁"</span>, <span class="tok-str">"含早"</span>],
   <span class="tok-key">"insurance"</span>: [<span class="tok-str">"hotel_cancel"</span>, <span class="tok-str">"property"</span>],
   <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">20</span>,
-  <span class="tok-key">"stay_bookable"</span>: <span class="tok-key">true</span>
+  <span class="tok-key">"online_booking"</span>: <span class="tok-key">true</span>,
+  <span class="tok-key">"online_payment"</span>: <span class="tok-key">true</span>
 }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 更新后全量 */</span> } }</code></pre>
     <p class="opt" style="font-size:12.5px;">不可改：<code>city_id</code>、<code>channel</code>、<code>owner_vendor_id</code>；改 <code>name</code> 会同步重生成唯一 <code>slug</code>。</p>
@@ -599,7 +600,7 @@
     <table>
       <tr><th>字段</th><th>取值</th><th>说明</th></tr>
       <tr><td><code>status</code></td><td><code>pending → confirmed / cancelled</code></td><td>确认后订单生效；取消为终态，不可再变更</td></tr>
-      <tr><td><code>pay_status</code></td><td><code>unpaid / paid / refunded</code> 或 空</td><td>民宿民宿为预付（先付后确认）；租赁住宿预订单为空（商家确认后线下收款）</td></tr>
+      <tr><td><code>pay_status</code></td><td><code>unpaid / paid / refunded</code> 或 空</td><td>由订单交易方式决定，与频道无关：在线支付单为 <code>unpaid</code> 起步；在线预订单为空，商家确认后线下收款</td></tr>
       <tr><td>确认前置</td><td>—</td><td><code>unpaid</code> 的订单不可确认（400），支付完成后可确认；<code>cancelled</code> 不可再变更</td></tr>
       <tr><td>拒单/取消</td><td>—</td><td>自动释放占用的房态晚；已支付订单 <code>pay_status</code> 标记 <code>refunded</code></td></tr>
     </table>
@@ -656,10 +657,10 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
     </ul>
 
     <h3>5.2 最短连住（min_stay_nights）</h3>
-    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=1</code> 晚，商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。<strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。</p>
+    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=15</code> 晚。商家可用 <code>ext.min_stay_nights</code> 按房源覆盖：rental 为 1–365 晚，minsu 为 15–365 晚、不得低于 15 晚。<strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。</p>
 
-    <h3>5.3 按晚预订开关（stay_bookable）</h3>
-    <p>房源默认<strong>仅 400 电话咨询</strong>（C 端不展示价格日历、下单接口拒绝）。<code>projects/create</code> / <code>projects/update</code> 传 <code>"stay_bookable": true</code> 开通后，C 端才展示日历并支持在线下单（<code>catalog</code> / 详情 / 房态日历出参均带 <code>bookable</code> 能力位）。关闭传 <code>false</code>（已生成订单不受影响，可正常确认/取消）。判断由平台服务端唯一执行，<strong>tag / 频道不参与</strong>。</p>
+    <h3>5.3 房源交易能力（online_booking / online_payment）</h3>
+    <p><code>projects/create</code> / <code>projects/update</code> 按房源配置两个独立布尔能力：<code>online_booking</code> = 客户在线选房并提交订单、商家确认后线下收款；<code>online_payment</code> = 客户在线选房后进入收银台、支付完成再由商家确认。两项可同时开启，但<strong>至少开启一项</strong>，与 rental/minsu 频道无关；新建时两项均省略则默认仅开启 online_booking。两项都开时，C 端由客户选择；接口下单用 <code>transaction_mode: "booking" | "payment"</code> 指定，缺省优先 booking。<code>catalog</code> / 详情 / 房态日历出参均返回两个能力位，并保留 <code>bookable</code> 作为“至少一项可用”的兼容汇总字段。</p>
   </section>
 
   <section id="insurance">
@@ -763,7 +764,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>400</td><td>—</td><td>channel 非法 / <code>city_id</code> 不属于商家开放城市 / <code>district_id</code> 不属于城市</td><td>先用 <code>projects/list</code> 或平台侧确认主数据</td></tr>
       <tr><td>400</td><td>—</td><td>上架被拒：缺 <code>price_from</code> / 无户型 / 照片不足 8 张 / 无封面 / <strong>评级未通过</strong> / 商家未过审</td><td>按 message 补齐；评级走 <code>rating/submit</code>（4.12），图片走 <code>photos/add</code>（4.11）</td></tr>
       <tr><td>400</td><td>—</td><td>评级：<code>dims</code> 缺维度 / 越界（0-5）/ 未知维度；或已在复核队列中重复提审</td><td>按 4.12 维度表修正；进度用 <code>rating/status</code> 查</td></tr>
-      <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 不在 1–365</td><td>按 §6 / §5 枚举修正</td></tr>
+      <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 超出频道范围（rental 1–365 / minsu 15–365）</td><td>按 §6 / §5 枚举修正</td></tr>
       <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
       <tr><td>400</td><td>—</td><td>无可更新字段 / <code>city_id</code> 不支持修改</td><td>按 message 调整</td></tr>
       <tr><td>400</td><td>—</td><td>订单未支付不可确认 / 订单已取消不可变更</td><td>支付走收银台后重试确认；取消为终态</td></tr>
@@ -808,7 +809,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
       min_stay_nights: 15, insurance: ['switch_rental', 'property'],
       units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }]
     },
-    '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, stay_bookable: true },
+    '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, online_booking: true, online_payment: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
