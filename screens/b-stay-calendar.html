@@ -91,7 +91,7 @@
     <div class="note" id="note">
       房态日历 = 逐晚库存（多间口径）：<b>总间数</b>（房型级，admin/开放接口可配）− <b>已订</b>（订单自动占用，取消自动释放）= <b>剩余</b>；
       商家可按晚设「<b>放出间数</b>」覆盖总间数、关房、夜价；无差异行即默认「可订 · 放出 = 总间数」（仅对已开通项目生效）。
-      <b>按晚预订</b>为项目级开关（projects.ext.stay_bookable）：未开通项目 C 端仅 400 电话咨询，开通后才支持日历选房 + 在线下单（缺省关闭）。
+      <b>在线预订 / 在线支付</b>为房源级独立能力（projects.ext），不与民宿/长租品类绑定，且至少开启一项。
       旅居口径<b>连住 15 晚起</b>（可按项目调整），下单时 C/B/服务端三处同口径校验。
     </div>
 
@@ -143,10 +143,12 @@
         </div>
 
         <div class="card">
-          <h3>按晚预订 / 入住规则与保障</h3>
+          <h3>交易方式 / 入住规则与保障</h3>
           <div class="sub">随项目下发 C 端详情页与下单校验（projects.ext，规则 15 不加列）</div>
-          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="cBook" />
-            <span><b>🟢 按晚预订（日历选房 + 在线下单）</b><small>开通后 C 端展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询。缺省关闭，开通即 C 端即时生效</small></span></label>
+          <label class="chk" style="margin-bottom:8px;"><input type="checkbox" id="cBooking" />
+            <span><b>📅 在线预订</b><small>客户在线选房并提交订单，商家确认后线下收款</small></span></label>
+          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="cPayment" />
+            <span><b>💳 在线支付</b><small>客户在线选房后进入收银台，支付完成再由商家确认；两项可同时开启</small></span></label>
           <div class="frow">
             <label>最短连住</label>
             <input type="number" id="cMin" min="1" max="365" style="width:90px;" />
@@ -280,18 +282,22 @@
   function loadConfig(){
     var p = currentProject();
     state.cfg = {
-      min_stay_nights: p ? (p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15)) : 15,
+      min_stay_nights: p ? (p.min_stay_nights || 15) : 15,
       insurance: (p && p.insurance) || [],
-      bookable: !!(p && p.bookable),
+      online_booking: !!(p && p.online_booking),
+      online_payment: !!(p && p.online_payment),
     };
+    $('cMin').min = p && p.channel === 'minsu' ? 15 : 1;
     $('cMin').value = state.cfg.min_stay_nights;
     Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
       c.checked = state.cfg.insurance.indexOf(c.value) >= 0;
       c.disabled = !state.writable;
     });
     $('cMin').disabled = !state.writable;
-    $('cBook').checked = state.cfg.bookable;
-    $('cBook').disabled = !state.writable;
+    $('cBooking').checked = state.cfg.online_booking;
+    $('cPayment').checked = state.cfg.online_payment;
+    $('cBooking').disabled = !state.writable;
+    $('cPayment').disabled = !state.writable;
   }
 
   /* ── 月历 ── */
@@ -317,7 +323,7 @@
       var p = currentProject();
       var unitName = state.unitId ? ($('fUnit').selectedOptions[0] || {}).textContent : '整栋 / 不限房型';
       $('calSub').textContent = (p ? p.name : '') + ' · ' + unitName +
-        ' · ' + (p && p.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
+        ' · ' + [p && p.online_booking ? '在线预订' : '', p && p.online_payment ? '在线支付' : ''].filter(Boolean).join(' + ') +
         ' · 最短连住 ' + (j.min_stay_nights || state.cfg.min_stay_nights) + ' 晚 · 保障 ' +
         ((j.insurance_types || []).map(function(t){ return t.short; }).join('/') || '未配置');
       var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订满', ''], past: ['—', ''] };
@@ -400,16 +406,20 @@
     Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
       if (c.checked) ins.push(c.value);
     });
+    var onlineBooking = $('cBooking').checked, onlinePayment = $('cPayment').checked;
+    if (!onlineBooking && !onlinePayment) { toast('在线预订与在线支付至少须开启一项'); return; }
     fetch(API + '/vendor/projects/' + state.pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins, stay_bookable: $('cBook').checked }) })
+      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins,
+        online_booking: onlineBooking, online_payment: onlinePayment }) })
       .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
       .then(function(j){
-        toast('已保存 · ' + (j.project.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
+        toast('已保存 · ' + [j.project.online_booking ? '在线预订' : '', j.project.online_payment ? '在线支付' : ''].filter(Boolean).join(' + ') +
           ' · 连住 ' + j.project.min_stay_nights + ' 晚 / 保障 ' + (j.project.insurance || []).length + ' 项');
         var p = currentProject();
         if (p) {
           p.min_stay_nights = j.project.min_stay_nights; p.insurance = j.project.insurance;
           p.insurance_types = j.project.insurance_types; p.bookable = j.project.bookable;
+          p.online_booking = j.project.online_booking; p.online_payment = j.project.online_payment;
         }
         renderCal();
       })

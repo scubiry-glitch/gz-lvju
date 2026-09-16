@@ -60,6 +60,20 @@
   .roomcard .rt.est{color:var(--muted);background:#f1f5f4;}
   .roomcard .rbtn{font-size:11.5px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 18px;border-radius:999px;}
   .roomcard .rbtn.full{background:#eef2f1;color:#8a9994;}
+  .room-tabs{display:flex;gap:0;overflow-x:auto;margin:12px 0 14px;border:1px solid var(--border);border-radius:8px;background:#f5f7f6;}
+  .room-tabs::-webkit-scrollbar{height:0;}
+  .room-tabs button{flex:1 0 auto;min-height:38px;border:0;border-right:1px solid var(--border);background:transparent;padding:8px 12px;color:var(--muted);font:600 11px var(--font);cursor:pointer;}
+  .room-tabs button:last-child{border-right:0;}
+  .room-tabs button.on{background:var(--brand);color:#fff;}
+  .room-copy{font-size:13px;line-height:1.8;color:var(--ink);margin:0 0 13px;white-space:pre-line;}
+  .room-facts{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border);}
+  .room-fact{min-width:0;padding:11px 8px 10px 0;border-bottom:1px solid var(--border);}
+  .room-fact:nth-child(even){padding-left:12px;border-left:1px solid var(--border);}
+  .room-fact .fk{display:block;font-size:9.5px;color:var(--muted);margin-bottom:3px;}
+  .room-fact .fv{display:block;font-size:12px;line-height:1.55;color:var(--ink);overflow-wrap:anywhere;}
+  .room-showcase{position:relative;width:100%;height:66.667dvh;min-height:320px;max-height:640px;margin:8px 0 0;background:#dfe7e3;overflow:hidden;}
+  .room-showcase img{display:block;width:100%;height:100%;object-fit:cover;}
+  .room-showcase figcaption{position:absolute;left:16px;right:16px;bottom:16px;width:max-content;max-width:calc(100% - 32px);padding:7px 10px;background:rgba(8,18,16,.68);color:#fff;font-size:11px;line-height:1.5;border-radius:6px;backdrop-filter:blur(6px);}
   .units-note{font-size:10px;color:var(--muted);margin-top:9px;line-height:1.5;}
   /* 加载骨架：数据到达前替代静态示例卡，避免闪变 */
   .skl-card{display:flex;gap:11px;border:1.5px solid var(--border);border-radius:14px;padding:10px;margin-top:10px;background:#fff;}
@@ -227,6 +241,18 @@
       </div>
       <div class="units-note" id="dUnitsNote">总价按各户型逐晚实价合计 · 连住 15 晚起 · 已订 / 关房不可选</div>
     </div>
+
+    <div class="block" id="dRoomInfoBlock" style="display:none;">
+      <div class="bt">房源介绍</div>
+      <div class="bs">空间、入住与设施信息由商家维护</div>
+      <div class="room-tabs" id="dRoomTabs" role="tablist" aria-label="选择房型介绍"></div>
+      <p class="room-copy" id="dRoomIntro"></p>
+      <div class="room-facts" id="dRoomFacts"></div>
+    </div>
+    <figure class="room-showcase" id="dRoomShowcase" style="display:none;">
+      <img id="dRoomShowcaseImg" alt="">
+      <figcaption id="dRoomShowcaseCaption"></figcaption>
+    </figure>
 
     <div class="block">
       <div class="bt" id="dRateTitle">旅居星级评价 · 5 维</div>
@@ -405,6 +431,63 @@ window.__NEARBY_RENDER__ = (function(){
   }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
+  var roomProfileUnits = [];
+  function renderRoomProfile(unitId) {
+    var u = roomProfileUnits.find(function(item){ return item.id === Number(unitId); }) || roomProfileUnits[0];
+    var block = document.getElementById('dRoomInfoBlock');
+    if (!u || !block) return;
+    var p = u.profile || {};
+    block.style.display = '';
+    var tabs = document.getElementById('dRoomTabs');
+    tabs.innerHTML = roomProfileUnits.map(function(item){
+      return '<button type="button" role="tab" data-u="'+item.id+'" aria-selected="'+(item.id===u.id?'true':'false')+'" class="'+(item.id===u.id?'on':'')+'">'+esc(item.name)+'</button>';
+    }).join('');
+    tabs.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var next = Number(btn.dataset.u);
+        renderRoomProfile(next);
+        if (window.__CAL_SELECT_UNIT__) window.__CAL_SELECT_UNIT__(next);
+      });
+    });
+    var intro = document.getElementById('dRoomIntro');
+    intro.textContent = p.introduction || '';
+    intro.style.display = p.introduction ? '' : 'none';
+    var areaType = p.area_type === 'usable' ? '使用面积' : p.area_type === 'building' ? '建筑面积' : '面积';
+    var windowLabel = { exterior:'外窗', interior:'内窗', none:'无窗' }[p.window_type] || '';
+    if (windowLabel && p.window_type !== 'none') {
+      if (p.window_count != null) windowLabel += ' · '+p.window_count+' 扇';
+      if (p.window_openable != null) windowLabel += p.window_openable ? ' · 可开启' : ' · 不可开启';
+    }
+    var occupancy = p.max_guests != null ? '最多 '+p.max_guests+' 人' : '';
+    if (p.max_adults != null) occupancy += (occupancy?' · ':'')+'成人 '+p.max_adults+' 人';
+    if (p.max_children != null) occupancy += (occupancy?' · ':'')+'儿童 '+p.max_children+' 人';
+    var smoking = { no:'全屋禁烟', designated:'仅指定区域可吸烟', allowed:'可吸烟' }[p.smoking] || '';
+    var facts = [
+      [areaType, u.area ? u.area+'㎡' : ''], ['房屋结构', u.layout],
+      ['共享空间', p.shared_spaces], ['窗户', windowLabel], ['入住人数', occupancy],
+      ['儿童适住', p.child_age_policy], ['加人 / 加床', p.extra_guest_policy], ['卧室与床位', p.beds],
+      ['洗浴与热水', p.bath_hot_water], ['厨房', p.kitchen], ['吸烟', smoking],
+      ['空调 / 暖气', p.climate], ['网络', p.network], ['打扫频率', p.cleaning_frequency],
+      ['床品 / 毛巾', p.linen_frequency]
+    ].filter(function(row){ return row[1] !== '' && row[1] != null; });
+    document.getElementById('dRoomFacts').innerHTML = facts.map(function(row){
+      return '<div class="room-fact"><span class="fk">'+esc(row[0])+'</span><span class="fv">'+esc(row[1])+'</span></div>';
+    }).join('');
+    var show = document.getElementById('dRoomShowcase');
+    if (p.feature_image) {
+      var image = document.getElementById('dRoomShowcaseImg');
+      image.src = p.feature_image;
+      image.alt = p.feature_image_caption || u.name;
+      var caption = document.getElementById('dRoomShowcaseCaption');
+      caption.textContent = p.feature_image_caption || '';
+      caption.style.display = p.feature_image_caption ? '' : 'none';
+      show.style.display = '';
+    } else {
+      show.style.display = 'none';
+      document.getElementById('dRoomShowcaseImg').removeAttribute('src');
+    }
+  }
+  window.__ROOM_PROFILE_SELECT__ = renderRoomProfile;
   var DIMS = {
     rental: [ {k:'comfort',l:'舒适'}, {k:'green',l:'绿色'}, {k:'tech',l:'智慧'}, {k:'safety',l:'安全'} ],
     minsu:  [ {k:'scenery',l:'环境景观'}, {k:'facilities',l:'设施配套'}, {k:'service',l:'服务品质'}, {k:'location',l:'区位交通'}, {k:'culture',l:'在地体验'} ]
@@ -473,8 +556,11 @@ window.__NEARBY_RENDER__ = (function(){
       if (p.channel === 'minsu') per = (+ex.price_night) || (p.price_from || 0);
       else if (u.rent_monthly) per = Math.max(1, Math.round(u.rent_monthly / 30));
       else if (p.price_from) per = Math.max(1, Math.round(p.price_from / 30));
-      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '' };
+      var profile = (ex.room_profile && typeof ex.room_profile === 'object' && !Array.isArray(ex.room_profile)) ? ex.room_profile : {};
+      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '', profile: profile };
     });
+    roomProfileUnits = unitsX;
+    if (unitsX.length) renderRoomProfile(unitsX[0].id);
     document.getElementById('dUnitsBlock').style.display = '';
     // 评级维度
     var dimsDef = DIMS[p.channel] || [];
@@ -546,23 +632,24 @@ window.__NEARBY_RENDER__ = (function(){
       }).join('');
       document.getElementById('dInsBlock').style.display = '';
     }
-    // 最短连住（旅居口径：rental 15 晚起 / minsu 1 晚起，商家可在项目上覆盖）
-    var minNights = p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15);
+    // 最短连住（旅居口径：rental / minsu 均默认 15 晚起，商家可在项目上覆盖）
+    var minNights = p.min_stay_nights || 15;
     var perNight = (p.channel === 'minsu') ? (price || 0) : (price ? Math.max(1, Math.round(price / 30)) : 0);
-    // 「按晚预订」能力位（服务端 stay_bookable 随项目下发）：未开通 = 仅电话咨询，无日历无预订
+    // 房源级交易能力：在线预订 / 在线支付至少一项开启即可进入日历与下单页。
     var canBook = p.bookable === true;
+    var txLabels = [p.online_booking ? '在线预订' : '', p.online_payment ? '在线支付' : ''].filter(Boolean).join(' / ');
     document.getElementById('datebar').style.display = canBook ? '' : 'none';
     document.getElementById('dUnitsNote').textContent = canBook
-      ? '总价按各户型逐晚实价合计 · 连住 ' + minNights + ' 晚起 · 已订 / 关房不可选'
-      : '该项目未开通按晚预订 · 价格仅供参考 · 请电话咨询';
-    // 未开通按晚预订：主按钮即电话咨询（规则16），左下咨询入口隐藏避免双入口
+      ? txLabels + ' · 总价按逐晚实价合计 · 连住 ' + minNights + ' 晚起 · 已订 / 关房不可选'
+      : '该项目未配置可用交易方式 · 价格仅供参考 · 请电话咨询';
+    // 无可用交易方式时主按钮降级为电话咨询。
     var orbEl = document.getElementById('aiCta');
     if (orbEl) orbEl.style.display = canBook ? '' : 'none';
-    window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel, bookable: canBook, consultMode: p.consult_mode || 'consultant', units: unitsX };
+    window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel,
+      bookable: canBook, onlineBooking: !!p.online_booking, onlinePayment: !!p.online_payment,
+      consultMode: p.consult_mode || 'consultant', units: unitsX };
     if (window.__CAL_SET_CONFIG__) window.__CAL_SET_CONFIG__(window.__STAY__);
-    // CTA 分流（口径 2026-09-05）：项目开通「按晚预订」→ 立即预订（minsu 预付收银台 /
-    // rental 预订单，booking 页按频道分流）+ 📞 电话咨询 双入口；未开通（保租房/普通长租/
-    // 新房/二手缺省）→ 仅 📞 电话咨询
+    // CTA 只看房源能力；下单页再按 online_booking / online_payment 展示可选交易方式。
     function bindPhone(el) {
       el.addEventListener('click', function(ev){
         ev.preventDefault();
@@ -576,7 +663,7 @@ window.__NEARBY_RENDER__ = (function(){
           .catch(function(){ alert('暂时无法接通，请稍后重试'); el.textContent = '📞 电话咨询'; });
       });
     }
-    // 底栏主按钮：开通按晚预订 = 「查看房型」（预订动作在房型卡上，见 goBooking）；未开通 = 📞 电话咨询
+    // 底栏主按钮：有交易能力 = 「查看房型」（动作在房型卡上）；否则 = 电话咨询。
     var bk = document.getElementById('dMainBtn');
     if (bk && canBook) {
       bk.textContent = '查看房型';
@@ -714,10 +801,12 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   function setUnit(uid){
     if (!live || !live.bookable || !uid || selUnit === uid) return;
     selUnit = uid;
+    if (window.__ROOM_PROFILE_SELECT__) window.__ROOM_PROFILE_SELECT__(uid);
     unitsEl.querySelectorAll('.roomcard').forEach(function(c){ c.classList.toggle('sel', +c.dataset.u === uid); });
     if (monthsBuilt) Object.keys(monthEls).forEach(paintMonth);   // 房态按户型各自缓存，重绘即可（不重拉）
     paintCards(); paintBars();
   }
+  window.__CAL_SELECT_UNIT__ = setUnit;
 
   /* ---------- 房态数据（户型 × 月份 各自缓存；每月一个批量请求带全所有户型，每张卡的总价都是实价） ---------- */
   function loadMonth(mk){
@@ -1055,6 +1144,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     selUnit = parseInt(q.get('unit') || '', 10) || 0;
     if (selUnit && !us.some(function(u){ return u.id === selUnit; })) selUnit = 0;
     if (!selUnit && us.length) selUnit = us[0].id;
+    if (selUnit && window.__ROOM_PROFILE_SELECT__) window.__ROOM_PROFILE_SELECT__(selUnit);
     ci = co = null; calCache = {}; pending = {}; monthsBuilt = false; monthEls = {};
     var qi = q.get('checkin') || '', qo = q.get('checkout') || '';
     if (/^\d{4}-\d{2}-\d{2}$/.test(qi)) {

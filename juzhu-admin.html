@@ -219,7 +219,7 @@
 <div id="panePhone" class="pane-main pane-phone" hidden>
   <div class="card" id="consultCard">
     <h2>商家咨询方式</h2>
-    <p class="hint">商家维度控制 C 端房源详情页左下角咨询入口的优先展示（仅对已开通按晚预订的项目生效）。<strong>咨询顾问</strong> = 400 虚拟号专线（与保租房咨询同链路，缺省）；<strong>AI 咨询</strong> = 智能 agent 入口（上线后再切换）。保存后 C 端实时读取。</p>
+    <p class="hint">商家维度控制 C 端房源详情页左下角咨询入口的优先展示（与房源交易能力并行）。<strong>咨询顾问</strong> = 400 虚拟号专线（与保租房咨询同链路，缺省）；<strong>AI 咨询</strong> = 智能 agent 入口（上线后再切换）。保存后 C 端实时读取。</p>
     <div id="consultList" style="margin-top:6px;"></div>
   </div>
   <div class="card">
@@ -1848,12 +1848,16 @@ function renderEditor() {
       '</div>';
   }
 
-  // 按晚预订 · 入住规则与保障（写 projects.ext，规则15/16 不加列；校验口径与服务端 vendor PUT 一致）
+  // 房源交易方式 · 入住规则与保障（写 projects.ext，规则15/16 不加列；校验口径与服务端一致）
   var stayCard = '';
   if (p.channel === 'rental' || p.channel === 'minsu') {
     var ext = {};
     try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
-    var defNights = p.channel === 'minsu' ? 1 : 15;   // 与服务端 STAY_MIN_NIGHTS_DEFAULT 一致
+    var hasTxCaps = Object.prototype.hasOwnProperty.call(ext, 'online_booking') || Object.prototype.hasOwnProperty.call(ext, 'online_payment');
+    var onlineBooking = hasTxCaps ? ext.online_booking === true : !(p.channel === 'minsu' && ext.stay_bookable === true);
+    var onlinePayment = hasTxCaps ? ext.online_payment === true : (p.channel === 'minsu' && ext.stay_bookable === true);
+    var txLabel = [onlineBooking ? '在线预订' : '', onlinePayment ? '在线支付' : ''].filter(Boolean).join(' + ');
+    var defNights = 15;   // 与服务端 STAY_MIN_NIGHTS_DEFAULT 一致
     var insOn = Array.isArray(ext.insurance) ? ext.insurance : [];
     // 与服务端 stay_config.cjs INSURANCE_TYPES 同一枚举（label/icon 单一数据源在服务端）
     var INSURANCES = [
@@ -1863,12 +1867,14 @@ function renderEditor() {
     ];
     stayCard =
       '<div class="card" id="stayCard">'+
-        '<h2>按晚预订 · 入住规则与保障 <span class="rating-status '+(ext.stay_bookable ? 'passed' : 'draft')+'" id="p_bookable_st">'+(ext.stay_bookable ? '🟢 在线预订' : '⚪ 仅 400 电话咨询')+'</span></h2>'+
-        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">开通 = C 端详情展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询（缺省关闭）。逐晚房态 / 夜价在 <a href="screens/b-stay-calendar.html?project='+p.id+'" target="_blank">运营工作台 · 房态日历</a> 维护；保存后 C 端即时生效。</p>'+
-        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="p_bookable" '+(ext.stay_bookable?'checked':'')+' style="margin-top:2px;"/>'+
-          '<span><b>🟢 按晚预订（日历选房 + 在线下单）</b><br><span style="font-size:11px;color:var(--muted);">旅居 / 民宿频道可开；保租房默认不开（保持 400 咨询）</span></span></label>'+
+        '<h2>交易方式 · 入住规则与保障 <span class="rating-status passed" id="p_bookable_st">🟢 '+txLabel+'</span></h2>'+
+        '<p style="font-size:12px;color:var(--muted);margin:0 0 10px;">交易能力按房源独立配置，不与民宿/长租品类绑定，且至少开启一项。逐晚房态 / 夜价在 <a href="screens/b-stay-calendar.html?project='+p.id+'" target="_blank">运营工作台 · 房态日历</a> 维护；保存后 C 端即时生效。</p>'+
+        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" id="p_online_booking" '+(onlineBooking?'checked':'')+' style="margin-top:2px;"/>'+
+          '<span><b>📅 在线预订</b><br><span style="font-size:11px;color:var(--muted);">客户在线选房并提交订单，商家确认后线下收款</span></span></label>'+
+        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;margin-top:8px;"><input type="checkbox" id="p_online_payment" '+(onlinePayment?'checked':'')+' style="margin-top:2px;"/>'+
+          '<span><b>💳 在线支付</b><br><span style="font-size:11px;color:var(--muted);">客户在线选房后进入收银台，支付完成再由商家确认</span></span></label>'+
         '<div class="grid" style="margin-top:10px;">'+
-          '<div class="fld"><label>最短连住（晚，留空 = 频道默认 '+defNights+'）</label><input id="p_minstay" type="number" min="1" max="365" value="'+(ext.min_stay_nights||'')+'" placeholder="'+defNights+'"/></div>'+
+          '<div class="fld"><label>最短连住（晚，留空 = 频道默认 '+defNights+'）</label><input id="p_minstay" type="number" min="'+(p.channel === 'minsu' ? 15 : 1)+'" max="365" value="'+(ext.min_stay_nights||'')+'" placeholder="'+defNights+'"/></div>'+
         '</div>'+
         '<div style="display:flex;gap:16px;flex-wrap:wrap;">'+
           INSURANCES.map(function(t){
@@ -1928,11 +1934,13 @@ function renderEditor() {
   renderUnits(isTrade);
   bindSpotsCard(p);
   if (stayCard) {   // 开关切换即时刷新徽标
-    var bkEl = document.getElementById('p_bookable'), bkSt = document.getElementById('p_bookable_st');
-    if (bkEl && bkSt) bkEl.onchange = function(){
-      bkSt.textContent = bkEl.checked ? '🟢 在线预订' : '⚪ 仅 400 电话咨询';
-      bkSt.className = 'rating-status ' + (bkEl.checked ? 'passed' : 'draft');
+    var bkEl = document.getElementById('p_online_booking'), payEl = document.getElementById('p_online_payment'), bkSt = document.getElementById('p_bookable_st');
+    var refreshTxBadge = function(){
+      var labels = [bkEl.checked ? '在线预订' : '', payEl.checked ? '在线支付' : ''].filter(Boolean);
+      bkSt.textContent = labels.length ? '🟢 ' + labels.join(' + ') : '🔴 至少开启一项';
+      bkSt.className = 'rating-status ' + (labels.length ? 'passed' : 'rejected');
     };
+    if (bkEl && payEl && bkSt) { bkEl.onchange = refreshTxBadge; payEl.onchange = refreshTxBadge; }
   }
 
   if (!isTrade) {
@@ -2280,17 +2288,21 @@ function saveProject() {
   if (p.channel === 'trade') body.old_house_hint = document.getElementById('p_old').value.trim();
   else body.managed_unit_count = numVal('p_managed');
 
-  // 按晚预订/最短连住/保险 → projects.ext（整包替换前先合并旧 ext，避免覆盖未知键；
-  // 校验与服务端 vendor PUT /projects/:id 同口径：连住 1-365，保险仅限服务端枚举）
-  if (document.getElementById('p_bookable')) {
+  // 交易方式/最短连住/保险 → projects.ext（整包替换前先合并旧 ext，避免覆盖未知键；
+  // 校验与服务端 vendor PUT /projects/:id 同口径：rental 1-365 / minsu 15-365，保险仅限服务端枚举）
+  if (document.getElementById('p_online_booking')) {
     var ext = {};
     try { ext = typeof p.ext === 'string' ? JSON.parse(p.ext) : (p.ext || {}); } catch (e) { ext = {}; }
-    ext.stay_bookable = document.getElementById('p_bookable').checked;
+    ext.online_booking = document.getElementById('p_online_booking').checked;
+    ext.online_payment = document.getElementById('p_online_payment').checked;
+    delete ext.stay_bookable;
+    if (!ext.online_booking && !ext.online_payment) { toast('在线预订与在线支付至少须开启一项'); return; }
     var mnV = document.getElementById('p_minstay').value.trim();
     if (mnV === '') { delete ext.min_stay_nights; }
     else {
       var mnN = parseInt(mnV, 10);
-      if (!(mnN >= 1 && mnN <= 365)) { toast('最短连住须为 1-365 的整数'); return; }
+      var mnFloor = p.channel === 'minsu' ? 15 : 1;
+      if (!(mnN >= mnFloor && mnN <= 365)) { toast('最短连住须为 '+mnFloor+'-365 的整数'); return; }
       ext.min_stay_nights = mnN;
     }
     ext.insurance = Array.prototype.map.call(document.querySelectorAll('.p_ins:checked'), function(cb){ return cb.value; });

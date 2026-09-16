@@ -38,6 +38,7 @@
   .btn.danger{background:#fff;border:1px solid #fecaca;color:var(--danger);}
   .btn.link{background:none;border:0;color:var(--brand);padding:0;font-size:11px;font-weight:600;cursor:pointer;}
   .cover-preview{width:120px;height:80px;border-radius:8px;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);margin-top:6px;}
+  .feature-preview{width:100%;height:260px;border-radius:8px;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);margin-top:8px;}
   .toast{position:fixed;bottom:20px;right:20px;background:#0f766e;color:#fff;padding:10px 16px;border-radius:10px;
     font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.15);opacity:0;transition:.25s;pointer-events:none;z-index:99;}
   .toast.show{opacity:1;}
@@ -53,8 +54,8 @@
   .amenity-chks label{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:11px;cursor:pointer;}
   .amenity-chks label.on{border-color:var(--brand);background:color-mix(in oklab,var(--brand) 8%,#fff);}
   .amenity-chks input{margin:0;}
-  .fee-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;}
-  .fee-row input{padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;}
+  .fee-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;margin-bottom:6px;align-items:center;}
+  .fee-row input{min-width:0;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:11px;}
   .keeper-preview{width:40px;height:40px;border-radius:50%;background:#e8eeec center/cover no-repeat;border:1px solid var(--border);display:inline-block;vertical-align:middle;}
   .img-field-row{display:flex;gap:8px;align-items:center;}
   .img-field-row input{flex:1;}
@@ -74,6 +75,17 @@
   .saved-indicator{display:inline-block;font-size:11px;color:var(--brand);font-weight:600;margin-left:8px;opacity:0;transition:opacity .3s;}
   .saved-indicator.show{opacity:1;}
   .loading{text-align:center;padding:40px;color:var(--muted);}
+  @media (max-width:600px){
+    .top{padding:12px;gap:8px;flex-wrap:wrap;}
+    .top h1{width:100%;min-width:0;}
+    .top .acts{width:100%;}
+    .wrap{padding:12px 10px 28px;}
+    .card{padding:15px 14px;}
+    .grid,.detail-grid{grid-template-columns:minmax(0,1fr);}
+    .detail-grid .full{grid-column:auto;}
+    .img-field-row>*{min-width:0;}
+    .feature-preview{height:220px;}
+  }
 </style>
 </head>
 <body>
@@ -256,12 +268,20 @@ function render() {
   var am = Array.isArray(u.amenities) ? u.amenities : [];
   if (typeof u.amenities === 'string') { try { am = JSON.parse(u.amenities); } catch(e) { am = []; } }
   if (!am.length) am = AMENITY_CATALOG.map(function(a){ return a.id; });
+  var ux = parseJsonField(u.ext, {});
+  if (!ux || typeof ux !== 'object' || Array.isArray(ux)) ux = {};
+  var rp = (ux.room_profile && typeof ux.room_profile === 'object' && !Array.isArray(ux.room_profile)) ? ux.room_profile : {};
+  function option(value, label, current) {
+    return '<option value="'+value+'"'+((current==null?'':String(current)) === value ? ' selected' : '')+'>'+label+'</option>';
+  }
 
   // Preview link
   var previewEl = document.getElementById('previewLink');
   if (project && u.slug) {
     var ch = project.channel || 'bzf';
-    previewEl.href = 'juzhu-unit-detail.html?project=' + encodeURIComponent(project.name) + '&unit=' + encodeURIComponent(u.slug) + '&channel=' + ch;
+    previewEl.href = (ch === 'rental' || ch === 'minsu')
+      ? 'lvju-app-detail.html?id=' + project.id + '&unit=' + u.id
+      : 'juzhu-unit-detail.html?project=' + encodeURIComponent(project.name) + '&unit=' + encodeURIComponent(u.slug) + '&channel=' + ch;
   }
 
   // Title
@@ -282,6 +302,7 @@ function render() {
 
   var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
   var coverBg = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
+  var featureBg = rp.feature_image ? "background-image:url('"+esc(rp.feature_image)+"')" : '';
 
   var html = '';
 
@@ -311,6 +332,52 @@ function render() {
   html += '<div><label>券后价（元/月，可选）</label><input class="ud_promo" type="number" value="'+(u.promo_price!=null?u.promo_price:'')+'"/></div>';
   html += '</div>';
   html += '</div>';
+
+  // ── Excel room profile: content / space / occupancy ──
+  html += '<div class="card">';
+  html += '<h2>房源介绍与空间 <span class="badge">房型级</span></h2>';
+  html += '<div class="detail-grid">';
+  html += '<div class="full"><label>房源简介</label><textarea class="rp_intro" maxlength="1000" placeholder="说明空间、布局、风格、适用人群与本房型差异点">'+esc(rp.introduction||'')+'</textarea></div>';
+  html += '<div><label>面积口径</label><select class="rp_area_type">'+
+    option('', '未标注', rp.area_type)+option('building', '建筑面积', rp.area_type)+option('usable', '使用面积', rp.area_type)+'</select></div>';
+  html += '<div><label>房屋结构</label><input value="'+esc(u.layout_label||'')+'" disabled title="请在基本信息的户型字段修改"/></div>';
+  html += '<div class="full"><label>共享空间</label><textarea class="rp_shared" maxlength="300" placeholder="如：共享厨房、花园；无共享空间请填写“无”">'+esc(rp.shared_spaces||'')+'</textarea></div>';
+  html += '<div><label>窗户类型</label><select class="rp_window_type">'+
+    option('', '未填写', rp.window_type)+option('exterior', '外窗', rp.window_type)+option('interior', '内窗', rp.window_type)+option('none', '无窗', rp.window_type)+'</select></div>';
+  html += '<div><label>窗户数量</label><input class="rp_window_count" type="number" min="0" max="20" value="'+(rp.window_count!=null?rp.window_count:'')+'"/></div>';
+  html += '<div><label>窗户是否可开</label><select class="rp_window_openable">'+
+    option('', '未填写', rp.window_openable==null?'':String(+rp.window_openable))+
+    option('1', '可开启', rp.window_openable==null?'':String(+rp.window_openable))+
+    option('0', '不可开启', rp.window_openable==null?'':String(+rp.window_openable))+'</select></div>';
+  html += '</div></div>';
+
+  html += '<div class="card">';
+  html += '<h2>入住、设施与环境 <span class="badge">房型级</span></h2>';
+  html += '<div class="detail-grid">';
+  html += '<div><label>最大入住人数</label><input class="rp_max_guests" type="number" min="1" max="99" value="'+(rp.max_guests!=null?rp.max_guests:'')+'"/></div>';
+  html += '<div><label>成人上限</label><input class="rp_max_adults" type="number" min="1" max="99" value="'+(rp.max_adults!=null?rp.max_adults:'')+'"/></div>';
+  html += '<div><label>儿童上限</label><input class="rp_max_children" type="number" min="0" max="99" value="'+(rp.max_children!=null?rp.max_children:'')+'"/></div>';
+  html += '<div class="full"><label>儿童适住年龄</label><input class="rp_child_age" maxlength="300" value="'+esc(rp.child_age_policy||'')+'" placeholder="如：0-12 岁；婴幼儿须由监护人陪同"/></div>';
+  html += '<div class="full"><label>加人 / 加床政策</label><textarea class="rp_extra" maxlength="500" placeholder="是否允许、最多人数、费用，以及是否含床品/早餐">'+esc(rp.extra_guest_policy||'')+'</textarea></div>';
+  html += '<div class="full"><label>卧室与床位明细</label><textarea class="rp_beds" maxlength="500" placeholder="如：卧室1：1张1.8×2.0m大床；客厅：1张沙发床">'+esc(rp.beds||'')+'</textarea></div>';
+  html += '<div><label>洗浴与热水</label><input class="rp_bath" maxlength="300" value="'+esc(rp.bath_hot_water||'')+'" placeholder="淋浴 · 24小时热水"/></div>';
+  html += '<div><label>吸烟属性</label><select class="rp_smoking">'+
+    option('', '未填写', rp.smoking)+option('no', '全屋禁烟', rp.smoking)+option('designated', '仅指定区域', rp.smoking)+option('allowed', '可吸烟', rp.smoking)+'</select></div>';
+  html += '<div class="full"><label>厨房可用性</label><input class="rp_kitchen" maxlength="500" value="'+esc(rp.kitchen||'')+'" placeholder="独立/共享/简易/不可用；厨具餐具、调料与做饭规则"/></div>';
+  html += '<div><label>空调 / 暖气覆盖</label><input class="rp_climate" maxlength="300" value="'+esc(rp.climate||'')+'" placeholder="全屋空调 · 地暖"/></div>';
+  html += '<div><label>网络</label><input class="rp_network" maxlength="200" value="'+esc(rp.network||'')+'" placeholder="免费 Wi-Fi"/></div>';
+  html += '<div><label>打扫频率</label><input class="rp_cleaning" maxlength="200" value="'+esc(rp.cleaning_frequency||'')+'" placeholder="一客一扫 / 每3天"/></div>';
+  html += '<div><label>床品 / 毛巾更换频率</label><input class="rp_linen" maxlength="200" value="'+esc(rp.linen_frequency||'')+'" placeholder="一客一换 / 每7天"/></div>';
+  html += '</div></div>';
+
+  html += '<div class="card">';
+  html += '<h2>商家展示图 <span class="badge">约 2/3 屏</span></h2>';
+  html += '<div class="detail-grid">';
+  html += '<div class="full"><label>图片地址</label><div class="img-field-row"><input class="rp_feature_image" value="'+esc(rp.feature_image||'')+'" placeholder="粘贴 HTTPS 图片 URL 或填写 assets/… 站内路径"/></div>'+
+    '<div class="hint">前台按约 2/3 可视屏高度全宽展示；建议使用竖图或主体居中的高清图。</div>'+
+    '<div class="feature-preview rp_feature_preview" style="'+featureBg+'"></div></div>';
+  html += '<div class="full"><label>图片说明</label><input class="rp_feature_caption" maxlength="120" value="'+esc(rp.feature_image_caption||'')+'" placeholder="如：庭院与客厅相连，午后采光充足"/></div>';
+  html += '</div></div>';
 
   // ── Amenities card ──
   html += '<div class="card">';
@@ -352,8 +419,6 @@ function render() {
 
   // ── 入住规则 · 库存与取消政策（房型级；仅租赁/民宿频道） ──
   if (project && (project.channel === 'rental' || project.channel === 'minsu')) {
-    var ux = parseJsonField(u.ext, {});
-    if (!ux || typeof ux !== 'object' || Array.isArray(ux)) ux = {};
     var cp = (ux.cancel_policy && typeof ux.cancel_policy === 'object' && !Array.isArray(ux.cancel_policy)) ? ux.cancel_policy : {};
     var days = cp.days_before == null ? 1 : cp.days_before;
     var preset = [0, 1, 2, 3, 5, 7, 15, 30];
@@ -439,6 +504,13 @@ function bindEvents() {
       toast('封面已上传');
     }).catch(function(e){ toast('上传失败：'+e.message); });
     coverUpload.value = '';
+  };
+
+  // 详情页 2/3 屏商家展示图
+  var featureInput = document.querySelector('.rp_feature_image');
+  var featurePrev = document.querySelector('.rp_feature_preview');
+  if (featureInput) featureInput.oninput = function() {
+    featurePrev.style.backgroundImage = this.value ? "url('"+this.value.replace(/'/g, '%27')+"')" : 'none';
   };
 
   // Keeper avatar
@@ -558,6 +630,42 @@ function collectDetail() {
     },
     other_fees: fees
   };
+  function textOf(selector) {
+    var el = document.querySelector(selector);
+    return el ? el.value.trim() : '';
+  }
+  function intOf(selector) {
+    var value = textOf(selector);
+    if (value === '') return null;
+    var n = Number(value);
+    return Number.isInteger(n) ? n : null;
+  }
+  var unitExt = parseJsonField(unit.ext, {});
+  if (!unitExt || typeof unitExt !== 'object' || Array.isArray(unitExt)) unitExt = {};
+  var openable = textOf('.rp_window_openable');
+  unitExt.room_profile = {
+    introduction: textOf('.rp_intro'),
+    area_type: textOf('.rp_area_type'),
+    shared_spaces: textOf('.rp_shared'),
+    window_type: textOf('.rp_window_type'),
+    window_count: intOf('.rp_window_count'),
+    window_openable: openable === '' ? null : openable === '1',
+    max_guests: intOf('.rp_max_guests'),
+    max_adults: intOf('.rp_max_adults'),
+    max_children: intOf('.rp_max_children'),
+    child_age_policy: textOf('.rp_child_age'),
+    extra_guest_policy: textOf('.rp_extra'),
+    beds: textOf('.rp_beds'),
+    bath_hot_water: textOf('.rp_bath'),
+    kitchen: textOf('.rp_kitchen'),
+    smoking: textOf('.rp_smoking'),
+    climate: textOf('.rp_climate'),
+    network: textOf('.rp_network'),
+    cleaning_frequency: textOf('.rp_cleaning'),
+    linen_frequency: textOf('.rp_linen'),
+    feature_image: textOf('.rp_feature_image'),
+    feature_image_caption: textOf('.rp_feature_caption')
+  };
   var body = {
     name: document.getElementById('u_name').value.trim(),
     area_sqm: parseFloat(document.getElementById('u_area').value) || null,
@@ -573,7 +681,8 @@ function collectDetail() {
       phone: document.querySelector('.ud_k_phone').value.trim()
     },
     rent_detail: rd,
-    cover_image: document.getElementById('u_cover').value.trim() || null
+    cover_image: document.getElementById('u_cover').value.trim() || null,
+    ext: unitExt
   };
   // 入住规则 · 库存与取消政策：total_qty 走列（多间库存 2026-09-10），cancel_policy → ext.cancel_policy
   // （合并进已有 ext 整包提交，保留 price_night 等键，服务端兜底校验）
@@ -585,14 +694,11 @@ function collectDetail() {
     }
     var cpOn = document.querySelector('.ud_cp_on');
     if (cpOn) {
-      var ext = parseJsonField(unit.ext, {});
-      if (!ext || typeof ext !== 'object' || Array.isArray(ext)) ext = {};
-      ext.cancel_policy = {
+      unitExt.cancel_policy = {
         enabled: cpOn.value === '1',
         days_before: parseInt((document.querySelector('.ud_cp_days') || {}).value, 10) || 0,
         cutoff_time: (document.querySelector('.ud_cp_time') || {}).value || '18:00'
       };
-      body.ext = ext;
     }
   }
   return body;
