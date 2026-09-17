@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 旅居频道补充房源 seed/clean（goal：lvju-app-lvju 旅居视图房源过少，补齐到 8 套）
- * 背景：页面接库前的硬编码 mock（西江苗寨/荔波小七孔/梵净山/万峰林 4 套）在 6f1c8ad 接库时被删，
+ * 背景：页面接库前的硬编码 test（西江苗寨/荔波小七孔/梵净山/万峰林 4 套）在 6f1c8ad 接库时被删，
  *       库里仅 migrate-housing-channels.cjs 灌入的 2 套（山舍·青岩/森林溪畔）。本脚本补 6 套
  *       贵阳各区真实旅居目的地，口径与 #93/#94 完全一致（rental + 「旅居」tag + stay_bookable）。
  * 用法：node scripts/lvju-stay-seed.cjs seed|clean

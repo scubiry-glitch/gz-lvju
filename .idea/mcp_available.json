@@ -1,0 +1,21 @@
+[ {
+  "@upstash/mcp-context7-server" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "@codelink-mcp/Weapons" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "magic-mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "@mastergo/magic-mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+} ]
