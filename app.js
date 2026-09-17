@@ -44,6 +44,9 @@ function loadDotEnv(filePath) {
   }
   return true;
 }
+//这样 JUZHU_ENV=test 时就会自动读 根/.env.test 补变量（
+const modeEnv = process.env.JUZHU_ENV || process.env.NODE_ENV;
+if (modeEnv) loadDotEnv(path.join(ROOT, `.env.${modeEnv}`));
 loadDotEnv();
 loadDotEnv(path.join(ROOT, 'runtime.env'));
 
@@ -4891,7 +4894,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.rollback();
           return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
         }
-        // 事务内锁项目行，清理已过期的 mock 待支付订单后再复核房态，避免并发双订。
+        // 事务内锁项目行，清理已过期的 test 待支付订单后再复核房态，避免并发双订。
         const [stale] = await conn.execute(
           `SELECT DISTINCT b.* FROM booking_orders b JOIN stay_calendar s ON s.booking_id=b.id
              WHERE b.project_id=? AND b.status='pending' AND b.pay_status='unpaid' AND b.payment_expires_at IS NOT NULL
@@ -5068,7 +5071,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const orderNo = String(body.order_no || '').trim();
       const phone = String(body.contact_phone || '').trim();
       const payMethod = String(body.pay_method || 'online').slice(0, 50);
-      if (!['online', 'wechat', 'alipay', 'mock'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
+      if (!['online', 'wechat', 'alipay', 'test'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
