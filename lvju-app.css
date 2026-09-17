@@ -13,6 +13,7 @@
   --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',Georgia,'Times New Roman',serif;
 }
 *,*::before,*::after{box-sizing:border-box;}
+[data-deferred]{display:none!important;}
 html,body{margin:0;height:100%;}
 body{background:radial-gradient(1000px 600px at 50% -10%,#13322e 0%,#0b0f12 60%);
   font-family:var(--font);-webkit-font-smoothing:antialiased;display:flex;justify-content:center;}

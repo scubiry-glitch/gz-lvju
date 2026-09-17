@@ -6,6 +6,8 @@
 <title>我的 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 <style>
+  [data-deferred]{display:none!important;}
+  .menu a.last-visible{border-bottom:0;}
   /* —— 底部抽屉（服务工单 / 400 客服）—— */
   .mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
   .mask[hidden]{display:none;}
@@ -40,7 +42,7 @@
     <div class="appbar ghost">
       <span class="bk" style="visibility:hidden">‹</span>
       <div class="ttl">我的</div>
-      <div class="act"><a href="lvju-app-messages.html">🔔</a><span>⚙</span></div>
+      <div class="act" hidden data-deferred><a href="lvju-app-messages.html">🔔</a><span>⚙</span></div>
     </div>
 
     <!-- 头部 -->
@@ -50,18 +52,18 @@
         <div class="av">🧑</div>
         <div class="ui">
           <div class="nm">张先生</div>
-          <div class="ph">138****6688 · 已实名</div>
+          <div class="ph">138****6688</div>
         </div>
       </div>
-      <div class="vip">👑 旅居黑卡会员 · 享 9 折 + 优先派管家</div>
+      <div class="vip" hidden data-deferred>👑 旅居黑卡会员 · 享 9 折 + 优先派管家</div>
     </div>
 
     <!-- 资产 -->
     <div class="mestat">
       <a><b>12</b><span>收藏</span></a>
-      <a><b>28</b><span>足迹</span></a>
-      <a href="lvju-app-coupons.html"><b>3</b><span>优惠券</span></a>
-      <a href="lvju-app-wallet.html"><b>¥860</b><span>钱包</span></a>
+      <a hidden data-deferred><b>28</b><span>足迹</span></a>
+      <a href="lvju-app-coupons.html" hidden data-deferred><b>3</b><span>优惠券</span></a>
+      <a href="lvju-app-wallet.html" hidden data-deferred><b>¥860</b><span>钱包</span></a>
     </div>
 
     <!-- 订单入口 -->
@@ -76,23 +78,23 @@
     <!-- 常用功能 -->
     <div class="seg">常用功能</div>
     <div class="menu">
-      <a href="lvju-app-wallet.html"><span class="ic">💰</span>我的钱包<span class="tip">¥860 · 3 券</span><span class="ar">›</span></a>
-      <a href="#"><span class="ic">🪪</span>实名认证<span class="tip" style="color:var(--ok)">已认证</span><span class="ar">›</span></a>
-      <a href="lvju-app-chat.html"><span class="ic">🛎</span>我的旅居管家<span class="tip">杨晓芳 L4</span><span class="ar">›</span></a>
-      <a href="lvju-app-lvju.html"><span class="ic">❤️</span>我的收藏<span class="tip">12 套房源</span><span class="ar">›</span></a>
-      <a href="#"><span class="ic">🧾</span>发票管理<span class="ar">›</span></a>
+      <a href="lvju-app-wallet.html" hidden data-deferred><span class="ic">💰</span>我的钱包<span class="tip">¥860 · 3 券</span><span class="ar">›</span></a>
+      <a href="#" hidden data-deferred><span class="ic">🪪</span>实名认证<span class="tip" style="color:var(--ok)">已认证</span><span class="ar">›</span></a>
+      <a href="lvju-app-chat.html" hidden data-deferred><span class="ic">🛎</span>我的旅居管家<span class="tip">杨晓芳 L4</span><span class="ar">›</span></a>
+      <a class="last-visible" href="lvju-app-lvju.html"><span class="ic">❤️</span>我的收藏<span class="tip">12 套房源</span><span class="ar">›</span></a>
+      <a href="#" hidden data-deferred><span class="ic">🧾</span>发票管理<span class="ar">›</span></a>
     </div>
 
     <div class="menu">
       <a href="javascript:void(0)" id="mTicket"><span class="ic">🛠</span>服务工单<span class="tip" id="ticketTip">报修 · 保洁 · 管家</span><span class="ar">›</span></a>
       <a href="javascript:void(0)" id="m400"><span class="ic">📞</span>400 在线客服<span class="tip" id="t400">热线 400-900-6688</span><span class="ar">›</span></a>
-      <a href="lvju-rating-standard.html"><span class="ic">⭐</span>旅居星级评价体系<span class="ar">›</span></a>
-      <a href="screens/portal-index.html"><span class="ic">🔍</span>验真公示门户<span class="ar">›</span></a>
-      <a href="lvju-app-service.html"><span class="ic">🎧</span>客服中心 · 12301<span class="ar">›</span></a>
-      <a href="#"><span class="ic">⚙️</span>设置<span class="ar">›</span></a>
+      <a class="last-visible" href="lvju-rating-standard.html" data-lvju-feature="caibei"><span class="ic">⭐</span>旅居星级评价体系<span class="ar">›</span></a>
+      <a href="screens/portal-index.html" hidden data-deferred><span class="ic">🔍</span>验真公示门户<span class="ar">›</span></a>
+      <a href="lvju-app-service.html" hidden data-deferred><span class="ic">🎧</span>客服中心 · 12301<span class="ar">›</span></a>
+      <a href="#" hidden data-deferred><span class="ic">⚙️</span>设置<span class="ar">›</span></a>
     </div>
 
-    <div class="banner gold" style="margin:16px 16px 8px;">
+    <div class="banner gold" style="margin:16px 16px 8px;" hidden data-deferred>
       <span class="bi">👑</span>
       <div class="bt"><b>升级旅居黑卡</b><p>全年 9 折 · 优先派管家 · 专属客服</p></div>
       <a class="go" href="#">立即开通 ›</a>
