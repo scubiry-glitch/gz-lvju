@@ -428,24 +428,26 @@ async function catalogEventually(base, projectId, citySlug, want) {
   // 改动 1：rental 的 units.ext.price_night 从「收下不生效」变为最高优先（> 月租/30 > 起价/30）
   // 改动 2：price_from 改选填，上架闸换成「每个户型都能算出默认夜价 > 0」；展示价三件套随接口下发
   // 改动 3：最短连住下放户型（户型 > 房源 > 频道默认），整栋单按排序最前户型
+  // 建一个「可直接上架」的房源（评级置 passed + 8 张图）：§5.9 / §5.10 共用
+  const mkPublishable = async (name, units, tags, projExtra) => {
+    const cr = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
+      name, channel: 'rental', city_id: city.id, district_id: district.id,
+      address: '回归演示地址 · ' + name, tags: tags || ['演示', '回归'], online_booking: true, units,
+      ...(projExtra || {}),
+    }));
+    const id = cr.j.project && cr.j.project.id;
+    if (!id) return { id: 0, cr };
+    await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [id]);
+    for (let i = 0; i < 8; i++) {
+      await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+        project_id: id, file_path: `https://cdn.example.test/${name}-${i}.jpg`, is_cover: i === 0,
+      }));
+    }
+    return { id, cr };
+  };
+
   let pid2 = 0;
   {
-    const mkPublishable = async (name, units, tags) => {
-      const cr = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
-        name, channel: 'rental', city_id: city.id, district_id: district.id,
-        address: '回归演示地址 · ' + name, tags: tags || ['演示', '回归'], online_booking: true, units,
-      }));
-      const id = cr.j.project && cr.j.project.id;
-      if (!id) return { id: 0, cr };
-      await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [id]);
-      for (let i = 0; i < 8; i++) {
-        await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
-          project_id: id, file_path: `https://cdn.example.test/${name}-${i}.jpg`, is_cover: i === 0,
-        }));
-      }
-      return { id, cr };
-    };
-
     // 9-1) 无 price_from 且户型无价 → 上架仍被拒（价格闸改为逐户型校验，不是放弃校验）
     const noPrice = await mkPublishable(RUN + '·无价房源', [{ name: '未定价户型', layout_label: '1室1厅', area_sqm: 40 }]);
     r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: noPrice.id, status: 'online' }));
@@ -510,6 +512,131 @@ async function catalogEventually(base, projectId, citySlug, want) {
       r.status === 200 && r.j.unit.min_stay_nights === 15, JSON.stringify(r.j.unit).slice(0, 160));
   }
 
+  // ── 5.10) 净可售与默认关房（2026-09 方案 B）：available_qty 基线口径 + 未推送晚默认关房 ──
+  // 场景取自商家反馈：总量 6，平台已售 2、他渠道 1、不可售 1 → 商家推「可售 2」，
+  // 平台侧应显示剩余 2（不再二次扣平台自己的 2），平台之后卖掉的才从这 2 里扣。
+  let pid3 = 0;
+  {
+    const p = await mkPublishable(RUN + '·净可售房源', [
+      // min_stay_nights=1：本段聚焦库存口径，先绕开连住闸
+      { name: '六间房型', layout_label: '1室1卫', area_sqm: 30, price_night: 300, total_qty: 6, min_stay_nights: 1 },
+    ], ['演示', '回归', '旅居']);
+    pid3 = p.id;
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid3, status: 'online' }));
+    check('10-0 净可售用例房源上架', r.status === 200, JSON.stringify(r.j));
+    const u3 = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid3 }))).j.units[0].id;
+    // 开免费取消（本段要验「取消后释放回净可售」；默认未开通 = 客户不可取消）
+    await call('/api/juzhu/housing/vendor/units/update', signed(vendor, {
+      id: u3, cancel_policy: { enabled: true, days_before: 30, cutoff_time: '18:00' },
+    }));
+    const dA = '2027-03-10', dB = '2027-03-11', dC = '2027-03-12', dD = '2027-03-13';
+    const dayOf = async (d) => {
+      const q = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: pid3, unit_id: u3, month: '2027-03' }));
+      return (q.j.days || []).filter((x) => x.date === d)[0] || null;
+    };
+    const avail = (d, n) => call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [d], status: 'open', available_qty: n,
+    }));
+
+    // 平台先卖 2 间（建立 booked_qty=2 的既成事实）
+    const bookMulti = await call('/api/juzhu/booking', {
+      project_id: pid3, unit_id: u3, rooms: 2, checkin: dA, checkout: dB,
+      contact_name: '净可售回归', contact_phone: bkPhone,
+    });
+    check('10-1 平台先订 2 间', bookMulti.status === 200 && bookMulti.j.rooms === 2, JSON.stringify(bookMulti.j).slice(0, 160));
+    if (bookMulti.status === 200 && bookMulti.j.order_no) bkIds.push(bookMulti.j.order_no);
+
+    // 商家推「净可售 2」→ 基线 = 当前已订 2 → 平台剩余应为 2（旧口径会算成 0）
+    r = await avail(dA, 2);
+    check('10-2 available_qty 推送回显（基线=推送时已订）',
+      r.status === 200 && r.j.days[0].qty === 2 && r.j.days[0].qty_base === 2 && r.j.days[0].remaining === 2,
+      JSON.stringify(r.j.days && r.j.days[0]));
+    let day = await dayOf(dA);
+    check('10-2b 日历 remaining = 2（不再二次扣平台已订）', day && day.remaining === 2 && day.available_qty === 2,
+      JSON.stringify(day));
+
+    // 平台再卖 1 间 → 从这 2 里扣
+    const book1 = await call('/api/juzhu/booking', {
+      project_id: pid3, unit_id: u3, checkin: dA, checkout: dB, contact_name: '净可售回归', contact_phone: bkPhone,
+    });
+    check('10-3 平台再订 1 间', book1.status === 200, JSON.stringify(book1.j).slice(0, 160));
+    if (book1.status === 200 && book1.j.order_no) bkIds.push(book1.j.order_no);
+    day = await dayOf(dA);
+    check('10-3b 剩余 2 → 1（平台占用从净可售里扣）', day && day.remaining === 1 && day.booked_qty === 3, JSON.stringify(day));
+
+    // 客户取消该单 → 回到 2
+    if (book1.status === 200 && book1.j.order_no) {
+      const cx = await call('/api/juzhu/booking/cancel', { order_no: book1.j.order_no, contact_phone: bkPhone });
+      day = await dayOf(dA);
+      check('10-3c 取消后回到 2（不越过推送值）',
+        cx.status === 200 && day && day.remaining === 2 && day.booked_qty === 2, 'cancel=' + cx.status + ' ' + JSON.stringify(day));
+    }
+
+    // 物理余量上限：已订 5 时推净可售 2 → 实际只剩 1 间，兜到 1（防对账漏项导致超售）
+    const bookMore = await call('/api/juzhu/booking', {
+      project_id: pid3, unit_id: u3, rooms: 3, checkin: dB, checkout: dC,
+      contact_name: '净可售回归', contact_phone: bkPhone,
+    });
+    if (bookMore.status === 200 && bookMore.j.order_no) bkIds.push(bookMore.j.order_no);
+    r = await avail(dB, 6);
+    day = await dayOf(dB);
+    check('10-4 净可售超过物理余量时兜到 total−已订（防超售）',
+      r.status === 200 && day && day.remaining === Math.max(0, 6 - day.booked_qty),
+      'booked=' + (day && day.booked_qty) + ' remaining=' + (day && day.remaining));
+
+    // 旧口径写法（qty）必须把基线清回 0，不与净可售混用
+    r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [dD], status: 'open', qty: 5,
+    }));
+    r = await avail(dD, 3);
+    r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [dD], status: 'open', qty: 5,
+    }));
+    day = await dayOf(dD);
+    // 基线清空的表现 = available_qty 回显为 null（该晚回到旧「放出总量」口径）
+    check('10-5 旧口径 qty 写回时基线清空（不混口径）',
+      r.status === 200 && day && day.available_qty === null && day.remaining === 5,
+      JSON.stringify(day));
+    r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [dD], status: 'open', qty: 3, available_qty: 3,
+    }));
+    check('10-5b qty 与 available_qty 同时传 → 400', r.status === 400 && /只能传一个/.test(r.j.message || ''), JSON.stringify(r.j));
+    r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [dD], status: 'open', available_qty: 1000,
+    }));
+    check('10-5c available_qty 越界 → 400', r.status === 400, JSON.stringify(r.j));
+
+    // 默认关房：开启后未推送放出的晚一律不可订（含只设过价的晚），推过的晚照常可订
+    const dE = '2027-03-20', dF = '2027-03-21', dG = '2027-03-22', dH = '2027-03-23';
+    await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: [dF], status: 'open', price_night: 333,
+    }));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u3, default_closed: true }));
+    check('10-6 房型开启默认关房', r.status === 200 && r.j.unit.ext && JSON.parse(r.j.unit.ext).default_closed === true,
+      JSON.stringify(r.j.unit && r.j.unit.ext));
+    day = await dayOf(dE);
+    check('10-6b 未推送的晚剩余 0（默认关房生效）', day && day.remaining === 0, JSON.stringify(day));
+    day = await dayOf(dF);
+    check('10-6c 只设过价的晚也算未放出 → 剩余 0', day && day.remaining === 0, JSON.stringify(day));
+    const blockedOrder = await call('/api/juzhu/booking', {
+      project_id: pid3, unit_id: u3, checkin: dE, checkout: dF,
+      contact_name: '净可售回归', contact_phone: bkPhone,
+    });
+    check('10-6d 未推送的晚下单被拒 400', blockedOrder.status === 400, JSON.stringify(blockedOrder.j).slice(0, 140));
+    await avail(dG, 2);
+    const okOrder = await call('/api/juzhu/booking', {
+      project_id: pid3, unit_id: u3, checkin: dG, checkout: dH,
+      contact_name: '净可售回归', contact_phone: bkPhone,
+    });
+    check('10-6e 推过放出的晚可订（默认关房不影响）', okOrder.status === 200, JSON.stringify(okOrder.j).slice(0, 160));
+    if (okOrder.status === 200 && okOrder.j.order_no) bkIds.push(okOrder.j.order_no);
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u3, default_closed: null }));
+    check('10-6f 关闭默认关房（ext 键清除）',
+      r.status === 200 && !(r.j.unit.ext && JSON.parse(r.j.unit.ext).default_closed), JSON.stringify(r.j.unit && r.j.unit.ext));
+    day = await dayOf(dE);
+    check('10-6g 关闭后未推送的晚恢复可订（该户型 total_qty=6，无占用）', day && day.remaining === 6, JSON.stringify(day));
+  }
+
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
     check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
@@ -523,11 +650,13 @@ async function catalogEventually(base, projectId, citySlug, want) {
         evCreated.order && evCreated.order.order_no);
       check('webhook 载荷不含明文手机号', !JSON.stringify(evCreated).includes(bkPhone), '');
     }
-    // 首次 500 → 期待重试后仍送达（重试间隔 5s/30s/120s）：等到第 2 次投递落地再断言
+    // 首次 500 → 期待重试后仍送达（重试间隔 5s/30s/120s）：等到第 2 次投递落地再断言。
+    // 按订单号过滤：前面的用例（§5.10 取消释放）也会向同一商家推 cancelled，不能只看全局条数。
+    const isBk4Cancel = (h) => h && h.event === 'booking.cancelled' && h.order && h.order.order_no === bk4.j.order_no;
     let cancelHits = [];
     const dl2 = Date.now() + 45000;
     while (Date.now() < dl2) {
-      cancelHits = hits.filter((h) => h && h.event === 'booking.cancelled');
+      cancelHits = hits.filter(isBk4Cancel);
       if (cancelHits.length >= 2) break;
       await new Promise((r2) => setTimeout(r2, 300));
     }
@@ -582,7 +711,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('缺 id → 400', r.status === 400, JSON.stringify(r.j));
 
   // ── 8) 清理本次演示数据（含 §5.9 的价格口径房源；先删这两个项目的订单，避免残留占用）──
-  const allPids = [pid, pid2].filter(Boolean);
+  const allPids = [pid, pid2, pid3].filter(Boolean);
   await conn.execute(`DELETE FROM booking_orders WHERE project_id IN (${allPids.map(() => '?').join(',')})`, allPids);
   for (const x of allPids) {
     await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [x]);

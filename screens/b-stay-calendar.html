@@ -180,6 +180,8 @@
             <input type="number" id="xMin" min="1" max="365" style="width:90px;" placeholder="留空 = 用频道默认" />
             <span style="color:var(--muted);font-size:11.5px;">晚（户型级 &gt; 房源级 &gt; 频道默认，见上「最短连住」行）</span>
           </div>
+          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="xClosed" />
+            <span><b>🔒 默认关房</b><small>开启后<strong>只有推过放出间数的晚才可订</strong>，没推过的晚一律不可订——多渠道商家防超售（缺省关闭 = 现状）</small></span></label>
           <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="xOn" />
             <span><b>🕒 开通「入住前免费取消」</b><small>开通后客户可在截止时刻前免费取消（已支付原路退回，房态自动释放）；关闭 = 预订成功后不可取消。缺省关闭</small></span></label>
           <div class="frow">
@@ -461,6 +463,9 @@
     $('xMin').value = (src === 'unit' && u.min_stay_nights) ? String(u.min_stay_nights) : '';
     $('xMin').placeholder = '留空 = 用' + (src === 'project' ? '房源默认' : '频道默认') + '（' + ((u && u.min_stay_nights) || 15) + ' 晚）';
     $('xMin').disabled = !state.writable;
+    var ux = {}; try { ux = (u && typeof u.ext === 'string') ? JSON.parse(u.ext) : ((u && u.ext) || {}); } catch (_) { ux = {}; }
+    $('xClosed').checked = ux.default_closed === true;
+    $('xClosed').disabled = !state.writable;
     var p = (u && u.cancel_policy) || { enabled: false, days_before: 1, cutoff_time: '18:00' };
     var days = String(p.days_before == null ? 1 : p.days_before);
     if (!$('xDays').querySelector('option[value="' + days + '"]')) {
@@ -494,7 +499,7 @@
     if (!unitIds.length) { toast('本房源暂无房型'); return; }
     Promise.all(unitIds.map(function(id){
       return fetch(API + '/vendor/units/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancel_policy: policy, min_stay_nights: minNights }) })
+        body: JSON.stringify({ cancel_policy: policy, min_stay_nights: minNights, default_closed: $('xClosed').checked }) })
         .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); });
     })).then(function(outs){
       // 以服务端回显为准（生效值 + 来源），本地不做二次推断
@@ -507,7 +512,8 @@
         u.min_stay_nights = x.min_stay_nights; u.min_stay_nights_source = x.min_stay_nights_source;
       });
       loadCancelCard();
-      toast('已保存 ' + unitIds.length + ' 个房型 · ' + cancelPreview(policy) + ' · 连住 ' + (minNights === null ? '用默认' : minNights + ' 晚'));
+      toast('已保存 ' + unitIds.length + ' 个房型 · ' + cancelPreview(policy) + ' · 连住 ' + (minNights === null ? '用默认' : minNights + ' 晚')
+        + ($('xClosed').checked ? ' · 默认关房已开' : ''));
     }).catch(function(e){ toast('保存失败：' + e.message); });
   }
   $('xSave').onclick = function(){ saveCancelPolicy([parseInt($('xUnit').value, 10) || 0]); };

@@ -76,6 +76,13 @@ function minStayNightsSourceOf(proj, unit) {
   return 'default';
 }
 
+/** 写入口校验：default_closed 只接受布尔；非法抛 Error（写入口据此 400） */
+function normalizeDefaultClosedInput(v) {
+  if (v === true || v === 'true' || v === 1 || v === '1') return true;
+  if (v === false || v === 'false' || v === 0 || v === '0') return false;
+  throw new Error('default_closed 须为布尔值（true = 未推送放出的日期默认不可订）');
+}
+
 /** 写入口校验：minsu 最低 15 晚，其他频道沿用 1 晚下限。 */
 function normalizeMinStayNightsInput(value, channel) {
   const floor = STAY_MIN_NIGHTS_MIN[channel] || 1;
@@ -195,12 +202,53 @@ function effectiveQtyOf(row, unit) {
   return row && Number(row.unit_id) === 0 ? 1 : totalQtyOf(unit);
 }
 
-/** 某晚剩余可订间数：关房 / legacy booked 行（迁移前的整行占用）→ 0；否则 max(0, 放出 − 已订) */
-function remainingOf(row, unit) {
-  if (!row) return totalQtyOf(unit);
+/**
+ * 「默认关房」（opt-in，2026-09 多渠道防超售）：开启后**只有商家显式设置过放出间数的晚**才可订，
+ * 没推过的晚一律不可订——避免商家在别的渠道卖掉/临时不可售的晚被平台重新放开。
+ * 判定用「该晚有没有 qty」而不是 source：下单占用会把 source 改写成 booking，但不会清 qty。
+ * 缺省关闭（存量行为逐字不变）；只作用于指定户型的预订，整栋单语义不变。
+ */
+function defaultClosedOf(proj, unit) {
+  const pick = (v) => v === true || v === 'true' || v === 1 || v === '1';
+  if (unit && pick(parseExtObj(unit.ext).default_closed)) return true;
+  return pick(parseExtObj(proj && proj.ext).default_closed);
+}
+
+/**
+ * 某晚剩余可订间数（口径单一数据源）。两种放出语义：
+ * - `qty_base IS NULL`（旧「放出总量」口径，2026-09-10 起）：remaining = max(0, 放出 − 已订)
+ * - `qty_base` 非 NULL（净可售口径／方案 B，2026-09）：商家推的 `qty` 是**推送时点的净可售**，
+ *   基线 = 推送时的已订数（可为 0），之后的平台占用才从它里面扣；
+ *   remaining = clamp(放出 − (已订 − 基线), 0, 物理余量)——取消释放不会越过实际剩下的房间。
+ * 关房 / legacy booked 行 → 0；无差异行 → 默认关房 ? 0 : total_qty。
+ * proj 可选（省略 = 不看默认关房，存量调用方语义不变）。
+ */
+function remainingOf(row, unit, proj) {
+  if (!row) return defaultClosedOf(proj, unit) ? 0 : totalQtyOf(unit);
   if (row.status === 'blocked' || row.status === 'booked') return 0;
+  if (row.qty == null && defaultClosedOf(proj, unit)) return 0;   // 未显式放出 → 默认关房
   const booked = parseInt(row.booked_qty, 10) || 0;
-  return Math.max(0, effectiveQtyOf(row, unit) - booked);
+  const qty = effectiveQtyOf(row, unit);
+  // qty_base = NULL → 旧「放出总量」口径；非 NULL（含 0）→ 净可售口径，值为推送时点的已订数
+  if (row.qty_base != null) {
+    const base = parseInt(row.qty_base, 10) || 0;
+    // 上限 = 物理余量（total_qty − 已订）：商家推的净数若超过实际剩下的房间数（对账漏了他渠道的销量），
+    // 这里兜住，避免超售；正常对账下不会触顶
+    const raw = qty - (booked - base);
+    const physical = Math.max(0, totalQtyOf(unit) - booked);
+    return Math.max(0, Math.min(raw, physical));
+  }
+  return Math.max(0, qty - booked);
+}
+
+/** 净可售口径的写入换算：available_qty（推送时点净可售）→ 存储的 qty / qty_base（基线 = 当前已订） */
+function availableToQty(availableQty, bookedQty) {
+  return { qty: Math.max(0, Math.min(999, parseInt(availableQty, 10) || 0)), qty_base: Math.max(0, parseInt(bookedQty, 10) || 0) };
+}
+
+/** 某晚是否为净可售口径（qty_base 非 NULL）；出参 available_qty 回显据此判定 */
+function isNetAvailableRow(row) {
+  return !!(row && row.qty_base != null && row.qty != null);
 }
 
 /**
@@ -271,7 +319,7 @@ function lowestSellableNightPrice(proj, units, dev, t0) {
       for (const u of units) {
         const ur = dev.unit.get(u.id + '|' + ds) || null;
         if (ur && (ur.status === 'blocked' || ur.status === 'booked')) continue;
-        if (remainingOf(ur, u) <= 0) continue;                         // 该户型当晚售罄
+        if (remainingOf(ur, u, proj) <= 0) continue;                   // 该户型当晚售罄 / 未放出
         const price = (ur && ur.price_night != null) ? Number(ur.price_night)
           : (pr && pr.price_night != null ? Number(pr.price_night) : unitNightPrice(proj, u));
         if (price > 0 && (best == null || price < best)) best = price;
@@ -304,7 +352,7 @@ async function priceDisplayScan(fetchRows, projects, units, now) {
   let rows = [];
   if (ids.length) {
     rows = await fetchRows(
-      `SELECT project_id, unit_id, stay_date, status, price_night, qty, booked_qty FROM stay_calendar
+      `SELECT project_id, unit_id, stay_date, status, price_night, qty, qty_base, booked_qty FROM stay_calendar
        WHERE project_id IN (${ids.map(() => '?').join(',')}) AND stay_date >= ? AND stay_date < ?`,
       [...ids, startKey, endKey]
     );
@@ -496,7 +544,7 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
   const lastDay = new Date(y, mo + 1, 0).getDate();
   const last = y + '-' + pad2(mo + 1) + '-' + String(lastDay).padStart(2, '0');
   const scRows = await fetchRows(
-    `SELECT unit_id, stay_date, status, price_night, source, booking_id, qty, booked_qty FROM stay_calendar
+    `SELECT unit_id, stay_date, status, price_night, source, booking_id, qty, qty_base, booked_qty FROM stay_calendar
      WHERE project_id=? AND stay_date BETWEEN ? AND ? AND (unit_id=0 OR unit_id=?) ORDER BY stay_date, unit_id`,
     [proj.id, first, last, unitId]
   );
@@ -514,13 +562,19 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
     let source = null;
     let bookingId = null;
     let qty = baseQty;      // 放出间数（差异行 qty 覆盖基准）
+    let qtyOverride = null; // 差异行的 qty（null = 未显式放出，默认关房判定要用）
+    let qtyBase = null;     // 净可售基线（非 NULL = 方案 B 口径，2026-09；NULL = 旧「放出总量」）
     let bookedQty = 0;      // 已订间数
     for (const r of scRows) {
       if (r.stay_date !== ds) continue;
       // legacy 防御：迁移前的 booked 行无 booked_qty，视为占满
       const rBooked = Math.max(parseInt(r.booked_qty, 10) || 0, r.status === 'booked' ? 1 : 0);
       if (Number(r.unit_id) === Number(unitId)) {
-        if (r.qty != null) qty = Math.max(0, parseInt(r.qty, 10) || 0);
+        if (r.qty != null) {
+          qty = Math.max(0, parseInt(r.qty, 10) || 0);
+          qtyOverride = r.qty;
+          qtyBase = r.qty_base == null ? null : (parseInt(r.qty_base, 10) || 0);
+        }
         bookedQty = Math.max(bookedQty, rBooked);
         if (r.status === 'blocked') { status = 'blocked'; source = r.source; }
         else if (r.status === 'booked') { status = 'booked'; source = r.source; }
@@ -534,8 +588,15 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
       }
       if (r.price_night != null && (r.unit_id === unitId || price === defPrice)) price = r.price_night;
     }
-    const remaining = status === 'blocked' ? 0 : Math.max(0, qty - bookedQty);
-    if (status !== 'blocked' && remaining <= 0) status = 'booked';
+    // 剩余数走单一数据源 remainingOf（含净可售基线 / 默认关房两种新口径）
+    const remaining = remainingOf({
+      status, qty: qtyOverride, qty_base: qtyBase, booked_qty: bookedQty, unit_id: unitId,
+    }, unit, proj);
+    // 剩余 0 的两种成因分开报：有占用 = booked（已订）；默认关房没推过 = blocked（商家未开放），
+    // 后者若报「已订」会误导 C 端（其实只是没放出）
+    if (status !== 'blocked' && remaining <= 0) {
+      status = (qtyOverride == null && defaultClosedOf(proj, unit)) ? 'blocked' : 'booked';
+    }
     days.push({
       date: ds,
       status: k < todayKey ? 'past' : status,
@@ -545,6 +606,7 @@ async function buildStayMonth(fetchRows, proj, unit, unitId, y, mo) {
       qty: qty != null ? qty : null,
       booked_qty: bookedQty,
       remaining,
+      available_qty: qtyBase == null ? null : qty,   // 净可售口径回显（null = 该晚按旧「放出总量」口径）
     });
   }
   return { month: y + '-' + pad2(mo + 1), base_price_night: defPrice || null, days };
@@ -573,7 +635,7 @@ async function releaseStayQty(execute, opts) {
   );
   const delRes = await execute(
     `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND stay_date>=? AND stay_date<?
-       AND booked_qty=0 AND status='open' AND source='booking' AND price_night IS NULL AND qty IS NULL`,
+       AND booked_qty=0 AND status='open' AND source='booking' AND price_night IS NULL AND qty IS NULL AND qty_base IS NULL`,
     [o.project_id, unitId, o.checkin, o.checkout]
   );
   return (delRes && delRes.affectedRows) || 0;
@@ -601,6 +663,10 @@ module.exports = {
   totalQtyOf,
   effectiveQtyOf,
   remainingOf,
+  defaultClosedOf,
+  normalizeDefaultClosedInput,
+  availableToQty,
+  isNetAvailableRow,
   unitNightPrice,
   wholeHousePriceUnit,
   stayNightPrices,

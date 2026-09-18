@@ -394,6 +394,7 @@
       <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>。<strong>2026-09 起两个频道都生效</strong>：默认夜价取值顺序 = <code>price_night</code> &gt; <code>rent_monthly/30</code> &gt; <code>price_from/30</code>（rental）/ <code>price_from</code>（minsu）。房态日历的逐晚覆盖价仍优先于以上全部（见 5.1）</td></tr>
       <tr><td><code>min_stay_nights</code></td><td>int</td><td>★ 最短连住（晚），写入 <code>units.ext.min_stay_nights</code>。<strong>2026-09 起下放到户型</strong>：生效顺序 = <strong>户型 &gt; 房源 &gt; 频道默认</strong>（rental/minsu 默认均 15 晚；下限 rental 1 / minsu 15，上限 365）。传 <code>null</code> 清除（回落房源级）。整栋单（不指定户型）按<strong>排序最前的户型</strong>执行，与取消政策同一套回退</td></tr>
       <tr><td><code>default_night_price</code></td><td>—</td><td><strong>只读出参</strong>（2026-09）：该户型的默认单夜价（按上面的顺序算好）。C 端详情页/下单页直接读它，<strong>不要再用 <code>rent_monthly/30</code> 自行折算</strong>——否则会与成交价脱节</td></tr>
+      <tr><td><code>default_closed</code></td><td>bool</td><td>★ <strong>默认关房</strong>（2026-09，写 <code>units.ext.default_closed</code>）：开启后<strong>只有你们推送过放出量的晚才可订</strong>，没推过的晚一律不可订——多渠道商家防超售（见 3.6）。缺省关闭；<code>null</code> 清除</td></tr>
       <tr><td><code>cancel_policy</code></td><td>object</td><td>★ 免费取消政策（房型级），写入 <code>units.ext.cancel_policy</code>：<code>{enabled, days_before, cutoff_time}</code>；免费取消窗口 = 入住日往前推 <code>days_before</code>（0-30，0=入住当天）天的 <code>cutoff_time</code>（HH:mm）时刻，窗口外 / 未开通一律不可取消不可退</td></tr>
       <tr><td><code>tags</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 房型说明 / 封面 / 排序（<code>sort_order</code> 升序展示，缺省 99，用于主推房型排前）</td></tr>
       <tr><td><code>amenities</code></td><td>string[]</td><td>★ 配套标识数组，按下表 10 个 id 传（C 端按 id 渲染图标）</td></tr>
@@ -410,9 +411,11 @@
       <tr><th>字段</th><th>说明</th></tr>
       <tr><td><code>project_id</code> + <code>unit_id</code></td><td>库存归属；<code>unit_id=0</code> 或缺省表示项目级（整栋 / 不限房型，容量恒 1）。下单冲突口径：整栋单查全项目任一户型，指定户型单查「项目级 + 该户型」</td></tr>
       <tr><td><code>stay_date</code></td><td>晚（YYYY-MM-DD，入住当晚）。<strong>写入窗口</strong>：单次 ≤ 400 晚、可多次滚动写更远（存储无总上限）；<strong>C 端日历可订窗口 = 当月起 12 个月</strong>，建议对账口径与其对齐</td></tr>
-      <tr><td><code>qty</code></td><td>★ <strong>放出间数覆盖</strong>（1-999；多间口径 2026-09-10）。该晚实际投放的可订间数；不传 / 传 <code>null</code> = 用房型 <code>total_qty</code>。项目级（<code>unit_id=0</code>）不收 <code>qty</code>。<strong>不得低于该晚已订间数</strong>（<code>booked_qty</code>），否则 400</td></tr>
+      <tr><td><code>qty</code></td><td>★ <strong>放出间数覆盖</strong>（1-999；多间口径 2026-09-10）。该晚实际投放的可订间数；不传 / 传 <code>null</code> = 用房型 <code>total_qty</code>。项目级（<code>unit_id=0</code>）不收 <code>qty</code>。<strong>不得低于该晚已订间数</strong>（<code>booked_qty</code>），否则 400。与 <code>available_qty</code> 语义不同，同一次调用只能传一个</td></tr>
+      <tr><td><code>available_qty</code></td><td>★ <strong>净可售（2026-09 方案 B，推荐多渠道商家用）</strong>：0-999，直接传「这一晚平台还能卖几间」——<strong>已经在你们那边扣掉其他渠道售出与暂不可售</strong>，可以按你们自己的口径算，不必关心平台卖了多少。平台记下推送时点的已订数作为<strong>基线</strong>，之后<strong>只有平台自己卖掉的</strong>才从这个数里扣，取消自动加回；同时以「物理余量（<code>total_qty</code> − 已订）」封顶，防对账漏项导致超售。详见 3.5</td></tr>
       <tr><td><code>status</code></td><td><code>open</code> 可订（默认，<strong>未设置过的晚即可订，放出 = total_qty</strong>）/ <code>blocked</code> 关房（商家；<strong>已订晚 <code>booked_qty&gt;0</code> 不可关房</strong>，须先取消订单）/<code>booked</code> 已订满——<strong>2026-09-10 起为派生态</strong>（剩余 <code>remaining ≤ 0</code> 时出参给出），由平台订单占用计数自动产生，取消自动释放，接口不可直接写</td></tr>
-      <tr><td><code>booked_qty</code> / <code>remaining</code></td><td><strong>出参随日历查询下发</strong>：该晚已订间数 / 剩余可订间数（<code>max(0, qty||total_qty − booked_qty)</code>，关房为 0）。多间房型当晚 <code>0 &lt; remaining &lt; qty</code> 时状态仍为 <code>open</code>——<strong>部分可订</strong>，C 端展示「仅剩 X 间」</td></tr>
+      <tr><td><code>booked_qty</code> / <code>remaining</code></td><td><strong>出参随日历查询下发</strong>：该晚已订间数 / 剩余可订间数。<code>remaining</code> 按该晚的放出口径计算：<code>qty</code>（放出总量）= <code>max(0, qty − booked_qty)</code>；<code>available_qty</code>（净可售）= <code>clamp(qty − (booked_qty − 基线), 0, total_qty − booked_qty)</code>（取消释放不会越过物理余量）。关房为 0。多间房型当晚 <code>0 &lt; remaining &lt; qty</code> 时状态仍为 <code>open</code>——<strong>部分可订</strong>，C 端展示「仅剩 X 间」</td></tr>
+      <tr><td><code>available_qty</code>（出参）</td><td>回显该晚的净可售口径值：<code>null</code> = 该晚按旧「放出总量」口径；有值 = 你们上次推的 <code>available_qty</code>。<code>set</code> 响应还会逐日返回 <code>days[]</code>（<code>qty / qty_base / booked_qty / remaining</code>），<strong>推完即可对账，不必再查一次日历</strong></td></tr>
       <tr><td><code>price_night</code></td><td>当晚价格覆盖（元），未覆盖回落默认夜价；<strong>户型级 &gt; 项目级 &gt; 默认</strong>。2026-09-10 起<strong>参与下单计价</strong>：订单金额 = 逐晚（覆盖价 || 默认夜价）合计 × 间数，与 C 端日历展示同口径——周末 / 节假日分档即按日期批量覆盖实现</td></tr>
     </table>
     <div class="callout info">
@@ -436,6 +439,36 @@
     <div class="callout warn">
       <strong>常见误解：</strong>「查房态 <code>status=open</code> 的记录」是不够的——平台库存模型是<strong>没有记录 = 默认可订</strong>，差异行只在关房 / 改价 / 改放出间数 / 被订时才产生。若只扫有记录的晚，会把绝大多数可订房源误判成「暂无可订」。
     </div>
+
+    <h3>3.5 净可售库存（<code>available_qty</code>，多渠道商家）</h3>
+    <p>如果同一批房间你们<strong>同时在别的渠道卖</strong>（OTA、直客、自己的小程序…），或者有房间<strong>临时不可售</strong>（未保洁、维修），用 <code>available_qty</code> 比 <code>qty</code> 更省事：直接把「这一晚平台还能卖几间」推上来，<strong>按你们自己的口径算就行</strong>。</p>
+    <table>
+      <tr><th>字段</th><th>语义</th><th>平台怎么算 remaining</th></tr>
+      <tr><td><code>qty</code>（旧）</td><td>该晚<strong>对平台开放的总量</strong>，含平台已卖掉的</td><td><code>max(0, qty − 已订)</code>——所以你们必须先查一次平台已订多少，有竞态</td></tr>
+      <tr><td><code>available_qty</code>（推荐）</td><td>该晚<strong>净可售</strong>，按你们的口径（已扣他渠道与不可售）</td><td>记下推送时点的已订数作<strong>基线</strong>，<code>clamp(可用 − (已订 − 基线), 0, 物理余量)</code>——平台之后卖掉的才扣，取消自动加回，无需你们再算</td></tr>
+    </table>
+    <p><strong>举个你们反馈里的例子：</strong>房型 <code>total_qty=6</code>，平台已售 2、其他渠道售 1、还有 1 间未保洁 → 你们算出「能卖 2 间」，直接推 <code>available_qty: 2</code>：</p>
+    <ol style="font-size:13.5px;">
+      <li>推送时平台已订 2 → 基线记 2 → <strong>平台显示剩余 2</strong>（旧口径会二次扣成 0）；</li>
+      <li>平台又卖掉 1 间 → 剩余 <strong>1</strong>；客户取消 → 自动回到 <strong>2</strong>；</li>
+      <li>其他渠道又卖掉 1 间 → 你们重推 <code>available_qty: 1</code>，基线刷新为当时的已订数 → 剩余 <strong>1</strong>。</li>
+    </ol>
+    <div class="callout info">
+      <strong>防超售兜底：</strong>如果推的净数超过实际剩下的房间数（比如对账漏了他渠道的销量），平台按<strong>物理余量 <code>total_qty − 已订</code></strong> 封顶，不会卖超。所以<strong>推大不会超售，推小才会少卖</strong>——对账宁可略保守。
+    </div>
+    <div class="callout warn">
+      <strong>两个口径别混：</strong><code>qty</code> 与 <code>available_qty</code> 同一次调用只能传一个（同时传 400）。任一时刻该晚只属于一种口径；用 <code>qty</code> 写回会把基线清空，回到旧语义。
+    </div>
+
+    <h3>3.6 默认关房（<code>default_closed</code>，可选开关）</h3>
+    <p>净可售解决的是「<strong>推过的晚</strong>怎么算」，默认关房解决的是「<strong>没推过的晚</strong>怎么办」。默认情况下平台是「没推过的晚 = 可订、放出量 = <code>total_qty</code>」——对多渠道商家这很危险：你们在别处卖掉、或临时不可售的晚，只要没推过，平台照样会放出去卖。</p>
+    <p>把房型的 <code>default_closed</code> 设为 <code>true</code>（写 <code>units.ext</code>，可经 <code>units/update</code> 或后台配置）后：</p>
+    <ul style="font-size:13.5px;">
+      <li><strong>只有你们显式推送过放出量的晚才可订</strong>（<code>qty</code> 或 <code>available_qty</code> 都算）；</li>
+      <li>没推过的晚一律不可订（<code>remaining = 0</code>，下单 400）；<strong>只设过夜价、没设放出量的晚也算没推过</strong>；</li>
+      <li>缺省<strong>关闭</strong>——不配置的房源行为与现在完全一致；只作用于指定户型的预订，<strong>整栋单（不指定户型）语义不变</strong>。</li>
+    </ul>
+    <p>建议需要多渠道对账的房型开启，并按「未来 12 个月」滚动推送放出量（见 5.1）。</p>
   </section>
 
   <section id="endpoints">
@@ -675,13 +708,21 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   <span class="tok-key">"dates"</span>: [<span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"2026-12-11"</span>],
   <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// blocked 关房；open 开房</span>
   <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>,                 <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 不改价</span>
-  <span class="tok-key">"qty"</span>: <span class="tok-key">null</span>                          <span class="tok-com">// ★ 放出间数覆盖（1-999，仅房型级）：open + qty = 该晚只放 N 间；不传 = 用 total_qty</span>
+  <span class="tok-key">"qty"</span>: <span class="tok-key">null</span>,                         <span class="tok-com">// ★ 放出总量覆盖（1-999，仅房型级）：open + qty = 该晚只放 N 间；不传 = 用 total_qty</span>
+  <span class="tok-key">"available_qty"</span>: <span class="tok-key">null</span>                  <span class="tok-com">// ★ 净可售（0-999，推荐，见 3.5）：与该晚的 qty 二选一；写回 qty 会把基线清空</span>
 }
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"affected"</span>: <span class="tok-num">2</span>, <span class="tok-key">"dates"</span>: <span class="tok-num">2</span> }</code></pre>
+→ 200 {
+  <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"affected"</span>: <span class="tok-num">2</span>, <span class="tok-key">"dates"</span>: <span class="tok-num">2</span>,
+  <span class="tok-key">"days"</span>: [                          <span class="tok-com">// 推完即可对账（不必再查一次日历）</span>
+    { <span class="tok-key">"date"</span>: <span class="tok-str">"2026-12-10"</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"open"</span>, <span class="tok-key">"qty"</span>: <span class="tok-num">2</span>, <span class="tok-key">"qty_base"</span>: <span class="tok-num">2</span>,
+      <span class="tok-key">"available_qty"</span>: <span class="tok-num">2</span>, <span class="tok-key">"booked_qty"</span>: <span class="tok-num">2</span>, <span class="tok-key">"remaining"</span>: <span class="tok-num">2</span> }
+  ]
+}</code></pre>
     <ul style="font-size:13.5px;">
-      <li><strong>已订晚（<code>booked_qty&gt;0</code>）不可关房</strong>：返回 400 并列出日期，须先取消订单；改价 / 调 <code>qty</code>（≥ 已订间数）不受限。</li>
-      <li>未设置过的晚天然可订、放出 = 房型 <code>total_qty</code>；「恢复默认」= status=open 且价、<code>qty</code> 均不传：清除差异行，<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>。</li>
+      <li><strong>已订晚（<code>booked_qty&gt;0</code>）不可关房</strong>：返回 400 并列出日期，须先取消订单；改价 / 调放出量不受限。</li>
+      <li>未设置过的晚天然可订、放出 = 房型 <code>total_qty</code>（<strong>除非该房型开了「默认关房」，见 3.6</strong>）；「恢复默认」= status=open 且价、放出量均不传：清除差异行，<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>。</li>
       <li><strong>qty 与已订（多间口径 2026-09-10）</strong>：<code>qty</code> 低于该晚已订间数返回 400（先取消订单或调高）；<code>qty</code> 改变只影响当晚可订余量，已订单不受影响。剩余 = <code>max(0, qty||total_qty − booked_qty)</code>。</li>
+      <li><strong>available_qty（2026-09 方案 B）</strong>：不受「不得低于已订」限制（它本身就是净数，推送时点的已订自动进基线）；<code>qty</code> 与 <code>available_qty</code> 同时传返回 400。详见 <a href="#dict">3.5</a>。</li>
       <li><strong>覆盖价参与下单计价</strong>（2026-09-10 起）：订单金额 = 逐晚「覆盖价 || 默认夜价」合计 × 间数。周末 / 节假日分档 = 把对应日期批量 <code>open + price_night</code>；平日不传即回落默认。订单占用不清除当晚覆盖价，取消释放后商家差异行（价 / qty / 关房）原样保留。</li>
       <li><strong>可订窗口</strong>：单次 ≤ 400 晚、可滚动写更远；C 端日历展示当月起 12 个月，建议按「未来 12 个月」滚动维护。</li>
     </ul>
@@ -721,6 +762,9 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>我不按月租卖，只按每晚定价，可以吗？</td><td>可以（2026-09 起）。给户型的 <code>price_night</code> 即可，<strong>rental 频道同样生效</strong>；<code>rent_monthly</code> 与 <code>price_from</code> 都可以不传。默认夜价顺序 = <code>price_night</code> &gt; <code>月租/30</code> &gt; <code>起价/30</code>。</td></tr>
       <tr><td>不传 price_from，C 端卡片价格显示什么？</td><td>按展示价三件套（3.4）自动算：<strong>带「旅居」tag 的 rental 与 minsu 按晚</strong>，取<strong>最低可售单夜价</strong>（从今天起按自然月向后扫 12 个月，取第一个有可售间夜的月份内的最低价）；<strong>其余 rental 按月</strong>，起价缺失时用户型默认夜价 × 30。全窗口无可售时卡片显示「暂无可订」。贵方无需做任何事。</td></tr>
       <tr><td>月租 /30 折算发生在哪侧？</td><td>平台侧（C 端按晚售卖口径）：默认夜价 = <code>round(月租/30)</code>。<strong>2026-09 起户型 <code>price_night</code> 优先于它</strong>（两个频道一致）；详情页/下单页直接读接口下发的 <code>default_night_price</code>，不要自己折。</td></tr>
+      <tr><td>我们同时在别的渠道卖，怎么让平台显示正确的可售数？</td><td>用 <code>available_qty</code>（<strong>净可售</strong>，2026-09）直接推「这一晚平台还能卖几间」，按你们自己的口径算（已扣他渠道 / 不可售）；平台记基线，之后只扣平台自己卖掉的，取消自动加回，并按物理余量封顶防超售。详见 3.5。</td></tr>
+      <tr><td>没推过的日期，怎么让它默认不可订？</td><td>把房型 <code>default_closed</code> 设为 <code>true</code>（2026-09，见 3.6）。之后只有你们推过放出量的晚才可订，避免别处卖掉/临时不可售的晚被平台放出去。缺省关闭，不影响存量房源。</td></tr>
+      <tr><td><code>remaining</code> 是怎么算的？我能自己传吗？</td><td><strong>一律只读，平台算好下发</strong>，接口不接受传入。算法随该晚的放出口径：<code>qty</code>（放出总量）= <code>max(0, qty − 已订)</code>；<code>available_qty</code>（净可售）= <code>clamp(可用 − (已订 − 基线), 0, 物理余量)</code>。关房 / 未放出（默认关房）= 0。</td></tr>
       <tr><td>promo_price 会影响成交价吗？</td><td>不会，当前是「首月特惠」展示标签位；营销价真实成交需另行排期。</td></tr>
       <tr><td>amenities 没有枚举怎么映射？</td><td>按下表 10 个 id 传（3.2）：ac / washer / fridge / heater / lock / wifi / tv / hood / microwave / induction。不传 = C 端回落展示全部；未知 id 不渲染。枚举字典化在平台排期。</td></tr>
       <tr><td>联系电话必须是 400 吗？后续能改吗？</td><td>相反：须为 <strong>11 位手机号</strong>（1 开头），400 号码会被拒。号码仅入库用于 C 端虚拟号实时绑定、任何接口不回显；可用 <code>projects/update</code> 更新。</td></tr>
@@ -800,6 +844,8 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>400</td><td>—</td><td>下单被拒：<code>该房源未配置价格，暂不可预订</code>（2026-09 新增：算不出价不再 0 元成单）</td><td>给户型补 <code>price_night</code> 或 <code>rent_monthly</code>（或房源起价）</td></tr>
       <tr><td>400</td><td>—</td><td>评级：<code>dims</code> 缺维度 / 越界（0-5）/ 未知维度；或已在复核队列中重复提审</td><td>按 4.12 维度表修正；进度用 <code>rating/status</code> 查</td></tr>
       <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 超出频道范围（rental 1–365 / minsu 15–365）</td><td>按 §6 / §5 枚举修正</td></tr>
+      <tr><td>400</td><td>—</td><td><code>qty</code> 与 <code>available_qty</code> 同时传（语义不同，只能传一个）/ <code>available_qty</code> 超出 0-999 / 项目级传放出量</td><td>见 3.5；项目级（<code>unit_id=0</code>）容量恒 1，不接受放出量</td></tr>
+      <tr><td>400</td><td>—</td><td><code>default_closed</code> 非布尔</td><td>传 <code>true</code> / <code>false</code>，<code>null</code> 清除（3.6）</td></tr>
       <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
       <tr><td>400</td><td>—</td><td>无可更新字段 / <code>city_id</code> 不支持修改</td><td>按 message 调整</td></tr>
       <tr><td>400</td><td>—</td><td>订单未支付不可确认 / 订单已取消不可变更</td><td>支付走收银台后重试确认；取消为终态</td></tr>
@@ -851,7 +897,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, min_stay_nights: 3, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
-    '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null, qty: null },
+    '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'open', price_night: null, qty: null, available_qty: 2 },
     '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
     '/api/juzhu/housing/vendor/units/delete': { id: 0 },
     '/api/juzhu/housing/vendor/bookings/list': { status: 'pending' },

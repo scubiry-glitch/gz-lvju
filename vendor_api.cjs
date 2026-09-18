@@ -553,6 +553,10 @@ function extFromBody(body, baseExt, channel) {
       ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, channel);
     }
   }
+  if (Object.prototype.hasOwnProperty.call(body, 'default_closed')) {
+    if (body.default_closed === null || body.default_closed === '') delete ext.default_closed;
+    else if (stayCfg.normalizeDefaultClosedInput(body.default_closed)) ext.default_closed = true; else delete ext.default_closed;
+  }
   ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
   return ext;
 }
@@ -578,6 +582,11 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
   // 最短连住（2026-09 下放户型）：户型级 > 房源级 > 频道默认，下限按频道校验
   if (u.min_stay_nights != null && u.min_stay_nights !== '') {
     try { ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(u.min_stay_nights, channel); }
+    catch (e) { throw new Error('units[].' + e.message); }
+  }
+  // 默认关房（2026-09 方案 B 配套）：未推送放出的日期默认不可订，多渠道商家防超售
+  if (u.default_closed != null && u.default_closed !== '') {
+    try { if (stayCfg.normalizeDefaultClosedInput(u.default_closed)) ext.default_closed = true; }
     catch (e) { throw new Error('units[].' + e.message); }
   }
   const [r] = await conn.execute(
@@ -867,6 +876,15 @@ async function housingUnitsUpdate(conn, body, vendorId) {
     }
     extDirty = true;
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'default_closed')) {
+    // 默认关房（2026-09 方案 B 配套）：true = 未推送放出的日期默认不可订；null/'' = 清除（关闭）
+    if (b.default_closed === null || b.default_closed === '') delete cur.default_closed;
+    else {
+      try { const dc = stayCfg.normalizeDefaultClosedInput(b.default_closed); if (dc) cur.default_closed = true; else delete cur.default_closed; }
+      catch (e) { return reply(400, { code: 400, message: e.message }); }
+    }
+    extDirty = true;
+  }
   if (extDirty) { sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null); }
   if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
   params.push(rows[0].id);
@@ -917,15 +935,22 @@ async function housingStayCalendarSet(conn, body, vendorId) {
   const dates = rawDates.filter((d) => stayCfg.isValidDateString(d));
   const price = (b.price_night === null || b.price_night === undefined || b.price_night === '') ? null : parseInt(b.price_night, 10);
   const qty = (b.qty === null || b.qty === undefined || b.qty === '') ? null : parseInt(b.qty, 10);
+  // available_qty（2026-09 方案 B）：净可售绝对值 = 推送时点「平台还能卖几间」（已扣他渠道与不可售），
+  // 服务端记基线，之后的平台占用才从它里面扣（见 stay_config.remainingOf）
+  const available = (b.available_qty === null || b.available_qty === undefined || b.available_qty === '') ? null : parseInt(b.available_qty, 10);
   if (['open', 'blocked'].indexOf(status) < 0) return reply(400, { code: 400, message: 'status 须为 open / blocked（booked 为剩余售罄的派生态，由订单占用）' });
   if (price != null && !(price >= 0)) return reply(400, { code: 400, message: 'price_night 须为非负整数或空' });
   if (qty != null && (!(qty >= 1) || qty > 999)) return reply(400, { code: 400, message: 'qty（放出间数）须为 1-999 的整数或空' });
-  if (qty != null && !unitId) return reply(400, { code: 400, message: '项目级（不限房型）容量恒 1，不支持 qty 覆盖' });
+  if (available != null && (!(available >= 0) || available > 999)) return reply(400, { code: 400, message: 'available_qty（净可售）须为 0-999 的整数或空' });
+  if (qty != null && available != null) return reply(400, { code: 400, message: 'qty（放出总量）与 available_qty（净可售）语义不同，同一次调用只能传一个' });
+  if ((qty != null || available != null) && !unitId) return reply(400, { code: 400, message: '项目级（不限房型）容量恒 1，不支持 qty / available_qty 覆盖' });
   if (!dates.length || dates.length !== rawDates.length) return reply(400, { code: 400, message: 'dates 必填且必须为真实有效的 YYYY-MM-DD 日期（单次 ≤ 400 天）' });
   if (dates.length > 400) return reply(400, { code: 400, message: '单次最多 400 天' });
+  let setUnitRow = null;
   if (unitId) {
-    const [u] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, row.id]);
+    const [u] = await conn.execute('SELECT id, ext, total_qty FROM units WHERE id=? AND project_id=?', [unitId, row.id]);
     if (!u.length) return reply(400, { code: 400, message: 'unit_id 不存在或不属于该房源' });
+    setUnitRow = u[0];
   }
   const marks = dates.map(() => '?').join(',');
   // 已订晚保护（多间口径）：booked_qty>0 的晚不可关房；qty 不得低于该晚已订间数
@@ -952,32 +977,57 @@ async function housingStayCalendarSet(conn, body, vendorId) {
         [row.id, unitId, d, price, now]);
       affected += r.affectedRows || 0;
     }
-  } else if (price != null || qty != null) {
+  } else if (price != null || qty != null || available != null) {
     // 设覆盖价 / 放出间数（彼此独立，只写传入的字段）
+    // 放出量两种口径：available_qty = 净可售（基线取该晚当前已订数，逐晚不同）；
+    // qty = 旧「放出总量」（基线重置为 0）。两者都会整对写入 qty + qty_base，不混口径。
+    const bookedByDate = new Map(booked.map((r) => [r.stay_date, parseInt(r.booked_qty, 10) || 0]));
     for (const d of dates) {
+      const pushQty = available != null ? available : qty;
+      const pushBase = available != null ? (bookedByDate.get(d) || 0) : null;
       const [r] = await conn.execute(
-        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, qty, source, updated_at)
-         VALUES (?,?,?,'open',?,?,'vendor',?)
+        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, qty, qty_base, source, updated_at)
+         VALUES (?,?,?,'open',?,?,?,'vendor',?)
          ON DUPLICATE KEY UPDATE status='open', source='vendor',
            ${price != null ? 'price_night=VALUES(price_night),' : ''}
-           ${qty != null ? 'qty=VALUES(qty),' : ''}
+           ${pushQty != null ? 'qty=VALUES(qty), qty_base=VALUES(qty_base),' : ''}
            updated_at=VALUES(updated_at)`,
-        [row.id, unitId, d, price, qty, now]);
+        [row.id, unitId, d, price, pushQty, pushBase, now]);
       affected += r.affectedRows || 0;
     }
   } else {
-    // 恢复默认：纯差异行删行；有占用的行保留计数，仅清 price/qty 回默认
+    // 恢复默认：纯差异行删行；有占用的行保留计数，仅清 price/qty/qty_base 回默认
     const [r] = await conn.execute(
       `DELETE FROM stay_calendar WHERE project_id=? AND unit_id=? AND status IN ('open','blocked')
        AND booked_qty=0 AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
     affected = r.affectedRows || 0;
     const [r2] = await conn.execute(
-      `UPDATE stay_calendar SET price_night=NULL, qty=NULL, updated_at=?
+      `UPDATE stay_calendar SET price_night=NULL, qty=NULL, qty_base=NULL, updated_at=?
        WHERE project_id=? AND unit_id=? AND booked_qty>0 AND stay_date IN (${marks})`,
       [now, row.id, unitId, ...dates]);
     affected += r2.affectedRows || 0;
   }
-  return reply(200, { code: 0, message: 'success', project_id: row.id, unit_id: unitId, status, price_night: price, qty, dates: dates.length, affected });
+  // 回显落地结果（推完即对账，不必再查一次日历）：逐日给出 放出量 / 基线 / 已订 / 剩余
+  const [after] = await conn.execute(
+    `SELECT stay_date, qty, qty_base, booked_qty, status FROM stay_calendar
+     WHERE project_id=? AND unit_id=? AND stay_date IN (${marks})`, [row.id, unitId, ...dates]);
+  const byDate = new Map(after.map((r) => [r.stay_date, r]));
+  const days = dates.map((d) => {
+    const r = byDate.get(d) || null;
+    return {
+      date: d,
+      status: r ? r.status : 'open',
+      qty: r && r.qty != null ? parseInt(r.qty, 10) : null,
+      qty_base: r ? (parseInt(r.qty_base, 10) || 0) : 0,
+      available_qty: r && r.qty != null && (parseInt(r.qty_base, 10) || 0) > 0 ? parseInt(r.qty, 10) : null,
+      booked_qty: r ? (parseInt(r.booked_qty, 10) || 0) : 0,
+      remaining: stayCfg.remainingOf(r, setUnitRow, row),
+    };
+  });
+  return reply(200, {
+    code: 0, message: 'success', project_id: row.id, unit_id: unitId, status,
+    price_night: price, qty, available_qty: available, dates: dates.length, affected, days,
+  });
 }
 
 // ── 订单履约：商家查单 / 确认 / 拒单（与 B 端会话接口同库同口径）──
