@@ -35,6 +35,14 @@
  *   const r = await payCenter.queryOrder({ appOrderId: 'B20260101001' });
  *   // 切环境：JUZHU_ENV=prod node xxx.js
  * ---------------------------------------------------------------------------
+ * 比如房源商家是收款方merchantNo_A， 平台是merchantNo_P，每次调用C2B下单 接口流程是否如下，金额101元
+ * 1、调用开通合同专户openSpecialAccount，入参：merchantNoList【merchantNo_A，merchantNo_P】 ，不用管返回调用成功即可
+ * 2、调用C2B支付下单v2/createOrder,入参收款信息recAndShareInfo 如何，是否
+ * recAndShareInfo：{ merchantNo:"merchantNo_A",shareOrderMode:"作废参数01都行不影响",
+ *        shareOrderInfos:[
+ *        {merchantNo:"merchantNo_A",amount:"101"，shareBizCode："02037200000000"}
+ *    ]}
+ * 3、调用ACN分账接口 给merchantNo_A，merchantNo_P分账，源商户就是下单传的merchantNo_A
  */
 'use strict';
 
