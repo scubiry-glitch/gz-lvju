@@ -48,12 +48,32 @@ function insuranceOf(proj) {
   return seen;
 }
 
-function minStayNightsOf(proj) {
-  const raw = parseInt(parseExtObj(proj && proj.ext).min_stay_nights, 10);
-  const floor = STAY_MIN_NIGHTS_MIN[(proj && proj.channel)] || 1;
-  let v = Number.isFinite(raw) ? raw : (STAY_MIN_NIGHTS_DEFAULT[(proj && proj.channel)] || 1);
+/**
+ * 最短连住生效值（2026-09 下放户型）：户型 ext > 房源 ext > 频道默认，
+ * 再按频道下限 clamp（rental 1 晚、minsu 15 晚）。unit 省略 = 房源级口径（列表摘要用）。
+ * 整栋单（不指定户型）由调用方传入「排序最前的户型」，与取消政策同一套回退。
+ */
+function minStayNightsOf(proj, unit) {
+  const channel = proj && proj.channel;
+  const floor = STAY_MIN_NIGHTS_MIN[channel] || 1;
+  const pick = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+  const fromUnit = unit ? pick(parseExtObj(unit.ext).min_stay_nights) : null;
+  const fromProj = pick(parseExtObj(proj && proj.ext).min_stay_nights);
+  let v = fromUnit != null ? fromUnit : (fromProj != null ? fromProj : (STAY_MIN_NIGHTS_DEFAULT[channel] || 1));
   if (!(v >= floor)) v = floor;
   return Math.min(v, 365);
+}
+
+/**
+ * 最短连住的取值来源：'unit'（户型级显式配置）/ 'project'（房源级）/ 'default'（频道默认）。
+ * 供后台表单区分「显式配置」与「继承来的生效值」——回显时只有 unit 档才预填输入框，
+ * 否则保存会把继承值静默固化成户型级配置。
+ */
+function minStayNightsSourceOf(proj, unit) {
+  const pick = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+  if (unit && pick(parseExtObj(unit.ext).min_stay_nights) != null) return 'unit';
+  if (pick(parseExtObj(proj && proj.ext).min_stay_nights) != null) return 'project';
+  return 'default';
 }
 
 /** 写入口校验：minsu 最低 15 晚，其他频道沿用 1 晚下限。 */
@@ -64,20 +84,33 @@ function normalizeMinStayNightsInput(value, channel) {
   return v;
 }
 
-/** 项目/户型夜价默认口径（规则15）：minsu=units.ext.price_night / price_from；rental=月租/30 折算 */
+/**
+ * 项目/户型默认夜价（规则15；2026-09 调整）：户型夜价 > 月租折算 > 房源起价折算。
+ * 两频道都优先认 units.ext.price_night——rental 此前忽略它，短租房源只能拿月租表达，
+ * 改后「传了不生效」变为生效；存量 rental 户型未配 price_night 者行为逐字不变。
+ * 日历逐晚覆盖价仍高于本层（见 stayNightPrices / buildStayMonth）。
+ */
 function unitNightPrice(proj, unit) {
   const p = proj || {};
   if (unit) {
-    if (p.channel === 'minsu') {
-      const ux = parseExtObj(unit.ext);
-      if (ux.price_night) return Math.round(ux.price_night);
-    } else if (unit.rent_monthly) {
+    const ux = parseExtObj(unit.ext);
+    if (ux.price_night) return Math.round(ux.price_night);
+    if (p.channel !== 'minsu' && unit.rent_monthly) {
       return Math.max(1, Math.round(unit.rent_monthly / 30));
     }
   }
   const base = p.price_from || 0;
   if (!base) return 0;
   return p.channel === 'minsu' ? base : Math.max(1, Math.round(base / 30));
+}
+
+/**
+ * 整栋单（不指定户型）的默认夜价基准单位（2026-09）：有房源起价就用起价（C 端「不限房型（按起价）」
+ * 的存量语义，价格逐字不变）；起价缺失时回落「排序最前户型」——price_from 改选填后必须补这层兜底，
+ * 否则整栋单会算成 0 元（下单闸会直接拒单）。返回值直接作为 unit 形参传给计价/日历函数，null = 按起价。
+ */
+function wholeHousePriceUnit(proj, headUnit) {
+  return (proj && proj.price_from > 0) ? null : (headUnit || null);
 }
 
 function boolCapability(v) {
@@ -198,15 +231,137 @@ async function stayNightPrices(fetchRows, proj, unit, unitId, checkin, checkout)
   return { prices, total: prices.reduce((a, b) => a + b, 0), default_night: def };
 }
 
-/** 项目房态配置（随 catalog / 项目详情 / 房态日历下发，含 bookable 能力位） */
-function stayConfigOf(proj) {
+// ===== 房源卡片展示价（2026-09，规则16 延伸）=====
+// C 端卡片价格只读服务端下发的 price_from_display / price_unit / price_note，
+// 页面不得自行折算或拼口径（此前搜索页/首页各抄了一份 fallback，已收口到这里）。
+// 单位口径（A″ 2026-09）：minsu 按晚；rental 带「旅居」tag 按晚；其余 rental 按月。
+// 按晚的走「最低可售单夜价」扫描；按月的沿用 price_from 起价口径。
+const PRICE_DISPLAY_SCAN_MONTHS = 12;   // 与 C 端房态日历可订窗口同一口径
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const ymdOf = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+
+/** 展示单位：'night' | 'month' | null（null = 该频道不适用，C 端走 price_total） */
+function priceDisplayUnitOf(proj) {
+  const p = proj || {};
+  if (p.channel === 'minsu') return 'night';
+  if (p.channel !== 'rental') return null;
+  let tags = p.tags;
+  if (typeof tags === 'string') { try { tags = JSON.parse(tags); } catch (_) { tags = []; } }
+  return (Array.isArray(tags) && tags.indexOf('旅居') >= 0) ? 'night' : 'month';
+}
+
+/**
+ * 单房源「最低可售单夜价」扫描：从 t0 起按自然月向后，取第一个存在可售间夜的月份，
+ * 该月内最低单夜价即展示价；扫满 PRICE_DISPLAY_SCAN_MONTHS 个月仍无可售 → null。
+ * 可售口径：项目级当晚未关房 + 该户型当晚未关房、未售罄；无差异行 = 默认可订（按默认夜价）。
+ * units 须已按 unitNightPrice>0 过滤；dev = { proj: Map<date,row>, unit: Map<'uid|date',row> }。
+ */
+function lowestSellableNightPrice(proj, units, dev, t0) {
+  const endKey = ymdOf(new Date(t0.getFullYear(), t0.getMonth() + PRICE_DISPLAY_SCAN_MONTHS, t0.getDate()));
+  for (let k = 0; k < PRICE_DISPLAY_SCAN_MONTHS; k++) {
+    const from = k === 0 ? t0 : new Date(t0.getFullYear(), t0.getMonth() + k, 1);
+    const to = new Date(t0.getFullYear(), t0.getMonth() + k + 1, 0);   // 该月最后一天
+    let best = null;
+    for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const ds = ymdOf(d);
+      if (ds >= endKey) break;                                        // 超出检索窗口
+      const pr = dev.proj.get(ds);
+      if (pr && pr.status === 'blocked') continue;                     // 项目级关房压制全天
+      for (const u of units) {
+        const ur = dev.unit.get(u.id + '|' + ds) || null;
+        if (ur && (ur.status === 'blocked' || ur.status === 'booked')) continue;
+        if (remainingOf(ur, u) <= 0) continue;                         // 该户型当晚售罄
+        const price = (ur && ur.price_night != null) ? Number(ur.price_night)
+          : (pr && pr.price_night != null ? Number(pr.price_night) : unitNightPrice(proj, u));
+        if (price > 0 && (best == null || price < best)) best = price;
+      }
+    }
+    if (best != null) return best;
+  }
+  return null;
+}
+
+/**
+ * 批量展示价（catalog / 列表用，一次查库）：返回 Map<project_id, 最低可售单夜价 | null>。
+ * 仅 rental/minsu 且至少一个户型有价的房源参与；其余记 null（C 端不展示按晚价）。
+ * fetchRows(sql, params) → Promise<rows>，由调用方注入。
+ */
+async function priceDisplayScan(fetchRows, projects, units, now) {
+  const out = new Map();
+  const list = (projects || []).filter(Boolean);
+  if (!list.length) return out;
+  const today = now || new Date();
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startKey = ymdOf(t0);
+  const endKey = ymdOf(new Date(t0.getFullYear(), t0.getMonth() + PRICE_DISPLAY_SCAN_MONTHS, t0.getDate()));
+  const unitsByProj = new Map();
+  for (const u of (units || [])) {
+    if (!unitsByProj.has(u.project_id)) unitsByProj.set(u.project_id, []);
+    unitsByProj.get(u.project_id).push(u);
+  }
+  const ids = list.map((p) => p.id);
+  let rows = [];
+  if (ids.length) {
+    rows = await fetchRows(
+      `SELECT project_id, unit_id, stay_date, status, price_night, qty, booked_qty FROM stay_calendar
+       WHERE project_id IN (${ids.map(() => '?').join(',')}) AND stay_date >= ? AND stay_date < ?`,
+      [...ids, startKey, endKey]
+    );
+  }
+  const devByProj = new Map();
+  for (const r of rows) {
+    let m = devByProj.get(r.project_id);
+    if (!m) { m = { proj: new Map(), unit: new Map() }; devByProj.set(r.project_id, m); }
+    if (!Number(r.unit_id)) m.proj.set(r.stay_date, r);
+    else m.unit.set(Number(r.unit_id) + '|' + r.stay_date, r);
+  }
+  for (const p of list) {
+    const priced = (unitsByProj.get(p.id) || []).filter((u) => unitNightPrice(p, u) > 0);
+    if (!priced.length || !['rental', 'minsu'].includes(p.channel)) { out.set(p.id, null); continue; }
+    const dev = devByProj.get(p.id);
+    if (!dev) {   // 常见路径：无任何差异行 = 全窗口可订，最低价即户型默认夜价最小值
+      out.set(p.id, Math.min(...priced.map((u) => unitNightPrice(p, u))));
+      continue;
+    }
+    out.set(p.id, lowestSellableNightPrice(p, priced, dev, t0));
+  }
+  return out;
+}
+
+/**
+ * 房源展示价三件套（随 catalog / 列表 / 详情下发，前端不自行折算）：
+ *   price_from_display 数值 | null；price_unit 'night' | 'month' | null；
+ *   price_note 空值文案（有值时为空串）：按晚无可售 = 「暂无可订」，按月无价 = 「价格面议」。
+ * 按月口径维持 price_from 起价语义；按晚口径走最低可售单夜价（monthLow 由 priceDisplayScan 求得）。
+ */
+function priceDisplayOf(proj, monthLow) {
+  const unit = priceDisplayUnitOf(proj);
+  if (unit === null) return { price_from_display: null, price_unit: null, price_note: '' };
+  if (unit === 'night') {
+    // minsu 的 price_from 口径本来就是「元/晚」，沿用起价语义（存量展示价不变）；
+    // rental（带旅居 tag）的 price_from 是「元/月」，不能当夜价用，一律走最低可售单夜价
+    const fromPriceFrom = (proj && proj.channel === 'minsu' && proj.price_from > 0) ? Number(proj.price_from) : null;
+    const v = fromPriceFrom != null ? fromPriceFrom : (monthLow != null && monthLow > 0 ? monthLow : null);
+    return { price_from_display: v, price_unit: 'night', price_note: v ? '' : '暂无可订' };
+  }
+  const v = proj && proj.price_from > 0 ? Number(proj.price_from) : (monthLow != null && monthLow > 0 ? monthLow * 30 : null);
+  return { price_from_display: v, price_unit: 'month', price_note: v ? '' : '价格面议' };
+}
+
+/**
+ * 项目房态配置（随 catalog / 项目详情 / 房态日历下发，含 bookable 能力位）。
+ * 传 unit 时 min_stay_nights 取该户型生效值——整栋单场景由调用方传「排序最前的户型」，
+ * 与 POST /api/juzhu/booking 的下单闸同口径；不传 = 房源级默认值（列表摘要）。
+ */
+function stayConfigOf(proj, unit) {
   const ins = insuranceOf(proj);
   const caps = transactionCapabilitiesOf(proj);
   return {
     bookable: caps.online_booking || caps.online_payment,
     online_booking: caps.online_booking,
     online_payment: caps.online_payment,
-    min_stay_nights: minStayNightsOf(proj),
+    min_stay_nights: minStayNightsOf(proj, unit),
     insurance: ins,
     insurance_types: INSURANCE_TYPES.filter((t) => ins.includes(t.key)),
   };
@@ -276,6 +431,20 @@ function withCancelPolicy(unit) {
   const p = cancelPolicyOf(unit);
   unit.cancel_policy = p;
   unit.cancel_policy_text = cancelPolicyTextOf(p);
+  return unit;
+}
+
+/**
+ * 给 unit 补生效的住宿规则（最短连住 + 取消政策）：units 透出处统一走这里，
+ * 前端只读 unit.min_stay_nights，不得回落到房源级或自设默认值（2026-09 下放户型）。
+ */
+function withStayRules(unit, proj) {
+  withCancelPolicy(unit);
+  unit.min_stay_nights = minStayNightsOf(proj, unit);
+  unit.min_stay_nights_source = minStayNightsSourceOf(proj, unit);
+  // 默认单夜价（含 2026-09 优先级：户型夜价 > 月租/30 > 房源起价/30）：随 unit 下发，
+  // C 端下单页/详情页直接读它，不得再用 rent_monthly/30 自行折算（会与成交价脱节）
+  unit.default_night_price = unitNightPrice(proj, unit) || null;
   return unit;
 }
 
@@ -424,6 +593,7 @@ module.exports = {
   parseExtObj,
   insuranceOf,
   minStayNightsOf,
+  minStayNightsSourceOf,
   normalizeMinStayNightsInput,
   transactionCapabilitiesOf,
   applyTransactionCapabilities,
@@ -432,7 +602,14 @@ module.exports = {
   effectiveQtyOf,
   remainingOf,
   unitNightPrice,
+  wholeHousePriceUnit,
   stayNightPrices,
+  PRICE_DISPLAY_SCAN_MONTHS,
+  priceDisplayUnitOf,
+  lowestSellableNightPrice,
+  priceDisplayScan,
+  priceDisplayOf,
+  withStayRules,
   normalizeCancelPolicyInput,
   cancelPolicyOf,
   cancelDeadlineOf,

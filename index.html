@@ -425,6 +425,7 @@
 <script src="screens/_region.js"></script>
 <script src="screens/_jzapi.js?v=4"></script>
 <script src="juzhu/app.js?v=22"></script>
+<script src="lvju-app-price.js"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -548,8 +549,12 @@
     return 'juzhu-bzf-project.html?channel=' + mode + '&project=' + encodeURIComponent(x.slug) + JUZHU.chainQS();
   }
   function channelPrice(mode, x) {
-    if (mode === 'rental') return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/月起</small>' : '价格面议';
-    if (mode === 'minsu')  return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/晚起</small>' : '价格面议';
+    // 租赁/民宿展示价走服务端三件套（2026-09）：/晚起 = 最低可售单夜价，/月起 = 起价
+    if (mode === 'rental' || mode === 'minsu') {
+      var pd = window.LVJU_PRICE ? LVJU_PRICE.parts(x) : { value: x.price_from, note: '价格面议' };
+      if (pd.value == null) return pd.note;
+      return '¥' + pd.value.toLocaleString() + '<small>' + LVJU_PRICE.unitText(x) + '</small>';
+    }
     return x.price_from != null ? x.price_from + '<small>起</small>' : '价格面议';
   }
   function renderChannelPane(mode, list) {

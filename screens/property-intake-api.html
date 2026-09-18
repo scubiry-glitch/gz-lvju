@@ -347,7 +347,15 @@
 
   <section id="dict">
     <h2><span class="num">3</span> 数据字典</h2>
-    <p>字段与平台房源模型一致、即接口契约本身；带 ★ 为商家写入接口接受的字段。</p>
+    <p>字段与平台房源模型一致、即接口契约本身；带 ★ 为商家写入接口接受的字段，标 <strong>只读出参</strong> 的字段由平台计算下发、传入无效。</p>
+    <div class="callout info">
+      <strong>2026-09 口径调整（价格与住宿规则下放到户型）：</strong>
+      ① <code>price_from</code> 改为<strong>选填</strong>，上架闸改为<strong>逐户型校验「能算出默认夜价」</strong>；
+      ② 户型 <code>price_night</code> 在 <code>rental</code> 频道<strong>同样生效</strong>（不再只认月租 ÷ 30）；
+      ③ 最短连住下放户型（<strong>户型 &gt; 房源 &gt; 频道默认</strong>），与取消政策同一层；
+      ④ 新增只读出参 <code>default_night_price</code>（户型）与 <code>price_from_display / price_unit / price_note</code>（房源卡片价，见 3.4）。
+      三项改动均<strong>向后兼容</strong>：按原样传 <code>price_from</code> + <code>rent_monthly</code> 的房源行为逐字不变。
+    </div>
 
     <h3>3.1 房源（projects）</h3>
     <table>
@@ -361,12 +369,13 @@
       <tr><td><code>slug</code></td><td>string</td><td>URL 标识（C 端深链词），<strong>同 channel 内唯一</strong>。建议直接传贵方房源编号；不传则按名称自动生成。<strong>注意</strong>：传入已存在的 slug 不报错，会静默加 <code>-2</code>/<code>-3</code> 后缀——创建前请先 <code>projects/list</code> 核对防重；改 <code>name</code> 会同步重生成 slug</td></tr>
       <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 URL；室内图集走 <code>photos/add</code>（4.11），<strong>上架须 ≥ 8 张照片</strong></td></tr>
       <tr><td><code>tags</code></td><td>string[]</td><td>★ 标签数组（如 <code>["保租房","近地铁"]</code>）</td></tr>
-      <tr><td><code>price_from</code></td><td>int</td><td>★ 起价，单位元。<code>rental</code> 口径为「元/月」，<code>minsu</code> 为「元/晚」；<strong>上架前置条件</strong>，同时是默认夜价的兜底（rental 折算 <code>价/30</code>）。平日/周末/节假日分档不走它，走房态日历逐晚覆盖（见 5.1）</td></tr>
+      <tr><td><code>price_from</code></td><td>int</td><td><strong>选填</strong>（2026-09 起）。起价，单位元：<code>rental</code> 为「元/月」，<code>minsu</code> 为「元/晚」；作为<strong>默认夜价的最后兜底</strong>（rental 折算 <code>价/30</code>）。<strong>不传也可以</strong>——此时由每个户型自己的价（<code>price_night</code> 或 <code>rent_monthly</code>）承担，上架闸按户型逐个校验（见 4.6）。平日/周末/节假日分档不走它，走房态日历逐晚覆盖（见 5.1）</td></tr>
+      <tr><td><code>price_from_display</code> / <code>price_unit</code> / <code>price_note</code></td><td>—</td><td><strong>只读出参</strong>（2026-09）：C 端卡片展示价三件套，页面直接渲染、不要自行折算。<code>price_unit</code> ∈ <code>night</code>（按晚起）/ <code>month</code>（按月起）/ <code>null</code>（该频道不适用，走 <code>price_total</code>）；<code>price_from_display</code> 为数值，为空时取 <code>price_note</code>（<code>暂无可订</code> / <code>价格面议</code>）。单位口径：<code>minsu</code> 与<strong>带「旅居」tag 的 rental</strong> 按晚（取<strong>最低可售单夜价</strong>，见 3.4），其余 rental 按月（起价语义不变）</td></tr>
       <tr><td><code>sort_order</code> / <code>is_featured</code> / <code>old_house_hint</code></td><td>—</td><td>★ 排序权重 / 平台精选（一般由平台设置）/ 卖旧买新提示</td></tr>
       <tr><td><code>contact_phone</code></td><td>string</td><td>★ 真实联系电话，<strong>11 位手机号</strong>（<code>1</code> 开头；400 号码不接受）。仅入库用于 C 端拨号的虚拟号实时绑定，任何查询接口不回显；可经 <code>projects/update</code> 更新</td></tr>
       <tr><td><code>owner_vendor_id</code></td><td>int</td><td>数据归属商家（签名商家自动写入，不可改）。所有接口按它做行级隔离；订单佣金快照按它取商家档费率</td></tr>
       <tr><td><code>status</code></td><td>string</td><td>★ <code>draft</code> 草稿（默认，新建强制）/ <code>online</code> 上架 / <code>offline</code> 下架</td></tr>
-      <tr><td><code>ext</code></td><td>object</td><td>★ 房源能力与差异属性：<code>online_booking</code>（在线预订）+ <code>online_payment</code>（在线支付，两项至少开启一项，见 5.3）+ <code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，见 5.2）</td></tr>
+      <tr><td><code>ext</code></td><td>object</td><td>★ 房源能力与差异属性：<code>online_booking</code>（在线预订）+ <code>online_payment</code>（在线支付，两项至少开启一项，见 5.3）+ <code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，<strong>2026-09 起降级为「房源默认值」</strong>，户型级优先，见 5.2）</td></tr>
       <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>审核/评级位：<code>draft → pending → passed / rejected</code>。<strong>passed 是上架前置</strong>；提审走 <code>projects/rating/submit</code>、进度与驳回原因走 <code>projects/rating/status</code>（4.12），列表/详情出参也随行返回</td></tr>
     </table>
 
@@ -378,11 +387,13 @@
       <tr><td><code>name</code></td><td>string</td><td class="req">★必填</td>户型名（如「两居 68㎡」「整栋 · 6 室」）。可传 <code>slug</code> = 贵方房型编号（项目内唯一，冲突静默加后缀，同 3.1 slug 注意事项）</td></tr>
       <tr><td><code>area_sqm</code></td><td>number</td><td>★ 面积（㎡）</td></tr>
       <tr><td><code>layout_label</code></td><td>string</td><td>★ 户型标签（<code>2室1厅</code>）</td></tr>
-      <tr><td><code>rent_monthly</code></td><td>int</td><td>★ 月租（元/月），照实传贵方月租即可；<strong>月租→夜价的 <code>/30</code> 折算发生在平台侧</strong>（C 端按晚售卖口径），rental 频道默认夜价 = <code>round(月租/30)</code>，并作为下单兜底价</td></tr>
+      <tr><td><code>rent_monthly</code></td><td>int</td><td>★ 月租（元/月），照实传贵方月租即可；<strong>月租→夜价的 <code>/30</code> 折算发生在平台侧</strong>（C 端按晚售卖口径）。<strong>2026-09 起为可选</strong>：与 <code>price_night</code> 至少给一个（短租房源可直接给夜价，见下）</td></tr>
       <tr><td><code>price_total</code></td><td>int</td><td>★ 总价（元），<code>newhouse</code>/<code>resale</code> 频道用</td></tr>
       <tr><td><code>promo_price</code></td><td>int</td><td>★ 优惠价（元）。当前为<strong>展示位</strong>：C 端据此打「首月特惠」标签，<strong>不参与订单计价</strong>（营销价真实成交需另行排期）</td></tr>
       <tr><td><code>total_qty</code></td><td>int</td><td>★ <strong>总间数</strong>（1-999，缺省 1）。该房型同规格可订单元数：每晚可订量 = <code>total_qty</code> − 当晚已订（可用 <code>stay-calendar/set</code> 的 <code>qty</code> 按晚覆盖放出间数，见 5.1）；下单可选多间（<code>rooms</code>），订单金额按 <code>逐晚价 × 间数</code> 计。<strong>调低不得低于未来晚已订间数</strong>，否则 400</td></tr>
-      <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>；<strong>仅 <code>minsu</code> 频道参与计价</strong>（缺省回落 <code>price_from</code>）。<code>rental</code> 频道忽略它，夜价一律 <code>月租/30</code> + 日历逐晚覆盖</td></tr>
+      <tr><td><code>price_night</code></td><td>int</td><td>★ 夜价（元/晚），写入 <code>units.ext.price_night</code>。<strong>2026-09 起两个频道都生效</strong>：默认夜价取值顺序 = <code>price_night</code> &gt; <code>rent_monthly/30</code> &gt; <code>price_from/30</code>（rental）/ <code>price_from</code>（minsu）。房态日历的逐晚覆盖价仍优先于以上全部（见 5.1）</td></tr>
+      <tr><td><code>min_stay_nights</code></td><td>int</td><td>★ 最短连住（晚），写入 <code>units.ext.min_stay_nights</code>。<strong>2026-09 起下放到户型</strong>：生效顺序 = <strong>户型 &gt; 房源 &gt; 频道默认</strong>（rental/minsu 默认均 15 晚；下限 rental 1 / minsu 15，上限 365）。传 <code>null</code> 清除（回落房源级）。整栋单（不指定户型）按<strong>排序最前的户型</strong>执行，与取消政策同一套回退</td></tr>
+      <tr><td><code>default_night_price</code></td><td>—</td><td><strong>只读出参</strong>（2026-09）：该户型的默认单夜价（按上面的顺序算好）。C 端详情页/下单页直接读它，<strong>不要再用 <code>rent_monthly/30</code> 自行折算</strong>——否则会与成交价脱节</td></tr>
       <tr><td><code>cancel_policy</code></td><td>object</td><td>★ 免费取消政策（房型级），写入 <code>units.ext.cancel_policy</code>：<code>{enabled, days_before, cutoff_time}</code>；免费取消窗口 = 入住日往前推 <code>days_before</code>（0-30，0=入住当天）天的 <code>cutoff_time</code>（HH:mm）时刻，窗口外 / 未开通一律不可取消不可退</td></tr>
       <tr><td><code>tags</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 房型说明 / 封面 / 排序（<code>sort_order</code> 升序展示，缺省 99，用于主推房型排前）</td></tr>
       <tr><td><code>amenities</code></td><td>string[]</td><td>★ 配套标识数组，按下表 10 个 id 传（C 端按 id 渲染图标）</td></tr>
@@ -409,6 +420,21 @@
     </div>
     <div class="callout info">
       <strong>验收工具：</strong><code>GET /api/juzhu/projects/{id}/stay-calendar?month=YYYY-MM&amp;unit_id=</code>（公开只读，用于上下架 / 房态验收）返回逐晚三态 + 价格 + <code>qty/booked_qty/remaining</code> 间数 + 最短连住 + 保险标识，与 C 端日历渲染一致。
+    </div>
+
+    <h3>3.4 卡片展示价（最低可售单夜价）</h3>
+    <p>C 端房源卡上的价格<strong>由平台计算并随接口下发</strong>（<code>price_from_display</code> / <code>price_unit</code> / <code>price_note</code>），贵方无需传、也不要在自己页面另算一套。单位口径：<code>minsu</code> 与<strong>带「旅居」tag 的 rental</strong> 按晚；其余 rental 按月（起价语义，<code>price_from</code> 缺省时回落户型默认夜价 × 30）。</p>
+    <p><strong>按晚房源的取值规则：</strong>从<strong>今天</strong>起按自然月向后扫描（最多 <strong>12 个月</strong>，与 C 端可订窗口同口径），取<strong>第一个存在可售间夜的月份</strong>，该月内<strong>最低单夜价</strong>即展示价；扫满仍无可售 → 不展示价格，文案「暂无可订」。</p>
+    <table>
+      <tr><th>某一晚的情况</th><th>能不能卖</th><th>单价取谁</th></tr>
+      <tr><td><strong>没有房态记录</strong>（默认态，绝大多数晚属于这种）</td><td>✅ 能</td><td>默认夜价（<code>price_night</code> &gt; 月租/30 &gt; 起价/30）</td></tr>
+      <tr><td>有记录，<code>blocked</code>（关房）</td><td>❌ 不能</td><td>—</td></tr>
+      <tr><td>有记录，<code>open</code> + 有覆盖价</td><td>✅ 能</td><td>该覆盖价</td></tr>
+      <tr><td>有记录，<code>open</code> + 无覆盖价</td><td>✅ 能</td><td>默认夜价</td></tr>
+      <tr><td>该晚已订满（<code>remaining ≤ 0</code>）</td><td>❌ 不能</td><td>—</td></tr>
+    </table>
+    <div class="callout warn">
+      <strong>常见误解：</strong>「查房态 <code>status=open</code> 的记录」是不够的——平台库存模型是<strong>没有记录 = 默认可订</strong>，差异行只在关房 / 改价 / 改放出间数 / 被订时才产生。若只扫有记录的晚，会把绝大多数可订房源误判成「暂无可订」。
     </div>
   </section>
 
@@ -462,12 +488,14 @@
   <span class="tok-key">"district_id"</span>: <span class="tok-num">41</span>,
   <span class="tok-key">"address"</span>: <span class="tok-str">"观山湖区 · 示例大道 88 号"</span>,
   <span class="tok-key">"tags"</span>: [<span class="tok-str">"旅居"</span>, <span class="tok-str">"近地铁"</span>],
-  <span class="tok-key">"price_from"</span>: <span class="tok-num">2400</span>,
+  <span class="tok-key">"price_from"</span>: <span class="tok-num">2400</span>,             <span class="tok-com">// 选填（2026-09）；不传则各户型自带价</span>
   <span class="tok-key">"contact_phone"</span>: <span class="tok-str">"13800001234"</span>,       <span class="tok-com">// 仅入库（虚拟号绑定），永不回显</span>
-  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>,               <span class="tok-com">// 最短连住，写入 ext（见 §5）</span>
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>,               <span class="tok-com">// 房源默认值；户型级优先（见 3.2 / §5.2）</span>
   <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],   <span class="tok-com">// 保险标识（见 §6）</span>
   <span class="tok-key">"units"</span>: [
-    { <span class="tok-key">"name"</span>: <span class="tok-str">"一居 45㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"1室1厅"</span>, <span class="tok-key">"area_sqm"</span>: <span class="tok-num">45</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">2400</span> }
+    { <span class="tok-key">"name"</span>: <span class="tok-str">"一居 45㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"1室1厅"</span>, <span class="tok-key">"area_sqm"</span>: <span class="tok-num">45</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">2400</span> },
+    <span class="tok-com">// 短租房源可只给夜价（rental 同样生效，2026-09）：</span>
+    { <span class="tok-key">"name"</span>: <span class="tok-str">"庭院房"</span>, <span class="tok-key">"area_sqm"</span>: <span class="tok-num">30</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">268</span>, <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">3</span> }
   ],
   <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>                      <span class="tok-com">// 缺省 draft；draft/offline 不出 C 端</span>
 }
@@ -493,7 +521,7 @@
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }     <span class="tok-com">// online 上架 / offline 下架 / draft 转草稿</span>
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }</code></pre>
     <div class="callout warn">
-      <strong>上架前置检查：</strong>必须已设 <code>price_from</code> 且至少有 1 个户型，否则 400。C 端目录有 ≤ 15 秒缓存，上架后最迟 15 秒可见、下架后最迟 15 秒消失。
+      <strong>上架前置检查：</strong>① 至少有 1 个户型；② <strong>每个户型都能算出一个大于 0 的默认夜价</strong>（<code>price_night</code> 或 <code>rent_monthly</code>，也可由房源 <code>price_from</code> 兜底）；③ 图集 ≥ 8 张 + 封面；④ 评级 <code>passed</code>。任一不满足返回 400 并指明是哪个户型缺价。C 端目录有 ≤ 15 秒缓存，上架后最迟 15 秒可见、下架后最迟 15 秒消失。
     </div>
 
     <h3>4.7 新增户型</h3>
@@ -505,9 +533,11 @@
     <h3>4.8 更新户型（调价 / 间数 / 取消政策等）</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3380</span>, <span class="tok-key">"price_night"</span>: <span class="tok-num">128</span>, <span class="tok-key">"total_qty"</span>: <span class="tok-num">5</span>,
+  <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">3</span>,                     <span class="tok-com">// 户型级最短连住（2026-09）；null 清除回落房源级</span>
   <span class="tok-key">"cancel_policy"</span>: { <span class="tok-key">"enabled"</span>: <span class="tok-str">true</span>, <span class="tok-key">"days_before"</span>: <span class="tok-num">1</span>, <span class="tok-key">"cutoff_time"</span>: <span class="tok-str">"18:00"</span> } }
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…*/</span> } }</code></pre>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…含 default_night_price / min_stay_nights 生效值…*/</span> } }</code></pre>
     <ul style="font-size:13.5px;">
+      <li><strong>最短连住</strong>：传入 <code>min_stay_nights</code>（rental 1-365 / minsu 15-365，越界 400）；传 <code>null</code> 或空串清除，回落房源级 → 频道默认。整栋单（不指定户型）按排序最前的户型执行。</li>
       <li><strong>取消政策</strong>：传入 <code>cancel_policy</code>（非法 <code>days_before</code>/<code>cutoff_time</code> 返回 400）；传 <code>null</code> 清除（= 未开通，客户不可取消）。免费取消窗口 = 入住日往前推 <code>days_before</code> 天的 <code>cutoff_time</code> 时刻；客户在窗口内取消自动退款并释放房态。</li>
       <li><strong>总间数（多间口径 2026-09-10）</strong>：<code>total_qty</code> 须为 1-999；调低到低于未来晚已订间数会返回 400（先处理订单再缩容）。</li>
     </ul>
@@ -572,7 +602,7 @@
     <h2><span class="num">5</span> 订单履约（商家接单）</h2>
     <p>客户在 C 端提交预订单后，商家经开放接口完成<strong>接单闭环</strong>：定时拉取订单 → 确认生效或拒单 → 拒单自动释放房态。订单按签约商家隔离，联系人手机号只回掩码（<code>139****5678</code>）。</p>
     <div class="callout info">
-      <strong>订单金额 = 逐晚合计（2026-09-10 口径）：</strong>每晚按「房态日历覆盖价（户型级 &gt; 项目级）→ 默认夜价」取值后求和，与 C 端日历展示同口径。默认夜价：<code>rental</code> = <code>round(月租/30)</code>、<code>minsu</code> = 房型 <code>price_night</code>（缺省回落 <code>price_from</code>）。佣金按订单金额快照锁定（规则 20）。
+      <strong>订单金额 = 逐晚合计（2026-09 口径）：</strong>每晚按「房态日历覆盖价（户型级 &gt; 项目级）→ 默认夜价」取值后求和，与 C 端日历展示同口径。<strong>默认夜价（两个频道一致）</strong>：房型 <code>price_night</code> &gt; <code>round(月租/30)</code> &gt; <code>round(起价/30)</code>（minsu 最后一档为 <code>price_from</code> 原值）。整栋单（不指定户型）价格基准 = 房源起价，<strong>起价缺失时回落排序最前户型</strong>。金额再 <code>× 间数</code>；算不出价的订单直接拒绝（400），不会 0 元成单。佣金按订单金额快照锁定（规则 20）。
     </div>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/bookings/list</span><span class="desc">本商家订单（≤200 条）</span></div>
 <pre><code>{
@@ -657,7 +687,9 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
     </ul>
 
     <h3>5.2 最短连住（min_stay_nights）</h3>
-    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=15</code> 晚。商家可用 <code>ext.min_stay_nights</code> 按房源覆盖：rental 为 1–365 晚，minsu 为 15–365 晚、不得低于 15 晚。<strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。</p>
+    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=15</code> 晚。商家可覆盖，<strong>2026-09 起生效顺序为「户型 &gt; 房源 &gt; 频道默认」</strong>：户型级写 <code>units.ext.min_stay_nights</code>（<code>units/create</code> / <code>units/update</code> 直接传 <code>min_stay_nights</code>），房源级 <code>projects.ext.min_stay_nights</code> 降级为<strong>房源默认值</strong>。取值范围：rental 1–365 晚，minsu 15–365 晚、不得低于 15 晚（越界返回 400）。</p>
+    <p><strong>整栋单（下单不指定户型）</strong>按<strong>排序最前的户型</strong>取值——与取消政策同一套回退，因此<strong>「最短连住」和「取消政策」两条住宿规则都可以只在户型上配</strong>，不必记住哪个在房源、哪个在户型。</p>
+    <p><strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。户型数组与房态日历出参均随行返回<strong>生效值</strong> <code>min_stay_nights</code>，页面直接读，不要回落到房源级或自设默认值。</p>
 
     <h3>5.3 房源交易能力（online_booking / online_payment）</h3>
     <p><code>projects/create</code> / <code>projects/update</code> 按房源配置两个独立布尔能力：<code>online_booking</code> = 客户在线选房并提交订单、商家确认后线下收款；<code>online_payment</code> = 客户在线选房后进入收银台、支付完成再由商家确认。两项可同时开启，但<strong>至少开启一项</strong>，与 rental/minsu 频道无关；新建时两项均省略则默认仅开启 online_booking。两项都开时，C 端由客户选择；接口下单用 <code>transaction_mode: "booking" | "payment"</code> 指定，缺省优先 booking。<code>catalog</code> / 详情 / 房态日历出参均返回两个能力位，并保留 <code>bookable</code> 作为“至少一项可用”的兼容汇总字段。</p>
@@ -685,8 +717,10 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>有经纬度字段吗？</td><td>暂无，只有 <code>address</code> 文本。房源级 POI 打点属新需求，请书面提给平台评估。</td></tr>
       <tr><td>slug 可以传我方房源 / 房型编号吗？</td><td>可以（同频道内唯一，未做字符集限制）。传入已存在的 slug 不报错、会静默加 <code>-2</code> 后缀，创建前先 <code>projects/list</code> 核对防重；接口暂无按 slug 幂等 upsert，已列入平台排期。</td></tr>
       <tr><td>只有封面图吗？</td><td>不止：图集走 <code>photos/add</code>（4.11），上架硬性要求 ≥ 8 张 + 封面。</td></tr>
-      <tr><td>price_from 是基础价吗？平日 / 周末 / 节假日价怎么表达？</td><td><code>price_from</code> 是起价（rental=元/月、minsu=元/晚）+ 默认夜价兜底，不分档。分档 = 房态日历逐晚 <code>price_night</code> 覆盖（5.1），订单金额按逐晚覆盖合计——2026-09-10 起覆盖价真实参与成交计价。</td></tr>
-      <tr><td>月租 /30 折算发生在哪侧？</td><td>平台侧（C 端按晚售卖口径）：默认夜价 = <code>round(月租/30)</code>。商家照实传 <code>rent_monthly</code> 即可；rental 房源的 <code>units.price_night</code> 不参与计价（仅 minsu 用）。</td></tr>
+      <tr><td>price_from 是基础价吗？平日 / 周末 / 节假日价怎么表达？</td><td><code>price_from</code> 是<strong>选填</strong>起价（rental=元/月、minsu=元/晚）+ 默认夜价的最后兜底，不分档。分档 = 房态日历逐晚 <code>price_night</code> 覆盖（5.1），订单金额按逐晚覆盖合计。不传起价时由各户型的价承担（见下条）。</td></tr>
+      <tr><td>我不按月租卖，只按每晚定价，可以吗？</td><td>可以（2026-09 起）。给户型的 <code>price_night</code> 即可，<strong>rental 频道同样生效</strong>；<code>rent_monthly</code> 与 <code>price_from</code> 都可以不传。默认夜价顺序 = <code>price_night</code> &gt; <code>月租/30</code> &gt; <code>起价/30</code>。</td></tr>
+      <tr><td>不传 price_from，C 端卡片价格显示什么？</td><td>按展示价三件套（3.4）自动算：<strong>带「旅居」tag 的 rental 与 minsu 按晚</strong>，取<strong>最低可售单夜价</strong>（从今天起按自然月向后扫 12 个月，取第一个有可售间夜的月份内的最低价）；<strong>其余 rental 按月</strong>，起价缺失时用户型默认夜价 × 30。全窗口无可售时卡片显示「暂无可订」。贵方无需做任何事。</td></tr>
+      <tr><td>月租 /30 折算发生在哪侧？</td><td>平台侧（C 端按晚售卖口径）：默认夜价 = <code>round(月租/30)</code>。<strong>2026-09 起户型 <code>price_night</code> 优先于它</strong>（两个频道一致）；详情页/下单页直接读接口下发的 <code>default_night_price</code>，不要自己折。</td></tr>
       <tr><td>promo_price 会影响成交价吗？</td><td>不会，当前是「首月特惠」展示标签位；营销价真实成交需另行排期。</td></tr>
       <tr><td>amenities 没有枚举怎么映射？</td><td>按下表 10 个 id 传（3.2）：ac / washer / fridge / heater / lock / wifi / tv / hood / microwave / induction。不传 = C 端回落展示全部；未知 id 不渲染。枚举字典化在平台排期。</td></tr>
       <tr><td>联系电话必须是 400 吗？后续能改吗？</td><td>相反：须为 <strong>11 位手机号</strong>（1 开头），400 号码会被拒。号码仅入库用于 C 端虚拟号实时绑定、任何接口不回显；可用 <code>projects/update</code> 更新。</td></tr>
@@ -762,7 +796,8 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>401</td><td>—</td><td>签名校验失败 / <code>vendor_id</code> 密钥未配置</td><td>核对 <code>hmac_key</code> 与签名算法（数组、空值、嵌套展平）</td></tr>
       <tr><td>400</td><td>—</td><td><code>name</code> / <code>city_id</code> / <code>project_id</code> 等必填缺失</td><td>按 message 补齐</td></tr>
       <tr><td>400</td><td>—</td><td>channel 非法 / <code>city_id</code> 不属于商家开放城市 / <code>district_id</code> 不属于城市</td><td>先用 <code>projects/list</code> 或平台侧确认主数据</td></tr>
-      <tr><td>400</td><td>—</td><td>上架被拒：缺 <code>price_from</code> / 无户型 / 照片不足 8 张 / 无封面 / <strong>评级未通过</strong> / 商家未过审</td><td>按 message 补齐；评级走 <code>rating/submit</code>（4.12），图片走 <code>photos/add</code>（4.11）</td></tr>
+      <tr><td>400</td><td>—</td><td>上架被拒：<strong>有户型算不出默认夜价</strong>（缺 <code>price_night</code>/<code>rent_monthly</code> 且无 <code>price_from</code>，message 会点名户型）/ 无户型 / 照片不足 8 张 / 无封面 / <strong>评级未通过</strong> / 商家未过审</td><td>按 message 补齐；评级走 <code>rating/submit</code>（4.12），图片走 <code>photos/add</code>（4.11）</td></tr>
+      <tr><td>400</td><td>—</td><td>下单被拒：<code>该房源未配置价格，暂不可预订</code>（2026-09 新增：算不出价不再 0 元成单）</td><td>给户型补 <code>price_night</code> 或 <code>rent_monthly</code>（或房源起价）</td></tr>
       <tr><td>400</td><td>—</td><td>评级：<code>dims</code> 缺维度 / 越界（0-5）/ 未知维度；或已在复核队列中重复提审</td><td>按 4.12 维度表修正；进度用 <code>rating/status</code> 查</td></tr>
       <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 超出频道范围（rental 1–365 / minsu 15–365）</td><td>按 §6 / §5 枚举修正</td></tr>
       <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
@@ -807,12 +842,15 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
       name: '示例·观山遇见旅居', channel: 'rental', city_id: 0, district_id: 0,
       address: '观山湖区 · 示例大道 88 号', tags: ['旅居', '近地铁'], price_from: 2400,
       min_stay_nights: 15, insurance: ['switch_rental', 'property'],
-      units: [{ name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 }]
+      units: [
+        { name: '一居 45㎡', layout_label: '1室1厅', area_sqm: 45, rent_monthly: 2400 },
+        { name: '庭院房', area_sqm: 30, price_night: 268, min_stay_nights: 3 }   // 短租：只给夜价 + 户型级连住
+      ]
     },
     '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, online_booking: true, online_payment: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
-    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
+    '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, min_stay_nights: 3, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
     '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'blocked', price_night: null, qty: null },
     '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
     '/api/juzhu/housing/vendor/units/delete': { id: 0 },

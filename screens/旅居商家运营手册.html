@@ -118,7 +118,8 @@
     <h3>2.3 房态 · 连住 · 交易能力</h3>
     <ul>
       <li>逐晚房态：<code>open / blocked / booked</code>；客户订单占用的夜晚自动锁定，任何接口不可改已订晚。</li>
-      <li>最短连住：rental、minsu 均默认 <b>15 晚</b>；rental 可按项目覆盖为 1–365 晚，minsu 可覆盖为 15–365 晚（不得低于 15 晚）。</li>
+      <li>最短连住：rental、minsu 均默认 <b>15 晚</b>；可按 <b>户型</b>（<code>units/update</code> 传 <code>min_stay_nights</code>）或<b>房源</b>（<code>projects/update</code> 的 <code>ext.min_stay_nights</code>）覆盖，<b>生效顺序 = 户型 &gt; 房源 &gt; 频道默认</b>；rental 可配 1–365 晚，minsu 可配 15–365 晚（不得低于 15 晚）。整栋单（不指定房型）按排序最前的户型执行，与取消政策同一套回退。</li>
+      <li>价格配置：<b>产品价下放在户型</b>（2026-09）——<code>price_night</code>（元/晚）在 rental 频道<b>同样生效</b>，默认夜价顺序 = <code>price_night</code> &gt; 月租 ÷ 30 &gt; 起价 ÷ 30；<code>price_from</code> 改为<b>选填</b>，不传起价时每个户型须自带价（上架闸逐个户型校验）。</li>
       <li><b>房源交易能力</b>：<code>online_booking</code>（在线预订、确认后线下收款）与 <code>online_payment</code>（在线支付、支付后确认）按房源独立配置，与频道无关；两项可同时开，但至少开启一项。逐晚价 / 关房在商家房态日历或 API 配置。</li>
       <li><b>取消政策</b>（房型级 <code>cancel_policy</code>）：在商家房态页「取消政策」卡或 <code>units/update</code> API 按房型配置——免费取消窗口 = 入住日往前推 N 天的截止时刻（如入住前一天 18:00）；窗口外 / 未开通一律<b>不可取消不可退</b>，客户窗口内取消自动退款并释放房态。</li>
       <li>上下架：<code>draft / online / offline</code>；C 端只出 online，上下架最迟 15 秒生效。</li>

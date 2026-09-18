@@ -424,6 +424,92 @@ async function catalogEventually(base, projectId, citySlug, want) {
     await call('/api/juzhu/booking/cancel', { order_no: bk4.j.order_no, contact_phone: bkPhone });
   }
 
+  // ── 5.9) 价格与连住口径（2026-09）：户型级夜价生效 / price_from 选填 / 最短连住下放户型 ──
+  // 改动 1：rental 的 units.ext.price_night 从「收下不生效」变为最高优先（> 月租/30 > 起价/30）
+  // 改动 2：price_from 改选填，上架闸换成「每个户型都能算出默认夜价 > 0」；展示价三件套随接口下发
+  // 改动 3：最短连住下放户型（户型 > 房源 > 频道默认），整栋单按排序最前户型
+  let pid2 = 0;
+  {
+    const mkPublishable = async (name, units, tags) => {
+      const cr = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
+        name, channel: 'rental', city_id: city.id, district_id: district.id,
+        address: '回归演示地址 · ' + name, tags: tags || ['演示', '回归'], online_booking: true, units,
+      }));
+      const id = cr.j.project && cr.j.project.id;
+      if (!id) return { id: 0, cr };
+      await conn.execute("UPDATE projects SET rating_status='passed' WHERE id=?", [id]);
+      for (let i = 0; i < 8; i++) {
+        await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+          project_id: id, file_path: `https://cdn.example.test/${name}-${i}.jpg`, is_cover: i === 0,
+        }));
+      }
+      return { id, cr };
+    };
+
+    // 9-1) 无 price_from 且户型无价 → 上架仍被拒（价格闸改为逐户型校验，不是放弃校验）
+    const noPrice = await mkPublishable(RUN + '·无价房源', [{ name: '未定价户型', layout_label: '1室1厅', area_sqm: 40 }]);
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: noPrice.id, status: 'online' }));
+    check('9-1 户型无价且无起价 → 上架被拒 400', r.status === 400 && /价格/.test(r.j.message || ''), JSON.stringify(r.j));
+
+    // 9-2) 不传 price_from、户型带 price_night → 可上架；展示价按晚下发（非起价折算）
+    // 带「旅居」tag = C 端按晚展示口径（A″）；不带则按月，展示价会走起价/月度折算
+    const okP = await mkPublishable(RUN + '·夜价房源', [
+      { name: '庭院房', layout_label: '1室1卫', area_sqm: 30, price_night: 268, min_stay_nights: 3 },
+    ], ['演示', '回归', '旅居']);
+    pid2 = okP.id;
+    check('9-2 price_from 选填：不传也能创建 + 回显展示价三件套',
+      okP.cr.j.project.price_from == null && okP.cr.j.project.price_unit === 'night'
+      && okP.cr.j.project.price_from_display === 268,
+      JSON.stringify(okP.cr.j.project).slice(0, 200));
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid2, status: 'online' }));
+    check('9-2b 每户型有价即可上架', r.status === 200 && r.j.status === 'online', JSON.stringify(r.j));
+    r = await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid2 }));
+    check('9-2c 详情下发户型生效夜价 + 户型级最短连住',
+      r.status === 200 && r.j.units[0].default_night_price === 268 && r.j.units[0].min_stay_nights === 3,
+      JSON.stringify(r.j.units[0]).slice(0, 200));
+    r = await call('/api/juzhu/housing/vendor/projects/list', signed(vendor, { channel: 'rental' }));
+    const listed = (r.j.list || []).filter((x) => x.id === pid2)[0];
+    check('9-2d 列表出参带展示价（C 端卡片同口径）',
+      !!listed && listed.price_unit === 'night' && listed.price_from_display === 268,
+      JSON.stringify(listed || {}).slice(0, 200));
+
+    // 9-3) 户型级最短连住生效：1 晚被拒、3 晚放行；且计价用 price_night（改动 1）
+    const p2a = '2027-01-10', p2b = '2027-01-11', p2c = '2027-01-12', p2d = '2027-01-13';
+    const u2 = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid2 }))).j.units[0].id;
+    let b = await call('/api/juzhu/booking', {
+      project_id: pid2, unit_id: u2, checkin: p2a, checkout: p2b,
+      contact_name: '口径回归', contact_phone: bkPhone,
+    });
+    check('9-3 户型级最短连住 3 晚 → 1 晚被拒 400', b.status === 400 && b.j.min_stay_nights === 3, JSON.stringify(b.j));
+    b = await call('/api/juzhu/booking', {
+      project_id: pid2, unit_id: u2, checkin: p2a, checkout: p2d,
+      contact_name: '口径回归', contact_phone: bkPhone,
+    });
+    check('9-3b 3 晚放行且按 ext.price_night 计价（268×3=804，旧口径会用 0）',
+      b.status === 200 && b.j.price_total === 804, JSON.stringify(b.j));
+    if (b.status === 200 && b.j.order_no) bkIds.push(b.j.order_no);
+
+    // 9-4) 整栋单（不传 unit_id）：连住取排序最前户型、价格无起价时同样回落该户型
+    const w1 = '2027-02-10', w2 = '2027-02-13';
+    const bw = await call('/api/juzhu/booking', {
+      project_id: pid2, checkin: w1, checkout: w2, contact_name: '口径回归', contact_phone: bkPhone,
+    });
+    check('9-4 整栋单回落首个户型：连住 3 晚放行 + 单价 268×3=804',
+      bw.status === 200 && bw.j.price_total === 804, JSON.stringify(bw.j).slice(0, 200));
+    const bwShort = await call('/api/juzhu/booking', {
+      project_id: pid2, checkin: w1, checkout: '2027-02-11', contact_name: '口径回归', contact_phone: bkPhone,
+    });
+    check('9-4b 整栋单同样受「首个户型 3 晚」约束', bwShort.status === 400 && bwShort.j.min_stay_nights === 3, JSON.stringify(bwShort.j));
+    if (bw.status === 200 && bw.j.order_no) bkIds.push(bw.j.order_no);
+
+    // 9-5) 户型级最短连住可清除（回落房源级/频道默认），非法值被拒
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u2, min_stay_nights: 0 }));
+    check('9-5 户型级最短连住越界被拒 400', r.status === 400, JSON.stringify(r.j));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u2, min_stay_nights: null }));
+    check('9-5b 清除户型级 → 回落频道默认 15 晚',
+      r.status === 200 && r.j.unit.min_stay_nights === 15, JSON.stringify(r.j.unit).slice(0, 160));
+  }
+
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
     check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
@@ -495,11 +581,15 @@ async function catalogEventually(base, projectId, citySlug, want) {
   r = await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, {}));
   check('缺 id → 400', r.status === 400, JSON.stringify(r.j));
 
-  // ── 8) 清理本次演示数据 ──
-  await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [pid]);
-  await conn.execute('DELETE FROM units WHERE project_id=?', [pid]);
-  await conn.execute('DELETE FROM photos WHERE entity_type="project" AND entity_id=?', [pid]);
-  await conn.execute('DELETE FROM projects WHERE id=?', [pid]);
+  // ── 8) 清理本次演示数据（含 §5.9 的价格口径房源；先删这两个项目的订单，避免残留占用）──
+  const allPids = [pid, pid2].filter(Boolean);
+  await conn.execute(`DELETE FROM booking_orders WHERE project_id IN (${allPids.map(() => '?').join(',')})`, allPids);
+  for (const x of allPids) {
+    await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [x]);
+    await conn.execute('DELETE FROM units WHERE project_id=?', [x]);
+    await conn.execute('DELETE FROM photos WHERE entity_type="project" AND entity_id=?', [x]);
+    await conn.execute('DELETE FROM projects WHERE id=?', [x]);
+  }
   check('清理演示数据', await catalogEventually(BASE, pid, city.slug, false));
 
   await conn.end();

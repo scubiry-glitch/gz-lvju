@@ -428,9 +428,17 @@ async function publishEligibility(conn, row) {
     return '商家尚未通过审核或已停用';
   }
   if (row.rating_status !== 'passed') return '房源审核/评级未通过，不能上架';
-  if (!row.price_from || row.price_from <= 0) return '上架前须设置 price_from（起价，元）';
-  const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [row.id]);
-  if (!u[0] || !Number(u[0].c)) return '上架前须至少创建 1 个户型（units/create）';
+  // 价格闸（2026-09）：price_from 改为选填——改成逐个户型校验「默认夜价 > 0」
+  // （户型 price_night > 月租/30 > 房源起价/30，见 stay_config.unitNightPrice）。
+  // 传了起价的房源全部户型自动继承，行为与旧闸一致；不传起价则每个户型须自带价。
+  const [units] = await conn.execute(
+    'SELECT id, name, rent_monthly, ext FROM units WHERE project_id=? ORDER BY sort_order, id', [row.id]);
+  if (!units.length) return '上架前须至少创建 1 个户型（units/create）';
+  const unpriced = units.filter((u) => !(stayCfg.unitNightPrice(row, u) > 0));
+  if (unpriced.length) {
+    return '上架前须设置价格：' + unpriced.map((u) => u.name || ('#' + u.id)).join('、')
+      + ' 缺夜价（price_night）或月租（rent_monthly），且房源未设置 price_from';
+  }
   const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
     WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`;
@@ -467,10 +475,30 @@ async function housingRegionsList(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', list, total: list.length });
 }
 
-async function housingProjectOut(conn, row) {
+/** 房源透出对象：脱敏 + 房态配置 + 展示价三件套（disp 由 priceDisplayOf 求得，与 C 端卡片同口径） */
+function housingProjectOut(row, disp) {
   const out = stripContactPhone(Object.assign({}, row));
   Object.assign(out, stayCfg.stayConfigOf(row));
+  Object.assign(out, disp || { price_from_display: null, price_unit: null, price_note: '' });
   return out;
+}
+
+/** 单房源透出（含展示价三件套）：create / update / status 的响应统一走这里 */
+async function housingProjectOutOne(conn, row) {
+  const lows = await displayPricesOf(conn, [row]);
+  return housingProjectOut(row, stayCfg.priceDisplayOf(row, lows.get(row.id)));
+}
+
+/** 批量求「最低可售单夜价」（Map<project_id, number|null>）：一次查户型 + 一次查房态差异行 */
+async function displayPricesOf(conn, projects) {
+  const ids = projects.map((p) => p.id);
+  let units = [];
+  if (ids.length) {
+    [units] = await conn.execute(
+      `SELECT id, project_id, rent_monthly, total_qty, ext FROM units WHERE project_id IN (${ids.map(() => '?').join(',')})`,
+      ids);
+  }
+  return stayCfg.priceDisplayScan(connRows(conn), projects, units);
 }
 
 async function housingProjectsList(conn, body, vendorId) {
@@ -489,7 +517,8 @@ async function housingProjectsList(conn, body, vendorId) {
   sql += ' ORDER BY p.sort_order, p.id DESC LIMIT 200';
   const [rows] = await conn.execute(sql, params);
   const list = [];
-  for (const r of rows) list.push(await housingProjectOut(conn, r));
+  const lows = await displayPricesOf(conn, rows);
+  for (const r of rows) list.push(housingProjectOut(r, stayCfg.priceDisplayOf(r, lows.get(r.id))));
   return reply(200, { code: 0, message: 'success', list, total: list.length });
 }
 
@@ -499,10 +528,11 @@ async function housingProjectsDetail(conn, body, vendorId) {
   const row = await ownProject(conn, vendorId, pid);
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   const [units] = await conn.execute('SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id', [row.id]);
+  const lows = await displayPricesOf(conn, [row]);
   return reply(200, {
     code: 0, message: 'success',
-    project: await housingProjectOut(conn, row),
-    units,
+    project: housingProjectOut(row, stayCfg.priceDisplayOf(row, lows.get(row.id))),
+    units: units.map((u) => stayCfg.withStayRules(u, row)),
   });
 }
 
@@ -544,6 +574,11 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
     const pn = parseInt(u.price_night, 10);
     if (!(pn >= 0)) throw new Error('units[].price_night 须为非负整数（元/晚）');
     ext.price_night = pn;
+  }
+  // 最短连住（2026-09 下放户型）：户型级 > 房源级 > 频道默认，下限按频道校验
+  if (u.min_stay_nights != null && u.min_stay_nights !== '') {
+    try { ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(u.min_stay_nights, channel); }
+    catch (e) { throw new Error('units[].' + e.message); }
   }
   const [r] = await conn.execute(
     `INSERT INTO units(project_id, name, slug, area_sqm, layout_label, rent_monthly, price_total,
@@ -621,7 +656,7 @@ async function housingProjectsCreate(conn, body, vendorId) {
     catch (e) { return reply(400, { code: 400, message: 'units 创建失败：' + e.message, project_id: pid }); }
   }
   const row = await ownProject(conn, vendorId, pid);
-  return reply(200, { code: 0, message: 'success', project: await housingProjectOut(conn, row) });
+  return reply(200, { code: 0, message: 'success', project: await housingProjectOutOne(conn, row) });
 }
 
 async function housingProjectsUpdate(conn, body, vendorId) {
@@ -678,7 +713,7 @@ async function housingProjectsUpdate(conn, body, vendorId) {
   params.push(row.id);
   await conn.execute(`UPDATE projects SET ${sets.join(', ')} WHERE id=?`, params);
   const fresh = await ownProject(conn, vendorId, row.id);
-  return reply(200, { code: 0, message: 'success', project: await housingProjectOut(conn, fresh) });
+  return reply(200, { code: 0, message: 'success', project: await housingProjectOutOne(conn, fresh) });
 }
 
 async function housingProjectsStatus(conn, body, vendorId) {
@@ -761,7 +796,7 @@ async function housingUnitsCreate(conn, body, vendorId) {
     const uid = await createUnit(conn, row.id, row.channel, row.price_from, b);
     await conn.execute('UPDATE projects SET unit_count=(SELECT COUNT(*) FROM units WHERE project_id=?) WHERE id=?', [row.id, row.id]);
     const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
-    return reply(200, { code: 0, message: 'success', unit: u[0] });
+    return reply(200, { code: 0, message: 'success', unit: stayCfg.withStayRules(u[0], row) });
   } catch (e) {
     return reply(400, { code: 400, message: e.message });
   }
@@ -823,12 +858,23 @@ async function housingUnitsUpdate(conn, body, vendorId) {
     }
     extDirty = true;
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')) {
+    // 最短连住（2026-09 下放户型）：户型级 > 房源级 > 频道默认；null/'' = 清除（回落房源级）
+    if (b.min_stay_nights === null || b.min_stay_nights === '') delete cur.min_stay_nights;
+    else {
+      try { cur.min_stay_nights = stayCfg.normalizeMinStayNightsInput(b.min_stay_nights, rows[0].channel); }
+      catch (e) { return reply(400, { code: 400, message: e.message }); }
+    }
+    extDirty = true;
+  }
   if (extDirty) { sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null); }
   if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
   params.push(rows[0].id);
   await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, params);
   const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [rows[0].id]);
-  return reply(200, { code: 0, message: 'success', unit: u[0] });
+  // 回显生效值（最短连住 / 默认夜价 / 取消政策），与 detail/list 出参同口径
+  const [prow] = await conn.execute('SELECT * FROM projects WHERE id=?', [rows[0].project_id]);
+  return reply(200, { code: 0, message: 'success', unit: stayCfg.withStayRules(u[0], prow[0] || { channel: rows[0].channel }) });
 }
 
 async function housingPhotosAdd(conn, body, vendorId) {

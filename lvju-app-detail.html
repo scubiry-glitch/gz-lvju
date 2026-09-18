@@ -7,6 +7,7 @@
 <title>云上观景民宿 · 房源详情 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 <script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   .pd-hero{height:280px;position:relative;color:#fff;}
   .pd-hero .badge{position:absolute;left:16px;bottom:16px;z-index:2;}
@@ -708,12 +709,12 @@ window.__NEARBY_RENDER__ = (function(){
     // 户型：只组装数据，房型卡 + 房态日历由下方日历脚本（携程式交互）统一渲染
     var unitsX = units.map(function(u){
       var ex = {}; if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) {} } else if (u.ext) { ex = u.ext; }
-      var per = 0;   // 晚均价（与服务端 unitNightPrice 同口径：minsu=ext.price_night / price_from；rental=月租/30）
-      if (p.channel === 'minsu') per = (+ex.price_night) || (p.price_from || 0);
-      else if (u.rent_monthly) per = Math.max(1, Math.round(u.rent_monthly / 30));
-      else if (p.price_from) per = Math.max(1, Math.round(p.price_from / 30));
+      // 晚均价读服务端下发的 default_night_price（口径单一数据源 stay_config.unitNightPrice，2026-09）：
+      // 户型夜价 > 月租/30 > 起价/30，页面不再自行折算（否则与成交价脱节）
+      var per = LVJU_PRICE.unitNight(u);
       var profile = (ex.room_profile && typeof ex.room_profile === 'object' && !Array.isArray(ex.room_profile)) ? ex.room_profile : {};
-      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), amenities: asArr(u.amenities), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '', profile: profile };
+      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), amenities: asArr(u.amenities), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '', profile: profile,
+        minNights: u.min_stay_nights || 0 };   // 房型级最短连住生效值（2026-09 下放户型）
     });
     roomProfileUnits = unitsX;
     if (unitsX.length) renderRoomProfile(unitsX[0].id);
@@ -957,6 +958,9 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   function setUnit(uid){
     if (!live || !live.bookable || !uid || selUnit === uid) return;
     selUnit = uid;
+    // 最短连住随所选房型（2026-09 下放户型；未选房型 = 整栋单口径，服务端已按首个户型下发）
+    var u0 = (live.units || []).filter(function(x){ return x.id === uid; })[0];
+    if (u0 && u0.minNights) live.minNights = u0.minNights;
     if (window.__ROOM_PROFILE_SELECT__) window.__ROOM_PROFILE_SELECT__(uid);
     unitsEl.querySelectorAll('.roomcard').forEach(function(c){ c.classList.toggle('sel', +c.dataset.u === uid); });
     if (monthsBuilt) Object.keys(monthEls).forEach(paintMonth);   // 房态按户型各自缓存，重绘即可（不重拉）

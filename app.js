@@ -707,6 +707,7 @@ const minStayNightsOf = stayCfg.minStayNightsOf;
 const transactionCapabilitiesOf = stayCfg.transactionCapabilitiesOf;
 const bookableOf = stayCfg.bookableOf;
 const unitNightPrice = stayCfg.unitNightPrice;
+const wholeHousePriceUnit = stayCfg.wholeHousePriceUnit;   // 整栋单价格基准（2026-09：起价缺失回落首个户型）
 const stayNightPrices = stayCfg.stayNightPrices;
 const stayConfigOf = stayCfg.stayConfigOf;
 const cancelPolicyOf = stayCfg.cancelPolicyOf;
@@ -726,6 +727,7 @@ function normalizeProjectExtInput(value, channel) {
   return stayCfg.applyTransactionCapabilities(ext, ext, channel);
 }
 const withCancelPolicy = stayCfg.withCancelPolicy;
+const withStayRules = stayCfg.withStayRules;   // unit 级生效住宿规则（最短连住 + 取消政策，2026-09）
 const orderCancelInfoOf = stayCfg.orderCancelInfoOf;
 const normalizeCancelPolicyInput = stayCfg.normalizeCancelPolicyInput;
 const stayDateList = stayCfg.stayDateList;
@@ -734,14 +736,17 @@ const releaseStayQty = stayCfg.releaseStayQty;   // 多间库存释放（2026-09
 function connExec(conn) {
   return async (sql, params) => (await conn.execute(sql, params))[0];
 }
-/** 取消政策取数：有 unit 用该房型；整栋单（unit_id 空）按项目首个房型（sort_order 最小）政策执行，无房型从严。
+/** 住宿规则取数（取消政策 / 最短连住共用）：有 unit 用该房型；整栋单（unit_id 空）按项目首个房型
+ *  （sort_order 最小）执行，无房型从严（2026-09：最短连住沿用同一回退，两条规则同源同口径）。
  *  fetchRows(sql, params) → rows，由调用方注入（conn 事务内 / queryRows 连接池）。 */
-async function cancelUnitRowFor(fetchRows, unitId, projectId) {
+async function fallbackUnitRowFor(fetchRows, unitId, projectId) {
+  // 取价所需列（ext.price_night / rent_monthly）一并带出：整栋单的默认夜价也按首个户型算
+  const cols = 'id, ext, rent_monthly';
   if (unitId) {
-    const rows = await fetchRows('SELECT id, ext FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    const rows = await fetchRows(`SELECT ${cols} FROM units WHERE id=? AND project_id=?`, [unitId, projectId]);
     return rows[0] || null;
   }
-  const rows = await fetchRows('SELECT id, ext FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [projectId]);
+  const rows = await fetchRows(`SELECT ${cols} FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1`, [projectId]);
   return rows[0] || null;
 }
 const MIN_PUBLISH_PHOTOS = 8;
@@ -763,9 +768,18 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
     return { ok: false, error: '商家尚未通过审核或已停用', status: 400 };
   }
   if (p.rating_status !== 'passed') return { ok: false, error: '房源审核/评级未通过，不能上架', status: 400 };
-  if (!p.price_from || p.price_from <= 0) return { ok: false, error: '上架前须设置 price_from（起价，元）', status: 400 };
-  const [u] = await conn.execute('SELECT COUNT(*) AS c FROM units WHERE project_id=?', [p.id]);
-  if (!u[0] || !Number(u[0].c)) return { ok: false, error: '上架前须至少创建 1 个户型（units/create）', status: 400 };
+  // 价格闸（2026-09）：price_from 改为选填——改成逐个户型校验「默认夜价 > 0」
+  // （户型 price_night > 月租/30 > 房源起价/30，见 stay_config.unitNightPrice）。
+  // 传了起价的房源全部户型自动继承，行为与旧闸一致；不传起价则每个户型须自带价。
+  const [units] = await conn.execute(
+    'SELECT id, name, rent_monthly, ext FROM units WHERE project_id=? ORDER BY sort_order, id', [p.id]);
+  if (!units.length) return { ok: false, error: '上架前须至少创建 1 个户型（units/create）', status: 400 };
+  const unpriced = units.filter((u) => !(unitNightPrice(p, u) > 0));
+  if (unpriced.length) {
+    return { ok: false, status: 400, error: '上架前须设置价格：'
+      + unpriced.map((u) => u.name || ('#' + u.id)).join('、')
+      + ' 缺夜价（price_night）或月租（rent_monthly），且房源未设置 price_from' };
+  }
   const [ph] = await conn.execute(
     `SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
        WHERE (entity_type='project' AND entity_id=?)
@@ -2164,7 +2178,7 @@ function normalizeUnitRoomProfileInput(value) {
   return out;
 }
 
-function normalizeUnitExtInput(value) {
+function normalizeUnitExtInput(value, channel) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('ext 须为对象');
   const ext = Object.assign({}, value);
@@ -2172,6 +2186,12 @@ function normalizeUnitExtInput(value) {
     const profile = normalizeUnitRoomProfileInput(ext.room_profile);
     if (profile && Object.keys(profile).length) ext.room_profile = profile;
     else delete ext.room_profile;
+  }
+  // 最短连住（2026-09 下放户型）：按频道单一口径校验（rental 1-365 / minsu 15-365），
+  // 传 channel 才用得上频道下限，缺省按 1-365 兜底；null/'' = 清除（回落房源级）
+  if ('min_stay_nights' in ext) {
+    if (ext.min_stay_nights === null || ext.min_stay_nights === '') delete ext.min_stay_nights;
+    else ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(ext.min_stay_nights, channel);
   }
   return ext;
 }
@@ -3576,12 +3596,12 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [projs] = await conn.execute('SELECT id FROM projects WHERE id=?', [pid]);
+          const [projs] = await conn.execute('SELECT id, channel FROM projects WHERE id=?', [pid]);
           if (!projs.length) { conn.end(); return jsonReply(res, { error: 'project not found' }, 404); }
           const name = body.name || '新户型';
           const slug = await uniqueUnitSlug(conn, pid, name, body.slug);
           let unitExt = null;
-          try { unitExt = normalizeUnitExtInput(body.ext); }
+          try { unitExt = normalizeUnitExtInput(body.ext, projs[0].channel); }
           catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
           await conn.execute(
             `INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,
@@ -3633,7 +3653,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT project_id FROM units WHERE id=?', [uid]);
+          const [rows] = await conn.execute(
+            'SELECT u.project_id, p.channel AS channel FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?', [uid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const pid = rows[0].project_id;
           const sets = [], vals = [];
@@ -3665,7 +3686,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
               catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
             }
             try {
-              const ext = normalizeUnitExtInput(body.ext);
+              const ext = normalizeUnitExtInput(body.ext, rows[0].channel);
               put('ext', ext != null ? JSON.stringify(ext) : null);
             } catch (e) {
               conn.end();
@@ -4357,13 +4378,24 @@ async function handleApiDirect(urlPath, qs, req, res) {
         keys.forEach((k) => { o[k] = parse(o[k]); });
         return o;
       });
+      // 卡片展示价（2026-09）：单位按 A″（minsu / 带「旅居」tag 的 rental 按晚，其余按月）；
+      // 按晚的走最低可售单夜价扫描。lite 首屏也要出价，故只补最小列，不整表拉户型。
+      let priceUnits = units;
+      if (lite && projectIds.length) {
+        priceUnits = await queryRows(
+          `SELECT id, project_id, rent_monthly, total_qty, ext FROM units
+           WHERE project_id IN (${projectIds.map(() => '?').join(',')})`, projectIds);
+      }
+      const priceLows = await stayCfg.priceDisplayScan(queryRows, projects, priceUnits);
+      const projById = new Map(projects.map((p) => [p.id, p]));
       const catalog = {
         city,
         channels,
         districts: mapRows(districts, ['tags']),
         projects: mapRows(projects, ['tags', 'rating', 'ext']).map((p) =>
-          Object.assign(stripContactPhone(p), stayConfigOf(p))),
-        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']).map((u) => withCancelPolicy(u)),
+          Object.assign(stripContactPhone(p), stayConfigOf(p), stayCfg.priceDisplayOf(p, priceLows.get(p.id)))),
+        units: mapRows(units, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext'])
+          .map((u) => withStayRules(u, projById.get(u.project_id))),
         photos,
         topic: topicMeta,
         stats: {
@@ -4470,11 +4502,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const vrows = rows[0].owner_vendor_id
           ? await queryRows('SELECT consult_mode FROM jz_vendors WHERE id=?', [rows[0].owner_vendor_id])
           : [];
+        // 项目级最短连住与展示价取「整栋单口径」（排序最前户型），与 /units 接口及下单闸同口径
+        const [headUnit] = await queryRows(
+          'SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [rows[0].id]);
+        const disp = await stayCfg.priceDisplayScan(queryRows, [rows[0]], headUnit ? [headUnit] : []);
         return jsonReply(res, imgThumbs.mapThumbsDeep(
-          Object.assign(rows[0], stayConfigOf(rows[0]), {
-            consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant',
-            spots
-          }), 640));
+          Object.assign(rows[0], stayConfigOf(rows[0], headUnit),
+            stayCfg.priceDisplayOf(rows[0], disp.get(rows[0].id)), {
+              consult_mode: (vrows[0] && vrows[0].consult_mode) || 'consultant',
+              spots
+            }), 640));
       }
     }
 
@@ -4597,14 +4634,21 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const projs = await queryRows(projSql, [isId ? parseInt(slug) : slug]);
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         const proj = projs[0];
-        const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [proj.id]);
+        const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id', [proj.id]);
         const photos = await queryRows(
           "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
           [proj.id]
         );
         parseJsonFields(proj, ['tags', 'rating']);
-        units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
-        return jsonReply(res, imgThumbs.mapThumbsDeep({ project: Object.assign(stripContactPhone(proj), stayConfigOf(proj)), units, photos }, 640));
+        // 户型级生效住宿规则（最短连住 + 取消政策，2026-09）：前端只读 unit 上的值
+        units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withStayRules(u, proj); });
+        // 项目级最短连住取「整栋单口径」= 排序最前户型，与下单闸同口径；展示价三件套一次算出
+        const disp = await stayCfg.priceDisplayScan(queryRows, [proj], units);
+        return jsonReply(res, imgThumbs.mapThumbsDeep({
+          project: Object.assign(stripContactPhone(proj), stayConfigOf(proj, units[0]),
+            stayCfg.priceDisplayOf(proj, disp.get(proj.id))),
+          units, photos,
+        }, 640));
       }
     }
 
@@ -4629,8 +4673,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
             const us = await queryRows('SELECT * FROM units WHERE id=? AND project_id=?', [uid, pid]);
             if (!us.length) continue;
             const up = cancelPolicyOf(us[0]);   // 房型级取消政策随月历下发（C 端房型卡直接用）
-            out.push(Object.assign({ unit_id: uid, cancel_policy: up, cancel_policy_text: cancelPolicyTextOf(up) },
-              await buildStayMonth(prows[0], us[0], uid, y, mo)));
+            out.push(Object.assign({
+              unit_id: uid, cancel_policy: up, cancel_policy_text: cancelPolicyTextOf(up),
+              min_stay_nights: minStayNightsOf(prows[0], us[0]),   // 户型级生效值（2026-09）
+            }, await buildStayMonth(prows[0], us[0], uid, y, mo)));
           }
           return jsonReply(res, { project_id: pid, month: `${y}-${String(mo + 1).padStart(2, '0')}`, units: out });
         }
@@ -4640,12 +4686,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
           unit = us[0];
         }
-        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        // 整栋单口径（2026-09）：不指定户型时价格基准按 wholeHousePriceUnit（有起价按起价）、
+        // 最短连住取「排序最前户型」，与下单闸一致；取消政策维持现状（不在本次改动面内）
+        const headUnit = unit || (await queryRows(
+          'SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [pid]))[0] || null;
+        const cal = await buildStayMonth(prows[0], unit || wholeHousePriceUnit(prows[0], headUnit), unitId, y, mo);
         const unitPolicy = unit ? cancelPolicyOf(unit) : null;
         return jsonReply(res, Object.assign({
           project_id: pid,
           unit_id: unitId,
-        }, cal, stayConfigOf(prows[0]), unitPolicy ? { cancel_policy: unitPolicy, cancel_policy_text: cancelPolicyTextOf(unitPolicy) } : {}));
+        }, cal, stayConfigOf(prows[0], headUnit), unitPolicy ? { cancel_policy: unitPolicy, cancel_policy_text: cancelPolicyTextOf(unitPolicy) } : {}));
       }
     }
 
@@ -4951,7 +5001,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const firstExtByProject = {};
       const unitlessPids = [...new Set(rows.filter((o) => o.unit_id == null).map((o) => o.project_id))];
       for (const upid of unitlessPids) {
-        const fu = await cancelUnitRowFor(queryRows, null, upid);
+        const fu = await fallbackUnitRowFor(queryRows, null, upid);
         if (fu) firstExtByProject[upid] = fu.ext;
       }
       return jsonReply(res, {
@@ -5084,12 +5134,6 @@ async function handleApiDirect(urlPath, qs, req, res) {
           return jsonReply(res, { error: '该房源不支持在线支付，请选择在线预订', online_booking: txCaps.online_booking, online_payment: false }, 400);
         }
         const initialPayStatus = transactionMode === 'payment' ? 'unpaid' : null;
-        // 最短连住（旅居口径，商家可在 ext.min_stay_nights 覆盖）
-        const minNights = minStayNightsOf(proj);
-        if (nights < minNights) {
-          await conn.rollback();
-          return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
-        }
         // 事务内锁项目行，清理已过期的 mock 待支付订单后再复核房态，避免并发双订。
         // 多间库存（2026-09-10）：过期判定只看订单自身列（stay_calendar.booking_id 多间下仅是首写标记，不可依赖）
         const [stale] = await conn.execute(
@@ -5107,6 +5151,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
             await conn.rollback();
             return jsonReply(res, { error: `该房型总间数仅 ${stayCfg.totalQtyOf(unitRow)} 间，无法预订 ${rooms} 间` }, 400);
           }
+        }
+        // 最短连住（2026-09 下放户型）：户型级 > 房源级 > 频道默认；整栋单按「排序最前户型」取，
+        // 与取消政策同一套回退（fallbackUnitRowFor）。三处同口径：C 端日历 / 下单页 / 本闸。
+        const stayRuleUnit = unitRow || await fallbackUnitRowFor(connExec(conn), unitId, projectId);
+        const minNights = minStayNightsOf(proj, stayRuleUnit);
+        if (nights < minNights) {
+          await conn.rollback();
+          return jsonReply(res, { error: `该房源须连住至少 ${minNights} 晚（当前 ${nights} 晚）`, min_stay_nights: minNights }, 400);
         }
         // 逐晚可用数校验（多间库存）：指定户型 → 项目级闸（关房/整栋被订）+ 户型级 remaining>=rooms；
         // unit 未指定 = 整栋/不限房型 → 全项目任一晚有占用/关房即拒（整栋包圆，沿用原语义）
@@ -5152,11 +5204,18 @@ async function handleApiDirect(urlPath, qs, req, res) {
       } catch (_) {}
         // 逐晚计价（2026-09-10）：每晚 = 日历覆盖价（户型级 > 项目级）否则默认夜价，
         // 单一数据源 stay_config.cjs，与 C 端日历/下单页展示同口径；price_total 为逐晚合计
-        //（价格未配置时合计为 0，沿用既有 0 元预订单口径，不在此处加新闸）
+        // 整栋单价格基准：有起价按起价（存量语义），无起价回落排序最前户型（stayRuleUnit）
         const nightCalc = await stayNightPrices(
-          async (sql, p) => (await conn.execute(sql, p))[0], proj, unitRow, unitId, checkin, checkout);
-        // 多间库存（2026-09-10）：单间逐晚口径不变，合计 × 间数；0 元预订单口径不变
+          async (sql, p) => (await conn.execute(sql, p))[0], proj,
+          unitRow || wholeHousePriceUnit(proj, stayRuleUnit), unitId, checkin, checkout);
+        // 多间库存（2026-09-10）：单间逐晚口径不变，合计 × 间数
         const priceTotal = nightCalc.total * rooms;
+        // 无价闸（2026-09）：price_from 改为选填后价格链必须真能算出价，否则会 0 元成单；
+        // 与上架闸「每个户型都要有默认夜价」呼应，此处是第二道兜底
+        if (!(priceTotal > 0)) {
+          await conn.rollback();
+          return jsonReply(res, { error: '该房源未配置价格，暂不可预订' }, 400);
+        }
         // 佣金快照（规则 20）：按 owner 商家 housing 档生效费率锁定，调价不追溯；
         // 平台自营（无商家行）回落全局基准
         const [vrate] = proj.owner_vendor_id
@@ -5208,7 +5267,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         });
         // 下单即回显所选房型的退改口径（units.ext.cancel_policy，单一数据源 stay_config.cjs）；
         // 整栋单（未选房型）按项目首个房型政策执行
-        const cpUnit = unitRow || await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], unitId, projectId);
+        const cpUnit = unitRow || await fallbackUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], unitId, projectId);
         const cancelInfo = orderCancelInfoOf(cpUnit, { status: 'pending', checkin });
         return jsonReply(res, { ok: true, order_no: orderNo, nights, rooms, price_total: priceTotal, min_stay_nights: minNights,
           payment_expires_at: paymentExpiresAt, pay_status: initialPayStatus, transaction_mode: transactionMode,
@@ -5251,7 +5310,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         } finally { await conn.end(); }
       }
       // 退改口径随单下发（units.ext.cancel_policy；整栋单按项目首个房型政策执行）
-      const lookupUnit = o.unit_ext ? { ext: o.unit_ext } : await cancelUnitRowFor(queryRows, o.unit_id, o.project_id);
+      const lookupUnit = o.unit_ext ? { ext: o.unit_ext } : await fallbackUnitRowFor(queryRows, o.unit_id, o.project_id);
       const cancelInfo = orderCancelInfoOf(lookupUnit, o);
       return jsonReply(res, {
         order: {
@@ -5280,7 +5339,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '仅待确认订单可取消' }, 400); }
         // 免费取消窗口（房型维度 units.ext.cancel_policy，单一数据源 stay_config.cjs）：
         // 窗口外 / 未启用一律不可取消不可退；商家侧（B 端 / HMAC）取消接口不受此闸约束
-        const cUnit = await cancelUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], rows[0].unit_id, rows[0].project_id);
+        const cUnit = await fallbackUnitRowFor(async (sql, p) => (await conn.execute(sql, p))[0], rows[0].unit_id, rows[0].project_id);
         const cInfo = orderCancelInfoOf(cUnit, rows[0]);
         if (!cInfo.can_cancel) {
           await conn.rollback();
@@ -5787,10 +5846,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
           projectIds
         );
       }
-      units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withCancelPolicy(u); });
+      const projById = new Map(projects.map((p) => [p.id, p]));
+      units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withStayRules(u, projById.get(u.project_id)); });
+      const disp = await stayCfg.priceDisplayScan(queryRows, projects, units);
       return jsonReply(res, {
         role: sess.role,
-        projects: projects.map((p) => Object.assign(stripContactPhone(parseJsonFields(p, ['ext'])), stayConfigOf(p))),
+        projects: projects.map((p) => Object.assign(stripContactPhone(parseJsonFields(p, ['ext'])), stayConfigOf(p),
+          stayCfg.priceDisplayOf(p, disp.get(p.id)))),
         units,
       });
     }
@@ -5838,7 +5900,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            'SELECT u.id, u.ext, p.owner_vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?',
+            'SELECT u.id, u.ext, u.project_id, p.owner_vendor_id, p.channel AS channel FROM units u JOIN projects p ON p.id=u.project_id WHERE u.id=?',
             [uid]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
@@ -5861,24 +5923,43 @@ async function handleApiDirect(urlPath, qs, req, res) {
             if (Number(bmax[0].m) > tq) { conn.end(); return jsonReply(res, { error: `未来已有晚的已订间数达 ${bmax[0].m}，total_qty 不得低于该值` }, 400); }
             put('total_qty', tq);
           }
-          if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+          // ext 合并：各键（ext 整包 / cancel_policy / min_stay_nights）合并到同一份 ext 后一次性写回，
+          // 避免多次 put('ext') 生成重复赋值互相覆盖（后者会把前者的改动丢掉）
+          let extCur = null;
+          let extTouched = false;
+          const extOf = () => { if (extCur == null) extCur = parseExtObj(rows[0].ext); return extCur; };
+          if ('ext' in body) { extCur = body.ext != null ? Object.assign({}, parseExtObj(body.ext)) : {}; extTouched = true; }
           if ('cancel_policy' in body) {
             // 取消政策只合并 ext.cancel_policy 一键（保留 price_night 等既有键），口径单一数据源 stay_config.cjs；
             // null = 清除（视为未开通，不可取消）
-            const ext = parseExtObj(rows[0].ext);
+            const ext = extOf();
             if (body.cancel_policy === null) delete ext.cancel_policy;
             else {
               try { ext.cancel_policy = normalizeCancelPolicyInput(body.cancel_policy); }
               catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
             }
-            put('ext', Object.keys(ext).length ? JSON.stringify(ext) : null);
+            extTouched = true;
           }
+          if ('min_stay_nights' in body) {
+            // 最短连住（2026-09 下放户型）：只合并 ext.min_stay_nights 一键，保留 price_night / cancel_policy；
+            // null/'' = 清除（回落房源级，再落频道默认）
+            const ext = extOf();
+            if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
+            else {
+              try { ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, rows[0].channel); }
+              catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+            }
+            extTouched = true;
+          }
+          if (extTouched) put('ext', extCur && Object.keys(extCur).length ? JSON.stringify(extCur) : null);
           if (!sets.length) { conn.end(); return jsonReply(res, { error: '无可更新字段' }, 400); }
           vals.push(uid);
           await conn.execute(`UPDATE units SET ${sets.join(', ')} WHERE id=?`, vals);
           await conn.commit();
           const [updated] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
-          return jsonReply(res, { ok: true, unit: updated[0] });
+          // 回显生效值（最短连住 + 来源 / 默认夜价 / 取消政策文案），B 端住宿规则卡直接用它对齐
+          const [prow] = await conn.execute('SELECT * FROM projects WHERE id=?', [rows[0].project_id]);
+          return jsonReply(res, { ok: true, unit: withStayRules(updated[0], prow[0] || { channel: rows[0].channel }) });
         } finally { await conn.end(); }
       }
     }
@@ -5908,14 +5989,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!us.length) return jsonReply(res, { error: 'unit not found' }, 404);
           unit = us[0];
         }
-        const cal = await buildStayMonth(prows[0], unit, unitId, y, mo);
+        // 整栋单口径（2026-09）：不指定户型时价格基准按 wholeHousePriceUnit、最短连住取「排序最前户型」
+        const headUnit = unit || (await queryRows(
+          'SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1', [pid]))[0] || null;
+        const cal = await buildStayMonth(prows[0], unit || wholeHousePriceUnit(prows[0], headUnit), unitId, y, mo);
         return jsonReply(res, Object.assign({
           role: sess.role,
           project_id: pid,
           project_name: prows[0].name,
           unit_id: unitId,
           writable: true,
-        }, cal, stayConfigOf(prows[0])));
+        }, cal, stayConfigOf(prows[0], headUnit)));
       }
     }
 

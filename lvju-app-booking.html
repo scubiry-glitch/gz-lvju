@@ -7,6 +7,7 @@
 <title>预定下单 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
 <script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   .bfield{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:#fff;}
   .bfield .l{font-size:13px;color:var(--muted);flex-shrink:0;}
@@ -277,7 +278,8 @@
   }
 
   /* ── 房源 + 价格（总价按商家逐晚实价合计，与详情页日历同口径）── */
-  var minNights = 15;     // 旅居口径连住下限（随项目下发，服务端同口径兜底）
+  var minNights = 15;     // 当前生效连住下限（未选房型 = 整栋单口径，选房型后随该房型；服务端同口径兜底）
+  var wholeMinNights = 15;   // 整栋单（不限房型）连住下限，切换房型后可回退
   var unitCp = {};        // 房型id -> 退改口径文案（units 接口随 cancel_policy 下发，前端不自行拼口径）
   var WK = ['日','一','二','三','四','五','六'];
   var nightCache = {};    // monthKey -> {date:day}（选中户型）
@@ -438,9 +440,11 @@
       document.getElementById('bStar').textContent = window.lvjuFeatureEnabled('caibei') && p.rating_status === 'passed' && r.stars
         ? '★ ' + r.stars + ' 星 · 已评级' : '精选房源';
       if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
-      perNight = p.price_from || 0;
-      // 最短连住（旅居口径：rental / minsu 均默认 15 晚起，商家可在项目上覆盖）+ 最早可入住日
-      minNights = p.min_stay_nights || 15;
+      // 展示价三件套（服务端下发，2026-09）：整栋单基准 = 起价，缺省回落首个户型默认夜价
+      var pd = LVJU_PRICE.parts(p);
+      perNight = pd.value || 0;
+      // 最短连住：未选房型 = 整栋单口径（服务端按排序最前户型下发）；选房型后随该房型切换
+      minNights = wholeMinNights = p.min_stay_nights || 15;
       var today = new Date(); today.setHours(0,0,0,0);
       var tmin = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
       document.getElementById('fIn').min = tmin;
@@ -450,15 +454,20 @@
         u.tags = asArr(u.tags);
         var ex = {};
         if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) { ex = {}; } } else if (u.ext) { ex = u.ext; }
-        var pn;
-        if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
-        else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
+        // 默认单夜价与最短连住都读服务端下发的生效值（口径单一数据源，2026-09），页面不自行折算
+        var pn = LVJU_PRICE.unitNight(u);
         unitCp[u.id] = u.cancel_policy_text || '';   // 退改口径随 units 下发
-        return '<option value="' + u.id + '" data-per="' + pn + '" data-qty="' + (parseInt(u.total_qty, 10) || 1) + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '（' + (parseInt(u.total_qty, 10) || 1) + ' 间）</option>';
+        return '<option value="' + u.id + '" data-per="' + pn + '" data-min="' + (parseInt(u.min_stay_nights, 10) || 0)
+          + '" data-qty="' + (parseInt(u.total_qty, 10) || 1) + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '（' + (parseInt(u.total_qty, 10) || 1) + ' 间）</option>';
       }).join('');
       var qUnit = parseInt(q.get('unit') || '', 10);
       if (qUnit) unitSel.value = String(qUnit);
-      if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
+      if (unitSel.selectedIndex > 0) {
+        var o = unitSel.options[unitSel.selectedIndex];
+        perNight = +o.dataset.per || perNight;
+        minNights = parseInt(o.dataset.min, 10) || wholeMinNights;   // 深链带 unit 时同步连住下限
+      }
+      document.getElementById('stayNote').textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
       updateCpNote();
       refreshRooms();
       var ci = q.get('checkin'), co = q.get('checkout');
@@ -491,6 +500,11 @@
   unitSel.addEventListener('change', function(){
     var o = unitSel.options[unitSel.selectedIndex];
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
+    // 连住下限随房型切换（2026-09 下放户型）：选了房型用房型生效值，不限房型回落整栋单口径
+    var dm = o && o.dataset ? parseInt(o.dataset.min, 10) || 0 : 0;
+    minNights = dm || wholeMinNights;
+    var sn = document.getElementById('stayNote');
+    if (sn) sn.textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
     nightCache = {}; nightLoaded = '';                 // 房态/夜价按户型隔离
     roomsSel.value = '1';                              // 换房型间数回 1，再按新房型总间数重建
     updateCpNote();
