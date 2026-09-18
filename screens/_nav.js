@@ -332,6 +332,7 @@
           { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
           { id: 'vendor-onboarding', label: '商家入驻申请', href: 'vendor-onboarding.html',    icon: 'user' },
           { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
+          { id: 'api-changelog', label: '★ 房源接口变更说明（2026-09）', href: 'housing-api-changelog.html', icon: 'book' },
           { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
           { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
           { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },
