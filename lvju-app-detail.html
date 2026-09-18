@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <title>云上观景民宿 · 房源详情 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
 <style>
   .pd-hero{height:280px;position:relative;color:#fff;}
   .pd-hero .badge{position:absolute;left:16px;bottom:16px;z-index:2;}
@@ -22,6 +23,23 @@
   .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
   .tagline{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px;}
   .tagline span{font-size:11px;color:var(--brand-deep);background:var(--brand-soft);padding:3px 9px;border-radius:6px;}
+  /* 携程式首屏设施摘要：项目概览后直接露出，随选中房型更新 */
+  .core-facilities{padding-top:10px;padding-bottom:10px;}
+  .core-facilities .core-hd{display:flex;align-items:baseline;gap:8px;}
+  .core-facilities .core-hd .bs{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .core-facilities .core-more{margin-left:auto;border:0;background:none;color:var(--brand-deep);font:600 10.5px var(--font);padding:4px 0;white-space:nowrap;cursor:pointer;}
+  .facility-grid{display:flex;align-items:center;gap:5px;margin-top:8px;overflow:hidden;}
+  .facility-item{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;text-align:left;}
+  .facility-item .fi{display:grid;place-items:center;width:24px;height:24px;flex:0 0 24px;border-radius:8px;background:#f1f7f5;color:var(--brand-deep);font-size:13px;line-height:1;}
+  .facility-item .fn{display:block;font-size:10.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .facility-item .fd{display:none;}
+  /* 正文分区导航：滚动容器是 .scr，因此在容器内吸顶 */
+  .section-nav{position:sticky;top:0;z-index:35;display:flex;height:46px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .section-nav button{position:relative;flex:1;border:0;background:none;color:var(--muted);font:600 13px var(--font);cursor:pointer;}
+  .section-nav button::after{content:"";position:absolute;left:50%;bottom:0;width:22px;height:3px;border-radius:3px;background:var(--brand);transform:translateX(-50%) scaleX(0);transition:transform .18s;}
+  .section-nav button.on{color:var(--brand-deep);font-weight:700;}
+  .section-nav button.on::after{transform:translateX(-50%) scaleX(1);}
+  .section-anchor{scroll-margin-top:54px;}
   .verify{margin-top:12px;border:1px dashed var(--gold);background:var(--gold-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:11px;}
   .verify .no{font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;color:var(--gold-deep);}
   .verify .vb{font-size:10.5px;color:var(--ink);margin-top:3px;}
@@ -60,11 +78,17 @@
   .roomcard .rt.est{color:var(--muted);background:#f1f5f4;}
   .roomcard .rbtn{font-size:11.5px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 18px;border-radius:999px;}
   .roomcard .rbtn.full{background:#eef2f1;color:#8a9994;}
-  .room-tabs{display:flex;gap:0;overflow-x:auto;margin:12px 0 14px;border:1px solid var(--border);border-radius:8px;background:#f5f7f6;}
+  .room-intro-head{display:flex;align-items:flex-start;gap:10px;}
+  .room-intro-head .rh-copy{flex:1;min-width:0;}
+  .room-position{flex-shrink:0;margin-top:2px;padding:3px 8px;border-radius:999px;background:#f1f5f4;color:var(--muted);font-size:10px;font-weight:600;}
+  .room-tabs-wrap{position:relative;overflow:hidden;}
+  .room-tabs-wrap::after{content:"";position:absolute;top:12px;right:0;bottom:14px;width:22px;pointer-events:none;background:linear-gradient(90deg,transparent,#fff 85%);}
+  .room-tabs{display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity;margin:11px 0 15px;padding:1px 22px 4px 0;border-bottom:1px solid var(--border);}
   .room-tabs::-webkit-scrollbar{height:0;}
-  .room-tabs button{flex:1 0 auto;min-height:38px;border:0;border-right:1px solid var(--border);background:transparent;padding:8px 12px;color:var(--muted);font:600 11px var(--font);cursor:pointer;}
-  .room-tabs button:last-child{border-right:0;}
-  .room-tabs button.on{background:var(--brand);color:#fff;}
+  .room-tabs button{position:relative;flex:0 0 auto;max-width:156px;min-height:34px;scroll-snap-align:center;border:0;background:transparent;padding:6px 4px 9px;color:var(--muted);font:600 11px var(--font);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .room-tabs button::after{content:"";position:absolute;left:4px;right:4px;bottom:0;height:3px;border-radius:3px;background:var(--brand);transform:scaleX(0);transition:transform .18s;}
+  .room-tabs button.on{color:var(--brand-deep);font-weight:700;}
+  .room-tabs button.on::after{transform:scaleX(1);}
   .room-copy{font-size:13px;line-height:1.8;color:var(--ink);margin:0 0 13px;white-space:pre-line;}
   .room-facts{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border);}
   .room-fact{min-width:0;padding:11px 8px 10px 0;border-bottom:1px solid var(--border);}
@@ -168,6 +192,8 @@
   .nearby a:last-child{border-bottom:0;}
   .nearby a .e{font-size:17px;}
   .nearby a .ar{margin-left:auto;color:var(--muted);}
+  .nearby.is-empty{min-height:calc(100dvh - 110px);}
+  .nearby-empty{padding:64px 0 8px;text-align:center;font-size:11px;color:var(--muted);}
   /* ── 周边玩法 · 杂志区块（规则 17）：眉题 + 封面故事大卡 + 景区/商圈 分组编辑行 ── */
   .nearby .nb-ek{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:8px 0 12px;}
   .nb-feat{position:relative;display:block;border-radius:16px;overflow:hidden;height:196px;color:#fff;margin-bottom:4px;box-shadow:0 8px 22px rgba(15,42,38,.14);}
@@ -206,7 +232,7 @@
 
     <div class="pd-hero s-xijiang" id="dHero">
       <div class="badge">
-        <span class="star" id="dStars">★ 4.9 五星旅居</span>
+        <span class="star" id="dStars" data-lvju-feature="caibei">★ 4.9 五星旅居</span>
         <div class="nm" id="dName">云上观景民宿</div>
         <div class="lo" id="dLoc">黔东南州 · 西江千户苗寨 · 整栋可包</div>
       </div>
@@ -219,7 +245,22 @@
       <div class="tagline" id="dTagline"><span>苗寨核心位</span><span>日落观景台</span><span>含双早</span><span>管家服务</span><span>地暖</span><span>可包栋</span></div>
     </div>
 
-    <div class="block" id="dUnitsBlock">
+    <div class="block core-facilities" id="dCoreFacilitiesBlock" style="display:none;">
+      <div class="core-hd">
+        <div class="bt">热门设施</div>
+        <div class="bs" id="dCoreFacilityRoom"></div>
+        <button class="core-more" id="dCoreFacilityMore" type="button">房型详情 ›</button>
+      </div>
+      <div class="facility-grid" id="dCoreFacilities"></div>
+    </div>
+
+    <nav class="section-nav" id="dSectionNav" aria-label="房源详情分区">
+      <button type="button" class="on" data-target="dUnitsBlock" aria-current="true">房型</button>
+      <button type="button" data-target="dFacilitiesBlock">设施</button>
+      <button type="button" data-target="dNearbyBlock">周边</button>
+    </nav>
+
+    <div class="block section-anchor" id="dUnitsBlock">
       <div class="bt">可预订房型 <button class="hd-fav" id="dFav" type="button" title="收藏房源">♡</button></div>
       <div class="datebar" id="datebar">
         <div class="ds"><small>入住</small><b class="ph" id="dbIn">请选择</b></div>
@@ -242,19 +283,26 @@
       <div class="units-note" id="dUnitsNote">总价按各户型逐晚实价合计 · 连住 15 晚起 · 已订 / 关房不可选</div>
     </div>
 
-    <div class="block" id="dRoomInfoBlock" style="display:none;">
-      <div class="bt">房源介绍</div>
-      <div class="bs">空间、入住与设施信息由商家维护</div>
-      <div class="room-tabs" id="dRoomTabs" role="tablist" aria-label="选择房型介绍"></div>
-      <p class="room-copy" id="dRoomIntro"></p>
-      <div class="room-facts" id="dRoomFacts"></div>
+    <div class="block section-anchor" id="dFacilitiesBlock" style="display:none;">
+      <div class="room-intro-head">
+        <div class="rh-copy">
+          <div class="bt">房型介绍</div>
+          <div class="bs">空间、入住规则与床型信息由商家按房型维护</div>
+        </div>
+        <span class="room-position" id="dRoomPosition">1 / 1</span>
+      </div>
+      <div class="room-tabs-wrap"><div class="room-tabs" id="dRoomTabs" role="tablist" aria-label="选择房型介绍"></div></div>
+      <div id="dRoomPanel" role="tabpanel">
+        <p class="room-copy" id="dRoomIntro"></p>
+        <div class="room-facts" id="dRoomFacts"></div>
+      </div>
     </div>
     <figure class="room-showcase" id="dRoomShowcase" style="display:none;">
       <img id="dRoomShowcaseImg" alt="">
       <figcaption id="dRoomShowcaseCaption"></figcaption>
     </figure>
 
-    <div class="block">
+    <div class="block" id="dRatingBlock" data-lvju-feature="caibei">
       <div class="bt" id="dRateTitle">旅居星级评价 · 5 维</div>
       <div class="bs" id="dRateNote">按旅居住宿维度评定</div>
       <div style="margin-top:8px;" id="dRateRows">
@@ -291,13 +339,13 @@
       </div>
     </div>
 
-    <div class="block" id="dInsBlock" style="display:none;">
+    <div class="block" id="dInsBlock" data-lvju-feature="stayProtection" style="display:none;">
       <div class="bt">入住保障 <span class="bs" style="font-weight:400;">商家已投保 · 扫码验真可查</span></div>
       <div id="dInsRows" style="margin-top:4px;"></div>
     </div>
 
-    <!-- 周边玩法（规则 17）：无 ?id= 时保留静态基线；线上按项目绑定的 商圈/景区 渲染杂志区块，空绑定整块隐藏 -->
-    <div class="block nearby" id="dNearbyBlock">
+    <!-- 周边玩法（规则 17）：无 ?id= 时保留静态基线；线上按项目绑定的 商圈/景区 渲染杂志区块，空绑定显示空状态 -->
+    <div class="block nearby section-anchor" id="dNearbyBlock">
       <div class="bt" style="margin-bottom:2px;">周边玩法 <span class="bs" style="font-weight:400;">按步程与车程编排 · 商家实地整理</span></div>
       <div class="nb-ek">Nearby · Editor's Picks</div>
       <div id="nbStatic">
@@ -348,7 +396,7 @@
 <script>
 /* 周边玩法 · 杂志区块渲染（规则 17）：数据来自 GET /api/juzhu/projects/:id 的 spots
    （项目绑定的维度地点，服务端已按 景区→商圈→美食→咖啡 + 绑定排序）。第 1 条 = 封面故事大卡，
-   其余按维度分组为编辑行；空绑定整块隐藏（不回落静态演示内容，防异地项目挂错样例）。
+   其余按维度分组为编辑行；空绑定显示空状态（不回落静态演示内容，防异地项目挂错样例）。
    深链：spot.link 优先（admin 覆写）→ 笔记详情页 lvju-app-spot-post.html?id= →
    已知 spot-detail 词条 → 回落 lvju-app-spots.html。 */
 window.__NEARBY_RENDER__ = (function(){
@@ -393,7 +441,16 @@ window.__NEARBY_RENDER__ = (function(){
         dyn = document.getElementById('nbDyn');
     if (!block || !dyn || !Array.isArray(spots)) return;
     spots = spots.filter(function(s){ return s && s.name; });
-    if (!spots.length) { block.style.display = 'none'; return; }   // 绑定空 → 整块隐藏
+    if (!spots.length) {
+      if (stat) stat.style.display = 'none';
+      dyn.innerHTML = '<div class="nearby-empty">商家暂未配置周边玩法</div>';
+      block.classList.add('is-empty');
+      block.style.display = '';
+      if (window.__DETAIL_SECTION_NAV__) window.__DETAIL_SECTION_NAV__.refresh();
+      return;
+    }
+    block.classList.remove('is-empty');
+    block.style.display = '';
     if (stat) stat.style.display = 'none';
     var groups = {};
     spots.slice(1).forEach(function(s){ var k = s.type || 'scenic'; (groups[k] = groups[k] || []).push(s); });
@@ -410,7 +467,61 @@ window.__NEARBY_RENDER__ = (function(){
     });
     h += '<div class="nb-foot"><span>共 ' + spots.length + ' 处 · 步程 / 车程由商家实地整理</span><a href="lvju-app-spots.html">全部玩法 ›</a></div>';
     dyn.innerHTML = h;
+    if (window.__DETAIL_SECTION_NAV__) window.__DETAIL_SECTION_NAV__.refresh();
   };
+})();
+</script>
+<script>
+/* 房型 / 设施 / 周边：在详情页自己的 .scr 滚动容器内吸顶并同步当前位置。 */
+(function(){
+  var scr = document.querySelector('.scr'), nav = document.getElementById('dSectionNav');
+  if (!scr || !nav) return;
+  var buttons = Array.prototype.slice.call(nav.querySelectorAll('button[data-target]'));
+  function visibleTarget(btn){
+    var el = document.getElementById(btn.dataset.target);
+    return el && getComputedStyle(el).display !== 'none' ? el : null;
+  }
+  function setActive(btn){
+    buttons.forEach(function(item){
+      var on = item === btn;
+      item.classList.toggle('on', on);
+      if (on) item.setAttribute('aria-current', 'true'); else item.removeAttribute('aria-current');
+    });
+  }
+  function go(targetId){
+    var el = document.getElementById(targetId);
+    if (!el || getComputedStyle(el).display === 'none') return;
+    var top = scr.scrollTop + el.getBoundingClientRect().top - scr.getBoundingClientRect().top - nav.offsetHeight + 1;
+    scr.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  }
+  buttons.forEach(function(btn){ btn.addEventListener('click', function(){ setActive(btn); go(btn.dataset.target); }); });
+  var ticking = false;
+  function paint(){
+    ticking = false;
+    var probe = scr.getBoundingClientRect().top + nav.offsetHeight + 10;
+    var active = null;
+    buttons.forEach(function(btn){
+      var el = visibleTarget(btn);
+      if (el && el.getBoundingClientRect().top <= probe) active = btn;
+    });
+    if (scr.scrollTop + scr.clientHeight >= scr.scrollHeight - 3) {
+      active = buttons.slice().reverse().find(function(btn){ return visibleTarget(btn); }) || active;
+    }
+    setActive(active || buttons.find(function(btn){ return visibleTarget(btn); }));
+  }
+  scr.addEventListener('scroll', function(){
+    if (!ticking) { ticking = true; requestAnimationFrame(paint); }
+  }, { passive: true });
+  window.__DETAIL_SECTION_NAV__ = {
+    go: go,
+    refresh: function(){
+      buttons.forEach(function(btn){ btn.hidden = !visibleTarget(btn); });
+      paint();
+    }
+  };
+  var more = document.getElementById('dCoreFacilityMore');
+  if (more) more.addEventListener('click', function(){ go('dFacilitiesBlock'); });
+  window.__DETAIL_SECTION_NAV__.refresh();
 })();
 </script>
 <script>
@@ -432,15 +543,55 @@ window.__NEARBY_RENDER__ = (function(){
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   var roomProfileUnits = [];
+  var FACILITY_CATALOG = {
+    ac:{icon:'❄',label:'空调暖气'}, washer:{icon:'◫',label:'洗衣机'}, fridge:{icon:'▣',label:'冰箱'},
+    heater:{icon:'♨',label:'热水'}, lock:{icon:'⌾',label:'智能门锁'}, wifi:{icon:'⌁',label:'无线网络'},
+    tv:{icon:'▤',label:'电视'}, hood:{icon:'♨',label:'油烟机'}, microwave:{icon:'◉',label:'微波炉'},
+    induction:{icon:'◎',label:'电磁炉'}, kitchen:{icon:'♨',label:'厨房'}, window:{icon:'▦',label:'自然采光'},
+    cleaning:{icon:'◇',label:'清洁服务'}
+  };
+  function facilityData(u){
+    var p = u.profile || {}, list = [], seen = {};
+    function add(key, detail, label){
+      if (seen[key]) return;
+      var meta = FACILITY_CATALOG[key] || {icon:'✓',label:label || key};
+      seen[key] = true;
+      list.push({ key:key, icon:meta.icon, label:label || meta.label, detail:detail || '' });
+    }
+    (u.amenities || []).forEach(function(key){
+      var detail = key === 'ac' ? p.climate : key === 'wifi' ? p.network : key === 'heater' ? p.bath_hot_water : '';
+      add(key, detail);
+    });
+    if (p.network) add('wifi', p.network);
+    if (p.climate) add('ac', p.climate);
+    if (p.bath_hot_water) add('heater', p.bath_hot_water);
+    if (p.kitchen) add('kitchen', p.kitchen);
+    if (p.window_type && p.window_type !== 'none') add('window', (p.window_count ? p.window_count+'扇 · ' : '')+(p.window_openable === false ? '不可开启' : '可开启'));
+    if (p.cleaning_frequency) add('cleaning', p.cleaning_frequency);
+    return list;
+  }
+  function facilityHtml(items){
+    return items.map(function(item){
+      return '<div class="facility-item"><span class="fi" aria-hidden="true">'+esc(item.icon)+'</span><span class="fn">'+esc(item.label)+'</span>'+
+        (item.detail ? '<span class="fd" title="'+esc(item.detail)+'">'+esc(item.detail)+'</span>' : '')+'</div>';
+    }).join('');
+  }
   function renderRoomProfile(unitId) {
     var u = roomProfileUnits.find(function(item){ return item.id === Number(unitId); }) || roomProfileUnits[0];
-    var block = document.getElementById('dRoomInfoBlock');
+    var block = document.getElementById('dFacilitiesBlock');
     if (!u || !block) return;
     var p = u.profile || {};
+    var facilities = facilityData(u);
     block.style.display = '';
+    var core = document.getElementById('dCoreFacilitiesBlock');
+    core.style.display = facilities.length ? '' : 'none';
+    document.getElementById('dCoreFacilityRoom').textContent = u.name || '';
+    document.getElementById('dCoreFacilities').innerHTML = facilityHtml(facilities.slice(0, 5));
+    var roomIndex = roomProfileUnits.indexOf(u);
+    document.getElementById('dRoomPosition').textContent = (roomIndex+1)+' / '+roomProfileUnits.length;
     var tabs = document.getElementById('dRoomTabs');
     tabs.innerHTML = roomProfileUnits.map(function(item){
-      return '<button type="button" role="tab" data-u="'+item.id+'" aria-selected="'+(item.id===u.id?'true':'false')+'" class="'+(item.id===u.id?'on':'')+'">'+esc(item.name)+'</button>';
+      return '<button type="button" role="tab" data-u="'+item.id+'" aria-controls="dRoomPanel" aria-selected="'+(item.id===u.id?'true':'false')+'" title="'+esc(item.name)+'" class="'+(item.id===u.id?'on':'')+'">'+esc(item.name)+'</button>';
     }).join('');
     tabs.querySelectorAll('button').forEach(function(btn){
       btn.addEventListener('click', function(){
@@ -448,6 +599,10 @@ window.__NEARBY_RENDER__ = (function(){
         renderRoomProfile(next);
         if (window.__CAL_SELECT_UNIT__) window.__CAL_SELECT_UNIT__(next);
       });
+    });
+    requestAnimationFrame(function(){
+      var active = tabs.querySelector('button.on');
+      if (active) tabs.scrollTo({ left: Math.max(0, active.offsetLeft-(tabs.clientWidth-active.offsetWidth)/2), behavior: 'smooth' });
     });
     var intro = document.getElementById('dRoomIntro');
     intro.textContent = p.introduction || '';
@@ -486,6 +641,7 @@ window.__NEARBY_RENDER__ = (function(){
       show.style.display = 'none';
       document.getElementById('dRoomShowcaseImg').removeAttribute('src');
     }
+    if (window.__DETAIL_SECTION_NAV__) window.__DETAIL_SECTION_NAV__.refresh();
   }
   window.__ROOM_PROFILE_SELECT__ = renderRoomProfile;
   var DIMS = {
@@ -507,7 +663,7 @@ window.__NEARBY_RENDER__ = (function(){
     var d = rs[1] || {};
     var p = Object.assign({}, rs[0] || {}, d.project || {}), units = d.units || [];
     function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
-    p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); });
+    p.tags = asArr(p.tags); units.forEach(function(u){ u.tags = asArr(u.tags); u.amenities = asArr(u.amenities); });
     var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = {}; } }
     r = r || {};
     // 周边玩法（规则 17）：绑定的商圈/景区 → 杂志区块。仅当响应带 spots 字段才接管
@@ -557,7 +713,7 @@ window.__NEARBY_RENDER__ = (function(){
       else if (u.rent_monthly) per = Math.max(1, Math.round(u.rent_monthly / 30));
       else if (p.price_from) per = Math.max(1, Math.round(p.price_from / 30));
       var profile = (ex.room_profile && typeof ex.room_profile === 'object' && !Array.isArray(ex.room_profile)) ? ex.room_profile : {};
-      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '', profile: profile };
+      return { id: u.id, name: u.name || '', area: u.area_sqm || 0, layout: u.layout_label || '', tags: asArr(u.tags), amenities: asArr(u.amenities), per: per, monthly: u.rent_monthly || 0, cover: u.cover_image || '', cancel_text: u.cancel_policy_text || '', profile: profile };
     });
     roomProfileUnits = unitsX;
     if (unitsX.length) renderRoomProfile(unitsX[0].id);
