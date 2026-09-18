@@ -7,6 +7,7 @@ const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
 const ratingCfg = require('./rating_config.cjs');
 const photoCfg = require('./photo_config.cjs');
+const roomProfileCfg = require('./room_profile.cjs');
 const MIN_PUBLISH_PHOTOS = 8;
 
 function reply(status, data) {
@@ -549,7 +550,7 @@ async function housingProjectsDetail(conn, body, vendorId) {
   return reply(200, {
     code: 0, message: 'success',
     project: housingProjectOut(row, stayCfg.priceDisplayOf(row, lows.get(row.id))),
-    units: units.map((u) => stayCfg.withStayRules(u, row)),
+    units: units.map((u) => unitOut(u, row)),
   });
 }
 
@@ -604,6 +605,11 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
   // 默认关房（2026-09 方案 B 配套）：未推送放出的日期默认不可订，多渠道商家防超售
   if (u.default_closed != null && u.default_closed !== '') {
     try { if (stayCfg.normalizeDefaultClosedInput(u.default_closed)) ext.default_closed = true; }
+    catch (e) { throw new Error('units[].' + e.message); }
+  }
+  // 房间档案（Excel 房源字段）：字段清单 / 长度 / 枚举校验在 room_profile.cjs（单一数据源）
+  if (u.room_profile != null && u.room_profile !== '') {
+    try { roomProfileCfg.mergeRoomProfileIntoExt(ext, u.room_profile); }
     catch (e) { throw new Error('units[].' + e.message); }
   }
   const [r] = await conn.execute(
@@ -827,7 +833,7 @@ async function housingUnitsCreate(conn, body, vendorId) {
     const uid = await createUnit(conn, row.id, row.channel, row.price_from, b);
     await conn.execute('UPDATE projects SET unit_count=(SELECT COUNT(*) FROM units WHERE project_id=?) WHERE id=?', [row.id, row.id]);
     const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
-    return reply(200, { code: 0, message: 'success', unit: stayCfg.withStayRules(u[0], row) });
+    return reply(200, { code: 0, message: 'success', unit: unitOut(u[0], row) });
   } catch (e) {
     return reply(400, { code: 400, message: e.message });
   }
@@ -907,6 +913,16 @@ async function housingUnitsUpdate(conn, body, vendorId) {
     }
     extDirty = true;
   }
+  if (Object.prototype.hasOwnProperty.call(b, 'room_profile')) {
+    // 房间档案（Excel 房源字段，2026-09 开放给商家接口）：只合并 ext.room_profile，保留其它键；
+    // 传 null/'' = 清除；未知键按白名单丢弃，字段越界/非法取值 400（校验在 room_profile.cjs）
+    if (b.room_profile === null || b.room_profile === '') delete cur.room_profile;
+    else {
+      try { roomProfileCfg.mergeRoomProfileIntoExt(cur, b.room_profile); }
+      catch (e) { return reply(400, { code: 400, message: e.message }); }
+    }
+    extDirty = true;
+  }
   if (extDirty) { sets.push('ext=?'); params.push(Object.keys(cur).length ? JSON.stringify(cur) : null); }
   if (!sets.length) return reply(400, { code: 400, message: '无可更新字段' });
   params.push(rows[0].id);
@@ -914,7 +930,7 @@ async function housingUnitsUpdate(conn, body, vendorId) {
   const [u] = await conn.execute('SELECT * FROM units WHERE id=?', [rows[0].id]);
   // 回显生效值（最短连住 / 默认夜价 / 取消政策），与 detail/list 出参同口径
   const [prow] = await conn.execute('SELECT * FROM projects WHERE id=?', [rows[0].project_id]);
-  return reply(200, { code: 0, message: 'success', unit: stayCfg.withStayRules(u[0], prow[0] || { channel: rows[0].channel }) });
+  return reply(200, { code: 0, message: 'success', unit: unitOut(u[0], prow[0] || { channel: rows[0].channel }) });
 }
 
 async function housingPhotosAdd(conn, body, vendorId) {
@@ -981,6 +997,17 @@ async function housingPhotosAdd(conn, body, vendorId) {
 
 /** 图集出参：分类中文名映射在 photo_config（单一数据源） */
 const photoOut = photoCfg.photoOut;
+
+/**
+ * 户型出参（商家接口统一走这里）：附房态生效值（最短连住 / 默认夜价 / 取消政策）
+ * 与**已解析**的 room_profile（Excel 房源字段）——商家不必自己去 parse ext 字符串。
+ */
+function unitOut(u, proj) {
+  if (!u) return u;
+  const ext = stayCfg.parseExtObj(u.ext);
+  const o = Object.assign({}, u, { room_profile: ext.room_profile || null });
+  return stayCfg.withStayRules(o, proj);
+}
 
 /** 房源图集合计张数（房源级 + 其全部户型级）：上架闸与覆盖告警共用 */
 async function galleryCountOf(conn, projectId) {

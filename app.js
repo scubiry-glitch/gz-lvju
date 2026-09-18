@@ -697,6 +697,7 @@ function stripContactPhone(row) {
 // 会话态接口（app.js）与商家 HMAC 开放接口（vendor_api.cjs）共用同一份口径
 const stayCfg = require('./stay_config.cjs');
 const photoCfg = require('./photo_config.cjs');
+const roomProfileCfg = require('./room_profile.cjs');
 const vendorRate = require('./vendor_rate.cjs'); // 商家佣金费率（按业务线分档）单一数据源：vendor_rate.cjs
 const INSURANCE_TYPES = stayCfg.INSURANCE_TYPES;
 const INSURANCE_KEYS = stayCfg.INSURANCE_KEYS;
@@ -2144,60 +2145,12 @@ async function syncProjectUnitCount(conn, projectId) {
   await conn.execute('UPDATE projects SET unit_count=? WHERE id=?', [r.c, projectId]);
 }
 
-const UNIT_ROOM_PROFILE_ENUMS = {
-  area_type: ['building', 'usable'],
-  window_type: ['exterior', 'interior', 'none'],
-  smoking: ['no', 'designated', 'allowed'],
-};
-const UNIT_ROOM_PROFILE_STRINGS = {
-  introduction: 1000,
-  shared_spaces: 300,
-  child_age_policy: 300,
-  extra_guest_policy: 500,
-  beds: 500,
-  bath_hot_water: 300,
-  kitchen: 500,
-  climate: 300,
-  network: 200,
-  cleaning_frequency: 200,
-  linen_frequency: 200,
-  feature_image: 1000,
-  feature_image_caption: 120,
-};
-
-/** Excel 房源字段统一放在 units.ext.room_profile，避免按住宿业态持续加列。 */
+// 房间档案（Excel 房源字段）的字段清单/长度/枚举/中文名统一在 room_profile.cjs（单一数据源）；
+// 管理端校验与商家开放接口（vendor_api units/create|update）共用同一份。
+// 保持函数声明（不能改成 const 别名）：本文件上方有提前的 `module.exports.X = X`，
+// 换成 const 会因 TDZ 在启动时报「Cannot access before initialization」。
 function normalizeUnitRoomProfileInput(value) {
-  if (value == null) return null;
-  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('room_profile 须为对象');
-  const out = {};
-  for (const [key, max] of Object.entries(UNIT_ROOM_PROFILE_STRINGS)) {
-    if (!(key in value) || value[key] == null || value[key] === '') continue;
-    const text = String(value[key]).trim();
-    if (text.length > max) throw new Error(`${key} 最多 ${max} 个字符`);
-    if (text) out[key] = text;
-  }
-  if (out.feature_image && (!/^(?:https?:\/\/|\/|assets\/|uploads\/)/i.test(out.feature_image) || /[\r\n"']/.test(out.feature_image))) {
-    throw new Error('feature_image 须为有效的 http(s) URL 或站内图片路径');
-  }
-  for (const [key, values] of Object.entries(UNIT_ROOM_PROFILE_ENUMS)) {
-    if (!(key in value) || value[key] == null || value[key] === '') continue;
-    const text = String(value[key]).trim();
-    if (!values.includes(text)) throw new Error(`${key} 取值无效`);
-    out[key] = text;
-  }
-  for (const key of ['window_count', 'max_guests', 'max_adults', 'max_children']) {
-    if (!(key in value) || value[key] == null || value[key] === '') continue;
-    const n = Number(value[key]);
-    const min = (key === 'window_count' || key === 'max_children') ? 0 : 1;
-    const max = key === 'window_count' ? 20 : 99;
-    if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${key} 须为 ${min}-${max} 的整数`);
-    out[key] = n;
-  }
-  if ('window_openable' in value && value.window_openable !== null && value.window_openable !== '') {
-    out.window_openable = value.window_openable === true || value.window_openable === 1
-      || value.window_openable === '1' || value.window_openable === 'true';
-  }
-  return out;
+  return roomProfileCfg.normalizeRoomProfileInput(value);
 }
 
 function normalizeUnitExtInput(value, channel) {

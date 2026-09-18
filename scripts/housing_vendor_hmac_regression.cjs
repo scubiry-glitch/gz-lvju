@@ -769,6 +769,46 @@ async function catalogEventually(base, projectId, citySlug, want) {
       && !photoCfg.ipIsBlocked('8.8.8.8') && !photoCfg.ipIsBlocked('2400:3200::1'));
   }
 
+  // ── 5.12) 房间档案 room_profile（Excel 房源字段，2026-09 开放给商家接口）──
+  {
+    const u5 = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid4 }))).j.units[0].id;
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, {
+      id: u5,
+      room_profile: {
+        introduction: '  面朝庭院，独立入户  ',
+        area_type: 'building', window_type: 'exterior', window_count: 2, window_openable: true,
+        max_guests: 4, max_adults: 3, max_children: 1, smoking: 'no',
+        beds: '卧室1：1.8×2.0m 大床', kitchen: '独立厨房 · 可做饭',
+        feature_image: 'https://cdn.example.test/room.jpg', feature_image_caption: '庭院实拍',
+        unknown_key_should_be_dropped: 'x',
+      },
+    }));
+    check('12-1 room_profile 写入 → 回显已解析对象 + 白名单丢弃未知键 + 去首尾空格',
+      r.status === 200 && r.j.unit.room_profile
+      && r.j.unit.room_profile.introduction === '面朝庭院，独立入户'
+      && r.j.unit.room_profile.max_guests === 4 && r.j.unit.room_profile.window_openable === true
+      && r.j.unit.room_profile.unknown_key_should_be_dropped === undefined,
+      JSON.stringify(r.j.unit.room_profile || {}).slice(0, 200));
+    const [rpRow] = await conn.execute('SELECT ext FROM units WHERE id=?', [u5]);
+    const rpExt = JSON.parse(rpRow[0].ext || '{}');
+    check('12-1b 落库到 units.ext.room_profile，且不动其它 ext 键',
+      rpExt.room_profile && rpExt.room_profile.beds === '卧室1：1.8×2.0m 大床' && rpExt.price_night === 200,
+      JSON.stringify(rpExt).slice(0, 200));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u5, room_profile: { smoking: 'sometimes' } }));
+    check('12-2 非法枚举 → 400 且报出可选值', r.status === 400 && /吸烟属性/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 160));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u5, room_profile: { max_guests: 200 } }));
+    check('12-2b 数值越界 → 400', r.status === 400 && /最大入住人数/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 160));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u5, room_profile: { feature_image: 'javascript:alert(1)' } }));
+    check('12-2c 图片地址非法 → 400', r.status === 400 && /图片地址/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 160));
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u5, room_profile: null }));
+    const [rpRow2] = await conn.execute('SELECT ext FROM units WHERE id=?', [u5]);
+    check('12-3 传 null 清除 room_profile（其它 ext 键保留）',
+      r.status === 200 && r.j.unit.room_profile === null
+      && JSON.parse(rpRow2[0].ext || '{}').room_profile === undefined
+      && JSON.parse(rpRow2[0].ext || '{}').price_night === 200,
+      JSON.stringify(r.j.unit.room_profile));
+  }
+
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
     check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
