@@ -206,6 +206,7 @@
           { id: 'credit-engine',   label: '信用规则引擎',        href: 'p-credit-engine.html', icon: 'cpu',      badge: '42' },
           { id: 'data-hub',        label: '数据中台',            href: 'p-data-hub.html',      icon: 'plug',     badge: '24/7' },
           { id: 'account-center',  label: '账号中心',            href: 'account-center.html',  icon: 'user',     badge: 'IAM', perms: ['iam.read', 'audit.read'] },
+          { id: 'demo-accounts',   label: '演示账号速查',        href: 'demo-accounts.html',   icon: 'user',     badge: '6' },
           { id: 'workflow',        label: 'BPMN 工作流引擎',     href: 'p-workflow.html',      icon: 'layers',   badge: '18' },
           { id: 'webhooks',        label: '事件总线 · Webhook',  href: 'p-webhooks.html',      icon: 'radio',    badge: '38', perms: ['admin.read'] },
           { id: 'api-gateway',     label: 'API 网关',            href: 'p-api-gateway.html',   icon: 'settings', badge: '86', perms: ['admin.read'] },
