@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <title>找房专题 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
 <style>
   /* 找房专题落地页（?topic=slug&city=）：数据走 catalog?topic= 服务端过滤（settings KV 定义，
      scripts/find-topic-seed.cjs）；卡片与找房枢纽（lvju-app-search.html）同款同口径。 */
@@ -150,7 +151,7 @@
     var r = p.rating || {};
     var meta2;
     if (fam === 'stay' && p.rating_status === 'passed' && r.stars) {
-      meta2 = '<span class="sc">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
+      meta2 = '<span class="sc" data-lvju-feature="caibei">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
         '<i>' + esc(channelChip(p)) + '</i><span>' + esc(loc) + '</span>';
     } else {
       var extra = (fam === 'newhouse' && p.managed_unit_count != null) ? ' · 房源 ' + fmt(p.managed_unit_count) : '';
@@ -158,7 +159,7 @@
     }
     var tags = (p.tags || []).filter(function(t){ return t !== '保租房' && t !== '演示' && t !== '精选'; }).slice(0, 3);
     var ins = fam === 'stay'
-      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
+      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am" data-lvju-feature="stayProtection">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
       : '';
     var tagHtml = tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + ins;
 

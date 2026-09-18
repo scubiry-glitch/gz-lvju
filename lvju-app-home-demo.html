@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>贝壳 APP · 找房·旅居 频道首页</title>
+<script src="lvju-app-config.js?v=1"></script>
 <style>
   :root{
     --surface:#ffffff; --fg:#0f172a; --muted:#6b7785; --border:#e7ece9;
@@ -208,7 +209,7 @@
       <div class="seg-h"><span class="bar"></span><h3>找房 · 全频道</h3><span class="more">全部 ›</span></div>
       <div class="chan">
         <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic">🏔</div><b>旅居</b><small>短住·候鸟·康养</small></a>
-        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic">🏨</div><b>民宿</b><small>整栋·星级·管家</small></a>
+        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic">🏨</div><b>民宿</b><small>整栋·庭院·管家</small></a>
         <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic">🗝</div><b>长租</b><small>整租·合租·月付</small></a>
         <a class="chan" href="lvju-app-newhouse.html" hidden data-deferred><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
         <a class="chan" href="lvju-app-resale.html" hidden data-deferred><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
@@ -223,7 +224,7 @@
         <div class="fin">
           <div class="fk">Editor's Pick · 旅居周刊</div>
           <h4>黔东南秘境<br>住进千户苗寨的云端</h4>
-          <p>编辑实地探访 12 处五彩贝旅居 · 含双早 + 苗寨向导</p>
+          <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
         </div>
       </a>
 
@@ -343,7 +344,8 @@
         var d = dmap[p.district_id];
         var loc = (d && p.address && p.address.indexOf(d.name) === 0) ? p.address : Array.from(new Set([d ? d.name : '', p.address || ''].filter(Boolean))).join(' · ');
         var r = p.rating || {};
-        var star = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 五彩贝旅居' : '在架好房';
+        var star = window.lvjuFeatureEnabled('caibei') && p.rating_status === 'passed' && r.stars
+          ? '★ ' + r.stars + ' 五彩贝旅居' : '精选好房';
         var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
         var img = p.cover_image
           ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'

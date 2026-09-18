@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <title>旅居 · 短住·候鸟·康养 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
 <style>
   /* 入住时间段（连续区间 · 连住 15 晚起） */
   .staybar{margin:10px 16px 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;}
@@ -63,7 +64,7 @@
       <div class="in">
         <div class="ek">Travel Living</div>
         <h1>把日子<br>过成一场旅行</h1>
-        <p>旅居星级旅居房源，短住、候鸟过冬、康养度假，配旅居管家服务</p>
+        <p><span data-lvju-feature="caibei">旅居星级旅居房源</span><span data-lvju-feature-off="caibei">精选旅居房源</span>，短住、候鸟过冬、康养度假，配旅居管家服务</p>
         <div class="stat">
           <div><b>2,400+</b><span>在营旅居</span></div>
           <div><b>9</b><span>市州覆盖</span></div>
@@ -106,7 +107,7 @@
       <div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
-    <div class="banner gold">
+    <div class="banner gold" data-lvju-feature="caibei stayProtection">
       <span class="bi">★</span>
       <div class="bt"><b>什么是旅居星级旅居？</b><p>5 维评定 + 公安/住建/保险验真，扫码可查</p></div>
       <a class="go" href="lvju-rating-standard.html">看标准 ›</a>
@@ -193,11 +194,11 @@
       var pn = perNight(p);
       var r = p.rating || {};
       var star = (p.rating_status === 'passed' && r.stars)
-        ? '<span class="star">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
+        ? '<span class="star" data-lvju-feature="caibei">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
       var dd = dmap[p.district_id];
       var loc = (dd && p.address && p.address.indexOf(dd.name) === 0) ? p.address : [dd ? dd.name : '', p.address || ''].filter(Boolean).join(' · ');
       var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
-      var ins = (p.insurance_types || []).map(function(t){ return '<span>' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('');
+      var ins = (p.insurance_types || []).map(function(t){ return '<span data-lvju-feature="stayProtection">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('');
       var img = p.cover_image
         ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="img s-xijiang">';

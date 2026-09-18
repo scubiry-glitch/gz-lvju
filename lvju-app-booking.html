@@ -6,6 +6,7 @@
 <link rel="icon" href="data:,">
 <title>预定下单 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
 <style>
   .bfield{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:#fff;}
   .bfield .l{font-size:13px;color:var(--muted);flex-shrink:0;}
@@ -434,7 +435,8 @@
       document.getElementById('bMeta').textContent = p.address || '';
       var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = {}; } }
       r = r || {};
-      document.getElementById('bStar').textContent = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 星 · 已评级' : '在架';
+      document.getElementById('bStar').textContent = window.lvjuFeatureEnabled('caibei') && p.rating_status === 'passed' && r.stars
+        ? '★ ' + r.stars + ' 星 · 已评级' : '精选房源';
       if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
       perNight = p.price_from || 0;
       // 最短连住（旅居口径：rental / minsu 均默认 15 晚起，商家可在项目上覆盖）+ 最早可入住日
