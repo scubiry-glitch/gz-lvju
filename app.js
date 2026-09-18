@@ -755,7 +755,7 @@ async function fallbackUnitRowFor(fetchRows, unitId, projectId) {
   const rows = await fetchRows(`SELECT ${cols} FROM units WHERE project_id=? ORDER BY sort_order, id LIMIT 1`, [projectId]);
   return rows[0] || null;
 }
-const MIN_PUBLISH_PHOTOS = 8;
+const MIN_PUBLISH_PHOTOS = photoCfg.PHOTO_MIN_PUBLISH;   // 单一数据源 photo_config.cjs（改阈值只改那一处）
 
 function parseExtSafe(value) {
   if (value == null || value === '') return {};

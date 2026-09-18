@@ -117,7 +117,7 @@
         <li><a href="#p5">住宿规则归位到户型</a></li>
         <li><a href="#fields">房源属性 API：房间档案 21 字段</a></li>
         <li><a href="#diff">字段级变更速查表</a></li>
-        <li><a href="#todo">需要你们确认的 3 件事</a></li>
+        <li><a href="#todo">需要你们确认的 2 件事（1 项已定）</a></li>
         <li><a href="#compat">向后兼容承诺</a></li>
       </ol>
     </div>
@@ -171,7 +171,7 @@
         <strong>没有房态记录的晚 = 默认可订</strong>（按默认夜价），不会误判成无房。</p>
         <div class="callout ok"><strong>你们要改什么：不用改。</strong>不想传起价就不传；想控制 C 端「¥X 起」，继续传即可。</div>
         <div class="callout warn"><strong>一处与你们原始描述的差异，请确认：</strong>你们写的是「图集最少 7 张」，
-        而平台<strong>上架门槛是合计 ≥ 8 张</strong>（房源图 + 户型图）。我们按 <strong>8 张</strong> 走了（见第 4 条）。</div>
+        而平台原上架门槛是合计 ≥ 8 张（房源图 + 户型图）。<strong>已按你们的 7 张调整：现在合计 ≥ 7 张 + 至少 1 张封面即可上架</strong>（见第 4 条）。</div>
       </div>
     </section>
 
@@ -249,11 +249,10 @@
           <tr><td><strong>老的 <code>photos/add</code></strong></td><td>保留，且改为<strong>幂等</strong>：同 URL / 同 <code>external_id</code> 重推 = 原地更新，
             不再堆重复行；顺带修掉「传了 <code>sort_order</code> 却被忽略」的问题。</td></tr>
         </table>
-        <div class="callout warn"><strong>请确认（与你们原始描述有差异）：</strong>
-        ① 你们写「图集最少 7 张（含封面）」，但平台<strong>上架门槛是合计 ≥ 8 张</strong>且至少 1 张封面——
-        我们按 <strong>8 张</strong> 走，如果你们上游只能稳定产出 7 张，告诉我们，改成 7 是一行的事。<br>
-        ② <code>photos/sync</code> <strong>不卡下限</strong>（只卡 100 张上限）——「≥8 张」是<strong>上架闸</strong>，不是每次覆盖的闸，
-        这样多户型房源才能先建后补。覆盖后不足 8 张时响应里会给一条 warning 提示。</div>
+        <div class="callout ok"><strong>图集张数已按你们的 7 张对齐：</strong>
+        ① <strong>上架门槛 = 房源图 + 户型图合计 ≥ 7 张</strong>且至少 1 张封面（原为 8 张，已下调）；<br>
+        ② <code>photos/sync</code> <strong>不卡下限</strong>（只卡 100 张上限）——「≥7 张」是<strong>上架闸</strong>，不是每次覆盖的闸，
+        这样多户型房源才能先建后补。覆盖后不足 7 张时响应里会给一条 warning 提示。</div>
       </div>
     </section>
 
@@ -351,13 +350,13 @@
 
     <!-- ============ 待确认 ============ -->
     <section id="todo">
-      <h2><span class="num">8</span>需要你们确认的 3 件事</h2>
+      <h2><span class="num">8</span>需要你们确认的 2 件事（1 项已定）</h2>
       <div class="card">
         <table>
           <tr><th width="8%">#</th><th width="38%">事项</th><th>我们的处理 / 建议</th></tr>
-          <tr><td>1</td><td><strong>图集最少张数：7 还是 8？</strong><br>
-            <span style="color:var(--muted);font-size:12.5px;">你们写 7 张（含封面），平台现有上架门槛是 ≥8 张</span></td>
-            <td>我们按 <strong>8 张</strong> 走（守住对外承诺的上架口径）。若你们上游只能稳定产出 7 张，回一句我们改成 7，两处常量同改。</td></tr>
+          <tr><td>1</td><td><s><strong>图集最少张数：7 还是 8？</strong></s> <span style="color:#15803d;font-weight:700;">已定：7 张</span><br>
+            <span style="color:var(--muted);font-size:12.5px;">你们写 7 张（含封面），平台原上架门槛是 ≥8 张</span></td>
+            <td><strong>✅ 已按 7 张落地</strong>（2026-09-18）：上架门槛下调为「房源图 + 户型图合计 ≥ 7 张 + 至少 1 张封面」。阈值收口到单一常量，两处上架闸同读一份。</td></tr>
           <tr><td>2</td><td><strong>「<code>qty</code> 要求 ≥ <code>total_qty</code>」这条规则的报错原文</strong><br>
             <span style="color:var(--muted);font-size:12.5px;">你们反馈里提到这条限制</span></td>
             <td>平台代码里<strong>没有</strong>这条规则——实际校验是「<code>qty</code> 不得低于该晚<strong>已订间数</strong>」（否则 400）。

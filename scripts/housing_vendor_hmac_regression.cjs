@@ -809,6 +809,44 @@ async function catalogEventually(base, projectId, citySlug, want) {
       JSON.stringify(r.j.unit.room_profile));
   }
 
+  // ── 5.13) 上架图集门槛（2026-09-18 按商家反馈由 8 下调为 7）──
+  // 阈值单一数据源 photo_config.PHOTO_MIN_PUBLISH，两处上架闸同读一份；这里锁住边界行为。
+  let pid6 = 0;
+  {
+    const photoCfg2 = require('../photo_config.cjs');
+    check('13-0 阈值常量 = 7（单一数据源）', photoCfg2.PHOTO_MIN_PUBLISH === 7, 'PHOTO_MIN_PUBLISH=' + photoCfg2.PHOTO_MIN_PUBLISH);
+
+    const mkWithPhotos = async (name, n) => {
+      const pj = await mkPublishable(name, [
+        { name: '门槛户型', area_sqm: 30, price_night: 200, min_stay_nights: 1 },
+      ], ['演示', '回归', '旅居']);
+      // mkPublishable 自己会先灌 8 张图；先清空再精确插入 n 张，否则卡不到边界
+      await conn.execute("DELETE FROM photos WHERE entity_type='project' AND entity_id=?", [pj.id]);
+      await conn.execute(
+        "DELETE FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?)", [pj.id]);
+      for (let i = 0; i < n; i++) {
+        await conn.execute(
+          `INSERT INTO photos(entity_type, entity_id, file_path, category, is_cover, sort_order)
+           VALUES ('project', ?, ?, 'other', ?, ?)`,
+          [pj.id, `https://cdn.example.test/${name}-${i}.jpg`, i === 0 ? 1 : 0, i]);
+      }
+      return pj.id;
+    };
+
+    pid6 = await mkWithPhotos(RUN + '·7图房源', 7);
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid6, status: 'online' }));
+    check('13-1 恰好 7 张（含封面）→ 可上架',
+      r.status === 200 && r.j.status === 'online', JSON.stringify(r.j).slice(0, 160));
+
+    const pid7 = await mkWithPhotos(RUN + '·6图房源', 6);
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid7, status: 'online' }));
+    check('13-2 只有 6 张 → 上架被拒 400 且提示 7 张',
+      r.status === 400 && /至少上传 7 张/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 160));
+    await conn.execute('DELETE FROM units WHERE project_id=?', [pid7]);
+    await conn.execute('DELETE FROM photos WHERE entity_type=\'project\' AND entity_id=?', [pid7]);
+    await conn.execute('DELETE FROM projects WHERE id=?', [pid7]);
+  }
+
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
     check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
@@ -883,7 +921,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('缺 id → 400', r.status === 400, JSON.stringify(r.j));
 
   // ── 8) 清理本次演示数据（含 §5.9 的价格口径房源；先删这两个项目的订单，避免残留占用）──
-  const allPids = [pid, pid2, pid3, pid4, pidNoPrice].filter(Boolean);
+  const allPids = [pid, pid2, pid3, pid4, pidNoPrice, pid6].filter(Boolean);
   await conn.execute(`DELETE FROM booking_orders WHERE project_id IN (${allPids.map(() => '?').join(',')})`, allPids);
   for (const x of allPids) {
     await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [x]);

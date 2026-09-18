@@ -8,7 +8,7 @@ const stayCfg = require('./stay_config.cjs');
 const ratingCfg = require('./rating_config.cjs');
 const photoCfg = require('./photo_config.cjs');
 const roomProfileCfg = require('./room_profile.cjs');
-const MIN_PUBLISH_PHOTOS = 8;
+const MIN_PUBLISH_PHOTOS = photoCfg.PHOTO_MIN_PUBLISH;   // 单一数据源 photo_config.cjs（改阈值只改那一处）
 
 function reply(status, data) {
   return { status, data };

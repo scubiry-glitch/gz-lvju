@@ -156,7 +156,7 @@
     <details>
       <summary><span class="q">Q8</span>房源创建成功为什么 C 端看不到？</summary>
       <div class="a">
-        <p>创建默认 <code>status='draft'</code>（草稿），C 端目录只展示 <code>online</code>。上架路径：<code>units/create</code> 至少 1 个户型并让它<strong>能算出默认夜价</strong>（户型 <code>price_night</code> 或 <code>rent_monthly</code>；也可由房源 <code>price_from</code> 兜底）→ <code>projects/status</code> 传 <code>online</code>，另有图集 ≥ 8 张 + 评级 <code>passed</code> 两道闸。<code>price_from</code> 自 2026-09 起<strong>选填</strong>，缺价或缺户型时上架接口直接 400，并点名是哪个户型。</p>
+        <p>创建默认 <code>status='draft'</code>（草稿），C 端目录只展示 <code>online</code>。上架路径：<code>units/create</code> 至少 1 个户型并让它<strong>能算出默认夜价</strong>（户型 <code>price_night</code> 或 <code>rent_monthly</code>；也可由房源 <code>price_from</code> 兜底）→ <code>projects/status</code> 传 <code>online</code>，另有图集 ≥ 7 张 + 评级 <code>passed</code> 两道闸。<code>price_from</code> 自 2026-09 起<strong>选填</strong>，缺价或缺户型时上架接口直接 400，并点名是哪个户型。</p>
       </div>
     </details>
 
@@ -219,7 +219,7 @@
       <div class="a">
         <p>未设置过的晚默认可订（房型开了「默认关房」则相反，见下）。夜价优先级：<strong>户型级覆盖 &gt; 项目级覆盖 &gt; 默认夜价</strong>；默认夜价两个频道一致 = 户型 <code>price_night</code> &gt; <code>月租/30</code> &gt; <code>起价/30</code>（2026-09 起 rental 的 <code>price_night</code> 同样生效，不再只认月租折算）。「恢复默认价」= 传 <code>status:'open'</code> 且不带 <code>price_night</code>，平台清除该晚价格覆盖。</p>
         <p><strong>放出量两种口径（2026-09）</strong>：<code>qty</code> = 该晚对平台开放的总量（含平台已订）；<strong><code>available_qty</code> = 净可售</strong>（推荐多渠道商家）——直接推「还能卖几间」，平台记基线、之后只扣平台自己卖掉的，取消自动加回，并按物理余量封顶防超售。两者只能传一个。<code>remaining</code> 一律只读。<code>default_closed=true</code>（房型 ext）开启「默认关房」：未推送放出的晚一律不可订，缺省关闭。</p>
-        <p><strong>图集（2026-09）</strong>：换图 / 撤图走 <code>photos/sync</code> <strong>全量覆盖</strong>——传该实体当前完整图集，平台自动移除不在列表内的旧图；匹配键 <code>external_id</code> 优先、URL 兜底（URL 带签名会变）。分类 <code>bedroom/kitchen/bathroom/living/nearby/other</code>，排序按 <code>sort</code> 从小到大归一化。上架需合计 ≥8 张 + 封面，单次上限 100 张（超出截取前 100 并告警）；单图 ≤10MB、分辨率 ≥800×600，推送时可带声明值即时校验、上架时抽检 2 张真拉取核对。</p>
+        <p><strong>图集（2026-09）</strong>：换图 / 撤图走 <code>photos/sync</code> <strong>全量覆盖</strong>——传该实体当前完整图集，平台自动移除不在列表内的旧图；匹配键 <code>external_id</code> 优先、URL 兜底（URL 带签名会变）。分类 <code>bedroom/kitchen/bathroom/living/nearby/other</code>，排序按 <code>sort</code> 从小到大归一化。上架需合计 ≥7 张 + 封面，单次上限 100 张（超出截取前 100 并告警）；单图 ≤10MB、分辨率 ≥800×600，推送时可带声明值即时校验、上架时抽检 2 张真拉取核对。</p>
       </div>
     </details>
 

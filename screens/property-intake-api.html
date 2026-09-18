@@ -367,7 +367,7 @@
       <tr><td><code>district_id</code></td><td>int</td><td>★ 行政区 id（<code>districts.id</code>），须属于 <code>city_id</code>；可不传</td></tr>
       <tr><td><code>address</code></td><td>string</td><td>★ 详细地址；缺省自动拼「城市 · 名称」。暂无经纬度字段（如需 POI 打点请向平台提需求）</td></tr>
       <tr><td><code>slug</code></td><td>string</td><td>URL 标识（C 端深链词），<strong>同 channel 内唯一</strong>。建议直接传贵方房源编号；不传则按名称自动生成。<strong>注意</strong>：传入已存在的 slug 不报错，会静默加 <code>-2</code>/<code>-3</code> 后缀——创建前请先 <code>projects/list</code> 核对防重；改 <code>name</code> 会同步重生成 slug</td></tr>
-      <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 URL；室内图集走 <code>photos/add</code>（4.11），<strong>上架须 ≥ 8 张照片</strong></td></tr>
+      <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 URL；室内图集走 <code>photos/add</code>（4.11），<strong>上架须 ≥ 7 张照片</strong></td></tr>
       <tr><td><code>tags</code></td><td>string[]</td><td>★ 标签数组（如 <code>["保租房","近地铁"]</code>）</td></tr>
       <tr><td><code>price_from</code></td><td>int</td><td><strong>选填</strong>（2026-09 起）。起价，单位元：<code>rental</code> 为「元/月」，<code>minsu</code> 为「元/晚」；作为<strong>默认夜价的最后兜底</strong>（rental 折算 <code>价/30</code>）。<strong>不传也可以</strong>——此时由每个户型自己的价（<code>price_night</code> 或 <code>rent_monthly</code>）承担，上架闸按户型逐个校验（见 4.6）。平日/周末/节假日分档不走它，走房态日历逐晚覆盖（见 5.1）</td></tr>
       <tr><td><code>price_from_display</code> / <code>price_unit</code> / <code>price_note</code></td><td>—</td><td><strong>只读出参</strong>（2026-09）：C 端卡片展示价三件套，页面直接渲染、不要自行折算。<code>price_unit</code> ∈ <code>night</code>（按晚起）/ <code>month</code>（按月起）/ <code>null</code>（该频道不适用，走 <code>price_total</code>）；<code>price_from_display</code> 为数值，为空时取 <code>price_note</code>（<code>暂无可订</code> / <code>价格面议</code>）。单位口径：<code>minsu</code> 与<strong>带「旅居」tag 的 rental</strong> 按晚（取<strong>最低可售单夜价</strong>，见 3.4），其余 rental 按月（起价语义不变）</td></tr>
@@ -591,7 +591,7 @@
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }     <span class="tok-com">// online 上架 / offline 下架 / draft 转草稿</span>
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"online"</span> }</code></pre>
     <div class="callout warn">
-      <strong>上架前置检查：</strong>① 至少有 1 个户型；② <strong>每个户型都能算出一个大于 0 的默认夜价</strong>（<code>price_night</code> 或 <code>rent_monthly</code>，也可由房源 <code>price_from</code> 兜底）；③ 图集 ≥ 8 张 + 封面；④ 评级 <code>passed</code>。任一不满足返回 400 并指明是哪个户型缺价。C 端目录有 ≤ 15 秒缓存，上架后最迟 15 秒可见、下架后最迟 15 秒消失。
+      <strong>上架前置检查：</strong>① 至少有 1 个户型；② <strong>每个户型都能算出一个大于 0 的默认夜价</strong>（<code>price_night</code> 或 <code>rent_monthly</code>，也可由房源 <code>price_from</code> 兜底）；③ 图集 ≥ 7 张 + 封面；④ 评级 <code>passed</code>。任一不满足返回 400 并指明是哪个户型缺价。C 端目录有 ≤ 15 秒缓存，上架后最迟 15 秒可见、下架后最迟 15 秒消失。
     </div>
 
     <h3>4.7 新增户型</h3>
@@ -667,7 +667,7 @@
       ① <strong>按实体覆盖</strong>——房源级只动房源级、户型级只动该户型，不会误删另一层（上架闸按两层合计算）；
       ② <strong>整体事务</strong>——任一校验不过整批不动，不留半拉图集；
       ③ <strong>上限 100 张</strong>——超出按 <code>sort</code>/数组顺序<strong>截取前 100 张</strong>，响应回 <code>truncated: true</code> + <code>warnings</code>（不静默丢图）；
-      ④ 覆盖后若该房源图集合计不足 8 张，响应会带一条 <code>warnings</code> 提示（<strong>不阻断</strong>——「≥8 张」是上架闸，不是每次覆盖的闸）。
+      ④ 覆盖后若该房源图集合计不足 7 张，响应会带一条 <code>warnings</code> 提示（<strong>不阻断</strong>——「≥8 张」是上架闸，不是每次覆盖的闸）。
     </div>
     <div class="callout warn">
       <strong>上架抽检（2026-09）：</strong><code>projects/status online</code> 时会真拉取<strong>封面 + 排序靠前的图（默认 2 张）</strong>核对大小与分辨率。
@@ -695,7 +695,7 @@
       外加平台算好的生效值：<code>default_night_price</code>（默认夜价）、<code>min_stay_nights</code> + <code>min_stay_nights_source</code>（连住下限与来源）、<code>cancel_policy</code> / <code>cancel_policy_text</code>（取消政策及中文文案）、<code>room_profile</code>（<strong>已解析的对象</strong>，不用自己 parse <code>ext</code> 字符串）。
     </div>
     <div class="callout warn">
-      <strong>上架素材硬性前置：</strong>房源（含其户型）图集合计 <strong>≥ 8 张</strong>且至少 1 张封面（<code>photos/sync</code> 单次覆盖<strong>不</strong>卡这个下限——它是<strong>上架闸</strong>，便于先建后补），否则 <code>projects/status online</code> 返回 400「上架前须至少上传 8 张房源照片」。
+      <strong>上架素材硬性前置：</strong>房源（含其户型）图集合计 <strong>≥ 7 张</strong>且至少 1 张封面（<code>photos/sync</code> 单次覆盖<strong>不</strong>卡这个下限——它是<strong>上架闸</strong>，便于先建后补），否则 <code>projects/status online</code> 返回 400「上架前须至少上传 8 张房源照片」。
     </div>
 
     <h3>4.12 评级提审 / 审核状态</h3>
@@ -848,7 +848,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>city_id / district_id 有枚举接口吗？</td><td>有：<code>regions/list</code>（4.1），只出该商家开放城市及其行政区；未配置城市约束则出全量。</td></tr>
       <tr><td>有经纬度字段吗？</td><td>暂无，只有 <code>address</code> 文本。房源级 POI 打点属新需求，请书面提给平台评估。</td></tr>
       <tr><td>slug 可以传我方房源 / 房型编号吗？</td><td>可以（同频道内唯一，未做字符集限制）。传入已存在的 slug 不报错、会静默加 <code>-2</code> 后缀，创建前先 <code>projects/list</code> 核对防重；接口暂无按 slug 幂等 upsert，已列入平台排期。</td></tr>
-      <tr><td>只有封面图吗？</td><td>不止：图集走 <code>photos/add</code>（4.11），上架硬性要求 ≥ 8 张 + 封面。</td></tr>
+      <tr><td>只有封面图吗？</td><td>不止：图集走 <code>photos/add</code>（4.11），上架硬性要求 ≥ 7 张 + 封面。</td></tr>
       <tr><td>price_from 是基础价吗？平日 / 周末 / 节假日价怎么表达？</td><td><code>price_from</code> 是<strong>选填</strong>起价（rental=元/月、minsu=元/晚）+ 默认夜价的最后兜底，不分档。分档 = 房态日历逐晚 <code>price_night</code> 覆盖（5.1），订单金额按逐晚覆盖合计。不传起价时由各户型的价承担（见下条）。</td></tr>
       <tr><td>我不按月租卖，只按每晚定价，可以吗？</td><td>可以（2026-09 起）。给户型的 <code>price_night</code> 即可，<strong>rental 频道同样生效</strong>；<code>rent_monthly</code> 与 <code>price_from</code> 都可以不传。默认夜价顺序 = <code>price_night</code> &gt; <code>月租/30</code> &gt; <code>起价/30</code>。</td></tr>
       <tr><td>不传 price_from，C 端卡片价格显示什么？</td><td>按展示价三件套（3.4）自动算：<strong>带「旅居」tag 的 rental 与 minsu 按晚</strong>，取<strong>最低可售单夜价</strong>（从今天起按自然月向后扫 12 个月，取第一个有可售间夜的月份内的最低价）；<strong>其余 rental 按月</strong>，起价缺失时用户型默认夜价 × 30。全窗口无可售时卡片显示「暂无可订」。贵方无需做任何事。</td></tr>
@@ -857,7 +857,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>没推过的日期，怎么让它默认不可订？</td><td>把房型 <code>default_closed</code> 设为 <code>true</code>（2026-09，见 3.6）。之后只有你们推过放出量的晚才可订，避免别处卖掉/临时不可售的晚被平台放出去。缺省关闭，不影响存量房源。</td></tr>
       <tr><td>换图 / 撤图怎么做？现在只能一张张加。</td><td>用 <code>photos/sync</code>（2026-09，见 4.11.1）：把该实体<strong>当前完整的图集</strong>传上来，平台自动移除不在列表里的旧图、保留并更新列表内的。单张的 <code>photos/add</code> 也保留，且<strong>同 URL / 同 external_id 重推 = 原地更新</strong>，不再堆重复图。</td></tr>
       <tr><td>图片 URL 带签名、每次都不一样，怎么让平台认出是同一张图？</td><td>传 <code>external_id</code>（你们侧的稳定图 id）。匹配键是 <strong>external_id 优先、URL 兜底</strong>——带上它，换签名 URL 也只是原地更新那张图，图片 id 不变、C 端引用不抖。</td></tr>
-      <tr><td>图集要几张？大小和分辨率有要求吗？</td><td>上架需<strong>合计 ≥ 8 张</strong>（房源级 + 户型级）且至少 1 张封面；单次 <code>photos/sync</code> 上限 <strong>100 张</strong>（超出按 sort 截取前 100 并回 <code>truncated</code> + 告警）。单图 <strong>≤10MB</strong>、分辨率 <strong>≥800×600</strong>：推送时可带 <code>width/height/size_bytes</code> 声明值即时校验；平台在上架时会<strong>抽检</strong>（默认封面 + 排序靠前的 2 张）真拉取核对。</td></tr>
+      <tr><td>图集要几张？大小和分辨率有要求吗？</td><td>上架需<strong>合计 ≥ 7 张</strong>（房源级 + 户型级）且至少 1 张封面；单次 <code>photos/sync</code> 上限 <strong>100 张</strong>（超出按 sort 截取前 100 并回 <code>truncated</code> + 告警）。单图 <strong>≤10MB</strong>、分辨率 <strong>≥800×600</strong>：推送时可带 <code>width/height/size_bytes</code> 声明值即时校验；平台在上架时会<strong>抽检</strong>（默认封面 + 排序靠前的 2 张）真拉取核对。</td></tr>
       <tr><td>房间档案（简介 / 窗户 / 床位 / 入住人数…）怎么传？</td><td>走户型级的 <code>room_profile</code> 对象（2026-09 开放，见 3.7）：<code>units/create</code> / <code>units/update</code> 传 <code>room_profile: {...}</code> 即可，<strong>只合并传入的键</strong>、未传的保持原值，传 <code>null</code> 清除整块。字段清单与取值范围见 3.7；越界会 400 并报出字段中文名与可选值。</td></tr>
       <tr><td>抽检拉图会不会拖慢上架？拉不到图怎么办？</td><td>只拉 2 张、只读必要字节、不落盘。仅<strong>网络不可达</strong>（超时 / DNS / 非 200）时<strong>放行</strong>并在响应里回 <code>warnings</code>——你们的 CDN 抖动不会卡住上架；只有<strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图）才拒绝。</td></tr>
       <tr><td><code>remaining</code> 是怎么算的？我能自己传吗？</td><td><strong>一律只读，平台算好下发</strong>，接口不接受传入。算法随该晚的放出口径：<code>qty</code>（放出总量）= <code>max(0, qty − 已订)</code>；<code>available_qty</code>（净可售）= <code>clamp(可用 − (已订 − 基线), 0, 物理余量)</code>。关房 / 未放出（默认关房）= 0。</td></tr>
@@ -937,7 +937,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>401</td><td>—</td><td>签名校验失败 / <code>vendor_id</code> 密钥未配置</td><td>核对 <code>hmac_key</code> 与签名算法（数组、空值、嵌套展平）</td></tr>
       <tr><td>400</td><td>—</td><td><code>name</code> / <code>city_id</code> / <code>project_id</code> 等必填缺失</td><td>按 message 补齐</td></tr>
       <tr><td>400</td><td>—</td><td>channel 非法 / <code>city_id</code> 不属于商家开放城市 / <code>district_id</code> 不属于城市</td><td>先用 <code>projects/list</code> 或平台侧确认主数据</td></tr>
-      <tr><td>400</td><td>—</td><td>上架被拒：<strong>有户型算不出默认夜价</strong>（缺 <code>price_night</code>/<code>rent_monthly</code> 且无 <code>price_from</code>，message 会点名户型）/ 无户型 / 照片不足 8 张 / 无封面 / <strong>评级未通过</strong> / 商家未过审</td><td>按 message 补齐；评级走 <code>rating/submit</code>（4.12），图片走 <code>photos/add</code>（4.11）</td></tr>
+      <tr><td>400</td><td>—</td><td>上架被拒：<strong>有户型算不出默认夜价</strong>（缺 <code>price_night</code>/<code>rent_monthly</code> 且无 <code>price_from</code>，message 会点名户型）/ 无户型 / 照片不足 7 张 / 无封面 / <strong>评级未通过</strong> / 商家未过审</td><td>按 message 补齐；评级走 <code>rating/submit</code>（4.12），图片走 <code>photos/add</code>（4.11）</td></tr>
       <tr><td>400</td><td>—</td><td>下单被拒：<code>该房源未配置价格，暂不可预订</code>（2026-09 新增：算不出价不再 0 元成单）</td><td>给户型补 <code>price_night</code> 或 <code>rent_monthly</code>（或房源起价）</td></tr>
       <tr><td>400</td><td>—</td><td>评级：<code>dims</code> 缺维度 / 越界（0-5）/ 未知维度；或已在复核队列中重复提审</td><td>按 4.12 维度表修正；进度用 <code>rating/status</code> 查</td></tr>
       <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 超出频道范围（rental 1–365 / minsu 15–365）</td><td>按 §6 / §5 枚举修正</td></tr>
@@ -968,7 +968,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
 
   <div class="doc-foot">
     <p><strong>版本：</strong>v2.2（2026-09-18）· 文档与线上实现同步校准。<br>
-      <strong>v2.2 变更（按商家反馈落地）：</strong>① 价格与住宿规则下放到户型——户型 <code>price_night</code> 在 rental 同样生效、<code>price_from</code> 改选填、最短连住下放到户型（见 3.2 / 5.2）；② 卡片展示价三件套 <code>price_from_display / price_unit / price_note</code> 与取数规则（3.4）；③ 房态净可售 <code>available_qty</code> + <code>set</code> 响应回 <code>days[]</code> 对账、默认关房 <code>default_closed</code>（3.5 / 3.6）；④ 图集<strong>全量覆盖</strong> <code>photos/sync</code> + 分类/排序 + 上架抽检（4.11）；⑤ 房间档案 <code>room_profile</code> 21 个字段对商家开放（3.7）。<br>
+      <strong>v2.2 变更（按商家反馈落地）：</strong>⓪ <strong>上架图集门槛由 ≥8 张下调为 ≥7 张</strong>（含封面，按商家确认的图集标准；房源图 + 户型图合计）；① 价格与住宿规则下放到户型——户型 <code>price_night</code> 在 rental 同样生效、<code>price_from</code> 改选填、最短连住下放到户型（见 3.2 / 5.2）；② 卡片展示价三件套 <code>price_from_display / price_unit / price_note</code> 与取数规则（3.4）；③ 房态净可售 <code>available_qty</code> + <code>set</code> 响应回 <code>days[]</code> 对账、默认关房 <code>default_closed</code>（3.5 / 3.6）；④ 图集<strong>全量覆盖</strong> <code>photos/sync</code> + 分类/排序 + 上架抽检（4.11）；⑤ 房间档案 <code>room_profile</code> 21 个字段对商家开放（3.7）。<br>
       <strong>v2.1（2026-09-10）：</strong>新增 <code>regions/list</code>、<code>photos/add</code>、<code>rating/submit|status</code> 端点；夜价覆盖价参与下单计价；amenities 10-id 映射与上架前置清单补全；新增「常见接入疑问」节。</p>
     <p><strong>密钥与凭证：</strong>由平台统一配置并线下下发；遗失须走平台重置，不要在多个业务间共享 <code>hmac_key</code>。</p>
     <p style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);">试点阶段接口字段以本页为准，扩展字段只增不破坏；重大变更会提前在「接入单」里同步。发布节奏随政策与试点进展而定。</p>

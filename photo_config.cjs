@@ -28,7 +28,9 @@ const PHOTO_CATEGORY_KEYS = PHOTO_CATEGORIES.map((c) => c.key);
 const PHOTO_CATEGORY_DEFAULT = 'other';
 
 // ===== 规则阈值 =====
-const PHOTO_MIN_PUBLISH = 8;                       // 上架闸：房源 + 其户型图集合计（与 MIN_PUBLISH_PHOTOS 同口径）
+// 上架闸：房源图 + 其户型图集合计。2026-09-18 按商家反馈由 8 调整为 7（含封面即满足）。
+// 两个上架闸（vendor_api.publishEligibility / app.js projectPublishEligibility）都读这一份，不得各写一个。
+const PHOTO_MIN_PUBLISH = 7;
 const PHOTO_MAX_PER_SYNC = 100;                    // 单次全量覆盖上限，超出截取前 100（按 sort/数组顺序）
 const PHOTO_MAX_BYTES = 10 * 1024 * 1024;          // 单图 ≤ 10MB
 const PHOTO_MIN_WIDTH = 800;                       // 分辨率 ≥ 800×600
