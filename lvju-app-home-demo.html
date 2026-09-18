@@ -31,9 +31,9 @@
   .scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .scr::-webkit-scrollbar{width:0;}
 
-  /* status bar */
-  .sbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 4px;font-size:12px;font-weight:600;color:#fff;position:relative;z-index:20;padding-top:max(14px,env(safe-area-inset-top));}
-  .sbar .r{display:flex;gap:5px;align-items:center;font-size:11px;}
+  /* 状态栏由原生壳绘制（见 capacitor.config.ts 的 StatusBar），页面内不再模拟。
+     hero 内容不再按 env(safe-area-inset-top) 让位——异形屏设备预设会报 ~47px，
+     凭空在顶部留一条空白；这里固定 10px，内容直接贴顶，图片仍全幅出血 */
 
   /* immersive hero */
   .hero{position:relative;padding:0 0 18px;color:#fff;overflow:hidden;}
@@ -49,7 +49,7 @@
     opacity:.5;}
   .hero .mist{position:absolute;left:-10%;right:-10%;bottom:96px;height:120px;
     background:radial-gradient(50% 100% at 50% 100%,rgba(255,255,255,.22),transparent 70%);filter:blur(8px);z-index:1;}
-  .hero-in{position:relative;z-index:5;padding:6px 20px 0;}
+  .hero-in{position:relative;z-index:5;padding:0 20px;}
   .h-top{display:flex;align-items:center;justify-content:space-between;}
   .h-loc{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;}
   .h-loc .pin{font-size:13px;}
@@ -173,9 +173,6 @@
 <body>
 <div class="app">
   <div class="scr">
-
-    <!-- status bar -->
-    <div class="sbar"><span>9:41</span><span class="r">📶 5G&nbsp; 🔋 88%</span></div>
 
     <!-- immersive hero -->
     <div class="hero">
