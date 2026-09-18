@@ -57,13 +57,15 @@
     return html;
   }
   function priceHtml(p, units, kind) {
-    var pf = p.price_from;
     if (kind === 'total') {
-      var w = wan(pf);
+      var w = wan(p.price_from);
       return '<b>' + (w ? '¥' + w : '价格待询') + '<small> 万起</small></b>';
     }
-    var v = pf || (units && units[0] && units[0].rent_monthly) || null;
-    return '<b>' + (v ? '¥' + fmt(v) : '价格待询') + '<small>/月起</small></b>';
+    // 租赁/民宿展示价走服务端三件套（2026-09，口径单一数据源 stay_config.priceDisplayOf）：
+    // 单位随房源分流（旅居/minsu 按晚、其余 rental 按月），页面不再用 price_from 自行折算
+    var pd = window.LVJU_PRICE ? LVJU_PRICE.parts(p) : { value: p.price_from, note: '价格待询' };
+    if (pd.value == null) return '<b>' + pd.note + '</b>';
+    return '<b>¥' + fmt(pd.value) + '<small>' + (window.LVJU_PRICE ? LVJU_PRICE.unitText(p) : '') + '</small></b>';
   }
 
   function cardM(p, cityName, units, o, dmap) {
