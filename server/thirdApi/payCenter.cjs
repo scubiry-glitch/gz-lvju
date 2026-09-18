@@ -5,21 +5,30 @@
  * 支付中台（落兵台 paySDK）接口封装，供其他 .cjs 调用。
  * 鉴权复用 server/utils/gateway-client.cjs（OAuth2 client_credentials + HMAC-SHA256）。
  *
- * 覆盖接口（落兵台 project 15453）：
+ * 覆盖接口：
+ * ── 支付类（落兵台 project 15453，前缀 PAY_PREFIX 默认 '/pay'）──
  *   1. C2B 支付下单      POST /pay/order/v2/createOrder      (api 1000086)
  *   2. 关闭订单          POST /pay/order/closeOrder          (api 9276)
  *   3. 支付订单查询      GET  /pay/order/v2/query            (api 1493269)
  *   4. 原路退款          POST /pay/order/refundOrder         (api 9297)
  *   5. 退款订单查询      GET  /pay/order/queryRefundOrder    (api 9264)
  *
+ * ── 分账类（落兵台 project 15873，前缀 PROFIT_PREFIX 默认
+ *       '/pay/open-pay-plat/pre/profits-share'，并非单纯 '/pay'）──
+ *   6. 开通合同专户      POST /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/account/openSpecialAccount      (api 1590841)
+ *   7. ACN 分账申请      POST /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/direct/split                    (api 1479542)
+ *   8. 分账回退申请      POST /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/direct/split/return            (api 1541838)
+ *   9. 分账结果与回退查询 GET /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/direct/split/query             (api 1479569)
+ *
  * 环境：new PayCenter({ env }) 或 createPayCenter(env) 直接指定 test | prod，
  *   据此选择网关地址与客户端凭证；凭证可被 OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET 覆盖。
  *
  * 约定：
- *   - 路径前缀 PAY_PREFIX 默认 '/pay'（与 /pay/order/v2/query 一致）；若网关改用
- *     servicePrefix 挂载，改 PAY_PREFIX 或构造时传 payPrefix 即可。
- *   - 各方法返回支付中台原始 JSON：{ errno, error, data }；HTTP 非 2xx 时抛错，
- *     业务级错误以 errno !== 0 体现在返回值中，由调用方自行判断。
+ *   - 支付类路径前缀 PAY_PREFIX 默认 '/pay'；分账类路径前缀 PROFIT_PREFIX 默认
+ *     '/pay/open-pay-plat/pre/profits-share'（用户指定，区别于 '/pay'）。
+ *     若网关改用 servicePrefix 挂载，改对应常量或构造时传 payPrefix / profitPrefix 即可。
+ *   - 各方法返回落兵台原始 JSON；HTTP 非 2xx 时抛错，业务级错误体现在返回值
+ *     （如 code 非 '200'）中，由调用方自行判断。
  *
  * 用法（环境由 JUZHU_ENV / NODE_ENV 读取，默认 test；无需手动 createPayCenter）：
  *   const { payCenter } = require('./thirdApi/payCenter.cjs');
@@ -34,6 +43,10 @@ const { GatewayClient } = require(path.join(__dirname, '..', 'utils', 'gateway-c
 
 // 路径前缀：与落兵台 pay 服务挂载路径一致（用户指定 /pay/order/v2/query）。
 const PAY_PREFIX = process.env.PAY_CENTER_PREFIX || '/pay';
+
+// 分账类路径前缀：落兵台 open-pay-plat 分账服务（project 15873），
+// 用户明确要求以 /pay/open-pay-plat/pre/profits-share 开头，而非单纯的 /pay。
+const PROFIT_PREFIX = process.env.PROFIT_SHARE_PREFIX || '/pay/open-pay-plat/pre/profits-share';
 
 // 各环境网关客户端配置（与 gateway-client.cjs / pay_mock.cjs 默认一致）。
 const ENV_CONFIG = {
@@ -85,13 +98,15 @@ class PayCenter {
   /**
    * @param {object} [options]
    * @param {string} [options.env='test'|'prod'] 环境（缺省按 JUZHU_ENV/NODE_ENV，否则 test）
-   * @param {string} [options.payPrefix]         路径前缀，默认 PAY_PREFIX
+   * @param {string} [options.payPrefix]         支付类路径前缀，默认 PAY_PREFIX
+   * @param {string} [options.profitPrefix]      分账类路径前缀，默认 PROFIT_PREFIX
    * @param {string} [options.gatewayUrl]        显式网关地址（与 clientConfig 同时传时优先）
    * @param {object} [options.clientConfig]      { clientId, clientSecret, clientType }
    * @param {GatewayClient} [options.client]     复用外部 GatewayClient 实例
    */
   constructor(options = {}) {
     this.payPrefix = options.payPrefix || PAY_PREFIX;
+    this.profitPrefix = options.profitPrefix || PROFIT_PREFIX;
     if (options.client) {
       this.client = options.client;
     } else {
@@ -108,6 +123,11 @@ class PayCenter {
 
   _path(p) {
     return (this.payPrefix || '') + p;
+  }
+
+  // 分账类接口路径（前缀 PROFIT_PREFIX = /pay/open-pay-plat/pre/profits-share）
+  _profitPath(p) {
+    return (this.profitPrefix || '') + p;
   }
 
   /**
@@ -197,6 +217,91 @@ class PayCenter {
       query: clean(params),
     });
   }
+
+  // ───────────────────────── 分账类（project 15873，前缀 PROFIT_PREFIX） ─────────────────────────
+
+  /**
+   * 6. 开通合同专户（落兵台 api 1590841）
+   * 支持开通一个合同下多个分账参与方的合同专户；接口幂等，开户失败可重试。
+   * 注意：code 非 '200' 视为失败；data[].accountOpenStatus === true 视为开户成功。
+   * @param {object} body 必填：bizCode, contractNo, merchantNoList[]
+   * @returns {Promise<{code:string,info:string,data:Array<{merchantNo:string,accountOpenStatus:boolean}>>}>}
+   */
+  async openSpecialAccount(body = {}) {
+    const need = ['bizCode', 'contractNo', 'merchantNoList'];
+    const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
+    if (miss.length) throw new Error('[payCenter] openSpecialAccount 缺少必填：' + miss.join(', '));
+    if (!Array.isArray(body.merchantNoList) || !body.merchantNoList.length) {
+      throw new Error('[payCenter] openSpecialAccount 的 merchantNoList 不能为空');
+    }
+    return this.client.json(
+      this._profitPath('/share-profits/api/standard/account/openSpecialAccount'),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: clean(body),
+      },
+    );
+  }
+
+  /**
+   * 7. ACN 分账申请（落兵台 api 1479542）
+   * @param {object} body 必填：bizOrderNo, bizCode, orderName, amount, contractInfo{contractNo},
+   *   payInfos[{merchantNo,amount}], details[{bizDetailNo,splitLevel,payerMerchantNo,payAmount,payeeMerchantNo,leafFlag,summary}]
+   * @returns {Promise<{code:string,info:string,data:object}>}
+   */
+  async splitApply(body = {}) {
+    const need = ['bizOrderNo', 'bizCode', 'orderName', 'amount', 'contractInfo', 'payInfos', 'details'];
+    const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
+    if (miss.length) throw new Error('[payCenter] splitApply 缺少必填：' + miss.join(', '));
+    if (!body.contractInfo || !body.contractInfo.contractNo) {
+      throw new Error('[payCenter] splitApply 的 contractInfo.contractNo 必填');
+    }
+    return this.client.json(this._profitPath('/share-profits/api/standard/direct/split'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: clean(body),
+    });
+  }
+
+  /**
+   * 8. 分账回退申请（落兵台 api 1541838）
+   * @param {object} body 必填：bizOrderNo, bizCode, orderName, amount, contractInfo{contractNo},
+   *   payInfos[{payNo,merchantNo,amount}], details[{bizDetailNo,splitLevel,payerMerchantNo,payAmount,
+   *   payeeMerchantNo,leafFlag,summary,sources[]}]
+   * @returns {Promise<{code:string,info:string,data:object}>}
+   */
+  async splitReturn(body = {}) {
+    const need = ['bizOrderNo', 'bizCode', 'orderName', 'amount', 'contractInfo', 'payInfos', 'details'];
+    const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
+    if (miss.length) throw new Error('[payCenter] splitReturn 缺少必填：' + miss.join(', '));
+    if (!body.contractInfo || !body.contractInfo.contractNo) {
+      throw new Error('[payCenter] splitReturn 的 contractInfo.contractNo 必填');
+    }
+    return this.client.json(this._profitPath('/share-profits/api/standard/direct/split/return'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: clean(body),
+    });
+  }
+
+  /**
+   * 9. 分账结果与分账回退结果查询（落兵台 api 1479569）
+   * @param {object} params 必填：bizCode, orderType；bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
+   *   orderType 取值：DIRECT_SPLIT-分账；SPLIT_RETURN-分账追回
+   * @returns {Promise<{code:string,info:string,data:object}>}
+   */
+  async querySplitResult(params = {}) {
+    if (!params.bizCode || !params.orderType) {
+      throw new Error('[payCenter] querySplitResult 必填 bizCode / orderType');
+    }
+    assertOneOf('querySplitResult', params, ['bizOrderNo', 'orderNo']);
+    return this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      query: clean(params),
+    });
+  }
 }
 
 // 按环境缓存单例：避免多个调用方各自 new GatewayClient 重复申请 token。
@@ -222,5 +327,6 @@ module.exports = {
   createPayCenter,
   ENV_CONFIG,
   PAY_PREFIX,
+  PROFIT_PREFIX,
   payCenter: defaultPayCenter,
 };
