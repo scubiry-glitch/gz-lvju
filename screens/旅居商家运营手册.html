@@ -120,6 +120,7 @@
       <li>逐晚房态：<code>open / blocked / booked</code>；客户订单占用的夜晚自动锁定，任何接口不可改已订晚。</li>
       <li>放出量两种口径（2026-09）：<code>qty</code> = 该晚对平台开放的<b>总量</b>（含平台已订）；<code>available_qty</code> = <b>净可售</b>（推荐多渠道商家）——直接推「还能卖几间」，平台记基线、之后只扣平台自己卖掉的、取消自动加回，并按物理余量封顶防超售。两者只能传一个，<code>remaining</code> 一律只读。</li>
       <li>默认关房（可选，房型 <code>ext.default_closed</code>）：开启后<b>只有推过放出量的晚才可订</b>，没推过的晚一律不可订——多渠道商家防超售；缺省关闭。</li>
+      <li>图集（2026-09）：换图/撤图走 <code>photos/sync</code> <b>全量覆盖</b>——传该实体当前完整的图集，平台自动移除不在列表内的旧图，保留并更新列表内的；带<b>分类</b>（卧室/厨房/卫生间/客厅/周边/其他）与<b>排序</b>（<code>sort</code> 从小到大）。匹配键 <code>external_id</code> 优先、URL 兜底（URL 带签名会变）。上架需图集合计 ≥8 张 + 封面，单次上限 100 张；单图 ≤10MB、分辨率 ≥800×600，上架时平台会抽检。</li>
       <li>最短连住：rental、minsu 均默认 <b>15 晚</b>；可按 <b>户型</b>（<code>units/update</code> 传 <code>min_stay_nights</code>）或<b>房源</b>（<code>projects/update</code> 的 <code>ext.min_stay_nights</code>）覆盖，<b>生效顺序 = 户型 &gt; 房源 &gt; 频道默认</b>；rental 可配 1–365 晚，minsu 可配 15–365 晚（不得低于 15 晚）。整栋单（不指定房型）按排序最前的户型执行，与取消政策同一套回退。</li>
       <li>价格配置：<b>产品价下放在户型</b>（2026-09）——<code>price_night</code>（元/晚）在 rental 频道<b>同样生效</b>，默认夜价顺序 = <code>price_night</code> &gt; 月租 ÷ 30 &gt; 起价 ÷ 30；<code>price_from</code> 改为<b>选填</b>，不传起价时每个户型须自带价（上架闸逐个户型校验）。</li>
       <li><b>房源交易能力</b>：<code>online_booking</code>（在线预订、确认后线下收款）与 <code>online_payment</code>（在线支付、支付后确认）按房源独立配置，与频道无关；两项可同时开，但至少开启一项。逐晚价 / 关房在商家房态日历或 API 配置。</li>

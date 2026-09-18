@@ -896,6 +896,8 @@ curl -G https://test-domain/mall/beike/juzhu/order/detail \
 | `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext` 且 rental 同样生效、`min_stay_nights` 户型级连住、`total_qty` 总间数 1-999） |
 | `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价/连住/总间数/`default_closed` 默认关房等；`total_qty` 调低不得低于未来晚已订间数） |
 | `/api/juzhu/housing/vendor/stay-calendar/set` | 房态/夜价/放出量：`qty`=放出总量（含平台已订），`available_qty`=净可售（方案 B，记基线）二者只能传一个；响应回 `days[]` 供推完即对账 |
+| `/api/juzhu/housing/vendor/photos/sync` | **图集全量覆盖**（2026-09）：传该实体完整图集，平台移除不在列表内的旧图；分类 `category` + 排序 `sort` + `external_id` 匹配键（URL 带签名会变）；超 100 张截取并告警 |
+| `/api/juzhu/housing/vendor/photos/add` | 单张追加/更新（同 URL 或同 `external_id` **原地更新**，不再堆重复行）；支持 `category` / `sort_order` |
 | `/api/juzhu/housing/vendor/units/delete` | 删除户型（有关联订单或被占用晚时拒绝） |
 | `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房（已订晚 `booked_qty>0` 不可关）/ `open` 开房（可带 `price_night` 覆价、`qty` 放出间数覆盖；均不传 = 恢复默认，占用行保留计数清覆盖）。多间口径：每晚可订 = `qty||total_qty` − `booked_qty` |
 | `/api/juzhu/housing/vendor/stay-calendar/query` | 商家视角逐晚房态查询（含 `qty/booked_qty/remaining` 间数、占用来源/关联订单、最短连住、保险；`booked` 为 remaining≤0 派生态） |

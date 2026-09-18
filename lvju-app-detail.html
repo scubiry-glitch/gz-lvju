@@ -674,10 +674,12 @@ window.__NEARBY_RENDER__ = (function(){
     document.getElementById('dLoc').textContent = p.address || '';
     var hero = document.getElementById('dHero');
     if (p.cover_image) hero.style.background = 'url(' + p.cover_image + ') center/cover';
-    // 真图轮播：units 接口下发的户型实拍（无图回退封面；单图隐藏计数）
+    // 真图轮播：units 接口下发的图集（房源级 + 户型级，2026-09），无图回退封面；单图隐藏计数。
+    // 分类（photo_config 枚举）随图下发，滑动时在计数旁显示，页面不另造中文名映射。
     var photos = (rs[1] || {}).photos || [];
     var urls = photos.map(function(ph){ return ph.file_path || ''; }).filter(Boolean);
-    if (!urls.length && p.cover_image) urls = [p.cover_image];
+    var labels = photos.filter(function(ph){ return ph.file_path; }).map(function(ph){ return ph.category_label || ''; });
+    if (!urls.length && p.cover_image) { urls = [p.cover_image]; labels = ['']; }
     var dots = document.getElementById('dDots');
     if (urls.length > 1) {
       var track = document.createElement('div');
@@ -686,7 +688,8 @@ window.__NEARBY_RENDER__ = (function(){
       hero.insertBefore(track, hero.firstChild);
       var updDots = function(){
         var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-        dots.textContent = (i + 1) + ' / ' + track.children.length;
+        var lb = labels[i] ? ' · ' + labels[i] : '';
+        dots.textContent = (i + 1) + ' / ' + track.children.length + lb;
       };
       track.addEventListener('scroll', function(){ window.requestAnimationFrame(updDots); }, { passive: true });
       updDots();

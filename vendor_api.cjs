@@ -6,6 +6,7 @@ const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
 const ratingCfg = require('./rating_config.cjs');
+const photoCfg = require('./photo_config.cjs');
 const MIN_PUBLISH_PHOTOS = 8;
 
 function reply(status, data) {
@@ -421,29 +422,45 @@ async function ownProject(conn, vendorId, pid) {
   return rows[0];
 }
 
+/** 上架前置检查：返回 { error, warnings }——error 非空即阻断上架；warnings 随成功响应回给商家 */
 async function publishEligibility(conn, row) {
   const [vendors] = await conn.execute('SELECT status, review_status FROM jz_vendors WHERE id=?', [row.owner_vendor_id]);
   const vendor = vendors[0];
   if (!vendor || vendor.status !== 'active' || (vendor.review_status && vendor.review_status !== 'approved')) {
-    return '商家尚未通过审核或已停用';
+    return { error: '商家尚未通过审核或已停用' };
   }
-  if (row.rating_status !== 'passed') return '房源审核/评级未通过，不能上架';
+  if (row.rating_status !== 'passed') return { error: '房源审核/评级未通过，不能上架' };
   // 价格闸（2026-09）：price_from 改为选填——改成逐个户型校验「默认夜价 > 0」
   // （户型 price_night > 月租/30 > 房源起价/30，见 stay_config.unitNightPrice）。
   // 传了起价的房源全部户型自动继承，行为与旧闸一致；不传起价则每个户型须自带价。
   const [units] = await conn.execute(
     'SELECT id, name, rent_monthly, ext FROM units WHERE project_id=? ORDER BY sort_order, id', [row.id]);
-  if (!units.length) return '上架前须至少创建 1 个户型（units/create）';
+  if (!units.length) return { error: '上架前须至少创建 1 个户型（units/create）' };
   const unpriced = units.filter((u) => !(stayCfg.unitNightPrice(row, u) > 0));
   if (unpriced.length) {
-    return '上架前须设置价格：' + unpriced.map((u) => u.name || ('#' + u.id)).join('、')
-      + ' 缺夜价（price_night）或月租（rent_monthly），且房源未设置 price_from';
+    return { error: '上架前须设置价格：' + unpriced.map((u) => u.name || ('#' + u.id)).join('、')
+      + ' 缺夜价（price_night）或月租（rent_monthly），且房源未设置 price_from' };
   }
   const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
     WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
-  if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`;
-  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return '上架前须设置房源封面图';
-  return null;
+  if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return { error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片` };
+  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return { error: '上架前须设置房源封面图' };
+  // 图集抽检（2026-09）：真拉取前 N 张核对大小/分辨率——封面优先
+  const check = await spotCheckPhotos(conn, row.id);
+  if (check.error) return { error: check.error };
+  return { error: null, warnings: check.warnings };
+}
+
+/** 抽检取数：封面 + 排序靠前的图，最多 photo_config.PHOTO_SPOT_CHECK 张
+ *  （LIMIT 用内联常量：预编译语句下 `LIMIT ?` 传 number 会被 MySQL 拒） */
+async function spotCheckPhotos(conn, projectId) {
+  const [rows] = await conn.execute(
+    `SELECT file_path FROM photos
+      WHERE (entity_type='project' AND entity_id=?)
+         OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))
+      ORDER BY is_cover DESC, entity_type, entity_id, sort_order, id LIMIT ${photoCfg.PHOTO_SPOT_CHECK}`,
+    [projectId, projectId]);
+  return photoCfg.spotCheck(rows.map((r) => r.file_path));
 }
 
 async function vendorAllowedCityIds(conn, vendorId) {
@@ -735,12 +752,17 @@ async function housingProjectsStatus(conn, body, vendorId) {
   const row = await ownProject(conn, vendorId, b.id);
   if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
   // 上架前置检查：无价格、无图片的房源不允许直接上架（C 端 catalog 只出 online）
+  let warnings = [];
   if (status === 'online') {
-    const err = await publishEligibility(conn, row);
-    if (err) return reply(400, { code: 400, message: err });
+    const gate = await publishEligibility(conn, row);
+    if (gate.error) return reply(400, { code: 400, message: gate.error });
+    warnings = gate.warnings || [];
   }
   await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, row.id]);
-  return reply(200, { code: 0, message: 'success', id: row.id, status });
+  return reply(200, {
+    code: 0, message: 'success', id: row.id, status,
+    ...(warnings.length ? { warnings } : {}),
+  });
 }
 
 // ── 评级提审 / 审核状态（rating_status：draft → pending → passed/rejected，平台复核唯一闸）──
@@ -910,15 +932,162 @@ async function housingPhotosAdd(conn, body, vendorId) {
     if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
     entityType = 'unit'; entityId = unitId;
   }
+  // 分类 / 稳定图 id（2026-09）：与 photos/sync 同口径，C 端按 category 分组展示
+  let category;
+  try { category = photoCfg.normalizeCategoryInput(b.category); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  const externalId = b.external_id == null || b.external_id === '' ? null : String(b.external_id).trim().slice(0, 120);
   const isCover = b.is_cover ? 1 : 0;
+  // 幂等（2026-09）：同实体同 URL / 同 external_id 已存在 → 原地更新，不再插重复行
+  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）
+  const [dup] = await conn.execute(
+    `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
+       AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
+    externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
+  if (dup.length) {
+    const sets = ['file_path=?', 'category=?'];
+    const vals = [filePath, category];
+    if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
+    if (b.source_path != null) { sets.push('source_path=?'); vals.push(b.source_path || null); }
+    // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
+    if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
+    if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
+    vals.push(dup[0].id);
+    await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
+    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
+    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
+    const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
+    return reply(200, { code: 0, message: 'success', updated: true, photo: photoOut(upd[0]) });
+  }
   if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-  const [next] = await conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+  let nextSort;
+  if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
+    nextSort = parseInt(b.sort_order, 10);
+  } else {
+    const [mx] = await conn.execute(
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+      [entityType, entityId]);
+    nextSort = mx[0].n;
+  }
   const [r] = await conn.execute(
-    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)`,
-    [entityType, entityId, filePath, b.source_path || null, isCover, next[0].n]);
-  if (entityType === 'project' && isCover) await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
+    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
+     VALUES (?,?,?,?,?,?,?,?)`,
+    [entityType, entityId, filePath, b.source_path || null, isCover, nextSort, category, externalId]);
+  if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
+  if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
   const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
-  return reply(200, { code: 0, message: 'success', photo: photo[0] });
+  return reply(200, { code: 0, message: 'success', photo: photoOut(photo[0]) });
+}
+
+/** 图集出参：分类中文名映射在 photo_config（单一数据源） */
+const photoOut = photoCfg.photoOut;
+
+/** 房源图集合计张数（房源级 + 其全部户型级）：上架闸与覆盖告警共用 */
+async function galleryCountOf(conn, projectId) {
+  const [rows] = await conn.execute(
+    `SELECT COUNT(*) AS c FROM photos
+      WHERE (entity_type='project' AND entity_id=?)
+         OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`,
+    [projectId, projectId]);
+  return Number(rows[0] && rows[0].c) || 0;
+}
+
+/**
+ * 图集全量覆盖（2026-09，商家反馈点 4）——传入该实体**当前完整的图集**，平台对比存量：
+ * 匹配上的原地更新（保住图片 id、C 端引用不抖），不在列表内的旧图删除，新增的插入；整体一个事务。
+ * 匹配键：external_id 优先（URL 带签名会变，认不出同一张图），其次 URL。
+ * 覆盖是**按实体**的：房源级只动 entity_type='project' 的行，户型级只动该 unit 的行，互不误删。
+ * 排序按 sort（缺省数组顺序）归一化为 0..n-1；封面取 is_cover 中排最前的一张，都没有则取第一张，
+ * 并同步到 projects.cover_image / units.cover_image。
+ */
+async function housingPhotosSync(conn, body, vendorId) {
+  const b = body || {};
+  const projectId = parseInt(b.project_id, 10);
+  if (!projectId) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const [projects] = await conn.execute('SELECT id, owner_vendor_id FROM projects WHERE id=?', [projectId]);
+  if (!projects.length || projects[0].owner_vendor_id !== vendorId) {
+    return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+  }
+  const unitId = b.unit_id == null || b.unit_id === '' ? null : parseInt(b.unit_id, 10);
+  let entityType = 'project';
+  let entityId = projectId;
+  if (unitId) {
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+    entityType = 'unit';
+    entityId = unitId;
+  }
+  let norm;
+  try { norm = photoCfg.normalizeGalleryInput(b.photos); }
+  catch (e) { return reply(400, { code: 400, message: e.message }); }
+  const items = photoCfg.assignSortOrders(norm.items);
+  const coverIdx = photoCfg.pickCoverIndex(items);
+  const cover = coverIdx >= 0 ? items[coverIdx].file_path : (items[0] ? items[0].file_path : null);
+
+  const [existing] = await conn.execute(
+    'SELECT * FROM photos WHERE entity_type=? AND entity_id=? ORDER BY sort_order, id', [entityType, entityId]);
+  const byExt = new Map();
+  const byUrl = new Map();
+  for (const r of existing) {
+    if (r.external_id) byExt.set(r.external_id, r);
+    byUrl.set(r.file_path, r);
+  }
+  const plan = items.map((it) => ({
+    it,
+    hit: (it.external_id && byExt.get(it.external_id)) || byUrl.get(it.file_path) || null,
+  }));
+  const keptIds = new Set(plan.filter((x) => x.hit).map((x) => x.hit.id));
+  const delIds = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+
+  await conn.beginTransaction();
+  try {
+    let removed = 0;
+    if (delIds.length) {
+      const [dr] = await conn.execute(
+        `DELETE FROM photos WHERE id IN (${delIds.map(() => '?').join(',')})`, delIds);
+      removed = dr.affectedRows || 0;
+    }
+    let added = 0;
+    let updated = 0;
+    for (const { it, hit } of plan) {
+      const isCover = it.file_path === cover ? 1 : 0;
+      if (hit) {
+        await conn.execute(
+          'UPDATE photos SET file_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
+          [it.file_path, it.category, it.sort_order, isCover, it.external_id, hit.id]);
+        updated++;
+      } else {
+        await conn.execute(
+          `INSERT INTO photos(entity_type, entity_id, file_path, category, sort_order, is_cover, external_id)
+           VALUES (?,?,?,?,?,?,?)`,
+          [entityType, entityId, it.file_path, it.category, it.sort_order, isCover, it.external_id]);
+        added++;
+      }
+    }
+    // 封面同步到实体列（C 端列表/卡片读它）
+    if (entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [cover, projectId]);
+    else await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [cover, unitId]);
+    await conn.commit();
+
+    const warnings = norm.warnings.slice();
+    const total = await galleryCountOf(conn, projectId);
+    if (total < photoCfg.PHOTO_MIN_PUBLISH) {
+      warnings.push(`该房源图集合计 ${total} 张，低于上架所需的 ${photoCfg.PHOTO_MIN_PUBLISH} 张（房源 + 户型合计）`);
+    }
+    const [after] = await conn.execute(
+      'SELECT * FROM photos WHERE entity_type=? AND entity_id=? ORDER BY sort_order, id', [entityType, entityId]);
+    return reply(200, {
+      code: 0, message: 'success',
+      entity_type: entityType, entity_id: entityId,
+      applied: items.length, added, updated, removed,
+      cover, truncated: norm.truncated, warnings,
+      gallery_total: total,
+      photos: after.map(photoOut),
+    });
+  } catch (e) {
+    try { await conn.rollback(); } catch (_) {}
+    return reply(400, { code: 400, message: '图集覆盖失败：' + e.message });
+  }
 }
 
 /** 房态批量设置：与 C/B 端同口径（多间库存 2026-09-10：已订晚 booked_qty>0 不可关房；
@@ -1182,6 +1351,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/projects/rating/status': housingRatingStatus,
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
+  '/api/juzhu/housing/vendor/photos/sync': housingPhotosSync,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
   '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
   '/api/juzhu/housing/vendor/stay-calendar/query': housingStayCalendarQuery,

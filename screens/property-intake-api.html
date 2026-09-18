@@ -594,17 +594,62 @@
   ]
 }</code></pre>
     <h3>4.11 房源图片（图集）</h3>
-    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/photos/add</span><span class="desc">追加室内图 / 户型图；<code>is_cover</code> 自动换封面并同步 <code>cover_image</code></span></div>
+    <h4 style="font-size:14px;margin:16px 0 6px;">4.11.1 全量覆盖图集（推荐，2026-09）</h4>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/photos/sync</span><span class="desc">传入该实体<strong>当前完整的图集</strong>，平台对比存量：保留列表内的、移除不在列表内的，整体一个事务</span></div>
+<pre><code>{
+  <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
+  <span class="tok-key">"unit_id"</span>: <span class="tok-num">3101</span>,                     <span class="tok-com">// 可选；缺省 = 房源级图集（只动房源级，不会碰户型级）</span>
+  <span class="tok-key">"photos"</span>: [
+    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.example.com/p1.jpg"</span>, <span class="tok-key">"category"</span>: <span class="tok-str">"bedroom"</span>, <span class="tok-key">"sort"</span>: <span class="tok-num">0</span>, <span class="tok-key">"is_cover"</span>: <span class="tok-key">true</span>,
+      <span class="tok-key">"external_id"</span>: <span class="tok-str">"IMG-1001"</span> },      <span class="tok-com">// 你们那边的稳定图 id（URL 带签名会变，靠它认同一张图）</span>
+    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.example.com/p2.jpg"</span>, <span class="tok-key">"category"</span>: <span class="tok-str">"living"</span>, <span class="tok-key">"sort"</span>: <span class="tok-num">1</span>,
+      <span class="tok-key">"width"</span>: <span class="tok-num">1920</span>, <span class="tok-key">"height"</span>: <span class="tok-num">1080</span>, <span class="tok-key">"size_bytes"</span>: <span class="tok-num">480000</span> }   <span class="tok-com">// 声明值可选，见下「校验」</span>
+  ]
+}
+→ 200 {
+  <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"applied"</span>: <span class="tok-num">8</span>, <span class="tok-key">"added"</span>: <span class="tok-num">5</span>, <span class="tok-key">"updated"</span>: <span class="tok-num">3</span>, <span class="tok-key">"removed"</span>: <span class="tok-num">2</span>,
+  <span class="tok-key">"cover"</span>: <span class="tok-str">"https://cdn.example.com/p1.jpg"</span>, <span class="tok-key">"truncated"</span>: <span class="tok-key">false</span>,
+  <span class="tok-key">"gallery_total"</span>: <span class="tok-num">12</span>, <span class="tok-key">"warnings"</span>: [],
+  <span class="tok-key">"photos"</span>: [ { <span class="tok-com">/* 覆盖后的完整图集（含 category_label），可直接用来核对 */</span> } ]
+}</code></pre>
+    <table>
+      <tr><th width="22%">字段</th><th>说明</th></tr>
+      <tr><td><code>url</code></td><td>★ 必填，<strong>http/https 绝对地址</strong>，≤500 字符；同一实体内不得重复</td></tr>
+      <tr><td><code>category</code></td><td>★ 图片分类，可选（缺省 <code>other</code>）：<code>bedroom</code> 卧室 / <code>kitchen</code> 厨房 / <code>bathroom</code> 卫生间 / <code>living</code> 客厅 / <code>nearby</code> 周边 / <code>other</code> 其他。未知值 400</td></tr>
+      <tr><td><code>sort</code></td><td>★ 展示顺序，<strong>从小到大</strong>；不传按数组顺序。平台归一化为 <code>0..n-1</code> 落库，C 端据此排序</td></tr>
+      <tr><td><code>is_cover</code></td><td>★ 封面；多张标记时取 <code>sort</code> 最靠前的那张。列表里一张都没标 → 取排序第一张。覆盖后自动同步 <code>cover_image</code></td></tr>
+      <tr><td><code>external_id</code></td><td>★ 你们侧的稳定图 id（≤120 字符）。<strong>匹配键：external_id 优先、URL 兜底</strong>——匹配上的原地更新（图片 id 不变、C 端引用不抖），否则插入/删除。URL 带签名会变，建议始终带上</td></tr>
+      <tr><td><code>width</code> / <code>height</code> / <code>size_bytes</code></td><td>★ 可选<strong>声明值</strong>：推送时即时校验（分辨率 ≥800×600、单图 ≤10MB，越界 400，无网络开销）；真伪由上架抽检核对</td></tr>
+    </table>
+    <div class="callout info">
+      <strong>规则与语义：</strong>
+      ① <strong>按实体覆盖</strong>——房源级只动房源级、户型级只动该户型，不会误删另一层（上架闸按两层合计算）；
+      ② <strong>整体事务</strong>——任一校验不过整批不动，不留半拉图集；
+      ③ <strong>上限 100 张</strong>——超出按 <code>sort</code>/数组顺序<strong>截取前 100 张</strong>，响应回 <code>truncated: true</code> + <code>warnings</code>（不静默丢图）；
+      ④ 覆盖后若该房源图集合计不足 8 张，响应会带一条 <code>warnings</code> 提示（<strong>不阻断</strong>——「≥8 张」是上架闸，不是每次覆盖的闸）。
+    </div>
+    <div class="callout warn">
+      <strong>上架抽检（2026-09）：</strong><code>projects/status online</code> 时会真拉取<strong>封面 + 排序靠前的图（默认 2 张）</strong>核对大小与分辨率。
+      <strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图 / 地址非法）→ 400 拒绝上架；
+      <strong>仅网络不可达</strong>（超时、DNS、非 200）→ <strong>放行</strong>并在响应里回 <code>warnings</code>（CDN 抖动不卡上架）。
+      抽检会读到你们的图片，平台只读必要字节、不落盘、不转存。
+    </div>
+
+    <h4 style="font-size:14px;margin:18px 0 6px;">4.11.2 单张追加 / 更新</h4>
+    <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/photos/add</span><span class="desc">追加室内图 / 户型图；<strong>同 URL 或同 external_id 重推 = 原地更新</strong>（2026-09 起不再堆重复行）</span></div>
 <pre><code>{
   <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
   <span class="tok-key">"unit_id"</span>: <span class="tok-num">3101</span>,                      <span class="tok-com">// 可选；缺省 = 房源级图集</span>
   <span class="tok-key">"file_path"</span>: <span class="tok-str">"https://cdn.example.com/p1.jpg"</span>,  <span class="tok-com">// 必填，URL ≤ 500 字符</span>
   <span class="tok-key">"is_cover"</span>: <span class="tok-key">true</span>,                       <span class="tok-com">// 设为封面（同实体原封面自动让位）</span>
-  <span class="tok-key">"sort_order"</span>: <span class="tok-str">""</span>                        <span class="tok-com">// 缺省追加到末尾</span>
+  <span class="tok-key">"category"</span>: <span class="tok-str">"bedroom"</span>,                 <span class="tok-com">// 图片分类（可选，缺省 other）</span>
+  <span class="tok-key">"external_id"</span>: <span class="tok-str">"IMG-1001"</span>,             <span class="tok-com">// 稳定图 id（可选）：幂等匹配键</span>
+  <span class="tok-key">"sort_order"</span>: <span class="tok-num">0</span>                         <span class="tok-com">// 不传 = 追加到末尾（2026-09 起传入即生效）</span>
 }
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"photo"</span>: { <span class="tok-com">/* id / entity_type / file_path / is_cover / sort_order */</span> } }</code></pre>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"updated"</span>: <span class="tok-key">true</span>, <span class="tok-key">"photo"</span>: { <span class="tok-com">/* 命中已有图时原地更新（updated=true） */</span> } }</code></pre>
+    <p class="opt" style="font-size:12.5px;">图集元素字段：<code>id / entity_type / entity_id / file_path / category / category_label / external_id / is_cover / sort_order</code>。<code>category_label</code> 为中文名，C 端直接渲染。</p>
     <div class="callout warn">
-      <strong>上架素材硬性前置：</strong>房源（含其户型）图集合计 <strong>≥ 8 张</strong>且至少 1 张封面，否则 <code>projects/status online</code> 返回 400「上架前须至少上传 8 张房源照片」。
+      <strong>上架素材硬性前置：</strong>房源（含其户型）图集合计 <strong>≥ 8 张</strong>且至少 1 张封面（<code>photos/sync</code> 单次覆盖<strong>不</strong>卡这个下限——它是<strong>上架闸</strong>，便于先建后补），否则 <code>projects/status online</code> 返回 400「上架前须至少上传 8 张房源照片」。
     </div>
 
     <h3>4.12 评级提审 / 审核状态</h3>
@@ -764,6 +809,10 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>月租 /30 折算发生在哪侧？</td><td>平台侧（C 端按晚售卖口径）：默认夜价 = <code>round(月租/30)</code>。<strong>2026-09 起户型 <code>price_night</code> 优先于它</strong>（两个频道一致）；详情页/下单页直接读接口下发的 <code>default_night_price</code>，不要自己折。</td></tr>
       <tr><td>我们同时在别的渠道卖，怎么让平台显示正确的可售数？</td><td>用 <code>available_qty</code>（<strong>净可售</strong>，2026-09）直接推「这一晚平台还能卖几间」，按你们自己的口径算（已扣他渠道 / 不可售）；平台记基线，之后只扣平台自己卖掉的，取消自动加回，并按物理余量封顶防超售。详见 3.5。</td></tr>
       <tr><td>没推过的日期，怎么让它默认不可订？</td><td>把房型 <code>default_closed</code> 设为 <code>true</code>（2026-09，见 3.6）。之后只有你们推过放出量的晚才可订，避免别处卖掉/临时不可售的晚被平台放出去。缺省关闭，不影响存量房源。</td></tr>
+      <tr><td>换图 / 撤图怎么做？现在只能一张张加。</td><td>用 <code>photos/sync</code>（2026-09，见 4.11.1）：把该实体<strong>当前完整的图集</strong>传上来，平台自动移除不在列表里的旧图、保留并更新列表内的。单张的 <code>photos/add</code> 也保留，且<strong>同 URL / 同 external_id 重推 = 原地更新</strong>，不再堆重复图。</td></tr>
+      <tr><td>图片 URL 带签名、每次都不一样，怎么让平台认出是同一张图？</td><td>传 <code>external_id</code>（你们侧的稳定图 id）。匹配键是 <strong>external_id 优先、URL 兜底</strong>——带上它，换签名 URL 也只是原地更新那张图，图片 id 不变、C 端引用不抖。</td></tr>
+      <tr><td>图集要几张？大小和分辨率有要求吗？</td><td>上架需<strong>合计 ≥ 8 张</strong>（房源级 + 户型级）且至少 1 张封面；单次 <code>photos/sync</code> 上限 <strong>100 张</strong>（超出按 sort 截取前 100 并回 <code>truncated</code> + 告警）。单图 <strong>≤10MB</strong>、分辨率 <strong>≥800×600</strong>：推送时可带 <code>width/height/size_bytes</code> 声明值即时校验；平台在上架时会<strong>抽检</strong>（默认封面 + 排序靠前的 2 张）真拉取核对。</td></tr>
+      <tr><td>抽检拉图会不会拖慢上架？拉不到图怎么办？</td><td>只拉 2 张、只读必要字节、不落盘。仅<strong>网络不可达</strong>（超时 / DNS / 非 200）时<strong>放行</strong>并在响应里回 <code>warnings</code>——你们的 CDN 抖动不会卡住上架；只有<strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图）才拒绝。</td></tr>
       <tr><td><code>remaining</code> 是怎么算的？我能自己传吗？</td><td><strong>一律只读，平台算好下发</strong>，接口不接受传入。算法随该晚的放出口径：<code>qty</code>（放出总量）= <code>max(0, qty − 已订)</code>；<code>available_qty</code>（净可售）= <code>clamp(可用 − (已订 − 基线), 0, 物理余量)</code>。关房 / 未放出（默认关房）= 0。</td></tr>
       <tr><td>promo_price 会影响成交价吗？</td><td>不会，当前是「首月特惠」展示标签位；营销价真实成交需另行排期。</td></tr>
       <tr><td>amenities 没有枚举怎么映射？</td><td>按下表 10 个 id 传（3.2）：ac / washer / fridge / heater / lock / wifi / tv / hood / microwave / induction。不传 = C 端回落展示全部；未知 id 不渲染。枚举字典化在平台排期。</td></tr>
@@ -794,7 +843,8 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
           <option value="/api/juzhu/housing/vendor/projects/status">projects/status · 上下架</option>
           <option value="/api/juzhu/housing/vendor/projects/rating/submit">projects/rating/submit · 评级提审</option>
           <option value="/api/juzhu/housing/vendor/projects/rating/status">projects/rating/status · 审核状态</option>
-          <option value="/api/juzhu/housing/vendor/photos/add">photos/add · 追加房源图片</option>
+          <option value="/api/juzhu/housing/vendor/photos/sync">photos/sync · 全量覆盖图集（推荐）</option>
+          <option value="/api/juzhu/housing/vendor/photos/add">photos/add · 追加/更新单张图片</option>
           <option value="/api/juzhu/housing/vendor/units/create">units/create · 新增户型</option>
           <option value="/api/juzhu/housing/vendor/units/update">units/update · 更新户型</option>
           <option value="/api/juzhu/housing/vendor/stay-calendar/set">stay-calendar/set · 房态/夜价</option>
@@ -846,6 +896,8 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
       <tr><td>400</td><td>—</td><td><code>insurance</code> 含未知标识 / <code>min_stay_nights</code> 超出频道范围（rental 1–365 / minsu 15–365）</td><td>按 §6 / §5 枚举修正</td></tr>
       <tr><td>400</td><td>—</td><td><code>qty</code> 与 <code>available_qty</code> 同时传（语义不同，只能传一个）/ <code>available_qty</code> 超出 0-999 / 项目级传放出量</td><td>见 3.5；项目级（<code>unit_id=0</code>）容量恒 1，不接受放出量</td></tr>
       <tr><td>400</td><td>—</td><td><code>default_closed</code> 非布尔</td><td>传 <code>true</code> / <code>false</code>，<code>null</code> 清除（3.6）</td></tr>
+      <tr><td>400</td><td>—</td><td><code>photos/sync</code> 入参问题：<code>photos</code> 空数组 / 未知 <code>category</code> / 同实体内 <code>url</code> 或 <code>external_id</code> 重复 / 非 http(s) 地址 / 声明分辨率低于 800×600 或超过 10MB</td><td>见 4.11.1；错误信息会指明第几项（<code>photos[i]</code>）</td></tr>
+      <tr><td>400</td><td>—</td><td>上架被拒：图集抽检<strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图）</td><td>按 message 里的图片地址整改后重推；仅网络不可达不会拒绝（走 <code>warnings</code>）</td></tr>
       <tr><td>400</td><td>—</td><td>房态：以下日期已有预订占用</td><td>先取消订单再改房态</td></tr>
       <tr><td>400</td><td>—</td><td>无可更新字段 / <code>city_id</code> 不支持修改</td><td>按 message 调整</td></tr>
       <tr><td>400</td><td>—</td><td>订单未支付不可确认 / 订单已取消不可变更</td><td>支付走收银台后重试确认；取消为终态</td></tr>
@@ -895,6 +947,11 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     },
     '/api/juzhu/housing/vendor/projects/update': { id: 0, price_from: 2680, insurance: ['hotel_cancel', 'property'], min_stay_nights: 20, online_booking: true, online_payment: true },
     '/api/juzhu/housing/vendor/projects/status': { id: 0, status: 'online' },
+    '/api/juzhu/housing/vendor/photos/sync': { project_id: 0, unit_id: 0, photos: [
+      { url: 'https://cdn.example.com/p1.jpg', category: 'bedroom', sort: 0, is_cover: true, external_id: 'IMG-1001', width: 1920, height: 1080 },
+      { url: 'https://cdn.example.com/p2.jpg', category: 'living', sort: 1, external_id: 'IMG-1002' },
+    ] },
+    '/api/juzhu/housing/vendor/photos/add': { project_id: 0, unit_id: 0, file_path: 'https://cdn.example.com/p1.jpg', is_cover: true, category: 'bedroom', sort_order: 0 },
     '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, min_stay_nights: 3, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
     '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'open', price_night: null, qty: null, available_qty: 2 },

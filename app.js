@@ -696,6 +696,7 @@ function stripContactPhone(row) {
 // ===== 房态 / 保险 / 最短连住（旅居短住口径）单一数据源：stay_config.cjs =====
 // 会话态接口（app.js）与商家 HMAC 开放接口（vendor_api.cjs）共用同一份口径
 const stayCfg = require('./stay_config.cjs');
+const photoCfg = require('./photo_config.cjs');
 const vendorRate = require('./vendor_rate.cjs'); // 商家佣金费率（按业务线分档）单一数据源：vendor_rate.cjs
 const INSURANCE_TYPES = stayCfg.INSURANCE_TYPES;
 const INSURANCE_KEYS = stayCfg.INSURANCE_KEYS;
@@ -792,7 +793,17 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
     return { ok: false, error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`, status: 400 };
   }
   if (!p.cover_image && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
-  return { ok: true, project: p, ext: parseExtSafe(p.ext) };
+  // 图集抽检（2026-09）：真拉取前 N 张核对大小/分辨率——封面优先。
+  // 确定性不合格阻断上架；仅网络不可达记 warning 放行（CDN 抖动不该卡住上架）
+  const [spot] = await conn.execute(
+    `SELECT file_path FROM photos
+      WHERE (entity_type='project' AND entity_id=?)
+         OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))
+      ORDER BY is_cover DESC, entity_type, entity_id, sort_order, id LIMIT ${photoCfg.PHOTO_SPOT_CHECK}`,
+    [p.id, p.id]);
+  const check = await photoCfg.spotCheck(spot.map((r) => r.file_path));
+  if (check.error) return { ok: false, error: check.error, status: 400 };
+  return { ok: true, project: p, ext: parseExtSafe(p.ext), warnings: check.warnings };
 }
 
 function bookingPaymentExpired(row) {
@@ -1470,6 +1481,8 @@ async function ensureSchemaRun() {
         source_path VARCHAR(500),
         is_cover TINYINT NOT NULL DEFAULT 0,
         sort_order INT NOT NULL DEFAULT 0,
+        category VARCHAR(20),
+        external_id VARCHAR(120),
         KEY idx_entity (entity_type, entity_id)
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS jz_categories (
@@ -1886,6 +1899,8 @@ async function ensureSchemaRun() {
       ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
       ['jz_vendors', 'commission_housing DECIMAL(5,2)'],   // 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
       ['jz_vendors', 'commission_jiazheng DECIMAL(5,2)'],  // 抽佣·家政档（本期仅配置，消费在家政结算）
+      ['photos', 'category VARCHAR(20)'],                      // 图片分类（2026-09，取值见 photo_config.PHOTO_CATEGORIES）
+      ['photos', 'external_id VARCHAR(120)'],                  // 商家侧稳定图 id（2026-09）：全量覆盖的匹配键（URL 带签名会变，不能只靠 URL）
       ['jz_products', 'city_id INT'],
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
@@ -1894,6 +1909,8 @@ async function ensureSchemaRun() {
     for (const [table, ddl] of extraCols) {
       try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
     }
+    // 图集分类回填（2026-09 商家反馈点 4）：存量图无分类 → 'other'，幂等（只碰 NULL/空串行）
+    try { await conn.execute("UPDATE photos SET category='other' WHERE category IS NULL OR category=''"); } catch (_) { /* 表未就绪 */ }
     // 保租房/卖旧买新种子（projects 为空时从 juzhu/data*.json 灌入）
     if (housingSeedAll) {
       try {
@@ -3820,20 +3837,26 @@ async function handleApiDirect(urlPath, qs, req, res) {
           }
           let isCoverVal = null;
           if ('is_cover' in body) isCoverVal = body.is_cover ? 1 : 0;
+          let categoryVal = null;
+          if ('category' in body) {
+            try { categoryVal = photoCfg.normalizeCategoryInput(body.category); }
+            catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+          }
           await conn.execute(
             `UPDATE photos SET
                file_path=COALESCE(?, file_path),
                sort_order=COALESCE(?, sort_order),
-               is_cover=COALESCE(?, is_cover)
+               is_cover=COALESCE(?, is_cover),
+               category=COALESCE(?, category)
              WHERE id=?`,
             [body.file_path ? body.file_path.trim() : null,
              body.sort_order != null ? body.sort_order : null,
-             isCoverVal, photoId]
+             isCoverVal, categoryVal, photoId]
           );
           await syncUnitCover(conn, uid);
           await conn.commit();
           const [photos] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
-          return jsonReply(res, { ok: true, photo: photos[0] });
+          return jsonReply(res, { ok: true, photo: photoCfg.photoOut(photos[0]) });
         } finally {
           await conn.end();
         }
@@ -4377,10 +4400,10 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       let photos = [];
       if (photoClauses.length) {
-        photos = await queryRows(
-          `SELECT id, entity_type, entity_id, file_path, is_cover, sort_order FROM photos WHERE ${photoClauses.join(' OR ')} ORDER BY entity_type, entity_id, sort_order, id`,
+        photos = photoCfg.photosOut(await queryRows(
+          `SELECT id, entity_type, entity_id, file_path, is_cover, sort_order, category, external_id FROM photos WHERE ${photoClauses.join(' OR ')} ORDER BY entity_type, entity_id, sort_order, id`,
           photoParams
-        );
+        ));
       }
       const parse = housingParseJsonField || ((v) => v);
       const mapRows = (rows, keys) => rows.map((r) => {
@@ -4645,10 +4668,15 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         const proj = projs[0];
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order, id', [proj.id]);
-        const photos = await queryRows(
-          "SELECT * FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?) ORDER BY entity_id, sort_order",
-          [proj.id]
-        );
+        // 图集 = 房源级 + 户型级（2026-09 商家反馈点 4：photos/sync 可只推房源级图集，
+        // 此前详情页只读户型级 → 房源级图集在 C 端看不见）。房源级在前，各自按 sort_order。
+        const photos = photoCfg.photosOut(await queryRows(
+          `SELECT * FROM photos
+            WHERE (entity_type='project' AND entity_id=?)
+               OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))
+            ORDER BY FIELD(entity_type,'project','unit'), entity_id, sort_order, id`,
+          [proj.id, proj.id]
+        ));
         parseJsonFields(proj, ['tags', 'rating']);
         // 户型级生效住宿规则（最短连住 + 取消政策，2026-09）：前端只读 unit 上的值
         units.forEach((u) => { parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']); withStayRules(u, proj); });
@@ -5887,14 +5915,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
             conn.end();
             return jsonReply(res, { error: 'forbidden：非本商家房源' }, 403);
           }
+          let pubWarnings = [];
           if (status === 'online') {
             const eligibility = await projectPublishEligibility(conn, pid, sess.role === 'vendor' ? sess.vendorId : null);
             if (!eligibility.ok) return jsonReply(res, { error: eligibility.error }, eligibility.status || 400);
+            pubWarnings = eligibility.warnings || [];
           }
           await conn.execute('UPDATE projects SET status=? WHERE id=?', [status, pid]);
           await conn.commit();
           const [updated] = await conn.execute('SELECT id, name, status FROM projects WHERE id=?', [pid]);
-          return jsonReply(res, { ok: true, project: updated[0] });
+          return jsonReply(res, { ok: true, project: updated[0], ...(pubWarnings.length ? { warnings: pubWarnings } : {}) });
         } finally { await conn.end(); }
       }
     }

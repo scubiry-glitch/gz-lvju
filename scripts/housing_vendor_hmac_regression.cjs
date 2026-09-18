@@ -447,9 +447,11 @@ async function catalogEventually(base, projectId, citySlug, want) {
   };
 
   let pid2 = 0;
+  let pidNoPrice = 0;    // §9-1 的「无价房源」也要清（曾经漏删，攒了一堆残留）
   {
     // 9-1) 无 price_from 且户型无价 → 上架仍被拒（价格闸改为逐户型校验，不是放弃校验）
     const noPrice = await mkPublishable(RUN + '·无价房源', [{ name: '未定价户型', layout_label: '1室1厅', area_sqm: 40 }]);
+    pidNoPrice = noPrice.id;
     r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: noPrice.id, status: 'online' }));
     check('9-1 户型无价且无起价 → 上架被拒 400', r.status === 400 && /价格/.test(r.j.message || ''), JSON.stringify(r.j));
 
@@ -637,6 +639,136 @@ async function catalogEventually(base, projectId, citySlug, want) {
     check('10-6g 关闭后未推送的晚恢复可订（该户型 total_qty=6，无占用）', day && day.remaining === 6, JSON.stringify(day));
   }
 
+  // ── 5.11) 图集全量覆盖（2026-09 商家反馈点 4）：photos/sync + 分类 + 排序 + 封面 + 抽检 ──
+  const photoCfg = require('../photo_config.cjs');
+  let pid4 = 0;
+  {
+    const p = await mkPublishable(RUN + '·图集房源', [
+      { name: '图集户型', area_sqm: 30, price_night: 200, min_stay_nights: 1 },
+    ], ['演示', '回归', '旅居']);
+    pid4 = p.id;
+    const u4 = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid4 }))).j.units[0].id;
+    const U = (n) => `https://cdn.example.test/${RUN}-g${n}.jpg`;
+    const mk = (n, extra) => Object.assign({ url: U(n) }, extra || {});
+    const cats = ['living', 'bedroom', 'bathroom', 'kitchen', 'nearby', 'other'];
+    const gallery = (n) => Array.from({ length: n }, (_, i) => mk(i + 1, {
+      category: cats[i % cats.length], sort: (n - i) * 10,      // sort 从大到小：验证按 sort 归一化
+    }));
+
+    // 11-1 全量覆盖：8 张（分类 + 乱序 sort + 封面不在第一位）
+    const g1 = gallery(8);
+    g1[3].is_cover = true;
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g1 }));
+    check('11-1 sync 全量覆盖 8 张（新增）',
+      r.status === 200 && r.j.applied === 8 && r.j.added === 8 && r.j.removed === 0 && r.j.updated === 0,
+      JSON.stringify(r.j).slice(0, 180));
+    check('11-1b 排序按 sort 归一化为 0..7、分类落库、封面取传入的那张',
+      r.status === 200 && r.j.photos.length === 8
+      && r.j.photos.every((x, i) => x.sort_order === i)
+      && r.j.photos[0].file_path === U(8)                     // sort 最小 = 原数组最后一支
+      && r.j.photos[0].category_label === '卧室'                 // g8 → cats[7%6]=bedroom
+      && r.j.cover === U(4) && r.j.photos.filter((x) => x.is_cover).length === 1,
+      JSON.stringify((r.j.photos || []).map((x) => [x.file_path.slice(-6), x.sort_order, x.category])));
+
+    // 11-2 再推一次：去掉 2 张、新增 1 张、改顺序与分类 → 图集应精确等于传入
+    const g2 = gallery(6).concat([mk(99, { category: 'living' })]);
+    g2.forEach((x, i) => { x.sort = i; });
+    g2[0].is_cover = true;
+    const beforeIds = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid4 }))).j.units[0].id;
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g2 }));
+    // g1 = U1..U8；g2 = U1..U6 + U99 → 保留 6 + 新增 1、移除 U7/U8
+    check('11-2 二次覆盖：保留 6 / 移除 2 / 新增 1',
+      r.status === 200 && r.j.removed === 2 && r.j.added === 1 && r.j.updated === 6
+      && r.j.photos.length === 7 && r.j.cover === U(1),
+      JSON.stringify({ a: r.j.added, u: r.j.updated, d: r.j.removed, n: (r.j.photos || []).length, cover: r.j.cover }));
+    check('11-2b 覆盖后图集 = 传入集合（无残留、无重复）',
+      r.status === 200 && JSON.stringify(r.j.photos.map((x) => x.file_path).sort())
+        === JSON.stringify(g2.map((x) => x.url).sort()),
+      JSON.stringify((r.j.photos || []).map((x) => x.file_path.slice(-6))));
+
+    // 11-3 external_id 匹配：URL 带签名会变，靠 external_id 认同一张图（行 id 不变）
+    const idBefore = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid4 }))).j.units[0].id;
+    const snapBefore = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, {
+      project_id: pid4, unit_id: u4,
+      photos: g2.map((x) => Object.assign({}, x, { external_id: 'E' + x.url.slice(-6) })),
+    }));
+    const idsBefore = snapBefore.j.photos.map((x) => x.id).join(',');
+    const g3 = g2.map((x, i) => Object.assign({}, x, {
+      external_id: 'E' + x.url.slice(-6),
+      url: i === 0 ? `https://cdn.example.test/${RUN}-rotated.jpg` : x.url,   // 第一张换 URL（签名变了）
+    }));
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g3 }));
+    check('11-3 URL 变、external_id 不变 → 原地更新（行 id 不变，不产生新增/删除）',
+      r.status === 200 && r.j.added === 0 && r.j.removed === 0 && r.j.updated === 7
+      && r.j.photos.map((x) => x.id).join(',') === idsBefore
+      && r.j.photos[0].file_path.endsWith('-rotated.jpg'),
+      JSON.stringify({ idsSame: r.j.photos.map((x) => x.id).join(',') === idsBefore, a: r.j.added, d: r.j.removed }));
+
+    // 11-4 覆盖按实体：户型级覆盖不动房源级
+    const gProj = Array.from({ length: 8 }, (_, i) => mk('p' + (i + 1), { category: 'nearby' }));
+    await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, photos: gProj }));
+    const unitBefore = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid4 }))).j.units[0].id;
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g3.slice(0, 8) }));
+    const [pcRows] = await conn.execute(`SELECT COUNT(*) c FROM photos WHERE entity_type='project' AND entity_id=?`, [pid4]);
+    const [ucRows] = await conn.execute(`SELECT COUNT(*) c FROM photos WHERE entity_type='unit' AND entity_id=?`, [u4]);
+    check('11-4 户型级覆盖不动房源级图集（各归各的 entity）',
+      r.status === 200 && Number(pcRows[0].c) === 8 && Number(ucRows[0].c) === 7,
+      'project=' + pcRows[0].c + ' unit=' + ucRows[0].c);
+
+    // 11-5 超 100 张：按 sort 截取前 100 并告警（不静默丢图）
+    const big = Array.from({ length: 120 }, (_, i) => mk('big' + i, { sort: i }));
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, photos: big }));
+    check('11-5 超 100 张 → 截取前 100 + truncated + 告警',
+      r.status === 200 && r.j.photos.length === 100 && r.j.truncated === true
+      && (r.j.warnings || []).some((w) => /超过 100 张/.test(w)),
+      JSON.stringify({ n: (r.j.photos || []).length, t: r.j.truncated }));
+
+    // 11-6 入参校验
+    const bad = async (photos, label, re) => {
+      const x = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos }));
+      check(label, x.status === 400 && re.test(x.j.message || ''), JSON.stringify(x.j).slice(0, 140));
+    };
+    await bad([mk(1, { category: 'garage' })], '11-6 未知分类 → 400', /category/);
+    await bad([mk(1), mk(1)], '11-6b 重复 url → 400', /重复/);
+    await bad([mk(1, { width: 640, height: 480 })], '11-6c 声明分辨率低于 800×600 → 400', /低于下限/);
+    await bad([mk(1, { size_bytes: 11 * 1024 * 1024 })], '11-6d 声明超过 10MB → 400', /10MB/);
+    await bad([{ url: 'assets/local.jpg' }], '11-6e 非 http(s) 地址 → 400', /http/);
+    await bad([], '11-6f 空数组 → 400', /不能为空/);
+
+    // 11-7 photos/add 幂等 + sort_order 生效（旧接口不再堆重复行）
+    const addUrl = `https://cdn.example.test/${RUN}-add-once.jpg`;
+    await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, { project_id: pid4, unit_id: u4, file_path: addUrl, category: 'kitchen' }));
+    const add2 = await call('/api/juzhu/housing/vendor/photos/add', signed(vendor, {
+      project_id: pid4, unit_id: u4, file_path: addUrl, category: 'living', sort_order: 2,
+    }));
+    const [dupRow] = await conn.execute('SELECT COUNT(*) c FROM photos WHERE entity_type=\'unit\' AND entity_id=? AND file_path=?', [u4, addUrl]);
+    check('11-7 photos/add 同 URL 重推 = 原地更新（不堆重复行）+ sort_order 生效 + 分类可改',
+      add2.status === 200 && add2.j.updated === true && Number(dupRow[0].c) === 1
+      && add2.j.photo.sort_order === 2 && add2.j.photo.category === 'living',
+      JSON.stringify({ n: dupRow[0].c, sort: add2.j.photo && add2.j.photo.sort_order, cat: add2.j.photo && add2.j.photo.category }));
+
+    // 11-8 上架抽检：URL 不可达 → 放行但回 warning（确定性不合格才阻断，见 11-9 纯函数用例）
+    await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, photos: gProj }));
+    r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid4, status: 'online' }));
+    check('11-8 抽检不可达 → 上架放行 + warnings（CDN 抖动不卡上架）',
+      r.status === 200 && Array.isArray(r.j.warnings) && r.j.warnings.length > 0,
+      JSON.stringify(r.j).slice(0, 200));
+
+    // 11-9 判定口径纯函数（与网络解耦，回归里守口径）
+    check('11-9 超 10MB → rejected', photoCfg.judgeProbe({ bytes: 11 * 1024 * 1024 }).status === 'rejected');
+    check('11-9b 640×480 → rejected', photoCfg.judgeProbe({ bytes: 1000, width: 640, height: 480 }).status === 'rejected');
+    check('11-9c 800×600 边界 → ok', photoCfg.judgeProbe({ bytes: 1000, width: 800, height: 600 }).status === 'ok');
+    check('11-9d 非图/损坏 → rejected', photoCfg.judgeProbe({ bytes: 10, parseFailed: true }).status === 'rejected');
+    check('11-9e 超时/HTTP 非 200 → unreachable（不阻断）',
+      photoCfg.judgeProbe({ error: 'timeout' }).status === 'unreachable'
+      && photoCfg.judgeProbe({ statusCode: 404 }).status === 'unreachable');
+    check('11-9f SSRF：内网/环回/元数据地址拦截，公网放行',
+      photoCfg.ipIsBlocked('127.0.0.1') && photoCfg.ipIsBlocked('10.1.2.3')
+      && photoCfg.ipIsBlocked('169.254.169.254') && photoCfg.ipIsBlocked('192.168.1.1')
+      && photoCfg.ipIsBlocked('::1') && photoCfg.ipIsBlocked('fd00::1')
+      && !photoCfg.ipIsBlocked('8.8.8.8') && !photoCfg.ipIsBlocked('2400:3200::1'));
+  }
+
   // ── Webhook 验收：booking.created / booking.paid / booking.cancelled（平台 → 商家，HMAC 验签）──
   if (hits.length === 0) {
     check('webhook 送达', false, '未收到任何事件（服务端未读取到 webhook_url）');
@@ -711,7 +843,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('缺 id → 400', r.status === 400, JSON.stringify(r.j));
 
   // ── 8) 清理本次演示数据（含 §5.9 的价格口径房源；先删这两个项目的订单，避免残留占用）──
-  const allPids = [pid, pid2, pid3].filter(Boolean);
+  const allPids = [pid, pid2, pid3, pid4, pidNoPrice].filter(Boolean);
   await conn.execute(`DELETE FROM booking_orders WHERE project_id IN (${allPids.map(() => '?').join(',')})`, allPids);
   for (const x of allPids) {
     await conn.execute('DELETE FROM stay_calendar WHERE project_id=?', [x]);
