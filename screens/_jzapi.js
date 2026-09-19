@@ -1,8 +1,8 @@
-/* _jzapi.js · 家政工单 API 总线（前后端分离，SQLite 为唯一数据源）
+/* _jzapi.js · 家政工单 API 总线（前后端分离，MySQL 为唯一数据源）
  * 页面通过本模块读写 /api/juzhu/jiazheng/*，不再使用 localStorage 造数。
  *
  * 【数据源边界 · 参见 CLAUDE.md 规则 8/9】
- *   权威数据源 = SQLite（juzhu/juzhu.db），经 juzhu/server.py 暴露。
+ *   权威数据源 = MySQL，经 app.js 暴露。
  *   本总线（家政工单闭环）与 screens/_orderbus.js（报修 · localStorage `bzf_orders`）
  *   并行、不混用：报修走 _orderbus.js，家政走本文件，二者不共享 key、不合并。
  *   家政"目录/SKU 配置"的前端适配 + 离线 mock 见根目录 jiazheng-data.js。
@@ -90,6 +90,8 @@
 
   function normalizeItem(o) {
     if (!o) return o;
+    for(var pair of [['worker','worker_json'],['rating','rating_json'],['log','log_json']]){if(!o[pair[0]]&&o[pair[1]]){try{o[pair[0]]=typeof o[pair[1]]==='string'?JSON.parse(o[pair[1]]):o[pair[1]];}catch{}}}
+    o.category=o.category||o.type;
     o.expectTime = o.expectTime || o.expect_time || '';
     o.createdLabel = o.createdLabel || (o.created_at || '').replace('T', ' ').replace('Z', '').slice(0, 16);
     o.icon = o.icon || ICON[o.type] || '✨';
@@ -111,21 +113,21 @@
 
   function stats() {
     return fetchJSON('/api/juzhu/jiazheng/orders/stats', { headers: authHeaders() })
-      .then(function (res) { return res.stats || {}; });
+      .then(function (res) { return res.stats || res; });
   }
 
   function get(id) {
     return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id), { headers: authHeaders() })
-      .then(function (res) { return normalizeItem(res.order); });
+      .then(function (res) { return normalizeItem(res.order || res); });
   }
 
   function byStatus(st) {
     var wanted = Array.isArray(st) ? st : [st];
-    return list({ status: wanted.join(','), pay_status: 'paid', limit: 100 });
+    return list({ status: wanted.join(','), pay_status: 'paid,not_required', limit: 100 });
   }
 
   function all() {
-    return list({ limit: 100, pay_status: 'paid' });
+    return list({ limit: 100, pay_status: 'paid,not_required' });
   }
 
   function create(payload) {

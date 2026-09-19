@@ -101,7 +101,7 @@ async function listUserOrders(conn, userId, limit) {
      LIMIT ${lim}`,
     [userId]
   );
-  return summarizeUserOrders(rows);
+  return summarizeUserOrders(await require('./commerce/main-system.cjs').enrichOrders(conn,rows));
 }
 
 async function getUserOrder(conn, orderRef, userId) {
@@ -114,7 +114,7 @@ async function getUserOrder(conn, orderRef, userId) {
      LIMIT 1`,
     [orderRef, userId]
   );
-  return rows[0] || null;
+  return (await require('./commerce/main-system.cjs').enrichOrders(conn,rows))[0] || null;
 }
 
 function nowCst() {

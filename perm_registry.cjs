@@ -20,6 +20,13 @@
 'use strict';
 
 const PERMS = [
+  ...[
+    ['commerce.admin.read','权益运营数据查看'], ['commerce.admin.write','权益配置与履约管理'],
+    ['commerce.admin.review','权益双人复核'], ['commerce.merchant.read','本商户权益数据查看'],
+    ['commerce.merchant.write','本商户权益配置提审'], ['commerce.merchant.redeem','指定门店权益核销'],
+    ['commerce.fund.read','权益结算资金只读'], ['commerce.fund.write','权益结算批次与指令处理'],
+    ['commerce.fund.review','权益结算复核审批'],
+  ].map(([code,name])=>({code,name,domain:'commerce',action:code.split('.').pop(),desc:name,roles:[]})),
   // ── 平台/基础字典 ──
   { code: 'admin.read',    name: '管理域只读',     domain: 'platform', action: 'read',   desc: 'admin 域业务只读（字典/城市/项目/设置）', roles: ['platform_op', 'operator_admin', 'operator_dispatcher'] },
   { code: 'admin.write',   name: '管理域写（旧）', domain: 'platform', action: 'write',  desc: '旧一刀切写权限点；已不作为路由闸，仅过渡期别名', roles: ['platform_op'] },
@@ -70,6 +77,55 @@ const PERMS = [
  * guard = 特殊闸（app.js 内实现），exempt = 完全免闸。
  */
 const ROUTES = [
+  {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.write',act:'commerce.code.issue',res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes/([0-9a-f-]{36})/disable$',perm:'commerce.admin.write',act:'commerce.code.disable',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/stats$',perm:'commerce.admin.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/merchant/redeem/preview$',perm:'commerce.merchant.redeem',act:'commerce.redeem.preview',res:'commerce'},
+  ...['admin','merchant'].flatMap(area => {
+    const base='^/api/commerce/v1/'+area+'/';
+    const config='(merchants|stores|staff|skus|rules|packages|plans)';
+    const read='(lookups|definitions|merchants|stores|staff|skus|rules|packages|plans|orders|coupons|memberships|appointments|redemptions|cases|audit|inventory|capacity)';
+    return [
+      {method:'GET',re:base+read+'$',perm:'commerce.'+area+'.read'},
+      {method:'POST',re:base+config+'$',perm:'commerce.'+area+'.write'},
+      {method:'PUT',re:base+config+'/([0-9]+)$',perm:'commerce.'+area+'.write'},
+      {method:'POST',re:base+config+'/([0-9]+)/transition$',perm:'commerce.'+area+'.write'},
+      ...(area==='admin'?[{method:'POST',re:base+config+'/([0-9]+)/review$',perm:'commerce.admin.review'}]:[]),
+      {method:'PUT',re:base+'inventory$',perm:'commerce.'+area+'.write'},
+      {method:'POST',re:base+'cases/([a-f0-9-]{36})/handle$',perm:'commerce.'+area+'.write'},
+      ...(area==='merchant'?[{method:'POST',re:base+'redeem$',perm:'commerce.merchant.redeem'}]:[]),
+    ].map(r=>({...r,act:r.method==='GET'?null:'commerce.'+area+'.mutate',res:'commerce'}));
+  }),
+
+  // ── 权益结算域（结算账单/指令回执/冲回追偿/对账，申请人与审批人分离）──
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/batches$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/batches$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/batches/(\\d+)$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/batches/(\\d+)/(freeze|unfreeze|submit|execute|close)$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/batches/(\\d+)/review$',perm:'commerce.fund.review',act:'commerce.fund.review',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/instructions$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/instructions/(\\d+)/(retry|query)$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/receipts$',perm:'commerce.fund.write',act:'commerce.fund.receipt',res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/refunds$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/refunds$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/refunds/(\\d+)/(execute|cancel)$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/refunds/(\\d+)/(retry|query)$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/reversals$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/reversals$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/reversals/(\\d+)/review$',perm:'commerce.fund.review',act:'commerce.fund.review',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/recoveries$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/recoveries/(\\d+)/recover$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/recoveries/(\\d+)/write-off$',perm:'commerce.fund.review',act:'commerce.fund.review',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/reconciliation$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/reconciliation$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/reconciliation/(\\d+)$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/reconciliation/(\\d+)/diffs/(\\d+)/(assign|resolve)$',perm:'commerce.fund.write',act:'commerce.fund.mutate',res:'commerce',idGroup:2},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/reconciliation/(\\d+)/diffs/(\\d+)/close$',perm:'commerce.fund.review',act:'commerce.fund.review',res:'commerce',idGroup:2},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/overview$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/settlement/sandbox/(PR-[0-9a-f]{16})$',perm:'commerce.fund.write',act:'commerce.fund.sandbox',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/settlement/sandbox$',perm:'commerce.fund.read',act:null,res:'commerce'},
+  {method:'GET',re:'^/api/commerce/v1/merchant/settlement$',perm:'commerce.merchant.read',act:null,res:'commerce'},
   // 平台参数 / 字典
   { method: 'PUT',    re: '^/api/juzhu/admin/settings$', perm: 'settings.write', act: 'settings.update', res: 'settings' },
   { method: 'POST',   re: '^/api/juzhu/admin/cities$', perm: 'dict.write', act: 'city.create', res: 'cities' },

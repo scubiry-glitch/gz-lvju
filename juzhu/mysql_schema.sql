@@ -493,3 +493,202 @@ CREATE TABLE IF NOT EXISTS idp_configs (
   created_at VARCHAR(32), updated_at VARCHAR(32),
   KEY idx_idp_org (org_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===== 新居住券包与会员 M1-A（commerce/migrate.cjs 001_m1a）=====
+-- 独立业务表；既有 IAM/服务订单表不迁移。运行迁移请使用 npm run commerce:migrate。
+CREATE TABLE IF NOT EXISTS commerce_migrations (version VARCHAR(64) PRIMARY KEY, checksum CHAR(64) NOT NULL, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_merchants (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_stores (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_staff (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_skus (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_rules (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_packages (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_plans (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL,
+ city_id BIGINT NULL, vendor_id BIGINT NULL, merchant_id BIGINT NULL, store_id BIGINT NULL,
+ version INT NOT NULL DEFAULT 1, published_version INT NULL, status VARCHAR(24) NOT NULL DEFAULT 'draft',
+ payload JSON NOT NULL, created_by BIGINT NOT NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY scope_idx(city_id,merchant_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_versions (kind VARCHAR(24) NOT NULL, entity_id BIGINT NOT NULL, version INT NOT NULL, snapshot JSON NOT NULL, reviewed_by BIGINT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(kind,entity_id,version)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_inventory (sku_id BIGINT PRIMARY KEY, total INT NOT NULL DEFAULT 0, reserved INT NOT NULL DEFAULT 0, granted INT NOT NULL DEFAULT 0, CHECK(total>=0 AND reserved>=0 AND granted>=0 AND total>=reserved+granted)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_orders (id VARCHAR(40) PRIMARY KEY, account_id BIGINT NOT NULL, city_id BIGINT NOT NULL, product_kind VARCHAR(24) NOT NULL, product_id BIGINT NOT NULL, product_version INT NOT NULL, amount_minor BIGINT NOT NULL, status VARCHAR(24) NOT NULL, expires_at DATETIME NOT NULL, snapshot JSON NOT NULL, source_account_id BIGINT NULL, provider_ref VARCHAR(128) NULL UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, KEY owner_idx(account_id,created_at),KEY expiry_idx(status,expires_at)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_order_items (id BIGINT AUTO_INCREMENT PRIMARY KEY, order_id VARCHAR(40) NOT NULL, sku_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, store_id BIGINT NOT NULL, quantity INT NOT NULL, allocation_minor BIGINT NOT NULL, snapshot JSON NOT NULL, KEY order_idx(order_id),KEY merchant_idx(merchant_id)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_coupons (id VARCHAR(40) PRIMARY KEY, order_id VARCHAR(40) NOT NULL, item_id BIGINT NOT NULL, unit_no INT NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, store_id BIGINT NOT NULL, city_id BIGINT NOT NULL, status VARCHAR(24) NOT NULL, expires_at DATETIME NOT NULL, allocation_minor BIGINT NOT NULL, snapshot JSON NOT NULL, token_hash CHAR(64) NULL, token_expires_at DATETIME NULL, UNIQUE KEY grant_idem(item_id,unit_no),KEY owner_idx(account_id),KEY store_idx(store_id)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_memberships (order_id VARCHAR(40) PRIMARY KEY, account_id BIGINT NOT NULL, name VARCHAR(255) NOT NULL, expires_at DATETIME NOT NULL, snapshot JSON NOT NULL,KEY owner_idx(account_id)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_capacity (store_id BIGINT NOT NULL, service_date DATE NOT NULL, total INT NOT NULL, reserved INT NOT NULL DEFAULT 0, PRIMARY KEY(store_id,service_date),CHECK(total>=reserved AND reserved>=0)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_appointments (id VARCHAR(40) PRIMARY KEY, coupon_id VARCHAR(40) NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, store_id BIGINT NOT NULL, city_id BIGINT NOT NULL, service_date DATE NOT NULL, status VARCHAR(24) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,KEY coupon_idx(coupon_id),KEY store_idx(store_id,service_date,status)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_redemptions (id VARCHAR(40) PRIMARY KEY, coupon_id VARCHAR(40) NOT NULL, -- 004起撤销保留历史后改为普通索引，核销事务内防重
+ account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, store_id BIGINT NOT NULL, city_id BIGINT NOT NULL, operator_id BIGINT NOT NULL, allocation_minor BIGINT NOT NULL, supplier_minor BIGINT NOT NULL, beike_minor BIGINT NOT NULL, channel_minor BIGINT NOT NULL, retained_minor BIGINT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'confirmed', reversed_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,KEY merchant_idx(merchant_id),KEY state_idx(status,merchant_id),KEY coupon_idx(coupon_id)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_cases (id VARCHAR(40) PRIMARY KEY, coupon_id VARCHAR(40) NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, store_id BIGINT NOT NULL, city_id BIGINT NOT NULL, kind VARCHAR(16) NOT NULL, reason VARCHAR(1000) NOT NULL, status VARCHAR(24) NOT NULL, resolution VARCHAR(1000) NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,KEY owner_idx(account_id),KEY coupon_idx(coupon_id,status)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_idempotency (actor_id BIGINT NOT NULL, operation VARCHAR(64) NOT NULL, request_key VARCHAR(80) NOT NULL, digest CHAR(64) NOT NULL, response JSON NULL, PRIMARY KEY(actor_id,operation,request_key)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_events (id BIGINT AUTO_INCREMENT PRIMARY KEY, aggregate_id VARCHAR(40) NOT NULL, event_type VARCHAR(64) NOT NULL, payload JSON NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, delivered_at DATETIME NULL,KEY delivery_idx(delivered_at)) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_audit (id BIGINT AUTO_INCREMENT PRIMARY KEY, actor_id BIGINT NOT NULL, city_id BIGINT NULL, merchant_id BIGINT NULL, action VARCHAR(64) NOT NULL, resource VARCHAR(64) NOT NULL, detail JSON NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,KEY scope_idx(city_id,merchant_id)) ENGINE=InnoDB;
+
+-- ===== 权益结算闭环（commerce/settlement.cjs 004_settlement）=====
+-- 追加式借贷分组账 + 沙箱机构镜像 + 结算批次/明细（uk_settle_once 防重复入账）+ 指令回执 + 冲回追偿 + 对账差异。
+CREATE TABLE IF NOT EXISTS commerce_ledger_entries (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, group_no VARCHAR(48) NOT NULL, side ENUM('debit','credit') NOT NULL,
+ account VARCHAR(96) NOT NULL, amount_minor BIGINT NOT NULL, source_type VARCHAR(32) NOT NULL, source_id VARCHAR(48) NOT NULL,
+ rule_ref VARCHAR(64) NULL, memo VARCHAR(255) NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ KEY group_idx(group_no), KEY source_idx(source_type,source_id), KEY account_idx(account)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_provider_requests (
+ request_no VARCHAR(48) PRIMARY KEY, target_type ENUM('payout','refund') NOT NULL, target_id VARCHAR(48) NOT NULL,
+ amount_minor BIGINT NOT NULL, simulated VARCHAR(16) NULL, status VARCHAR(16) NOT NULL DEFAULT 'processing',
+ paid_at DATETIME NULL, query_count INT NOT NULL DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, KEY target_idx(target_type,target_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_settlement_batches (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, batch_no VARCHAR(48) NOT NULL UNIQUE, kind ENUM('merchant','promoter') NOT NULL,
+ merchant_id BIGINT NOT NULL DEFAULT 0, promoter_account_id BIGINT NOT NULL DEFAULT 0, city_id BIGINT NULL,
+ period_start DATE NOT NULL, period_end DATE NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'draft',
+ item_count INT NOT NULL DEFAULT 0, payable_minor BIGINT NOT NULL DEFAULT 0, offset_minor BIGINT NOT NULL DEFAULT 0,
+ pre_freeze_status VARCHAR(16) NULL, submitted_by BIGINT NULL, reviewed_by BIGINT NULL, review_note VARCHAR(1000) NULL,
+ executed_at DATETIME NULL, closed_by BIGINT NULL, closed_reason VARCHAR(500) NULL, created_by BIGINT NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uk_batch_period(kind,merchant_id,promoter_account_id,period_start,period_end), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_settlement_items (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, batch_id BIGINT NOT NULL, line_kind ENUM('merchant','promoter') NOT NULL,
+ redemption_id VARCHAR(40) NOT NULL, coupon_id VARCHAR(40) NOT NULL, order_id VARCHAR(40) NOT NULL,
+ merchant_id BIGINT NOT NULL, promoter_account_id BIGINT NULL, city_id BIGINT NOT NULL, rule_ref VARCHAR(64) NOT NULL,
+ basis_minor BIGINT NOT NULL, payable_minor BIGINT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uk_settle_once(redemption_id,line_kind), KEY batch_idx(batch_id,status), KEY merchant_idx(merchant_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_payout_instructions (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, instruction_no VARCHAR(48) NOT NULL UNIQUE, batch_id BIGINT NOT NULL UNIQUE,
+ request_no VARCHAR(48) NOT NULL UNIQUE, target_kind VARCHAR(16) NOT NULL, merchant_id BIGINT NOT NULL DEFAULT 0,
+ promoter_account_id BIGINT NOT NULL DEFAULT 0, amount_minor BIGINT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+ retry_count INT NOT NULL DEFAULT 0, fail_reason VARCHAR(500) NULL, submitted_at DATETIME NULL, settled_at DATETIME NULL,
+ last_query_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_refund_orders (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, refund_no VARCHAR(48) NOT NULL UNIQUE, case_id VARCHAR(40) NOT NULL UNIQUE,
+ coupon_id VARCHAR(40) NOT NULL, order_id VARCHAR(40) NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL,
+ city_id BIGINT NOT NULL, amount_minor BIGINT NOT NULL, kind VARCHAR(16) NOT NULL DEFAULT 'unused',
+ status VARCHAR(16) NOT NULL DEFAULT 'pending', request_no VARCHAR(48) NOT NULL UNIQUE, retry_count INT NOT NULL DEFAULT 0,
+ fail_reason VARCHAR(500) NULL, created_by BIGINT NOT NULL, submitted_at DATETIME NULL, settled_at DATETIME NULL, last_query_at DATETIME NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY account_idx(account_id), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_receipts (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, target_type ENUM('payout','refund') NOT NULL, target_id BIGINT NOT NULL,
+ request_no VARCHAR(48) NOT NULL, outcome VARCHAR(16) NOT NULL, payload JSON NULL, digest CHAR(64) NOT NULL,
+ received_at DATETIME NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uk_receipt(request_no,digest), KEY target_idx(target_type,target_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_recovery_cases (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, recovery_no VARCHAR(48) NOT NULL UNIQUE, debtor_kind ENUM('merchant','promoter') NOT NULL,
+ merchant_id BIGINT NOT NULL DEFAULT 0, promoter_account_id BIGINT NOT NULL DEFAULT 0, redemption_id VARCHAR(40) NOT NULL,
+ reason VARCHAR(1000) NOT NULL, amount_minor BIGINT NOT NULL, recovered_minor BIGINT NOT NULL DEFAULT 0,
+ status VARCHAR(16) NOT NULL DEFAULT 'open', close_kind VARCHAR(16) NULL, close_reason VARCHAR(500) NULL,
+ closed_by BIGINT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY debtor_idx(debtor_kind,merchant_id,promoter_account_id,status)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_redemption_reversals (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, reversal_no VARCHAR(48) NOT NULL UNIQUE, redemption_id VARCHAR(40) NOT NULL UNIQUE,
+ reason VARCHAR(1000) NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'requested', requested_by BIGINT NOT NULL,
+ reviewed_by BIGINT NULL, review_note VARCHAR(1000) NULL, reviewed_at DATETIME NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_recon_batches (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, recon_no VARCHAR(48) NOT NULL UNIQUE, period_start DATE NOT NULL, period_end DATE NOT NULL,
+ status VARCHAR(16) NOT NULL DEFAULT 'completed', total_instructions INT NOT NULL DEFAULT 0, matched_count INT NOT NULL DEFAULT 0,
+ diff_count INT NOT NULL DEFAULT 0, created_by BIGINT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ KEY period_idx(period_start,period_end)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS commerce_recon_diffs (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, recon_id BIGINT NOT NULL, diff_no VARCHAR(48) NOT NULL UNIQUE,
+ biz_type VARCHAR(24) NOT NULL, biz_id VARCHAR(48) NOT NULL, kind VARCHAR(24) NOT NULL,
+ expected_minor BIGINT NULL, actual_minor BIGINT NULL, detail VARCHAR(1000) NOT NULL, owner_id BIGINT NULL,
+ status VARCHAR(16) NOT NULL DEFAULT 'open', resolution VARCHAR(1000) NULL, closed_by BIGINT NULL,
+ closed_reason VARCHAR(500) NULL, closed_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uk_diff(recon_id,biz_type,biz_id,kind), KEY state_idx(status)
+) ENGINE=InnoDB;
+
+-- 004 同时为 commerce_redemptions 追加撤销语义列（幂等 ALTER，由 migrate.cjs 校验执行）：
+-- ALTER TABLE commerce_redemptions ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'confirmed';

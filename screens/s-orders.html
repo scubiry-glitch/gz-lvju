@@ -248,7 +248,7 @@
   }));
 </script>
 <script src="_region.js?v=2"></script>
-<script src="_jzapi.js"></script>
+<script src="_jzapi.js?v=7"></script>
 <script>
 const JZ = window.BZF_JZ;
 let toastTimer = null;
@@ -317,7 +317,7 @@ function orderCard(o){
 
 function render(){
   const box = document.getElementById('liveOrders');
-  JZ.list({ pay_status: 'paid', status: 'dispatched,accepted,serving,done,rated', limit: 20 }).then(function(list) {
+  JZ.list({ pay_status: 'paid,not_required', status: 'dispatched,accepted,serving,done,rated', limit: 20 }).then(function(list) {
     box.innerHTML = list.map(orderCard).join('');
     document.getElementById('tsWait').textContent = list.filter(function(o){ return o.status==='dispatched'; }).length;
     document.getElementById('tsDoing').textContent = list.filter(function(o){ return o.status==='accepted'||o.status==='serving'; }).length;

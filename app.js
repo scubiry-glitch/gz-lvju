@@ -186,7 +186,7 @@ function isPublicStatic(urlPath) {
   }
   if (parts.some(isSensitivePart)) return false;
   if (parts.length === 1 && ROOT_BLOCKED_FILES.has(parts[0].toLowerCase())) return false;
-  if (parts[0] === 'node_modules' || parts[0] === 'scripts' || parts[0] === '.git') return false;
+  if (parts[0] === 'node_modules' || parts[0] === 'scripts' || parts[0] === '.git' || parts[0] === 'commerce') return false;
   return true;
 }
 
@@ -394,6 +394,20 @@ async function restrictOrdersRead(req, res) {
     return String(principal.account.worker_id); // worker 只见派给自己的
   }
   return undefined; // 平台/legacy → 不限
+}
+
+// The main order centre reserves this namespace for server-verified account sessions.
+// A caller-supplied user_id can never select somebody else's commerce orders.
+async function grUserQuery(req,qp){
+  const raw=String(qp.get('user_id')||'');
+  if(qp.get('source')==='account'||raw.startsWith('commerce-account-')){
+    const session=await authCenter.verifySessionToken(extractBearerToken(req)).catch(()=>null);
+    if(!session||session.account.status!=='active'||session.account.principal_type!=='user')return {ok:false,status:401,error:'请使用新居住账号登录'};
+    const userId=require('./commerce/main-system.cjs').accountUser(session.account.id);
+    if(raw&&raw!==userId)return {ok:false,status:403,error:'不能查看其他账号的订单'};
+    return {ok:true,userId};
+  }
+  return grOrders.validateUserIdQuery(raw);
 }
 
 /** 账号主体的运营写动作 → audit_log（legacy/匿名不记） */
@@ -4254,7 +4268,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           params.push(...statuses);
         }
       }
-      if (qp.get('pay_status')) { sql += ' AND o.pay_status=?'; params.push(qp.get('pay_status')); }
+      if(qp.get('pay_status')){const states=qp.get('pay_status').split(',').filter(s=>['paid','unpaid','not_required'].includes(s));if(!states.length)return jsonReply(res,{error:'无效支付状态'},400);sql+=' AND o.pay_status IN ('+states.map(()=>'?').join(',')+')';params.push(...states);}
       const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
       sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
@@ -4270,8 +4284,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const [dispatchedR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='dispatched'");
       const [doneR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status='done' OR status='rated'");
       const [unpaidR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE pay_status='unpaid'");
+      const [poolR] = await queryRows("SELECT COUNT(*) AS c FROM jz_orders WHERE status IN ('pending','dispatched','accepted','serving')");
       return jsonReply(res, {
-        pending: pendingR.c, dispatched: dispatchedR.c, done: doneR.c, unpaid: unpaidR.c,
+        pending: pendingR.c, dispatched: dispatchedR.c, done: doneR.c, unpaid: unpaidR.c, pool:poolR.c,
       });
     }
 
@@ -4279,6 +4294,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
       if (m && req.method === 'GET') {
+        if(req.principal?.account?.principal_type==='user'&&/^[a-f0-9-]{36}$/.test(m[1])){const owned=await queryRows('SELECT w.* FROM jz_orders w JOIN commerce_cases c ON BINARY c.id=BINARY w.id WHERE w.id=? AND c.account_id=?',[m[1],req.principal.account.id]);if(owned.length)return jsonReply(res,{order:owned[0]});}
         const workerFilter = await restrictOrdersRead(req, res);
         if (workerFilter === null) return;
         const orderId = m[1];
@@ -6290,6 +6306,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
           if (order.pay_status === 'paid') { conn.end(); return jsonReply(res, { ok: true, order }); }
+          if(order.pay_status==='not_required')return jsonReply(res,{error:'售后工单无需支付'},409);
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
           if (order.slot_id) {
             const [slotRes] = await conn.execute(
@@ -6324,7 +6341,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
-          if (order.pay_status !== 'paid' || order.status !== 'pending') {
+          if (!(['paid','not_required'].includes(order.pay_status)) || order.status !== 'pending') {
             conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
           }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -6353,7 +6370,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const STATUS_ORDER = ['pending', 'dispatched', 'accepted', 'serving', 'done'];
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+          await conn.beginTransaction();
+          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=? FOR UPDATE', [orderId]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
           const curIdx = STATUS_ORDER.indexOf(order.status);
@@ -6369,6 +6387,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
             'UPDATE jz_orders SET status=?, updated_at=?, log_json=? WHERE id=?',
             [nextStatus, now, JSON.stringify(log), orderId]
           );
+          if(nextStatus==='done')await require('./commerce/main-system.cjs').workCompleted(conn,order);
           await conn.commit();
           await auditIfAccount(req, 'order.advance', 'jz_orders', String(orderId), { from: order.status, to: nextStatus });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
@@ -6453,6 +6472,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       );
       if (!products.length) return jsonReply(res, { ok: false, error: '产品未找到' }, 404);
       const product = products[0];
+      if(String(product.query||'').startsWith('guiyang-life-demo-v1:'))return jsonReply(res,{ok:false,error:'演示商品请前往生活权益体验，不生成真实服务商预约链接'},409);
       const pagePath = product.path || 'pages-sub/goods/goods';
       const productQuery = product.query || '';
       const vendorId = String(product.vendor_id || '');
@@ -6502,7 +6522,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     if (urlPath === '/api/juzhu/gr/orders' && req.method === 'GET') {
       if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
       const qp = new URLSearchParams(qs);
-      const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+      const parsed = await grUserQuery(req,qp);
       if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
@@ -6520,7 +6540,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
         const orderRef = decodeURIComponent(m[1]);
         const qp = new URLSearchParams(qs);
-        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        const parsed = await grUserQuery(req,qp);
         if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
@@ -6575,7 +6595,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!grOrders) return jsonReply(res, { ok: false, error: 'gr_orders module missing' }, 500);
         const orderRef = decodeURIComponent(m[1]);
         const qp = new URLSearchParams(qs);
-        const parsed = grOrders.validateUserIdQuery(qp.get('user_id'));
+        const parsed = await grUserQuery(req,qp);
         if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
         const conn = await mysql2.createConnection(getDbConfig());
         try {

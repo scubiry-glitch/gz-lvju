@@ -385,7 +385,7 @@
 </div>
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
-<script src="_jzapi.js"></script>
+<script src="_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -404,7 +404,7 @@
     return html;
   }
   function renderLive() {
-    JZ.list({ pay_status: 'paid', limit: 40 }).then(function(all) {
+    JZ.list({ pay_status: 'paid,not_required', limit: 40 }).then(function(all) {
       document.querySelectorAll('.tk[data-live-api]').forEach(function(el){ el.remove(); });
       var pending = all.filter(function(o){ return o.status==='pending'; });
       var doing = all.filter(function(o){ return ['dispatched','accepted','serving'].indexOf(o.status)>-1; });
