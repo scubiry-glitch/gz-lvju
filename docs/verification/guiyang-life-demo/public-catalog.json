@@ -1,0 +1,1314 @@
+{
+  "at": "2026-09-19T16:47:35.711Z",
+  "channel_services": 46,
+  "categories": 12,
+  "products": [
+    {
+      "id": 7,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "新居入住季 · 券包（演示）",
+      "description": "【贵阳演示】钥匙到手，家还没就绪。开荒、搬运、安装一次约齐，把毛坯感留在门外。",
+      "price_minor": 97400,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": "new-home",
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "开荒保洁 · 新居 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】开荒保洁 · 新居；新房装修后 · 全屋开荒。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        },
+        {
+          "name": "居民搬家 · 同城 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】居民搬家 · 同城；金杯车 · 2名师傅。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        },
+        {
+          "name": "家电维修 · 上门 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电维修 · 上门；冰箱/洗衣机/热水器。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        },
+        {
+          "name": "空调清洗 · 挂机 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】空调清洗 · 挂机；高温蒸汽 · 拆装深度。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 8,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "康养到家周 · 券包（演示）",
+      "description": "【贵阳演示】家里多了一位长辈，日常照护与居家安全要一起想——陪护、体检、管道与家电养护同屏安排。",
+      "price_minor": 753800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": "care",
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "养老陪护 · 日间 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】养老陪护 · 日间；持证护理 · 日间到岗。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 21
+        },
+        {
+          "name": "体检套餐 · 基础 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】体检套餐 · 基础；三甲对接 · 报告解读。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 21
+        },
+        {
+          "name": "住家保姆 · 全职 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】住家保姆 · 全职；做饭/保洁/照护 全包。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        },
+        {
+          "name": "家电保养 · 套餐 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电保养 · 套餐；空调/冰箱/洗衣机。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 22
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 9,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "租住安心包 · 券包（演示）",
+      "description": "【贵阳演示】房租、押金、意外——租住不只是钥匙。家财险、分期、评估与托管同屏，住得稳、账算清。",
+      "price_minor": 50000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": "asset",
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "资产评估 · 房产 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】资产评估 · 房产；持证评估师上门。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 23
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 10,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "绿色焕新 · 券包（演示）",
+      "description": "【贵阳演示】旧物清出、宽带装上、号码携转、屋子擦亮——搬家换机不必分四次约人。",
+      "price_minor": 22700,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": "green",
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "宽带新装 · 千兆 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】宽带新装 · 千兆；装维上门 · 当周开通。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 18
+        },
+        {
+          "name": "日常保洁 · 2小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 11,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "邻里日常 · 券包（演示）",
+      "description": "【贵阳演示】买菜取件缴费——邻里小事不必亲自跑。团购日配、跑腿代办，忙不过来再约钟点工。",
+      "price_minor": 28500,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": "neighbor",
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "便民代办 · 跑腿 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】便民代办 · 跑腿；取送件 · 代缴代办。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 25
+        },
+        {
+          "name": "钟点工 · 3小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】钟点工 · 3小时；做饭保洁 · 灵活预约。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        },
+        {
+          "name": "日常保洁 · 2小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 12,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "新居住基础权益礼包（演示）",
+      "description": "贵阳演示版：保洁、维修、搬家、旅居、报告各一张，单券90天有效。",
+      "price_minor": 99900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "日常保洁 · 2小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        },
+        {
+          "name": "家电维修 · 上门 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电维修 · 上门；冰箱/洗衣机/热水器。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        },
+        {
+          "name": "居民搬家 · 同城 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】居民搬家 · 同城；金杯车 · 2名师傅。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        },
+        {
+          "name": "旅居体验服务 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】旅居体验服务；一次旅居行程沟通与入住流程体验。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 25
+        },
+        {
+          "name": "资产评估 · 房产 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】资产评估 · 房产；持证评估师上门。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 23
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 2,
+      "kind": "plans",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "新居住会员（演示）",
+      "description": "参考v1.9：999元/年，赠送五项独立生活权益。贵阳无资金演示，不开通真实付费会员。",
+      "price_minor": 99900,
+      "valid_days": 365,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "items": [
+        {
+          "name": "日常保洁 · 2小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        },
+        {
+          "name": "家电维修 · 上门 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电维修 · 上门；冰箱/洗衣机/热水器。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        },
+        {
+          "name": "居民搬家 · 同城 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】居民搬家 · 同城；金杯车 · 2名师傅。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        },
+        {
+          "name": "旅居体验服务 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】旅居体验服务；一次旅居行程沟通与入住流程体验。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 25
+        },
+        {
+          "name": "资产评估 · 房产 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】资产评估 · 房产；持证评估师上门。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 23
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 22,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "日常保洁 · 2小时 · 单品券（演示）",
+      "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 12800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "cleaning-daily-2h",
+      "items": [
+        {
+          "name": "日常保洁 · 2小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日常保洁 · 2小时；1人上门 · 全屋除尘整理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 23,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "深度清洁 · 4小时 · 单品券（演示）",
+      "description": "【演示服务券】深度清洁 · 4小时；3人团队 · 含厨卫去污。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 26800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "deep-clean-4h",
+      "items": [
+        {
+          "name": "深度清洁 · 4小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】深度清洁 · 4小时；3人团队 · 含厨卫去污。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 24,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "空调清洗 · 挂机 · 单品券（演示）",
+      "description": "【演示服务券】空调清洗 · 挂机；高温蒸汽 · 拆装深度。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 8900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "ac-clean-wall",
+      "items": [
+        {
+          "name": "空调清洗 · 挂机 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】空调清洗 · 挂机；高温蒸汽 · 拆装深度。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 25,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "管道疏通 · 当天 · 单品券（演示）",
+      "description": "【演示服务券】管道疏通 · 当天；30分钟响应 · 不通不收费。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 9900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "pipe-unclog-fast",
+      "items": [
+        {
+          "name": "管道疏通 · 当天 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】管道疏通 · 当天；30分钟响应 · 不通不收费。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 26,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "灯具安装 · 吸顶灯 · 单品券（演示）",
+      "description": "【演示服务券】灯具安装 · 吸顶灯；电工持证 · 高空作业规范。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 5900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "light-install-ceiling",
+      "items": [
+        {
+          "name": "灯具安装 · 吸顶灯 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】灯具安装 · 吸顶灯；电工持证 · 高空作业规范。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 27,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "居民搬家 · 同城 · 单品券（演示）",
+      "description": "【演示服务券】居民搬家 · 同城；金杯车 · 2名师傅。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 39800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-city-standard",
+      "items": [
+        {
+          "name": "居民搬家 · 同城 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】居民搬家 · 同城；金杯车 · 2名师傅。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 28,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "日式搬家 · 全包 · 单品券（演示）",
+      "description": "【演示服务券】日式搬家 · 全包；打包收纳 + 还原归位。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 168000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-japanese-full",
+      "items": [
+        {
+          "name": "日式搬家 · 全包 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】日式搬家 · 全包；打包收纳 + 还原归位。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 29,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "钟点工 · 3小时 · 单品券（演示）",
+      "description": "【演示服务券】钟点工 · 3小时；做饭保洁 · 灵活预约。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 12800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "nanny-hourly-3h",
+      "items": [
+        {
+          "name": "钟点工 · 3小时 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】钟点工 · 3小时；做饭保洁 · 灵活预约。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 30,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "育儿嫂 · 住家 · 单品券（演示）",
+      "description": "【演示服务券】育儿嫂 · 住家；3年以上经验 · 持证。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 880000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "nanny-livein-babycare",
+      "items": [
+        {
+          "name": "育儿嫂 · 住家 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】育儿嫂 · 住家；3年以上经验 · 持证。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 31,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "开荒保洁 · 新居 · 单品券（演示）",
+      "description": "【演示服务券】开荒保洁 · 新居；新房装修后 · 全屋开荒。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 39800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "raw-clean-new",
+      "items": [
+        {
+          "name": "开荒保洁 · 新居 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】开荒保洁 · 新居；新房装修后 · 全屋开荒。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 32,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "玻璃清洗 · 高层 · 单品券（演示）",
+      "description": "【演示服务券】玻璃清洗 · 高层；内外双面 · 无痕清洁。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 10800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "glass-clean-highrise",
+      "items": [
+        {
+          "name": "玻璃清洗 · 高层 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】玻璃清洗 · 高层；内外双面 · 无痕清洁。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 33,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "油烟机清洗 · 深度 · 单品券（演示）",
+      "description": "【演示服务券】油烟机清洗 · 深度；拆洗深度 · 除重油。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 12800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "cleaning",
+      "topic_id": null,
+      "channel_slug": "hood-clean-deep",
+      "items": [
+        {
+          "name": "油烟机清洗 · 深度 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】油烟机清洗 · 深度；拆洗深度 · 除重油。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 14
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 34,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "家电维修 · 上门 · 单品券（演示）",
+      "description": "【演示服务券】家电维修 · 上门；冰箱/洗衣机/热水器。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 8900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "appliance-repair",
+      "items": [
+        {
+          "name": "家电维修 · 上门 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电维修 · 上门；冰箱/洗衣机/热水器。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 35,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "空调维修 · 加氟 · 单品券（演示）",
+      "description": "【演示服务券】空调维修 · 加氟；不制冷/漏氟/异响。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 15900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "ac-repair-refill",
+      "items": [
+        {
+          "name": "空调维修 · 加氟 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】空调维修 · 加氟；不制冷/漏氟/异响。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 36,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "门窗维修 · 锁具 · 单品券（演示）",
+      "description": "【演示服务券】门窗维修 · 锁具；门窗变形/锁具损坏。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 8900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "door-window-repair",
+      "items": [
+        {
+          "name": "门窗维修 · 锁具 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】门窗维修 · 锁具；门窗变形/锁具损坏。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 37,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "水管维修 · 应急 · 单品券（演示）",
+      "description": "【演示服务券】水管维修 · 应急；渗漏/爆裂 应急处理。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 9900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "repair",
+      "topic_id": null,
+      "channel_slug": "waterpipe-repair",
+      "items": [
+        {
+          "name": "水管维修 · 应急 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】水管维修 · 应急；渗漏/爆裂 应急处理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 15
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 38,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "长途搬家 · 跨城 · 单品券（演示）",
+      "description": "【演示服务券】长途搬家 · 跨城；厢式货车 · 300km+。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 120000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-longhaul",
+      "items": [
+        {
+          "name": "长途搬家 · 跨城 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】长途搬家 · 跨城；厢式货车 · 300km+。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 39,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "钢琴搬运 · 专业 · 单品券（演示）",
+      "description": "【演示服务券】钢琴搬运 · 专业；立式/三角钢琴 可接。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 80000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-piano",
+      "items": [
+        {
+          "name": "钢琴搬运 · 专业 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】钢琴搬运 · 专业；立式/三角钢琴 可接。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 40,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "企业搬迁 · 整体 · 单品券（演示）",
+      "description": "【演示服务券】企业搬迁 · 整体；办公整体搬迁方案。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 280000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-office",
+      "items": [
+        {
+          "name": "企业搬迁 · 整体 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】企业搬迁 · 整体；办公整体搬迁方案。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 41,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "搬货上下楼 · 计件 · 单品券（演示）",
+      "description": "【演示服务券】搬货上下楼 · 计件；无电梯搬运 · 计件。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 20000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-updown",
+      "items": [
+        {
+          "name": "搬货上下楼 · 计件 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】搬货上下楼 · 计件；无电梯搬运 · 计件。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 42,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "住家保姆 · 全职 · 单品券（演示）",
+      "description": "【演示服务券】住家保姆 · 全职；做饭/保洁/照护 全包。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 680000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "nanny-livein-full",
+      "items": [
+        {
+          "name": "住家保姆 · 全职 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】住家保姆 · 全职；做饭/保洁/照护 全包。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 43,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "白班保姆 · 日间 · 单品券（演示）",
+      "description": "【演示服务券】白班保姆 · 日间；日间到岗 · 不住家。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 520000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "nanny-dayshift",
+      "items": [
+        {
+          "name": "白班保姆 · 日间 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】白班保姆 · 日间；日间到岗 · 不住家。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 44,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "月嫂 · 26天 · 单品券（演示）",
+      "description": "【演示服务券】月嫂 · 26天；5年经验 · 三甲护理。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 1280000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "yuesao-26d",
+      "items": [
+        {
+          "name": "月嫂 · 26天 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】月嫂 · 26天；5年经验 · 三甲护理。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 45,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "养老护理 · 陪护 · 单品券（演示）",
+      "description": "【演示服务券】养老护理 · 陪护；失能/半失能 专业陪护。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 600000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "nanny",
+      "topic_id": null,
+      "channel_slug": "elder-care",
+      "items": [
+        {
+          "name": "养老护理 · 陪护 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】养老护理 · 陪护；失能/半失能 专业陪护。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 17
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 46,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "宽带新装 · 千兆 · 单品券（演示）",
+      "description": "【演示服务券】宽带新装 · 千兆；装维上门 · 当周开通。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 9900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "telecom",
+      "topic_id": null,
+      "channel_slug": "telecom-broadband",
+      "items": [
+        {
+          "name": "宽带新装 · 千兆 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】宽带新装 · 千兆；装维上门 · 当周开通。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 18
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 47,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "养老陪护 · 日间 · 单品券（演示）",
+      "description": "【演示服务券】养老陪护 · 日间；持证护理 · 日间到岗。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 28000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "health_care",
+      "topic_id": null,
+      "channel_slug": "health-elder-day",
+      "items": [
+        {
+          "name": "养老陪护 · 日间 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】养老陪护 · 日间；持证护理 · 日间到岗。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 21
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 48,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "体检套餐 · 基础 · 单品券（演示）",
+      "description": "【演示服务券】体检套餐 · 基础；三甲对接 · 报告解读。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 29900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "health_care",
+      "topic_id": null,
+      "channel_slug": "health-checkup-basic",
+      "items": [
+        {
+          "name": "体检套餐 · 基础 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】体检套餐 · 基础；三甲对接 · 报告解读。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 21
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 49,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "管道养护 · 季度 · 单品券（演示）",
+      "description": "【演示服务券】管道养护 · 季度；疏通+防堵养护。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 19800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "home_maintain",
+      "topic_id": null,
+      "channel_slug": "maintain-pipe-quarter",
+      "items": [
+        {
+          "name": "管道养护 · 季度 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】管道养护 · 季度；疏通+防堵养护。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 22
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 50,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "家电保养 · 套餐 · 单品券（演示）",
+      "description": "【演示服务券】家电保养 · 套餐；空调/冰箱/洗衣机。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 15900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "home_maintain",
+      "topic_id": null,
+      "channel_slug": "maintain-appliance",
+      "items": [
+        {
+          "name": "家电保养 · 套餐 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】家电保养 · 套餐；空调/冰箱/洗衣机。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 22
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 51,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "资产评估 · 房产 · 单品券（演示）",
+      "description": "【演示服务券】资产评估 · 房产；持证评估师上门。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 50000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "asset",
+      "topic_id": null,
+      "channel_slug": "asset-appraisal",
+      "items": [
+        {
+          "name": "资产评估 · 房产 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】资产评估 · 房产；持证评估师上门。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 23
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 52,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "便民代办 · 跑腿 · 单品券（演示）",
+      "description": "【演示服务券】便民代办 · 跑腿；取送件 · 代缴代办。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 2900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "community",
+      "topic_id": null,
+      "channel_slug": "community-errand",
+      "items": [
+        {
+          "name": "便民代办 · 跑腿 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】便民代办 · 跑腿；取送件 · 代缴代办。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 25
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 53,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "同城搬家 · 小面 · 单品券（演示）",
+      "description": "【演示服务券】同城搬家 · 小面；小面 · 1.6×1.3×1.1m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 9600,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-local-small-van",
+      "items": [
+        {
+          "name": "同城搬家 · 小面 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】同城搬家 · 小面；小面 · 1.6×1.3×1.1m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 54,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "同城搬家 · 中面 · 单品券（演示）",
+      "description": "【演示服务券】同城搬家 · 中面；中面 · 2.5×1.4×1.2m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 16800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-local-medium-van",
+      "items": [
+        {
+          "name": "同城搬家 · 中面 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】同城搬家 · 中面；中面 · 2.5×1.4×1.2m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 55,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "同城搬家 · 厢货 · 单品券（演示）",
+      "description": "【演示服务券】同城搬家 · 厢货；厢货 · 4.2×1.8×1.8m · 2人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 30800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-local-box-truck",
+      "items": [
+        {
+          "name": "同城搬家 · 厢货 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】同城搬家 · 厢货；厢货 · 4.2×1.8×1.8m · 2人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 56,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "跨城搬家 · 小面 · 单品券（演示）",
+      "description": "【演示服务券】跨城搬家 · 小面；小面 · 1.6×1.3×1.1m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 9600,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-longhaul-small-van",
+      "items": [
+        {
+          "name": "跨城搬家 · 小面 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】跨城搬家 · 小面；小面 · 1.6×1.3×1.1m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 57,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "跨城搬家 · 中面 · 单品券（演示）",
+      "description": "【演示服务券】跨城搬家 · 中面；中面 · 2.5×1.4×1.2m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 16800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-longhaul-medium-van",
+      "items": [
+        {
+          "name": "跨城搬家 · 中面 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】跨城搬家 · 中面；中面 · 2.5×1.4×1.2m · 1人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 58,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "跨城搬家 · 厢货 · 单品券（演示）",
+      "description": "【演示服务券】跨城搬家 · 厢货；厢货 · 4.2×1.8×1.8m · 2人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 30800,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "moving",
+      "topic_id": null,
+      "channel_slug": "moving-longhaul-box-truck",
+      "items": [
+        {
+          "name": "跨城搬家 · 厢货 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】跨城搬家 · 厢货；厢货 · 4.2×1.8×1.8m · 2人全程搬运。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 16
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 59,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "旅居体验服务 · 单品券（演示）",
+      "description": "【演示服务券】旅居体验服务；一次旅居行程沟通与入住流程体验。仅供无资金流程体验，不代表已购买真实服务。",
+      "price_minor": 39900,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "community",
+      "topic_id": null,
+      "channel_slug": "guiyang-demo-travel",
+      "items": [
+        {
+          "name": "旅居体验服务 · 单品券（演示）",
+          "quantity": 1,
+          "description": "【演示服务券】旅居体验服务；一次旅居行程沟通与入住流程体验。仅供无资金流程体验，不代表已购买真实服务。",
+          "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
+          "valid_days": 90,
+          "store_id": 25
+        }
+      ],
+      "demo_purchase_enabled": true
+    }
+  ],
+  "data_mutations": 0
+}

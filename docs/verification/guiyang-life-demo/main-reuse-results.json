@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-19T16:16:51.555Z",
+  "database": "isolated database, removed after verification",
+  "checks": [
+    {
+      "name": "Main order centre reads the same entitlement order with correct account ownership",
+      "passed": true
+    },
+    {
+      "name": "After-sale request enters the existing main work pool without pretending it was paid",
+      "passed": true
+    },
+    {
+      "name": "Main dispatch and processing close the same after-sale case and update the customer progress",
+      "passed": true
+    },
+    {
+      "name": "Existing main order list/detail and work progress render the linked customer records",
+      "passed": true
+    }
+  ]
+}

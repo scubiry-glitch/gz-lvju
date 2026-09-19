@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-09-19T11:53:48.832Z",
+  "adapter": "isolated-memory-test",
+  "results": [
+    {
+      "command": "node --test scripts/commerce/domain.test.cjs scripts/commerce/http.test.cjs",
+      "exit_code": 0,
+      "passed": true,
+      "log": "check-1.txt"
+    },
+    {
+      "command": "node test_index_boot.js",
+      "exit_code": 0,
+      "passed": true,
+      "log": "check-2.txt"
+    },
+    {
+      "command": "node test_static_guard.js",
+      "exit_code": 0,
+      "passed": true,
+      "log": "check-3.txt"
+    }
+  ]
+}

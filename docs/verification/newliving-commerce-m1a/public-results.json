@@ -1,0 +1,72 @@
+{
+  "at": "2026-09-19T16:47:37.364Z",
+  "origin": "https://sytest.meizu.life",
+  "mode": "mysql-m1a",
+  "data_mutations": 0,
+  "checks": [
+    {
+      "name": "Public M1-A service healthy with payments disabled",
+      "passed": true
+    },
+    {
+      "name": "Public catalogue projects only public data",
+      "passed": true
+    },
+    {
+      "name": "Public management and previous test-session endpoints require real login",
+      "passed": true
+    },
+    {
+      "name": "Original IAM API is available after permission catalogue refresh",
+      "passed": true
+    },
+    {
+      "name": "Four public pages render official UI, login and responsive states",
+      "passed": true
+    },
+    {
+      "name": "Consumer homepage: 320/390/430/1440 layouts, image and four reachable navigation items",
+      "passed": true
+    },
+    {
+      "name": "Consumer anonymous cards, membership, account, appointment, order and support navigation",
+      "passed": true
+    },
+    {
+      "name": "Consumer catalogue failure offers a working retry",
+      "passed": true
+    },
+    {
+      "name": "Consumer rapid navigation ignores an older catalogue response",
+      "passed": true
+    },
+    {
+      "name": "Consumer redesigned pages have no uncaught JavaScript errors",
+      "passed": true
+    },
+    {
+      "name": "Guiyang public catalogue has 12 populated categories and complete service details",
+      "passed": true
+    },
+    {
+      "name": "Guiyang public single vouchers, five topics and member expose demo purchase only",
+      "passed": true
+    },
+    {
+      "name": "Guiyang channel, 12 category pages, five topic links and single-voucher detail connect",
+      "passed": true
+    },
+    {
+      "name": "Every published management page is reachable",
+      "passed": true
+    },
+    {
+      "name": "Homepage benefits entry points to the official service",
+      "passed": true
+    },
+    {
+      "name": "No uncaught JavaScript errors on public entry pages",
+      "passed": true
+    }
+  ]
+}
