@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN" data-console-login="off">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f4ef">
+  <title>生活权益 · 新居住频道</title>
+  <link rel="stylesheet" href="lvju-app.css">
+  <link rel="stylesheet" href="screens/_commerce.css">
+  <link rel="stylesheet" href="screens/_commerce-consumer.css?v=20260919-5">
+</head>
+<body class="commerce-page commerce-consumer" data-commerce-view="consumer">
+  <div class="app">
+    <header class="appbar">
+      <a class="bk" href="index.html?tab=jiazheng" aria-label="返回新居住频道">‹</a>
+      <div class="ttl">生活权益<small>新居住 · 好生活，在身边</small></div>
+      <div class="consumer-account">
+        <span id="account-name" class="sr-only">新居住账号</span>
+        <button id="account-login" type="button">登录</button>
+        <button id="account-logout" type="button" hidden>退出</button>
+      </div>
+    </header>
+    <div class="scr" id="consumer-scroll">
+      <p id="commerce-status" role="status" aria-live="polite"></p>
+      <main id="commerce-content" class="commerce-content" aria-label="生活权益内容">
+        <section class="commerce-card consumer-loading" aria-busy="true">正在为您准备生活权益…</section>
+      </main>
+      <footer class="consumer-footer"><span>新居住 · 认真照顾每一种生活</span><a href="index.html?tab=jiazheng">返回生活服务频道 <span aria-hidden="true">↗</span></a></footer>
+    </div>
+    <nav id="commerce-tabs" class="commerce-tabs" aria-label="权益导航"></nav>
+  </div>
+  <script src="screens/_console-login.js"></script>
+  <script src="screens/_commerce-official.js?v=20260919-5"></script>
+  <script src="screens/_commerce-consumer.js?v=20260919-5"></script>
+  <script src="screens/_qr.js"></script>
+  <script src="screens/_commerce-customer.js?v=20260919-5"></script>
+</body>
+</html>
