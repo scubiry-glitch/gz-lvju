@@ -268,7 +268,7 @@ const day=n=>bj(new Date(Date.now()+n*86400000));
   });
 
   // ── HTTP 层：权限闸与四端视角 ──
-  server=createServer({pool,auth,demoEnabled:false});
+  server=createServer({pool,auth,demoEnabled:false,staticFiles:true});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const origin='http://127.0.0.1:'+server.address().port;
   const request=async(route,actor,method='GET',body)=>{const response=await fetch(origin+'/api/commerce/v1'+route,{method,headers:{...(actor?{Authorization:'Bearer '+actor.token}:{}),...(method!=='GET'?{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()}:{})},body:body?JSON.stringify(body):undefined});return {status:response.status,body:await response.json()};};
@@ -299,6 +299,8 @@ const day=n=>bj(new Date(Date.now()+n*86400000));
    assert(mine.body.data.refunds.every(r=>r.refund_no&&r.status));
    assert(mine.body.data.refunds.some(r=>r.status==='refunded'));
   });
+
+  if(process.argv.includes('--browser'))await require('./settlement-browser.cjs').run({origin,actors,check});
 
   const out=path.resolve(__dirname,'../../docs/verification/newliving-commerce-settlement');fs.mkdirSync(out,{recursive:true});
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({at:new Date().toISOString(),database:'isolated temporary MySQL database (removed)',scenarios:results},null,2));

@@ -233,3 +233,16 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **写入口与审计**：`PUT /api/juzhu/admin/vendors/:id/commission`（ROUTES 挂 `vendor.fund.write`，act `vendor.commission.update`）+ 处理器内 before/after 审计（role.update 金标准）；入驻审批 `approve` 按 `rate_base−rate_discount` 折算、按 phone **单命中** active 商家回填对应档位（多命中/未命中不阻塞）。管理台：`screens/p-vendor-rates.html`（P 端「商家费率」，nav p 系列 B 组，`_nav.js` 已登记）；全局基准走既有 `PUT /admin/settings`（`settings.write`）。
 - **商家可见**：`GET /api/juzhu/vendor/me` 随发两档 `commission.{housing,jiazheng}.{rate,is_default}`；B 端 `b-listing-mgmt.html` 徽标展示房源档佣金；HMAC `bookings/list`·`bookings/detail` 与 B 端 `/vendor/booking/orders` 每单随发快照字段。**费率不经商家 HMAC 写通道**（`vendor_config.cjs` 进程缓存不受影响）。
 - **perm 基线**：新增 `vendor.fund.write`（domain vendor，roles platform_op/operator_admin）已入 `scripts/__fixtures__/perm_roles_baseline.json`；既有缺口（`GET /admin/vendors`、`PUT /admin/vendors/:id/review` 未登记 ROUTES、consult-mode 重复死规则）为已知债，动权限面前先跑 `node scripts/perm_registry_snapshot.cjs` 对照。
+
+## 规则 21 · 权益结算闭环单一数据源（`commerce/settlement.cjs`）
+
+**券包/会员权益的结算、退款、冲回、对账只走 `commerce/settlement.cjs`（迁移 `004_settlement`），页面与其它模块不得另建资金表或绕过批次直接付款。**（2026-09-20 拍板）
+
+- **逐券计算锁定在核销时刻**：`commerce_redemptions` 的 supplier/beike/channel/retained 由订单锁定的规则快照算出，账务（`commerce_ledger_entries` 借贷分组账）与结算明细（`commerce_settlement_items.rule_ref`）都引用它；改规则版本不追溯，任何"重算"都应能在验收里复算一致（不变量 I5）。
+- **防重复三道闸**：① `uk_settle_once(redemption_id,line_kind)` 明细跨批次唯一；② `uk_batch_period` 同收款方同账期一批次；③ 指令 `request_no` 唯一且**重试沿用原号**（不许换号重付）。生成账单对已入账明细是幂等空操作，不是错误。
+- **申请与审批分离是服务端闸**：批次复核、误核销撤销复核、差异关闭都校验提交人≠复核人；权限点 `commerce.fund.read/write/review` 只在 `perm_registry.ROUTES` 登记，前端按钮隐藏不构成校验。
+- **UNKNOWN 只查原指令**：结果未知的指令禁止重试、禁止换指令；失败指令可受控重试 ≤3 次（`applyInstrument` 的 `controlled` 位只给重试链路，回执链路 paid↔failed 互斥 409）。回执按 `uk_receipt(request_no,digest)` 幂等去重。
+- **沙箱机构是镜像不是资金**：`commerce_provider_requests` 即未来持牌机构适配器的契约面（`sandboxSubmit/sandboxQuery/sandboxSimulate` 三个薄壳）；对外文案必须写明"不代表真实资金"，商户页与 KPI 已内置该披露，改版不得删。
+- **演示卡券不进资金域**：一切结算/退款/对账查询都带 `NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE)` 过滤；新增结算相关查询漏掉这个条件会把演示单卷进账差。
+- **误核销撤销保留历史**：`commerce_redemptions.coupon_id` 已从 UNIQUE 降级为普通索引（撤销后同券可再核销），防重靠核销事务内"券行锁 + 查 confirmed"——不要再把唯一索引加回去；撤销已结算明细生成 `commerce_recovery_cases`，下期生成商户账单时可 `offset_recovery` 抵扣，全部动作过账。
+- **金额守恒不变量 I1–I7**（`verifyInvariants`）是验收底线：订单实付=已核销+已退款+未核销池；本地已付逐笔有机构镜像。改动结算链路后必须跑 `node scripts/commerce/settlement-test.cjs --browser`（11 场景 + 浏览器 6 检查）。
