@@ -34,6 +34,15 @@
   /* 正文 */
   .body{padding:12px 18px 0;font-size:13.5px;line-height:1.95;color:#28322e;}
   .body p{margin:0 0 12px;}
+  /* Markdown 子集：小标题/列表/引用/行内样式（正文口径见 _region 之外，规则 17 body 字段） */
+  .body h3{font-family:var(--serif);font-size:16.5px;font-weight:700;color:var(--ink);line-height:1.5;margin:2px 0 11px;}
+  .body ul,.body ol{margin:0 0 12px;padding-left:19px;}
+  .body li{font-size:13.5px;line-height:1.85;color:#28322e;margin-bottom:3px;}
+  .body blockquote{margin:0 0 12px;padding:1px 0 1px 12px;border-left:3px solid color-mix(in oklab,var(--brand) 35%,#fff);color:#4a5751;}
+  .body strong{color:var(--ink);font-weight:700;}
+  .body del{color:var(--muted);}
+  .body code{background:#f1f5f4;border:1px solid var(--border);border-radius:5px;padding:1px 5px;font-size:12.5px;}
+  .body a{color:#2563eb;text-decoration:none;}
   .tagsrow{display:flex;flex-wrap:wrap;gap:6px 14px;padding:2px 18px 0;}
   .tagsrow a{font-size:12.5px;font-weight:600;color:#2563eb;text-decoration:none;}
   /* 攻略信息卡 */
@@ -114,6 +123,29 @@
   var id = parseInt(q.get('id') || '', 10);
   var $ = function(i){ return document.getElementById(i); };
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  /* 正文 Markdown 子集渲染（与后台 Vditor 工具栏对齐：标题/列表/引用/粗斜删/行内码/链接）。
+     一律先 esc() 再套自有标签，不做原始 HTML 透传；老内容（纯文本空行分段）渲染结果不变。 */
+  function mdInline(x){
+    return esc(x)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function(m0, t, u){
+        return /^(https?:\/\/|\/|assets\/)/i.test(u) ? '<a href="'+u+'" target="_blank" rel="noopener">'+t+'</a>' : m0;
+      });
+  }
+  function mdBody(text){
+    return text.split(/\n\s*\n/).map(function(block){
+      var lines = block.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+      if (!lines.length) return '';
+      if (lines.length === 1 && /^#{1,6}\s+/.test(lines[0])) return '<h3>' + mdInline(lines[0].replace(/^#{1,6}\s+/, '')) + '</h3>';
+      if (lines.every(function(l){ return /^[-*]\s+/.test(l); })) return '<ul>' + lines.map(function(l){ return '<li>' + mdInline(l.replace(/^([-*]\s+)+/, '')) + '</li>'; }).join('') + '</ul>';   // 展平嵌套：连写标记也剥掉
+      if (lines.every(function(l){ return /^\d+[.、]\s+/.test(l); })) return '<ol>' + lines.map(function(l){ return '<li>' + mdInline(l.replace(/^\d+[.、]\s+/, '')) + '</li>'; }).join('') + '</ol>';
+      if (lines.every(function(l){ return /^>\s?/.test(l); })) return '<blockquote>' + mdInline(lines.map(function(l){ return l.replace(/^>\s?/, ''); }).join(' ')) + '</blockquote>';
+      return '<p>' + lines.map(mdInline).join('<br>') + '</p>';
+    }).join('');
+  }
 
   if (!id) { miss('缺少笔记 id · 从房源详情页「周边玩法」点进来即可'); return; }
   fetch('/api/juzhu/spots/' + id).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }).then(render)
@@ -155,9 +187,9 @@
       }, { passive: true });
     }
 
-    // 正文：body 分段，空则回落 summary
+    // 正文：Markdown 子集渲染，空则回落 summary
     var text = (s.body || '').trim() || s.summary || '';
-    $('pBody').innerHTML = text.split(/\n+/).filter(Boolean).map(function(p){ return '<p>' + esc(p) + '</p>'; }).join('');
+    $('pBody').innerHTML = mdBody(text);
 
     // 标签
     var tags = Array.isArray(s.tags) ? s.tags : [];

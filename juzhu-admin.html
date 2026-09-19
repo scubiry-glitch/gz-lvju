@@ -1221,6 +1221,66 @@ function renderSpots() {
 /* ===== 周边玩法（spots）：表格做管理视图（快捷排序/上架开关），编辑/新建进单页面板 ===== */
 var spotDraft = null;      // 当前编辑中的地点工作副本（null=面板关闭）
 var spotDraftDirty = false;
+/* 笔记正文编辑器：正文仍存 Markdown 纯文本（spots.body 口径不变），编辑器只是更好的输入框。
+   懒加载 Vditor，拉不到（内网/断网）一律回落原生 textarea，后台可用性不依赖外网。 */
+var spotBodyInst = null;   // 当前 Vditor 实例（面板每次重渲染前必须 destroy）
+var vditorLoad = { state: 'idle', cbs: [] };   // idle | loading | ok | fail
+var VDITOR_ROOT = 'https://cdn.jsdelivr.net/npm/vditor@4.0.0';
+function ensureVditor(cb) {
+  if (window.Vditor) return cb(true);
+  if (vditorLoad.state === 'fail') return cb(false);
+  vditorLoad.cbs.push(cb);
+  if (vditorLoad.state === 'loading') return;
+  vditorLoad.state = 'loading';
+  function done(ok) {
+    if (vditorLoad.state === 'ok' || vditorLoad.state === 'fail') return;
+    vditorLoad.state = (ok && window.Vditor) ? 'ok' : 'fail';
+    vditorLoad.cbs.splice(0).forEach(function(f){ try { f(vditorLoad.state === 'ok'); } catch (e) {} });
+  }
+  var link = document.createElement('link');
+  link.rel = 'stylesheet'; link.href = VDITOR_ROOT + '/dist/index.css';
+  document.head.appendChild(link);
+  var sc = document.createElement('script');
+  sc.src = VDITOR_ROOT + '/dist/index.min.js';
+  sc.onload = function(){ done(true); };
+  sc.onerror = function(){ done(false); };
+  document.head.appendChild(sc);
+  setTimeout(function(){ done(false); }, 8000);   // 断网不挂死：到点回落原生框
+}
+function spotBodyValue(box) {
+  if (spotBodyInst) {
+    try { var v = spotBodyInst.getValue(); if (typeof v === 'string') return v; } catch (e) {}
+  }
+  var ta = box.querySelector('.se_body');
+  return ta ? ta.value : '';
+}
+function upgradeSpotBodyEditor(box) {
+  var host = box.querySelector('.se_body_host');
+  var ta = host && host.querySelector('.se_body');
+  if (!ta) return;                                 // 已是 Vditor，或面板已关闭
+  ensureVditor(function(ok) {
+    if (!ok || !document.body.contains(host) || !host.querySelector('.se_body')) return;
+    var val = ta.value;
+    var mount = document.createElement('div');
+    host.innerHTML = '';
+    host.appendChild(mount);
+    var inst = new Vditor(mount, {
+      value: val,
+      mode: 'ir',                                  // 即时渲染：所见即所得，取值为 Markdown
+      height: 300,
+      cdn: VDITOR_ROOT,
+      cache: { enable: false },                    // 面板按地点反复重建，禁止 localStorage 串内容
+      placeholder: '小红书式正文，空行分段；可用 ## 小标题、- 列表、**加粗**。留空则前台只显示导语',
+      // 刻意不含 upload：正文里的图走「图集路径」字段（photos），不把 base64 塞进 body
+      toolbar: ['headings','bold','italic','strike','|','quote','list','ordered-list','|','link','|','undo','redo','|','fullscreen','both'],
+      input: function(){ spotDraftDirty = true; },
+      after: function(){                          // 面板在加载期间被重渲染 → 立刻销毁，别留孤儿实例
+        if (!document.body.contains(mount)) { try { inst.destroy(); } catch (e) {} spotBodyInst = null; }
+      }
+    });
+    spotBodyInst = inst;
+  });
+}
 function spotDraftBody(box) {
   // 面板 → 全量 body（与 /admin/spots PUT 字段一致，含笔记五项）
   var photos = box.querySelector('.se_photos').value.split(/[,，\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
@@ -1236,7 +1296,7 @@ function spotDraftBody(box) {
     link: box.querySelector('.se_link').value.trim() || null,
     sort_order: +box.querySelector('.se_sort').value || 0,
     enabled: box.querySelector('.se_en').checked ? 1 : 0,
-    body: box.querySelector('.se_body').value.trim() || null,
+    body: spotBodyValue(box).replace(/\n{3,}/g, '\n\n').trim() || null,   // 编辑器会补空行，落库统一成「空行分段」
     photos: photos,
     address: box.querySelector('.se_address').value.trim() || null,
     duration: box.querySelector('.se_duration').value.trim() || null,
@@ -1246,6 +1306,7 @@ function spotDraftBody(box) {
 function renderSpotEditor() {
   var box = document.getElementById('spotEditor');
   if (!box) return;
+  if (spotBodyInst) { try { spotBodyInst.destroy(); } catch (e) {} spotBodyInst = null; }   // 面板整块重建，先销毁旧编辑器
   if (!spotDraft) { box.innerHTML = ''; return; }
   var d = spotDraft;
   var SPOT_TYPE_LABEL = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
@@ -1278,7 +1339,7 @@ function renderSpotEditor() {
       '</div></div>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:90px 1fr;gap:8px 10px;font-size:12px;margin-top:10px;align-items:start;">'+
-      '<b style="padding-top:6px;">笔记正文</b><textarea class="se_body" rows="7" placeholder="小红书式正文，空行分段；留空则前台只显示导语">'+esc(d.body||'')+'</textarea>'+
+      '<b style="padding-top:6px;">笔记正文</b><div class="se_body_host"><textarea class="se_body" rows="7" placeholder="小红书式正文，空行分段；留空则前台只显示导语">'+esc(d.body||'')+'</textarea></div>'+
       '<b style="padding-top:6px;">图集路径</b><input class="se_photos" value="'+esc(photos.join(', '))+'" placeholder="assets/lvju/a.jpg, assets/lvju/b.jpg（逗号分隔，含封面共 2-4 张效果最佳）"/>'+
       '<b style="padding-top:6px;">攻略信息</b><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
         '<input class="se_address" value="'+esc(d.address||'')+'" placeholder="地址：贵阳市花溪区青岩镇北街"/>'+
@@ -1317,6 +1378,7 @@ function renderSpotEditor() {
       renderSpots();
     }).catch(function(e){ toast('保存失败：'+e.message); });
   };
+  upgradeSpotBodyEditor(box);   // 原生 textarea 打底，Vditor 就绪后就地升级；拉不到就保持原状
 }
 function syncSpotPreview(box) {
   var cov = box.querySelector('.se_cover').value.trim();
