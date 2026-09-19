@@ -19,8 +19,11 @@
   .sub-tabs a.on{background:linear-gradient(90deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-weight:700;}
   .hero-card{margin:10px 16px 0;border-radius:18px;padding:14px 16px;color:#fff;position:relative;overflow:hidden;
     background:linear-gradient(135deg,#0b5d56,#1b4f47 48%,#c58d36);box-shadow:0 12px 26px rgba(15,42,38,.14);}
-  .hero-card.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 52%,#8bb8ff);}
-  .hero-card.moving{background:linear-gradient(135deg,#f97316,#bf4b13 50%,#f7b267);}
+  /* 频道横幅（原型说明视觉规范）：宽度 100%、高度自动不裁切、圆角 14px */
+  .hero-banner{overflow:hidden;margin:14px 12px 0;border-radius:14px;}
+  .hero-banner img{display:block;width:100%;height:auto;}
+  .hero-card.repair{background:linear-gradient(135deg,#f97316,#bf4b13 50%,#f7b267);}
+  .hero-card.moving{background:linear-gradient(135deg,#1376FF 0%,#0E61FF 48%,#408FFB 100%);}
   .hero-card.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 52%,#d6bcfa);}
   .hero-card.telecom{background:linear-gradient(135deg,#1d4e89,#123a66 52%,#7db3f0);}
   .hero-card.insurance{background:linear-gradient(135deg,#8c6224,#6b4a1a 52%,#e8c878);}
@@ -49,10 +52,11 @@
   .list{padding:4px 16px 24px;}
   .svc-card{display:flex;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:8px;
     box-shadow:0 5px 14px rgba(15,42,38,.06);}
-  .svc-poster{width:76px;min-height:76px;border-radius:11px;color:#fff;position:relative;overflow:hidden;flex-shrink:0;
+  .svc-poster{flex:0 0 82px;width:82px;min-height:122px;border-radius:8px;color:#fff;position:relative;overflow:hidden;
+    padding:11px 8px;display:flex;flex-direction:column;justify-content:space-between;
     background:linear-gradient(135deg,#0f766e,#14b8a6);}
-  .svc-poster.repair{background:linear-gradient(135deg,#2563eb,#60a5fa);}
-  .svc-poster.moving{background:linear-gradient(135deg,#ea580c,#fb923c);}
+  .svc-poster.repair{background:linear-gradient(135deg,#ea580c,#fb923c);}
+  .svc-poster.moving{background:linear-gradient(135deg,#1678ff,#168FFA);}
   .svc-poster.nanny{background:linear-gradient(135deg,#7c3aed,#a78bfa);}
   .svc-poster.telecom{background:linear-gradient(135deg,#1d4e89,#60a5fa);}
   .svc-poster.insurance{background:linear-gradient(135deg,#8c6224,#e8c878);}
@@ -63,25 +67,23 @@
   .svc-poster.recycle{background:linear-gradient(135deg,#166534,#86efac);}
   .svc-poster.community{background:linear-gradient(135deg,#6d28d9,#c4b5fd);}
   .svc-poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.18));}
-  .svc-poster .t1,.svc-poster .t2,.svc-poster .t3{position:relative;z-index:2;}
-  .svc-poster .t1{font-size:9px;padding:6px 8px 0;opacity:.9;letter-spacing:.08em;}
-  .svc-poster .t2{font-family:var(--serif);font-size:18px;line-height:1.05;padding:4px 8px 0;font-weight:700;}
-  .svc-poster .t3{position:absolute;left:8px;right:8px;bottom:6px;font-size:9px;opacity:.95;}
+  .svc-poster .t1,.svc-poster .t2,.svc-poster .t3,.svc-poster svg{position:relative;z-index:2;}
+  .svc-poster .t1{font-size:10px;opacity:.92;}
+  .svc-poster .t2{font-size:16px;line-height:1.35;font-weight:700;}
+  .svc-poster svg{width:60px;height:32px;margin:2px 0;}
+  .svc-poster .t3{font-size:10px;opacity:.95;}
   .svc-main{flex:1;min-width:0;display:flex;flex-direction:column;}
-  .svc-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
-  .svc-top h3{font-size:13px;font-weight:800;line-height:1.25;color:var(--ink);}
-  .svc-top .state{font-size:10px;color:#ea580c;background:#fff7ed;border:1px solid #fed7aa;padding:2px 7px;border-radius:999px;white-space:nowrap;}
-  .svc-meta{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.35;}
-  .svc-rank{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px;}
-  .svc-rank span{font-size:10px;padding:2px 7px;border-radius:999px;background:#faf5e8;color:var(--gold-deep);}
-  .svc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px;overflow:hidden;max-height:18px;}
-  .svc-tags span{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--cat-soft,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
+  .svc-main h3{font-size:14px;font-weight:800;line-height:1.25;color:var(--ink);}
+  .svc-meta{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35;}
+  .svc-tags{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 0;}
+  .svc-tags span{font-size:10px;padding:2px 5px;border-radius:4px;background:var(--cat-soft,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
   .svc-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3px;}
   .svc-price{color:#ef5a2a;}
   .svc-price b{font-family:var(--serif);font-size:18px;line-height:1;}
   .svc-price small{font-size:11px;color:var(--muted);}
   .svc-book{display:inline-flex;align-items:center;justify-content:center;padding:6px 13px;border-radius:11px;
-    background:linear-gradient(90deg,#ff7a18,#ff5f6d);color:#fff;font-size:12px;font-weight:800;box-shadow:0 8px 16px rgba(255,95,109,.18);}
+    background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-size:12px;font-weight:800;
+    box-shadow:0 8px 16px color-mix(in oklab,var(--cat-brand,var(--brand)) 26%,transparent);}
   .empty{padding:48px 24px;text-align:center;color:var(--muted);}
 </style>
 </head>
@@ -120,7 +122,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=4"></script>
+<script src="screens/_jzapi.js?v=6"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -152,21 +154,7 @@
   JZ.applyRegionChrome({ titleSub: '#ttlSub', loc: '#cityLoc' });
   document.title = '本地生活 · ' + JZ.regionCity();
 
-  /* 与 hero / poster 频道色对齐，供副导航等 chrome 使用 */
-  var CAT_THEME = {
-    cleaning:         { brand: '#0f766e', brand2: '#14b8a6', deep: '#0b5d56' },
-    repair:           { brand: '#1d4ed8', brand2: '#60a5fa', deep: '#16356a' },
-    moving:           { brand: '#ea580c', brand2: '#fb923c', deep: '#bf4b13' },
-    nanny:            { brand: '#7c3aed', brand2: '#a78bfa', deep: '#4d2579' },
-    telecom:          { brand: '#1d4e89', brand2: '#60a5fa', deep: '#123a66' },
-    insurance:        { brand: '#8c6224', brand2: '#c9a24b', deep: '#6b4a1a' },
-    consumer_finance: { brand: '#0f1a4d', brand2: '#8ba3e0', deep: '#0a1028' },
-    health_care:      { brand: '#0e7490', brand2: '#67e8f9', deep: '#0a5568' },
-    home_maintain:    { brand: '#3f6212', brand2: '#a3e635', deep: '#2d4a0c' },
-    asset:            { brand: '#1e3a5f', brand2: '#93c5fd', deep: '#152a45' },
-    recycle:          { brand: '#166534', brand2: '#86efac', deep: '#0f4a26' },
-    community:        { brand: '#6d28d9', brand2: '#c4b5fd', deep: '#4c1d95' }
-  };
+  /* 与 hero / poster 频道色对齐，供副导航等 chrome 使用。配色表在 _jzapi.js（单一数据源） */
 
   var CAT_UI = {
     cleaning: { heroEyebrow: 'HOUSEKEEPING SELECT', desc: '日常保洁、深度清洁、搬家保洁一屏可选，均为持证服务者就近上门。', price: '¥128', unit: '起', cls: 'cleaning' },
@@ -184,13 +172,14 @@
   };
 
   function applyCatTheme(type){
-    var t = CAT_THEME[type] || CAT_THEME.cleaning;
-    var root = document.querySelector('.scr') || document.documentElement;
-    root.style.setProperty('--cat-brand', t.brand);
-    root.style.setProperty('--cat-brand-2', t.brand2);
-    root.style.setProperty('--cat-deep', t.deep);
-    root.style.setProperty('--cat-soft', 'color-mix(in oklab,' + t.brand + ' 12%, transparent)');
+    JZ.applyCatTheme(document.querySelector('.scr') || document.documentElement, type);
   }
+
+  // 列表海报车型图标（原型说明 L01：海报底部为车型，同款卡车图标全品类统一）
+  var TRUCK_SVG = '<svg viewBox="0 0 100 60" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">'+
+    '<rect x="6" y="13" width="53" height="32" rx="3"/>'+
+    '<path d="M59 25h18l14 13v7H59M68 26v12h22M30 14v30"/>'+
+    '<circle cx="24" cy="47" r="7" fill="#edf3ff"/><circle cx="75" cy="47" r="7" fill="#edf3ff"/></svg>';
 
   function priceText(item){
     var p = item.product_min_price || item.price_from || 0;
@@ -208,13 +197,47 @@
     }).join('');
   }
 
+  // 频道横幅：仅当本频道当前商品**全部来自同一商家**且该商家配了 banner_url 时展示
+  // （避免把 A 商的品牌物料挂在 B 商商品列表上）；否则回落渐变 hero。
+  function heroBannerOf(){
+    var list = skus.filter(function(x){ return x.category_id === currentType; });
+    if (!list.length) return '';
+    var name = list[0].vendor_name;
+    if (!name) return '';
+    for (var i = 1; i < list.length; i++) {
+      if (list[i].vendor_name !== name) return '';
+    }
+    return list[0].vendor_banner || '';
+  }
+
   function renderHero(){
     applyCatTheme(currentType);
     var cat = categories.find(function(x){ return x.id === currentType; }) || { name: '家政', icon: '✨' };
     var ui = CAT_UI[currentType] || CAT_UI.cleaning;
     var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.product_min_price||a.price_from||0)-(b.product_min_price||b.price_from||0); })[0];
     var el = document.getElementById('hero');
+    document.getElementById('ttl').firstChild.textContent = cat.name + '服务';
+    var banner = heroBannerOf();
+    if (banner) {
+      // 原型说明视觉规范：宽度 100%、高度自动不裁切、圆角 14px；加载失败回落渐变 hero
+      el.className = 'hero-banner';
+      el.innerHTML = '<img src="' + banner + '" width="1164" height="600" alt="' +
+        JZ.esc(cat.name) + '服务：全程搬运、收费透明、认证师傅、物品保护">';
+      // 回落用 onerror 属性挂不行：内联处理器在全局作用域求值，取不到本 IIFE 里的
+      // renderHeroText（会 ReferenceError，横幅裂在图里）。改为拿到元素后挂函数。
+      var img = el.querySelector('img');
+      if (img) img.onerror = function(){ el.className = 'hero-card ' + ui.cls; renderHeroText(); };
+      return;
+    }
     el.className = 'hero-card ' + ui.cls;
+    renderHeroText();
+  }
+
+  function renderHeroText(){
+    var cat = categories.find(function(x){ return x.id === currentType; }) || { name: '家政', icon: '✨' };
+    var ui = CAT_UI[currentType] || CAT_UI.cleaning;
+    var top = skus.filter(function(x){ return x.category_id === currentType; }).sort(function(a,b){ return (a.product_min_price||a.price_from||0)-(b.product_min_price||b.price_from||0); })[0];
+    var el = document.getElementById('hero');
     el.innerHTML = '<div class="in">'+
       '<div class="eyebrow">'+ui.heroEyebrow+'</div>'+
       '<h1>'+cat.icon+' '+cat.name+'服务</h1>'+
@@ -223,7 +246,6 @@
       '<div class="hero-cta"><div class="price">'+(top?priceText(top):ui.price)+'<small>'+(top?(top.price_unit||'起'):ui.unit)+'</small></div>'+
       '<a class="btn" href="#list">查看热门服务</a></div>'+
     '</div>';
-    document.getElementById('ttl').firstChild.textContent = cat.name + '服务';
   }
 
   function filtered(){
@@ -246,24 +268,23 @@
       return;
     }
     document.getElementById('list').innerHTML = items.map(function(item){
+      // 海报三段：商家名 / 品类 / 车型（对齐原型说明 L01 列表卡片）
       var head = item.name.split('·')[0].trim();
       var tail = item.name.split('·')[1] ? item.name.split('·')[1].trim() : item.spec || '';
       var cls = item.category_id;
-      var rank = [];
-      if (item.rating_score) rank.push('★ ' + Number(item.rating_score).toFixed(1));
-      if (item.sales_text) rank.push(item.sales_text);
-      if (item.worker_min_level) rank.push(item.worker_min_level + '+');
+      var summary = item.list_desc || item.spec || '';
+      var allTags = (item.tags || []).map(function(x){ return '<span>'+x+'</span>'; }).join('');
       return '<a class="svc-card" href="' + JZ.chainCity('juzhu-jiazheng-detail.html?sku='+encodeURIComponent(item.slug)) + '">'+
         '<div class="svc-poster '+cls+'">'+
-          '<div class="t1">'+(item.badges && item.badges[0] ? item.badges[0] : '精选服务')+'</div>'+
+          '<div class="t1">'+(item.vendor_name || '认证服务商')+'</div>'+
           '<div class="t2">'+head+'</div>'+
+          TRUCK_SVG+
           '<div class="t3">'+tail+'</div>'+
         '</div>'+
         '<div class="svc-main">'+
-          '<div class="svc-top"><h3>'+item.name+'</h3><span class="state">可预约</span></div>'+
-          '<div class="svc-meta">'+(item.spec||'')+' · 最快可约 今天18:00</div>'+
-          '<div class="svc-rank">'+rank.map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>'+
-          '<div class="svc-tags">'+(item.tags||[]).slice(0,3).map(function(x){ return '<span>'+x+'</span>'; }).join('')+'</div>'+
+          '<h3>'+item.name+'</h3>'+
+          '<div class="svc-meta">'+summary+'</div>'+
+          '<div class="svc-tags">'+allTags+'</div>'+
           '<div class="svc-bottom"><div class="svc-price"><b>'+priceText(item).replace('¥','')+'</b><small> '+(item.price_unit||'起')+'</small></div>'+
           '<span class="svc-book">去预约</span></div>'+
         '</div></a>';

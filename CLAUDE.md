@@ -106,6 +106,22 @@
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
 - **鉴权**：`/api/juzhu/*` **默认拒绝**，须 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端管理台经 `localStorage JUZHU_API_KEY` 对齐，勿在页面硬编码。白名单仅限 C 端目录/房源展示、`POST /api/juzhu/jiazheng/wechat-link`、`GET /api/juzhu/gr/orders*`、`GET .../virtual-phone`；商家开放接口走 HMAC；admin 走登录会话或 Key。**工单列表/详情/支付/评价/派单一律要 Key**（禁止 `?phone=` 匿名旁路）
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
+- **生活服务专区入口恒为 12 个频道**（`index.html` 的 `renderJiazhengCats`）：入口列表以本地 `JZ_CATS` 为基准，`GET /api/juzhu/jiazheng/categories` 回来的只做**覆盖 + 追加**，**不得直接按接口结果渲染**。接口按「当前城市有无可售商品」过滤，会把当前城市没配商品的频道一并滤掉（实测 `city=贵州` 只剩 10 个，丢了保洁和维修）——但这是导航入口不是库存指示，少一个入口就少一条进频道的路。接口失败 / `_jzapi.js` 未加载时也要回落 `renderJiazhengCats(null)` 画出纯本地 12 个，不得整块空白。
+- **分类配色单一数据源**：家政各分类的品牌色写在 `_jzapi.js` 的 `CAT_THEME`（`catTheme()` / `applyCatTheme(el, type)`，后者把 `--cat-brand / --cat-brand-2 / --cat-deep / --cat-soft / --cat-tint` 写到元素上）。列表页与详情页的 hero / poster / 标签 / 按钮 / **正文模块 chrome**（小节标题色条、序号圆点、商家 Logo 底、证书卡、服务者卡、选中态描边与光晕）**只消费这些 CSS 变量**，页面不得再各写一份配色表，也不得残留全局 `--brand`（青绿）——那会让蓝色/橙色频道里混进绿色。
+  - `--cat-soft` = 12% 品牌色**透明**混合（叠在白卡上的浅底）；`--cat-tint` = 白底 8% 品牌色**不透明**浅底。**深色 hero 上用白色半透明，浅色容器上用 `--cat-tint`**；把 `--cat-soft` 用在深色底上会隐形。
+  - `moving`（搬家）= 参考稿《搬家服务原型说明》蓝犀牛 × 贝壳 的频道蓝：品牌 `#1678ff` / `#168FFA`，详情 hero `#1376FF → #0E61FF → #408FFB` 135°，列表标签 `#EFF6FF` 底 + `#1678ff` 字。
+  - `repair`（维修）**让出原来的蓝**、改用搬家腾出的橙 `#ea580c`（语义贴合「紧急响应」），避免到家服务一排两个蓝。`index.html` 各分类另有深色变体（`.jz-cat.* .bg/.orb`）与 4px 强调条（`.in::before`），改色时两处要一起改；搬家深色变体取 `#1a54b8`（**不要用 `#1d4a8c`**，与 `telecom` `#1d4e89` 的 ΔE 仅 5.3，肉眼几乎同色）。
+  - 改 `_jzapi.js` 后记得把引用页的 `?v=N` 一起 +1（缓存击穿）。
+- **C 端内容口径（《搬家服务原型说明》蓝犀牛 × 贝壳 2026-09-18）**——详情页各模块的字段归属：
+  - **列表 hero / 频道横幅**：`jz_vendors.banner_url` 配频道级横幅（列表接口随行下发 `vendor_banner`），**仅当本频道当前商品全部来自同一商家且该商家配了横幅**时替换掉渐变 hero（否则会把 A 商的品牌物料挂在 B 商的商品列表上）。样式照原型说明视觉规范：宽 100%、高 auto 不裁切、圆角 14px；`onerror` 回落渐变 hero。素材是 OSS 那张 `lxn-banner.png`（1164×600），按仓库惯例（**无外链图**）落到 `assets/` 本地引用；缩略图由 `img_thumbs.cjs` 自动出，但 `.t*.webp` 是 gitignore 的运行时产物，页面**引原图**别引缩略图。
+  - **列表卡片**（L01）：海报三段 = 商家名 / 品类 / 车型 + 卡车图标；下方 名称 + 列表描述 + **全量**标签 + 起价 + 去预约。不要加参考稿没有的「可预约」pill 或写死的「最快可约 今天18:00」。
+  - **详情顶部**（D02）：**两行**标签——第一行固定「`{L2}+ 持证服务者` + `★ 评分`」，第二行**原样复用列表标签且顺序一致**。两行 chip **统一用白色半透明 `rgba(255,255,255,.16)` + 白字**：参考稿原型里 `.detail .hero-tag` 的优先级压过 `.hero-tag.blue/.green`，实际渲染就是这个样式；不统一会变成白透 + 绿 + 浅蓝三种底混排，很难看。**不要改用 `--cat-soft`**（12% 品牌色透明混合，蓝色 hero 上等于隐形）。hero 正文不要限 `max-width`（会挤成窄柱、右侧留大片空白）。
+  - **服务说明**（D03）：每项 = 标题 + 正文，存 `jz_skus.includes`（`[{name,desc}]`，旧纯字符串数组渲染端仍兼容）；小面/中面 2 项、厢货 4 项。
+  - **商家介绍**（D05）：Logo + 品牌名 + 「`{品类}服务商`」副标题 + **整段品牌简介**，简介存 `jz_vendors.intro`（`merchantIntroOf` 有值就整段用它、不再拼自动统计；**没值回落旧拼接**，避免存量商家整块空白）。不再展示评分/评价/起订价三宫格——起订价对搬家无意义且 `start_price` 未配时渲染成「¥0/起」。
+  - **认证服务者**（D06）：证书按品类取，**同城/跨城 = ACP，日式 = ACA**（`/日式/` 判名）。
+  - **服务流程**（D07）：全商品统一 4 步，正文存 `service_notice`（与 `service_flow` 一一对应，不是费用须知）。
+- **沈阳可售商品**：列表/详情接口按「`jz_products.city_id` = 当前城市 + 商家 active 且 `city_ids` 命中」双维度过滤，**`city_id` 为 NULL 的商品在任何城市都不展示**。沈阳搬家用 `node scripts/moving-shenyang-seed.cjs seed|clean`（蓝犀牛 vendor 151，商品固定 id 段 5161-5166，幂等，clean 只删本脚本清单）。
+  - 列表接口另补 `vendor_name` / `list_desc` / `vendor_banner` 三个相关子查询，与 `product_min_price` 共用 `priceAggJoin`。两条硬约束：① **tokens 绑定份数按 `priceAggJoin` 在 SQL 里的实际出现次数自动算**（`sql.split(priceAggJoin).length - 1` + cityExists 那份），**不要手工计数**——手工少 push 一份会静默查空（踩过：6 条变 0 条）；② **子查询不得引用 `v.` 别名**——`v` 只在 cityName 能解析成城市时（`cityId !== null`）才由 `priceAggJoin` 引入，传省名 / 未知城市时 `priceAggJoin` 为空串，`v.name` 会直接报 `Unknown column 'v.name' in 'field list'`（踩过）。取商家字段一律用自包子查询 `(SELECT v2.x FROM jz_vendors v2 WHERE v2.id=p.vendor_id)`，两种情况下都成立。
 
 ## 规则 10 · 话务虚拟号（TP）只走服务端
 

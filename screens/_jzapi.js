@@ -493,9 +493,50 @@
     return url + sep + 'mock_uid=' + encodeURIComponent(uid);
   }
 
+  // 家政分类配色「单一数据源」：列表页 hero/poster/标签/按钮 与 详情页 hero/底部按钮 共用。
+  // 改分类色只改这里，页面不得再各写一份。moving 取《搬家服务原型说明》蓝犀牛 × 贝壳 的
+  // 频道蓝（#1678ff 系）；repair 让出原来的蓝、改用搬家腾出的橙。
+  var CAT_THEME = {
+    cleaning:         { brand: '#0f766e', brand2: '#14b8a6', deep: '#0b5d56' },
+    repair:           { brand: '#ea580c', brand2: '#fb923c', deep: '#bf4b13' },
+    moving:           { brand: '#1678ff', brand2: '#168FFA', deep: '#0E61FF' },
+    nanny:            { brand: '#7c3aed', brand2: '#a78bfa', deep: '#4d2579' },
+    telecom:          { brand: '#1d4e89', brand2: '#60a5fa', deep: '#123a66' },
+    insurance:        { brand: '#8c6224', brand2: '#c9a24b', deep: '#6b4a1a' },
+    consumer_finance: { brand: '#0f1a4d', brand2: '#8ba3e0', deep: '#0a1028' },
+    health_care:      { brand: '#0e7490', brand2: '#67e8f9', deep: '#0a5568' },
+    home_maintain:    { brand: '#3f6212', brand2: '#a3e635', deep: '#2d4a0c' },
+    asset:            { brand: '#1e3a5f', brand2: '#93c5fd', deep: '#152a45' },
+    recycle:          { brand: '#166534', brand2: '#86efac', deep: '#0f4a26' },
+    community:        { brand: '#6d28d9', brand2: '#c4b5fd', deep: '#4c1d95' }
+  };
+
+  function catTheme(type) {
+    return CAT_THEME[type] || CAT_THEME.cleaning;
+  }
+
+  // 把分类色写成 CSS 变量，供页面元素按 var(--cat-brand) 消费；element 为空时只返回主题对象。
+  //   --cat-brand / -brand-2 / -deep  主色三档
+  //   --cat-soft   12% 品牌色**透明**混合（叠在白卡上作浅底，别用在深色 hero 上，会隐形）
+  //   --cat-tint   **不透明**浅底（白底 8% 品牌色），用于本身就是浅色底的容器，不会透出下层
+  function applyCatTheme(element, type) {
+    var t = catTheme(type);
+    if (element && element.style && element.style.setProperty) {
+      element.style.setProperty('--cat-brand', t.brand);
+      element.style.setProperty('--cat-brand-2', t.brand2);
+      element.style.setProperty('--cat-deep', t.deep);
+      element.style.setProperty('--cat-soft', 'color-mix(in oklab,' + t.brand + ' 12%, transparent)');
+      element.style.setProperty('--cat-tint', 'color-mix(in oklab,' + t.brand + ' 8%, #fff)');
+    }
+    return t;
+  }
+
   window.BZF_JZ = {
     STATUS: STATUS,
     ICON: ICON,
+    CAT_THEME: CAT_THEME,
+    catTheme: catTheme,
+    applyCatTheme: applyCatTheme,
     apiKey: apiKey,
     setApiKey: setApiKey,
     sessionToken: sessionToken,

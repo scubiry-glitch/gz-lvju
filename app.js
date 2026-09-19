@@ -1248,6 +1248,13 @@ function merchantIntroOf(vendor, product) {
     guarantees: ['服务前 2 小时可免费取消', '服务前 2 小时内取消扣 30%', '服务开始后不可取消', '认证商家按平台标准提供售后处理'],
   };
   if (!vendor) return intro;
+  // 商家配置了品牌简介（jz_vendors.intro）就整段用它 —— 「商家介绍」按原型说明 D05 展示
+  // Logo + 品牌名 + 副标题 + 完整简介；此时不再拼自动统计（起订价对搬家等业态无意义，
+  // 且 start_price 未配时会渲染成「¥0/起」）。未配简介的存量商家回落旧拼接，避免整块空白。
+  if (vendor.intro && String(vendor.intro).trim()) {
+    intro.summary = String(vendor.intro).trim();
+    return intro;
+  }
   const vendorName = vendor.name || '认证商家';
   const category = (product && product.category) || vendor.type || '家政';
   const subtitle = (product && product.subtitle) || (product && product.title) || '';
@@ -1900,6 +1907,8 @@ async function ensureSchemaRun() {
       ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
       ['jz_vendors', 'commission_housing DECIMAL(5,2)'],   // 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
       ['jz_vendors', 'commission_jiazheng DECIMAL(5,2)'],  // 抽佣·家政档（本期仅配置，消费在家政结算）
+      ['jz_vendors', 'intro TEXT'],                        // 品牌简介（C 端「商家介绍」整段展示；NULL = 该块不渲染）
+      ['jz_vendors', 'banner_url VARCHAR(500)'],           // 频道级横幅（列表页 hero；NULL = 回落渐变 hero）
       ['photos', 'category VARCHAR(20)'],                      // 图片分类（2026-09，取值见 photo_config.PHOTO_CATEGORIES）
       ['photos', 'external_id VARCHAR(120)'],                  // 商家侧稳定图 id（2026-09）：全量覆盖的匹配键（URL 带签名会变，不能只靠 URL）
       ['jz_products', 'city_id INT'],
@@ -4020,16 +4029,38 @@ async function handleApiDirect(urlPath, qs, req, res) {
                     AND v2.status='active' AND p2.city_id=${Number(cityId)}
                     AND ${cityIdsClause('v2', tokens)}
                 )`;
-          // 占位符按 SQL 中出现顺序绑定：SELECT 子查询里的 tokens 在前，WHERE EXISTS 的在后
-          params.push(...tokens, ...tokens);
         }
       }
+      // 每 SKU 的当前城市代表商品（最低价优先）派生列。注意两条硬约束：
+      // ① 括号里不得引用 `v.` 别名 —— `v` 只在 cityId 解析成功时才由 priceAggJoin 引入，
+      //    传省名/未知城市时 priceAggJoin 为空串，`v.name` 会直接报 Unknown column。
+      //    取商家字段一律用自包子查询 (SELECT v2.x FROM jz_vendors v2 WHERE v2.id=p.vendor_id)。
+      // ② tokens 的绑定份数在下面按 priceAggJoin 的实际出现次数自动算，不要手工计数
+      //    （手工少 push 一份会静默查空：列表从 6 条变 0 条）。
       let sql = `SELECT s.*, c.name AS category_name, c.icon AS category_icon,
                    (SELECT MIN(p.price) FROM jz_products p ${priceAggJoin}
-                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price
+                    WHERE p.channel_sku_id=s.id AND p.status='on') AS product_min_price,
+                   (SELECT (SELECT v2.name FROM jz_vendors v2 WHERE v2.id=p.vendor_id)
+                    FROM jz_products p ${priceAggJoin}
+                    WHERE p.channel_sku_id=s.id AND p.status='on'
+                    ORDER BY p.price ASC, p.id ASC LIMIT 1) AS vendor_name,
+                   (SELECT NULLIF(p.subtitle,'') FROM jz_products p ${priceAggJoin}
+                    WHERE p.channel_sku_id=s.id AND p.status='on'
+                    ORDER BY p.price ASC, p.id ASC LIMIT 1) AS list_desc,
+                   (SELECT (SELECT v2.banner_url FROM jz_vendors v2 WHERE v2.id=p.vendor_id)
+                    FROM jz_products p ${priceAggJoin}
+                    WHERE p.channel_sku_id=s.id AND p.status='on'
+                    ORDER BY p.price ASC, p.id ASC LIMIT 1) AS vendor_banner
                  FROM jz_skus s JOIN jz_categories c ON c.id=s.category_id
                  WHERE s.enabled=1 AND c.enabled=1
                    AND EXISTS (SELECT 1 FROM jz_products p WHERE p.channel_sku_id=s.id AND p.status='on')${cityExists}`;
+      if (priceAggJoin) {
+        // priceAggJoin 在 SELECT 里出现几次就绑几份 tokens（按实际出现次数，不手工数），
+        // 末尾再加 cityExists 里的一份；顺序与 SQL 中出现顺序一致。
+        const uses = sql.split(priceAggJoin).length - 1;
+        const tokens = await cityMatchTokens(cityName);
+        for (let i = 0; i < uses + 1; i++) params.push(...tokens);
+      }
       if (categoryId) { sql += ' AND s.category_id=?'; params.push(categoryId); }
       if (q) {
         sql += ' AND (s.name LIKE ? OR s.spec LIKE ?)';
