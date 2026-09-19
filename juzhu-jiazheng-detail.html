@@ -275,7 +275,7 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=6"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -494,7 +494,7 @@
 
   function render(){
     document.getElementById('ttl').firstChild.textContent = item.name;
-    // 频道色写成 CSS 变量（底部按钮等消费）；配色表在 _jzapi.js（单一数据源）
+    // 频道色写成 CSS 变量（底部按钮等消费）；配色表在 _jzapi.js?v=7（单一数据源）
     JZ.applyCatTheme(document.querySelector('.app'), item.category_id);
     var hero = document.getElementById('hero');
     hero.className = 'hero ' + heroClass(item.category_id);
@@ -646,6 +646,14 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
+    if(product && String(product.query||'').startsWith('guiyang-life-demo-v1:')){
+      fetch('/api/commerce/v1/catalog?city='+encodeURIComponent(JZ.regionCity())).then(function(r){if(!r.ok)throw Error('权益服务暂不可用');return r.json();}).then(function(data){
+        var coupon=(data.data||[]).find(function(p){return p.kind==='skus'&&p.channel_slug===slug&&p.is_demo;});
+        if(coupon)location.href='juzhu-commerce.html?city='+encodeURIComponent(JZ.regionCity())+'&product=skus-'+coupon.id;
+        else toast('此项为演示咨询入口，不发生投保、授信、估价成交或真实服务下单。');
+      }).catch(function(e){toast(e.message||'请稍后再试');});
+      return;
+    }
     // 登录拦截：ensureUserId 统一身份（测试环境模拟登录 / 生产 App 内 jsbridge3），
     // 取不到（非 App 环境或未登录）不生成小程序链接
     JZ.ensureUserId().then(function(uid){
@@ -692,6 +700,10 @@
       return;
     }
     render();
+    if(String(product.query||'').startsWith('guiyang-life-demo-v1:')){
+      var note=document.createElement('p');note.className='demo-service-note';note.textContent='贵阳演示服务 · 商家、人员、价格与服务说明均用于流程展示，不提供真实履约。';note.style.cssText='margin:12px 14px;padding:12px;border-radius:12px;background:#fff2d8;color:#73532b;font-size:12px;line-height:1.7';document.querySelector('.scr').prepend(note);
+      document.getElementById('submitBtn').textContent='体验演示流程';
+    }
     renderVendors();
     renderProducts();
     // 选择上门时间暂时隐藏

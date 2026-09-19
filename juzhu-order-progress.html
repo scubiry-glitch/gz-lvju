@@ -59,7 +59,7 @@
 </div>
 <div class="toast" id="toast"></div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -115,7 +115,9 @@
 
   function render(){
     if (!order) return;
+    if(String(order.source||'').startsWith('新居住权益售后')){STEPS[0].sub='售后申请已进入主站工单池，无需另付费用';STEPS[1].sub='已分配售后处理人员';STEPS[2].sub='处理人员已接单';STEPS[3].label='处理中';STEPS[3].sub='正在处理您的售后申请';STEPS[4].label='已处理';STEPS[4].sub='处理结果已同步至生活权益售后记录';}
     var st = JZ.STATUS[order.status] || JZ.STATUS.pending;
+    if(order.pay_status==='not_required'){STEPS=STEPS.filter(s=>s.k!=='rated');if(order.status==='done')st={...st,c:'已处理'};}
     document.getElementById('subTtl').textContent = order.id;
     var wraw = order.worker || null;
     // 兼容：下单后未派单为 {preferred, slot}；派单后为 {name, level, slot, from_customer}
@@ -136,7 +138,7 @@
                 : ''))+
         '</span></div>'+
         '<div class="kv"><span class="k">费用</span><span>'+fmtPrice(order.fee)+'</span></div>'+
-        '<div class="kv"><span class="k">支付</span><span>'+(order.pay_status==='paid'?'已支付 · '+JZ.esc(order.pay_method||'贝壳支付'):'待支付')+'</span></div>'+
+        '<div class="kv"><span class="k">支付</span><span>'+(order.pay_status==='not_required'?'无需支付（售后工单）':order.pay_status==='paid'?'已支付 · '+JZ.esc(order.pay_method||'贝壳支付'):'待支付')+'</span></div>'+
         '<div class="kv"><span class="k">来源</span><span>'+JZ.esc(order.source)+'</span></div>'+
       '</div>';
     if (worker && worker.name) {
@@ -149,7 +151,7 @@
       var wtitle = order.status==='pending' ? '首选服务者' : '服务者';
       html += '<div class="block"><h3>'+wtitle+'</h3><div class="worker"><div class="av">'+JZ.esc((worker.name||'师').slice(0,1))+'</div><div><b>'+JZ.esc(worker.name)+pickedBadge+'</b><div style="font-size:11px;color:var(--muted);">'+JZ.esc(worker.level||'')+' · 行业认证 · <a href="screens/s-cert.html" style="color:var(--brand);">查看证书</a></div>'+slotLine+'</div></div></div>';
     }
-    if (order.status === 'done') html += renderRate();
+    if (order.status === 'done' && order.pay_status !== 'not_required') html += renderRate();
     if (order.status === 'rated' && order.rating) {
       html += '<div class="block"><h3>您的评价</h3><div style="font-size:14px;color:var(--gold);">★ '+order.rating.score+'</div><p style="font-size:12px;color:var(--muted);margin-top:6px;">'+(order.rating.tags||[]).join(' · ')+'</p></div>';
     }
@@ -161,13 +163,15 @@
     document.getElementById('main').innerHTML = html;
 
     var cta = document.getElementById('ctaBar');
-    if (order.pay_status !== 'paid') {
+    if(order.pay_status==='not_required'){
+      cta.style.display='flex';document.getElementById('ctaFee').textContent='无需支付';document.getElementById('ctaHint').textContent='主站售后工单';document.getElementById('ctaBtn').textContent='返回售后';document.getElementById('ctaBtn').href='juzhu-commerce.html?view=cases';
+    } else if (order.pay_status !== 'paid') {
       cta.style.display = 'flex';
       document.getElementById('ctaFee').textContent = fmtPrice(order.fee);
       document.getElementById('ctaHint').textContent = '完成支付后进入工单池';
       document.getElementById('ctaBtn').textContent = '去支付';
       document.getElementById('ctaBtn').href = 'lvju-app-pay.html?order='+encodeURIComponent(order.id)+'&channel=jiazheng';
-    } else if (order.status === 'done') {
+    } else if (order.status === 'done' && order.pay_status !== 'not_required') {
       cta.style.display = 'none';
       bindRate();
     } else {

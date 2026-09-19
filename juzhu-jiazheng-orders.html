@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-console-login="off">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -20,7 +20,7 @@
 <div class="app">
   <div class="scr">
     <div class="appbar">
-      <a class="bk" href="index.html">‹</a>
+      <a class="bk" href="index.html?tab=jiazheng">‹</a>
       <div class="ttl">我的订单</div>
       <div class="act"><span style="visibility:hidden">⚙</span></div>
     </div>
@@ -36,8 +36,9 @@
     <div class="wrap" id="list" style="padding-top:14px;"></div>
   </div>
 </div>
+<script src="screens/_console-login.js"></script>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_jzapi.js?v=6"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -72,7 +73,7 @@
       var icon = CAT_ICON[o.category_id] || '🧰';
       return '<div class="ordcard">' +
         '<div class="oh"><span class="shop">🐚 ' + esc((JZ.channelShort && JZ.channelShort()) || '新居住') + ' · 生活服务</span>' +
-        '<span class="stt ' + st.cls + '">' + st.label + '</span></div>' +
+        '<span class="stt ' + st.cls + '">' + (o.is_demo?'演示 · 已发放':st.label) + '</span></div>' +
         '<div class="ob">' +
           '<div class="th" style="display:grid;place-items:center;font-size:30px;' +
             'background:linear-gradient(135deg,#0f766e,#14b8a6);">' + icon + '</div>' +
@@ -89,12 +90,15 @@
   }
 
   function load(){
+    if(window.BZF_CONSOLE?.token()){
+      fetch('/api/juzhu/gr/orders?source=account',{headers:{Authorization:'Bearer '+BZF_CONSOLE.token()}}).then(r=>r.json()).then(res=>{if(!res.ok)throw Error(res.error||'加载失败');render(curStatus?(res.list||[]).filter(o=>o.status===curStatus):res.list);}).catch(e=>{document.getElementById('list').textContent=e.message;});return;
+    }
     // 身份：ensureUserId 统一入口（测试环境模拟登录 / 生产 App 内 jsbridge3）；
     // 取不到（非 App 环境或未登录）提示登录，不发请求
     JZ.ensureUserId().then(function(uid){
       if (!uid) {
         document.getElementById('list').innerHTML =
-          '<div class="empty"><span class="ic">🔒</span>暂未登录，请登录后重试</div>';
+          '<div class="empty"><span class="ic">🔒</span>登录后查看订单<br><button id="main-order-login" style="margin-top:16px;padding:10px 20px;border:0;border-radius:10px;background:#0f766e;color:#fff">账号登录</button></div>';
         return;
       }
       fetch('/api/juzhu/gr/orders?user_id=' + encodeURIComponent(uid))
@@ -109,6 +113,7 @@
     });
   }
 
+  document.getElementById('list').addEventListener('click',e=>{if(e.target.id==='main-order-login')BZF_CONSOLE.requireLogin({hint:'查看我的生活服务订单'}).then(load).catch(()=>{});});
   document.getElementById('tabs').addEventListener('click', function(e){
     var t = e.target.closest('a'); if (!t) return;
     curStatus = t.getAttribute('data-s');

@@ -423,7 +423,7 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=6"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script src="juzhu/app.js?v=22"></script>
 <script src="lvju-app-price.js"></script>
 <script>
@@ -943,7 +943,7 @@
     // 接口挂了也要把 12 个入口画出来（此时无接口数据，纯 JZ_CATS）
     BZF_JZ.categories().then(renderJiazhengCats).catch(function() { renderJiazhengCats(null); });
   } else {
-    renderJiazhengCats(null);   // _jzapi.js 没加载出来也不该整块空白
+    renderJiazhengCats(null);   // _jzapi.js?v=7 没加载出来也不该整块空白
   }
 
   var skusP = window.BZF_JZ
@@ -1053,5 +1053,6 @@
   });
 })();
 </script>
+<script src="screens/_commerce-entry.js?v=20260919-2"></script>
 </body>
 </html>

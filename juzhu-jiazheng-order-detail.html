@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-console-login="off">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -44,8 +44,9 @@
     <div id="body"></div>
   </div>
 </div>
+<script src="screens/_console-login.js"></script>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_jzapi.js?v=6"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -68,6 +69,25 @@
   }
 
   function render(o){
+    if(o.is_commerce){
+      document.getElementById('body').innerHTML='<div class="info"><div class="row"><b>'+esc(o.product_name)+'</b></div><div class="row"><span class="k">订单状态</span><span>'+(o.is_demo?'演示权益已发放':'权益已发放')+'</span></div><div class="row"><span class="k">实际支付</span><span>'+fmtYuan(o.fee)+'</span></div><div class="row"><span class="k">下单时间</span><span>'+fmtTime(o.created_at)+'</span></div><div class="row"><span class="k">订单号</span><span style="overflow-wrap:anywhere;min-width:0">'+esc(o.order_ref)+'</span></div></div><div id="commerce-track" class="info" aria-busy="true"><div class="row"><span class="k">履约进度</span><span>加载中…</span></div></div><div class="info"><div class="row"><a href="juzhu-commerce.html?view=coupons">查看卡券与预约 →</a></div><div class="row"><a href="juzhu-commerce.html?view=cases">查看售后工单 →</a></div></div>'+(o.is_demo?'<p style="padding:14px;color:#806333;font-size:12px">演示订单不发生扣款，不提供真实服务。</p>':'');
+      fetch('/api/commerce/v1/my/orders/'+encodeURIComponent(o.order_ref),{headers:{Authorization:'Bearer '+BZF_CONSOLE.token()}}).then(function(r){return r.json()}).then(function(res){
+        var box=document.getElementById('commerce-track');if(!box)return;
+        if(!res.ok||!res.data||!Array.isArray(res.data.coupons)){box.removeAttribute('aria-busy');box.innerHTML='<div class="row"><span class="k">履约进度</span><span>暂时无法加载（'+esc((res.error||'请重新登录'))+'）</span></div>';return;}
+        var d=res.data;
+        var rows=d.coupons.map(function(c){
+          var step='已到账';
+          if(c.redeemed_at)step='已核销 '+fmtTime(c.redeemed_at);
+          else if(c.appointment_date)step='已预约 '+esc(c.appointment_date)+(c.appointment_status==='booked'?'（待服务）':'');
+          else if(c.status==='frozen')step='售后冻结';
+          else if(c.status!=='available')step=esc(c.status);
+          return '<div class="row"><span class="k">'+esc(c.name||'卡券')+'</span><span>'+step+' · 有效期至 '+esc(String(c.expires_at||'').slice(0,10))+'</span></div>';
+        }).join('');
+        box.removeAttribute('aria-busy');
+        box.innerHTML='<div class="row"><span class="k">履约进度</span><span>到账 → 预约 → 核销</span></div>'+(rows||'<div class="row"><span class="k">卡券</span><span>暂无发放记录</span></div>');
+      }).catch(function(){var box=document.getElementById('commerce-track');if(box){box.removeAttribute('aria-busy');box.innerHTML='<div class="row"><span class="k">履约进度</span><span>暂时无法加载，请稍后刷新</span></div>';}});
+      return;
+    }
     var STEPS = [
       { id: 'created',  label: '下单',   time: o.created_at },
       { id: 'paid',     label: '已支付', time: o.paid_at },
@@ -117,6 +137,9 @@
   var curOrder = null;
 
   function load(){
+    if(window.BZF_CONSOLE?.token()){
+      fetch('/api/juzhu/gr/orders/'+encodeURIComponent(orderRef)+'?source=account',{headers:{Authorization:'Bearer '+BZF_CONSOLE.token()}}).then(r=>r.json()).then(res=>{if(!res.ok||!res.order)throw Error(res.error||'订单不存在或无权查看');curOrder=res.order;render(curOrder);if(!curOrder.is_commerce)loadVendorDetail();}).catch(e=>{document.getElementById('body').textContent=e.message;});return;
+    }
     // 身份：ensureUserId 统一入口（测试环境模拟登录 / 生产 App 内 jsbridge3）；
     // 取不到（非 App 环境或未登录）提示登录，不发请求
     JZ.ensureUserId().then(function(uid){
