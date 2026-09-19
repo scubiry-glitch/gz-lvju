@@ -92,6 +92,11 @@
       {name:'数据与审计',items:[
         {id:'commerce-stats',label:'运营统计',href:'commerce-admin-stats.html',icon:'pulse',perms:['commerce.admin.read']},
         {id:'commerce-audit',label:'操作审计',href:'commerce-admin-audit.html',icon:'book',perms:['commerce.admin.read']},
+      ]},
+      {name:'结算与对账',items:[
+        {id:'commerce-settlement',label:'结算账单',href:'commerce-admin-settlement.html',icon:'coin',perms:['commerce.fund.read']},
+        {id:'commerce-refunds',label:'退款执行',href:'commerce-admin-refunds.html',icon:'wallet',perms:['commerce.fund.read']},
+        {id:'commerce-reconciliation',label:'对账中心',href:'commerce-admin-reconciliation.html',icon:'check',perms:['commerce.fund.read']},
       ]}],
     },
     // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
