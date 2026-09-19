@@ -1,0 +1,104 @@
+{
+  "at": "2026-09-19T18:25:39.104Z",
+  "environment": {
+    "node": "v22.22.0",
+    "mysql": "8.0.45",
+    "cpus": 2,
+    "load": 2.23,
+    "database": "isolated temporary MySQL (removed after run)",
+    "pool_connectionLimit": 12
+  },
+  "checks": [
+    {
+      "name": "environment",
+      "passed": true,
+      "env": {
+        "node": "v22.22.0",
+        "mysql": "8.0.45",
+        "cpus": 2,
+        "load": 2.23,
+        "database": "isolated temporary MySQL (removed after run)",
+        "pool_connectionLimit": 12,
+        "data_volumes": {
+          "skus": 18,
+          "merchants": 3
+        }
+      }
+    },
+    {
+      "name": "PERF-0 环境与阈值登记（先登记后验收）",
+      "passed": true
+    },
+    {
+      "name": "latency_read",
+      "passed": true,
+      "p95_ms": {
+        "catalog": 7.475226,
+        "my": 8.791156
+      },
+      "p50_ms": {
+        "catalog": 2.990303,
+        "my": 5.123998
+      },
+      "samples": 120
+    },
+    {
+      "name": "PERF-1 商品浏览与本人权益查询：P95≤1s",
+      "passed": true
+    },
+    {
+      "name": "latency_exchange_concurrent",
+      "passed": true,
+      "p95_ms": 454.807294,
+      "samples": 100,
+      "ok": 100,
+      "conflict": 0
+    },
+    {
+      "name": "PERF-2 并发兑换 200 抢 100 库存：零超卖、零重复到账，兑换 P95≤1s",
+      "passed": true
+    },
+    {
+      "name": "latency_appointment_concurrent",
+      "passed": true,
+      "p95_ms": 154.145138,
+      "samples": 10,
+      "ok": 10
+    },
+    {
+      "name": "PERF-3 并发预约 50 抢 10 名额：零超额，预约 P95≤1s",
+      "passed": true
+    },
+    {
+      "name": "latency_redeem_concurrent",
+      "passed": true,
+      "p95_ms": 108.856287,
+      "samples": 30,
+      "ok": 1
+    },
+    {
+      "name": "PERF-4 并发核销同一券 30 路：恰好一次成功，核销 P95≤1s",
+      "passed": true
+    },
+    {
+      "name": "settlement_10k",
+      "passed": true,
+      "seed_ms": 2878,
+      "generate_ms": 3944,
+      "items": 10000,
+      "payable_minor": 80000000,
+      "rss_before_mb": 136,
+      "rss_after_mb": 139
+    },
+    {
+      "name": "settlement_10k_execute",
+      "passed": true,
+      "submit_review_execute_ms": 345,
+      "instruction_amount_minor": 80000000
+    },
+    {
+      "name": "PERF-5 万级结算明细：批次生成耗时/资源峰值/金额精确",
+      "passed": true
+    }
+  ]
+}

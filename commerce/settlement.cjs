@@ -100,7 +100,7 @@ const ddl=[
 async function migrate(c){
  const [r]=await c.execute('SELECT checksum FROM commerce_migrations WHERE version=?',['004_settlement']);
  const checksum=digest(ddl.join('\n'));
- if(r.length){assert(r[0].checksum===checksum,'结算迁移004校验失败',500);return;}
+ if(r.length){assert(r[0].checksum===checksum,'结算迁移004校验失败',500);}else{
  for(const sql of ddl)await c.query(sql);
  // MySQL 8 lacks ADD COLUMN IF NOT EXISTS: check information_schema before altering existing tables.
  const alterations=[
@@ -121,6 +121,22 @@ async function migrate(c){
   if(!rows.length)await c.query(sql);
  }
  await c.execute('INSERT INTO commerce_migrations(version,checksum) VALUES(?,?)',['004_settlement',checksum]);
+ }
+ // 005_compensation：已核销服务失败的先行赔付（平台自有资金口径）与应收代偿联动。
+ const ddl5=[`CREATE TABLE IF NOT EXISTS commerce_compensation_cases (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY, compensation_no VARCHAR(48) NOT NULL UNIQUE, case_id VARCHAR(40) NOT NULL UNIQUE,
+  coupon_id VARCHAR(40) NOT NULL, order_id VARCHAR(40) NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL,
+  city_id BIGINT NOT NULL, amount_minor BIGINT NOT NULL, reason VARCHAR(1000) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending', requested_by BIGINT NOT NULL, reviewed_by BIGINT NULL,
+  review_note VARCHAR(1000) NULL, reviewed_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, KEY state_idx(status)
+ ) ENGINE=InnoDB`];
+ const [r5]=await c.execute('SELECT checksum FROM commerce_migrations WHERE version=?',['005_compensation']);
+ const checksum5=digest(ddl5.join('\n'));
+ if(r5.length){assert(r5[0].checksum===checksum5,'结算迁移005校验失败',500);}else{
+  for(const sql of ddl5)await c.query(sql);
+  await c.execute('INSERT INTO commerce_migrations(version,checksum) VALUES(?,?)',['005_compensation',checksum5]);
+ }
 }
 
 // ── append-only balanced ledger ──
@@ -658,8 +674,9 @@ async function verifyInvariants(pool){
  checks.push({name:'I3 同一明细不重复入账（跨批次防重）',passed:!dupItems.length,detail:dupItems.map(r=>r.redemption_id+':'+r.line_kind)});
  const badItems=await rowsOf(`SELECT i.id FROM commerce_settlement_items i JOIN commerce_coupons cc ON cc.id=i.coupon_id WHERE cc.status<>'redeemed' OR i.payable_minor<=0 OR NOT ${notDemo}`);
  checks.push({name:'I6b 仅已确认核销且非演示卡券进入结算',passed:!badItems.length,detail:badItems.map(r=>r.id)});
- const paidDup=await rowsOf("SELECT request_no,COUNT(*) n FROM commerce_receipts WHERE outcome='paid' GROUP BY request_no HAVING n>1");
- checks.push({name:'I4a 同一指令只有一次成功回执',passed:!paidDup.length,detail:paidDup.map(r=>r.request_no)});
+ const paidDup=await rowsOf(`SELECT source_id,source_type,COUNT(*) n FROM commerce_ledger_entries
+  WHERE (account='provider_payout_out' OR account='provider_refund_out') GROUP BY source_id,source_type HAVING n>1`);
+ checks.push({name:'I4a 每笔指令最多一次出金过账（重复回执不重复付款）',passed:!paidDup.length,detail:paidDup.map(r=>r.source_id)});
  const orders=await rowsOf(`SELECT id,amount_minor FROM commerce_orders WHERE status='fulfilled' AND NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE) LIMIT 500`);
  let conservation=true;const badOrders=[];
  for(const o of orders){
@@ -680,6 +697,10 @@ async function verifyInvariants(pool){
  checks.push({name:'I4b 本地已付指令逐笔有机构镜像（无重复付款；镜像盈余走对账差异）',passed:mirrorOk,detail:[paidMirror]});
  const closedRefunds=await rowsOf(`SELECT s.id FROM commerce_cases s JOIN commerce_coupons cc ON cc.id=s.coupon_id WHERE s.kind='refund' AND s.status='closed' AND cc.status NOT IN ('refunded') AND ${notDemo}`);
  checks.push({name:'I7 退款结单与卡券状态一致',passed:!closedRefunds.length,detail:closedRefunds.map(r=>r.id)});
+ const compWithoutRecovery=await rowsOf(`SELECT cp.compensation_no FROM commerce_compensation_cases cp WHERE cp.status='paid' AND NOT EXISTS (SELECT 1 FROM commerce_recovery_cases rc WHERE rc.reason LIKE CONCAT('%',cp.compensation_no,'%') AND rc.debtor_kind='merchant' AND rc.amount_minor=cp.amount_minor)`);
+ checks.push({name:'I8a 每笔先行赔付关联应收商户代偿',passed:!compWithoutRecovery.length,detail:compWithoutRecovery.map(r=>r.compensation_no)});
+ const refundMarkedCompensation=await rowsOf(`SELECT cp.compensation_no FROM commerce_compensation_cases cp JOIN commerce_coupons cc ON cc.id=cp.coupon_id WHERE cc.status<>'redeemed'`);
+ checks.push({name:'I8b 赔付仅对应已核销卡券（未核销退款不记赔付）',passed:!refundMarkedCompensation.length,detail:refundMarkedCompensation.map(r=>r.compensation_no)});
  return {passed:checks.every(x=>x.passed),checks};
 }
 
@@ -692,6 +713,7 @@ async function overview(service){
  const refunds=await one("SELECT COUNT(*) total,SUM(status='pending') pending,SUM(status='submitted') submitted,SUM(status='unknown') unknown,SUM(status='failed') failed,SUM(status='refunded') refunded FROM commerce_refund_orders");
  const redemptions=await one(`SELECT COUNT(*) total,COALESCE(SUM(r.supplier_minor),0) supplier_minor,COALESCE(SUM(r.channel_minor),0) channel_minor,SUM(r.status='reversed') reversed FROM commerce_redemptions r JOIN commerce_coupons cc ON cc.id=r.coupon_id WHERE NOT (JSON_EXTRACT(cc.snapshot,'$.is_demo') <=> TRUE)`);
  const recoveries=await one("SELECT COUNT(*) total,COALESCE(SUM(amount_minor-recovered_minor),0) open_minor FROM commerce_recovery_cases WHERE status='open'");
+ const compensations=await one("SELECT COUNT(*) total,SUM(status='pending') pending,SUM(status='paid') paid,COALESCE(SUM(CASE WHEN status='paid' THEN amount_minor END),0) paid_minor FROM commerce_compensation_cases");
  const diffs=await one("SELECT COUNT(*) total,SUM(status='open') open,SUM(status='processing') processing FROM commerce_recon_diffs");
  const reversals=await one("SELECT COUNT(*) total,SUM(status='requested') requested FROM commerce_redemption_reversals");
  return {batches:{total:n(batches.total),draft:n(batches.draft),submitted:n(batches.submitted),approved:n(batches.approved),executing:n(batches.executing),completed:n(batches.completed),frozen:n(batches.frozen),closed:n(batches.closed)},
@@ -699,6 +721,7 @@ async function overview(service){
   refunds:{total:n(refunds.total),pending:n(refunds.pending),submitted:n(refunds.submitted),unknown:n(refunds.unknown),failed:n(refunds.failed),refunded:n(refunds.refunded)},
   redemptions:{total:n(redemptions.total),supplier_minor:n(redemptions.supplier_minor),channel_minor:n(redemptions.channel_minor),reversed:n(redemptions.reversed)},
   recoveries:{total:n(recoveries.total),open_minor:n(recoveries.open_minor)},
+  compensations:{total:n(compensations.total),pending:n(compensations.pending),paid:n(compensations.paid),paid_minor:n(compensations.paid_minor)},
   diffs:{total:n(diffs.total),open:n(diffs.open),processing:n(diffs.processing)},
   reversals:{total:n(reversals.total),requested:n(reversals.requested)},
   invariants:await verifyInvariants(service.pool)};
@@ -751,7 +774,97 @@ async function listRefundOrders(service,p,query){
  return {rows};
 }
 
+// ── compensation (已核销服务失败先行赔付): platform-own funds, recovery from merchant ──
+const COMP_STATES=['pending','paid','cancelled'];
+async function createCompensation(service,p,input,key){
+ assert(typeof input.case_id==='string'&&/^[0-9a-f-]{36}$/.test(input.case_id),'售后单编号无效');
+ return service.tx(c=>service.idem(c,p,'compensation.create',key,input,async()=>{
+  const [dupe]=await c.execute('SELECT id,compensation_no,status FROM commerce_compensation_cases WHERE case_id=?',[input.case_id]);
+  if(dupe.length)return {id:dupe[0].id,compensation_no:dupe[0].compensation_no,status:dupe[0].status,existing:true};
+  const [cases]=await c.execute('SELECT * FROM commerce_cases WHERE id=? FOR UPDATE',[input.case_id]);assert(cases.length,'售后单不存在',404);
+  const cs=cases[0];
+  assert(cs.kind==='compensation','仅服务失败工单可以建立赔付单',409,'case_kind');
+  assert(cs.status==='awaiting_provider','售后单不在待赔付处理状态',409,'case_state');
+  const [coupons]=await c.execute('SELECT * FROM commerce_coupons WHERE id=? FOR UPDATE',[cs.coupon_id]);assert(coupons.length,'卡券不存在',404);
+  const coupon=coupons[0],snapshot=parse(coupon.snapshot);
+  assert(coupon.status==='redeemed','仅已核销卡券可申请赔付（未核销走退款）',409,'coupon_state');
+  assert(snapshot.is_demo!==true,'演示卡券不进入资金域赔付',409,'demo_excluded');
+  const compensationNo=no('CP');
+  const [r]=await c.execute(`INSERT INTO commerce_compensation_cases
+   (compensation_no,case_id,coupon_id,order_id,account_id,merchant_id,city_id,amount_minor,reason,requested_by) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+   [compensationNo,input.case_id,coupon.id,coupon.order_id,coupon.account_id,coupon.merchant_id,coupon.city_id,coupon.allocation_minor,(input.reason||cs.reason||'').slice(0,1000),p.account.id]);
+  await service.audit(c,p,'compensation.create',compensationNo,{case_id:input.case_id,amount:coupon.allocation_minor},{city_id:coupon.city_id,merchant_id:coupon.merchant_id});
+  return {id:r.insertId,compensation_no:compensationNo,status:'pending'};
+ }));
+}
+async function reviewCompensation(service,p,key,input){
+ return service.tx(async c=>{
+  const [rows]=await c.execute('SELECT * FROM commerce_compensation_cases WHERE id=? FOR UPDATE',[key]);assert(rows.length,'赔付单不存在',404);
+  const comp=rows[0];
+  assert(comp.status==='pending','该赔付单已处理',409,'compensation_state');
+  assert(Number(comp.requested_by)!==Number(p.account.id),'申请人不能复核自己的赔付单',403,'review_separation');
+  assert(typeof input.note==='string'&&input.note.trim().length>=2,'请填写复核意见');
+  if(input.action!=='approve'){
+   await c.execute("UPDATE commerce_compensation_cases SET status='cancelled',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?",[p.account.id,input.note.trim(),key]);
+   await c.execute("UPDATE commerce_cases SET status='rejected',resolution=? WHERE id=? AND status='awaiting_provider'",['赔付复核未通过：'+input.note.trim(),comp.case_id]);
+   await service.audit(c,p,'compensation.review',comp.compensation_no,{action:'rejected'},{city_id:comp.city_id,merchant_id:comp.merchant_id});
+   return {id:key,status:'cancelled'};
+  }
+  // 平台自有资金先行赔付（沙箱口径，无真实资金），同时挂应收商户代偿，进入追偿闭环。
+  await post(c,{sourceType:'compensation',sourceId:comp.compensation_no,lines:[
+   {side:'debit',account:'compensation_expense',amount:Number(comp.amount_minor)},
+   {side:'credit',account:'platform_own_compensation_cash',amount:Number(comp.amount_minor)}],memo:'compensation '+comp.compensation_no});
+  const recovery=await openRecovery(c,'merchant',comp.merchant_id,0,comp.coupon_id,Number(comp.amount_minor),'服务失败先行赔付 '+comp.compensation_no+'，向商户追偿');
+  await c.execute(`UPDATE commerce_compensation_cases SET status='paid',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?`,[p.account.id,input.note.trim(),key]);
+  await c.execute("UPDATE commerce_cases SET status='closed',resolution=CONCAT_WS(' / ',NULLIF(resolution,''),'平台已完成先行赔付（沙箱口径），并向商户追偿') WHERE id=?",[comp.case_id]);
+  await service.audit(c,p,'compensation.review',comp.compensation_no,{action:'approved',amount:comp.amount_minor,recovery:recovery.recovery_no},{city_id:comp.city_id,merchant_id:comp.merchant_id});
+  return {id:key,status:'paid',recovery_no:recovery.recovery_no};
+ });
+}
+async function listCompensations(service,p,query){
+ let where='1=1',args=[];
+ if(['pending','paid','cancelled'].includes(query.status)){where+=' AND status=?';args.push(query.status);}
+ return {rows:await service.get(service.pool,`SELECT cc.*,JSON_UNQUOTE(JSON_EXTRACT(cpv.snapshot,'$.sku.name')) coupon_name FROM commerce_compensation_cases cc LEFT JOIN commerce_coupons cpv ON cpv.id=cc.coupon_id WHERE ${where} ORDER BY cc.id DESC LIMIT 200`,args)};
+}
+
+// ── operational alerts (M1-A4): threshold + current + runbook per rule; exercised by injected drills ──
+async function operationalAlerts(service){
+ const one=async(sql,args=[])=>(await service.get(service.pool,sql,args))[0];
+ const n=v=>Number(v)||0;
+ const now='UTC_TIMESTAMP()';
+ const grantBacklog=await one("SELECT COUNT(*) n FROM commerce_orders WHERE status='reserved' AND expires_at<="+now);
+ const expiryStale=await one("SELECT COUNT(*) n FROM commerce_coupons WHERE status='available' AND expires_at<="+now);
+ const refundStuck=await one("SELECT COUNT(*) n, SUM(status='unknown') unk FROM commerce_refund_orders WHERE status IN ('pending','submitted') AND created_at<="+now+" - INTERVAL 24 HOUR");
+ const refundUnknown=await one("SELECT COUNT(*) n FROM commerce_refund_orders WHERE status='unknown'");
+ const payoutUnknown=await one("SELECT COUNT(*) n FROM commerce_payout_instructions WHERE status='unknown'");
+ const payoutExhausted=await one("SELECT COUNT(*) n FROM commerce_payout_instructions WHERE status='failed' AND retry_count>=3");
+ const payoutStuck=await one("SELECT COUNT(*) n FROM commerce_payout_instructions WHERE status='submitted' AND submitted_at<="+now+" - INTERVAL 24 HOUR");
+ const reconOpen=await one("SELECT COUNT(*) n FROM commerce_recon_diffs WHERE status IN ('open','processing')");
+ const opFailures=await one("SELECT COUNT(*) n FROM commerce_audit WHERE action='operation.failed' AND created_at>="+now+" - INTERVAL 1 HOUR");
+ const compPending=await one("SELECT COUNT(*) n FROM commerce_compensation_cases WHERE status='pending' AND created_at<="+now+" - INTERVAL 24 HOUR");
+ const expiringSoon=await one("SELECT COUNT(*) n FROM commerce_coupons WHERE status='available' AND expires_at<="+now+" + INTERVAL 7 DAY AND expires_at>"+now);
+ const invariants=await verifyInvariants(service.pool);
+ const broken=invariants.checks.filter(c=>!c.passed).map(c=>c.name);
+ const rules=[
+  {code:'service_unavailable',name:'服务不可用',severity:'critical',current:null,triggered:false,threshold:'healthz 探活连续失败（外部监控 30s 周期 ×3）',view:'GET /api/commerce/v1/healthz；systemctl status sy-commerce-preview',runbook:'责任：系统负责人。① systemctl status sy-commerce-preview.service 查看退出原因；② journalctl -u sy-commerce-preview -n 100 定位（DB 连接失败/迁移校验失败）；③ 修复或按 RECOVERY 手册回退上一个已验证版本；④ 恢复后 curl healthz + 运营统计页复核。'},
+  {code:'grant_backlog',name:'发放/预占积压',severity:'critical',current:n(grantBacklog.n),triggered:n(grantBacklog.n)>0,threshold:'>0（过期预占未被释放）',view:'运营统计页 订单卡；SQL commerce_orders status=reserved AND expires_at<now',runbook:'责任：平台运营。① 记录滞留订单号；② 检查 expire 定时任务是否存活（服务日志 Commerce expiry failed）；③ 手动触发一次 expire（重启服务即执行）；④ 仍不释放则按事务失败排查（库存行锁）。'},
+  {code:'expiry_pending',name:'到期处理滞留',severity:'warning',current:n(expiryStale.n),triggered:n(expiryStale.n)>50,threshold:'>50（30 秒周期扫描未能及时消化）',view:'运营统计页 卡券卡（available 且已过期）',runbook:'责任：平台运营。① 检查是否有损坏券数据阻塞扫描（日志 Commerce expiry failed）；② 移除/修复阻塞行后任务自动续跑；③ 到期券逐单建原路退款 case，不批量改库。'},
+  {code:'refund_stuck',name:'退款滞留',severity:'warning',current:n(refundStuck.n),triggered:n(refundStuck.n)>0,threshold:'pending/submitted 超 24h >0',view:'退款执行页（状态=待执行/退款处理中）',runbook:'责任：平台运营 + 资金复核。① 查退款单 fail_reason 与重试次数；② pending 可执行/作废；③ submitted 超 24h 走查单；④ 与用户沟通到账时限。'},
+  {code:'instrument_unknown',name:'结算结果未知',severity:'critical',current:n(payoutUnknown.n)+n(refundUnknown.n),triggered:n(payoutUnknown.n)+n(refundUnknown.n)>0,threshold:'>0（即时）',view:'结算账单页 指令状态=结果未知；退款执行页 查询中',runbook:'责任：资金复核。① 立即对原请求查单（只能查原指令，禁止重试或换号重付）；② 查实后按回执/查单结果推进；③ 仍未知保持 UNKNOWN 并联系机构核实。'},
+  {code:'retry_exhausted',name:'重试达上限',severity:'critical',current:n(payoutExhausted.n),triggered:n(payoutExhausted.n)>0,threshold:'>0（失败且已重试 3 次）',view:'结算账单页 指令（重试=3，已失败）',runbook:'责任：资金复核（转人工）。① 与机构人工核实原请求最终状态；② 若机构已付：登记差异并进入对账处理，禁止直接改单；③ 若确认失败：修正机构侧后由人工再放行重试渠道；④ 全程留痕于对账差异/审计。'},
+  {code:'payout_stuck',name:'付款指令无回执',severity:'warning',current:n(payoutStuck.n),triggered:n(payoutStuck.n)>0,threshold:'submitted 超 24h 无回执 >0',view:'结算账单页（机构处理中超 24h）',runbook:'责任：资金复核。① 对原请求查单；② 机构侧无记录则按机构账单缺失生成对账差异并跟进。'},
+  {code:'recon_diff_open',name:'对账差异未闭环',severity:'warning',current:n(reconOpen.n),triggered:n(reconOpen.n)>0,threshold:'open/processing >0（账期结束前应清零）',view:'对账中心 差异明细',runbook:'责任：平台运营指派责任人 → 资金复核关闭。① 逐条核实差异类型；② 处理并记录；③ 关账前全部差异需关闭（关闭由非责任人复核）。'},
+  {code:'operation_failures',name:'业务失败突增',severity:'warning',current:n(opFailures.n),triggered:n(opFailures.n)>50,threshold:'近 1 小时 operation.failed >50',view:'运营统计页 近期失败记录',runbook:'责任：系统负责人。① 聚合失败原因（接口+原因列）；② 区分用户误操作与系统性故障；③ 系统性故障按对应 runbook 处理。'},
+  {code:'compensation_pending',name:'赔付复核滞留',severity:'warning',current:n(compPending.n),triggered:n(compPending.n)>0,threshold:'pending 超 24h >0',view:'对账中心 先行赔付区（待复核）',runbook:'责任：资金复核。① 24h 内完成赔付复核（同意/拒绝）；② 滞留超 SLA 上报升级。'},
+  {code:'expiring_soon',name:'到期退回预告',severity:'info',current:n(expiringSoon.n),triggered:false,threshold:'未来 7 天到期券数（信息项）',view:'运营统计页 卡券卡',runbook:'责任：平台运营。关注未来一周原路退回量，提前准备客服口径；不要求处理。'},
+  {code:'invariant_broken',name:'账务不变量异常',severity:'critical',current:broken.join('；')||null,triggered:broken.length>0,threshold:'I1–I8 任一不通过（即时）',view:'结算账单页 资金不变量卡',runbook:'责任：系统负责人 + 资金复核（停手排查）。① 立即停止生成新账单/执行；② 按失败不变量定位（I2 守恒/I3 重复/I4 镜像/I8 赔付联动）；③ 修复前不动任何资金指令；④ 排查结论与修复留档。'},
+ ];
+ const triggered=rules.filter(r=>r.triggered);
+ return {checked_at:new Date().toISOString(),total:rules.length,triggered_count:triggered.length,critical:triggered.some(r=>r.severity==='critical'),rules};
+}
+
 module.exports={migrate,post,confirmLines,reverseLines,generateBatches,batchAction,batchView,listBatches,ingestReceipt,queryInstrument,retryInstrument,listInstructions,
  createRefundOrder,refundAction,requestReversal,reviewReversal,listReversals,recover,writeOffRecovery,listRecoveries,
+ createCompensation,reviewCompensation,listCompensations,
  runReconciliation,reconDetail,listRecons,diffAction,verifyInvariants,overview,merchantSettlement,promoterSettlement,listRefundOrders,
- sandboxSimulate,sandboxQuery};
+ sandboxSimulate,sandboxQuery,operationalAlerts};

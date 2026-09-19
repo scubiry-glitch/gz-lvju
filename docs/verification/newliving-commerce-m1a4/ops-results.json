@@ -1,0 +1,62 @@
+{
+  "at": "2026-09-19T19:18:06.027Z",
+  "database": "isolated temporary MySQL database (removed)",
+  "checks": [
+    {
+      "name": "ENV-1 幂等重放与冲突：同键同内容回放原结果，同键异内容 409",
+      "passed": true
+    },
+    {
+      "name": "ENV-2 客户端断连：请求中断后服务端事务完整，幂等键可安全重放",
+      "passed": true
+    },
+    {
+      "name": "ENV-3 数据库事务失败：注入的核销事务完整回滚，随后真实核销恰好一次",
+      "passed": true
+    },
+    {
+      "name": "ENV-4 服务重启：状态零丢失，定时任务重启后幂等续跑",
+      "passed": true
+    },
+    {
+      "name": "ENV-5 定时任务中断：单条脏数据阻塞不吞任务，修复后不丢不重",
+      "passed": true
+    },
+    {
+      "name": "ENV-6 重复与乱序回执：已付指令拒绝状态反转，重复成功回执不重复入账",
+      "passed": true
+    },
+    {
+      "name": "ALERT-1 告警基线：健康库全绿；healthz 可用",
+      "passed": true
+    },
+    {
+      "name": "ALERT-2 注入演练：五类告警实际触发并可恢复",
+      "passed": true
+    },
+    {
+      "name": "ALERT-3 转人工边界：重试达上限的指令保持可查可解释，不静默丢弃",
+      "passed": true
+    },
+    {
+      "name": "Browser alert table renders all rules with runbooks and thresholds",
+      "passed": true
+    },
+    {
+      "name": "Browser triggered alert shows red state and recovers after fix",
+      "passed": true
+    },
+    {
+      "name": "Browser compensation section on reconciliation console",
+      "passed": true
+    },
+    {
+      "name": "Browser session revocation forces re-login on every console (登录失效)",
+      "passed": true
+    },
+    {
+      "name": "Browser no uncaught JS errors on m1a4 pages",
+      "passed": true
+    }
+  ]
+}

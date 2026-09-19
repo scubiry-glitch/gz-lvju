@@ -692,3 +692,14 @@ CREATE TABLE IF NOT EXISTS commerce_recon_diffs (
 
 -- 004 同时为 commerce_redemptions 追加撤销语义列（幂等 ALTER，由 migrate.cjs 校验执行）：
 -- ALTER TABLE commerce_redemptions ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'confirmed';
+
+-- ===== 先行赔付（commerce/settlement.cjs 005_compensation）=====
+-- 已核销服务失败的先行赔付：平台自有资金口径（沙箱），复核通过即挂应收商户代偿进入追偿闭环。
+CREATE TABLE IF NOT EXISTS commerce_compensation_cases (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY, compensation_no VARCHAR(48) NOT NULL UNIQUE, case_id VARCHAR(40) NOT NULL UNIQUE,
+ coupon_id VARCHAR(40) NOT NULL, order_id VARCHAR(40) NOT NULL, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL,
+ city_id BIGINT NOT NULL, amount_minor BIGINT NOT NULL, reason VARCHAR(1000) NOT NULL,
+ status VARCHAR(16) NOT NULL DEFAULT 'pending', requested_by BIGINT NOT NULL, reviewed_by BIGINT NULL,
+ review_note VARCHAR(1000) NULL, reviewed_at DATETIME NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, KEY state_idx(status)
+) ENGINE=InnoDB;

@@ -24,6 +24,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    assert(req.headers.host===new URL(origin).host,'请求来源无效',403);
    if(method!=='GET')assert(!req.headers.origin||req.headers.origin===origin,'不允许跨站操作',403);
    if(pathname===prefix+'/meta'&&method==='GET'){await pool.query('SELECT 1');return reply(200,{mode:'mysql-m1a',payment_enabled:false,version:'M1-A',authentication:'account-center'});}
+   if(pathname===prefix+'/healthz'&&method==='GET'){try{const result=(await pool.query('SELECT 1 AS ok, (SELECT MAX(version) FROM commerce_migrations) AS migration').catch(()=>[[{ok:0}]]))[0];if(result[0]&&Number(result[0].ok)===1)return reply(200,{status:'ok',database:true,migration:result[0].migration||null,payment_enabled:false});}catch(e){}return reply(503,{status:'unavailable',database:false});}
    if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
    if(pathname===prefix+'/catalog'&&method==='GET')return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,demo_purchase_enabled:demoEnabled&&p.is_demo})));
    // No legacy API key, M0 role selector, arbitrary account header, or machine token fallback.
@@ -68,6 +69,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname===prefix+'/admin/stats'&&method==='GET')return reply(200,await service.stats(principal,perm));
    // ── settlement closed loop (结算域)：registry 已按 FUND_* 权限点校验 ──
    if(pathname===prefix+'/admin/settlement/overview'&&method==='GET')return reply(200,await settlement.overview(service));
+   if(pathname===prefix+'/admin/settlement/alerts'&&method==='GET')return reply(200,await settlement.operationalAlerts(service));
    if(pathname===prefix+'/admin/settlement/batches'&&method==='GET')return reply(200,await settlement.listBatches(service,principal,Object.fromEntries(url.searchParams)));
    if(pathname===prefix+'/admin/settlement/batches'&&method==='POST')return reply(201,await settlement.generateBatches(service,principal,body,req.headers['idempotency-key']));
    const batchId=pathname.match(/^\/api\/commerce\/v1\/admin\/settlement\/batches\/(\d+)$/);
@@ -89,6 +91,10 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const reversalAct=pathname.match(/^\/api\/commerce\/v1\/admin\/settlement\/reversals\/(\d+)\/review$/);
    if(reversalAct&&method==='POST')return reply(200,await settlement.reviewReversal(service,principal,Number(reversalAct[1]),body));
    if(pathname===prefix+'/admin/settlement/recoveries'&&method==='GET')return reply(200,await settlement.listRecoveries(service,principal,Object.fromEntries(url.searchParams)));
+   if(pathname===prefix+'/admin/settlement/compensations'&&method==='GET')return reply(200,await settlement.listCompensations(service,principal,Object.fromEntries(url.searchParams)));
+   if(pathname===prefix+'/admin/settlement/compensations'&&method==='POST')return reply(201,await settlement.createCompensation(service,principal,body,req.headers['idempotency-key']));
+   const compAct=pathname.match(/^\/api\/commerce\/v1\/admin\/settlement\/compensations\/(\d+)\/review$/);
+   if(compAct&&method==='POST')return reply(200,await settlement.reviewCompensation(service,principal,Number(compAct[1]),body));
    const recoveryAct=pathname.match(/^\/api\/commerce\/v1\/admin\/settlement\/recoveries\/(\d+)\/(recover|write-off)$/);
    if(recoveryAct&&method==='POST')return reply(200,await settlement[recoveryAct[2]==='recover'?'recover':'writeOffRecovery'](service,principal,Number(recoveryAct[1]),body));
    if(pathname===prefix+'/admin/settlement/reconciliation'&&method==='GET')return reply(200,await settlement.listRecons(service,principal));
