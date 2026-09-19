@@ -3,7 +3,8 @@
 const {readTopics}=require('./initialization.cjs');
 const BATCH='guiyang-life-demo-v1';
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
-const isDemo=p=>p?.initialization?.batch===BATCH&&p.initialization.mode==='demo';
+// 演示判定只看 mode；批次名仅用于 seed 收据归属（新批次如 hotel-exchange-demo-v1 同样可演示购买）。
+const isDemo=p=>p?.initialization?.mode==='demo';
 async function seed(pool){
  const c=await pool.getConnection(),result={batch:BATCH,created:[],existing:[]};let locked=false;
  try{
