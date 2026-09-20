@@ -5,8 +5,8 @@ const U=promoter?null:window.COMMERCE_CONSUMER;
 const isShop=document.body.dataset.productShop==='true';
 const isDetail=document.body.dataset.productDetail==='true';
 const isHotels=document.body.dataset.hotelDirectory==='true';
-let hotelFilter={tier:query.get('tier')||'',brand:'',q:''};
 const query=new URLSearchParams(location.search);let city=query.get('city')||'';try{city=city||localStorage.getItem('bzf_jz_city')||'';}catch{}
+let hotelFilter={tier:query.get('tier')||'',brand:'',q:''};
 // Signed referral source: kept through product redirects and attached to demo orders for attribution.
 const referral=query.get('ref')||'';
 const withRef=u=>referral?u+(u.includes('?')?'&':'?')+'ref='+encodeURIComponent(referral):u;

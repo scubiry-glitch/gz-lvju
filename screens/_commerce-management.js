@@ -71,7 +71,7 @@ async function editor(existing){const def=definitions[kind],values=existing?.pay
     return !tier||r.payload?.exchange_tier===tier;});
    storeSel.innerHTML='<option value="">请选择</option>'+list.map(r=>'<option value="'+r.id+'" '+(!online&&Number(r.id)===Number(values.store_id)?'selected':'')+'>'+esc(r.name)+' · #'+r.id+(r.payload?.exchange_tier?'（'+esc(r.payload.exchange_tier)+' 通兑锚点）':'')+(r.payload?.service_channel==='online'?'（线上服务台）':'')+'</option>').join('');
    const storeLabel=storeSel.closest('label.field');if(storeLabel&&storeLabel.childNodes[0])storeLabel.childNodes[0].nodeValue=online?'线上服务台（本商户）：':'服务门店（线下到店必选）：';
-   d.querySelectorAll('[name=exchange_tier],[name=exchange_tier_minor]').forEach(el=>{const lab=el.closest('label.field');if(lab)lab.hidden=online;});
+   d.querySelectorAll('[name=exchange_tier],[name=exchange_tier_minor]').forEach(el=>{const lab=el.closest('label.field');if(lab)lab.style.display=online?'none':'';});
   };
   channelSel.onchange=sync;tierSel.onchange=sync;sync();
  }
