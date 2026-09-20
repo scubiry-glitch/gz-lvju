@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-20T00:46:22.854Z",
+  "at": "2026-09-20T01:28:50.341Z",
   "origin": "http://127.0.0.1:38780 (Host: sytest.meizu.life)",
   "checks": [
     {
@@ -30,12 +30,12 @@
     {
       "name": "Exchange coupon issued with tier metadata",
       "ok": true,
-      "detail": "143ac334-3334-4d20-a09c-e5cb45b05d3b"
+      "detail": "2ef4d91e-94f1-4aa1-9927-fc51d31314d5"
     },
     {
       "name": "Coupon books a chosen same-tier hotel",
       "ok": true,
-      "detail": "hotel=宜尚酒店东营东城南一路店"
+      "detail": "hotel=城市精选贵阳高铁东站店"
     },
     {
       "name": "Cancelling the booking frees the hotel slot",
@@ -85,7 +85,7 @@
     {
       "name": "Admin SKU form switches store picker to online counter for online channel",
       "ok": true,
-      "detail": "线上服务台（本商户）： 请选择 线上服务台（演示，虚拟门店） · #84（线上服"
+      "detail": "线上服务台（本商户）： 请选择 线上服务台（演示，虚拟门店） · #141（线上"
     },
     {
       "name": "Admin SKU form filters stores to the tier anchor for exchange",
@@ -99,7 +99,7 @@
     }
   ],
   "booking": {
-    "coupon": "143ac334-3334-4d20-a09c-e5cb45b05d3b",
+    "coupon": "2ef4d91e-94f1-4aa1-9927-fc51d31314d5",
     "hotel": "城市便捷禹州大禹像胖东来店"
   }
 }
