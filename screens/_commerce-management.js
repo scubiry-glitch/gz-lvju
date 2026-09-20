@@ -80,8 +80,9 @@ async function openIssueDialog(preselect){
   const [kindValue,idValue]=String(data.get('product')).split('-');const product=products.find(p=>p.kind===kindValue&&String(p.id)===idValue);
   const result=await api('/admin/exchange-codes','POST',{kind:product.kind,product_id:product.id,version:product.version,expires_days:Number(data.get('expires_days')),quantity:Number(data.get('quantity'))},{idempotencyKey:crypto.randomUUID()});
   const codes=(result.codes||[{code:result.code}]).map(c=>c.code).join('\n');
-  const next=dialog('兑换码已生成（共 '+result.count+' 张）','<p>'+esc(result.name)+' · 有效期至 '+C.dateText(result.expires_at)+' · 单码单次兑换</p><label class="field">请立即复制并妥善保管（关闭后不再显示）<textarea readonly rows="'+Math.min(10,Math.max(3,result.count))+'">'+esc(codes)+'</textarea></label><button type="button" class="btn copy-codes">复制全部</button><p>可在「兑换码管理」按状态查询、停用或查看兑换记录。</p>');
+  const next=dialog('兑换码已生成（共 '+result.count+' 张）','<p>'+esc(result.name)+' · 有效期至 '+C.dateText(result.expires_at)+' · 单码单次兑换</p><label class="field">请立即复制并妥善保管（关闭后不再显示）<textarea readonly rows="'+Math.min(10,Math.max(3,result.count))+'">'+esc(codes)+'</textarea></label><div class="commerce-actions"><button type="button" class="btn copy-codes">复制全部</button><button type="button" class="btn export-codes">导出 CSV</button></div><p>可在「兑换码管理」按状态查询、停用或查看兑换记录。</p>');
   next.querySelector('textarea').onclick=e=>e.target.select();next.querySelector('.copy-codes').onclick=async e=>{try{await navigator.clipboard.writeText(codes);e.target.textContent='已复制';}catch{e.target.textContent='请手动复制';}};
+  next.querySelector('.export-codes').onclick=e=>{const csv='﻿兑换码,商品,有效期至\n'+(result.codes||[{code:result.code}]).map(c=>c.code+','+result.name+','+result.expires_at).join('\n')+'\n';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='兑换码-'+result.kind+'-'+result.count+'张.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);e.target.textContent='已导出';};
   if(kind==='exchanges')await exchangesView();
  });
  d.querySelector('[type=submit]').textContent='生成兑换码';
