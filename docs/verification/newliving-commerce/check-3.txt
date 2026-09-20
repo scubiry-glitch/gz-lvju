@@ -1,0 +1,1 @@
+ok: node static guard + api key policy

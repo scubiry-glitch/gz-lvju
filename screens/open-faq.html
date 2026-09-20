@@ -156,7 +156,7 @@
     <details>
       <summary><span class="q">Q8</span>房源创建成功为什么 C 端看不到？</summary>
       <div class="a">
-        <p>创建默认 <code>status='draft'</code>（草稿），C 端目录只展示 <code>online</code>。上架路径：<code>projects/update</code> 补 <code>price_from</code> + <code>units/create</code> 至少 1 个户型 → <code>projects/status</code> 传 <code>online</code>。缺价或缺户型时上架接口直接 400 提示。</p>
+        <p>创建默认 <code>status='draft'</code>（草稿），C 端目录只展示 <code>online</code>。上架路径：<code>units/create</code> 至少 1 个户型并让它<strong>能算出默认夜价</strong>（户型 <code>price_night</code> 或 <code>rent_monthly</code>；也可由房源 <code>price_from</code> 兜底）→ <code>projects/status</code> 传 <code>online</code>，另有图集 ≥ 7 张 + 评级 <code>passed</code> 两道闸。<code>price_from</code> 自 2026-09 起<strong>选填</strong>，缺价或缺户型时上架接口直接 400，并点名是哪个户型。</p>
       </div>
     </details>
 
@@ -191,7 +191,7 @@
     <details>
       <summary><span class="q">Q13</span>客户下了单，商家怎么接单？</summary>
       <div class="a">
-        <p>两条路：<strong>① Webhook 事件推送（推荐）</strong>——在接入单里提供通知 URL，客户下单 / 支付 / 取消时平台主动推 HMAC 签名事件（<code>booking.created / booking.paid / booking.cancelled</code>），收到先验签（同一套算法）再处理，5s 内回 2xx 即送达，失败自动重试 3 次；<strong>② 拉取兜底</strong>——<code>bookings/list</code> 定时拉 <code>status='pending'</code> 对账（建议每分钟）。拿到订单后 <code>bookings/confirm</code> 确认或 <code>bookings/cancel</code> 拒单（拒单自动释放房态）；民宿民宿预付单未支付时确认会被拒。联系人手机号只回掩码。</p>
+        <p>两条路：<strong>① Webhook 事件推送（推荐）</strong>——在接入单里提供通知 URL，客户下单 / 支付 / 取消时平台主动推 HMAC 签名事件（<code>booking.created / booking.paid / booking.cancelled</code>），收到先验签（同一套算法）再处理，5s 内回 2xx 即送达，失败自动重试 3 次；<strong>② 拉取兜底</strong>——<code>bookings/list</code> 定时拉 <code>status='pending'</code> 对账（建议每分钟）。拿到订单后 <code>bookings/confirm</code> 确认或 <code>bookings/cancel</code> 拒单（拒单自动释放房态）；在线支付单未支付时确认会被拒。联系人手机号只回掩码。</p>
         <p class="tip">订单详情见 <a href="property-intake-api.html#fulfill">房源接入 API §5 订单履约</a>，可用页内调试台直接试。</p>
       </div>
     </details>
@@ -217,14 +217,16 @@
     <details>
       <summary><span class="q">Q14</span>没设置过的日期是什么房态？夜价优先级？</summary>
       <div class="a">
-        <p>未设置过的晚默认可订。夜价优先级：<strong>户型级覆盖 &gt; 项目级覆盖 &gt; 默认夜价</strong>（rental=月租/30 折算，minsu=<code>units.ext.price_night</code> 或起价）。「恢复默认价」= 传 <code>status:'open'</code> 且不带 <code>price_night</code>，平台清除该晚价格覆盖。</p>
+        <p>未设置过的晚默认可订（房型开了「默认关房」则相反，见下）。夜价优先级：<strong>户型级覆盖 &gt; 项目级覆盖 &gt; 默认夜价</strong>；默认夜价两个频道一致 = 户型 <code>price_night</code> &gt; <code>月租/30</code> &gt; <code>起价/30</code>（2026-09 起 rental 的 <code>price_night</code> 同样生效，不再只认月租折算）。「恢复默认价」= 传 <code>status:'open'</code> 且不带 <code>price_night</code>，平台清除该晚价格覆盖。</p>
+        <p><strong>放出量两种口径（2026-09）</strong>：<code>qty</code> = 该晚对平台开放的总量（含平台已订）；<strong><code>available_qty</code> = 净可售</strong>（推荐多渠道商家）——直接推「还能卖几间」，平台记基线、之后只扣平台自己卖掉的，取消自动加回，并按物理余量封顶防超售。两者只能传一个。<code>remaining</code> 一律只读。<code>default_closed=true</code>（房型 ext）开启「默认关房」：未推送放出的晚一律不可订，缺省关闭。</p>
+        <p><strong>图集（2026-09）</strong>：换图 / 撤图走 <code>photos/sync</code> <strong>全量覆盖</strong>——传该实体当前完整图集，平台自动移除不在列表内的旧图；匹配键 <code>external_id</code> 优先、URL 兜底（URL 带签名会变）。分类 <code>bedroom/kitchen/bathroom/living/nearby/other</code>，排序按 <code>sort</code> 从小到大归一化。上架需合计 ≥7 张 + 封面，单次上限 100 张（超出截取前 100 并告警）；单图 ≤10MB、分辨率 ≥800×600，推送时可带声明值即时校验、上架时抽检 2 张真拉取核对。</p>
       </div>
     </details>
 
     <details>
       <summary><span class="q">Q14</span>最短连住是多少？在哪生效？</summary>
       <div class="a">
-        <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=1</code> 晚；商家可用 <code>ext.min_stay_nights</code>（1–365）按房源覆盖。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400，改口径只需改服务端常量或该字段，不需要改页面。</p>
+        <p>缺省口径：<code>rental=15</code> 晚（旅居/长租）、<code>minsu=15</code> 晚（民宿）。商家可覆盖，<strong>2026-09 起生效顺序为「户型 &gt; 房源 &gt; 频道默认」</strong>：户型级传 <code>units</code> 的 <code>min_stay_nights</code>，房源级 <code>ext.min_stay_nights</code> 降级为默认值。rental 为 1–365 晚，minsu 为 15–365 晚、不得低于 15 晚。<strong>整栋单（不指定户型）按排序最前的户型</strong>，与取消政策同一套回退。同一口径在 <strong>C 端日历选段、下单页、平台下单接口</strong>三处校验，不足直接 400。</p>
       </div>
     </details>
 

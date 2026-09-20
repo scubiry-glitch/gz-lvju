@@ -93,12 +93,12 @@ function dateStr(offsetDays) {
   const savedCols = [null, null];   // 还原商家两档原值
   let savedPhone = vendor.phone;    // 还原商家电话（回归会临时改写以保证审批回填单命中）
 
-  // 测试房源（rental + stay_bookable，下单用）
+  // 测试房源（rental + 在线预订，下单用）
   const [cities] = await conn.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
   const [pins] = await conn.execute(
     `INSERT INTO projects(city_id, channel, name, slug, tags, status, rating_status, owner_vendor_id, ext, unit_count)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [cities[0].id, 'rental', '佣金回归-' + RUN, RUN, JSON.stringify(['演示']), 'online', 'passed', vendor.id, JSON.stringify({ stay_bookable: true }), 1]
+    [cities[0].id, 'rental', '佣金回归-' + RUN, RUN, JSON.stringify(['演示']), 'online', 'passed', vendor.id, JSON.stringify({ online_booking: true, online_payment: false }), 1]
   );
   const pid = pins.insertId;
   const [uins] = await conn.execute(

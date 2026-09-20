@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>贝壳 APP · 找房·旅居 频道首页</title>
+<script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   :root{
     --surface:#ffffff; --fg:#0f172a; --muted:#6b7785; --border:#e7ece9;
@@ -16,6 +18,7 @@
     --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',Georgia,'Times New Roman',serif;
   }
   *,*::before,*::after{box-sizing:border-box;}
+  [data-deferred]{display:none!important;}
   html,body{margin:0;height:100%;}
   body{background:radial-gradient(1000px 600px at 50% -10%,#13322e 0%,#0b0f12 60%);
     font-family:var(--font);-webkit-font-smoothing:antialiased;display:flex;justify-content:center;}
@@ -29,9 +32,9 @@
   .scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .scr::-webkit-scrollbar{width:0;}
 
-  /* status bar */
-  .sbar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px 4px;font-size:12px;font-weight:600;color:#fff;position:relative;z-index:20;padding-top:max(14px,env(safe-area-inset-top));}
-  .sbar .r{display:flex;gap:5px;align-items:center;font-size:11px;}
+  /* 状态栏由原生壳绘制（见 capacitor.config.ts 的 StatusBar），页面内不再模拟。
+     hero 内容不再按 env(safe-area-inset-top) 让位——异形屏设备预设会报 ~47px，
+     凭空在顶部留一条空白；这里固定 10px，内容直接贴顶，图片仍全幅出血 */
 
   /* immersive hero */
   .hero{position:relative;padding:0 0 18px;color:#fff;overflow:hidden;}
@@ -47,7 +50,7 @@
     opacity:.5;}
   .hero .mist{position:absolute;left:-10%;right:-10%;bottom:96px;height:120px;
     background:radial-gradient(50% 100% at 50% 100%,rgba(255,255,255,.22),transparent 70%);filter:blur(8px);z-index:1;}
-  .hero-in{position:relative;z-index:5;padding:6px 20px 0;}
+  .hero-in{position:relative;z-index:5;padding:0 20px;}
   .h-top{display:flex;align-items:center;justify-content:space-between;}
   .h-loc{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;}
   .h-loc .pin{font-size:13px;}
@@ -73,15 +76,15 @@
   .seg-h .bar{width:3px;height:15px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
   .seg-h h3{font-size:15px;font-weight:700;color:var(--ink);font-family:var(--serif);}
   .seg-h .more{margin-left:auto;font-size:11px;color:var(--muted);}
-  .chan{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;padding:0 18px;}
-  .chan a{position:relative;background:#fff;border:1px solid var(--border);border-radius:15px;padding:14px 10px;text-align:center;
+  .chan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 12px;}
+  .chan a{position:relative;background:#fff;border:1px solid var(--border);border-radius:15px;padding:14px 4px;text-align:center;
     box-shadow:0 6px 16px rgba(15,42,38,.05);transition:.15s;display:block;color:var(--ink);}
   .chan a:active{transform:scale(.97);}
   .chan a:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(15,42,38,.12);border-color:color-mix(in oklab,var(--brand) 30%,var(--border));}
   .chan .ic{width:40px;height:40px;margin:0 auto 8px;border-radius:12px;display:grid;place-items:center;font-size:20px;
     background:linear-gradient(135deg,var(--brand-soft),#fff);}
   .chan.feat .ic{background:linear-gradient(135deg,#1f6f5f,#0b5d56);color:#fff;box-shadow:0 6px 14px rgba(11,93,86,.3);}
-  .chan b{font-size:13px;font-weight:600;display:block;}
+  .chan b{font-size:12px;font-weight:600;display:block;}
   .chan small{font-size:10px;color:var(--muted);display:block;margin-top:2px;}
   .chan .nb{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;color:#fff;
     background:linear-gradient(90deg,var(--gold),var(--gold-deep));padding:1px 6px;border-radius:999px;letter-spacing:.04em;}
@@ -105,6 +108,21 @@
   .content4 .ic{font-size:23px;}
   .content4 b{font-size:12px;font-weight:600;display:block;margin-top:6px;}
   .content4 small{font-size:9px;color:var(--muted);}
+
+  /* curated local posts */
+  .poststrip{display:flex;gap:10px;overflow-x:auto;padding:0 18px 6px;scroll-snap-type:x mandatory;scroll-padding-left:18px;}
+  .poststrip::-webkit-scrollbar{height:0;}
+  .postcard{flex:0 0 164px;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    box-shadow:0 6px 16px rgba(15,42,38,.06);scroll-snap-align:start;color:var(--ink);}
+  .postcard .pic{height:108px;position:relative;background:center/cover no-repeat #dfe8e4;}
+  .postcard .pic::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,18,16,.34));}
+  .postcard .type{position:absolute;z-index:2;left:8px;top:8px;font-size:9px;font-weight:700;color:#fff;
+    background:rgba(8,18,16,.5);backdrop-filter:blur(5px);padding:2px 8px;border-radius:999px;}
+  .postcard .pcopy{padding:9px 10px 11px;}
+  .postcard b{display:-webkit-box;min-height:35px;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    font-family:var(--serif);font-size:13px;line-height:1.35;}
+  .postcard p{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.45;}
 
   /* listing magazine cards */
   .list{padding:0 18px;}
@@ -157,9 +175,6 @@
 <div class="app">
   <div class="scr">
 
-    <!-- status bar -->
-    <div class="sbar"><span>9:41</span><span class="r">📶 5G&nbsp; 🔋 88%</span></div>
-
     <!-- immersive hero -->
     <div class="hero">
       <div class="bgimg"></div>
@@ -170,7 +185,7 @@
             <span class="pin">📍</span>
             <span class="city"><span id="cityName">贵阳 ▾</span><small id="citySub">贵州 · 旅居目的地</small></span>
           </div>
-          <div class="h-ico"><span>♡</span><a href="lvju-app-messages.html" style="text-decoration:none"><span>☷</span></a></div>
+          <div class="h-ico"><span>♡</span><a href="lvju-app-messages.html" style="text-decoration:none" hidden data-deferred><span>☷</span></a></div>
         </div>
         <div class="editorial">
           <div class="ek">Travel to Guizhou, Live More</div>
@@ -192,12 +207,12 @@
       <div class="seg-h"><span class="bar"></span><h3>找房 · 全频道</h3><span class="more">全部 ›</span></div>
       <div class="chan">
         <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic">🏔</div><b>旅居</b><small>短住·候鸟·康养</small></a>
-        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic">🏨</div><b>民宿</b><small>整栋·星级·管家</small></a>
+        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic">🏨</div><b>民宿</b><small>整栋·庭院·管家</small></a>
         <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic">🗝</div><b>长租</b><small>整租·合租·月付</small></a>
-        <a class="chan" href="lvju-app-newhouse.html"><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
-        <a class="chan" href="lvju-app-resale.html"><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
+        <a class="chan" href="lvju-app-newhouse.html" hidden data-deferred><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
+        <a class="chan" href="lvju-app-resale.html" hidden data-deferred><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
         <a class="chan" href="lvju-app-guide.html"><div class="ic">🧭</div><b>置业导购</b><small>看房·测算</small></a>
-        <a class="chan" href="lvju-app-lifestyle.html"><div class="ic">🌿</div><b>生活方式</b><small>玩在贵州</small></a>
+        <a class="chan" href="lvju-app-lifestyle.html" hidden data-deferred><div class="ic">🌿</div><b>生活方式</b><small>玩在贵州</small></a>
       </div>
 
       <!-- magazine cover -->
@@ -207,7 +222,7 @@
         <div class="fin">
           <div class="fk">Editor's Pick · 旅居周刊</div>
           <h4>黔东南秘境<br>住进千户苗寨的云端</h4>
-          <p>编辑实地探访 12 处五彩贝旅居 · 含双早 + 苗寨向导</p>
+          <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
         </div>
       </a>
 
@@ -220,8 +235,16 @@
         <a href="lvju-app-convenience.html"><div class="ic">🛎</div><b>旅游便民</b><small>出行·向导</small></a>
       </div>
 
+      <!-- curated posts -->
+      <div id="postSec">
+        <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选笔记 · 在地发现</h3><a class="more" id="postMore" href="lvju-app-spots.html">更多 ›</a></div>
+        <div class="poststrip" id="postList">
+          <div style="color:#9aa5a1;padding:22px 0;font-size:12px;">加载中…</div>
+        </div>
+      </div>
+
       <!-- curated listings -->
-      <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选好房 · 五彩贝旅居</h3><span class="more">查看列表 ›</span></div>
+      <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选好房 · 特色旅居</h3><span class="more">查看列表 ›</span></div>
       <div class="list" id="featList">
         <div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">加载中…</div>
       </div>
@@ -250,9 +273,9 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
-/* 精选好房 = 后台 is_featured 的在架项目，统一读 catalog。
+/* 精选好房 = 后台 is_featured 优先，不足 2 个时由特色旅居项目补齐，统一读 catalog。
    左上角城市切换（口径与桌面首页一致）：URL ?city= > localStorage bzf_jz_city > 默认 贵阳；
    切换后重拉目标城市 catalog 并重绘，频道链接携带 ?city= 供子页续读。 */
 (function(){
@@ -284,10 +307,32 @@
     fetch('/api/juzhu/catalog?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(cat){
       var el = document.getElementById('featList');
       var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
-      var featured = (cat.projects || []).filter(function(p){
-        return p.is_featured === 1 && (p.channel === 'rental' || p.channel === 'minsu');
-      }).sort(function(a,b){ return (a.featured_rank||999) - (b.featured_rank||999); });
-      var src = featured.length ? featured : (cat.projects || []).filter(function(p){ return p.channel === 'rental'; }).slice(0, 2);
+      var eligible = (cat.projects || []).filter(function(p){
+        return p.channel === 'rental' || p.channel === 'minsu';
+      });
+      function tagsOf(p){ return Array.isArray(p.tags) ? p.tags : []; }
+      function priority(p){
+        if (p.is_featured === 1) return 0;
+        if (tagsOf(p).indexOf('旅居') >= 0) return 1;
+        if (p.channel === 'minsu') return 2;
+        return 3;
+      }
+      var curated = eligible.filter(function(p){
+        var tags = tagsOf(p);
+        return tags.indexOf('保租房') < 0 && tags.indexOf('演示') < 0;
+      }).sort(function(a,b){
+        return priority(a) - priority(b) ||
+          (a.featured_rank || 999) - (b.featured_rank || 999) ||
+          (a.sort_order || 999) - (b.sort_order || 999);
+      });
+      var src = curated.slice(0, 2);
+      if (src.length < 2) {
+        var used = {}; src.forEach(function(p){ used[p.id] = true; });
+        eligible.some(function(p){
+          if (!used[p.id]) { src.push(p); used[p.id] = true; }
+          return src.length === 2;
+        });
+      }
 
       if (!src.length) {
         el.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">' + esc(CITY) + '暂无在架精选房源 · 可切换城市查看</div>';
@@ -297,7 +342,8 @@
         var d = dmap[p.district_id];
         var loc = (d && p.address && p.address.indexOf(d.name) === 0) ? p.address : Array.from(new Set([d ? d.name : '', p.address || ''].filter(Boolean))).join(' · ');
         var r = p.rating || {};
-        var star = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 五彩贝旅居' : '在架好房';
+        var star = window.lvjuFeatureEnabled('caibei') && p.rating_status === 'passed' && r.stars
+          ? '★ ' + r.stars + ' 五彩贝旅居' : '精选好房';
         var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
         var img = p.cover_image
           ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
@@ -306,13 +352,32 @@
           '<span class="star">' + esc(star) + '</span><span class="like">♡</span>' +
           '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
           '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>精选</span>') + '</div>' +
-          '<div class="pr"><b>' + (p.price_from != null ? '¥' + fmt(p.price_from) + '<small>/月起</small>' : '价格面议') + '</b><a class="bk" href="lvju-app-detail.html?id=' + p.id + '">预订</a></div></div>' +
+          '<div class="pr"><b>' + (function(){ var pd = LVJU_PRICE.parts(p); return pd.value != null
+            ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>' : pd.note; })() + '</b><a class="bk" href="lvju-app-detail.html?id=' + p.id + '">预订</a></div></div>' +
           '</div>';
       }).join('');
     }).catch(function(){
       document.getElementById('featList').innerHTML =
         '<div style="text-align:center;color:#b45309;padding:24px 0;font-size:12px;">无法连接新居住数据库</div>';
     });
+  }
+
+  function loadFeaturedPosts(){
+    var sec = document.getElementById('postSec');
+    var el = document.getElementById('postList');
+    sec.hidden = false;
+    el.innerHTML = '<div style="color:#9aa5a1;padding:22px 0;font-size:12px;">加载中…</div>';
+    document.getElementById('postMore').href = 'lvju-app-spots.html?city=' + encodeURIComponent(CITY);
+    fetch('/api/juzhu/spots?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(data){
+      var posts = (data.spots || []).slice(0, 3);
+      if (!posts.length) { sec.hidden = true; return; }
+      el.innerHTML = posts.map(function(s){
+        var bg = s.cover_image || 'assets/lvju/countryside.t640.webp';
+        return '<a class="postcard" href="lvju-app-spot-post.html?id=' + s.id + '">' +
+          '<div class="pic" style="background-image:url(' + esc(bg) + ')"><span class="type">' + esc(s.type_label || '在地笔记') + '</span></div>' +
+          '<div class="pcopy"><b>' + esc(s.name) + '</b><p>' + esc(s.summary || '') + '</p></div></a>';
+      }).join('');
+    }).catch(function(){ sec.hidden = true; });
   }
 
   // —— 城市切换弹层（省→市级联）——
@@ -347,7 +412,7 @@
       p.set('city', city);
       history.replaceState(null, '', location.pathname + '?' + p.toString());
     } catch(e){}
-    paintChip(); chainCityLinks(); closeSheet(); loadFeatured();
+    paintChip(); chainCityLinks(); closeSheet(); loadFeaturedPosts(); loadFeatured();
   }
 
   document.getElementById('cityChip').addEventListener('click', openSheet);
@@ -361,6 +426,7 @@
 
   paintChip();
   chainCityLinks();
+  loadFeaturedPosts();
   loadFeatured();
 })();
 </script>

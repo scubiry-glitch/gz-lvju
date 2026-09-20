@@ -199,7 +199,7 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=4"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
 (function () {
   var JZ = window.BZF_JZ;
@@ -422,6 +422,11 @@
   function detailHref(slug) {
     return 'juzhu-jiazheng-detail.html' + cityQs({ sku: slug });
   }
+  var benefitLink=document.createElement('a');
+  benefitLink.href='juzhu-commerce.html'+cityQs({topic:q.get('id')||'new-home',kind:'packages'});
+  benefitLink.textContent='查看本专题券包与生活权益 →';
+  benefitLink.style.cssText='display:block;margin:14px 12px;padding:14px 16px;background:#fff;border:1px solid var(--accent,#0f766e);border-radius:13px;color:var(--accent,#0f766e);font-size:13px;text-decoration:none;text-align:center';
+  document.querySelector('.scene-block').after(benefitLink);
 
   // 旅程
   var journeyEl = document.getElementById('journey');

@@ -54,10 +54,11 @@ async function main() {
   }
   console.log(`insurance backfilled: ${nIns}/${projs.length} projects`);
 
-  // 2) 存量订单 → 房态 booked 行（先清 booking 来源差异行，再按当前有效订单重建）
+  // 2) 存量订单 → 房态占用计数（多间口径 2026-09-10：status='open' + booked_qty 递增，booked 为派生态；
+  //    先清 booking 来源差异行，再按当前有效订单重建）
   await conn.execute("DELETE FROM stay_calendar WHERE source='booking'");
   const [orders] = await conn.execute(
-    "SELECT id, project_id, unit_id, checkin, checkout FROM booking_orders WHERE status IN ('pending','confirmed')"
+    "SELECT id, project_id, unit_id, checkin, checkout, rooms FROM booking_orders WHERE status IN ('pending','confirmed')"
   );
   let nDays = 0;
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -68,15 +69,16 @@ async function main() {
     for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
       const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       await conn.execute(
-        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, price_night, source, booking_id, updated_at)
-         VALUES (?,?,?,'booked',NULL,'booking',?,?)
-         ON DUPLICATE KEY UPDATE status='booked', source='booking', booking_id=VALUES(booking_id), updated_at=VALUES(updated_at)`,
-        [o.project_id, o.unit_id || 0, ds, o.id, now]
+        `INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, source, booked_qty, booking_id, updated_at)
+         VALUES (?,?,?,'open','booking',?,?,?)
+         ON DUPLICATE KEY UPDATE booked_qty=booked_qty+VALUES(booked_qty), source='booking',
+           booking_id=COALESCE(booking_id, VALUES(booking_id)), updated_at=VALUES(updated_at)`,
+        [o.project_id, o.unit_id || 0, ds, Math.max(1, o.rooms || 1), o.id, now]
       );
       nDays += 1;
     }
   }
-  console.log(`stay_calendar rebuilt: ${orders.length} orders -> ${nDays} booked nights`);
+  console.log(`stay_calendar rebuilt: ${orders.length} orders -> ${nDays} occupied unit-nights`);
 
   await conn.end();
 }

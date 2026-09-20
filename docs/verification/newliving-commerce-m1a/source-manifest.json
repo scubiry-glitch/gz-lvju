@@ -1,0 +1,262 @@
+{
+  "generated_at": "2026-09-19T12:49:50.404Z",
+  "branch": "plan/newliving-coupons-membership-v1.9",
+  "files": [
+    {
+      "file": "app.js",
+      "sha256": "26267ea2e9c70a55749f73bbedf0f455aa99520573de0970001389b6c6fd0e13"
+    },
+    {
+      "file": "commerce/app.cjs",
+      "sha256": "21ef3a2c7db4aadf762070d363213cff41da0b984f6252dc832e29902f96f41b"
+    },
+    {
+      "file": "commerce/configuration.cjs",
+      "sha256": "3b8de08c00668832ad6b92f2ed854ab7fa7b3eef660e7283bf6c64a380069083"
+    },
+    {
+      "file": "commerce/db.cjs",
+      "sha256": "5f5c206ff8b09b9f12a9ba10f42d5513ccd7a64923ae030766dd3e5fc022ec3c"
+    },
+    {
+      "file": "commerce/domain.cjs",
+      "sha256": "2ce25c67a0dc5c1ae32fb4980bf8fa28feeeca5b97361859892b8f18c222cd58"
+    },
+    {
+      "file": "commerce/migrate.cjs",
+      "sha256": "5cb5e9f77b0999b54b0752409d91d07d2fa75ca3360366059938cc17a02f4046"
+    },
+    {
+      "file": "commerce/server.cjs",
+      "sha256": "98e16a4bab9d2300a372206ed9cfa96ebbee8931e7ff4e222718bcf7605f08d7"
+    },
+    {
+      "file": "commerce/service.cjs",
+      "sha256": "19efb39d9bd39482bf8cbda85533f16e676a47d9eba2bf5229b45744d9b170d4"
+    },
+    {
+      "file": "deploy/commerce/nginx-location.conf",
+      "sha256": "bf5f6745fa5a67d6a56adaf39e20ecd8b4a88d7fe75202a901ffa0c7aec1126d"
+    },
+    {
+      "file": "deploy/commerce/sy-commerce-preview.service",
+      "sha256": "ba34112768257817afc17cc422c5f9667eaa94f9fe2754ffe153f2812768b93f"
+    },
+    {
+      "file": "index.html",
+      "sha256": "5f0a66c86ae3eba6b1417914d741fcdd34d360de459348d78f677bf410446870"
+    },
+    {
+      "file": "juzhu-commerce.html",
+      "sha256": "0af7a7d7afd04ca10db97bde8a5303a0567e03813c80ea26700f147055303a4f"
+    },
+    {
+      "file": "juzhu-promoter.html",
+      "sha256": "1d5eb73bee625bf57f0bfd1223e96998570b81872cbe7ed0f8d71bda4cc2ecd2"
+    },
+    {
+      "file": "juzhu/mysql_schema.sql",
+      "sha256": "8a95c3fdf207622d4944c9f6038f18c5e2e65e44bf5e4f03c090a9d573d2726f"
+    },
+    {
+      "file": "overview.html",
+      "sha256": "e7f0b62eff4f6dc51ef4c74900ad13707073b9b4abb24addd748904424c8a371"
+    },
+    {
+      "file": "package.json",
+      "sha256": "5fc149319e9c30828826fc64573fea56613ee2268330ffb1ef268110b5e273fd"
+    },
+    {
+      "file": "perm_registry.cjs",
+      "sha256": "26e3879ac1019bba2f6784a5b72fbcec30bc2eebae78a09c8aee141675c16d15"
+    },
+    {
+      "file": "screens/_commerce-customer.js",
+      "sha256": "6c44caae6ded003c6dd8bac1aedd102a9e7e23d450118495bd61f30f3f1a62ee"
+    },
+    {
+      "file": "screens/_commerce-entry.js",
+      "sha256": "1908cc7900c7ba8e3a070d878ef651adaffc2086077011c20f049d261d2b6c63"
+    },
+    {
+      "file": "screens/_commerce-management.js",
+      "sha256": "6b6ca2a3a87244f7e5c0958992d1cdfcf370c8f1ce2fd5e2dd3ecf2db1c1d0fb"
+    },
+    {
+      "file": "screens/_commerce-official.js",
+      "sha256": "f7a7c9576b660dc2484793d378b25060093a3c11a9cea1782e793134f200357a"
+    },
+    {
+      "file": "screens/_commerce.css",
+      "sha256": "08b0e68a520495f7d03f97265b9af46b8f63d2e4de7382d10e3534625acada66"
+    },
+    {
+      "file": "screens/_nav.js",
+      "sha256": "08014ae7aa53950501e73b4acf41a2c87cda00f85063105e758b2c29099907c8"
+    },
+    {
+      "file": "screens/commerce-admin-appointments.html",
+      "sha256": "a4f3dd256505534e2b957ed77cd314d35edd655f80866cbefd710d521ea319c5"
+    },
+    {
+      "file": "screens/commerce-admin-audit.html",
+      "sha256": "935e1ce7051290d192d3e4055437eee7f35f8493c61b11023d78338adf24496b"
+    },
+    {
+      "file": "screens/commerce-admin-capacity.html",
+      "sha256": "fef1c44ee199310284a93d8258a646eb9f091fdb319dd63efebd750b467dc706"
+    },
+    {
+      "file": "screens/commerce-admin-cases.html",
+      "sha256": "4ffb79b87cecb6296681cc0a1f6df59f9953f4451ca2debadc5fe10347aafe15"
+    },
+    {
+      "file": "screens/commerce-admin-coupons.html",
+      "sha256": "a3839c6ac4087592ea54b2f495661d2dcc6a282800e936cdfecc43f72cff9fc9"
+    },
+    {
+      "file": "screens/commerce-admin-inventory.html",
+      "sha256": "7512244da10d9c3307768ca03330d0e4613357937915c101227f3e5c9460fd24"
+    },
+    {
+      "file": "screens/commerce-admin-memberships.html",
+      "sha256": "73d22b32efc84e1de54bcd0e4cf7ab2b82004aaee09deb937c291471e18e53b2"
+    },
+    {
+      "file": "screens/commerce-admin-merchants.html",
+      "sha256": "a93c54b833b1bcb7f4242ef3c0b82411c6f84bfdecd9c8e55081ceba0c1fcaa5"
+    },
+    {
+      "file": "screens/commerce-admin-orders.html",
+      "sha256": "8d0bbe986f277811a8d967b17c1888afdb568917749c195715f7e3e80dbbc49a"
+    },
+    {
+      "file": "screens/commerce-admin-packages.html",
+      "sha256": "8e61a142cf83481080efc28604050c050ade46b16768ee48f3a119bf03a5c37b"
+    },
+    {
+      "file": "screens/commerce-admin-plans.html",
+      "sha256": "a416a855105949cb74ed4c6031c3c4c50fe78b98b299d2139e1138a4e7187c8a"
+    },
+    {
+      "file": "screens/commerce-admin-redemptions.html",
+      "sha256": "609a08c26067b08a3b2d97b1b6dad130eb190d2ba356a34c1a4b72a50c45d368"
+    },
+    {
+      "file": "screens/commerce-admin-rules.html",
+      "sha256": "f0cdd48d2f695ab6e57c846a240fd546013a5ee36c65ef4f20b107f008185069"
+    },
+    {
+      "file": "screens/commerce-admin-skus.html",
+      "sha256": "83ac906aa202f4400531bcd72378c53f2fa4db8710e5aa42a2192f0a4de837e4"
+    },
+    {
+      "file": "screens/commerce-admin-staff.html",
+      "sha256": "1bc0231329a55b16bf506b671fc1a771fb227d51117db9107e19a2c787995dc3"
+    },
+    {
+      "file": "screens/commerce-admin-stores.html",
+      "sha256": "de581f31df78069cb699a345b5cee4ae2e7afd98e653f6f8612b0ae991ad9700"
+    },
+    {
+      "file": "screens/commerce-admin.html",
+      "sha256": "bc87d1e324e0730b712cfc51ddf1d185555f6d4497eacbf4926ef9795dd63eff"
+    },
+    {
+      "file": "screens/commerce-merchant-appointments.html",
+      "sha256": "3180bb107f4dcda3966f7d16ffd7907f263a346111ac885e8d452148bb362ae0"
+    },
+    {
+      "file": "screens/commerce-merchant-capacity.html",
+      "sha256": "a47d51446023d1929fb8f6230fdfd45f7c39949e312aa1193d6f250782db5df7"
+    },
+    {
+      "file": "screens/commerce-merchant-cases.html",
+      "sha256": "17c631180b35e602b8afe4678d5cc8ea720bb3e8ec50d32b579a600a0558bac8"
+    },
+    {
+      "file": "screens/commerce-merchant-coupons.html",
+      "sha256": "1830954012d10f2c66513c4bd53449dcc4aaac2e82a3defa0248b7d1120b96ec"
+    },
+    {
+      "file": "screens/commerce-merchant-inventory.html",
+      "sha256": "15272e67bc9fa2cf6deaf8ac466af33710c72dea9308f7bc54f392acfbd4e24e"
+    },
+    {
+      "file": "screens/commerce-merchant-merchants.html",
+      "sha256": "f209f41db234f24d20539e61267bd13f69e983329905bff405cdeedbb8e14720"
+    },
+    {
+      "file": "screens/commerce-merchant-orders.html",
+      "sha256": "be41976fa14bd1e7831239b1b26eb23e16592b25958b0c6a36ee9cad4f461dff"
+    },
+    {
+      "file": "screens/commerce-merchant-redemptions.html",
+      "sha256": "78acf02b9c472c3fdcc05212ef3901020a6e12213cd9d515fb4571bb37676f77"
+    },
+    {
+      "file": "screens/commerce-merchant-skus.html",
+      "sha256": "cbf86333a23b3c4b8a2c3ffa141c24b3b0d925c886aa9e41f36ad24e284b9806"
+    },
+    {
+      "file": "screens/commerce-merchant-staff.html",
+      "sha256": "21731de9224398b8200af57ca7f325cb9990fab1275d7a25975a89d055d843b4"
+    },
+    {
+      "file": "screens/commerce-merchant-stores.html",
+      "sha256": "eeb66a73e6cd78f82969daafd159502d264e318e91be32eff49d956772e25ca4"
+    },
+    {
+      "file": "screens/commerce-merchant.html",
+      "sha256": "a22a1529d6acd939fa70b12e5cba067d1ae61a1a220d56d63091b907d7afc460"
+    },
+    {
+      "file": "scripts/commerce/browser.cjs",
+      "sha256": "c88283bb6afac196fbb64a71eefe09cb0672b96fab206263c1c8657852d18646"
+    },
+    {
+      "file": "scripts/commerce/domain.test.cjs",
+      "sha256": "21e21851ef59cd6d80ea4603b5ae5c20e215e64b59d92bcb53e0ddd8bda8fc4a"
+    },
+    {
+      "file": "scripts/commerce/generate-pages.cjs",
+      "sha256": "a069319002b5695bae3b4b7f676334cd936124c65978147d8c556b585b03c307"
+    },
+    {
+      "file": "scripts/commerce/http.test.cjs",
+      "sha256": "f57dbb121664862dec9bb15b3f4d7f982d5d709b74d14988b389d4329ddc523c"
+    },
+    {
+      "file": "scripts/commerce/install-preview.cjs",
+      "sha256": "7150bc35a769425cb86b30105d47db50a28fbcda2c3f559c5c8900962732d5bb"
+    },
+    {
+      "file": "scripts/commerce/m1a-browser.cjs",
+      "sha256": "ddefbf6081f082ecec7b6300ee7a2989896d95f35ea77618078dfa912881f57d"
+    },
+    {
+      "file": "scripts/commerce/m1a-iam-regressions.cjs",
+      "sha256": "98bb066c125e845e121132e0b205c798de8696d563555ba7672243a8eccdda15"
+    },
+    {
+      "file": "scripts/commerce/m1a-inspect.cjs",
+      "sha256": "3a938e121de6de7c93d68f5c13c9ac86b2e1cd2dc0b573508c2bea4243d0aa94"
+    },
+    {
+      "file": "scripts/commerce/m1a-public-smoke.cjs",
+      "sha256": "35c0c7433be9c85f8d3d3dab0e13b3f3e5df98db80c9fdf960c24bf08a87f8f8"
+    },
+    {
+      "file": "scripts/commerce/m1a-test.cjs",
+      "sha256": "4d2363668833c1e547732237091db8f5cc86a600aab7f70d11ee823611958263"
+    },
+    {
+      "file": "scripts/commerce/public-smoke.cjs",
+      "sha256": "0fac635a0d7bca9ec84b119d7bb4fc818a6b6fadb93ac9ca4d5867ffeb932675"
+    },
+    {
+      "file": "scripts/commerce/verify.cjs",
+      "sha256": "a6bda7d01fde1d7927fad7a76626dbd860da493f97b77b2976b582363b928b14"
+    }
+  ]
+}

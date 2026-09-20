@@ -1,0 +1,110 @@
+{
+  "at": "2026-09-20T01:28:08.447Z",
+  "database": "isolated temporary MySQL database (removed)",
+  "checks": [
+    {
+      "name": "Migration idempotency and persistent merchant approval",
+      "passed": true
+    },
+    {
+      "name": "Submitter cannot approve and read-only cannot write",
+      "passed": true
+    },
+    {
+      "name": "Object scope isolation, explicit city and merchant scope",
+      "passed": true
+    },
+    {
+      "name": "Immutable published snapshot and optimistic edit conflicts",
+      "passed": true
+    },
+    {
+      "name": "Concurrent stock reservation: no oversell; retry idempotency",
+      "passed": true
+    },
+    {
+      "name": "Verified internal fulfillment once; no duplicate grant",
+      "passed": true
+    },
+    {
+      "name": "Expired order releases reserved stock once",
+      "passed": true
+    },
+    {
+      "name": "Personal assets have no pricing rules and deny another owner",
+      "passed": true
+    },
+    {
+      "name": "Concurrent appointments respect date capacity; failed reschedule retains slot",
+      "passed": true
+    },
+    {
+      "name": "Refund freeze invalidates token and is idempotent",
+      "passed": true
+    },
+    {
+      "name": "Same-store redemption only; concurrent redemption vs refund exactly one wins",
+      "passed": true
+    },
+    {
+      "name": "Redemption preview shows the service without any side effect and carries structured failure codes",
+      "passed": true
+    },
+    {
+      "name": "Multi-SKU stock rollback is atomic",
+      "passed": true
+    },
+    {
+      "name": "Unused expiry queues one original-source refund, never marks payment complete",
+      "passed": true
+    },
+    {
+      "name": "HTTP real IAM sessions, locked/revoked denial, no legacy credentials",
+      "passed": true
+    },
+    {
+      "name": "HTTP review cannot bypass fine-grained permission and all pay routes closed",
+      "passed": true
+    },
+    {
+      "name": "Signed single-level referrals reject tampering and preserve attribution",
+      "passed": true
+    },
+    {
+      "name": "Registry defaults unchanged and every commerce management method explicitly matched",
+      "passed": true
+    },
+    {
+      "name": "HTTP fulfilment chain, today filter, stats scope, error codes and locatable failures",
+      "passed": true
+    },
+    {
+      "name": "Hotel roster sampling is deterministic and covers every tier with brand rotation",
+      "passed": true
+    },
+    {
+      "name": "Hotel exchange demo seeds hotels, anchors, categories and an exchange package",
+      "passed": true
+    },
+    {
+      "name": "Exchange coupon books any same-tier hotel; anchors and other tiers are rejected",
+      "passed": true
+    },
+    {
+      "name": "Non-exchange offline coupons ignore extra store_id and keep legacy booking",
+      "passed": true
+    },
+    {
+      "name": "Online coupons cannot book; they redeem via online-counter staff without appointment",
+      "passed": true
+    },
+    {
+      "name": "Public hotel directory exposes tiers and public fields only",
+      "passed": true
+    },
+    {
+      "name": "Demo clean refuses while business records reference the batch",
+      "passed": true
+    }
+  ]
+}

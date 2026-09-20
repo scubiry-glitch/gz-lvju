@@ -6,6 +6,8 @@
 <link rel="icon" href="data:,">
 <title>找房 · 全频道 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   /* 找房枢纽（底部「找房」tab 直达）—— 携程/美团式横向卡片 + 筛选栏 + 搜索发现 + 专题入口。
      数据一次拉 catalog（全频道），分段/关键词/筛选/排序全部客户端过滤，不新增服务端参数。 */
@@ -134,7 +136,7 @@
         <input id="kw" placeholder="搜目的地 / 楼盘 / 民宿 / 景区" autocomplete="off" />
         <span class="clr" id="kwClear">✕</span>
       </div>
-      <a href="lvju-app-map.html" style="font-size:12px;font-weight:700;color:var(--brand-deep);flex-shrink:0;">🗺 地图</a>
+      <a href="lvju-app-map.html" hidden data-deferred style="font-size:12px;font-weight:700;color:var(--brand-deep);flex-shrink:0;">🗺 地图</a>
     </div>
 
     <!-- 搜索发现（历史 + 热门）：聚焦弹出，点外收起 -->
@@ -157,7 +159,7 @@
     <div class="fbar" id="fbar">
       <a class="cell" data-f="dist"><span class="v">区域</span><span class="arr">▼</span></a>
       <a class="cell" data-f="price"><span class="v">价格</span><span class="arr">▼</span></a>
-      <a class="cell" data-f="star"><span class="v">评分</span><span class="arr">▼</span></a>
+      <a class="cell" data-f="star" data-lvju-feature="caibei"><span class="v">评分</span><span class="arr">▼</span></a>
       <a class="cell" data-f="sort"><span class="v">综合排序</span><span class="arr">▼</span></a>
     </div>
 
@@ -202,11 +204,11 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
-<script src="screens/_jzapi.js"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script>
 /* 找房枢纽：底部「找房」tab 的全频道落地页（携程/美团式列表）。
    分段口径与各频道页一致（规则 15：旅居 = rental/minsu 带「旅居」tag，长租/民宿 = 各频道排除「旅居」）；
-   卡片渲染沿用各频道页口径（评级 / 晚价·月价 / 新房·二手价 / stay_bookable CTA）。
+   卡片渲染沿用各频道页口径（评级 / 晚价·月价 / 新房·二手价 / 房源交易能力 CTA）。
    专题（topics）：settings KV topic_<slug>（scripts/find-topic-seed.cjs），入口计数本地推导，落地页走
    catalog?topic= 服务端过滤（lvju-app-topic.html）。
    卖旧买新（trade）走新居住频道专区政府，不进本枢纽。 */
@@ -253,7 +255,7 @@
     { id: 'def', label: '综合排序' },
     { id: 'price', label: '价格优先' },
     { id: 'star', label: '星级优先' },
-  ];
+  ].filter(function(o){ return o.id !== 'star' || window.lvjuFeatureEnabled('caibei'); });
   var F = { dist: 0, price: 0, star: 0, sort: 'def' };   // dist: 0=不限 / district_id
 
   var cat = null, dmap = {}, umap = {};
@@ -366,7 +368,7 @@
     var r = p.rating || {};
     var meta;
     if (fam === 'stay' && p.rating_status === 'passed' && r.stars) {
-      meta = '<span class="sc">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
+      meta = '<span class="sc" data-lvju-feature="caibei">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
         '<i>' + esc(channelChip(p)) + '</i><span>' + esc(loc) + '</span>';
     } else {
       var extra = (fam === 'newhouse' && p.managed_unit_count != null) ? ' · 房源 ' + fmt(p.managed_unit_count) : '';
@@ -374,18 +376,18 @@
     }
     var tags = (p.tags || []).filter(function(t){ return t !== '保租房' && t !== '演示' && t !== '精选'; }).slice(0, 3);
     var ins = fam === 'stay'
-      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
+      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am" data-lvju-feature="stayProtection">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
       : '';
     var tagHtml = tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + ins;
 
     var price, href, cta;
     if (fam === 'stay') {
-      var pf = p.price_from;
-      if (pf == null && p.channel === 'rental') {
-        var rents = (umap[p.id] || []).map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; });
-        if (rents.length) pf = Math.min.apply(null, rents);
-      }
-      price = pf != null ? '<i>¥</i><b>' + fmt(pf) + '</b><small>' + (p.channel === 'minsu' ? '/晚起' : '/月起') + '</small>' : '<span style="font-size:13px;">价格面议</span>';
+      // 展示价三件套由服务端下发（2026-09）：/晚起 = 最低可售单夜价、/月起 = 起价；
+      // 无价文案也由服务端给（按晚扫不到可售 = 暂无可订），页面不再自行折算
+      var pd = LVJU_PRICE.parts(p);
+      price = pd.value != null
+        ? '<i>¥</i><b>' + fmt(pd.value) + '</b><small>' + LVJU_PRICE.unitText(p) + '</small>'
+        : '<span style="font-size:13px;">' + pd.note + '</span>';
       href = 'lvju-app-detail.html?id=' + p.id;
       cta = p.bookable ? '<span class="go">预订</span>' : '<span class="go tel">📞 咨询</span>';
     } else if (fam === 'newhouse') {

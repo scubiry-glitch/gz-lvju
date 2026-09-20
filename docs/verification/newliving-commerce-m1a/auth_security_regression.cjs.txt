@@ -1,0 +1,28 @@
+PASS  admin 登录只传 password → 400（枚举面移除）
+PASS  admin 显式账号登录 200
+PASS  测试账号创建
+PASS  错误密码第 1 次 → 401
+PASS  错误密码第 2 次 → 401
+PASS  错误密码第 3 次 → 401
+PASS  错误密码第 4 次 → 401
+PASS  错误密码第 5 次 → 401
+PASS  第 6 次 → 429 + retry_after
+PASS  accounts 置 locked + 计数 5
+PASS  audit_log 出现 auth.login.lock
+PASS  锁定期内正确密码仍 429
+PASS  admin 解锁 200
+PASS  解锁后 locked_until 清空、计数清零
+PASS  解锁后正确密码登录恢复
+PASS  审计 result='ok' 落库
+PASS  审计 result='fail' 落库
+PASS  不存在账号第 6 次 → 429（枚举被拦）
+PASS  账号不存在也落 fail 审计
+PASS  tenant 注册即返回 token
+PASS  tenant 已注册+错误密码 → 401
+PASS  tenant 错误密码只计一次失败（双调用修复）
+PASS  新账号密码哈希为 scrypt 格式
+PASS  存量 sha256 行登录成功（格式兼容）
+PASS  登录后懒升级为 scrypt 格式
+# 清理完成
+
+ALL PASS

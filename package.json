@@ -4,11 +4,17 @@
   "description": "新居住服务平台",
   "main": "app.js",
   "scripts": {
+    "commerce:dev": "node commerce/server.cjs",
+    "commerce:test": "node --test scripts/commerce/domain.test.cjs scripts/commerce/http.test.cjs",
     "build:android": "npx cap sync android",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android",
-    "build:apk": "bash scripts/build-apk.sh"
+    "build:apk": "bash scripts/build-apk.sh",
+    "commerce:m1a": "node commerce/app.cjs",
+    "commerce:migrate": "node commerce/migrate.cjs",
+    "commerce:m1a:test": "node scripts/commerce/m1a-test.cjs --browser",
+    "commerce:init": "node scripts/commerce/initialize-topics.cjs"
   },
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",

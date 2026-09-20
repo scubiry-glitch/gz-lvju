@@ -1,0 +1,25 @@
+PASS  GET permissions 200 且含目录+角色
+PASS  权限点目录含 account.manage（预留不接路由）
+PASS  角色矩阵含内置标记
+PASS  GET iam/overview 200 且字段齐全
+PASS  POST roles 200
+PASS  未知权限点拒绝
+PASS  自定义角色含 '*' 拒绝
+PASS  内置角色拒改
+PASS  内置角色拒删
+PASS  PUT 自定义角色生效
+PASS  自定义角色可建号
+PASS  被引用角色拒删
+PASS  accounts?role_code 过滤
+PASS  accounts?q= 模糊过滤
+PASS  GET orgs 200 且 city_ids 解析为数组
+PASS  PUT orgs/:id 维护 city_ids
+PASS  GET sessions 列表（不含 token 原文）
+PASS  DELETE 全部下线
+PASS  audit?result=fail 过滤
+PASS  audit?action= 前缀过滤
+PASS  PUT accounts/:id unlock=1
+PASS  解除引用后可删角色
+# 清理完成
+
+ALL PASS

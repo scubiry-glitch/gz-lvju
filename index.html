@@ -73,8 +73,8 @@
   .jz-cat h3{font-family:var(--serif);font-size:16px;line-height:1.15;letter-spacing:.2px;color:#fffdf9;}
   .jz-cat .desc,.jz-cat .sub,.jz-cat .stats{display:none;}
   .jz-cat.cleaning .bg{background:linear-gradient(145deg,#214842,#15352f 58%,#0d221f);}
-  .jz-cat.repair  .bg{background:linear-gradient(145deg,#2a4260,#1b2f48 58%,#101d31);}
-  .jz-cat.moving  .bg{background:linear-gradient(145deg,#6d5544,#4d372a 58%,#2a1d15);}
+  .jz-cat.repair  .bg{background:linear-gradient(145deg,#7a3d15,#55280c 58%,#2e1506);}
+  .jz-cat.moving  .bg{background:linear-gradient(145deg,#1a54b8,#113a80 58%,#081f47);}
   .jz-cat.nanny   .bg{background:linear-gradient(145deg,#5e5566,#453c4d 58%,#2a222f);}
   .jz-cat.telecom .bg{background:linear-gradient(145deg,#1d4e89,#123a66 58%,#0b2444);}
   .jz-cat.insurance .bg{background:linear-gradient(145deg,#8c6224,#6b4a1a 58%,#3d2a0e);}
@@ -166,10 +166,10 @@
   .life-v6 .jz-cat .bg{display:none;}
   .life-v6 .jz-cat .in{padding:14px;min-height:0;flex-direction:row;align-items:center;gap:12px;position:relative;}
   .life-v6 .jz-cat .in::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:18px 0 0 18px;background:var(--brand);}
-  .life-v6 .jz-cat.repair .in::before{background:#1d4e89;}
-  .life-v6 .jz-cat.moving .in::before{background:#6d5544;}
+  .life-v6 .jz-cat.repair .in::before{background:#ea580c;}
+  .life-v6 .jz-cat.moving .in::before{background:#1678ff;}
   .life-v6 .jz-cat.nanny .in::before{background:#5e5566;}
-  .life-v6 .jz-cat.telecom .in::before{background:#2563eb;}
+  .life-v6 .jz-cat.telecom .in::before{background:#1d4e89;}
   .life-v6 .jz-cat.insurance .in::before{background:#8c6224;}
   .life-v6 .jz-cat.consumer_finance .in::before{background:#0f1a4d;}
   .life-v6 .jz-cat.health_care .in::before{background:#0e7490;}
@@ -183,8 +183,8 @@
   .life-v6 .jz-cat .hero{margin-top:0;flex:1;}
   .life-v6 .jz-cat .orb{width:44px;height:44px;font-size:20px;border-radius:14px;box-shadow:none;border:0;}
   .life-v6 .jz-cat.cleaning .orb{background:linear-gradient(145deg,#214842,#0d221f);}
-  .life-v6 .jz-cat.repair .orb{background:linear-gradient(145deg,#2a4260,#101d31);}
-  .life-v6 .jz-cat.moving .orb{background:linear-gradient(145deg,#6d5544,#2a1d15);}
+  .life-v6 .jz-cat.repair .orb{background:linear-gradient(145deg,#7a3d15,#2e1506);}
+  .life-v6 .jz-cat.moving .orb{background:linear-gradient(145deg,#1a54b8,#081f47);}
   .life-v6 .jz-cat.nanny .orb{background:linear-gradient(145deg,#5e5566,#2a222f);}
   .life-v6 .jz-cat.telecom .orb{background:linear-gradient(145deg,#1d4e89,#0b2444);}
   .life-v6 .jz-cat.insurance .orb{background:linear-gradient(145deg,#8c6224,#3d2a0e);}
@@ -234,8 +234,8 @@
     box-shadow:0 6px 14px rgba(15,42,38,.05);padding:12px;display:flex;flex-direction:column;gap:5px;color:inherit;text-decoration:none;}
   .jz-hot-rail .card .ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:16px;color:#fff;}
   .jz-hot-rail .card.cleaning .ic{background:linear-gradient(145deg,#214842,#0d221f);}
-  .jz-hot-rail .card.repair .ic{background:linear-gradient(145deg,#2a4260,#101d31);}
-  .jz-hot-rail .card.moving .ic{background:linear-gradient(145deg,#6d5544,#2a1d15);}
+  .jz-hot-rail .card.repair .ic{background:linear-gradient(145deg,#7a3d15,#2e1506);}
+  .jz-hot-rail .card.moving .ic{background:linear-gradient(145deg,#1a54b8,#081f47);}
   .jz-hot-rail .card.nanny .ic{background:linear-gradient(145deg,#5e5566,#2a222f);}
   .jz-hot-rail .card.telecom .ic{background:linear-gradient(145deg,#1d4e89,#0b2444);}
   .jz-hot-rail .card.insurance .ic{background:linear-gradient(145deg,#8c6224,#3d2a0e);}
@@ -423,8 +423,9 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=4"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script src="juzhu/app.js?v=22"></script>
+<script src="lvju-app-price.js"></script>
 <script>
 (function(){
   var pad = function(n){ return String(n).padStart(2,'0'); };
@@ -548,8 +549,12 @@
     return 'juzhu-bzf-project.html?channel=' + mode + '&project=' + encodeURIComponent(x.slug) + JUZHU.chainQS();
   }
   function channelPrice(mode, x) {
-    if (mode === 'rental') return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/月起</small>' : '价格面议';
-    if (mode === 'minsu')  return x.price_from != null ? '¥' + Number(x.price_from).toLocaleString() + '<small>/晚起</small>' : '价格面议';
+    // 租赁/民宿展示价走服务端三件套（2026-09）：/晚起 = 最低可售单夜价，/月起 = 起价
+    if (mode === 'rental' || mode === 'minsu') {
+      var pd = window.LVJU_PRICE ? LVJU_PRICE.parts(x) : { value: x.price_from, note: '价格面议' };
+      if (pd.value == null) return pd.note;
+      return '¥' + pd.value.toLocaleString() + '<small>' + LVJU_PRICE.unitText(x) + '</small>';
+    }
     return x.price_from != null ? x.price_from + '<small>起</small>' : '价格面议';
   }
   function renderChannelPane(mode, list) {
@@ -636,11 +641,20 @@
   function renderJiazhengCats(apiCats){
     var byId = {};
     JZ_CATS.forEach(function(c) { byId[c.id] = c; });
-    var list = (apiCats || []).map(function(c) {
-          var base = byId[c.id] || {};
+    var apiById = {};
+    (apiCats || []).forEach(function(c) { if (c && c.id) apiById[c.id] = c; });
+    // 入口以本地 JZ_CATS 为基准（12 个固定频道入口），接口回来的只做覆盖 + 追加。
+    // 接口按「当前城市有无可售商品」过滤，会把当前城市没配商品的频道一并滤掉
+    // （实测 city=贵州 只剩 10 个，丢了保洁和维修）；但这是导航入口，不是库存指示，
+    // 少一个入口就少一条进频道的路，所以不能跟着接口缩水。
+    var ids = JZ_CATS.map(function(c) { return c.id; });
+    Object.keys(apiById).forEach(function(id) { if (ids.indexOf(id) < 0) ids.push(id); });
+    var list = ids.map(function(id) {
+          var c = apiById[id] || {};
+          var base = byId[id] || {};
           return {
-            id: c.id,
-            name: c.name || base.name,
+            id: id,
+            name: c.name || base.name || id,
             icon: c.icon || base.icon || '•',
             pill: base.pill || '本地生活',
             desc: base.desc || (c.note || ''),
@@ -649,11 +663,6 @@
             group: base.group || '本地生活'
           };
         });
-    var catOrder = {};
-    JZ_CATS.forEach(function(c, i) { catOrder[c.id] = i; });
-    list.sort(function(a, b) {
-      return (catOrder[a.id] != null ? catOrder[a.id] : 99) - (catOrder[b.id] != null ? catOrder[b.id] : 99);
-    });
     var grid = document.getElementById('jzCats');
     if (lifeLayout === 'v5') {
       var groups = {};
@@ -731,11 +740,13 @@
     var el = document.getElementById('jzCoupon');
     if (!el) return;
     var list = [
-      { cls: '', amt: '50', unit: '元', title: '新用户立减', rule: '首单保洁/维修/搬家通用', href: 'juzhu-jiazheng-list.html?type=cleaning', tip: '今日可领' },
+      { cls: '', amt: '80', unit: '元档起', title: '酒店通兑券', rule: '同档任选试点名单酒店 · 随便住', href: 'juzhu-hotels.html', tip: '档内任选' },
       { cls: 'teal', amt: '30', unit: '元', title: '深度保洁满减', rule: '满 199 可用 · 限保洁', href: 'juzhu-jiazheng-list.html?type=cleaning', tip: '领券下单' },
       { cls: 'navy', amt: '100', unit: '元', title: '搬家专享券', rule: '同城搬家立减 · 不可叠加', href: 'juzhu-jiazheng-list.html?type=moving', tip: '限时领' },
       { cls: 'violet', amt: '8.8', unit: '折', title: '康养到家折扣', rule: '陪护/体检套餐可用', href: 'juzhu-jiazheng-list.html?type=health_care', tip: '立即领' },
-      { cls: 'green', amt: '20', unit: '元', title: '社区便民券', rule: '团购·跑腿满 50 减 20', href: 'juzhu-jiazheng-list.html?type=community', tip: '邻里专享' }
+      { cls: 'green', amt: '20', unit: '元', title: '社区便民券', rule: '团购·跑腿满 50 减 20', href: 'juzhu-jiazheng-list.html?type=community', tip: '邻里专享' },
+      { cls: 'green', amt: '门票', unit: '', title: '景点门票券', rule: '演示景区单人票 · 到园核销', href: 'juzhu-vouchers.html?kind=skus&category=scenic_ticket', tip: '去选券' },
+      { cls: 'violet', amt: '餐饮', unit: '', title: '本地餐饮券', rule: '演示餐厅代金 · 到店核销', href: 'juzhu-vouchers.html?kind=skus&category=dining', tip: '去选券' }
     ];
     el.innerHTML = list.map(function(c){
       return '<a class="ticket '+c.cls+'" href="'+c.href+'">'+
@@ -931,7 +942,10 @@
   }
 
   if (window.BZF_JZ && BZF_JZ.categories) {
-    BZF_JZ.categories().then(renderJiazhengCats).catch(function() {});
+    // 接口挂了也要把 12 个入口画出来（此时无接口数据，纯 JZ_CATS）
+    BZF_JZ.categories().then(renderJiazhengCats).catch(function() { renderJiazhengCats(null); });
+  } else {
+    renderJiazhengCats(null);   // _jzapi.js?v=7 没加载出来也不该整块空白
   }
 
   var skusP = window.BZF_JZ
@@ -1041,5 +1055,6 @@
   });
 })();
 </script>
+<script src="screens/_commerce-entry.js?v=20260919-2"></script>
 </body>
 </html>

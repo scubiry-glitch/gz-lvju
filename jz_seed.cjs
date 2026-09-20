@@ -257,7 +257,7 @@ async function seedAll(conn) {
     for (const s of JZ_DEFAULT_SKUS) {
       await conn.execute(
         `INSERT INTO jz_skus(id,category_id,name,slug,spec,price_from,price_unit,duration_min,
-          tags,badges,sales_text,rating_score,worker_min_level,includes_json,service_flow,service_notice,sort_order,enabled)
+          tags,badges,sales_text,rating_score,worker_min_level,includes,service_flow,service_notice,sort_order,enabled)
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [s.id,s.category_id,s.name,s.slug,s.spec,s.price_from,s.price_unit,s.duration_min,
          jd(s.tags),jd(s.badges),s.sales_text,s.rating_score,s.worker_min_level,

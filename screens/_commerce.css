@@ -1,0 +1,93 @@
+/* Layout additions only. Mobile typography/tokens/components come from lvju-app.css;
+   desktop geometry follows screens/p-jz-product.html. No global theme changes. */
+.commerce-page .scr{padding-bottom:24px}
+.commerce-content{padding:16px;display:grid;gap:14px;align-content:start}
+.commerce-content h2{font-family:var(--serif);font-size:21px;margin:0 0 8px}
+.commerce-content h3{font-size:15px;margin:0 0 8px}
+.commerce-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0;overflow-wrap:anywhere}
+.commerce-card p{font-size:13px;line-height:1.7;margin:8px 0;color:var(--muted)}
+.commerce-card .money{font:700 28px var(--serif);color:var(--gold-deep)}
+.commerce-hero{background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:white;border:0;padding:24px 20px}
+.commerce-hero p{color:rgba(255,255,255,.85)}
+.commerce-hero .eyebrow{letter-spacing:.14em;font-size:10px;margin-bottom:12px}
+.commerce-hero h2{font-size:25px;line-height:1.4}
+.commerce-note{padding:9px 14px;background:var(--gold-soft);font-size:11px;line-height:1.6;color:var(--gold-deep)}
+.commerce-toolbar{padding:10px 14px;background:var(--surface);display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.commerce-toolbar label{font-size:11px;color:var(--muted)}
+.commerce-toolbar select{max-width:100%;min-width:0}
+.commerce-tabs{display:flex;gap:7px;padding:12px 14px;background:var(--surface);flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.commerce-tabs button,.commerce-tabs a{padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:white;font:12px var(--font);color:var(--muted);cursor:pointer}
+.commerce-tabs .on{background:var(--brand-soft);color:var(--brand);border-color:var(--brand)}
+.commerce-page button,.commerce-page input,.commerce-page select,.commerce-page textarea{font:inherit}
+.commerce-page button{cursor:pointer}
+.commerce-page button:disabled{opacity:.45;cursor:not-allowed}
+.commerce-page input:not([type=checkbox]),.commerce-page select,.commerce-page textarea{padding:9px;border:1px solid var(--border);border-radius:8px;background:white;max-width:100%;color:var(--fg)}
+.commerce-page input:not([type=checkbox]),.commerce-page textarea{width:100%}
+.commerce-page .field{display:grid;gap:6px;margin:12px 0;font-size:12px;color:var(--muted)}
+.commerce-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+.commerce-actions .btn{border:1px solid var(--border);border-radius:8px;padding:9px 13px;background:white;color:var(--brand);font:13px var(--font);display:inline-block;text-align:center}
+.commerce-actions .btn.pri{background:var(--brand);border-color:var(--brand);color:white}
+.commerce-badge{display:inline-block;font-size:10px;padding:3px 8px;border-radius:999px;background:var(--brand-soft);color:var(--brand);margin:0 6px 6px 0}
+.commerce-list{list-style:none;margin:0;padding:0}
+.commerce-list li{padding:12px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.6}
+.commerce-list li:last-child{border:0}
+.commerce-list small{display:block;color:var(--muted);font-size:11px}
+.commerce-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.commerce-kpi{padding:13px;background:#f5f7f6;border-radius:9px;min-width:0}
+.commerce-kpi b{font-size:20px;display:block;overflow-wrap:anywhere}
+.commerce-kpi span{font-size:11px;color:var(--muted)}
+.commerce-empty{text-align:center;padding:36px 18px}
+.commerce-empty h3{font-family:var(--serif);font-size:20px}
+#commerce-status{margin:0 14px;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+#commerce-status:not(:empty){padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+#commerce-status.error{color:#b91c1c;border-color:#fecaca}
+.commerce-code{font-family:monospace;font-size:13px;overflow-wrap:anywhere;user-select:all;padding:12px;background:#f5f7f6;border:1px dashed var(--brand);border-radius:8px}
+.commerce-page .detail-row{display:flex;justify-content:space-between;gap:12px;margin:8px 0;font-size:12px}
+.commerce-page .detail-row span{color:var(--muted)}
+.commerce-page .receipt{padding-top:12px;border-top:1px dashed var(--border);margin-top:12px}
+.commerce-desktop{display:block;background:#f8fafc;min-height:100vh;color:var(--fg)}
+.commerce-desktop .console{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.commerce-desktop .main{min-width:0}
+.commerce-desktop .appbar{position:static}
+.commerce-desktop .commerce-content{padding:20px 24px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.commerce-desktop .commerce-content>.wide{grid-column:1/-1}
+.commerce-desktop .commerce-content h2{font:700 20px var(--font)}
+.commerce-desktop .commerce-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.commerce-desktop .commerce-card{padding:16px 18px}
+/* 工作台导航去重：≥1024px 共享侧栏在场，页面内模块 chips 隐藏；≤1023px 侧栏隐藏（_nav.js），chips 作为唯一导航。 */
+@media(min-width:1024px){.commerce-desktop .commerce-tabs{display:none}}
+/* 登录后身份与退出在侧栏用户盒，account-bar 仅匿名登录入口；模块名由面板承担，顶栏只留空间名。 */
+.commerce-desktop .account-bar.is-auth{display:none}
+.commerce-desktop .management-panel .eyebrow{display:none}
+/* 侧栏密度（仅权益工作台作用域，不动全站 _nav.js 样式） */
+.commerce-desktop .nv-side .nv-group{padding:11px 18px 4px;font-size:10px;letter-spacing:1px}
+.commerce-desktop .nv-side .nv-link{padding:7px 16px;font-size:12.5px}
+.commerce-desktop .nv-side .nv-link svg{width:15px;height:15px}
+.commerce-desktop .nv-side .nv-link.active{font-weight:600}
+@media(max-width:1023px){.commerce-desktop .console{grid-template-columns:minmax(0,1fr)}.commerce-desktop #side-nav,.commerce-desktop .nv-side{display:none}.commerce-desktop .commerce-content{padding:14px;grid-template-columns:minmax(0,1fr)}.commerce-desktop .commerce-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.commerce-desktop .commerce-tabs{position:sticky;top:0;z-index:5;flex-wrap:nowrap;overflow:auto;white-space:nowrap;box-shadow:0 6px 14px -10px #00000038}.commerce-desktop .commerce-tabs a,.commerce-desktop .commerce-tabs button{flex-shrink:0}}
+/* M1-A: reuse the existing site palette and card/navigation system. */
+.commerce-page{font-size:14px}.commerce-page *{box-sizing:border-box}.commerce-page .btn{display:inline-flex;justify-content:center;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:9px 13px;background:white;color:var(--brand);font-size:13px;text-decoration:none}.commerce-page .btn.pri{background:var(--brand);color:white;border-color:var(--brand)}.commerce-page button:focus-visible,.commerce-page a:focus-visible{outline:3px solid #d6ab67;outline-offset:3px}.account-bar{display:flex;align-items:center;gap:12px;padding:12px 16px;background:white;border-bottom:1px solid var(--border);font-size:12px}.account-bar span{flex:1;color:var(--muted)}.empty-mark{font-size:36px;color:var(--brand);margin:0 0 14px}.panel-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.eyebrow{display:block;letter-spacing:.12em;font-size:10px;color:var(--muted);margin-bottom:10px}.commerce-hero .eyebrow{color:#d8eee8}.management-filter{display:flex;align-items:end;gap:12px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--border);margin-top:18px}.management-filter label{display:grid;gap:6px;font-size:12px;color:var(--muted)}.commerce-table-wrap{overflow:auto;width:100%;border:1px solid var(--border);border-radius:9px}.commerce-table-wrap table{width:100%;border-collapse:collapse;text-align:left;font-size:12.5px;min-width:650px}.commerce-table-wrap th{background:#f5f7f7;font-weight:500;color:var(--muted)}.commerce-table-wrap td,.commerce-table-wrap th{padding:13px 12px;border-bottom:1px solid var(--border);max-width:240px;overflow-wrap:anywhere}.commerce-table-wrap tbody tr:hover{background:#f8fbfa}.row-actions{display:flex;gap:6px;flex-wrap:wrap;min-width:130px}.row-actions .btn{font-size:12px;padding:6px 9px}.pagination{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding-top:16px;font-size:12px;color:var(--muted)}.pagination span{margin-right:auto}.state-submitted,.state-awaiting_provider{background:#fff4df;color:#895f20}.state-rejected,.state-frozen{background:#fff0ed;color:#ad4438}.state-archived,.state-expired{background:#f1f3f5;color:#64748b}.commerce-dialog{border:1px solid var(--border);border-radius:16px;width:min(640px,calc(100vw - 28px));max-height:90dvh;padding:0;color:var(--fg);box-shadow:0 20px 90px #0003}.commerce-dialog::backdrop{background:#102b2870}
+.commerce-dialog form{display:flex;flex-direction:column;max-height:90dvh}
+.commerce-dialog header,.commerce-dialog footer{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1px solid var(--border);gap:12px;flex-shrink:0}.commerce-dialog h2{margin:0;font-size:17px;line-height:1.45}.dialog-close{border:0;background:transparent;font-size:24px;line-height:1;color:var(--muted)}.dialog-close:hover{color:var(--fg)}
+.commerce-dialog footer{border-top:1px solid var(--border);border-bottom:0;justify-content:flex-end}.commerce-dialog footer .btn{min-width:84px}
+/* 弹窗正文：详情行/说明全宽，文本与数字输入两列成组；长内容在体内滚动。 */
+.dialog-body{padding:4px 22px 18px;overflow-wrap:anywhere;overflow-y:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;align-content:start}
+.dialog-body>*{grid-column:1/-1}
+.dialog-body>label.field{grid-column:span 1;margin:0;padding:9px 0 3px}
+.dialog-body>label.field:has(textarea),.dialog-body>label.field:has(select),.dialog-body>label.field:has(input[type=checkbox]),.dialog-body>label.field:only-child{grid-column:1/-1}
+.voucher-code-dialog .dialog-body{display:block}
+.dialog-error{color:#b91c1c;padding:2px 22px 10px;font-size:12.5px;flex-shrink:0}
+.commerce-dialog .field{font-size:12.5px}
+.commerce-dialog .field input,.commerce-dialog .field select,.commerce-dialog .field textarea{width:100%;min-width:0;box-sizing:border-box;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font:14px/1.5 var(--font);background:white;color:var(--fg)}
+.commerce-dialog .field input:focus,.commerce-dialog .field select:focus,.commerce-dialog .field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.commerce-dialog .field textarea{resize:vertical;min-height:78px;line-height:1.7}
+.commerce-dialog .field:has(input[type=checkbox]),.commerce-dialog .field:has(input[type=radio]){display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg)}
+.commerce-dialog .field:has(input[type=checkbox]) input,.commerce-dialog .field:has(input[type=radio]) input{width:auto}
+.commerce-dialog .detail-row{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.commerce-dialog .detail-row span{color:var(--muted);font-size:12.5px}
+.commerce-dialog .detail-row b{font-weight:500;font-size:14px;white-space:pre-wrap}.package-items{border:1px solid var(--border);border-radius:8px;padding:12px}.item-line{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:12px}.item-line label{display:grid;gap:6px;font-size:12px}.form-hint,.consumer-footnote{color:var(--muted);font-size:12px;line-height:1.8}.setup-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px;padding-left:20px;margin:22px 0}.product-benefits{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0}.product-benefits span{background:var(--brand-soft);border-radius:6px;padding:6px 9px;color:var(--brand);font-size:11px}.product-bottom{display:flex;justify-content:space-between;gap:14px;align-items:center}.consumer-footnote{text-align:center;padding:0 10px}.commerce-kpi{color:var(--fg);text-decoration:none}.commerce-kpi b{margin:10px 0}.commerce-kpi small{font-size:11px;color:var(--brand)}
+@keyframes kpi-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.commerce-grid .commerce-kpi{animation:kpi-in .4s cubic-bezier(.2,.7,.3,1) both}
+.commerce-grid .commerce-kpi:nth-child(2){animation-delay:.05s}.commerce-grid .commerce-kpi:nth-child(3){animation-delay:.1s}.commerce-grid .commerce-kpi:nth-child(4){animation-delay:.15s}.commerce-grid .commerce-kpi:nth-child(5){animation-delay:.2s}.commerce-grid .commerce-kpi:nth-child(6){animation-delay:.25s}
+@media(prefers-reduced-motion:reduce){.commerce-grid .commerce-kpi{animation:none}}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media(max-width:760px){.panel-heading{flex-direction:column;gap:8px}.setup-steps{grid-template-columns:1fr;gap:12px}.commerce-dialog .detail-row{grid-template-columns:90px minmax(0,1fr)}.dialog-body{grid-template-columns:minmax(0,1fr)}.commerce-tabs{flex-wrap:nowrap;overflow:auto;white-space:nowrap}.commerce-tabs a,.commerce-tabs button{flex-shrink:0}.management-filter label{flex:1;min-width:110px}.management-filter input,.management-filter select{width:100%}.item-line{grid-template-columns:minmax(0,1fr)}.account-bar .btn{font-size:11px;padding:7px 9px}}

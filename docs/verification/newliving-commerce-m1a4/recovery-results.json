@@ -1,0 +1,73 @@
+{
+  "at": "2026-09-19T19:17:56.667Z",
+  "database": "isolated temporary MySQL database (removed)",
+  "checks": [
+    {
+      "name": "backup",
+      "passed": true,
+      "backup_ms": 215,
+      "dump_bytes": 76071,
+      "recovery_point": {
+        "ledger_latest": "2026-09-20T03:17:51.000Z",
+        "migration": "005_compensation"
+      }
+    },
+    {
+      "name": "REC-1 备份：mysqldump 全量一致性快照，记录数据恢复点",
+      "passed": true
+    },
+    {
+      "name": "restore",
+      "passed": true,
+      "rto_ms": 2753,
+      "rto_human": "2.8s",
+      "fingerprint": {
+        "orders": 2,
+        "coupons": 2,
+        "redemptions": 1,
+        "ledger": 11,
+        "batches": 1,
+        "items": 1,
+        "instructions": 1,
+        "receipts": 2,
+        "recoveries": 0,
+        "compensations": 0,
+        "debit_sum": "48000",
+        "credit_sum": "48000",
+        "refund_paid": "10000",
+        "payout_paid": "8000"
+      },
+      "recovery_point": {
+        "latest": "2026-09-20T03:17:51.000Z",
+        "migration": "005_compensation"
+      },
+      "invariants": "passed"
+    },
+    {
+      "name": "REC-2 恢复：全库还原后逐表行数、金额合计、账务不变量一致（记录 RTO）",
+      "passed": true
+    },
+    {
+      "name": "migration_upgrade",
+      "passed": true,
+      "note": "001-003 → 005 无损升级；ALTER 幂等；升级前业务表行数不变，004/005 重建为空"
+    },
+    {
+      "name": "REC-3 迁移升级：旧版本库（仅 001-003）无损升级到当前版本，业务数据保留",
+      "passed": true
+    },
+    {
+      "name": "rollback",
+      "passed": true,
+      "rollback_target": "HEAD（上一已验收版本）",
+      "meta_ok": true,
+      "catalog_ok": true,
+      "data_unchanged": true,
+      "note": "回退代码对新增表无感知；迁移版本表保留，前向升级无需处理"
+    },
+    {
+      "name": "REC-4 版本回退：回退代码不删历史、不覆盖账务，服务可启动",
+      "passed": true
+    }
+  ]
+}

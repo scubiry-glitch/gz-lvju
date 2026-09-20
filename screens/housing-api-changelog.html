@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>房源开放接口 · 变更说明（2026-09）· 新居住开放平台</title>
+  <style>
+    :root {
+      --bg: #fafafa; --surface: #fff; --fg: #111;
+      --muted: #6b6b6b; --border: #e5e5e5; --accent: #0f766e;
+      --accent-soft: color-mix(in oklab, var(--accent) 12%, transparent);
+      --success: #17a34a; --warn: #eab308; --danger: #dc2626;
+      --code-bg: #0f172a; --code-fg: #e2e8f0;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+      --font-body: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --font-mono: ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+      background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    p { margin: 0 0 10px; }
+    h1, h2, h3, h4 { font-weight: 700; }
+    code { font-family: var(--font-mono); font-size: 0.9em; background: color-mix(in oklab, var(--fg) 6%, transparent);
+      padding: 1px 5px; border-radius: 5px; }
+    pre { margin: 8px 0 14px; padding: 14px 16px; background: var(--code-bg); color: var(--code-fg);
+      border-radius: var(--radius-md); overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; }
+    pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+    pre .tok-key { color: #93c5fd; }
+    pre .tok-str { color: #fcd34d; }
+    pre .tok-num { color: #86efac; }
+    pre .tok-com { color: #64748b; font-style: italic; }
+
+    .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .doc-shell { max-width: 1000px; padding: 0 0 56px; min-width: 0; }
+    @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } #side-nav { display: none; } }
+
+    .doc-nav { display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--surface);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+    .doc-nav h1 { flex: 1; font-size: 16px; margin: 0; }
+    .doc-nav .ver { font-size: 11px; color: var(--muted); padding: 3px 8px; background: var(--bg); border-radius: 999px; }
+
+    .hero { margin: 20px 20px 12px; padding: 26px; border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, #07352f 0%, #0f766e 100%); color: #fff; }
+    .hero h2 { font-size: 22px; margin: 0 0 8px; letter-spacing: .3px; }
+    .hero p { opacity: .93; max-width: 64ch; }
+    .hero .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .hero .badge { font-size: 11px; padding: 4px 11px; border-radius: 999px;
+      background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); }
+
+    section { margin: 0 20px 26px; }
+    section h2 { font-size: 19px; margin: 26px 0 12px; display: flex; align-items: center; gap: 10px; }
+    section h2 .num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+      background: var(--accent); color: #fff; font-size: 13px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 16px 18px; margin: 0 0 14px; }
+    .card h3 { font-size: 15.5px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .card .tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); }
+    .card .tag.new { background: color-mix(in oklab, var(--success) 16%, transparent); color: #15803d; }
+    .card .tag.keep { background: color-mix(in oklab, var(--fg) 8%, transparent); color: var(--muted); }
+    .quote { font-size: 13px; color: var(--muted); border-left: 3px solid var(--border); padding: 2px 0 2px 11px; margin: 8px 0 12px; }
+    .lab { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin: 12px 0 5px; }
+
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 13px; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--bg); font-weight: 700; font-size: 12px; color: var(--muted); }
+    td code { white-space: nowrap; }
+
+    .callout { border-radius: var(--radius-sm); padding: 11px 14px; margin: 10px 0; font-size: 13.5px; }
+    .callout.info   { background: var(--accent-soft); color: color-mix(in oklab, var(--accent) 80%, black); }
+    .callout.warn   { background: color-mix(in oklab, var(--warn) 16%, transparent); color: #78350f; }
+    .callout.danger { background: color-mix(in oklab, var(--danger) 12%, transparent); color: var(--danger); }
+    .callout.ok     { background: color-mix(in oklab, var(--success) 13%, transparent); color: #15803d; }
+
+    .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 14px 18px; margin: 0 20px 10px; }
+    .toc h3 { margin: 0 0 8px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .toc ol { padding-left: 20px; margin: 0; columns: 2; column-gap: 24px; }
+    .toc li { font-size: 13px; padding: 2px 0; break-inside: avoid; }
+
+    .doc-foot { margin: 26px 20px 0; padding: 16px 20px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 12.5px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div id="side-nav" data-series="portal" data-active="api-changelog"></div>
+
+  <div class="doc-shell">
+    <div class="doc-nav">
+      <h1>房源开放接口 · 变更说明（2026-09）</h1>
+      <span class="ver">v2026-09-18</span>
+    </div>
+
+    <div class="hero">
+      <h2>你们提的 5 条 + 房源字段，已全部落地</h2>
+      <p>按贵方 2026-09 的接入反馈逐条实现：短租按晚定价、起价选填、多渠道库存对账、图集迭代换图、
+      住宿规则归位，以及「房源字段」表的 21 个房间档案字段。下面每条都写清了三件事——
+      <strong>原问题</strong>、<strong>我们怎么改</strong>、<strong>你们要改什么</strong>。</p>
+      <div class="badges">
+        <span class="badge">✅ 5 条反馈全部落地</span>
+        <span class="badge">✅ 向后兼容：不传新字段 = 行为不变</span>
+        <span class="badge">📄 接口全量文档见「房源接入 API」</span>
+      </div>
+    </div>
+
+    <div class="toc">
+      <h3>目录</h3>
+      <ol>
+        <li><a href="#p1">短租按晚定价（户型级夜价）</a></li>
+        <li><a href="#p2">起价改为选填 + 卡片展示价</a></li>
+        <li><a href="#p3">多渠道库存：净可售 + 默认关房</a></li>
+        <li><a href="#p4">图集全量覆盖（换图 / 撤图）</a></li>
+        <li><a href="#p5">住宿规则归位到户型</a></li>
+        <li><a href="#fields">房源属性 API：房间档案 21 字段</a></li>
+        <li><a href="#diff">字段级变更速查表</a></li>
+        <li><a href="#todo">需要你们确认的 2 件事（1 项已定）</a></li>
+        <li><a href="#compat">向后兼容承诺</a></li>
+      </ol>
+    </div>
+
+    <!-- ============ 点 1 ============ -->
+    <section id="p1">
+      <h2><span class="num">1</span>短租按晚定价</h2>
+      <div class="card">
+        <h3>户型级夜价 <span class="tag new">新增生效</span></h3>
+        <div class="quote">「我们目前的业务是短租，每晚价格独立（周末涨价、节假日溢价、平日低价）；接口中的 price_from 是按月租金折算，这样不太好。」</div>
+        <div class="lab">怎么改的</div>
+        <p><code>units.price_night</code>（元/晚）此前在 <code>rental</code> 频道<strong>收得下但不参与计价</strong>，
+        现在<strong>两个频道一致生效</strong>。默认夜价取值顺序：</p>
+        <table>
+          <tr><th width="8%">顺序</th><th width="34%">取值</th><th>说明</th></tr>
+          <tr><td>1</td><td><code>units.price_night</code></td><td><strong>本次生效</strong>：你们直接传每晚价</td></tr>
+          <tr><td>2</td><td><code>rent_monthly ÷ 30</code></td><td>保留，老数据不受影响</td></tr>
+          <tr><td>3</td><td><code>price_from ÷ 30</code></td><td>保留，兜底</td></tr>
+          <tr><td>最高</td><td>房态日历逐晚覆盖价</td><td>不变：周末 / 节假日分档仍走这里</td></tr>
+        </table>
+        <div class="callout ok"><strong>你们要改什么：不用改。</strong>继续传 <code>price_night</code> 即可生效；
+        存量按 <code>rent_monthly</code> 传的房源价格一分不变。</div>
+      </div>
+    </section>
+
+    <!-- ============ 点 2 ============ -->
+    <section id="p2">
+      <h2><span class="num">2</span>起价改为选填 + 卡片展示价</h2>
+      <div class="card">
+        <h3>price_from 选填 <span class="tag new">门槛调整</span></h3>
+        <div class="quote">「房源 project 上的 price_from 是否可以非必填？我们目前没有 project，属于对接适配，会构造一个出来；价格设定在 unit 层级，不想使用 price_from。」</div>
+        <div class="lab">怎么改的</div>
+        <ul>
+          <li><code>price_from</code> <strong>改为选填</strong>，不传即可。</li>
+          <li>上架门槛从「必须有起价」换成「<strong>每个户型都能算出一个大于 0 的默认夜价</strong>」——
+            不传起价时，每个户型自己带价（<code>price_night</code> 或 <code>rent_monthly</code>）就行；
+            传了起价，全部户型自动继承，行为与旧闸一致。缺价会 400 并<strong>点名是哪个户型</strong>。</li>
+          <li>新增只读出参 <code>price_from_display</code> / <code>price_unit</code> / <code>price_note</code>，
+            C 端卡片价格由平台算好下发。</li>
+          <li>顺带堵了个洞：算不出价的订单现在<strong>直接拒单（400）</strong>，不再 0 元成单。</li>
+        </ul>
+        <div class="lab">卡片展示单位怎么定（A″ 口径）</div>
+        <table>
+          <tr><th width="30%">房源</th><th width="16%">单位</th><th>取值</th></tr>
+          <tr><td><code>minsu</code> 民宿</td><td><code>night</code> 按晚</td><td>起价（<code>price_from</code> 本就是元/晚）</td></tr>
+          <tr><td><code>rental</code> 且带「旅居」tag</td><td><code>night</code> 按晚</td><td><strong>最低可售单夜价</strong>（见下）</td></tr>
+          <tr><td>其余 <code>rental</code>（保租房 / 长租）</td><td><code>month</code> 按月</td><td>起价语义，<strong>展示不变</strong></td></tr>
+        </table>
+        <p><strong>「最低可售单夜价」怎么算：</strong>从<strong>今天</strong>起按自然月向后扫描（最多 <strong>12 个月</strong>，与 C 端可订窗口同口径），
+        取<strong>第一个存在可售间夜的月份</strong>，该月内<strong>最低单夜价</strong>即展示价；扫满仍无可售 → 卡片显示「暂无可订」。
+        <strong>没有房态记录的晚 = 默认可订</strong>（按默认夜价），不会误判成无房。</p>
+        <div class="callout ok"><strong>你们要改什么：不用改。</strong>不想传起价就不传；想控制 C 端「¥X 起」，继续传即可。</div>
+        <div class="callout warn"><strong>一处与你们原始描述的差异，请确认：</strong>你们写的是「图集最少 7 张」，
+        而平台原上架门槛是合计 ≥ 8 张（房源图 + 户型图）。<strong>已按你们的 7 张调整：现在合计 ≥ 7 张 + 至少 1 张封面即可上架</strong>（见第 4 条）。</div>
+      </div>
+    </section>
+
+    <!-- ============ 点 3 ============ -->
+    <section id="p3">
+      <h2><span class="num">3</span>多渠道库存：净可售 + 默认关房</h2>
+      <div class="card">
+        <h3>净可售 <code>available_qty</code> <span class="tag new">新增</span></h3>
+        <div class="quote">「户型的 total_qty=6，贝壳侧卖了 2 个，橙途其他渠道卖了 1 个，还有 1 个暂不可售（未保洁）→ 可售库存 6−2−1−1=2。
+        房源经营为多渠道、且有部分库存暂时不可售，可售库存会不断变化。」</div>
+        <div class="lab">怎么改的</div>
+        <p>新增 <code>available_qty</code>（<strong>净可售</strong>）：直接推「这一晚平台还能卖几间」，<strong>按你们自己的口径算</strong>。
+        平台记下推送时点的已订数作为<strong>基线</strong>，之后<strong>只有平台自己卖掉的</strong>才从这个数里扣，取消自动加回；
+        并以「物理余量（<code>total_qty − 已订</code>）」封顶，<strong>防对账漏项导致超售</strong>。</p>
+        <table>
+          <tr><th width="22%">动作</th><th width="18%">平台剩余</th><th>说明</th></tr>
+          <tr><td>推 <code>available_qty: 2</code>（此时平台已订 2）</td><td><strong>2</strong></td><td>基线记 2；旧口径会二次扣成 0</td></tr>
+          <tr><td>平台又卖掉 1 间</td><td><strong>1</strong></td><td>只扣平台之后的占用</td></tr>
+          <tr><td>客户取消</td><td><strong>2</strong></td><td>自动加回，不越过推送值</td></tr>
+          <tr><td>他渠道再卖 1 → 重推 <code>available_qty: 1</code></td><td><strong>1</strong></td><td>基线刷新为当时已订数</td></tr>
+        </table>
+        <p><code>qty</code>（放出总量，含平台已订）与 <code>available_qty</code> <strong>同一次调用只能传一个</strong>（同时传 400）。
+        写 <code>qty</code> 会把基线清空，回到旧语义。推送响应会逐日回 <code>days[]</code>（<code>qty / booked_qty / remaining</code>），
+        <strong>推完即可对账，不必再查一次日历</strong>。</p>
+        <div class="callout info"><strong>防超售兜底：</strong>推的数若超过实际剩下的房间数，平台按物理余量封顶。
+        所以<strong>推大不会超售，推小才会少卖</strong>——对账宁可略保守。</div>
+        <h3 style="margin-top:20px;">默认关房 <code>default_closed</code> <span class="tag new">可选开关</span></h3>
+        <p>净可售解决「<strong>推过的晚</strong>怎么算」，默认关房解决「<strong>没推过的晚</strong>怎么办」。
+        平台默认「没推过的晚 = 可订、放出 = <code>total_qty</code>」——对多渠道商家这很危险：
+        你们在别处卖掉、或临时不可售的晚，只要没推过，平台照样放出去卖。</p>
+        <p>把房型的 <code>default_closed</code> 设为 <code>true</code> 后：<strong>只有你们显式推送过放出量的晚才可订</strong>；
+        没推过的晚、<strong>只设过夜价没设放出量的晚</strong>一律不可订。<strong>缺省关闭</strong>（不配置 = 现状），
+        只作用于指定户型的预订，整栋单语义不变。</p>
+        <div class="callout ok"><strong>你们要改什么：不用改。</strong>不用净可售也可以继续用 <code>qty</code>；
+        默认关房是可选开关，建议需要多渠道对账的房型开启，并按未来 12 个月滚动推送放出量。</div>
+      </div>
+    </section>
+
+    <!-- ============ 点 4 ============ -->
+    <section id="p4">
+      <h2><span class="num">4</span>图集全量覆盖（换图 / 撤图）</h2>
+      <div class="card">
+        <h3><code>photos/sync</code> <span class="tag new">新增接口</span></h3>
+        <div class="quote">「只提供了新增图片的功能。反复迭代房型图片（换实拍图、替换旧图、撤掉失效图），每次只能 add；
+        图片越堆越多，图集冗余、C 端展示杂乱。」</div>
+        <div class="lab">怎么改的</div>
+        <p>新增 <strong><code>photos/sync</code></strong>：把该实体<strong>当前完整的图集</strong>传上来，平台对比存量——
+        <strong>保留列表内的</strong>（原地更新，图片 id 不变、C 端引用不抖）、<strong>移除不在列表内的</strong>，整体一个事务。</p>
+        <pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"unit_id"</span>: <span class="tok-num">3101</span>,   <span class="tok-com">// 不传 unit_id = 房源级图集</span>
+  <span class="tok-key">"photos"</span>: [
+    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.example.com/p1.jpg"</span>, <span class="tok-key">"category"</span>: <span class="tok-str">"bedroom"</span>, <span class="tok-key">"sort"</span>: <span class="tok-num">0</span>, <span class="tok-key">"is_cover"</span>: <span class="tok-key">true</span>,
+      <span class="tok-key">"external_id"</span>: <span class="tok-str">"IMG-1001"</span> },   <span class="tok-com">// 你们侧的稳定图 id</span>
+    { <span class="tok-key">"url"</span>: <span class="tok-str">"https://cdn.example.com/p2.jpg"</span>, <span class="tok-key">"category"</span>: <span class="tok-str">"living"</span>, <span class="tok-key">"sort"</span>: <span class="tok-num">1</span>,
+      <span class="tok-key">"width"</span>: <span class="tok-num">1920</span>, <span class="tok-key">"height"</span>: <span class="tok-num">1080</span> }        <span class="tok-com">// 声明值可选</span>
+  ] }
+→ 200 { <span class="tok-key">"applied"</span>: <span class="tok-num">8</span>, <span class="tok-key">"added"</span>: <span class="tok-num">5</span>, <span class="tok-key">"updated"</span>: <span class="tok-num">3</span>, <span class="tok-key">"removed"</span>: <span class="tok-num">2</span>,
+        <span class="tok-key">"cover"</span>: <span class="tok-str">"…/p1.jpg"</span>, <span class="tok-key">"truncated"</span>: <span class="tok-key">false</span>, <span class="tok-key">"warnings"</span>: [],
+        <span class="tok-key">"photos"</span>: [ <span class="tok-com">/* 覆盖后的完整图集 */</span> ] }</code></pre>
+        <div class="lab">你们关心的几个点</div>
+        <table>
+          <tr><th width="26%">事项</th><th>处理</th></tr>
+          <tr><td><strong>同一张图怎么认</strong></td><td>匹配键 <strong><code>external_id</code> 优先、URL 兜底</strong>。你们说 URL 带签名会变——带上稳定图 id 即可，
+            换签名 URL 也只是原地更新那一张。</td></tr>
+          <tr><td><strong>图片分类</strong></td><td><code>category</code>：<code>bedroom</code> 卧室 / <code>kitchen</code> 厨房 / <code>bathroom</code> 卫生间 /
+            <code>living</code> 客厅 / <code>nearby</code> 周边 / <code>other</code> 其他（可选，缺省 <code>other</code>）。
+            C 端详情图集滑动时会显示分类。</td></tr>
+          <tr><td><strong>展示顺序</strong></td><td><code>sort</code> 从小到大，平台归一化为 <code>0..n-1</code> 落库；不传按数组顺序。</td></tr>
+          <tr><td><strong>数量</strong></td><td>单次上限 <strong>100 张</strong>，超出按 <code>sort</code> <strong>截取前 100</strong> 并回
+            <code>truncated: true</code> + <code>warnings</code>（不静默丢图）。</td></tr>
+          <tr><td><strong>大小 / 分辨率</strong></td><td>单图 <strong>≤10MB</strong>、分辨率 <strong>≥800×600</strong>。推送时可带
+            <code>width/height/size_bytes</code> <strong>声明值即时校验</strong>（零网络开销）；上架时平台<strong>抽检</strong>封面 + 靠前 2 张
+            <strong>真拉取核对</strong>。</td></tr>
+          <tr><td><strong>抽检会不会卡上架</strong></td><td><strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图）→ 400 拒绝；
+            <strong>仅网络不可达</strong>（超时 / DNS / 非 200）→ <strong>放行</strong>并回 <code>warnings</code>，CDN 抖动不卡上架。</td></tr>
+          <tr><td><strong>老的 <code>photos/add</code></strong></td><td>保留，且改为<strong>幂等</strong>：同 URL / 同 <code>external_id</code> 重推 = 原地更新，
+            不再堆重复行；顺带修掉「传了 <code>sort_order</code> 却被忽略」的问题。</td></tr>
+        </table>
+        <div class="callout ok"><strong>图集张数已按你们的 7 张对齐：</strong>
+        ① <strong>上架门槛 = 房源图 + 户型图合计 ≥ 7 张</strong>且至少 1 张封面（原为 8 张，已下调）；<br>
+        ② <code>photos/sync</code> <strong>不卡下限</strong>（只卡 100 张上限）——「≥7 张」是<strong>上架闸</strong>，不是每次覆盖的闸，
+        这样多户型房源才能先建后补。覆盖后不足 7 张时响应里会给一条 warning 提示。</div>
+      </div>
+    </section>
+
+    <!-- ============ 点 5 ============ -->
+    <section id="p5">
+      <h2><span class="num">5</span>住宿规则归位到户型</h2>
+      <div class="card">
+        <h3>最短连住下放户型 <span class="tag new">口径调整</span></h3>
+        <div class="quote">「projects 上的 min_stay_nights 和 units 的 cancel_policy，建议调整到一个实体中。
+        可以考虑把 projects 的 min_stay_nights 也调整到 unit 层级。」</div>
+        <div class="lab">怎么改的</div>
+        <p>最短连住现在<strong>户型级可配</strong>，生效顺序 <strong>户型 &gt; 房源 &gt; 频道默认</strong>（rental / minsu 默认均 15 晚）。
+        取消政策本来就挂在户型上——<strong>这样两条住宿规则都可以只在户型上配</strong>，不用再记哪个在房源、哪个在户型。</p>
+        <ul>
+          <li>写入：<code>units/create</code> / <code>units/update</code> 传 <code>min_stay_nights</code>（rental 1–365 / minsu 15–365，越界 400）。</li>
+          <li>房源级 <code>ext.min_stay_nights</code> 保留，语义降级为「房源默认值」。</li>
+          <li><strong>整栋单（不指定户型）</strong>按<strong>排序最前的户型</strong>取值——与取消政策同一套回退。</li>
+          <li>出参随行下发<strong>生效值</strong> <code>min_stay_nights</code> + 来源 <code>min_stay_nights_source</code>（<code>unit</code>/<code>project</code>/<code>default</code>）。</li>
+        </ul>
+        <div class="callout ok"><strong>你们要改什么：不用改。</strong>不传户型级 = 完全按现状（房源级 → 频道默认）。</div>
+      </div>
+    </section>
+
+    <!-- ============ 房源属性 API ============ -->
+    <section id="fields">
+      <h2><span class="num">6</span>房源属性 API：房间档案 21 字段</h2>
+      <div class="card">
+        <h3><code>units.room_profile</code> <span class="tag new">新开放写入</span></h3>
+        <p>入驻「房源字段」表（Excel）里的字段，统一放在户型级 <code>room_profile</code>，经
+        <code>units/create</code> / <code>units/update</code> 的 <code>room_profile</code> 对象写入，C 端详情页「房间档案」卡直接渲染。
+        <strong>此前这些字段只能平台后台录入，现在对商家开放接口开放</strong>。</p>
+        <div class="lab">写入规则</div>
+        <ul>
+          <li><strong>合并语义</strong>：传入的键覆盖同名键，<strong>未传的键保持原值</strong>；传 <code>null</code> 清除整块。</li>
+          <li><strong>白名单</strong>：不在下表内的键<strong>直接丢弃</strong>（不报错）。空值（<code>null</code> / 空串）视为未传。</li>
+          <li><strong>越界报错</strong>：枚举非法 / 数值越界 / 文本超长 / 图片地址非法 → 400，
+            message 里带字段中文名与可选值（例：<code>room_profile.smoking（吸烟属性）取值无效，可选：no / designated / allowed</code>）。</li>
+          <li><strong>出参</strong>：<code>units[]</code> 里直接给<strong>已解析的 <code>room_profile</code> 对象</strong>，不用自己 parse <code>ext</code> 字符串。</li>
+        </ul>
+        <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>,
+  <span class="tok-key">"room_profile"</span>: {
+    <span class="tok-key">"introduction"</span>: <span class="tok-str">"面朝庭院，独立入户"</span>,
+    <span class="tok-key">"area_type"</span>: <span class="tok-str">"building"</span>, <span class="tok-key">"window_type"</span>: <span class="tok-str">"exterior"</span>, <span class="tok-key">"window_count"</span>: <span class="tok-num">2</span>, <span class="tok-key">"window_openable"</span>: <span class="tok-key">true</span>,
+    <span class="tok-key">"max_guests"</span>: <span class="tok-num">4</span>, <span class="tok-key">"max_adults"</span>: <span class="tok-num">3</span>, <span class="tok-key">"max_children"</span>: <span class="tok-num">1</span>, <span class="tok-key">"smoking"</span>: <span class="tok-str">"no"</span>,
+    <span class="tok-key">"beds"</span>: <span class="tok-str">"卧室1：1.8×2.0m 大床"</span>, <span class="tok-key">"kitchen"</span>: <span class="tok-str">"独立厨房 · 可做饭"</span>,
+    <span class="tok-key">"feature_image"</span>: <span class="tok-str">"https://cdn.example.com/room.jpg"</span>
+  } }</code></pre>
+        <div class="lab">21 个字段</div>
+        <table>
+          <tr><th width="26%">字段</th><th width="15%">类型</th><th>说明</th></tr>
+          <tr><td><code>introduction</code></td><td>string ≤1000</td><td>房源简介：空间、布局、风格、适用人群、与本房型差异点</td></tr>
+          <tr><td><code>area_type</code></td><td>enum</td><td>面积口径：<code>building</code> 建筑面积 / <code>usable</code> 使用面积</td></tr>
+          <tr><td><code>shared_spaces</code></td><td>string ≤300</td><td>共享空间（如共享厨房、花园；无则填「无」）</td></tr>
+          <tr><td><code>window_type</code></td><td>enum</td><td>窗户类型：<code>exterior</code> 外窗 / <code>interior</code> 内窗 / <code>none</code> 无窗</td></tr>
+          <tr><td><code>window_count</code></td><td>int 0-20</td><td>窗户数量</td></tr>
+          <tr><td><code>window_openable</code></td><td>bool</td><td>窗户是否可开启</td></tr>
+          <tr><td><code>max_guests</code> / <code>max_adults</code> / <code>max_children</code></td><td>int</td><td>最大入住人数 1-99 / 成人上限 1-99 / 儿童上限 0-99</td></tr>
+          <tr><td><code>child_age_policy</code></td><td>string ≤300</td><td>儿童适住年龄（如「0-12 岁；婴幼儿须由监护人陪同」）</td></tr>
+          <tr><td><code>extra_guest_policy</code></td><td>string ≤500</td><td>加人 / 加床政策：是否允许、最多人数、费用、是否含床品早餐</td></tr>
+          <tr><td><code>beds</code></td><td>string ≤500</td><td>卧室与床位明细（如「卧室1：1 张 1.8×2.0m 大床；客厅：1 张沙发床」）</td></tr>
+          <tr><td><code>bath_hot_water</code></td><td>string ≤300</td><td>洗浴与热水（如「淋浴 · 24 小时热水」）</td></tr>
+          <tr><td><code>smoking</code></td><td>enum</td><td>吸烟属性：<code>no</code> 全屋禁烟 / <code>designated</code> 仅指定区域 / <code>allowed</code> 可吸烟</td></tr>
+          <tr><td><code>kitchen</code></td><td>string ≤500</td><td>厨房可用性：独立/共享/简易/不可用；厨具餐具、调料与做饭规则</td></tr>
+          <tr><td><code>climate</code></td><td>string ≤300</td><td>空调 / 暖气覆盖（如「全屋空调 · 地暖」）</td></tr>
+          <tr><td><code>network</code></td><td>string ≤200</td><td>网络（如「免费 Wi-Fi」）</td></tr>
+          <tr><td><code>cleaning_frequency</code></td><td>string ≤200</td><td>打扫频率（如「一客一扫」）</td></tr>
+          <tr><td><code>linen_frequency</code></td><td>string ≤200</td><td>床品 / 毛巾更换频率（如「一客一换」）</td></tr>
+          <tr><td><code>feature_image</code></td><td>string ≤1000</td><td>房间示意图地址：<strong>http(s) URL</strong> 或站内路径；禁换行与引号</td></tr>
+          <tr><td><code>feature_image_caption</code></td><td>string ≤120</td><td>房间示意图说明</td></tr>
+        </table>
+        <div class="callout info"><strong>与图集的分工：</strong><code>room_profile</code> 放<strong>一条</strong>房间示意图 + 一堆<strong>文字描述</strong>；
+        多张实拍图走图集（第 4 条的 <code>photos/sync</code>，带分类与排序）。两者互不影响。</div>
+      </div>
+    </section>
+
+    <!-- ============ 速查表 ============ -->
+    <section id="diff">
+      <h2><span class="num">7</span>字段级变更速查表</h2>
+      <table>
+        <tr><th width="24%">字段 / 接口</th><th width="16%">变化</th><th>说明</th></tr>
+        <tr><td><code>units.price_night</code></td><td><strong>生效</strong></td><td>rental 频道不再忽略；默认夜价最高优先</td></tr>
+        <tr><td><code>projects.price_from</code></td><td><strong>选填</strong></td><td>上架闸改为逐户型校验默认夜价 &gt; 0</td></tr>
+        <tr><td><code>price_from_display</code> / <code>price_unit</code> / <code>price_note</code></td><td>新增只读</td><td>C 端卡片价格，单位按房源分流；全窗口无可售 → 「暂无可订」</td></tr>
+        <tr><td><code>default_night_price</code></td><td>新增只读</td><td>户型默认单夜价（已算好，别再用月租 ÷ 30 自行折算）</td></tr>
+        <tr><td><code>available_qty</code></td><td>新增</td><td>净可售；与 <code>qty</code> 二选一；<code>set</code> 响应回 <code>days[]</code></td></tr>
+        <tr><td><code>units.default_closed</code></td><td>新增可选</td><td>默认关房，缺省关闭；只作用于指定户型</td></tr>
+        <tr><td><code>photos/sync</code></td><td><strong>新增接口</strong></td><td>图集全量覆盖 + 分类 + 排序 + 封面重算</td></tr>
+        <tr><td><code>photos/add</code></td><td>行为修正</td><td>改为幂等（同 URL / external_id 原地更新）；<code>sort_order</code> 传入即生效</td></tr>
+        <tr><td><code>units.min_stay_nights</code></td><td><strong>下放户型</strong></td><td>户型 &gt; 房源 &gt; 频道默认；整栋单按排序最前户型</td></tr>
+        <tr><td><code>units.room_profile</code></td><td><strong>新开放写入</strong></td><td>21 个房间档案字段；合并语义；出参已解析</td></tr>
+        <tr><td><code>min_stay_nights_source</code></td><td>新增只读</td><td>生效值来源：<code>unit</code> / <code>project</code> / <code>default</code></td></tr>
+        <tr><td><code>projects.featured_rank</code> / <code>unit_count</code> / <code>managed_unit_count</code></td><td>文档补齐</td><td>此前接口已支持但文档漏记，现补全说明</td></tr>
+      </table>
+    </section>
+
+    <!-- ============ 待确认 ============ -->
+    <section id="todo">
+      <h2><span class="num">8</span>需要你们确认的 2 件事（1 项已定）</h2>
+      <div class="card">
+        <table>
+          <tr><th width="8%">#</th><th width="38%">事项</th><th>我们的处理 / 建议</th></tr>
+          <tr><td>1</td><td><s><strong>图集最少张数：7 还是 8？</strong></s> <span style="color:#15803d;font-weight:700;">已定：7 张</span><br>
+            <span style="color:var(--muted);font-size:12.5px;">你们写 7 张（含封面），平台原上架门槛是 ≥8 张</span></td>
+            <td><strong>✅ 已按 7 张落地</strong>（2026-09-18）：上架门槛下调为「房源图 + 户型图合计 ≥ 7 张 + 至少 1 张封面」。阈值收口到单一常量，两处上架闸同读一份。</td></tr>
+          <tr><td>2</td><td><strong>「<code>qty</code> 要求 ≥ <code>total_qty</code>」这条规则的报错原文</strong><br>
+            <span style="color:var(--muted);font-size:12.5px;">你们反馈里提到这条限制</span></td>
+            <td>平台代码里<strong>没有</strong>这条规则——实际校验是「<code>qty</code> 不得低于该晚<strong>已订间数</strong>」（否则 400）。
+            请把你们撞到的原始报错贴回来，我们对一下是不是别的原因。</td></tr>
+          <tr><td>3</td><td><strong>整栋单（不指定房型）按「排序最前的户型」取规则</strong></td>
+            <td>已按此实现（与取消政策同一套回退）。若你们更认同「取最严（所有户型取最大值）」，告诉我们，两条规则一起调。</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 兼容性 ============ -->
+    <section id="compat">
+      <h2><span class="num">9</span>向后兼容承诺</h2>
+      <div class="card">
+        <div class="callout ok"><strong>不传新字段 = 行为逐字不变。</strong>具体来说：</div>
+        <ul>
+          <li>继续按 <code>price_from</code> + <code>rent_monthly</code> 传的房源：默认夜价与卡片展示价<strong>一分不变</strong>
+            （存量 132 个 rental 户型未配 <code>price_night</code>，已验证价格无变化）。</li>
+          <li>继续用 <code>qty</code>（放出总量）的房源：剩余数算法<strong>逐字节不变</strong>（<code>qty_base</code> 为空的存量行按旧口径走）。</li>
+          <li>不开启 <code>default_closed</code> 的房型：没推过的晚<strong>照旧可订</strong>。</li>
+          <li>继续用 <code>photos/add</code> 的接入方：接口保留；只是重复推同一张图不再堆重复行。</li>
+          <li>保租房 / 长租房源的 C 端卡片<strong>仍按月展示</strong>（<code>¥X/月起</code>），不受「旅居按晚」影响。</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="doc-foot">
+      <p><strong>配套文档：</strong>
+        <a href="property-intake-api.html">房源接入 API（含在线调试台）</a> —— 全部端点、字段字典、错误码、可直接发起请求；
+        <a href="open-faq.html">常见接入疑问 FAQ</a>；
+        <a href="旅居商家运营手册.html">旅居商家运营手册</a>。</p>
+      <p style="margin:0;"><strong>版本：</strong>2026-09-18 · 本页汇总 2026-09 一轮商家反馈的落地结果，接口契约以《房源接入 API》为准。</p>
+    </div>
+  </div>
+</div>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+</body>
+</html>

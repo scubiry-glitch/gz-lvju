@@ -1,0 +1,2489 @@
+{
+  "batch": "living-topics-v19-shenyang-v1",
+  "city": {
+    "id": 1,
+    "name": "沈阳",
+    "slug": "shenyang"
+  },
+  "topicHash": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19",
+  "designHash": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211",
+  "records": [
+    {
+      "kind": "merchants",
+      "key": "merchant:1:1",
+      "payload": {
+        "name": "春晖家政",
+        "vendor_id": 1,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 1,
+            "original_address": "西湖区文三路"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 1
+    },
+    {
+      "kind": "stores",
+      "key": "store:1:1",
+      "payload": {
+        "name": "春晖家政 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 1,
+            "original_address": "西湖区文三路"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:1:1"
+      },
+      "city_id": 1,
+      "vendor_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:1:1",
+      "payload": {
+        "name": "春晖家政 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:1:1"
+      },
+      "city_id": 1,
+      "vendor_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:raw-clean-new",
+      "payload": {
+        "name": "开荒保洁 · 新居服务券",
+        "supply_minor": null,
+        "retail_minor": 42800,
+        "valid_days": null,
+        "description": "新房装修后 · 全屋开荒；水泥漆点清理；全屋除尘除胶；门窗轨道清洁；地面打蜡养护",
+        "conditions": "按建筑面积计价；高空外窗不含；顽固污渍需二次确认；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 10,
+            "slug": "raw-clean-new",
+            "product_id": 111,
+            "vendor_id": 1,
+            "source_price_minor": 42800,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              111,
+              502
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:1:1",
+        "store_id": "store:1:1"
+      },
+      "city_id": 1,
+      "vendor_id": 1
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:21:1",
+      "payload": {
+        "name": "蚂蚁搬家",
+        "vendor_id": 21,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 21,
+            "original_address": "下城区东新路"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 21
+    },
+    {
+      "kind": "stores",
+      "key": "store:21:1",
+      "payload": {
+        "name": "蚂蚁搬家 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 21,
+            "original_address": "下城区东新路"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:21:1"
+      },
+      "city_id": 1,
+      "vendor_id": 21
+    },
+    {
+      "kind": "rules",
+      "key": "rule:21:1",
+      "payload": {
+        "name": "蚂蚁搬家 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:21:1"
+      },
+      "city_id": 1,
+      "vendor_id": 21
+    },
+    {
+      "kind": "skus",
+      "key": "sku:moving-city-standard",
+      "payload": {
+        "name": "居民搬家 · 同城服务券",
+        "supply_minor": null,
+        "retail_minor": 39800,
+        "valid_days": null,
+        "description": "金杯车 · 2名师傅；基础搬运；车辆运输；大件保护包裹；楼道清运",
+        "conditions": "楼层费按现场核算；超距单独计费；贵重物品建议保价；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 6,
+            "slug": "moving-city-standard",
+            "product_id": 2101,
+            "vendor_id": 21,
+            "source_price_minor": 39800,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              2101,
+              5151
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:21:1",
+        "store_id": "store:21:1"
+      },
+      "city_id": 1,
+      "vendor_id": 21
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:11:1",
+      "payload": {
+        "name": "快修家电",
+        "vendor_id": 11,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 11,
+            "original_address": "上城区庆春路"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "stores",
+      "key": "store:11:1",
+      "payload": {
+        "name": "快修家电 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 11,
+            "original_address": "上城区庆春路"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:11:1"
+      },
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "rules",
+      "key": "rule:11:1",
+      "payload": {
+        "name": "快修家电 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:11:1"
+      },
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "skus",
+      "key": "sku:appliance-repair",
+      "payload": {
+        "name": "家电维修 · 上门服务券",
+        "supply_minor": null,
+        "retail_minor": 8900,
+        "valid_days": null,
+        "description": "冰箱/洗衣机/热水器；故障检测；配件更换；功能调试；作业清洁",
+        "conditions": "配件费另计；超范围可重派；30天同故障质保；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 13,
+            "slug": "appliance-repair",
+            "product_id": 1107,
+            "vendor_id": 11,
+            "source_price_minor": 8900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              1107,
+              1201
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:11:1",
+        "store_id": "store:11:1"
+      },
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "skus",
+      "key": "sku:ac-clean-wall",
+      "payload": {
+        "name": "空调清洗 · 挂机服务券",
+        "supply_minor": null,
+        "retail_minor": 8900,
+        "valid_days": null,
+        "description": "高温蒸汽 · 拆装深度；滤网拆洗；蒸汽除菌；出风口清洁；基础功能检测",
+        "conditions": "柜机另计；高空外机不含；服务后24小时内可追评；频道展示价为参考/台，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 3,
+            "slug": "ac-clean-wall",
+            "product_id": 1105,
+            "vendor_id": 11,
+            "source_price_minor": 8900,
+            "source_price_unit": "/台",
+            "candidate_product_ids": [
+              1105
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:11:1",
+        "store_id": "store:11:1"
+      },
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "skus",
+      "key": "sku:pipe-unclog-fast",
+      "payload": {
+        "name": "管道疏通 · 当天服务券",
+        "supply_minor": null,
+        "retail_minor": 9900,
+        "valid_days": null,
+        "description": "30分钟响应 · 不通不收费；厨房下水疏通；卫生间地漏疏通；基础堵点判断；作业区清洁恢复",
+        "conditions": "超技能范围可重派；配件费另计；30天同故障质保；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 4,
+            "slug": "pipe-unclog-fast",
+            "product_id": 1102,
+            "vendor_id": 11,
+            "source_price_minor": 9900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              1102
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:11:1",
+        "store_id": "store:11:1"
+      },
+      "city_id": 1,
+      "vendor_id": 11
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:2:1",
+      "payload": {
+        "name": "平台优选·保洁",
+        "vendor_id": 2,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 2,
+            "original_address": "全国连锁"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 2
+    },
+    {
+      "kind": "stores",
+      "key": "store:2:1",
+      "payload": {
+        "name": "平台优选·保洁 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 2,
+            "original_address": "全国连锁"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:2:1"
+      },
+      "city_id": 1,
+      "vendor_id": 2
+    },
+    {
+      "kind": "rules",
+      "key": "rule:2:1",
+      "payload": {
+        "name": "平台优选·保洁 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:2:1"
+      },
+      "city_id": 1,
+      "vendor_id": 2
+    },
+    {
+      "kind": "skus",
+      "key": "sku:hood-clean-deep",
+      "payload": {
+        "name": "油烟机清洗 · 深度服务券",
+        "supply_minor": null,
+        "retail_minor": 12800,
+        "valid_days": null,
+        "description": "拆洗深度 · 除重油；油烟机拆洗；扇叶除油；机身内壁清洁；功能复检",
+        "conditions": "集成灶另计；老旧机型谨慎拆；服务后24h可追评；频道展示价为参考/台，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 12,
+            "slug": "hood-clean-deep",
+            "product_id": 203,
+            "vendor_id": 2,
+            "source_price_minor": 12800,
+            "source_price_unit": "/台",
+            "candidate_product_ids": [
+              203,
+              402
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:2:1",
+        "store_id": "store:2:1"
+      },
+      "city_id": 1,
+      "vendor_id": 2
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:44:1",
+      "payload": {
+        "name": "康养到家",
+        "vendor_id": 44,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 44,
+            "original_address": "全市"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 44
+    },
+    {
+      "kind": "stores",
+      "key": "store:44:1",
+      "payload": {
+        "name": "康养到家 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 44,
+            "original_address": "全市"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:44:1"
+      },
+      "city_id": 1,
+      "vendor_id": 44
+    },
+    {
+      "kind": "rules",
+      "key": "rule:44:1",
+      "payload": {
+        "name": "康养到家 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:44:1"
+      },
+      "city_id": 1,
+      "vendor_id": 44
+    },
+    {
+      "kind": "skus",
+      "key": "sku:health-elder-day",
+      "payload": {
+        "name": "养老陪护 · 日间服务券",
+        "supply_minor": null,
+        "retail_minor": 28000,
+        "valid_days": null,
+        "description": "持证护理 · 日间到岗；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考/天，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 31,
+            "slug": "health-elder-day",
+            "product_id": 4107,
+            "vendor_id": 44,
+            "source_price_minor": 28000,
+            "source_price_unit": "/天",
+            "candidate_product_ids": [
+              4107,
+              5107
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:44:1",
+        "store_id": "store:44:1"
+      },
+      "city_id": 1,
+      "vendor_id": 44
+    },
+    {
+      "kind": "skus",
+      "key": "sku:health-checkup-basic",
+      "payload": {
+        "name": "体检套餐 · 基础服务券",
+        "supply_minor": null,
+        "retail_minor": 29900,
+        "valid_days": null,
+        "description": "三甲对接 · 报告解读；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 32,
+            "slug": "health-checkup-basic",
+            "product_id": 4108,
+            "vendor_id": 44,
+            "source_price_minor": 29900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              4108,
+              5108
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:44:1",
+        "store_id": "store:44:1"
+      },
+      "city_id": 1,
+      "vendor_id": 44
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:31:1",
+      "payload": {
+        "name": "阿姨来了",
+        "vendor_id": 31,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 31,
+            "original_address": "全国连锁"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 31
+    },
+    {
+      "kind": "stores",
+      "key": "store:31:1",
+      "payload": {
+        "name": "阿姨来了 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 31,
+            "original_address": "全国连锁"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:31:1"
+      },
+      "city_id": 1,
+      "vendor_id": 31
+    },
+    {
+      "kind": "rules",
+      "key": "rule:31:1",
+      "payload": {
+        "name": "阿姨来了 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:31:1"
+      },
+      "city_id": 1,
+      "vendor_id": 31
+    },
+    {
+      "kind": "skus",
+      "key": "sku:nanny-livein-full",
+      "payload": {
+        "name": "住家保姆 · 全职服务券",
+        "supply_minor": null,
+        "retail_minor": 680000,
+        "valid_days": null,
+        "description": "做饭/保洁/照护 全包；一日三餐；全屋保洁；衣物洗护；日常采买",
+        "conditions": "签约含体检；试工3天可换人；节假日另议；频道展示价为参考/月，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 21,
+            "slug": "nanny-livein-full",
+            "product_id": 3104,
+            "vendor_id": 31,
+            "source_price_minor": 680000,
+            "source_price_unit": "/月",
+            "candidate_product_ids": [
+              3104,
+              3201,
+              5253
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:31:1",
+        "store_id": "store:31:1"
+      },
+      "city_id": 1,
+      "vendor_id": 31
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:45:1",
+      "payload": {
+        "name": "安居养护",
+        "vendor_id": 45,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 45,
+            "original_address": "全市"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 45
+    },
+    {
+      "kind": "stores",
+      "key": "store:45:1",
+      "payload": {
+        "name": "安居养护 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 45,
+            "original_address": "全市"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:45:1"
+      },
+      "city_id": 1,
+      "vendor_id": 45
+    },
+    {
+      "kind": "rules",
+      "key": "rule:45:1",
+      "payload": {
+        "name": "安居养护 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:45:1"
+      },
+      "city_id": 1,
+      "vendor_id": 45
+    },
+    {
+      "kind": "skus",
+      "key": "sku:maintain-appliance",
+      "payload": {
+        "name": "家电保养 · 套餐服务券",
+        "supply_minor": null,
+        "retail_minor": 15900,
+        "valid_days": null,
+        "description": "空调/冰箱/洗衣机；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 34,
+            "slug": "maintain-appliance",
+            "product_id": 4110,
+            "vendor_id": 45,
+            "source_price_minor": 15900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              4110,
+              5110
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:45:1",
+        "store_id": "store:45:1"
+      },
+      "city_id": 1,
+      "vendor_id": 45
+    },
+    {
+      "kind": "skus",
+      "key": "sku:maintain-pipe-quarter",
+      "payload": {
+        "name": "管道养护 · 季度服务券",
+        "supply_minor": null,
+        "retail_minor": 19800,
+        "valid_days": null,
+        "description": "疏通+防堵养护；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考/季，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 33,
+            "slug": "maintain-pipe-quarter",
+            "product_id": 4109,
+            "vendor_id": 45,
+            "source_price_minor": 19800,
+            "source_price_unit": "/季",
+            "candidate_product_ids": [
+              4109,
+              5109
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:45:1",
+        "store_id": "store:45:1"
+      },
+      "city_id": 1,
+      "vendor_id": 45
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:42:1",
+      "payload": {
+        "name": "安居财险专区",
+        "vendor_id": 42,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 42,
+            "original_address": "全国"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 42
+    },
+    {
+      "kind": "stores",
+      "key": "store:42:1",
+      "payload": {
+        "name": "安居财险专区 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 42,
+            "original_address": "全国"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:42:1"
+      },
+      "city_id": 1,
+      "vendor_id": 42
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:43:1",
+      "payload": {
+        "name": "江苏银行消费金融",
+        "vendor_id": 43,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 43,
+            "original_address": "本地"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 43
+    },
+    {
+      "kind": "stores",
+      "key": "store:43:1",
+      "payload": {
+        "name": "江苏银行消费金融 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 43,
+            "original_address": "本地"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:43:1"
+      },
+      "city_id": 1,
+      "vendor_id": 43
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:46:1",
+      "payload": {
+        "name": "贝壳资产顾问",
+        "vendor_id": 46,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 46,
+            "original_address": "本地"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 46
+    },
+    {
+      "kind": "stores",
+      "key": "store:46:1",
+      "payload": {
+        "name": "贝壳资产顾问 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 46,
+            "original_address": "本地"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:46:1"
+      },
+      "city_id": 1,
+      "vendor_id": 46
+    },
+    {
+      "kind": "rules",
+      "key": "rule:46:1",
+      "payload": {
+        "name": "贝壳资产顾问 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:46:1"
+      },
+      "city_id": 1,
+      "vendor_id": 46
+    },
+    {
+      "kind": "skus",
+      "key": "sku:asset-appraisal",
+      "payload": {
+        "name": "资产评估 · 房产服务券",
+        "supply_minor": null,
+        "retail_minor": 50000,
+        "valid_days": null,
+        "description": "持证评估师上门；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 35,
+            "slug": "asset-appraisal",
+            "product_id": 4111,
+            "vendor_id": 46,
+            "source_price_minor": 50000,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              4111,
+              5111
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:46:1",
+        "store_id": "store:46:1"
+      },
+      "city_id": 1,
+      "vendor_id": 46
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:47:1",
+      "payload": {
+        "name": "绿色回收站",
+        "vendor_id": 47,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 47,
+            "original_address": "全市"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 47
+    },
+    {
+      "kind": "stores",
+      "key": "store:47:1",
+      "payload": {
+        "name": "绿色回收站 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 47,
+            "original_address": "全市"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:47:1"
+      },
+      "city_id": 1,
+      "vendor_id": 47
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:41:1",
+      "payload": {
+        "name": "联通装维优选",
+        "vendor_id": 41,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 41,
+            "original_address": "全市覆盖"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 41
+    },
+    {
+      "kind": "stores",
+      "key": "store:41:1",
+      "payload": {
+        "name": "联通装维优选 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 41,
+            "original_address": "全市覆盖"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:41:1"
+      },
+      "city_id": 1,
+      "vendor_id": 41
+    },
+    {
+      "kind": "rules",
+      "key": "rule:41:1",
+      "payload": {
+        "name": "联通装维优选 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:41:1"
+      },
+      "city_id": 1,
+      "vendor_id": 41
+    },
+    {
+      "kind": "skus",
+      "key": "sku:telecom-broadband",
+      "payload": {
+        "name": "宽带新装 · 千兆服务券",
+        "supply_minor": null,
+        "retail_minor": 9900,
+        "valid_days": null,
+        "description": "装维上门 · 当周开通；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 25,
+            "slug": "telecom-broadband",
+            "product_id": 4101,
+            "vendor_id": 41,
+            "source_price_minor": 9900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              4101,
+              5101
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:41:1",
+        "store_id": "store:41:1"
+      },
+      "city_id": 1,
+      "vendor_id": 41
+    },
+    {
+      "kind": "skus",
+      "key": "sku:cleaning-daily-2h",
+      "payload": {
+        "name": "日常保洁 · 2小时服务券",
+        "supply_minor": null,
+        "retail_minor": 13980,
+        "valid_days": null,
+        "description": "1人上门 · 全屋除尘整理；客厅卧室除尘；地面清洁；台面整理；基础厨卫擦拭",
+        "conditions": "服务前2小时可免费取消；标准耗材已含；超时按30分钟补差价；频道展示价为参考/次，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 1,
+            "slug": "cleaning-daily-2h",
+            "product_id": 103,
+            "vendor_id": 1,
+            "source_price_minor": 13980,
+            "source_price_unit": "/次",
+            "candidate_product_ids": [
+              103,
+              201,
+              301,
+              401,
+              501
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:1:1",
+        "store_id": "store:1:1"
+      },
+      "city_id": 1,
+      "vendor_id": 1
+    },
+    {
+      "kind": "merchants",
+      "key": "merchant:48:1",
+      "payload": {
+        "name": "邻里便民站",
+        "vendor_id": 48,
+        "city_id": 1,
+        "contract_ref": null,
+        "contact": null,
+        "phone": null,
+        "description": "从生活服务频道既有商家档案关联。沈阳履约主体、合同及联系方式待核实。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 48,
+            "original_address": "全市"
+          },
+          "missing": [
+            "沈阳履约授权",
+            "合同编号",
+            "业务联系人",
+            "联系电话"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1,
+      "vendor_id": 48
+    },
+    {
+      "kind": "stores",
+      "key": "store:48:1",
+      "payload": {
+        "name": "邻里便民站 · 沈阳服务点（待确认）",
+        "city_id": 1,
+        "address": null,
+        "phone": null,
+        "capacity": null,
+        "lead_hours": null,
+        "description": "拟用于沈阳权益履约，实际门店地址、预约名额及服务时段待商户确认。原档案地址仅作来源记录，不作为沈阳门店地址。",
+        "initialization": {
+          "source": {
+            "table": "jz_vendors",
+            "id": 48,
+            "original_address": "全市"
+          },
+          "missing": [
+            "实际门店",
+            "沈阳服务地址",
+            "每日履约产能",
+            "提前预约时间",
+            "营业服务时段"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:48:1"
+      },
+      "city_id": 1,
+      "vendor_id": 48
+    },
+    {
+      "kind": "rules",
+      "key": "rule:48:1",
+      "payload": {
+        "name": "邻里便民站 · 权益分配规则",
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "供货报价、最低佣金标准与渠道比例待商务审核。v1.9中20%/50%为演算参考，不构成商户承诺。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 18.1"
+          },
+          "missing": [
+            "贝壳佣金比例",
+            "渠道分佣比例",
+            "最低佣金率门槛"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:48:1"
+      },
+      "city_id": 1,
+      "vendor_id": 48
+    },
+    {
+      "kind": "skus",
+      "key": "sku:community-errand",
+      "payload": {
+        "name": "便民代办 · 跑腿服务券",
+        "supply_minor": null,
+        "retail_minor": 2900,
+        "valid_days": null,
+        "description": "取送件 · 代缴代办；在线预约；认证服务商；进度可查",
+        "conditions": "价格以实际报价为准；部分服务需资质核验；频道展示价为参考起，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 40,
+            "slug": "community-errand",
+            "product_id": 4116,
+            "vendor_id": 48,
+            "source_price_minor": 2900,
+            "source_price_unit": "起",
+            "candidate_product_ids": [
+              4116,
+              5116
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:48:1",
+        "store_id": "store:48:1"
+      },
+      "city_id": 1,
+      "vendor_id": 48
+    },
+    {
+      "kind": "skus",
+      "key": "sku:nanny-hourly-3h",
+      "payload": {
+        "name": "钟点工 · 3小时服务券",
+        "supply_minor": null,
+        "retail_minor": 12800,
+        "valid_days": null,
+        "description": "做饭保洁 · 灵活预约；一餐制作；基础保洁；衣物整理；简单采购代办",
+        "conditions": "食材默认用户提供；需提前确认菜谱；节假日价格浮动；频道展示价为参考/次，券服务规格、有效期、供货报价与适用门店以复核后版本为准。",
+        "initialization": {
+          "source": {
+            "topic_file": "juzhu-topic.html",
+            "channel_sku_id": 8,
+            "slug": "nanny-hourly-3h",
+            "product_id": 3103,
+            "vendor_id": 31,
+            "source_price_minor": 12800,
+            "source_price_unit": "/次",
+            "candidate_product_ids": [
+              3103,
+              5251
+            ]
+          },
+          "missing": [
+            "商户供货报价",
+            "券有效期",
+            "券规格及实际成交价确认",
+            "可售库存与门店产能"
+          ]
+        }
+      },
+      "refs": {
+        "merchant_id": "merchant:31:1",
+        "store_id": "store:31:1"
+      },
+      "city_id": 1,
+      "vendor_id": 31
+    },
+    {
+      "kind": "packages",
+      "key": "package:topic:new-home",
+      "payload": {
+        "name": "新居入住季 · 专题券包",
+        "city_id": 1,
+        "price_minor": null,
+        "description": "钥匙到手，家还没就绪。开荒、搬运、安装一次约齐，把毛坯感留在门外。 开荒完成后再约搬家，避免二次扬尘；安装与搬家错开半天，师傅不撞车；下水不通可加购管道疏通 · 当天",
+        "items": [
+          {
+            "sku_key": "sku:raw-clean-new",
+            "rule_key": "rule:1:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:moving-city-standard",
+            "rule_key": "rule:21:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:appliance-repair",
+            "rule_key": "rule:11:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:ac-clean-wall",
+            "rule_key": "rule:11:1",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "topic_id": "new-home",
+            "topic_url": "juzhu-topic.html?id=new-home",
+            "topic_sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+          },
+          "reference_total_minor": 100400,
+          "reference_price_note": "仅为频道展示参考价合计，包含起价或按期服务，非券包最终售价。",
+          "related_services": [
+            {
+              "name": "管道疏通 · 当天",
+              "slug": "pipe-unclog-fast",
+              "href": "juzhu-jiazheng-detail.html?sku=pipe-unclog-fast&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            },
+            {
+              "name": "油烟机清洗 · 深度",
+              "slug": "hood-clean-deep",
+              "href": "juzhu-jiazheng-detail.html?sku=hood-clean-deep&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            }
+          ],
+          "missing": [
+            "券包零售价",
+            "逐券分摊金额",
+            "关联商户及门店审核",
+            "供货与分配规则确认"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "packages",
+      "key": "package:topic:care",
+      "payload": {
+        "name": "康养到家周 · 专题券包",
+        "city_id": 1,
+        "price_minor": null,
+        "description": "家里多了一位长辈，日常照护与居家安全要一起想——陪护、体检、管道与家电养护同屏安排。 日间陪护可先试 1–2 天再签月；体检结果出来后再调护理等级；管道养护与家电保养建议同周完成",
+        "items": [
+          {
+            "sku_key": "sku:health-elder-day",
+            "rule_key": "rule:44:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:health-checkup-basic",
+            "rule_key": "rule:44:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:maintain-appliance",
+            "rule_key": "rule:45:1",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "topic_id": "care",
+            "topic_url": "juzhu-topic.html?id=care",
+            "topic_sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+          },
+          "reference_total_minor": 73800,
+          "reference_price_note": "仅为频道展示参考价合计，包含起价或按期服务，非券包最终售价。",
+          "related_services": [
+            {
+              "name": "住家保姆 · 全职",
+              "slug": "nanny-livein-full",
+              "href": "juzhu-jiazheng-detail.html?sku=nanny-livein-full&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            },
+            {
+              "name": "管道养护 · 季度",
+              "slug": "maintain-pipe-quarter",
+              "href": "juzhu-jiazheng-detail.html?sku=maintain-pipe-quarter&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            },
+            {
+              "name": "管道疏通 · 当天",
+              "slug": "pipe-unclog-fast",
+              "href": "juzhu-jiazheng-detail.html?sku=pipe-unclog-fast&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            }
+          ],
+          "missing": [
+            "券包零售价",
+            "逐券分摊金额",
+            "关联商户及门店审核",
+            "供货与分配规则确认"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "packages",
+      "key": "package:topic:asset",
+      "payload": {
+        "name": "租住安心包 · 专题券包",
+        "city_id": 1,
+        "price_minor": null,
+        "description": "房租、押金、意外——租住不只是钥匙。家财险、分期、评估与托管同屏，住得稳、账算清。 家财险建议与入住同日生效；分期不够可再查消费贷额度；评估后再决定是否托管运营",
+        "items": [
+          {
+            "sku_key": "sku:asset-appraisal",
+            "rule_key": "rule:46:1",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "topic_id": "asset",
+            "topic_url": "juzhu-topic.html?id=asset",
+            "topic_sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+          },
+          "reference_total_minor": 50000,
+          "reference_price_note": "仅为频道展示参考价合计，包含起价或按期服务，非券包最终售价。",
+          "related_services": [
+            {
+              "name": "家财险 · 基础版",
+              "slug": "insurance-home-basic",
+              "href": "juzhu-jiazheng-detail.html?sku=insurance-home-basic&city=shenyang",
+              "reason": "专题保险及额度服务保持原服务入口，不作为通用付费券"
+            },
+            {
+              "name": "分期免息 · 租住",
+              "slug": "finance-rent-installment",
+              "href": "juzhu-jiazheng-detail.html?sku=finance-rent-installment&city=shenyang",
+              "reason": "专题保险及额度服务保持原服务入口，不作为通用付费券"
+            },
+            {
+              "name": "托管运营 · 咨询",
+              "slug": "asset-custody",
+              "href": "juzhu-jiazheng-detail.html?sku=asset-custody&city=shenyang",
+              "reason": "估价、咨询或非固定商品，不按零元付费券组包"
+            },
+            {
+              "name": "租客责任险",
+              "slug": "insurance-tenant",
+              "href": "juzhu-jiazheng-detail.html?sku=insurance-tenant&city=shenyang",
+              "reason": "专题保险及额度服务保持原服务入口，不作为通用付费券"
+            },
+            {
+              "name": "消费贷 · 额度查询",
+              "slug": "finance-credit-limit",
+              "href": "juzhu-jiazheng-detail.html?sku=finance-credit-limit&city=shenyang",
+              "reason": "专题保险及额度服务保持原服务入口，不作为通用付费券"
+            }
+          ],
+          "missing": [
+            "券包零售价",
+            "逐券分摊金额",
+            "关联商户及门店审核",
+            "供货与分配规则确认"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "packages",
+      "key": "package:topic:green",
+      "payload": {
+        "name": "绿色焕新 · 专题券包",
+        "city_id": 1,
+        "price_minor": null,
+        "description": "旧物清出、宽带装上、号码携转、屋子擦亮——搬家换机不必分四次约人。 回收完成后再约宽带，避免机房堆物；宽带与携号尽量同周办完；空屋再做保洁与空调清洗",
+        "items": [
+          {
+            "sku_key": "sku:telecom-broadband",
+            "rule_key": "rule:41:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:cleaning-daily-2h",
+            "rule_key": "rule:1:1",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "topic_id": "green",
+            "topic_url": "juzhu-topic.html?id=green",
+            "topic_sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+          },
+          "reference_total_minor": 23880,
+          "reference_price_note": "仅为频道展示参考价合计，包含起价或按期服务，非券包最终售价。",
+          "related_services": [
+            {
+              "name": "旧家电回收",
+              "slug": "recycle-appliance",
+              "href": "juzhu-jiazheng-detail.html?sku=recycle-appliance&city=shenyang",
+              "reason": "估价、咨询或非固定商品，不按零元付费券组包"
+            },
+            {
+              "name": "号码携转 · 套餐",
+              "slug": "telecom-portability",
+              "href": "juzhu-jiazheng-detail.html?sku=telecom-portability&city=shenyang",
+              "reason": "估价、咨询或非固定商品，不按零元付费券组包"
+            },
+            {
+              "name": "家具回收 · 套装",
+              "slug": "recycle-furniture",
+              "href": "juzhu-jiazheng-detail.html?sku=recycle-furniture&city=shenyang",
+              "reason": "估价、咨询或非固定商品，不按零元付费券组包"
+            },
+            {
+              "name": "空调清洗 · 挂机",
+              "slug": "ac-clean-wall",
+              "href": "juzhu-jiazheng-detail.html?sku=ac-clean-wall&city=shenyang",
+              "reason": "专题可选服务，未纳入基础组合"
+            }
+          ],
+          "missing": [
+            "券包零售价",
+            "逐券分摊金额",
+            "关联商户及门店审核",
+            "供货与分配规则确认"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "packages",
+      "key": "package:topic:neighbor",
+      "payload": {
+        "name": "邻里日常 · 专题券包",
+        "city_id": 1,
+        "price_minor": null,
+        "description": "买菜取件缴费——邻里小事不必亲自跑。团购日配、跑腿代办，忙不过来再约钟点工。 团购建议周日晚下一单，覆盖工作日；跑腿适合取件/代缴，不替代大件搬运；钟点工与日常保洁可错开时段",
+        "items": [
+          {
+            "sku_key": "sku:community-errand",
+            "rule_key": "rule:48:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:nanny-hourly-3h",
+            "rule_key": "rule:31:1",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:cleaning-daily-2h",
+            "rule_key": "rule:1:1",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "topic_id": "neighbor",
+            "topic_url": "juzhu-topic.html?id=neighbor",
+            "topic_sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+          },
+          "reference_total_minor": 29680,
+          "reference_price_note": "仅为频道展示参考价合计，包含起价或按期服务，非券包最终售价。",
+          "related_services": [
+            {
+              "name": "社区团购 · 日配",
+              "slug": "community-groupbuy",
+              "href": "juzhu-jiazheng-detail.html?sku=community-groupbuy&city=shenyang",
+              "reason": "估价、咨询或非固定商品，不按零元付费券组包"
+            }
+          ],
+          "missing": [
+            "券包零售价",
+            "逐券分摊金额",
+            "关联商户及门店审核",
+            "供货与分配规则确认"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:membership:cleaning",
+      "payload": {
+        "name": "新居住会员 · 保洁权益券",
+        "merchant_id": null,
+        "store_id": null,
+        "supply_minor": null,
+        "retail_minor": null,
+        "valid_days": null,
+        "description": "v1.9沈阳L1基础权益中的保洁服务，单券单次独立发放及核销。具体服务规格与供应商需按18.1逐券确认。",
+        "conditions": "需预约；券有效期独立于会员有效期；未使用到期自动申请原路退款。具体适用范围以审核版本为准。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8 / 18.1",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": 19980,
+          "candidate_channel_skus": [
+            {
+              "topic_file": "juzhu-topic.html",
+              "channel_sku_id": 1,
+              "slug": "cleaning-daily-2h",
+              "product_id": 103,
+              "vendor_id": 1,
+              "source_price_minor": 13980,
+              "source_price_unit": "/次",
+              "candidate_product_ids": [
+                103,
+                201,
+                301,
+                401,
+                501
+              ]
+            },
+            {
+              "topic_file": "juzhu-topic.html",
+              "channel_sku_id": 10,
+              "slug": "raw-clean-new",
+              "product_id": 111,
+              "vendor_id": 1,
+              "source_price_minor": 42800,
+              "source_price_unit": "起",
+              "candidate_product_ids": [
+                111,
+                502
+              ]
+            }
+          ],
+          "missing": [
+            "履约商户",
+            "实际门店",
+            "服务规格",
+            "供货报价",
+            "零售价口径",
+            "券有效期"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:membership:cleaning",
+      "payload": {
+        "name": "新居住会员 · 保洁分配规则",
+        "merchant_id": null,
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "按v1.9逐券商务模板补齐实际供应商报价与佣金依据，未确认前不使用文档演算值代替真实条件。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "18.1"
+          },
+          "missing": [
+            "履约商户",
+            "报价与佣金合同",
+            "佣金比例及门槛"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:membership:repair",
+      "payload": {
+        "name": "新居住会员 · 维修权益券",
+        "merchant_id": null,
+        "store_id": null,
+        "supply_minor": null,
+        "retail_minor": null,
+        "valid_days": null,
+        "description": "v1.9沈阳L1基础权益中的维修服务，单券单次独立发放及核销。具体服务规格与供应商需按18.1逐券确认。",
+        "conditions": "需预约；券有效期独立于会员有效期；未使用到期自动申请原路退款。具体适用范围以审核版本为准。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8 / 18.1",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": 13320,
+          "candidate_channel_skus": [
+            {
+              "topic_file": "juzhu-topic.html",
+              "channel_sku_id": 13,
+              "slug": "appliance-repair",
+              "product_id": 1107,
+              "vendor_id": 11,
+              "source_price_minor": 8900,
+              "source_price_unit": "起",
+              "candidate_product_ids": [
+                1107,
+                1201
+              ]
+            }
+          ],
+          "missing": [
+            "履约商户",
+            "实际门店",
+            "服务规格",
+            "供货报价",
+            "零售价口径",
+            "券有效期"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:membership:repair",
+      "payload": {
+        "name": "新居住会员 · 维修分配规则",
+        "merchant_id": null,
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "按v1.9逐券商务模板补齐实际供应商报价与佣金依据，未确认前不使用文档演算值代替真实条件。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "18.1"
+          },
+          "missing": [
+            "履约商户",
+            "报价与佣金合同",
+            "佣金比例及门槛"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:membership:moving",
+      "payload": {
+        "name": "新居住会员 · 搬家权益券",
+        "merchant_id": null,
+        "store_id": null,
+        "supply_minor": null,
+        "retail_minor": null,
+        "valid_days": null,
+        "description": "v1.9沈阳L1基础权益中的搬家服务，单券单次独立发放及核销。具体服务规格与供应商需按18.1逐券确认。",
+        "conditions": "需预约；券有效期独立于会员有效期；未使用到期自动申请原路退款。具体适用范围以审核版本为准。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8 / 18.1",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": 27750,
+          "candidate_channel_skus": [
+            {
+              "topic_file": "juzhu-topic.html",
+              "channel_sku_id": 6,
+              "slug": "moving-city-standard",
+              "product_id": 2101,
+              "vendor_id": 21,
+              "source_price_minor": 39800,
+              "source_price_unit": "起",
+              "candidate_product_ids": [
+                2101,
+                5151
+              ]
+            }
+          ],
+          "missing": [
+            "履约商户",
+            "实际门店",
+            "服务规格",
+            "供货报价",
+            "零售价口径",
+            "券有效期"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:membership:moving",
+      "payload": {
+        "name": "新居住会员 · 搬家分配规则",
+        "merchant_id": null,
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "按v1.9逐券商务模板补齐实际供应商报价与佣金依据，未确认前不使用文档演算值代替真实条件。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "18.1"
+          },
+          "missing": [
+            "履约商户",
+            "报价与佣金合同",
+            "佣金比例及门槛"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:membership:travel",
+      "payload": {
+        "name": "新居住会员 · 旅居权益券",
+        "merchant_id": null,
+        "store_id": null,
+        "supply_minor": null,
+        "retail_minor": null,
+        "valid_days": null,
+        "description": "v1.9沈阳L1基础权益中的旅居服务，单券单次独立发放及核销。具体服务规格与供应商需按18.1逐券确认。",
+        "conditions": "需预约；券有效期独立于会员有效期；未使用到期自动申请原路退款。具体适用范围以审核版本为准。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8 / 18.1",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": 33300,
+          "candidate_channel_skus": [],
+          "missing": [
+            "履约商户",
+            "实际门店",
+            "服务规格",
+            "供货报价",
+            "零售价口径",
+            "券有效期"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:membership:travel",
+      "payload": {
+        "name": "新居住会员 · 旅居分配规则",
+        "merchant_id": null,
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "按v1.9逐券商务模板补齐实际供应商报价与佣金依据，未确认前不使用文档演算值代替真实条件。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "18.1"
+          },
+          "missing": [
+            "履约商户",
+            "报价与佣金合同",
+            "佣金比例及门槛"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "skus",
+      "key": "sku:membership:report",
+      "payload": {
+        "name": "新居住会员 · 报告权益券",
+        "merchant_id": null,
+        "store_id": null,
+        "supply_minor": null,
+        "retail_minor": null,
+        "valid_days": null,
+        "description": "v1.9沈阳L1基础权益中的报告服务，单券单次独立发放及核销。具体服务规格与供应商需按18.1逐券确认。",
+        "conditions": "需预约；券有效期独立于会员有效期；未使用到期自动申请原路退款。具体适用范围以审核版本为准。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8 / 18.1",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": 5550,
+          "candidate_channel_skus": [
+            {
+              "topic_file": "juzhu-topic.html",
+              "channel_sku_id": 35,
+              "slug": "asset-appraisal",
+              "product_id": 4111,
+              "vendor_id": 46,
+              "source_price_minor": 50000,
+              "source_price_unit": "起",
+              "candidate_product_ids": [
+                4111,
+                5111
+              ]
+            }
+          ],
+          "missing": [
+            "履约商户",
+            "实际门店",
+            "服务规格",
+            "供货报价",
+            "零售价口径",
+            "券有效期"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "rules",
+      "key": "rule:membership:report",
+      "payload": {
+        "name": "新居住会员 · 报告分配规则",
+        "merchant_id": null,
+        "beike_bps": null,
+        "channel_bps": null,
+        "floor_bps": null,
+        "description": "按v1.9逐券商务模板补齐实际供应商报价与佣金依据，未确认前不使用文档演算值代替真实条件。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "18.1"
+          },
+          "missing": [
+            "履约商户",
+            "报价与佣金合同",
+            "佣金比例及门槛"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "packages",
+      "key": "package:membership:l1",
+      "payload": {
+        "name": "新居住基础权益礼包",
+        "city_id": 1,
+        "price_minor": 99900,
+        "description": "沈阳试点L1基础权益：保洁、维修、搬家、旅居、报告各一张。独立券包商品，也作为新居住会员赠送权益。供应商、服务规格与单券有效期待逐项确认。",
+        "items": [
+          {
+            "sku_key": "sku:membership:cleaning",
+            "rule_key": "rule:membership:cleaning",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:membership:repair",
+            "rule_key": "rule:membership:repair",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:membership:moving",
+            "rule_key": "rule:membership:moving",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:membership:travel",
+            "rule_key": "rule:membership:travel",
+            "quantity": 1,
+            "allocation_minor": null
+          },
+          {
+            "sku_key": "sku:membership:report",
+            "rule_key": "rule:membership:report",
+            "quantity": 1,
+            "allocation_minor": null
+          }
+        ],
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "5.4.7 / 5.4.8",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "reference_allocation_minor": [
+            {
+              "name": "保洁",
+              "amount": 19980
+            },
+            {
+              "name": "维修",
+              "amount": 13320
+            },
+            {
+              "name": "搬家",
+              "amount": 27750
+            },
+            {
+              "name": "旅居",
+              "amount": 33300
+            },
+            {
+              "name": "报告",
+              "amount": 5550
+            }
+          ],
+          "missing": [
+            "五项正式供应商及服务规格",
+            "逐券分摊审批",
+            "商户报价与规则"
+          ]
+        }
+      },
+      "refs": {},
+      "city_id": 1
+    },
+    {
+      "kind": "plans",
+      "key": "plan:membership:l1",
+      "payload": {
+        "name": "新居住会员",
+        "city_id": 1,
+        "price_minor": 99900,
+        "valid_days": 365,
+        "description": "沈阳L1基础会员，999元/年；开通后一次性赠送基础权益礼包，保洁、维修、搬家、旅居、报告各一张。会员与券有效期独立，不因会员到期自动作废已发券。一期仅配置此卡种。",
+        "initialization": {
+          "source": {
+            "document": "v1.9",
+            "section": "3.3 / 5.4.8",
+            "design_sha256": "1025460dc4819364c24465be9d6a592e55010d86cf745069e29612fc730d4211"
+          },
+          "missing": [
+            "赠送礼包及五项供给完成审核"
+          ]
+        }
+      },
+      "refs": {
+        "package_id": "package:membership:l1"
+      },
+      "city_id": 1
+    }
+  ]
+}

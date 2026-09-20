@@ -8,8 +8,8 @@
 <style>
   .scr{padding-bottom:110px;}
   .hero{position:relative;padding:74px 16px 18px;color:#fff;overflow:hidden;background:linear-gradient(135deg,#0b5d56,#11453f 48%,#c58d36);}
-  .hero.repair{background:linear-gradient(135deg,#1d4ed8,#16356a 48%,#8bb8ff);}
-  .hero.moving{background:linear-gradient(135deg,#f97316,#bf4b13 48%,#f7b267);}
+  .hero.repair{background:linear-gradient(135deg,#f97316,#bf4b13 48%,#f7b267);}
+  .hero.moving{background:linear-gradient(135deg,#1376FF 0%,#0E61FF 48%,#408FFB 100%);}
   .hero.nanny{background:linear-gradient(135deg,#7c3aed,#4d2579 48%,#d6bcfa);}
   .hero.telecom{background:linear-gradient(135deg,#1d4e89,#123a66 48%,#7db3f0);}
   .hero.insurance{background:linear-gradient(135deg,#8c6224,#6b4a1a 48%,#e8c878);}
@@ -24,9 +24,17 @@
   .hero .in{position:relative;z-index:2;}
   .eyebrow{font-size:10px;letter-spacing:.22em;opacity:.88;}
   .hero h1{font-family:var(--serif);font-size:29px;line-height:1.18;margin-top:8px;}
-  .hero p{font-size:12px;opacity:.94;margin-top:8px;max-width:29ch;line-height:1.55;}
+  /* 参考稿的 hero 正文铺满可用宽度；原先限 29ch 会挤成窄柱、右侧留大片空白 */
+  .hero p{font-size:12px;opacity:.94;margin-top:8px;line-height:1.7;}
   .metrics{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
   .metrics span{font-size:10px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.16);}
+  /* 顶部第二行 = 列表标签原样（原型说明 D02：顺序与列表保持一致）。
+     两行 chip 统一用「白色半透明 + 白字」——参考稿原型里 .detail .hero-tag 的
+     优先级高于 .hero-tag.blue/.green，实际渲染出来就是这个样式；不统一会变成
+     白透 + 绿 + 浅蓝三种底混排，很难看。不要改用 --cat-soft：那是 12% 品牌色
+     透明混合，蓝色 hero 上等于隐形。 */
+  .metrics.detail-tags{margin-top:12px;}
+  .metrics.detail-tags .tg{background:rgba(255,255,255,.16);color:#fff;font-weight:500;}
   .price-card{background:#fff;margin:-18px 12px 0;padding:16px;border-radius:18px;position:relative;z-index:5;
     box-shadow:0 12px 30px rgba(15,42,38,.08);}
   .price-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;}
@@ -39,23 +47,34 @@
   .coupon span{font-size:11px;color:#9a3412;}
   .block{background:#fff;margin:10px 12px 0;padding:16px;border-radius:16px;box-shadow:0 6px 18px rgba(15,42,38,.05);}
   .block h3{font-family:var(--serif);font-size:16px;display:flex;align-items:center;gap:8px;}
-  .block h3::before{content:"";width:3px;height:16px;border-radius:3px;background:linear-gradient(var(--brand),var(--gold));}
+  .block h3::before{content:"";width:3px;height:16px;border-radius:3px;background:linear-gradient(var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));}
   .spec{font-size:13px;color:var(--ink);margin-top:10px;line-height:1.7;}
   .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
-  .chip-row span{font-size:11px;padding:5px 10px;border-radius:999px;background:#eef6f4;color:var(--brand-deep);}
+  .chip-row span{font-size:11px;padding:5px 10px;border-radius:999px;background:var(--cat-tint,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
   .list{display:grid;gap:10px;margin-top:12px;}
   .item{display:flex;gap:10px;align-items:flex-start;}
-  .item .dot{width:22px;height:22px;border-radius:50%;background:#eef6f4;color:var(--brand);display:grid;place-items:center;font-size:12px;flex-shrink:0;}
+  .item .dot{width:22px;height:22px;border-radius:50%;background:var(--cat-tint,#eef6f4);color:var(--cat-brand,var(--brand));display:grid;place-items:center;font-size:12px;flex-shrink:0;}
   .item b{display:block;font-size:13px;color:var(--ink);}
   .item p{margin:2px 0 0;font-size:11px;color:var(--muted);line-height:1.55;}
   .time-slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;}
   .time-slots a{display:block;text-align:center;padding:10px 6px;font-size:12px;border:1px solid var(--border);border-radius:12px;background:#f8fbfa;color:var(--ink);}
-  .time-slots a.on{border-color:var(--brand);background:#eef6f4;color:var(--brand-deep);font-weight:700;}
+  .time-slots a.on{border-color:var(--cat-brand,var(--brand));background:var(--cat-tint,#eef6f4);color:var(--cat-deep,var(--brand-deep));font-weight:700;}
   .related{display:grid;gap:10px;margin-top:12px;}
   .r-card{display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#f8fbfa;border:1px solid var(--border);}
   .r-card b{font-size:14px;color:var(--ink);}
   .r-card p{margin:3px 0 0;font-size:11px;color:var(--muted);}
   .r-card span{font-family:var(--serif);font-size:20px;color:var(--gold-deep);white-space:nowrap;}
+  /* 认证服务者证书卡（原型说明 D06：浅色卡 + 圆形渐变图标）。参考稿那版固定蓝，
+     这里跟随频道色，否则橙色/紫色频道里会插一张蓝卡。 */
+  .cert-card{display:flex;align-items:center;gap:14px;padding:16px;margin-top:12px;border-radius:10px;
+    background:var(--cat-tint,#FAFBFF);border:1px solid color-mix(in oklab, var(--cat-brand,#2563EB) 22%, #fff);
+    text-decoration:none;}
+  .cert-icon{width:40px;height:40px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--cat-brand-2,#60A5FA),var(--cat-brand,#3B82F6));color:#fff;font-size:11px;font-weight:800;letter-spacing:.02em;}
+  .cert-body{flex:1;min-width:0;}
+  .cert-body b{display:block;font-size:14px;font-weight:600;color:var(--ink);}
+  .cert-body small{font-size:12px;color:var(--muted);}
+  .cert-link{font-size:12px;color:var(--cat-deep,#2563EB);font-weight:600;white-space:nowrap;}
   .toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:rgba(16,23,28,.92);color:#fff;padding:10px 14px;border-radius:999px;font-size:12px;z-index:80;display:none;}
   .toast.on{display:block;}
   .slot-date{font-size:12px;font-weight:700;color:var(--ink);margin:14px 0 8px;}
@@ -66,40 +85,40 @@
   .rs-date{flex:0 0 auto;min-width:52px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:#f8fbfa;color:var(--ink);cursor:pointer;font:inherit;}
   .rs-date .dl{font-size:12px;font-weight:700;line-height:1.2;}
   .rs-date .dm{font-size:10px;color:var(--muted);}
-  .rs-date.on{border-color:var(--brand);background:#eef6f4;color:var(--brand-deep);}
-  .rs-date.on .dm{color:var(--brand-deep);}
+  .rs-date.on{border-color:var(--cat-brand,var(--brand));background:var(--cat-tint,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
+  .rs-date.on .dm{color:var(--cat-deep,var(--brand-deep));}
   .slot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
   .slot{border:1px solid var(--border);border-radius:12px;padding:9px 11px;background:#f8fbfa;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
-  .slot.on{border-color:var(--brand);background:#eef6f4;box-shadow:0 0 0 2px rgba(15,118,110,.16);}
+  .slot.on{border-color:var(--cat-brand,var(--brand));background:var(--cat-tint,#eef6f4);box-shadow:0 0 0 2px color-mix(in oklab, var(--cat-brand,var(--brand)) 16%, transparent);}
   .slot .st{font-size:13px;font-weight:700;color:var(--ink);}
   .slot .sw{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:6px;}
-  .slot .rm{font-size:10px;color:var(--brand);font-weight:600;}
+  .slot .rm{font-size:10px;color:var(--cat-brand,var(--brand));font-weight:600;}
   .slot-empty{font-size:12px;color:var(--muted);padding:8px 0;}
   .block h3 .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:400;font-family:var(--font);}
   /* 商家介绍 */
   .merchant{display:flex;gap:12px;align-items:flex-start;margin-top:12px;}
-  .merchant .logo{width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,#eef6f4,#dfeeea);display:grid;place-items:center;font-size:28px;flex-shrink:0;}
+  .merchant .logo{width:52px;height:52px;border-radius:15px;background:linear-gradient(135deg,var(--cat-tint,#eef6f4),var(--cat-tint,#dfeeea));display:grid;place-items:center;font-size:28px;flex-shrink:0;}
   .merchant .mi{flex:1;min-width:0;}
   .merchant .nm{font-size:16px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .merchant .rk{font-size:10px;color:var(--gold-deep);background:#fff7ed;border:1px solid #fed7aa;padding:2px 8px;border-radius:999px;font-weight:600;}
   .merchant .rt{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
   .merchant .rt b{color:#ef5a2a;font-family:var(--serif);font-size:14px;}
   .cert-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;}
-  .cert{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:5px 10px;border-radius:999px;background:#eafaf3;color:#0f766e;border:1px solid #b9e7d7;font-weight:600;}
+  .cert{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:5px 10px;border-radius:999px;background:var(--cat-tint,#eafaf3);color:var(--cat-deep,#0f766e);border:1px solid var(--cat-tint,#b9e7d7);font-weight:600;}
   .cert::before{content:"✓";font-size:10px;}
   .cert.gov{background:#eef2ff;color:#1e40af;border-color:#c7d2fe;}
   .merchant-summary{font-size:12px;color:var(--muted);line-height:1.7;margin-top:12px;}
   /* 多商家同款列表 */
   .vrow{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:#fff;margin-top:10px;text-decoration:none;color:inherit;}
   .vrow:first-of-type{margin-top:12px;}
-  .vrow.cur{border-color:var(--brand);background:#eef6f4;}
-  .vrow .vlogo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#eef6f4,#dfeeea);display:grid;place-items:center;font-size:22px;flex-shrink:0;}
+  .vrow.cur{border-color:var(--cat-brand,var(--brand));background:var(--cat-tint,#eef6f4);}
+  .vrow .vlogo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--cat-tint,#eef6f4),var(--cat-tint,#dfeeea));display:grid;place-items:center;font-size:22px;flex-shrink:0;}
   .vrow .vmi{flex:1;min-width:0;}
   .vrow .vmi b{font-size:14px;color:var(--ink);}
-  .vrow .vmi b em{font-style:normal;font-size:10px;color:var(--brand);font-weight:700;margin-left:4px;}
+  .vrow .vmi b em{font-style:normal;font-size:10px;color:var(--cat-brand,var(--brand));font-weight:700;margin-left:4px;}
   .vrow .vsub{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
   .vrow .vbs{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;}
-  .vrow .vb{font-size:9px;color:var(--brand-deep);background:#eef6f4;border:1px solid var(--border);border-radius:999px;padding:1px 7px;}
+  .vrow .vb{font-size:9px;color:var(--cat-deep,var(--brand-deep));background:var(--cat-tint,#eef6f4);border:1px solid var(--border);border-radius:999px;padding:1px 7px;}
   .vrow .vprice{font-family:var(--serif);font-size:17px;color:#ef5a2a;flex-shrink:0;}
   .stat-grid{display:flex;gap:8px;margin-top:12px;}
   .stat-grid .s{flex:1;text-align:center;background:#f8fbfa;border:1px solid var(--border);border-radius:12px;padding:10px 4px;}
@@ -107,21 +126,21 @@
   .stat-grid .s span{font-size:10px;color:var(--muted);}
   /* 认证服务者 */
   .workers{display:grid;gap:10px;margin-top:12px;}
-  .wk{display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:15px;background:linear-gradient(135deg,#f9fcfb,#eef6f4);border:1px solid #e5efeb;}
-  .wk .avatar{width:50px;height:50px;border-radius:15px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;display:grid;place-items:center;font-size:24px;flex-shrink:0;position:relative;}
+  .wk{display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:15px;background:linear-gradient(135deg,var(--cat-tint,#f9fcfb),var(--cat-tint,#eef6f4));border:1px solid var(--cat-tint,#e5efeb);}
+  .wk .avatar{width:50px;height:50px;border-radius:15px;background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;display:grid;place-items:center;font-size:24px;flex-shrink:0;position:relative;}
   .wk .lvl{position:absolute;bottom:-5px;right:-5px;font-size:9px;font-weight:800;background:var(--gold-deep);color:#fff;border:2px solid #fff;border-radius:999px;padding:0 5px;line-height:15px;}
   .wk .wb{flex:1;min-width:0;}
   .wk .wn{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:6px;}
-  .wk .wl{font-size:9px;font-weight:700;color:#0f766e;background:#eafaf3;border:1px solid #b9e7d7;border-radius:999px;padding:1px 6px;}
+  .wk .wl{font-size:9px;font-weight:700;color:var(--cat-deep,#0f766e);background:var(--cat-tint,#eafaf3);border:1px solid var(--cat-tint,#b9e7d7);border-radius:999px;padding:1px 6px;}
   .wk .wmeta{font-size:11px;color:var(--muted);margin-top:4px;}
   .wk .wmeta b{color:#ef5a2a;}
   .wk .wcerts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
-  .wk .wcerts span{font-size:10px;padding:2px 7px;border-radius:999px;background:#eafaf3;color:#0f766e;border:1px solid #d6efe5;}
+  .wk .wcerts span{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--cat-tint,#eafaf3);color:var(--cat-deep,#0f766e);border:1px solid var(--cat-tint,#d6efe5);}
   .wk .wcerts span::before{content:"✓ ";}
   .wk{cursor:pointer;transition:border-color .15s,box-shadow .15s;}
-  .wk .pick{margin-left:auto;align-self:center;flex-shrink:0;font-size:11px;font-weight:700;color:var(--brand);border:1px solid var(--border);background:#fff;border-radius:999px;padding:6px 12px;}
-  .wk.sel{border-color:var(--brand);box-shadow:0 0 0 2px rgba(15,118,110,.18);}
-  .wk.sel .pick{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .wk .pick{margin-left:auto;align-self:center;flex-shrink:0;font-size:11px;font-weight:700;color:var(--cat-brand,var(--brand));border:1px solid var(--border);background:#fff;border-radius:999px;padding:6px 12px;}
+  .wk.sel{border-color:var(--cat-brand,var(--brand));box-shadow:0 0 0 2px color-mix(in oklab, var(--cat-brand,var(--brand)) 18%, transparent);}
+  .wk.sel .pick{background:var(--cat-brand,var(--brand));color:#fff;border-color:var(--cat-brand,var(--brand));}
   /* 真实评价 */
   .reviews{display:grid;gap:12px;margin-top:12px;}
   .rv{border-bottom:1px solid var(--border);padding-bottom:12px;}
@@ -132,7 +151,7 @@
   .rv .rtags{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}
   .rv .rtags span{font-size:10px;padding:2px 8px;border-radius:999px;background:#f1f5f4;color:var(--muted);}
   .rv .rtext{font-size:12px;color:var(--ink);line-height:1.65;margin-top:8px;}
-  .rv .rreply{font-size:11px;color:var(--muted);background:#f8fbfa;border-left:2px solid var(--brand);padding:8px 10px;border-radius:0 8px 8px 0;margin-top:9px;line-height:1.6;}
+  .rv .rreply{font-size:11px;color:var(--muted);background:#f8fbfa;border-left:2px solid var(--cat-brand,var(--brand));padding:8px 10px;border-radius:0 8px 8px 0;margin-top:9px;line-height:1.6;}
   /* 底部双按钮：lvju-app.css 的 .cta 为「单按钮」设计（padding 13×30 + margin-left:auto），
      这里放了两个按钮会挤到换行。改为紧凑 + nowrap，主按钮渐变、次按钮描边。 */
   .cta{gap:8px;padding-left:14px;padding-right:14px;}
@@ -141,8 +160,12 @@
   .cta .heart{flex:0 0 auto;}
   .cta .btn{white-space:nowrap;flex:0 0 auto;}
   .cta .btn-call{margin-left:auto;padding:11px 14px;font-size:12px;background:#fff;
-    color:var(--brand);border:1px solid var(--border);font-weight:600;}
+    color:var(--cat-brand,var(--brand));border:1px solid var(--border);font-weight:600;}
   .cta #submitBtn{margin-left:0;padding:12px 22px;font-size:14px;}
+  /* 底部价格与按钮跟随频道色（参考稿「视觉规范」：底部价格橙 #ef5a2a、按钮取频道色） */
+  .cta .p b{color:#ef5a2a;}
+  .cta #submitBtn{background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));
+    box-shadow:0 6px 16px color-mix(in oklab,var(--cat-brand,var(--brand)) 28%,transparent);}
   /* loading 遮罩 */
   .loading-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
   .loading-overlay.on{display:flex;}
@@ -178,7 +201,6 @@
     <div class="block">
       <h3>服务说明</h3>
       <div class="spec" id="spec"></div>
-      <div class="chip-row" id="tags"></div>
       <div class="list" id="includes"></div>
     </div>
 
@@ -188,12 +210,10 @@
         <div class="logo" id="mLogo">🏠</div>
         <div class="mi">
           <div class="nm" id="mName">认证商家</div>
-          <div class="rt" id="mRating"></div>
-          <div class="cert-row" id="mCerts"></div>
+          <div class="rt" id="mSub"></div>
         </div>
       </div>
       <div class="merchant-summary" id="mSummary"></div>
-      <div class="stat-grid" id="mStats"></div>
     </div>
 
     <div class="block" id="vendorsBlock" hidden>
@@ -203,9 +223,16 @@
 
     <div class="block">
       <h3>认证服务者<span class="count" id="wCount"></span></h3>
-      <p class="spec" style="margin-top:8px;font-size:11px;color:var(--muted);">行业认证 · 实名+持证+背调+投保，认证状态实时回流</p>
+      <!-- 证书按品类取（原型说明 D06）：同城/跨城 = ACP，日式 = ACA -->
+      <a class="cert-card" id="certCard" href="screens/s-cert.html" hidden>
+        <span class="cert-icon" id="certIcon">ACP</span>
+        <span class="cert-body">
+          <b id="certTitle">专家 ACP 证书</b>
+          <small id="certSub">完成认证培训 · 考试成绩合格</small>
+        </span>
+        <span class="cert-link">查看 ›</span>
+      </a>
       <div class="workers" id="workers"></div>
-      <a class="cta" href="screens/s-cert.html" style="display:inline-block;margin-top:12px;padding:9px 14px;border-radius:999px;background:#fff;border:1px solid var(--border);font-size:12px;color:var(--brand);font-weight:700;text-decoration:none;">查看认证与证书 ›</a>
     </div>
 
     <div class="block">
@@ -248,7 +275,7 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=4"></script>
+<script src="screens/_jzapi.js?v=7"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -467,13 +494,19 @@
 
   function render(){
     document.getElementById('ttl').firstChild.textContent = item.name;
+    // 频道色写成 CSS 变量（底部按钮等消费）；配色表在 _jzapi.js?v=7（单一数据源）
+    JZ.applyCatTheme(document.querySelector('.app'), item.category_id);
     var hero = document.getElementById('hero');
     hero.className = 'hero ' + heroClass(item.category_id);
+    // 顶部两行标签（原型说明 D02）：第一行固定「认证 + 评分」，第二行严格用列表标签、顺序一致
+    var heroTags = (item.tags || []).map(function(t){ return '<span class="tg">' + esc(t) + '</span>'; }).join('');
     hero.innerHTML = '<div class="in">'+
       '<div class="eyebrow">'+(item.category_name || '家政服务').toUpperCase()+'</div>'+
       '<h1>'+item.name+'</h1>'+
       '<p>'+(item.spec || '')+'。行业认证持证服务者上门，支付后平台统一安排服务，全程进度可查。</p>'+
-      '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span><span>'+(item.duration_min || 0)+' 分钟</span><span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
+      '<div class="metrics"><span>'+(item.worker_min_level || 'L2')+'+ 持证服务者</span>'+
+        '<span>'+(item.rating_score ? ('★ ' + Number(item.rating_score).toFixed(1)) : '高评分')+'</span></div>'+
+      (heroTags ? '<div class="metrics detail-tags">'+heroTags+'</div>' : '')+
     '</div>';
     var displayPrice = (product && product.price != null) ? product.price : item.price_from;
     document.getElementById('price').textContent = fmtPrice(displayPrice);
@@ -481,11 +514,12 @@
     document.getElementById('priceUnit').textContent = item.price_unit || '起';
     document.getElementById('sales').textContent = item.sales_text || '最近好评稳定';
     document.getElementById('spec').textContent = item.spec || '';
-    document.getElementById('tags').innerHTML = (item.tags || []).concat(item.badges || []).map(function(x){
-      return '<span>' + x + '</span>';
-    }).join('');
-    document.getElementById('includes').innerHTML = (item.includes_json || []).map(function(x, i){
-      return '<div class="item"><span class="dot">'+(i+1)+'</span><div><b>'+x+'</b><p>按标准工序执行，完工可回传记录。</p></div></div>';
+    // 服务说明（D03）：每项独立配置标题与正文；兼容旧的纯字符串数组
+    document.getElementById('includes').innerHTML = (item.includes || item.includes_json || []).map(function(x, i){
+      var isObj = x && typeof x === 'object';
+      var name = isObj ? (x.name || '') : String(x == null ? '' : x);
+      var desc = isObj ? (x.desc || '') : '按标准工序执行，完工可回传记录。';
+      return '<div class="item"><span class="dot">'+(i+1)+'</span><div><b>'+esc(name)+'</b><p>'+esc(desc)+'</p></div></div>';
     }).join('');
     document.getElementById('flow').innerHTML = (item.service_flow || []).map(function(x, i){
       return '<div class="item"><span class="dot">'+(i+1)+'</span><div><b>'+x+'</b><p>'+(item.service_notice && item.service_notice[i] ? item.service_notice[i] : '符合中台认证与工单流转要求')+'</p></div></div>';
@@ -495,6 +529,7 @@
     //   return '<a class="r-card" href="?sku='+encodeURIComponent(x.slug)+'"><div><b>'+x.name+'</b><p>'+(x.spec||'')+'</p></div><span>'+fmtPrice(x.price_from)+'</span></a>';
     // }).join('');
     renderMerchant();
+    renderCert();
     renderWorkers();
     renderReviews();
   }
@@ -523,7 +558,8 @@
     }).join('');
   }
 
-  // 商家介绍 + 认证徽章
+  // 商家介绍（原型说明 D05）：Logo + 品牌名 + 「<品类>服务商」副标题 + 完整品牌简介。
+  // 简介取服务端 merchant_intro.summary（商家配了 jz_vendors.intro 就用它，否则回落自动拼接）。
   function renderMerchant(){
     var blk = document.getElementById('merchantBlock');
     if (!vendor){ blk.hidden = true; return; }
@@ -531,16 +567,24 @@
     document.getElementById('mLogo').textContent = vendor.logo || '🏠';
     document.getElementById('mName').textContent = vendor.name || '认证商家';
     document.getElementById('mRank').textContent = vendor.rank_label || '';
-    document.getElementById('mRating').innerHTML =
-      '<b>★ '+Number(vendor.rating||0).toFixed(1)+'</b> · '+num(vendor.review_count)+' 条评价' +
-      (vendor.address ? ' · '+esc(vendor.address) : '') + (vendor.hours ? ' · '+esc(vendor.hours) : '');
-    document.getElementById('mCerts').innerHTML = (vendor.badges || []).map(function(b){
-      return '<span class="cert'+(b === 'whitelist' ? ' gov' : '')+'">'+(BADGE_LABELS[b] || b)+'</span>';
-    }).join('');
+    document.getElementById('mSub').textContent = (item.category_name || '家政') + '服务商';
     document.getElementById('mSummary').textContent = (merchantIntro && merchantIntro.summary) || '';
-    document.getElementById('mStats').innerHTML = ((merchantIntro && merchantIntro.stats) || []).map(function(s){
-      return '<div class="s"><b>'+esc(s.value)+'</b><span>'+esc(s.label)+'</span></div>';
-    }).join('');
+  }
+
+  // 认证服务者证书（原型说明 D06）：按品类取，同城/跨城 = ACP，日式 = ACA
+  var CERTS = {
+    acp: { title: '专家 ACP 证书', sub: '完成认证培训 · 考试成绩合格' },
+    aca: { title: '行业专家 ACA 证书', sub: '服务认证考试合格 · 通过人才测评' }
+  };
+  function renderCert(){
+    var el = document.getElementById('certCard');
+    if (!el) return;
+    var key = /日式/.test(item.name || '') ? 'aca' : 'acp';
+    el.hidden = false;
+    el.setAttribute('data-cert', key);
+    document.getElementById('certIcon').textContent = key.toUpperCase();
+    document.getElementById('certTitle').textContent = CERTS[key].title;
+    document.getElementById('certSub').textContent = CERTS[key].sub;
   }
 
   // 认证服务者（等级 + 白名单 + 持证状态）
@@ -602,6 +646,14 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
+    if(product && String(product.query||'').startsWith('guiyang-life-demo-v1:')){
+      fetch('/api/commerce/v1/catalog?city='+encodeURIComponent(JZ.regionCity())).then(function(r){if(!r.ok)throw Error('权益服务暂不可用');return r.json();}).then(function(data){
+        var coupon=(data.data||[]).find(function(p){return p.kind==='skus'&&p.channel_slug===slug&&p.is_demo;});
+        if(coupon)location.href='juzhu-commerce.html?city='+encodeURIComponent(JZ.regionCity())+'&product=skus-'+coupon.id;
+        else toast('此项为演示咨询入口，不发生投保、授信、估价成交或真实服务下单。');
+      }).catch(function(e){toast(e.message||'请稍后再试');});
+      return;
+    }
     // 登录拦截：ensureUserId 统一身份（测试环境模拟登录 / 生产 App 内 jsbridge3），
     // 取不到（非 App 环境或未登录）不生成小程序链接
     JZ.ensureUserId().then(function(uid){
@@ -648,6 +700,10 @@
       return;
     }
     render();
+    if(String(product.query||'').startsWith('guiyang-life-demo-v1:')){
+      var note=document.createElement('p');note.className='demo-service-note';note.textContent='贵阳演示服务 · 商家、人员、价格与服务说明均用于流程展示，不提供真实履约。';note.style.cssText='margin:12px 14px;padding:12px;border-radius:12px;background:#fff2d8;color:#73532b;font-size:12px;line-height:1.7';document.querySelector('.scr').prepend(note);
+      document.getElementById('submitBtn').textContent='体验演示流程';
+    }
     renderVendors();
     renderProducts();
     // 选择上门时间暂时隐藏

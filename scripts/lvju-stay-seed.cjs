@@ -3,7 +3,7 @@
  * 旅居频道补充房源 seed/clean（goal：lvju-app-lvju 旅居视图房源过少，补齐到 8 套）
  * 背景：页面接库前的硬编码 mock（西江苗寨/荔波小七孔/梵净山/万峰林 4 套）在 6f1c8ad 接库时被删，
  *       库里仅 migrate-housing-channels.cjs 灌入的 2 套（山舍·青岩/森林溪畔）。本脚本补 6 套
- *       贵阳各区真实旅居目的地，口径与 #93/#94 完全一致（rental + 「旅居」tag + stay_bookable）。
+ *       贵阳各区真实旅居目的地，口径与 #93/#94 完全一致（rental + 「旅居」tag + 在线预订）。
  * 用法：node scripts/lvju-stay-seed.cjs seed|clean
  * 规则12/14：只用 Node + mysql2；凭证只读环境变量（juzhu/.env.local → JUZHU_DB_* / MYSQL_*）
  * 约束：幂等（按 slug 判重）；clean 只删本脚本 slug 清单内的行，不动 #93/#94 等既有房源。
@@ -49,8 +49,8 @@ const SEEDS = [
     units: [['山林大床房', '一居一卫', 28, 14800], ['吊脚楼双床房', '二居一卫', 30, 16800]] },
 ];
 
-// 与 #93/#94 一致的项目级 ext（规则16：按晚预订开关 + 保险标识）
-const PROJECT_EXT = JSON.stringify({ insurance: ['switch_rental', 'property'], stay_bookable: true });
+// 与 #93/#94 一致的项目级 ext（规则16：房源交易能力 + 保险标识）
+const PROJECT_EXT = JSON.stringify({ insurance: ['switch_rental', 'property'], online_booking: true, online_payment: false });
 
 async function conn() {
   const c = await mysql.createConnection({

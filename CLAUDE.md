@@ -106,6 +106,22 @@
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
 - **鉴权**：`/api/juzhu/*` **默认拒绝**，须 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端管理台经 `localStorage JUZHU_API_KEY` 对齐，勿在页面硬编码。白名单仅限 C 端目录/房源展示、`POST /api/juzhu/jiazheng/wechat-link`、`GET /api/juzhu/gr/orders*`、`GET .../virtual-phone`；商家开放接口走 HMAC；admin 走登录会话或 Key。**工单列表/详情/支付/评价/派单一律要 Key**（禁止 `?phone=` 匿名旁路）
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
+- **生活服务专区入口恒为 12 个频道**（`index.html` 的 `renderJiazhengCats`）：入口列表以本地 `JZ_CATS` 为基准，`GET /api/juzhu/jiazheng/categories` 回来的只做**覆盖 + 追加**，**不得直接按接口结果渲染**。接口按「当前城市有无可售商品」过滤，会把当前城市没配商品的频道一并滤掉（实测 `city=贵州` 只剩 10 个，丢了保洁和维修）——但这是导航入口不是库存指示，少一个入口就少一条进频道的路。接口失败 / `_jzapi.js` 未加载时也要回落 `renderJiazhengCats(null)` 画出纯本地 12 个，不得整块空白。
+- **分类配色单一数据源**：家政各分类的品牌色写在 `_jzapi.js` 的 `CAT_THEME`（`catTheme()` / `applyCatTheme(el, type)`，后者把 `--cat-brand / --cat-brand-2 / --cat-deep / --cat-soft / --cat-tint` 写到元素上）。列表页与详情页的 hero / poster / 标签 / 按钮 / **正文模块 chrome**（小节标题色条、序号圆点、商家 Logo 底、证书卡、服务者卡、选中态描边与光晕）**只消费这些 CSS 变量**，页面不得再各写一份配色表，也不得残留全局 `--brand`（青绿）——那会让蓝色/橙色频道里混进绿色。
+  - `--cat-soft` = 12% 品牌色**透明**混合（叠在白卡上的浅底）；`--cat-tint` = 白底 8% 品牌色**不透明**浅底。**深色 hero 上用白色半透明，浅色容器上用 `--cat-tint`**；把 `--cat-soft` 用在深色底上会隐形。
+  - `moving`（搬家）= 参考稿《搬家服务原型说明》蓝犀牛 × 贝壳 的频道蓝：品牌 `#1678ff` / `#168FFA`，详情 hero `#1376FF → #0E61FF → #408FFB` 135°，列表标签 `#EFF6FF` 底 + `#1678ff` 字。
+  - `repair`（维修）**让出原来的蓝**、改用搬家腾出的橙 `#ea580c`（语义贴合「紧急响应」），避免到家服务一排两个蓝。`index.html` 各分类另有深色变体（`.jz-cat.* .bg/.orb`）与 4px 强调条（`.in::before`），改色时两处要一起改；搬家深色变体取 `#1a54b8`（**不要用 `#1d4a8c`**，与 `telecom` `#1d4e89` 的 ΔE 仅 5.3，肉眼几乎同色）。
+  - 改 `_jzapi.js` 后记得把引用页的 `?v=N` 一起 +1（缓存击穿）。
+- **C 端内容口径（《搬家服务原型说明》蓝犀牛 × 贝壳 2026-09-18）**——详情页各模块的字段归属：
+  - **列表 hero / 频道横幅**：`jz_vendors.banner_url` 配频道级横幅（列表接口随行下发 `vendor_banner`），**仅当本频道当前商品全部来自同一商家且该商家配了横幅**时替换掉渐变 hero（否则会把 A 商的品牌物料挂在 B 商的商品列表上）。样式照原型说明视觉规范：宽 100%、高 auto 不裁切、圆角 14px；`onerror` 回落渐变 hero。素材是 OSS 那张 `lxn-banner.png`（1164×600），按仓库惯例（**无外链图**）落到 `assets/` 本地引用；缩略图由 `img_thumbs.cjs` 自动出，但 `.t*.webp` 是 gitignore 的运行时产物，页面**引原图**别引缩略图。
+  - **列表卡片**（L01）：海报三段 = 商家名 / 品类 / 车型 + 卡车图标；下方 名称 + 列表描述 + **全量**标签 + 起价 + 去预约。不要加参考稿没有的「可预约」pill 或写死的「最快可约 今天18:00」。
+  - **详情顶部**（D02）：**两行**标签——第一行固定「`{L2}+ 持证服务者` + `★ 评分`」，第二行**原样复用列表标签且顺序一致**。两行 chip **统一用白色半透明 `rgba(255,255,255,.16)` + 白字**：参考稿原型里 `.detail .hero-tag` 的优先级压过 `.hero-tag.blue/.green`，实际渲染就是这个样式；不统一会变成白透 + 绿 + 浅蓝三种底混排，很难看。**不要改用 `--cat-soft`**（12% 品牌色透明混合，蓝色 hero 上等于隐形）。hero 正文不要限 `max-width`（会挤成窄柱、右侧留大片空白）。
+  - **服务说明**（D03）：每项 = 标题 + 正文，存 `jz_skus.includes`（`[{name,desc}]`，旧纯字符串数组渲染端仍兼容）；小面/中面 2 项、厢货 4 项。**列名禁止写 `includes_json`**：那是链家库一次热修残留，`ensureJzSkusIncludesColumn()` 启动时把它 rename 成 `includes`；接口出参也只暴露 `includes`。
+  - **商家介绍**（D05）：Logo + 品牌名 + 「`{品类}服务商`」副标题 + **整段品牌简介**，简介存 `jz_vendors.intro`（`merchantIntroOf` 有值就整段用它、不再拼自动统计；**没值回落旧拼接**，避免存量商家整块空白）。不再展示评分/评价/起订价三宫格——起订价对搬家无意义且 `start_price` 未配时渲染成「¥0/起」。
+  - **认证服务者**（D06）：证书按品类取，**同城/跨城 = ACP，日式 = ACA**（`/日式/` 判名）。
+  - **服务流程**（D07）：全商品统一 4 步，正文存 `service_notice`（与 `service_flow` 一一对应，不是费用须知）。
+- **沈阳可售商品**：列表/详情接口按「`jz_products.city_id` = 当前城市 + 商家 active 且 `city_ids` 命中」双维度过滤，**`city_id` 为 NULL 的商品在任何城市都不展示**。沈阳搬家用 `node scripts/moving-shenyang-seed.cjs seed|clean`（蓝犀牛 vendor 151，商品固定 id 段 5161-5166，幂等，clean 只删本脚本清单）。
+  - 列表接口另补 `vendor_name` / `list_desc` / `vendor_banner` 三个相关子查询，与 `product_min_price` 共用 `priceAggJoin`。两条硬约束：① **tokens 绑定份数按 `priceAggJoin` 在 SQL 里的实际出现次数自动算**（`sql.split(priceAggJoin).length - 1` + cityExists 那份），**不要手工计数**——手工少 push 一份会静默查空（踩过：6 条变 0 条）；② **子查询不得引用 `v.` 别名**——`v` 只在 cityName 能解析成城市时（`cityId !== null`）才由 `priceAggJoin` 引入，传省名 / 未知城市时 `priceAggJoin` 为空串，`v.name` 会直接报 `Unknown column 'v.name' in 'field list'`（踩过）。取商家字段一律用自包子查询 `(SELECT v2.x FROM jz_vendors v2 WHERE v2.id=p.vendor_id)`，两种情况下都成立。
 
 ## 规则 10 · 话务虚拟号（TP）只走服务端
 
@@ -123,7 +139,7 @@
 
 - **家政种子**：`jz_seed.cjs`（`ensureSchema` 时表空才写）
 - **保租房种子**：`housing_seed.cjs` 从 `juzhu/data.json` / `data-nanjing.json` / `data-guiyang.json` 灌入（`cities` 为空时）
-- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（家政）+ `/api/juzhu/housing/vendor/*`（房源，2026-09）（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`；文档页 `screens/property-intake-api.html` 含在线调试台，回归 `node scripts/housing_vendor_hmac_regression.cjs`）
+- **商家开放接口**：`POST /api/juzhu/callback` + `/api/juzhu/jiazheng/vendor/*`（家政）+ `/api/juzhu/housing/vendor/*`（房源，2026-09）（HMAC，`vendor_api.cjs`，对齐 `api_doc.md`；文档页 `screens/property-intake-api.html` 含在线调试台，回归 `node scripts/housing_vendor_hmac_regression.cjs`）。2026-09-10 增补：`regions/list`（城市/行政区枚举，限商家开放城市）、`photos/add`（图集，上架须 ≥7 张）、`projects/rating/submit|status`（评级提审/审核状态，rating_status=passed 是上架闸；维度口径单一数据源 `rating_config.cjs`）。
 - **文档中心**：`screens/open-platform.html`（开放平台门户：接口文档 + 运营手册 + FAQ 汇总，nav 在 portal 系列「开放平台」组）；FAQ 在 `screens/open-faq.html`。手册只保留中文名版（`本地生活运营服务商操作手册.html` / `平台运营方操作手册.html`），英文别名副本已删。**不要链接 `api_doc.md` 等被静态服务拦截的文件**，对外一律引 HTML 文档页。
 - **C 端展示**：`juzhu/app.js` 优先 `GET /api/juzhu/catalog?city=`，失败才回落静态 JSON
 - **我的订单 / 微信预约**：`GET /api/juzhu/gr/orders*`、`POST /api/juzhu/jiazheng/wechat-link`（vendor 密钥与 `url_link` 读 `jz_vendors` 表 `hmac_key`/`url_link`/`order_detail_url` 三列，禁止对外 HTTP）
@@ -150,22 +166,31 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - 上下架 = `projects.status`（online/offline/draft）；C 端 catalog 只出 `online`。
 - 频道内视图区分：rental 频道内以 tag「旅居」区分两个 C 端视图——lvju-app-lvju 只出带「旅居」tag（山舍等旅居托管），lvju-app-changzu 排除「旅居」tag（保租房/长租公寓）。前端过滤（lvju-catalog requiredTag / 页面内 filter），不加服务端参数。
 - 演示数据：`node scripts/demo-listings.cjs seed|clean`（tag「演示」一键清理，禁止用真实商家名）；**演示项目/户型使用固定 id 段 9001-9006 / 9101-9109**，reseed 后直链不失效。
-- 旅居视图补充房源：`node scripts/lvju-stay-seed.cjs seed|clean`（山舍旅居托管 vendor，rental + 「旅居」tag + `stay_bookable`，与 #93/#94 同口径；幂等按 slug 判重，clean 只删脚本内 slug 清单，#93/#94 不动）。
+- 旅居视图补充房源：`node scripts/lvju-stay-seed.cjs seed|clean`（山舍旅居托管 vendor，rental + 「旅居」tag + `online_booking`，与 #93/#94 同口径；幂等按 slug 判重，clean 只删脚本内 slug 清单，#93/#94 不动）。
 - 验收实例端口：`juzhu/.env.local` 的 `JUZHU_VERIFY_PORT`（38766），不与主服务 8766 抢端口。
 
-## 规则 16 · 房态日历 / 保险标识 / 最短连住（旅居短住口径）
+## 规则 16 · 房态日历 / 多间库存 / 保险标识 / 最短连住（旅居短住口径）
 
-**逐晚库存与入住规则的单一数据源在服务端（`app.js`），页面不得各自硬编码口径。**（2026-09-05 拍板）
+**逐晚库存与入住规则的单一数据源在服务端（`stay_config.cjs` + `app.js`），页面不得各自硬编码口径。**（2026-09-05 拍板；2026-09-10 多间库存修订，设计稿 `docs/stay-multi-qty-design.md`）
 
-- **房态**：`stay_calendar` 表只存差异行（`status: open/blocked/booked`、`price_night` 覆盖、`booking_id`），**无行 = 默认可订**；`unit_id=0` 表示项目级（整栋/不限房型）。`booked` 只由下单写入、取消自动释放，商家接口不可改已订晚。
-  - C 端公开读：`GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（含夜价/三态/最短连住/保险）
+- **房态**：`stay_calendar` 表只存差异行（**stored `status` 只写 `open`/`blocked` 商家闸门**；`price_night` 覆价、`qty` 放出间数覆盖、`booked_qty` 已订间数计数），**无行 = 默认可订（放出 = `units.total_qty`）**；`unit_id=0` 表示项目级（整栋/不限房型，**容量恒 1**，不收 `qty`）。**`booked` 是 `remaining<=0` 的派生态，只在接口出参出现、不落库**（`buildStayMonth` 输出 `qty/booked_qty/remaining`）。`uk_sc(project_id,unit_id,stay_date)` 唯一键不动——一行表达一个 unit-night 的计数。
+  - C 端公开读：`GET /api/juzhu/projects/:id/stay-calendar?month=&unit_id=`（含夜价/三态/间数/最短连住/保险）
   - 商家读写（会话态）：`GET|POST /api/juzhu/vendor/stay-calendar`；商家读写（HMAC 开放态）：`POST /api/juzhu/housing/vendor/stay-calendar`（owner 校验）
-- **最短连住**：`STAY_MIN_NIGHTS_DEFAULT`（rental=15 晚 / minsu=1）+ `projects.ext.min_stay_nights`（1-365，商家可覆盖）。**三处同口径校验**：C 端日历选段、下单页、`POST /api/juzhu/booking` 服务端兜底；改口径只改服务端常量或 ext，不要在前端另设数字。
-- **按晚预订能力开关（2026-09-05）**：能否在线预订 = `projects.ext.stay_bookable === true`（`stay_config.cjs bookableOf()` 唯一判断，随 `stayConfigOf()` 以 `bookable` 下发 catalog/详情/units/日历），**缺省 false = 仅 400 电话咨询**；tag/频道不参与判断（仅保留 channel∈rental/minsu 粗门）。「维护房态」= B 端 `b-stay-calendar.html` 的「按晚预订」开关（vendor PUT / HMAC `projects/update` 均可写）；admin 台 `juzhu-admin.html` 项目编辑器的「按晚预订 · 入住规则与保障」区块亦可配 `stay_bookable`/`min_stay_nights`/`insurance` 三项（`PUT /admin/projects/:id` 写 ext，2026-09-06 起；逐晚房态/夜价仍在 B 端）。开通后「无行=默认可订」才对外生效；迁移/回填 `node scripts/stay-bookable-init.cjs`（备份 `stay_calendar_bak_20260905`、清 rental 房态、按已开通项目重建 booked 行）。
+- **多间库存（2026-09-10）**：unit = 同规格房型 × N 间（`units.total_qty` 1-999，**缺省 1 = 存量单间行为逐字节不变**，写入口 clamp 并校验「不得低于未来晚已订间数」）。口径单一数据源 `stay_config.cjs`（`totalQtyOf / effectiveQtyOf / remainingOf`）。下单带 `rooms`（缺省 1，整栋单强制 1，`booking_orders.rooms` 落库，金额 = 单间逐晚合计 × rooms）；占用 = 事务内 `INSERT IGNORE` 补缺行 + `booked_qty=booked_qty+rooms` 条件递增（**不翻 status、不碰 price_night/qty/qty_base**；`booking_id` 仅 `COALESCE` 首写，任何占用判定不得依赖它）；释放 = `releaseStayQty()` 按订单区间对称递减 + 纯占用行删除（**商家差异行 price_night/qty/blocked 原样保留**——取代旧「DELETE WHERE booking_id」连带清夜价的副作用）。商家设 `qty` 不得低于该晚 `booked_qty`；已订晚不可关房。过期单清理按 `booking_orders.payment_expires_at` 自身列判，不 join stay_calendar。
+- **放出量两种口径（2026-09 方案 B，`stay_calendar.qty_base`）**：`qty_base IS NULL` = 旧「放出总量」口径，`remaining = max(0, 放出 − 已订)`（存量逐字节不变）；`qty_base` 非 NULL = **净可售口径**，商家推 `available_qty`（HMAC `stay-calendar/set` / B 端同名字段）时服务端记下**推送时点的已订数**作基线，`remaining = clamp(放出 − (已订 − 基线), 0, total_qty − 已订)`——平台之后的占用才扣、取消自动加回、**物理余量封顶防超售**。`qty` 与 `available_qty` 同传 400；写 `qty` 把基线清空；`releaseStayQty` 删纯占用行要求 `qty_base IS NULL`。**凡是读 `stay_calendar` 算 remaining 的 SQL 都必须带出 `qty_base`**（漏了会静默按旧口径算，出过这个 bug）。出参：日历 `days[].available_qty` 回显净可售（null = 旧口径），`set` 响应回 `days[]` 供推完即对账。
+- **房间档案（`units.ext.room_profile`，单一数据源 `room_profile.cjs`）**：入驻「房源字段」表（Excel）统一塞进户型 ext，避免按业态加列——21 个字段：文本 13（`introduction/shared_spaces/child_age_policy/extra_guest_policy/beds/bath_hot_water/kitchen/climate/network/cleaning_frequency/linen_frequency/feature_image/feature_image_caption`，各带长度上限）、枚举 3（`area_type` 面积口径 / `window_type` 窗户类型 / `smoking` 吸烟属性）、数值 4（`window_count/max_guests/max_adults/max_children`）、布尔 1（`window_openable`）。**字段清单/长度/中文名只在 `room_profile.cjs`**，页面与其它模块不得再造一份。写入口：后台 `PUT /admin/units/:id`（`normalizeUnitExtInput`）与商家开放接口 `units/create|update` 的 `room_profile` 键，**合并语义**（只覆盖传入的键、未传保持原值、`null` 清除整块、未知键静默丢弃），非法取值 400 且 message 带字段中文名与可选值。出参在 `units[]` 里给**已解析的 `room_profile` 对象**（`vendor_api.unitOut()`），商家不必自己 parse `ext` 字符串；C 端详情页「房间档案」卡渲染时对文本一律 `esc()`/`textContent`（新增字段沿用这条，不要再拼 innerHTML）。
+- **房源图集（2026-09 商家反馈点 4，单一数据源 `photo_config.cjs`）**：分类枚举（`bedroom/kitchen/bathroom/living/nearby/other`）与数量/大小/分辨率阈值只写这一份，页面与其它模块不得再造映射（出参用 `photoOut()` 补 `category_label`）。**全量覆盖 `photos/sync`**：按实体（`project` / `unit`）整体替换——匹配上的原地更新（匹配键 `external_id` 优先、URL 兜底，URL 带签名会变）、不在列表内的删行，事务内完成；`sort` 归一化 0..n-1，封面取 `is_cover` 中最靠前的、否则第一张，并同步 `cover_image`；超 100 张截取前 100 并回 `truncated`+`warnings`。`photos/add` 保留但改为**幂等**（同 URL / 同 `external_id` 原地更新，修掉「反复推堆重复图」）。**上架抽检**：`projects/status online` 时真拉取封面+靠前 2 张核对（`photo_config.probeImage`）——**确定性不合格**（>10MB / <800×600 / 非图）拒绝上架，**仅网络不可达**只回 warning 放行；判定逻辑是纯函数 `judgeProbe()`，网络层是薄壳。探测带 SSRF 防护（`ipIsBlocked()` 在 DNS `lookup` 回调里拦内网/环回/云元数据地址，限时、限字节、限跳转），**新增出网能力必须走这一层**。
+- **默认关房（2026-09，opt-in）**：`units.ext.default_closed`（房源级 `projects.ext.default_closed` 兜底，`stay_config.defaultClosedOf`）为 true 时，**只有商家显式推送过放出量的晚才可订**（判定用「该晚有没有 `qty`」，不用 `source`——下单占用会把 source 改写成 booking 但不清 qty）；没推过的晚、只设过价的晚一律 `remaining=0`。缺省关闭 = 存量行为不变；**只作用于指定户型的预订，整栋单语义不变**。多渠道商家配合 `available_qty` 按未来 12 个月滚动推送使用。
+- **最短连住（2026-09 下放户型）**：生效顺序 **`units.ext.min_stay_nights` > `projects.ext.min_stay_nights` > `STAY_MIN_NIGHTS_DEFAULT`**（rental=15 晚 / minsu=15 晚；rental 可配 1-365，minsu 可配 15-365，不得降到 15 晚以下）。房源级降级为「房源默认值」，**整栋单（不指定户型）按排序最前的户型**执行——与取消政策同一套回退（`app.js fallbackUnitRowFor()`，两条规则同源）。**三处同口径校验**：C 端日历选段、下单页、`POST /api/juzhu/booking` 服务端兜底；改口径只改服务端常量或 ext，不要在前端另设数字。户型/房态日历出参随行下发**生效值** `min_stay_nights`，前端只读它。
+- **默认夜价与展示价（2026-09 价格下放户型）**：默认夜价（单间口径）= **户型 `units.ext.price_night` > `rent_monthly/30` > `price_from/30`**（minsu 最后一档为 `price_from` 原值），两频道一致；日历逐晚覆盖价仍高于本层。`stay_config.unitNightPrice()` 是唯一实现，随 unit 下发只读 `default_night_price`，**页面不得再用 `/30` 自行折算**（此前 C 端详情页/下单页各抄了一份，已收口）。整栋单价格基准 = `wholeHousePriceUnit()`：有起价按起价（存量语义），起价缺失回落排序最前户型。**`price_from` 自 2026-09 起选填**，上架闸（`vendor_api.publishEligibility` / `app.js projectPublishEligibility` 两处同口径）改为**逐户型校验能算出默认夜价 > 0**，用 `price_from` 兜底的存量房源行为不变。
+- **卡片展示价（2026-09，`stay_config.priceDisplayOf` 单一数据源）**：C 端卡片只读服务端下发的 `price_from_display` / `price_unit` / `price_note`（页面不得自行折算或拼「/月起」「/晚起」）。单位口径（A″）：**minsu 与带「旅居」tag 的 rental 按晚**（取**最低可售单夜价**：从今天起按自然月向后扫 `PRICE_DISPLAY_SCAN_MONTHS`=12 个月，取第一个有可售间夜的月份内的最低价；**无差异行 = 默认可订**，只扫 `status='open'` 的差异行会把绝大多数房源误判成「暂无可订」），**其余 rental 按月**（起价语义，缺省回落户型默认夜价 × 30）。全窗口无可售 → `price_note='暂无可订'`。批量求值走 `priceDisplayScan()`（一次查库，catalog 的 `lite=1` 首屏只补最小列）。
+- **逐晚计价（2026-09-10，2026-09 修订）**：订单金额 = 逐晚「日历覆盖价（`stay_calendar.price_night`，户型级 > 项目级）→ 默认夜价」合计 **× 间数（rooms）**，单一数据源 `stay_config.cjs stayNightPrices()`（单间口径），与 C 端日历/下单页展示同口径；周末/节假日分档即按日期批量覆盖实现。**0 元预订单口径已收紧（2026-09）**：`price_total` 算不出正数 → 下单直接 400「该房源未配置价格，暂不可预订」（配合 price_from 选填，避免无价房源 0 元成单）。
+- **房源交易能力（2026-09-16）**：`projects.ext.online_booking`（在线预订、商家确认后线下收款）与 `online_payment`（在线支付、支付后确认）按房源独立配置，不按 rental/minsu 分流；两项可同时开但至少一项为 true。`stay_config.cjs transactionCapabilitiesOf()` 是单一读口径，`applyTransactionCapabilities()` 是写入口校验，`stayConfigOf()` 下发两项并保留 `bookable` 兼容汇总位。两项都开时 C 端客户选择，`POST /api/juzhu/booking` 用 `transaction_mode=booking|payment` 指定（缺省优先 booking）；订单是否生成 `pay_status=unpaid` 与 30 分钟支付时限只取决于 transaction_mode。
 - **保险标识**：`INSURANCE_TYPES`（`switch_rental` 换租保险 / `hotel_cancel` 酒店取消险 / `property` 财产保险）是唯一枚举，存 `projects.ext.insurance`（key 数组），商家经 `PUT /api/juzhu/vendor/projects/:id` 配置；catalog/项目详情按 `insurance_types` 下发（含 label/icon），C 端直接渲染，**不要再造一份中文名映射**。
-- **免费取消政策（2026-09-09，房型维度）**：`units.ext.cancel_policy = {enabled, days_before, cutoff_time}`（免费取消窗口 = 入住日往前推 `days_before`（0-30，0=入住当天）天的 `cutoff_time` 时刻，缺省 `1 天 18:00`）。**缺省从严 = 未开通即不可取消不可退**（硬截止，无扣款分档）。口径单一数据源 `stay_config.cjs`（`cancelPolicyOf / cancelDeadlineOf / freeCancelOpenOf / cancelPolicyTextOf / orderCancelInfoOf`），政策中文文案服务端算好随接口下发（`cancel_policy_text`），**前端不得自行拼口径**。客户取消闸只在 `POST /api/juzhu/booking/cancel`（窗口外 400）；商家侧取消（B 端 `PUT /vendor/orders/:id`、HMAC `bookings/cancel`）**不受此闸约束**；整栋单（`unit_id` 为空）按项目首个房型（sort_order 最小）的政策回退执行，项目无房型才从严不可取消。配置写入口：B 端房态页「取消政策」卡（vendor `PUT /units/:id` 专用键，read-modify-write 保住 `price_night`）、admin `juzhu-admin-unit.html`（`PUT /admin/units/:id` ext 合并）、HMAC `units/update`。`booking/my` / `booking/lookup` 每单随下发 `can_cancel / cancel_policy_text / cancel_deadline`，C 端取消按钮以 `can_cancel` 为准。回填 `node scripts/cancel-policy-init.cjs`（给已开通项目预配默认政策）。
-- **回填工具**：`node scripts/stay-calendar-init.cjs`（保险缺配置按频道默认补齐 + 存量订单重建为 booked 行，幂等可重跑）。
-- 入口页：B 端 `screens/b-stay-calendar.html`（房态月历 + 批量关房/夜价 + 连住与保险配置 + 房型级取消政策），C 端 `lvju-app-lvju.html`（连续时间段选择）→ `lvju-app-detail.html`（房态日历）→ `lvju-app-booking.html`。
+- **免费取消政策（2026-09-09，房型维度）**：`units.ext.cancel_policy = {enabled, days_before, cutoff_time}`（免费取消窗口 = 入住日往前推 `days_before`（0-30，0=入住当天）天的 `cutoff_time` 时刻，缺省 `1 天 18:00`）。**缺省从严 = 未开通即不可取消不可退**（硬截止，无扣款分档）。口径单一数据源 `stay_config.cjs`（`cancelPolicyOf / cancelDeadlineOf / freeCancelOpenOf / cancelPolicyTextOf / orderCancelInfoOf`），政策中文文案服务端算好随接口下发（`cancel_policy_text`），**前端不得自行拼口径**。客户取消闸只在 `POST /api/juzhu/booking/cancel`（窗口外 400）；商家侧取消（B 端 `PUT /vendor/orders/:id`、HMAC `bookings/cancel`）**不受此闸约束**；整栋单（`unit_id` 为空）按项目首个房型（sort_order 最小）的政策回退执行，项目无房型才从严不可取消。配置写入口：B 端房态页「取消政策」卡（vendor `PUT /units/:id` 专用键，read-modify-write 保住 `price_night`）、admin `juzhu-admin-unit.html`（`PUT /admin/units/:id` ext 合并；同卡配 `total_qty` 走列）、HMAC `units/update`。`booking/my` / `booking/lookup` 每单随下发 `can_cancel / cancel_policy_text / cancel_deadline`，C 端取消按钮以 `can_cancel` 为准。回填 `node scripts/cancel-policy-init.cjs`（给已开通项目预配默认政策）。
+- **回填工具**：`node scripts/stay-calendar-init.cjs`（保险缺配置按频道默认补齐 + 存量订单重建为占用计数，幂等可重跑）；多间迁移 `node scripts/stay-qty-init.cjs`（备份 `stay_calendar_bak_20260910`，旧整行 booked → `booked_qty=1 + status='open'`）。
+- **回归**：`node scripts/stay_qty_regression.cjs [base]`（订满/回补/qty 覆盖/整栋互斥/单间兼容）+ `housing_vendor_hmac_regression.cjs`（§5.7 多间段）。
+- 入口页：B 端 `screens/b-stay-calendar.html`（房态月历 + 批量关房/夜价/放出间数 + 连住与保险配置 + 房型级取消政策），C 端 `lvju-app-lvju.html`（连续时间段选择）→ `lvju-app-detail.html`（房态日历，`remaining≤2` 显「仅剩 X 间」）→ `lvju-app-booking.html`（间数选择）。
 
 ## 规则 17 · 周边玩法维度（`spots` / `project_spots`）
 
@@ -208,3 +233,28 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **写入口与审计**：`PUT /api/juzhu/admin/vendors/:id/commission`（ROUTES 挂 `vendor.fund.write`，act `vendor.commission.update`）+ 处理器内 before/after 审计（role.update 金标准）；入驻审批 `approve` 按 `rate_base−rate_discount` 折算、按 phone **单命中** active 商家回填对应档位（多命中/未命中不阻塞）。管理台：`screens/p-vendor-rates.html`（P 端「商家费率」，nav p 系列 B 组，`_nav.js` 已登记）；全局基准走既有 `PUT /admin/settings`（`settings.write`）。
 - **商家可见**：`GET /api/juzhu/vendor/me` 随发两档 `commission.{housing,jiazheng}.{rate,is_default}`；B 端 `b-listing-mgmt.html` 徽标展示房源档佣金；HMAC `bookings/list`·`bookings/detail` 与 B 端 `/vendor/booking/orders` 每单随发快照字段。**费率不经商家 HMAC 写通道**（`vendor_config.cjs` 进程缓存不受影响）。
 - **perm 基线**：新增 `vendor.fund.write`（domain vendor，roles platform_op/operator_admin）已入 `scripts/__fixtures__/perm_roles_baseline.json`；既有缺口（`GET /admin/vendors`、`PUT /admin/vendors/:id/review` 未登记 ROUTES、consult-mode 重复死规则）为已知债，动权限面前先跑 `node scripts/perm_registry_snapshot.cjs` 对照。
+
+## 规则 21 · 权益结算闭环单一数据源（`commerce/settlement.cjs`）
+
+**券包/会员权益的结算、退款、冲回、对账只走 `commerce/settlement.cjs`（迁移 `004_settlement`），页面与其它模块不得另建资金表或绕过批次直接付款。**（2026-09-20 拍板）
+
+- **逐券计算锁定在核销时刻**：`commerce_redemptions` 的 supplier/beike/channel/retained 由订单锁定的规则快照算出，账务（`commerce_ledger_entries` 借贷分组账）与结算明细（`commerce_settlement_items.rule_ref`）都引用它；改规则版本不追溯，任何"重算"都应能在验收里复算一致（不变量 I5）。
+- **防重复三道闸**：① `uk_settle_once(redemption_id,line_kind)` 明细跨批次唯一；② `uk_batch_period` 同收款方同账期一批次；③ 指令 `request_no` 唯一且**重试沿用原号**（不许换号重付）。生成账单对已入账明细是幂等空操作，不是错误。
+- **申请与审批分离是服务端闸**：批次复核、误核销撤销复核、差异关闭都校验提交人≠复核人；权限点 `commerce.fund.read/write/review` 只在 `perm_registry.ROUTES` 登记，前端按钮隐藏不构成校验。
+- **UNKNOWN 只查原指令**：结果未知的指令禁止重试、禁止换指令；失败指令可受控重试 ≤3 次（`applyInstrument` 的 `controlled` 位只给重试链路，回执链路 paid↔failed 互斥 409）。回执按 `uk_receipt(request_no,digest)` 幂等去重。
+- **沙箱机构是镜像不是资金**：`commerce_provider_requests` 即未来持牌机构适配器的契约面（`sandboxSubmit/sandboxQuery/sandboxSimulate` 三个薄壳）；对外文案必须写明"不代表真实资金"，商户页与 KPI 已内置该披露，改版不得删。
+- **演示卡券不进资金域**：一切结算/退款/对账查询都带 `NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE)` 过滤；新增结算相关查询漏掉这个条件会把演示单卷进账差。
+- **误核销撤销保留历史**：`commerce_redemptions.coupon_id` 已从 UNIQUE 降级为普通索引（撤销后同券可再核销），防重靠核销事务内"券行锁 + 查 confirmed"——不要再把唯一索引加回去；撤销已结算明细生成 `commerce_recovery_cases`，下期生成商户账单时可 `offset_recovery` 抵扣，全部动作过账。
+- **金额守恒不变量 I1–I7**（`verifyInvariants`）是验收底线：订单实付=已核销+已退款+未核销池；本地已付逐笔有机构镜像。改动结算链路后必须跑 `node scripts/commerce/settlement-test.cjs --browser`（11 场景 + 浏览器 6 检查）。
+
+## 规则 22 · 券核销渠道（线上/线下）与酒店通兑口径
+
+**本地生活券的核销渠道、通兑档位、名单抽样只走 `commerce/configuration.cjs` + `commerce/hotel-exchange-demo.cjs`，页面与域逻辑不得另造一份口径。**（2026-09-20 拍板）
+
+- **所有类目的券创建时区分线上/线下**：`sku.payload.redeem_channel`（`offline` 缺省 / `online`）。线下券必须绑具体门店（商家可在商户中心「门店管理」自建，门店类型 `service_channel: store|online`）；线上券绑本商户「线上服务台」虚拟门店（承载 NOT NULL store_id，无产能），**免预约直核**。校验单一入口在 `configuration.cjs validate()` + `service.references()`（线下禁绑线上服务台、线上必须绑、枚举 `enum` 字段类型也定义在这里）。
+- **酒店通兑 = 线下 + `exchange_tier`（t80…t200）**：档位枚举/中文名/展示价单一数据源 `EXCHANGE_TIERS`；同档任选名单酒店、**预约选店制**——预约必传档内 `store_id`（`kind:'hotel'` + 同档校验，跨档/锚点 422 `tier_mismatch`），`appointments.store_id`=所选酒店；核销门店与授权按实际履约门店商户（券发在运营商户名下、核销人是酒店商户员工），`redemptions.merchant_id` 归集所选酒店商户 → 结算账单按事业群自然分商户。改期/取消按 `appointment.store_id` 对称释放产能。
+- **锚点虚拟门店**：每档 1 个（capacity 0，不可直接预约），承载发券时 `commerce_coupons.store_id NOT NULL`；线上服务台同理。**凡是"无固定物理门店"的券形态，优先用虚拟门店承载，不要动 commerce 表结构**（迁移 checksum 锁死，新增列须走新版本号并复制整份 DDL）。
+- **isDemo 泛化约定**：`guiyang-demo.cjs isDemo()` 只看 `initialization.mode==='demo'`，批次名仅用于 seed 收据归属；新增演示批次（如 `hotel-exchange-demo-v1`）必须 payload 带 `initialization:{batch,mode:'demo'}`，否则会误入资金域。资金隔离最终只认 `snapshot.is_demo`（demo-order 打标）。
+- **酒店名单**：`commerce/hotel-roster.json`（1809 家、6 档 80/100/120/160/180/200，`hotel-roster-build.cjs` 从 Excel 转换，可重跑）；演示抽样 `sampleHotels(perTier=8)` 是确定性算法（品牌分层 + hotel_code 字典序轮转），改抽样规则必须保持可复算。门店 city 挂演示城市、真实区域存 payload（名单为全国门店，通兑跨城属预期）。
+- **公开名录**：`GET /api/commerce/v1/hotels`（session 前只读，与 /catalog 同形态，无需 perm 登记）只输出公开字段；C 端名录页 `juzhu-hotels.html`（generate-pages 生成，静态白名单已含）。
+- **回归**：`node scripts/commerce/m1a-test.cjs --hotel-exchange`（档内任选/跨档拒绝/线上免预约/核销归集/资金零分录）；线上 `node scripts/commerce/live-hotel-check.cjs`（19 项，可重复跑：预约后即取消）。设计文档 `docs/prd/DESIGN-本地生活酒店通兑与三品类券.md`，验收 `docs/verification/hotel-exchange-closed-loop/`。

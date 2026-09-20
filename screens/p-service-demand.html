@@ -116,7 +116,7 @@
 <div class="toast" id="toast"></div>
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
-<script src="_jzapi.js"></script>
+<script src="_jzapi.js?v=7"></script>
 <script src="_orderbus.js"></script>
 <script>
 const JZ = window.BZF_JZ;
@@ -151,11 +151,11 @@ function actionCell(o) {
 
 function render() {
   const rows = document.getElementById('liveRows');
-  JZ.list({ pay_status: 'paid', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
+  JZ.list({ pay_status: 'paid,not_required', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
     rows.innerHTML = list.map(o =>
       '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
       '<td>' + JZ.esc(o.id) + '</td>' +
-      '<td>' + (o.icon || '') + ' ' + JZ.esc(o.category) + '</td>' +
+      '<td>' + (o.icon || '') + ' ' + JZ.esc(o.category || o.type) + '</td>' +
       '<td>' + JZ.esc(o.source) + ' <span class="badge b-live">API</span></td>' +
       '<td>' + JZ.esc(o.house) + '</td>' +
       '<td><span class="badge ' + (PRIO[o.type] || '') + '">' + (PRIO_TXT[o.type] || '低') + '</span></td>' +
@@ -172,7 +172,19 @@ function render() {
   });
 }
 
-function doDispatch(id) {
+async function doDispatch(id) {
+  try{
+    const order=await JZ.get(id);
+    if(String(order.source||'').startsWith('新居住权益售后')){
+      const response=await fetch('/api/juzhu/jz/workers',{headers:{Authorization:'Bearer '+JZ.sessionToken()}});
+      const data=await response.json();if(!response.ok)throw Error(data.error||'无法加载处理人员');
+      const workers=(data.list||data.items||data.workers||[]).filter(w=>w.status==='active');
+      if(!workers.length)throw Error('暂无可分配的处理人员，请先在主站维护服务者');
+      const d=document.createElement('dialog');d.style.cssText='border:1px solid #e7ece9;border-radius:16px;padding:24px;width:min(440px,90vw);color:#193d37';
+      d.innerHTML='<form><h3 style="margin:0 0 12px">分配售后处理人员</h3><p style="font-size:12px;color:#758370">'+JZ.esc(order.house)+'</p><label style="display:grid;gap:8px;font-size:13px;margin:20px 0">处理人员<select name="worker" style="padding:12px;border:1px solid #dfe5d8;border-radius:8px" required>'+workers.map(w=>'<option value="'+w.id+'">'+JZ.esc(w.name)+' · '+JZ.esc(w.level)+'</option>').join('')+'</select></label><p class="dispatch-error" role="alert" style="color:#ad4438"></p><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" style="padding:9px 16px" data-close>取消</button><button type="submit" style="padding:9px 16px;border:0;border-radius:8px;background:#0f766e;color:white">确认派单</button></div></form>';
+      document.body.append(d);d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('form').onsubmit=async event=>{event.preventDefault();const b=d.querySelector('[type=submit]');b.disabled=true;try{const worker=workers.find(w=>String(w.id)===new FormData(event.target).get('worker'));await JZ.dispatch(id,{id:worker.id,name:worker.name,level:worker.level});d.close();toast('已分配售后处理人员');render();}catch(e){d.querySelector('.dispatch-error').textContent=e.message;}finally{b.disabled=false;}};d.showModal();return;
+    }
+  }catch(error){toast(error.message);return;}
   JZ.dispatch(id).then(function(o) {
     if (o && o.worker) {
       toast('已按规则派单 → ' + o.worker.name + ' · ' + o.worker.level + '，服务者 App 已收到');

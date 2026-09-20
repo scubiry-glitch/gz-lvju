@@ -1,0 +1,180 @@
+/* Consumer surface: the life channel's cream, teal, gold and serif vocabulary. */
+.commerce-consumer{--consumer-paper:#f6f4ef;--consumer-ink:#193d37;color:var(--consumer-ink)}
+.commerce-consumer .app,.commerce-consumer .scr{background:var(--consumer-paper)}
+.commerce-consumer .appbar{flex-shrink:0;padding:13px 18px;background:var(--consumer-paper);border-bottom:1px solid #193d370a;gap:11px}
+.commerce-consumer .bk{background:#fff9;border:1px solid #193d370d;color:var(--consumer-ink);font-size:25px}
+.commerce-consumer .ttl{font-size:18px;letter-spacing:.04em}
+.commerce-consumer .ttl small{font-size:10px;letter-spacing:.04em;color:#737c70;margin-top:4px}
+.consumer-account{margin-left:auto;flex-shrink:0}
+.consumer-account button{background:transparent;border:1px solid #193d3726;border-radius:20px;color:var(--brand-deep);padding:8px 14px;font-size:12px}
+.commerce-consumer [hidden]{display:none!important}
+.commerce-consumer .scr{padding:0;overscroll-behavior:contain}
+.commerce-consumer .commerce-content{padding:10px 18px 0;gap:22px;display:flex;flex-direction:column}
+.commerce-consumer #commerce-status:not(:empty){margin-top:12px}
+.commerce-consumer .commerce-card{border-color:#193d370c;border-radius:16px;box-shadow:0 4px 16px #233c3103}
+.commerce-consumer svg{width:24px;height:24px;flex-shrink:0}
+.commerce-consumer h1,.commerce-consumer h2,.commerce-consumer h3{color:var(--consumer-ink)}
+.commerce-consumer .consumer-cover{position:relative;isolation:isolate;overflow:hidden;border:0;padding:20px;height:254px;flex-shrink:0;color:white;background:#344c40 url('../assets/commerce/living.webp') center 58%/cover}
+.consumer-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#132d26df,#132d2670 65%,#132d2626)}
+.consumer-cover-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.1em;color:#f6f4efe6}
+.consumer-cover-label span{font-size:8px;letter-spacing:.2em}
+.consumer-cover-copy{margin-top:25px}
+.commerce-consumer .consumer-cover-copy p{color:#fffce8c9;font-size:11px;margin:0 0 10px;letter-spacing:.08em}
+.commerce-consumer .consumer-cover h1{color:#fffcef;font:500 30px/1.35 var(--serif);letter-spacing:.06em;margin:0 0 20px}
+.consumer-cover-copy a{color:#fff3d6;font-size:11px;text-decoration:none;border-bottom:1px solid #fff3d65c;padding-bottom:5px;display:inline-flex;gap:18px;align-items:center;min-height:30px}
+.consumer-cover-index{position:absolute;bottom:20px;right:18px;font:10px var(--font);letter-spacing:.13em;color:#fff9}
+.consumer-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:-6px}
+.consumer-shortcut{border:0;background:transparent;display:flex;align-items:center;flex-direction:column;gap:9px;padding:6px 0;color:var(--consumer-ink);min-width:0}
+.consumer-shortcut svg{width:43px;height:43px;padding:10px;background:#e9ede5;border:1px solid #193d3708;border-radius:15px;color:#446456}
+.consumer-shortcut span{font-size:11px;line-height:1.5}
+.consumer-shortcut small{font-size:11px;color:#777e73}
+.consumer-member{width:100%;min-height:133px;border:1px solid #dfcfaf;border-radius:14px;background:linear-gradient(115deg,#f0e5cf,#f6efdf);text-align:left;padding:18px;display:flex;align-items:center;justify-content:space-between;overflow:hidden;gap:10px;position:relative}
+.consumer-member-copy{position:relative;display:flex;flex-direction:column;gap:6px;z-index:1}
+.consumer-kicker{font-size:8px;letter-spacing:.16em;color:#8c7348;display:block}
+.consumer-member strong{font:600 21px var(--serif);color:#4c3c24;letter-spacing:.05em}
+.consumer-member-copy>span:not(.consumer-kicker){font-size:11px;color:#796749}
+.consumer-member-copy>b{font-size:10px;color:#745427;margin-top:5px;font-weight:500;display:flex;gap:16px}
+.consumer-member-art{flex-shrink:0;width:94px;height:104px;border-radius:10px;border:1px solid #cdb887;background:linear-gradient(140deg,#ead8ad,#d5be8b);transform:rotate(12deg) translate(4px,8px);box-shadow:-5px 5px 15px #876e4621;display:flex;align-items:center;flex-direction:column;justify-content:center;gap:6px;color:#795d2b}
+.consumer-member-art svg{width:31px;height:31px}
+.consumer-member-art>span{font:15px var(--serif);letter-spacing:.13em}
+.consumer-member-art small{font-size:7px;letter-spacing:.22em}
+.consumer-section{min-width:0}
+.consumer-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 13px}
+.commerce-consumer .consumer-section-title h2{font:600 18px var(--serif);margin:0;letter-spacing:.01em}
+.consumer-section-title>span{font-size:10px;color:#828778;white-space:nowrap}
+.consumer-topics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.consumer-topic{display:block;padding:14px 13px 11px;background:#e7ede5;color:#24473a;border:1px solid #193d3709;border-radius:13px;min-width:0;text-decoration:none;transition:transform .16s ease}
+.consumer-topic:active{transform:scale(.98)}
+.consumer-topic-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:13px}
+.consumer-topic-top>span{font-size:8px;letter-spacing:.08em;opacity:.65}
+.consumer-topic-top svg{width:22px;height:22px;opacity:.75}
+.commerce-consumer .consumer-topic h3{font:600 17px var(--serif);color:inherit;margin:0 0 6px}
+.consumer-topic p{font-size:10px;line-height:1.6;margin:0;color:inherit;opacity:.75}
+.consumer-topic-bottom{display:flex;justify-content:space-between;align-items:center;gap:3px;margin-top:12px;font-size:9px;color:inherit}
+.consumer-topic-bottom b{font-size:17px;font-weight:400}
+.topic-care{background:#e5eeec;color:#365c62}.topic-asset{background:#e9e9ee;color:#505567}.topic-green{background:#e9edde;color:#52623c}
+.topic-neighbor{background:#efe7da;color:#775b3d;grid-column:1/-1;position:relative;padding-right:65px}
+.topic-neighbor .consumer-topic-top{position:absolute;right:18px;top:50%;transform:translateY(-50%);margin:0}.topic-neighbor .consumer-topic-top>span{display:none}.topic-neighbor .consumer-topic-top svg{width:34px;height:34px}
+.topic-neighbor .consumer-topic-bottom{margin-top:8px}.topic-neighbor .consumer-topic-bottom>b{display:none}
+.commerce-consumer .consumer-preparing{display:flex;gap:12px;padding:15px;background:#fff9;align-items:center;border:1px dashed #b6c4b5}
+.consumer-preparing>svg{color:#6e8977;width:29px;height:29px}
+.commerce-consumer .consumer-preparing h3{font:500 13px var(--font);margin:0 0 5px}.commerce-consumer .consumer-preparing p{font-size:11px;margin:0;line-height:1.6;color:#7b8378}
+.consumer-service-note{display:flex;justify-content:center;align-items:center;gap:8px;color:#7c8579;font-size:9px;flex-wrap:wrap}.consumer-service-note i{width:3px;height:3px;border-radius:50%;background:#b4beac}
+.consumer-footer{padding:22px 16px 26px;display:flex;flex-direction:column;gap:10px;text-align:center;color:#9a9d8c;font-size:10px;letter-spacing:.06em}
+.consumer-footer a{color:#728370;text-decoration:none;font-size:10px}
+.commerce-consumer .commerce-tabs{flex-shrink:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:8px 8px max(9px,env(safe-area-inset-bottom));border:0;border-top:1px solid #193d3710;background:#fffcf7;box-shadow:0 -4px 18px #16382c03;overflow:visible;z-index:20}
+.commerce-consumer .commerce-tabs button{border:0;border-radius:10px;padding:5px 2px;background:transparent;color:#889083;font-size:10px;line-height:1.5;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.commerce-consumer .commerce-tabs button svg{width:22px;height:22px}
+.commerce-consumer .commerce-tabs .on{color:var(--brand-deep);background:#e9eee5;font-weight:600}
+.consumer-view-heading{padding:18px 2px 4px}
+.consumer-view-heading .consumer-kicker{color:#8a9384;font-size:9px;margin-bottom:12px}
+.consumer-view-heading h1{font:600 28px var(--serif);margin:0 0 9px}
+.consumer-view-heading p{font-size:12px;color:#7c8477;margin:0;line-height:1.7}
+.consumer-back{display:block;background:transparent;border:0;padding:0 0 20px;color:#627664;font-size:12px!important}
+.commerce-consumer .consumer-empty,.commerce-consumer .commerce-empty{padding:38px 20px 34px;min-height:280px;text-align:center}
+.consumer-empty-icon{width:70px;height:70px;margin:0 auto 20px;display:grid;place-items:center;background:#f0f2e9;border-radius:24px;color:#779179;transform:rotate(-6deg)}
+.consumer-empty-icon svg{width:34px;height:34px;transform:rotate(6deg)}
+.commerce-consumer .consumer-empty h2{font:500 20px var(--serif);margin-bottom:10px}
+.commerce-consumer .consumer-empty p{font-size:12px;margin:0 auto 24px;max-width:240px;line-height:1.8;color:#7a8476}
+.commerce-consumer .btn{border-radius:10px;font-size:12px;min-height:40px}
+.consumer-products{display:grid;gap:13px}
+.consumer-product-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.consumer-product-icon{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#eef2e9;color:#61785a}
+.commerce-consumer .product-card{padding:18px}
+.commerce-consumer .product-card{position:relative;padding:13px 14px 12px 70px;border-radius:12px;min-height:128px}
+.commerce-consumer .consumer-product-top{margin:0 0 6px;justify-content:flex-end}
+.commerce-consumer .consumer-product-icon{position:absolute;left:14px;top:17px;width:43px;height:43px}
+.commerce-consumer .product-card h3{font-size:16px;line-height:1.5;margin:0 0 5px}
+.commerce-consumer .product-card>p{font-size:10px;margin:3px 0}
+.commerce-consumer .product-card .product-benefits{margin:6px 0;gap:4px}
+.commerce-consumer .product-card .product-benefits span{padding:3px 5px;font-size:9px}
+.commerce-consumer .product-card .product-bottom{border:0;padding-top:5px;gap:8px}
+.commerce-consumer .product-card .money{font-size:22px;display:flex;align-items:baseline;gap:5px;flex-wrap:wrap}
+.commerce-consumer .product-card .btn{min-height:33px;padding:7px 10px;font-size:11px}
+.commerce-consumer .product-card h3{font:600 20px var(--serif);margin-bottom:9px}
+.commerce-consumer .product-card p{font-size:12px;color:#7a8176}
+.commerce-consumer .product-benefits span{background:#f0f3eb;color:#657a5e;font-size:10px}
+.commerce-consumer .product-bottom{padding-top:14px;border-top:1px dashed #dfe4d8}
+.commerce-consumer .money{font:600 26px var(--serif);color:#92713d}
+.consumer-sale-note{font-size:10px;text-align:center;color:#8a8e7f;line-height:1.8;margin:14px 0 0}
+/* 「浏览全部单品券」整宽胶囊次级按钮（对齐品牌青绿体系；点击跳独立选券页） */
+.consumer-all-products{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:14px;padding:12px 16px;background:#fff;border:1px solid #d8ddd0;border-radius:999px;color:#41604b;font:600 13px/1 var(--font);letter-spacing:.02em;cursor:pointer;transition:border-color .15s,background .15s}
+.consumer-all-products:hover{border-color:#41604b;background:#f6f8f2}
+.consumer-all-products::after{content:'›';font-size:15px;line-height:1;color:#779179}
+.consumer-shop-tabs{display:flex;gap:8px;margin-bottom:12px}.consumer-shop-tabs button{flex:1;border:0;border-radius:8px;background:#eaece3;color:#71806a;padding:10px 5px;font-size:12px}.consumer-shop-tabs [aria-pressed=true]{background:#365c49;color:#fff}
+.consumer-search{display:flex;gap:8px;margin:0 0 14px}.commerce-consumer .consumer-search input{border-radius:10px;border:1px solid #dfe4d7;background:#fff9;font-size:11px;padding:11px;min-width:0}.consumer-search button{border:0;background:transparent;font-size:12px;color:#4c694a;padding:0 4px;flex-shrink:0}
+.consumer-category{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:12px;color:#6c7967}.commerce-consumer .consumer-category select{font-size:12px;background:#fff9;max-width:75%}
+.consumer-browse-all{display:block;width:100%;padding:13px;border:1px solid #dce3d5;background:transparent;color:#52724d;border-radius:10px;font-size:12px;margin-top:13px}
+.commerce-consumer .money small{display:block;font:9px var(--font);color:#8a8e7f;margin-top:4px}
+.consumer-demo-note{padding:12px 14px;background:#f3ead8;color:#806333;border-radius:10px;font-size:11px;line-height:1.8}
+.commerce-consumer .detail-row b{font-size:11px;font-weight:400;overflow-wrap:anywhere;text-align:right;min-width:0}
+.commerce-consumer .detail-row span{flex-shrink:0}
+.commerce-consumer .commerce-actions .btn{flex:1;padding:9px 10px;white-space:nowrap}
+.consumer-profile{display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:22px 18px!important;margin-top:10px}
+.consumer-profile-icon{width:54px;height:54px;border-radius:50%;background:#eaf0e5;display:grid;place-items:center;color:#7d9071}
+.consumer-profile>div{flex:1;min-width:0}.consumer-profile h1{font:600 21px var(--serif);margin:8px 0 0;overflow-wrap:anywhere}.consumer-profile p{font-size:11px!important;margin-bottom:0!important}
+.consumer-profile>.btn{margin-left:68px}
+.consumer-account-assets{display:grid;grid-template-columns:1fr 1fr;padding:14px;background:#edeedd;border-radius:14px}
+.consumer-account-assets .consumer-shortcut:first-child{border-right:1px solid #d8dece}
+.consumer-account-assets .consumer-shortcut svg{background:transparent;border:0}
+.consumer-menu{padding:0 17px!important}
+.consumer-menu button{display:flex;gap:14px;align-items:center;padding:19px 0;width:100%;border:0;border-bottom:1px solid #edf0e6;background:transparent;text-align:left;color:#657c62}
+.consumer-menu button:last-child{border:0}.consumer-menu button>span:first-of-type{flex:1}.consumer-menu b{display:block;font-size:13px;font-weight:500;color:#2e483a}.consumer-menu small{display:block;font-size:11px;color:#8a9183;margin-top:5px}
+.commerce-consumer .commerce-dialog{max-width:430px;border-radius:20px;background:#fffef9}
+.commerce-consumer .commerce-dialog h2{font:600 20px var(--serif)}
+.commerce-consumer .dialog-body{padding-top:18px;font-size:13px;line-height:1.8}
+.consumer-loading{min-height:254px;display:grid;place-items:center;color:#7e8d79;font-size:12px}
+@media(max-width:359px){.commerce-consumer .commerce-content{padding-left:13px;padding-right:13px;gap:19px}.commerce-consumer .consumer-section-title h2{font-size:16px}.consumer-section-title>span{font-size:9px}.consumer-topic{padding:12px 10px}.consumer-topic-bottom{font-size:8px}.consumer-member-art{width:78px}.consumer-cover-label{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.commerce-consumer *{scroll-behavior:auto!important;transition:none!important}}
+.commerce-consumer .product-card h3{font:600 16px/1.45 var(--serif)}
+.commerce-consumer .product-card .product-bottom{padding-top:4px;border:0}
+.commerce-consumer .product-card .product-benefits{margin:6px 0}
+.commerce-consumer .consumer-product-detail{position:relative;padding:26px 20px}
+.consumer-product-detail h1{font:600 26px/1.5 var(--serif);margin:14px 0 8px}
+.consumer-product-detail>.consumer-product-icon{position:static;margin-bottom:18px;width:50px;height:50px}
+.consumer-product-detail .money{margin-top:16px}.consumer-usage{padding-left:18px;font-size:12px;line-height:2.3;color:#70806c}
+.consumer-detail-buy{position:sticky;bottom:0;background:#fffcf7;padding:12px;display:flex;gap:12px;align-items:center;border:1px solid #dfe5d8;border-radius:12px;z-index:10}
+.consumer-detail-buy>.btn{flex:1}.consumer-detail-buy>a{font-size:12px;color:#607858;text-decoration:none}
+/* Membership belongs to the same warm, teal and gold site palette. */
+.commerce-consumer #account-logout{display:none!important}
+.member-heading{padding-bottom:6px}
+.commerce-consumer .member-pass{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(120deg,#123f3a,#193d38 48%,#295348);color:#f3e6c5;padding:25px 23px 22px;border:1px solid #577465;border-radius:18px;box-shadow:0 10px 24px #173e3520;min-height:224px}
+.member-pass:before,.member-pass:after{content:"";position:absolute;z-index:-1;width:280px;height:280px;border:1px solid #cfb98538;border-radius:50%;right:-123px;top:-60px}
+.member-pass:after{width:330px;height:330px;right:-142px;top:-91px;box-shadow:0 0 0 24px #cfb98508,0 0 0 49px #cfb98507}
+.member-pass-top{display:flex;align-items:center;justify-content:space-between;font-size:12px;letter-spacing:2px;color:#d4c399}
+.member-pass-top svg{width:29px;height:29px}.member-wordmark{display:block;font-size:9px;letter-spacing:3px;color:#b5bb9e;margin-top:23px}
+.commerce-consumer .member-pass h1{font-family:"Noto Serif SC","Songti SC",serif;font-size:25px;line-height:1.45;letter-spacing:1px;color:#f5e7bf;margin:7px 0}
+.commerce-consumer .member-pass p{font-size:12px;color:#c7d4c7;margin:0}.member-pass-bottom{border-top:1px solid #d7c79d33;margin-top:26px;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;color:#ded6ba}.member-pass-bottom b{font-weight:500}.member-pass-bottom>span:last-child{font-family:Georgia,serif;font-size:19px}.member-pass-bottom small{font:10px sans-serif}.member-pass.is-owned .member-pass-bottom>span:last-child{font:11px sans-serif;white-space:nowrap;border:1px solid #a39b73;border-radius:20px;padding:4px 9px}
+.commerce-consumer .member-wallet{display:flex;width:100%;align-items:center;gap:12px;padding:17px 18px;text-align:left;cursor:pointer;color:#253b35}
+.member-wallet-icon{display:grid;place-items:center;background:#f2ece0;color:#89774f;border-radius:12px;width:43px;height:43px;flex-shrink:0}.member-wallet-icon svg{width:23px;height:23px}.member-wallet>span:nth-child(2){flex:1}.member-wallet b{display:block;font-size:15px;font-weight:600}.member-wallet small{display:block;font-size:11px;color:#828378;margin-top:5px}.member-wallet>span:last-child{font-size:12px;color:#807353}.member-login{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.member-login span{font-size:11px;color:#8a877d}
+.commerce-consumer .member-benefits{padding:20px 18px}.member-benefits .consumer-section-title{margin-bottom:10px}.member-benefits .consumer-section-title h2{font-size:18px}.commerce-consumer .member-benefit-intro{font-size:12px;line-height:1.8;color:#818076;margin:0 0 13px}
+.member-benefit{border-top:1px solid #eeeae1}.member-benefit summary{display:flex;gap:12px;align-items:center;list-style:none;cursor:pointer;padding:17px 0}.member-benefit summary::-webkit-details-marker{display:none}.member-benefit-number{font:italic 23px Georgia,serif;color:#b09b71;width:27px;flex-shrink:0}.member-benefit summary>span:nth-child(2){flex:1;min-width:0}.member-benefit b{font-weight:500;font-size:14px;line-height:1.6}.member-benefit small{display:block;color:#958669;font-size:11px;margin-top:3px}.member-benefit-expand{color:#a4926b}.member-benefit[open] .member-benefit-expand{transform:rotate(45deg)}.member-benefit>div{padding:0 0 12px 39px}.commerce-consumer .member-benefit>div p{font-size:12px;line-height:1.9;color:#6d726a}.commerce-consumer .member-validity-note{background:#f7f4ed;padding:12px;border-radius:8px;font-size:11px;color:#938269;line-height:1.8;margin:4px 0 0}.member-record{display:grid;gap:6px;padding:14px 0;border-top:1px solid #eeeae1;font-size:12px}.member-record span{color:#827f74}.member-record a{color:#0f766e}.member-detail{margin-bottom:16px}.commerce-consumer .member-detail.consumer-product-detail{background:none;padding:0}.member-detail .member-pass{margin-bottom:0}
+.voucher-code-dialog .voucher-qr{width:232px;max-width:100%;aspect-ratio:1;margin:16px auto;background:#fff;display:grid;place-items:center;border-radius:10px}.voucher-qr svg{display:block;width:100%;height:auto}.code-subtitle,.code-expiry,.code-hint{text-align:center;font-size:12px}.code-expiry{color:#0f766e}.code-divider{border-top:1px solid #e9e5db;text-align:center;font-size:12px;color:#8d8677;padding-top:16px;margin-top:18px}.copy-value{font-size:12px;letter-spacing:.2px}.manual-token{margin:15px 0;color:#666b60;font-size:12px}.manual-token summary{cursor:pointer}.code-hint{color:#99917f;font-size:11px;line-height:1.8}.voucher-code-dialog .commerce-code{word-break:break-all}.voucher-code-dialog .dialog-body{overflow-y:auto}
+.voucher-code-dialog .copy-value{width:100%;min-width:0;font:11px/1.6 monospace;letter-spacing:0}.voucher-code-dialog .field{width:100%}
+/* Coupon wallet status filter (available / used / expired). */
+.coupon-filter{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 4px}
+.coupon-filter button{border:1px solid #d8dccb;background:#fff;color:#4d5c49;border-radius:20px;padding:7px 14px;font-size:12px;cursor:pointer}
+.coupon-filter button[aria-pressed="true"]{background:#123f3a;border-color:#123f3a;color:#f3e6c5}
+.redeem-preview{margin-top:10px}.redeem-preview:empty{display:none}
+.redeem-preview .detail-row{display:flex;gap:12px;font-size:12px;padding:6px 0;border-top:1px dashed #e7e2d5}
+.redeem-preview .detail-row span{color:#828378;flex-shrink:0}
+.redeem-preview .detail-row b{font-weight:500;overflow-wrap:anywhere;min-width:0}
+.commerce-desktop .redeem-preview .detail-row{font-size:13px}
+/* Hotel exchange directory (tier chips + roster cards) and channel tags. */
+.channel-tag{display:inline-block;border-radius:20px;padding:3px 10px;font-size:10px;letter-spacing:.5px;margin-left:6px}
+.channel-tag.is-online{background:#ecf5ef;color:#0f766e;border:1px solid #bcd9c9}
+.channel-tag.is-exchange{background:#f7f1e2;color:#8a6d2f;border:1px solid #e0cfa4}
+.exchange-info .btn{margin-top:12px;display:inline-block}
+.consumer-hotel-tiers{padding:16px 18px}
+.consumer-hotel-tiers .consumer-shop-tabs{margin-bottom:12px}
+.consumer-hotel-tiers .consumer-shop-tabs button small{display:block;font-size:10px;opacity:.75;margin-top:2px}
+.consumer-hotel-tiers .consumer-search,.consumer-hotel-tiers .consumer-category{margin-top:10px}
+.consumer-hotel-list{display:grid;gap:12px}
+.consumer-hotel{padding:16px 18px}
+.consumer-hotel-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tier-badge{display:inline-block;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;background:#123f3a;color:#f3e6c5;letter-spacing:.5px}
+.tier-badge.tier-t80{background:#3d6b5c}.tier-badge.tier-t100{background:#2c5f52}.tier-badge.tier-t120{background:#123f3a}.tier-badge.tier-t160{background:#8a6d2f}.tier-badge.tier-t180{background:#74541f}.tier-badge.tier-t200{background:#4f3d16}
+.consumer-hotel h3{font-size:15px;font-weight:600;margin:10px 0 4px;line-height:1.6}
+.consumer-hotel p{font-size:11px;color:#828378;margin:0}
+.consumer-hotel-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px dashed #e7e2d5;margin-top:12px;padding-top:10px;font-size:11px;color:#938269}
+.consumer-hotel-bottom b{color:#0f766e;font-weight:500}

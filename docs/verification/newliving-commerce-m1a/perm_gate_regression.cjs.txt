@@ -1,0 +1,71 @@
+# perm_strict=0（过渡：admin.write 别名生效）
+PASS  platform_admin PUT settings 放行
+PASS  gov_viewer PUT settings 403
+PASS  operator_admin PUT settings 403
+PASS  匿名 PUT settings 401
+PASS  platform_admin PUT cities/:id 放行
+PASS  gov_viewer PUT cities/:id 403
+PASS  operator_admin PUT cities/:id 403
+PASS  匿名 PUT cities/:id 401
+PASS  platform_admin POST districts 放行
+PASS  gov_viewer POST districts 403
+PASS  operator_admin POST districts 403
+PASS  匿名 POST districts 401
+PASS  platform_admin PUT projects/:id 放行
+PASS  gov_viewer PUT projects/:id 403
+PASS  operator_admin PUT projects/:id 放行（house.write 首次接闸）
+PASS  匿名 PUT projects/:id 401
+PASS  platform_admin DELETE projects/:id 放行
+PASS  gov_viewer DELETE projects/:id 403
+PASS  operator_admin DELETE projects/:id 放行（house.write 首次接闸）
+PASS  匿名 DELETE projects/:id 401
+PASS  platform_admin PUT units/:id 放行
+PASS  gov_viewer PUT units/:id 403
+PASS  operator_admin PUT units/:id 放行（house.write 首次接闸）
+PASS  匿名 PUT units/:id 401
+PASS  platform_admin POST accounts 放行
+PASS  gov_viewer POST accounts 403
+PASS  operator_admin POST accounts 403
+PASS  匿名 POST accounts 401
+PASS  platform_admin PUT accounts/:id 放行
+PASS  gov_viewer PUT accounts/:id 403
+PASS  operator_admin PUT accounts/:id 403
+PASS  匿名 PUT accounts/:id 401
+PASS  platform_admin POST accounts/:id/api-key 放行
+PASS  gov_viewer POST accounts/:id/api-key 403
+PASS  operator_admin POST accounts/:id/api-key 403
+PASS  匿名 POST accounts/:id/api-key 401
+PASS  platform_admin PUT idp-configs 放行
+PASS  gov_viewer PUT idp-configs 403
+PASS  operator_admin PUT idp-configs 403
+PASS  匿名 PUT idp-configs 401
+PASS  platform_admin POST ratings/:code/review 放行
+PASS  gov_viewer POST ratings/:code/review 403
+PASS  operator_admin POST ratings/:code/review 403
+PASS  匿名 POST ratings/:code/review 401
+PASS  platform_admin POST export 放行
+PASS  gov_viewer POST export 403
+PASS  operator_admin POST export 403
+PASS  匿名 POST export 401
+PASS  platform_admin POST projects/:id/rating/submit 放行
+PASS  gov_viewer POST projects/:id/rating/submit 403
+PASS  匿名 POST projects/:id/rating/submit 401
+PASS  platform_admin GET projects 200
+PASS  gov_viewer GET projects 403
+PASS  匿名 GET projects 401
+PASS  platform_admin GET accounts 200
+PASS  gov_viewer GET accounts 403
+PASS  匿名 GET accounts 401
+PASS  platform_admin GET dictionary 200
+PASS  gov_viewer GET dictionary 403
+PASS  匿名 GET dictionary 401
+PASS  platform_admin GET audit 200
+PASS  gov_viewer GET audit 403
+PASS  匿名 GET audit 401
+PASS  旧全局 Key 写 403
+PASS  旧全局 Key 管理读 403（GET 收口）
+PASS  细粒度审计 project.update 落表
+PASS  注册路由不再产生 admin.write 粗粒度审计
+# 清理完成（测试账号 IAMREG894305_*）
+
+ALL PASS

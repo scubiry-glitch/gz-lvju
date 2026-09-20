@@ -1,0 +1,30 @@
+{
+  "base": "https://sytest.meizu.life",
+  "checked_at": "2026-09-19T11:57:24.016Z",
+  "pages": [
+    {
+      "file": "juzhu-commerce.html",
+      "loaded": true,
+      "test_transaction": {
+        "test_only": true,
+        "payment": "PAID",
+        "grant": "COMPLETED",
+        "count": 5
+      }
+    },
+    {
+      "file": "juzhu-promoter.html",
+      "loaded": true
+    },
+    {
+      "file": "screens/commerce-merchant.html",
+      "loaded": true
+    },
+    {
+      "file": "screens/commerce-admin.html",
+      "loaded": true
+    }
+  ],
+  "page_errors": [],
+  "passed": true
+}

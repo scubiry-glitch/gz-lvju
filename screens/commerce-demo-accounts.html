@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN" data-console-login="off">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>演示账号 · 新居住权益工作台</title><link rel="stylesheet" href="../lvju-app.css"><link rel="stylesheet" href="_commerce.css"></head>
+<body class="commerce-page commerce-desktop" data-commerce-view="admin" data-section="demo-accounts"><div class="console"><aside id="side-nav" data-series="commerce" data-active="demo-accounts"></aside><div class="main"><header class="appbar"><a class="bk" href="../overview.html" aria-label="返回全站总览">‹</a><div class="ttl">演示账号<small>新居住 · 权益工作台（仅 sytest 演示环境）</small></div></header><nav id="commerce-tabs" class="commerce-tabs" aria-label="权益管理导航"></nav><main id="commerce-content" class="commerce-content">
+
+<section class="commerce-card wide commerce-hero"><div class="eyebrow">NEW LIVING · DEMO ACCOUNTS</div><h2>演示账号一览</h2><p>主站 IAM 测试账号（admin / va_owner / op_admin / w_worker1 / holding_viewer1 等 6 个）另见 <a href="demo-accounts.html"><b>演示账号速查</b></a>。以下为权益结算演示账号，由 <code>scripts/commerce/settlement-demo-seed.cjs</code> 生成，覆盖权益四端的演示视角。密码统一为 <b>Demo#2026</b>；全部为「演示」前缀账号，仅存在于 sytest 预览环境，机构为沙箱口径，<b>不代表真实资金</b>。</p></section>
+
+<section class="commerce-card wide"><h2>账号矩阵</h2><div class="commerce-table-wrap"><table><caption class="sr-only">演示账号</caption><thead><tr><th>账号</th><th>登录名</th><th>密码</th><th>角色与权限</th><th>建议入口</th></tr></thead><tbody>
+<tr><td>演示·结算运营</td><td><code>demo_operator</code></td><td><code>Demo#2026</code></td><td>权益配置与履约管理 + <b>结算批次/指令/退款/对账处理</b>（commerce.admin.*、commerce.fund.read/write）</td><td><a href="commerce-admin-settlement.html">结算账单</a> · <a href="commerce-admin-refunds.html">退款执行</a> · <a href="commerce-admin-reconciliation.html">对账中心</a> · <a href="commerce-admin-stats.html">运营统计</a></td></tr>
+<tr><td>演示·结算复核</td><td><code>demo_reviewer</code></td><td><code>Demo#2026</code></td><td>独立复核审批（commerce.admin.review、commerce.fund.review）——<b>申请与审批分离的另一端</b></td><td><a href="commerce-admin-settlement.html">结算账单（复核）</a> · <a href="commerce-admin-reconciliation.html">对账中心（撤销/赔付/差异关闭复核）</a></td></tr>
+<tr><td>演示核销员甲</td><td><code>demo_cashier_a</code></td><td><code>Demo#2026</code></td><td>演示结算商户甲（vendor 范围）：门店核销 + 本商户应结/到账</td><td><a href="commerce-merchant-settlement.html">应结与到账</a> · <a href="commerce-merchant.html">商户工作台</a></td></tr>
+<tr><td>演示核销员乙</td><td><code>demo_cashier_b</code></td><td><code>Demo#2026</code></td><td>演示结算商户乙（vendor 范围）：同上，用于跨商户隔离对照</td><td><a href="commerce-merchant-settlement.html">应结与到账</a></td></tr>
+<tr><td>演示客户·林女士</td><td><code>demo_lin</code></td><td><code>Demo#2026</code></td><td>本人权益：卡券 / 预约 / 订单 / 售后（含退款进度）</td><td><a href="../juzhu-commerce.html">生活权益</a> · <a href="../juzhu-commerce.html?view=cases">售后（退款进度）</a></td></tr>
+<tr><td>演示客户·陈先生</td><td><code>demo_chen</code></td><td><code>Demo#2026</code></td><td>本人权益（跨用户隔离对照）</td><td><a href="../juzhu-commerce.html">生活权益</a></td></tr>
+<tr><td>演示推广员·沈晓</td><td><code>demo_promoter</code></td><td><code>Demo#2026</code></td><td>推广归因：本人佣金确认 / 结算中 / 已到账</td><td><a href="../juzhu-promoter.html?view=promotion">权益推广 · 推广记录</a></td></tr>
+</tbody></table></div></section>
+
+<section class="commerce-card wide"><h2>一条龙演示路径（约 10 分钟）</h2><ol class="setup-steps">
+<li><b>客户下单与履约</b>（演示客户·林女士）：生活权益 → 演示券包（演示环境开放演示购买/兑换）→ 预约 → 出示核销码。</li>
+<li><b>商户核销</b>（演示核销员甲）：商户工作台 → 核销卡券（扫码或录入券编号+动态码）。</li>
+<li><b>结算闭环</b>（演示·结算运营）：结算账单 → 生成账单（选已结束账期）→ 提审 → 执行 → 回执/查单；退款执行页处理待退款单。</li>
+<li><b>独立复核</b>（演示·结算复核）：结算账单「复核」；对账中心复核误核销撤销、赔付与差异关闭（提交人不能自审）。</li>
+<li><b>对账与差异</b>（演示·结算运营）：对账中心 → 新建对账 → 差异指派/处理 → 复核账号关闭。</li>
+<li><b>资金视角回看</b>：商户「应结与到账」、推广员「已到账」、客户「退款进度」三端同看一账。</li>
+</ol><p>数据与口径详见 <code>docs/verification/guiyang-closed-loop/DEMO-DATA.md</code>；清理与重建：<code>node scripts/commerce/settlement-demo-seed.cjs clean|seed</code>。</p></section>
+
+</main></div></div><script src="_console-login.js"></script><script src="_nav.js"></script><script>
+document.querySelector('#commerce-tabs').innerHTML='<a class="on" href="commerce-demo-accounts.html" aria-current="page">演示账号</a>'+'<a href="commerce-admin-settlement.html">结算账单</a><a href="commerce-admin-reconciliation.html">对账中心</a><a href="commerce-admin-stats.html">运营统计</a>';
+</script></body></html>

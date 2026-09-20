@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>演示账号速查 · 测试账号一览</title>
+  <style>
+    :root {
+      --bg: #f5f6f8; --surface: #ffffff; --fg: #0f172a;
+      --muted: #64748b; --border: #e2e8f0;
+      --primary: #0f172a; --primary-deep: #020617; --accent: #0f766e;
+      --warn: #b45309; --danger: #dc2626;
+      --radius: 12px;
+      --font: system-ui, -apple-system, 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+      --mono: ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: var(--font); font-size: 14px; line-height: 1.65; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+    a { color: #0369a1; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code, .mono { font-family: var(--mono); font-size: 0.93em; }
+    .console { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+    .main { min-width: 0; padding: 20px 24px 56px; }
+    .shell { max-width: 1080px; margin: 0 auto; }
+    @media (max-width: 1023px) { .console { grid-template-columns: 1fr; } #side-nav { display: none; } }
+
+    .hero {
+      margin: 8px 0 18px; padding: 22px 26px; border-radius: 16px; color: #fff;
+      background: linear-gradient(135deg, var(--primary-deep), var(--primary) 55%, #1e293b);
+    }
+    .hero h1 { margin: 0 0 6px; font-size: 21px; }
+    .hero p { margin: 0; opacity: .88; font-size: 13px; max-width: 72ch; }
+    .hero .chips { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .hero .chips span { font-size: 11px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); }
+
+    .sessbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 16px; margin-bottom: 16px; font-size: 13px;
+    }
+    .sessbar .dot { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; flex-shrink: 0; }
+    .sessbar .dot.on { background: #16a34a; }
+    .sessbar .grow { flex: 1; }
+    .sessbar button {
+      border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+      border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
+    }
+    .sessbar button:hover { border-color: #94a3b8; }
+
+    .notice {
+      background: color-mix(in oklab, #b45309 8%, var(--surface));
+      border: 1px solid color-mix(in oklab, #b45309 32%, var(--border));
+      border-radius: var(--radius); padding: 12px 18px; margin-bottom: 20px; font-size: 13px;
+    }
+    .notice ul { margin: 6px 0 2px; padding-left: 20px; }
+    .notice li { margin: 3px 0; }
+
+    .grp-head {
+      display: flex; align-items: baseline; gap: 10px;
+      margin: 26px 2px 10px; padding-left: 10px; border-left: 4px solid var(--grp, var(--primary));
+    }
+    .grp-head h2 { margin: 0; font-size: 16px; }
+    .grp-head .sub { font-size: 12px; color: var(--muted); }
+
+    .acc {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .acc-top { display: flex; align-items: center; gap: 10px; padding: 12px 18px; flex-wrap: wrap; }
+    .acc-top .avatar {
+      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+      display: grid; place-items: center; font-size: 18px; font-weight: 700; color: #fff;
+      background: linear-gradient(135deg, var(--grp, var(--primary)), color-mix(in oklab, var(--grp, var(--primary)) 60%, black));
+    }
+    .acc-top .who { flex: 1; min-width: 200px; }
+    .acc-top .who .nm { font-weight: 700; font-size: 14.5px; }
+    .acc-top .who .ds { font-size: 12px; color: var(--muted); }
+    .chip {
+      display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px;
+      background: var(--bg); border: 1px solid var(--border); color: #475569; white-space: nowrap;
+    }
+    .chip.role { background: color-mix(in oklab, var(--grp, var(--primary)) 10%, #fff); border-color: color-mix(in oklab, var(--grp, var(--primary)) 30%, var(--border)); color: color-mix(in oklab, var(--grp, var(--primary)) 85%, black); font-weight: 600; }
+
+    .cred-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      padding: 4px 18px 12px;
+    }
+    @media (max-width: 760px) { .cred-grid { grid-template-columns: 1fr; } }
+    .cred {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px;
+    }
+    .cred .k { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .cred .v { flex: 1; font-family: var(--mono); font-size: 13px; word-break: break-all; min-width: 0; }
+    .cred .v.masked { letter-spacing: 2px; }
+    .cred button {
+      border: 1px solid var(--border); background: var(--surface); border-radius: 7px;
+      font-size: 11px; padding: 3px 8px; cursor: pointer; color: #475569; flex-shrink: 0; font-family: var(--font);
+    }
+    .cred button:hover { border-color: #94a3b8; color: var(--fg); }
+
+    .acc-foot {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 18px 14px; border-top: 1px dashed var(--border); font-size: 12.5px;
+    }
+    .acc-foot .lbl { color: var(--muted); flex-shrink: 0; }
+    .pglink {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px;
+      font-size: 12px; color: #0369a1; background: var(--surface);
+    }
+    .pglink:hover { border-color: #7dd3fc; text-decoration: none; }
+    .btn-login {
+      margin-left: auto; border: 0; border-radius: 9px; padding: 7px 16px; cursor: pointer;
+      font: inherit; font-size: 12.5px; font-weight: 600; color: #fff;
+      background: linear-gradient(135deg, var(--grp, var(--primary)), color-mix(in oklab, var(--grp, var(--primary)) 62%, black));
+    }
+    .btn-login:hover { filter: brightness(1.12); }
+    .btn-login:disabled { opacity: .55; cursor: wait; }
+
+    section.card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      margin-top: 20px; padding: 16px 22px 18px;
+    }
+    section.card > h2 { font-size: 15.5px; margin: 4px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 11.5px; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+    td .mono { word-break: break-all; }
+
+    .foot { margin-top: 22px; font-size: 12px; color: var(--muted); }
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(20px);
+      background: #0f172a; color: #fff; font-size: 13px; padding: 9px 18px; border-radius: 10px;
+      opacity: 0; pointer-events: none; transition: all .22s; z-index: 999; max-width: 88vw;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="console">
+
+  <div id="side-nav" data-series="p" data-active="demo-accounts"></div>
+
+  <main class="main">
+    <div class="shell">
+
+  <div class="hero">
+    <h1>🔑 演示账号速查</h1><p style="margin-top:8px">权益结算演示账号（demo_operator / demo_cashier_a / demo_lin 等 7 个，统一口令 Demo#2026）另见 <a href="commerce-demo-accounts.html"><b>演示账号 · 新居住权益工作台</b></a>。</p>
+    <p>全部为<strong>演示账号</strong>，登录框里直接输入即可。统一走账号中心 <code style="color:#cbd5e1">POST /api/auth/login</code>（MySQL <code style="color:#cbd5e1">accounts</code> 表）；点每张卡的「一键登录并进入」可免手输直接进入对应控制台。</p>
+    <div class="chips">
+      <span>6 个账号</span><span>5 种角色</span><span>覆盖 P / B / S 三端</span><span>含国企持有方只读</span>
+    </div>
+  </div>
+
+  <div class="sessbar" id="sessbar">
+    <span class="dot" id="sessDot"></span>
+    <span id="sessText">正在检查本机登录态…</span>
+    <span class="grow"></span>
+    <button id="sessReload" type="button">刷新</button>
+  </div>
+
+  <div class="notice">
+    <strong>⚠ 使用须知</strong>
+    <ul>
+      <li>这些账号只存在于<strong>演示环境的数据库</strong>（<code>accounts</code> 表，仓库代码里没有口令记录）；本页为演示方便明文展示，<strong>生产凭证一律不进页面 / 仓库</strong>（CLAUDE.md 规则 11）。</li>
+      <li><strong>防爆破</strong>：同一账号连错 5 次锁 30 分钟、同 IP 30 次 / 10 分钟——演示时别随手试密码，锁了要等。</li>
+      <li><strong>切换账号</strong>：直接点另一张卡的「一键登录」即可覆盖本机会话 token；或在右上角先「退出登录」。</li>
+      <li>本页需经 Node 服务（<code>:8766</code> 或预览域名）访问才有 API；<code>file://</code> 直开时「一键登录」不可用，可复制账密后到页面登录框粘贴。</li>
+    </ul>
+  </div>
+
+  <div id="groups"></div>
+
+  <section class="card">
+    <h2>🚪 三种登录入口（同一套账号）</h2>
+    <table>
+      <thead><tr><th>入口</th><th>页面</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>控制台统一登录门</td>
+          <td><code>screens/</code> 下后台页（派单台、花名册、P 中台各页…）</td>
+          <td>页面引入 <code>_console-login.js</code>，首次访问自动弹登录层，输入账密即可；401 时也会自动弹出并重放请求。</td>
+        </tr>
+        <tr>
+          <td>内容后台自带登录框</td>
+          <td><a href="../juzhu-admin.html">juzhu-admin.html</a></td>
+          <td>页面自管登录态（<code>data-console-login="off"</code>），用自己的登录表单，走同一登录接口。</td>
+        </tr>
+        <tr>
+          <td>商家徽标登录</td>
+          <td><a href="b-listing-mgmt.html">b-listing-mgmt.html</a></td>
+          <td>点右上角「只读 · 点击登录」徽标，先后弹账号 / 密码输入框，走 <code>/vendor/login</code> 别名（同一账号中心链路，商家账号自动带 <code>vendor_id</code> 数据范围）。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>🗄 数据库对照（联调用）</h2>
+    <table>
+      <thead><tr><th>accounts.id</th><th>login_name</th><th>角色</th><th>数据范围（account_roles.scope）</th><th>绑定</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td class="mono">admin</td><td>platform_admin</td><td>all（全量）</td><td>—</td></tr>
+        <tr><td>28</td><td class="mono">va_owner</td><td>vendor_owner</td><td>vendor:160</td><td>商家 V160 测试运营商A（可删）</td></tr>
+        <tr><td>29</td><td class="mono">va_operator</td><td>vendor_operator</td><td>vendor:160</td><td>商家 V160</td></tr>
+        <tr><td>32</td><td class="mono">op_admin</td><td>operator_admin</td><td>vendor:160</td><td>商家 V160（机构管理员）</td></tr>
+        <tr><td>30</td><td class="mono">w_worker1</td><td>worker</td><td>self（worker_id=1）</td><td>服务者 #1 陈建国（L4）</td></tr>
+        <tr><td>31</td><td class="mono">holding_viewer1</td><td>holding_viewer</td><td>all（只读）</td><td>—（无任何写权限点）</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin:10px 0 0;">
+      角色权限面由 <code>perm_registry.cjs</code> 折叠（改角色先改注册表）；登录防爆破见 <code>login_throttle</code> 表；会话 30 天 TTL，改权限 / scope 即吊销全部会话。
+    </p>
+  </section>
+
+  <div class="foot">
+    演示账号如需增删，直接操作演示库 <code>accounts</code> / <code>account_roles</code>（Node + mysql2，规则 14），并同步更新本页。
+  </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ── 账号数据（与演示库 accounts 表一一对应；口令仅演示账号）──
+  var ACCOUNTS = [
+    {
+      group: 'plat',
+      user: 'admin', pwd: 'adm-67b03bdc3d1082212987945c',
+      name: '平台超管', ds: '平台管理员 · 全权（permissions 含 *）',
+      role: 'platform_admin', roleName: '平台管理员', scope: '全部数据（all）', avatar: '🛡',
+      pages: [
+        { label: '内容编辑后台', href: '../juzhu-admin.html' },
+        { label: 'P · 控制台', href: 'p-console.html' },
+        { label: '账号中心 IAM', href: 'account-center.html' },
+        { label: 'P · 服务订单概览', href: 'p-jz-order-overview.html' },
+        { label: 'P · 评级详情', href: 'p-rating-detail.html' },
+        { label: 'P · 工单池派单', href: 'p-service-demand.html' },
+      ],
+      loginTo: { label: '内容编辑后台', href: '../juzhu-admin.html' },
+      note: '全部 P 端页（p-jz-* / p-rating-* / p-service-*）与 juzhu-admin.html 均可进。',
+    },
+    {
+      group: 'op',
+      user: 'va_owner', pwd: 'va-owner-2026',
+      name: '商家管理员', ds: 'V160 测试运营商A（可删）· 本商家数据可见可写',
+      role: 'vendor_owner', roleName: '商家管理员', scope: '本商家（vendor:160）', avatar: '🏪',
+      pages: [
+        { label: 'B · 房源上下架（商家工作台）', href: 'b-listing-mgmt.html' },
+        { label: 'B · 房态日历 · 保障配置', href: 'b-stay-calendar.html' },
+      ],
+      loginTo: { label: '房源上下架', href: 'b-listing-mgmt.html' },
+      note: '登录后 B 端工作台右上显示「🏪 商家（佣金 x%）」徽标（规则 20，费率只读）。',
+    },
+    {
+      group: 'op',
+      user: 'va_operator', pwd: 'va-op-2026x',
+      name: '商家客服', ds: 'V160 · 同一商家工作台，写权限受角色收窄',
+      role: 'vendor_operator', roleName: '商家客服/运营', scope: '本商家（vendor:160）', avatar: '🎧',
+      pages: [
+        { label: 'B · 房源上下架（商家工作台）', href: 'b-listing-mgmt.html' },
+      ],
+      loginTo: { label: '房源上下架', href: 'b-listing-mgmt.html' },
+      note: '与 va_owner 同商家、不同角色——用于对照角色权限收窄。',
+    },
+    {
+      group: 'op',
+      user: 'op_admin', pwd: 'op-admin-2026',
+      name: '运营机构管理员', ds: 'V160 机构管理员 · 调度 / 花名册等机构日常',
+      role: 'operator_admin', roleName: '白名单运营商管理员', scope: '本商家（vendor:160）', avatar: '🏬',
+      pages: [
+        { label: 'B · 派单看板（调度台）', href: 'b-dispatch-board.html' },
+        { label: 'B · 员工花名册', href: 'b-staff-roster.html' },
+      ],
+      loginTo: { label: '派单看板 · 调度台', href: 'b-dispatch-board.html' },
+      note: '家政派单链路（规则 9）：P 派单 → 本调度台 → S 服务者接单。',
+    },
+    {
+      group: 'worker',
+      user: 'w_worker1', pwd: 'w-worker-2026',
+      name: '服务者', ds: '绑定服务者 #1 陈建国（L4）· 仅本人数据',
+      role: 'worker', roleName: '服务者', scope: '仅本人（self · worker_id=1）', avatar: '🛠',
+      pages: [
+        { label: 'S · 服务者 App（接单 / 推进）', href: 's-orders.html' },
+      ],
+      loginTo: { label: '服务者 App', href: 's-orders.html' },
+      note: '接单后推进工单状态，客户在 C 端评价回流（规则 8 闭环）。',
+    },
+    {
+      group: 'holding',
+      user: 'holding_viewer1', pwd: 'hold-view-2026',
+      name: '国企持有方（只读）', ds: '产权方资管视角 · 无任何写权限点（规则 4）',
+      role: 'holding_viewer', roleName: '国企持有方（只读）', scope: '全部数据 · 只读（all）', avatar: '🏢',
+      pages: [
+        { label: 'B · 资管大盘（入住率 / 收入）', href: 'b-operator-console.html' },
+        { label: 'B · 运营商绩效与 SLA', href: 'b-occupancy.html' },
+      ],
+      loginTo: { label: '资管大盘', href: 'b-operator-console.html' },
+      note: '只看资管 / 报表 / SLA 维度，派单上架等一线动作页不出现（视角红线）；账号用于 org/report 等只读接口与 IAM 演示。',
+    },
+  ];
+
+  var GROUPS = [
+    { key: 'plat',    label: '⭐ 平台方（P 端 · 服务认证中台 / 内容后台）', sub: 'platform_admin 全权', color: '#0f172a' },
+    { key: 'op',      label: '🏬 白名单运营商（B 端 · 商家 V160）', sub: '商家管理员 / 商家客服 / 机构管理员 三种角色对照', color: '#0f766e' },
+    { key: 'worker',  label: '🛠 服务者（S 端 App）', sub: '一线接单与工单推进', color: '#0d9488' },
+    { key: 'holding', label: '🏢 国企持有方（B 端 · 只读）', sub: '资管视角，不做日常运营（规则 4）', color: '#334155' },
+  ];
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 3200);
+  }
+
+  function copyText(text, tip) {
+    function done() { toast(tip || '已复制'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { legacy(); });
+    } else legacy();
+    function legacy() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败，请手动选择'); }
+      ta.remove();
+    }
+  }
+
+  function render() {
+    var html = '';
+    GROUPS.forEach(function (g) {
+      var list = ACCOUNTS.filter(function (a) { return a.group === g.key; });
+      if (!list.length) return;
+      html += '<div class="grp-head" style="--grp:' + g.color + '"><h2>' + esc(g.label) + '</h2><span class="sub">' + esc(g.sub) + '</span></div>';
+      list.forEach(function (a) {
+        html += '<div class="acc" style="--grp:' + g.color + '">' +
+          '<div class="acc-top">' +
+            '<div class="avatar">' + a.avatar + '</div>' +
+            '<div class="who"><div class="nm">' + esc(a.name) + '</div><div class="ds">' + esc(a.ds) + '</div></div>' +
+            '<span class="chip role">' + esc(a.roleName) + ' · <span class="mono">' + esc(a.role) + '</span></span>' +
+            '<span class="chip">数据范围：' + esc(a.scope) + '</span>' +
+          '</div>' +
+          '<div class="cred-grid">' +
+            credRow('账号', a.user, false, a.user) +
+            credRow('密码', a.pwd, true, a.pwd) +
+          '</div>' +
+          '<div class="acc-foot">' +
+            '<span class="lbl">去往</span>' +
+            a.pages.map(function (p) { return '<a class="pglink" href="' + esc(p.href) + '">' + esc(p.label) + ' ↗</a>'; }).join('') +
+            '<button class="btn-login" type="button" data-user="' + esc(a.user) + '">一键登录并进入「' + esc(a.loginTo.label) + '」</button>' +
+          '</div>' +
+          '<div class="acc-foot" style="border-top:0;padding-top:0;"><span class="ds" style="font-size:12px;color:var(--muted);">' + esc(a.note) + '</span></div>' +
+        '</div>';
+      });
+    });
+    document.getElementById('groups').innerHTML = html;
+
+    document.querySelectorAll('.cred button[data-copy]').forEach(function (b) {
+      b.addEventListener('click', function () { copyText(b.getAttribute('data-copy'), '已复制 ' + b.getAttribute('data-kind')); });
+    });
+    document.querySelectorAll('.cred button[data-reveal]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = document.getElementById(b.getAttribute('data-reveal'));
+        var masked = v.classList.toggle('masked');
+        v.textContent = masked ? '••••••••••••' : v.getAttribute('data-v');
+        b.textContent = masked ? '显示' : '隐藏';
+      });
+    });
+    document.querySelectorAll('.btn-login').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var a = ACCOUNTS.filter(function (x) { return x.user === b.getAttribute('data-user'); })[0];
+        if (a) quickLogin(a, b);
+      });
+    });
+  }
+
+  function credRow(kind, val, secret, copyVal) {
+    var id = 'cv-' + kind + '-' + val.replace(/[^a-zA-Z0-9]/g, '');
+    var html = '<div class="cred">' +
+      '<span class="k">' + kind + '</span>' +
+      '<span class="v' + (secret ? ' masked' : '') + '" id="' + id + '"' + (secret ? ' data-v="' + esc(val) + '"' : '') + '>' +
+        (secret ? '••••••••••••' : esc(val)) + '</span>' +
+      (secret ? '<button type="button" data-reveal="' + id + '">显示</button>' : '') +
+      '<button type="button" data-copy="' + esc(copyVal) + '" data-kind="' + kind + '">复制</button>' +
+    '</div>';
+    return html;
+  }
+
+  function quickLogin(a, btn) {
+    btn.disabled = true;
+    var old = btn.textContent;
+    btn.textContent = '登录中…';
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login_name: a.user, password: a.pwd }),
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (res) {
+      if (!res.ok || !res.j.token) {
+        btn.disabled = false; btn.textContent = old;
+        var err = res.j.error || '登录失败';
+        if (/lock|锁|throttle|频繁/i.test(err)) err += '（防爆破：稍后再试，别连续重试）';
+        toast('❌ ' + a.user + '：' + err);
+        return;
+      }
+      try { localStorage.setItem('BZF_SESSION_TOKEN', res.j.token); } catch (e) {}
+      toast('✅ 已登录 ' + a.user + '（' + a.roleName + '），正在进入' + a.loginTo.label + '…');
+      setTimeout(function () { location.href = a.loginTo.href; }, 700);
+    }).catch(function () {
+      btn.disabled = false; btn.textContent = old;
+      toast('登录服务不可用——需经 Node 服务访问本页；可复制账密到目标页面登录框');
+    });
+  }
+
+  // ── 本机会话状态 ──
+  function refreshSession() {
+    var dot = document.getElementById('sessDot');
+    var txt = document.getElementById('sessText');
+    var t = '';
+    try { t = localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch (e) {}
+    if (!t) { dot.className = 'dot'; txt.innerHTML = '本机<strong>未登录</strong>——点任意卡片「一键登录」，或到目标页面登录框输入。'; return; }
+    txt.textContent = '正在校验本机会话…';
+    fetch('/api/auth/me', { headers: { Authorization: 'Bearer ' + t } })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.account) {
+          try { localStorage.removeItem('BZF_SESSION_TOKEN'); } catch (e) {}
+          dot.className = 'dot'; txt.innerHTML = '本机会话已失效，已清除——请重新「一键登录」。';
+          return;
+        }
+        var acc = res.j.account;
+        var roles = (res.j.roles || []).map(function (r) { return r.role_code || r; }).join(' / ');
+        dot.className = 'dot on';
+        txt.innerHTML = '本机会话：<strong>' + esc(acc.display_name || acc.login_name) + '</strong>' +
+          '（<span class="mono">' + esc(roles || acc.principal_type || '') + '</span>）' +
+          ' <button type="button" id="sessOut" style="margin-left:8px;">退出登录</button>';
+        var out = document.getElementById('sessOut');
+        if (out) out.addEventListener('click', logout);
+      })
+      .catch(function () {
+        dot.className = 'dot';
+        txt.innerHTML = '无法连接登录服务（需经 Node 服务访问）；仍可复制账密到目标页面。';
+      });
+  }
+  function logout() {
+    var t = '';
+    try { t = localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch (e) {}
+    try { localStorage.removeItem('BZF_SESSION_TOKEN'); } catch (e) {}
+    if (t) fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + t } }).catch(function () {});
+    toast('已退出登录');
+    refreshSession();
+  }
+
+  document.getElementById('sessReload').addEventListener('click', refreshSession);
+  render();
+  refreshSession();
+})();
+</script>
+</body>
+</html>
