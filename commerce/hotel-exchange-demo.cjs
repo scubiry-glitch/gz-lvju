@@ -9,18 +9,23 @@ const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const tierOf=h=>'t'+h.tier;
 const TIER_BY_VALUE=Object.fromEntries(EXCHANGE_TIERS.map(t=>[t.value,t]));
 
-// 确定性抽样：每档按品牌分层、hotel_code 字典序轮转取前 perTier 家，覆盖品牌多样性。
+// 确定性抽样：贵阳/沈阳（演示城市与试点口径）名单门店全量入围，其余名额按
+// 品牌分层 + hotel_code 字典序轮转补足；每档总量仍为 perTier，可重跑、可复算。
 // 返回项保留数值 tier，并附 exchange_tier（t80…t200）；不要用 tierOf 再包一层。
+const PINNED_CITIES=['贵阳','沈阳'];
 function sampleHotels(list=roster.hotels,perTier=8){
+ const pinned=new Set(list.filter(h=>PINNED_CITIES.some(c=>h.name.includes(c))).map(h=>h.code));
  const byTier=new Map();
  for(const h of list){const tier=tierOf(h);if(TIER_BY_VALUE[tier]){if(!byTier.has(tier))byTier.set(tier,[]);byTier.get(tier).push(h);}}
  const picked=[];
  for(const tier of [...byTier.keys()].sort((a,b)=>TIER_BY_VALUE[a].minor-TIER_BY_VALUE[b].minor)){
+  const group=byTier.get(tier);
+  for(const h of group.filter(h=>pinned.has(h.code)).sort((a,b)=>a.code<b.code?-1:1))picked.push({...h,exchange_tier:tier});
   const brands=new Map();
-  for(const h of byTier.get(tier)){if(!brands.has(h.brand))brands.set(h.brand,[]);brands.get(h.brand).push(h);}
+  for(const h of group){if(pinned.has(h.code))continue;if(!brands.has(h.brand))brands.set(h.brand,[]);brands.get(h.brand).push(h);}
   for(const arr of brands.values())arr.sort((a,b)=>a.code<b.code?-1:a.code>b.code?1:0);
   const queues=[...brands.keys()].sort().map(b=>brands.get(b));
-  for(let i=0,taken=0;taken<perTier&&queues.some(q=>q.length);i++){const h=queues[i%queues.length].shift();if(h){picked.push({...h,exchange_tier:tier});taken++;}}
+  for(let i=0,taken=group.filter(h=>pinned.has(h.code)).length;taken<perTier&&queues.some(q=>q.length);i++){const h=queues[i%queues.length].shift();if(h){picked.push({...h,exchange_tier:tier});taken++;}}
  }
  return picked;
 }

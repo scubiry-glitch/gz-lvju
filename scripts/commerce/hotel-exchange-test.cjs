@@ -30,6 +30,9 @@ async function run({pool,service,actors,check,origin,auth}){
   const byTier={};for(const h of a)byTier[h.exchange_tier]=(byTier[h.exchange_tier]||0)+1;
   assert.deepEqual(Object.keys(byTier).sort(),['t100','t120','t160','t180','t200','t80']);
   for(const n of Object.values(byTier))assert.equal(n,8);
+  // 贵阳（演示城市）与沈阳（试点口径）名单门店全量入围，不受轮转名额影响。
+  assert.equal(a.filter(h=>h.name.includes('贵阳')).length,17);
+  assert.equal(a.filter(h=>h.name.includes('沈阳')).length,9);
  });
  await check('Hotel exchange demo seeds hotels, anchors, categories and an exchange package',async()=>{
   await pool.query("INSERT IGNORE INTO cities(id,name,slug) VALUES(3,'贵阳','guiyang')");
@@ -74,7 +77,11 @@ async function run({pool,service,actors,check,origin,auth}){
   onlineCoupon=(await service.my(actors.user)).coupons.find(c=>c.order_id===order.id);
   await assert.rejects(()=>service.appointment(actors.user,{coupon_id:onlineCoupon.id,service_date:bjDate(Date.now()+2*86400000)},'online-appt-01'),/线上核销券无需预约/);
   [[{id:counterStoreId,merchant_id:counterMerchantId,vendor_id:counterVendorId}]]=await pool.query("SELECT e.id,m.id merchant_id,m.vendor_id FROM commerce_stores e JOIN commerce_versions v ON v.kind='stores' AND v.entity_id=e.id AND v.version=e.published_version JOIN commerce_merchants m ON m.id=e.merchant_id WHERE JSON_UNQUOTE(JSON_EXTRACT(v.snapshot,'$.service_channel'))='online' LIMIT 1");
-  for(const [i,vendor] of [[22,counterVendorId],[23,warVendorId],[24,warVendorId]])await pool.execute("INSERT INTO accounts(id,display_name,principal_type,status,vendor_id) VALUES(?,?,'user','active',?)",[i,'核销账号'+i,vendor]);
+  // exchange-test 可能已用同 id 建过账号：INSERT IGNORE + UPDATE 对齐 vendor。
+  for(const [i,vendor] of [[22,counterVendorId],[23,warVendorId],[24,warVendorId]]){
+   await pool.execute("INSERT IGNORE INTO accounts(id,display_name,principal_type,status) VALUES(?,?,'user','active')",[i,'核销账号'+i]);
+   await pool.execute("UPDATE accounts SET vendor_id=?,principal_type='user',status='active' WHERE id=?",[vendor,i]);
+  }
   const counterPrincipal=await staffAt('线上核销员',counterStoreId,22,counterVendorId);
   const hotelStaff=await staffAt('入住酒店核销员',t80b.id,23,warVendorId);
   const otherHotelStaff=await staffAt('其他门店核销员',t80a.id,24,warVendorId);

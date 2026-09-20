@@ -19,7 +19,7 @@
 | 工作项 | 验收标准 | 结果 | 证据 |
 |---|---|---|---|
 | 名单转换 | Excel 1809 家全量转 roster.json；6 档枚举；编码唯一 | ✅ 1809 家 / 80:229 100:476 120:427 160:296 180:263 200:118 | `commerce/hotel-roster.json`（meta.tiers） |
-| 确定性抽样 | 每档 8 家、品牌分层、可重跑同结果 | ✅ 48 家；t120-t200 覆盖 8 品牌、t80 5 品牌 | hotel-exchange-test「sampling is deterministic」 |
+| 确定性抽样 | 每档 8 家、贵阳/沈阳全量入围、品牌分层、可重跑同结果 | ✅ 48 家 = 贵阳 17 + 沈阳 9（全量）+ 轮转 22 | hotel-exchange-test「sampling is deterministic」 |
 | 通兑演示数据 | 5 事业群商户各挂各店；每档锚点虚拟门店（capacity 0）+ 通兑 SKU；门票/餐饮/线上演示 SKU；三品类组合券包 | ✅ 9 商户 / 57 店 / 9 SKU / 1 券包 | seed-*.json；`/catalog?city=贵阳` |
 | 线上/线下渠道 | SKU 创建区分 redeem_channel；线上=线上服务台虚拟门店；线下必须绑具体门店（管理台表单联动过滤） | ✅ | live-check「Admin SKU form …」两条 + 截图 admin-sku-form-*.png |
 | 档内任选预约 | 通兑券预约必选档内酒店；锚点/跨档/名录外拒绝；同日换店放行 | ✅ 422 tier_mismatch / store_required | 隔离库 + live-check「Cross-tier booking …」 |
