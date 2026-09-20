@@ -197,7 +197,7 @@
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
   function sdkProbe(){
     return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
@@ -217,7 +217,7 @@
           return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
             .then(function(r){ return r.json(); })
-            .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){} boot(); } });
+            .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); localStorage.setItem('BZF_SESSION_TOKEN', j.token); } catch(e){} boot(); } });
         }
       }).catch(function(){ /* SDK 失败 → 保持密码门 */ });
     }
@@ -230,7 +230,7 @@
         .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
         .then(function(res){
           if (!res.ok) { eEl.textContent = res.j.error || '登录失败'; eEl.style.display = 'block'; return; }
-          try { localStorage.setItem('BJZ_TOKEN', res.j.token); } catch(e){}
+          try { localStorage.setItem('BJZ_TOKEN', res.j.token); localStorage.setItem('BZF_SESSION_TOKEN', res.j.token); } catch(e){}
           boot();
         }).catch(function(){ eEl.textContent = '网络异常'; eEl.style.display = 'block'; });
     };

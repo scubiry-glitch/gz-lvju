@@ -139,7 +139,7 @@
   /* ── 登录（贝壳 SDK 默认 → 密码兜底）+ 我的预订 ── */
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
   function sdkProbe(){
     // App 内 jsbridge3 / jsbridgesdk 注入的全局；E2E 可用 window.__beikeSdk 模拟
@@ -188,12 +188,12 @@
     lgBox.style.display = 'none';
     myBox.style.display = 'block';
     fetch('/api/juzhu/booking/my', { headers: authH() })
-      .then(function(r){ if (r.status === 401) { try { localStorage.removeItem('BJZ_TOKEN'); } catch(e){} lgBox.style.display = 'block'; myBox.style.display = 'none'; throw new Error('401'); } return r.json(); })
+      .then(function(r){ if (r.status === 401) { try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){} lgBox.style.display = 'block'; myBox.style.display = 'none'; throw new Error('401'); } return r.json(); })
       .then(function(j){ myRender(j.items || []); })
       .catch(function(e){ if (e.message !== '401') { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:#991b1b;">加载失败</div>'; } });
   }
   function afterLogin(j){
-    try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){}
+    try { localStorage.setItem('BJZ_TOKEN', j.token); localStorage.setItem('BZF_SESSION_TOKEN', j.token); } catch(e){}
     loadMine();
   }
   function trySdkLogin(){
@@ -235,7 +235,7 @@
     trySdkLogin().then(function(ok){ if (!ok) { document.getElementById('lgErr').textContent = 'SDK 登录失败，请用密码登录'; document.getElementById('lgErr').style.display = 'block'; } });
   });
   document.getElementById('myOut').addEventListener('click', function(){
-    try { localStorage.removeItem('BJZ_TOKEN'); } catch(e){} location.reload();
+    try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){} location.reload();
   });
   boot();
 })();
