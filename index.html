@@ -740,11 +740,13 @@
     var el = document.getElementById('jzCoupon');
     if (!el) return;
     var list = [
-      { cls: '', amt: '50', unit: '元', title: '新用户立减', rule: '首单保洁/维修/搬家通用', href: 'juzhu-jiazheng-list.html?type=cleaning', tip: '今日可领' },
+      { cls: '', amt: '80', unit: '元档起', title: '酒店通兑券', rule: '同档任选试点名单酒店 · 随便住', href: 'juzhu-hotels.html', tip: '档内任选' },
       { cls: 'teal', amt: '30', unit: '元', title: '深度保洁满减', rule: '满 199 可用 · 限保洁', href: 'juzhu-jiazheng-list.html?type=cleaning', tip: '领券下单' },
       { cls: 'navy', amt: '100', unit: '元', title: '搬家专享券', rule: '同城搬家立减 · 不可叠加', href: 'juzhu-jiazheng-list.html?type=moving', tip: '限时领' },
       { cls: 'violet', amt: '8.8', unit: '折', title: '康养到家折扣', rule: '陪护/体检套餐可用', href: 'juzhu-jiazheng-list.html?type=health_care', tip: '立即领' },
-      { cls: 'green', amt: '20', unit: '元', title: '社区便民券', rule: '团购·跑腿满 50 减 20', href: 'juzhu-jiazheng-list.html?type=community', tip: '邻里专享' }
+      { cls: 'green', amt: '20', unit: '元', title: '社区便民券', rule: '团购·跑腿满 50 减 20', href: 'juzhu-jiazheng-list.html?type=community', tip: '邻里专享' },
+      { cls: 'green', amt: '门票', unit: '', title: '景点门票券', rule: '演示景区单人票 · 到园核销', href: 'juzhu-vouchers.html?kind=skus&category=scenic_ticket', tip: '去选券' },
+      { cls: 'violet', amt: '餐饮', unit: '', title: '本地餐饮券', rule: '演示餐厅代金 · 到店核销', href: 'juzhu-vouchers.html?kind=skus&category=dining', tip: '去选券' }
     ];
     el.innerHTML = list.map(function(c){
       return '<a class="ticket '+c.cls+'" href="'+c.href+'">'+

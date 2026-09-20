@@ -63,6 +63,7 @@
       groups: [{name:'业务入口',items:[
         {id:'consumer',label:'生活权益',href:'../juzhu-commerce.html',icon:'wallet'},
         {id:'vouchers',label:'选券页 · 用户端',href:'../juzhu-vouchers.html?city=贵阳',icon:'search'},
+        {id:'hotels',label:'酒店通兑名录',href:'../juzhu-hotels.html?city=贵阳',icon:'search'},
         {id:'promoter',label:'权益推广',href:'../juzhu-promoter.html',icon:'radio'},
         {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
         {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},

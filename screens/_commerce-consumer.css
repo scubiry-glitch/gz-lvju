@@ -156,3 +156,21 @@
 .redeem-preview .detail-row span{color:#828378;flex-shrink:0}
 .redeem-preview .detail-row b{font-weight:500;overflow-wrap:anywhere;min-width:0}
 .commerce-desktop .redeem-preview .detail-row{font-size:13px}
+/* Hotel exchange directory (tier chips + roster cards) and channel tags. */
+.channel-tag{display:inline-block;border-radius:20px;padding:3px 10px;font-size:10px;letter-spacing:.5px;margin-left:6px}
+.channel-tag.is-online{background:#ecf5ef;color:#0f766e;border:1px solid #bcd9c9}
+.channel-tag.is-exchange{background:#f7f1e2;color:#8a6d2f;border:1px solid #e0cfa4}
+.exchange-info .btn{margin-top:12px;display:inline-block}
+.consumer-hotel-tiers{padding:16px 18px}
+.consumer-hotel-tiers .consumer-shop-tabs{margin-bottom:12px}
+.consumer-hotel-tiers .consumer-shop-tabs button small{display:block;font-size:10px;opacity:.75;margin-top:2px}
+.consumer-hotel-tiers .consumer-search,.consumer-hotel-tiers .consumer-category{margin-top:10px}
+.consumer-hotel-list{display:grid;gap:12px}
+.consumer-hotel{padding:16px 18px}
+.consumer-hotel-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tier-badge{display:inline-block;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;background:#123f3a;color:#f3e6c5;letter-spacing:.5px}
+.tier-badge.tier-t80{background:#3d6b5c}.tier-badge.tier-t100{background:#2c5f52}.tier-badge.tier-t120{background:#123f3a}.tier-badge.tier-t160{background:#8a6d2f}.tier-badge.tier-t180{background:#74541f}.tier-badge.tier-t200{background:#4f3d16}
+.consumer-hotel h3{font-size:15px;font-weight:600;margin:10px 0 4px;line-height:1.6}
+.consumer-hotel p{font-size:11px;color:#828378;margin:0}
+.consumer-hotel-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px dashed #e7e2d5;margin-top:12px;padding-top:10px;font-size:11px;color:#938269}
+.consumer-hotel-bottom b{color:#0f766e;font-weight:500}

@@ -19,3 +19,5 @@ for(const area of ['consumer','promoter']){
 fs.writeFileSync('juzhu-voucher.html',fs.readFileSync('scripts/commerce/consumer-page.html','utf8').replace('<title>生活权益 · 新居住频道</title>','<title>权益详情 · 新居住频道</title>').replace('data-commerce-view="consumer"','data-commerce-view="consumer" data-product-detail="true"').replace('>生活权益<small>','>权益详情<small>'));
 
 fs.writeFileSync('juzhu-vouchers.html',fs.readFileSync('scripts/commerce/consumer-page.html','utf8').replace('<title>生活权益 · 新居住频道</title>','<title>选券 · 新居住频道</title>').replace('data-commerce-view="consumer"','data-commerce-view="consumer" data-product-shop="true"').replace('>生活权益<small>','>选券<small>'));
+
+fs.writeFileSync('juzhu-hotels.html',fs.readFileSync('scripts/commerce/consumer-page.html','utf8').replace('<title>生活权益 · 新居住频道</title>','<title>酒店通兑名录 · 新居住频道</title>').replace('data-commerce-view="consumer"','data-commerce-view="consumer" data-hotel-directory="true"').replace('>生活权益<small>','>酒店名录<small>'));
