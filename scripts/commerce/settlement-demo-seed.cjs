@@ -68,15 +68,16 @@ const manifest=()=>({seed_key:SEED_KEY,at:new Date().toISOString(),periods:{p1:P
    if(!old.length)await pool.execute('INSERT INTO roles(role_code,name,permissions,builtin) VALUES(?,?,?,0)',[code,code.replace('demo_','演示')+'（演示）',JSON.stringify(perms)]);
   }
   // ── 账号（按 display_name 幂等）──
-  async function account(name,role,vendorId,withPwd){
+  async function account(name,role,vendorId,loginName){
    const [old]=await pool.execute("SELECT id FROM accounts WHERE display_name=? AND principal_type='user'",[name]);
    let id;
    if(old.length)id=old[0].id;
    else{
     const hash=await authCenter.hashPassword(PWD);
-    const [r]=await pool.execute("INSERT INTO accounts(display_name,principal_type,status,vendor_id,password_hash) VALUES(?,'user','active',?,?)",[name,vendorId||null,hash]);
+    const [r]=await pool.execute("INSERT INTO accounts(display_name,login_name,principal_type,status,vendor_id,password_hash) VALUES(?,?,'user','active',?,?)",[name,loginName||null,vendorId||null,hash]);
     id=r.insertId;
    }
+   if(loginName)await pool.execute('UPDATE accounts SET login_name=?,password_hash=COALESCE(password_hash,?) WHERE id=?',[loginName,await authCenter.hashPassword(PWD),id]);
    const [ar]=await pool.execute('SELECT role_code FROM account_roles WHERE account_id=? AND role_code=?',[id,role]);
    if(!ar.length)await pool.execute('INSERT INTO account_roles(account_id,role_code,scope) VALUES(?,?,?)',[id,role,JSON.stringify(vendorId?{level:'vendor',vendor_id:vendorId}:{level:'all'})]);
    m.accounts[name]=id;return {id};
@@ -90,13 +91,13 @@ const manifest=()=>({seed_key:SEED_KEY,at:new Date().toISOString(),periods:{p1:P
    m.vendors[name]=r.insertId;return r.insertId;
   }
   const vendorA=await vendor('演示结算商户甲'),vendorB=await vendor('演示结算商户乙');
-  const cashierA=await account('演示核销员甲','demo_settle_merchant',vendorA,true);
-  const cashierB=await account('演示核销员乙','demo_settle_merchant',vendorB,true);
-  const operator=(await account('演示·结算运营','demo_fund_operator',null,true)).id;
-  const reviewer=(await account('演示·结算复核','demo_fund_reviewer',null,true)).id;
-  const lin=(await account('演示客户·林女士','user',null,false)).id;
-  const chen=(await account('演示客户·陈先生','user',null,false)).id;
-  const promoter=(await account('演示推广员·沈晓','user',null,false)).id;
+  const cashierA=await account('演示核销员甲','demo_settle_merchant',vendorA,'demo_cashier_a');
+  const cashierB=await account('演示核销员乙','demo_settle_merchant',vendorB,'demo_cashier_b');
+  const operator=(await account('演示·结算运营','demo_fund_operator',null,'demo_operator')).id;
+  const reviewer=(await account('演示·结算复核','demo_fund_reviewer',null,'demo_reviewer')).id;
+  const lin=(await account('演示客户·林女士','user',null,'demo_lin').id);
+  const chen=(await account('演示客户·陈先生','user',null,'demo_chen').id);
+  const promoter=(await account('演示推广员·沈晓','user',null,'demo_promoter').id);
   const OPR=await A(operator),REV=await A(reviewer),USR=await A(lin),USR2=await A(chen),MER=await A(cashierA.id),MER2=await A(cashierB.id);
   // ── 演示范围预清理：上次中断/重跑残留（按演示账号关联，子表在前；不触碰任何非演示数据）──
   {

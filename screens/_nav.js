@@ -66,6 +66,7 @@
         {id:'promoter',label:'权益推广',href:'../juzhu-promoter.html',icon:'radio'},
         {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
         {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},
+        {id:'demo-accounts',label:'演示账号',href:'commerce-demo-accounts.html',icon:'book'},
       ]},
       {name:'配置管理',items:[
         {id:'commerce-merchants',label:'商户管理',href:'commerce-admin-merchants.html',icon:'bank',perms:['commerce.admin.read']},
