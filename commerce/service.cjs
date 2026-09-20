@@ -37,7 +37,11 @@ class Service {
   const scope={city_id:payload.city_id||null,merchant_id:payload.merchant_id||null,store_id:payload.store_id||null,vendor_id:payload.vendor_id||null};
   if(kind==='merchants'){const v=await this.get(c,'SELECT id FROM jz_vendors WHERE id=?',[payload.vendor_id]);assert(v.length,'账号中心商家ID不存在');const city=await this.get(c,'SELECT id FROM cities WHERE id=?',[payload.city_id]);assert(city.length,'城市ID不存在');}
   if(payload.merchant_id){const merchant=await this.approved(c,'merchants',payload.merchant_id);scope.city_id=merchant.city_id;scope.vendor_id=merchant.vendor_id;}
-  if(payload.store_id){const store=await this.approved(c,'stores',payload.store_id);assert(store.merchant_id===payload.merchant_id,'门店不属于选定商户');scope.city_id=store.city_id;}
+  if(payload.store_id){const store=await this.approved(c,'stores',payload.store_id);assert(store.merchant_id===payload.merchant_id,'门店不属于选定商户');scope.city_id=store.city_id;
+   if(kind==='skus'){const channel=payload.redeem_channel||'offline';
+    if(channel==='online')assert(store.payload.service_channel==='online','线上核销券必须绑定本商户的线上服务台门店');
+    else assert(store.payload.service_channel!=='online','线下到店券不能绑定线上服务台门店');
+    if(payload.exchange_tier)assert(store.payload.exchange_tier===payload.exchange_tier,'通兑档位与锚点门店不匹配');}}
   if(kind==='stores')assert(payload.city_id===scope.city_id,'门店城市必须与商户经营城市一致');
   if(kind==='staff'){const a=await this.get(c,'SELECT id,vendor_id,principal_type,status FROM accounts WHERE id=?',[payload.account_id]);assert(a.length&&a[0].principal_type==='user'&&a[0].status==='active'&&a[0].vendor_id===scope.vendor_id,'核销人员必须为本商户有效个人账号');}
   if(kind==='packages'){
