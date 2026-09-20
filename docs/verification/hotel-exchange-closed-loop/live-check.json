@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-20T01:28:50.341Z",
+  "at": "2026-09-20T01:38:52.151Z",
   "origin": "http://127.0.0.1:38780 (Host: sytest.meizu.life)",
   "checks": [
     {
@@ -30,7 +30,7 @@
     {
       "name": "Exchange coupon issued with tier metadata",
       "ok": true,
-      "detail": "2ef4d91e-94f1-4aa1-9927-fc51d31314d5"
+      "detail": "25f1d04a-30b4-4ab6-8384-7e900f586874"
     },
     {
       "name": "Coupon books a chosen same-tier hotel",
@@ -73,6 +73,11 @@
       "detail": "FOR EVERYDAY LIVING\n好服务，随心选\n\n从一张券开始，照顾生活的小需要。\n\n单品券\n生活券包\n搜索\n服"
     },
     {
+      "name": "Exchange product detail renders with roster entry and usage steps",
+      "ok": true,
+      "detail": "sku #71"
+    },
+    {
       "name": "Coupon detail shows tier and hotel-booking entry",
       "ok": true,
       "detail": ""
@@ -99,7 +104,7 @@
     }
   ],
   "booking": {
-    "coupon": "2ef4d91e-94f1-4aa1-9927-fc51d31314d5",
+    "coupon": "25f1d04a-30b4-4ab6-8384-7e900f586874",
     "hotel": "城市便捷禹州大禹像胖东来店"
   }
 }

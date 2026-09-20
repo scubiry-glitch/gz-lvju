@@ -77,6 +77,12 @@ const bjDate=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'
   const shopText=await page.locator('#commerce-content').innerText();
   shot('Shop category filter surfaces exchange vouchers with tier tag',shopText.includes('酒店通兑')&&shopText.includes('任选'),shopText.slice(0,60));
   await page.screenshot({path:path.join(outDir,'hotel-shop-390.png'),fullPage:true});
+  if(t80){
+   await page.goto('https://sytest.meizu.life/juzhu-voucher.html?kind=skus&id='+t80.id+'&city='+encodeURIComponent('贵阳'));await ready();
+   const productDetailText=await page.locator('#commerce-content').innerText();
+   shot('Exchange product detail renders with roster entry and usage steps',productDetailText.includes('档内任选')&&productDetailText.includes('如何使用')&&!productDetailText.includes('正在为您准备'),'sku #'+t80.id);
+   await page.screenshot({path:path.join(outDir,'hotel-product-detail-390.png'),fullPage:true});
+  }
   if(userToken&&out.booking){
    await page.goto('https://sytest.meizu.life/juzhu-voucher.html?coupon='+encodeURIComponent(out.booking.coupon)+'&city=贵阳');await ready();
    const detailText=await page.locator('#commerce-content').innerText();
