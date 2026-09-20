@@ -10,6 +10,7 @@ const tierOf=h=>'t'+h.tier;
 const TIER_BY_VALUE=Object.fromEntries(EXCHANGE_TIERS.map(t=>[t.value,t]));
 
 // 确定性抽样：每档按品牌分层、hotel_code 字典序轮转取前 perTier 家，覆盖品牌多样性。
+// 返回项保留数值 tier，并附 exchange_tier（t80…t200）；不要用 tierOf 再包一层。
 function sampleHotels(list=roster.hotels,perTier=8){
  const byTier=new Map();
  for(const h of list){const tier=tierOf(h);if(TIER_BY_VALUE[tier]){if(!byTier.has(tier))byTier.set(tier,[]);byTier.get(tier).push(h);}}
@@ -19,7 +20,7 @@ function sampleHotels(list=roster.hotels,perTier=8){
   for(const h of byTier.get(tier)){if(!brands.has(h.brand))brands.set(h.brand,[]);brands.get(h.brand).push(h);}
   for(const arr of brands.values())arr.sort((a,b)=>a.code<b.code?-1:a.code>b.code?1:0);
   const queues=[...brands.keys()].sort().map(b=>brands.get(b));
-  for(let i=0,taken=0;taken<perTier&&queues.some(q=>q.length);i++){const h=queues[i%queues.length].shift();if(h){picked.push({...h,tier});taken++;}}
+  for(let i=0,taken=0;taken<perTier&&queues.some(q=>q.length);i++){const h=queues[i%queues.length].shift();if(h){picked.push({...h,exchange_tier:tier});taken++;}}
  }
  return picked;
 }
@@ -64,7 +65,7 @@ async function seed(pool,{perTier=8}={}){
   }
   for(const h of sampled){
    const ref=refs['war:'+h.war_zone];
-   await entity('stores','hotel:'+h.code,{name:h.name+'（试点演示）',merchant_id:ref.merchant.id,city_id:city.id,address:'上线名单收录门店（演示环境不提供实际入住）',phone:'未开通',capacity:3,lead_hours:0,service_channel:'store',kind:'hotel',exchange_tier:tierOf(h),hotel_code:h.code,hotel_brand:h.brand,hotel_region:h.region,hotel_branch:h.branch,hotel_war_zone:h.war_zone,description:h.brand+' · '+h.region+'（'+h.branch+'，'+h.war_zone+'）；OTA 报名价格档位 '+h.tier+' 元。试点演示数据，不提供真实入住。'},{vendor_id:ref.vendor.id,merchant_id:ref.merchant.id});
+   await entity('stores','hotel:'+h.code,{name:h.name+'（试点演示）',merchant_id:ref.merchant.id,city_id:city.id,address:'上线名单收录门店（演示环境不提供实际入住）',phone:'未开通',capacity:3,lead_hours:0,service_channel:'store',kind:'hotel',exchange_tier:h.exchange_tier,hotel_code:h.code,hotel_brand:h.brand,hotel_region:h.region,hotel_branch:h.branch,hotel_war_zone:h.war_zone,description:h.brand+' · '+h.region+'（'+h.branch+'，'+h.war_zone+'）；OTA 报名价格档位 '+h.tier+' 元。试点演示数据，不提供真实入住。'},{vendor_id:ref.vendor.id,merchant_id:ref.merchant.id});
   }
   // 2) 通兑运营商户：每档一个锚点虚拟门店（capacity 0，不可直接预约）+ 每档一个通兑券 SKU。
   await vendor('exchange','筑城酒店通兑运营台（演示）','酒店通兑券的运营与档位锚点主体；演示环境无真实资金。');

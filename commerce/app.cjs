@@ -14,7 +14,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const url=new URL(req.url,'http://localhost');pathname=url.pathname;
    if(!pathname.startsWith(prefix+'/')){
     if(staticFiles&&req.method==='GET'){
-     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:commerce-[a-z-]+\.html|_commerce[a-z0-9-]*\.(?:js|css)|_console-login\.js|_qr\.js|_nav\.js))$/;
+     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:commerce-[a-z-]+\.html|_commerce[a-z0-9-]*\.(?:js|css)|_console-login\.js|_qr\.js|_nav\.js))$/;
      if(valid.test(pathname)){const file=path.resolve(__dirname,'..','.'+pathname);if(fs.existsSync(file)){res.writeHead(200,{'Content-Type':pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.webp')?'image/webp':'text/javascript'});res.end(fs.readFileSync(file));return;}}
     }
     throw new Fault(404,'接口不存在');
@@ -27,6 +27,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname===prefix+'/healthz'&&method==='GET'){try{const result=(await pool.query('SELECT 1 AS ok, (SELECT MAX(version) FROM commerce_migrations) AS migration').catch(()=>[[{ok:0}]]))[0];if(result[0]&&Number(result[0].ok)===1)return reply(200,{status:'ok',database:true,migration:result[0].migration||null,payment_enabled:false});}catch(e){}return reply(503,{status:'unavailable',database:false});}
    if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
    if(pathname===prefix+'/catalog'&&method==='GET')return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,demo_purchase_enabled:demoEnabled&&p.is_demo})));
+   if(pathname===prefix+'/hotels'&&method==='GET')return reply(200,await service.hotels(Object.fromEntries(url.searchParams)));
    // No legacy API key, M0 role selector, arbitrary account header, or machine token fallback.
    const session=await auth.verifySessionToken(auth.bearerToken(req));
    assert(session&&session.account.status==='active'&&session.account.principal_type==='user','请登录后继续',401);

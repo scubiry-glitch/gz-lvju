@@ -105,6 +105,7 @@ const results=[];const check=async(name,fn)=>{await fn();results.push({name,pass
  if(process.argv.includes('--guiyang-demo'))await require('./guiyang-demo-test.cjs').run({pool,sourceDatabase:cfg.database,service,actors,check,origin,auth});
  if(process.argv.includes('--initialization'))await require('./initialization-test.cjs').run({pool,service,actors,check,sku,store,merchant});
  if(process.argv.includes('--guiyang-demo'))await require('./exchange-test.cjs').run({pool,service,actors,check,origin});
+ if(process.argv.includes('--hotel-exchange'))await require('./hotel-exchange-test.cjs').run({pool,service,actors,check,origin,auth});
  if(process.env.COMMERCE_BROWSER==='1'||process.argv.includes('--browser'))await require('./m1a-browser.cjs').run({origin,actors,check,initialization:process.argv.includes('--initialization'),guiyangDemo:process.argv.includes('--guiyang-demo')});
  const out=path.resolve(__dirname,'../../docs/verification/newliving-commerce-m1a');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({at:new Date().toISOString(),database:'isolated temporary MySQL database (removed)',checks:results},null,2));console.log('M1-A acceptance: '+results.length+' passed');
  }finally{if(server)await new Promise(resolve=>server.close(resolve));if(pool)await pool.end();if(created&&/^commerce_m1a_test_\d+$/.test(database))await admin.query('DROP DATABASE `'+database+'`');await admin.end();}

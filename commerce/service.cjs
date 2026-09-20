@@ -1,6 +1,6 @@
 'use strict';
 const crypto=require('node:crypto');
-const {definitions,kinds,Fault,assert,validate}=require('./configuration.cjs');
+const {definitions,kinds,Fault,assert,validate,EXCHANGE_TIERS}=require('./configuration.cjs');
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const id=()=>crypto.randomUUID();
 const digest=v=>crypto.createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
@@ -114,7 +114,20 @@ class Service {
   await c.execute(`UPDATE commerce_${kind} SET status=?,submitted_by=?,reviewed_by=?,review_note=?,published_version=? WHERE id=?`,[status,action==='submit'?p.account.id:e.submitted_by,['approve','reject'].includes(action)?p.account.id:e.reviewed_by,input.note||e.review_note,action==='publish'?e.version:(action==='archive'?null:e.published_version),key]);
   await this.audit(c,p,`configuration.${action}`,`${kind}/${key}`,{version:e.version,note:input.note||null},e);return this.entity(c,kind,key);
  });}
- async catalog(city=''){const out=[],{isDemo}=require('./guiyang-demo.cjs');for(const kind of ['packages','plans','skus']){const args=[kind];let where="e.status<>'archived'";if(city){where+=' AND (c.name=? OR c.slug=? OR CAST(c.id AS CHAR)=?)';args.push(city,city,city);}const rows=await this.get(this.pool,`SELECT e.id,e.city_id,e.published_version,v.snapshot,c.name city_name FROM commerce_${kind} e JOIN commerce_versions v ON v.kind=? AND v.entity_id=e.id AND v.version=e.published_version JOIN cities c ON c.id=e.city_id WHERE ${where}`,args);for(const e of rows){const p=parse(e.snapshot),demo=isDemo(p);out.push({id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,category_id:p.category_id||null,topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,items:(kind==='skus'?[{sku:p,quantity:1}]:(p.items||p.package?.items||[])).map(i=>({name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id}))});}}return out;}
+ async catalog(city=''){const out=[],{isDemo}=require('./guiyang-demo.cjs');for(const kind of ['packages','plans','skus']){const args=[kind];let where="e.status<>'archived'";if(city){where+=' AND (c.name=? OR c.slug=? OR CAST(c.id AS CHAR)=?)';args.push(city,city,city);}const rows=await this.get(this.pool,`SELECT e.id,e.city_id,e.published_version,v.snapshot,c.name city_name FROM commerce_${kind} e JOIN commerce_versions v ON v.kind=? AND v.entity_id=e.id AND v.version=e.published_version JOIN cities c ON c.id=e.city_id WHERE ${where}`,args);for(const e of rows){const p=parse(e.snapshot),demo=isDemo(p);out.push({id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,category_id:p.category_id||null,topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,exchange_tier:p.exchange_tier||null,exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,exchange_tier_minor:p.exchange_tier_minor||null,items:(kind==='skus'?[{sku:p,quantity:1}]:(p.items||p.package?.items||[])).map(i=>({name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id}))});}}return out;}
+ // 公开酒店名录（试点名单演示）：只读 published 快照中的演示酒店，输出公开字段与档位 facets。
+ async hotels(query={}){
+  const rows=await this.get(this.pool,"SELECT e.id,v.snapshot FROM commerce_stores e JOIN commerce_versions v ON v.kind='stores' AND v.entity_id=e.id AND v.version=e.published_version WHERE e.status<>'archived' AND JSON_UNQUOTE(JSON_EXTRACT(v.snapshot,'$.kind'))='hotel' LIMIT 500");
+  const labelOf=Object.fromEntries(EXCHANGE_TIERS.map(t=>[t.value,t]));
+  const hotels=[];
+  for(const r of rows){const p=parse(r.snapshot),tier=labelOf[p.exchange_tier];if(!tier)continue;
+   hotels.push({store_id:r.id,name:String(p.name||'').replace(/（试点演示）$/,''),brand:p.hotel_brand||'',region:p.hotel_region||'',branch:p.hotel_branch||'',war_zone:p.hotel_war_zone||'',tier:tier.value,tier_label:tier.label,tier_minor:tier.minor,hotel_code:p.hotel_code||''});}
+  const tierKey=query.tier&&labelOf[query.tier]?query.tier:null,brand=String(query.brand||''),q=String(query.q||'').trim().slice(0,50);
+  const list=hotels.filter(h=>(!tierKey||h.tier===tierKey)&&(!brand||h.brand===brand)&&(!q||[h.name,h.brand,h.region,h.war_zone].some(x=>x.includes(q))));
+  list.sort((a,b)=>(labelOf[a.tier].minor-labelOf[b.tier].minor)||(a.name<b.name?-1:1));
+  const tiers=EXCHANGE_TIERS.map(t=>{const inTier=hotels.filter(h=>h.tier===t.value);return {tier:t.value,label:t.label,tier_minor:t.minor,count:inTier.length,brands:[...new Set(inTier.map(h=>h.brand))].sort()};});
+  return {tiers,hotels:list,total:list.length,is_demo:true,note:'试点报名名单演示；不提供真实入住与履约，不发生资金往来。'};
+ }
  async inventory(p,perm,input,merchantOnly=false){assert(Number.isSafeInteger(input.total)&&input.total>=0&&input.total<=10000000,'库存或产能总量无效');return this.tx(async c=>{const capacity=input.kind==='capacity';const e=await this.entity(c,capacity?'stores':'skus',capacity?input.store_id:input.sku_id,true);await this.allowed(c,p,perm,e,merchantOnly);
   if(capacity){assert(/^\d{4}-\d{2}-\d{2}$/.test(input.service_date)&&input.service_date>=new Date().toISOString().slice(0,10),'请选择今天或之后的日期');await c.execute('INSERT IGNORE INTO commerce_capacity(store_id,service_date,total) VALUES(?,?,?)',[e.id,input.service_date,input.total]);const rows=await this.get(c,'SELECT * FROM commerce_capacity WHERE store_id=? AND service_date=? FOR UPDATE',[e.id,input.service_date]);assert(rows[0].reserved<=input.total,'产能不能低于已预约量',409);await c.execute('UPDATE commerce_capacity SET total=? WHERE store_id=? AND service_date=?',[input.total,e.id,input.service_date]);}
   else {const [r]=await c.execute('UPDATE commerce_inventory SET total=? WHERE sku_id=? AND reserved+granted<=?',[input.total,e.id,input.total]);assert(r.affectedRows,'库存不能低于已预占与已发放数量',409);}
@@ -172,46 +185,67 @@ class Service {
  out.compensations=(await this.get(this.pool,`SELECT cp.compensation_no,cp.coupon_id,cp.amount_minor,cp.status,cp.review_note,cp.created_at,JSON_UNQUOTE(JSON_EXTRACT(cpv.snapshot,'$.sku.name')) coupon_name FROM commerce_compensation_cases cp LEFT JOIN commerce_coupons cpv ON cpv.id=cp.coupon_id WHERE cp.account_id=? ORDER BY cp.id DESC LIMIT 100`,[p.account.id])).map(r=>({compensation_no:r.compensation_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,amount_minor:r.amount_minor,status:r.status,note:r.review_note,created_at:r.created_at}));
  return out;}
  async coupon(c,key,lock=true){const [v]=await this.get(c,`SELECT * FROM commerce_coupons WHERE id=?${lock?' FOR UPDATE':''}`,[key]);assert(v,'卡券不存在',404);return row(v);}
- async appointment(p,input,key){return this.tx(c=>this.idem(c,p,'appointment',key,input,async()=>{const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);assert(coupon.status==='available','卡券当前不可预约',409);const [old]=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);
+ async appointment(p,input,key){return this.tx(c=>this.idem(c,p,'appointment',key,input,async()=>{const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);assert(coupon.status==='available','卡券当前不可预约',409);
+  assert(coupon.snapshot.sku?.redeem_channel!=='online','线上核销券无需预约，直接出示动态码',409,'no_appointment_needed');
+  const exchangeTier=coupon.snapshot.sku?.exchange_tier;
+  const [old]=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);
   if(input.action==='cancel'){assert(old,'预约不存在',404);await c.execute("UPDATE commerce_appointments SET status='cancelled' WHERE id=?",[old.id]);await c.execute('UPDATE commerce_capacity SET reserved=reserved-1 WHERE store_id=? AND service_date=?',[old.store_id,date(old.service_date).slice(0,10)]);return {cancelled:true};}
-  const store=await this.approved(c,'stores',coupon.store_id);assert(/^\d{4}-\d{2}-\d{2}$/.test(input.service_date),'预约日期无效');const when=Date.parse(input.service_date+'T00:00:00+08:00');assert(Number.isFinite(when)&&when>=Date.now()+store.payload.lead_hours*3600000&&when<new Date(coupon.expires_at).getTime(),'预约日期应满足提前量且在卡券有效期内');assert(!old||date(old.service_date).slice(0,10)!==input.service_date,'已预约该日期',409);
-  // 先 UPDATE（常态无间隙锁）；仅当日历行缺失才 INSERT IGNORE 兜底（并发首订场景，配合 tx 层死锁重试）。
-  let [r]=await c.execute('UPDATE commerce_capacity SET reserved=reserved+1 WHERE store_id=? AND service_date=? AND reserved<total',[coupon.store_id,input.service_date]);
-  if(!r.affectedRows){
-   await c.execute('INSERT IGNORE INTO commerce_capacity(store_id,service_date,total) VALUES(?,?,?)',[coupon.store_id,input.service_date,store.payload.capacity]);
-   [r]=await c.execute('UPDATE commerce_capacity SET reserved=reserved+1 WHERE store_id=? AND service_date=? AND reserved<total',[coupon.store_id,input.service_date]);
+  // 门店选择：通兑券在预约时选定档内具体酒店；普通线下券仍为发券绑定门店（多余参数忽略，行为不变）。
+  let storeId=coupon.store_id,merchantId=coupon.merchant_id;
+  if(exchangeTier){
+   assert(Number.isSafeInteger(input.store_id),'请选择要入住的酒店',422,'store_required');
+   const chosen=await this.approved(c,'stores',input.store_id);
+   assert(chosen.payload.kind==='hotel'&&chosen.payload.exchange_tier===exchangeTier,'请选择同档位试点名单内的酒店',422,'tier_mismatch');
+   storeId=chosen.id;merchantId=chosen.merchant_id;
   }
-  assert(r.affectedRows,'当日预约已满，请选择其他日期',409);
+  const store=await this.approved(c,'stores',storeId);assert(/^\d{4}-\d{2}-\d{2}$/.test(input.service_date),'预约日期无效');const when=Date.parse(input.service_date+'T00:00:00+08:00');assert(Number.isFinite(when)&&when>=Date.now()+store.payload.lead_hours*3600000&&when<new Date(coupon.expires_at).getTime(),'预约日期应满足提前量且在卡券有效期内');
+  assert(!old||!(date(old.service_date).slice(0,10)===input.service_date&&old.store_id===storeId),exchangeTier?'已预约该酒店该日期，请更换酒店或日期':'已预约该日期',409);
+  // 先 UPDATE（常态无间隙锁）；仅当日历行缺失才 INSERT IGNORE 兜底（并发首订场景，配合 tx 层死锁重试）。
+  let [r]=await c.execute('UPDATE commerce_capacity SET reserved=reserved+1 WHERE store_id=? AND service_date=? AND reserved<total',[storeId,input.service_date]);
+  if(!r.affectedRows){
+   await c.execute('INSERT IGNORE INTO commerce_capacity(store_id,service_date,total) VALUES(?,?,?)',[storeId,input.service_date,store.payload.capacity]);
+   [r]=await c.execute('UPDATE commerce_capacity SET reserved=reserved+1 WHERE store_id=? AND service_date=? AND reserved<total',[storeId,input.service_date]);
+  }
+  assert(r.affectedRows,exchangeTier?'该酒店当日已约满，请选择其他酒店或日期':'当日预约已满，请选择其他日期',409);
   if(old){await c.execute('UPDATE commerce_capacity SET reserved=reserved-1 WHERE store_id=? AND service_date=?',[old.store_id,date(old.service_date).slice(0,10)]);await c.execute("UPDATE commerce_appointments SET status='rescheduled' WHERE id=?",[old.id]);}
-  const appointmentId=id();await c.execute('INSERT INTO commerce_appointments(id,coupon_id,account_id,merchant_id,store_id,city_id,service_date,status) VALUES(?,?,?,?,?,?,?,?)',[appointmentId,coupon.id,p.account.id,coupon.merchant_id,coupon.store_id,coupon.city_id,input.service_date,'booked']);return {id:appointmentId,service_date:input.service_date};
+  const appointmentId=id();await c.execute('INSERT INTO commerce_appointments(id,coupon_id,account_id,merchant_id,store_id,city_id,service_date,status) VALUES(?,?,?,?,?,?,?,?)',[appointmentId,coupon.id,p.account.id,merchantId,storeId,coupon.city_id,input.service_date,'booked']);return {id:appointmentId,service_date:input.service_date,store_id:storeId};
  }));}
  async token(p,key){return this.tx(async c=>{const coupon=await this.coupon(c,key);assert(coupon.account_id===p.account.id,'卡券不属于当前账号',403);assert(coupon.status==='available'&&new Date(coupon.expires_at)>new Date(),'卡券不可核销',409);const token=crypto.randomBytes(16).toString('hex');await c.execute('UPDATE commerce_coupons SET token_hash=?,token_expires_at=? WHERE id=?',[digest(token),date(Date.now()+120000),key]);return {coupon_id:key,token,expires_in:120};});}
  // Two-stage fulfilment: preview validates everything redeem() validates without any side effect.
  async checkRedeemable(c,p,perm,input,merchantOnly=true){
   const coupon=await this.coupon(c,input.coupon_id);
-  await this.allowed(c,p,perm,coupon,merchantOnly);
-  const staff=await this.get(c,"SELECT v.snapshot FROM commerce_staff e JOIN commerce_versions v ON v.kind='staff' AND v.entity_id=e.id AND v.version=e.published_version WHERE e.status<>'archived' AND e.store_id=?",[coupon.store_id]);assert(staff.some(s=>parse(s.snapshot).account_id===p.account.id),'未获该门店核销授权',403,'no_redeem_auth');
+  const online=coupon.snapshot.sku?.redeem_channel==='online';
+  const [appointment]=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);
+  // 核销门店：通兑券=预约时选定的酒店；线上券=发券绑定的线上服务台；普通线下券=发券绑定门店。
+  const storeId=appointment?appointment.store_id:coupon.store_id;
+  // 授权归属按「实际履约门店的商户」：通兑券发在运营商户名下，但核销人是所选酒店的商户员工。
+  const scopeResource=appointment?{...coupon,merchant_id:appointment.merchant_id,store_id:appointment.store_id,city_id:appointment.city_id}:coupon;
+  await this.allowed(c,p,perm,scopeResource,merchantOnly);
+  const staff=await this.get(c,"SELECT v.snapshot FROM commerce_staff e JOIN commerce_versions v ON v.kind='staff' AND v.entity_id=e.id AND v.version=e.published_version WHERE e.status<>'archived' AND e.store_id=?",[storeId]);assert(staff.some(s=>parse(s.snapshot).account_id===p.account.id),'未获该门店核销授权',403,'no_redeem_auth');
   assert(coupon.status==='available'&&new Date(coupon.expires_at)>new Date(),'卡券已使用、冻结或过期',409,'coupon_unavailable');assert(typeof input.token==='string'&&coupon.token_hash===digest(input.token)&&new Date(coupon.token_expires_at)>new Date(),'核销码无效或已过期',409,'token_invalid');
-  const [appointment]=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);assert(appointment,'请先完成预约',409,'no_appointment');const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());assert(date(appointment.service_date).slice(0,10)===today,'仅可核销当日预约',409,'not_service_date');
-  return {coupon,appointment};
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  if(!online){assert(appointment,'请先完成预约',409,'no_appointment');assert(date(appointment.service_date).slice(0,10)===today,'仅可核销当日预约',409,'not_service_date');}
+  return {coupon,appointment,storeId,online};
  }
- async redeemPreviewMeta(coupon,appointment){
+ async redeemPreviewMeta(coupon,appointment,storeId){
   const sku=coupon.snapshot.sku||{};
-  const [store]=await this.get(this.pool,'SELECT name FROM commerce_stores WHERE id=?',[coupon.store_id]);
+  const [store]=await this.get(this.pool,'SELECT name FROM commerce_stores WHERE id=?',[storeId||coupon.store_id]);
   const [customer]=await this.get(this.pool,'SELECT display_name FROM accounts WHERE id=?',[coupon.account_id]);
   const amount=coupon.allocation_minor,rule=coupon.snapshot.rule||{};
-  return {coupon_id:coupon.id,name:sku.name||coupon.snapshot.name||'生活权益',description:sku.description||coupon.snapshot.description||'',conditions:sku.conditions||'',store:store?.name||'',service_date:date(appointment.service_date).slice(0,10),customer:customer?.display_name||'',expires_at:coupon.expires_at,allocation_minor:amount,supplier_minor:amount-Math.floor(amount*(rule.beike_bps||0)/10000),is_demo:coupon.snapshot.is_demo===true};
+  return {coupon_id:coupon.id,name:sku.name||coupon.snapshot.name||'生活权益',description:sku.description||coupon.snapshot.description||'',conditions:sku.conditions||'',store:store?.name||'',service_date:appointment?date(appointment.service_date).slice(0,10):null,customer:customer?.display_name||'',expires_at:coupon.expires_at,allocation_minor:amount,supplier_minor:amount-Math.floor(amount*(rule.beike_bps||0)/10000),is_demo:coupon.snapshot.is_demo===true,redeem_channel:sku.redeem_channel||'offline',exchange_tier:sku.exchange_tier||null};
  }
  async previewRedeem(p,perm,input){
   assert(input&&typeof input.coupon_id==='string'&&typeof input.token==='string','请提供卡券编号与动态核销码',422,'redeem_input_invalid');
-  return this.tx(async c=>{const {coupon,appointment}=await this.checkRedeemable(c,p,perm,input);return {...await this.redeemPreviewMeta(coupon,appointment),preview:true};});
+  return this.tx(async c=>{const {coupon,appointment,storeId}=await this.checkRedeemable(c,p,perm,input);return {...await this.redeemPreviewMeta(coupon,appointment,storeId),preview:true};});
  }
- async redeem(p,perm,input,key){return this.tx(c=>this.idem(c,p,'redeem',key,input,async()=>{const {coupon,appointment}=await this.checkRedeemable(c,p,perm,input);
+ async redeem(p,perm,input,key){return this.tx(c=>this.idem(c,p,'redeem',key,input,async()=>{const {coupon,appointment,storeId,online}=await this.checkRedeemable(c,p,perm,input);
   const existing=await this.get(c,"SELECT id FROM commerce_redemptions WHERE coupon_id=? AND status='confirmed'",[coupon.id]);assert(!existing.length,'该卡券已存在有效核销',409,'coupon_unavailable');
   const [order]=await this.get(c,'SELECT source_account_id FROM commerce_orders WHERE id=?',[coupon.order_id]);
-  const rule=coupon.snapshot.rule,amount=coupon.allocation_minor,beike=Math.floor(amount*rule.beike_bps/10000),channel=order.source_account_id?Math.floor(beike*rule.channel_bps/10000):0;const redemption=id();await c.execute('INSERT INTO commerce_redemptions(id,coupon_id,account_id,merchant_id,store_id,city_id,operator_id,allocation_minor,supplier_minor,beike_minor,channel_minor,retained_minor) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[redemption,coupon.id,coupon.account_id,coupon.merchant_id,coupon.store_id,coupon.city_id,p.account.id,amount,amount-beike,beike,channel,beike-channel]);
-  if(coupon.snapshot.is_demo!==true)await require('./settlement.cjs').post(c,{sourceType:'redemption',sourceId:redemption,lines:require('./settlement.cjs').confirmLines({merchant_id:coupon.merchant_id,allocation_minor:amount,supplier_minor:amount-beike,beike_minor:beike,channel_minor:channel,retained_minor:beike-channel,source_account_id:order.source_account_id}),rule_ref:'rule:'+coupon.snapshot.rule_id+'.v'+(coupon.snapshot.rule_version??'?'),memo:'redemption '+redemption});
-  await c.execute("UPDATE commerce_coupons SET status='redeemed',token_hash=NULL,token_expires_at=NULL WHERE id=?",[coupon.id]);await c.execute("UPDATE commerce_appointments SET status='completed' WHERE id=?",[appointment.id]);await this.audit(c,p,'coupon.redeem',coupon.id,{redemption},coupon);return {id:redemption,status:'redeemed'};
+  // 通兑券核销归集到预约时选定的酒店商户；线上券归集到线上服务台所属商户。
+  const merchantId=appointment?appointment.merchant_id:coupon.merchant_id;
+  const rule=coupon.snapshot.rule,amount=coupon.allocation_minor,beike=Math.floor(amount*rule.beike_bps/10000),channel=order.source_account_id?Math.floor(beike*rule.channel_bps/10000):0;const redemption=id();await c.execute('INSERT INTO commerce_redemptions(id,coupon_id,account_id,merchant_id,store_id,city_id,operator_id,allocation_minor,supplier_minor,beike_minor,channel_minor,retained_minor) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[redemption,coupon.id,coupon.account_id,merchantId,storeId,coupon.city_id,p.account.id,amount,amount-beike,beike,channel,beike-channel]);
+  if(coupon.snapshot.is_demo!==true)await require('./settlement.cjs').post(c,{sourceType:'redemption',sourceId:redemption,lines:require('./settlement.cjs').confirmLines({merchant_id:merchantId,allocation_minor:amount,supplier_minor:amount-beike,beike_minor:beike,channel_minor:channel,retained_minor:beike-channel,source_account_id:order.source_account_id}),rule_ref:'rule:'+coupon.snapshot.rule_id+'.v'+(coupon.snapshot.rule_version??'?'),memo:'redemption '+redemption});
+  await c.execute("UPDATE commerce_coupons SET status='redeemed',token_hash=NULL,token_expires_at=NULL WHERE id=?",[coupon.id]);if(appointment)await c.execute("UPDATE commerce_appointments SET status='completed' WHERE id=?",[appointment.id]);await this.audit(c,p,'coupon.redeem',coupon.id,{redemption},coupon);return {id:redemption,status:'redeemed',store_id:storeId,online};
  }));}
  async openCase(p,input,key){return this.tx(c=>this.idem(c,p,'case',key,input,async()=>{assert(['refund','help','compensation'].includes(input.kind)&&typeof input.reason==='string'&&input.reason.trim().length>=5&&input.reason.length<=1000,'请选择售后类型并填写至少5字说明');const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);const existing=await this.get(c,"SELECT id FROM commerce_cases WHERE coupon_id=? AND status IN ('open','processing','awaiting_provider')",[coupon.id]);assert(!existing.length,'已有处理中售后，请勿重复提交',409);
   if(input.kind==='refund'){assert(coupon.status==='available','卡券已使用或冻结，不能申请未使用退款',409);await c.execute("UPDATE commerce_coupons SET status='frozen',token_hash=NULL WHERE id=?",[coupon.id]);const appts=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);for(const a of appts){await c.execute("UPDATE commerce_appointments SET status='cancelled' WHERE id=?",[a.id]);await c.execute('UPDATE commerce_capacity SET reserved=reserved-1 WHERE store_id=? AND service_date=?',[a.store_id,date(a.service_date).slice(0,10)]);}}
