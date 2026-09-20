@@ -12,7 +12,7 @@ async function run({origin,actors,check}){
    const {ctx,page}=await context(actors.operator);
    await page.goto(origin+'/screens/commerce-admin-settlement.html');await ready(page);
    const text=await page.locator('#commerce-content').innerText();
-   assert(text.includes('结算账单')&&text.includes('结算批次'),page.url());
+   assert(text.includes('结算账单')&&text.includes('结算批次'),page.url()+' → '+text.slice(0,200)+' | status:'+await page.locator('#commerce-status').textContent());
    assert(text.includes('资金不变量'),'不变量状态可见');
    assert(text.includes('付款指令与回执'));
    await page.screenshot({path:path.join(out,'01-settlement-admin-desktop.png'),fullPage:true});
