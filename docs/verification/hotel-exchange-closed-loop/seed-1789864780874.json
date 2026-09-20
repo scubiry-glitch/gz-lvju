@@ -1,0 +1,389 @@
+{
+  "at": "2026-09-20T00:39:40.874Z",
+  "batch": "hotel-exchange-demo-v1",
+  "created": [
+    {
+      "kind": "channel_vendors",
+      "id": 235
+    },
+    {
+      "kind": "merchants",
+      "id": 28
+    },
+    {
+      "kind": "rules",
+      "id": 30
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 236
+    },
+    {
+      "kind": "merchants",
+      "id": 29
+    },
+    {
+      "kind": "rules",
+      "id": 31
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 237
+    },
+    {
+      "kind": "merchants",
+      "id": 30
+    },
+    {
+      "kind": "rules",
+      "id": 32
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 238
+    },
+    {
+      "kind": "merchants",
+      "id": 31
+    },
+    {
+      "kind": "rules",
+      "id": 33
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 239
+    },
+    {
+      "kind": "merchants",
+      "id": 32
+    },
+    {
+      "kind": "rules",
+      "id": 34
+    },
+    {
+      "kind": "stores",
+      "id": 28
+    },
+    {
+      "kind": "stores",
+      "id": 29
+    },
+    {
+      "kind": "stores",
+      "id": 30
+    },
+    {
+      "kind": "stores",
+      "id": 31
+    },
+    {
+      "kind": "stores",
+      "id": 32
+    },
+    {
+      "kind": "stores",
+      "id": 33
+    },
+    {
+      "kind": "stores",
+      "id": 34
+    },
+    {
+      "kind": "stores",
+      "id": 35
+    },
+    {
+      "kind": "stores",
+      "id": 36
+    },
+    {
+      "kind": "stores",
+      "id": 37
+    },
+    {
+      "kind": "stores",
+      "id": 38
+    },
+    {
+      "kind": "stores",
+      "id": 39
+    },
+    {
+      "kind": "stores",
+      "id": 40
+    },
+    {
+      "kind": "stores",
+      "id": 41
+    },
+    {
+      "kind": "stores",
+      "id": 42
+    },
+    {
+      "kind": "stores",
+      "id": 43
+    },
+    {
+      "kind": "stores",
+      "id": 44
+    },
+    {
+      "kind": "stores",
+      "id": 45
+    },
+    {
+      "kind": "stores",
+      "id": 46
+    },
+    {
+      "kind": "stores",
+      "id": 47
+    },
+    {
+      "kind": "stores",
+      "id": 48
+    },
+    {
+      "kind": "stores",
+      "id": 49
+    },
+    {
+      "kind": "stores",
+      "id": 50
+    },
+    {
+      "kind": "stores",
+      "id": 51
+    },
+    {
+      "kind": "stores",
+      "id": 52
+    },
+    {
+      "kind": "stores",
+      "id": 53
+    },
+    {
+      "kind": "stores",
+      "id": 54
+    },
+    {
+      "kind": "stores",
+      "id": 55
+    },
+    {
+      "kind": "stores",
+      "id": 56
+    },
+    {
+      "kind": "stores",
+      "id": 57
+    },
+    {
+      "kind": "stores",
+      "id": 58
+    },
+    {
+      "kind": "stores",
+      "id": 59
+    },
+    {
+      "kind": "stores",
+      "id": 60
+    },
+    {
+      "kind": "stores",
+      "id": 61
+    },
+    {
+      "kind": "stores",
+      "id": 62
+    },
+    {
+      "kind": "stores",
+      "id": 63
+    },
+    {
+      "kind": "stores",
+      "id": 64
+    },
+    {
+      "kind": "stores",
+      "id": 65
+    },
+    {
+      "kind": "stores",
+      "id": 66
+    },
+    {
+      "kind": "stores",
+      "id": 67
+    },
+    {
+      "kind": "stores",
+      "id": 68
+    },
+    {
+      "kind": "stores",
+      "id": 69
+    },
+    {
+      "kind": "stores",
+      "id": 70
+    },
+    {
+      "kind": "stores",
+      "id": 71
+    },
+    {
+      "kind": "stores",
+      "id": 72
+    },
+    {
+      "kind": "stores",
+      "id": 73
+    },
+    {
+      "kind": "stores",
+      "id": 74
+    },
+    {
+      "kind": "stores",
+      "id": 75
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 240
+    },
+    {
+      "kind": "merchants",
+      "id": 33
+    },
+    {
+      "kind": "rules",
+      "id": 35
+    },
+    {
+      "kind": "stores",
+      "id": 76
+    },
+    {
+      "kind": "skus",
+      "id": 62
+    },
+    {
+      "kind": "stores",
+      "id": 77
+    },
+    {
+      "kind": "skus",
+      "id": 63
+    },
+    {
+      "kind": "stores",
+      "id": 78
+    },
+    {
+      "kind": "skus",
+      "id": 64
+    },
+    {
+      "kind": "stores",
+      "id": 79
+    },
+    {
+      "kind": "skus",
+      "id": 65
+    },
+    {
+      "kind": "stores",
+      "id": 80
+    },
+    {
+      "kind": "skus",
+      "id": 66
+    },
+    {
+      "kind": "stores",
+      "id": 81
+    },
+    {
+      "kind": "skus",
+      "id": 67
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 241
+    },
+    {
+      "kind": "merchants",
+      "id": 34
+    },
+    {
+      "kind": "rules",
+      "id": 36
+    },
+    {
+      "kind": "stores",
+      "id": 82
+    },
+    {
+      "kind": "skus",
+      "id": 68
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 242
+    },
+    {
+      "kind": "merchants",
+      "id": 35
+    },
+    {
+      "kind": "rules",
+      "id": 37
+    },
+    {
+      "kind": "stores",
+      "id": 83
+    },
+    {
+      "kind": "skus",
+      "id": 69
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 243
+    },
+    {
+      "kind": "merchants",
+      "id": 36
+    },
+    {
+      "kind": "rules",
+      "id": 38
+    },
+    {
+      "kind": "stores",
+      "id": 84
+    },
+    {
+      "kind": "skus",
+      "id": 70
+    },
+    {
+      "kind": "packages",
+      "id": 16
+    }
+  ],
+  "existing": [],
+  "sampled": 48,
+  "city": {
+    "id": 3,
+    "name": "贵阳",
+    "slug": "guiyang"
+  }
+}
