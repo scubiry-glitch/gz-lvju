@@ -246,3 +246,15 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **演示卡券不进资金域**：一切结算/退款/对账查询都带 `NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE)` 过滤；新增结算相关查询漏掉这个条件会把演示单卷进账差。
 - **误核销撤销保留历史**：`commerce_redemptions.coupon_id` 已从 UNIQUE 降级为普通索引（撤销后同券可再核销），防重靠核销事务内"券行锁 + 查 confirmed"——不要再把唯一索引加回去；撤销已结算明细生成 `commerce_recovery_cases`，下期生成商户账单时可 `offset_recovery` 抵扣，全部动作过账。
 - **金额守恒不变量 I1–I7**（`verifyInvariants`）是验收底线：订单实付=已核销+已退款+未核销池；本地已付逐笔有机构镜像。改动结算链路后必须跑 `node scripts/commerce/settlement-test.cjs --browser`（11 场景 + 浏览器 6 检查）。
+
+## 规则 22 · 券核销渠道（线上/线下）与酒店通兑口径
+
+**本地生活券的核销渠道、通兑档位、名单抽样只走 `commerce/configuration.cjs` + `commerce/hotel-exchange-demo.cjs`，页面与域逻辑不得另造一份口径。**（2026-09-20 拍板）
+
+- **所有类目的券创建时区分线上/线下**：`sku.payload.redeem_channel`（`offline` 缺省 / `online`）。线下券必须绑具体门店（商家可在商户中心「门店管理」自建，门店类型 `service_channel: store|online`）；线上券绑本商户「线上服务台」虚拟门店（承载 NOT NULL store_id，无产能），**免预约直核**。校验单一入口在 `configuration.cjs validate()` + `service.references()`（线下禁绑线上服务台、线上必须绑、枚举 `enum` 字段类型也定义在这里）。
+- **酒店通兑 = 线下 + `exchange_tier`（t80…t200）**：档位枚举/中文名/展示价单一数据源 `EXCHANGE_TIERS`；同档任选名单酒店、**预约选店制**——预约必传档内 `store_id`（`kind:'hotel'` + 同档校验，跨档/锚点 422 `tier_mismatch`），`appointments.store_id`=所选酒店；核销门店与授权按实际履约门店商户（券发在运营商户名下、核销人是酒店商户员工），`redemptions.merchant_id` 归集所选酒店商户 → 结算账单按事业群自然分商户。改期/取消按 `appointment.store_id` 对称释放产能。
+- **锚点虚拟门店**：每档 1 个（capacity 0，不可直接预约），承载发券时 `commerce_coupons.store_id NOT NULL`；线上服务台同理。**凡是"无固定物理门店"的券形态，优先用虚拟门店承载，不要动 commerce 表结构**（迁移 checksum 锁死，新增列须走新版本号并复制整份 DDL）。
+- **isDemo 泛化约定**：`guiyang-demo.cjs isDemo()` 只看 `initialization.mode==='demo'`，批次名仅用于 seed 收据归属；新增演示批次（如 `hotel-exchange-demo-v1`）必须 payload 带 `initialization:{batch,mode:'demo'}`，否则会误入资金域。资金隔离最终只认 `snapshot.is_demo`（demo-order 打标）。
+- **酒店名单**：`commerce/hotel-roster.json`（1809 家、6 档 80/100/120/160/180/200，`hotel-roster-build.cjs` 从 Excel 转换，可重跑）；演示抽样 `sampleHotels(perTier=8)` 是确定性算法（品牌分层 + hotel_code 字典序轮转），改抽样规则必须保持可复算。门店 city 挂演示城市、真实区域存 payload（名单为全国门店，通兑跨城属预期）。
+- **公开名录**：`GET /api/commerce/v1/hotels`（session 前只读，与 /catalog 同形态，无需 perm 登记）只输出公开字段；C 端名录页 `juzhu-hotels.html`（generate-pages 生成，静态白名单已含）。
+- **回归**：`node scripts/commerce/m1a-test.cjs --hotel-exchange`（档内任选/跨档拒绝/线上免预约/核销归集/资金零分录）；线上 `node scripts/commerce/live-hotel-check.cjs`（19 项，可重复跑：预约后即取消）。设计文档 `docs/prd/DESIGN-本地生活酒店通兑与三品类券.md`，验收 `docs/verification/hotel-exchange-closed-loop/`。
