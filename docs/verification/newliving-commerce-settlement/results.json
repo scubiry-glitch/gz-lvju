@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-19T17:21:18.891Z",
+  "at": "2026-09-20T00:05:13.910Z",
   "database": "isolated temporary MySQL database (removed)",
   "scenarios": [
     {
@@ -32,6 +32,14 @@
     },
     {
       "name": "SC8 跨账期 + 已结算后冲回：撤销已结算核销产生追偿，下期抵扣/人工追回，同券可重新履约",
+      "passed": true
+    },
+    {
+      "name": "SC12 会员续购顺延：有效期内续费从原到期日叠加，无会员从当下起算",
+      "passed": true
+    },
+    {
+      "name": "SC13 先行赔付闭环：已核销服务失败→受理→建单→独立复核→过账并挂应收代偿",
       "passed": true
     },
     {

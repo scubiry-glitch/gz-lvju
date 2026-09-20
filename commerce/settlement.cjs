@@ -672,8 +672,12 @@ async function verifyInvariants(pool){
  checks.push({name:'I6a 无归属订单不产生渠道佣金明细',passed:!unattributed.length,detail:unattributed.map(r=>r.id)});
  const dupItems=await rowsOf('SELECT redemption_id,line_kind,COUNT(*) n FROM commerce_settlement_items GROUP BY redemption_id,line_kind HAVING n>1');
  checks.push({name:'I3 同一明细不重复入账（跨批次防重）',passed:!dupItems.length,detail:dupItems.map(r=>r.redemption_id+':'+r.line_kind)});
- const badItems=await rowsOf(`SELECT i.id FROM commerce_settlement_items i JOIN commerce_coupons cc ON cc.id=i.coupon_id WHERE cc.status<>'redeemed' OR i.payable_minor<=0 OR NOT ${notDemo}`);
- checks.push({name:'I6b 仅已确认核销且非演示卡券进入结算',passed:!badItems.length,detail:badItems.map(r=>r.id)});
+ const badItems=await rowsOf(`SELECT i.id FROM commerce_settlement_items i
+  JOIN commerce_coupons cc ON cc.id=i.coupon_id
+  LEFT JOIN commerce_redemptions r ON r.id=i.redemption_id
+  WHERE cc.status<>'redeemed' AND i.status<>'reversed' AND i.payable_minor>0 AND NOT (JSON_EXTRACT(cc.snapshot,'$.is_demo') <=> TRUE)
+   AND (r.status<>'reversed' OR NOT EXISTS (SELECT 1 FROM commerce_recovery_cases rc WHERE rc.redemption_id=i.redemption_id AND rc.debtor_kind=i.line_kind))`);
+ checks.push({name:'I6b 仅已确认核销进入结算；撤销明细须已冲回或挂追偿',passed:!badItems.length,detail:badItems.map(r=>r.id)});
  const paidDup=await rowsOf(`SELECT source_id,source_type,COUNT(*) n FROM commerce_ledger_entries
   WHERE (account='provider_payout_out' OR account='provider_refund_out') GROUP BY source_id,source_type HAVING n>1`);
  checks.push({name:'I4a 每笔指令最多一次出金过账（重复回执不重复付款）',passed:!paidDup.length,detail:paidDup.map(r=>r.source_id)});

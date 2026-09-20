@@ -5,6 +5,7 @@
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path');
 const mysql=require('mysql2/promise'),{config,initAuth}=require('../../commerce/db.cjs'),{migrate}=require('../../commerce/migrate.cjs'),{Service}=require('../../commerce/service.cjs'),settlement=require('../../commerce/settlement.cjs'),{createServer}=require('../../commerce/app.cjs');
 const results=[];const check=async(name,fn)=>{await fn();results.push({name,passed:true});console.log('PASS '+name);};
+const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const bj=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(v);
 const day=n=>bj(new Date(Date.now()+n*86400000));
 (async()=>{
@@ -236,6 +237,52 @@ const day=n=>bj(new Date(Date.now()+n*86400000));
    await approveAndExecute(pb2.batch_id);await pay(pb2.batch_id);
    const inv=await conservation();
    assert(inv.checks.find(c=>c.name.startsWith('I1')).passed,'账务分组全部平衡');
+  });
+
+  await check('SC12 会员续购顺延：有效期内续费从原到期日叠加，无会员从当下起算',async()=>{
+   const plan=await publish('plans',{name:'结算验收会员',city_id:1,package_id:single.id,price_minor:10000,valid_days:30,description:'会员验收'});
+   const first=await service.reserveOrder(actors.user,{kind:'plans',product_id:plan.id},'order-plan-1');
+   await service.fulfillPaidOrder(first.id,'settle-plan-1',10000);
+   const mine1=(await service.my(actors.user)).memberships.find(m=>m.order_id===first.id);
+   assert(mine1,'首购会员到账');
+   const days1=Math.round((new Date(mine1.expires_at)-Date.now())/86400000);
+   assert(days1>=29&&days1<=30,'首购有效期≈30天，实际 '+days1);
+   const second=await service.reserveOrder(actors.user,{kind:'plans',product_id:plan.id},'order-plan-2');
+   await service.fulfillPaidOrder(second.id,'settle-plan-2',10000);
+   const mine2=(await service.my(actors.user)).memberships.find(m=>m.order_id===second.id);
+   const gap=Math.round((new Date(mine2.expires_at)-new Date(mine1.expires_at))/86400000);
+   assert(gap===30,'续费自原到期日顺延30天，实际 '+gap+' 天');
+   const extend=parse((await pool.execute('SELECT snapshot FROM commerce_memberships WHERE order_id=?',[second.id]))[0][0].snapshot).extends_from;
+   assert(extend,'顺延来源可追溯（extends_from 落快照）');
+  });
+
+  await check('SC13 先行赔付闭环：已核销服务失败→受理→建单→独立复核→过账并挂应收代偿',async()=>{
+   const {coupons}=await buy(single,'order-sc13');
+   await redeem(coupons[0],'redeem-sc13');
+   const compCase=await service.openCase(actors.user,{coupon_id:coupons[0].id,kind:'compensation',reason:'SC13 服务未履约申请赔付验收'},'case-sc13');
+   assert.equal((await pool.execute('SELECT kind FROM commerce_cases WHERE id=?',[compCase.id]))[0][0].kind,'compensation');
+   await service.resolveCase(actors.operator,W,compCase.id,{action:'accept',resolution:'核实服务失败，进入赔付处理'});
+   assert.equal((await pool.execute('SELECT status FROM commerce_cases WHERE id=?',[compCase.id]))[0][0].status,'awaiting_provider');
+   const comp=await settlement.createCompensation(service,actors.manager,{case_id:compCase.id},'compensation-sc13');
+   assert.equal(comp.status,'pending');
+   await assert.rejects(()=>settlement.reviewCompensation(service,actors.manager,comp.id,{action:'approve',note:'自审'}),/申请人不能复核/);
+   const approved=await settlement.reviewCompensation(service,actors.reviewer,comp.id,{action:'approve',note:'核实属实，同意先行赔付'});
+   assert.equal(approved.status,'paid');
+   assert.ok(approved.recovery_no.startsWith('RC-'),'赔付联动应收商户代偿');
+   const [ledger]=await pool.execute("SELECT side,amount_minor,account FROM commerce_ledger_entries WHERE source_type='compensation' ORDER BY id");
+   assert.equal(ledger.length,2);
+   assert.equal(Number(ledger.find(l=>l.side==='debit').amount_minor),10000,'赔付支出过账（沙箱口径）');
+   assert.equal((await pool.execute('SELECT status FROM commerce_cases WHERE id=?',[compCase.id]))[0][0].status,'closed','赔付完成后售后结单');
+   // 追偿闭环：到账登记关闭
+   const [rec]=(await pool.execute("SELECT id,amount_minor FROM commerce_recovery_cases WHERE redemption_id=? AND debtor_kind='merchant'",[coupons[0].id]))[0];
+   await settlement.recover(service,actors.operator,rec.id,{amount_minor:Number(rec.amount_minor),note:'商户代偿到账'});
+   assert.equal((await pool.execute('SELECT status FROM commerce_recovery_cases WHERE id=?',[rec.id]))[0][0].status,'closed');
+   await conservation();
+   // 用户可见赔付状态
+   const mine=await service.my(actors.user);
+   assert(mine.compensations.some(c=>c.compensation_no),'/my 随发赔付状态');
+   const dup=await settlement.createCompensation(service,actors.manager,{case_id:compCase.id},'compensation-sc13-dup');
+   assert.equal(dup.existing,true,'同工单重复建赔付单幂等返回原单');
   });
 
   await check('SC9 对账闭环：平台指令与机构账单逐笔核对，差异有责任人/处理记录/关闭依据',async()=>{
