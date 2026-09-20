@@ -515,7 +515,7 @@
     document.getElementById('sales').textContent = item.sales_text || '最近好评稳定';
     document.getElementById('spec').textContent = item.spec || '';
     // 服务说明（D03）：每项独立配置标题与正文；兼容旧的纯字符串数组
-    document.getElementById('includes').innerHTML = (item.includes || []).map(function(x, i){
+    document.getElementById('includes').innerHTML = (item.includes || item.includes_json || []).map(function(x, i){
       var isObj = x && typeof x === 'object';
       var name = isObj ? (x.name || '') : String(x == null ? '' : x);
       var desc = isObj ? (x.desc || '') : '按标准工序执行，完工可回传记录。';

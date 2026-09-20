@@ -1168,6 +1168,40 @@ function parseJsonFields(row, fields, defaultVal) {
   return row;
 }
 
+/** jz_skus JSON 字段。列名永远是 includes（与 tags/badges/gallery 同口径）。
+ *  链家库曾热修为 includes_json：启动时 rename，读路径这里再兜一层别名。 */
+const SKU_JSON_FIELDS = ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice'];
+function parseSkuJsonFields(row, extraFields) {
+  if (row && row.includes == null && row.includes_json != null) row.includes = row.includes_json;
+  return parseJsonFields(row, extraFields ? SKU_JSON_FIELDS.concat(extraFields) : SKU_JSON_FIELDS);
+}
+
+async function ensureJzSkusIncludesColumn(conn) {
+  let cols = [];
+  try {
+    const [rows] = await conn.execute('SHOW COLUMNS FROM jz_skus');
+    cols = rows.map((r) => r.Field);
+  } catch (_) {
+    return;
+  }
+  const hasIncludes = cols.includes('includes');
+  const hasJson = cols.includes('includes_json');
+  try {
+    if (hasJson && !hasIncludes) {
+      await conn.execute('ALTER TABLE jz_skus CHANGE COLUMN includes_json includes TEXT');
+      console.log('jz_skus: renamed includes_json → includes');
+    } else if (hasJson && hasIncludes) {
+      await conn.execute('UPDATE jz_skus SET includes=includes_json WHERE includes IS NULL AND includes_json IS NOT NULL');
+      await conn.execute('ALTER TABLE jz_skus DROP COLUMN includes_json');
+      console.log('jz_skus: merged includes_json into includes');
+    } else if (!hasIncludes) {
+      await conn.execute('ALTER TABLE jz_skus ADD COLUMN includes TEXT');
+    }
+  } catch (e) {
+    console.warn('jz_skus includes 列对齐失败:', e.message);
+  }
+}
+
 // ==== 家政 SKU 详情契约 helper（对齐 Python 版 jiazheng_db.py）====
 const VENDOR_BADGE_LABELS = {
   whitelist: '白名单商家',
@@ -1933,6 +1967,7 @@ async function ensureSchemaRun() {
     for (const [table, ddl] of extraCols) {
       try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
     }
+    await ensureJzSkusIncludesColumn(conn);
     // 图集分类回填（2026-09 商家反馈点 4）：存量图无分类 → 'other'，幂等（只碰 NULL/空串行）
     try { await conn.execute("UPDATE photos SET category='other' WHERE category IS NULL OR category=''"); } catch (_) { /* 表未就绪 */ }
     // 保租房/卖旧买新种子（projects 为空时从 juzhu/data*.json 灌入）
@@ -4082,8 +4117,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       sql += ' ORDER BY s.category_id, s.sort_order, s.id';
       const rows = await queryRows(sql, params);
-      const SKU_JSON_FIELDS = ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice'];
-      rows.forEach(r => parseJsonFields(r, SKU_JSON_FIELDS));
+      rows.forEach(r => parseSkuJsonFields(r));
       return jsonReply(res, { items: rows });
     }
 
@@ -4119,7 +4153,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         );
         if (!skus.length) return jsonReply(res, { error: 'not found' }, 404);
         const item = skus[0];
-        parseJsonFields(item, ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice']);
+        parseSkuJsonFields(item);
 
         // products：同 SPU 全部上架商品（双维度城市过滤，对齐 Python list_channel_sku_products）
         let prodSql = `SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
@@ -4196,7 +4230,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
            FROM jz_skus WHERE enabled=1 AND category_id=? AND slug<>? ORDER BY sort_order, id LIMIT 4`,
           [item.category_id, item.slug]
         );
-        related.forEach(r => parseJsonFields(r, ['gallery', 'tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+        related.forEach(r => parseSkuJsonFields(r));
 
         // reviews：真实评价优先，不足 3 条补类目 fallback（对齐 Python _review_rows/_fallback_reviews）
         if (products.length) {
@@ -6629,7 +6663,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
          FROM jz_skus s LEFT JOIN jz_categories c ON c.id=s.category_id
          ORDER BY s.category_id, s.sort_order, s.id`
       );
-      rows.forEach(r => parseJsonFields(r, ['tags', 'badges', 'includes', 'service_flow', 'service_notice']));
+      rows.forEach(r => parseSkuJsonFields(r));
       return jsonReply(res, { list: rows });
     }
 
