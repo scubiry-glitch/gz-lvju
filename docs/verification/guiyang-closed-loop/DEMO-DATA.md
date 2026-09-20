@@ -47,3 +47,9 @@
 - 补缺：`node scripts/commerce/seed-guiyang-demo.cjs --apply`（幂等，仅创建缺失项，保留已编辑记录与库存）；`node scripts/commerce/link-main-systems.cjs`（幂等补齐历史主站关联）。
 - 演示识别：商品名带「（演示）」后缀，`initialization.batch=guiyang-life-demo-v1`；真实交易与真实商家资料不得混入该批次。
 - 兑换码发放/停用记录在「操作审计」与 `commerce_audit` 可查，明文码不入库。
+
+## 结算与对账 · 演示数据（2026-09-20）
+
+来源：`scripts/commerce/settlement-demo-seed.cjs seed|clean|status`（种子号 `demo-settlement-v1`，按 manifest 清单幂等/可清）。覆盖结算闭环四端演示：账期批次（已完成 3 / 待执行 1 / 执行中 1 / 草稿 1）、付款指令（已到账 3 / 结果未知 1）、退款（已付 1 / 处理中 1）、误核销撤销 1（商户+渠道追偿 open）、先行赔付 1（应收代偿 open）、对账 1 批（差异 1 已关闭 + 1 处理中）。账号全部「演示」前缀；机构为沙箱，金额非零但**不代表真实资金**（各页面已内嵌该披露）。
+
+演示登录（仅 sytest，密码 `Demo#2026`）：`demo_operator`（演示·结算运营，fund 全权）、`demo_cashier_a`（演示核销员甲，商户端「应结与到账」）。客户端/推广端用对应演示账号登录后查看退款与佣金。截图见 `../newliving-commerce-settlement/demo-0*.png`。
