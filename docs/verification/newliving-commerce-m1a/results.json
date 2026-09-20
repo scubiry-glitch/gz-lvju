@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-19T17:01:34.433Z",
+  "at": "2026-09-20T00:04:59.452Z",
   "database": "isolated temporary MySQL database (removed)",
   "checks": [
     {
@@ -76,6 +76,126 @@
     },
     {
       "name": "HTTP fulfilment chain, today filter, stats scope, error codes and locatable failures",
+      "passed": true
+    },
+    {
+      "name": "Guiyang seed covers every enabled service and 12 categories without replacing existing data",
+      "passed": true
+    },
+    {
+      "name": "Guiyang seed retries create no duplicates and preserve inventory already consumed",
+      "passed": true
+    },
+    {
+      "name": "Single voucher checkout is authenticated, acknowledged, versioned and idempotent",
+      "passed": true
+    },
+    {
+      "name": "Demo package and member issue correct independent coupons without payment or commissions",
+      "passed": true
+    },
+    {
+      "name": "Demo stock concurrency cannot oversell; real products and disabled environment cannot use demo purchase",
+      "passed": true
+    },
+    {
+      "name": "Demo coupon appointment and refund remain a zero-funds service workflow",
+      "passed": true
+    },
+    {
+      "name": "Exchange issuance enforces account, permission and city scope; immutable version and idempotency",
+      "passed": true
+    },
+    {
+      "name": "Single, package and membership codes grant correct owned rights, zero funds and native orders",
+      "passed": true
+    },
+    {
+      "name": "Invalid, expired, unacknowledged and competing code claims cannot grant twice",
+      "passed": true
+    },
+    {
+      "name": "Insufficient stock rolls back the code claim and all grant records",
+      "passed": true
+    },
+    {
+      "name": "Batch issuance returns distinct single-use codes under one idempotent key",
+      "passed": true
+    },
+    {
+      "name": "Code list supports status query, records and scope; plaintext never returns",
+      "passed": true
+    },
+    {
+      "name": "Disable keeps unredeemed codes from exchange; redeemed codes are immutable",
+      "passed": true
+    },
+    {
+      "name": "Demo orders record signed referral attribution while every amount stays zero",
+      "passed": true
+    },
+    {
+      "name": "Two customers and three demo merchants reject every cross-account access",
+      "passed": true
+    },
+    {
+      "name": "Browser platform modules render real lists without demo controls",
+      "passed": true
+    },
+    {
+      "name": "Browser create, submit, independent review and publish a store",
+      "passed": true
+    },
+    {
+      "name": "Browser search empty state and published version editor",
+      "passed": true
+    },
+    {
+      "name": "Browser merchant modules scoped and platform configuration hidden",
+      "passed": true
+    },
+    {
+      "name": "Browser consumer product details, personal assets and promotion share",
+      "passed": true
+    },
+    {
+      "name": "Browser four entry pages responsive at 390px and 1440px",
+      "passed": true
+    },
+    {
+      "name": "Browser anonymous, permission denial, server failure and retry states",
+      "passed": true
+    },
+    {
+      "name": "Browser single-voucher filtering, acknowledged checkout and member gift delivery",
+      "passed": true
+    },
+    {
+      "name": "Browser admin issues one-time member code and customer redeems through My",
+      "passed": true
+    },
+    {
+      "name": "Browser coupon wallet filters available, used and expired states",
+      "passed": true
+    },
+    {
+      "name": "Browser merchant redemption preview explains denial without any side effect",
+      "passed": true
+    },
+    {
+      "name": "Browser exchange-code console batch issues, disables and queries redemption records",
+      "passed": true
+    },
+    {
+      "name": "Browser QR round-trip, copy coupon ID, expiry, refresh and merchant scan import",
+      "passed": true
+    },
+    {
+      "name": "Member and standalone shop layout fits mobile widths; no logout, no duplicate wallet tab",
+      "passed": true
+    },
+    {
+      "name": "Browser no uncaught JavaScript errors",
       "passed": true
     }
   ]

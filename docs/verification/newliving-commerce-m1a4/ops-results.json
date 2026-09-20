@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-19T19:18:06.027Z",
+  "at": "2026-09-19T23:56:20.192Z",
   "database": "isolated temporary MySQL database (removed)",
   "checks": [
     {
@@ -36,26 +36,6 @@
     },
     {
       "name": "ALERT-3 转人工边界：重试达上限的指令保持可查可解释，不静默丢弃",
-      "passed": true
-    },
-    {
-      "name": "Browser alert table renders all rules with runbooks and thresholds",
-      "passed": true
-    },
-    {
-      "name": "Browser triggered alert shows red state and recovers after fix",
-      "passed": true
-    },
-    {
-      "name": "Browser compensation section on reconciliation console",
-      "passed": true
-    },
-    {
-      "name": "Browser session revocation forces re-login on every console (登录失效)",
-      "passed": true
-    },
-    {
-      "name": "Browser no uncaught JS errors on m1a4 pages",
       "passed": true
     }
   ]

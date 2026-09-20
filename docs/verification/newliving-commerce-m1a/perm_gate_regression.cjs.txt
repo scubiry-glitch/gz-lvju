@@ -66,6 +66,6 @@ PASS  旧全局 Key 写 403
 PASS  旧全局 Key 管理读 403（GET 收口）
 PASS  细粒度审计 project.update 落表
 PASS  注册路由不再产生 admin.write 粗粒度审计
-# 清理完成（测试账号 IAMREG613181_*）
+# 清理完成（测试账号 IAMREG894305_*）
 
 ALL PASS
