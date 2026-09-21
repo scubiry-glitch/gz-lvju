@@ -20,6 +20,14 @@
  *   8. 分账回退申请      POST /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/direct/split/return            (api 1541838)
  *   9. 分账结果与回退查询 GET /pay/open-pay-plat/pre/profits-share/share-profits/api/standard/direct/split/query             (api 1479569)
  *
+ * 相关（非方法，供对接参考）：
+ *   - OAuth2 网关鉴权流程：https://weapons.ke.com/project/15453/interface/api/21917
+ *     （本模块鉴权复用 server/utils/gateway-client.cjs，client_credentials + HMAC-SHA256）
+ *   - 订单结果通知（支付 + 退款回调）：https://weapons.ke.com/project/15453/interface/api/1501795
+ *     （由 createC2BOrder / refundOrder 的 callBackInfo.callbackUrl 接收）
+ *   - 分账相关回调：https://weapons.ke.com/project/15873/interface/api/cat_281801
+ *     （收款后分账由理房通分账服务直接 HTTP 回调，todo：网关生产环境申请接口权限）
+ *
  * 环境：new PayCenter({ env }) 或 createPayCenter(env) 直接指定 test | prod，
  *   据此选择网关地址与客户端凭证；凭证可被 OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET 覆盖。
  *
@@ -140,6 +148,7 @@ class PayCenter {
 
   /**
    * 1. C2B 支付下单（幂等；返回收银台 URL / token / 订单号）
+   *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/1000086
    * @param {object} body 落兵台 createOrder 完整请求体，必填：
    *   amount, appCode, appOrderId, appOrderName, projectCode, shareBizCode,
    *   payChannel{cashierType, shareBizCode, tradeInfo{tradeName,tradeDesc}},
@@ -161,6 +170,7 @@ class PayCenter {
 
   /**
    * 2. 关闭订单（过期/用户取消场景；终态 40）
+   *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/9276
    * @param {object} params 必填：appCode, projectCode，且 orderId / businessOrderNo / cashierOrderNo 至少其一
    *   可选：ucid, userType
    * @returns {Promise<{errno:number,error:string,data:object}>}
@@ -179,7 +189,8 @@ class PayCenter {
 
   /**
    * 3. 支付订单查询
-   * @param {object} params 必填：appOrderId / orderId 至少其一；可选 appCode, projectCode
+   *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/1493269
+   * @param {object} params 必填：appCode，appOrderId / orderId 至少其一；可选   projectCode
    * @returns {Promise<{errno:number,error:string,data:object}>}
    */
   async queryOrder(params = {}) {
@@ -193,6 +204,7 @@ class PayCenter {
 
   /**
    * 4. 原路退款（异步；默认 refundType=01 原路）
+   *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/9297
    * @param {object} body 必填：appCode, projectCode, appOrderId, refundAmount, callbackUrl,
    *   ucid, userType, shareOrderInfos[{merchantNo, shareBizCode, amount}]，
    *   且 orderId / businessOrderNo / cashierOrderNo 至少其一（定位原单）
@@ -213,6 +225,7 @@ class PayCenter {
 
   /**
    * 5. 退款订单查询
+   *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/9264
    * @param {object} params 必填：appCode，且 orderId / businessOrderNo / cashierOrderNo 至少其一
    * @returns {Promise<{errno:number,error:string,data:object}>}
    */
@@ -229,8 +242,9 @@ class PayCenter {
   // ───────────────────────── 分账类（project 15873，前缀 PROFIT_PREFIX） ─────────────────────────
 
   /**
-   * 6. 开通合同专户（落兵台 api 1590841）
-   * 支持开通一个合同下多个分账参与方的合同专户；接口幂等，开户失败可重试。
+   * 6. 开通合同专户
+   *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1590841
+   *   支持开通一个合同下多个分账参与方的合同专户；接口幂等，开户失败可重试。
    * 注意：code 非 '200' 视为失败；data[].accountOpenStatus === true 视为开户成功。
    * @param {object} body 必填：bizCode, contractNo, merchantNoList[]
    * @returns {Promise<{code:string,info:string,data:Array<{merchantNo:string,accountOpenStatus:boolean}>>}>}
@@ -253,7 +267,8 @@ class PayCenter {
   }
 
   /**
-   * 7. ACN 分账申请（落兵台 api 1479542）
+   * 7. ACN 分账申请
+   *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1479542
    * @param {object} body 必填：bizOrderNo, bizCode, orderName, amount, contractInfo{contractNo},
    *   payInfos[{merchantNo,amount}], details[{bizDetailNo,splitLevel,payerMerchantNo,payAmount,payeeMerchantNo,leafFlag,summary}]
    * @returns {Promise<{code:string,info:string,data:object}>}
@@ -273,7 +288,8 @@ class PayCenter {
   }
 
   /**
-   * 8. 分账回退申请（落兵台 api 1541838）
+   * 8. 分账回退申请
+   *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1541838
    * @param {object} body 必填：bizOrderNo, bizCode, orderName, amount, contractInfo{contractNo},
    *   payInfos[{payNo,merchantNo,amount}], details[{bizDetailNo,splitLevel,payerMerchantNo,payAmount,
    *   payeeMerchantNo,leafFlag,summary,sources[]}]
@@ -294,7 +310,8 @@ class PayCenter {
   }
 
   /**
-   * 9. 分账结果与分账回退结果查询（落兵台 api 1479569）
+   * 9. 分账结果与分账回退结果查询
+   *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1479569
    * @param {object} params 必填：bizCode, orderType；bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
    *   orderType 取值：DIRECT_SPLIT-分账；SPLIT_RETURN-分账追回
    * @returns {Promise<{code:string,info:string,data:object}>}
