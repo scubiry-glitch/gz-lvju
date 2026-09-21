@@ -15,7 +15,29 @@ if [ ! -d "node_modules/bcryptjs" ]; then
     || echo "bcryptjs install failed, continuing"
 fi
 if [ ! -d "node_modules/mysql2" ]; then
-  npm install mysql2 --no-save --registry https://registry.npmmirror.com 2>/dev/null || echo "mysql2 install skipped"
+  # mysql2 + 全量依赖：从 npmmirror curl 逐包安装
+  _install_pkg() {
+    local pkg="$1" tgz="$2"
+    local tmp=/tmp/_npm_pkg_dl
+    mkdir -p "$tmp"
+    curl -sL "https://registry.npmmirror.com/${pkg}/-/${tgz}.tgz" -o "$tmp/${pkg##*/}.tgz" 2>/dev/null \
+      && tar -xzf "$tmp/${pkg##*/}.tgz" -C "$tmp/" \
+      && mkdir -p "node_modules/$pkg" \
+      && cp -r "$tmp/package/." "node_modules/$pkg/" \
+      && rm -rf "$tmp" \
+      && echo "$pkg installed" \
+      || echo "$pkg install failed, continuing"
+  }
+  _install_pkg mysql2          mysql2-3.23.3
+  _install_pkg long            long-5.3.2
+  _install_pkg lru.min         lru.min-1.1.4
+  _install_pkg iconv-lite      iconv-lite-0.7.3
+  _install_pkg safer-buffer    safer-buffer-2.1.2
+  _install_pkg sql-escaper     sql-escaper-1.5.1
+  _install_pkg aws-ssl-profiles aws-ssl-profiles-1.1.2
+  _install_pkg generate-function generate-function-2.3.1
+  _install_pkg is-property     is-property-1.0.2
+  _install_pkg named-placeholders named-placeholders-1.1.6
 fi
 
 echo "Build complete"
