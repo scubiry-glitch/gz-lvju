@@ -208,3 +208,16 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **写入口与审计**：`PUT /api/juzhu/admin/vendors/:id/commission`（ROUTES 挂 `vendor.fund.write`，act `vendor.commission.update`）+ 处理器内 before/after 审计（role.update 金标准）；入驻审批 `approve` 按 `rate_base−rate_discount` 折算、按 phone **单命中** active 商家回填对应档位（多命中/未命中不阻塞）。管理台：`screens/p-vendor-rates.html`（P 端「商家费率」，nav p 系列 B 组，`_nav.js` 已登记）；全局基准走既有 `PUT /admin/settings`（`settings.write`）。
 - **商家可见**：`GET /api/juzhu/vendor/me` 随发两档 `commission.{housing,jiazheng}.{rate,is_default}`；B 端 `b-listing-mgmt.html` 徽标展示房源档佣金；HMAC `bookings/list`·`bookings/detail` 与 B 端 `/vendor/booking/orders` 每单随发快照字段。**费率不经商家 HMAC 写通道**（`vendor_config.cjs` 进程缓存不受影响）。
 - **perm 基线**：新增 `vendor.fund.write`（domain vendor，roles platform_op/operator_admin）已入 `scripts/__fixtures__/perm_roles_baseline.json`；既有缺口（`GET /admin/vendors`、`PUT /admin/vendors/:id/review` 未登记 ROUTES、consult-mode 重复死规则）为已知债，动权限面前先跑 `node scripts/perm_registry_snapshot.cjs` 对照。
+
+## 规则 21 · 房源图片对象存储单一出口（贝壳 ODS/S3）
+
+**图片上传/读取只走 `img_storage.cjs`（`s3_client.cjs` 为协议层），页面与接口不得直连 ODS、不得自行拼签名。**（2026-09-21 拍板，详见 `docs/s3-image-storage.md`）
+
+- **配置**：`S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_FILE_ENDPOINT/S3_BUCKET` + 形态开关（`S3_SIGN_VERSION` / `S3_REGION` / `S3_ADDRESSING` / `S3_FILE_STYLE` / `S3_KEY_PREFIX` / `S3_EXTRA_HEADERS`）。密钥只进运行时 env / 根 `.env` / `juzhu/.env.local`（均 gitignore），**禁止写进源码、前端、文档、测试**。未配置 S3 时自动回落 `assets/uploads/`（响应带 `storage:'local'` + `warned`），业务不中断。
+- **规范口径（勿凭直觉改）**：接入规范要求 **V4 签名**（缺省 `v4`）+ **虚拟主机寻址** + **读图 URL 含桶名** + **key 前缀 `lvju/`** + **额外请求头**；四项已生效实测，`S3_EXTRA_HEADERS` 缺省 `{"x-amz-acl":"public-read"}`。虚拟主机寻址代码已支持，但 `<bucket>.ods.lianjia.com` 本网络端口不通（80 空响应/443 握手重置）→ 暂用 `S3_ADDRESSING=path`，网关放开后改环境变量即可。**改任一项先跑 `npm run s3:smoke` 全绿**；403 定位用 `npm run s3:probe`。
+- **V4 实现红线（改签名代码勿回退）**：`host` **必须**参与签名；canonical URI 必须用 **URL 实际路径**（virtual→`/key`，path→`/bucket/key`）；`content-length` **不签**。历史误判「服务端不支持 V4」实为这三处实现缺陷，排查法：PUT 200 但 `ETag=d41d8cd9…`（空串 MD5）= 客户端没发 body；桶级 `HEAD/GET` 一律 403（无 ListBucket），**探测只用对象级 PUT 探针**。
+- **零 schema 变更**：`photos.file_path` 与各 `*.cover_image` 继续存「可直接进 `<img src>` 的字符串」——本地 `/assets/...` 原样、S3 存完整 URL；也接受 `s3://<key>` 与裸 key（读取/改写时自动补全）。历史数据不迁移。
+- **缩略图**：上传时同步写 `.t240.webp` / `.t640.webp`（同目录同命名约定）；C 端改写仍集中在 `img_thumbs.cjs`，S3 分支先 HEAD 校验（进程内缓存）再改写，**不得产生 404**；`S3_THUMB_REWRITE=0` 可整体关闭。
+- **上传入口**：`POST /api/juzhu/admin/photos/upload`（兼容别名 `/admin/upload`）、`/api/juzhu/admin/photos/presign`（前端直传）、商家侧 `/api/juzhu/housing/vendor/photos/upload`（HMAC + owner 校验）；前两者在 `perm_registry.ROUTES` 挂 `house.write`，自检 `GET /api/juzhu/admin/storage/status` 挂 `admin.read`。**新增图片路由必须同步登记 ROUTES**。
+- **读取出口**：`GET /api/juzhu/img?p=`（公网白名单，**不依赖数据库**，位于 `ensureSchema()` 之前）；生产优先由 file 域 CDN 直出，服务端零流量。
+- 上架闸不变（≥8 图 + 有封面 + 评级通过）；`sharp` 为可选依赖，缺失时跳过归一化与缩略图但不阻断上传。

@@ -105,6 +105,10 @@ const ROUTES = [
   { method: 'PUT',    re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.update', res: 'photos', idGroup: 1 },
   { method: 'DELETE', re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.delete', res: 'photos', idGroup: 1 },
   { method: 'POST',   re: '^/api/juzhu/admin/upload$', perm: 'house.write', act: 'upload', res: 'photos' },
+  // 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传（与 admin/upload 同权限面 house.write）
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/upload$', perm: 'house.write', act: 'photo.upload', res: 'photos' },
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
+  { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },,
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
   // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）

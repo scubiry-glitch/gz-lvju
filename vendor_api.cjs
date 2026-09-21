@@ -7,6 +7,10 @@ const grOrders = require('./gr_orders.cjs');
 const stayCfg = require('./stay_config.cjs');
 const MIN_PUBLISH_PHOTOS = 8;
 
+// 图片存储（贝壳 ODS/S3，S3 优先 + 本地兜底）：商家直传通道用；模块缺失时该路由返回 500
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
+
 function reply(status, data) {
   return { status, data };
 }
@@ -768,6 +772,89 @@ async function housingPhotosAdd(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', photo: photo[0] });
 }
 
+/** 解析上传载荷：data_url / base64 / source_url 三选一（与 app.js 同口径，此处独立实现避免循环依赖） */
+function decodeImagePayload(body) {
+  const b = body || {};
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(b.data_url || '').trim());
+  if (m) return { contentType: m[1], buffer: Buffer.from(m[2], 'base64'), filename: b.filename || '' };
+  const raw = b.base64;
+  if (raw) return { contentType: b.content_type || '', buffer: Buffer.from(String(raw).replace(/^data:[^,]+,/, ''), 'base64'), filename: b.filename || '' };
+  const src = b.source_url || b.url;
+  if (src) return { sourceUrl: String(src).trim(), filename: b.filename || '', contentType: b.content_type || '' };
+  return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+}
+
+/**
+ * 图片上传（对象存储）：商家直传通道
+ * 走与 admin 同一 img_storage（S3 优先、本地兜底），owner 校验后落 photos 表；
+ * source_url 支持把商家自有 CDN 上的图片镜像到平台对象存储。
+ */
+async function housingPhotosUpload(conn, body, vendorId) {
+  if (!imgStorage) return reply(500, { code: 500, message: 'img_storage module missing' });
+  const b = body || {};
+  const projectId = parseInt(b.project_id, 10);
+  if (!projectId) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const row = await ownProject(conn, vendorId, projectId);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+
+  let entityType = 'project';
+  let entityId = projectId;
+  if (b.unit_id != null && b.unit_id !== '') {
+    const unitId = parseInt(b.unit_id, 10);
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+    entityType = 'unit'; entityId = unitId;
+  }
+  if (b.is_cover && entityType === 'unit') {
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [entityId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+  }
+
+  const payload = decodeImagePayload(b);
+  if (payload.error) return reply(400, { code: 400, message: payload.error });
+
+  const upload = await imgStorage.uploadImage({
+    buffer: payload.buffer,
+    sourceUrl: payload.sourceUrl,
+    filename: payload.filename,
+    contentType: payload.contentType,
+    prefix: 'housing',
+    entityType,
+    entityId,
+    makeThumbs: b.make_thumbs !== false,
+  });
+  if (!upload.ok) return reply(400, { code: 400, message: upload.error });
+
+  const isCover = b.is_cover ? 1 : 0;
+  let sortOrder = b.sort_order == null || b.sort_order === '' ? null : parseInt(b.sort_order, 10);
+  if (sortOrder == null) {
+    const [next] = await conn.execute(
+      `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?`,
+      [entityType, entityId]
+    );
+    sortOrder = next[0].n;
+  }
+  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+  const [ins] = await conn.execute(
+    'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+    [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
+  );
+  if (entityType === 'project' && isCover) {
+    await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
+  }
+  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [ins.insertId]);
+  return reply(200, {
+    code: 0, message: 'success',
+    storage: upload.storage,
+    file_path: upload.url,
+    thumb_240: upload.thumb_240 || null,
+    thumb_640: upload.thumb_640 || null,
+    bytes: upload.bytes,
+    warned: upload.warned || undefined,
+    photo: photo[0],
+  });
+}
+
 /** 房态批量设置：与 C/B 端同口径（已订晚不可改；open+无夜价=恢复默认价并删差异行） */
 async function housingStayCalendarSet(conn, body, vendorId) {
   const b = body || {};
@@ -973,6 +1060,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/projects/status': housingProjectsStatus,
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
+  '/api/juzhu/housing/vendor/photos/upload': housingPhotosUpload,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
   '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
   '/api/juzhu/housing/vendor/stay-calendar/query': housingStayCalendarQuery,

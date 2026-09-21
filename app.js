@@ -93,6 +93,10 @@ let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 let vendorApi = null;
 try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
+let s3Client = null;
+try { s3Client = require('./s3_client.cjs'); } catch (_) {}
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
 // 商家 HMAC-SHA256 签名（平台 → 商家方向的 urllink / order_detail 用）
 let hmacAuth = null;
 try { hmacAuth = require('./hmac_auth.cjs'); } catch (_) {}
@@ -590,6 +594,8 @@ function isCEndPublicApi(urlPath, method) {
   // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
   if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
   if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
+  // 图片代理读取（对象存储/本地统一出口，公网可读，无 PII）
+  if (m === 'GET' && (p === '/api/juzhu/img' || p === '/api/juzhu/image')) return true;
   if (m !== 'GET') return false;
   const exact = new Set([
     '/api/juzhu/catalog',
@@ -2070,6 +2076,73 @@ async function syncUnitCover(conn, unitId) {
   }
 }
 
+// ===== 房源图片：上传载荷解析 + 落库（对象存储/本地统一，见 img_storage.cjs）=====
+/** 解析上传载荷：data_url / base64 / source_url 三选一 */
+function decodeImagePayload(body) {
+  const b = body || {};
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(b.data_url || b.dataUrl || '').trim());
+  if (m) return { contentType: m[1], buffer: Buffer.from(m[2], 'base64'), filename: b.filename || '' };
+  const raw = b.base64 || b.image_base64
+    || (typeof b.image === 'string' && b.image && !/^https?:\/\//i.test(b.image) ? b.image : null);
+  if (raw) {
+    const s = String(raw).trim().replace(/^data:[^,]+,/, '');
+    return { contentType: b.content_type || b.contentType || '', buffer: Buffer.from(s, 'base64'), filename: b.filename || '' };
+  }
+  const src = b.source_url || b.sourceUrl || b.url;
+  if (src) return { sourceUrl: String(src).trim(), filename: b.filename || '', contentType: b.content_type || '' };
+  return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+}
+
+/** 解析图片归属实体（unit / project / spot / district） */
+function photoEntityOf(body) {
+  const b = body || {};
+  const pick = (v) => (v != null && v !== '' ? parseInt(v, 10) : null);
+  if (pick(b.unit_id)) return { entityType: 'unit', entityId: pick(b.unit_id) };
+  if (pick(b.project_id)) return { entityType: 'project', entityId: pick(b.project_id) };
+  if (pick(b.spot_id)) return { entityType: 'spot', entityId: pick(b.spot_id) };
+  if (pick(b.district_id)) return { entityType: 'district', entityId: pick(b.district_id) };
+  if (b.entity_type && pick(b.entity_id)) return { entityType: String(b.entity_type), entityId: pick(b.entity_id) };
+  return null;
+}
+
+/** 校验实体存在（防脏绑定）；返回错误文案或 null */
+async function assertPhotoEntity(conn, entityType, entityId) {
+  const tableOf = { unit: 'units', project: 'projects', spot: 'spots', district: 'districts' };
+  const table = tableOf[entityType];
+  if (!table) return `不支持的 entity_type: ${entityType}（可用 unit/project/spot/district）`;
+  const [rows] = await conn.execute(`SELECT id FROM ${table} WHERE id=?`, [entityId]);
+  return rows.length ? null : `${entityType} ${entityId} 不存在`;
+}
+
+/** 落 photos 表：封面互斥 + 同步 cover_image（unit 走 syncUnitCover，project 直写） */
+async function insertPhotoRow(conn, entityType, entityId, upload, body) {
+  const isCover = body && body.is_cover ? 1 : 0;
+  let sortOrder = body && body.sort_order;
+  if (sortOrder == null) {
+    const [r] = await conn.execute(
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+      [entityType, entityId]
+    );
+    sortOrder = r[0].n;
+  }
+  if (isCover) {
+    await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+  }
+  await conn.execute(
+    'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+    [entityType, entityId, upload.url,
+      (body && body.source_path) || upload.key || null, isCover, sortOrder]
+  );
+  const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+  const photoId = r[0].id;
+  if (entityType === 'unit') await syncUnitCover(conn, entityId);
+  if (entityType === 'project' && isCover) {
+    await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, entityId]);
+  }
+  const [rows] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
+  return rows[0];
+}
+
 // Node.js 直连 MySQL 实现全部管理接口（Python 不可用时 fallback）
 async function handleApiDirect(urlPath, qs, req, res) {
   try {
@@ -2118,6 +2191,24 @@ async function handleApiDirect(urlPath, qs, req, res) {
           ip: wp.ip, ua: wp.ua,
         });
       }
+    }
+
+    // ===== 图片读取（对象存储/本地统一出口，公网可读）=====
+    // 放在 ensureSchema() 之前：读图不依赖数据库，DB 抖动时图片仍可服务
+    if ((urlPath === '/api/juzhu/img' || urlPath === '/api/juzhu/image') && req.method === 'GET') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const qp = new URLSearchParams(qs);
+      const p = (qp.get('p') || qp.get('key') || qp.get('path') || '').trim();
+      if (!p || p.length > 600) return jsonReply(res, { error: 'p 必填（≤600 字符）' }, 400);
+      const got = await imgStorage.readImage(p);
+      if (!got.ok) return jsonReply(res, { error: got.error }, got.status === 404 ? 404 : 502);
+      res.writeHead(200, {
+        'Content-Type': got.contentType,
+        'Content-Length': got.buffer.length,
+        'Cache-Control': 'public, max-age=86400, immutable',
+        'Access-Control-Allow-Origin': '*',
+      });
+      return res.end(got.buffer);
     }
 
     await ensureSchema();
@@ -3673,6 +3764,96 @@ async function handleApiDirect(urlPath, qs, req, res) {
           await conn.end();
         }
       }
+    }
+
+    // ===== 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传 / 读取代理 / 自检 =====
+    // 统一入口：已配置 S3_* 走对象存储，否则自动回落 assets/uploads（口径见 img_storage.cjs）
+    if ((urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload') && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const ct = String(req.headers['content-type'] || '');
+      if (ct.includes('multipart/form-data')) {
+        return jsonReply(res, { error: 'multipart 不支持：请改用 base64 / data_url，或先调 /photos/presign 由前端直传对象存储' }, 415);
+      }
+      const body = await readBody(req);
+      const payload = decodeImagePayload(body);
+      if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+      const entity = photoEntityOf(body);
+      const t0 = Date.now();
+      const upload = await imgStorage.uploadImage({
+        buffer: payload.buffer,
+        sourceUrl: payload.sourceUrl,
+        filename: payload.filename,
+        contentType: payload.contentType,
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        makeThumbs: body.make_thumbs !== false,
+      });
+      if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+      if (body.save === false || !entity) {
+        return jsonReply(res, { ok: true, upload, saved: false, elapsed_ms: Date.now() - t0 }, 201);
+      }
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const bad = await assertPhotoEntity(conn, entity.entityType, entity.entityId);
+        if (bad) return jsonReply(res, { error: bad, upload }, 400);
+        const photo = await insertPhotoRow(conn, entity.entityType, entity.entityId, upload, body);
+        await conn.commit();
+        console.log(`[img] upload ok storage=${upload.storage} key=${upload.key} → ${entity.entityType}#${entity.entityId} ${upload.bytes}B ${Date.now() - t0}ms`);
+        return jsonReply(res, { ok: true, upload, photo, saved: true, elapsed_ms: Date.now() - t0 }, 201);
+      } catch (e) {
+        return jsonReply(res, { error: '落库失败: ' + String(e && e.message || e), upload }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // POST /api/juzhu/admin/photos/presign —— 预签名直传（大图/批量前端直传对象存储，不经服务端中转）
+    if (urlPath === '/api/juzhu/admin/photos/presign' && req.method === 'POST') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      if (!s3Client.isConfigured()) {
+        return jsonReply(res, { error: 'S3 未配置（S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET）', mode: 'local' }, 503);
+      }
+      const body = await readBody(req);
+      const entity = photoEntityOf(body);
+      const ext = String(body.ext || 'jpg').replace(/^\./, '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp'].indexOf(ext) < 0) return jsonReply(res, { error: 'ext 仅支持 jpg/jpeg/png/webp' }, 400);
+      const key = imgStorage.keyFor({
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        ext,
+      });
+      const contentType = body.content_type || ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+      const p = s3Client.presign(key, { method: 'PUT', expires: body.expires, contentType });
+      return jsonReply(res, Object.assign({ ok: true, key, public_url: s3Client.publicUrl(key), content_type: contentType,
+        note: '前端直接 PUT 该 url（需带 Content-Type 头），完成后把 public_url 交给 /photos/add 或 /photos/upload?save=false 落库' }, p));
+    }
+
+    // GET /api/juzhu/admin/storage/status?probe=1 —— 对象存储自检（运维/联调用）
+    if (urlPath === '/api/juzhu/admin/storage/status' && req.method === 'GET') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      const c = s3Client.config();
+      const out = {
+        mode: imgStorage.storageMode(),
+        configured: s3Client.isConfigured(),
+        bucket: c.bucket,
+        endpoint: c.endpoint,
+        file_endpoint: c.fileEndpoint,
+        sign_version: c.signVersion,
+        region: c.region,
+        addressing: c.addressing,
+        file_style: c.fileStyle,
+        key_prefix: c.keyPrefix,
+        max_bytes: imgStorage.maxBytes(),
+        thumb_rewrite: String(process.env.S3_THUMB_REWRITE == null ? '1' : process.env.S3_THUMB_REWRITE) !== '0',
+        sample_public_url: c.bucket ? s3Client.publicUrl('housing/sample.jpg') : '',
+      };
+      if (new URLSearchParams(qs).get('probe') === '1' && s3Client.isConfigured()) {
+        const key = new URLSearchParams(qs).get('key') || '';
+        out.probe = await s3Client.detectSignVersion(key);
+      }
+      return jsonReply(res, out);
     }
 
     // POST /admin/export（Serverless 无持久文件系统，跳过写文件，返回 ok）
