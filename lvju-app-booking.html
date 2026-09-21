@@ -71,7 +71,7 @@
 
     <div id="loginGate" class="gate" style="display:none;">
       <div class="gt">🔒 预订需要先登录</div>
-      <div class="gs">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
+      <div class="gs" id="gSub">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
       <input id="gPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
       <input id="gPwd" placeholder="密码（≥8位，首登自动注册）" type="password" />
       <div id="gErr" style="font-size:11px;color:#991b1b;margin-bottom:8px;display:none;"></div>
@@ -150,9 +150,11 @@
     <a class="btn" id="bSubmit" style="cursor:pointer;">提交订单</a>
   </div>
 </div>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js"></script>
 <script>
 /* 预订下单（需登录）：GET /api/auth/me 判断登录态 →
-   未登录：显示登录门（贝壳 SDK 默认，探测失败切密码 JIT）；
+   未登录：贝壳 App 跳转 clogin / 原生登录页；非 App 密码 JIT；
    已登录：联系人簿（booking_contacts）+ 账号资料预填 → POST /api/juzhu/booking 落库，
    订单自动归属登录用户（user_id）。 */
 (function(){
@@ -174,26 +176,42 @@
   function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
   function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
   function sdkProbe(){
-    return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
+    return window.JsBridgeV3 || window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
   }
 
   /* ── 登录门 ── */
-  function showGate(){
+  function paintGate(msg){
     document.getElementById('loginGate').style.display = 'block';
     document.getElementById('formBox').style.display = 'none';
     document.getElementById('cBar').style.display = 'none';
-    // 贝壳 SDK 默认登录（App 环境）
-    var sdk = sdkProbe();
-    if (sdk && typeof sdk.getUserInfo === 'function') {
-      Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
-        var i = info && info.data ? info.data : info;
-        if (i && (i.uid || i.userId || i.id) && (i.phone || i.mobile)) {
-          return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
-            .then(function(r){ return r.json(); })
-            .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){} boot(); } });
+    var sub = document.getElementById('gSub');
+    if (sub && msg) sub.textContent = msg;
+  }
+  function showGate(){
+    paintGate('默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）');
+    if (window.BZF_BEIKE_LOGIN) {
+      BZF_BEIKE_LOGIN.ensureAppLogin({
+        onReady: function(){ boot(); },
+        onNeedPassword: function(){
+          var inApp = BZF_BEIKE_LOGIN.isBeikeApp();
+          paintGate(inApp
+            ? '未从贝壳 App 取到登录态，请完成登录后返回；也可使用密码登录（首次输入即自动注册）'
+            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）');
         }
-      }).catch(function(){ /* SDK 失败 → 保持密码门 */ });
+      });
+    } else {
+      var sdk = sdkProbe();
+      if (sdk && typeof sdk.getUserInfo === 'function') {
+        Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
+          var i = info && info.data ? info.data : info;
+          if (i && (i.uid || i.userId || i.id) && (i.phone || i.mobile)) {
+            return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
+              .then(function(r){ return r.json(); })
+              .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){} boot(); } });
+          }
+        }).catch(function(){ /* SDK 失败 → 保持密码门 */ });
+      }
     }
     document.getElementById('gGo').onclick = function(){
       var ph = document.getElementById('gPhone').value.trim(), pw = document.getElementById('gPwd').value;

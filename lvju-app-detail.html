@@ -318,6 +318,8 @@
   </div>
 </div>
 <script src="screens/_qr.js"></script>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js"></script>
 <script>
 /* 周边玩法 · 杂志区块渲染（规则 17）：数据来自 GET /api/juzhu/projects/:id 的 spots
    （项目绑定的维度地点，服务端已按 景区→商圈→美食→咖啡 + 绑定排序）。第 1 条 = 封面故事大卡，
@@ -914,9 +916,12 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     sheet.classList.remove('open'); sheet.setAttribute('aria-hidden', 'true');
   }
   function goBooking(){
-    location.href = 'lvju-app-booking.html?id=' + live.projectId +
+    var next = 'lvju-app-booking.html?id=' + live.projectId +
       (selUnit ? '&unit=' + selUnit : '') +
       (ci && co ? '&checkin=' + iso(ci) + '&checkout=' + iso(co) : '');
+    // 贝壳 App 未登录 → 跳转登录页，回跳到下单页；非 App / 已登录直接去下单
+    if (window.BZF_BEIKE_LOGIN) { BZF_BEIKE_LOGIN.gateThenGo(next); return; }
+    location.href = next;
   }
 
   datebar.addEventListener('click', openCal);
