@@ -2592,7 +2592,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
                   COALESCE(SUM(COALESCE(p.managed_unit_count, p.unit_count)), 0) AS unit_count
            FROM jz_vendors v
            LEFT JOIN projects p ON p.owner_vendor_id = v.id AND p.channel IN ('rental','minsu')${cityJoin.sql}
-           WHERE v.type IN ('platform','housing_operator','lvju_host')
+           WHERE v.type IN ('platform','housing_operator','lvju_host','homestay')
            GROUP BY v.id, v.name, v.type ORDER BY project_count DESC, v.id`,
           cityJoin.params
         );
@@ -5680,7 +5680,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const operators = await queryRows(
         `SELECT v.id, v.name, v.type, COUNT(p.id) project_count
          FROM jz_vendors v LEFT JOIN projects p ON p.owner_vendor_id = v.id${citySql.sql}
-         WHERE v.type IN ('platform','housing_operator','lvju_host')
+         WHERE v.type IN ('platform','housing_operator','lvju_host','homestay')
          GROUP BY v.id, v.name, v.type ORDER BY project_count DESC LIMIT 20`,
         citySql.params
       );
