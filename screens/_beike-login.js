@@ -18,6 +18,7 @@
   'use strict';
   var TOKEN_KEY = 'BJZ_TOKEN';
   var JUMP_KEY = 'bzf_beike_login_jumped';
+  var NEXT_KEY = 'bzf_beike_login_next';
 
   function token() {
     try { return (localStorage.getItem(TOKEN_KEY) || '').trim(); } catch (e) { return ''; }
@@ -170,12 +171,24 @@
     try { sessionStorage.setItem(JUMP_KEY, String(Date.now())); } catch (e) {}
   }
 
+  function saveNext(url) {
+    try { sessionStorage.setItem(NEXT_KEY, absUrl(url)); } catch (e) {}
+  }
+
+  function samePage(a, b) {
+    function bare(u) {
+      try { var x = new URL(absUrl(u)); x.hash = ''; return x.href; } catch (e) { return absUrl(u); }
+    }
+    return bare(a) === bare(b);
+  }
+
   function jumpToLogin(returnUrl) {
     if (!isBeikeApp()) return false;
-    var back = absUrl(returnUrl || location.href);
+    if (returnUrl) saveNext(returnUrl);
+    // 回跳必须是当前页：把目标页传给 actionLogin 会先打开「我的/订单」，取消登录也会停在那里
+    var back = location.href;
     markJumped();
     initBridge();
-    // 与 Morph Login.toLogin({ env:'app' }) 对齐：优先 $ljBridge.actionLogin
     morphAppLogin(back).then(function (ok) {
       if (ok) return;
       var url = nativeLoginUrl(back);
@@ -188,7 +201,23 @@
     return true;
   }
 
-  /* 详情页「订」：App 未登录先跳登录（回跳到下单页）；已登录/非 App 直接去 nextUrl */
+  function resumeAfterLogin() {
+    var next = '';
+    try { next = sessionStorage.getItem(NEXT_KEY) || ''; } catch (e) {}
+    if (!next || samePage(next, location.href)) return;
+    if (token()) {
+      try { sessionStorage.removeItem(NEXT_KEY); } catch (e) {}
+      location.href = next;
+      return;
+    }
+    var app = appUserInfo();
+    if (pickUser(app)) {
+      try { sessionStorage.removeItem(NEXT_KEY); } catch (e) {}
+      exchange(app).then(function () { location.href = next; });
+    }
+  }
+
+  /* 详情页「订」/ tab「订单·我的」：未登录只唤起登录，成功后再去目标页；取消留在当前页 */
   function gateThenGo(nextUrl) {
     var next = absUrl(nextUrl);
     if (token()) { location.href = next; return; }
@@ -197,7 +226,10 @@
       exchange(app).then(function () { location.href = next; });
       return;
     }
-    if (isBeikeApp() && !jumpedRecently()) { jumpToLogin(next); return; }
+    if (isBeikeApp()) {
+      jumpToLogin(next);
+      return;
+    }
     location.href = next;
   }
 
@@ -245,8 +277,16 @@
       gateThenGo(href);
     }, true);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindAuthTabs);
-  else bindAuthTabs();
+  function bootLoginResume() {
+    bindAuthTabs();
+    resumeAfterLogin();
+    w.addEventListener('pageshow', resumeAfterLogin);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.visibilityState || document.visibilityState === 'visible') resumeAfterLogin();
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootLoginResume);
+  else bootLoginResume();
 
   w.BZF_BEIKE_LOGIN = {
     TOKEN_KEY: TOKEN_KEY,
