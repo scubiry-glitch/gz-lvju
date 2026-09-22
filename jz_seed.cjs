@@ -271,8 +271,8 @@ async function seedAll(conn) {
     for (const v of JZ_VENDORS) {
       await conn.execute(
         `INSERT INTO jz_vendors(id,type,name,logo,address,rating,review_count,rank_type,rank_label,
-          badges,live,start_price,unit,hours,status,sort_order,created_at,updated_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?)`,
+          badges,live,start_price,unit,hours,status,review_status,sort_order,created_at,updated_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','approved',?,?,?)`,
         [v.id,v.type,v.name,v.logo,v.address,v.rating,v.review_count,v.rank_type,v.rank_label,
          jd(v.badges),v.live,v.start_price,v.unit,v.hours,v.sort_order,now,now]
       );

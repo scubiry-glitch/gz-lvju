@@ -13,7 +13,8 @@
       "audit.read",
       "rating.review",
       "vendor.fund.write",
-      "vendor.onboarding.review"
+      "vendor.onboarding.review",
+      "vendor.review"
     ]
   },
   "holding_viewer": {
@@ -34,6 +35,7 @@
       "org.write",
       "vendor.fund.write",
       "vendor.onboarding.review",
+      "vendor.review",
       "worker.manage"
     ]
   },
