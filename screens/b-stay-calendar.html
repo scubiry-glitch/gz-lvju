@@ -89,9 +89,9 @@
     </div>
 
     <div class="note" id="note">
-      房态日历 = 逐晚库存：<b>可订 / 关房 / 已订</b> 三态 + 夜价覆盖；无差异行即默认「可订」（仅对已开通项目生效）。
-      <b>按晚预订</b>为项目级开关（projects.ext.stay_bookable）：未开通项目 C 端仅 400 电话咨询，开通后才支持日历选房 + 在线下单（缺省关闭）。
-      C 端详情日历实时读本页数据；<b>已订</b> 由客户订单自动占用（取消自动释放），商家只能改「关房 / 开房 / 夜价」。
+      房态日历 = 逐晚库存（多间口径）：<b>总间数</b>（房型级，admin/开放接口可配）− <b>已订</b>（订单自动占用，取消自动释放）= <b>剩余</b>；
+      商家可按晚设「<b>放出间数</b>」覆盖总间数、关房、夜价；无差异行即默认「可订 · 放出 = 总间数」（仅对已开通项目生效）。
+      <b>在线预订 / 在线支付</b>为房源级独立能力（projects.ext），不与民宿/长租品类绑定，且至少开启一项。
       旅居口径<b>连住 15 晚起</b>（可按项目调整），下单时 C/B/服务端三处同口径校验。
     </div>
 
@@ -115,8 +115,8 @@
           <div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载中…</div>
         </div>
         <div class="legend">
-          <span><i style="background:#fff;border:1px solid var(--border);"></i>可订（默认）</span>
-          <span><i style="background:#fdecec;"></i>已订 · 订单占用</span>
+          <span><i style="background:#fff;border:1px solid var(--border);"></i>可订（剩 X / 放出 N 间）</span>
+          <span><i style="background:#fdecec;"></i>已订满 · 订单占用</span>
           <span><i style="background:#f1f5f4;"></i>关房（商家）</span>
           <span><i style="background:#fafafa;"></i>已过</span>
         </div>
@@ -124,8 +124,8 @@
 
       <div>
         <div class="card" style="margin-bottom:14px;">
-          <h3>批量设置房态 / 夜价</h3>
-          <div class="sub">关房 = 不对 C 端可订；开房并填夜价 = 覆盖默认价；开房不填价 = 恢复默认价</div>
+          <h3>批量设置房态 / 夜价 / 放出间数</h3>
+          <div class="sub">关房 = 不对 C 端可订（已订晚不可关）；夜价 / 放出间数按晚覆盖（留空 = 恢复默认：价回默认、放出 = 总间数）</div>
           <div class="frow"><label>起</label><input type="date" id="bFrom" /> <label>止</label><input type="date" id="bTo" /></div>
           <div class="frow">
             <label>动作</label>
@@ -134,6 +134,7 @@
               <option value="open">开房</option>
             </select>
             <input type="number" id="bPrice" placeholder="夜价覆盖（元/晚）" min="0" style="width:150px;" />
+            <input type="number" id="bQty" placeholder="放出间数（≤总间数）" min="1" max="999" style="width:150px;" />
           </div>
           <div class="frow">
             <button class="btn btn-primary" id="bApply">应用到所选日期</button>
@@ -142,10 +143,12 @@
         </div>
 
         <div class="card">
-          <h3>按晚预订 / 入住规则与保障</h3>
+          <h3>交易方式 / 入住规则与保障</h3>
           <div class="sub">随项目下发 C 端详情页与下单校验（projects.ext，规则 15 不加列）</div>
-          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="cBook" />
-            <span><b>🟢 按晚预订（日历选房 + 在线下单）</b><small>开通后 C 端展示价格日历并支持在线下单；关闭 = 仅 400 电话咨询。缺省关闭，开通即 C 端即时生效</small></span></label>
+          <label class="chk" style="margin-bottom:8px;"><input type="checkbox" id="cBooking" />
+            <span><b>📅 在线预订</b><small>客户在线选房并提交订单，商家确认后线下收款</small></span></label>
+          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="cPayment" />
+            <span><b>💳 在线支付</b><small>客户在线选房后进入收银台，支付完成再由商家确认；两项可同时开启</small></span></label>
           <div class="frow">
             <label>最短连住</label>
             <input type="number" id="cMin" min="1" max="365" style="width:90px;" />
@@ -166,12 +169,19 @@
         </div>
 
         <div class="card" style="margin-top:14px;">
-          <h3>取消政策（房型级）</h3>
-          <div class="sub">免费取消窗口 = 入住日往前推 N 天的截止时刻；窗口外 / 未开通一律不可取消不可退（units.ext.cancel_policy，规则 15 不加列）</div>
+          <h3>入住规则（房型级）</h3>
+          <div class="sub">最短连住与免费取消政策都按房型配置（units.ext，规则 15 不加列）；取消窗口 = 入住日往前推 N 天的截止时刻，窗口外 / 未开通一律不可取消不可退</div>
           <div class="frow">
             <label>房型</label>
             <select id="xUnit" style="max-width:170px;"></select>
           </div>
+          <div class="frow">
+            <label>最短连住</label>
+            <input type="number" id="xMin" min="1" max="365" style="width:90px;" placeholder="留空 = 用频道默认" />
+            <span style="color:var(--muted);font-size:11.5px;">晚（户型级 &gt; 房源级 &gt; 频道默认，见上「最短连住」行）</span>
+          </div>
+          <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="xClosed" />
+            <span><b>🔒 默认关房</b><small>开启后<strong>只有推过放出间数的晚才可订</strong>，没推过的晚一律不可订——多渠道商家防超售（缺省关闭 = 现状）</small></span></label>
           <label class="chk" style="margin-bottom:10px;"><input type="checkbox" id="xOn" />
             <span><b>🕒 开通「入住前免费取消」</b><small>开通后客户可在截止时刻前免费取消（已支付原路退回，房态自动释放）；关闭 = 预订成功后不可取消。缺省关闭</small></span></label>
           <div class="frow">
@@ -271,7 +281,7 @@
     var fu = $('fUnit');
     var us = state.units.filter(function(u){ return u.project_id === state.pid; });
     fu.innerHTML = '<option value="">整栋 / 不限房型</option>' + us.map(function(u){
-      return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'</option>';
+      return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'（'+(parseInt(u.total_qty,10)||1)+' 间）</option>';
     }).join('');
     state.unitId = 0;
   }
@@ -279,18 +289,22 @@
   function loadConfig(){
     var p = currentProject();
     state.cfg = {
-      min_stay_nights: p ? (p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15)) : 15,
+      min_stay_nights: p ? (p.min_stay_nights || 15) : 15,
       insurance: (p && p.insurance) || [],
-      bookable: !!(p && p.bookable),
+      online_booking: !!(p && p.online_booking),
+      online_payment: !!(p && p.online_payment),
     };
+    $('cMin').min = p && p.channel === 'minsu' ? 15 : 1;
     $('cMin').value = state.cfg.min_stay_nights;
     Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
       c.checked = state.cfg.insurance.indexOf(c.value) >= 0;
       c.disabled = !state.writable;
     });
     $('cMin').disabled = !state.writable;
-    $('cBook').checked = state.cfg.bookable;
-    $('cBook').disabled = !state.writable;
+    $('cBooking').checked = state.cfg.online_booking;
+    $('cPayment').checked = state.cfg.online_payment;
+    $('cBooking').disabled = !state.writable;
+    $('cPayment').disabled = !state.writable;
   }
 
   /* ── 月历 ── */
@@ -316,19 +330,24 @@
       var p = currentProject();
       var unitName = state.unitId ? ($('fUnit').selectedOptions[0] || {}).textContent : '整栋 / 不限房型';
       $('calSub').textContent = (p ? p.name : '') + ' · ' + unitName +
-        ' · ' + (p && p.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
+        ' · ' + [p && p.online_booking ? '在线预订' : '', p && p.online_payment ? '在线支付' : ''].filter(Boolean).join(' + ') +
         ' · 最短连住 ' + (j.min_stay_nights || state.cfg.min_stay_nights) + ' 晚 · 保障 ' +
         ((j.insurance_types || []).map(function(t){ return t.short; }).join('/') || '未配置');
-      var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订', ''], past: ['—', ''] };
+      var ST = { open: ['可订', ''], blocked: ['关房', ''], booked: ['已订满', ''], past: ['—', ''] };
       var html = ['日','一','二','三','四','五','六'].map(function(w){ return '<div class="wk">'+w+'</div>'; }).join('');
       var first = new Date(parseInt(state.month.slice(0,4), 10), parseInt(state.month.slice(5,7), 10) - 1, 1);
       for (var i = 0; i < first.getDay(); i++) html += '<div class="cell blank"></div>';
       days.forEach(function(d){
         var st = ST[d.status] ? d.status : 'open';
+        // 多间库存：放出 >1 间时展示「剩 X / 放出 N」；单间房型保持原三态文案
+        var multi = (parseInt(d.qty, 10) || 1) > 1;
+        var stText = ST[st][0];
+        if (st === 'open') stText = multi ? '剩 ' + (d.remaining || 0) + '/' + d.qty + ' 间' : '可订';
+        else if (st === 'booked') stText = multi ? '剩 0/' + d.qty + ' 间' : '已订';
         var cls = 'cell ' + st + (state.writable && (st === 'open' || st === 'blocked') ? ' writable' : '');
         html += '<div class="' + cls + '" data-date="' + d.date + '" data-status="' + st + '">' +
           '<div class="dn">' + parseInt(d.date.slice(8,10), 10) + '</div>' +
-          '<span class="st">' + ST[st][0] + '</span>' +
+          '<span class="st">' + stText + '</span>' +
           (d.price ? '<div class="pr">¥' + fmt(d.price) + '</div>' : '') +
           '</div>';
       });
@@ -350,11 +369,16 @@
     });
   }
 
-  function setStay(dates, status, price){
+  function setStay(dates, status, price, qty){
     return fetch(API + '/vendor/stay-calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: state.pid, unit_id: state.unitId || null, dates: dates, status: status, price_night: price }) })
+      body: JSON.stringify({ project_id: state.pid, unit_id: state.unitId || null, dates: dates, status: status, price_night: price, qty: qty }) })
       .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
-      .then(function(j){ toast('已' + (status === 'blocked' ? '关房' : '开放') + ' ' + j.dates + ' 晚' + (price != null ? ' · 夜价 ¥' + fmt(price) : '')); renderCal(); })
+      .then(function(j){
+        toast('已' + (status === 'blocked' ? '关房' : '开放') + ' ' + j.dates + ' 晚' +
+          (price != null ? ' · 夜价 ¥' + fmt(price) : '') +
+          (qty != null ? ' · 放出 ' + qty + ' 间' : ''));
+        renderCal();
+      })
       .catch(function(e){ toast('操作失败：' + e.message); });
   }
 
@@ -371,7 +395,14 @@
     var priceRaw = $('bPrice').value.trim();
     var price = (status === 'open' && priceRaw !== '') ? parseInt(priceRaw, 10) : null;
     if (price != null && !(price >= 0)) { toast('夜价须为非负整数'); return; }
-    setStay(dates, status, price);
+    // 放出间数（多间库存 2026-09-10）：仅房型级 + 开房时可设；留空 = 该字段恢复默认
+    var qty = null;
+    var qtyRaw = $('bQty').value.trim();
+    if (status === 'open' && qtyRaw !== '' && state.unitId) {
+      qty = parseInt(qtyRaw, 10);
+      if (!(qty >= 1 && qty <= 999)) { toast('放出间数须为 1-999 的整数'); return; }
+    }
+    setStay(dates, status, price, qty);
   };
 
   /* ── 规则与保障 ── */
@@ -382,16 +413,20 @@
     Array.prototype.forEach.call($('cIns').querySelectorAll('input[type=checkbox]'), function(c){
       if (c.checked) ins.push(c.value);
     });
+    var onlineBooking = $('cBooking').checked, onlinePayment = $('cPayment').checked;
+    if (!onlineBooking && !onlinePayment) { toast('在线预订与在线支付至少须开启一项'); return; }
     fetch(API + '/vendor/projects/' + state.pid, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins, stay_bookable: $('cBook').checked }) })
+      body: JSON.stringify({ min_stay_nights: parseInt($('cMin').value, 10) || null, insurance: ins,
+        online_booking: onlineBooking, online_payment: onlinePayment }) })
       .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
       .then(function(j){
-        toast('已保存 · ' + (j.project.bookable ? '🟢 在线预订 + 400' : '⚪ 仅 400 电话咨询') +
+        toast('已保存 · ' + [j.project.online_booking ? '在线预订' : '', j.project.online_payment ? '在线支付' : ''].filter(Boolean).join(' + ') +
           ' · 连住 ' + j.project.min_stay_nights + ' 晚 / 保障 ' + (j.project.insurance || []).length + ' 项');
         var p = currentProject();
         if (p) {
           p.min_stay_nights = j.project.min_stay_nights; p.insurance = j.project.insurance;
           p.insurance_types = j.project.insurance_types; p.bookable = j.project.bookable;
+          p.online_booking = j.project.online_booking; p.online_payment = j.project.online_payment;
         }
         renderCal();
       })
@@ -422,6 +457,15 @@
   }
   function loadCancelCard(){
     var u = cancelUnitById(parseInt($('xUnit').value, 10) || 0);
+    // 最短连住（2026-09 下放户型）：只有户型级显式配置过才预填，否则留空 = 保持继承
+    // （min_stay_nights_source 由服务端下发，避免把继承值静默固化成户型级配置）
+    var src = u && u.min_stay_nights_source;
+    $('xMin').value = (src === 'unit' && u.min_stay_nights) ? String(u.min_stay_nights) : '';
+    $('xMin').placeholder = '留空 = 用' + (src === 'project' ? '房源默认' : '频道默认') + '（' + ((u && u.min_stay_nights) || 15) + ' 晚）';
+    $('xMin').disabled = !state.writable;
+    var ux = {}; try { ux = (u && typeof u.ext === 'string') ? JSON.parse(u.ext) : ((u && u.ext) || {}); } catch (_) { ux = {}; }
+    $('xClosed').checked = ux.default_closed === true;
+    $('xClosed').disabled = !state.writable;
     var p = (u && u.cancel_policy) || { enabled: false, days_before: 1, cutoff_time: '18:00' };
     var days = String(p.days_before == null ? 1 : p.days_before);
     if (!$('xDays').querySelector('option[value="' + days + '"]')) {
@@ -448,18 +492,28 @@
     var t = $('xTime').value || '';
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) { toast('截止时刻须为 HH:mm'); return; }
     var policy = { enabled: $('xOn').checked, days_before: parseInt($('xDays').value, 10) || 0, cutoff_time: t };
+    // 最短连住（2026-09 下放户型）：留空 = 清除户型级配置、回落房源级；与服务端同口径校验
+    var minRaw = ($('xMin').value || '').trim();
+    var minNights = minRaw === '' ? null : parseInt(minRaw, 10);
+    if (minNights !== null && !(minNights >= 1 && minNights <= 365)) { toast('最短连住须为 1-365 的整数（留空 = 用房源默认）'); return; }
     if (!unitIds.length) { toast('本房源暂无房型'); return; }
     Promise.all(unitIds.map(function(id){
       return fetch(API + '/vendor/units/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cancel_policy: policy }) })
+        body: JSON.stringify({ cancel_policy: policy, min_stay_nights: minNights, default_closed: $('xClosed').checked }) })
         .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); });
-    })).then(function(){
-      unitIds.forEach(function(id){
-        var u = cancelUnitById(id);
-        if (u) { u.cancel_policy = policy; u.cancel_policy_text = cancelPreview(policy); }
+    })).then(function(outs){
+      // 以服务端回显为准（生效值 + 来源），本地不做二次推断
+      outs.forEach(function(j){
+        var x = j && j.unit;
+        if (!x) return;
+        var u = cancelUnitById(x.id);
+        if (!u) return;
+        u.cancel_policy = x.cancel_policy; u.cancel_policy_text = x.cancel_policy_text;
+        u.min_stay_nights = x.min_stay_nights; u.min_stay_nights_source = x.min_stay_nights_source;
       });
       loadCancelCard();
-      toast('已保存 ' + unitIds.length + ' 个房型 · ' + cancelPreview(policy));
+      toast('已保存 ' + unitIds.length + ' 个房型 · ' + cancelPreview(policy) + ' · 连住 ' + (minNights === null ? '用默认' : minNights + ' 晚')
+        + ($('xClosed').checked ? ' · 默认关房已开' : ''));
     }).catch(function(e){ toast('保存失败：' + e.message); });
   }
   $('xSave').onclick = function(){ saveCancelPolicy([parseInt($('xUnit').value, 10) || 0]); };

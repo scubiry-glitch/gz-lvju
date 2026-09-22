@@ -1,0 +1,11 @@
+{
+  "at": "2026-09-20T01:28:32.475Z",
+  "removed": 273,
+  "by_kind": {
+    "merchants": 9,
+    "rules": 9,
+    "stores": 57,
+    "skus": 9,
+    "packages": 1
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "base_commit": "a7d6447",
+  "branch": "plan/newliving-coupons-membership-v1.9",
+  "scope": "working-tree runtime and test files",
+  "files": [
+    {
+      "file": "app.js",
+      "sha256": "26267ea2e9c70a55749f73bbedf0f455aa99520573de0970001389b6c6fd0e13"
+    },
+    {
+      "file": "commerce/domain.cjs",
+      "sha256": "2ce25c67a0dc5c1ae32fb4980bf8fa28feeeca5b97361859892b8f18c222cd58"
+    },
+    {
+      "file": "commerce/server.cjs",
+      "sha256": "98e16a4bab9d2300a372206ed9cfa96ebbee8931e7ff4e222718bcf7605f08d7"
+    },
+    {
+      "file": "deploy/commerce/nginx-location.conf",
+      "sha256": "c0054a83889a5e3b69c8c04bd08e316c39e3beae7a75a578a07ee173a5b2d828"
+    },
+    {
+      "file": "deploy/commerce/sy-commerce-preview.service",
+      "sha256": "1f8eea6ba55ada42afb923a68d0f46acb467b78141204865d62aeaf920a77b53"
+    },
+    {
+      "file": "index.html",
+      "sha256": "5f0a66c86ae3eba6b1417914d741fcdd34d360de459348d78f677bf410446870"
+    },
+    {
+      "file": "juzhu-commerce.html",
+      "sha256": "370f94476cf567ad70d76af61494c7ded2d494187abf5157f7eca71571f80b74"
+    },
+    {
+      "file": "juzhu-promoter.html",
+      "sha256": "3c52f1ea9ec2de2abf03d4aa458ffce614c26052680748a4ba823af3299db628"
+    },
+    {
+      "file": "overview.html",
+      "sha256": "e3f0b71b3add4524ca12bdf819a6609b028e43ba7974b36c5e2646b90b59e06a"
+    },
+    {
+      "file": "package.json",
+      "sha256": "6f6e5a0aa88cb6268e6819afc88029cc15097b3b4217578d6d908537d34cff72"
+    },
+    {
+      "file": "screens/_commerce-api.js",
+      "sha256": "e56b5eabb4c60d7c334e74904a8b8bb090e9f87306bebc9175d58e2fb954a65e"
+    },
+    {
+      "file": "screens/_commerce-entry.js",
+      "sha256": "c0a4763a815ffd930f2219eb35bec11d4d825fae4c26054aaf595a370c826bf4"
+    },
+    {
+      "file": "screens/_commerce-ui.js",
+      "sha256": "53ea5dd53055e3edbe4f62ca99aa0f8c5db6e33c20dcf5445746a162d9b5b0fa"
+    },
+    {
+      "file": "screens/_commerce.css",
+      "sha256": "59a8740cc0eac33f8aaa3aa9bf6444a69080b983d91b63d920433ed2bab2382c"
+    },
+    {
+      "file": "screens/_nav.js",
+      "sha256": "a225bdc51293da520bda18565ea9f9537f5a3a0d1273ab29516e2f9dedfc0fed"
+    },
+    {
+      "file": "screens/commerce-admin.html",
+      "sha256": "b69fe96b05a097211edd390035eb674b8cf04551515af52bbaacfd72fb54e82a"
+    },
+    {
+      "file": "screens/commerce-merchant.html",
+      "sha256": "7a1cd367aa0a0a58d0793937d05a4fc17238123d57b95a06a39e6771caac41a8"
+    },
+    {
+      "file": "scripts/commerce/browser.cjs",
+      "sha256": "c88283bb6afac196fbb64a71eefe09cb0672b96fab206263c1c8657852d18646"
+    },
+    {
+      "file": "scripts/commerce/domain.test.cjs",
+      "sha256": "21e21851ef59cd6d80ea4603b5ae5c20e215e64b59d92bcb53e0ddd8bda8fc4a"
+    },
+    {
+      "file": "scripts/commerce/http.test.cjs",
+      "sha256": "f57dbb121664862dec9bb15b3f4d7f982d5d709b74d14988b389d4329ddc523c"
+    },
+    {
+      "file": "scripts/commerce/install-preview.cjs",
+      "sha256": "e0eb9c6adc10a6a343ab1d4be7e34710e3424aceda987005162501785216cee2"
+    },
+    {
+      "file": "scripts/commerce/public-smoke.cjs",
+      "sha256": "0fac635a0d7bca9ec84b119d7bb4fc818a6b6fadb93ac9ca4d5867ffeb932675"
+    },
+    {
+      "file": "scripts/commerce/verify.cjs",
+      "sha256": "a6bda7d01fde1d7927fad7a76626dbd860da493f97b77b2976b582363b928b14"
+    },
+    {
+      "file": "test_static_guard.js",
+      "sha256": "5d5f2f9b75fba85401bd5fc84e7d28c7be15e54c4d978126b272121736ce0590"
+    }
+  ],
+  "updated_at": "2026-09-19T11:58:37.991Z"
+}

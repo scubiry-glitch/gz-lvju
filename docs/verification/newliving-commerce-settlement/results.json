@@ -1,0 +1,82 @@
+{
+  "at": "2026-09-20T00:34:39.195Z",
+  "database": "isolated temporary MySQL database (removed)",
+  "scenarios": [
+    {
+      "name": "SC1 部分核销：双券包只核销一张，仅核销部分确认应结与佣金，重复生成不重复入账",
+      "passed": true
+    },
+    {
+      "name": "SC2 复核与执行：申请审批分离、异常冻结阻断执行、明细可追溯规则版本",
+      "passed": true
+    },
+    {
+      "name": "SC3 回执幂等：重复回执不重复入账，paid 后 failed 冲突被拒，批次自动完成",
+      "passed": true
+    },
+    {
+      "name": "SC4 失败重试：明确失败可控重试（沿用原指令号），达上限后拒绝",
+      "passed": true
+    },
+    {
+      "name": "SC5 超时未知：UNKNOWN 只能查原指令，查实成功后无重复付款",
+      "passed": true
+    },
+    {
+      "name": "SC6 部分退款：未核销券原路退回，与核销互斥，订单仍守恒",
+      "passed": true
+    },
+    {
+      "name": "SC7 到期退款：到期自动进入退款通道并执行原路退回",
+      "passed": true
+    },
+    {
+      "name": "SC8 跨账期 + 已结算后冲回：撤销已结算核销产生追偿，下期抵扣/人工追回，同券可重新履约",
+      "passed": true
+    },
+    {
+      "name": "SC12 会员续购顺延：有效期内续费从原到期日叠加，无会员从当下起算",
+      "passed": true
+    },
+    {
+      "name": "SC13 先行赔付闭环：已核销服务失败→受理→建单→独立复核→过账并挂应收代偿",
+      "passed": true
+    },
+    {
+      "name": "SC9 对账闭环：平台指令与机构账单逐笔核对，差异有责任人/处理记录/关闭依据",
+      "passed": true
+    },
+    {
+      "name": "SC10 金额守恒不变量全绿（I1–I7）",
+      "passed": true
+    },
+    {
+      "name": "SC11 结算接口权限闸与四端可查",
+      "passed": true
+    },
+    {
+      "name": "Browser settlement admin page renders overview, batches and instructions",
+      "passed": true
+    },
+    {
+      "name": "Browser reviewer sees approval actions but cannot generate or execute",
+      "passed": true
+    },
+    {
+      "name": "Browser refunds page builds from case and executes",
+      "passed": true
+    },
+    {
+      "name": "Browser merchant settlement view shows payable and received",
+      "passed": true
+    },
+    {
+      "name": "Browser consumer sees refund progress and promoter sees settlement",
+      "passed": true
+    },
+    {
+      "name": "Browser new pages responsive with no overflow and no JS errors",
+      "passed": true
+    }
+  ]
+}

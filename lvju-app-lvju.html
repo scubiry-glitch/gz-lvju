@@ -6,6 +6,8 @@
 <link rel="icon" href="data:,">
 <title>旅居 · 短住·候鸟·康养 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   /* 入住时间段（连续区间 · 连住 15 晚起） */
   .staybar{margin:10px 16px 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;}
@@ -55,7 +57,7 @@
     <div class="appbar ghost">
       <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
       <div class="ttl">旅居<small>短住 · 候鸟 · 康养</small></div>
-      <div class="act"><a href="lvju-app-map.html">🗺</a><span>♡</span><span>⤴</span></div>
+      <div class="act"><a href="lvju-app-map.html" hidden data-deferred>🗺</a><span>♡</span><span>⤴</span></div>
     </div>
 
     <div class="hero-sm">
@@ -63,7 +65,7 @@
       <div class="in">
         <div class="ek">Travel Living</div>
         <h1>把日子<br>过成一场旅行</h1>
-        <p>旅居星级旅居房源，短住、候鸟过冬、康养度假，配旅居管家服务</p>
+        <p><span data-lvju-feature="caibei">旅居星级旅居房源</span><span data-lvju-feature-off="caibei">精选旅居房源</span>，短住、候鸟过冬、康养度假，配旅居管家服务</p>
         <div class="stat">
           <div><b>2,400+</b><span>在营旅居</span></div>
           <div><b>9</b><span>市州覆盖</span></div>
@@ -106,7 +108,7 @@
       <div style="grid-column:1/-1;text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
     </div>
 
-    <div class="banner gold">
+    <div class="banner gold" data-lvju-feature="caibei stayProtection">
       <span class="bi">★</span>
       <div class="bt"><b>什么是旅居星级旅居？</b><p>5 维评定 + 公安/住建/保险验真，扫码可查</p></div>
       <a class="go" href="lvju-rating-standard.html">看标准 ›</a>
@@ -147,8 +149,11 @@
   function short(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
   function nights(){ return (ci&&co) ? Math.round((co-ci)/864e5) : 0; }
   function perNight(p){
+    // 单夜价取服务端展示价（2026-09：旅居按晚 = 最低可售单夜价，已是单夜口径），页面不再自行 /30 折算
+    var pd = window.LVJU_PRICE ? LVJU_PRICE.parts(p) : null;
+    if (pd && pd.unit === 'night' && pd.value != null) return pd.value;
     var v = p.price_from || 0;
-    return v ? Math.max(1, Math.round(v/30)) : 0;   // rental 口径：月租（起价）/30 折算夜价
+    return v ? Math.max(1, Math.round(v/30)) : 0;   // 兜底：月租（起价）/30 折算夜价
   }
 
   /* ---------- 房源卡（读 catalog 缓存） ---------- */
@@ -185,25 +190,23 @@
     document.getElementById('sortNote').textContent = '共 ' + projects.length + ' 套在营';
     var n = nights();
     wrap.innerHTML = projects.map(function(p){
-      var units = umap[p.id] || [];
-      var price = p.price_from;
-      if (price == null && units.length) {
-        price = Math.min.apply(null, units.map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; }));
-      }
+      var pd = LVJU_PRICE.parts(p);   // 展示价三件套（服务端下发，2026-09）
       var pn = perNight(p);
       var r = p.rating || {};
       var star = (p.rating_status === 'passed' && r.stars)
-        ? '<span class="star">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
+        ? '<span class="star" data-lvju-feature="caibei">★ ' + r.stars + '.' + (r.score ? String(r.score).slice(-1) : '0') + ' 旅居</span>' : '';
       var dd = dmap[p.district_id];
       var loc = (dd && p.address && p.address.indexOf(dd.name) === 0) ? p.address : [dd ? dd.name : '', p.address || ''].filter(Boolean).join(' · ');
       var tags = (p.tags || []).filter(function(t){ return t !== '保租房'; }).slice(0, 3);
-      var ins = (p.insurance_types || []).map(function(t){ return '<span>' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('');
+      var ins = (p.insurance_types || []).map(function(t){ return '<span data-lvju-feature="stayProtection">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('');
       var img = p.cover_image
         ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
         : '<div class="img s-xijiang">';
       var priceHtml;
       if (n >= MIN_NIGHTS && pn) priceHtml = '<b>¥' + fmt(pn * n) + '<small>/ ' + n + ' 晚</small></b>';
-      else priceHtml = '<b>' + (price != null ? '¥' + fmt(price) + '<small>/月起</small>' : '价格面议') + '</b>';
+      else priceHtml = '<b>' + (pd.value != null
+        ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>'
+        : pd.note) + '</b>';
       var favs = []; try { favs = JSON.parse(localStorage.getItem('bzf_fav') || '[]'); } catch (_) {}
       var liked = favs.indexOf(String(p.id)) >= 0 || favs.indexOf(Number(p.id)) >= 0;
       return '<a class="mcard" data-project-id="' + p.id + '" href="lvju-app-detail.html?id=' + p.id + (n ? '&checkin=' + iso(ci) + (co ? '&checkout=' + iso(co) : '') : '') + '">' +

@@ -137,7 +137,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   }
   function renderPhone(p){ document.getElementById('dPhone').textContent = p; }
 
-  var token = ''; try { token = localStorage.getItem('BJZ_TOKEN') || ''; } catch(e) {}
+  var token = ''; try { token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e) {}
   if (token) {
     fetch('/api/juzhu/booking/my', { headers: { 'Authorization': 'Bearer ' + token } })
       .then(function(r){ return r.json(); })

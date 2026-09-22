@@ -133,11 +133,22 @@
 
   <main id="main"></main>
 
+  <section class="report-group" data-group="user" id="commerce-hub" style="margin-bottom:40px;padding:16px;background:rgba(15,118,110,0.04);border-radius:14px;">
+    <div class="rg-head" style="background:linear-gradient(135deg,#0f766e,#0d9488)"><div><div class="rg-label">新居住 · 券包与会员</div><div class="rg-desc">权益业务中心 · 商户、商品、券包、会员及履约管理；购买暂未开放。</div></div><div class="rg-count">四端核心流程</div></div>
+    <div class="pages-grid" style="margin-top:14px;">
+      <a class="page-card" href="juzhu-commerce.html"><span class="name">生活权益 · 用户端<span class="file">单品券 / 券包 / 会员 / 主站订单与售后</span></span></a>
+      <a class="page-card" href="juzhu-vouchers.html?city=贵阳"><span class="name">单品券与详情<span class="file">独立详情页 / 演示购买</span></span></a>
+      <a class="page-card" href="juzhu-hotels.html?city=贵阳"><span class="name">酒店通兑名录<span class="file">档位酒店名录 / 同档任选</span></span></a>
+      <a class="page-card" href="juzhu-promoter.html"><span class="name">权益推广 · 推广端<span class="file">分享 / 佣金 / 测试提现</span></span></a>
+      <a class="page-card" href="screens/commerce-merchant.html"><span class="name">商户工作台<span class="file">商户资料 / 门店人员 / 券商品 / 预约核销</span></span></a>
+      <a class="page-card" href="screens/commerce-admin.html"><span class="name">管理工作台<span class="file">经营概览 / 配置审核 / 库存 / 履约 / 售后</span></span></a><a class="page-card" href="screens/commerce-demo-accounts.html"><span class="name">演示账号<span class="file">四端演示登录 / 一条龙演示路径（仅 sytest）</span></span></a>
+    </div>
+  <div class="page-list"><a class="page-card" href="screens/commerce-admin-merchants.html"><span class="name">商户管理<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-stores.html"><span class="name">门店管理<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-staff.html"><span class="name">核销人员<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-skus.html"><span class="name">券商品<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-rules.html"><span class="name">报价与分配规则<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-packages.html"><span class="name">券包配置<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-plans.html"><span class="name">会员方案<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-inventory.html"><span class="name">库存管理<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-capacity.html"><span class="name">预约产能<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-orders.html"><span class="name">订单与发放<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-appointments.html"><span class="name">预约管理<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-redemptions.html"><span class="name">核销记录<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-cases.html"><span class="name">售后工单<span class="file">权益运营中心</span></span></a><a class="page-card" href="screens/commerce-admin-audit.html"><span class="name">操作审计<span class="file">权益运营中心</span></span></a></div><div class="page-list"><a class="page-card" href="screens/commerce-admin-coupons.html"><span class="name">卡券发放</span></a><a class="page-card" href="screens/commerce-admin-memberships.html"><span class="name">会员记录</span></a><a class="page-card" href="screens/commerce-admin-exchanges.html"><span class="name">兑换码管理<span class="file">批量发码 / 停用 / 兑换记录</span></span></a><a class="page-card" href="screens/commerce-admin-stats.html"><span class="name">运营统计<span class="file">发放 / 预约 / 核销 / 兑换 / 售后 / 失败记录</span></span></a><a class="page-card" href="screens/commerce-admin-settlement.html"><span class="name">结算账单<span class="file">批次复核 / 执行 / 回执 / 沙箱机构</span></span></a><a class="page-card" href="screens/commerce-admin-refunds.html"><span class="name">退款执行<span class="file">原路退回指令 / 失败重试 / 查单</span></span></a><a class="page-card" href="screens/commerce-admin-reconciliation.html"><span class="name">对账中心<span class="file">逐笔核对 / 差异处理 / 误核销撤销 / 追偿</span></span></a></div></section>
   <section class="report-group" data-group="user" id="juzhu-hub" style="margin-bottom:40px;padding:16px;background:rgba(15,118,110,0.04);border-radius:14px;">
     <div class="rg-head" style="background:linear-gradient(135deg, #0f766e 0%, #0d9488 100%);">
       <div>
         <div class="rg-label">🏠 新居住频道 · 家政服务（API 驱动）</div>
-        <div class="rg-desc">C 端下单 → 收银台 → P 中台派单 → B 看板 → S 接单 → 评价回流 · 数据走 <code>screens/_jzapi.js</code></div>
+        <div class="rg-desc">C 端下单 → 收银台 → P 中台派单 → B 看板 → S 接单 → 评价回流 · 数据走 <code>screens/_jzapi.js?v=7</code></div>
       </div>
       <div class="rg-count">本地生活 11 频道 · 前后端分离</div>
     </div>
@@ -170,6 +181,7 @@
       <a class="page-card" href="screens/b-dispatch-board.html"><span class="name">B · 派单看板<span class="file">screens/b-dispatch-board.html</span></span></a>
       <a class="page-card" href="juzhu-admin.html"><span class="name">内容编辑后台<span class="file">juzhu-admin.html</span></span></a>
       <a class="page-card" href="screens/account-center.html"><span class="name">账号中心 · IAM<span class="file">screens/account-center.html</span></span></a>
+      <a class="page-card" href="screens/demo-accounts.html"><span class="name">P · 演示账号速查<span class="file">screens/demo-accounts.html</span></span></a>
     </div>
   </section>
 

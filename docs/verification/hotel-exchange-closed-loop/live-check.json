@@ -1,0 +1,110 @@
+{
+  "at": "2026-09-20T01:38:52.151Z",
+  "origin": "http://127.0.0.1:38780 (Host: sytest.meizu.life)",
+  "checks": [
+    {
+      "name": "Public directory lists 48 sampled hotels across 6 tiers",
+      "ok": true,
+      "detail": "80元档:8 100元档:8 120元档:8 160元档:8 180元档:8 200元档:8"
+    },
+    {
+      "name": "Directory exposes public fields only",
+      "ok": true,
+      "detail": "城市便捷禹州大禹像胖东来店"
+    },
+    {
+      "name": "Catalog carries 6 exchange SKUs and online voucher with redeem channel",
+      "ok": true,
+      "detail": "80元档/100元档/120元档/160元档/180元档/200元档"
+    },
+    {
+      "name": "Cross-category package bundles exchange, ticket and dining vouchers",
+      "ok": true,
+      "detail": "本地生活 · 酒店通兑体验包（演示）"
+    },
+    {
+      "name": "Consumer demo account signs in through the account centre",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Exchange coupon issued with tier metadata",
+      "ok": true,
+      "detail": "25f1d04a-30b4-4ab6-8384-7e900f586874"
+    },
+    {
+      "name": "Coupon books a chosen same-tier hotel",
+      "ok": true,
+      "detail": "hotel=城市精选贵阳高铁东站店"
+    },
+    {
+      "name": "Cancelling the booking frees the hotel slot",
+      "ok": true,
+      "detail": "\"\""
+    },
+    {
+      "name": "Coupon re-books another same-tier hotel after cancel",
+      "ok": true,
+      "detail": "rebooked to 城市便捷禹州大禹像胖东来店 · "
+    },
+    {
+      "name": "Cross-tier booking is rejected with tier_mismatch",
+      "ok": true,
+      "detail": "请选择同档位试点名单内的酒店"
+    },
+    {
+      "name": "Online coupon cannot book an appointment",
+      "ok": true,
+      "detail": "线上核销券无需预约，直接出示动态码"
+    },
+    {
+      "name": "Online coupon issues redemption code without appointment",
+      "ok": true,
+      "detail": "120s dynamic code"
+    },
+    {
+      "name": "Hotel directory renders tier chips and roster cards",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Shop category filter surfaces exchange vouchers with tier tag",
+      "ok": true,
+      "detail": "FOR EVERYDAY LIVING\n好服务，随心选\n\n从一张券开始，照顾生活的小需要。\n\n单品券\n生活券包\n搜索\n服"
+    },
+    {
+      "name": "Exchange product detail renders with roster entry and usage steps",
+      "ok": true,
+      "detail": "sku #71"
+    },
+    {
+      "name": "Coupon detail shows tier and hotel-booking entry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Booking dialog lists same-tier hotels",
+      "ok": true,
+      "detail": "8 hotels in picker"
+    },
+    {
+      "name": "Admin SKU form switches store picker to online counter for online channel",
+      "ok": true,
+      "detail": "线上服务台（本商户）： 请选择 线上服务台（演示，虚拟门店） · #141（线上"
+    },
+    {
+      "name": "Admin SKU form filters stores to the tier anchor for exchange",
+      "ok": true,
+      "detail": "9 anchor options"
+    },
+    {
+      "name": "No page script errors during browser walk",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "booking": {
+    "coupon": "25f1d04a-30b4-4ab6-8384-7e900f586874",
+    "hotel": "城市便捷禹州大禹像胖东来店"
+  }
+}

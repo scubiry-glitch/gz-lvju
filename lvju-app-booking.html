@@ -6,6 +6,8 @@
 <link rel="icon" href="data:,">
 <title>预定下单 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   .bfield{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:#fff;}
   .bfield .l{font-size:13px;color:var(--muted);flex-shrink:0;}
@@ -41,6 +43,8 @@
   .nlist .nrow .d{color:var(--muted);}
   .nlist .nrow .p{font-family:var(--serif);color:var(--gold-deep);font-weight:700;}
   .nlist .nrow .p.hi{color:#b45309;}
+  .preview-note{display:none;margin:12px 18px 0;padding:10px 13px;border:1px solid #f59e0b;border-radius:10px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.5;}
+  #txRow:target{outline:2px solid #f59e0b;outline-offset:-2px;background:#fffbeb;}
 </style>
 </head>
 <body>
@@ -81,12 +85,13 @@
     <div id="noBook" style="display:none;background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px 18px;text-align:center;">
       <div style="font-size:34px;">📞</div>
       <div style="font-weight:700;margin:8px 0 4px;"><span class="nb-name"></span> · 仅支持电话咨询</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.7;">该项目未开通在线预订，咨询与签约请拨打房源电话<br>（虚拟号专线保护，双方真实号码均不外泄）</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;">该项目暂未配置在线预订或在线支付，咨询与签约请拨打房源电话<br>（虚拟号专线保护，双方真实号码均不外泄）</div>
       <button class="sv" id="nbCall" style="margin-top:14px;width:100%;">📞 拨打咨询电话</button>
       <a href="javascript:history.back()" style="display:block;margin-top:10px;font-size:12px;color:var(--muted);">← 返回上页</a>
     </div>
 
     <div id="formBox">
+      <div class="preview-note" id="previewNote">模拟预览：可切换交易方式查看流程，当前页面不会生成真实订单。</div>
       <div class="minihouse">
         <div class="th s-xijiang" id="bThumb"></div>
         <div class="mi">
@@ -111,6 +116,12 @@
         <div class="bfield" style="border-bottom:0;padding-top:0;padding-bottom:9px;"><span class="l" style="flex:1;font-size:11.5px;color:var(--muted);" id="cpNote">🕒 退改规则加载中…</span></div>
         <div class="bfield"><span class="l">房型</span>
           <select id="fUnit" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"></select>
+        </div>
+        <div class="bfield" id="roomsRow" style="display:none;"><span class="l">间数</span>
+          <select id="fRooms" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"><option value="1">1 间</option></select>
+        </div>
+        <div class="bfield" id="txRow"><span class="l">交易方式</span>
+          <select id="fTx" style="border:0;outline:0;font-size:13px;text-align:right;background:transparent;color:var(--ink);"></select>
         </div>
       </div>
 
@@ -140,7 +151,7 @@
       <div id="bErr" class="err"></div>
 
       <div style="font-size:11px;color:var(--muted);padding:14px 18px 18px;line-height:1.6;">
-        提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，商家确认后订单生效；联系人保存后下次自动带出，手机号仅用于订单联络，不会完整展示给他人。
+        <span id="txAgreement">提交即同意《旅居预订与退改协议》。</span>商家确认后订单生效；联系人保存后下次自动带出，手机号仅用于订单联络，不会完整展示给他人。
       </div>
     </div>
   </div>
@@ -159,13 +170,28 @@
    订单自动归属登录用户（user_id）。 */
 (function(){
   var q = new URLSearchParams(location.search);
+  var IS_PREVIEW = q.get('preview') === '1';
   // 城市提示（兜底带房用）：URL ?city= > localStorage bzf_jz_city（首页切换器写入）> 默认贵阳
   var CITY = q.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || 'guiyang';
   var err = document.getElementById('bErr');
   var unitSel = document.getElementById('fUnit');
+  var roomsSel = document.getElementById('fRooms');
   var perNight = 0;
   var curId = 0;
-  var curChannel = '';
+  var txSel = document.getElementById('fTx');
+
+  function renderSteps(){
+    var paid = txSel.value === 'payment';
+    var sb = document.getElementById('stepsBar');
+    if (sb) sb.innerHTML = paid
+      ? '<span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span><span class="st"><span class="n">2</span>在线支付</span><span class="sep">›</span><span class="st"><span class="n">3</span>商家确认</span><span class="sep">›</span><span class="st"><span class="n">4</span>完成</span>'
+      : '<span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span><span class="st"><span class="n">2</span>商家确认</span><span class="sep">›</span><span class="st"><span class="n">3</span>线下收款</span>';
+    var ag = document.getElementById('txAgreement');
+    if (ag) ag.innerHTML = paid
+      ? '提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，支付后待商家确认。'
+      : '提交即同意《旅居预订与退改协议》。本单在线预订，商家确认后线下收款。';
+  }
+  txSel.addEventListener('change', renderSteps);
   var me = null;          // { phone, display_name, id }
   var contacts = [];      // 联系人簿
 
@@ -173,7 +199,7 @@
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
   function sdkProbe(){
     return window.JsBridgeV3 || window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
@@ -208,7 +234,7 @@
             return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
               body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
               .then(function(r){ return r.json(); })
-              .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); } catch(e){} boot(); } });
+              .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); localStorage.setItem('BZF_SESSION_TOKEN', j.token); } catch(e){} boot(); } });
           }
         }).catch(function(){ /* SDK 失败 → 保持密码门 */ });
       }
@@ -222,7 +248,7 @@
         .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
         .then(function(res){
           if (!res.ok) { eEl.textContent = res.j.error || '登录失败'; eEl.style.display = 'block'; return; }
-          try { localStorage.setItem('BJZ_TOKEN', res.j.token); } catch(e){}
+          try { localStorage.setItem('BJZ_TOKEN', res.j.token); localStorage.setItem('BZF_SESSION_TOKEN', res.j.token); } catch(e){}
           boot();
         }).catch(function(){ eEl.textContent = '网络异常'; eEl.style.display = 'block'; });
     };
@@ -270,7 +296,8 @@
   }
 
   /* ── 房源 + 价格（总价按商家逐晚实价合计，与详情页日历同口径）── */
-  var minNights = 15;     // 旅居口径连住下限（随项目下发，服务端同口径兜底）
+  var minNights = 15;     // 当前生效连住下限（未选房型 = 整栋单口径，选房型后随该房型；服务端同口径兜底）
+  var wholeMinNights = 15;   // 整栋单（不限房型）连住下限，切换房型后可回退
   var unitCp = {};        // 房型id -> 退改口径文案（units 接口随 cancel_policy 下发，前端不自行拼口径）
   var WK = ['日','一','二','三','四','五','六'];
   var nightCache = {};    // monthKey -> {date:day}（选中户型）
@@ -289,29 +316,60 @@
     var mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     var m = nightCache[mk];
     var inf = m ? (m[iso(d)] || null) : null;
-    return { price: (inf && inf.price) ? inf.price : perNight, booked: !!(inf && (inf.status === 'booked' || inf.status === 'blocked')) };
+    return { price: (inf && inf.price) ? inf.price : perNight,
+      booked: !!(inf && (inf.status === 'booked' || inf.status === 'blocked' || (inf.remaining != null && inf.remaining <= 0))) };
+  }
+  // 间数（多间库存 2026-09-10）：上限 = 房型总间数与选段内最小剩余的较小者；整栋单（不限房型）恒 1 间
+  function curUnitQty(){
+    var o = unitSel.options[unitSel.selectedIndex];
+    return o && o.dataset && o.dataset.qty ? (parseInt(o.dataset.qty, 10) || 1) : 1;
+  }
+  function minRemaining(){
+    var r = rangeNights();
+    if (!r.n) return null;
+    var min = null;
+    r.list.forEach(function(d){
+      var mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      var m = nightCache[mk];
+      var inf = m ? (m[iso(d)] || null) : null;
+      if (inf && inf.remaining != null) min = (min == null) ? inf.remaining : Math.min(min, inf.remaining);
+    });
+    return min;
+  }
+  function refreshRooms(){
+    var qty = curUnitQty();
+    var min = minRemaining();
+    var max = Math.max(1, Math.min(qty, min == null ? qty : Math.max(min, 1)));
+    var cur = parseInt(roomsSel.value, 10) || 1;
+    var html = '';
+    for (var i = 1; i <= max; i++) html += '<option value="' + i + '">' + i + ' 间</option>';
+    roomsSel.innerHTML = html;
+    roomsSel.value = String(Math.min(cur, max));
+    document.getElementById('roomsRow').style.display = unitSel.value ? '' : 'none';
   }
   function calc(){
     var r = rangeNights();
     var n = r.n;
+    var rooms = parseInt(roomsSel.value, 10) || 1;
     var short_ = (n >= 1 && n < minNights);
     var sum = 0, est = false;
     r.list.forEach(function(d){ var dp = dayPriceAt(d); if (!dp.price) est = true; sum += dp.price || perNight || 0; });
+    sum = sum * rooms;                                 // 多间库存：单间逐晚合计 × 间数（服务端同口径）
     var ok = (n >= minNights);
     var ciV0 = document.getElementById('fIn').value, coV0 = document.getElementById('fOut').value;
     document.getElementById('pLine').textContent = ok
-      ? ('房费 ' + mds(new Date(ciV0 + 'T00:00:00')) + ' – ' + mds(new Date(coV0 + 'T00:00:00')) + ' · ' + n + ' 晚')
-      : ('房费 ¥' + fmt(perNight) + ' × ' + (n > 0 ? n : '—') + ' 晚');
+      ? ('房费 ' + mds(new Date(ciV0 + 'T00:00:00')) + ' – ' + mds(new Date(coV0 + 'T00:00:00')) + ' · ' + n + ' 晚' + (rooms > 1 ? ' × ' + rooms + ' 间' : ''))
+      : ('房费 ¥' + fmt(perNight) + ' × ' + (n > 0 ? n : '—') + ' 晚' + (rooms > 1 ? ' × ' + rooms + ' 间' : ''));
     var totTxt = (ok && sum) ? '¥' + fmt(sum) : '—';
     document.getElementById('pTotal').textContent = totTxt;
     document.getElementById('pSum').textContent = totTxt;
     document.getElementById('pNote').textContent = est ? '按晚均价估算 · 逐晚实价加载中' : '与详情页日历实价同口径';
     document.querySelector('#cTotal b').textContent = totTxt;
     document.querySelector('#cTotal span').textContent =
-      short_ ? '连住不足 ' + minNights + ' 晚' : (n >= 1 ? '共 ' + n + ' 晚' : '待选日期');
+      short_ ? '连住不足 ' + minNights + ' 晚' : (n >= 1 ? '共 ' + n + ' 晚' + (rooms > 1 ? ' · ' + rooms + ' 间' : '') : '待选日期');
     var note = document.getElementById('stayNote');
     if (short_) note.textContent = '⚠ 该房源须连续入住 ≥ ' + minNights + ' 晚，当前 ' + n + ' 晚';
-    else note.textContent = '总价按商家逐晚实价合计 · 连住 ' + minNights + ' 晚起';
+    else note.textContent = '总价按商家逐晚实价合计 × 间数 · 连住 ' + minNights + ' 晚起';
     renderConfirm();
   }
   // 确认条（只读日期 + 修改回详情日历）
@@ -346,8 +404,9 @@
       var box = document.getElementById('nightList');
       box.innerHTML = r.list.map(function(d){
         var dp = dayPriceAt(d);
-        return '<div class="nrow"><span class="d">' + mds(d) + ' 周' + WK[d.getDay()] + (dp.booked ? ' · 已订' : '') + '</span><span class="p' + (dp.booked ? ' hi' : '') + '">¥' + fmt(dp.price || perNight) + '</span></div>';
+        return '<div class="nrow"><span class="d">' + mds(d) + ' 周' + WK[d.getDay()] + (dp.booked ? ' · 已订满' : '') + '</span><span class="p' + (dp.booked ? ' hi' : '') + '">¥' + fmt(dp.price || perNight) + '</span></div>';
       }).join('');
+      refreshRooms();   // 逐晚剩余到位后收敛间数上限（多间库存 2026-09-10）
       calc();
     });
   }
@@ -359,8 +418,7 @@
       fetch('/api/juzhu/projects/' + pid + '/units').then(function(r){ if (!r.ok) { var er2 = new Error(String(r.status)); er2.status = r.status; throw er2; } return r.json(); })
     ]).then(function(rs){
       var p = rs[0] || {}, units = (rs[1] || {}).units || [];
-      curChannel = p.channel || '';
-      // 未开通「按晚预订」（口径 2026-09-05）→ 仅电话咨询，不出预订表单（服务端同样拒绝兜底）
+      // 无可用交易能力时降级为电话咨询，不出下单表单（服务端同样拒绝兜底）。
       if (p.bookable === false) {
         document.getElementById('formBox').style.display = 'none';
         var cb = document.getElementById('cBar'); if (cb) cb.style.display = 'none';
@@ -380,23 +438,31 @@
         });
         return;
       }
-      // 步骤条按频道：minsu 预付口径含支付步骤（rental 保持 3 步确认制）
-      var sb = document.getElementById('stepsBar');
-      if (sb && curChannel === 'minsu') sb.innerHTML =
-        '<span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span>' +
-        '<span class="st"><span class="n">2</span>在线支付</span><span class="sep">›</span>' +
-        '<span class="st"><span class="n">3</span>商家确认</span><span class="sep">›</span>' +
-        '<span class="st"><span class="n">4</span>完成</span>';
+      // 交易方式完全按房源能力，不再按频道分流；两项都开时由客户选择。
+      var txOpts = [];
+      if (p.online_booking) txOpts.push('<option value="booking">在线预订 · 商家确认后线下收款</option>');
+      if (p.online_payment) txOpts.push('<option value="payment">在线支付 · 支付后商家确认</option>');
+      txSel.innerHTML = txOpts.join('');
+      var qTx = q.get('transaction_mode');
+      if (qTx === 'booking' || qTx === 'payment') {
+        for (var ti = 0; ti < txSel.options.length; ti++) {
+          if (txSel.options[ti].value === qTx) { txSel.value = qTx; break; }
+        }
+      }
+      renderSteps();
       p.tags = asArr(p.tags);
       document.getElementById('bName').textContent = p.name || '';
       document.getElementById('bMeta').textContent = p.address || '';
       var r = p.rating; if (typeof r === 'string') { try { r = JSON.parse(r); } catch (e) { r = {}; } }
       r = r || {};
-      document.getElementById('bStar').textContent = (p.rating_status === 'passed' && r.stars) ? '★ ' + r.stars + ' 星 · 已评级' : '在架';
+      document.getElementById('bStar').textContent = window.lvjuFeatureEnabled('caibei') && p.rating_status === 'passed' && r.stars
+        ? '★ ' + r.stars + ' 星 · 已评级' : '精选房源';
       if (p.cover_image) document.getElementById('bThumb').style.background = 'url(' + p.cover_image + ') center/cover';
-      perNight = p.price_from || 0;
-      // 最短连住（旅居口径：rental 15 晚起 / minsu 1 晚起，商家可在项目上覆盖）+ 最早可入住日
-      minNights = p.min_stay_nights || (p.channel === 'minsu' ? 1 : 15);
+      // 展示价三件套（服务端下发，2026-09）：整栋单基准 = 起价，缺省回落首个户型默认夜价
+      var pd = LVJU_PRICE.parts(p);
+      perNight = pd.value || 0;
+      // 最短连住：未选房型 = 整栋单口径（服务端按排序最前户型下发）；选房型后随该房型切换
+      minNights = wholeMinNights = p.min_stay_nights || 15;
       var today = new Date(); today.setHours(0,0,0,0);
       var tmin = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
       document.getElementById('fIn').min = tmin;
@@ -406,16 +472,22 @@
         u.tags = asArr(u.tags);
         var ex = {};
         if (typeof u.ext === 'string') { try { ex = JSON.parse(u.ext); } catch (e) { ex = {}; } } else if (u.ext) { ex = u.ext; }
-        var pn;
-        if (p.channel === 'minsu') pn = (ex && ex.price_night) || p.price_from || 0;
-        else pn = u.rent_monthly ? Math.round(u.rent_monthly / 30) : (p.price_from ? Math.round(p.price_from / 30) : 0);
+        // 默认单夜价与最短连住都读服务端下发的生效值（口径单一数据源，2026-09），页面不自行折算
+        var pn = LVJU_PRICE.unitNight(u);
         unitCp[u.id] = u.cancel_policy_text || '';   // 退改口径随 units 下发
-        return '<option value="' + u.id + '" data-per="' + pn + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '</option>';
+        return '<option value="' + u.id + '" data-per="' + pn + '" data-min="' + (parseInt(u.min_stay_nights, 10) || 0)
+          + '" data-qty="' + (parseInt(u.total_qty, 10) || 1) + '">' + esc(u.name) + (u.area_sqm ? ' · ' + fmt(u.area_sqm) + '㎡' : '') + '（' + (parseInt(u.total_qty, 10) || 1) + ' 间）</option>';
       }).join('');
       var qUnit = parseInt(q.get('unit') || '', 10);
       if (qUnit) unitSel.value = String(qUnit);
-      if (unitSel.selectedIndex > 0) { var o = unitSel.options[unitSel.selectedIndex]; perNight = +o.dataset.per || perNight; }
+      if (unitSel.selectedIndex > 0) {
+        var o = unitSel.options[unitSel.selectedIndex];
+        perNight = +o.dataset.per || perNight;
+        minNights = parseInt(o.dataset.min, 10) || wholeMinNights;   // 深链带 unit 时同步连住下限
+      }
+      document.getElementById('stayNote').textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
       updateCpNote();
+      refreshRooms();
       var ci = q.get('checkin'), co = q.get('checkout');
       if (ci) document.getElementById('fIn').value = ci;
       if (co) document.getElementById('fOut').value = co;
@@ -446,8 +518,15 @@
   unitSel.addEventListener('change', function(){
     var o = unitSel.options[unitSel.selectedIndex];
     perNight = o && o.dataset && o.dataset.per ? +o.dataset.per : perNight;
+    // 连住下限随房型切换（2026-09 下放户型）：选了房型用房型生效值，不限房型回落整栋单口径
+    var dm = o && o.dataset ? parseInt(o.dataset.min, 10) || 0 : 0;
+    minNights = dm || wholeMinNights;
+    var sn = document.getElementById('stayNote');
+    if (sn) sn.textContent = '旅居房源须连续入住 · 连住 ' + minNights + ' 晚起';
     nightCache = {}; nightLoaded = '';                 // 房态/夜价按户型隔离
+    roomsSel.value = '1';                              // 换房型间数回 1，再按新房型总间数重建
     updateCpNote();
+    refreshRooms();
     calc();
     if (document.getElementById('nightList').style.display !== 'none') loadNightDetail();
   });
@@ -459,6 +538,7 @@
     if (open) loadNightDetail();
   });
   document.getElementById('cSave').addEventListener('click', function(){
+    if (IS_PREVIEW) { showErr('当前为模拟预览，不能保存联系人'); return; }
     var nm = document.getElementById('cName').value.trim(), ph = document.getElementById('cPhone').value.trim();
     if (!nm || !/^1\d{10}$/.test(ph)) { showErr('联系人姓名与 11 位手机号为必填'); return; }
     fetch('/api/juzhu/booking/contacts', { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
@@ -477,6 +557,7 @@
   document.getElementById('bSubmit').addEventListener('click', function(){
     var submitBtn = document.getElementById('bSubmit');
     err.style.display = 'none';
+    if (IS_PREVIEW) { showErr('当前为模拟预览，不会提交真实订单'); return; }
     if (!curId) { showErr('房源未加载，请稍后再试'); return; }
     var ciV = document.getElementById('fIn').value, coV = document.getElementById('fOut').value;
     var nV = (ciV && coV) ? Math.round((new Date(coV) - new Date(ciV)) / 864e5) : 0;
@@ -484,10 +565,12 @@
     var body = {
       project_id: curId,
       unit_id: unitSel.value ? parseInt(unitSel.value, 10) : null,
+      rooms: parseInt(roomsSel.value, 10) || 1,          // 多间库存 2026-09-10（整栋单服务端强制 1）
       checkin: document.getElementById('fIn').value,
       checkout: document.getElementById('fOut').value,
       contact_name: document.getElementById('fName').value.trim(),
       contact_phone: document.getElementById('fPhone').value.trim(),
+      transaction_mode: txSel.value,
       idempotency_key: 'lvju-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
     };
     submitBtn.disabled = true; submitBtn.style.opacity = '.55';
@@ -500,10 +583,10 @@
         document.getElementById('okNo').textContent = res.j.order_no;
         document.getElementById('okCp').textContent = res.j.cancel_policy_text
           ? '🕒 ' + res.j.cancel_policy_text + (res.j.cancel_deadline ? '（截止 ' + res.j.cancel_deadline + '）' : '') : '';
-        // 民宿（minsu）为预付口径：提交成功后引导收银台支付；长租（rental）预订单走商家确认
+        // 是否进入收银台以订单 pay_status 为准，不按房源频道判断。
         var payBtn = document.getElementById('okPay');
         if (payBtn) {
-          if (curChannel === 'minsu') {
+          if (res.j.pay_status === 'unpaid') {
             payBtn.href = 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(res.j.order_no) +
               '&phone=' + encodeURIComponent(body.contact_phone) + '&price=' + encodeURIComponent(res.j.price_total || '');
             payBtn.style.display = 'inline-block';
@@ -522,12 +605,35 @@
   var isRetry = false;
   var qid = parseInt(q.get('id') || '', 10);
   function boot(){
-    document.getElementById('fIn').addEventListener('change', calc);
-    document.getElementById('fOut').addEventListener('change', calc);
+    document.getElementById('fIn').addEventListener('change', function(){ refreshRooms(); calc(); });
+    document.getElementById('fOut').addEventListener('change', function(){ refreshRooms(); calc(); });
+    roomsSel.addEventListener('change', calc);           // 间数变化 → 合计 × 间数
     document.getElementById('cSel').addEventListener('change', applyContact);
+    if (IS_PREVIEW) {
+      document.getElementById('previewNote').style.display = 'block';
+      document.getElementById('loginGate').style.display = 'none';
+      document.getElementById('formBox').style.display = 'block';
+      document.getElementById('cBar').style.display = 'flex';
+      document.getElementById('cSel').innerHTML = '<option selected>模拟联系人（预览）</option>';
+      document.getElementById('cSel').disabled = true;
+      document.getElementById('fName').value = '模拟联系人';
+      document.getElementById('fName').readOnly = true;
+      document.getElementById('fPhone').value = '138****0000';
+      document.getElementById('fPhone').readOnly = true;
+      document.getElementById('bSubmit').textContent = '模拟预览 · 不提交';
+      document.getElementById('bSubmit').setAttribute('aria-disabled', 'true');
+      if (qid) load(qid);
+      else {
+        fetch('/api/juzhu/catalog?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(cat){
+          var p = (cat.projects || []).filter(function(x){ return x.bookable && x.status !== 'offline'; })[0];
+          if (p) load(p.id); else showErr('暂无可预览房源');
+        }).catch(function(){ showErr('目录服务不可用，请稍后再试'); });
+      }
+      return;
+    }
     checkMe().then(function(acc){
       if (!acc) {
-        // 未登录：指定房源未开通按晚预订 → 直接给「仅电话咨询」引导卡（无需会话）；
+        // 未登录：指定房源无可用交易能力 → 直接给电话咨询引导卡（无需会话）；
         // 可订房源仍先登录（预订单需要会话归属）
         if (!qid) { showGate(); return; }
         fetch('/api/juzhu/projects/' + qid).then(function(r){ return r.json(); }).then(function(p){

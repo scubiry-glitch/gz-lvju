@@ -262,11 +262,11 @@
       </table>
     </div>
 
-    <!-- 家政工单池（新居住频道 · API 实时，SQLite 单一数据源 via _jzapi.js） -->
+    <!-- 家政工单池（新居住频道 · API 实时，SQLite 单一数据源 via _jzapi.js?v=7） -->
     <div class="card" style="margin-top:16px;">
       <div class="card-head">
         <h3>家政工单池 <span style="font-size:11px; color:var(--success); font-weight:600; margin-left:6px;">● 实时</span></h3>
-        <span class="meta">新居住·家政频道 · 数据源：SQLite via _jzapi.js（与上方报修工单分属两条链）</span>
+        <span class="meta">新居住·家政频道 · 数据源：SQLite via _jzapi.js?v=7（与上方报修工单分属两条链）</span>
       </div>
       <div class="pool-head">
         <div class="pool-tab on">待派 <strong id="jzcPending" style="color:var(--danger); margin-left:4px;">0</strong></div>
@@ -295,8 +295,8 @@
   </main>
 </div>
 <script src="_region.js?v=2"></script>
-<!-- 家政工单走 _jzapi.js（SQLite）；报修工单演示走 _orderbus.js（localStorage）。两条链不合并，见 CLAUDE.md 规则 8/9。 -->
-<script src="_jzapi.js"></script>
+<!-- 家政工单走 _jzapi.js?v=7（SQLite）；报修工单演示走 _orderbus.js（localStorage）。两条链不合并，见 CLAUDE.md 规则 8/9。 -->
+<script src="_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;

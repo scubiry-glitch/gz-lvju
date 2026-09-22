@@ -93,7 +93,7 @@
 
   <div class="list" id="cxList">
 
-    <!-- 家政投诉（新居住频道 · API 实时低分工单，SQLite 单一数据源 via _jzapi.js，监管只读） -->
+    <!-- 家政投诉（新居住频道 · API 实时低分工单，SQLite 单一数据源 via _jzapi.js?v=7，监管只读） -->
 
     <div class="card">
       <div class="head">
@@ -215,8 +215,8 @@
   <div id="m-tabbar" data-series="g" data-active="complaint"></div>
 </div>
 <script src="_region.js?v=2"></script>
-<!-- 家政投诉读自 _jzapi.js（SQLite 家政链），非 localStorage；监管只读，不做处置写操作。见 CLAUDE.md 规则 9。 -->
-<script src="_jzapi.js"></script>
+<!-- 家政投诉读自 _jzapi.js?v=7（SQLite 家政链），非 localStorage；监管只读，不做处置写操作。见 CLAUDE.md 规则 9。 -->
+<script src="_jzapi.js?v=7"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;

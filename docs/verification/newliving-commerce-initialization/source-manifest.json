@@ -1,0 +1,50 @@
+{
+  "at": "2026-09-19T13:12:19.900Z",
+  "branch": "plan/newliving-coupons-membership-v1.9",
+  "files": [
+    {
+      "file": "commerce/initialization.cjs",
+      "sha256": "525607a912fd7334a64ba1e4c80c07d401daee775d7c2cd75ac4444e8e5fddef"
+    },
+    {
+      "file": "commerce/service.cjs",
+      "sha256": "eefb11a71e279ebdb1398249b96d6aab7d2608dff19701d48ad08a49ff0efb51"
+    },
+    {
+      "file": "scripts/commerce/initialize-topics.cjs",
+      "sha256": "edac92c1b92a7c3423a75d7db9f4957196bd0697e9ee7cff96e0e6c5d711a816"
+    },
+    {
+      "file": "scripts/commerce/initialization-test.cjs",
+      "sha256": "1ede139b14ec9cc7e8dac07902e26d4b28c1d7165ab48e411238b1c7726faae4"
+    },
+    {
+      "file": "scripts/commerce/m1a-test.cjs",
+      "sha256": "153795d63c2cb23313e08d3edcb03c8a25e543dc927807755a4726ae935d66d6"
+    },
+    {
+      "file": "scripts/commerce/m1a-browser.cjs",
+      "sha256": "f01f9135ff1829246b933df95f141c36ad38de62f16e09bc4fd39ebef006db64"
+    },
+    {
+      "file": "screens/_commerce-management.js",
+      "sha256": "f3809639b3ff3960ec5f2b90daa75be5d223302daf50e45d62a6c36fcf1dc922"
+    },
+    {
+      "file": "screens/_commerce-official.js",
+      "sha256": "081cd7c411990faea664c080cab81eb8c1f45e268d3a6cfd7b7b6e42bc2538df"
+    },
+    {
+      "file": "juzhu-topic.html",
+      "sha256": "affefc74fca81f24422cca531af0102a70fa5b4273e7c5bc624a055848a53f19"
+    },
+    {
+      "file": "index.html",
+      "sha256": "5f0a66c86ae3eba6b1417914d741fcdd34d360de459348d78f677bf410446870"
+    },
+    {
+      "file": "package.json",
+      "sha256": "0b7c249b48625da9d3aa4612c7c636b55c365e076d3a106875de6984657a6671"
+    }
+  ]
+}

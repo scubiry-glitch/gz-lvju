@@ -1,0 +1,25 @@
+{
+  "passed": true,
+  "adapter": "isolated-memory-test",
+  "checks": [
+    "purchase grants five coupons and no earned commission",
+    "appointment, preview, redemption and merchant settlement",
+    "provider reservation, UNKNOWN and original-request query",
+    "unused refund distinct from own-funds compensation and recovery",
+    "test expiry triggers original-source refund",
+    "membership grant retry and independent membership expiry",
+    "invoice/help case acceptance and response",
+    "role switching and other-user empty holdings",
+    "consumer 390px no horizontal overflow",
+    "promoter 390px no horizontal overflow",
+    "merchant 390px no horizontal overflow",
+    "merchant mobile sidebar hidden and header at top",
+    "admin 390px no horizontal overflow",
+    "admin mobile sidebar hidden and header at top",
+    "service unavailable blocks transaction UI",
+    "homepage links commerce while preserving 12 service categories",
+    "shared navigation contains five valid destinations"
+  ],
+  "page_errors": [],
+  "captured_at": "2026-09-19T11:36:06.651Z"
+}

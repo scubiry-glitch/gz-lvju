@@ -56,6 +56,51 @@
 
   // ============ 6 系列定义（单一数据源） ============
   const SERIES = {
+    commerce: {
+      name: '新居住 · 权益工作台', short: '券包与会员 · 业务中心', icon: '券',
+      primary: '#0f766e', primaryDeep: '#0b5d56',
+      user: { avatar: '券', name: '权益业务中心', org: '使用新居住账号与授权范围' },
+      groups: [{name:'业务入口',items:[
+        {id:'consumer',label:'生活权益',href:'../juzhu-commerce.html',icon:'wallet'},
+        {id:'vouchers',label:'选券页 · 用户端',href:'../juzhu-vouchers.html?city=贵阳',icon:'search'},
+        {id:'hotels',label:'酒店通兑名录',href:'../juzhu-hotels.html?city=贵阳',icon:'search'},
+        {id:'promoter',label:'权益推广',href:'../juzhu-promoter.html',icon:'radio'},
+        {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
+        {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},
+        {id:'demo-accounts',label:'演示账号',href:'commerce-demo-accounts.html',icon:'book'},
+      ]},
+      {name:'配置管理',items:[
+        {id:'commerce-merchants',label:'商户管理',href:'commerce-admin-merchants.html',icon:'bank',perms:['commerce.admin.read']},
+        {id:'commerce-stores',label:'门店管理',href:'commerce-admin-stores.html',icon:'home',perms:['commerce.admin.read']},
+        {id:'commerce-staff',label:'核销人员',href:'commerce-admin-staff.html',icon:'user',perms:['commerce.admin.read']},
+        {id:'commerce-skus',label:'券商品',href:'commerce-admin-skus.html',icon:'box',perms:['commerce.admin.read']},
+        {id:'commerce-rules',label:'报价与分配规则',href:'commerce-admin-rules.html',icon:'settings',perms:['commerce.admin.read']},
+        {id:'commerce-packages',label:'券包配置',href:'commerce-admin-packages.html',icon:'layers',perms:['commerce.admin.read']},
+        {id:'commerce-plans',label:'会员方案',href:'commerce-admin-plans.html',icon:'award',perms:['commerce.admin.read']},
+      ]},
+      {name:'履约运营',items:[
+        {id:'commerce-inventory',label:'库存管理',href:'commerce-admin-inventory.html',icon:'list',perms:['commerce.admin.read']},
+        {id:'commerce-capacity',label:'预约产能',href:'commerce-admin-capacity.html',icon:'target',perms:['commerce.admin.read']},
+        {id:'commerce-orders',label:'订单与发放',href:'commerce-admin-orders.html',icon:'file',perms:['commerce.admin.read']},
+        {id:'commerce-appointments',label:'预约管理',href:'commerce-admin-appointments.html',icon:'bell',perms:['commerce.admin.read']},
+        {id:'commerce-redemptions',label:'核销记录',href:'commerce-admin-redemptions.html',icon:'check',perms:['commerce.admin.read']},
+        {id:'commerce-exchanges',label:'兑换码管理',href:'commerce-admin-exchanges.html',icon:'coin',perms:['commerce.admin.read']},
+      ]},
+      {name:'客户与售后',items:[
+        {id:'commerce-coupons',label:'卡券发放',href:'commerce-admin-coupons.html',icon:'wallet',perms:['commerce.admin.read']},
+        {id:'commerce-memberships',label:'会员记录',href:'commerce-admin-memberships.html',icon:'star',perms:['commerce.admin.read']},
+        {id:'commerce-cases',label:'售后工单',href:'commerce-admin-cases.html',icon:'chat',perms:['commerce.admin.read']},
+      ]},
+      {name:'数据与审计',items:[
+        {id:'commerce-stats',label:'运营统计',href:'commerce-admin-stats.html',icon:'pulse',perms:['commerce.admin.read']},
+        {id:'commerce-audit',label:'操作审计',href:'commerce-admin-audit.html',icon:'book',perms:['commerce.admin.read']},
+      ]},
+      {name:'结算与对账',items:[
+        {id:'commerce-settlement',label:'结算账单',href:'commerce-admin-settlement.html',icon:'coin',perms:['commerce.fund.read']},
+        {id:'commerce-refunds',label:'退款执行',href:'commerce-admin-refunds.html',icon:'wallet',perms:['commerce.fund.read']},
+        {id:'commerce-reconciliation',label:'对账中心',href:'commerce-admin-reconciliation.html',icon:'check',perms:['commerce.fund.read']},
+      ]}],
+    },
     // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
     lvju: {
       name: '旅居找房 App（C 端）', short: '旅居 · C 端移动原型', icon: '🏔',
@@ -206,6 +251,7 @@
           { id: 'credit-engine',   label: '信用规则引擎',        href: 'p-credit-engine.html', icon: 'cpu',      badge: '42' },
           { id: 'data-hub',        label: '数据中台',            href: 'p-data-hub.html',      icon: 'plug',     badge: '24/7' },
           { id: 'account-center',  label: '账号中心',            href: 'account-center.html',  icon: 'user',     badge: 'IAM', perms: ['iam.read', 'audit.read'] },
+          { id: 'demo-accounts',   label: '演示账号速查',        href: 'demo-accounts.html',   icon: 'user',     badge: '6' },
           { id: 'workflow',        label: 'BPMN 工作流引擎',     href: 'p-workflow.html',      icon: 'layers',   badge: '18' },
           { id: 'webhooks',        label: '事件总线 · Webhook',  href: 'p-webhooks.html',      icon: 'radio',    badge: '38', perms: ['admin.read'] },
           { id: 'api-gateway',     label: 'API 网关',            href: 'p-api-gateway.html',   icon: 'settings', badge: '86', perms: ['admin.read'] },
@@ -331,6 +377,7 @@
           { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
           { id: 'vendor-onboarding', label: '商家入驻申请', href: 'vendor-onboarding.html',    icon: 'user' },
           { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
+          { id: 'api-changelog', label: '★ 房源接口变更说明（2026-09）', href: 'housing-api-changelog.html', icon: 'book' },
           { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
           { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
           { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },

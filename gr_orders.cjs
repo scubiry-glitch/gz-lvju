@@ -101,7 +101,7 @@ async function listUserOrders(conn, userId, limit) {
      LIMIT ${lim}`,
     [userId]
   );
-  return summarizeUserOrders(rows);
+  return summarizeUserOrders(await require('./commerce/main-system.cjs').enrichOrders(conn,rows));
 }
 
 async function getUserOrder(conn, orderRef, userId) {
@@ -114,7 +114,7 @@ async function getUserOrder(conn, orderRef, userId) {
      LIMIT 1`,
     [orderRef, userId]
   );
-  return rows[0] || null;
+  return (await require('./commerce/main-system.cjs').enrichOrders(conn,rows))[0] || null;
 }
 
 function nowCst() {
@@ -191,10 +191,11 @@ async function updateOrderCallback(conn, opts) {
       [vendorId, o.vendor_oid, o.status, o.fee, now, now, o.order_ref]
     );
   } else if (o.status === 'assigned') {
+    // 重新派单（含 serving 回退 assigned）：清空 serving_at，避免状态已回退但时间轴仍残留旧的服务开始时间
     await conn.execute(
       `UPDATE gr_orders
          SET vendor_id=COALESCE(?, vendor_id), vendor_oid=?, status=?,
-             worker_name=?, worker_phone=?, eta=?, updated_at=?
+             worker_name=?, worker_phone=?, eta=?, serving_at=NULL, updated_at=?
        WHERE order_ref=? AND vendor_oid=?`,
       [vendorId, o.vendor_oid, o.status, o.worker_name, o.worker_phone, o.eta, now, o.order_ref, o.vendor_oid]
     );

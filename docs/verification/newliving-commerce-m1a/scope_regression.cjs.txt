@@ -1,0 +1,23 @@
+PASS  测试项目创建（city A / trade）
+PASS  city 档 org/report 200
+PASS  city 档响应带 scope 声明
+PASS  city 档 orders 诚实降级（空集+note）
+PASS  all 档 org/report 200 且 orders 全量
+PASS  vendor 档 org/report 403
+PASS  匿名 org/report 401（外层凭证闸）
+PASS  stats 匿名 → degraded + operators 剥离
+PASS  stats report.read 会话 → 全量 operators
+PASS  staff 匿名 401（此前完全无鉴权）
+PASS  staff org 档 200（含平台级行）
+PASS  staff 无 org.read/worker.manage 档 403
+PASS  city A 档项目列表含本项目
+PASS  QS 与 scope 取交集（city A 档查 city B → 空）
+PASS  vendor 档项目列表全部 owner_vendor_id=153
+PASS  gov（无 admin.read）管理项目列表 403
+PASS  改 scope 前 me 可用
+PASS  PUT accounts/:id 显式 scope 200
+PASS  scope 变更后旧 token 失效（401）
+PASS  重登后 scope 反映新授权城市
+# 清理完成
+
+ALL PASS

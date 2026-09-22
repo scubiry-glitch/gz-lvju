@@ -892,12 +892,15 @@ curl -G https://test-domain/mall/beike/juzhu/order/detail \
 | `/api/juzhu/housing/vendor/projects/detail` | 房源详情 + 户型明细 |
 | `/api/juzhu/housing/vendor/projects/create` | 创建房源（默认 `draft` 不入 C 端；可带 `units` 一次建全；`contact_phone` 仅入库不回显） |
 | `/api/juzhu/housing/vendor/projects/update` | 按 id 增量更新（价格/地址/标签/保险/最短连住等；`city_id`/`channel` 不可改） |
-| `/api/juzhu/housing/vendor/projects/status` | 上下架：`online` / `offline` / `draft`（上架前置：已有 `price_from` 且 ≥1 个户型） |
-| `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext`） |
-| `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价等） |
+| `/api/juzhu/housing/vendor/projects/status` | 上下架：`online` / `offline` / `draft`（上架前置：≥1 个户型且**每个户型都能算出默认夜价**；`price_from` 自 2026-09 起选填） |
+| `/api/juzhu/housing/vendor/units/create` | 追加户型（`rent_monthly` 元/月、`price_night` 元/晚写 `units.ext` 且 rental 同样生效、`min_stay_nights` 户型级连住、`total_qty` 总间数 1-999、`room_profile` 房间档案 21 字段） |
+| `/api/juzhu/housing/vendor/units/update` | 户型增量更新（调价/夜价/连住/总间数/`default_closed` 默认关房/`room_profile` 房间档案等；`total_qty` 调低不得低于未来晚已订间数）。出参带 `default_night_price` / `min_stay_nights(+_source)` / `room_profile`（已解析） |
+| `/api/juzhu/housing/vendor/stay-calendar/set` | 房态/夜价/放出量：`qty`=放出总量（含平台已订），`available_qty`=净可售（方案 B，记基线）二者只能传一个；响应回 `days[]` 供推完即对账 |
+| `/api/juzhu/housing/vendor/photos/sync` | **图集全量覆盖**（2026-09）：传该实体完整图集，平台移除不在列表内的旧图；分类 `category` + 排序 `sort` + `external_id` 匹配键（URL 带签名会变）；超 100 张截取并告警 |
+| `/api/juzhu/housing/vendor/photos/add` | 单张追加/更新（同 URL 或同 `external_id` **原地更新**，不再堆重复行）；支持 `category` / `sort_order` |
 | `/api/juzhu/housing/vendor/units/delete` | 删除户型（有关联订单或被占用晚时拒绝） |
-| `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房 / `open` 开房（可带 `price_night` 覆盖或恢复默认）；已订晚不可改 |
-| `/api/juzhu/housing/vendor/stay-calendar/query` | 商家视角逐晚房态查询（含占用来源/关联订单、最短连住、保险） |
+| `/api/juzhu/housing/vendor/stay-calendar/set` | 逐晚房态：`blocked` 关房（已订晚 `booked_qty>0` 不可关）/ `open` 开房（可带 `price_night` 覆价、`qty` 放出间数覆盖；均不传 = 恢复默认，占用行保留计数清覆盖）。多间口径：每晚可订 = `qty||total_qty` − `booked_qty` |
+| `/api/juzhu/housing/vendor/stay-calendar/query` | 商家视角逐晚房态查询（含 `qty/booked_qty/remaining` 间数、占用来源/关联订单、最短连住、保险；`booked` 为 remaining≤0 派生态） |
 | `/api/juzhu/housing/vendor/bookings/list` | 本商家订单（status/pay_status/project_id 过滤，≤200 条；手机号掩码） |
 | `/api/juzhu/housing/vendor/bookings/detail` | 按 id 查单（owner 校验） |
 | `/api/juzhu/housing/vendor/bookings/confirm` | 确认订单（`pay_status='unpaid'` 不可确认；确认后订单生效） |

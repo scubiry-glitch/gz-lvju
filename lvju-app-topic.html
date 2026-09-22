@@ -6,6 +6,8 @@
 <link rel="icon" href="data:,">
 <title>找房专题 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=5">
+<script src="lvju-app-config.js?v=1"></script>
+<script src="lvju-app-price.js?v=1"></script>
 <style>
   /* 找房专题落地页（?topic=slug&city=）：数据走 catalog?topic= 服务端过滤（settings KV 定义，
      scripts/find-topic-seed.cjs）；卡片与找房枢纽（lvju-app-search.html）同款同口径。 */
@@ -150,7 +152,7 @@
     var r = p.rating || {};
     var meta2;
     if (fam === 'stay' && p.rating_status === 'passed' && r.stars) {
-      meta2 = '<span class="sc">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
+      meta2 = '<span class="sc" data-lvju-feature="caibei">★' + esc(r.stars) + (r.score ? '.' + esc(String(r.score).slice(-1)) : '') + '</span>' +
         '<i>' + esc(channelChip(p)) + '</i><span>' + esc(loc) + '</span>';
     } else {
       var extra = (fam === 'newhouse' && p.managed_unit_count != null) ? ' · 房源 ' + fmt(p.managed_unit_count) : '';
@@ -158,18 +160,17 @@
     }
     var tags = (p.tags || []).filter(function(t){ return t !== '保租房' && t !== '演示' && t !== '精选'; }).slice(0, 3);
     var ins = fam === 'stay'
-      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
+      ? (p.insurance_types || []).slice(0, 1).map(function(t){ return '<span class="am" data-lvju-feature="stayProtection">' + (t.icon || '🛡') + ' ' + esc(t.short || t.label) + '</span>'; }).join('')
       : '';
     var tagHtml = tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + ins;
 
     var price, href, cta;
     if (fam === 'stay') {
-      var pf = p.price_from;
-      if (pf == null && p.channel === 'rental') {
-        var rents = (umap[p.id] || []).map(function(u){ return u.rent_monthly; }).filter(function(v){ return v > 0; });
-        if (rents.length) pf = Math.min.apply(null, rents);
-      }
-      price = pf != null ? '<i>¥</i><b>' + fmt(pf) + '</b><small>' + (p.channel === 'minsu' ? '/晚起' : '/月起') + '</small>' : '<span style="font-size:13px;">价格面议</span>';
+      // 展示价三件套由服务端下发（2026-09）：/晚起 = 最低可售单夜价、/月起 = 起价
+      var pd = LVJU_PRICE.parts(p);
+      price = pd.value != null
+        ? '<i>¥</i><b>' + fmt(pd.value) + '</b><small>' + LVJU_PRICE.unitText(p) + '</small>'
+        : '<span style="font-size:13px;">' + pd.note + '</span>';
       href = 'lvju-app-detail.html?id=' + p.id;
       cta = p.bookable ? '<span class="go">预订</span>' : '<span class="go tel">📞 咨询</span>';
     } else if (fam === 'newhouse') {

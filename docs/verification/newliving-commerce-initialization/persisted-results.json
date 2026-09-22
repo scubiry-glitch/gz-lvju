@@ -1,0 +1,429 @@
+{
+  "at": "2026-09-19T13:10:07.997Z",
+  "batch": "living-topics-v19-shenyang-v1",
+  "passed": true,
+  "counts": {
+    "merchants": 13,
+    "stores": 13,
+    "rules": 15,
+    "skus": 21,
+    "packages": 6,
+    "plans": 1
+  },
+  "records": [
+    {
+      "kind": "merchants",
+      "id": 1,
+      "name": "春晖家政",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 1,
+      "name": "春晖家政 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 1,
+      "name": "春晖家政 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 1,
+      "name": "开荒保洁 · 新居服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 2,
+      "name": "蚂蚁搬家",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 2,
+      "name": "蚂蚁搬家 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 2,
+      "name": "蚂蚁搬家 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 2,
+      "name": "居民搬家 · 同城服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 3,
+      "name": "快修家电",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 3,
+      "name": "快修家电 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 3,
+      "name": "快修家电 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 3,
+      "name": "家电维修 · 上门服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 4,
+      "name": "空调清洗 · 挂机服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 5,
+      "name": "管道疏通 · 当天服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 4,
+      "name": "平台优选·保洁",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 4,
+      "name": "平台优选·保洁 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 4,
+      "name": "平台优选·保洁 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 6,
+      "name": "油烟机清洗 · 深度服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 5,
+      "name": "康养到家",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 5,
+      "name": "康养到家 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 5,
+      "name": "康养到家 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 7,
+      "name": "养老陪护 · 日间服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 8,
+      "name": "体检套餐 · 基础服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 6,
+      "name": "阿姨来了",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 6,
+      "name": "阿姨来了 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 6,
+      "name": "阿姨来了 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 9,
+      "name": "住家保姆 · 全职服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 7,
+      "name": "安居养护",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 7,
+      "name": "安居养护 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 7,
+      "name": "安居养护 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 10,
+      "name": "家电保养 · 套餐服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 11,
+      "name": "管道养护 · 季度服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 8,
+      "name": "安居财险专区",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 8,
+      "name": "安居财险专区 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 9,
+      "name": "江苏银行消费金融",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 9,
+      "name": "江苏银行消费金融 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 10,
+      "name": "贝壳资产顾问",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 10,
+      "name": "贝壳资产顾问 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 8,
+      "name": "贝壳资产顾问 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 12,
+      "name": "资产评估 · 房产服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 11,
+      "name": "绿色回收站",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 11,
+      "name": "绿色回收站 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 12,
+      "name": "联通装维优选",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 12,
+      "name": "联通装维优选 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 9,
+      "name": "联通装维优选 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 13,
+      "name": "宽带新装 · 千兆服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 14,
+      "name": "日常保洁 · 2小时服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "merchants",
+      "id": 13,
+      "name": "邻里便民站",
+      "status": "draft"
+    },
+    {
+      "kind": "stores",
+      "id": 13,
+      "name": "邻里便民站 · 沈阳服务点（待确认）",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 10,
+      "name": "邻里便民站 · 权益分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 15,
+      "name": "便民代办 · 跑腿服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 16,
+      "name": "钟点工 · 3小时服务券",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 1,
+      "name": "新居入住季 · 专题券包",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 2,
+      "name": "康养到家周 · 专题券包",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 3,
+      "name": "租住安心包 · 专题券包",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 4,
+      "name": "绿色焕新 · 专题券包",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 5,
+      "name": "邻里日常 · 专题券包",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 17,
+      "name": "新居住会员 · 保洁权益券",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 11,
+      "name": "新居住会员 · 保洁分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 18,
+      "name": "新居住会员 · 维修权益券",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 12,
+      "name": "新居住会员 · 维修分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 19,
+      "name": "新居住会员 · 搬家权益券",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 13,
+      "name": "新居住会员 · 搬家分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 20,
+      "name": "新居住会员 · 旅居权益券",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 14,
+      "name": "新居住会员 · 旅居分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "skus",
+      "id": 21,
+      "name": "新居住会员 · 报告权益券",
+      "status": "draft"
+    },
+    {
+      "kind": "rules",
+      "id": 15,
+      "name": "新居住会员 · 报告分配规则",
+      "status": "draft"
+    },
+    {
+      "kind": "packages",
+      "id": 6,
+      "name": "新居住基础权益礼包",
+      "status": "draft"
+    },
+    {
+      "kind": "plans",
+      "id": 1,
+      "name": "新居住会员",
+      "status": "draft"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+[PASS] testBootClassOnApp
+[PASS] testBootCssHidesIncompleteShell
+[PASS] testRevealAfterCatalogPaint
+ok: index boot shell
