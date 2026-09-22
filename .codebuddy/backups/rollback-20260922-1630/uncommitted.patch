@@ -1,0 +1,1290 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index ffd2d30..65e5cbf 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -221,3 +221,4 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
+ - **上传入口**：`POST /api/juzhu/admin/photos/upload`（兼容别名 `/admin/upload`）、`/api/juzhu/admin/photos/presign`（前端直传）、商家侧 `/api/juzhu/housing/vendor/photos/upload`（HMAC + owner 校验）；前两者在 `perm_registry.ROUTES` 挂 `house.write`，自检 `GET /api/juzhu/admin/storage/status` 挂 `admin.read`。**新增图片路由必须同步登记 ROUTES**。
+ - **读取出口**：`GET /api/juzhu/img?p=`（公网白名单，**不依赖数据库**，位于 `ensureSchema()` 之前）；生产优先由 file 域 CDN 直出，服务端零流量。
+ - 上架闸不变（≥8 图 + 有封面 + 评级通过）；`sharp` 为可选依赖，缺失时跳过归一化与缩略图但不阻断上传。
++- **本地 `assets/` → S3 的整体切换**按 [`docs/s3-migration-plan.md`](docs/s3-migration-plan.md) 执行（S0 契约修复 → S1 双写 → S2 存量迁移 → S3 切读 → S4 收尾，每阶段可回滚）。已拍板：后台 `/admin/upload` 补 multipart+`scope` 兼容；对象保持 `public-read`；存量只迁 `photos` + 各类 `cover_image` 引用；允许重编码；**存量不补缩略图**（新上传仍生成）。灰度/回滚主开关为 `IMG_URL_MODE`（`local`/`dual`/`s3`）；迁移期**禁止删除 `assets/`**。
+diff --git a/README.md b/README.md
+index 54cefe6..3cb7d3d 100644
+--- a/README.md
++++ b/README.md
+@@ -169,6 +169,7 @@ node app.js                               # 8766（守护自动拉起；验证
+ | [`CLAUDE.md`](CLAUDE.md) | 工作约定（20 条规则：导航同步 / 角色红线 / 单一数据源 / 频道模型 / 权限注册表 / 佣金口径…） |
+ | [`docs/deploy.md`](docs/deploy.md) | 部署 / MySQL 迁移 |
+ | [`docs/s3-image-storage.md`](docs/s3-image-storage.md) | 房源图片对象存储（贝壳 ODS/S3）：配置、上传/读取、缩略图、实测口径、排障 |
++| [`docs/s3-migration-plan.md`](docs/s3-migration-plan.md) | 房源图片迁移 S3 实施计划：改动范围、风险评估、S0–S4 可执行任务清单与回滚手册（**待执行**） |
+ | [`docs/account-and-auth-design.md`](docs/account-and-auth-design.md) | 账号中心与权限设计 |
+ | [`docs/tp-sign-and-call.md`](docs/tp-sign-and-call.md) | 话务虚拟号签名与调用（密钥仅服务端） |
+ | [`docs/juzhu-info-architecture.md`](docs/juzhu-info-architecture.md) | 新居住信息架构 |
+diff --git a/app.js b/app.js
+index 987365c..90dc726 100644
+--- a/app.js
++++ b/app.js
+@@ -762,7 +762,9 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
+   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) {
+     return { ok: false, error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`, status: 400 };
+   }
+-  if (!p.cover_image && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
++  if (!okImg(p.cover_image) && !Number(ph[0].has_cover || 0)) {
++    return { ok: false, error: '上架前须设置房源封面图（公网 URL 或本地 assets 路径均可）', status: 400 };
++  }
+   return { ok: true, project: p, ext: parseExtSafe(p.ext) };
+ }
+ 
+@@ -1826,6 +1828,15 @@ async function ensureSchemaRun() {
+       ['jz_products', 'channel_sku_id INT'],
+       ['jz_products', 'path VARCHAR(500)'],
+       ['jz_products', 'query VARCHAR(500)'],
++      // S2-4：图片迁移回滚列（S2 迁移前把原值写入 legacy_*，便于一键回退；见 docs/s3-migration-plan.md §6）
++      ['photos', 'legacy_file_path TEXT'],
++      ['projects', 'legacy_cover_image VARCHAR(500)'],
++      ['units', 'legacy_cover_image VARCHAR(500)'],
++      ['districts', 'legacy_cover_image VARCHAR(500)'],
++      ['cities', 'legacy_hero_bg_image TEXT'],
++      ['spots', 'legacy_cover_image VARCHAR(500)'],
++      ['spots', 'legacy_photos TEXT'],
++      ['routes', 'legacy_cover_image VARCHAR(500)'],
+     ];
+     for (const [table, ddl] of extraCols) {
+       try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
+@@ -1916,6 +1927,10 @@ async function ensureSchemaRun() {
+ }
+ 
+ module.exports.ensureSchema = ensureSchema;
++// 图片上传：multipart 解析与 scope 处理（供回归脚本单测，见 scripts/admin_upload_multipart_regression.cjs）
++module.exports.parseMultipart = parseMultipart;
++module.exports.readRawBody = readRawBody;
++module.exports.handleAdminMultipartUpload = handleAdminMultipartUpload;
+ 
+ function jsonReply(res, data, code) {
+   const body = JSON.stringify(data);
+@@ -2077,6 +2092,202 @@ async function syncUnitCover(conn, unitId) {
+ }
+ 
+ // ===== 房源图片：上传载荷解析 + 落库（对象存储/本地统一，见 img_storage.cjs）=====
++/**
++ * 读取**原始 Buffer** 请求体（二进制安全；readBody 按 utf8 拼字符串，会破坏图片字节，故图片上传专用）
++ * 结果缓存在 req._rawBodyBuffer，重复调用不重复消费流。
++ */
++function readRawBody(req, maxBytes) {
++  if (req._rawBodyBuffer) return Promise.resolve(req._rawBodyBuffer);
++  return new Promise((resolve, reject) => {
++    const limit = maxBytes || (imgStorage ? imgStorage.maxBytes() + 1024 * 1024 : 16 * 1024 * 1024);
++    const chunks = [];
++    let total = 0;
++    let done = false;
++    req.on('data', (c) => {
++      if (done) return;
++      total += c.length;
++      if (total > limit) {
++        done = true;
++        reject(new Error(`请求体过大（>${(limit / 1048576).toFixed(0)}MB）`));
++        try { req.destroy(); } catch (_) { /* ignore */ }
++        return;
++      }
++      chunks.push(c);
++    });
++    req.on('end', () => {
++      if (done) return;
++      done = true;
++      req._rawBodyBuffer = Buffer.concat(chunks);
++      resolve(req._rawBodyBuffer);
++    });
++    req.on('error', (e) => { if (!done) { done = true; reject(e); } });
++  });
++}
++
++/**
++ * 极简 multipart/form-data 解析（无依赖、二进制安全）
++ * @returns {{fields:Object<string,string>, files:Object<string,{filename:string,contentType:string,data:Buffer}>}|{error:string}}
++ */
++function parseMultipart(buf, contentType) {
++  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(String(contentType || ''));
++  const boundary = m ? String(m[1] || m[2] || '').trim() : '';
++  if (!boundary) return { error: '缺少 multipart boundary' };
++  // 首分隔符无前导 CRLF；后续分隔符必须带 "\r\n" 前缀，
++  // 否则图片字节里偶然出现 "--boundary" 会被误判为分隔符（RFC 2046 只保证 "\r\n--boundary" 不出现）
++  const firstDelim = Buffer.from('--' + boundary);
++  const nextDelim = Buffer.from('\r\n--' + boundary);
++  const fields = {};
++  const files = {};
++  let pos = buf.indexOf(firstDelim);
++  if (pos < 0) return { error: 'multipart 边界未匹配（body 与 Content-Type 不一致？）' };
++  pos += firstDelim.length;
++  while (pos < buf.length) {
++    if (buf[pos] === 0x2d && buf[pos + 1] === 0x2d) break;          // 结束标记 "--"
++    while (pos < buf.length && (buf[pos] === 0x0d || buf[pos] === 0x0a)) pos += 1;
++    const headEnd = buf.indexOf('\r\n\r\n', pos);
++    if (headEnd < 0) break;
++    const headerText = buf.slice(pos, headEnd).toString('utf8');
++    const bodyStart = headEnd + 4;
++    let next = buf.indexOf(nextDelim, bodyStart);
++    if (next < 0) next = buf.length;                                 // 容错：末尾无完整分隔符
++    const data = buf.slice(bodyStart, next);                         // 已天然排除尾随 CRLF
++    const nameM = /name="([^"]*)"/i.exec(headerText);
++    const fileM = /filename="([^"]*)"/i.exec(headerText);
++    const ctM = /content-type:\s*([^\r\n]+)/i.exec(headerText);
++    if (nameM) {
++      const name = nameM[1];
++      if (fileM) {
++        files[name] = { filename: fileM[1], contentType: ctM ? ctM[1].trim() : '', data };
++      } else {
++        fields[name] = data.toString('utf8').trim();
++      }
++    }
++    pos = next + nextDelim.length;
++  }
++  return { fields, files };
++}
++
++/**
++ * 上传 scope → 实体映射（语义对齐历史 Python 实现 juzhu/server.py:2424 `_upload_file`，保持前端零改动）
++ * 返回 file_path 供前端填入对应输入框；仅 unit_photo / city_hero 会直接改库（与历史行为一致）。
++ */
++async function handleAdminMultipartUpload(req, res) {
++  if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
++  const ct = String(req.headers['content-type'] || '');
++  let mp;
++  try {
++    const raw = await readRawBody(req);
++    mp = parseMultipart(raw, ct);
++  } catch (e) {
++    return jsonReply(res, { error: String(e && e.message || e) }, 413);
++  }
++  if (mp.error) return jsonReply(res, { error: mp.error }, 400);
++
++  const fields = mp.fields || {};
++  const file = (mp.files || {}).file;
++  if (!file || !file.data || !file.data.length) return jsonReply(res, { error: '缺少 file 字段' }, 400);
++
++  const scope = String(fields.scope || '').trim();
++  const SCOPE_ENTITY = {
++    project_cover: 'project',
++    project_cover_new: 'project',
++    unit_cover: 'unit',
++    unit_gallery: 'unit',
++    unit_photo: 'unit',
++    unit_keeper: 'keeper',
++    city_hero: 'city',
++  };
++  const entityType = SCOPE_ENTITY[scope];
++  if (!entityType) {
++    return jsonReply(res, {
++      error: '未知 scope（可用：' + Object.keys(SCOPE_ENTITY).join(' / ') + '）',
++      scope: scope || null,
++    }, 400);
++  }
++
++  // 按需建连：project_cover_new（草稿封面，前端随后把 file_path 存进表单）无需任何 DB 校验，
++  // 不应因数据库抖动而失败（也便于无库环境做上传链路自检）
++  let conn = null;
++  const ensureConn = async () => { if (!conn) conn = await mysql2.createConnection(getDbConfig()); return conn; };
++  try {
++    // ── scope 级前置校验 + 归属实体 ──
++    let entityId = 0;
++    let photoId = null;
++    if (scope === 'unit_cover' || scope === 'unit_gallery' || scope === 'unit_keeper' || scope === 'unit_photo') {
++      const c = await ensureConn();
++      if (scope === 'unit_photo') {
++        photoId = parseInt(fields.photo_id, 10);
++        if (!photoId) return jsonReply(res, { error: '缺少 photo_id' }, 400);
++        const [prows] = await c.execute("SELECT id, entity_id FROM photos WHERE id=? AND entity_type='unit'", [photoId]);
++        if (!prows.length) return jsonReply(res, { error: '图片记录不存在' }, 404);
++        entityId = prows[0].entity_id;
++      } else {
++        entityId = parseInt(fields.unit_id, 10);
++        if (!entityId) return jsonReply(res, { error: '缺少 unit_id' }, 400);
++        const [urows] = await c.execute('SELECT id FROM units WHERE id=?', [entityId]);
++        if (!urows.length) return jsonReply(res, { error: 'unit not found' }, 404);
++      }
++    } else if (scope === 'project_cover') {
++      entityId = parseInt(fields.project_id, 10);
++      if (entityId) {
++        const c = await ensureConn();
++        const [prows] = await c.execute('SELECT id FROM projects WHERE id=?', [entityId]);
++        if (!prows.length) return jsonReply(res, { error: 'project not found' }, 404);
++      }
++    } else if (scope === 'city_hero') {
++      const c = await ensureConn();
++      entityId = parseInt(fields.city_id, 10) || 0;
++      if (entityId) {
++        const [crows] = await c.execute('SELECT id FROM cities WHERE id=?', [entityId]);
++        if (!crows.length) return jsonReply(res, { error: 'city not found' }, 404);
++      } else {
++        const [crows] = await c.execute('SELECT id FROM cities ORDER BY id LIMIT 1');
++        entityId = crows.length ? crows[0].id : 0;
++      }
++    }
++
++    // ── 统一走对象存储（未配置时自动回落本地）──
++    const upload = await imgStorage.uploadImage({
++      buffer: file.data,
++      filename: file.filename,
++      contentType: file.contentType,
++      prefix: fields.prefix || 'housing',
++      entityType,
++      entityId,
++      makeThumbs: String(fields.make_thumbs || '1') !== '0',
++    });
++    if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
++
++    // ── 需要直接改库的两种 scope（其余由前端把 file_path 存进表单后整体保存）──
++    if (scope === 'unit_photo') {
++      await conn.execute('UPDATE photos SET file_path=? WHERE id=?', [upload.url, photoId]);
++      await syncUnitCover(conn, entityId);
++      await conn.commit();
++    } else if (scope === 'city_hero' && entityId) {
++      await conn.execute('UPDATE cities SET hero_bg_image=? WHERE id=?', [upload.url, entityId]);
++      await conn.commit();
++    } else if (conn) {
++      await conn.commit();
++    }
++
++    console.log(`[img] upload(multipart) scope=${scope} storage=${upload.storage} key=${upload.key} → ${entityType}#${entityId} ${upload.bytes}B`);
++    return jsonReply(res, {
++      ok: true,
++      message: 'success',
++      file_path: upload.url,          // 历史契约：前端据此填入输入框/预览
++      scope,
++      entity_type: entityType,
++      entity_id: entityId,
++      upload,
++      warned: upload.warned || undefined,
++    }, 201);
++  } catch (e) {
++    return jsonReply(res, { error: '上传失败: ' + String(e && e.message || e) }, 500);
++  } finally {
++    if (conn) await conn.end();
++  }
++}
++
+ /** 解析上传载荷：data_url / base64 / source_url 三选一 */
+ function decodeImagePayload(body) {
+   const b = body || {};
+@@ -2093,6 +2304,38 @@ function decodeImagePayload(body) {
+   return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+ }
+ 
++/**
++ * 图片引用归一（**写侧唯一入口**）：任何形态入参都落成「可直接放进 <img src> 的值」。
++ * 口径见 img_storage.normalizeImageRef；IMG_URL_MODE=s3 时存量本地路径会改写为迁移后的 S3 URL。
++ */
++function normImg(v) {
++  return imgStorage ? imgStorage.normalizeImageRef(v) : v;
++}
++
++/** 图片引用是否可用（上架闸用；避免 'todo' / '-' 之类脏值冒充封面） */
++function okImg(v) {
++  return imgStorage ? imgStorage.isValidImageRef(v) : !!v;
++}
++
++/** 删除图片时同步清理对象存储（S3_DELETE_ON_PHOTO_DELETE=1 才生效；缺省保守关闭） */
++async function deleteImageObject(ref) {
++  if (String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') !== '1') return false;
++  if (!imgStorage || !s3Client || !s3Client.isConfigured()) return false;
++  try {
++    const parsed = imgStorage.parse(ref);
++    if (parsed.kind !== 's3' || !parsed.key) return false;
++    await s3Client.deleteObject(parsed.key);
++    for (const size of imgStorage.THUMB_SIZES) {
++      await s3Client.deleteObject(imgStorage.thumbKey(parsed.key, size)).catch(() => {});
++    }
++    console.log(`[img] 已删除对象 ${parsed.key}（含缩略图）`);
++    return true;
++  } catch (e) {
++    console.warn('[img] 删除对象失败:', e && e.message);
++    return false;
++  }
++}
++
+ /** 解析图片归属实体（unit / project / spot / district） */
+ function photoEntityOf(body) {
+   const b = body || {};
+@@ -2130,7 +2373,7 @@ async function insertPhotoRow(conn, entityType, entityId, upload, body) {
+   }
+   await conn.execute(
+     'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+-    [entityType, entityId, upload.url,
++    [entityType, entityId, normImg(upload.url),
+       (body && body.source_path) || upload.key || null, isCover, sortOrder]
+   );
+   const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+@@ -2927,7 +3170,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         await conn.execute(
+           'INSERT INTO districts(city_id, name, slug, note, sort_order, cover_image, has_projects) VALUES (?,?,?,?,?,?,?)',
+           [cityId, name, slug, (body.note || '').trim() || null, parseInt(body.sort_order) || 999,
+-           (body.cover_image || '').trim() || null, parseInt(body.has_projects) || 0]
++           normImg((body.cover_image || '').trim()) || null, parseInt(body.has_projects) || 0]
+         );
+         const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+         const did = r[0].id;
+@@ -2957,6 +3200,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           for (const [key, col] of Object.entries(mapping)) {
+             if (key in body) {
+               let val = body[key];
++              if (key === 'cover_image') val = normImg(val);
+               if (['sort_order','is_hot','layout_tall','layout_wide','has_projects'].includes(key)) {
+                 val = (val !== null && val !== '') ? parseInt(val) : 0;
+               } else if (typeof val === 'string') {
+@@ -3035,7 +3279,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         await conn.execute(
+           'INSERT INTO spots(city_id, type, name, slug, icon, cover_image, summary, body, photos, address, duration, ticket, tags, link, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+           [body.city_id ? parseInt(body.city_id) : null, type, name, slug,
+-           (body.icon || '').trim() || null, (body.cover_image || '').trim() || null,
++           (body.icon || '').trim() || null, normImg((body.cover_image || '').trim()) || null,
+            (body.summary || '').trim() || null,
+            (body.body || '').trim() || null,
+            Array.isArray(body.photos) ? JSON.stringify(body.photos) : null,
+@@ -3075,10 +3319,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           for (const [key, col] of Object.entries(mapping)) {
+             if (!(key in body)) continue;
+             let val = body[key];
++            if (key === 'cover_image') val = normImg(val);
+             if (key === 'sort_order') val = parseInt(val) || 0;
+             else if (key === 'enabled') val = (val === 0 || val === '0') ? 0 : 1;
+             else if (key === 'city_id') val = val ? parseInt(val) : null;
+-            else if (key === 'tags' || key === 'photos') val = Array.isArray(val) ? JSON.stringify(val) : (val || null);
++            else if (key === 'tags' || key === 'photos') {
++              if (key === 'photos' && Array.isArray(val)) val = val.map(normImg);
++              val = Array.isArray(val) ? JSON.stringify(val) : (val || null);
++            }
+             else if (typeof val === 'string') val = val.trim() || null;
+             if (key === 'slug' && val && !SPOT_SLUG_RE.test(val)) {
+               conn.end(); return jsonReply(res, { error: 'slug 须为小写字母/数字/连字符（用作 C 端深链）' }, 400);
+@@ -3208,7 +3456,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         await conn.execute(
+           'INSERT INTO routes(city_id, slug, name, summary, cover_image, days, stops, sort_order, enabled) VALUES (?,?,?,?,?,?,?,?,?)',
+           [body.city_id ? parseInt(body.city_id) : null, slug, name,
+-           (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
++           (body.summary || '').trim() || null, normImg((body.cover_image || '').trim()) || null,
+            Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+            JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+            parseInt(body.sort_order) || 999,
+@@ -3246,7 +3494,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           await conn.execute(
+             'UPDATE routes SET city_id=?, name=?, summary=?, cover_image=?, days=?, stops=?, sort_order=?, enabled=? WHERE id=?',
+             [body.city_id ? parseInt(body.city_id) : null, name,
+-             (body.summary || '').trim() || null, (body.cover_image || '').trim() || null,
++             (body.summary || '').trim() || null, normImg((body.cover_image || '').trim()) || null,
+              Math.min(30, Math.max(1, parseInt(body.days) || 1)),
+              JSON.stringify(stops.map((s) => ({ spot_id: parseInt(s.spot_id, 10), note: ((s.note || '') + '').trim().slice(0, 120) || '' }))),
+              parseInt(body.sort_order) || 999,
+@@ -3306,7 +3554,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         const crit = { label, tags };
+         if (body.channel) crit.channel = String(body.channel);
+         const desc = (body.desc || '').trim(); if (desc) crit.desc = desc;
+-        const cover = (body.cover_image || '').trim(); if (cover) crit.cover_image = cover;
++        const cover = normImg((body.cover_image || '').trim()); if (cover) crit.cover_image = cover;
+         // enabled 接受布尔 false / 0 / '0'（admin UI 传布尔，脚本可能传 0）
+         crit.enabled = !(body.enabled === false || body.enabled === 0 || body.enabled === '0');
+         const conn = await mysql2.createConnection(getDbConfig());
+@@ -3397,7 +3645,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
+             sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
+            VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
+-          [cityId, districtId, channel, name, slug, body.cover_image || null, address,
++          [cityId, districtId, channel, name, slug, normImg(body.cover_image) || null, address,
+            encodeTags(body.tags),
+            body.sort_order || 999, body.price_from || null,
+            body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
+@@ -3447,7 +3695,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           }
+           for (const col of ['address', 'cover_image', 'sort_order', 'price_from',
+               'is_featured', 'featured_rank', 'old_house_hint', 'status']) {
+-            if (col in body) put(col, body[col]);
++            if (col in body) put(col, col === 'cover_image' ? normImg(body[col]) : body[col]);
+           }
+           if ('ext' in body) put('ext', body.ext != null ? JSON.stringify(body.ext) : null);
+           if ('owner_vendor_id' in body) {
+@@ -3546,7 +3794,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+              body.amenities ? JSON.stringify(body.amenities) : null,
+              body.keeper ? JSON.stringify(body.keeper) : null,
+              body.rent_detail ? JSON.stringify(body.rent_detail) : null,
+-             body.sort_order || 999, body.cover_image || null]
++             body.sort_order || 999, normImg(body.cover_image) || null]
+           );
+           const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+           const uid = r[0].id;
+@@ -3597,7 +3845,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           }
+           for (const col of ['area_sqm','layout_label','rent_monthly','price_total',
+               'unit_spec','promo_price','sort_order','cover_image']) {
+-            if (col in body) put(col, body[col]);
++            if (col in body) put(col, col === 'cover_image' ? normImg(body[col]) : body[col]);
+           }
+           if ('ext' in body) {
+             // 服务端兜底：ext.cancel_policy 过单一数据源校验，防管理端拼错口径（规则15 差异属性放 ext）
+@@ -3662,14 +3910,51 @@ async function handleApiDirect(urlPath, qs, req, res) {
+       }
+     }
+ 
+-    // POST /admin/units/:id/photos  （仅支持 JSON body，不支持文件上传）
++    // POST /admin/units/:id/photos  （JSON：file_path 透传；multipart：直传即上传+落库）
+     {
+       const m = urlPath.match(/^\/api\/juzhu\/admin\/units\/(\d+)\/photos$/);
+       if (m && req.method === 'POST') {
+         const uid = parseInt(m[1]);
+-        const ct = req.headers['content-type'] || '';
++        const ct = String(req.headers['content-type'] || '');
+         if (ct.includes('multipart/form-data')) {
+-          return jsonReply(res, { error: '文件上传请使用 /api/juzhu/admin/upload 接口，Serverless 环境不支持直接上传图片到本机文件系统' }, 503);
++          // 户型图集上传：走对象存储（未配置 S3 时回落本地），上传成功后直接落 photos 表
++          if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
++          let mp;
++          try {
++            mp = parseMultipart(await readRawBody(req), ct);
++          } catch (e) {
++            return jsonReply(res, { error: String(e && e.message || e) }, 413);
++          }
++          if (mp.error) return jsonReply(res, { error: mp.error }, 400);
++          const file = (mp.files || {}).file;
++          if (!file || !file.data || !file.data.length) return jsonReply(res, { error: '缺少 file 字段' }, 400);
++          const conn = await mysql2.createConnection(getDbConfig());
++          try {
++            const [units] = await conn.execute('SELECT id FROM units WHERE id=?', [uid]);
++            if (!units.length) { conn.end(); return jsonReply(res, { error: 'unit not found' }, 404); }
++            const upload = await imgStorage.uploadImage({
++              buffer: file.data,
++              filename: file.filename,
++              contentType: file.contentType,
++              prefix: (mp.fields && mp.fields.prefix) || 'housing',
++              entityType: 'unit',
++              entityId: uid,
++              makeThumbs: String((mp.fields || {}).make_thumbs || '1') !== '0',
++            });
++            if (!upload.ok) { conn.end(); return jsonReply(res, { error: upload.error }, 400); }
++            const photo = await insertPhotoRow(conn, 'unit', uid, upload, {
++              is_cover: (mp.fields || {}).is_cover === '1' || (mp.fields || {}).is_cover === 'true',
++              sort_order: (mp.fields || {}).sort_order,
++              source_path: file.filename || null,
++            });
++            await conn.commit();
++            console.log(`[img] unit photo(multipart) unit#${uid} storage=${upload.storage} key=${upload.key}`);
++            return jsonReply(res, { ok: true, file_path: upload.url, photo, upload }, 201);
++          } catch (e) {
++            return jsonReply(res, { error: '上传失败: ' + String(e && e.message || e) }, 500);
++          } finally {
++            await conn.end();
++          }
+         }
+         const body = await readBody(req);
+         const conn = await mysql2.createConnection(getDbConfig());
+@@ -3692,7 +3977,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+           }
+           await conn.execute(
+             "INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES ('unit', ?, ?, ?, ?, ?)",
+-            [uid, filePath, body.source_path || null, isCover, sortOrder]
++            [uid, normImg(filePath), body.source_path || null, isCover, sortOrder]
+           );
+           const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+           const photoId = r[0].id;
+@@ -3730,7 +4015,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
+                sort_order=COALESCE(?, sort_order),
+                is_cover=COALESCE(?, is_cover)
+              WHERE id=?`,
+-            [body.file_path ? body.file_path.trim() : null,
++            [body.file_path ? normImg(body.file_path.trim()) : null,
+              body.sort_order != null ? body.sort_order : null,
+              isCoverVal, photoId]
+           );
+@@ -3752,14 +4037,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         const conn = await mysql2.createConnection(getDbConfig());
+         try {
+           const [rows] = await conn.execute(
+-            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'", [photoId]
++            "SELECT entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [photoId]
+           );
+           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+           const uid = rows[0].entity_id;
++          const removedRef = rows[0].file_path;
+           await conn.execute('DELETE FROM photos WHERE id=?', [photoId]);
+           await syncUnitCover(conn, uid);
+           await conn.commit();
+-          return jsonReply(res, { ok: true });
++          // S1-5：同步清理对象存储（仅 S3_DELETE_ON_PHOTO_DELETE=1；缺省保守关闭，避免误删不可恢复）
++          const objDeleted = await deleteImageObject(removedRef);
++          return jsonReply(res, { ok: true, object_deleted: objDeleted });
+         } finally {
+           await conn.end();
+         }
+@@ -3768,12 +4056,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
+ 
+     // ===== 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传 / 读取代理 / 自检 =====
+     // 统一入口：已配置 S3_* 走对象存储，否则自动回落 assets/uploads（口径见 img_storage.cjs）
++    // POST /api/juzhu/admin/upload —— 后台图片上传。multipart/form-data + scope（对齐历史 Python 契约，
++    // 前端 juzhu-admin*.html 的 7 个上传入口零改动）；同时保留 JSON(base64/source_url) 分支向后兼容。
++    if (urlPath === '/api/juzhu/admin/upload' && req.method === 'POST') {
++      const ct0 = String(req.headers['content-type'] || '');
++      if (ct0.includes('multipart/form-data')) return handleAdminMultipartUpload(req, res);
++    }
+     if ((urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload') && req.method === 'POST') {
+       if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+-      const ct = String(req.headers['content-type'] || '');
+-      if (ct.includes('multipart/form-data')) {
+-        return jsonReply(res, { error: 'multipart 不支持：请改用 base64 / data_url，或先调 /photos/presign 由前端直传对象存储' }, 415);
+-      }
+       const body = await readBody(req);
+       const payload = decodeImagePayload(body);
+       if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+@@ -3836,6 +4126,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
+       const c = s3Client.config();
+       const out = {
+         mode: imgStorage.storageMode(),
++        img_url_mode: imgStorage.urlMode(),
++        migrate_prefix: imgStorage.migratePrefix(),
++        delete_on_photo_delete: String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1',
++        normalize: String(process.env.IMG_NORMALIZE || '1') !== '0',
++        source_url_allowlist: String(process.env.S3_SOURCE_URL_ALLOWLIST || '') || null,
+         configured: s3Client.isConfigured(),
+         bucket: c.bucket,
+         endpoint: c.endpoint,
+@@ -3845,9 +4140,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
+         addressing: c.addressing,
+         file_style: c.fileStyle,
+         key_prefix: c.keyPrefix,
++        extra_headers: s3Client.extraHeaders(),
+         max_bytes: imgStorage.maxBytes(),
+         thumb_rewrite: String(process.env.S3_THUMB_REWRITE == null ? '1' : process.env.S3_THUMB_REWRITE) !== '0',
+-        sample_public_url: c.bucket ? s3Client.publicUrl('housing/sample.jpg') : '',
++        sample_key: [c.keyPrefix, 'housing/project/1/2026/09/sample.jpg'].filter(Boolean).join('/'),
++        sample_public_url: c.bucket
++          ? s3Client.publicUrl([c.keyPrefix, 'housing/project/1/2026/09/sample.jpg'].filter(Boolean).join('/'))
++          : '',
+       };
+       if (new URLSearchParams(qs).get('probe') === '1' && s3Client.isConfigured()) {
+         const key = new URLSearchParams(qs).get('key') || '';
+diff --git a/docs/s3-image-storage.md b/docs/s3-image-storage.md
+index 03ad144..9c0b7c1 100644
+--- a/docs/s3-image-storage.md
++++ b/docs/s3-image-storage.md
+@@ -145,6 +145,7 @@ POST /api/juzhu/housing/vendor/photos/upload
+ | 打包 | `package_backend.sh` 用 `*.cjs` 通配，新模块自动进包 |
+ | 自检 | `npm run s3:smoke`（连通性 + 签名探测 + 上传/读回/缩略图/预签名/清理） |
+ | 环境探测 | `npm run s3:probe`（region × 寻址 × 签名版本矩阵，定位 403 根因；支持 `--regions=` / `--addressings=` / `--versions=`） |
++| 端到端 | `npm run s3:e2e`（走 HTTP：登录 → storage/status → 上传 → 代理读取 → 公网读取 → 预签名直传 → 清理；`--project=<id>` 额外验证落库） |
+ | 运维 | `GET /api/juzhu/admin/storage/status?probe=1` 返回模式、bucket、签名版本、采样 URL，并对 v2/v4 各做一次 PUT 探针 |
+ 
+ ---
+@@ -186,3 +187,37 @@ POST /api/juzhu/housing/vendor/photos/upload
+ - `S3_SECRET_KEY` 只从运行时环境变量 / 根 `.env` / `juzhu/.env.local` 读取，**禁止写入源码、前端、文档**；静态服务已拦截 `.env*` / `runtime.env` / `*.cjs`。
+ - 生产建议：平台环境变量注入 + 独立 bucket/前缀（`S3_KEY_PREFIX`）+ 定期轮换密钥。
+ - 图片本身不含 PII；`contact_phone` 仍只在 `projects` 表，不出接口。
++
++---
++
++## 9. 验证步骤（由快到全，逐层定位）
++
++| 层 | 做什么 | 命令 / 操作 | 通过标准 | 依赖 |
++|---|---|---|---|---|
++| L1 | **协议层自检**（最快，先跑） | `npm run s3:smoke` | 全部 PASS（签名/上传/读回/Content-Type/缩略图/公网/预签名/清理） | 仅需 S3 配置；**不需要数据库、不需要起服务** |
++| L2 | **环境探测**（403 时用） | `npm run s3:probe` | 出现可用组合（当前应见 `v4 / path`） | 同上 |
++| L3 | **服务端配置自检** | 起 `node app.js` → `GET /api/juzhu/admin/storage/status?probe=1` | `mode=s3`、`sign_version=v4`、`key_prefix=lvju`、`sample_public_url` 形态正确 | 数据库可达 + 管理员登录 |
++| L4 | **端到端接口验证** | `npm run s3:e2e -- --password=***` | 全部 PASS（上传→代理读→公网读→预签名直传） | 同上；默认 `save=false` **不写业务表** |
++| L5 | **落库链路** | `npm run s3:e2e -- --password=*** --project=<演示房源id>` | `photos` 行返回且 `file_path` 为可直用 URL | 同上；**会在该项目下插一条图片记录** |
++| L6 | **人工确认** | 上传后用浏览器打开返回的 `url` / `thumb_640` | 能看到图；缩略图命中（`.t640.webp`） | 浏览器可访问 file 域 |
++
++**快速定位口诀**：L1 挂了＝存储/签名配置问题（别怀疑业务代码）；L1 绿但 L4 挂＝HTTP 集成问题（登录/权限/路由）；L4 绿但 L6 看不到图＝读图域名或 bucket 读权限问题。
++
++**用 curl 手测（等价于 L4 的关键两步）**：
++```bash
++# 1) 登录拿 token（首个账号由 JUZHU_ADMIN_PASSWORD 引导，见 auth_center.bootstrapPlatformAdmin）
++TOKEN=$(curl -s -X POST http://127.0.0.1:8766/api/juzhu/admin/auth/login \
++  -H 'Content-Type: application/json' \
++  -d '{"login_name":"admin","password":"<JUZHU_ADMIN_PASSWORD>"}' | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
++
++# 2) 上传（data_url / base64 / source_url 三选一；save:false = 只上传不落库）
++curl -s -X POST http://127.0.0.1:8766/api/juzhu/admin/photos/upload \
++  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
++  -d '{"source_url":"https://任意可访问图片地址/a.jpg","save":false,"prefix":"verify"}'
++# → { ok, upload:{ storage:'s3', url:'https://file.ljcdn.com/test/lvju/...', thumb_640, bytes, content_type } }
++
++# 3) 读回（公网直读 + 服务端代理两种都验）
++curl -I "https://file.ljcdn.com/test/lvju/.......jpg"          # 期望 200
++curl -s -o /dev/null -w '%{http_code} %{size_download}\n' \
++  "http://127.0.0.1:8766/api/juzhu/img?p=lvju/.......jpg"      # 期望 200 + 与 upload.bytes 一致
++```
+diff --git a/housing_seed.cjs b/housing_seed.cjs
+index 73bc375..dfeb543 100644
+--- a/housing_seed.cjs
++++ b/housing_seed.cjs
+@@ -11,6 +11,11 @@ function enc(v) {
+   return v;
+ }
+ 
++/** 图片引用归一（S2-3）：dual 模式对本地路径是 no-op；IMG_URL_MODE=s3 时写入公网 URL */
++function normImg(v) {
++  try { return require('./img_storage.cjs').normalizeImageRef(v); } catch (_) { return v; }
++}
++
+ function parseJsonField(v) {
+   if (v == null) return null;
+   if (typeof v === 'object') return v;
+@@ -144,7 +149,7 @@ async function seedAll(conn, juzhuDir) {
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       [
+         d.id, d.city_id, d.name, d.slug, d.note || null,
+-        d.has_projects ? 1 : 0, d.sort_order || 0, d.cover_image || null,
++        d.has_projects ? 1 : 0, d.sort_order || 0, normImg(d.cover_image) || null,
+         d.project_count || 0, d.unit_count || 0, d.vacant_count == null ? null : d.vacant_count,
+         d.managed_unit_count == null ? null : d.managed_unit_count,
+         d.avg_price == null ? null : d.avg_price,
+@@ -165,7 +170,7 @@ async function seedAll(conn, juzhuDir) {
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       [
+         p.id, p.city_id, p.district_id, p.channel, p.name, p.slug,
+-        p.cover_image || null, p.address || null, enc(p.tags),
++        normImg(p.cover_image) || null, p.address || null, enc(p.tags),
+         p.sort_order || 0, p.unit_count || 0,
+         p.managed_unit_count == null ? null : p.managed_unit_count,
+         p.price_from == null ? null : p.price_from,
+@@ -193,7 +198,7 @@ async function seedAll(conn, juzhuDir) {
+         enc(u.tags), u.unit_spec || null,
+         u.promo_price == null ? null : u.promo_price,
+         enc(u.amenities), enc(u.keeper), enc(u.rent_detail),
+-        u.sort_order || 0, u.cover_image || null,
++        u.sort_order || 0, normImg(u.cover_image) || null,
+       ]
+     );
+     nUnit += 1;
+@@ -205,7 +210,7 @@ async function seedAll(conn, juzhuDir) {
+       `INSERT INTO photos(id, entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+        VALUES(?,?,?,?,?,?,?)`,
+       [
+-        p.id, p.entity_type, p.entity_id, p.file_path,
++        p.id, p.entity_type, p.entity_id, normImg(p.file_path),
+         p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0,
+       ]
+     );
+@@ -265,7 +270,7 @@ async function backfillPhotos(conn, juzhuDir) {
+           enc(u.tags), u.unit_spec || null,
+           u.promo_price == null ? null : u.promo_price,
+           enc(u.amenities), enc(u.keeper), enc(u.rent_detail),
+-          u.sort_order || 0, u.cover_image || null,
++          u.sort_order || 0, normImg(u.cover_image) || null,
+         ]
+       );
+       nUnit += 1;
+@@ -287,7 +292,7 @@ async function backfillPhotos(conn, juzhuDir) {
+       await conn.execute(
+         `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order)
+          VALUES(?,?,?,?,?,?)`,
+-        [p.entity_type, p.entity_id, p.file_path, p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0]
++        [p.entity_type, p.entity_id, normImg(p.file_path), p.source_path || null, p.is_cover ? 1 : 0, p.sort_order || 0]
+       );
+       nPhoto += 1;
+     } catch (_) { /* 单条失败不中断后续封面回写 */ }
+diff --git a/img_storage.cjs b/img_storage.cjs
+index 3e50c41..78d973f 100644
+--- a/img_storage.cjs
++++ b/img_storage.cjs
+@@ -43,11 +43,79 @@ const MIME_EXT = {
+ };
+ const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
+ 
+-/** 存储模式：s3 = 已配置可用；local = 回落本地磁盘 */
++/** 存储模式：s3 = 已配置且未强制本地；local = 回落本地磁盘。
++ *  IMG_URL_MODE=local 是**最强回滚开关**：即使 S3 配置齐全也强制走本地（等价改造前行为）。 */
+ function storageMode() {
++  if (urlMode() === 'local') return 'local';
+   return S3.isConfigured() ? 's3' : 'local';
+ }
+ 
++/**
++ * 图片地址语义模式（灰度/回滚主开关，见 docs/s3-migration-plan.md S1-2）：
++ *   local  新上传也回落本地；读侧不改写            → 完全等价改造前
++ *   dual   （缺省）新上传走 S3；读侧兼容两种形态，存量路径不改写
++ *   s3     新上传走 S3 + 读侧把存量本地路径改写为 S3 URL（切读，无需改库即可灰度验证）
++ */
++function urlMode() {
++  const m = String(process.env.IMG_URL_MODE || 'dual').trim().toLowerCase();
++  return ['local', 'dual', 's3'].includes(m) ? m : 'dual';
++}
++
++/** 存量迁移 key 前缀（S2 用；读侧改写也用它，两者必须一致） */
++function migratePrefix() {
++  const p = String(process.env.S3_MIGRATE_PREFIX || '').trim().replace(/^\/+|\/+$/g, '');
++  return p || [S3.config().keyPrefix, 'legacy'].filter(Boolean).join('/');
++}
++
++/** `assets/juzhu/sy/x.jpg` → `<S3_MIGRATE_PREFIX>/juzhu/sy/x.jpg`（去 assets/ 前缀） */
++function legacyKeyOf(p) {
++  const rel = String(p || '').replace(/^\/+/, '').replace(/^assets\//i, '');
++  return [migratePrefix(), rel].filter(Boolean).join('/');
++}
++
++/** 存量本地路径 → 公网 URL */
++function legacyUrlOf(p) {
++  return S3.publicUrl(legacyKeyOf(p));
++}
++
++/**
++ * 图片引用归一化（写侧唯一入口）：任何入参都落成「可直接放进 <img src> 的值」
++ *   已 URL / data:            → 原样
++ *   s3://key                  → 公网 URL（始终转换）
++ *   /assets/... 或 assets/... → local/dual 原样保留；s3 模式改写为迁移后的公网 URL
++ *   裸 key（无 assets/ 前缀） → 公网 URL
++ */
++function normalizeImageRef(v) {
++  if (v == null) return v;
++  const s = String(v).trim();
++  if (!s) return v;
++  if (/^https?:\/\//i.test(s) || /^data:/i.test(s)) return s;
++  if (/^s3:\/\//i.test(s)) return S3.publicUrl(S3.normalizeKey(s));
++  if (isLocalPath(s)) return urlMode() === 's3' ? legacyUrlOf(s) : s;
++  return S3.isConfigured() ? S3.publicUrl(s) : s;
++}
++
++/** 读侧：与写侧同口径（s3 模式把存量本地路径改写为 S3 URL） */
++const resolveForRead = normalizeImageRef;
++
++/** 封面/图片引用是否「看起来可用」（上架闸用，避免脏值占位） */
++function isValidImageRef(v) {
++  if (v == null) return false;
++  const s = String(v).trim();
++  if (!s) return false;
++  return /^(https?:\/\/|data:|s3:\/\/|\/?assets\/)/i.test(s);
++}
++
++/** source_url 镜像域名白名单（S1-7，防 SSRF）；未配置 = 不限制 */
++function sourceUrlAllowed(u) {
++  const raw = String(process.env.S3_SOURCE_URL_ALLOWLIST || '').trim();
++  if (!raw) return true;
++  let host = '';
++  try { host = new URL(u).host.toLowerCase(); } catch (_) { return false; }
++  return raw.split(/[,\s]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)
++    .some((allow) => host === allow || host.endsWith('.' + allow));
++}
++
+ function maxBytes() {
+   const n = parseInt(process.env.S3_MAX_BYTES || '', 10);
+   return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_BYTES;
+@@ -178,6 +246,15 @@ function extFrom(filename, contentType) {
+  */
+ async function normalize(buffer, maxWidth) {
+   if (!sharp) return { buffer, changed: false, mime: '', width: null, height: null };
++  // IMG_NORMALIZE=0：关闭归一化/重编码（原图字节直传，保留 PNG 透明通道；决策 4 的逃生口）
++  if (String(process.env.IMG_NORMALIZE || '1') === '0') {
++    try {
++      const meta0 = await sharp(buffer, { failOn: 'none' }).metadata();
++      return { buffer, changed: false, mime: MIME_EXT['image/' + meta0.format] ? 'image/' + (meta0.format === 'jpeg' ? 'jpeg' : meta0.format) : '', width: meta0.width || null, height: meta0.height || null };
++    } catch (_) {
++      return { buffer, changed: false, mime: '', width: null, height: null };
++    }
++  }
+   try {
+     const meta = await sharp(buffer, { failOn: 'none' }).metadata();
+     if (meta.format === 'webp') return { buffer, changed: false, mime: 'image/webp', width: meta.width || null, height: meta.height || null };
+@@ -240,6 +317,9 @@ async function uploadImage(opts) {
+   // 远程镜像
+   if (!buffer && o.sourceUrl) {
+     if (!/^https?:\/\//i.test(o.sourceUrl)) return fail('sourceUrl 必须是 http(s) 地址');
++    if (!sourceUrlAllowed(o.sourceUrl)) {
++      return fail('sourceUrl 域名不在白名单内（S3_SOURCE_URL_ALLOWLIST）');
++    }
+     try {
+       const ac = new AbortController();
+       const timer = setTimeout(() => ac.abort(), 20000);
+@@ -352,11 +432,19 @@ async function migrateLocalToS3(localPath, opts) {
+ 
+ module.exports = {
+   storageMode,
++  urlMode,
+   maxBytes,
+   isLocalPath,
+   isS3Url,
+   parse,
+   resolveUrl,
++  migratePrefix,
++  legacyKeyOf,
++  legacyUrlOf,
++  normalizeImageRef,
++  resolveForRead,
++  isValidImageRef,
++  sourceUrlAllowed,
+   keyFor,
+   thumbKey,
+   thumbUrlOf,
+@@ -366,6 +454,7 @@ module.exports = {
+   migrateLocalToS3,
+   normalize,
+   makeThumbs,
++  mimeOfExt,
+   THUMB_SIZES,
+   LOCAL_URL_PREFIX,
+   _thumbCache: thumbCache,
+diff --git a/img_thumbs.cjs b/img_thumbs.cjs
+index 1232c12..c6138f9 100644
+--- a/img_thumbs.cjs
++++ b/img_thumbs.cjs
+@@ -88,6 +88,11 @@ function ensureThumb(urlPath, size) {
+ function thumbOf(urlPath, size) {
+   if (!isAssetImagePath(urlPath)) return remoteThumb(urlPath, size);
+   if (!sharp) return urlPath;
++  // IMG_URL_MODE=s3：存量本地路径先改写为迁移后的 S3 URL（切读灰度，无需改库）
++  if (imgStorage) {
++    const resolved = imgStorage.resolveForRead(String(urlPath));
++    if (resolved !== urlPath) return remoteThumb(resolved, size);
++  }
+   const tUrl = decodeURIComponent(urlPath).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+   try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
+   ensureThumb(urlPath, size);   // 后台补，立即返回原图（本次回退，下次命中）
+@@ -105,6 +110,11 @@ function mapThumbsDeep(obj, size) {
+         return /^https?:\/\//i.test(v) && REMOTE_IMG_RE.test(v) ? remoteThumb(v, size) : v;
+       }
+       if (!IMG_RE.test(v)) return v;
++      // IMG_URL_MODE=s3：存量本地路径改写为迁移后的 S3 URL（切读灰度，无需改库）
++      if (imgStorage) {
++        const resolved = imgStorage.resolveForRead(v);
++        if (resolved !== v) return remoteThumb(resolved, size);
++      }
+       const tUrl = decodeURIComponent(v).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+       try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
+       ensureThumb(v, size);
+diff --git a/juzhu-admin-unit.html b/juzhu-admin-unit.html
+index 3cbb148..b3903c2 100644
+--- a/juzhu-admin-unit.html
++++ b/juzhu-admin-unit.html
+@@ -219,8 +219,21 @@ function tagsStr(tags) {
+   return '';
+ }
+ 
++/** 图片地址归一：绝对 URL / data: / 根路径原样返回，其余补前导斜杠。
++ *  S3 迁移后 photos.file_path / *.cover_image 可能是完整 URL（见 docs/s3-migration-plan.md S0-3）。 */
++function imgUrl(p) {
++  if (!p) return '';
++  var s = String(p).trim();
++  if (/^https?:\/\//i.test(s) || s.indexOf('data:') === 0 || s.charAt(0) === '/') return s;
++  return '/' + s;
++}
++/** 仅用于拼 CSS background-image；值加引号防特殊字符 */
++function cssUrl(p) {
++  var u = imgUrl(p);
++  return u ? "url('" + u + "')" : 'none';
++}
+ function imgStyle(path) {
+-  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
++  return path ? 'background-image:' + cssUrl(path) : '';
+ }
+ 
+ /* ── Load data ── */
+@@ -280,8 +293,8 @@ function render() {
+       '<button type="button" class="btn danger fee_del">删</button></div>';
+   }).join('');
+ 
+-  var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
+-  var coverBg = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
++  var avBg = k.avatar ? 'background-image:' + cssUrl(k.avatar) : '';
++  var coverBg = u.cover_image ? 'background-image:' + cssUrl(u.cover_image) : '';
+ 
+   var html = '';
+ 
+@@ -421,7 +434,7 @@ function bindEvents() {
+   // Cover image
+   var coverInput = document.getElementById('u_cover');
+   if (coverInput) coverInput.oninput = function() {
+-    document.getElementById('coverPrev').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++    document.getElementById('coverPrev').style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+   };
+   var coverUpload = document.getElementById('coverUpload');
+   if (coverUpload) coverUpload.onchange = function() {
+@@ -434,7 +447,7 @@ function bindEvents() {
+     toast('上传中…');
+     uploadForm('/upload', fd).then(function(res) {
+       document.getElementById('u_cover').value = res.file_path;
+-      document.getElementById('coverPrev').style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
++      document.getElementById('coverPrev').style.backgroundImage = cssUrl(res.file_path);
+       toast('封面已上传');
+     }).catch(function(e){ toast('上传失败：'+e.message); });
+     coverUpload.value = '';
+@@ -444,7 +457,7 @@ function bindEvents() {
+   var avIn = document.querySelector('.ud_k_avatar');
+   var avPrev = document.querySelector('.ud_k_prev');
+   if (avIn) avIn.oninput = function() {
+-    avPrev.style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++    avPrev.style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+   };
+   var avatarUpload = document.querySelector('.ud_k_upload');
+   if (avatarUpload) avatarUpload.onchange = function() {
+@@ -457,7 +470,7 @@ function bindEvents() {
+     toast('上传中…');
+     uploadForm('/upload', fd).then(function(res) {
+       avIn.value = res.file_path;
+-      avPrev.style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
++      avPrev.style.backgroundImage = cssUrl(res.file_path);
+       toast('头像已上传');
+     }).catch(function(e){ toast('上传失败：'+e.message); });
+     avatarUpload.value = '';
+@@ -595,7 +608,7 @@ function bindPhotoEvents() {
+   document.querySelectorAll('.photo-card').forEach(function(card) {
+     var pid = +card.dataset.photo;
+     card.querySelector('.ph_path').oninput = function() {
+-      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++      card.querySelector('.pv').style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+     };
+     card.querySelector('.ph_save').onclick = function() {
+       api('/photos/'+pid, { method:'PUT', body: {
+diff --git a/juzhu-admin.html b/juzhu-admin.html
+index 46fcb21..4fbf113 100644
+--- a/juzhu-admin.html
++++ b/juzhu-admin.html
+@@ -637,8 +637,7 @@ function bindCoverUpload(inputId, previewId, getMeta) {
+     uploadImage(file, getMeta()).then(function(res) {
+       input.value = res.file_path;
+       if (previewId) {
+-        document.getElementById(previewId).style.backgroundImage =
+-          "url('/"+res.file_path.replace(/^\//,'')+"')";
++        document.getElementById(previewId).style.backgroundImage = cssUrl(res.file_path);
+       }
+       toast('上传成功');
+       fileInput.value = '';
+@@ -1646,8 +1645,21 @@ function photosOf(unitId) {
+     .sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0) || a.id - b.id; });
+ }
+ 
++/** 图片地址归一：绝对 URL / data: / 根路径原样返回，其余补前导斜杠。
++ *  S3 迁移后 photos.file_path / *.cover_image 可能是完整 URL（见 docs/s3-migration-plan.md S0-3）。 */
++function imgUrl(p) {
++  if (!p) return '';
++  var s = String(p).trim();
++  if (/^https?:\/\//i.test(s) || s.indexOf('data:') === 0 || s.charAt(0) === '/') return s;
++  return '/' + s;
++}
++/** 仅用于拼 CSS background-image；值加引号防特殊字符 */
++function cssUrl(p) {
++  var u = imgUrl(p);
++  return u ? "url('" + u + "')" : 'none';
++}
+ function imgStyle(path) {
+-  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
++  return path ? 'background-image:' + cssUrl(path) : '';
+ }
+ 
+ function renderNewProjectForm() {
+@@ -1816,7 +1828,7 @@ function renderEditor() {
+   if (!p) return;
+   var isTrade = p.channel === 'trade';
+   var chLabel = channelLabel(p.channel);
+-  var cover = p.cover_image ? "background-image:url('/"+p.cover_image.replace(/^\//,'')+"')" : '';
++  var cover = p.cover_image ? 'background-image:' + cssUrl(p.cover_image) : '';
+   var rs = p.rating_status || 'draft';
+   var rating = parseRating(p);
+   var ratingCard = '';
+@@ -1916,8 +1928,7 @@ function renderEditor() {
+     '</div>';
+ 
+   document.getElementById('p_cover').oninput = function() {
+-    document.getElementById('p_cover_prev').style.backgroundImage =
+-      this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++    document.getElementById('p_cover_prev').style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+   };
+   bindCoverUpload('p_cover', 'p_cover_prev', function() {
+     return { scope: 'project_cover', project_id: state.current.id };
+@@ -1997,7 +2008,7 @@ function renderUnitDetailPanel(u) {
+       '<input class="fee_val" value="'+esc(f.value||'')+'" placeholder="金额/单位"/>'+
+       '<button type="button" class="btn danger fee_del">删</button></div>';
+   }).join('');
+-  var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
++  var avBg = k.avatar ? 'background-image:' + cssUrl(k.avatar) : '';
+   return '<div class="unit-detail-panel" data-unit-detail="'+u.id+'">'+
+     '<div class="sec"><div class="sec-h">房源信息标签</div>'+
+       '<div class="detail-grid">'+
+@@ -2045,7 +2056,7 @@ function bindUnitDetailPanel(unitId) {
+   var avIn = panel.querySelector('.ud_k_avatar');
+   var avPrev = panel.querySelector('.ud_k_prev');
+   avIn.oninput = function() {
+-    avPrev.style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++    avPrev.style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+   };
+   var up = panel.querySelector('.ud_k_upload');
+   if (up) {
+@@ -2058,7 +2069,7 @@ function bindUnitDetailPanel(unitId) {
+       fd.append('unit_id', unitId);
+       uploadForm('/upload', fd).then(function(res) {
+         avIn.value = res.file_path;
+-        avPrev.style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
++        avPrev.style.backgroundImage = cssUrl(res.file_path);
+         toast('头像已上传');
+       }).catch(function(e){ toast('上传失败：'+e.message); });
+       up.value = '';
+@@ -2169,7 +2180,7 @@ function bindPhotoPanel(unitId) {
+   panel.querySelectorAll('.photo-card').forEach(function(card){
+     var pid = +card.dataset.photo;
+     card.querySelector('.ph_path').oninput = function(){
+-      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
++      card.querySelector('.pv').style.backgroundImage = this.value ? cssUrl(this.value) : 'none';
+     };
+     card.querySelector('.ph_save').onclick = function(){
+       api('/photos/'+pid, { method:'PUT', body: {
+@@ -2233,7 +2244,7 @@ function renderUnits(isTrade) {
+   var tbody = document.getElementById('unitRows');
+   var html = '';
+   state.units.forEach(function(u) {
+-    var th = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
++    var th = u.cover_image ? 'background-image:' + cssUrl(u.cover_image) : '';
+     var priceVal = isTrade ? (u.price_total||'') : (u.rent_monthly||'');
+     var pc = photosOf(u.id).length;
+     html += '<tr class="unit-main" data-id="'+u.id+'">'+
+diff --git a/juzhu/.env.example b/juzhu/.env.example
+index 71ca9e0..58e3022 100644
+--- a/juzhu/.env.example
++++ b/juzhu/.env.example
+@@ -58,3 +58,21 @@ S3_MAX_BYTES=12582912
+ S3_THUMB_REWRITE=1
+ # 单次请求超时（毫秒）
+ S3_TIMEOUT_MS=20000
++
++# ── 图片引用语义模式（灰度/回滚主开关，见 docs/s3-migration-plan.md S1-2）──
++# local  新上传也回落本地；读侧不改写              → 完全等价改造前（最强回滚）
++# dual   （缺省）新上传走 S3；读侧兼容两种形态，存量路径不改写
++# s3     新上传走 S3 + 读侧把存量本地路径改写为迁移后的 S3 URL（切读，无需改库即可灰度验证）
++IMG_URL_MODE=dual
++
++# 存量迁移 key 前缀（S2 迁移与 s3 模式读侧改写必须一致；缺省 = <S3_KEY_PREFIX>/legacy）
++S3_MIGRATE_PREFIX=lvju/legacy
++
++# 删除图片时是否同步删除对象存储（缺省 0：对象删除不可恢复，保守关闭）
++S3_DELETE_ON_PHOTO_DELETE=0
++
++# source_url 镜像域名白名单（逗号分隔，防 SSRF；空 = 不限制）
++S3_SOURCE_URL_ALLOWLIST=
++
++# 是否对上传图片做归一化重编码（1=统一转 JPEG，体积小但 PNG 透明会丢；0=原图字节直传）
++IMG_NORMALIZE=1
+diff --git a/package.json b/package.json
+index 0269f5a..88aa100 100644
+--- a/package.json
++++ b/package.json
+@@ -10,7 +10,12 @@
+     "cap:run": "npx cap run android",
+     "build:apk": "bash scripts/build-apk.sh",
+     "s3:smoke": "node scripts/s3_smoke.cjs",
+-    "s3:probe": "node scripts/s3_region_probe.cjs"
++    "s3:probe": "node scripts/s3_region_probe.cjs",
++    "s3:e2e": "node scripts/s3_api_e2e.cjs",
++    "test:admin-upload": "node scripts/admin_upload_multipart_regression.cjs",
++    "test:img-mode": "node scripts/img_url_mode_regression.cjs",
++    "s3:migrate": "node scripts/s3-migrate-images.cjs",
++    "s3:verify": "node scripts/s3-verify-images.cjs"
+   },
+   "dependencies": {
+     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
+diff --git a/perm_registry.cjs b/perm_registry.cjs
+index bc27bd8..198fc02 100644
+--- a/perm_registry.cjs
++++ b/perm_registry.cjs
+@@ -108,7 +108,7 @@ const ROUTES = [
+   // 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传（与 admin/upload 同权限面 house.write）
+   { method: 'POST',   re: '^/api/juzhu/admin/photos/upload$', perm: 'house.write', act: 'photo.upload', res: 'photos' },
+   { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
+-  { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },,
++  { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },
+   // 导出
+   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
+   // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）
+@@ -159,6 +159,14 @@ const ROUTES = [
+ ];
+ 
+ const _compiled = ROUTES.map((r) => Object.assign({}, r, { _re: new RegExp(r.re) }));
++// 防御：ROUTES 字面量里多写一个逗号会产生「数组空洞」，.map 会跳过它但 for...of 会取到 undefined，
++// 导致 permRegistry.match() 抛错 → 所有「凭据通过的 admin 请求」全部 500（2026-09-21 实际踩过）。
++// 这里在**模块加载期**直接失败，宁可起不来，也不要静默 500。
++for (let i = 0; i < _compiled.length; i += 1) {
++  if (!(i in _compiled) || !_compiled[i]) {
++    throw new Error(`perm_registry: ROUTES 第 ${i} 项为空（数组空洞/多余逗号），请检查 ROUTES 字面量`);
++  }
++}
+ const _permByCode = new Map(PERMS.map((p) => [p.code, p]));
+ 
+ /** 命中路由规则；未命中返回 null（调用方回退旧行为） */
+diff --git a/s3_client.cjs b/s3_client.cjs
+index 9034d11..505f284 100644
+--- a/s3_client.cjs
++++ b/s3_client.cjs
+@@ -466,6 +466,7 @@ async function detectSignVersion(probePrefix) {
+ 
+ module.exports = {
+   config,
++  extraHeaders,
+   isConfigured,
+   encodeKey,
+   normalizeKey,
+diff --git a/screens/p-rating-detail.html b/screens/p-rating-detail.html
+index 95fd768..0d7c0cc 100644
+--- a/screens/p-rating-detail.html
++++ b/screens/p-rating-detail.html
+@@ -470,7 +470,11 @@
+ 
+       var hero = document.querySelector('.house-hero');
+       if (hero && p.cover_image) {
+-        hero.querySelector('.img').innerHTML = '<img src="/'+p.cover_image.replace(/^\//,'')+'" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" alt=""/>';
++        // 图片地址归一：绝对 URL 直用（S3 迁移后 cover_image 可能是完整 URL），本地相对路径补前导斜杠
++        var coverSrc = /^(https?:)?\/\//i.test(p.cover_image) || p.cover_image.charAt(0) === '/'
++          ? p.cover_image
++          : '/' + String(p.cover_image).replace(/^\//, '');
++        hero.querySelector('.img').innerHTML = '<img src="' + coverSrc + '" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" alt=""/>';
+       }
+       if (hero) {
+         hero.querySelector('h4').textContent = p.name;
+diff --git a/screens/property-intake-api.html b/screens/property-intake-api.html
+index b043406..1997c44 100644
+--- a/screens/property-intake-api.html
++++ b/screens/property-intake-api.html
+@@ -357,7 +357,7 @@
+       <tr><td><code>district_id</code></td><td>int</td><td>★ 行政区 id（<code>districts.id</code>），须属于 <code>city_id</code></td></tr>
+       <tr><td><code>address</code></td><td>string</td><td>★ 详细地址；缺省自动拼「城市 · 名称」</td></tr>
+       <tr><td><code>slug</code></td><td>string</td><td>URL 标识；缺省由名称自动生成并保证同频道唯一</td></tr>
+-      <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 URL</td></tr>
++      <tr><td><code>cover_image</code></td><td>string</td><td>★ 封面图 <strong>公网 URL</strong>（如 <code>https://file.ljcdn.com/&lt;bucket&gt;/&lt;key&gt;</code>）；保存后原样回显，C 端直接使用。历史相对路径仍兼容</td></tr>
+       <tr><td><code>tags</code></td><td>string[]</td><td>★ 标签数组（如 <code>["保租房","近地铁"]</code>）</td></tr>
+       <tr><td><code>price_from</code></td><td>int</td><td>★ 起价，单位元。<code>rental</code> 口径为「元/月」，<code>minsu</code> 为「元/晚」；<strong>上架前置条件</strong></td></tr>
+       <tr><td><code>sort_order</code> / <code>is_featured</code> / <code>old_house_hint</code></td><td>—</td><td>★ 排序权重 / 平台精选（一般由平台设置）/ 卖旧买新提示</td></tr>
+@@ -368,6 +368,11 @@
+       <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>评级状态与结果（平台侧维护，商家只读）</td></tr>
+     </table>
+ 
++    <div class="callout info">
++      <strong>图片字段统一口径（2026-09）：</strong>所有图片字段（<code>cover_image</code>、<code>file_path</code> 等）保存与回显的都是<strong>可直接放进 <code>&lt;img src&gt;</code> 的值</strong>——新数据为对象存储公网 URL，历史数据为相对路径，两者服务端与 C 端都兼容。
++      三种上传方式任选：① 商家自有 CDN 链接经 <code>photos/upload</code> 的 <code>source_url</code> 镜像入库；② <code>base64</code>/<code>data_url</code> 直传；③ 自行上传后把公网 URL 交给 <code>photos/add</code>（<code>file_path</code>）。
++    </div>
++
+     <h3>3.2 户型（units）</h3>
+     <table>
+       <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+diff --git a/scripts/lvju-stay-seed.cjs b/scripts/lvju-stay-seed.cjs
+index 1ee9b56..348dba3 100644
+--- a/scripts/lvju-stay-seed.cjs
++++ b/scripts/lvju-stay-seed.cjs
+@@ -24,6 +24,11 @@ for (const f of ['juzhu/.env.local', '.env', 'runtime.env']) {
+ }
+ const mysql = require('mysql2/promise');
+ 
++/** 图片引用归一（S2-3）：dual 模式对本地路径是 no-op；IMG_URL_MODE=s3 时写入公网 URL */
++function normImg(v) {
++  try { return require('../img_storage.cjs').normalizeImageRef(v); } catch (_) { return v; }
++}
++
+ const CITY_SLUG = 'guiyang';
+ const VENDOR_LOGIN = 'shanshe'; // 山舍旅居托管（migrate-housing-channels.cjs 创建，lvju_host）
+ 
+@@ -90,7 +95,7 @@ async function seed(db) {
+       `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
+         sort_order,unit_count,managed_unit_count,price_from,owner_vendor_id,status,ext)
+        VALUES (?,?,?,?,?,?,?,?,900,?,?,?,?,'online',?)`,
+-      [cityId, districtIds[s.district], 'rental', s.name, s.slug, s.cover, address, JSON.stringify(s.tags),
++      [cityId, districtIds[s.district], 'rental', s.name, s.slug, normImg(s.cover), address, JSON.stringify(s.tags),
+         s.units.length, s.units.length, priceFrom, vendorId, PROJECT_EXT]);
+     const pid = r.insertId;
+     let seq = 0;
+diff --git a/scripts/spots-seed.cjs b/scripts/spots-seed.cjs
+index 371c8ca..b476e5c 100644
+--- a/scripts/spots-seed.cjs
++++ b/scripts/spots-seed.cjs
+@@ -27,6 +27,11 @@ for (const f of ['juzhu/.env.local', '.env', 'runtime.env']) {
+ }
+ const mysql = require('mysql2/promise');
+ 
++/** 图片引用归一（S2-3）：dual 模式对本地路径是 no-op；IMG_URL_MODE=s3 时写入公网 URL */
++function normImg(v) {
++  try { return require('../img_storage.cjs').normalizeImageRef(v); } catch (_) { return v; }
++}
++
+ const CITY_SLUG = 'guiyang';
+ const A = 'assets/lvju/';
+ // city_id=null = 全省通用（跨市目的地，任何项目可绑）；link 只挂已有 spot-detail 词条的 slug
+@@ -290,8 +295,8 @@ async function seed(db) {
+     const [r] = await db.execute(
+       `INSERT INTO spots(city_id,type,name,slug,icon,cover_image,summary,body,photos,address,duration,ticket,tags,link,sort_order,enabled)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+-      [city_id, s.type, s.name, s.slug, s.icon, s.cover, s.summary, s.body || null,
+-       JSON.stringify(s.photos || []), s.address || null, s.duration || null, s.ticket || null,
++      [city_id, s.type, s.name, s.slug, s.icon, normImg(s.cover), s.summary, s.body || null,
++       JSON.stringify((s.photos || []).map(normImg)), s.address || null, s.duration || null, s.ticket || null,
+        JSON.stringify(s.tags), s.link, s.sort]);
+     spotIds[s.slug] = r.insertId;
+     nNew++;
+diff --git a/vendor_api.cjs b/vendor_api.cjs
+index ff241e4..1784898 100644
+--- a/vendor_api.cjs
++++ b/vendor_api.cjs
+@@ -11,6 +11,11 @@ const MIN_PUBLISH_PHOTOS = 8;
+ let imgStorage = null;
+ try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
+ 
++/** 图片引用归一（写侧唯一入口，口径见 img_storage.normalizeImageRef） */
++function normImg(v) {
++  return imgStorage ? imgStorage.normalizeImageRef(v) : v;
++}
++
+ function reply(status, data) {
+   return { status, data };
+ }
+@@ -437,7 +442,9 @@ async function publishEligibility(conn, row) {
+   const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
+     WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
+   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`;
+-  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return '上架前须设置房源封面图';
++  // 封面判定（S1-4）：公网 URL / 本地 assets 路径均可；'todo' 之类脏值不算
++  const okCover = imgStorage ? imgStorage.isValidImageRef(row.cover_image) : !!row.cover_image;
++  if (!okCover && !Number(ph[0].has_cover || 0)) return '上架前须设置房源封面图（公网 URL 或本地 assets 路径均可）';
+   return null;
+ }
+ 
+@@ -539,7 +546,7 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
+       u.promo_price == null || u.promo_price === '' ? null : parseInt(u.promo_price, 10),
+       tagsToDb(u.amenities),
+       u.sort_order == null || u.sort_order === '' ? 99 : parseInt(u.sort_order, 10),
+-      u.cover_image || null,
++      normImg(u.cover_image) || null,
+       Object.keys(ext).length ? JSON.stringify(ext) : null,
+     ]
+   );
+@@ -586,7 +593,7 @@ async function housingProjectsCreate(conn, body, vendorId) {
+        owner_vendor_id, status, ext)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     [
+-      cityId, districtId, channel, name, slug, b.cover_image || null, address, tagsToDb(b.tags),
++      cityId, districtId, channel, name, slug, normImg(b.cover_image) || null, address, tagsToDb(b.tags),
+       b.sort_order == null || b.sort_order === '' ? 999 : parseInt(b.sort_order, 10),
+       Array.isArray(b.units) ? b.units.length : 0,
+       b.price_from == null || b.price_from === '' ? null : parseInt(b.price_from, 10),
+@@ -619,6 +626,7 @@ async function housingProjectsUpdate(conn, body, vendorId) {
+     if (col === 'name') continue;
+     if (Object.prototype.hasOwnProperty.call(b, col)) {
+       let v = b[col];
++      if (col === 'cover_image') v = normImg(v);
+       if (['sort_order', 'price_from', 'unit_count', 'managed_unit_count', 'featured_rank'].includes(col)) {
+         v = v == null || v === '' ? null : parseInt(v, 10);
+       } else if (col === 'is_featured') {
+@@ -703,7 +711,10 @@ async function housingUnitsUpdate(conn, body, vendorId) {
+   }
+   const sets = [], params = [];
+   for (const col of ['name', 'layout_label', 'unit_spec', 'cover_image']) {
+-    if (Object.prototype.hasOwnProperty.call(b, col)) { sets.push('`' + col + '`=?'); params.push(b[col]); }
++    if (Object.prototype.hasOwnProperty.call(b, col)) {
++      sets.push('`' + col + '`=?');
++      params.push(col === 'cover_image' ? normImg(b[col]) : b[col]);
++    }
+   }
+   for (const col of ['area_sqm']) {
+     if (Object.prototype.hasOwnProperty.call(b, col)) {
+@@ -750,7 +761,7 @@ async function housingPhotosAdd(conn, body, vendorId) {
+   const b = body || {};
+   const projectId = parseInt(b.project_id, 10);
+   const unitId = b.unit_id == null || b.unit_id === '' ? null : parseInt(b.unit_id, 10);
+-  const filePath = String(b.file_path || '').trim();
++  const filePath = normImg(String(b.file_path || '').trim());
+   if (!projectId || !filePath || filePath.length > 500) return reply(400, { code: 400, message: 'project_id 与 file_path 必填（URL 长度 ≤500）' });
+   const [projects] = await conn.execute('SELECT id, owner_vendor_id FROM projects WHERE id=?', [projectId]);
+   if (!projects.length || projects[0].owner_vendor_id !== vendorId) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+@@ -837,7 +848,7 @@ async function housingPhotosUpload(conn, body, vendorId) {
+   if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+   const [ins] = await conn.execute(
+     'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+-    [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
++    [entityType, entityId, normImg(upload.url), b.source_path || upload.key || null, isCover, sortOrder]
+   );
+   if (entityType === 'project' && isCover) {
+     await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
