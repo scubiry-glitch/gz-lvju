@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>贝壳 APP · 找房·旅居 频道首页</title>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.bootcdn.net/ajax/libs/vConsole/3.15.1/vconsole.min.js';
+  s.onload = function(){ try { window.__vc = new window.VConsole(); } catch (e) {} };
+  s.onerror = function(){
+    var s2 = document.createElement('script');
+    s2.src = 'https://unpkg.com/vconsole@3.15.1/dist/vconsole.min.js';
+    s2.onload = function(){ try { window.__vc = new window.VConsole(); } catch (e) {} };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <script src="lvju-app-config.js?v=1"></script>
 <script src="lvju-app-price.js?v=1"></script>
 <style>
@@ -274,8 +288,26 @@
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=4"></script>
+<script src="screens/_beike-login.js?v=6"></script>
 <script src="screens/_jzapi.js?v=7"></script>
+<script>
+(function(){
+  function dumpLogin(tag){
+    var L = window.BZF_BEIKE_LOGIN;
+    console.log('[login]', tag, {
+      BJZ_TOKEN: L && L.token ? L.token() : '',
+      lianjia_token: L && L.lianjiaToken ? L.lianjiaToken() : '',
+      accessToken: L && L.ljAccessToken ? L.ljAccessToken() : '',
+      beikeLoggedIn: L && L.beikeLoggedIn ? L.beikeLoggedIn() : false,
+      isBeikeApp: L && L.isBeikeApp ? L.isBeikeApp() : false,
+      userInfo: L && L.appUserInfo ? L.appUserInfo() : null,
+      cookie: (typeof document !== 'undefined' && document.cookie) || ''
+    });
+  }
+  dumpLogin('boot');
+  window.addEventListener('pageshow', function(){ dumpLogin('pageshow'); });
+})();
+</script>
 <script>
 /* 精选好房 = 后台 is_featured 优先，不足 2 个时由特色旅居项目补齐，统一读 catalog。
    左上角城市切换（口径与桌面首页一致）：URL ?city= > localStorage bzf_jz_city > 默认 贵阳；
