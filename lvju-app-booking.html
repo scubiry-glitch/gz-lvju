@@ -210,19 +210,16 @@
     document.getElementById('loginGate').style.display = 'block';
     document.getElementById('formBox').style.display = 'none';
     document.getElementById('cBar').style.display = 'none';
-    var sub = document.getElementById('gSub');
-    if (sub && msg) sub.textContent = msg;
-  }
-  function showGate(){
-    paintGate('默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）');
-    if (window.BZF_BEIKE_LOGIN) {
-      BZF_BEIKE_LOGIN.ensureAppLogin({
-        onReady: function(){ boot(); },
-        onNeedPassword: function(){
-          var inApp = BZF_BEIKE_LOGIN.isBeikeApp();
-          paintGate(inApp
-            ? '未从贝壳 App 取到登录态，请完成登录后返回；也可使用密码登录（首次输入即自动注册）'
-            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）');
+    // 贝壳 SDK 默认登录（App 环境）
+    var sdk = sdkProbe();
+    if (sdk && typeof sdk.getUserInfo === 'function') {
+      Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
+        var i = info && info.data ? info.data : info;
+        if (i && (i.uid || i.userId || i.id) && (i.phone || i.mobile)) {
+          return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ uid: String(i.uid || i.userId || i.id), phone: String(i.phone || i.mobile), name: (i.name || '').trim() }) })
+            .then(function(r){ return r.json(); })
+            .then(function(j){ if (j.ok && j.token) { try { localStorage.setItem('BJZ_TOKEN', j.token); localStorage.setItem('BZF_SESSION_TOKEN', j.token); } catch(e){} boot(); } });
         }
       });
     } else {
