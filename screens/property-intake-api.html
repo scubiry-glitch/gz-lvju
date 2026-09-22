@@ -301,6 +301,9 @@
       <li>追加 <code>timestamp</code>（毫秒时间戳）参与上述串；用 <code>hmac_key</code> 做 <strong>HMAC-SHA256</strong>，取 <strong>hex 小写</strong> 为 <code>sign</code>。</li>
       <li>请求体 = 业务参数 + <code>vendor_id</code> + <code>timestamp</code> + <code>sign</code>，<code>POST</code> JSON 发送。时间戳与服务器偏差 <strong>±5 分钟</strong> 内有效。</li>
     </ol>
+    <div style="margin-top:8px;padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;font-size:12.5px;color:#991b1b;">
+      ⚠️ <strong>数值字段一律传整数，禁止浮点</strong>（如 <code>price_night: 188</code>，不要 <code>188.0</code>）：Python 侧 <code>str(188.0)='188.0'</code> 而平台序列化为 <code>'188'</code>，两边签名串不一致会直接 <strong>401 验签失败</strong>。价格单位为元、取整数。
+    </div>
 
 <pre><code><span class="tok-com">// Node 签名示例</span>
 <span class="tok-key">const</span> crypto = require(<span class="tok-str">'crypto'</span>);
@@ -797,7 +800,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
   <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>,                        <span class="tok-com">// 0 或缺省 = 项目级（整栋 / 不限房型，容量恒 1）</span>
   <span class="tok-key">"dates"</span>: [<span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"2026-12-11"</span>],
-  <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// blocked 关房；open 开房</span>
+  <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// 可选：blocked 关房 / open 开房；缺省 = 保持各晚现状（只改价/净可售）</span>
   <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>,                 <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 不改价</span>
   <span class="tok-key">"qty"</span>: <span class="tok-key">null</span>,                         <span class="tok-com">// ★ 放出总量覆盖（1-999，仅房型级）：open + qty = 该晚只放 N 间；不传 = 用 total_qty</span>
   <span class="tok-key">"available_qty"</span>: <span class="tok-key">null</span>                  <span class="tok-com">// ★ 净可售（0-999，推荐，见 3.5）：与该晚的 qty 二选一；写回 qty 会把基线清空</span>
@@ -810,6 +813,12 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   ]
 }</code></pre>
     <ul style="font-size:13.5px;">
+      <li><strong>status 可选（2026-09-22）</strong>：只推价格 / 净可售时可以不传 <code>status</code>——对应间夜保持原状态（<code>blocked</code> 晚保持关房、<code>open</code> 晚保持可订），无差异行的晚按默认 <code>open</code> 建行。<code>status: open</code> 且价、放出量均不传 = 显式「恢复默认」。</li>
+      <li><strong>dates 支持对象数组（2026-09-22）</strong>：逐晚独立值，一次请求混合推送不同房态 / 价格——
+<pre><code>[{ <span class="tok-str">"stay_date"</span>: <span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"available_qty"</span>: <span class="tok-num">0</span>, <span class="tok-str">"status"</span>: <span class="tok-str">"open"</span> },
+ { <span class="tok-str">"stay_date"</span>: <span class="tok-str">"2026-12-11"</span>, <span class="tok-str">"price_night"</span>: <span class="tok-num">188</span> }]</code></pre>
+        字段缺省含义与顶层一致（<code>status</code> 缺省 = 保持现状）。平铺字符串数组 + 顶层字段形态继续可用（所有晚同值）。</li>
+      <li><strong>统一用 available_qty 管理房态（推荐）</strong>：<code>available_qty: 0 + status: open</code> 即「该晚 0 间可售」——剩余派生为 0、C 端显示售罄，效果等同关房，且随时可推一个正数恢复；不必在 open / blocked 之间切换语义。</li>
       <li><strong>已订晚（<code>booked_qty&gt;0</code>）不可关房</strong>：返回 400 并列出日期，须先取消订单；改价 / 调放出量不受限。</li>
       <li>未设置过的晚天然可订、放出 = 房型 <code>total_qty</code>（<strong>除非该房型开了「默认关房」，见 3.6</strong>）；「恢复默认」= status=open 且价、放出量均不传：清除差异行，<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>。</li>
       <li><strong>qty 与已订（多间口径 2026-09-10）</strong>：<code>qty</code> 低于该晚已订间数返回 400（先取消订单或调高）；<code>qty</code> 改变只影响当晚可订余量，已订单不受影响。剩余 = <code>max(0, qty||total_qty − booked_qty)</code>。</li>
@@ -840,6 +849,23 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   </section>
 
   <section id="faq">
+    <h2>Webhook 通知与审核自动上架（2026-09-22）</h2>
+    <h3>审核通过自动上架（auto_publish）</h3>
+    <p>默认行为：评级复核通过后，商家仍需自行调 <code>projects/status</code> 推 <code>online</code>。若希望<strong>复核通过即自动上架</strong>，在 <code>projects/create</code> 或 <code>projects/update</code> 传 <code>auto_publish: true</code>（存 <code>ext.auto_publish</code>，随时可传 <code>false</code> 关闭）。自动上架复用与商家推送<strong>完全相同</strong>的上架闸（评级通过 / 逐户型默认夜价 &gt; 0 / 图片抽检）与交易方式校验：闸全过 → 直接 <code>online</code>；任一不过 → 保持 <code>draft</code>，具体原因通过 <code>rating.reviewed</code> webhook 的 <code>auto_publish.reason</code> 带回，商家补齐后自行推送上架即可。</p>
+    <h3>评级审核结果 Webhook（rating.reviewed）</h3>
+    <p>评级复核（通过 / 驳回）完成时，平台向商家 <code>webhook_url</code> POST 一条签名通知，商家无需再轮询 <code>rating/status</code>。<strong>webhook_url 由商家自助配置</strong>：B 端后台「房源管理」（<code>b-listing-mgmt.html</code>）顶部「🔔 Webhook 通知」卡填写并保存，支持一键发送 <code>webhook.test</code> 连通性测试（同步回传送达结果）；推送与测试统一经平台出网防护层（内网 / 环回 / 云元数据地址拒绝）。</p>
+    <table>
+      <tr><th>字段</th><th>说明</th></tr>
+      <tr><td><code>event</code></td><td><code>rating.reviewed</code></td></tr>
+      <tr><td><code>vendor_id</code></td><td>商家 id</td></tr>
+      <tr><td><code>data.project_id</code> / <code>data.code</code> / <code>data.channel</code></td><td>房源 id / 评级编号（SY-RENT-… / MZ-…）/ 频道</td></tr>
+      <tr><td><code>data.rating_status</code></td><td><code>passed</code> / <code>rejected</code></td></tr>
+      <tr><td><code>data.rating_note</code> / <code>data.reviewed_at</code></td><td>复核备注 / 复核时间（ISO）</td></tr>
+      <tr><td><code>data.auto_publish</code></td><td><code>{enabled, attempted, result: published|blocked|skipped, reason?, warnings?}</code>；未开启 auto_publish 时 result=skipped</td></tr>
+      <tr><td><code>timestamp</code> / <code>sign</code></td><td>毫秒时间戳与 HMAC-SHA256 签名，<strong>对 <code>{event, vendor_id, data}</code> 按第 2 章同算法计算</strong>，商家按同规则验签</td></tr>
+    </table>
+    <p style="font-size:12.5px;color:var(--muted);">推送 5 秒超时，失败重试 3 次（5s/30s/120s）后放弃——webhook 只通知不担保必达，商家以 <code>projects/rating/status</code> 拉取对账兜底。响应返回任意 2xx 即视为送达。</p>
+
     <h2>附 · 常见接入疑问（答疑纪要 2026-09-10）</h2>
     <p>以下为首批接入方答疑结论，与线上实现同步校准；与本页正文冲突处以正文为准。</p>
     <table>

@@ -96,8 +96,8 @@ async function ensureVendor(db, v, bcrypt) {
   const [rows] = await db.execute('SELECT id FROM jz_vendors WHERE login_name=? LIMIT 1', [v.login_name]);
   if (rows.length) return rows[0].id;
   const [r] = await db.execute(
-    'INSERT INTO jz_vendors(type,name,status,login_name,password_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',
-    [v.type, v.name, 'active', v.login_name, bcrypt.hashSync(v.password, 10), new Date().toISOString().slice(0, 19).replace('T', ' '), new Date().toISOString().slice(0, 19).replace('T', ' ')]
+    'INSERT INTO jz_vendors(type,name,status,review_status,login_name,password_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)',
+    [v.type, v.name, 'active', 'approved', v.login_name, bcrypt.hashSync(v.password, 10), new Date().toISOString().slice(0, 19).replace('T', ' '), new Date().toISOString().slice(0, 19).replace('T', ' ')]
   );
   return r.insertId;
 }

@@ -98,7 +98,7 @@
     }
     .gov-side .item::before{content:"▸"; color:var(--muted); flex-shrink:0;}
 
-    /* 十受众价值矩阵 5×2 grid（含 5 类机构 + 政府/银行/持有方/租客/媒体）*/
+    /* 九受众价值矩阵 5×2 grid（含 4 类机构 + 政府/银行/持有方/租客/媒体）*/
     .audience-grid{
       display:grid; grid-template-columns:repeat(5, 1fr); gap:8px;
     }
@@ -296,11 +296,11 @@
       </div>
     </div>
 
-    <!-- § 2 十受众价值矩阵（5 类机构 + 政府/银行/持有方/租客/媒体） -->
+    <!-- § 2 九受众价值矩阵（4 类机构 + 政府/银行/持有方/租客/媒体） -->
     <div class="section">
       <div class="section-title">
         <span class="num">2</span>
-        <span class="label">十受众价值矩阵 · 同一底座 / 多种输出（5 类机构 + G/F/持有方/租客/媒体）</span>
+        <span class="label">九受众价值矩阵 · 同一底座 / 多种输出（4 类机构 + G/F/持有方/租客/媒体）</span>
         <span class="badge">公共数据产品</span>
       </div>
       <div class="audience-grid">
@@ -326,7 +326,7 @@
         </div>
         <div class="aud-card vendor">
           <div class="ah"><div class="icon">👥</div><div class="name">V 人力服务商</div></div>
-          <div class="scene">旗下持证 S 收入对比 · 项目交付准时率 · 跨工种调度 · 续约策略</div>
+          <div class="scene">旗下持证服务者收入对比 · 项目交付准时率 · 跨工种调度 · 续约策略</div>
           <div class="out">V 端运营版月报 + API</div>
         </div>
         <div class="aud-card supply">
@@ -338,11 +338,6 @@
           <div class="ah"><div class="icon">🎓</div><div class="name">T 培训机构</div></div>
           <div class="scene">学员通过率诊断 · 题库使用热区 · 工种需求预测 · 课程定价参考</div>
           <div class="out">T 端培训运营月报</div>
-        </div>
-        <div class="aud-card staff">
-          <div class="ah"><div class="icon">🛠</div><div class="name">S 服务者</div></div>
-          <div class="scene">个人业绩参考 · 户型定位推荐 · 区域行情速查</div>
-          <div class="out">S 端 App 内嵌</div>
         </div>
         <div class="aud-card user">
           <div class="ah"><div class="icon">🏠</div><div class="name">租客 / 用户</div></div>
@@ -357,7 +352,7 @@
       </div>
 
       <div class="impl-aligned cols-4">
-        <div class="impl-banner">📎 十受众触达 · 已实现页面（5 类机构 + 5 横向角色）</div>
+        <div class="impl-banner">📎 九受众触达 · 已实现页面（4 类机构 + 5 横向角色；服务者（人）页面见「人的标准」）</div>
         <div class="col">
           <div class="col-head">🏛 住建厅</div>
           <a href="g-dashboard.html" class="impl-pill">监管大屏<span class="file">g-dashboard.html</span></a>
@@ -392,11 +387,6 @@
           <div class="col-head">🎓 T 培训机构</div>
           <a href="training-orgs.html" class="impl-pill">T 公示名录<span class="file">training-orgs.html</span></a>
           <a href="t-courses.html" class="impl-pill">课程开发<span class="file">t-courses.html</span></a>
-        </div>
-        <div class="col">
-          <div class="col-head">🛠 S 服务者</div>
-          <a href="s-income.html" class="impl-pill">收入<span class="file">s-income.html</span></a>
-          <a href="s-orders.html" class="impl-pill">接单<span class="file">s-orders.html</span></a>
         </div>
         <div class="col">
           <div class="col-head">🏠 租客</div>

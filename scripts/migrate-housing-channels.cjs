@@ -130,8 +130,8 @@ function randPassword() {
     [PLATFORM_VENDOR.type, PLATFORM_VENDOR.name]);
   if (!pv.length) {
     const [r] = await conn.execute(
-      'INSERT INTO jz_vendors(type,name,status,sort_order,created_at,updated_at) VALUES (?,?,?,300,?,?)',
-      [PLATFORM_VENDOR.type, PLATFORM_VENDOR.name, 'active',
+      'INSERT INTO jz_vendors(type,name,status,review_status,sort_order,created_at,updated_at) VALUES (?,?,?,?,300,?,?)',
+      [PLATFORM_VENDOR.type, PLATFORM_VENDOR.name, 'active', 'approved',
         new Date().toISOString().replace(/\.\d+Z$/, 'Z'), new Date().toISOString().replace(/\.\d+Z$/, 'Z')]);
     pv = await conn.execute('SELECT id FROM jz_vendors WHERE id=?', [r.insertId]).then((x) => x[0]);
     log(`platform vendor #${pv[0].id} created`);
@@ -146,8 +146,8 @@ function randPassword() {
     const pwd = randPassword();
     const hash = bcrypt.hashSync(pwd, 10);
     const [r] = await conn.execute(
-      'INSERT INTO jz_vendors(type,name,login_name,password_hash,city_ids,status,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)',
-      [v.type, v.name, v.login, hash, v.cityIds, 'active', v.sort,
+      'INSERT INTO jz_vendors(type,name,login_name,password_hash,city_ids,status,review_status,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [v.type, v.name, v.login, hash, v.cityIds, 'active', 'approved', v.sort,
         new Date().toISOString().replace(/\.\d+Z$/, 'Z'), new Date().toISOString().replace(/\.\d+Z$/, 'Z')]);
     vendorIdByLogin[v.login] = r.insertId;
     passwords[v.login] = pwd;

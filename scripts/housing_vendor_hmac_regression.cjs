@@ -7,6 +7,8 @@
  *   更新(保险/最短连住) → 房态关房/开房/夜价 → 下单逐晚计价（覆盖价参与合计） → 下架 → 越权负例 → 清理
  *
  * 用法：node scripts/housing_vendor_hmac_regression.cjs [base_url]   # 默认 http://127.0.0.1:8766
+ * 注意：webhook 段用 127.0.0.1 收事件——目标实例需以 WEBHOOK_PRIVATE_ALLOW=1 启动（SSRF 防护的测试开关，
+ *   生产 8766 不开）。推荐：WEBHOOK_PRIVATE_ALLOW=1 PORT=38766 node app.js & 后跑本脚本 http://127.0.0.1:38766。
  * 凭证只读环境变量（MYSQL_* / JUZHU_DB_* / juzhu/.env.local），禁止写入仓库。
  */
 'use strict';

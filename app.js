@@ -1,4 +1,6 @@
 const http = require('http');
+const dns = require('dns');
+const net = require('net');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -870,6 +872,62 @@ async function cleanupExpiredBookingOrders() {
 // 重试 3 次（5s/30s/120s）仍失败即放弃，商家以 bookings/list 拉取对账兜底。
 const WEBHOOK_RETRY_DELAYS = [5000, 30000, 120000];
 
+/** 受防护的出网 POST（2026-09-22）：DNS 解析即校验（photo_config.ipIsBlocked 拦内网/环回/云元数据地址），
+ *  不跟随重定向、响应限 64KB、限时。webhook 投递与连通性测试统一走这里
+ *（规则 16：新增出网能力必须走这一层——webhook_url 开放商家自助配置后，投递侧是唯一拦截点）。 */
+function guardedPostJson(rawUrl, bodyObj, timeoutMs) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(rawUrl); } catch (_) { return resolve({ ok: false, error: 'URL 非法' }); }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return resolve({ ok: false, error: '仅支持 http/https' });
+    // IP 字面量主机 Node 会跳过 lookup 钩子直连（实测调用次数为 0），入口先行拦截（IPv6 去方括号后判）
+    const ipLiteral = u.hostname.replace(/^\[|\]$/g, '');
+    if (process.env.WEBHOOK_PRIVATE_ALLOW !== '1' && net.isIP(ipLiteral) && photoCfg.ipIsBlocked(ipLiteral)) {
+      return resolve({ ok: false, error: '目标地址为内网/环回/保留 IP，已拒绝' });
+    }
+    const data = Buffer.from(JSON.stringify(bodyObj), 'utf8');
+    let settled = false;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+    let req;
+    try {
+      req = (u.protocol === 'https:' ? https : http).request({
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || undefined,
+        path: u.pathname + (u.search || ''),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': data.length },
+        timeout: timeoutMs || 5000,
+        // DNS 解析即校验：命中的地址在建连前拦掉，避免解析后重绑定（与 photo_config 探测同口径）
+        // WEBHOOK_PRIVATE_ALLOW=1 仅供回归/联调实例放行内网目标（回归脚本用 127.0.0.1 收事件）；生产一律不开
+        lookup: (hostname, options, cb) => {
+          if (process.env.WEBHOOK_PRIVATE_ALLOW === '1') return dns.lookup(hostname, options, cb);
+          dns.lookup(hostname, { all: true }, (err, addrs) => {
+            if (err) return cb(err);
+            const list = Array.isArray(addrs) ? addrs : [addrs];
+            const bad = list.find((a) => photoCfg.ipIsBlocked(a.address));
+            if (bad) return cb(new Error('目标地址解析到内网/环回/元数据地址，已拒绝'));
+            const first = list[0];
+            if (options && options.all) return cb(null, list);
+            cb(null, first.address, first.family);
+          });
+        },
+      }, (res) => {
+        let n = 0;
+        res.on('data', (c) => {
+          n += c.length;
+          if (n > 65536) { req.destroy(); done({ ok: false, status: res.statusCode, error: '响应超过 64KB' }); }
+        });
+        res.on('end', () => done({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode }));
+        res.on('error', () => done({ ok: false, error: '响应读取失败' }));
+      });
+    } catch (e) { return done({ ok: false, error: String(e.message || e) }); }
+    req.on('timeout', () => { req.destroy(); done({ ok: false, error: '连接/响应超时' }); });
+    req.on('error', (e) => done({ ok: false, error: String(e.message || e) }));
+    req.end(data);
+  });
+}
+
 function webhookSign(secretKey, payload, timestamp) {
   const hmacAuth = require('./hmac_auth.cjs');
   const flat = hmacAuth.flattenAndFilter(payload);
@@ -880,21 +938,12 @@ function webhookSign(secretKey, payload, timestamp) {
 
 async function deliverWebhook(vendor, event, data, attempt) {
   const n = attempt || 0;
-  let res = null;
-  try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 5000);
-    res = await fetch(vendor.webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      signal: ac.signal,
-    }).finally(() => clearTimeout(timer));
-  } catch (_) { res = null; }
-  if (res && res.ok) {
+  const out = await guardedPostJson(vendor.webhook_url, data, 5000);   // 出网统一走 SSRF 防护层
+  if (out.ok) {
     console.log('[webhook] delivered', event, 'vendor#' + data.vendor_id, 'attempt', n + 1);
     return;
   }
+  console.warn('[webhook] attempt', n + 1, 'failed:', out.error || out.status);
   if (n < WEBHOOK_RETRY_DELAYS.length) {
     setTimeout(() => {
       deliverWebhook(vendor, event, data, n + 1).catch(() => {});
@@ -921,6 +970,30 @@ function notifyVendorBooking(vendorId, event, order) {
       event,
       vendor_id: vendorId,
       order,
+      timestamp: ts,
+      sign: webhookSign(v.hmac_key, payload, ts),
+    };
+    deliverWebhook(v, event, body, 0).catch(() => {});
+  })().catch((e) => console.warn('[webhook] notify error:', e.message));
+}
+
+/** 下发商家 webhook（通用事件，2026-09-22 商家诉求 3.2）：签名体 = {event, vendor_id, data}，
+ *  同开放接口算法；当前用于 rating.reviewed（评级复核结果）。未配 webhook_url = 不推送。 */
+function notifyVendorEvent(vendorId, event, data) {
+  (async () => {
+    const conn = await mysql2.createConnection(getDbConfig());
+    let v = null;
+    try {
+      const [rows] = await conn.execute('SELECT id, hmac_key, webhook_url FROM jz_vendors WHERE id=?', [vendorId]);
+      v = rows[0] || null;
+    } finally { await conn.end(); }
+    if (!v || !v.webhook_url || !v.hmac_key) return;
+    const ts = Date.now();
+    const payload = { event, vendor_id: vendorId, data };
+    const body = {
+      event,
+      vendor_id: vendorId,
+      data,
       timestamp: ts,
       sign: webhookSign(v.hmac_key, payload, ts),
     };
@@ -1608,7 +1681,7 @@ async function ensureSchemaRun() {
         updated_at VARCHAR(30)
         ,login_name VARCHAR(120)
         ,password_hash VARCHAR(255)
-        ,review_status VARCHAR(20) NOT NULL DEFAULT 'approved'
+        ,review_status VARCHAR(20) NOT NULL DEFAULT 'pending'
         ,review_note TEXT
         ,reviewed_at VARCHAR(30)
         ,commission_housing DECIMAL(5,2) DEFAULT NULL
@@ -1785,6 +1858,7 @@ async function ensureSchemaRun() {
         status VARCHAR(16) NOT NULL DEFAULT 'pending',
         rate_base DECIMAL(5,2) NOT NULL DEFAULT 10.00,
         rate_discount DECIMAL(5,2) DEFAULT NULL,
+        approved_vendor_id INT DEFAULT NULL,
         checklist_json TEXT,
         review_note VARCHAR(500) DEFAULT '',
         reviewer VARCHAR(64) DEFAULT '',
@@ -1793,7 +1867,8 @@ async function ensureSchemaRun() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_vo_status (status),
         INDEX idx_vo_no (apply_no),
-        INDEX idx_vo_phone (phone)
+        INDEX idx_vo_phone (phone),
+        INDEX idx_vo_vendor (approved_vendor_id)
       ) CHARSET=utf8mb4`,
     ];
     for (const ddl of ddls) {
@@ -1867,8 +1942,8 @@ async function ensureSchemaRun() {
     const nowLife = new Date().toISOString().slice(0, 19);
     for (const [id, type, name, logo, address, rating, reviews] of lifeVendors) {
       await conn.execute(
-        `INSERT IGNORE INTO jz_vendors(id,type,name,logo,address,rating,review_count,badges,live,start_price,unit,hours,status,sort_order,created_at,updated_at,city_ids)
-         VALUES(?,?,?,?,?,?,?,?,0,0,'起','09:00-21:00','active',?,?,?,NULL)`,
+        `INSERT IGNORE INTO jz_vendors(id,type,name,logo,address,rating,review_count,badges,live,start_price,unit,hours,status,review_status,sort_order,created_at,updated_at,city_ids)
+         VALUES(?,?,?,?,?,?,?,?,0,0,'起','09:00-21:00','active','approved',?,?,?,NULL)`,
         [id, type, name, logo, address, rating, reviews, JSON.stringify(['whitelist']), id, nowLife, nowLife]
       );
     }
@@ -1951,7 +2026,7 @@ async function ensureSchemaRun() {
       ['stay_calendar', 'qty_base INT'],                       // 净可售基线（2026-09 方案 B）：available_qty 推送时的已订数；NULL = 旧「放出总量」口径
       ['jz_vendors', 'login_name VARCHAR(120)'],
       ['jz_vendors', 'password_hash VARCHAR(255)'],
-      ['jz_vendors', "review_status VARCHAR(20) NOT NULL DEFAULT 'approved'"],
+      ['jz_vendors', "review_status VARCHAR(20) NOT NULL DEFAULT 'pending'"],   // 2026-09-22 从严：新建档默认待审（存量行不动；种子/流程内建档显式写 'approved'）
       ['jz_vendors', 'review_note TEXT'],
       ['jz_vendors', 'reviewed_at VARCHAR(30)'],
       ['jz_vendors', 'city_ids TEXT'],
@@ -1973,10 +2048,15 @@ async function ensureSchemaRun() {
       ['jz_products', 'channel_sku_id INT'],
       ['jz_products', 'path VARCHAR(500)'],
       ['jz_products', 'query VARCHAR(500)'],
+      ['vendor_onboarding', 'approved_vendor_id INT'],   // 受理台 ↔ 商家档案互通（2026-09-22）：approve 按 phone 单命中时记录关联商家
     ];
     for (const [table, ddl] of extraCols) {
       try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
     }
+    // 商家资质复审默认从严（2026-09-22）：旧库列已存在，ADD COLUMN 不换默认值，这里显式对齐——
+    // 新建档不再「生而 approved」（252 青屿民宿教训：脚本直插商家自证通过、零审计留痕），进待审视野。
+    // 只改列默认值，存量行原值不动；幂等可重跑。
+    try { await conn.execute("ALTER TABLE jz_vendors ALTER COLUMN review_status SET DEFAULT 'pending'"); } catch (_) { /* 表未就绪 */ }
     await ensureJzSkusIncludesColumn(conn);
     // 图集分类回填（2026-09 商家反馈点 4）：存量图无分类 → 'other'，幂等（只碰 NULL/空串行）
     try { await conn.execute("UPDATE photos SET category='other' WHERE category IS NULL OR category=''"); } catch (_) { /* 表未就绪 */ }
@@ -2388,7 +2468,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
       await ensureSchema();
       const qp = new URLSearchParams(qs);
       const st = (qp.get('status') || '').trim();
-      const sql = 'SELECT * FROM vendor_onboarding' + (st ? ' WHERE status=?' : '') + ' ORDER BY created_at DESC LIMIT 200';
+      const sql = 'SELECT vo.*, (SELECT v.name FROM jz_vendors v WHERE v.id = vo.approved_vendor_id) AS approved_vendor_name'
+        + ' FROM vendor_onboarding vo' + (st ? ' WHERE vo.status=?' : '') + ' ORDER BY vo.created_at DESC LIMIT 200';
       const rows = await queryRows(sql, st ? [st] : []);
       const byStatus = await queryRows('SELECT status, COUNT(*) AS c FROM vendor_onboarding GROUP BY status');
       const counts = {}; byStatus.forEach(r => { counts[r.status] = r.c; });
@@ -2444,6 +2525,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
               `UPDATE jz_vendors SET ${bizCols.map((c) => c + '=?').join(', ')} WHERE id=?`,
               [...bizCols.map(() => rateVal), vrows[0].id]
             );
+            // 受理台 ↔ 商家档案互通（2026-09-22）：申请单记下关联商家，详情/列表可回查
+            await queryRows('UPDATE vendor_onboarding SET approved_vendor_id=? WHERE id=?', [vrows[0].id, id]);
             backfillNote = '；费率已回填商家 ' + vrows[0].name + '（' + rateVal + '%）';
             await authCenter.audit({
               action: 'vendor.commission.update', resource: 'vendors', resourceId: String(vrows[0].id),
@@ -2624,7 +2707,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /admin/vendors/consult —— 商家维度咨询方式（C 端详情页左下角咨询入口优先级）
     if (urlPath === '/api/juzhu/admin/vendors' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
-      let sql = 'SELECT id, type, name, phone, city_ids, status, review_status, review_note, reviewed_at, created_at, updated_at FROM jz_vendors WHERE 1=1';
+      let sql = 'SELECT v.id, v.type, v.name, v.phone, v.city_ids, v.status, v.review_status, v.review_note, v.reviewed_at, v.created_at, v.updated_at,'
+        + ' (SELECT ob.apply_no FROM vendor_onboarding ob WHERE ob.approved_vendor_id = v.id ORDER BY ob.id DESC LIMIT 1) AS onboarding_apply_no'
+        + ' FROM jz_vendors v WHERE 1=1';
       const params = [];
       if (qp.get('review_status')) { sql += ' AND review_status=?'; params.push(qp.get('review_status')); }
       if (qp.get('status')) { sql += ' AND status=?'; params.push(qp.get('status')); }
@@ -2639,14 +2724,33 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (!['reviewing', 'approved', 'rejected'].includes(reviewStatus)) return jsonReply(res, { error: 'review_status 须为 reviewing/approved/rejected' }, 400);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
+          const vid = parseInt(m[1], 10);
+          const [curRows] = await conn.execute(
+            'SELECT id, name, review_status, status FROM jz_vendors WHERE id=?', [vid]);
+          if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          const cur = curRows[0];
           const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
           const nextStatus = reviewStatus === 'approved' ? 'active' : (reviewStatus === 'rejected' ? 'suspended' : 'active');
-          const [r] = await conn.execute(
+          await conn.execute(
             'UPDATE jz_vendors SET review_status=?, review_note=?, reviewed_at=?, status=?, updated_at=? WHERE id=?',
-            [reviewStatus, String(body.review_note || '').trim().slice(0, 1000) || null, now, nextStatus, now, parseInt(m[1], 10)]
+            [reviewStatus, String(body.review_note || '').trim().slice(0, 1000) || null, now, nextStatus, now, vid]
           );
-          if (!r.affectedRows) return jsonReply(res, { error: '商家不存在' }, 404);
-          return jsonReply(res, { ok: true, id: parseInt(m[1], 10), review_status: reviewStatus, status: nextStatus });
+          // 资质复审是准入动作：处理器内记 before/after（role.update 金标准），不只依赖 ROUTES 自动审计
+          const p = req.principal || {};
+          await authCenter.audit({
+            accountId: p.account && p.account.id,
+            principalType: 'account',
+            roles: p.roles,
+            action: 'vendor.review.update',
+            resource: 'vendors',
+            resourceId: String(vid),
+            scopeLevel: authCenter.bestScopeLevel(p),
+            result: 'ok',
+            before: { review_status: cur.review_status, status: cur.status },
+            after: { review_status: reviewStatus, status: nextStatus },
+            ip: p.ip, ua: p.ua,
+          });
+          return jsonReply(res, { ok: true, id: vid, review_status: reviewStatus, status: nextStatus });
         } finally { await conn.end(); }
       }
     }
@@ -5766,6 +5870,78 @@ async function handleApiDirect(urlPath, qs, req, res) {
 
     // ===== 商家（vendor）接口：role=vendor 会话，一律按 owner_vendor_id 隔离 =====
 
+    // GET /api/juzhu/vendor/webhook —— webhook 配置查看（2026-09-22 自助化 + 平台代管）
+    // vendor 会话：只看自己；platform 会话：全量商家清单（含各自 webhook_url），供 B 端下拉代管
+    if (urlPath === '/api/juzhu/vendor/webhook' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || (sess.role !== 'vendor' && sess.role !== 'platform')) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const EVENTS = ['rating.reviewed', 'booking.created', 'booking.paid', 'booking.cancelled', 'webhook.test'];
+      if (sess.role === 'vendor') {
+        const vrows = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [sess.vendorId]);
+        return jsonReply(res, { role: 'vendor', webhook_url: (vrows[0] && vrows[0].webhook_url) || '', events: EVENTS });
+      }
+      const vrows = await queryRows(
+        "SELECT id, name, webhook_url FROM jz_vendors WHERE status='active' AND type IN ('platform','housing_operator','lvju_host','homestay','developer','agent') ORDER BY sort_order, id");
+      return jsonReply(res, { role: 'platform', events: EVENTS, vendors: vrows.map((v) => ({ id: v.id, name: v.name, webhook_url: v.webhook_url || '' })) });
+    }
+
+    // POST /api/juzhu/vendor/webhook —— 配置/清除 webhook_url（vendor=自己；platform 带 vendor_id 代管）
+    //（URL 仅格式校验；内网/保留地址在投递侧由 guardedPostJson 的 DNS 解析拦截——解析后重绑定也拦得住）
+    if (urlPath === '/api/juzhu/vendor/webhook' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || (sess.role !== 'vendor' && sess.role !== 'platform')) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const body = await readBody(req);
+      const targetVid = sess.role === 'vendor' ? sess.vendorId : (parseInt(body.vendor_id, 10) || 0);
+      if (!targetVid) return jsonReply(res, { error: 'vendor_id 必填（平台代管）' }, 400);
+      if (sess.role === 'platform') {
+        const ex = await queryRows('SELECT id FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+        if (!ex.length) return jsonReply(res, { error: '商家不存在' }, 404);
+      }
+      const url = String(body.webhook_url || '').trim();
+      if (url && !/^https?:\/\//i.test(url)) return jsonReply(res, { error: 'webhook_url 须以 http:// 或 https:// 开头' }, 400);
+      if (url.length > 500) return jsonReply(res, { error: 'webhook_url 过长（≤500 字符）' }, 400);
+      const before = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+      await queryRows('UPDATE jz_vendors SET webhook_url=?, updated_at=? WHERE id=?',
+        [url || null, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+      try {
+        await authCenter.audit({
+          accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+          action: 'vendor.webhook.update', resource: 'vendor', resourceId: String(targetVid),
+          before: { webhook_url: (before[0] && before[0].webhook_url) || null },
+          after: { webhook_url: url || null }, result: 'ok',
+        });
+      } catch (_) {}
+      return jsonReply(res, { ok: true, webhook_url: url || null });
+    }
+
+    // POST /api/juzhu/vendor/webhook/test —— 同步试推一次 webhook.test（单次不重试，回传送达结果）
+    if (urlPath === '/api/juzhu/vendor/webhook/test' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || (sess.role !== 'vendor' && sess.role !== 'platform')) return jsonReply(res, { error: 'unauthorized' }, 401);
+      const body = await readBody(req);
+      const targetVid = sess.role === 'vendor' ? sess.vendorId : (parseInt(body.vendor_id, 10) || 0);
+      if (!targetVid) return jsonReply(res, { error: 'vendor_id 必填（平台代管）' }, 400);
+      const vrows = await queryRows('SELECT webhook_url, hmac_key FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+      const v = vrows[0];
+      if (!v || !v.webhook_url) return jsonReply(res, { error: '请先保存 webhook_url' }, 400);
+      if (!v.hmac_key) return jsonReply(res, { error: '商家未配置 hmac_key，无法签名' }, 400);
+      const ts = Date.now();
+      const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+      const payload = { event: 'webhook.test', vendor_id: targetVid, data };
+      const signed = { event: payload.event, vendor_id: targetVid, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts) };
+      const out = await guardedPostJson(v.webhook_url, signed, 5000);
+      try {
+        await authCenter.audit({
+          accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+          action: 'vendor.webhook.test', resource: 'vendor', resourceId: String(targetVid),
+          after: out, result: out.ok ? 'ok' : 'fail',
+        });
+      } catch (_) {}
+      return jsonReply(res, out.ok
+        ? { ok: true, status: out.status }
+        : { ok: false, error: out.error || ('HTTP ' + out.status), status: out.status || null });
+    }
+
     // POST /api/juzhu/vendor/login —— 商家登录（2026-09-09 并入账号中心：本路由只是别名，返回体形状不变，B 端页面零改动）
     // 凭据在 accounts（vendor_id 绑定 + vendor_owner 角色，scrypt）：
     // ① accounts 有账号 → authCenter.loginWithPassword 统一链（ident+ip 双维节流 / 锁定 / bcrypt 遗留哈希懒升级 / auth.login 审计）；
@@ -6348,7 +6524,53 @@ async function handleApiDirect(urlPath, qs, req, res) {
           );
           await conn.commit();
           const [updated] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
-          return jsonReply(res, { ok: true, project: updated[0] });
+          let proj = updated[0] || null;
+          // 3.1 审核通过自动上架（商家诉求 2026-09-22）：商家经 projects/create|update 配 ext.auto_publish=true 时，
+          // 平台复核通过即自动推 online——复用商家开放接口同一套上架闸与图片抽检（housingProjectsStatus），
+          // 闸不过保持 draft，原因随响应体与 rating.reviewed webhook 带回；未配置 flag 行为不变。
+          let autoPub = null;
+          if (action === 'passed' && proj) {
+            let extObj = {};
+            try { extObj = JSON.parse(proj.ext || '{}') || {}; } catch (_) { extObj = {}; }
+            autoPub = { enabled: extObj.auto_publish === true };
+            if (autoPub.enabled) {
+              autoPub.attempted = true;
+              const vapi = vendorApi || require('./vendor_api.cjs');
+              const r = await vapi.housingProjectsStatus(conn, { id: pid, status: 'online' }, proj.owner_vendor_id);
+              const d = (r && r.data) || {};
+              if (r && r.status === 200) {
+                autoPub.result = 'published';
+                if (d.warnings && d.warnings.length) autoPub.warnings = d.warnings;
+                const [r2] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);   // 回读，响应体反映自动上架后的状态
+                proj = r2[0] || proj;
+              } else {
+                autoPub.result = 'blocked';
+                autoPub.reason = d.message || '上架闸未通过';
+              }
+              try {
+                await authCenter.audit({
+                  accountId: (req.principal && req.principal.account && req.principal.account.id) || null,
+                  principalType: 'user', action: 'project.auto_publish', resource: 'projects', resourceId: String(pid),
+                  after: autoPub, result: autoPub.result === 'published' ? 'ok' : 'fail',
+                });
+              } catch (_) {}
+            }
+          }
+          // 3.2 评级审核结果 webhook（webhook_url 未配置 = 不推送；5s 超时，重试 5s/30s/120s）
+          if (proj) {
+            let ratingCode = null;
+            try { ratingCode = (JSON.parse(proj.rating || '{}') || {}).code || null; } catch (_) {}
+            notifyVendorEvent(proj.owner_vendor_id, 'rating.reviewed', {
+              project_id: pid,
+              code: ratingCode,
+              channel: proj.channel,
+              rating_status: action,
+              rating_note: body.note || null,
+              reviewed_at: now,
+              auto_publish: autoPub,
+            });
+          }
+          return jsonReply(res, { ok: true, project: proj, ...(autoPub ? { auto_publish: autoPub } : {}) });
         } finally { await conn.end(); }
       }
     }

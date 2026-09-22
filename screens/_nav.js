@@ -399,7 +399,7 @@
         { name: '三大标准', items: [
           { id: 'people-standard',   label: '人的标准 · 服务者认证体系',        href: 'd-people-standard.html',   icon: 'user' },
           { id: 'property-standard', label: '房的标准 · 好房子四维度+综合星级',  href: 'd-property-standard.html', icon: 'star' },
-          { id: 'org-standard',      label: '机构的标准 · 五类机构生态',         href: 'd-org-standard.html',      icon: 'box' },
+          { id: 'org-standard',      label: '机构的标准 · 四类机构生态',         href: 'd-org-standard.html',      icon: 'box' },
         ]},
         { name: '专题', collapsed: true, items: [
           { id: 'research-platform', label: '研判中台 · ' + R.operator + '数据资产输出', href: 'd-research-platform.html', icon: 'cpu' },
