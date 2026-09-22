@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>机构的标准 · 五类机构生态</title>
+  <title>机构的标准 · 四类机构生态</title>
   <style>
     :root {
       --bg: #f5f6f8;
@@ -67,9 +67,9 @@
     }
     .crosslink a{font-weight:600; text-decoration:underline;}
 
-    /* 五类机构总览（5 列） */
+    /* 四类机构总览（4 列） */
     .five-grid{
-      display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;
     }
     .org-card{
       border-radius:10px; padding:14px; color:#fff;
@@ -77,8 +77,7 @@
       position:relative; overflow:hidden;
       min-height:280px;
     }
-    /* 5 类机构配色：S 服务者(蓝) / B 运营商(青绿) / V 人力(橙) / M 物资(紫) / T 培训(紫罗兰) */
-    .org-card.staff    {background:linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);}        /* S 服务者 */
+    /* 4 类机构配色：B 运营商(青绿) / V 人力(橙) / M 物资(紫) / T 培训(紫罗兰)；S 服务者（人）归「人的标准」，不作机构类 */
     .org-card.op       {background:linear-gradient(135deg, #134e4a 0%, var(--op) 100%);}      /* B 运营商 */
     .org-card.vendor   {background:linear-gradient(135deg, #7c2d12 0%, var(--vendor) 100%);}  /* V 人力服务商 */
     .org-card.material {background:linear-gradient(135deg, #4c1d95 0%, var(--supplier) 100%);}/* M 物资供应商 */
@@ -94,7 +93,7 @@
     .section.collapsible.collapsed .section-title::after{transform:translateY(-50%) rotate(-90deg);}
     .section.collapsible.collapsed .collapsible-body{display:none;}
 
-    /* ===== § 2 五类机构 × P 中台 关系图谱 ===== */
+    /* ===== § 2 四类机构 × P 中台 关系图谱 ===== */
     .rel-wrap{display:grid; grid-template-columns:1.6fr 1fr; gap:18px; align-items:start;}
     .rel-svg{width:100%; height:auto; display:block; background:#fafbfc; border:1px solid var(--border); border-radius:10px;}
     .rel-legend{font-size:12px; line-height:1.65;}
@@ -284,6 +283,7 @@
       background:#fafafa; border:1px dashed #e2e8f0; border-radius:8px;
     }
     .impl-aligned.cols-3{grid-template-columns:repeat(3, 1fr);}
+    .impl-aligned.cols-4{grid-template-columns:repeat(4, 1fr);}
     .impl-aligned.cols-5{grid-template-columns:repeat(5, 1fr);}
     .impl-aligned.cols-6{grid-template-columns:repeat(6, 1fr);}
     .impl-aligned .impl-banner{
@@ -315,7 +315,7 @@
     }
     @media (max-width: 1100px){
       .five-grid{grid-template-columns:repeat(2, 1fr);}
-      .impl-aligned.cols-5, .impl-aligned.cols-6{grid-template-columns:repeat(3, 1fr);}
+      .impl-aligned.cols-4, .impl-aligned.cols-5, .impl-aligned.cols-6{grid-template-columns:repeat(3, 1fr);}
     }
     @media (max-width: 900px){
       .timeline-grid, .mode-grid, .biz-grid{grid-template-columns:1fr 1fr;}
@@ -331,32 +331,32 @@
 
   <div class="main-wrap">
     <div class="doc-header">
-      <h1>机构的标准 · 五类机构生态</h1>
-      <div class="sub">江苏保租房五类机构准入·协作·考核·退出全流程标准 · 政府背书 + 贝壳承建 + 同业开放</div>
+      <h1>机构的标准 · 四类机构生态</h1>
+      <div class="sub">江苏保租房四类机构准入·协作·考核·退出全流程标准 · 政府背书 + 贝壳承建 + 同业开放</div>
       <div class="tags">
-        <span class="tag">🛠 S 服务者</span>
         <span class="tag">🏬 B 白名单运营商</span>
         <span class="tag">👥 V 人力服务商</span>
         <span class="tag">🛒 M 物资供应商</span>
         <span class="tag">🎓 T 培训机构</span>
         <span class="tag" style="background:#f0fdf4; color:#0f766e; border:1px dashed #0f766e;">🏢 国企持有方（产权方·旁注）</span>
+        <span class="tag" style="background:#eff6ff; color:#1e40af; border:1px dashed #1e40af;">🛠 服务者（人）· 见「人的标准」</span>
       </div>
     </div>
 
     <div class="crosslink">
-      📐 顶层定位：与 <a href="d-people-standard.html">人的标准</a>、<a href="d-property-standard.html">房的标准</a> 三标合一 · 「人」回答谁来做、「房」回答做什么、本文回答<strong>谁能来、怎么来、来了怎么管</strong>。对应 <a href="d-master-blueprint.html">总图谱</a> 的「四方共建模式」机构生态层。参考前版 <a href="d-org-gov-standard.html">机构+政府合作模式 v1</a>。
+      📐 顶层定位：与 <a href="d-people-standard.html">人的标准</a>、<a href="d-property-standard.html">房的标准</a> 三标合一 · 「人」回答谁来做、「房」回答做什么、本文回答<strong>谁能来、怎么来、来了怎么管</strong>。服务者（个人持证）不属机构类，其准入/分级/星级统一由 <a href="d-people-standard.html">人的标准</a> 定义。对应 <a href="d-master-blueprint.html">总图谱</a> 的「四方共建模式」机构生态层。参考前版 <a href="d-org-gov-standard.html">机构+政府合作模式 v1</a>。
     </div>
 
-    <!-- § 1 五类机构 × P 认证中台 · 关系图谱 -->
+    <!-- § 1 四类机构 × P 认证中台 · 关系图谱 -->
     <div class="section">
       <div class="section-title">
         <span class="num">1</span>
-        <span class="label">五类机构 × P 服务认证中台 · 关系图谱</span>
+        <span class="label">四类机构 × P 服务认证中台 · 关系图谱</span>
         <span class="badge">谁认证谁 · 谁雇佣谁 · 谁供给谁</span>
       </div>
 
       <div class="rel-wrap">
-        <svg class="rel-svg" viewBox="0 0 720 460" xmlns="http://www.w3.org/2000/svg">
+        <svg class="rel-svg" viewBox="0 55 720 405" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <marker id="arr-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
               <path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/>
@@ -369,22 +369,19 @@
             </marker>
           </defs>
 
-          <!-- 主辐射：P → 5 机构（颁证 + 录入星级 + 公示） -->
+          <!-- 主辐射：P → 4 机构（颁证 + 录入星级 + 公示） -->
           <g stroke="#0f172a" stroke-width="1.6" fill="none" marker-end="url(#arr-p)" opacity="0.85">
-            <line x1="360" y1="220" x2="360" y2="60"/>     <!-- P → S 顶 -->
             <line x1="430" y1="200" x2="590" y2="100"/>    <!-- P → T 右上 -->
             <line x1="430" y1="240" x2="610" y2="240"/>    <!-- P → V 右 -->
             <line x1="430" y1="270" x2="580" y2="400"/>    <!-- P → M 右下 -->
             <line x1="290" y1="270" x2="140" y2="400"/>    <!-- P → B 左下 -->
           </g>
 
-          <!-- 业务流动：T 培训 → S/V/B；V 雇佣 S；V→B 派单；M→B 供货；S→B 执行 -->
+          <!-- 业务流动：T 培训 V 人员（服务者出证见人的标准）；V→B 派单；M→B 供货 -->
           <g stroke="#64748b" stroke-width="1.4" stroke-dasharray="5 3" fill="none" marker-end="url(#arr-flow)" opacity="0.75">
-            <path d="M 600 130 Q 470 80 410 60"/>                  <!-- T → S 培训出证 -->
             <path d="M 620 130 Q 660 200 640 240"/>                <!-- T → V 培训人员 -->
             <path d="M 580 270 Q 480 320 240 410"/>                <!-- V → B 派单 -->
             <path d="M 540 430 Q 320 460 180 430"/>                <!-- M → B 集采供货 -->
-            <path d="M 360 90 Q 220 220 160 400"/>                 <!-- S → B 执行 -->
           </g>
 
           <!-- 中心节点 P -->
@@ -394,13 +391,6 @@
             <text x="360" y="232" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">🛡</text>
             <text x="360" y="252" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">P 服务认证中台</text>
             <text x="360" y="268" text-anchor="middle" fill="#fbbf24" font-size="10">标准·颁证·星级·公示·验真</text>
-          </g>
-
-          <!-- S 服务者（顶） -->
-          <g>
-            <rect x="290" y="20" width="140" height="50" rx="10" fill="#2563eb" stroke="#1e3a8a" stroke-width="1.5"/>
-            <text x="360" y="42" text-anchor="middle" fill="#fff" font-size="16">🛠</text>
-            <text x="360" y="60" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">S · 服务者（个人持证）</text>
           </g>
 
           <!-- T 培训（右上） -->
@@ -437,7 +427,7 @@
               fill="#f0fdf4" stroke="#0f766e" stroke-width="1.5" stroke-dasharray="5 3"/>
             <text x="107" y="262" text-anchor="middle" fill="#0f766e" font-size="13">🏢</text>
             <text x="107" y="280" text-anchor="middle" fill="#134e4a" font-size="11" font-weight="700">国企持有方（产权）</text>
-            <text x="107" y="294" text-anchor="middle" fill="#0f766e" font-size="10">资产委托 · 不在 5 类机构内</text>
+            <text x="107" y="294" text-anchor="middle" fill="#0f766e" font-size="10">资产委托 · 不在 4 类机构内</text>
             <!-- 委托运营→B -->
             <path d="M 110 305 Q 110 360 140 395"
               stroke="#0f766e" stroke-width="1.6" fill="none"
@@ -446,69 +436,50 @@
           </g>
 
           <!-- 箭头中段文字注解 -->
-          <text x="370" y="130" fill="#0f172a" font-size="10" font-weight="600">颁证</text>
           <text x="495" y="148" fill="#0f172a" font-size="10" font-weight="600">资质 LV</text>
           <text x="510" y="232" fill="#0f172a" font-size="10" font-weight="600">服务商 LV1-5</text>
           <text x="495" y="345" fill="#0f172a" font-size="10" font-weight="600">物资 LV</text>
           <text x="230" y="345" fill="#0f172a" font-size="10" font-weight="600">白名单 + 星级</text>
 
-          <text x="450" y="50" fill="#64748b" font-size="9.5" font-style="italic">T 培训 → S 持证</text>
-          <text x="555" y="195" fill="#64748b" font-size="9.5" font-style="italic">T 培训 V 人员</text>
+          <text x="660" y="180" fill="#64748b" font-size="9.5" font-style="italic">T 培训 V 人员</text>
           <text x="400" y="380" fill="#64748b" font-size="9.5" font-style="italic">V 派单</text>
           <text x="340" y="450" fill="#64748b" font-size="9.5" font-style="italic">M 集采供货</text>
-          <text x="200" y="200" fill="#64748b" font-size="9.5" font-style="italic">S 执行运营</text>
         </svg>
 
         <div class="rel-legend">
           <h4>🧭 关系一句话</h4>
           <div class="li"><span class="swatch" style="background:#0f172a;"></span><div class="text">
-            <strong>P 是中心</strong> —— 给 S/B/V/M/T 五类全部颁证、录入星级、提供公示验真。
-          </div></div>
-          <div class="li"><span class="swatch" style="background:#2563eb;"></span><div class="text">
-            <strong>S 服务者</strong>（个人持证）— 被 V 雇佣 · 被 B 派单 · 受 T 培训出证。
+            <strong>P 是中心</strong> —— 给 B/V/M/T 四类全部颁证、录入星级、提供公示验真。
           </div></div>
           <div class="li"><span class="swatch" style="background:#0f766e;"></span><div class="text">
-            <strong>B 白名单运营商</strong> — 国企持有方委托运营 · 调度 V/S/M/T 四方资源做日常动作。
+            <strong>B 白名单运营商</strong> — 国企持有方委托运营 · 调度 V/M/T 三方资源做日常动作。
           </div></div>
           <div class="li"><span class="swatch" style="background:#c2410c;"></span><div class="text">
-            <strong>V 人力服务商</strong> — 雇佣 S 服务者，把团体派给 B 运营商，受 T 培训。
+            <strong>V 人力服务商</strong> — 雇佣持证服务者（人），把团体派给 B 运营商，受 T 培训。
           </div></div>
           <div class="li"><span class="swatch" style="background:#6b21a8;"></span><div class="text">
             <strong>M 物资供应商</strong> — 省级集采，给 B 运营商供货（家具/家电/建材/智能锁/涂料/卫浴 6 类）。
           </div></div>
           <div class="li"><span class="swatch" style="background:#7c3aed;"></span><div class="text">
-            <strong>T 培训机构</strong> — 培训 S 服务者持证 + V 人员复训 + B 内训定向培训。
+            <strong>T 培训机构</strong> — 培训服务者持证出证 + V 人员复训 + B 内训定向培训。
           </div></div>
           <div class="note">
-            🏢 <b>国企持有方</b> 不在 5 类机构内 —— 它是 <b>资产方/产权方</b>，通过"委托运营"把资产交给 B 运营商执行；自身仍接受 P 中台的合规备案，但日常派单/上架/管家等动作 <b>不做</b>（详见 CLAUDE 规则 4）。
+            🏢 <b>国企持有方</b> 不在 4 类机构内 —— 它是 <b>资产方/产权方</b>，通过"委托运营"把资产交给 B 运营商执行；自身仍接受 P 中台的合规备案，但日常派单/上架/管家等动作 <b>不做</b>（详见 CLAUDE 规则 4）。<br/>
+            🛠 <b>服务者（人 · 个人持证）</b> 同样不属机构类 —— 个人准入、L0-L7 持证与星级统一由 <a href="d-people-standard.html" style="text-decoration:underline; font-weight:600;">人的标准</a> 定义，V 的「旗下持证人数」与 T 的「出证」均引用该体系。
           </div>
         </div>
       </div>
     </div>
 
-    <!-- § 2 五类机构总览 -->
+    <!-- § 2 四类机构总览 -->
     <div class="section">
       <div class="section-title">
         <span class="num">2</span>
-        <span class="label">五类机构总览 · 准入 / 协作 / 考核 / 贡献四维度</span>
+        <span class="label">四类机构总览 · 准入 / 协作 / 考核 / 贡献四维度</span>
         <span class="badge">机构生态架构</span>
       </div>
 
       <div class="five-grid">
-        <div class="org-card staff">
-          <div class="oh">
-            <div class="icon">🛠</div>
-            <div>
-              <div class="name">S · 服务者</div>
-              <div class="scope">持证个人 · 一线执行<br/>管家 / 维修 / 带看 / 装修工</div>
-            </div>
-          </div>
-          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台个人证（L0-L7）+ 人社备案</div></div>
-          <div class="o-row"><span class="lbl">协作</span><div class="txt">受 V 雇佣 / B 派单 · S 端 App 接单履约</div></div>
-          <div class="o-row"><span class="lbl">考核</span><div class="txt">业绩量 · 客户评分 ≥4.4 · 持证升级</div></div>
-          <div class="o-row"><span class="lbl">贡献</span><div class="txt">5000+ 持证 · 服务素质 · 一线触达租客</div></div>
-        </div>
-
         <div class="org-card op">
           <div class="oh">
             <div class="icon">🏬</div>
@@ -518,7 +489,7 @@
             </div>
           </div>
           <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台白名单 + 省房协认证 + 5 年托管经验</div></div>
-          <div class="o-row"><span class="lbl">协作</span><div class="txt">国企持有方委托 · 调度 V/S/M/T 四方资源</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">国企持有方委托 · 调度 V/M/T 三方资源</div></div>
           <div class="o-row"><span class="lbl">考核</span><div class="txt">入住率 · 投诉率 · SLA 时效 · 续约率 · 星级</div></div>
           <div class="o-row"><span class="lbl">贡献</span><div class="txt">专业化运营 · 标准化交付 · 同业对标</div></div>
         </div>
@@ -531,8 +502,8 @@
               <div class="scope">服务者所属机构 · 团体雇主<br/>派单接单 / 装修交付 / 服家团队</div>
             </div>
           </div>
-          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 V 端入驻 + 旗下持证 S ≥10</div></div>
-          <div class="o-row"><span class="lbl">协作</span><div class="txt">雇佣 S 服务者 · 承接 B 运营商派单（分账 3/2/3）</div></div>
+          <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 V 端入驻 + 旗下持证服务者 ≥10</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">雇佣持证服务者 · 承接 B 运营商派单（分账 3/2/3）</div></div>
           <div class="o-row"><span class="lbl">考核</span><div class="txt">持证率 · 业绩量 · 项目交付准时率</div></div>
           <div class="o-row"><span class="lbl">贡献</span><div class="txt">人力规模 · 服务素质 · 项目交付能力</div></div>
         </div>
@@ -560,24 +531,18 @@
             </div>
           </div>
           <div class="o-row"><span class="lbl">资质</span><div class="txt">P 中台 T 端入驻 + 人社认证 + 讲师持证</div></div>
-          <div class="o-row"><span class="lbl">协作</span><div class="txt">培训 S 服务者 + V 人员 + B 内训 · 出"持证人"</div></div>
+          <div class="o-row"><span class="lbl">协作</span><div class="txt">培训服务者持证 + V 人员 + B 内训 · 出"持证人"</div></div>
           <div class="o-row"><span class="lbl">考核</span><div class="txt">学员通过率 · 课程评分 · 排课满载率</div></div>
           <div class="o-row"><span class="lbl">贡献</span><div class="txt">人才输送 · 标准化培训 · L0-L7 持证体系</div></div>
         </div>
       </div>
 
       <div class="unified-bar">
-        <div class="ub"><span class="em">5 类机构 · 4 维度标准</span>资质准入 · 协作模式 · 考核指标 · 价值贡献</div>
+        <div class="ub"><span class="em">4 类机构 · 4 维度标准</span>资质准入 · 协作模式 · 考核指标 · 价值贡献</div>
       </div>
 
-      <div class="impl-aligned cols-5">
-        <div class="impl-banner">📎 五类机构 · 已实现页面（与上方 5 张 org-card 对齐）</div>
-        <div class="col">
-          <div class="col-head">🛠 S 服务者</div>
-          <a href="service-workers.html" class="impl-pill">服务者公示<span class="file">service-workers.html</span></a>
-          <a href="home.html" class="impl-pill">服务者 App 首页<span class="file">home.html</span></a>
-          <a href="s-orders.html" class="impl-pill">订单履约<span class="file">s-orders.html</span></a>
-        </div>
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 四类机构 · 已实现页面（与上方 4 张 org-card 对齐；服务者（人）页面见「人的标准」）</div>
         <div class="col">
           <div class="col-head">🏬 B 白名单运营商</div>
           <a href="operators.html" class="impl-pill">同业开放公示<span class="file">operators.html</span></a>
@@ -678,26 +643,16 @@
       </div>
     </div>
 
-    <!-- § 4 五类机构分级标准（可收起） -->
+    <!-- § 4 四类机构分级标准（可收起） -->
     <div class="section collapsible collapsed" id="sec-grading">
       <div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')">
         <span class="num">4</span>
-        <span class="label">五类机构分级标准 · 每类机构的 LV1–LV3</span>
+        <span class="label">四类机构分级标准 · 每类机构的 LV1–LV3</span>
         <span class="badge">向上跃迁路径 · 点击展开/收起</span>
       </div>
 
      <div class="collapsible-body">
       <div class="five-grid">
-        <div class="org-card staff">
-          <div class="oh">
-            <div class="icon">🛠</div>
-            <div><div class="name">S 服务者分级</div><div class="scope">按持证等级（个人）</div></div>
-          </div>
-          <div class="o-row"><span class="lbl">L0-L1</span><div class="txt">见习/初级 · 基础持证 · 单一岗位</div></div>
-          <div class="o-row"><span class="lbl">L2-L3</span><div class="txt">熟练/资深 · 跨岗 · 客评 ≥4.4 · 可独立带新</div></div>
-          <div class="o-row"><span class="lbl">L4-L5</span><div class="txt">专家/领军 · 跨项目调度 · 参与标准/题库共建</div></div>
-        </div>
-
         <div class="org-card op">
           <div class="oh">
             <div class="icon">🏬</div>
@@ -739,12 +694,8 @@
         </div>
       </div>
 
-      <div class="impl-aligned cols-5">
-        <div class="impl-banner">📎 分级标准 · 已实现页面（与上方 5 类机构分级对齐）</div>
-        <div class="col">
-          <div class="col-head">S 服务者分级</div>
-          <a href="service-workers.html" class="impl-pill">服务者公示 + 持证<span class="file">service-workers.html</span></a>
-        </div>
+      <div class="impl-aligned cols-4">
+        <div class="impl-banner">📎 分级标准 · 已实现页面（与上方 4 类机构分级对齐；服务者 L0-L7 持证分级见「人的标准」）</div>
         <div class="col">
           <div class="col-head">B 运营商分级</div>
           <a href="b-perf-renewal.html" class="impl-pill">绩效与续约<span class="file">b-perf-renewal.html</span></a>
@@ -976,14 +927,14 @@
         <div class="tl-card s1">
           <div class="date">2026.6</div>
           <div class="t">机构标准发布</div>
-          <div class="d">五类机构准入标准定稿 · 接受市场监管局公平竞争审查</div>
+          <div class="d">四类机构准入标准定稿 · 接受市场监管局公平竞争审查</div>
           <div class="metric">✓ 标准 1.0 发文</div>
         </div>
         <div class="tl-card s2">
           <div class="date">2026.7</div>
           <div class="t">首批机构入驻</div>
-          <div class="d">南京浦口标杆配套 · 5 类机构各首批 5 家</div>
-          <div class="metric">✓ 25 家机构持证</div>
+          <div class="d">南京浦口标杆配套 · 4 类机构各首批 5 家</div>
+          <div class="metric">✓ 20 家机构持证</div>
         </div>
         <div class="tl-card s3">
           <div class="date">2026.8–10</div>
@@ -1012,7 +963,7 @@
           <a href="g-policy.html" class="impl-pill">政策发文<span class="file">g-policy.html</span></a>
         </div>
         <div class="col">
-          <div class="col-head">2026.7 首批 25</div>
+          <div class="col-head">2026.7 首批 20</div>
           <a href="g-whitelist-operator.html" class="impl-pill">白名单审定<span class="file">g-whitelist-operator.html</span></a>
         </div>
         <div class="col">
@@ -1097,8 +1048,8 @@
     </div>
 
     <div class="doc-footer">
-      <div class="em">建立江苏保租房五类机构生态</div>
-      <div class="sub">国企·运营·服务者·物资·培训 五位一体 · 政府背书 + 贝壳承建 + 同业开放 · 合规可持续</div>
+      <div class="em">建立江苏保租房四类机构生态</div>
+      <div class="sub">运营·人力·物资·培训 四类机构 × 国企持有方（产权） · 政府背书 + 贝壳承建 + 同业开放 · 合规可持续</div>
     </div>
   </div>
 
