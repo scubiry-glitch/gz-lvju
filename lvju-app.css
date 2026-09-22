@@ -103,11 +103,12 @@ h1,h2,h3,h4{margin:0;}
 .lrow .info .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
 .lrow .info .tags span{font-size:9.5px;color:var(--brand-deep);background:var(--brand-soft);padding:1px 7px;border-radius:5px;}
 .lrow .pr{margin-top:8px;display:flex;align-items:baseline;justify-content:space-between;}
-.lrow .pr b{color:var(--gold-deep);font-size:17px;font-family:var(--serif);}
+/* 价格与按钮禁止收缩换行（CJK 逐字断行会把「价格面议」挤成竖排）；长文案一律由 .unit 收缩出省略号 */
+.lrow .pr b{color:var(--gold-deep);font-size:17px;font-family:var(--serif);white-space:nowrap;flex-shrink:0;}
 .lrow .pr b small{font-size:10px;color:var(--muted);font-weight:400;font-family:var(--font);}
-.lrow .pr .unit{font-size:10px;color:var(--muted);}
+.lrow .pr .unit{font-size:10px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 /* 预订/咨询角标：开通过按晚预订 = 实心「预订」；未开通 = 琥珀「📞 咨询」（口径 2026-09-05） */
-.lrow .pr .bk{font-size:10px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:3px 10px;border-radius:999px;}
+.lrow .pr .bk{font-size:10px;font-weight:600;color:var(--brand-deep);background:var(--brand-soft);padding:3px 10px;border-radius:999px;flex-shrink:0;white-space:nowrap;}
 .mcard .pr .bk.tel,.lrow .pr .bk.tel{color:#92400e;background:#fef3c7;}
 
 /* ---------- tiles grid (内容服务 / 便民) ---------- */
