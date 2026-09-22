@@ -1,3 +1,5 @@
+(node:2079944) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
 PASS  测试项目创建（city A / trade）
 PASS  city 档 org/report 200
 PASS  city 档响应带 scope 声明

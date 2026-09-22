@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "origin": "https://sytest.meizu.life",
+  "checks": [
+    {
+      "name": "Static visual contracts include QR expiry, status hierarchy and reduced motion",
+      "passed": true
+    },
+    {
+      "name": "Consumer pages stay within the viewport at 320/390/430/1440px",
+      "passed": true
+    },
+    {
+      "name": "Home and shop controls preserve 44px touch targets and concise cards",
+      "passed": true
+    },
+    {
+      "name": "Membership first screen exposes highlights, wallet and non-sticky CTA",
+      "passed": true
+    },
+    {
+      "name": "Account profile keeps name and login aligned without wrapping",
+      "passed": true
+    },
+    {
+      "name": "Loading feedback keeps layout and announces an in-progress state",
+      "passed": true
+    },
+    {
+      "name": "No uncaught JavaScript errors on the audited routes",
+      "passed": true
+    }
+  ],
+  "page_errors": [],
+  "captured_at": "2026-09-22T01:43:08.231Z",
+  "data_mutations": 0
+}
