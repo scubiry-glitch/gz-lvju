@@ -6,18 +6,20 @@
  *   BZF_BEIKE_LOGIN.gateThenGo(nextUrl);
  *   引入后自动拦截 tabbar「订单 / 我的」点击。
  *
- * 口径：
+ * 口径（wiki 登录常见问题 · APP端接入）：
  *  1. 已有 BJZ_TOKEN → 直接放行。
- *  2. Morph 同款：getCookie('lianjia_token') 或 $ljBridge.getAccessToken / getUserInfo
- *     视为贝壳已登录，再 POST /api/juzhu/auth/beike 换成 BJZ_TOKEN。
- *  3. 都没有：App 内 Login.toLogin → $ljBridge.actionLogin(当前页)；浏览器走密码门。
- *  4. 登录回跳无 JS 回调，回跳后自己再读 cookie / getUserInfo。
+ *  2. 从 App 共享存储取 lianjia_token（$ljBridge.getAccessToken / cookie），
+ *     POST /api/juzhu/auth/beike 由服务端 /token/verify 换 BJZ_TOKEN。
+ *     不拿 getUserInfo 的 uid+手机号当身份。
+ *  3. 没有 token：App 内 $ljBridge.actionLogin(当前页)；浏览器走密码门。
+ *  4. 登录回跳无 JS 回调，回跳后再读 token。
  */
 (function (w) {
   'use strict';
   var TOKEN_KEY = 'BJZ_TOKEN';
   var JUMP_KEY = 'bzf_beike_login_jumped';
   var NEXT_KEY = 'bzf_beike_login_next';
+  var USER_KEY = 'bzf_beike_user';
 
   function token() {
     try { return (localStorage.getItem(TOKEN_KEY) || '').trim(); } catch (e) { return ''; }
@@ -53,6 +55,9 @@
 
   function isBeikeApp() {
     try {
+      if (w.__BZF_IS_BEIKE_APP) return true;
+    } catch (e0) {}
+    try {
       if (w.JsBridgeV3 && typeof w.JsBridgeV3.getAPPEnv === 'function') {
         var env = w.JsBridgeV3.getAPPEnv();
         if (env && (env.isBeike || env.isLianjiaApp)) return true;
@@ -60,6 +65,7 @@
     } catch (e) {}
     var ua = navigator.userAgent || '';
     return /lianjiabeike/i.test(ua) ||
+      /Lianjia\/Beike/i.test(ua) ||
       (/Lianjia/i.test(ua) && !/Alliance|lianjiabaichuan|beikesteward|beike_rentplat|decorate|LiveInBeike|beikeanzhu|fanghuoji/i.test(ua));
   }
 
@@ -118,17 +124,32 @@
     try {
       if (w.$ljBridge && typeof w.$ljBridge.getAccessToken === 'function') {
         var t = w.$ljBridge.getAccessToken();
+        if (t && typeof t === 'object') t = t.token || t.accessToken || t.lianjia_token || '';
         return t ? String(t).trim() : '';
       }
     } catch (e) {}
     return '';
   }
 
-  /* 贝壳侧已登录：cookie / App accessToken / getUserInfo 有 uid */
+  /* 换票用的票：App 共享存储 / cookie，不要用 getUserInfo */
+  function beikeAccessToken() {
+    return ljAccessToken() || lianjiaToken();
+  }
+
+  function lastUser() {
+    try { return JSON.parse(sessionStorage.getItem(USER_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function setLastUser(u) {
+    try {
+      if (u) sessionStorage.setItem(USER_KEY, JSON.stringify(u));
+      else sessionStorage.removeItem(USER_KEY);
+    } catch (e) {}
+  }
+
+  /* 贝壳侧已登录：有 lianjia_token 即可，getUserInfo 只作展示兜底 */
   function beikeLoggedIn() {
+    if (beikeAccessToken()) return true;
     if (pickUser(appUserInfo())) return true;
-    if (lianjiaToken()) return true;
-    if (ljAccessToken()) return true;
     return false;
   }
 
@@ -175,7 +196,8 @@
       loadLjBridge().then(function (lj) {
         if (lj && typeof lj.ready === 'function') {
           try {
-            lj.ready(function (bridge) {
+            lj.ready(function (bridge, webStatus) {
+              if (webStatus && webStatus.isApp) w.__BZF_IS_BEIKE_APP = true;
               if (bridge && typeof bridge.actionLogin === 'function') {
                 bridge.actionLogin(encodeURIComponent(back));
                 resolve(true);
@@ -191,38 +213,38 @@
     });
   }
 
-  function exchange(info) {
-    var u = pickUser(info);
-    if (!u || !/^1\d{10}$/.test(u.phone)) return Promise.resolve(null);
-    var body = {
-      uid: u.uid,
-      phone: u.phone,
-      name: u.name,
-      lianjia_token: lianjiaToken() || ljAccessToken() || ''
-    };
+  function exchange() {
+    var lj = beikeAccessToken();
+    if (!lj) return Promise.resolve(null);
     return fetch('/api/juzhu/auth/beike', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ lianjia_token: lj })
     }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j && j.ok && j.token) { setToken(j.token); return j; }
+      if (j && j.ok && j.token) {
+        setToken(j.token);
+        setLastUser({
+          uid: j.uid || '',
+          phone: j.phone_masked || '',
+          name: j.display_name || ''
+        });
+        return j;
+      }
       return null;
     }).catch(function () { return null; });
   }
 
-  /* 登录回跳后：读 Morph cookie / getUserInfo，换 BJZ_TOKEN。刚回跳时 bridge 可能要等几拍。 */
+  /* 登录回跳后：读 lianjia_token 换 BJZ_TOKEN。刚回跳时 bridge 可能要等几拍。 */
   function tryExchangeFromApp(done) {
     done = typeof done === 'function' ? done : function () {};
     if (token()) { done(true); return; }
     var tries = 0;
-    var hint = jumpedRecently() || !!lianjiaToken() || !!ljAccessToken() || !!pickUser(appUserInfo());
+    var hint = jumpedRecently() || !!beikeAccessToken();
     var max = hint ? 8 : 1;
     function once() {
       if (token()) { done(true); return; }
-      var app = appUserInfo();
-      var u = pickUser(app);
-      if (u && /^1\d{10}$/.test(u.phone)) {
-        exchange(app).then(function (j) { done(!!j); });
+      if (beikeAccessToken()) {
+        exchange().then(function (j) { done(!!j); });
         return;
       }
       tries += 1;
@@ -232,7 +254,10 @@
     loadLjBridge().then(function (lj) {
       if (lj && typeof lj.ready === 'function') {
         try {
-          lj.ready(function () { once(); });
+          lj.ready(function (bridge, webStatus) {
+            if (webStatus && webStatus.isApp) w.__BZF_IS_BEIKE_APP = true;
+            once();
+          });
           return;
         } catch (e) {}
       }
@@ -300,14 +325,9 @@
   function gateThenGo(nextUrl) {
     var next = absUrl(nextUrl);
     if (token()) { location.href = next; return; }
-    var app = appUserInfo();
-    if (pickUser(app) || beikeLoggedIn()) {
+    if (beikeAccessToken()) {
       tryExchangeFromApp(function (ok) {
         if (ok || token()) { location.href = next; return; }
-        if (pickUser(appUserInfo()) || lianjiaToken() || ljAccessToken()) {
-          location.href = next;
-          return;
-        }
         if (isBeikeApp()) jumpToLogin(next);
         else location.href = next;
       });
@@ -328,22 +348,19 @@
     if (token()) { onReady(); return; }
     tryExchangeFromApp(function (ok) {
       if (ok || token()) { onReady(); return; }
-      var app = appUserInfo();
-      if (pickUser(app)) {
-        onNeedPassword();
-        return;
-      }
-      if (isBeikeApp() && !jumpedRecently()) {
-        jumpToLogin(location.href);
+      if (isBeikeApp() || beikeLoggedIn()) {
+        if (!jumpedRecently()) jumpToLogin(location.href);
         var once = function () {
           if (document.visibilityState && document.visibilityState !== 'visible') return;
           tryExchangeFromApp(function (again) {
             if (again || token()) onReady();
-            else if (jumpedRecently()) onNeedPassword();
           });
         };
         w.addEventListener('pageshow', once);
         document.addEventListener('visibilitychange', once);
+        setTimeout(function () {
+          if (!token()) onNeedPassword();
+        }, 4000);
         return;
       }
       onNeedPassword();
@@ -394,6 +411,8 @@
     getCookie: getCookie,
     lianjiaToken: lianjiaToken,
     ljAccessToken: ljAccessToken,
-    beikeLoggedIn: beikeLoggedIn
+    beikeLoggedIn: beikeLoggedIn,
+    beikeAccessToken: beikeAccessToken,
+    lastUser: lastUser
   };
 })(window);

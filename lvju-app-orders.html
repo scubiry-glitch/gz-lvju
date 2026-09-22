@@ -17,6 +17,11 @@
       <div class="act"><span>🔍</span></div>
     </div>
 
+    <div id="syncBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
+      <div style="font-size:13px;font-weight:700;color:var(--ink);">正在同步贝壳登录…</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">登录成功后会自动展示我的预订，请稍候</div>
+    </div>
+
     <div id="loginBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
       <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">登录后自动展示我的预订</div>
       <div id="lgMsg" style="font-size:11px;color:var(--muted);margin-bottom:10px;">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
@@ -61,7 +66,7 @@
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=6"></script>
+<script src="screens/_beike-login.js?v=8"></script>
 <script>
 /* 预订查单/取消：POST /api/juzhu/booking/lookup（order_no+手机号 双因子，规则9 禁 ?phone= 旁路）
    响应手机号为打码形式（规则10）。支持 ?order_no=&phone= 自动带入（下单成功页跳转）。 */
@@ -141,6 +146,9 @@
   /* ── 登录（贝壳 SDK 默认 → 密码兜底）+ 我的预订 ── */
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
+  var syncBox = document.getElementById('syncBox');
+  function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; }
+  function hideSync(){ if (syncBox) syncBox.style.display = 'none'; }
   function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
   function sdkProbe(){
@@ -187,6 +195,7 @@
     });
   }
   function loadMine(){
+    hideSync();
     lgBox.style.display = 'none';
     myBox.style.display = 'block';
     fetch('/api/juzhu/booking/my', { headers: authH() })
@@ -199,34 +208,41 @@
     loadMine();
   }
   function trySdkLogin(){
-    var sdk = sdkProbe();
-    if (!sdk || typeof sdk.getUserInfo !== 'function') return Promise.resolve(false);
-    return Promise.resolve().then(function(){ return sdk.getUserInfo(); }).then(function(info){
-      var i = info && info.data ? info.data : info;
-      var uid = i && (i.uid || i.userId || i.id), ph = i && (i.phone || i.mobile);
-      if (!uid || !ph) return false;
-      return fetch('/api/juzhu/auth/beike', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ uid: String(uid), phone: String(ph), name: (i.name || '').trim() }) })
-        .then(function(r){ return r.json(); })
-        .then(function(j){ if (j.ok) { afterLogin(j); return true; } return false; });
-    }).catch(function(){ return false; });
+    if (window.BZF_BEIKE_LOGIN && typeof BZF_BEIKE_LOGIN.exchange === 'function') {
+      return BZF_BEIKE_LOGIN.exchange().then(function(j){
+        if (j && j.ok && j.token) { afterLogin(j); return true; }
+        return false;
+      });
+    }
+    return Promise.resolve(false);
   }
   function boot(){
     if (tok()) { loadMine(); return; }
-    lgBox.style.display = 'block';
     if (window.BZF_BEIKE_LOGIN) {
+      showSync();
+      console.log('[orders] boot', {
+        BJZ_TOKEN: tok(),
+        lianjia_token: BZF_BEIKE_LOGIN.beikeAccessToken ? BZF_BEIKE_LOGIN.beikeAccessToken() : (BZF_BEIKE_LOGIN.lianjiaToken && BZF_BEIKE_LOGIN.lianjiaToken()),
+        isBeikeApp: BZF_BEIKE_LOGIN.isBeikeApp(),
+        beikeLoggedIn: BZF_BEIKE_LOGIN.beikeLoggedIn && BZF_BEIKE_LOGIN.beikeLoggedIn(),
+        userInfo: BZF_BEIKE_LOGIN.appUserInfo && BZF_BEIKE_LOGIN.appUserInfo(),
+        city: q.get('city') || ''
+      });
       BZF_BEIKE_LOGIN.ensureAppLogin({
         onReady: function(){ loadMine(); },
         onNeedPassword: function(){
+          hideSync();
           lgBox.style.display = 'block';
-          document.getElementById('lgMsg').textContent = BZF_BEIKE_LOGIN.isBeikeApp()
-            ? '请先完成贝壳 App 登录；也可使用密码登录（首次输入即自动注册）'
+          var inApp = BZF_BEIKE_LOGIN.isBeikeApp() || (BZF_BEIKE_LOGIN.beikeLoggedIn && BZF_BEIKE_LOGIN.beikeLoggedIn());
+          document.getElementById('lgMsg').textContent = inApp
+            ? '没拿到 lianjia_token 或验票失败，请完成 App 登录后返回；也可使用密码登录'
             : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）';
           document.getElementById('lgSdk').style.display = BZF_BEIKE_LOGIN.isBeikeApp() ? 'block' : 'none';
         }
       });
       return;
     }
+    lgBox.style.display = 'block';
     trySdkLogin().then(function(ok){
       if (ok) return;
       lgBox.style.display = 'block';
