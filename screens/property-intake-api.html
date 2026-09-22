@@ -916,7 +916,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
         <input type="text" id="pBase" placeholder="留空 = 当前站点" />
         <label>业务参数 JSON（数组/嵌套对象会按平台规则参与签名）</label>
         <textarea id="pBody" spellcheck="false">{}</textarea>
-        <label class="chk"><input type="checkbox" id="pRemember" /> 在本机记住 vendor_id / hmac_key（localStorage）</label>
+        <label class="chk"><input type="checkbox" id="pRemember" /> 本次会话记住 vendor_id / hmac_key（sessionStorage，关标签页即清）</label>
         <button class="go" id="pGo">签名并发送</button>
         <div class="sts" id="pSts">stringToSign 预览会显示在这里（联调对签用）</div>
         <p class="hint" style="margin-top:8px;">常用模板：上架 <code>{"id":123,"status":"online"}</code> · 关房 <code>{"project_id":123,"dates":["2026-12-10"],"status":"blocked"}</code> · 建房源见 §4.3 示例 · 接单 <code>{"id":36}</code>（confirm/cancel 同参，id 取 bookings/list 返回值）。</p>
@@ -1086,7 +1086,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
 
   /* ── 表单逻辑 ── */
   try {
-    var saved = JSON.parse(localStorage.getItem('BZF_HOUSING_PLAY') || 'null');
+    var saved = JSON.parse(sessionStorage.getItem('BZF_HOUSING_PLAY') || 'null');
     if (saved) { $('pVendor').value = saved.vendor || ''; $('pKey').value = saved.key || ''; $('pRemember').checked = true; }
   } catch (e) {}
   $('pPath').onchange = function(){
@@ -1106,8 +1106,8 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
     catch (e) { out('<span class="st s4">JSON 解析失败</span>\n' + e.message); return; }
     if (!vendor) { out('<span class="st s4">缺少 vendor_id</span>'); return; }
     if (!key) { out('<span class="st s4">缺少 hmac_key（平台下发）</span>'); return; }
-    if ($('pRemember').checked) { try { localStorage.setItem('BZF_HOUSING_PLAY', JSON.stringify({ vendor: vendor, key: key })); } catch (e) {} }
-    else { try { localStorage.removeItem('BZF_HOUSING_PLAY'); } catch (e) {} }
+    if ($('pRemember').checked) { try { sessionStorage.setItem('BZF_HOUSING_PLAY', JSON.stringify({ vendor: vendor, key: key })); } catch (e) {} }
+    else { try { sessionStorage.removeItem('BZF_HOUSING_PLAY'); } catch (e) {} }
 
     body.vendor_id = Number(vendor) || vendor;
     var ts = Date.now();

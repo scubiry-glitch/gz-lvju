@@ -439,9 +439,9 @@
   <div class="toast" id="toast"></div>
 </div>
 
-<script src="_orderbus.js"></script>
+<script src="_jzapi.js?v=8"></script>
 <script>
-const BO = window.BZF_ORDERS;
+const JZ = window.BZF_JZ;
 
 // ---- 需求类型 → 类别预设 ----
 const CATS = {
@@ -515,46 +515,64 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 
-// ---- submit demand ----
-function submitRepair() {
-  const desc = document.getElementById('repairDesc').value.trim();
-  if (!desc) { alert('请描述需求情况'); return; }
-
-  const o = BO.create({
-    type: curType,
-    category: curCat,
-    desc: desc,
-    house: document.getElementById('repairHouse').value,
-    phone: document.getElementById('repairPhone').value,
-    expectTime: document.getElementById('repairWhen').value + ' · ' + document.getElementById('repairSoon').value
-  });
-
-  document.getElementById('repairId').textContent = o.id;
-  document.querySelector('#submitSuccess .sb-text').innerHTML =
-    '<strong>需求已提交</strong><br/>已进入平台工单池等待派单 · 工单号：<span id="repairId">' + o.id + '</span>';
-  document.getElementById('submitSuccess').style.display = 'flex';
-  document.getElementById('repairDesc').value = '';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  renderLive();
-  toast('已提交，可在「报修记录」查看派单进度');
+// ---- submit demand（写 MySQL jz_orders，经 /api/juzhu/jiazheng/repairs；phone 记住用于「报修记录」回查）----
+function repairPhone() {
+  try { return localStorage.getItem('bzf_repair_phone') || document.getElementById('repairPhone').value.trim(); }
+  catch (e) { return document.getElementById('repairPhone').value.trim(); }
 }
 
-// ---- render live orders in records tab ----
-function renderLive() {
+async function submitRepair() {
+  const desc = document.getElementById('repairDesc').value.trim();
+  if (!desc) { alert('请描述需求情况'); return; }
+  const phone = document.getElementById('repairPhone').value.trim();
+  try {
+    const o = await JZ.createRepair({
+      type: curType,
+      desc: desc + ' · ' + curCat,
+      house: document.getElementById('repairHouse').value,
+      phone: phone,
+      expectTime: document.getElementById('repairWhen').value + ' · ' + document.getElementById('repairSoon').value
+    });
+    try { localStorage.setItem('bzf_repair_phone', phone); } catch (e) {}
+    document.querySelector('#submitSuccess .sb-text').innerHTML =
+      '<strong>需求已提交</strong><br/>已进入平台工单池等待派单 · 工单号：<span id="repairId">' + JZ.esc(o.id) + '</span>';
+    document.getElementById('submitSuccess').style.display = 'flex';
+    document.getElementById('repairDesc').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    renderLive();
+    toast('已提交，可在「报修记录」查看派单进度');
+  } catch (err) {
+    alert('提交失败：' + err.message + (JZ.apiKey() || JZ.sessionToken() ? '' : '（需配置访问凭据或登录账号）'));
+  }
+}
+
+// ---- render live orders in records tab（MySQL，phone 归属过滤）----
+let liveList = [];
+async function renderLive() {
   const box = document.getElementById('liveRecords');
-  const list = BO.all();
-  document.getElementById('recDivider').style.display = list.length ? 'flex' : 'none';
-  if (!list.length) { box.innerHTML = ''; return; }
-  box.innerHTML = list.map(cardHTML).join('');
+  const phone = repairPhone();
+  if (!phone) {
+    box.innerHTML = '<div class="empty-state"><p>提交报修后，这里会显示派单进度</p></div>';
+    document.getElementById('recDivider').style.display = 'none';
+    return;
+  }
+  try {
+    const list = await JZ.listRepairs(phone);
+    liveList = list;
+    document.getElementById('recDivider').style.display = list.length ? 'flex' : 'none';
+    box.innerHTML = list.length ? list.map(cardHTML).join('') : '';
+  } catch (err) {
+    box.innerHTML = '<div class="empty-state"><p>工单加载失败：' + JZ.esc(err.message) + '</p></div>';
+  }
 }
 
 function cardHTML(o) {
-  const st = BO.STATUS[o.status];
-  const icon = BO.ICON[o.type] || '🔧';
+  const st = JZ.STATUS[o.status];
+  const icon = JZ.ICON[o.type] || '🔧';
   let worker = '';
   if (o.worker) {
-    worker = '<div class="order-worker"><span class="av">' + BO.esc(o.worker.name.slice(0, 1)) +
-      '</span><span>服务者 ' + BO.esc(o.worker.name) + ' · ' + BO.esc(o.worker.level) +
+    worker = '<div class="order-worker"><span class="av">' + JZ.esc(o.worker.name.slice(0, 1)) +
+      '</span><span>服务者 ' + JZ.esc(o.worker.name) + ' · ' + JZ.esc(o.worker.level) +
       '</span></div>';
   }
   let progLabel = st.c;
@@ -579,22 +597,24 @@ function cardHTML(o) {
 
   return '<div class="repair-card">' +
     '<div class="repair-header"><div>' +
-    '<div class="category">' + icon + ' ' + BO.esc(o.category || o.type) +
+    '<div class="category">' + icon + ' ' + JZ.esc(o.category || o.type) +
     '<span class="live-flag">实时</span></div>' +
-    '<div class="date">' + BO.esc(o.createdLabel) + ' · 工单号：' + BO.esc(o.id) + '</div>' +
+    '<div class="date">' + JZ.esc(o.createdLabel) + ' · 工单号：' + JZ.esc(o.id) + '</div>' +
     '</div><span class="r-status ' + st.cls + '">' + st.c + '</span></div>' +
-    '<div class="repair-body"><span>' + BO.esc(o.desc) + '</span>' + worker +
+    '<div class="repair-body"><span>' + JZ.esc(o.desc) + '</span>' + worker +
     '<div class="repair-progress"><div class="progress-bar-bg"><div class="progress-fill" style="width:' + st.pct + '%;background:' +
     (st.cls === 'done' ? 'var(--success)' : st.cls === 'pending' ? 'var(--warn)' : 'var(--accent)') + ';"></div></div>' +
-    '<div class="progress-label"><span>' + progLabel + '</span><span>¥' + o.fee + '</span></div></div></div>' +
+    '<div class="progress-label"><span>' + progLabel + '</span><span>免费 · 以实际结算为准</span></div></div></div>' +
     actions + '</div>';
 }
 
-function cancelOrder(id) {
+async function cancelOrder(id) {
   if (!confirm('确认取消该需求？')) return;
-  localStorage.setItem('bzf_orders', JSON.stringify(BO.all().filter(o => o.id !== id)));
-  renderLive();
-  toast('已取消');
+  try {
+    await JZ.repairCancel(id, repairPhone());
+    renderLive();
+    toast('已取消');
+  } catch (err) { toast(err.message); }
 }
 
 // ---- rating sheet ----
@@ -604,9 +624,9 @@ function openRate(id) {
   setStars(5);
   document.getElementById('tagPick').querySelectorAll('.tg').forEach(t => t.classList.remove('on'));
   document.getElementById('rateText').value = '';
-  const o = BO.get(id);
+  const o = liveList.find(x => x.id === id);
   document.getElementById('rateSub').textContent =
-    (o && o.worker ? '服务者 ' + o.worker.name + ' · ' + o.worker.level + ' · ' : '') + (o ? o.category : '');
+    (o && o.worker ? '服务者 ' + o.worker.name + ' · ' + o.worker.level + ' · ' : '') + (o ? (o.category || o.type) : '');
   document.getElementById('rateMask').classList.add('open');
 }
 function closeRate() { document.getElementById('rateMask').classList.remove('open'); }
@@ -624,17 +644,19 @@ document.querySelectorAll('#rateStars .star').forEach(s => {
 document.querySelectorAll('#tagPick .tg').forEach(t => {
   t.addEventListener('click', () => t.classList.toggle('on'));
 });
-function submitRate() {
+async function submitRate() {
   if (!rateScore) { alert('请先打分'); return; }
   const tags = Array.from(document.querySelectorAll('#tagPick .tg.on')).map(t => t.dataset.t);
-  BO.rate(rateTarget, {
-    score: rateScore,
-    tags: tags,
-    text: document.getElementById('rateText').value.trim()
-  });
-  closeRate();
-  renderLive();
-  toast('评价已提交，已回流服务者信用');
+  try {
+    await JZ.rate(rateTarget, {
+      score: rateScore,
+      tags: tags,
+      text: document.getElementById('rateText').value.trim()
+    });
+    closeRate();
+    renderLive();
+    toast('评价已提交，已回流服务者信用');
+  } catch (err) { alert('评价失败：' + err.message); }
 }
 
 // ---- bottom tab nav ----
@@ -648,8 +670,8 @@ document.querySelectorAll('.tab-item').forEach(tab => {
   });
 });
 
-// 其它页面（派单/完工）改动后回到本页自动刷新
-BO.onChange(renderLive);
+// 其它页面（派单/完工）改动后回到本页自动刷新（API 总线轮询 + 本页操作即时刷新）
+JZ.onChange(renderLive);
 window.addEventListener('pageshow', renderLive);
 renderLive();
 </script>

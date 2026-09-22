@@ -1,2 +1,4 @@
 PASS  内置角色权限面与基线一致（12 个角色）
+(node:2079920) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
 PASS  库内 builtin 角色与常量一致（12 行）

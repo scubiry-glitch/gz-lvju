@@ -88,24 +88,24 @@
 - **已知边界**：① relabel 只处理静态文本节点 + `<title>`，页面**加载后由 JS 动态生成**的含品牌串内容不会被替换——这类内容应改读 `BZF_REGION`；② 需保持江苏原值的样例节点加 `data-noregion` 跳过；③ **改名 ≠ 改业务语义**：把保租房换成旅居住宿后，F 系列公积金/监管账户、好房子评级口径等是业务重做，不在本层职责内。
 - 详见 `docs/region-abstraction-plan.md`。
 
-## 规则 8 · 居住服务工单闭环单一数据源（`screens/_orderbus.js`）
+## 规则 8 · 居住服务工单闭环（已并轨 MySQL，`_orderbus.js` 已退役）
 
-**"客户提交需求 → 中台派单 → 服务者接单/完成 → 客户评价 → 评价回流"这条闭环的跨页面状态，只走 `screens/_orderbus.js`（localStorage `bzf_orders`），页面不得各自硬编码 mock。** 这是让纯静态原型"可点击贯通可演示"的总线。
+**"客户提交需求 → 中台派单 → 服务者接单/完成 → 客户评价 → 评价回流"这条闭环的跨页面状态，全部走 `screens/_jzapi.js`（MySQL `jz_orders`）。**（2026-09-22 拍板并轨；原 `screens/_orderbus.js` localStorage 演示总线已删除，`bzf_orders` 废弃）
 
-- **状态机**：`pending`(待派) → `dispatched`(已派单) → `accepted`(已接单) → `serving`(服务中) → `done`(已完成待评价) → `rated`(已评价)。每态在 `STATUS` 里同时给出 `c`/`worker`/`admin` 三视角文案 + 进度条 `pct`。
-- **四个接入页各司其职**：`repair.html`(C端提交+进度+评价) / `p-service-demand.html`(中台派单) / `s-orders.html`(服务者推进) / `p-service-review.html`(评价回流)。每页保留原有"示例"静态内容，**实时工单叠加在顶部并标「实时」徽标**，演示不污染基线观感。
-- **API**：`BZF_ORDERS.create / dispatch / advance / rate / byStatus / get / reset / onChange`。`advance` 封顶到 `done`（评价只能由客户 `rate` 触发）；`onChange` 监听跨页 storage 变更自动重渲染。
-- **复用而非新造**：再接入任何端（如 B 端运营商工单视图、G 端投诉关联）时，引 `<script src="_orderbus.js"></script>`（在 region 脚本之后、nav 脚本前后均可，只要在使用 `BZF_ORDERS` 的内联脚本之前），从 `byStatus()` 取数据渲染，**不要再 new 一套 localStorage key**。
-- **与 region 解耦**：本总线只产数据，服务者姓名/房源等为样例字面量，不参与 relabel；如某态文案需随省份变，改读 `BZF_REGION`，勿写死。
+- **状态机**：`pending`(待派) → `dispatched`(已派单) → `accepted`(已接单) → `serving`(服务中) → `done`(已完成待评价) → `rated`(已评价)，单一数据源 `_jzapi.js` 的 `STATUS`（`c`/`worker`/`admin` 三视角文案 + 进度条 `pct`）与 `ORDER`（状态序）。
+- **接入页各司其职**：`repair.html`(C端报修提交+进度+评价) / `lvju-app-me.html`·`lvju-app-ticket.html`(旅居 App 提交+详情) / `p-service-demand.html`(中台派单) / `s-orders.html`(服务者推进) / `p-service-review.html`(评价回流)。每页保留原有"示例"静态内容，实时工单叠加并标「实时」徽标。
+- **复用而非新造**：再接入任何端时引 `<script src="_jzapi.js?v=N"></script>`，报修走 `createRepair / listRepairs / repairGet / repairCancel`，派单推进评价走既有 `dispatch / advance / rate`，**不要再 new 一套 localStorage key**。
 
-## 规则 9 · 家政工单 API 总线（`screens/_jzapi.js`）
+## 规则 9 · 工单 API 总线（`screens/_jzapi.js`）
 
-**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
+**新居住 · 家政/报修工单**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源）。
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
 - **鉴权**：`/api/juzhu/*` **默认拒绝**，须 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端管理台经 `localStorage JUZHU_API_KEY` 对齐，勿在页面硬编码。白名单仅限 C 端目录/房源展示、`POST /api/juzhu/jiazheng/wechat-link`、`GET /api/juzhu/gr/orders*`、`GET .../virtual-phone`；商家开放接口走 HMAC；admin 走登录会话或 Key。**工单列表/详情/支付/评价/派单一律要 Key**（禁止 `?phone=` 匿名旁路）
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
+- **工单出参与派单（2026-09-22）**：orders list/detail 随行下发 `type_label`——产品化下单写入的 `type` 是英文 `category_id`（cleaning…），服务端 CASE join `jz_categories` 出中文名，存量中文 type 与权益售后（type≠category_id）原样保留；页面显示类型一律用 `type_label`，**不得再各造 id→中文 映射**。`POST .../dispatch` **派单必指派**：不传 `worker` 时服务端按 `jz_workers` 信用分↓完单量↓择优自动分配（worker_json 带 `auto:true`），无 active 服务者 400——不再落 `worker_json=NULL` 幽灵单（服务者端按 worker 过滤看不见，闭环会断；存量幽灵单在 P 端显示「已派单 · 未指派」）。
+- **报修单 repairs 通道（2026-09-22，原 `_orderbus` localStorage 并轨入 MySQL）**：`POST /api/juzhu/jiazheng/repairs`（C 端报修下单，挂 `ORDER_CREATE`；`sku_id=NULL`、`category_id='repair'`、`type`=中文报修类型字面量、`fee=0`、`pay_status='not_required'`、`source` 须以「旅居客 App」开头）写同一张 `jz_orders`；`GET /repairs?phone=`（**phone 必填**）与 `GET /repairs/:id?phone=`（id+phone 双因子）只出 `source LIKE '旅居客 App%'` 的行——**永远不存在匿名全表读取**（匿名在 `requireApiKey` 即 401；legacy key 经 `C_WRITE_PATH_RE` + `C_REPAIRS_READ_RE` 放行 POST/GET/DELETE）；`DELETE /repairs/:id?phone=` = 待派取消，条件硬 DELETE（`status='pending' AND worker_json IS NULL`，已派 409）——**不引入 `cancelled` 状态**（会波及 stats/各端过滤全链）。派单/推进/评价复用既有 `/orders/:id/*` 路由。C 端页面演示凭据走 localStorage `JUZHU_API_KEY`（同 `jiazheng-booking.html` 模式）或登录会话；`repair.html` 提交后把 phone 存 `localStorage bzf_repair_phone` 供「报修记录」与详情页回查。
 - **生活服务专区入口恒为 12 个频道**（`index.html` 的 `renderJiazhengCats`）：入口列表以本地 `JZ_CATS` 为基准，`GET /api/juzhu/jiazheng/categories` 回来的只做**覆盖 + 追加**，**不得直接按接口结果渲染**。接口按「当前城市有无可售商品」过滤，会把当前城市没配商品的频道一并滤掉（实测 `city=贵州` 只剩 10 个，丢了保洁和维修）——但这是导航入口不是库存指示，少一个入口就少一条进频道的路。接口失败 / `_jzapi.js` 未加载时也要回落 `renderJiazhengCats(null)` 画出纯本地 12 个，不得整块空白。
 - **分类配色单一数据源**：家政各分类的品牌色写在 `_jzapi.js` 的 `CAT_THEME`（`catTheme()` / `applyCatTheme(el, type)`，后者把 `--cat-brand / --cat-brand-2 / --cat-deep / --cat-soft / --cat-tint` 写到元素上）。列表页与详情页的 hero / poster / 标签 / 按钮 / **正文模块 chrome**（小节标题色条、序号圆点、商家 Logo 底、证书卡、服务者卡、选中态描边与光晕）**只消费这些 CSS 变量**，页面不得再各写一份配色表，也不得残留全局 `--brand`（青绿）——那会让蓝色/橙色频道里混进绿色。
   - `--cat-soft` = 12% 品牌色**透明**混合（叠在白卡上的浅底）；`--cat-tint` = 白底 8% 品牌色**不透明**浅底。**深色 hero 上用白色半透明，浅色容器上用 `--cat-tint`**；把 `--cat-soft` 用在深色底上会隐形。
@@ -212,7 +212,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **登录防爆破**：`login_throttle` 表两级节流（ident 连错 5 次锁 30 分钟、IP 30 次/10min，env `AUTH_LOCK_*` 可调）；账号不存在也计失败并落审计（`audit_log.result` 列区分 ok/fail）。admin 登录必须显式 login_name（「只传 password 默认唯一管理员」已移除）。密码哈希 `scrypt$salt$hash`，存量 sha256 行登录时懒升级。
 - **账号中心页面**：`screens/account-center.html`（P 端，功能权限+数据权限+账号+审计+IdP 六 tab）是账号/权限唯一管理入口；`juzhu-admin.html` 账号/审计 tab 只留迁移卡。`_nav.js` item 支持可选 `perms: [...]`（任一命中即显示；**未登录/演示态一律全显**，保静态演示页基线观感）；`mount()` 幂等可重入，暴露 `BZF_NAV.refresh/hydrate`。
 - **回归**：`scripts/perm_gate_regression.cjs`（权限矩阵）/ `auth_security_regression.cjs`（防爆破+scrypt+TTL）/ `scope_regression.cjs`（行级过滤）/ `iam_api_regression.cjs`（账号中心 API）四条全绿才算过。
-- **商家登录并入账号中心（2026-09-09）**：商家凭据 = `accounts` 行（`principal_type='user'` + `vendor_id` 绑定 + `vendor_owner` 角色，scope 自动 `{level:'vendor'}`），`POST /vendor/login` 只是别名（返回体形状不变，B 端页面零改动）：有账号走 `loginWithPassword` 统一链，无账号且 `jz_vendors` bcrypt 命中则懒建档（密码重哈希 scrypt）。`verifyPassword` 支持 bcrypt 遗留格式（`$2a$/$2b$/$2y$`，登录一次懒升级 scrypt）。批量预迁移 `node scripts/vendor_accounts_migrate.cjs [--dry]`；旧 HMAC 自证 token（`verifyVendorLoginToken`）仅宽限至自然过期、不再签发；`jz_vendors.password_hash` 冻结（仅兜底路径读一次），改密/停用商家账号在 IAM 走 `updateAccount`（自动吊销会话）。回归 `node scripts/vendor_login_migration_regression.cjs`。
+- **商家登录并入账号中心（2026-09-09）**：商家凭据 = `accounts` 行（`principal_type='user'` + `vendor_id` 绑定 + `vendor_owner` 角色，scope 自动 `{level:'vendor'}`），`POST /vendor/login` 只是别名（返回体形状不变，B 端页面零改动）：有账号走 `loginWithPassword` 统一链，无账号且 `jz_vendors` bcrypt 命中则懒建档（密码重哈希 scrypt）。`verifyPassword` 支持 bcrypt 遗留格式（`$2a$/$2b$/$2y$`，登录一次懒升级 scrypt）。批量预迁移 `node scripts/vendor_accounts_migrate.cjs [--dry]`；旧 HMAC 自证 token（`verifyVendorLoginToken`）仅宽限至自然过期、不再签发；`jz_vendors.password_hash` 冻结（仅兜底路径读一次），改密/停用商家账号在 IAM 走 `updateAccount`（自动吊销会话）。回归 `node scripts/vendor_login_migration_regression.cjs`。B 端页面（`b-listing-mgmt` / `b-go-live-check`）登录后 token 统一落 `BZF_SESSION_TOKEN`，**`JUZHU_VENDOR_TOKEN` 旧键只清不写**（2026-09-22 清理；`api-doc.html` 同步删除历史 `dev-juzhu-key` 示例，商户调试台 `BZF_HOUSING_PLAY` 记住的凭据降级为 sessionStorage 会话级）。
 
 ## 规则 19 · 内容域统筹（专题 / 路线 / 周边玩法，一个后台面）
 
@@ -244,6 +244,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **UNKNOWN 只查原指令**：结果未知的指令禁止重试、禁止换指令；失败指令可受控重试 ≤3 次（`applyInstrument` 的 `controlled` 位只给重试链路，回执链路 paid↔failed 互斥 409）。回执按 `uk_receipt(request_no,digest)` 幂等去重。
 - **沙箱机构是镜像不是资金**：`commerce_provider_requests` 即未来持牌机构适配器的契约面（`sandboxSubmit/sandboxQuery/sandboxSimulate` 三个薄壳）；对外文案必须写明"不代表真实资金"，商户页与 KPI 已内置该披露，改版不得删。
 - **演示卡券不进资金域**：一切结算/退款/对账查询都带 `NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE)` 过滤；新增结算相关查询漏掉这个条件会把演示单卷进账差。
+- **推广员端（juzhu-promoter.html + `_commerce-customer.js` promoter 分支）**：`/promotion` KPI 与 `promoterSettlement` 必须排除演示核销（演示核销永不进批次，漏过滤会让「待入账单核销」永久虚高）；逐券明细/归因订单/代发到账走 `GET /promotion/records`（本人 scope 只读，单查 ≤50 条）。选品目录走 `GET /promotion/products`（公开 catalog 同形状 + `commission_minor`/`commission_bps` 预估佣金，算法=核销入账同式 `channel=floor(floor(alloc×beike_bps/1e4)×channel_bps/1e4)`，演示商品恒 0 不进资金域；随行下发本人逐商品 `clicks/orders/demo_orders/redemptions/earned_minor`）。**点击埋点在公开 `GET /referral`**（分享链接落地即写 `commerce_events` `referral.click`，转化率=归因/点击的分母来源，挂了 try/catch 不阻塞落地）。分享资格闸：settings KV `promoter_gate`（缺省 `'0'`=演示期开放；`'1'`=仅 `promoter` 角色或 `*` 权限可 `POST /shares`），资格状态随 `/promotion` 下发（`promoter_gate`/`share_qualified`），页面据此渲染资格横幅。预览演示数据：`node scripts/commerce/promoter-demo-seed.cjs seed|clean|status`（依赖 `settlement-demo-seed` 的演示账号 `demo_promoter`/`Demo#2026`；只造点击事件与 is_demo 归因/核销，永不写资金域）。
 - **误核销撤销保留历史**：`commerce_redemptions.coupon_id` 已从 UNIQUE 降级为普通索引（撤销后同券可再核销），防重靠核销事务内"券行锁 + 查 confirmed"——不要再把唯一索引加回去；撤销已结算明细生成 `commerce_recovery_cases`，下期生成商户账单时可 `offset_recovery` 抵扣，全部动作过账。
 - **金额守恒不变量 I1–I7**（`verifyInvariants`）是验收底线：订单实付=已核销+已退款+未核销池；本地已付逐笔有机构镜像。改动结算链路后必须跑 `node scripts/commerce/settlement-test.cjs --browser`（11 场景 + 浏览器 6 检查）。
 
@@ -258,3 +259,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **酒店名单**：`commerce/hotel-roster.json`（1809 家、6 档 80/100/120/160/180/200，`hotel-roster-build.cjs` 从 Excel 转换，可重跑）；演示抽样 `sampleHotels(perTier=8)` 是确定性算法（品牌分层 + hotel_code 字典序轮转），改抽样规则必须保持可复算。门店 city 挂演示城市、真实区域存 payload（名单为全国门店，通兑跨城属预期）。
 - **公开名录**：`GET /api/commerce/v1/hotels`（session 前只读，与 /catalog 同形态，无需 perm 登记）只输出公开字段；C 端名录页 `juzhu-hotels.html`（generate-pages 生成，静态白名单已含）。
 - **回归**：`node scripts/commerce/m1a-test.cjs --hotel-exchange`（档内任选/跨档拒绝/线上免预约/核销归集/资金零分录）；线上 `node scripts/commerce/live-hotel-check.cjs`（19 项，可重复跑：预约后即取消）。设计文档 `docs/prd/DESIGN-本地生活酒店通兑与三品类券.md`，验收 `docs/verification/hotel-exchange-closed-loop/`。
+
+## 规则 23 · sytest 静态资源缓存约定（2026-09-22 拍板）
+
+sytest.meizu.life 的 nginx vhost（`/etc/nginx/conf.d/sytest.meizu.life.conf`，配置在仓库外不入 git）已开 **gzip** + **css/js 强缓存**（`public, max-age=31536000, immutable`）；HTML 保持 `no-cache`，`/juzhu/app.js` 白名单块先行仍 `no-cache`。**因此：改动任何 `.js` / `.css` 后，必须同步 +1 所有引用该文件的 `?v=N`**（存量约定，见规则 9；`_nav.js` 等未带 `?v=` 的共享脚本被改后，回访用户一年内拿旧缓存——改共享脚本时顺手在主要引用页补 `?v=`）。「改了没生效」先想到缓存，再查代码。备份：`sytest.meizu.life.conf.bak.20260922-perf`。

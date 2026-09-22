@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-19T19:18:39.071Z",
+  "at": "2026-09-22T01:46:44.962Z",
   "channel_services": 46,
   "categories": 12,
   "products": [
@@ -17,6 +17,10 @@
       "category_id": null,
       "topic_id": "new-home",
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "开荒保洁 · 新居 · 单品券（演示）",
@@ -67,6 +71,10 @@
       "category_id": null,
       "topic_id": "care",
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "养老陪护 · 日间 · 单品券（演示）",
@@ -117,6 +125,10 @@
       "category_id": null,
       "topic_id": "asset",
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "资产评估 · 房产 · 单品券（演示）",
@@ -143,6 +155,10 @@
       "category_id": null,
       "topic_id": "green",
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "宽带新装 · 千兆 · 单品券（演示）",
@@ -177,6 +193,10 @@
       "category_id": null,
       "topic_id": "neighbor",
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "便民代办 · 跑腿 · 单品券（演示）",
@@ -219,6 +239,10 @@
       "category_id": null,
       "topic_id": null,
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "日常保洁 · 2小时 · 单品券（演示）",
@@ -264,6 +288,142 @@
       "demo_purchase_enabled": true
     },
     {
+      "id": 13,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "演示居家服务券包",
+      "description": "演示券包：一张保洁服务券",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": false,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "演示家政保洁服务",
+          "quantity": 1,
+          "description": "全屋基础保洁一次（演示）",
+          "conditions": "提前预约，超出范围另行约定",
+          "valid_days": 30,
+          "store_id": 26
+        }
+      ],
+      "demo_purchase_enabled": false
+    },
+    {
+      "id": 14,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "演示安居双券包",
+      "description": "演示券包：两张保洁服务券",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": false,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "演示家政保洁服务",
+          "quantity": 2,
+          "description": "全屋基础保洁一次（演示）",
+          "conditions": "提前预约，超出范围另行约定",
+          "valid_days": 30,
+          "store_id": 26
+        }
+      ],
+      "demo_purchase_enabled": false
+    },
+    {
+      "id": 15,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "演示安心检修券包",
+      "description": "演示券包：一张检修服务券",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": false,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "演示家电检修服务",
+          "quantity": 1,
+          "description": "基础检修一次（演示）",
+          "conditions": "提前预约，配件另计",
+          "valid_days": 30,
+          "store_id": 27
+        }
+      ],
+      "demo_purchase_enabled": false
+    },
+    {
+      "id": 17,
+      "kind": "packages",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "本地生活 · 酒店通兑体验包（演示）",
+      "description": "【贵阳演示】酒店通兑（120元档任选一晚）+ 景点门票 + 餐饮代金，三品类各一张，单券 90 天有效；全部为试点演示权益，不发生资金往来。",
+      "price_minor": 24540,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "酒店通兑 · 120元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】120元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 135
+        },
+        {
+          "name": "城市漫游 · 景点门票（演示）",
+          "quantity": 1,
+          "description": "【演示】指定演示景区单人票一张，预约日期当日有效。演示环境不提供真实入园与履约，不发生资金往来。",
+          "conditions": "线下到店核销：提前预约当日出示动态码；一券一次，90 天有效。试点演示，不构成真实入园承诺。",
+          "valid_days": 90,
+          "store_id": 139
+        },
+        {
+          "name": "本地风味 · 餐饮代金（演示）",
+          "quantity": 1,
+          "description": "【演示】演示餐厅餐饮代金券一张，到店核销。演示环境不提供真实餐食与履约，不发生资金往来。",
+          "conditions": "线下到店核销：提前预约当日出示动态码；一券一次，90 天有效。试点演示，不构成真实用餐承诺。",
+          "valid_days": 90,
+          "store_id": 140
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
       "id": 2,
       "kind": "plans",
       "city_id": 3,
@@ -277,6 +437,10 @@
       "category_id": null,
       "topic_id": null,
       "channel_slug": null,
+      "redeem_channel": null,
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "日常保洁 · 2小时 · 单品券（演示）",
@@ -335,6 +499,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "cleaning-daily-2h",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "日常保洁 · 2小时 · 单品券（演示）",
@@ -361,6 +529,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "deep-clean-4h",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "深度清洁 · 4小时 · 单品券（演示）",
@@ -387,6 +559,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "ac-clean-wall",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "空调清洗 · 挂机 · 单品券（演示）",
@@ -413,6 +589,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "pipe-unclog-fast",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "管道疏通 · 当天 · 单品券（演示）",
@@ -439,6 +619,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "light-install-ceiling",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "灯具安装 · 吸顶灯 · 单品券（演示）",
@@ -465,6 +649,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-city-standard",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "居民搬家 · 同城 · 单品券（演示）",
@@ -491,6 +679,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-japanese-full",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "日式搬家 · 全包 · 单品券（演示）",
@@ -517,6 +709,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "nanny-hourly-3h",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "钟点工 · 3小时 · 单品券（演示）",
@@ -543,6 +739,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "nanny-livein-babycare",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "育儿嫂 · 住家 · 单品券（演示）",
@@ -569,6 +769,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "raw-clean-new",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "开荒保洁 · 新居 · 单品券（演示）",
@@ -595,6 +799,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "glass-clean-highrise",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "玻璃清洗 · 高层 · 单品券（演示）",
@@ -621,6 +829,10 @@
       "category_id": "cleaning",
       "topic_id": null,
       "channel_slug": "hood-clean-deep",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "油烟机清洗 · 深度 · 单品券（演示）",
@@ -647,6 +859,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "appliance-repair",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "家电维修 · 上门 · 单品券（演示）",
@@ -673,6 +889,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "ac-repair-refill",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "空调维修 · 加氟 · 单品券（演示）",
@@ -699,6 +919,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "door-window-repair",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "门窗维修 · 锁具 · 单品券（演示）",
@@ -725,6 +949,10 @@
       "category_id": "repair",
       "topic_id": null,
       "channel_slug": "waterpipe-repair",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "水管维修 · 应急 · 单品券（演示）",
@@ -751,6 +979,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-longhaul",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "长途搬家 · 跨城 · 单品券（演示）",
@@ -777,6 +1009,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-piano",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "钢琴搬运 · 专业 · 单品券（演示）",
@@ -803,6 +1039,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-office",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "企业搬迁 · 整体 · 单品券（演示）",
@@ -829,6 +1069,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-updown",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "搬货上下楼 · 计件 · 单品券（演示）",
@@ -855,6 +1099,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "nanny-livein-full",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "住家保姆 · 全职 · 单品券（演示）",
@@ -881,6 +1129,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "nanny-dayshift",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "白班保姆 · 日间 · 单品券（演示）",
@@ -907,6 +1159,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "yuesao-26d",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "月嫂 · 26天 · 单品券（演示）",
@@ -933,6 +1189,10 @@
       "category_id": "nanny",
       "topic_id": null,
       "channel_slug": "elder-care",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "养老护理 · 陪护 · 单品券（演示）",
@@ -959,6 +1219,10 @@
       "category_id": "telecom",
       "topic_id": null,
       "channel_slug": "telecom-broadband",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "宽带新装 · 千兆 · 单品券（演示）",
@@ -985,6 +1249,10 @@
       "category_id": "health_care",
       "topic_id": null,
       "channel_slug": "health-elder-day",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "养老陪护 · 日间 · 单品券（演示）",
@@ -1011,6 +1279,10 @@
       "category_id": "health_care",
       "topic_id": null,
       "channel_slug": "health-checkup-basic",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "体检套餐 · 基础 · 单品券（演示）",
@@ -1037,6 +1309,10 @@
       "category_id": "home_maintain",
       "topic_id": null,
       "channel_slug": "maintain-pipe-quarter",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "管道养护 · 季度 · 单品券（演示）",
@@ -1063,6 +1339,10 @@
       "category_id": "home_maintain",
       "topic_id": null,
       "channel_slug": "maintain-appliance",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "家电保养 · 套餐 · 单品券（演示）",
@@ -1089,6 +1369,10 @@
       "category_id": "asset",
       "topic_id": null,
       "channel_slug": "asset-appraisal",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "资产评估 · 房产 · 单品券（演示）",
@@ -1115,6 +1399,10 @@
       "category_id": "community",
       "topic_id": null,
       "channel_slug": "community-errand",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "便民代办 · 跑腿 · 单品券（演示）",
@@ -1141,6 +1429,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-local-small-van",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "同城搬家 · 小面 · 单品券（演示）",
@@ -1167,6 +1459,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-local-medium-van",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "同城搬家 · 中面 · 单品券（演示）",
@@ -1193,6 +1489,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-local-box-truck",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "同城搬家 · 厢货 · 单品券（演示）",
@@ -1219,6 +1519,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-longhaul-small-van",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "跨城搬家 · 小面 · 单品券（演示）",
@@ -1245,6 +1549,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-longhaul-medium-van",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "跨城搬家 · 中面 · 单品券（演示）",
@@ -1271,6 +1579,10 @@
       "category_id": "moving",
       "topic_id": null,
       "channel_slug": "moving-longhaul-box-truck",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "跨城搬家 · 厢货 · 单品券（演示）",
@@ -1297,6 +1609,10 @@
       "category_id": "community",
       "topic_id": null,
       "channel_slug": "guiyang-demo-travel",
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
       "items": [
         {
           "name": "旅居体验服务 · 单品券（演示）",
@@ -1305,6 +1621,336 @@
           "conditions": "限贵阳演示场景，一券一次；提前预约，90天有效。演示权益不兑付真实服务，不发生扣款或退款。",
           "valid_days": 90,
           "store_id": 25
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 60,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "演示家政保洁服务",
+      "description": "全屋基础保洁一次（演示）",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": false,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "演示家政保洁服务",
+          "quantity": 1,
+          "description": "全屋基础保洁一次（演示）",
+          "conditions": "提前预约，超出范围另行约定",
+          "valid_days": 30,
+          "store_id": 26
+        }
+      ],
+      "demo_purchase_enabled": false
+    },
+    {
+      "id": 61,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "演示家电检修服务",
+      "description": "基础检修一次（演示）",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": false,
+      "category_id": null,
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "演示家电检修服务",
+          "quantity": 1,
+          "description": "基础检修一次（演示）",
+          "conditions": "提前预约，配件另计",
+          "valid_days": 30,
+          "store_id": 27
+        }
+      ],
+      "demo_purchase_enabled": false
+    },
+    {
+      "id": 71,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 80元档（试点名单任选，演示）",
+      "description": "【演示】80元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 8000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t80",
+      "exchange_tier_label": "80元档",
+      "exchange_tier_minor": 8000,
+      "items": [
+        {
+          "name": "酒店通兑 · 80元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】80元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 133
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 72,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 100元档（试点名单任选，演示）",
+      "description": "【演示】100元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 10000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t100",
+      "exchange_tier_label": "100元档",
+      "exchange_tier_minor": 10000,
+      "items": [
+        {
+          "name": "酒店通兑 · 100元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】100元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 134
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 73,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 120元档（试点名单任选，演示）",
+      "description": "【演示】120元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 12000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t120",
+      "exchange_tier_label": "120元档",
+      "exchange_tier_minor": 12000,
+      "items": [
+        {
+          "name": "酒店通兑 · 120元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】120元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 135
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 74,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 160元档（试点名单任选，演示）",
+      "description": "【演示】160元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 16000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t160",
+      "exchange_tier_label": "160元档",
+      "exchange_tier_minor": 16000,
+      "items": [
+        {
+          "name": "酒店通兑 · 160元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】160元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 136
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 75,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 180元档（试点名单任选，演示）",
+      "description": "【演示】180元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 18000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t180",
+      "exchange_tier_label": "180元档",
+      "exchange_tier_minor": 18000,
+      "items": [
+        {
+          "name": "酒店通兑 · 180元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】180元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 137
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 76,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "酒店通兑 · 200元档（试点名单任选，演示）",
+      "description": "【演示】200元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+      "price_minor": 20000,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "hotel_exchange",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": "t200",
+      "exchange_tier_label": "200元档",
+      "exchange_tier_minor": 20000,
+      "items": [
+        {
+          "name": "酒店通兑 · 200元档（试点名单任选，演示）",
+          "quantity": 1,
+          "description": "【演示】200元档 酒店通兑券：同一价格档位内任选试点名单酒店，预约入住一晚。名单来自《门店长租价格建议及报名表》报名上线酒店（共 1809 家，本演示抽样接入 48 家）。演示环境不提供真实入住与履约，不发生资金往来。",
+          "conditions": "线下到店核销：先在档内任选酒店与日期预约，入住当日出示动态码核销；一券一晚，90 天有效。试点演示，不构成真实预订或价格承诺。",
+          "valid_days": 90,
+          "store_id": 138
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 77,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "城市漫游 · 景点门票（演示）",
+      "description": "【演示】指定演示景区单人票一张，预约日期当日有效。演示环境不提供真实入园与履约，不发生资金往来。",
+      "price_minor": 5550,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "scenic_ticket",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "城市漫游 · 景点门票（演示）",
+          "quantity": 1,
+          "description": "【演示】指定演示景区单人票一张，预约日期当日有效。演示环境不提供真实入园与履约，不发生资金往来。",
+          "conditions": "线下到店核销：提前预约当日出示动态码；一券一次，90 天有效。试点演示，不构成真实入园承诺。",
+          "valid_days": 90,
+          "store_id": 139
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 78,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "本地风味 · 餐饮代金（演示）",
+      "description": "【演示】演示餐厅餐饮代金券一张，到店核销。演示环境不提供真实餐食与履约，不发生资金往来。",
+      "price_minor": 6990,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "dining",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "offline",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "本地风味 · 餐饮代金（演示）",
+          "quantity": 1,
+          "description": "【演示】演示餐厅餐饮代金券一张，到店核销。演示环境不提供真实餐食与履约，不发生资金往来。",
+          "conditions": "线下到店核销：提前预约当日出示动态码；一券一次，90 天有效。试点演示，不构成真实用餐承诺。",
+          "valid_days": 90,
+          "store_id": 140
+        }
+      ],
+      "demo_purchase_enabled": true
+    },
+    {
+      "id": 79,
+      "kind": "skus",
+      "city_id": 3,
+      "city_name": "贵阳",
+      "version": 1,
+      "name": "线上生活咨询权益（演示）",
+      "description": "【演示】线上生活咨询权益一次，免预约，出示动态码由线上服务台确认后核销。演示环境不提供真实服务，不发生资金往来。",
+      "price_minor": 1990,
+      "valid_days": null,
+      "is_demo": true,
+      "category_id": "online_service",
+      "topic_id": null,
+      "channel_slug": null,
+      "redeem_channel": "online",
+      "exchange_tier": null,
+      "exchange_tier_label": null,
+      "exchange_tier_minor": null,
+      "items": [
+        {
+          "name": "线上生活咨询权益（演示）",
+          "quantity": 1,
+          "description": "【演示】线上生活咨询权益一次，免预约，出示动态码由线上服务台确认后核销。演示环境不提供真实服务，不发生资金往来。",
+          "conditions": "线上核销：无需预约门店，直接出示动态码；一券一次，90 天有效。试点演示。",
+          "valid_days": 90,
+          "store_id": 141
         }
       ],
       "demo_purchase_enabled": true

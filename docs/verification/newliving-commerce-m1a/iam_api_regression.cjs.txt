@@ -1,3 +1,5 @@
+(node:2079958) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
 PASS  GET permissions 200 且含目录+角色
 PASS  权限点目录含 account.manage（预留不接路由）
 PASS  角色矩阵含内置标记

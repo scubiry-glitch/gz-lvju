@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "width": 320,
+      "name": "coupon states, CTA gating, compact IDs, 44px controls",
+      "passed": true
+    },
+    {
+      "width": 320,
+      "name": "QR expiry preserves box and refresh action",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "name": "coupon states, CTA gating, compact IDs, 44px controls",
+      "passed": true
+    },
+    {
+      "width": 390,
+      "name": "QR expiry preserves box and refresh action",
+      "passed": true
+    }
+  ],
+  "page_errors": [],
+  "captured_at": "2026-09-22T01:48:17.493Z",
+  "data_mutations": 0
+}
