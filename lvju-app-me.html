@@ -50,10 +50,10 @@
     <div class="me-hd">
       <div class="bg s-fanjing"></div>
       <div class="u">
-        <div class="av">🧑</div>
-        <div class="ui">
-          <div class="nm">张先生</div>
-          <div class="ph">138****6688</div>
+        <div class="av" id="meAv" style="cursor:pointer">🧑</div>
+        <div class="ui" id="meUi" style="cursor:pointer">
+          <div class="nm" id="meName">点击登录</div>
+          <div class="ph" id="mePhone">登录后查看订单与收藏</div>
         </div>
       </div>
       <div class="vip" hidden data-deferred>👑 旅居黑卡会员 · 享 9 折 + 优先派管家</div>
@@ -160,6 +160,8 @@
   </div>
 </div>
 
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js?v=2"></script>
 <script src="screens/_orderbus.js"></script>
 <script>
 (function(){
@@ -293,6 +295,41 @@
   mask.addEventListener('click', function(e){ if (e.target === mask) close(); });
 
   paint400();
+
+  /* 未登录：点「订单 / 我的」或进本页 → 贝壳 App 登录 */
+  function maskPhone(p){
+    p = String(p || '');
+    return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : (p || '已登录');
+  }
+  function paintMe(loggedIn, user){
+    var nm = $('meName'), ph = $('mePhone');
+    if (!nm || !ph) return;
+    if (!loggedIn) {
+      nm.textContent = '点击登录';
+      ph.textContent = '登录后查看订单与收藏';
+      return;
+    }
+    nm.textContent = (user && user.name) || '旅居用户';
+    ph.textContent = user && user.phone ? maskPhone(user.phone) : '已登录';
+  }
+  function tryAppLogin(){
+    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.jumpToLogin(location.href)) return true;
+    return false;
+  }
+  function onMeHdClick(){
+    if (window.BZF_BEIKE_LOGIN && !BZF_BEIKE_LOGIN.token()) tryAppLogin();
+  }
+  var meAv = $('meAv'), meUi = $('meUi');
+  if (meAv) meAv.addEventListener('click', onMeHdClick);
+  if (meUi) meUi.addEventListener('click', onMeHdClick);
+  if (window.BZF_BEIKE_LOGIN) {
+    BZF_BEIKE_LOGIN.ensureAppLogin({
+      onReady: function(){
+        paintMe(true, BZF_BEIKE_LOGIN.pickUser(BZF_BEIKE_LOGIN.appUserInfo()));
+      },
+      onNeedPassword: function(){ paintMe(false); }
+    });
+  }
 })();
 </script>
 </body>

@@ -1,25 +1,23 @@
-/* _beike-login.js · C 端订房登录闸（贝壳 App 原生登录 + pcLogin.js）
+/* _beike-login.js · C 端订房登录闸（只跳贝壳/链家 App 原生登录）
  *
- * 用法（详情 / 下单页，jsbridgesdk.js 之后）：
+ * 用法（详情 / 下单 / 订单 / 我的，以及带 tabbar 的 C 端页）：
  *   <script src="jsbridgesdk.js?v=1"></script>
  *   <script src="screens/_beike-login.js"></script>
  *   BZF_BEIKE_LOGIN.gateThenGo(nextUrl);
+ *   引入后自动拦截 tabbar「订单 / 我的」点击。
  *
  * 口径：
  *  1. 已有 BJZ_TOKEN → 直接放行。
- *  2. 贝壳/链家 App 内：JsBridgeV3.getUserInfo 有身份则换会话；没有则跳转登录页
- *     （scheme://user/login，失败回落 clogin.ke.com?service=回跳地址）。
- *  3. 非 App：动态加载 https://s1.ljcdn.com/clogin/js/pcLogin.js（BeikeLoginSDK），
- *     已登录则换会话；未登录交给页面密码门（不在详情页弹 PC 滑块）。
+ *  2. 贝壳/链家 App 内：JsBridgeV3.getUserInfo 有身份则换会话；没有则按 Morph
+ *     Login.toLogin(env=app)：$ljBridge.actionLogin(encodeURIComponent(回跳))。
+ *     无 $ljBridge 时回落 scheme://actionlogin?param=…（与 Morph 旧 bridge 同源）。
+ *  3. 非 App（浏览器）：不唤起 App、不跳 H5 登录页，交给页面密码门。
  *  4. 登录回跳 2 分钟内仍无身份 → 不再连跳，避免死循环。
  */
 (function (w) {
   'use strict';
   var TOKEN_KEY = 'BJZ_TOKEN';
   var JUMP_KEY = 'bzf_beike_login_jumped';
-  var PC_SDK = 'https://s1.ljcdn.com/clogin/js/pcLogin.js';
-  var CLOGIN = 'https://clogin.ke.com/login';
-  var _pcP = null;
 
   function token() {
     try { return (localStorage.getItem(TOKEN_KEY) || '').trim(); } catch (e) { return ''; }
@@ -90,34 +88,63 @@
     return null;
   }
 
-  function loadPcLogin() {
-    if (w.BeikeLoginSDK) return Promise.resolve(w.BeikeLoginSDK);
-    if (_pcP) return _pcP;
-    _pcP = new Promise(function (resolve) {
+  var LJ_BRIDGE_SDK = '//s1.ljcdn.com/m-base/release/v04.4/asset/bridge_d0b9f70cd88e0a5q.js';
+  var _ljP = null;
+
+  function loadLjBridge() {
+    if (w.$ljBridge) return Promise.resolve(w.$ljBridge);
+    if (_ljP) return _ljP;
+    _ljP = new Promise(function (resolve) {
       var s = document.createElement('script');
-      s.src = PC_SDK;
+      s.src = (location.protocol === 'http:' ? 'https:' : location.protocol) + LJ_BRIDGE_SDK;
       s.async = true;
-      s.onload = function () { resolve(w.BeikeLoginSDK || null); };
+      s.onload = function () { resolve(w.$ljBridge || null); };
       s.onerror = function () { resolve(null); };
       (document.head || document.documentElement).appendChild(s);
     });
-    return _pcP;
+    return _ljP;
   }
 
-  function pcUserInfo() {
-    return loadPcLogin().then(function (sdk) {
-      if (!sdk || typeof sdk.getUserInfo !== 'function') return null;
-      return new Promise(function (resolve) {
-        var done = false;
-        var finish = function (info) {
-          if (done) return;
-          done = true;
-          resolve(unwrap(info));
-        };
-        try { sdk.getUserInfo(finish); } catch (e) { resolve(null); return; }
-        setTimeout(function () { finish(null); }, 2000);
+  // Morph 旧 bridge 回落：scheme://actionlogin?param=<encodeURIComponent(encodeURIComponent(回跳))>
+  function nativeLoginUrl(back) {
+    var path = 'actionlogin?param=' + encodeURIComponent(encodeURIComponent(back));
+    try {
+      if (w.JsBridgeV3 && typeof w.JsBridgeV3.getSchemeLink === 'function') {
+        var linked = w.JsBridgeV3.getSchemeLink(path);
+        if (linked) return linked;
+      }
+    } catch (e) {}
+    var scheme = '';
+    try {
+      if (w.JsBridgeV3 && typeof w.JsBridgeV3.getScheme === 'function') scheme = w.JsBridgeV3.getScheme() || '';
+    } catch (e2) {}
+    if (!scheme) {
+      var env = null;
+      try { env = w.JsBridgeV3 && w.JsBridgeV3.getAPPEnv && w.JsBridgeV3.getAPPEnv(); } catch (e3) {}
+      scheme = (env && env.isLianjiaApp && !env.isBeike) ? 'lianjia' : 'lianjiabeike';
+    }
+    return scheme + '://' + path;
+  }
+
+  function morphAppLogin(back) {
+    return new Promise(function (resolve) {
+      loadLjBridge().then(function (lj) {
+        if (lj && typeof lj.ready === 'function') {
+          try {
+            lj.ready(function (bridge) {
+              if (bridge && typeof bridge.actionLogin === 'function') {
+                bridge.actionLogin(encodeURIComponent(back));
+                resolve(true);
+                return;
+              }
+              resolve(false);
+            });
+            return;
+          } catch (e) {}
+        }
+        resolve(false);
       });
-    }).catch(function () { return null; });
+    });
   }
 
   function exchange(info) {
@@ -144,32 +171,21 @@
   }
 
   function jumpToLogin(returnUrl) {
+    if (!isBeikeApp()) return false;
     var back = absUrl(returnUrl || location.href);
-    var clogin = CLOGIN + '?service=' + encodeURIComponent(back);
     markJumped();
     initBridge();
-    if (isBeikeApp() && w.JsBridgeV3 && typeof w.JsBridgeV3.navigateTo === 'function') {
-      var native = null;
-      try {
-        var scheme = typeof w.JsBridgeV3.getScheme === 'function' ? w.JsBridgeV3.getScheme() : '';
-        if (scheme && typeof w.JsBridgeV3.getSchemeLink === 'function') {
-          native = w.JsBridgeV3.getSchemeLink('user/login?url=' + encodeURIComponent(back));
-        }
-      } catch (e) { native = null; }
-      w.JsBridgeV3.navigateTo({
-        url: native || clogin,
-        fail: function () {
-          w.JsBridgeV3.navigateTo({ url: clogin, fail: function () { location.href = clogin; } });
-        }
-      });
-      return;
-    }
-    loadPcLogin().then(function (sdk) {
-      if (sdk && typeof sdk.init === 'function') {
-        try { sdk.init(0, function () { location.href = back; }); return; } catch (e) {}
+    // 与 Morph Login.toLogin({ env:'app' }) 对齐：优先 $ljBridge.actionLogin
+    morphAppLogin(back).then(function (ok) {
+      if (ok) return;
+      var url = nativeLoginUrl(back);
+      if (w.JsBridgeV3 && typeof w.JsBridgeV3.navigateTo === 'function') {
+        w.JsBridgeV3.navigateTo({ url: url, fail: function () { location.href = url; } });
+      } else {
+        location.href = url;
       }
-      location.href = clogin;
     });
+    return true;
   }
 
   /* 详情页「订」：App 未登录先跳登录（回跳到下单页）；已登录/非 App 直接去 nextUrl */
@@ -212,10 +228,25 @@
       return;
     }
     onNeedPassword();
-    pcUserInfo().then(function (info) {
-      return exchange(info);
-    }).then(function (j) { if (j) onReady(); });
   }
+
+  function isAuthTabHref(href) {
+    return /lvju-app-orders\.html|lvju-app-me\.html/.test(String(href || ''));
+  }
+
+  function bindAuthTabs() {
+    document.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest('.tabbar a') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!isAuthTabHref(href) || a.classList.contains('on')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      gateThenGo(href);
+    }, true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindAuthTabs);
+  else bindAuthTabs();
 
   w.BZF_BEIKE_LOGIN = {
     TOKEN_KEY: TOKEN_KEY,
@@ -226,8 +257,8 @@
     pickUser: pickUser,
     exchange: exchange,
     jumpToLogin: jumpToLogin,
+    nativeLoginUrl: nativeLoginUrl,
     gateThenGo: gateThenGo,
-    ensureAppLogin: ensureAppLogin,
-    loadPcLogin: loadPcLogin
+    ensureAppLogin: ensureAppLogin
   };
 })(window);

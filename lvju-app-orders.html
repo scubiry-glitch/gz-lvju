@@ -60,6 +60,8 @@
     <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
   </div>
 </div>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js?v=2"></script>
 <script>
 /* 预订查单/取消：POST /api/juzhu/booking/lookup（order_no+手机号 双因子，规则9 禁 ?phone= 旁路）
    响应手机号为打码形式（规则10）。支持 ?order_no=&phone= 自动带入（下单成功页跳转）。 */
@@ -212,6 +214,19 @@
   function boot(){
     if (tok()) { loadMine(); return; }
     lgBox.style.display = 'block';
+    if (window.BZF_BEIKE_LOGIN) {
+      BZF_BEIKE_LOGIN.ensureAppLogin({
+        onReady: function(){ loadMine(); },
+        onNeedPassword: function(){
+          lgBox.style.display = 'block';
+          document.getElementById('lgMsg').textContent = BZF_BEIKE_LOGIN.isBeikeApp()
+            ? '请先完成贝壳 App 登录；也可使用密码登录（首次输入即自动注册）'
+            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）';
+          document.getElementById('lgSdk').style.display = BZF_BEIKE_LOGIN.isBeikeApp() ? 'block' : 'none';
+        }
+      });
+      return;
+    }
     trySdkLogin().then(function(ok){
       if (ok) return;
       lgBox.style.display = 'block';
@@ -232,6 +247,7 @@
       }).catch(function(){ eEl.textContent = '网络异常'; eEl.style.display = 'block'; });
   });
   document.getElementById('lgSdk').addEventListener('click', function(){
+    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.jumpToLogin(location.href)) return;
     trySdkLogin().then(function(ok){ if (!ok) { document.getElementById('lgErr').textContent = 'SDK 登录失败，请用密码登录'; document.getElementById('lgErr').style.display = 'block'; } });
   });
   document.getElementById('myOut').addEventListener('click', function(){
