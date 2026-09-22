@@ -1,4 +1,6 @@
 const http = require('http');
+const dns = require('dns');
+const net = require('net');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -869,6 +871,62 @@ async function cleanupExpiredBookingOrders() {
 // 重试 3 次（5s/30s/120s）仍失败即放弃，商家以 bookings/list 拉取对账兜底。
 const WEBHOOK_RETRY_DELAYS = [5000, 30000, 120000];
 
+/** 受防护的出网 POST（2026-09-22）：DNS 解析即校验（photo_config.ipIsBlocked 拦内网/环回/云元数据地址），
+ *  不跟随重定向、响应限 64KB、限时。webhook 投递与连通性测试统一走这里
+ *（规则 16：新增出网能力必须走这一层——webhook_url 开放商家自助配置后，投递侧是唯一拦截点）。 */
+function guardedPostJson(rawUrl, bodyObj, timeoutMs) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(rawUrl); } catch (_) { return resolve({ ok: false, error: 'URL 非法' }); }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return resolve({ ok: false, error: '仅支持 http/https' });
+    // IP 字面量主机 Node 会跳过 lookup 钩子直连（实测调用次数为 0），入口先行拦截（IPv6 去方括号后判）
+    const ipLiteral = u.hostname.replace(/^\[|\]$/g, '');
+    if (process.env.WEBHOOK_PRIVATE_ALLOW !== '1' && net.isIP(ipLiteral) && photoCfg.ipIsBlocked(ipLiteral)) {
+      return resolve({ ok: false, error: '目标地址为内网/环回/保留 IP，已拒绝' });
+    }
+    const data = Buffer.from(JSON.stringify(bodyObj), 'utf8');
+    let settled = false;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+    let req;
+    try {
+      req = (u.protocol === 'https:' ? https : http).request({
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || undefined,
+        path: u.pathname + (u.search || ''),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': data.length },
+        timeout: timeoutMs || 5000,
+        // DNS 解析即校验：命中的地址在建连前拦掉，避免解析后重绑定（与 photo_config 探测同口径）
+        // WEBHOOK_PRIVATE_ALLOW=1 仅供回归/联调实例放行内网目标（回归脚本用 127.0.0.1 收事件）；生产一律不开
+        lookup: (hostname, options, cb) => {
+          if (process.env.WEBHOOK_PRIVATE_ALLOW === '1') return dns.lookup(hostname, options, cb);
+          dns.lookup(hostname, { all: true }, (err, addrs) => {
+            if (err) return cb(err);
+            const list = Array.isArray(addrs) ? addrs : [addrs];
+            const bad = list.find((a) => photoCfg.ipIsBlocked(a.address));
+            if (bad) return cb(new Error('目标地址解析到内网/环回/元数据地址，已拒绝'));
+            const first = list[0];
+            if (options && options.all) return cb(null, list);
+            cb(null, first.address, first.family);
+          });
+        },
+      }, (res) => {
+        let n = 0;
+        res.on('data', (c) => {
+          n += c.length;
+          if (n > 65536) { req.destroy(); done({ ok: false, status: res.statusCode, error: '响应超过 64KB' }); }
+        });
+        res.on('end', () => done({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode }));
+        res.on('error', () => done({ ok: false, error: '响应读取失败' }));
+      });
+    } catch (e) { return done({ ok: false, error: String(e.message || e) }); }
+    req.on('timeout', () => { req.destroy(); done({ ok: false, error: '连接/响应超时' }); });
+    req.on('error', (e) => done({ ok: false, error: String(e.message || e) }));
+    req.end(data);
+  });
+}
+
 function webhookSign(secretKey, payload, timestamp) {
   const hmacAuth = require('./hmac_auth.cjs');
   const flat = hmacAuth.flattenAndFilter(payload);
@@ -879,21 +937,12 @@ function webhookSign(secretKey, payload, timestamp) {
 
 async function deliverWebhook(vendor, event, data, attempt) {
   const n = attempt || 0;
-  let res = null;
-  try {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 5000);
-    res = await fetch(vendor.webhook_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      signal: ac.signal,
-    }).finally(() => clearTimeout(timer));
-  } catch (_) { res = null; }
-  if (res && res.ok) {
+  const out = await guardedPostJson(vendor.webhook_url, data, 5000);   // 出网统一走 SSRF 防护层
+  if (out.ok) {
     console.log('[webhook] delivered', event, 'vendor#' + data.vendor_id, 'attempt', n + 1);
     return;
   }
+  console.warn('[webhook] attempt', n + 1, 'failed:', out.error || out.status);
   if (n < WEBHOOK_RETRY_DELAYS.length) {
     setTimeout(() => {
       deliverWebhook(vendor, event, data, n + 1).catch(() => {});
@@ -5774,6 +5823,65 @@ async function handleApiDirect(urlPath, qs, req, res) {
     }
 
     // ===== 商家（vendor）接口：role=vendor 会话，一律按 owner_vendor_id 隔离 =====
+
+    // GET /api/juzhu/vendor/webhook —— 商家 webhook 配置自助查看（2026-09-22 自助化）
+    if (urlPath === '/api/juzhu/vendor/webhook' && req.method === 'GET') {
+      const sess = await requestSession(req);
+      if (!sess || sess.role !== 'vendor') return jsonReply(res, { error: 'unauthorized' }, 401);
+      const vrows = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [sess.vendorId]);
+      return jsonReply(res, {
+        webhook_url: (vrows[0] && vrows[0].webhook_url) || '',
+        events: ['rating.reviewed', 'booking.created', 'booking.paid', 'booking.cancelled', 'webhook.test'],
+      });
+    }
+
+    // POST /api/juzhu/vendor/webhook —— 商家自助配置/清除 webhook_url
+    //（URL 仅格式校验；内网/保留地址在投递侧由 guardedPostJson 的 DNS 解析拦截——解析后重绑定也拦得住）
+    if (urlPath === '/api/juzhu/vendor/webhook' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || sess.role !== 'vendor') return jsonReply(res, { error: 'unauthorized' }, 401);
+      const body = await readBody(req);
+      const url = String(body.webhook_url || '').trim();
+      if (url && !/^https?:\/\//i.test(url)) return jsonReply(res, { error: 'webhook_url 须以 http:// 或 https:// 开头' }, 400);
+      if (url.length > 500) return jsonReply(res, { error: 'webhook_url 过长（≤500 字符）' }, 400);
+      const before = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [sess.vendorId]);
+      await queryRows('UPDATE jz_vendors SET webhook_url=?, updated_at=? WHERE id=?',
+        [url || null, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), sess.vendorId]);
+      try {
+        await authCenter.audit({
+          accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+          action: 'vendor.webhook.update', resource: 'vendor', resourceId: String(sess.vendorId),
+          before: { webhook_url: (before[0] && before[0].webhook_url) || null },
+          after: { webhook_url: url || null }, result: 'ok',
+        });
+      } catch (_) {}
+      return jsonReply(res, { ok: true, webhook_url: url || null });
+    }
+
+    // POST /api/juzhu/vendor/webhook/test —— 同步试推一次 webhook.test（单次不重试，回传送达结果）
+    if (urlPath === '/api/juzhu/vendor/webhook/test' && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess || sess.role !== 'vendor') return jsonReply(res, { error: 'unauthorized' }, 401);
+      const vrows = await queryRows('SELECT webhook_url, hmac_key FROM jz_vendors WHERE id=? LIMIT 1', [sess.vendorId]);
+      const v = vrows[0];
+      if (!v || !v.webhook_url) return jsonReply(res, { error: '请先保存 webhook_url' }, 400);
+      if (!v.hmac_key) return jsonReply(res, { error: '商家未配置 hmac_key，无法签名' }, 400);
+      const ts = Date.now();
+      const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+      const payload = { event: 'webhook.test', vendor_id: sess.vendorId, data };
+      const body = { event: payload.event, vendor_id: sess.vendorId, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts) };
+      const out = await guardedPostJson(v.webhook_url, body, 5000);
+      try {
+        await authCenter.audit({
+          accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+          action: 'vendor.webhook.test', resource: 'vendor', resourceId: String(sess.vendorId),
+          after: out, result: out.ok ? 'ok' : 'fail',
+        });
+      } catch (_) {}
+      return jsonReply(res, out.ok
+        ? { ok: true, status: out.status }
+        : { ok: false, error: out.error || ('HTTP ' + out.status), status: out.status || null });
+    }
 
     // POST /api/juzhu/vendor/login —— 商家登录（2026-09-09 并入账号中心：本路由只是别名，返回体形状不变，B 端页面零改动）
     // 凭据在 accounts（vendor_id 绑定 + vendor_owner 角色，scrypt）：

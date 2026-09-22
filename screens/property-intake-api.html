@@ -853,7 +853,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
     <h3>审核通过自动上架（auto_publish）</h3>
     <p>默认行为：评级复核通过后，商家仍需自行调 <code>projects/status</code> 推 <code>online</code>。若希望<strong>复核通过即自动上架</strong>，在 <code>projects/create</code> 或 <code>projects/update</code> 传 <code>auto_publish: true</code>（存 <code>ext.auto_publish</code>，随时可传 <code>false</code> 关闭）。自动上架复用与商家推送<strong>完全相同</strong>的上架闸（评级通过 / 逐户型默认夜价 &gt; 0 / 图片抽检）与交易方式校验：闸全过 → 直接 <code>online</code>；任一不过 → 保持 <code>draft</code>，具体原因通过 <code>rating.reviewed</code> webhook 的 <code>auto_publish.reason</code> 带回，商家补齐后自行推送上架即可。</p>
     <h3>评级审核结果 Webhook（rating.reviewed）</h3>
-    <p>评级复核（通过 / 驳回）完成时，平台向商家 <code>webhook_url</code>（线下提供给平台配置）POST 一条签名通知，商家无需再轮询 <code>rating/status</code>：</p>
+    <p>评级复核（通过 / 驳回）完成时，平台向商家 <code>webhook_url</code> POST 一条签名通知，商家无需再轮询 <code>rating/status</code>。<strong>webhook_url 由商家自助配置</strong>：B 端后台「房源管理」（<code>b-listing-mgmt.html</code>）顶部「🔔 Webhook 通知」卡填写并保存，支持一键发送 <code>webhook.test</code> 连通性测试（同步回传送达结果）；推送与测试统一经平台出网防护层（内网 / 环回 / 云元数据地址拒绝）。</p>
     <table>
       <tr><th>字段</th><th>说明</th></tr>
       <tr><td><code>event</code></td><td><code>rating.reviewed</code></td></tr>
