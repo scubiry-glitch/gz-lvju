@@ -927,6 +927,30 @@ function notifyVendorBooking(vendorId, event, order) {
   })().catch((e) => console.warn('[webhook] notify error:', e.message));
 }
 
+/** 下发商家 webhook（通用事件，2026-09-22 商家诉求 3.2）：签名体 = {event, vendor_id, data}，
+ *  同开放接口算法；当前用于 rating.reviewed（评级复核结果）。未配 webhook_url = 不推送。 */
+function notifyVendorEvent(vendorId, event, data) {
+  (async () => {
+    const conn = await mysql2.createConnection(getDbConfig());
+    let v = null;
+    try {
+      const [rows] = await conn.execute('SELECT id, hmac_key, webhook_url FROM jz_vendors WHERE id=?', [vendorId]);
+      v = rows[0] || null;
+    } finally { await conn.end(); }
+    if (!v || !v.webhook_url || !v.hmac_key) return;
+    const ts = Date.now();
+    const payload = { event, vendor_id: vendorId, data };
+    const body = {
+      event,
+      vendor_id: vendorId,
+      data,
+      timestamp: ts,
+      sign: webhookSign(v.hmac_key, payload, ts),
+    };
+    deliverWebhook(v, event, body, 0).catch(() => {});
+  })().catch((e) => console.warn('[webhook] notify error:', e.message));
+}
+
 /** 组装某月房态日历（规则见 stay_config.buildStayMonth；行读取走连接池） */
 function buildStayMonth(proj, unit, unitId, y, mo) {
   return stayCfg.buildStayMonth(queryRows, proj, unit, unitId, y, mo);
@@ -6333,7 +6357,53 @@ async function handleApiDirect(urlPath, qs, req, res) {
           );
           await conn.commit();
           const [updated] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);
-          return jsonReply(res, { ok: true, project: updated[0] });
+          let proj = updated[0] || null;
+          // 3.1 审核通过自动上架（商家诉求 2026-09-22）：商家经 projects/create|update 配 ext.auto_publish=true 时，
+          // 平台复核通过即自动推 online——复用商家开放接口同一套上架闸与图片抽检（housingProjectsStatus），
+          // 闸不过保持 draft，原因随响应体与 rating.reviewed webhook 带回；未配置 flag 行为不变。
+          let autoPub = null;
+          if (action === 'passed' && proj) {
+            let extObj = {};
+            try { extObj = JSON.parse(proj.ext || '{}') || {}; } catch (_) { extObj = {}; }
+            autoPub = { enabled: extObj.auto_publish === true };
+            if (autoPub.enabled) {
+              autoPub.attempted = true;
+              const vapi = vendorApi || require('./vendor_api.cjs');
+              const r = await vapi.housingProjectsStatus(conn, { id: pid, status: 'online' }, proj.owner_vendor_id);
+              const d = (r && r.data) || {};
+              if (r && r.status === 200) {
+                autoPub.result = 'published';
+                if (d.warnings && d.warnings.length) autoPub.warnings = d.warnings;
+                const [r2] = await conn.execute('SELECT * FROM projects WHERE id=?', [pid]);   // 回读，响应体反映自动上架后的状态
+                proj = r2[0] || proj;
+              } else {
+                autoPub.result = 'blocked';
+                autoPub.reason = d.message || '上架闸未通过';
+              }
+              try {
+                await authCenter.audit({
+                  accountId: (req.principal && req.principal.account && req.principal.account.id) || null,
+                  principalType: 'user', action: 'project.auto_publish', resource: 'projects', resourceId: String(pid),
+                  after: autoPub, result: autoPub.result === 'published' ? 'ok' : 'fail',
+                });
+              } catch (_) {}
+            }
+          }
+          // 3.2 评级审核结果 webhook（webhook_url 未配置 = 不推送；5s 超时，重试 5s/30s/120s）
+          if (proj) {
+            let ratingCode = null;
+            try { ratingCode = (JSON.parse(proj.rating || '{}') || {}).code || null; } catch (_) {}
+            notifyVendorEvent(proj.owner_vendor_id, 'rating.reviewed', {
+              project_id: pid,
+              code: ratingCode,
+              channel: proj.channel,
+              rating_status: action,
+              rating_note: body.note || null,
+              reviewed_at: now,
+              auto_publish: autoPub,
+            });
+          }
+          return jsonReply(res, { ok: true, project: proj, ...(autoPub ? { auto_publish: autoPub } : {}) });
         } finally { await conn.end(); }
       }
     }

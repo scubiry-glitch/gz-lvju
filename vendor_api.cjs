@@ -575,6 +575,12 @@ function extFromBody(body, baseExt, channel) {
     if (body.default_closed === null || body.default_closed === '') delete ext.default_closed;
     else if (stayCfg.normalizeDefaultClosedInput(body.default_closed)) ext.default_closed = true; else delete ext.default_closed;
   }
+  // 审核通过后自动上架（2026-09-22 商家诉求 3.1）：true = 评级复核通过即由平台自动推 online
+  //（仍走同一套上架闸与图片抽检；闸不过保持 draft，原因随 rating.reviewed webhook 带回）
+  if (Object.prototype.hasOwnProperty.call(body, 'auto_publish')) {
+    if (body.auto_publish === true || body.auto_publish === 'true') ext.auto_publish = true;
+    else delete ext.auto_publish;
+  }
   ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
   return ext;
 }
@@ -1410,6 +1416,7 @@ module.exports = {
   parseCityIds,
   validateProductCitySync,
   handleRequest,
+  housingProjectsStatus,
   VENDOR_ROUTES,
   HOUSING_ROUTES,
 };
