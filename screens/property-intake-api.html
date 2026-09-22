@@ -302,7 +302,7 @@
       <li>请求体 = 业务参数 + <code>vendor_id</code> + <code>timestamp</code> + <code>sign</code>，<code>POST</code> JSON 发送。时间戳与服务器偏差 <strong>±5 分钟</strong> 内有效。</li>
     </ol>
     <div style="margin-top:8px;padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;font-size:12.5px;color:#991b1b;">
-      ⚠️ <strong>数值字段一律传整数，禁止浮点</strong>（如 <code>price_night: 188</code>，不要 <code>188.0</code>）：Python 侧 <code>str(188.0)='188.0'</code> 而平台序列化为 <code>'188'</code>，两边签名串不一致会直接 <strong>401 验签失败</strong>。价格单位为元、取整数。另：批量设置房态/夜价/放出间数的每次调用都<strong>必带 <code>status</code></strong>（<code>open</code>/<code>blocked</code>），只推价格也要带——推价格即「把这些晚以该价开放」。
+      ⚠️ <strong>数值字段一律传整数，禁止浮点</strong>（如 <code>price_night: 188</code>，不要 <code>188.0</code>）：Python 侧 <code>str(188.0)='188.0'</code> 而平台序列化为 <code>'188'</code>，两边签名串不一致会直接 <strong>401 验签失败</strong>。价格单位为元、取整数。
     </div>
 
 <pre><code><span class="tok-com">// Node 签名示例</span>
@@ -800,7 +800,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>,
   <span class="tok-key">"unit_id"</span>: <span class="tok-num">0</span>,                        <span class="tok-com">// 0 或缺省 = 项目级（整栋 / 不限房型，容量恒 1）</span>
   <span class="tok-key">"dates"</span>: [<span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"2026-12-11"</span>],
-  <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// blocked 关房；open 开房</span>
+  <span class="tok-key">"status"</span>: <span class="tok-str">"blocked"</span>,                 <span class="tok-com">// 可选：blocked 关房 / open 开房；缺省 = 保持各晚现状（只改价/净可售）</span>
   <span class="tok-key">"price_night"</span>: <span class="tok-key">null</span>,                 <span class="tok-com">// blocked 可同时设价；open + 价格 = 夜价覆盖；open + null = 不改价</span>
   <span class="tok-key">"qty"</span>: <span class="tok-key">null</span>,                         <span class="tok-com">// ★ 放出总量覆盖（1-999，仅房型级）：open + qty = 该晚只放 N 间；不传 = 用 total_qty</span>
   <span class="tok-key">"available_qty"</span>: <span class="tok-key">null</span>                  <span class="tok-com">// ★ 净可售（0-999，推荐，见 3.5）：与该晚的 qty 二选一；写回 qty 会把基线清空</span>
@@ -813,6 +813,12 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   ]
 }</code></pre>
     <ul style="font-size:13.5px;">
+      <li><strong>status 可选（2026-09-22）</strong>：只推价格 / 净可售时可以不传 <code>status</code>——对应间夜保持原状态（<code>blocked</code> 晚保持关房、<code>open</code> 晚保持可订），无差异行的晚按默认 <code>open</code> 建行。<code>status: open</code> 且价、放出量均不传 = 显式「恢复默认」。</li>
+      <li><strong>dates 支持对象数组（2026-09-22）</strong>：逐晚独立值，一次请求混合推送不同房态 / 价格——
+<pre><code>[{ <span class="tok-str">"stay_date"</span>: <span class="tok-str">"2026-12-10"</span>, <span class="tok-str">"available_qty"</span>: <span class="tok-num">0</span>, <span class="tok-str">"status"</span>: <span class="tok-str">"open"</span> },
+ { <span class="tok-str">"stay_date"</span>: <span class="tok-str">"2026-12-11"</span>, <span class="tok-str">"price_night"</span>: <span class="tok-num">188</span> }]</code></pre>
+        字段缺省含义与顶层一致（<code>status</code> 缺省 = 保持现状）。平铺字符串数组 + 顶层字段形态继续可用（所有晚同值）。</li>
+      <li><strong>统一用 available_qty 管理房态（推荐）</strong>：<code>available_qty: 0 + status: open</code> 即「该晚 0 间可售」——剩余派生为 0、C 端显示售罄，效果等同关房，且随时可推一个正数恢复；不必在 open / blocked 之间切换语义。</li>
       <li><strong>已订晚（<code>booked_qty&gt;0</code>）不可关房</strong>：返回 400 并列出日期，须先取消订单；改价 / 调放出量不受限。</li>
       <li>未设置过的晚天然可订、放出 = 房型 <code>total_qty</code>（<strong>除非该房型开了「默认关房」，见 3.6</strong>）；「恢复默认」= status=open 且价、放出量均不传：清除差异行，<strong>有占用的晚保留占用计数、仅清覆盖回默认</strong>。</li>
       <li><strong>qty 与已订（多间口径 2026-09-10）</strong>：<code>qty</code> 低于该晚已订间数返回 400（先取消订单或调高）；<code>qty</code> 改变只影响当晚可订余量，已订单不受影响。剩余 = <code>max(0, qty||total_qty − booked_qty)</code>。</li>
