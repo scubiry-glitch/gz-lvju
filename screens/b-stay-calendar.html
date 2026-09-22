@@ -324,7 +324,11 @@
     $('mLabel').textContent = state.month.replace('-', ' / ');
     $('calTitle').textContent = '房态月历 · ' + state.month;
     $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载房态…</div>';
-    var url = API + '/projects/' + state.pid + '/stay-calendar?month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '');
+    // 会话态走商家专用接口（owner 校验、不要求 online——draft/下架房源也要能管房态）；
+    // 只读降级态才走 C 端公开接口（公开接口仅 online+passed 房源可得，draft 会 404）
+    var url = state.writable
+      ? API + '/vendor/stay-calendar?project_id=' + state.pid + '&month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '')
+      : API + '/projects/' + state.pid + '/stay-calendar?month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '');
     fetch(url).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }).then(function(j){
       var days = j.days || [];
       var p = currentProject();
