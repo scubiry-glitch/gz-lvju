@@ -71,14 +71,59 @@ async function run({pool,service,actors,check,origin}){
   await assert.rejects(()=>service.verifyReferral(ref.slice(0,-2)+'xx'),/签名/);
   const order=await callAny('/demo-orders',actors.other,'POST',{kind:p.kind,product_id:p.id,version:p.version,demo_ack:true,referral:ref});assert.equal(order.status,201);
   const [[row]]=await pool.execute('SELECT source_account_id FROM commerce_orders WHERE id=?',[order.data.id]);assert.equal(row.source_account_id,promoter.account.id,'demo purchase keeps its promoter');
-  const coupon=(await service.my(actors.other)).coupons.find(c=>c.order_id===order.data.id);assert(coupon);
+  const coupons=(await service.my(actors.other)).coupons.filter(c=>c.order_id===order.data.id);const coupon=coupons.find(c=>c.store_id===p.items[0].store_id)||coupons[0];assert(coupon,'attributed demo coupon granted');
   const [[ruleSnap]]=await pool.execute("SELECT JSON_EXTRACT(snapshot,'$.rule.beike_bps') b, JSON_EXTRACT(snapshot,'$.rule.channel_bps') c FROM commerce_coupons WHERE id=?",[coupon.id]);
   assert.equal(Number(ruleSnap.b),0);assert.equal(Number(ruleSnap.c),0,'demo rule keeps every share at zero');
   const unattributed=await callAny('/demo-orders',actors.other,'POST',{kind:'skus',product_id:catalog.find(x=>x.kind==='skus').id,version:catalog.find(x=>x.kind==='skus').version,demo_ack:true});assert.equal(unattributed.status,201);
   const [[plain]]=await pool.execute('SELECT source_account_id FROM commerce_orders WHERE id=?',[unattributed.data.id]);assert.equal(plain.source_account_id,null,'no referral means no attribution');
   const promo=await callAny('/promotion',promoter);assert.equal(promo.status,200);
   assert(promo.data.demo_orders>=1,'promotion view separates demo orders');assert.equal(Number(promo.data.confirmed_minor),0,'demo confirmation keeps commission at zero');
+  assert.equal(Number(promo.data.orders),0,'demo attribution must not inflate attributed orders');
   assert(String(promo.data.demo_note||'').includes('分开')||String(promo.data.demo_note||'').includes('演示'));
+  // 归因演示券被核销后同样不得进入推广口径：演示核销永不进结算批次，awaiting_batch 不许被它永久顶高（规则 21）。
+  const storeRow=await service.approved(pool,'stores',p.items[0].store_id);
+  const accountId=24;
+  await pool.execute("INSERT IGNORE INTO accounts(id,display_name,principal_type,status,vendor_id) VALUES(?,?,'user','active',?)",[accountId,'归因核销员',storeRow.vendor_id]);
+  await pool.execute('INSERT IGNORE INTO account_roles(account_id,role_code,scope) VALUES(?,\'merchant\',?)',[accountId,JSON.stringify({level:'vendor',vendor_id:storeRow.vendor_id})]);
+  const existingStaff=await service.get(pool,'SELECT id FROM commerce_staff WHERE store_id=?',[p.items[0].store_id]);
+  let staff;
+  if(existingStaff.length){staff=await service.entity(pool,'staff',existingStaff[0].id);}
+  else{staff=await service.save(actors.writer,'commerce.admin.write','staff',null,{payload:{name:'归因核销员',merchant_id:storeRow.merchant_id,store_id:p.items[0].store_id,account_id:accountId}});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'submit'});staff=await service.transition(actors.reviewer,'commerce.admin.review','staff',staff.id,{version:staff.version,action:'approve',note:'归因验收核销授权'});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'publish'});}
+  const redeemer={type:'account',...await service.auth.getAccountWithRoles(accountId),token:(await service.auth.createSession(accountId,'127.0.0.1','attribution acceptance')).token};
+  const bj=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(v);
+  await service.appointment(actors.other,{coupon_id:coupon.id,service_date:bj(Date.now()+86400000)},'attrib-appt');
+  await pool.execute("UPDATE commerce_appointments SET service_date=CURDATE() WHERE coupon_id=? AND status='booked'",[coupon.id]);
+  const redeemToken=await service.token(actors.other,coupon.id);
+  await service.redeem(redeemer,'commerce.merchant.redeem',{coupon_id:coupon.id,token:redeemToken.token},'attrib-redeem');
+  const promo2=await callAny('/promotion',promoter);assert.equal(promo2.status,200);
+  assert.equal(Number(promo2.data.orders),0,'demo redemption must not inflate attributed orders');
+  assert.equal(Number(promo2.data.redemptions),0,'demo redemption must not inflate valid redemptions');
+  assert.equal(Number(promo2.data.settlement.awaiting_batch),0,'demo redemption must never await settlement batches');
+  assert.equal(Number(promo2.data.settlement.confirmed_minor),0,'demo redemption must not create commission');
+  // 逐券明细接口（本人 scope）：归因订单与演示核销进列表，代发记录为空数组形状。
+  const rec=await callAny('/promotion/records',promoter);assert.equal(rec.status,200);
+  assert((rec.data.orders||[]).some(o=>o.order_id===order.data.id&&Number(o.is_demo)===1),'records list attributed demo orders');
+  assert((rec.data.redemptions||[]).some(r=>r.id&&Number(r.is_demo)===1),'records list demo redemptions');
+  assert(Array.isArray(rec.data.payouts),'records expose payout history');
+  // 选品接口：预估佣金 + 本人点击/归因统计。演示商品佣金恒 0；真实归因计数排除演示（规则 21）。
+  await callAny('/referral?token='+encodeURIComponent(ref),promoter);
+  const pc=await callAny('/promotion/products',promoter);assert.equal(pc.status,200);
+  const mine=(pc.data.products||[]).find(x=>x.kind===p.kind&&x.id===p.id);assert(mine,'product enrichment returned');
+  assert(mine.is_demo===true&&mine.commission_minor===0&&mine.commission_bps===null,'demo product discloses zero commission');
+  assert(Number(mine.clicks)>=1,'referral landing click counted');
+  assert(Number(mine.demo_orders)>=1,'demo attribution visible per product');
+  assert(Number(mine.orders)===0,'per-product real orders exclude demo');
+  // 推广资格闸：settings.promoter_gate='1' 时无 promoter 角色被拒；授予角色后恢复；页面状态随 /promotion 下发。
+  await pool.execute("INSERT INTO settings(`key`,value) VALUES('promoter_gate','1') ON DUPLICATE KEY UPDATE value='1'");
+  const outsider=await freshAccount(25,'无资格账号');
+  assert.equal((await callAny('/shares',outsider,'POST',{kind:p.kind,product_id:p.id})).status,403,'gate blocks unqualified accounts');
+  const outsiderPromo=await callAny('/promotion',outsider);
+  assert.equal(outsiderPromo.data.promoter_gate,true);assert.equal(outsiderPromo.data.share_qualified,false,'promotion view reflects qualification');
+  await pool.execute("INSERT IGNORE INTO roles(role_code,name,permissions,builtin) VALUES('promoter','推广员','[]',0)");
+  await pool.execute('INSERT IGNORE INTO account_roles(account_id,role_code,scope) VALUES(?,\'promoter\',?)',[promoter.account.id,JSON.stringify({level:'self'})]);
+  assert.equal((await callAny('/shares',promoter,'POST',{kind:p.kind,product_id:p.id})).status,201,'promoter role passes the gate');
+  assert.equal((await callAny('/promotion',promoter)).data.share_qualified,true,'qualified promoter reflected');
+  await pool.execute("UPDATE settings SET value='0' WHERE `key`='promoter_gate'");
  });
  await check('Two customers and three demo merchants reject every cross-account access',async()=>{
   // Build redeemers for three distinct demo merchants with a published staff authorisation each.
@@ -92,10 +137,8 @@ async function run({pool,service,actors,check,origin}){
    await pool.execute("INSERT IGNORE INTO accounts(id,display_name,principal_type,status,vendor_id) VALUES(?,?,'user','active',?)",[accountId,'交叉核销员'+(index+1),vendorId]);
    await pool.execute('INSERT IGNORE INTO account_roles(account_id,role_code,scope) VALUES(?,\'merchant\',?)',[accountId,JSON.stringify({level:'vendor',vendor_id:vendorId})]);
    const storeRow=await service.approved(pool,'stores',p.items[0].store_id);
-   const existing=await service.get(pool,'SELECT id FROM commerce_staff WHERE store_id=?',[p.items[0].store_id]);
-   let staff;
-   if(existing.length){staff=await service.entity(pool,'staff',existing[0].id);}
-   else{staff=await service.save(actors.writer,'commerce.admin.write','staff',null,{payload:{name:'交叉核销员'+(index+1),merchant_id:storeRow.merchant_id,store_id:p.items[0].store_id,account_id:accountId}});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'submit'});staff=await service.transition(actors.reviewer,'commerce.admin.review','staff',staff.id,{version:staff.version,action:'approve',note:'交叉验收核销授权'});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'publish'});}
+   // 每个核销员账号各自建一份门店授权；不复用既有 staff（可能绑定别的账号，如归因场景的核销员）。
+   let staff=await service.save(actors.writer,'commerce.admin.write','staff',null,{payload:{name:'交叉核销员'+(index+1)+'-'+accountId,merchant_id:storeRow.merchant_id,store_id:p.items[0].store_id,account_id:accountId}});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'submit'});staff=await service.transition(actors.reviewer,'commerce.admin.review','staff',staff.id,{version:staff.version,action:'approve',note:'交叉验收核销授权'});staff=await service.transition(actors.writer,'commerce.admin.write','staff',staff.id,{version:staff.version,action:'publish'});
    redeemers.push({type:'account',...await service.auth.getAccountWithRoles(accountId),token:(await service.auth.createSession(accountId,'127.0.0.1','cross acceptance')).token});
   }
   const customerA=await freshAccount(31,'交叉客户A'),customerB=await freshAccount(32,'交叉客户B');

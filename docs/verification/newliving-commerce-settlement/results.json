@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-20T00:34:39.195Z",
+  "at": "2026-09-21T06:25:11.432Z",
   "database": "isolated temporary MySQL database (removed)",
   "scenarios": [
     {
@@ -52,30 +52,6 @@
     },
     {
       "name": "SC11 结算接口权限闸与四端可查",
-      "passed": true
-    },
-    {
-      "name": "Browser settlement admin page renders overview, batches and instructions",
-      "passed": true
-    },
-    {
-      "name": "Browser reviewer sees approval actions but cannot generate or execute",
-      "passed": true
-    },
-    {
-      "name": "Browser refunds page builds from case and executes",
-      "passed": true
-    },
-    {
-      "name": "Browser merchant settlement view shows payable and received",
-      "passed": true
-    },
-    {
-      "name": "Browser consumer sees refund progress and promoter sees settlement",
-      "passed": true
-    },
-    {
-      "name": "Browser new pages responsive with no overflow and no JS errors",
       "passed": true
     }
   ]

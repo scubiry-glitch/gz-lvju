@@ -3,9 +3,10 @@
  *
  * 【数据源边界 · 参见 CLAUDE.md 规则 8/9】
  *   权威数据源 = MySQL，经 app.js 暴露。
- *   本总线（家政工单闭环）与 screens/_orderbus.js（报修 · localStorage `bzf_orders`）
- *   并行、不混用：报修走 _orderbus.js，家政走本文件，二者不共享 key、不合并。
- *   家政"目录/SKU 配置"的前端适配 + 离线 test 见根目录 jiazheng-data.js。
+ *   2026-09-22 并轨：原 screens/_orderbus.js（报修 · localStorage `bzf_orders`）已退役，
+ *   报修/旅居客工单统一走本总线的 repairs 系列（createRepair/listRepairs/repairGet/repairCancel，
+ *   服务端 /api/juzhu/jiazheng/repairs*，phone+source 双过滤），与家政订单同一张 jz_orders。
+ *   家政"目录/SKU 配置"的前端适配 + 离线 mock 见根目录 jiazheng-data.js。
  */
 (function () {
   'use strict';
@@ -27,6 +28,8 @@
 
   var ICON = {
     '保洁': '🧹', '维修': '🔧', '搬家': '📦', '保姆': '👶', '家政': '✨',
+    '报修': '🔧', '管家': '🛎', '管家服务': '🛎', '送物': '📦', '家电安装': '🔌',
+    '除螨消杀': '🧴', '接送': '🚗', '其他': '🧰',
     '电讯服务': '📱', '财险服务': '🛡', '消费金融': '💳', '健康养老': '🏥',
     '居家维护': '🏠', '资产服务': '🏦', '二手回收': '♻️'
   };
@@ -185,6 +188,43 @@
     }).then(function (res) {
       notify();
       return normalizeItem(res.order);
+    });
+  }
+
+  // ===== 报修单（旅居客 App 提交，写入同一张 jz_orders；读接口 phone 必填 + source 限定）=====
+  // type 为中文报修类型字面量（报修/保洁/管家/送物…），服务端 type_label 原样透传。
+  function createRepair(payload) {
+    return fetchJSON('/api/juzhu/jiazheng/repairs', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload || {})
+    }).then(function (res) {
+      notify();
+      return normalizeItem(res.order);
+    });
+  }
+
+  function listRepairs(phone) {
+    var url = '/api/juzhu/jiazheng/repairs?phone=' + encodeURIComponent(phone || '');
+    return fetchJSON(url, { headers: authHeaders() }).then(function (res) {
+      return (res.items || []).map(normalizeItem);
+    });
+  }
+
+  function repairGet(id, phone) {
+    var url = '/api/juzhu/jiazheng/repairs/' + encodeURIComponent(id) + '?phone=' + encodeURIComponent(phone || '');
+    return fetchJSON(url, { headers: authHeaders() }).then(function (res) {
+      return normalizeItem(res.order || res);
+    });
+  }
+
+  function repairCancel(id, phone) {
+    return fetchJSON('/api/juzhu/jiazheng/repairs/' + encodeURIComponent(id) + '?phone=' + encodeURIComponent(phone || ''), {
+      method: 'DELETE',
+      headers: authHeaders()
+    }).then(function (res) {
+      notify();
+      return res;
     });
   }
 
@@ -535,6 +575,7 @@
 
   window.BZF_JZ = {
     STATUS: STATUS,
+    ORDER: Object.keys(STATUS),
     ICON: ICON,
     CAT_THEME: CAT_THEME,
     catTheme: catTheme,
@@ -554,6 +595,10 @@
     dispatch: dispatch,
     advance: advance,
     rate: rate,
+    createRepair: createRepair,
+    listRepairs: listRepairs,
+    repairGet: repairGet,
+    repairCancel: repairCancel,
     categories: categories,
     skus: skus,
     sku: sku,

@@ -96,15 +96,12 @@ REST 双轨：C 端工单 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）�
 | [`_nav.js`](screens/_nav.js) | 桌面 sidebar + 6 系列页面清单（G/B/F/P/S/C）单一数据源；item 支持可选 `perms`；页面不硬编码导航 | 内置 SERIES 定义 |
 | [`_navmobile.js`](screens/_navmobile.js) | 移动端 chrome（status-bar / 渐变 header / 底部 tabbar）集中配置 | 内置 |
 | [`_region.js`](screens/_region.js) | 地域/部门/业务词/机构主体名词单一数据源；运行时 relabel + `relabelStr()` 属性改名 | `PRESETS` + `?region=` |
-| [`_orderbus.js`](screens/_orderbus.js) | 居住服务「报修」工单闭环总线（可点击贯通演示） | `localStorage bzf_orders` |
-| [`_jzapi.js`](screens/_jzapi.js) | 家政工单 REST 总线（C 端下单 + P/B 管理台双轨 API） | **MySQL**（`/api/juzhu/*`） |
+| [`_jzapi.js`](screens/_jzapi.js) | 工单 REST 总线（家政下单 + 报修 repairs 通道 + P/B 管理台双轨 API；2026-09-22 起报修并轨，`_orderbus.js` 退役） | **MySQL**（`/api/juzhu/*`） |
 | [`_qr.js`](screens/_qr.js) | 二维码生成（第三方 MIT 库） | — |
 
-**三层数据边界（互不重叠，见 `CLAUDE.md` 规则 8/9）**：
+**数据边界（互不重叠，见 `CLAUDE.md` 规则 8/9）**：
 1. `jiazheng-data.js`（根目录）= 家政「目录/SKU」前端适配 + 离线 mock/兜底；
-2. `screens/_jzapi.js` = 家政订单总线，走 REST，**MySQL 为唯一权威源**；
-3. `screens/_orderbus.js` = 报修演示总线，走 `localStorage`。
-三者不共享 key、不合并。
+2. `screens/_jzapi.js` = 工单总线（家政 + 报修统一写入 `jz_orders`），走 REST，**MySQL 为唯一权威源**。
 
 ---
 

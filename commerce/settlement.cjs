@@ -754,14 +754,16 @@ async function merchantSettlement(service,p){
 }
 async function promoterSettlement(pool,accountId){
  const one=async(sql,args=[])=>(await pool.execute(sql,args))[0];
+ // 演示核销永不进结算批次，这里必须同步排除，否则 awaiting_batch 会被演示核销永久顶高（规则 21）。
+ const notDemo="AND NOT (JSON_EXTRACT(o.snapshot,'$.is_demo') <=> TRUE)";
  const [totals]=await one(`SELECT COALESCE(SUM(r.channel_minor),0) confirmed_minor,
   COALESCE(SUM(CASE WHEN i.status='pending' AND bi.status='executing' THEN i.payable_minor END),0) settling_minor
   FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id JOIN commerce_orders o ON o.id=rc.order_id
   LEFT JOIN commerce_settlement_items i ON i.redemption_id=r.id AND i.line_kind='promoter'
   LEFT JOIN commerce_settlement_batches bi ON bi.id=i.batch_id
-  WHERE o.source_account_id=? AND r.status='confirmed'`,[accountId]);
+  WHERE o.source_account_id=? AND r.status='confirmed' ${notDemo}`,[accountId]);
  const [paid]=await one(`SELECT COALESCE(SUM(amount_minor),0) paid_minor FROM commerce_payout_instructions WHERE target_kind='promoter' AND promoter_account_id=? AND status='paid'`,[accountId]);
- const [awaiting]=await one(`SELECT COUNT(*) n FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id JOIN commerce_orders o ON o.id=rc.order_id WHERE o.source_account_id=? AND r.status='confirmed' AND NOT EXISTS (SELECT 1 FROM commerce_settlement_items i WHERE i.redemption_id=r.id AND i.line_kind='promoter')`,[accountId]);
+ const [awaiting]=await one(`SELECT COUNT(*) n FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id JOIN commerce_orders o ON o.id=rc.order_id WHERE o.source_account_id=? AND r.status='confirmed' ${notDemo} AND NOT EXISTS (SELECT 1 FROM commerce_settlement_items i WHERE i.redemption_id=r.id AND i.line_kind='promoter')`,[accountId]);
  const [recovery]=await one(`SELECT COALESCE(SUM(amount_minor-recovered_minor),0) open_minor FROM commerce_recovery_cases WHERE debtor_kind='promoter' AND promoter_account_id=? AND status='open'`,[accountId]);
  return {confirmed_minor:Number(totals.confirmed_minor)||0,settling_minor:Number(totals.settling_minor)||0,paid_minor:Number(paid.paid_minor)||0,recovery_open_minor:Number(recovery.open_minor)||0,awaiting_batch:Number(awaiting.n)||0};
 }

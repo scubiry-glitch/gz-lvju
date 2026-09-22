@@ -71,11 +71,10 @@
 | 导航单一数据源 | `screens/_nav.js` | ✅ 存在（SERIES G/B/F/P/S/C） |
 | 移动 chrome | `screens/_navmobile.js` | ✅ |
 | 地域配置 | `screens/_region.js` | ✅ `PRESETS`: `js`(默认)/`gx`/`sy_zj`/`gz_zj` |
-| 报修工单总线 | `screens/_orderbus.js` | ✅ `localStorage bzf_orders` |
-| 家政 REST 总线 | `screens/_jzapi.js` | ✅ 走 SQLite（`/api/juzhu/jiazheng/*` + `/api/juzhu/jz/*`） |
+| 工单 REST 总线 | `screens/_jzapi.js` | ✅ 走 MySQL（`/api/juzhu/jiazheng/*` + `/repairs` + `/api/juzhu/jz/*`；2026-09-22 报修并轨，`_orderbus.js` 退役） |
 | SQLite 数据层 | `juzhu/server.py` + `juzhu/juzhu.db` | ✅ `server.py` 端口 8765；`juzhu.db` 存在（98KB） |
 
-**三层数据边界**（④）：`jiazheng-data.js`（目录 mock/兜底）/ `_jzapi.js`（SQLite 订单总线）/ `_orderbus.js`（localStorage 报修）三条并行、不重叠 —— 已在 `README.md` 与 `CLAUDE.md` 规则 8/9 记录。
+**数据边界**（④）：`jiazheng-data.js`（目录 mock/兜底）/ `_jzapi.js`（MySQL 工单总线：家政 + 报修统一 `jz_orders`）两层并行、不重叠 —— 已在 `README.md` 与 `CLAUDE.md` 规则 8/9 记录。
 
 ---
 

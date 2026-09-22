@@ -288,7 +288,7 @@ gov/bank 用户 → 机构 IdP（政务外网统一认证 / 银行内网 SSO）
 | 团队/权限边界 | 商家端/服务者端交给独立小组或外包 | `sy-console-vendor` / `sy-app-s` 独立仓，账号体系 API 化对接 |
 | 安全合规域 | F 端银行要求独立合规审查域、政务外联专区 | `sy-finance-gateway` 独立仓（只放对账/资金接口），密钥域隔离 |
 
-**必须保持的约定（拆仓也不变）**：`screens/_nav.js` 单一导航源与规则 1 的同步义务；`_region.js`/`_orderbus.js`/`_jzapi.js` 三个单一数据源随所属端走；后端 API 契约（含 HMAC 协议）以 `api_doc.md` 为准，跨仓只走版本化 API，不共享 DB 表读写。
+**必须保持的约定（拆仓也不变）**：`screens/_nav.js` 单一导航源与规则 1 的同步义务；`_region.js`/`_jzapi.js` 两个单一数据源随所属端走（`_orderbus.js` 已于 2026-09-22 并轨退役）；后端 API 契约（含 HMAC 协议）以 `api_doc.md` 为准，跨仓只走版本化 API，不共享 DB 表读写。
 
 ---
 

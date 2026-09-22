@@ -135,7 +135,7 @@
 <script src="_nav.js"></script>
 <script>
 /* 上线完整性自查：GET /api/juzhu/vendor/go-live-check（vendor=自己；platform 可 ?vendor_id= 代查）。
-   未登录 → 页内登录卡（POST /vendor/login，token 入 BZF_SESSION_TOKEN/JUZHU_VENDOR_TOKEN，与 B 端互通）；
+   未登录 → 页内登录卡（POST /vendor/login，token 入 BZF_SESSION_TOKEN 统一会话，与 B 端互通）；
    html[data-console-login=off] = 登录态自管，401 交给本页 gate 而非控制台统一登录层（商家凭据在 jz_vendors，不在账号中心）。 */
 (function(){
   var API = '/api/juzhu';
@@ -273,7 +273,7 @@
           if (!res.ok || !res.j.token) { $('gErr').textContent = res.j.error || '登录失败'; return; }
           try {
             localStorage.setItem('BZF_SESSION_TOKEN', res.j.token);
-            localStorage.setItem('JUZHU_VENDOR_TOKEN', res.j.token);
+            localStorage.removeItem('JUZHU_VENDOR_TOKEN'); // 旧键只清不写
           } catch(e){}
           toast('登录成功，正在自查…');
           load();

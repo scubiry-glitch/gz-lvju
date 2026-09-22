@@ -282,7 +282,7 @@
     }).join('') || '<div class="up-box"><div class="n">—</div><div class="l">暂无城市</div></div>';
 
     // 运营商维度（stats.operators：platform=平台自营/国企持有方直营，housing_operator=白名单运营商）
-    var TYPE = { platform:'平台自营', housing_operator:'白名单运营商', lvju_host:'旅居托管' };
+    var TYPE = { platform:'平台自营', housing_operator:'白名单运营商', lvju_host:'旅居托管', homestay:'民宿' };
     var ops = stats.operators || [];
     document.getElementById('opRows').innerHTML = ops.length ? ops.map(function(o){
       return '<tr>'+
