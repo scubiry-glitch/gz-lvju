@@ -339,7 +339,9 @@
       var RGCITY = (window.BZF_REGION && BZF_REGION.prov && BZF_REGION.prov.capital) || '沈阳';
       var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
       tbody.innerHTML = allItems.slice((curPage-1)*PAGE_SIZE, curPage*PAGE_SIZE).map(function(p){
-        var r = p.rating || {};
+        var r = p.rating;
+        if (typeof r === 'string') { try { r = JSON.parse(r); } catch (_) { r = {}; } }
+        if (!r || typeof r !== 'object') r = {};
         var code = r.code || (String(p.id).padStart(5,'0'));
         var stars = r.stars || 3;
         var score = (r.score==null) ? '—' : r.score;

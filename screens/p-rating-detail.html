@@ -427,7 +427,8 @@
   (function(){
     var q = new URLSearchParams(location.search);
     var id = q.get('id');
-    if (!id || id.indexOf('SY-BZF-') !== 0) return;
+    // 评级编号前缀（规则 15）：rental=SY-RENT-、minsu=MZ-，旧 SY-BZF- 兼容；其余 id 走页面静态演示内容
+    if (!id || !/^(SY-BZF-|SY-RENT-|MZ-)/.test(id)) return;
 
     var DIMS = [
       { key:'comfort', label:'舒适', icon:'🛋', color:'#f59e0b' },
@@ -460,7 +461,9 @@
       return r.json();
     }).then(function(data){
       var p = data.project;
-      var rating = p.rating || {};
+      var rating = p.rating;
+      if (typeof rating === 'string') { try { rating = JSON.parse(rating); } catch (_) { rating = {}; } }
+      if (!rating || typeof rating !== 'object') rating = {};
       var dims = rating.dims || {};
       DIMS = DIMS_BY_CH[p.channel] || (rating.dims && Object.keys(rating.dims).length ? Object.keys(rating.dims).map(function(k){ return { key:k, label:k, icon:'•', color:'#3b82f6' }; }) : DIMS);
       document.title = '好房子复核 · '+p.name;
