@@ -259,3 +259,7 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 - **酒店名单**：`commerce/hotel-roster.json`（1809 家、6 档 80/100/120/160/180/200，`hotel-roster-build.cjs` 从 Excel 转换，可重跑）；演示抽样 `sampleHotels(perTier=8)` 是确定性算法（品牌分层 + hotel_code 字典序轮转），改抽样规则必须保持可复算。门店 city 挂演示城市、真实区域存 payload（名单为全国门店，通兑跨城属预期）。
 - **公开名录**：`GET /api/commerce/v1/hotels`（session 前只读，与 /catalog 同形态，无需 perm 登记）只输出公开字段；C 端名录页 `juzhu-hotels.html`（generate-pages 生成，静态白名单已含）。
 - **回归**：`node scripts/commerce/m1a-test.cjs --hotel-exchange`（档内任选/跨档拒绝/线上免预约/核销归集/资金零分录）；线上 `node scripts/commerce/live-hotel-check.cjs`（19 项，可重复跑：预约后即取消）。设计文档 `docs/prd/DESIGN-本地生活酒店通兑与三品类券.md`，验收 `docs/verification/hotel-exchange-closed-loop/`。
+
+## 规则 23 · sytest 静态资源缓存约定（2026-09-22 拍板）
+
+sytest.meizu.life 的 nginx vhost（`/etc/nginx/conf.d/sytest.meizu.life.conf`，配置在仓库外不入 git）已开 **gzip** + **css/js 强缓存**（`public, max-age=31536000, immutable`）；HTML 保持 `no-cache`，`/juzhu/app.js` 白名单块先行仍 `no-cache`。**因此：改动任何 `.js` / `.css` 后，必须同步 +1 所有引用该文件的 `?v=N`**（存量约定，见规则 9；`_nav.js` 等未带 `?v=` 的共享脚本被改后，回访用户一年内拿旧缓存——改共享脚本时顺手在主要引用页补 `?v=`）。「改了没生效」先想到缓存，再查代码。备份：`sytest.meizu.life.conf.bak.20260922-perf`。
