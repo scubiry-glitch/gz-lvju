@@ -4290,8 +4290,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const workerFilter = await restrictOrdersRead(req, res);
       if (workerFilter === null) return;
       const phone = (qp.get('phone') || '').trim();
-      let sql = `SELECT o.*, s.name AS sku_name FROM jz_orders o
-                 LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1`;
+      // type_label：产品化下单路径 type=category_id（英文 key），join 出中文名；
+      // 存量中文 type（保洁…）与权益售后（type≠category_id）原样保留
+      let sql = `SELECT o.*, s.name AS sku_name, c.name AS category_name,
+                        CASE WHEN o.type=o.category_id AND c.name IS NOT NULL THEN c.name ELSE o.type END AS type_label
+                 FROM jz_orders o
+                 LEFT JOIN jz_skus s ON s.id=o.sku_id
+                 LEFT JOIN jz_categories c ON c.id=o.category_id WHERE 1=1`;
       const params = [];
       if (workerFilter) { sql += " AND o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json) AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id'))=?"; params.push(workerFilter); }
       if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
@@ -4333,8 +4338,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
         if (workerFilter === null) return;
         const orderId = m[1];
         const rows = await queryRows(
-          `SELECT o.*, s.name AS sku_name FROM jz_orders o
-           LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?`,
+          `SELECT o.*, s.name AS sku_name, c.name AS category_name,
+                  CASE WHEN o.type=o.category_id AND c.name IS NOT NULL THEN c.name ELSE o.type END AS type_label
+           FROM jz_orders o
+           LEFT JOIN jz_skus s ON s.id=o.sku_id
+           LEFT JOIN jz_categories c ON c.id=o.category_id WHERE o.id=?`,
           [orderId]
         );
         if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
@@ -4501,8 +4509,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const m = urlPath.match(/^\/api\/juzhu\/ratings\/([^/]+)$/);
       if (m && req.method === 'GET') {
         const code = decodeURIComponent(m[1]);
-        // code 格式 <前缀>-{id}（SY-BZF-/SY-RENT-/MZ-），直接按 id 查
-        const idMatch = code.match(/-(\d+)$/);
+        // code 格式 <前缀>-{id}（SY-BZF-/SY-RENT-/MZ-），直接按 id 查；纯数字（含补零）也按 id 兼容（存量队列旧链接）
+        const idMatch = code.match(/-(\d+)$/) || code.match(/^0*(\d+)$/);
         let proj = null;
         if (idMatch) {
           const rows = await queryRows(
@@ -6379,7 +6387,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
             conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
           }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-          const worker = body.worker || null;
+          // 规则派单兜底：未显式指派（B 端快速派/裸派单）时按 信用分↓ 完单量↓ 择优分配，
+          // 不再落 worker_json=NULL 的幽灵单（服务者端按 worker 过滤，幽灵单无人可见、闭环断）
+          let worker = body.worker || null;
+          if (!worker) {
+            const [cands] = await conn.execute(
+              "SELECT id,name,level FROM jz_workers WHERE status='active' ORDER BY credit_score DESC, completed_orders DESC LIMIT 1"
+            );
+            if (!cands.length) { conn.end(); return jsonReply(res, { error: '暂无可派服务者，请先在主站维护服务者名单' }, 400); }
+            worker = { id: cands[0].id, name: cands[0].name, level: cands[0].level, auto: true };
+          }
           let log = [];
           try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
           log.push({ at: now, action: 'dispatched', worker });

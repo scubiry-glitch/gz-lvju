@@ -427,8 +427,8 @@
   (function(){
     var q = new URLSearchParams(location.search);
     var id = q.get('id');
-    // 评级编号前缀（规则 15）：rental=SY-RENT-、minsu=MZ-，旧 SY-BZF- 兼容；其余 id 走页面静态演示内容
-    if (!id || !/^(SY-BZF-|SY-RENT-|MZ-)/.test(id)) return;
+    // 评级编号前缀（规则 15）：rental=SY-RENT-、minsu=MZ-，旧 SY-BZF- 兼容；纯数字 id（存量旧链接）也放行；其余走页面静态演示内容
+    if (!id || !(/^(SY-BZF-|SY-RENT-|MZ-)/.test(id) || /^\d+$/.test(id))) return;
 
     var DIMS = [
       { key:'comfort', label:'舒适', icon:'🛋', color:'#f59e0b' },

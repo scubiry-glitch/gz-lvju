@@ -199,6 +199,11 @@
       if (typeof r === 'string') { try { r = JSON.parse(r); } catch (_) { r = {}; } }
       return (!r || typeof r !== 'object') ? {} : r;
     }
+    // 评级编号单一语义：code=<前缀>-<id>。存量行 rating JSON 缺 code 时按频道补前缀（服务端按尾号 id 解析）
+    function codeOf(p){
+      var r = ratingObj(p);
+      return r.code || ((p.channel === 'minsu' ? 'MZ-' : 'SY-BZF-') + p.id);
+    }
     function scoreOf(r){
       if (r.score != null) return { v: r.score, w: Math.max(0, Math.min(100, +r.score)) };
       var d = r.dims, vals = (d && typeof d === 'object') ? Object.keys(d).map(function(k){ return +d[k]; }).filter(function(x){ return !isNaN(x); }) : [];
@@ -214,8 +219,7 @@
         if (st && (p.rating_status || 'pending') !== st) return false;
         if (ch && (p.channel || '') !== ch) return false;
         if (q) {
-          var r = ratingObj(p);
-          var hay = ((r.code || '') + ' ' + String(p.id).padStart(5, '0') + ' ' + (p.name || '')).toLowerCase();
+          var hay = (codeOf(p) + ' ' + (p.name || '')).toLowerCase();
           if (hay.indexOf(q) < 0) return false;
         }
         return true;
@@ -236,7 +240,7 @@
       var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
       tbody.innerHTML = items.slice((curPage-1)*PAGE_SIZE, curPage*PAGE_SIZE).map(function(p){
         var r = ratingObj(p);
-        var code = r.code || (String(p.id).padStart(5,'0'));
+        var code = codeOf(p);
         var c = CH[p.channel] || null;
         var chBadge = c
           ? '<span style="font-size:11px;padding:2px 8px;border-radius:999px;background:'+c.bg+';color:'+c.fg+';white-space:nowrap;">'+c.label+'</span>'
