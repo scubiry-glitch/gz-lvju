@@ -301,6 +301,9 @@
       <li>追加 <code>timestamp</code>（毫秒时间戳）参与上述串；用 <code>hmac_key</code> 做 <strong>HMAC-SHA256</strong>，取 <strong>hex 小写</strong> 为 <code>sign</code>。</li>
       <li>请求体 = 业务参数 + <code>vendor_id</code> + <code>timestamp</code> + <code>sign</code>，<code>POST</code> JSON 发送。时间戳与服务器偏差 <strong>±5 分钟</strong> 内有效。</li>
     </ol>
+    <div style="margin-top:8px;padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:8px;font-size:12.5px;color:#991b1b;">
+      ⚠️ <strong>数值字段一律传整数，禁止浮点</strong>（如 <code>price_night: 188</code>，不要 <code>188.0</code>）：Python 侧 <code>str(188.0)='188.0'</code> 而平台序列化为 <code>'188'</code>，两边签名串不一致会直接 <strong>401 验签失败</strong>。价格单位为元、取整数。另：批量设置房态/夜价/放出间数的每次调用都<strong>必带 <code>status</code></strong>（<code>open</code>/<code>blocked</code>），只推价格也要带——推价格即「把这些晚以该价开放」。
+    </div>
 
 <pre><code><span class="tok-com">// Node 签名示例</span>
 <span class="tok-key">const</span> crypto = require(<span class="tok-str">'crypto'</span>);
