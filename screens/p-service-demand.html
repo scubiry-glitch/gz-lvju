@@ -69,10 +69,10 @@
       <div class="card">
         <h3>工单池概览 <span class="pill">实时</span></h3>
         <div class="kpis">
-          <div class="kpi"><b id="kpiWait">26</b><span>待派</span></div>
-          <div class="kpi"><b id="kpiDoing">184</b><span>进行中</span></div>
-          <div class="kpi"><b>312</b><span>今日完结</span></div>
-          <div class="kpi"><b>8 分</b><span>平均响应</span></div>
+          <div class="kpi"><b id="kpiWait">–</b><span>待派（已支付）</span></div>
+          <div class="kpi"><b id="kpiDoing">–</b><span>进行中</span></div>
+          <div class="kpi"><b id="kpiDone">–</b><span>已完结</span></div>
+          <div class="kpi"><b id="kpiUnpaid">–</b><span>待支付挂起</span></div>
         </div>
       </div>
 
@@ -97,18 +97,19 @@
       </div>
 
       <div class="card full">
-        <h3>待派工单 <span class="pill">按优先级排序</span></h3>
+        <h3>工单池 · 待派与进行中 <span class="pill">待派优先</span></h3>
         <table>
           <thead><tr><th>工单号</th><th>类型</th><th>来源</th><th>房源 / 位置</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
           <tbody id="liveRows"></tbody>
           <tbody>
+            <tr><td colspan="7" style="color:var(--muted);font-size:11px;background:var(--line);">以下为静态示例行（演示布局用，非实时数据，不可操作）</td></tr>
             <tr><td>WO-2026-58821</td><td>开荒保洁</td><td>旅居客 App</td><td>梧桐公馆 · 江宁区</td><td><span class="badge b-hi">高</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
             <tr><td>WO-2026-58820</td><td>管家服务</td><td>房源运营方</td><td>人才公寓 · 雨花台</td><td><span class="badge b-go">中</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
             <tr><td>WO-2026-58814</td><td>家电维修</td><td>管家上报</td><td>梅园新村 · 玄武区</td><td><span class="badge b-go">中</span></td><td><span class="badge b-go">派单中</span></td><td><a class="lnk" href="p-traffic-policy.html">规则 →</a></td></tr>
             <tr><td>WO-2026-58807</td><td>退住核验</td><td>系统巡检</td><td>梧桐公馆 · 江宁区</td><td><span class="badge">低</span></td><td><span class="badge b-ok">已接单</span></td><td><a class="lnk" href="s-orders.html">查看 →</a></td></tr>
           </tbody>
         </table>
-        <div class="note">派单规则由 <a href="p-traffic-policy.html" style="color:var(--accent);font-weight:600;">流量倾斜策略</a> 计算（等级 + 信用分 + 距离 + 扶持权重）；成交分账走 <a href="p-transaction.html" style="color:var(--accent);font-weight:600;">派单交易</a> T+7。</div>
+        <div class="note">派单在服务者名单中指定人选（B 端「快速派」按 信用分 ↓ 完单量 ↓ 择优）；倾斜规则见 <a href="p-traffic-policy.html" style="color:var(--accent);font-weight:600;">流量倾斜策略</a>；成交分账走 <a href="p-transaction.html" style="color:var(--accent);font-weight:600;">派单交易</a> T+7。</div>
       </div>
     </div>
   </main>
@@ -120,8 +121,14 @@
 <script src="_orderbus.js"></script>
 <script>
 const JZ = window.BZF_JZ;
-const PRIO = { '保洁': 'b-hi', '维修': 'b-go', '搬家': 'b-go', '保姆': 'b-hi', '家政': '' };
-const PRIO_TXT = { '保洁': '高', '维修': '中', '搬家': '中', '保姆': '高', '家政': '低' };
+// 优先级按「类型中文名」查表；orders 接口下发 type_label（英文 category_id 已由服务端 join 成中文名），
+// 这里保留英文 key 兜底（服务端未升级/离线场景），权益售后单视为高优
+const PRIO = { '保洁': 'b-hi', 'cleaning': 'b-hi', '维修': 'b-go', 'repair': 'b-go', '搬家': 'b-go', 'moving': 'b-go', '保姆': 'b-hi', 'nanny': 'b-hi', '家政': '', '权益售后': 'b-hi' };
+const PRIO_TXT = { '保洁': '高', 'cleaning': '高', '维修': '中', 'repair': '中', '搬家': '中', 'moving': '中', '保姆': '高', 'nanny': '高', '家政': '低', '权益售后': '高' };
+const PRIO_RANK = { '高': 0, '中': 1, '低': 2 };
+const ST_RANK = { pending: 0, dispatched: 1, accepted: 2, serving: 3 };
+function typeLabel(o) { return o.type_label || o.category || o.type; }
+function prioTxt(o) { return PRIO_TXT[typeLabel(o)] || '低'; }
 
 let toastTimer = null;
 function toast(msg) {
@@ -144,7 +151,9 @@ function actionCell(o) {
     return '<a class="lnk" onclick="doDispatch(\'' + o.id + '\')">派单 →</a>';
   }
   if (o.status === 'dispatched') {
-    return '<a class="lnk done">已派 ' + JZ.esc(o.worker ? o.worker.name : '') + '</a>';
+    return o.worker
+      ? '<a class="lnk done">已派 ' + JZ.esc(o.worker.name) + '</a>'
+      : '<span class="badge b-wait">已派单 · 未指派</span>'; // 存量幽灵单（派单必指派修复前落库）
   }
   return '<a class="lnk" href="s-orders.html">查看 →</a>';
 }
@@ -152,20 +161,29 @@ function actionCell(o) {
 function render() {
   const rows = document.getElementById('liveRows');
   JZ.list({ pay_status: 'paid,not_required', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
+    // 待派优先：状态序 pending→serving，同状态内按优先级 高→低（?? 不能写 ||——pending 序号 0 是 falsy）
+    list.sort(function (a, b) {
+      return ((ST_RANK[a.status] ?? 9) - (ST_RANK[b.status] ?? 9)) || (PRIO_RANK[prioTxt(a)] - PRIO_RANK[prioTxt(b)]);
+    });
     rows.innerHTML = list.map(o =>
       '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
       '<td>' + JZ.esc(o.id) + '</td>' +
-      '<td>' + (o.icon || '') + ' ' + JZ.esc(o.category || o.type) + '</td>' +
+      '<td>' + (o.icon || '') + ' ' + JZ.esc(typeLabel(o)) + '</td>' +
       '<td>' + JZ.esc(o.source) + ' <span class="badge b-live">API</span></td>' +
       '<td>' + JZ.esc(o.house) + '</td>' +
-      '<td><span class="badge ' + (PRIO[o.type] || '') + '">' + (PRIO_TXT[o.type] || '低') + '</span></td>' +
+      '<td><span class="badge ' + (PRIO[typeLabel(o)] || '') + '">' + prioTxt(o) + '</span></td>' +
       '<td>' + statusBadge(o) + '</td>' +
       '<td>' + actionCell(o) + '</td></tr>'
     ).join('');
 
+    // KPI 与上表同口径（已支付/免支付过滤后）：待派/进行中按表内计数；
+    // 已完结与待支付挂起取全量统计（stats 不分支付状态，正好用于这两格）
+    const wait = list.filter(function (o) { return o.status === 'pending'; }).length;
+    document.getElementById('kpiWait').textContent = wait;
+    document.getElementById('kpiDoing').textContent = (list.length - wait);
     JZ.stats().then(function(s) {
-      document.getElementById('kpiWait').textContent = (s.pending || 0);
-      document.getElementById('kpiDoing').textContent = (s.pool || 0) - (s.pending || 0);
+      document.getElementById('kpiDone').textContent = (s.done || 0);
+      document.getElementById('kpiUnpaid').textContent = (s.unpaid || 0);
     }).catch(function(){});
   }).catch(function(err) {
     rows.innerHTML = '<tr><td colspan="7" style="color:var(--danger);">API 加载失败：' + JZ.esc(err.message) + '</td></tr>';
@@ -175,22 +193,16 @@ function render() {
 async function doDispatch(id) {
   try{
     const order=await JZ.get(id);
-    if(String(order.source||'').startsWith('新居住权益售后')){
-      const response=await fetch('/api/juzhu/jz/workers',{headers:{Authorization:'Bearer '+JZ.sessionToken()}});
-      const data=await response.json();if(!response.ok)throw Error(data.error||'无法加载处理人员');
-      const workers=(data.list||data.items||data.workers||[]).filter(w=>w.status==='active');
-      if(!workers.length)throw Error('暂无可分配的处理人员，请先在主站维护服务者');
-      const d=document.createElement('dialog');d.style.cssText='border:1px solid #e7ece9;border-radius:16px;padding:24px;width:min(440px,90vw);color:#193d37';
-      d.innerHTML='<form><h3 style="margin:0 0 12px">分配售后处理人员</h3><p style="font-size:12px;color:#758370">'+JZ.esc(order.house)+'</p><label style="display:grid;gap:8px;font-size:13px;margin:20px 0">处理人员<select name="worker" style="padding:12px;border:1px solid #dfe5d8;border-radius:8px" required>'+workers.map(w=>'<option value="'+w.id+'">'+JZ.esc(w.name)+' · '+JZ.esc(w.level)+'</option>').join('')+'</select></label><p class="dispatch-error" role="alert" style="color:#ad4438"></p><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" style="padding:9px 16px" data-close>取消</button><button type="submit" style="padding:9px 16px;border:0;border-radius:8px;background:#0f766e;color:white">确认派单</button></div></form>';
-      document.body.append(d);d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('form').onsubmit=async event=>{event.preventDefault();const b=d.querySelector('[type=submit]');b.disabled=true;try{const worker=workers.find(w=>String(w.id)===new FormData(event.target).get('worker'));await JZ.dispatch(id,{id:worker.id,name:worker.name,level:worker.level});d.close();toast('已分配售后处理人员');render();}catch(e){d.querySelector('.dispatch-error').textContent=e.message;}finally{b.disabled=false;}};d.showModal();return;
-    }
-  }catch(error){toast(error.message);return;}
-  JZ.dispatch(id).then(function(o) {
-    if (o && o.worker) {
-      toast('已按规则派单 → ' + o.worker.name + ' · ' + o.worker.level + '，服务者 App 已收到');
-    }
-    render();
-  }).catch(function(err) { toast(err.message); });
+    const afterSales=String(order.source||'').startsWith('新居住权益售后');
+    const response=await fetch('/api/juzhu/jz/workers',{headers:{Authorization:'Bearer '+JZ.sessionToken()}});
+    const data=await response.json();if(!response.ok)throw Error(data.error||data.message||'无法加载服务者名单');
+    const workers=(data.list||data.items||data.workers||[]).filter(w=>w.status==='active');
+    if(!workers.length)throw Error(afterSales?'暂无可分配的处理人员，请先在主站维护服务者':'暂无可派服务者，请先在主站维护服务者名单');
+    const roleLabel=afterSales?'处理人员':'服务者';
+    const d=document.createElement('dialog');d.style.cssText='border:1px solid #e7ece9;border-radius:16px;padding:24px;width:min(440px,90vw);color:#193d37';
+    d.innerHTML='<form><h3 style="margin:0 0 12px">'+(afterSales?'分配售后处理人员':'派单 · 选择服务者')+'</h3><p style="font-size:12px;color:#758370">'+JZ.esc(order.house)+'</p><label style="display:grid;gap:8px;font-size:13px;margin:20px 0">'+roleLabel+'<select name="worker" style="padding:12px;border:1px solid #dfe5d8;border-radius:8px" required>'+workers.map(w=>'<option value="'+w.id+'">'+JZ.esc(w.name)+' · '+JZ.esc(w.level)+' · 信用 '+JZ.esc(w.credit_score)+'</option>').join('')+'</select></label><p class="dispatch-error" role="alert" style="color:#ad4438"></p><div style="display:flex;justify-content:flex-end;gap:10px"><button type="button" style="padding:9px 16px" data-close>取消</button><button type="submit" style="padding:9px 16px;border:0;border-radius:8px;background:#0f766e;color:white">确认派单</button></div></form>';
+    document.body.append(d);d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());d.querySelector('form').onsubmit=async event=>{event.preventDefault();const b=d.querySelector('[type=submit]');b.disabled=true;try{const worker=workers.find(w=>String(w.id)===new FormData(event.target).get('worker'));await JZ.dispatch(id,{id:worker.id,name:worker.name,level:worker.level});d.close();toast(afterSales?'已分配售后处理人员':'已派单 → '+worker.name+' · '+worker.level);render();}catch(e){d.querySelector('.dispatch-error').textContent=e.message;}finally{b.disabled=false;}};d.showModal();
+  }catch(error){toast(error.message);}
 }
 
 JZ.onChange(render);
