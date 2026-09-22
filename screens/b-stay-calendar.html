@@ -283,7 +283,14 @@
     fu.innerHTML = '<option value="">整栋 / 不限房型</option>' + us.map(function(u){
       return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'（'+(parseInt(u.total_qty,10)||1)+' 间）</option>';
     }).join('');
-    state.unitId = 0;
+    // 有户型时默认选中第一个户型（接口推送的房态都挂在户型上，默认整栋视图会让商家看不到推送结果；
+    // 整栋日历是 unit_id=0 的独立层，仍可手动切换）
+    if (us.length) {
+      fu.value = String(us[0].id);
+      state.unitId = us[0].id;
+    } else {
+      state.unitId = 0;
+    }
   }
 
   function loadConfig(){
