@@ -275,7 +275,7 @@
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=7"></script>
+<script src="screens/_jzapi.js?v=8"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -494,7 +494,7 @@
 
   function render(){
     document.getElementById('ttl').firstChild.textContent = item.name;
-    // 频道色写成 CSS 变量（底部按钮等消费）；配色表在 _jzapi.js?v=7（单一数据源）
+    // 频道色写成 CSS 变量（底部按钮等消费）；配色表在 _jzapi.js?v=8（单一数据源）
     JZ.applyCatTheme(document.querySelector('.app'), item.category_id);
     var hero = document.getElementById('hero');
     hero.className = 'hero ' + heroClass(item.category_id);

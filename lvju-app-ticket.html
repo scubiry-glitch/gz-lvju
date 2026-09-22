@@ -136,14 +136,18 @@
   </div>
 </div>
 
-<script src="screens/_orderbus.js"></script>
+<script src="screens/_jzapi.js?v=8"></script>
 <script>
 (function(){
-  var BO = window.BZF_ORDERS;
-  var esc = BO.esc;
+  var JZ = window.BZF_JZ;
+  var esc = JZ.esc;
   var $ = function(id){ return document.getElementById(id); };
   var id = new URLSearchParams(location.search).get('id') || '';
   var cur = null;
+  // 报修单按 phone 归属回查：repair.html 提交时记住的手机号优先，旅居「我的」页默认号兜底
+  function myPhone(){
+    try { return localStorage.getItem('bzf_repair_phone') || '138****6688'; } catch(e){ return '138****6688'; }
+  }
 
   function get400(){
     try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
@@ -151,18 +155,20 @@
   }
   function telHref(n){ return 'tel:' + String(n).replace(/[^0-9+]/g,''); }
 
-  function render(){
-    var o = BO.get(id);
+  async function render(){
+    var o;
+    try { o = await JZ.repairGet(id, myPhone()); }
+    catch (e) { o = null; }
     if (!o) { $('empty').hidden = false; $('detail').hidden = true; return; }
     cur = o;
     $('empty').hidden = true; $('detail').hidden = false;
-    var st = BO.STATUS[o.status];
-    $('hIcon').textContent = BO.ICON[o.type] || '🧰';
-    $('hType').textContent = o.type + (o.category ? ' · ' + o.category : '');
+    var st = JZ.STATUS[o.status] || JZ.STATUS.pending;
+    $('hIcon').textContent = JZ.ICON[o.type] || '🧰';
+    $('hType').textContent = o.type + (o.category && o.category !== o.type ? ' · ' + o.category : '');
     $('hStatus').textContent = st.c;
     $('hBar').style.width = st.pct + '%';
     $('hPct').textContent = st.pct + '%';
-    $('hStep').textContent = '第 ' + (st.step + 1) + ' / ' + BO.ORDER.length + ' 步';
+    $('hStep').textContent = '第 ' + (st.step + 1) + ' / ' + JZ.ORDER.length + ' 步';
     $('dDesc').textContent = o.desc || '-';
     $('dId').textContent = o.id;
     $('dCreated').textContent = o.createdLabel || '-';
@@ -170,23 +176,27 @@
     $('dHouse').textContent = o.house || '-';
     $('dPhone').textContent = o.phone || '-';
     $('dSource').textContent = o.source || '-';
-    $('feeTxt').textContent = '服务费基准 ¥' + (BO.FEE[o.type] || BO.FEE['其他']) + ' 起（以实际结算为准）';
+    $('feeTxt').textContent = '免费基准 · 以实际结算为准';
 
     // 服务者
     if (o.worker) {
       $('wCard').hidden = false;
-      $('wBody').innerHTML = '<span class="av">' + BO.esc(o.worker.name.slice(0,1)) + '</span>' +
-        '<span style="flex:1;"><b>' + BO.esc(o.worker.name) + '</b><span class="lv">' + BO.esc(o.worker.level) + '</span>' +
-        '<div class="tags">持证上岗 · 已投保' + ((o.worker.tags && o.worker.tags.length) ? ' · ' + o.worker.tags.map(BO.esc).join(' / ') : '') + '</div></span>';
+      $('wBody').innerHTML = '<span class="av">' + JZ.esc(o.worker.name.slice(0,1)) + '</span>' +
+        '<span style="flex:1;"><b>' + JZ.esc(o.worker.name) + '</b><span class="lv">' + JZ.esc(o.worker.level) + '</span>' +
+        '<div class="tags">持证上岗 · 已投保' + ((o.worker.tags && o.worker.tags.length) ? ' · ' + o.worker.tags.map(JZ.esc).join(' / ') : '') + '</div></span>';
     } else { $('wCard').hidden = true; }
 
-    // 时间轴
-    var hitSet = {}; (o.log || []).forEach(function(l){ hitSet[l.s] = l; });
-    $('timeline').innerHTML = BO.ORDER.map(function(s){
+    // 时间轴（API log 形状 {at, action}：created→pending / dispatched→dispatched / advance→to / rated→rated）
+    var hitSet = {};
+    (o.log || []).forEach(function(l){
+      var s = l.s || (l.action === 'created' ? 'pending' : l.action === 'dispatched' ? 'dispatched' : l.action === 'advance' ? l.to : l.action === 'rated' ? 'rated' : null);
+      if (s) hitSet[s] = { at: (l.at || '').replace('T', ' ').slice(0, 16) };
+    });
+    $('timeline').innerHTML = JZ.ORDER.map(function(s){
       var hit = hitSet[s];
       var cls = 'nd' + (hit ? ' hit' : '');
-      if (!hit && BO.STATUS[s].step > BO.STATUS[o.status].step) cls += ' dim';
-      return '<div class="' + cls + '"><div class="t">' + BO.STATUS[s].c + '</div><div class="a">' + (hit ? hit.at : '待推进') + '</div></div>';
+      if (!hit && JZ.STATUS[s].step > (JZ.STATUS[o.status] || st).step) cls += ' dim';
+      return '<div class="' + cls + '"><div class="t">' + JZ.STATUS[s].c + '</div><div class="a">' + (hit ? hit.at : '待推进') + '</div></div>';
     }).join('');
 
     // 操作区
@@ -202,19 +212,14 @@
 
     $('btnTel').setAttribute('href', telHref(get400()));
   }
-  function get400(){
-    try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
-    try { return localStorage.getItem('BZF_LVJU_400') || '400-900-6688'; } catch(e){ return '400-900-6688'; }
-  }
 
-  // 取消（仅待派单）：撤回演示总线工单
+  // 取消（仅待派单）：条件硬 DELETE（服务端校验 pending + 未派 + phone 归属）
   $('btnCancel').addEventListener('click', function(){
     if (!cur) return;
     if (!confirm('确定取消该工单吗？取消后中台工单池同步移除。')) return;
-    try {
-      localStorage.setItem('bzf_orders', JSON.stringify(BO.all().filter(function(o){ return o.id !== id; })));
-    } catch(e){}
-    location.href = 'lvju-app-me.html';
+    JZ.repairCancel(id, myPhone()).then(function(){
+      location.href = 'lvju-app-me.html';
+    }).catch(function(err){ alert('取消失败：' + err.message); });
   });
 
   // 评价
@@ -236,11 +241,12 @@
   });
   $('btnRate').addEventListener('click', function(){
     if (!rateScore) { alert('请先点选星级'); return; }
-    BO.rate(id, { score: rateScore, tags: rateTags, text: $('rateText').value.trim() });
-    render();
+    JZ.rate(id, { score: rateScore, tags: rateTags, text: $('rateText').value.trim() }).then(function(){
+      render();
+    }).catch(function(err){ alert('评价失败：' + err.message); });
   });
 
-  BO.onChange(render);
+  JZ.onChange(render);
   window.addEventListener('pageshow', render);
   render();
 })();

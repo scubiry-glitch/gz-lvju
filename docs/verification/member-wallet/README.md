@@ -32,3 +32,19 @@
 - 线上只读回归：16 项通过；独立选券页 HTTP 200。
 - 静态入口、首页启动检查和差异空白检查通过。
 - 已应用迁移 `002_exchange_codes` 并更新 sytest 服务。二维码截图和 320/390/430/1440 宽度会员截图存于本目录。
+
+## 2026-09-21 视觉精修
+
+- 会员首屏增加赠券数量、权益项数和使用方式摘要，压缩卡面和标题留白；开通栏不再覆盖权益内容。
+- 首页及选券商品卡将长说明截短为两行，保留名称、核心摘要、有效期、数量和价格。
+- 消费者端主要按钮、筛选控件和登录按钮统一为不低于 44px 的触控高度；“我的”页改为三列网格，避免登录按钮挤压昵称。
+- 卡券列表增加状态样式、摘要、到期／服务日期／金额元数据和紧凑操作区；完整编号仍在详情页保留。
+- 核销弹窗将倒计时和刷新按钮置于二维码下方固定区域，过期二维码保持尺寸并给出刷新指引；提交操作显示“提交中…”，成功/失败反馈使用就近 Toast。
+- 加载过程中保留页面布局并显示更新遮罩，尊重 `prefers-reduced-motion`。
+
+本轮截图：`visual-home-390.png`、`visual-home-products-390.png`、`visual-shop-390.png`、`visual-membership-390.png`、`visual-account-390.png`。浏览器检查覆盖 390px 首页、选券、会员和我的页面；均无横向溢出、无页面错误，选券按钮和筛选控件实测 44px。
+
+视觉专项脚本：`node scripts/commerce/consumer-visual-polish-audit.cjs`，7/7 通过，零页面错误、未产生业务数据变更；结果与会员/我的截图见 `consumer-visual-polish-audit.json`、`visual-polish-membership-390.png` 和 `visual-polish-account-390.png`。当前 sytest 贵阳公开目录实测为 49 张单品券、10 个券包和 1 个会员方案，其中 47/7/1 为可演示购买商品；另有 2 张单品券和 3 个券包是结算演示夹具，购买入口关闭。
+
+- 卡券钱包专项：`node scripts/commerce/consumer-wallet-visual-audit.cjs`，4/4 通过；覆盖 320/390px 下可用、线上核销、已核销、已过期、售后冻结五种状态，主操作门控、编号复制和二维码失效布局，截图为 `wallet-mock-320.png`、`wallet-mock-390.png`、`wallet-qr-expired-320.png`、`wallet-qr-expired-390.png`。
+- 反馈专项：`node scripts/commerce/consumer-feedback-audit.cjs`，4/4 通过；覆盖重复提交拦截、提交中/失败恢复、业务成功文案、Toast 视口位置、`prefers-reduced-motion` 及管理/推广端兼容，无真实写入。

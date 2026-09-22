@@ -6,7 +6,7 @@ const results=[];const check=async(name,fn)=>{await fn();results.push({name,pass
  const cfg=config(),database='commerce_m1a_test_'+Date.now();let admin=await mysql.createConnection(cfg),testConfig=cfg;let pool,server,created=false;
  try{
  try{await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');}catch(e){if(e.code!=='ER_DBACCESS_DENIED_ERROR')throw e;await admin.end();testConfig={...cfg,user:'root',password:undefined,socketPath:'/var/lib/mysql/mysql.sock'};admin=await mysql.createConnection(testConfig);await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');}created=true;pool=mysql.createPool({...testConfig,database,connectionLimit:12});
- for(const table of ['accounts','roles','account_roles','sessions','cities','jz_vendors','gr_orders','jz_orders','jz_categories','jz_skus','jz_products','jz_workers','jz_sku_workers'])await pool.query('CREATE TABLE `'+table+'` LIKE `'+cfg.database+'`.`'+table+'`');
+ for(const table of ['accounts','roles','account_roles','sessions','cities','settings','jz_vendors','gr_orders','jz_orders','jz_categories','jz_skus','jz_products','jz_workers','jz_sku_workers'])await pool.query('CREATE TABLE `'+table+'` LIKE `'+cfg.database+'`.`'+table+'`');
  await pool.query('INSERT INTO jz_categories SELECT * FROM `'+cfg.database+'`.jz_categories');
  await migrate(pool);await migrate(pool);const auth=initAuth(pool),service=new Service(pool,auth);
  await pool.query("INSERT INTO cities(id,name,slug) VALUES (1,'验收城市','acceptance'),(2,'其他城市','other')");

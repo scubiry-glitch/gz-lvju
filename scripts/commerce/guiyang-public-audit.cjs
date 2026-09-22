@@ -9,7 +9,16 @@ async function run({browser,origin,check}){
   for(let offset=0;offset<skus.length;offset+=6)await Promise.all(skus.slice(offset,offset+6).map(async sku=>{const d=await get('/api/juzhu/jiazheng/skus/'+sku.slug+'?city='+city);assert(d.product&&d.product.city_id===3,sku.slug);assert(d.vendor?.name.includes('演示'),sku.slug);assert(d.workers?.length,sku.slug);assert(d.item.includes?.length&&d.item.service_flow?.length,sku.slug);assert.equal(d.product.sales_count,0);}));
  });
  await check('Guiyang public single vouchers, five topics and member expose demo purchase only',async()=>{
-  catalog=(await get('/api/commerce/v1/catalog?city='+city)).data;assert.equal(catalog.filter(p=>p.kind==='skus').length,38);assert.equal(catalog.filter(p=>p.kind==='packages').length,6);assert.equal(catalog.filter(p=>p.kind==='plans').length,1);assert(catalog.every(p=>p.city_id===3&&p.is_demo&&p.demo_purchase_enabled));assert.equal(new Set(catalog.filter(p=>p.topic_id).map(p=>p.topic_id)).size,5);
+  catalog=(await get('/api/commerce/v1/catalog?city='+city)).data;
+  // Keep the original demo seed as the minimum contract while allowing later
+  // channel additions (for example online and hotel exchange products).
+  assert(catalog.filter(p=>p.kind==='skus').length>=38,'single voucher baseline');
+  assert(catalog.filter(p=>p.kind==='packages').length>=6,'package baseline');
+  assert.equal(catalog.filter(p=>p.kind==='plans').length,1);
+  assert(catalog.every(p=>p.city_id===3));
+  assert(catalog.filter(p=>p.is_demo).every(p=>p.demo_purchase_enabled),'demo products must remain purchasable in the no-funds flow');
+  assert(!catalog.some(p=>!p.is_demo&&p.demo_purchase_enabled),'non-demo products must not open the demo purchase path');
+  assert.equal(new Set(catalog.filter(p=>p.topic_id).map(p=>p.topic_id)).size,5);
   assert(!(await get('/api/commerce/v1/catalog?city=shenyang')).data.some(p=>p.city_id===3));assert.deepEqual((await get('/api/commerce/v1/catalog?city=missing-city')).data,[]);
  });
  await check('Guiyang channel, 12 category pages, five topic links and single-voucher detail connect',async()=>{
