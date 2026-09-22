@@ -19,6 +19,31 @@
   .hero-track{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;}
   .hero-track::-webkit-scrollbar{width:0;height:0;}
   .hero-slide{flex:0 0 100%;height:100%;background-size:cover;background-position:center;scroll-snap-align:start;}
+  .pd-hero.gal-ok{cursor:zoom-in;}
+  /* ---- 图册全屏查看器（2026-09）：hero 轮播 / 房型卡缩略图 / 房型介绍展示图 三处入口共用 ---- */
+  .galsheet{position:absolute;inset:0;z-index:80;background:#0a100e;visibility:hidden;opacity:0;transition:opacity .22s,visibility 0s .22s;}
+  .galsheet.open{visibility:visible;opacity:1;transition:opacity .22s;}
+  .gal-track{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-x;cursor:grab;}
+  .gal-track.dragging{cursor:grabbing;scroll-snap-type:none;}
+  .gal-track::-webkit-scrollbar{width:0;height:0;}
+  .gal-slide{flex:0 0 100%;height:100%;scroll-snap-align:center;display:grid;place-items:center;}
+  .gal-slide img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;}
+  .gal-nav{position:absolute;top:0;bottom:0;width:22%;z-index:2;border:0;background:none;padding:0;cursor:pointer;display:grid;place-items:center;}
+  .gal-nav .ar{display:grid;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);color:#fff;font-size:21px;font-weight:700;font-style:normal;line-height:1;place-items:center;pointer-events:none;transition:background .15s,opacity .2s;}
+  @media (hover:hover) and (pointer:fine){
+    .gal-nav:hover .ar{background:rgba(255,255,255,.3);}
+  }
+  .gal-nav[disabled]{cursor:default;}
+  .gal-nav[disabled] .ar{opacity:.22;}
+  .gal-nav.prev{left:0;}
+  .gal-nav.next{right:0;}
+  .gal-top{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;align-items:center;gap:10px;padding:12px 14px;pointer-events:none;}
+  .gal-idx{font-size:12px;font-weight:700;color:#fff;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);padding:5px 12px;border-radius:999px;}
+  .gal-x{margin-left:auto;pointer-events:auto;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);color:#fff;display:grid;place-items:center;font-size:13px;cursor:pointer;border:0;padding:0;font-family:var(--font);}
+  /* 房型卡缩略图：图册入口徽标（右上角，与左下「✓ 已选」错开） */
+  .rth .rth-n{position:absolute;right:5px;top:5px;z-index:2;font-size:9px;font-weight:700;color:#fff;background:rgba(8,18,16,.55);backdrop-filter:blur(6px);padding:2px 7px;border-radius:999px;pointer-events:none;}
+  .roomcard .rth{cursor:zoom-in;}
+  .room-showcase.gal-ok{cursor:zoom-in;}
   .block{background:#fff;margin:8px 0 0;padding:15px 18px;}
   .block .bt{font-family:var(--serif);font-weight:700;font-size:16px;color:var(--ink);}
   .block .bs{font-size:11px;color:var(--muted);margin-top:2px;}
@@ -392,7 +417,108 @@
       </div>
     </div>
   </div>
+
+  <!-- 图册全屏查看器：hero 轮播 / 房型卡缩略图 / 房型介绍展示图 点击进入；横滑 / 左右点击区 / 滚轮翻页 -->
+  <div class="galsheet" id="galsheet" role="dialog" aria-label="图片图册" aria-hidden="true">
+    <div class="gal-track" id="galTrack"></div>
+    <button class="gal-nav prev" id="galPrev" type="button" aria-label="上一张"><i class="ar">‹</i></button>
+    <button class="gal-nav next" id="galNext" type="button" aria-label="下一张"><i class="ar">›</i></button>
+    <div class="gal-top">
+      <span class="gal-idx" id="galIdx"></span>
+      <button class="gal-x" id="galClose" type="button" aria-label="关闭图册">✕</button>
+    </div>
+  </div>
 </div>
+<script>
+/* 图册全屏查看器（2026-09）：三处入口共用（BZF_GAL.open）。
+   横滑(scroll-snap) / 鼠标拖拽 / 左右点击区 / 滚轮 / 方向键翻页；✕ 或 Esc 关闭；打开期间锁定 .scr 背景滚动。 */
+var BZF_GAL = (function(){
+  var sheet, track, idxEl, prevBtn, nextBtn, closeBtn, scrEl;
+  var list = [], cur = 0, wheelAt = 0, drag = null;
+  function $(i){ return document.getElementById(i); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function clamp(i){ return Math.min(list.length - 1, Math.max(0, i)); }
+  function update(){
+    if (!list.length) return;
+    cur = clamp(Math.round(track.scrollLeft / Math.max(1, track.clientWidth)));
+    var it = list[cur] || {};
+    idxEl.textContent = (cur + 1) + ' / ' + list.length + (it.label ? ' · ' + it.label : '');
+    prevBtn.disabled = cur <= 0;                        // 边界箭头置灰（单图两侧都灰）
+    nextBtn.disabled = cur >= list.length - 1;
+  }
+  function go(i){ if (list.length) track.scrollTo({ left: clamp(i) * Math.max(1, track.clientWidth), behavior: 'smooth' }); }
+  function onKey(e){
+    if (e.key === 'Escape') { drag = null; track.classList.remove('dragging'); close(); }
+    else if (!drag && e.key === 'ArrowLeft') go(cur - 1);
+    else if (!drag && e.key === 'ArrowRight') go(cur + 1);
+  }
+  function close(){
+    sheet.classList.remove('open');
+    sheet.setAttribute('aria-hidden', 'true');
+    scrEl.style.overflow = '';
+    document.removeEventListener('keydown', onKey);
+  }
+  function open(items, start){
+    list = (items || []).filter(function(it){ return it && it.url; });
+    if (!list.length) return;
+    track.innerHTML = list.map(function(it){
+      return '<div class="gal-slide"><img loading="lazy" src="' + esc(it.url) + '" alt="' + esc(it.label || '房源图片') + '"></div>';
+    }).join('');
+    sheet.classList.add('open');
+    sheet.setAttribute('aria-hidden', 'false');
+    scrEl.style.overflow = 'hidden';
+    track.scrollLeft = clamp(start || 0) * Math.max(1, track.clientWidth);
+    update();
+    document.addEventListener('keydown', onKey);
+  }
+  sheet = $('galsheet'); track = $('galTrack'); idxEl = $('galIdx');
+  prevBtn = $('galPrev'); nextBtn = $('galNext'); closeBtn = $('galClose');
+  scrEl = document.querySelector('.scr');
+  track.addEventListener('scroll', function(){ window.requestAnimationFrame(update); }, { passive: true });
+  prevBtn.addEventListener('click', function(){ go(cur - 1); });
+  nextBtn.addEventListener('click', function(){ go(cur + 1); });
+  closeBtn.addEventListener('click', close);
+  track.addEventListener('wheel', function(e){   // 桌面滚轮 = 前后翻页（节流防触板惯性连发）
+    e.preventDefault();
+    if (drag) return;                            // 拖拽进行中不叠加翻页
+    if (Date.now() - wheelAt < 320 || Math.abs(e.deltaY) < 8) return;
+    wheelAt = Date.now();
+    go(cur + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
+  /* 鼠标拖拽翻页（2026-09）：桌面无原生拖拽横滑，按住图片左右拖 + 甩动即可翻页；
+     位移 >60px 或甩动速度 >0.5px/ms 翻页，否则回弹。触屏/笔不接管（原生惯性已够）。 */
+  function dragEnd(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    var d = drag; drag = null;
+    var dx = (d.moved ? d.lastX : d.x0) - d.x0;
+    var target = (Math.abs(dx) > 60 || Math.abs(d.v) > 0.5) ? d.i0 + (dx < 0 ? 1 : -1) : d.i0;
+    go(target);
+    // 动画结束后再恢复 scroll-snap：松手瞬间恢复会被 mandatory snap 直接拉齐、吞掉过渡
+    var done = false;
+    function fin(){ if (done) return; done = true; track.classList.remove('dragging'); track.removeEventListener('scrollend', fin); }
+    track.addEventListener('scrollend', fin);
+    setTimeout(fin, 450);
+  }
+  track.addEventListener('pointerdown', function(e){
+    if (e.pointerType !== 'mouse' || e.button !== 0 || !list.length || drag) return;
+    e.preventDefault();                          // 压掉图片原生拖拽 / 文本选择
+    drag = { id: e.pointerId, x0: e.clientX, sl0: track.scrollLeft, lastX: e.clientX, lastT: Date.now(), v: 0, i0: cur, moved: false };
+  });
+  window.addEventListener('pointermove', function(e){
+    if (!drag || e.pointerId !== drag.id) return;
+    var dx = e.clientX - drag.x0;
+    if (!drag.moved && Math.abs(dx) < 4) return; // 4px 死区：点按不误判成拖
+    if (!drag.moved) { drag.moved = true; track.classList.add('dragging'); }
+    var now = Date.now(), dt = now - drag.lastT;
+    if (dt > 0) drag.v = drag.v * 0.6 + ((e.clientX - drag.lastX) / dt) * 0.4;   // 平滑瞬时速度（px/ms）
+    drag.lastX = e.clientX; drag.lastT = now;
+    track.scrollLeft = drag.sl0 - dx;            // 1:1 跟手
+  });
+  window.addEventListener('pointerup', dragEnd);
+  window.addEventListener('pointercancel', dragEnd);
+  return { open: open, close: close };
+})();
+</script>
 <script src="screens/_qr.js"></script>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_beike-login.js"></script>
@@ -546,6 +672,17 @@ window.__NEARBY_RENDER__ = (function(){
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   var roomProfileUnits = [];
+  var rpCurrentId = 0;   // 房型介绍当前展示的户型（展示图点击进图册用）
+  // 房型介绍展示图点击 → 当前户型全屏图册（入口开关在 renderRoomProfile 里按有无图集切换）
+  document.getElementById('dRoomShowcase').addEventListener('click', function(){
+    if (!this.classList.contains('gal-ok')) return;
+    var g = (window.__UNIT_GALLERY_OF__ || function(){ return []; })(rpCurrentId);
+    var src = document.getElementById('dRoomShowcaseImg').getAttribute('src') || '';
+    var start = 0;
+    for (var k = 0; k < g.length; k++) { if (g[k].url === src) { start = k; break; } }
+    // 无图集时至少支持对展示图本张放大
+    BZF_GAL.open(g.length ? g : (src ? [{ url: src, label: '' }] : []), start);
+  });
   var FACILITY_CATALOG = {
     ac:{icon:'❄',label:'空调暖气'}, washer:{icon:'◫',label:'洗衣机'}, fridge:{icon:'▣',label:'冰箱'},
     heater:{icon:'♨',label:'热水'}, lock:{icon:'⌾',label:'智能门锁'}, wifi:{icon:'⌁',label:'无线网络'},
@@ -583,6 +720,7 @@ window.__NEARBY_RENDER__ = (function(){
     var u = roomProfileUnits.find(function(item){ return item.id === Number(unitId); }) || roomProfileUnits[0];
     var block = document.getElementById('dFacilitiesBlock');
     if (!u || !block) return;
+    rpCurrentId = u.id;
     var p = u.profile || {};
     var facilities = facilityData(u);
     block.style.display = '';
@@ -644,6 +782,8 @@ window.__NEARBY_RENDER__ = (function(){
       show.style.display = 'none';
       document.getElementById('dRoomShowcaseImg').removeAttribute('src');
     }
+    // 展示图可点 → 当前户型图册（含房源级回落）；连图集都没有时仍可单张放大展示图本身
+    show.classList.toggle('gal-ok', ((window.__UNIT_GALLERY_OF__ || function(){ return []; })(u.id)).length > 0 || !!p.feature_image);
     if (window.__DETAIL_SECTION_NAV__) window.__DETAIL_SECTION_NAV__.refresh();
   }
   window.__ROOM_PROFILE_SELECT__ = renderRoomProfile;
@@ -682,7 +822,21 @@ window.__NEARBY_RENDER__ = (function(){
     var urls = photos.map(function(ph){ return ph.file_path || ''; }).filter(Boolean);
     var labels = photos.filter(function(ph){ return ph.file_path; }).map(function(ph){ return ph.category_label || ''; });
     if (!urls.length && p.cover_image) { urls = [p.cover_image]; labels = ['']; }
+    // 图册分桶（2026-09）：房源级 / 户型级各自成册，供 hero 轮播、房型卡缩略图、房型介绍展示图
+    // 三处点击进全屏图册；户型无自有图集时回落房源级（__UNIT_GALLERY_OF__ 是页面唯一取用口）。
+    var projGal = photos.filter(function(ph){ return ph.entity_type === 'project' && ph.file_path; })
+      .map(function(ph){ return { url: ph.file_path, label: ph.category_label || '' }; });
+    var unitGalMap = {};
+    photos.forEach(function(ph){
+      if (ph.entity_type !== 'unit' || !ph.file_path) return;
+      (unitGalMap[ph.entity_id] = unitGalMap[ph.entity_id] || []).push({ url: ph.file_path, label: ph.category_label || '' });
+    });
+    window.__UNIT_GALLERY_OF__ = function(uid){
+      var g = unitGalMap[uid];
+      return (g && g.length) ? g : projGal;
+    };
     var dots = document.getElementById('dDots');
+    var heroTrack = null;
     if (urls.length > 1) {
       var track = document.createElement('div');
       track.className = 'hero-track';
@@ -695,8 +849,18 @@ window.__NEARBY_RENDER__ = (function(){
       };
       track.addEventListener('scroll', function(){ window.requestAnimationFrame(updDots); }, { passive: true });
       updDots();
+      heroTrack = track;
     } else if (dots) {
       dots.style.display = 'none';
+    }
+    // hero 整块点击 → 全屏图册（含全部图，不止轮播截取的前 8 张；起点 = 当前滑到的张）
+    if (urls.length) {
+      var heroGal = urls.map(function(u, i){ return { url: u, label: labels[i] || '' }; });
+      hero.classList.add('gal-ok');
+      hero.addEventListener('click', function(){
+        var i = heroTrack ? Math.round(heroTrack.scrollLeft / Math.max(1, heroTrack.clientWidth)) : 0;
+        BZF_GAL.open(heroGal, i);
+      });
     }
     document.title = (p.name || '房源详情') + ' · 贝壳找房旅居';
     var st = p.rating_status || 'draft';
@@ -930,22 +1094,41 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     if (!us) return;                                   // 示例基线：保留页内静态房型卡
     if (!us.length) { unitsEl.innerHTML = '<div class="units-note">该项目暂无户型明细</div>'; return; }
     var bookable = live.bookable;
+    var galOf = window.__UNIT_GALLERY_OF__ || function(){ return []; };
     unitsEl.innerHTML = us.map(function(u, i){
       var meta = [u.area ? u.area + '㎡' : '', u.layout].filter(Boolean).join(' · ');
       var tags = (u.tags || []).slice(0, 3).map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('');
+      var galN = galOf(u.id).length;
       var right = bookable
         ? '<div class="rp"><b>¥' + fmtN(u.per) + '</b><small>/晚均</small></div>' +
           '<div class="rt" data-rt="' + u.id + '">选日期看总价</div>' +
           '<span class="rbtn" data-u="' + u.id + '">订</span>'
         : '<div class="rp"><b>¥' + fmtN(u.monthly || u.per) + '</b><small>' + (live.channel === 'minsu' ? '/晚' : '/月起') + '</small></div>';
       return '<div class="roomcard' + (bookable && u.id === selUnit ? ' sel' : '') + '" data-u="' + u.id + '">' +
-        '<div class="rth' + (u.cover ? '' : ' g' + ((i % 6) + 1)) + '"' + (u.cover ? ' style="background-image:url(\'' + u.cover + '\')"' : '') + '></div>' +
+        '<div class="rth' + (u.cover ? '' : ' g' + ((i % 6) + 1)) + '"' + (u.cover ? ' style="background-image:url(\'' + u.cover + '\')"' : '') + '>' +
+          (galN ? '<span class="rth-n">' + galN + '图</span>' : '') + '</div>' +
         '<div class="rin"><div class="rnm">' + esc(u.name) + '</div>' +
         (meta ? '<div class="rmeta">' + esc(meta) + '</div>' : '') +
         (u.cancel_text ? '<div class="rmeta" style="color:#0f766e;">🕒 ' + esc(u.cancel_text) + '</div>' : '') +
         '<div class="rtags">' + tags + '</div></div>' +
         '<div class="rbuy">' + right + '</div></div>';
     }).join('');
+    // 缩略图点击 → 该户型全屏图册（截停冒泡，不改变选中房型；起点 = 该户型封面）。
+    // 户型与房源级都无图时不截停，让卡片点击回落到「选房型」。
+    unitsEl.querySelectorAll('.roomcard .rth').forEach(function(th){
+      th.addEventListener('click', function(ev){
+        var card = th.closest('.roomcard');
+        if (!card) return;
+        var uid = +card.dataset.u;
+        var g = galOf(uid);
+        if (!g.length) return;
+        ev.stopPropagation();
+        var cover = (live.units.filter(function(x){ return x.id === uid; })[0] || {}).cover || '';
+        var start = 0;
+        for (var k = 0; k < g.length; k++) { if (g[k].url === cover) { start = k; break; } }
+        BZF_GAL.open(g, start);
+      });
+    });
     if (!bookable) return;
     unitsEl.querySelectorAll('.roomcard').forEach(function(card){
       card.addEventListener('click', function(){ setUnit(+card.dataset.u); });
