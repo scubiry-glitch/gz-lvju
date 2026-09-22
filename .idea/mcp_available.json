@@ -1,20 +1,30 @@
 [ {
-  "@upstash/mcp-context7-server" : {
-    "delete" : false,
-    "status" : "enabled"
-  }
-}, {
   "@codelink-mcp/Weapons" : {
     "delete" : false,
     "status" : "enabled"
   }
 }, {
-  "magic-mcp" : {
+  "@f2c/mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "f2c-mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "@modelcontextprotocol/Github" : {
     "delete" : false,
     "status" : "enabled"
   }
 }, {
   "@mastergo/magic-mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "f2c_mcp" : {
     "delete" : false,
     "status" : "enabled"
   }
