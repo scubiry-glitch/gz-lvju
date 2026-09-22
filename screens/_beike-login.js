@@ -170,6 +170,9 @@
   function markJumped() {
     try { sessionStorage.setItem(JUMP_KEY, String(Date.now())); } catch (e) {}
   }
+  function clearJumped() {
+    try { sessionStorage.removeItem(JUMP_KEY); } catch (e) {}
+  }
 
   function saveNext(url) {
     try { sessionStorage.setItem(NEXT_KEY, absUrl(url)); } catch (e) {}
@@ -217,13 +220,18 @@
     }
   }
 
-  /* 详情页「订」/ tab「订单·我的」：未登录只唤起登录，成功后再去目标页；取消留在当前页 */
+  /* 详情页「订」/ tab「订单·我的」：没登录每次都弹登录，成功后再去目标页；取消留在当前页。
+     不读 jumpedRecently：那是防页面自动连跳，用户再点必须再弹。 */
   function gateThenGo(nextUrl) {
     var next = absUrl(nextUrl);
     if (token()) { location.href = next; return; }
     var app = appUserInfo();
     if (pickUser(app)) {
-      exchange(app).then(function () { location.href = next; });
+      exchange(app).then(function (j) {
+        if (j) { location.href = next; return; }
+        if (isBeikeApp()) jumpToLogin(next);
+        else location.href = next;
+      });
       return;
     }
     if (isBeikeApp()) {
@@ -274,6 +282,7 @@
       if (!isAuthTabHref(href) || a.classList.contains('on')) return;
       ev.preventDefault();
       ev.stopPropagation();
+      clearJumped();
       gateThenGo(href);
     }, true);
   }
