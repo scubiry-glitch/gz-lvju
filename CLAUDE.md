@@ -88,25 +88,24 @@
 - **已知边界**：① relabel 只处理静态文本节点 + `<title>`，页面**加载后由 JS 动态生成**的含品牌串内容不会被替换——这类内容应改读 `BZF_REGION`；② 需保持江苏原值的样例节点加 `data-noregion` 跳过；③ **改名 ≠ 改业务语义**：把保租房换成旅居住宿后，F 系列公积金/监管账户、好房子评级口径等是业务重做，不在本层职责内。
 - 详见 `docs/region-abstraction-plan.md`。
 
-## 规则 8 · 居住服务工单闭环单一数据源（`screens/_orderbus.js`）
+## 规则 8 · 居住服务工单闭环（已并轨 MySQL，`_orderbus.js` 已退役）
 
-**"客户提交需求 → 中台派单 → 服务者接单/完成 → 客户评价 → 评价回流"这条闭环的跨页面状态，只走 `screens/_orderbus.js`（localStorage `bzf_orders`），页面不得各自硬编码 mock。** 这是让纯静态原型"可点击贯通可演示"的总线。
+**"客户提交需求 → 中台派单 → 服务者接单/完成 → 客户评价 → 评价回流"这条闭环的跨页面状态，全部走 `screens/_jzapi.js`（MySQL `jz_orders`）。**（2026-09-22 拍板并轨；原 `screens/_orderbus.js` localStorage 演示总线已删除，`bzf_orders` 废弃）
 
-- **状态机**：`pending`(待派) → `dispatched`(已派单) → `accepted`(已接单) → `serving`(服务中) → `done`(已完成待评价) → `rated`(已评价)。每态在 `STATUS` 里同时给出 `c`/`worker`/`admin` 三视角文案 + 进度条 `pct`。
-- **四个接入页各司其职**：`repair.html`(C端提交+进度+评价) / `p-service-demand.html`(中台派单) / `s-orders.html`(服务者推进) / `p-service-review.html`(评价回流)。每页保留原有"示例"静态内容，**实时工单叠加在顶部并标「实时」徽标**，演示不污染基线观感。
-- **API**：`BZF_ORDERS.create / dispatch / advance / rate / byStatus / get / reset / onChange`。`advance` 封顶到 `done`（评价只能由客户 `rate` 触发）；`onChange` 监听跨页 storage 变更自动重渲染。
-- **复用而非新造**：再接入任何端（如 B 端运营商工单视图、G 端投诉关联）时，引 `<script src="_orderbus.js"></script>`（在 region 脚本之后、nav 脚本前后均可，只要在使用 `BZF_ORDERS` 的内联脚本之前），从 `byStatus()` 取数据渲染，**不要再 new 一套 localStorage key**。
-- **与 region 解耦**：本总线只产数据，服务者姓名/房源等为样例字面量，不参与 relabel；如某态文案需随省份变，改读 `BZF_REGION`，勿写死。
+- **状态机**：`pending`(待派) → `dispatched`(已派单) → `accepted`(已接单) → `serving`(服务中) → `done`(已完成待评价) → `rated`(已评价)，单一数据源 `_jzapi.js` 的 `STATUS`（`c`/`worker`/`admin` 三视角文案 + 进度条 `pct`）与 `ORDER`（状态序）。
+- **接入页各司其职**：`repair.html`(C端报修提交+进度+评价) / `lvju-app-me.html`·`lvju-app-ticket.html`(旅居 App 提交+详情) / `p-service-demand.html`(中台派单) / `s-orders.html`(服务者推进) / `p-service-review.html`(评价回流)。每页保留原有"示例"静态内容，实时工单叠加并标「实时」徽标。
+- **复用而非新造**：再接入任何端时引 `<script src="_jzapi.js?v=N"></script>`，报修走 `createRepair / listRepairs / repairGet / repairCancel`，派单推进评价走既有 `dispatch / advance / rate`，**不要再 new 一套 localStorage key**。
 
-## 规则 9 · 家政工单 API 总线（`screens/_jzapi.js`）
+## 规则 9 · 工单 API 总线（`screens/_jzapi.js`）
 
-**新居住 · 家政频道**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源），与 `_orderbus.js`（localStorage 报修演示）并行、不混用。
+**新居住 · 家政/报修工单**的跨页面状态只走 `screens/_jzapi.js`（REST `/api/juzhu/jiazheng/*`，MySQL 为唯一数据源）。
 
 - **接入页**：`juzhu-jiazheng-*.html`、`juzhu-order-progress.html`、`lvju-app-pay.html`（`channel=jiazheng`）、`p-service-demand.html`、`p-service-review.html`、`s-orders.html`、`b-dispatch-board.html`
 - **API**：`BZF_JZ.create / pay / dispatch / advance / rate / list / get / onChange`
 - **鉴权**：`/api/juzhu/*` **默认拒绝**，须 `JUZHU_API_KEY`（只从 `.env` / `.env.local` 读取；**禁止**历史默认 `dev-juzhu-key`，任何环境均拒绝）；前端管理台经 `localStorage JUZHU_API_KEY` 对齐，勿在页面硬编码。白名单仅限 C 端目录/房源展示、`POST /api/juzhu/jiazheng/wechat-link`、`GET /api/juzhu/gr/orders*`、`GET .../virtual-phone`；商家开放接口走 HMAC；admin 走登录会话或 Key。**工单列表/详情/支付/评价/派单一律要 Key**（禁止 `?phone=` 匿名旁路）
 - **双轨 API**：C 端工单走 `/api/juzhu/jiazheng/*`（`jz_skus` + `jz_orders`）；P/B 管理台走 `/api/juzhu/jz/*`（`jz_subcategories` / `jz_vendors` / `jz_products` / `jz_workers`）。订单表统一为 `jz_orders`，vendor 下单经 `channel_sku_id` 映射到 SKU。
 - **工单出参与派单（2026-09-22）**：orders list/detail 随行下发 `type_label`——产品化下单写入的 `type` 是英文 `category_id`（cleaning…），服务端 CASE join `jz_categories` 出中文名，存量中文 type 与权益售后（type≠category_id）原样保留；页面显示类型一律用 `type_label`，**不得再各造 id→中文 映射**。`POST .../dispatch` **派单必指派**：不传 `worker` 时服务端按 `jz_workers` 信用分↓完单量↓择优自动分配（worker_json 带 `auto:true`），无 active 服务者 400——不再落 `worker_json=NULL` 幽灵单（服务者端按 worker 过滤看不见，闭环会断；存量幽灵单在 P 端显示「已派单 · 未指派」）。
+- **报修单 repairs 通道（2026-09-22，原 `_orderbus` localStorage 并轨入 MySQL）**：`POST /api/juzhu/jiazheng/repairs`（C 端报修下单，挂 `ORDER_CREATE`；`sku_id=NULL`、`category_id='repair'`、`type`=中文报修类型字面量、`fee=0`、`pay_status='not_required'`、`source` 须以「旅居客 App」开头）写同一张 `jz_orders`；`GET /repairs?phone=`（**phone 必填**）与 `GET /repairs/:id?phone=`（id+phone 双因子）只出 `source LIKE '旅居客 App%'` 的行——**永远不存在匿名全表读取**（匿名在 `requireApiKey` 即 401；legacy key 经 `C_WRITE_PATH_RE` + `C_REPAIRS_READ_RE` 放行 POST/GET/DELETE）；`DELETE /repairs/:id?phone=` = 待派取消，条件硬 DELETE（`status='pending' AND worker_json IS NULL`，已派 409）——**不引入 `cancelled` 状态**（会波及 stats/各端过滤全链）。派单/推进/评价复用既有 `/orders/:id/*` 路由。C 端页面演示凭据走 localStorage `JUZHU_API_KEY`（同 `jiazheng-booking.html` 模式）或登录会话；`repair.html` 提交后把 phone 存 `localStorage bzf_repair_phone` 供「报修记录」与详情页回查。
 - **生活服务专区入口恒为 12 个频道**（`index.html` 的 `renderJiazhengCats`）：入口列表以本地 `JZ_CATS` 为基准，`GET /api/juzhu/jiazheng/categories` 回来的只做**覆盖 + 追加**，**不得直接按接口结果渲染**。接口按「当前城市有无可售商品」过滤，会把当前城市没配商品的频道一并滤掉（实测 `city=贵州` 只剩 10 个，丢了保洁和维修）——但这是导航入口不是库存指示，少一个入口就少一条进频道的路。接口失败 / `_jzapi.js` 未加载时也要回落 `renderJiazhengCats(null)` 画出纯本地 12 个，不得整块空白。
 - **分类配色单一数据源**：家政各分类的品牌色写在 `_jzapi.js` 的 `CAT_THEME`（`catTheme()` / `applyCatTheme(el, type)`，后者把 `--cat-brand / --cat-brand-2 / --cat-deep / --cat-soft / --cat-tint` 写到元素上）。列表页与详情页的 hero / poster / 标签 / 按钮 / **正文模块 chrome**（小节标题色条、序号圆点、商家 Logo 底、证书卡、服务者卡、选中态描边与光晕）**只消费这些 CSS 变量**，页面不得再各写一份配色表，也不得残留全局 `--brand`（青绿）——那会让蓝色/橙色频道里混进绿色。
   - `--cat-soft` = 12% 品牌色**透明**混合（叠在白卡上的浅底）；`--cat-tint` = 白底 8% 品牌色**不透明**浅底。**深色 hero 上用白色半透明，浅色容器上用 `--cat-tint`**；把 `--cat-soft` 用在深色底上会隐形。

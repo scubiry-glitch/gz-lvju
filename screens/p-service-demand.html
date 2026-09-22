@@ -87,26 +87,17 @@
         <div class="note">需求类型：<span class="tags" style="display:inline-flex;"><span>保洁</span><span>维修</span><span>管家服务</span><span>送物</span><span>退住核验</span></span></div>
       </div>
 
-      <div class="card full" id="busCard" hidden>
-        <h3>实时工单 · 旅居客提交 <span class="pill">演示总线 · 本机</span></h3>
-        <table>
-          <thead><tr><th>工单号</th><th>类型</th><th>来源</th><th>房源 / 位置</th><th>期望</th><th>状态</th><th>操作</th></tr></thead>
-          <tbody id="busRows"></tbody>
-        </table>
-        <div class="note">来源：<b>旅居 App「我的 · 服务工单」</b>（localStorage 演示总线 _orderbus，与下方 API 工单池并行展示、不混写）；派单按演示池轮转分配持证服务者。P 端操作需账号中心登录（未登录时登录层会自动弹出）。</div>
-      </div>
-
       <div class="card full">
         <h3>工单池 · 待派与进行中 <span class="pill">待派优先</span></h3>
         <table>
-          <thead><tr><th>工单号</th><th>类型</th><th>来源</th><th>房源 / 位置</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>工单号</th><th>类型</th><th>来源</th><th>房源 / 位置</th><th>期望</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
           <tbody id="liveRows"></tbody>
           <tbody>
-            <tr><td colspan="7" style="color:var(--muted);font-size:11px;background:var(--line);">以下为静态示例行（演示布局用，非实时数据，不可操作）</td></tr>
-            <tr><td>WO-2026-58821</td><td>开荒保洁</td><td>旅居客 App</td><td>梧桐公馆 · 江宁区</td><td><span class="badge b-hi">高</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
-            <tr><td>WO-2026-58820</td><td>管家服务</td><td>房源运营方</td><td>人才公寓 · 雨花台</td><td><span class="badge b-go">中</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
-            <tr><td>WO-2026-58814</td><td>家电维修</td><td>管家上报</td><td>梅园新村 · 玄武区</td><td><span class="badge b-go">中</span></td><td><span class="badge b-go">派单中</span></td><td><a class="lnk" href="p-traffic-policy.html">规则 →</a></td></tr>
-            <tr><td>WO-2026-58807</td><td>退住核验</td><td>系统巡检</td><td>梧桐公馆 · 江宁区</td><td><span class="badge">低</span></td><td><span class="badge b-ok">已接单</span></td><td><a class="lnk" href="s-orders.html">查看 →</a></td></tr>
+            <tr><td colspan="8" style="color:var(--muted);font-size:11px;background:var(--line);">以下为静态示例行（演示布局用，非实时数据，不可操作）</td></tr>
+            <tr><td>WO-2026-58821</td><td>开荒保洁</td><td>旅居客 App</td><td>梧桐公馆 · 江宁区</td><td>今天 18:00</td><td><span class="badge b-hi">高</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
+            <tr><td>WO-2026-58820</td><td>管家服务</td><td>房源运营方</td><td>人才公寓 · 雨花台</td><td>明天上午</td><td><span class="badge b-go">中</span></td><td><span class="badge b-wait">待派</span></td><td><a class="lnk" href="p-transaction.html">派单 →</a></td></tr>
+            <tr><td>WO-2026-58814</td><td>家电维修</td><td>管家上报</td><td>梅园新村 · 玄武区</td><td>本周内</td><td><span class="badge b-go">中</span></td><td><span class="badge b-go">派单中</span></td><td><a class="lnk" href="p-traffic-policy.html">规则 →</a></td></tr>
+            <tr><td>WO-2026-58807</td><td>退住核验</td><td>系统巡检</td><td>梧桐公馆 · 江宁区</td><td>-</td><td><span class="badge">低</span></td><td><span class="badge b-ok">已接单</span></td><td><a class="lnk" href="s-orders.html">查看 →</a></td></tr>
           </tbody>
         </table>
         <div class="note">派单在服务者名单中指定人选（B 端「快速派」按 信用分 ↓ 完单量 ↓ 择优）；倾斜规则见 <a href="p-traffic-policy.html" style="color:var(--accent);font-weight:600;">流量倾斜策略</a>；成交分账走 <a href="p-transaction.html" style="color:var(--accent);font-weight:600;">派单交易</a> T+7。</div>
@@ -117,14 +108,13 @@
 <div class="toast" id="toast"></div>
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
-<script src="_jzapi.js?v=7"></script>
-<script src="_orderbus.js"></script>
+<script src="_jzapi.js?v=8"></script>
 <script>
 const JZ = window.BZF_JZ;
 // 优先级按「类型中文名」查表；orders 接口下发 type_label（英文 category_id 已由服务端 join 成中文名），
 // 这里保留英文 key 兜底（服务端未升级/离线场景），权益售后单视为高优
-const PRIO = { '保洁': 'b-hi', 'cleaning': 'b-hi', '维修': 'b-go', 'repair': 'b-go', '搬家': 'b-go', 'moving': 'b-go', '保姆': 'b-hi', 'nanny': 'b-hi', '家政': '', '权益售后': 'b-hi' };
-const PRIO_TXT = { '保洁': '高', 'cleaning': '高', '维修': '中', 'repair': '中', '搬家': '中', 'moving': '中', '保姆': '高', 'nanny': '高', '家政': '低', '权益售后': '高' };
+const PRIO = { '保洁': 'b-hi', 'cleaning': 'b-hi', '维修': 'b-go', 'repair': 'b-go', '搬家': 'b-go', 'moving': 'b-go', '保姆': 'b-hi', 'nanny': 'b-hi', '家政': '', '权益售后': 'b-hi', '报修': 'b-hi', '管家': 'b-go', '管家服务': 'b-go', '家电安装': 'b-go', '除螨消杀': 'b-go', '送物': '', '接送': '', '其他': '' };
+const PRIO_TXT = { '保洁': '高', 'cleaning': '高', '维修': '中', 'repair': '中', '搬家': '中', 'moving': '中', '保姆': '高', 'nanny': '高', '家政': '低', '权益售后': '高', '报修': '高', '管家': '中', '管家服务': '中', '家电安装': '中', '除螨消杀': '中', '送物': '低', '接送': '低', '其他': '低' };
 const PRIO_RANK = { '高': 0, '中': 1, '低': 2 };
 const ST_RANK = { pending: 0, dispatched: 1, accepted: 2, serving: 3 };
 function typeLabel(o) { return o.type_label || o.category || o.type; }
@@ -171,6 +161,7 @@ function render() {
       '<td>' + (o.icon || '') + ' ' + JZ.esc(typeLabel(o)) + '</td>' +
       '<td>' + JZ.esc(o.source) + ' <span class="badge b-live">API</span></td>' +
       '<td>' + JZ.esc(o.house) + '</td>' +
+      '<td>' + JZ.esc(o.expectTime || '-') + '</td>' +
       '<td><span class="badge ' + (PRIO[typeLabel(o)] || '') + '">' + prioTxt(o) + '</span></td>' +
       '<td>' + statusBadge(o) + '</td>' +
       '<td>' + actionCell(o) + '</td></tr>'
@@ -186,7 +177,7 @@ function render() {
       document.getElementById('kpiUnpaid').textContent = (s.unpaid || 0);
     }).catch(function(){});
   }).catch(function(err) {
-    rows.innerHTML = '<tr><td colspan="7" style="color:var(--danger);">API 加载失败：' + JZ.esc(err.message) + '</td></tr>';
+    rows.innerHTML = '<tr><td colspan="8" style="color:var(--danger);">API 加载失败：' + JZ.esc(err.message) + '</td></tr>';
   });
 }
 
@@ -208,37 +199,6 @@ async function doDispatch(id) {
 JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
-
-/* ===== 实时工单（演示总线 _orderbus）：旅居 App「我的 · 服务工单」提交的真实工单 ===== */
-const BO = window.BZF_ORDERS;
-const BUS_CLS = { pending:'b-wait', dispatched:'b-go', accepted:'b-go', serving:'b-ok' };
-function renderBus() {
-  if (!BO) return;
-  const list = BO.all().filter(o => ['pending','dispatched','accepted','serving'].indexOf(o.status) >= 0);
-  document.getElementById('busCard').hidden = (list.length === 0);
-  document.getElementById('busRows').innerHTML = list.map(o => {
-    const st = BO.STATUS[o.status];
-    const act = o.status === 'pending'
-      ? '<a class="lnk" onclick="busDispatch(\'' + o.id + '\')">派单 →</a>'
-      : '<a class="lnk done">已派 ' + (o.worker ? BO.esc(o.worker.name) : '') + '</a>';
-    return '<tr style="background:color-mix(in oklab,var(--accent) 4%,transparent);">' +
-      '<td>' + BO.esc(o.id) + '</td>' +
-      '<td>' + (BO.ICON[o.type] || '🧰') + ' ' + BO.esc(o.type) + '</td>' +
-      '<td>' + BO.esc(o.source) + ' <span class="badge b-live">实时</span></td>' +
-      '<td>' + BO.esc(o.house) + '</td>' +
-      '<td>' + BO.esc(o.expectTime || '-') + '</td>' +
-      '<td><span class="badge ' + (BUS_CLS[o.status] || 'b-wait') + '">' + st.admin + '</span></td>' +
-      '<td>' + act + '</td></tr>';
-  }).join('');
-}
-function busDispatch(id) {
-  const o = BO.dispatch(id);
-  if (o && o.worker) toast('已派单（演示总线）→ ' + o.worker.name + ' · ' + o.worker.level);
-  renderBus();
-}
-BO.onChange(renderBus);
-window.addEventListener('pageshow', renderBus);
-renderBus();
 </script>
 <script src="_nav.js"></script>
 </body>

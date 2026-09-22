@@ -160,10 +160,10 @@
   </div>
 </div>
 
-<script src="screens/_orderbus.js"></script>
+<script src="screens/_jzapi.js?v=8"></script>
 <script>
 (function(){
-  var BO = window.BZF_ORDERS;
+  var JZ = window.BZF_JZ;
   var $ = function(id){ return document.getElementById(id); };
 
   /* ================= 400 在线客服（电话可配置） ================= */
@@ -196,7 +196,7 @@
     setTimeout(function(){ $('btnCopy400').textContent = '复制号码'; }, 1600);
   });
 
-  /* ================= 服务工单（真实工单 · _orderbus 总线） ================= */
+  /* ================= 服务工单（真实工单 · _jzapi repairs 总线，MySQL） ================= */
   var BASE_TYPES = ['报修','保洁','管家','送物','家电安装','除螨消杀','接送','其他'];
   var ICONS = { '报修':'🔧','保洁':'🧹','管家':'🛎','送物':'📦','家电安装':'🔌','除螨消杀':'🧴','接送':'🚗','其他':'🧰' };
   var CUSTOM_EMOJIS = ['🧰','🔧','🛒','🚗','🧴','🎨','🌿','🏊'];
@@ -256,30 +256,36 @@
   });
   $('btnCustomCancel').addEventListener('click', function(){ $('customRow').hidden = true; });
 
+  var ME_PHONE = '138****6688'; // 演示身份手机号（服务端按 phone + source 限定回查）
   function renderMine(){
-    var list = BO.all().filter(function(o){ return String(o.source||'').indexOf('旅居客 App') === 0; }).slice(-10).reverse();
-    $('mine').innerHTML = list.length ? list.map(function(o){
-      var st = BO.STATUS[o.status];
-      return '<a class="tk" href="lvju-app-ticket.html?id=' + encodeURIComponent(o.id) + '" style="text-decoration:none;color:inherit;cursor:pointer;">' +
-        '<span class="ic">' + iconOf(o.type) + '</span>' +
-        '<span class="meta"><b>' + BO.esc(o.desc) + '</b>' + BO.esc(o.id) + ' · ' + BO.esc(o.createdLabel) +
-        ' · 期望 ' + BO.esc(o.expectTime || '尽快') + '</span>' +
-        '<span class="st st-' + o.status + '">' + st.c + '</span></a>';
-    }).join('') : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">暂无工单，提交后实时进入中台工单池</div>';
-    var openN = BO.all().filter(function(o){ return ['pending','dispatched','accepted','serving'].indexOf(o.status) >= 0; }).length;
-    $('ticketTip').textContent = openN ? (openN + ' 单进行中') : '报修 · 保洁 · 管家';
+    JZ.listRepairs(ME_PHONE).then(function(all){
+      var list = all.slice(0, 10);
+      $('mine').innerHTML = list.length ? list.map(function(o){
+        var st = JZ.STATUS[o.status] || { c: o.status };
+        return '<a class="tk" href="lvju-app-ticket.html?id=' + encodeURIComponent(o.id) + '" style="text-decoration:none;color:inherit;cursor:pointer;">' +
+          '<span class="ic">' + iconOf(o.type) + '</span>' +
+          '<span class="meta"><b>' + JZ.esc(o.desc) + '</b>' + JZ.esc(o.id) + ' · ' + JZ.esc(o.createdLabel) +
+          ' · 期望 ' + JZ.esc(o.expectTime || '尽快') + '</span>' +
+          '<span class="st st-' + o.status + '">' + st.c + '</span></a>';
+      }).join('') : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">暂无工单，提交后实时进入中台工单池</div>';
+      var openN = all.filter(function(o){ return ['pending','dispatched','accepted','serving'].indexOf(o.status) >= 0; }).length;
+      $('ticketTip').textContent = openN ? (openN + ' 单进行中') : '报修 · 保洁 · 管家';
+    }).catch(function(){
+      $('mine').innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">工单加载失败（需访问凭据或登录账号）</div>';
+    });
   }
   $('btnSubmit').addEventListener('click', function(){
     var desc = $('tkDesc').value.trim() || (curType + '服务需求');
-    var o = BO.create({
+    JZ.createRepair({
       type: curType,
       desc: desc,
       house: '我的旅居 · 贵阳',
-      phone: '138****6688',
+      phone: ME_PHONE,
       expectTime: $('tkTime').value,
       source: '旅居客 App · 我的'
-    });
-    location.href = 'lvju-app-ticket.html?id=' + encodeURIComponent(o.id);
+    }).then(function(o){
+      location.href = 'lvju-app-ticket.html?id=' + encodeURIComponent(o.id);
+    }).catch(function(err){ alert('提交失败：' + err.message); });
   });
 
   /* ================= 抽屉开合 ================= */

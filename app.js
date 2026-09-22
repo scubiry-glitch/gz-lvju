@@ -311,19 +311,25 @@ const RATING_CODE_PREFIX = ratingCfg.RATING_CODE_PREFIX;
 
 // C 端涉写三路径（下单/支付/评价）——旧全局 key 的最后一处过渡放行，
 // 收紧由 settings.require_c_login 开关控制（requireCEndWrite）
-const C_WRITE_PATH_RE = /^\/api\/juzhu\/jiazheng\/orders(\/[^/]+\/(pay|rate))?$/;
+const C_WRITE_PATH_RE = /^\/api\/juzhu\/jiazheng\/(orders(\/[^/]+\/(pay|rate))?|repairs)$/;
+// 报修单（repairs）的 phone 限定读 / 取消：legacy key 演示通道同时放行 GET/DELETE（仍是凭据通道，匿名照旧 401）
+const C_REPAIRS_READ_RE = /^\/api\/juzhu\/jiazheng\/repairs(\/[^/]+)?$/;
 
 async function requireApiKey(req, res, urlPath) {
   // 通道1（唯一）：账号中心（Bearer 会话 或 机器账号 API Key）。
-  // 旧全局 JUZHU_API_KEY 已全面停用——管理面一律拒绝；仅 C 端涉写三路径过渡期保留。
+  // 旧全局 JUZHU_API_KEY 已全面停用——管理面一律拒绝；仅 C 端涉写路径 + 报修 phone 限定读过渡期保留。
   const principal = await authCenter.principalOf(req).catch(() => null);
   if (principal && principal.type === 'account') {
     req.principal = principal;
     return true;
   }
   const provided = providedApiKey(req);
-  if (provided && apiKeyMatches(provided, expectedApiKey())
-      && req.method === 'POST' && urlPath && C_WRITE_PATH_RE.test(urlPath.replace(/\/+$/, ''))) {
+  const p = (provided && urlPath) ? urlPath.replace(/\/+$/, '') : '';
+  const legacyOk = !!p && (
+    (req.method === 'POST' && C_WRITE_PATH_RE.test(p)) ||
+    ((req.method === 'GET' || req.method === 'DELETE') && C_REPAIRS_READ_RE.test(p))
+  );
+  if (legacyOk && apiKeyMatches(provided, expectedApiKey())) {
     req.principal = { type: 'legacy' };
     return true;
   }
@@ -4329,6 +4335,43 @@ async function handleApiDirect(urlPath, qs, req, res) {
       });
     }
 
+    // ===== 报修单（旅居客 App 提交，sku-less，写入同一张 jz_orders）=====
+    // 读接口凭据 + phone 必填 + source 限定三重收口：不存在匿名全表视图（规则 9）。
+    // 不套 restrictOrdersRead——user 角色会话会被行级闸 403，这里以 phone 归属替代。
+    const REPAIR_SELECT = `SELECT o.*, c2.name AS category_name,
+              CASE WHEN o.type=o.category_id AND c2.name IS NOT NULL THEN c2.name ELSE o.type END AS type_label
+           FROM jz_orders o
+           LEFT JOIN jz_categories c2 ON c2.id=o.category_id`;
+    const REPAIR_SOURCE_SQL = "o.source LIKE '旅居客 App%'";
+
+    // GET /api/juzhu/jiazheng/repairs?phone=（我的报修列表）
+    if (urlPath === '/api/juzhu/jiazheng/repairs' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      const phone = (qp.get('phone') || '').trim();
+      if (!phone) return jsonReply(res, { error: 'phone 必填' }, 400);
+      const rows = await queryRows(
+        `${REPAIR_SELECT} WHERE ${REPAIR_SOURCE_SQL} AND o.phone=? ORDER BY o.created_at DESC LIMIT 50`,
+        [phone]
+      );
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /api/juzhu/jiazheng/repairs/:id?phone=（详情，id+phone 双因子）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/repairs\/([^/]+)$/);
+      if (m && req.method === 'GET') {
+        const qp = new URLSearchParams(qs);
+        const phone = (qp.get('phone') || '').trim();
+        if (!phone) return jsonReply(res, { error: 'phone 必填' }, 400);
+        const rows = await queryRows(
+          `${REPAIR_SELECT} WHERE ${REPAIR_SOURCE_SQL} AND o.id=? AND o.phone=?`,
+          [m[1], phone]
+        );
+        if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+        return jsonReply(res, { order: rows[0] });
+      }
+    }
+
     // GET /api/juzhu/jiazheng/orders/:id
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
@@ -6333,6 +6376,58 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const [orders] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
         return jsonReply(res, { ok: true, order: orders[0] }, 201);
       } finally { await conn.end(); }
+    }
+
+    // POST /api/juzhu/jiazheng/repairs（旅居客报修下单：sku-less 免支付，口径同 commerce/main-system.cjs linkCase 先例）
+    if (urlPath === '/api/juzhu/jiazheng/repairs' && req.method === 'POST') {
+      if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
+      const body = await readBody(req);
+      if (!body.type) return jsonReply(res, { error: 'type 必填' }, 400);
+      if (!body.house) return jsonReply(res, { error: 'house 必填' }, 400);
+      if (!body.phone) return jsonReply(res, { error: 'phone 必填' }, 400);
+      if (!body.expectTime) return jsonReply(res, { error: 'expectTime 必填' }, 400);
+      const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+      const orderId = 'WO-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      const source = String(body.source || '旅居客 App').slice(0, 100);
+      if (!source.startsWith('旅居客 App')) return jsonReply(res, { error: 'source 须以「旅居客 App」开头' }, 400);
+      const log = [{ at: now, action: 'created', note: `来源: ${source}` }];
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        await conn.execute(
+          `INSERT INTO jz_orders(id,sku_id,category_id,type,house,phone,expect_time,\`desc\`,fee,pay_status,status,source,created_at,updated_at,log_json)
+           VALUES (?, NULL, 'repair', ?, ?, ?, ?, ?, 0, 'not_required', 'pending', ?, ?, ?, ?)`,
+          [orderId, String(body.type).slice(0, 50), body.house, body.phone, body.expectTime,
+           body.desc || null, source, now, now, JSON.stringify(log)]
+        );
+        await conn.commit();
+        const [orders] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
+        return jsonReply(res, { ok: true, order: orders[0] }, 201);
+      } finally { await conn.end(); }
+    }
+
+    // DELETE /api/juzhu/jiazheng/repairs/:id?phone=（待派取消=条件硬 DELETE，复刻原 _orderbus 语义；不引入 cancelled 态）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/repairs\/([^/]+)$/);
+      if (m && req.method === 'DELETE') {
+        if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
+        const qp = new URLSearchParams(qs);
+        const phone = (qp.get('phone') || '').trim();
+        if (!phone) return jsonReply(res, { error: 'phone 必填' }, 400);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [rows] = await conn.execute(
+            "SELECT id,status,worker_json FROM jz_orders WHERE id=? AND phone=? AND source LIKE '旅居客 App%'",
+            [m[1], phone]
+          );
+          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
+          if (rows[0].status !== 'pending' || rows[0].worker_json) {
+            conn.end(); return jsonReply(res, { error: '已派单，请联系 400 客服取消' }, 409);
+          }
+          await conn.execute('DELETE FROM jz_orders WHERE id=?', [m[1]]);
+          await conn.commit();
+          return jsonReply(res, { ok: true });
+        } finally { await conn.end(); }
+      }
     }
 
     // POST /api/juzhu/jiazheng/orders/:id/pay
