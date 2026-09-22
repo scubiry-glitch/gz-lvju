@@ -8,6 +8,7 @@ const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶�
 const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
 const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
 const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
+const sessionToken = require('./session_token.cjs'); // 贝壳 lianjia_token → /token/verify
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
   exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
@@ -5081,30 +5082,44 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
     }
 
-    // POST /api/juzhu/auth/beike —— 贝壳 SDK 登录换会话（App 内 jsbridge getUserInfo 回传）
-    // ⚠ 生产环境必须接入真实 SDK 验签（app_id/secret 或 OIDC），当前仅非生产开放（出边界）
+    // POST /api/juzhu/auth/beike —— App H5 用 lianjia_token 换旅居会话
+    // 只信 session /token/verify 的 ucid，不信前端传来的 uid/手机号
     if (urlPath === '/api/juzhu/auth/beike' && req.method === 'POST') {
-      if (isProduction()) return jsonReply(res, { error: '生产环境暂未接入贝壳 SDK 验签，请用密码登录' }, 501);
       const body = await readBody(req);
-      const uid = String(body.uid || '').trim();
-      const phone = String(body.phone || '').trim();
-      const name = String(body.name || '').trim();
-      if (!uid || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: 'uid 与手机号必填' }, 400);
+      const ljToken = String(body.lianjia_token || body.token || '').trim();
+      if (!ljToken) return jsonReply(res, { error: '缺少 lianjia_token' }, 400);
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+      const referer = (process.env.SESSION_REFERER || '').trim() || ('http://' + host + '/');
+      const verified = await sessionToken.verify(ljToken, { referer });
+      if (!verified.ok) return jsonReply(res, { error: verified.error, error_code: verified.error_code }, verified.status || 502);
+      const uid = verified.ucid;
+      const phone = verified.phone || '';
+      const name = verified.displayName || '';
       const loginName = 'bk' + uid;
+      const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+      const ua = req.headers['user-agent'] || '';
       let accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
       if (!accRows.length) {
         const created = await authCenter.createAccount({
           login_name: loginName, password: 'bk-' + crypto.randomBytes(12).toString('hex'),
-          roles: ['user'], principal_type: 'user', phone,
+          roles: ['user'], principal_type: 'user', phone: phone || undefined,
           display_name: name || ('贝壳用户' + uid.slice(-4)),
-        }, { ip: (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), ua: req.headers['user-agent'] || '' });
+        }, { ip, ua });
         if (created.error) return jsonReply(res, { error: created.error }, 400);
-      } else {
-        await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone) WHERE id=?', [phone, accRows[0].id]).catch(() => {});
+      } else if (phone) {
+        await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone), display_name=COALESCE(NULLIF(?,""),display_name) WHERE id=?', [phone, name, accRows[0].id]).catch(() => {});
       }
       accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
-      const sess = await authCenter.createSession(accRows[0].id, (req.headers['x-forwarded-for'] || '').split(',')[0].trim(), req.headers['user-agent'] || '');
-      return jsonReply(res, { ok: true, token: sess.token, role: 'user', expires_at: sess.expires_at });
+      const sess = await authCenter.createSession(accRows[0].id, ip, ua);
+      return jsonReply(res, {
+        ok: true,
+        token: sess.token,
+        role: 'user',
+        expires_at: sess.expires_at,
+        uid,
+        display_name: name || ('贝壳用户' + uid.slice(-4)),
+        phone_masked: phone ? maskPhoneStd(phone) : '',
+      });
     }
 
     // GET /api/juzhu/booking/my —— 我的预订（登录会话；按 user_id + 账号手机号认领）
