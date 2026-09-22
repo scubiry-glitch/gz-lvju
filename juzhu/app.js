@@ -308,7 +308,7 @@ window.JUZHU = (function () {
     };
   }
 
-  /** 好房子四维度评级（项目级；已通过复核用库内数据，否则 mock） */
+  /** 好房子四维度评级（项目级；已通过复核用库内数据，否则 test） */
   function houseRating(project) {
     if (!project) return null;
     var r = project.rating;

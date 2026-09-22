@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * scripts/mock_oidp.cjs —— 最小 mock OIDC Provider（阶段3 联邦登录联调/验收用）
+ * scripts/mock_oidp.cjs —— 最小 test OIDC Provider（阶段3 联邦登录联调/验收用）
  *
  * 端点：
  *   GET /.well-known/openid-configuration
@@ -19,7 +19,7 @@ const PORT = parseInt(process.argv[2] || process.env.MOCK_IDP_PORT || '19020', 1
 const ISSUER = process.env.MOCK_IDP_ISSUER || ('http://127.0.0.1:' + PORT);
 const CLIENT_ID = process.env.MOCK_IDP_CLIENT_ID || 'juzhu-demo';
 const CLIENT_SECRET = process.env.MOCK_IDP_CLIENT_SECRET || 'demo-secret';
-const KID = 'mock-key-1';
+const KID = 'test-key-1';
 
 // RS256 密钥对（进程内存活期有效）
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -60,9 +60,9 @@ const server = http.createServer((req, res) => {
   }
   if (u.pathname === '/jwks') return send(res, 200, { keys: [publicJwk] });
   if (u.pathname === '/authorize') {
-    // 免登录自动批准：sub 默认 mock-gov-001，可用 ?sub= 覆盖（模拟不同工号）
+    // 免登录自动批准：sub 默认 test-gov-001，可用 ?sub= 覆盖（模拟不同工号）
     const code = crypto.randomBytes(12).toString('hex');
-    codes.set(code, { sub: u.searchParams.get('sub') || 'mock-gov-001', nonce: u.searchParams.get('nonce') || '', exp: Date.now() + 120000 });
+    codes.set(code, { sub: u.searchParams.get('sub') || 'test-gov-001', nonce: u.searchParams.get('nonce') || '', exp: Date.now() + 120000 });
     const back = new URL(u.searchParams.get('redirect_uri'));
     back.searchParams.set('code', code);
     if (u.searchParams.get('state')) back.searchParams.set('state', u.searchParams.get('state'));
@@ -81,7 +81,7 @@ const server = http.createServer((req, res) => {
       codes.delete(form.get('code') || '');
       if (!rec || Date.now() > rec.exp) return send(res, 400, { error: 'invalid_grant' });
       return send(res, 200, {
-        access_token: 'mock-access-' + crypto.randomBytes(6).toString('hex'),
+        access_token: 'test-access-' + crypto.randomBytes(6).toString('hex'),
         token_type: 'Bearer',
         id_token: idToken(rec.sub, rec.nonce, form.get('client_id')),
         expires_in: 300,

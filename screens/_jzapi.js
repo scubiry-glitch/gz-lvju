@@ -5,7 +5,7 @@
  *   权威数据源 = MySQL，经 app.js 暴露。
  *   本总线（家政工单闭环）与 screens/_orderbus.js（报修 · localStorage `bzf_orders`）
  *   并行、不混用：报修走 _orderbus.js，家政走本文件，二者不共享 key、不合并。
- *   家政"目录/SKU 配置"的前端适配 + 离线 mock 见根目录 jiazheng-data.js。
+ *   家政"目录/SKU 配置"的前端适配 + 离线 test 见根目录 jiazheng-data.js。
  */
 (function () {
   'use strict';
@@ -471,7 +471,7 @@
     if (_settingsEnvP) return _settingsEnvP;
     _settingsEnvP = fetch('/api/juzhu/settings')
       .then(function (r) { return r.json(); })
-      .catch(function () { return {}; }); // 失败视为非 mock：按生产逻辑走，不模拟兜底
+      .catch(function () { return {}; }); // 失败视为非 test：按生产逻辑走，不模拟兜底
     return _settingsEnvP;
   }
 

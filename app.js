@@ -44,6 +44,9 @@ function loadDotEnv(filePath) {
   }
   return true;
 }
+//这样 JUZHU_ENV=test 时就会自动读 根/.env.test 补变量（
+const modeEnv = process.env.JUZHU_ENV || process.env.NODE_ENV;
+if (modeEnv) loadDotEnv(path.join(ROOT, `.env.${modeEnv}`));
 loadDotEnv();
 loadDotEnv(path.join(ROOT, 'runtime.env'));
 
@@ -5446,7 +5449,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const orderNo = String(body.order_no || '').trim();
       const phone = String(body.contact_phone || '').trim();
       const payMethod = String(body.pay_method || 'online').slice(0, 50);
-      if (!['online', 'wechat', 'alipay', 'mock'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
+      if (!['online', 'wechat', 'alipay', 'mock', 'test'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
       const conn = await mysql2.createConnection(getDbConfig());
       try {
