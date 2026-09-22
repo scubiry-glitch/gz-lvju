@@ -118,35 +118,41 @@
       </div>
     </div>
 
-    <!-- stats -->
+    <!-- stats（接真实计数；AI 准确率为引擎演示口径） -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="num">156</div>
+        <div class="num" id="statTotal">—</div>
         <div class="label">总申请数</div>
       </div>
       <div class="stat-card">
-        <div class="num pending">23</div>
+        <div class="num pending" id="statPending">—</div>
         <div class="label">待复核</div>
       </div>
       <div class="stat-card">
-        <div class="num passed">128</div>
+        <div class="num passed" id="statPassed">—</div>
         <div class="label">已通过</div>
       </div>
       <div class="stat-card">
-        <div class="num rejected">5</div>
+        <div class="num rejected" id="statRejected">—</div>
         <div class="label">已驳回</div>
       </div>
       <div class="stat-card">
         <div class="num" style="color:var(--accent);">82%</div>
-        <div class="label">AI 准确率</div>
+        <div class="label">AI 准确率（演示）</div>
       </div>
     </div>
 
-    <!-- 新居住 · 保租房好房子复核（juzhu-admin 提交） -->
+    <!-- 评级复核队列（真实数据；原「新居住保租房」块与「旅居房源复核（演示样例）」表融合，演示表已删） -->
     <div class="filter-bar" style="margin-top:8px;background:linear-gradient(90deg,#ecfdf5,#fff);">
-      <span class="lbl">新居住保租房</span>
+      <span class="lbl">评级复核队列</span>
       <span style="font-size:11px;color:var(--muted);">数据来自 <code>juzhu-admin</code> → <code>/api/juzhu/ratings</code></span>
       <div class="spacer"></div>
+      <input id="ratingSearch" type="text" placeholder="搜索编号/项目名…" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;width:170px;">
+      <select id="ratingChannel" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
+        <option value="">全部频道</option>
+        <option value="rental">保租房 · 好房子</option>
+        <option value="minsu">旅居 · 彩贝</option>
+      </select>
       <select id="ratingStatus" style="padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
         <option value="pending" selected>待复核</option>
         <option value="passed">已通过</option>
@@ -162,7 +168,7 @@
             <th>房源编号</th>
             <th>项目名称</th>
             <th>行政区</th>
-            <th>申请星级</th>
+            <th>频道</th>
             <th>AI 初评</th>
             <th>提交时间</th>
             <th>状态</th>
@@ -175,147 +181,6 @@
       </table>
     </div>
     <div class="pagination" id="juzhuPager" style="padding:8px 0 14px;"></div>
-
-    <div class="page-header" style="margin-bottom:12px;padding:12px 18px;">
-      <h1 style="font-size:16px;margin:0;">旅居房源复核（演示样例）</h1>
-    </div>
-
-    <!-- filters -->
-    <div class="filter-bar">
-      <span class="lbl">筛选：</span>
-      <select>
-        <option>全部状态</option>
-        <option selected>待复核</option>
-        <option>已通过</option>
-        <option>已驳回</option>
-      </select>
-      <select>
-        <option>全部星级</option>
-        <option>五彩贝</option>
-        <option>四彩贝</option>
-        <option>三彩贝</option>
-      </select>
-      <select>
-        <option>全部地区</option>
-        <option>贵阳市</option>
-        <option>遵义市</option>
-        <option>黔东南州</option>
-      </select>
-      <input type="text" placeholder="搜索房源编号/项目名...">
-      <div class="spacer"></div>
-      <span style="font-size:11px;color:var(--muted);">共 23 条待复核</span>
-    </div>
-
-    <!-- table -->
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>房源编号</th>
-            <th>项目名称</th>
-            <th>运营方</th>
-            <th>申请星级</th>
-            <th>AI 初评</th>
-            <th>置信度</th>
-            <th>提交时间</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="house-id">GZ-LJ-00891</span></td>
-            <td><b>梧桐公馆</b><br><small style="color:var(--muted);">贵阳市 · 观山湖区</small></td>
-            <td>贵州安居旅居</td>
-            <td><span class="star-badge s5">🐚🐚🐚🐚🐚 五彩贝</span></td>
-            <td>
-              <div class="score-cell">
-                <div class="score-bar"><i style="width:85%;background:linear-gradient(90deg,var(--accent),var(--gold));"></i></div>
-                <span class="score-num">85</span>
-              </div>
-            </td>
-            <td><b style="color:var(--ok);">92%</b></td>
-            <td>2024-06-24</td>
-            <td><span class="status-tag pending">待复核</span></td>
-            <td class="action-btns">
-              <a href="p-rating-detail.html?id=GZ-LJ-00891" class="btn btn-primary">复核</a>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="house-id">GZ-LJ-00892</span></td>
-            <td><b>丹霞别院</b><br><small style="color:var(--muted);">遵义市 · 赤水市</small></td>
-            <td>赤水旅居</td>
-            <td><span class="star-badge s4">🐚🐚🐚🐚 四彩贝</span></td>
-            <td>
-              <div class="score-cell">
-                <div class="score-bar"><i style="width:78%;background:var(--accent);"></i></div>
-                <span class="score-num">78</span>
-              </div>
-            </td>
-            <td><b style="color:var(--ok);">88%</b></td>
-            <td>2024-06-24</td>
-            <td><span class="status-tag pending">待复核</span></td>
-            <td class="action-btns">
-              <a href="p-rating-detail.html?id=GZ-LJ-00892" class="btn btn-primary">复核</a>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="house-id">GZ-LJ-00893</span></td>
-            <td><b>苗寨风情苑</b><br><small style="color:var(--muted);">黔东南州 · 西江镇</small></td>
-            <td>西江苗旅</td>
-            <td><span class="star-badge s5">🐚🐚🐚🐚🐚 五彩贝</span></td>
-            <td>
-              <div class="score-cell">
-                <div class="score-bar"><i style="width:72%;background:linear-gradient(90deg,var(--accent),var(--warn));"></i></div>
-                <span class="score-num">72</span>
-              </div>
-            </td>
-            <td><b style="color:var(--warn);">68%</b></td>
-            <td>2024-06-23</td>
-            <td><span class="status-tag pending">待复核</span></td>
-            <td class="action-btns">
-              <a href="p-rating-detail.html?id=GZ-LJ-00893" class="btn btn-primary">复核</a>
-            </td>
-          </tr>
-          <tr>
-            <td><span class="house-id">GZ-LJ-00894</span></td>
-            <td><b>翠谷山居</b><br><small style="color:var(--muted);">贵阳市 · 花溪区</small></td>
-            <td>花溪旅投</td>
-            <td><span class="star-badge s3">🐚🐚🐚 三彩贝</span></td>
-            <td>
-              <div class="score-cell">
-                <div class="score-bar"><i style="width:65%;background:#3b82f6;"></i></div>
-                <span class="score-num">65</span>
-              </div>
-            </td>
-            <td><b style="color:var(--ok);">95%</b></td>
-            <td>2024-06-23</td>
-            <td><span class="status-tag pending">待复核</span></td>
-            <td class="action-btns">
-              <a href="p-rating-detail.html?id=GZ-LJ-00894" class="btn btn-primary">复核</a>
-            </td>
-          </tr>
-          <tr style="opacity:0.6;">
-            <td><span class="house-id">GZ-LJ-00885</span></td>
-            <td><b>青岩古镇民宿</b><br><small style="color:var(--muted);">贵阳市 · 花溪区</small></td>
-            <td>青岩文旅</td>
-            <td><span class="star-badge s4">🐚🐚🐚🐚 四彩贝</span></td>
-            <td>
-              <div class="score-cell">
-                <div class="score-bar"><i style="width:82%;background:var(--accent);"></i></div>
-                <span class="score-num">82</span>
-              </div>
-            </td>
-            <td><b style="color:var(--ok);">90%</b></td>
-            <td>2024-06-22</td>
-            <td><span class="status-tag passed">已通过</span></td>
-            <td class="action-btns">
-              <a href="p-rating-detail.html?id=GZ-LJ-00885" class="btn btn-ghost">查看</a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
   </div>
 
   <script src="_region.js"></script>
@@ -323,36 +188,71 @@
   <script>
   (function(){
     var STATUS = { pending:'待复核', passed:'已通过', rejected:'已驳回', draft:'草稿' };
-    var STAR = ['','一','二','三','四','五'];
+    var CH = {
+      rental: { label: '保租房 · 好房子', bg: '#ecfdf5', fg: '#065f46' },
+      minsu:  { label: '旅居 · 彩贝',    bg: '#fef3c7', fg: '#92400e' }
+    };
     var PAGE_SIZE = 10, curPage = 1, allItems = [];
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function ratingObj(p){
+      var r = p.rating;
+      if (typeof r === 'string') { try { r = JSON.parse(r); } catch (_) { r = {}; } }
+      return (!r || typeof r !== 'object') ? {} : r;
+    }
+    function scoreOf(r){
+      if (r.score != null) return { v: r.score, w: Math.max(0, Math.min(100, +r.score)) };
+      var d = r.dims, vals = (d && typeof d === 'object') ? Object.keys(d).map(function(k){ return +d[k]; }).filter(function(x){ return !isNaN(x); }) : [];
+      if (!vals.length) return null;
+      var avg = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
+      return { v: Math.round(avg * 10) / 10, w: Math.max(0, Math.min(100, avg)) };
+    }
+    function filtered(){
+      var st = document.getElementById('ratingStatus').value;
+      var ch = document.getElementById('ratingChannel').value;
+      var q = (document.getElementById('ratingSearch').value || '').trim().toLowerCase();
+      return allItems.filter(function(p){
+        if (st && (p.rating_status || 'pending') !== st) return false;
+        if (ch && (p.channel || '') !== ch) return false;
+        if (q) {
+          var r = ratingObj(p);
+          var hay = ((r.code || '') + ' ' + String(p.id).padStart(5, '0') + ' ' + (p.name || '')).toLowerCase();
+          if (hay.indexOf(q) < 0) return false;
+        }
+        return true;
+      });
+    }
     function render(){
       var tbody = document.getElementById('juzhuRatings');
       var pager = document.getElementById('juzhuPager');
-      if (!allItems.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">暂无'+(STATUS[document.getElementById('ratingStatus').value]||'')+'保租项目 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交</td></tr>';
+      var items = filtered();
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px;">无符合筛选的房源 · 请在 <a href="../juzhu-admin.html">juzhu-admin</a> 提交评级</td></tr>';
         pager.innerHTML = '';
         return;
       }
-      var pages = Math.max(1, Math.ceil(allItems.length / PAGE_SIZE));
+      var pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
       if (curPage > pages) curPage = pages;
       var RGCITY = (window.BZF_REGION && BZF_REGION.prov && BZF_REGION.prov.capital) || '沈阳';
       var RGBIZ  = (window.BZF_REGION && BZF_REGION.biz && BZF_REGION.biz.term) || '保租房';
-      tbody.innerHTML = allItems.slice((curPage-1)*PAGE_SIZE, curPage*PAGE_SIZE).map(function(p){
-        var r = p.rating;
-        if (typeof r === 'string') { try { r = JSON.parse(r); } catch (_) { r = {}; } }
-        if (!r || typeof r !== 'object') r = {};
+      tbody.innerHTML = items.slice((curPage-1)*PAGE_SIZE, curPage*PAGE_SIZE).map(function(p){
+        var r = ratingObj(p);
         var code = r.code || (String(p.id).padStart(5,'0'));
-        var stars = r.stars || 3;
-        var score = (r.score==null) ? '—' : r.score;
+        var c = CH[p.channel] || null;
+        var chBadge = c
+          ? '<span style="font-size:11px;padding:2px 8px;border-radius:999px;background:'+c.bg+';color:'+c.fg+';white-space:nowrap;">'+c.label+'</span>'
+          : esc(p.channel || '—');
+        var sc = scoreOf(r);
+        var scoreCell = sc
+          ? '<div class="score-cell"><div class="score-bar"><i style="width:'+sc.w+'%;background:var(--accent);"></i></div><span class="score-num">'+sc.v+'</span></div>'
+          : '—';
         var st = p.rating_status || 'pending';
         var dt = (p.rating_submitted_at || '').slice(0,10) || '—';
         return '<tr>'+
           '<td><span class="house-id">'+esc(code)+'</span></td>'+
           '<td><b>'+esc(p.name)+'</b><br><small style="color:var(--muted);">'+esc(RGCITY)+' · '+esc(RGBIZ)+'</small></td>'+
           '<td>'+esc(p.district_name||'—')+'</td>'+
-          '<td><span class="star-badge s'+stars+'">★ '+STAR[stars]+'星</span></td>'+
-          '<td><div class="score-cell"><div class="score-bar"><i style="width:'+score+'%;background:var(--accent);"></i></div><span class="score-num">'+score+'</span></div></td>'+
+          '<td>'+chBadge+'</td>'+
+          '<td>'+scoreCell+'</td>'+
           '<td>'+esc(dt)+'</td>'+
           '<td><span class="status-tag '+st+'">'+(STATUS[st]||st)+'</span></td>'+
           '<td class="action-btns"><a href="p-rating-detail.html?id='+encodeURIComponent(code)+'" class="btn btn-primary">复核</a></td>'+
@@ -361,7 +261,7 @@
       var pg = '<button'+(curPage===1?' disabled':'')+' data-pg="'+(curPage-1)+'">‹</button>';
       for (var i=1;i<=pages;i++) pg += '<button'+(i===curPage?' class="active"':'')+' data-pg="'+i+'">'+i+'</button>';
       pg += '<button'+(curPage===pages?' disabled':'')+' data-pg="'+(curPage+1)+'">›</button>';
-      pg += '<span style="font-size:11px;color:var(--muted);align-self:center;margin-left:8px;">共 '+allItems.length+' 条</span>';
+      pg += '<span style="font-size:11px;color:var(--muted);align-self:center;margin-left:8px;">共 '+items.length+' 条</span>';
       pager.innerHTML = pg;
       Array.prototype.forEach.call(pager.querySelectorAll('button[data-pg]'), function(b){
         b.onclick = function(){
@@ -370,19 +270,26 @@
         };
       });
     }
-    function load(status){
-      var qs = status ? ('?status='+encodeURIComponent(status)) : '';
-      curPage = 1;
-      fetch('/api/juzhu/ratings'+qs).then(function(r){ return r.json(); }).then(function(data){
+    function resetPage(){ curPage = 1; render(); }
+    function load(){
+      fetch('/api/juzhu/ratings').then(function(r){ return r.json(); }).then(function(data){
         allItems = Array.isArray(data) ? data : (data.items || []);
-        render();
+        var counts = { pending:0, passed:0, rejected:0 };
+        allItems.forEach(function(p){ var s = p.rating_status || 'pending'; if (counts[s] != null) counts[s]++; });
+        document.getElementById('statTotal').textContent = allItems.length;
+        document.getElementById('statPending').textContent = counts.pending;
+        document.getElementById('statPassed').textContent = counts.passed;
+        document.getElementById('statRejected').textContent = counts.rejected;
+        resetPage();
       }).catch(function(){
         document.getElementById('juzhuRatings').innerHTML =
           '<tr><td colspan="8" style="text-align:center;color:#991b1b;padding:24px;">无法连接新居住 API（/api/juzhu/ratings）· 请启动 juzhu 服务</td></tr>';
       });
     }
-    document.getElementById('ratingStatus').onchange = function(){ load(this.value); };
-    load('pending');
+    document.getElementById('ratingStatus').onchange = resetPage;
+    document.getElementById('ratingChannel').onchange = resetPage;
+    document.getElementById('ratingSearch').oninput = resetPage;
+    load();
   })();
   </script>
 </body>
