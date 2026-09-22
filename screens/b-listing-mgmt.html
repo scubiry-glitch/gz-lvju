@@ -180,7 +180,7 @@
 (function(){
   var API = '/api/juzhu';
   var state = { role:null, vendorName:'', grain:'unit', projects:[], units:[], districts:[], cities:[], tab:'all', tabKey:'rating' };
-  function tok(){ try { return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('JUZHU_VENDOR_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function adminTok(){ try { return localStorage.getItem('JUZHU_ADMIN_TOKEN') || ''; } catch(e){ return ''; } }
   function apiKey(){ try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e){ return ''; } }
   function authHeaders(){
@@ -220,7 +220,7 @@
   badge.onclick = function(){
     if (state.role) {
       if (state.role === 'vendor' && confirm('退出商家登录？')) {
-        try { localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload();
+        try { localStorage.removeItem('BZF_SESSION_TOKEN'); localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload();
       }
       return;
     }
@@ -232,7 +232,7 @@
       body: JSON.stringify({ login_name:name, password:pwd }) })
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if (j.token) { try { localStorage.setItem('JUZHU_VENDOR_TOKEN', j.token); } catch(e){} location.reload(); }
+        if (j.token) { try { localStorage.setItem('BZF_SESSION_TOKEN', j.token); localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload(); }
         else alert(j.error || '登录失败');
       }).catch(function(){ alert('登录失败：服务不可用'); });
   };
