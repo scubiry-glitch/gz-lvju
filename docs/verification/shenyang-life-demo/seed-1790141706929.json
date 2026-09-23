@@ -1,0 +1,432 @@
+{
+  "at": "2026-09-23T05:35:06.929Z",
+  "batch": "shenyang-life-demo-v1",
+  "city": {
+    "id": 1,
+    "name": "沈阳",
+    "slug": "shenyang"
+  },
+  "created": [
+    {
+      "kind": "channel_vendors",
+      "id": 258
+    },
+    {
+      "kind": "merchants",
+      "id": 45
+    },
+    {
+      "kind": "stores",
+      "id": 142
+    },
+    {
+      "kind": "rules",
+      "id": 47
+    },
+    {
+      "kind": "channel_workers",
+      "id": 47
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 259
+    },
+    {
+      "kind": "merchants",
+      "id": 46
+    },
+    {
+      "kind": "stores",
+      "id": 143
+    },
+    {
+      "kind": "rules",
+      "id": 48
+    },
+    {
+      "kind": "channel_workers",
+      "id": 48
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 260
+    },
+    {
+      "kind": "merchants",
+      "id": 47
+    },
+    {
+      "kind": "stores",
+      "id": 144
+    },
+    {
+      "kind": "rules",
+      "id": 49
+    },
+    {
+      "kind": "channel_workers",
+      "id": 49
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 261
+    },
+    {
+      "kind": "merchants",
+      "id": 48
+    },
+    {
+      "kind": "stores",
+      "id": 145
+    },
+    {
+      "kind": "rules",
+      "id": 50
+    },
+    {
+      "kind": "channel_workers",
+      "id": 50
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 262
+    },
+    {
+      "kind": "merchants",
+      "id": 49
+    },
+    {
+      "kind": "stores",
+      "id": 146
+    },
+    {
+      "kind": "rules",
+      "id": 51
+    },
+    {
+      "kind": "channel_workers",
+      "id": 51
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 263
+    },
+    {
+      "kind": "merchants",
+      "id": 50
+    },
+    {
+      "kind": "stores",
+      "id": 147
+    },
+    {
+      "kind": "rules",
+      "id": 52
+    },
+    {
+      "kind": "channel_workers",
+      "id": 52
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 264
+    },
+    {
+      "kind": "merchants",
+      "id": 51
+    },
+    {
+      "kind": "stores",
+      "id": 148
+    },
+    {
+      "kind": "rules",
+      "id": 53
+    },
+    {
+      "kind": "channel_workers",
+      "id": 53
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 265
+    },
+    {
+      "kind": "merchants",
+      "id": 52
+    },
+    {
+      "kind": "stores",
+      "id": 149
+    },
+    {
+      "kind": "rules",
+      "id": 54
+    },
+    {
+      "kind": "channel_workers",
+      "id": 54
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 266
+    },
+    {
+      "kind": "merchants",
+      "id": 53
+    },
+    {
+      "kind": "stores",
+      "id": 150
+    },
+    {
+      "kind": "rules",
+      "id": 55
+    },
+    {
+      "kind": "channel_workers",
+      "id": 55
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 267
+    },
+    {
+      "kind": "merchants",
+      "id": 54
+    },
+    {
+      "kind": "stores",
+      "id": 151
+    },
+    {
+      "kind": "rules",
+      "id": 56
+    },
+    {
+      "kind": "channel_workers",
+      "id": 56
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 268
+    },
+    {
+      "kind": "merchants",
+      "id": 55
+    },
+    {
+      "kind": "stores",
+      "id": 152
+    },
+    {
+      "kind": "rules",
+      "id": 57
+    },
+    {
+      "kind": "channel_workers",
+      "id": 57
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 269
+    },
+    {
+      "kind": "merchants",
+      "id": 56
+    },
+    {
+      "kind": "stores",
+      "id": 153
+    },
+    {
+      "kind": "rules",
+      "id": 58
+    },
+    {
+      "kind": "channel_workers",
+      "id": 58
+    },
+    {
+      "kind": "skus",
+      "id": 80
+    },
+    {
+      "kind": "skus",
+      "id": 81
+    },
+    {
+      "kind": "skus",
+      "id": 82
+    },
+    {
+      "kind": "skus",
+      "id": 83
+    },
+    {
+      "kind": "skus",
+      "id": 84
+    },
+    {
+      "kind": "skus",
+      "id": 85
+    },
+    {
+      "kind": "skus",
+      "id": 86
+    },
+    {
+      "kind": "skus",
+      "id": 87
+    },
+    {
+      "kind": "skus",
+      "id": 88
+    },
+    {
+      "kind": "skus",
+      "id": 89
+    },
+    {
+      "kind": "skus",
+      "id": 90
+    },
+    {
+      "kind": "skus",
+      "id": 91
+    },
+    {
+      "kind": "skus",
+      "id": 92
+    },
+    {
+      "kind": "skus",
+      "id": 93
+    },
+    {
+      "kind": "skus",
+      "id": 94
+    },
+    {
+      "kind": "skus",
+      "id": 95
+    },
+    {
+      "kind": "skus",
+      "id": 96
+    },
+    {
+      "kind": "skus",
+      "id": 97
+    },
+    {
+      "kind": "skus",
+      "id": 98
+    },
+    {
+      "kind": "skus",
+      "id": 99
+    },
+    {
+      "kind": "skus",
+      "id": 100
+    },
+    {
+      "kind": "skus",
+      "id": 101
+    },
+    {
+      "kind": "skus",
+      "id": 102
+    },
+    {
+      "kind": "skus",
+      "id": 103
+    },
+    {
+      "kind": "skus",
+      "id": 104
+    },
+    {
+      "kind": "skus",
+      "id": 105
+    },
+    {
+      "kind": "skus",
+      "id": 106
+    },
+    {
+      "kind": "skus",
+      "id": 107
+    },
+    {
+      "kind": "skus",
+      "id": 108
+    },
+    {
+      "kind": "skus",
+      "id": 109
+    },
+    {
+      "kind": "skus",
+      "id": 110
+    },
+    {
+      "kind": "skus",
+      "id": 111
+    },
+    {
+      "kind": "skus",
+      "id": 112
+    },
+    {
+      "kind": "skus",
+      "id": 113
+    },
+    {
+      "kind": "skus",
+      "id": 114
+    },
+    {
+      "kind": "skus",
+      "id": 115
+    },
+    {
+      "kind": "skus",
+      "id": 116
+    },
+    {
+      "kind": "skus",
+      "id": 117
+    },
+    {
+      "kind": "packages",
+      "id": 18
+    },
+    {
+      "kind": "packages",
+      "id": 19
+    },
+    {
+      "kind": "packages",
+      "id": 20
+    },
+    {
+      "kind": "packages",
+      "id": 21
+    },
+    {
+      "kind": "packages",
+      "id": 22
+    },
+    {
+      "kind": "packages",
+      "id": 23
+    },
+    {
+      "kind": "plans",
+      "id": 3
+    }
+  ],
+  "existing": []
+}

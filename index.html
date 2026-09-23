@@ -688,14 +688,14 @@
     if (cntMore) cntMore.textContent = has ? (list.length + ' 频道') : '—';
   }
 
-  // 热门推荐：各大类各取 1 条热门 SKU，横滑卡
+  // 热门推荐：各大类各取 1 条热门 SKU，横滑卡（12 频道全展示；城市货架配齐才有 12 张）
   function renderJiazhengSubs(skus) {
     var cats = JZ_CATS.map(function(c) { return c.id; });
     var iconBy = {};
     JZ_CATS.forEach(function(c) { iconBy[c.id] = c.icon || '•'; });
     var rows = cats.map(function(cat) {
       return (skus || []).filter(function(s) { return s.category_id === cat; })[0] || null;
-    }).filter(Boolean).slice(0, 8);
+    }).filter(Boolean).slice(0, 12);
     document.getElementById('jzSubs').innerHTML = rows.map(function(r) {
       var displayPrice = r.product_min_price || r.price_from || 0;
       var price = '¥' + Number(displayPrice).toLocaleString() + (r.price_unit || '起');
