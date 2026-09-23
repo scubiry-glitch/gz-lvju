@@ -1435,6 +1435,7 @@ async function ensureSchemaRun() {
         label VARCHAR(100) NOT NULL,
         sort_order INT NOT NULL DEFAULT 0,
         enabled TINYINT NOT NULL DEFAULT 1,
+        hidden_cities TEXT NULL,
         note TEXT
       ) CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS settings (
@@ -2054,6 +2055,7 @@ async function ensureSchemaRun() {
       ['jz_products', 'path VARCHAR(500)'],
       ['jz_products', 'query VARCHAR(500)'],
       ['vendor_onboarding', 'approved_vendor_id INT'],   // 受理台 ↔ 商家档案互通（2026-09-22）：approve 按 phone 单命中时记录关联商家
+      ['channels', 'hidden_cities TEXT NULL'],  // 按城市隐藏 tab（JSON 数组，如 ["shenyang"]）
     ];
     for (const [table, ddl] of extraCols) {
       try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
@@ -3116,6 +3118,11 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if ('sort_order' in body) { fields.push('sort_order=?'); params.push(parseInt(body.sort_order) || 0); }
           if ('enabled' in body) { fields.push('enabled=?'); params.push(body.enabled ? 1 : 0); }
           if ('note' in body) { fields.push('note=?'); params.push((body.note || '').trim() || null); }
+          if ('hidden_cities' in body) {
+            const hc = body.hidden_cities;
+            const hcVal = (Array.isArray(hc) && hc.length) ? JSON.stringify(hc) : (hc ? String(hc) : null);
+            fields.push('hidden_cities=?'); params.push(hcVal);
+          }
           if (!fields.length) { conn.end(); return jsonReply(res, { error: '无更新字段' }, 400); }
           params.push(channelId);
           await conn.execute(`UPDATE channels SET ${fields.join(', ')} WHERE id=?`, params);
@@ -4573,8 +4580,16 @@ async function handleApiDirect(urlPath, qs, req, res) {
         projParams.push(qpChannel);
       }
       projSql += ' ORDER BY channel, sort_order, id';
-      let [channels, districts, projects] = await Promise.all([
-        queryRows('SELECT * FROM channels WHERE enabled=1 ORDER BY sort_order, id'),
+      const allChannels = await queryRows('SELECT * FROM channels WHERE enabled=1 ORDER BY sort_order, id');
+      const citySlug = city.slug || '';
+      let channels = allChannels.filter((ch) => {
+        if (!ch.hidden_cities) return true;
+        try {
+          const hiddenList = JSON.parse(ch.hidden_cities);
+          return !hiddenList.includes(citySlug);
+        } catch (_) { return true; }
+      });
+      const [districts, projects] = await Promise.all([
         queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]),
         queryRows(projSql, projParams),
       ]);
