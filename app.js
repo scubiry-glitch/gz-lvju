@@ -5505,7 +5505,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         }
         await conn.commit();
         notifyVendorBooking(proj.owner_vendor_id, 'booking.created', {
-          order_no: orderNo, project_id: projectId, unit_id: unitId || null,
+          id: ins.insertId, order_no: orderNo, project_id: projectId, unit_id: unitId || null,
           channel: proj.channel, checkin: checkin, checkout: checkout,
           nights: nights, rooms: rooms, price_total: priceTotal, status: 'pending', pay_status: initialPayStatus,
           transaction_mode: transactionMode,
@@ -5604,7 +5604,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         });
         await conn.commit();
         notifyVendorBooking(rows[0].owner_vendor_id, 'booking.cancelled', {
-          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          id: rows[0].id, order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
           channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
           nights: rows[0].nights, price_total: rows[0].price_total,
           status: 'cancelled', pay_status: newPay || null, cancel_by: 'customer',
@@ -5637,7 +5637,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
         await conn.commit();
         notifyVendorBooking(rows[0].owner_vendor_id, 'booking.paid', {
-          order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
+          id: rows[0].id, order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
           channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
           nights: rows[0].nights, price_total: rows[0].price_total,
           status: rows[0].status, pay_status: 'paid', pay_method: payMethod, pay_at: now,
