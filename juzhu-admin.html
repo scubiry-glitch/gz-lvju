@@ -57,6 +57,9 @@
   .tbl .acts{white-space:nowrap;}
   .tbl .acts button{padding:4px 8px;font-size:11px;margin-left:4px;}
   .tbl tr.on td{background:color-mix(in oklab,var(--brand) 8%,#fff);}
+  .city-tab-flags{display:grid;grid-template-columns:repeat(3,max-content);gap:4px 8px;white-space:nowrap;}
+  .city-tab-flags label{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--muted);cursor:pointer;}
+  .city-tab-flags input{width:auto!important;margin:0;}
   /* 周边绑定添加行（规则 17） */
   .ps-add{display:flex;gap:8px;align-items:center;margin:10px 0 12px;flex-wrap:wrap;}
   .ps-add select{padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;min-width:240px;}
@@ -303,6 +306,19 @@
 <script>
 var API = '/api/juzhu/admin';
 var state = { projects: [], districts: [], channels: [], cities: [], city: null, current: null, units: [], photos: [], expandedUnit: null, expandedDetail: null, tab: 'content', apiOk: false, spots: [], spotBindings: [], topics: [], routes: [], topicCat: null };
+var HOME_TABS = [
+  { id: 'rental', label: '长租' }, { id: 'minsu', label: '民宿' },
+  { id: 'newhouse', label: '新房' }, { id: 'resale', label: '二手' },
+  { id: 'trade', label: '卖旧买新' }, { id: 'jiazheng', label: '生活服务' }
+];
+
+function hiddenHomeTabsOf(city) {
+  var raw = city && city.hidden_home_tabs;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch (e) { raw = []; }
+  }
+  return Array.isArray(raw) ? raw.map(String) : [];
+}
 
 // 会话 token 统一走账号中心（BZF_SESSION_TOKEN，与 _console-login.js / 其他控制台共享），
 // 旧 JUZHU_ADMIN_TOKEN / JUZHU_API_KEY 已废止
@@ -719,11 +735,16 @@ function renderDictionary() {
   var cityList = (state.cities && state.cities.length) ? state.cities : (state.city ? [state.city] : []);
   var cityRows = cityList.map(function(c) {
     var on = state.city && Number(state.city.id) === Number(c.id);
+    var hidden = hiddenHomeTabsOf(c);
+    var tabFlags = '<div class="city-tab-flags">' + HOME_TABS.map(function(t) {
+      return '<label><input type="checkbox" class="c_tab" data-tab="'+t.id+'"'+(hidden.indexOf(t.id) >= 0 ? ' checked' : '')+' />'+t.label+'</label>';
+    }).join('') + '</div>';
     return '<tr data-cid="'+c.id+'"'+(on?' class="on"':'')+'>'+
       '<td><input class="c_name" value="'+esc(c.name||'')+'"/></td>'+
       '<td><input class="c_slug" value="'+esc(c.slug||'')+'"/></td>'+
       '<td><input class="c_phone" value="'+esc(c.booking_phone||'')+'"/></td>'+
       '<td><input class="c_hero" value="'+esc(c.hero_bg_image||'')+'"/></td>'+
+      '<td>'+tabFlags+'</td>'+
       '<td class="acts"><button type="button" class="btn primary c_save">保存</button>'+
       '<button type="button" class="btn danger c_del">删</button></td></tr>';
   }).join('');
@@ -750,8 +771,8 @@ function renderDictionary() {
   // 周边玩法维度已迁至独立「周边」tab（renderSpots，2026-09-06）：字典回归城市/频道/行政区
   root.innerHTML =
     '<div class="card"><h2>城市 <span class="badge">'+cityList.length+'</span></h2>'+
-      '<p class="hint">顶部切换器选择当前编辑城市（高亮行）。名称与 slug 全局唯一；仍有行政区或项目的城市不可删，且至少保留一座。</p>'+
-      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>咨询电话</th><th>头图路径</th><th>操作</th></tr></thead>'+
+      '<p class="hint">顶部切换器选择当前编辑城市（高亮行）。首页隐藏 Tab 按城市生效；名称与 slug 全局唯一；仍有行政区或项目的城市不可删，且至少保留一座。</p>'+
+      '<table class="tbl"><thead><tr><th>名称</th><th>Slug</th><th>咨询电话</th><th>头图路径</th><th>首页隐藏 Tab</th><th>操作</th></tr></thead>'+
       '<tbody id="cityRows">'+cityRows+'</tbody></table>'+
       '<div class="bar"><button type="button" class="btn ghost" id="addCity">+ 新增城市</button></div>'+
     '</div>'+
@@ -782,7 +803,8 @@ function renderDictionary() {
         name: tr.querySelector('.c_name').value.trim(),
         slug: tr.querySelector('.c_slug').value.trim(),
         booking_phone: tr.querySelector('.c_phone').value.trim() || null,
-        hero_bg_image: tr.querySelector('.c_hero').value.trim() || null
+        hero_bg_image: tr.querySelector('.c_hero').value.trim() || null,
+        hidden_home_tabs: Array.from(tr.querySelectorAll('.c_tab:checked')).map(function(input){ return input.dataset.tab; })
       }}).then(function(res) {
         var idx = (state.cities || []).findIndex(function(c){ return Number(c.id) === Number(id); });
         if (idx >= 0 && res && res.city) state.cities[idx] = res.city;

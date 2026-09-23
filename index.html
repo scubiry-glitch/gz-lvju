@@ -424,7 +424,7 @@
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_region.js"></script>
 <script src="screens/_jzapi.js?v=8"></script>
-<script src="juzhu/app.js?v=22"></script>
+<script src="juzhu/app.js?v=23"></script>
 <script src="lvju-app-price.js"></script>
 <script>
 (function(){
@@ -850,11 +850,17 @@
     var tabs = document.getElementById('tabs');
     var chs = JUZHU.enabledChannels();
     if (!chs.length) return;
+    var ids = chs.map(function(c){ return c.id; });
+    // 城市切换可能隐藏当前选中的 tab；落到该城市第一个可见 tab，避免只剩空 pane。
+    if (curTab && ids.indexOf(curTab) < 0) curTab = '';
+    if (initTab && ids.indexOf(initTab) < 0) initTab = '';
+    var selected = curTab || initTab || (chs[0] && chs[0].id);
     tabs.innerHTML = chs.map(function(c, i) {
-      var on = curTab ? (c.id === curTab) : (initTab ? c.id === initTab : i === 0);
+      var on = c.id === selected;
       return '<a class="' + (on ? 'on' : '') + '" data-tab="' + c.id + '">' + c.label + '</a>';
     }).join('');
-    activateTab(curTab || initTab || (chs[0] && chs[0].id) || 'bzf');
+    curTab = selected;
+    activateTab(selected || 'bzf');
   }
 
   // 数据到达后的统一绘制（启动与切城市共用）：tab 保留当前选中，全部 pane 重绘

@@ -265,3 +265,11 @@ C 端「新居住频道 / 新居住专区 / 新居住」等品牌文案只读全
 ## 规则 23 · sytest 静态资源缓存约定（2026-09-22 拍板）
 
 sytest.meizu.life 的 nginx vhost（`/etc/nginx/conf.d/sytest.meizu.life.conf`，配置在仓库外不入 git）已开 **gzip** + **css/js 强缓存**（`public, max-age=31536000, immutable`）；HTML 保持 `no-cache`，`/juzhu/app.js` 白名单块先行仍 `no-cache`。**因此：改动任何 `.js` / `.css` 后，必须同步 +1 所有引用该文件的 `?v=N`**（存量约定，见规则 9；`_nav.js` 等未带 `?v=` 的共享脚本被改后，回访用户一年内拿旧缓存——改共享脚本时顺手在主要引用页补 `?v=`）。「改了没生效」先想到缓存，再查代码。备份：`sytest.meizu.life.conf.bak.20260922-perf`。
+
+## 规则 24 · 首页频道 tab 按城市隐藏（`cities.hidden_home_tabs`）
+
+C 端首页（`index.html`）的频道 tab（保租房/长租/卖旧买新/生活服务/民宿/新房/二手）按城市配置显隐，单一数据源 = `cities.hidden_home_tabs`（JSON 数组，元素限 `housing_cities.cjs` 的 `HOME_TAB_IDS` 白名单 7 个 id，杜绝把后台/专题等非首页频道误写进配置）。（2026-09-23 拍板，首例：沈阳隐藏 长租/民宿/新房/二手）
+
+- **服务端是过滤主体**：`GET /api/juzhu/catalog` 出参 `channels` 已按当前城市过滤完（改配置走 `catalogMemoInvalidateAll()` 立即生效，不走 15s TTL）；`juzhu/app.js` 的 `enabledChannels()` 只按 `cache.hidden_home_tabs` 做兜底再过滤。页面只准消费 `JUZHU.enabledChannels()`，不得各造 tab 清单。
+- **写入口**：后台 `juzhu-admin.html`「字典」tab 城市行「首页隐藏 Tab」勾选 → `PUT /admin/cities/:id`（权限点 `dict.write`；服务端 `validateCityWrite` 校验白名单）。直改 DB 不走写通道时注意 catalog 有 15s 进程内 memo。
+- **隐藏 ≠ 下架**：只裁首页入口，`?channel=` 直链与数据接口照常；隐藏 tab 深链（如沈阳 `?tab=resale`）由 `paintTabs()` 回落到该城市第一个可见 tab，避免空 pane。

@@ -1071,6 +1071,9 @@ function catalogMemoInvalidateTopics() {
     if (key.includes('|t=')) catalogMemo.delete(key);
   }
 }
+function catalogMemoInvalidateAll() {
+  catalogMemo.clear();
+}
 const catalogMemo = new Map();
 function catalogMemoGet(key) {
   const hit = catalogMemo.get(key);
@@ -1423,6 +1426,7 @@ async function ensureSchemaRun() {
         slug VARCHAR(100) NOT NULL,
         booking_phone VARCHAR(50),
         hero_bg_image VARCHAR(500),
+        hidden_home_tabs TEXT,
         UNIQUE KEY uk_name (name),
         UNIQUE KEY uk_slug (slug)
       ) CHARSET=utf8mb4`,
@@ -2011,6 +2015,7 @@ async function ensureSchemaRun() {
     }
     // 旧库 CREATE TABLE IF NOT EXISTS 不会补列；导入/查询前先对齐
     const extraCols = [
+      ['cities', 'hidden_home_tabs TEXT'],
       ['projects', "status VARCHAR(20) NOT NULL DEFAULT 'draft'"],
       ['projects', 'owner_vendor_id INT'],
       ['projects', 'ext TEXT'],
@@ -2563,11 +2568,14 @@ async function handleApiDirect(urlPath, qs, req, res) {
       // 周边玩法维度（规则 17）：不按城市过滤——绑定 picker 需要全省通用（city_id NULL）与跨市目的地
       const spots = await queryRows('SELECT * FROM spots ORDER BY type, sort_order, id');
       spots.forEach((r) => parseJsonFields(r, ['tags']));
+      allCities.forEach((r) => { r.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(r.hidden_home_tabs) : []; });
+      if (city) city.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(city.hidden_home_tabs) : [];
       return jsonReply(res, { city, cities: allCities, districts, channels, spots });
     }
 
     if (urlPath === '/api/juzhu/admin/cities' && req.method === 'GET') {
       const rows = await queryRows('SELECT * FROM cities ORDER BY id');
+      rows.forEach((r) => { r.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(r.hidden_home_tabs) : []; });
       return jsonReply(res, rows);
     }
 
@@ -2996,6 +3004,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       try {
         const city = await insertCityRow(conn, parsed.fields);
         await conn.commit();
+        if (city) city.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(city.hidden_home_tabs) : [];
         return jsonReply(res, { ok: true, city }, 201);
       } catch (e) {
         return cityDupReply(res, e);
@@ -3020,6 +3029,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
           if (!existing.length) { conn.end(); return jsonReply(res, { error: '城市不存在' }, 404); }
           const city = await updateCityRow(conn, cid, parsed.fields);
           await conn.commit();
+          catalogMemoInvalidateAll();
+          if (city) city.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(city.hidden_home_tabs) : [];
           return jsonReply(res, { ok: true, city });
         } catch (e) {
           return cityDupReply(res, e);
@@ -4511,6 +4522,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
     // GET /api/juzhu/cities
     if (urlPath === '/api/juzhu/cities' && req.method === 'GET') {
       const rows = await queryRows('SELECT * FROM cities ORDER BY id');
+      rows.forEach((r) => { r.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(r.hidden_home_tabs) : []; });
       return jsonReply(res, rows);
     }
 
@@ -4538,6 +4550,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
       if (!cities.length) return jsonReply(res, { error: 'no city' }, 404);
       const city = cities[0];
+      city.hidden_home_tabs = housingCities ? housingCities.parseHiddenHomeTabs(city.hidden_home_tabs) : [];
       // channel / topic 过滤（topic 定义存 settings KV：topic_<slug>；qpChannel/qpTopic 已在上方解析）
       let projSql = "SELECT * FROM projects WHERE city_id=? AND status='online' AND rating_status='passed'";
       const projParams = [city.id];
@@ -4560,11 +4573,13 @@ async function handleApiDirect(urlPath, qs, req, res) {
         projParams.push(qpChannel);
       }
       projSql += ' ORDER BY channel, sort_order, id';
-      const [channels, districts, projects] = await Promise.all([
+      let [channels, districts, projects] = await Promise.all([
         queryRows('SELECT * FROM channels WHERE enabled=1 ORDER BY sort_order, id'),
         queryRows('SELECT * FROM districts WHERE city_id=? ORDER BY sort_order, id', [city.id]),
         queryRows(projSql, projParams),
       ]);
+      const hiddenHomeTabs = new Set(city.hidden_home_tabs);
+      channels = channels.filter((channel) => !hiddenHomeTabs.has(String(channel.id)));
       const projectIds = projects.map((p) => p.id);
       let units = [];
       if (!lite && projectIds.length) {
