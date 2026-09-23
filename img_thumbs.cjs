@@ -31,6 +31,15 @@ function remoteThumb(url, size) {
   try { return imgStorage.thumbCandidate(url, size) || url; } catch (_) { return url; }
 }
 
+/**
+ * 读侧引用出口：IMG_URL_MODE=s3 时把存量本地引用改写为迁移前缀下的公网 URL
+ * （不改库即可灰度验证切读；dual/local 下为 no-op）。见 docs/s3-intake-api-plan.md §5。
+ */
+function resolveRef(p) {
+  if (!imgStorage || typeof imgStorage.resolveForRead !== 'function') return p;
+  try { return imgStorage.resolveForRead(p) || p; } catch (_) { return p; }
+}
+
 const ROOT = __dirname;
 const ASSETS_DIR = path.join(ROOT, 'assets');
 const SIZES = { 240: 240, 640: 640 };
@@ -48,6 +57,8 @@ function isAssetImagePath(p) {
   if (!p || typeof p !== 'string') return false;
   const norm = String(p).replace(/^\/+/, '');
   if (!norm.startsWith('assets/')) return false;
+  // 防路径穿越（与 img_storage.isLocalPath 同口径）
+  if (norm.split(/[\\/]/).includes('..') || norm.includes('\\')) return false;
   return IMG_RE.test(norm);
 }
 
@@ -86,12 +97,13 @@ function ensureThumb(urlPath, size) {
  * size: 240（卡片/列表）| 640（详情/横幅）
  */
 function thumbOf(urlPath, size) {
-  if (!isAssetImagePath(urlPath)) return remoteThumb(urlPath, size);
-  if (!sharp) return urlPath;
-  const tUrl = decodeURIComponent(urlPath).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+  const ref = resolveRef(urlPath);                 // s3 模式下本地引用 → 迁移前缀公网 URL
+  if (!isAssetImagePath(ref)) return remoteThumb(ref, size);
+  if (!sharp) return ref;
+  const tUrl = decodeURIComponent(ref).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
   try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
-  ensureThumb(urlPath, size);   // 后台补，立即返回原图（本次回退，下次命中）
-  return urlPath;
+  ensureThumb(ref, size);   // 后台补，立即返回原图（本次回退，下次命中）
+  return ref;
 }
 
 /** 深度遍历响应对象，把所有 assets 图片字符串字段改写为缩略图路径（同步、已存在的才替换） */
@@ -100,15 +112,16 @@ function mapThumbsDeep(obj, size) {
   const walk = (v, depth) => {
     if (depth > 6) return v;
     if (typeof v === 'string') {
-      if (!isAssetImagePath(v)) {
+      const ref = resolveRef(v);                   // s3 模式下本地引用 → 迁移前缀公网 URL
+      if (!isAssetImagePath(ref)) {
         // 对象存储/CDN 直链：仅对图片扩展名做缩略图改写（已 HEAD 校验存在）
-        return /^https?:\/\//i.test(v) && REMOTE_IMG_RE.test(v) ? remoteThumb(v, size) : v;
+        return /^https?:\/\//i.test(ref) && REMOTE_IMG_RE.test(ref) ? remoteThumb(ref, size) : ref;
       }
-      if (!IMG_RE.test(v)) return v;
-      const tUrl = decodeURIComponent(v).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+      if (!IMG_RE.test(ref)) return ref;
+      const tUrl = decodeURIComponent(ref).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
       try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
-      ensureThumb(v, size);
-      return v;
+      ensureThumb(ref, size);
+      return ref;
     }
     if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = walk(v[i], depth + 1); return v; }
     if (v && typeof v === 'object') { for (const k of Object.keys(v)) v[k] = walk(v[k], depth + 1); return v; }
@@ -149,4 +162,4 @@ function initBackground() {
   setInterval(() => { scanAll().catch(() => {}); }, RESCAN_INTERVAL_MS).unref();
 }
 
-module.exports = { thumbOf, mapThumbsDeep, ensureThumb, scanAll, initBackground, isAssetImagePath, remoteThumb };
+module.exports = { thumbOf, mapThumbsDeep, ensureThumb, scanAll, initBackground, isAssetImagePath, remoteThumb, resolveRef };

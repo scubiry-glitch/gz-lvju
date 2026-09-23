@@ -54,8 +54,15 @@ function maxBytes() {
 }
 
 // ── 路径工具 ──────────────────────────────────────────────────
+/** 本地静态路径判定：必须在 assets/ 下，且不含路径穿越/反斜杠/控制字符 */
 function isLocalPath(p) {
-  return /^\/?assets\//i.test(String(p || ''));
+  const s = String(p || '');
+  if (!/^\/?assets\//i.test(s)) return false;
+  if (s.split(/[\\/]/).includes('..')) return false;
+  if (s.includes('\\')) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f]/.test(s)) return false;
+  return true;
 }
 
 function isS3Url(p) {
@@ -95,6 +102,232 @@ function parse(p) {
 function resolveUrl(p) {
   const r = parse(p);
   return r.url || '';
+}
+
+// ── 灰度 / 回滚开关（口径见 docs/s3-intake-api-plan.md §5） ─────
+/**
+ * 写侧 + 读侧主开关（改环境变量即回滚，不需要发版）：
+ *   local —— 最强回滚：即使 S3 配齐也不写 S3，读侧不改写 → 等价改造前
+ *   dual  —— 缺省：新上传走 S3；读侧不改写存量本地路径
+ *   s3    —— 新上传走 S3 + 读侧把 assets/... 改写为迁移前缀下的公网 URL
+ */
+function urlMode() {
+  const v = String(process.env.IMG_URL_MODE == null ? 'dual' : process.env.IMG_URL_MODE).trim().toLowerCase();
+  return (v === 'local' || v === 's3') ? v : 'dual';
+}
+
+/** 外部（第三方）图片 URL 的处置策略：keep = 原样保留（缺省，零行为变化）| mirror = 镜像进对象存储 */
+function ingestMode() {
+  const v = String(process.env.IMG_INGEST == null ? 'keep' : process.env.IMG_INGEST).trim().toLowerCase();
+  return v === 'mirror' ? 'mirror' : 'keep';
+}
+
+/** 是否允许 sharp 重编码（0 = 保原格式，PNG 透明不丢） */
+function normalizeRewriteEnabled() {
+  return String(process.env.IMG_NORMALIZE == null ? '1' : process.env.IMG_NORMALIZE) !== '0';
+}
+
+/** S3 未配置时是否 fail-closed（生产必开：后端发行包不含 assets/，回落本地 = 静默丢图） */
+function failOnUnconfigured() {
+  return String(process.env.S3_FAIL_ON_UNCONFIGURED == null ? '0' : process.env.S3_FAIL_ON_UNCONFIGURED) === '1';
+}
+
+/** 写侧实际落点：local 模式强制本地 */
+function writeMode() {
+  return urlMode() === 'local' ? 'local' : storageMode();
+}
+
+/** 存量迁移 key 前缀（缺省 <S3_KEY_PREFIX>/legacy） */
+function migratePrefix() {
+  const raw = String(process.env.S3_MIGRATE_PREFIX || '').trim().replace(/^\/+|\/+$/g, '');
+  if (raw) return raw;
+  const kp = S3.config().keyPrefix;
+  return kp ? kp + '/legacy' : 'legacy';
+}
+
+/** 本地引用 → 确定性迁移 key：assets/juzhu/sy/x.jpg → <migratePrefix>/juzhu/sy/x.jpg
+ *  注意：必须确定性（不能用 keyFor 的 uuid），否则与读侧改写不一致 → 切读必然 404。 */
+function legacyKeyOf(ref) {
+  const s = String(ref || '').trim();
+  if (!isLocalPath(s)) return '';
+  const rel = s.replace(/^\/+/, '').replace(/^assets\//i, '');
+  if (!rel) return '';
+  return migratePrefix() + '/' + rel;
+}
+
+function legacyUrlOf(ref) {
+  const k = legacyKeyOf(ref);
+  return k ? S3.publicUrl(k) : '';
+}
+
+const IMG_EXT_RE = /\.(jpe?g|png|webp|gif|avif)$/i;
+
+/** 裸 key 判定：必须带 <keyPrefix>/ / <migratePrefix>/ / housing/ 前缀（写侧从严，避免把历史相对路径误判成对象 key） */
+function looksLikeKey(s) {
+  const v = String(s || '');
+  const kp = S3.config().keyPrefix;
+  if (kp && v.startsWith(kp + '/')) return true;
+  const mp = migratePrefix();
+  if (mp && v.startsWith(mp + '/')) return true;
+  return v.startsWith('housing/');
+}
+
+function isExternalUrl(p) {
+  const s = String(p || '');
+  return S3.looksLikeUrl(s) && !isS3Url(s);
+}
+
+/**
+ * 形态归一化（纯函数，不触网）：任意图片引用 → 统一形态
+ *   本地      → /assets/...            （存量零改动：dual 下仅补前导斜杠）
+ *   对象存储  → https://<file-domain>/<bucket>/<key>
+ *   内联      → data: / blob: 原样
+ *   第三方    → 原样保留（是否镜像由 IMG_INGEST 决定，见 ingestRef）
+ * @returns {{ok:boolean, ref:string, kind:'local'|'s3'|'external'|'inline'|'unknown', changed:boolean, warn:string}}
+ */
+function normalizeImageRef(p) {
+  const raw = String(p == null ? '' : p).trim();
+  if (!raw) return { ok: false, ref: '', kind: 'unknown', changed: false, warn: '空图片引用' };
+  if (/^(data|blob):/i.test(raw)) return { ok: true, ref: raw, kind: 'inline', changed: false, warn: '' };
+  if (isLocalPath(raw)) {
+    const norm = '/' + raw.replace(/^\/+/, '');
+    return { ok: true, ref: norm, kind: 'local', changed: norm !== raw, warn: '' };
+  }
+  if (S3.looksLikeUrl(raw)) {
+    if (isS3Url(raw)) {
+      const url = S3.publicUrl(parse(raw).key);
+      return { ok: true, ref: url || raw, kind: 's3', changed: !!url && url !== raw, warn: '' };
+    }
+    return { ok: true, ref: raw, kind: 'external', changed: false, warn: '' };
+  }
+  if (/^s3:\/\//i.test(raw) || looksLikeKey(raw)) {
+    return { ok: true, ref: S3.publicUrl(S3.normalizeKey(raw)), kind: 's3', changed: true, warn: '' };
+  }
+  return { ok: false, ref: raw, kind: 'unknown', changed: false, warn: '无法识别的图片引用（既非本地路径/对象 key，也非 http URL）' };
+}
+
+/** 读侧出口：IMG_URL_MODE=s3 时把存量本地引用改写为迁移前缀下的公网 URL（不改库即可灰度切读） */
+function resolveForRead(p) {
+  const s = String(p == null ? '' : p).trim();
+  if (urlMode() !== 's3' || !isLocalPath(s)) return s;
+  return legacyUrlOf(s) || s;
+}
+
+/** 引用是否"像一张真图"（用于上架封面/图集判定，排除 'todo' / '-' / 空 等脏值） */
+function isValidImageRef(p) {
+  const raw = String(p == null ? '' : p).trim();
+  if (!raw || raw === '-' || raw.length > 600) return false;
+  if (/^data:/i.test(raw)) return true;
+  if (isLocalPath(raw)) return IMG_EXT_RE.test(raw);
+  if (S3.looksLikeUrl(raw)) return true;
+  return looksLikeKey(raw);
+}
+
+// ── 外部 URL 安全（SSRF 防护） ─────────────────────────────────
+function sourceUrlAllowed(url) {
+  const raw = String(process.env.S3_SOURCE_URL_ALLOWLIST || '').trim();
+  if (!raw) return true;                       // 未配置白名单：不限制（缺省 keep 模式不会走到镜像）
+  let host = '';
+  try { host = new URL(url).host.toLowerCase(); } catch (_) { return false; }
+  return raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+    .some((h) => host === h || host.endsWith('.' + h));
+}
+
+/**
+ * 字面量层面的内网/非法地址拦截（DNS 解析后的私网仍需出网侧策略兜底，见计划书 R8）。
+ */
+function isBlockedHost(host) {
+  const h = String(host || '').toLowerCase();
+  if (!h) return true;
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  if (h.startsWith('[') || h.includes(':')) return true;         // IPv6 一律拒（简化，业务不需要）
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (m) {
+    const a = parseInt(m[1], 10);
+    const b = parseInt(m[2], 10);
+    if (a === 0 || a === 127 || a === 10) return true;
+    if (a === 169 && b === 254) return true;                     // link-local（云元数据）
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    return false;
+  }
+  return false;
+}
+
+/**
+ * 写入收口：任意图片引用 → 受管引用。
+ *   - 非 external：只做形态归一化（不触网）
+ *   - external   ：IMG_INGEST=mirror 时（且 opts.mirror 显式为真）镜像进对象存储；否则原样保留
+ * @param {string} ref
+ * @param {object} opts { mirror?:boolean, prefix?, entityType?, entityId?, makeThumbs? }
+ * @returns {Promise<{ok:boolean, ref:string, kind:string, changed:boolean, mirrored:boolean, upload?:object, error?:string, warn?:string}>}
+ */
+async function ingestRef(ref, opts) {
+  const o = opts || {};
+  const n = normalizeImageRef(ref);
+  if (!n.ok) return { ok: false, ref: '', kind: n.kind, changed: false, mirrored: false, error: n.warn };
+  if (n.kind !== 'external') {
+    return { ok: true, ref: n.ref, kind: n.kind, changed: n.changed, mirrored: false, warn: n.warn || '' };
+  }
+  if (!o.mirror || ingestMode() !== 'mirror') {
+    return { ok: true, ref: n.ref, kind: 'external', changed: false, mirrored: false,
+      warn: '外部图片原样保留（IMG_INGEST != mirror）' };
+  }
+  let host = '';
+  try { host = new URL(n.ref).host.toLowerCase(); } catch (_) {
+    return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false, error: 'source_url 非法' };
+  }
+  if (isBlockedHost(host)) {
+    return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false,
+      error: 'source_url 指向内网/非法地址（SSRF 防护拦截）' };
+  }
+  if (!sourceUrlAllowed(n.ref)) {
+    return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false,
+      error: 'source_url 不在 S3_SOURCE_URL_ALLOWLIST 白名单内' };
+  }
+  const up = await uploadImage({
+    sourceUrl: n.ref,
+    prefix: o.prefix,
+    entityType: o.entityType,
+    entityId: o.entityId,
+    makeThumbs: o.makeThumbs,
+  });
+  if (!up.ok) return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false, error: '镜像失败: ' + up.error };
+  if (up.storage !== 's3' && failOnUnconfigured()) {
+    return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false, error: '镜像未落到对象存储: ' + (up.warned || '') };
+  }
+  return { ok: true, ref: up.url, kind: 's3', changed: true, mirrored: true, upload: up, warn: up.warned || '' };
+}
+
+/**
+ * 删除对象（含两档缩略图）；用于"上传成功但落库失败"的补偿删除与显式删除。
+ * ⚠ 只接受**本域**引用（s3:// / 裸 key / 本域公网 URL）：
+ *   绝不对外部第三方 URL 反解 key —— 否则 https://other-cdn/x.jpg 会被当成 <bucket>/x.jpg 删除，
+ *   可能误删同名对象（本函数默认按「不确定就不动」处理）。
+ */
+async function deleteObjectByRef(ref, opts) {
+  const o = opts || {};
+  const s = String(ref == null ? '' : ref).trim();
+  if (!s) return { ok: false, skipped: true, error: '空引用' };
+  if (isLocalPath(s)) return { ok: false, skipped: true, error: '本地引用无需删除对象' };
+  let key = '';
+  if (/^s3:\/\//i.test(s)) key = S3.normalizeKey(s);
+  else if (looksLikeKey(s)) key = s;
+  else if (S3.looksLikeUrl(s) && isS3Url(s)) key = parse(s).key;
+  else return { ok: false, skipped: true, error: '非本域对象引用（拒绝对外部 URL 反解 key，避免误删）' };
+  if (!key) return { ok: false, skipped: true, error: 'key 为空' };
+  if (!S3.isConfigured()) return { ok: false, skipped: true, error: 'S3 未配置' };
+  const out = { ok: true, key, deleted: [] };
+  const del = async (k) => {
+    const res = await S3.deleteObject(k);
+    if (res.ok) out.deleted.push(k); else out.ok = false;
+    return res;
+  };
+  await del(key);
+  if (o.thumbs !== false) {
+    for (const size of THUMB_SIZES) await del(thumbKey(key, size));
+  }
+  return out;
 }
 
 /** 生成对象 key：<prefix>/<entity>/<id>/<yyyy>/<MM>/<uuid>.<ext> */
@@ -259,7 +492,9 @@ async function uploadImage(opts) {
   if (!ext) return fail('不支持的图片格式（仅 jpg/jpeg/png/webp）');
   if (!contentType) contentType = Object.keys(MIME_EXT).find((k) => MIME_EXT[k] === ext) || 'image/jpeg';
 
-  const norm = await normalize(buffer, o.maxWidth);
+  const norm = normalizeRewriteEnabled()
+    ? await normalize(buffer, o.maxWidth)
+    : { buffer, changed: false, mime: '', width: null, height: null };
   const finalBuf = norm.buffer;
   // 归一化可能改变编码格式（PNG→JPEG）：Content-Type 与扩展名都必须跟着走
   if (norm.mime) contentType = norm.mime;
@@ -267,17 +502,20 @@ async function uploadImage(opts) {
   const thumbs = o.makeThumbs === false ? {} : await makeThumbs(finalBuf);
 
   // ── S3 分支 ──
-  if (storageMode() === 's3') {
-    const key = keyFor({ prefix: o.prefix, entityType: o.entityType, entityId: o.entityId, ext: finalExt });
+  if (writeMode() === 's3') {
+    // o.key 用于「幂等重试复用同一 key」；缺省每次生成 uuid key
+    const key = o.key ? S3.normalizeKey(o.key) : keyFor({ prefix: o.prefix, entityType: o.entityType, entityId: o.entityId, ext: finalExt });
     const up = await S3.uploadLarge(key, finalBuf, { contentType });
     if (!up.ok) {
       // 上传失败 → 回落本地，业务不中断（同时把失败原因带回，便于排查）
+      const reason = `S3 上传失败（HTTP ${up.status}${up.error ? ' ' + up.error : ''}）`;
+      if (failOnUnconfigured()) return fail(`${reason}，且 S3_FAIL_ON_UNCONFIGURED=1 禁止回落本地`);
       const local = saveLocal(finalBuf, finalExt, '');
       return {
         ok: true, storage: 'local', url: local.urlPath, key: local.urlPath,
         thumb_240: '', thumb_640: '', bytes: finalBuf.length,
         content_type: contentType, width: norm.width, height: norm.height,
-        warned: `S3 上传失败（HTTP ${up.status}${up.error ? ' ' + up.error : ''}），已回落本地存储`,
+        warned: `${reason}，已回落本地存储`,
       };
     }
     const thumbRes = { thumb_240: '', thumb_640: '' };
@@ -302,6 +540,10 @@ async function uploadImage(opts) {
   }
 
   // ── 本地分支 ──
+  // 生产 fail-closed：后端发行包不含 assets/，回落本地 = 写下不可服务的文件（静默丢图）
+  if (failOnUnconfigured() && urlMode() !== 'local') {
+    return fail('S3 未配置（S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET），且 S3_FAIL_ON_UNCONFIGURED=1 禁止回落本地');
+  }
   const local = saveLocal(finalBuf, finalExt, '');
   return {
     ok: true, storage: 'local', url: local.urlPath, key: local.urlPath,
@@ -322,6 +564,11 @@ async function readImage(p) {
   if (!r.kind) return { ok: false, error: '空路径' };
   if (r.kind === 'local') {
     const disk = path.join(ROOT, decodeURIComponent(r.path.replace(/^\/+/, '')));
+    // 纵深防御：解析后必须仍在仓库根内（防路径穿越读任意文件）
+    const rel = path.relative(ROOT, disk);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+      return { ok: false, error: '非法本地路径' };
+    }
     try {
       const stat = fs.statSync(disk);
       return { ok: true, buffer: fs.readFileSync(disk), bytes: stat.size, contentType: mimeOfExt(path.extname(disk)) };
@@ -352,6 +599,25 @@ async function migrateLocalToS3(localPath, opts) {
 
 module.exports = {
   storageMode,
+  // 灰度 / 回滚开关
+  urlMode,
+  writeMode,
+  ingestMode,
+  normalizeRewriteEnabled,
+  failOnUnconfigured,
+  migratePrefix,
+  // 引用归一化（写侧收口 / 读侧出口）
+  legacyKeyOf,
+  legacyUrlOf,
+  isExternalUrl,
+  looksLikeKey,
+  normalizeImageRef,
+  resolveForRead,
+  isValidImageRef,
+  sourceUrlAllowed,
+  isBlockedHost,
+  ingestRef,
+  deleteObjectByRef,
   maxBytes,
   isLocalPath,
   isS3Url,

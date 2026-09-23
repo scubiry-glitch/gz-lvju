@@ -10,7 +10,9 @@
     "cap:run": "npx cap run android",
     "build:apk": "bash scripts/build-apk.sh",
     "s3:smoke": "node scripts/s3_smoke.cjs",
-    "s3:probe": "node scripts/s3_region_probe.cjs"
+    "s3:probe": "node scripts/s3_region_probe.cjs",
+    "test:img-ingest": "node scripts/img_ingest_regression.cjs",
+    "test:admin-upload": "node scripts/admin_upload_multipart_regression.cjs"
   },
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",

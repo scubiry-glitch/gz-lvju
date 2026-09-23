@@ -219,8 +219,22 @@ function tagsStr(tags) {
   return '';
 }
 
+/* 图片引用 → 可用于 <img src> / CSS url() 的值：
+   绝对 URL（含协议相对 //）与 data:/blob: 原样；本地/相对路径补前导 /。
+   兼容对象存储改造：库内可能存 https://file-domain/... 绝对地址（不能拼成 /https://...）。 */
+function imgUrl(path) {
+  var s = (path == null ? '' : String(path)).trim();
+  if (!s) return '';
+  if (/^(https?:)?\/\//i.test(s) || /^(data|blob):/i.test(s)) return s;
+  return '/' + s.replace(/^\/+/, '');
+}
+function cssUrl(path) {
+  var u = imgUrl(path);
+  return u ? "url('" + u + "')" : '';
+}
 function imgStyle(path) {
-  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
+  var u = imgUrl(path);
+  return u ? 'background-image:url(\'' + u + '\')' : '';
 }
 
 /* ── Load data ── */
@@ -280,8 +294,8 @@ function render() {
       '<button type="button" class="btn danger fee_del">删</button></div>';
   }).join('');
 
-  var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
-  var coverBg = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
+  var avBg = imgStyle(k.avatar);
+  var coverBg = imgStyle(u.cover_image);
 
   var html = '';
 
@@ -421,7 +435,7 @@ function bindEvents() {
   // Cover image
   var coverInput = document.getElementById('u_cover');
   if (coverInput) coverInput.oninput = function() {
-    document.getElementById('coverPrev').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    document.getElementById('coverPrev').style.backgroundImage = cssUrl(this.value) || 'none';
   };
   var coverUpload = document.getElementById('coverUpload');
   if (coverUpload) coverUpload.onchange = function() {
@@ -434,7 +448,7 @@ function bindEvents() {
     toast('上传中…');
     uploadForm('/upload', fd).then(function(res) {
       document.getElementById('u_cover').value = res.file_path;
-      document.getElementById('coverPrev').style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
+      document.getElementById('coverPrev').style.backgroundImage = cssUrl(res.file_path);
       toast('封面已上传');
     }).catch(function(e){ toast('上传失败：'+e.message); });
     coverUpload.value = '';
@@ -444,7 +458,7 @@ function bindEvents() {
   var avIn = document.querySelector('.ud_k_avatar');
   var avPrev = document.querySelector('.ud_k_prev');
   if (avIn) avIn.oninput = function() {
-    avPrev.style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    avPrev.style.backgroundImage = cssUrl(this.value) || 'none';
   };
   var avatarUpload = document.querySelector('.ud_k_upload');
   if (avatarUpload) avatarUpload.onchange = function() {
@@ -457,7 +471,7 @@ function bindEvents() {
     toast('上传中…');
     uploadForm('/upload', fd).then(function(res) {
       avIn.value = res.file_path;
-      avPrev.style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
+      avPrev.style.backgroundImage = cssUrl(res.file_path);
       toast('头像已上传');
     }).catch(function(e){ toast('上传失败：'+e.message); });
     avatarUpload.value = '';
@@ -595,7 +609,7 @@ function bindPhotoEvents() {
   document.querySelectorAll('.photo-card').forEach(function(card) {
     var pid = +card.dataset.photo;
     card.querySelector('.ph_path').oninput = function() {
-      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+      card.querySelector('.pv').style.backgroundImage = cssUrl(this.value) || 'none';
     };
     card.querySelector('.ph_save').onclick = function() {
       api('/photos/'+pid, { method:'PUT', body: {
@@ -640,17 +654,24 @@ function bindPhotoEvents() {
       var files = Array.prototype.slice.call(bulkInput.files || []);
       if (!files.length) return;
       toast('上传 '+files.length+' 张…');
-      var chain = Promise.resolve();
-      files.forEach(function(file) {
-        chain = chain.then(function() {
-          var fd = new FormData();
-          fd.append('file', file);
-          return uploadForm('/units/'+unitId+'/photos', fd);
-        });
+      // 并发上限 3（串行在批量场景易触发网关超时）；单张失败不阻断整批
+      var queue = files.slice();
+      var failed = [];
+      function worker() {
+        if (!queue.length) return Promise.resolve();
+        var file = queue.shift();
+        var fd = new FormData();
+        fd.append('file', file);
+        return uploadForm('/units/'+unitId+'/photos', fd)
+          .catch(function(e){ failed.push((file.name || '文件') + '：' + e.message); })
+          .then(worker);
+      }
+      var workers = [];
+      for (var i = 0; i < Math.min(3, files.length); i++) workers.push(worker());
+      Promise.all(workers).then(function() {
+        toast(failed.length ? ('部分失败 '+failed.length+' 张：'+failed[0]) : '上传完成');
+        reloadPhotos();
       });
-      chain.then(function() {
-        toast('上传完成'); reloadPhotos();
-      }).catch(function(e){ toast('上传失败：'+e.message); });
       bulkInput.value = '';
     };
   }

@@ -20,6 +20,8 @@ scripts/tp_call_log.json
 # 仓库只提交 jpg/png 原图，见 CLAUDE.md 规则 17「缩略图管线自动出 .t240/.t640」）
 assets/**/*.t240.webp
 assets/**/*.t640.webp
+# 运行时上传回落目录（S3 未配置时 img_storage 写这里；仅本机调试产物，不入库）
+assets/uploads/
 # vendor 默认忽略；jsbridge 离线包需入库供 npm file: 依赖
 vendor/*
 !vendor/lianjia-jsbridge3-1.1.6.tgz
