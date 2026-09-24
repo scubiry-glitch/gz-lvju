@@ -602,9 +602,16 @@
                     .then(function(pay){
                       if (!pay.ok) { alert(pay.d.error || '支付失败'); reset(); return; }
                       var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
-                      // App 内由桥能力拉起；桥未注入或 H5 直接跳中台收银台地址。
-                      if (pay.d.cashier_url) { location.href = pay.d.cashier_url; return; }
-                      location.href = paid;
+                      if (!pay.d.cashier_url) { location.href = paid; return; }
+                      // App 内走原生 navigateTo 打开收银台；H5 直接跳中台地址。
+                      if (cashierType === '1' && window.JsBridgeV3 && typeof window.JsBridgeV3.navigateTo === 'function') {
+                        window.JsBridgeV3.navigateTo({
+                          url: pay.d.cashier_url,
+                          fail: function(){ location.href = pay.d.cashier_url; },
+                        });
+                        return;
+                      }
+                      location.href = pay.d.cashier_url;
                     });
                 })
                 .catch(function(){ alert('网络异常，请稍后再试'); reset(); });
