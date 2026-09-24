@@ -135,7 +135,7 @@
       <div class="h-row">
         <div>
           <h1>服务认证中台 · 控制台</h1>
-          <div class="sub">标准 + 规则 + 数据 — 为 5 类机构（S 服务者 / B 运营商 / V 人力 / M 物资 / T 培训）+ G / C / F 提供统一能力</div>
+          <div class="sub">标准 + 规则 + 数据 — 为 4 类机构（B 运营商 / V 人力 / M 物资 / T 培训）+ 个人服务者（人的标准）+ G / C / F 提供统一能力</div>
         </div>
         <div class="meta">
           <span>当前租户：<b>江苏住房与城乡建设厅</b></span>
@@ -150,19 +150,19 @@
         <div class="ki"><div class="l"><span class="dot ok"></span>等级标准</div><div class="n">6<span class="u">级 / 11 工种</span></div><div class="d"><span>v2.4 已发布</span><span class="delta">↑ 1</span></div></div>
         <div class="ki"><div class="l"><span class="dot"></span>题库题目</div><div class="n">1,248<span class="u">道</span></div><div class="d"><span>试卷 84 套</span><span class="delta">↑ 38</span></div></div>
         <div class="ki"><div class="l"><span class="dot warn"></span>待审变更</div><div class="n">7<span class="u">单</span></div><div class="d"><span>含 2 单加急</span><span class="delta dn">需处理</span></div></div>
-        <div class="ki"><div class="l"><span class="dot ok"></span>下游消费端</div><div class="n">8<span class="u">端在线</span></div><div class="d"><span>S / B / V / M / T + G / C / F</span><span class="delta">100%</span></div></div>
+        <div class="ki"><div class="l"><span class="dot ok"></span>下游消费端</div><div class="n">8<span class="u">端在线</span></div><div class="d"><span>B / V / M / T + 人 + G / C / F</span><span class="delta">100%</span></div></div>
       </div>
 
-      <!-- 架构图：公共底座 + 5 类机构分组 -->
+      <!-- 架构图：公共底座 + 4 类机构分组 + 个人轨道 -->
       <div style="margin:14px 0; padding:18px; background:linear-gradient(135deg,#0f172a,#1e293b); color:white; border-radius:10px;">
         <div style="display:flex; align-items:baseline; margin-bottom:14px;">
-          <div style="font-size:14px; font-weight:700;">🏗 P 中台架构 · 1 公共底座 + 5 类机构分组</div>
+          <div style="font-size:14px; font-weight:700;">🏗 P 中台架构 · 1 公共底座 + 4 类机构分组 + 1 个人轨道</div>
           <div style="margin-left:auto; font-size:11px; opacity:0.7;">公共抽象，业务独立</div>
         </div>
 
         <!-- 公共底座 -->
         <div style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px 14px; margin-bottom:12px;">
-          <div style="font-size:11px; opacity:0.75; margin-bottom:6px;">🧱 公共底座（横跨 5 类机构 · 共享基础设施 · 9 张）</div>
+          <div style="font-size:11px; opacity:0.75; margin-bottom:6px;">🧱 公共底座（横跨 4 类机构 + 个人轨道 · 共享基础设施 · 9 张）</div>
           <div style="display:flex; flex-wrap:wrap; gap:6px; font-size:11px;">
             <a href="p-console.html" style="padding:3px 8px; background:#b45309; color:white; border-radius:4px; font-weight:600;">控制台</a>
             <a href="p-cert-issue.html" style="padding:3px 8px; background:rgba(255,255,255,0.12); color:white; border-radius:4px;">发证管理</a>
@@ -176,11 +176,11 @@
           </div>
         </div>
 
-        <!-- 5 类机构分组 -->
+        <!-- 4 类机构分组 + 个人轨道（人不属机构类） -->
         <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:8px;">
-          <div style="background:rgba(37,99,235,0.18); border:1px solid rgba(37,99,235,0.5); border-radius:8px; padding:10px 12px;">
-            <div style="font-size:11px; font-weight:700; color:#93c5fd;">🛠 × S 服务者</div>
-            <div style="font-size:10px; opacity:0.7; margin-top:3px;">个人持证轨道</div>
+          <div style="background:rgba(37,99,235,0.18); border:1px dashed rgba(37,99,235,0.5); border-radius:8px; padding:10px 12px;">
+            <div style="font-size:11px; font-weight:700; color:#93c5fd;">🛠 × 服务者（人）</div>
+            <div style="font-size:10px; opacity:0.7; margin-top:3px;">个人轨道 · 人的标准（不属机构类）</div>
             <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
               <a href="p-standards.html" style="font-size:11px; color:white; padding:2px 0;">L0-L7 标准 ›</a>
               <a href="p-question-bank.html" style="font-size:11px; color:white; padding:2px 0;">题库试卷 ›</a>
@@ -230,7 +230,7 @@
 
         <div style="margin-top:12px; padding:8px 12px; background:rgba(255,255,255,0.06); border-left:3px solid #b45309; border-radius:4px; font-size:11px; line-height:1.6; opacity:0.85;">
           <b>设计原则</b>：① 公共部分（证书 / 信用 / 工作流 / 权限 / 数据 / 事件 / API / 通知 / 控制台）= 一份代码 9 张页，所有机构共用。<br/>
-          ② 5 类机构分组 = 各自业务逻辑独立，互不耦合；S 用派单分账，B 用白名单审定，M 用品类质检，T 用课程排课。<br/>
+          ② 4 类机构分组 + 个人轨道 = 各自业务逻辑独立，互不耦合；人走 L0-L7 持证与派单分账（人的标准），B 用白名单审定，M 用品类质检，T 用课程排课。<br/>
           ③ 跨链接（↗）指向 B/V/M/T 系列页面，避免 P 中台重建已有功能。
         </div>
       </div>

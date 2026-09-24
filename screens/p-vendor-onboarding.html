@@ -193,6 +193,7 @@ function openDetail(id){
     term.innerHTML = '<b>' + ST_LABEL[item.status] + '</b>' +
       (item.reviewer ? ' · 审核人 ' + esc(item.reviewer) : '') +
       (item.reviewed_at ? ' · ' + esc(item.reviewed_at) : '') +
+      (item.approved_vendor_id ? '<br>已关联商家：#' + item.approved_vendor_id + (item.approved_vendor_name ? ' ' + esc(item.approved_vendor_name) : '') + '（费率已按 phone 回填）' : '') +
       (item.review_note ? '<br>意见：' + esc(item.review_note) : '');
   } else { term.hidden = true; }
   const acts = [];

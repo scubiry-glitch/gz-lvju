@@ -142,6 +142,18 @@
       <a href="b-house-rating-input.html" style="margin-left:6px; color:#92400e; text-decoration:underline; font-weight:600;">立即处理 →</a>
     </div>
 
+    <div id="whCard" style="display:none; margin:0 0 12px; padding:12px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:10px;">
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔔 Webhook 通知</div>
+      <div id="whStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select id="whVendor" style="display:none; max-width:280px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;"></select>
+        <input id="whUrl" placeholder="https://你的服务/回调地址" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <button class="btn btn-primary" id="whSave">保存</button>
+        <button class="btn btn-ghost" id="whTest">发送测试</button>
+      </div>
+      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">推送事件：评级审核结果（rating.reviewed）、订单事件（booking.created / paid / cancelled）、连通性测试（webhook.test）。签名与开放接口同算法；响应 2xx 视为送达，失败重试 5s/30s/120s。内网 / 保留地址会被拒绝。</div>
+    </div>
+
     <div class="lst-card">
       <table class="lst">
         <thead>
@@ -485,6 +497,66 @@
     document.querySelectorAll('.rowchk').forEach(function(c){ c.checked=false; });
     document.getElementById('chkAll').checked=false; bindChk();
   };
+
+  // ---- Webhook 通知配置（商家自助 + 平台代管，2026-09-22）----
+  var whRole = null, whVendors = [];
+  function whShow(msg){ document.getElementById('whStatus').innerHTML = msg; }
+  function whEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function whCurVid(){ return whRole === 'platform' ? (parseInt(document.getElementById('whVendor').value, 10) || 0) : 0; }
+  function whFillFromSel(){
+    var vid = whCurVid();
+    var v = whVendors.filter(function(x){ return x.id === vid; })[0] || {};
+    document.getElementById('whUrl').value = v.webhook_url || '';
+    whShow(v.webhook_url ? '已配置：<code>' + whEsc(v.webhook_url) + '</code>' : '未配置——配置后评级审核结果与订单事件将实时推送到该商家的服务');
+  }
+  function loadWebhook(){
+    get(API + '/vendor/webhook').then(function(j){
+      document.getElementById('whCard').style.display = '';
+      whRole = j.role || 'vendor';
+      if (whRole === 'platform') {
+        whVendors = j.vendors || [];
+        var sel = document.getElementById('whVendor');
+        sel.style.display = '';
+        sel.innerHTML = whVendors.map(function(v){
+          return '<option value="' + v.id + '">' + whEsc(v.name) + '（' + v.id + '）' + (v.webhook_url ? ' ✓' : '') + '</option>';
+        }).join('');
+        var prefer = whVendors.filter(function(v){ return v.webhook_url; })[0];
+        if (prefer) sel.value = String(prefer.id);
+        whFillFromSel();
+        sel.onchange = whFillFromSel;
+      } else {
+        document.getElementById('whVendor').style.display = 'none';
+        document.getElementById('whUrl').value = j.webhook_url || '';
+        whShow(j.webhook_url
+          ? '已配置：<code>' + whEsc(j.webhook_url) + '</code>'
+          : '未配置——配置后评级审核结果与订单事件将实时推送到你的服务');
+      }
+    }).catch(function(){ document.getElementById('whCard').style.display = 'none'; });   // 未登录只读态不展示
+  }
+  document.getElementById('whSave').onclick = function(){
+    var vid = whCurVid();
+    post(API + '/vendor/webhook', { vendor_id: vid || undefined, webhook_url: document.getElementById('whUrl').value.trim() }).then(function(j){
+      if (whRole === 'platform') {
+        var v = whVendors.filter(function(x){ return x.id === vid; })[0];
+        if (v) v.webhook_url = j.webhook_url || '';
+        var sel = document.getElementById('whVendor');
+        sel.innerHTML = whVendors.map(function(x){
+          return '<option value="' + x.id + '"' + (x.id === vid ? ' selected' : '') + '>' + whEsc(x.name) + '（' + x.id + '）' + (x.webhook_url ? ' ✓' : '') + '</option>';
+        }).join('');
+      }
+      whShow(j.webhook_url ? '已配置：<code>' + whEsc(j.webhook_url) + '</code>' : '已清除');
+    }).catch(function(e){ whShow('<span style="color:#991b1b;">保存失败：' + whEsc(e.message) + '</span>'); });
+  };
+  document.getElementById('whTest').onclick = function(){
+    var btn = document.getElementById('whTest'); btn.disabled = true;
+    post(API + '/vendor/webhook/test', { vendor_id: whCurVid() || undefined }).then(function(j){
+      whShow(j.ok
+        ? '<span style="color:#065f46;">测试已送达（HTTP ' + j.status + '）——对方服务应收到 webhook.test 事件，可用 hmac_key 验签</span>'
+        : '<span style="color:#991b1b;">送达失败：' + whEsc(j.error || '未知') + '</span>');
+    }).catch(function(e){ whShow('<span style="color:#991b1b;">测试失败：' + whEsc(e.message) + '</span>'); })
+      .then(function(){ btn.disabled = false; });
+  };
+  loadWebhook();
 
   renderBadge();
   load();
