@@ -28,15 +28,15 @@
  *   - 分账相关回调：https://weapons.ke.com/project/15873/interface/api/cat_281801
  *     （收款后分账由理房通分账服务直接 HTTP 回调，todo：网关生产环境申请接口权限）
  *
- * 环境：new PayCenter({ env }) 或 createPayCenter(env) 直接指定 test | prod，
- *   据此选择网关地址与客户端凭证；凭证可被 OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET 覆盖。
+ * 环境：new PayCenter({ env }) 或 createPayCenter(env) 直接指定 test | prod | production，
+ *   据此选择网关地址；客户端凭证必须由 OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET 注入。
  *
  * 约定：
  *   - 支付类路径前缀 PAY_PREFIX 默认 '/pay'；分账类路径前缀 PROFIT_PREFIX 默认
  *     '/pay/open-pay-plat/pre/profits-share'（用户指定，区别于 '/pay'）。
  *     若网关改用 servicePrefix 挂载，改对应常量或构造时传 payPrefix / profitPrefix 即可。
- *   - 各方法返回落兵台原始 JSON；HTTP 非 2xx 时抛错，业务级错误体现在返回值
- *     （如 code 非 '200'）中，由调用方自行判断。
+ *   - 支付类方法返回落兵台原始 JSON；HTTP 非 2xx 或 errno 非 0 时抛错。
+ *   - 分账类方法仍返回原始 JSON，业务级 code 由调用方判断。
  *
  * 用法（环境由 JUZHU_ENV / NODE_ENV 读取，默认 test；无需手动 createPayCenter）：
  *   const { payCenter } = require('./thirdApi/payCenter.cjs');
@@ -63,32 +63,33 @@ const PAY_PREFIX = process.env.PAY_CENTER_PREFIX || '/pay';
 // 用户明确要求以 /pay/open-pay-plat/pre/profits-share 开头，而非单纯的 /pay。
 const PROFIT_PREFIX = process.env.PROFIT_SHARE_PREFIX || '/pay/open-pay-plat/pre/profits-share';
 
-// 各环境网关客户端配置（与 gateway-client.cjs / pay_mock.cjs 默认一致）。
+// 各环境网关客户端配置。凭证不提供源码默认值。
 const ENV_CONFIG = {
   test: {
     gatewayUrl: 'https://aroute-test.ke.com',
     clientConfig: {
-      clientId: process.env.OAUTH_CLIENT_ID || 'gz_lvju_testDTYCRqK1XxcusagEYg',
-      clientSecret:
-        process.env.OAUTH_CLIENT_SECRET ||
-        'H75GEA1nWgwgls8N4O_RAiqtp6lZG8Ci5XkN3nSGEtJP2NETEgGWYwhsRCOOsuYx',
-      clientType: 'Web_Server_ThirdParty',
+      clientId: process.env.OAUTH_CLIENT_ID || '',
+      clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
+      clientType: process.env.OAUTH_CLIENT_TYPE || 'Web_Server_ThirdParty',
     },
   },
   prod: {
     gatewayUrl: 'http://i.aroute.ke.com',
     clientConfig: {
-      clientId: process.env.OAUTH_CLIENT_ID || 'gz_lvjuBBu793Lfpvs6v20dPdoij1J',
-      clientSecret:
-        process.env.OAUTH_CLIENT_SECRET ||
-        'KKw4uCY9hXLpMtosS3iKmmu9QZIq9lesBjCizGq_CAtC8EYGUx5erVvOlzntRv84',
-      clientType: 'Web_Server_KeIDC',
+      clientId: process.env.OAUTH_CLIENT_ID || '',
+      clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
+      clientType: process.env.OAUTH_CLIENT_TYPE || 'Web_Server_KeIDC',
     },
   },
 };
 
 function envOf() {
   return (process.env.JUZHU_ENV || process.env.NODE_ENV || 'development').toLowerCase();
+}
+
+function normalizeEnv(env) {
+  const value = String(env || '').trim().toLowerCase();
+  return value === 'prod' || value === 'production' ? 'prod' : 'test';
 }
 
 // 剔除 undefined / null（保留空串、0、false，避免误删“传空即可”的字段）。
@@ -109,10 +110,23 @@ function assertOneOf(label, obj, keys) {
   }
 }
 
+function assertPaySuccess(result, action) {
+  if (result && Number(result.errno) === 0 && result.data != null) return result;
+  const error = new Error(
+    `[payCenter] ${action}业务失败: ${result && result.error ? result.error : '未知错误'}`,
+  );
+  error.name = 'PayCenterBusinessError';
+  error.code = 'PAY_CENTER_BUSINESS_ERROR';
+  error.errno = result ? result.errno : undefined;
+  error.traceId = result ? result.traceId : undefined;
+  error.payResult = result;
+  throw error;
+}
+
 class PayCenter {
   /**
    * @param {object} [options]
-   * @param {string} [options.env='test'|'prod'] 环境（缺省按 JUZHU_ENV/NODE_ENV，否则 test）
+   * @param {string} [options.env='test'|'prod'|'production'] 环境（缺省按 JUZHU_ENV/NODE_ENV，否则 test）
    * @param {string} [options.payPrefix]         支付类路径前缀，默认 PAY_PREFIX
    * @param {string} [options.profitPrefix]      分账类路径前缀，默认 PROFIT_PREFIX
    * @param {string} [options.gatewayUrl]        显式网关地址（与 clientConfig 同时传时优先）
@@ -125,13 +139,10 @@ class PayCenter {
     if (options.client) {
       this.client = options.client;
     } else {
-      const cfg =
-        options.gatewayUrl && options.clientConfig
-          ? { gatewayUrl: options.gatewayUrl, clientConfig: options.clientConfig }
-          : ENV_CONFIG[options.env || envOf()] || ENV_CONFIG.test;
+      const cfg = ENV_CONFIG[normalizeEnv(options.env || envOf())];
       this.client = new GatewayClient({
-        gatewayUrl: cfg.gatewayUrl,
-        clientConfig: cfg.clientConfig,
+        gatewayUrl: options.gatewayUrl || process.env.OAUTH_GATEWAY_URL || cfg.gatewayUrl,
+        clientConfig: options.clientConfig || cfg.clientConfig,
       });
     }
   }
@@ -143,6 +154,11 @@ class PayCenter {
   // 分账类接口路径（前缀 PROFIT_PREFIX = /pay/open-pay-plat/pre/profits-share）
   _profitPath(p) {
     return (this.profitPrefix || '') + p;
+  }
+
+  async _paymentJson(action, path, options) {
+    const result = await this.client.json(path, options);
+    return assertPaySuccess(result, action);
   }
 
   /**
@@ -160,7 +176,7 @@ class PayCenter {
     if (!body || !body.appCode || !body.appOrderId || body.amount == null) {
       throw new Error('[payCenter] createC2BOrder 至少需要 appCode / appOrderId / amount');
     }
-    return this.client.json(this._path('/order/v2/createOrder'), {
+    return this._paymentJson('C2B 支付下单', this._path('/order/v2/createOrder'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: clean(body),
@@ -179,7 +195,7 @@ class PayCenter {
     if (!params.appCode || !params.projectCode) {
       throw new Error('[payCenter] closeOrder 必填 appCode / projectCode');
     }
-    return this.client.json(this._path('/order/closeOrder'), {
+    return this._paymentJson('关闭订单', this._path('/order/closeOrder'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: clean(params),
@@ -194,7 +210,8 @@ class PayCenter {
    */
   async queryOrder(params = {}) {
     assertOneOf('queryOrder', params, ['appOrderId', 'orderId']);
-    return this.client.json(this._path('/order/v2/query'), {
+    if (!params.appCode) throw new Error('[payCenter] queryOrder 必填 appCode');
+    return this._paymentJson('支付订单查询', this._path('/order/v2/query'), {
       method: 'GET',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       query: clean(params),
@@ -215,7 +232,7 @@ class PayCenter {
     const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
     if (miss.length) throw new Error('[payCenter] refundOrder 缺少必填：' + miss.join(', '));
     const payload = Object.assign({ refundType: '01' }, body);
-    return this.client.json(this._path('/order/refundOrder'), {
+    return this._paymentJson('原路退款', this._path('/order/refundOrder'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: clean(payload),
@@ -231,7 +248,7 @@ class PayCenter {
   async queryRefundOrder(params = {}) {
     assertOneOf('queryRefundOrder', params, ['orderId', 'businessOrderNo', 'cashierOrderNo']);
     if (!params.appCode) throw new Error('[payCenter] queryRefundOrder 必填 appCode');
-    return this.client.json(this._path('/order/queryRefundOrder'), {
+    return this._paymentJson('退款订单查询', this._path('/order/queryRefundOrder'), {
       method: 'GET',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       query: clean(params),
@@ -334,11 +351,10 @@ class PayCenter {
 const _instances = {};
 /**
  * 便捷工厂：按环境构造 PayCenter（同环境返回缓存单例）。
- * @param {string} [env='test'|'prod'] 直接指定环境；缺省读 JUZHU_ENV/NODE_ENV，否则 test
+ * @param {string} [env='test'|'prod'|'production'] 直接指定环境；缺省读 JUZHU_ENV/NODE_ENV，否则 test
  */
 function createPayCenter(env) {
-  const e = String(env || envOf()).toLowerCase();
-  const key = ENV_CONFIG[e] ? e : 'test'; // 未知环境（如 development）回退 test，归并到同一实例
+  const key = normalizeEnv(env || envOf());
   if (!_instances[key]) _instances[key] = new PayCenter({ env: key });
   return _instances[key];
 }
@@ -352,5 +368,7 @@ module.exports = {
   ENV_CONFIG,
   PAY_PREFIX,
   PROFIT_PREFIX,
+  normalizeEnv,
+  assertPaySuccess,
   payCenter: defaultPayCenter,
 };
