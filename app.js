@@ -5,20 +5,6 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
-const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
-const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
-const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
-const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
-const sessionToken = require('./session_token.cjs'); // 贝壳 lianjia_token → /token/verify
-authCenter.init({
-  query: (sql, params) => queryRows(sql, params),
-  exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
-  jsonReply,
-  expectedApiKey,
-  expectedAdminPassword,
-  isProduction,
-});
 
 // 用 __dirname，避免被测试 require 时 require.main 指向测试文件
 const ROOT = path.resolve(__dirname);
@@ -52,6 +38,24 @@ const modeEnv = process.env.JUZHU_ENV || process.env.NODE_ENV;
 if (modeEnv) loadDotEnv(path.join(ROOT, `.env.${modeEnv}`));
 loadDotEnv();
 loadDotEnv(path.join(ROOT, 'runtime.env'));
+
+// 业务模块可能在加载期读取环境变量，必须统一放在运行时配置加载之后。
+const bcrypt = require('bcryptjs'); // 规则14：仅 Node；vendor 登录口令散列
+const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶段1，见 docs/account-and-auth-design.md）
+const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
+const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
+const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
+const sessionToken = require('./session_token.cjs'); // 贝壳 lianjia_token → /token/verify
+const { payCenter } = require('./server/thirdApi/payCenter.cjs');
+const { createPaymentService } = require('./payment_service.cjs');
+authCenter.init({
+  query: (sql, params) => queryRows(sql, params),
+  exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
+  jsonReply,
+  expectedApiKey,
+  expectedAdminPassword,
+  isProduction,
+});
 
 const PORT = process.env.PORT || 9000;
 
@@ -105,6 +109,18 @@ async function getVendorConfig() {
   if (!loadVendorConfigFromDb) throw new Error('vendor_config module missing');
   if (!mysql2) throw new Error('mysql2 module missing');
   return loadVendorConfigFromDb(() => mysql2.createConnection(getDbConfig()));
+}
+
+let paymentService = null;
+function getPaymentService() {
+  if (!paymentService) {
+    paymentService = createPaymentService({
+      createConnection: () => mysql2.createConnection(getDbConfig()),
+      payCenter,
+      notifyVendorBooking,
+    });
+  }
+  return paymentService;
 }
 
 function getDbConfig() {
@@ -607,6 +623,9 @@ function isCEndPublicApi(urlPath, method) {
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
   const m = String(method || 'GET').toUpperCase();
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
+  if (m === 'POST' && process.env.PAY_NOTIFY_TOKEN
+    && p === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}`) return true;
+  if (m === 'POST' && p === '/api/juzhu/payment/query') return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
   // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
@@ -865,6 +884,61 @@ async function cleanupExpiredBookingOrders() {
     if (conn) { try { await conn.rollback(); } catch (_) {} }
     if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(e && e.code)) console.warn('cleanupExpiredBookingOrders:', e.message);
   } finally { if (conn) conn.release(); }
+}
+
+// 已创建收银台的订单必须先由中台确认关单，才可释放库存，避免晚到支付成功。
+async function cleanupExpiredPaymentOrders() {
+  let scanConn;
+  try {
+    scanConn = await getPool().getConnection();
+    const [rows] = await scanConn.execute(
+      `SELECT b.* FROM booking_orders b
+       JOIN payment_orders p ON p.biz_order_no=b.order_no
+       WHERE b.status='pending'
+         AND b.payment_expires_at IS NOT NULL AND b.payment_expires_at <= UTC_TIMESTAMP()
+         AND p.pay_status IN ('creating','create_unknown','paying','closing','close_unknown')
+       ORDER BY p.id DESC LIMIT 100`,
+    );
+    for (const row of rows) {
+      let closeResult;
+      try {
+        closeResult = await getPaymentService().closePaymentByOrder(row.order_no, 'booking_expired');
+      } catch (error) {
+        console.warn('cleanupExpiredPaymentOrders close:', row.order_no, error.message);
+        continue;
+      }
+      if (closeResult.skipped) continue;
+      const conn = await getPool().getConnection();
+      try {
+        await conn.beginTransaction();
+        const [locked] = await conn.execute(`SELECT * FROM booking_orders WHERE id=? FOR UPDATE`, [row.id]);
+        const booking = locked[0];
+        if (booking && booking.status === 'pending' && !booking.paid_payment_order_id) {
+          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          await conn.execute(
+            `UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=?`,
+            [now, booking.id],
+          );
+          await releaseStayQty(connExec(conn), {
+            project_id: booking.project_id, unit_id: booking.unit_id, rooms: booking.rooms,
+            checkin: booking.checkin, checkout: booking.checkout, now,
+          });
+        }
+        await conn.commit();
+      } catch (error) {
+        try { await conn.rollback(); } catch (_) {}
+        console.warn('cleanupExpiredPaymentOrders expire:', row.order_no, error.message);
+      } finally {
+        conn.release();
+      }
+    }
+  } catch (error) {
+    if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(error && error.code)) {
+      console.warn('cleanupExpiredPaymentOrders:', error.message);
+    }
+  } finally {
+    if (scanConn) scanConn.release();
+  }
 }
 
 // ===== 商家 Webhook 推送（平台 → 商家，HMAC 签名与开放接口同算法）=====
@@ -2150,6 +2224,105 @@ async function ensureSchemaRun() {
     await authCenter.ensureAuthSchema(conn);
     // 审计留存（默认 180 天，AUDIT_RETENTION_DAYS 可调）
     await authCenter.cleanupAudit().catch((e) => console.warn('cleanupAudit warn:', e.message));
+    // 支付中台一期迁移：新表可 CREATE；存量表字段变更只在迁移末尾追加 ALTER。
+    await conn.execute(`CREATE TABLE IF NOT EXISTS payment_orders (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地支付记录主键',
+      biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
+      app_order_id VARCHAR(28) NOT NULL COMMENT '支付中台业务支付单号及幂等键',
+      amount DECIMAL(12,2) NOT NULL COMMENT '本次支付应付金额',
+      payer_ucid VARCHAR(64) NOT NULL COMMENT '支付用户 UCID 快照',
+      payer_user_type VARCHAR(8) NOT NULL COMMENT '支付用户类型快照',
+      merchant_no VARCHAR(64) NOT NULL COMMENT '收款商户号快照',
+      share_biz_code VARCHAR(64) NOT NULL COMMENT '统一业务码快照',
+      cashier_type VARCHAR(8) NOT NULL COMMENT '收银台类型',
+      pay_method VARCHAR(50) NULL COMMENT '实际支付方式',
+      pay_status VARCHAR(24) NOT NULL COMMENT '本地支付状态',
+      gateway_order_status VARCHAR(8) NULL COMMENT '中台原始订单状态',
+      pay_no VARCHAR(64) NULL COMMENT '支付流水号',
+      cashier_url TEXT NULL COMMENT '收银台地址',
+      callback_url VARCHAR(500) NOT NULL COMMENT '异步通知地址',
+      cashier_expires_at DATETIME NULL COMMENT '收银台失效时间',
+      paid_at DATETIME NULL COMMENT '支付确认成功时间',
+      closed_at DATETIME NULL COMMENT '关单确认时间',
+      close_reason VARCHAR(32) NULL COMMENT '关单原因',
+      query_retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
+      next_query_at DATETIME NULL COMMENT '下次查询时间',
+      version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+      created_at DATETIME NOT NULL COMMENT '创建时间',
+      updated_at DATETIME NOT NULL COMMENT '更新时间',
+      UNIQUE KEY uk_po_app_order (app_order_id),
+      KEY idx_po_biz_order_id (biz_order_no, id),
+      KEY idx_po_biz_order_status (biz_order_no, pay_status),
+      KEY idx_po_status_retry (pay_status, next_query_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付表'`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS payment_refunds (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地退款单主键',
+      payment_order_id BIGINT NOT NULL COMMENT '关联支付记录 ID',
+      biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
+      app_order_id VARCHAR(28) NOT NULL COMMENT '退款业务单号及幂等键',
+      idempotency_key VARCHAR(128) NOT NULL COMMENT '退款幂等键',
+      refund_reason_type VARCHAR(32) NOT NULL COMMENT '退款原因',
+      trigger_source VARCHAR(32) NOT NULL COMMENT '触发来源',
+      refund_amount DECIMAL(12,2) NOT NULL COMMENT '退款金额',
+      payer_ucid VARCHAR(64) NOT NULL COMMENT '原支付用户 UCID 快照',
+      merchant_no VARCHAR(64) NOT NULL COMMENT '原支付商户号快照',
+      refund_status VARCHAR(24) NOT NULL COMMENT '退款状态',
+      refunded_at DATETIME NULL COMMENT '退款成功时间',
+      retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
+      next_retry_at DATETIME NULL COMMENT '下次查询时间',
+      version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+      created_at DATETIME NOT NULL COMMENT '创建时间',
+      updated_at DATETIME NOT NULL COMMENT '更新时间',
+      UNIQUE KEY uk_pr_app_order (app_order_id),
+      UNIQUE KEY uk_pr_idempotency (idempotency_key),
+      KEY idx_pr_biz_order (biz_order_no),
+      KEY idx_pr_payment (payment_order_id),
+      KEY idx_pr_status_retry (refund_status, next_retry_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单退款表'`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS payment_gateway_logs (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '网关调用日志主键',
+      payment_order_id BIGINT NULL COMMENT '关联支付记录 ID',
+      payment_refund_id BIGINT NULL COMMENT '关联退款记录 ID',
+      app_order_id VARCHAR(28) NOT NULL COMMENT '业务单号',
+      operation_type VARCHAR(24) NOT NULL COMMENT '调用类型',
+      request_no VARCHAR(64) NOT NULL COMMENT '调用请求号',
+      http_status INT NULL COMMENT 'HTTP 状态',
+      business_code VARCHAR(64) NULL COMMENT '中台业务码',
+      trace_id VARCHAR(128) NULL COMMENT '网关链路 ID',
+      success_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否成功',
+      request_json LONGTEXT NULL COMMENT '脱敏请求',
+      response_json LONGTEXT NULL COMMENT '脱敏响应',
+      error_message VARCHAR(500) NULL COMMENT '异常摘要',
+      started_at DATETIME NOT NULL COMMENT '开始时间',
+      finished_at DATETIME NULL COMMENT '结束时间',
+      UNIQUE KEY uk_pgl_request_no (request_no),
+      KEY idx_pgl_payment (payment_order_id, operation_type),
+      KEY idx_pgl_refund (payment_refund_id, operation_type),
+      KEY idx_pgl_app_order (app_order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台出站调用日志'`);
+    await conn.execute(`CREATE TABLE IF NOT EXISTS payment_notify_log (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '中台通知日志主键',
+      notify_key VARCHAR(191) NOT NULL COMMENT '通知幂等键',
+      notify_type VARCHAR(16) NOT NULL COMMENT 'pay 或 refund',
+      app_order_id VARCHAR(28) NULL COMMENT '业务单号',
+      order_status VARCHAR(8) NULL COMMENT '中台状态',
+      payload_json LONGTEXT NOT NULL COMMENT '脱敏通知原文',
+      handle_result VARCHAR(16) NOT NULL COMMENT '处理结果',
+      handle_message VARCHAR(500) NULL COMMENT '处理说明',
+      received_at DATETIME NOT NULL COMMENT '接收时间',
+      handled_at DATETIME NULL COMMENT '处理完成时间',
+      UNIQUE KEY uk_pnl_notify_key (notify_key),
+      KEY idx_pnl_app_order (app_order_id),
+      KEY idx_pnl_received (received_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台异步通知日志'`);
+    try { await conn.execute('ALTER TABLE jz_vendors ADD COLUMN pay_merchant_no VARCHAR(64)'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN paid_payment_order_id BIGINT NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN latest_refund_id BIGINT NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN refund_status VARCHAR(24) NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN refunded_at DATETIME NULL'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_paid_payment (paid_payment_order_id)'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_latest_refund (latest_refund_id)'); } catch (_) {}
+    try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_refund_status (refund_status)'); } catch (_) {}
     schemaEnsured = true;
   } finally {
     await conn.end();
@@ -5232,7 +5405,19 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const loginName = 'bk' + uid;
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
       const ua = req.headers['user-agent'] || '';
-      let accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      let accRows = await queryRows(
+        `SELECT id FROM accounts WHERE idp_type='beike' AND idp_subject=? LIMIT 1`,
+        [uid],
+      );
+      if (!accRows.length) {
+        accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+        if (accRows.length) {
+          await queryRows(
+            `UPDATE accounts SET idp_type='beike', idp_subject=? WHERE id=? AND (idp_type IS NULL OR idp_type='beike')`,
+            [uid, accRows[0].id],
+          );
+        }
+      }
       if (!accRows.length) {
         const created = await authCenter.createAccount({
           login_name: loginName, password: 'bk-' + crypto.randomBytes(12).toString('hex'),
@@ -5240,10 +5425,17 @@ async function handleApiDirect(urlPath, qs, req, res) {
           display_name: name || ('贝壳用户' + uid.slice(-4)),
         }, { ip, ua });
         if (created.error) return jsonReply(res, { error: created.error }, 400);
+        await queryRows(
+          `UPDATE accounts SET idp_type='beike', idp_subject=? WHERE id=?`,
+          [uid, created.account.id],
+        );
       } else if (phone) {
         await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone), display_name=COALESCE(NULLIF(?,""),display_name) WHERE id=?', [phone, name, accRows[0].id]).catch(() => {});
       }
-      accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
+      accRows = await queryRows(
+        `SELECT id FROM accounts WHERE idp_type='beike' AND idp_subject=? LIMIT 1`,
+        [uid],
+      );
       const sess = await authCenter.createSession(accRows[0].id, ip, ua);
       return jsonReply(res, {
         ok: true,
@@ -5623,9 +5815,18 @@ async function handleApiDirect(urlPath, qs, req, res) {
             : '该订单未开通免费取消，预订成功后不可取消';
           return jsonReply(res, { error: reason, cancel_policy_text: cInfo.cancel_policy_text, cancel_deadline: cInfo.cancel_deadline }, 400);
         }
+          if (['paying', 'creating', 'create_unknown', 'closing', 'close_unknown'].includes(rows[0].pay_status)) {
+            await conn.rollback();
+            return jsonReply(res, { error: '支付状态确认中，请稍后再取消' }, 409);
+          }
         const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        // 已支付订单取消 → 标记退款（模拟退款通道；真实网关接入后走原路退回）
-        const newPay = rows[0].pay_status === 'paid' ? 'refunded' : rows[0].pay_status;
+        // 已支付订单取消：先落退款中状态，提交后再在事务外调用支付中台。
+        const paidPaymentId = rows[0].paid_payment_order_id;
+        if (rows[0].pay_status === 'paid' && !paidPaymentId) {
+          await conn.rollback();
+          return jsonReply(res, { error: '订单缺少有效支付记录，请联系客服处理' }, 409);
+        }
+        const newPay = rows[0].pay_status === 'paid' ? 'refunding' : rows[0].pay_status;
         await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status=?, updated_at=? WHERE id=?", [newPay, now, rows[0].id]);
         // 释放库存（多间口径 2026-09-10）：递减 booked_qty，纯占用行删行（商家夜价/qty 差异行保留）
         await releaseStayQty(connExec(conn), {
@@ -5639,41 +5840,85 @@ async function handleApiDirect(urlPath, qs, req, res) {
           nights: rows[0].nights, price_total: rows[0].price_total,
           status: 'cancelled', pay_status: newPay || null, cancel_by: 'customer',
         });
-        return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled' });
+        if (paidPaymentId) {
+          try {
+            const created = await getPaymentService().createOrReuseRefund(paidPaymentId, 'booking_cancel', 'user');
+            await getPaymentService().requestRefund(created.refund, created.payment);
+          } catch (e) {
+            return jsonReply(res, {
+              ok: true, order_no: orderNo, status: 'cancelled', pay_status: 'refunding',
+              error: '退款申请已记录，等待补偿处理',
+            }, 202);
+          }
+        }
+        return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled', pay_status: newPay || null });
       } finally { await conn.end(); }
     }
 
-    // POST /api/juzhu/booking/pay —— 收银台支付（双因子：order_no + contact_phone；模拟通道，网关接入后替换）
+    // POST /api/juzhu/booking/pay —— 创建或复用真实支付中台收银台
     if (urlPath === '/api/juzhu/booking/pay' && req.method === 'POST') {
       const body = await readBody(req);
       const orderNo = String(body.order_no || '').trim();
       const phone = String(body.contact_phone || '').trim();
-      const payMethod = String(body.pay_method || 'online').slice(0, 50);
-      if (!['online', 'wechat', 'alipay', 'mock', 'test'].includes(payMethod)) return jsonReply(res, { error: '不支持的支付方式' }, 400);
+      const cashierType = String(body.cashier_type || '').trim();
       if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
-      const conn = await mysql2.createConnection(getDbConfig());
+      if (!['1', '2'].includes(cashierType)) return jsonReply(res, { error: 'cashier_type 仅支持 1 或 2' }, 400);
+      const sess = await requestSession(req);
+      if (!sess || !sess.account || sess.role !== 'user') return jsonReply(res, { error: '仅贝壳登录用户可发起在线支付' }, 401);
       try {
-        await conn.beginTransaction();
-        const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE order_no=? AND contact_phone=? LIMIT 1 FOR UPDATE', [orderNo, phone]);
-        if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: '订单不存在或手机号不匹配' }, 404); }
-        if (await expireBooking(conn, rows[0])) { await conn.commit(); return jsonReply(res, { error: '待支付订单已过期' }, 400); }
-        if (rows[0].status !== 'pending') { await conn.rollback(); return jsonReply(res, { error: '订单已取消或已完结，无法支付' }, 400); }
-        if (rows[0].pay_status === 'paid') {
-          await conn.commit();
-          return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status, idempotent_replay: true });
-        }
-        if (rows[0].pay_status !== 'unpaid') { await conn.rollback(); return jsonReply(res, { error: '该订单不在待支付状态（当前：' + (rows[0].pay_status || '无需支付）') }, 400); }
-        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-        await conn.execute("UPDATE booking_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=? WHERE id=?", [payMethod, now, now, rows[0].id]);
-        await conn.commit();
-        notifyVendorBooking(rows[0].owner_vendor_id, 'booking.paid', {
-          id: rows[0].id, order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
-          channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
-          nights: rows[0].nights, price_total: rows[0].price_total,
-          status: rows[0].status, pay_status: 'paid', pay_method: payMethod, pay_at: now,
+        const out = await getPaymentService().createOrReusePayment({
+          orderNo,
+          contactPhone: phone,
+          account: sess.account,
+          cashierType,
+          clientIp: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(),
         });
-        return jsonReply(res, { ok: true, order_no: orderNo, pay_status: 'paid', status: rows[0].status });
-      } finally { await conn.end(); }
+        return jsonReply(res, {
+          ok: true, order_no: out.orderNo, app_order_id: out.appOrderId || null,
+          pay_status: out.payStatus, cashier_type: cashierType,
+          cashier_url: out.cashierUrl || null, idempotent_replay: !!out.reused,
+        });
+      } catch (e) {
+        return jsonReply(res, { error: e.message || '支付单创建失败', code: e.code || null }, 400);
+      }
+    }
+
+    // POST /api/juzhu/payment/query —— 前端支付结果确认
+    if (urlPath === '/api/juzhu/payment/query' && req.method === 'POST') {
+      const body = await readBody(req);
+      const orderNo = String(body.order_no || '').trim();
+      const phone = String(body.contact_phone || '').trim();
+      if (!orderNo || !phone) return jsonReply(res, { error: 'order_no 与手机号必填' }, 400);
+      const sess = await requestSession(req);
+      if (!sess || !sess.account || sess.role !== 'user') return jsonReply(res, { error: 'unauthorized' }, 401);
+      try {
+        const owned = await queryRows(
+          `SELECT id FROM booking_orders WHERE order_no=? AND contact_phone=? AND user_id=? LIMIT 1`,
+          [orderNo, phone, String(sess.account.id)],
+        );
+        if (!owned.length) return jsonReply(res, { error: '订单不存在或无权查询' }, 404);
+        const out = await getPaymentService().queryPayment({
+          orderNo,
+          appOrderId: body.app_order_id ? String(body.app_order_id) : null,
+        });
+        return jsonReply(res, { ok: true, result: out.data || out });
+      } catch (e) {
+        return jsonReply(res, { error: e.message || '支付状态查询失败', code: e.code || null }, 400);
+      }
+    }
+
+    // POST /api/juzhu/payment/notify/:token —— 支付中台异步通知
+    if (process.env.PAY_NOTIFY_TOKEN
+      && urlPath === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}` && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const result = await getPaymentService().handleNotify(body);
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(result);
+      } catch (_) {
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('FAILED');
+      }
     }
 
     // GET /api/juzhu/vendor/booking/orders —— vendor 只见自己；platform 全量（可 ?status=）
@@ -7759,11 +8004,27 @@ const server = http.createServer((req, res) => {
 if (require.main === module) {
   const bookingExpiryTimer = setInterval(() => cleanupExpiredBookingOrders().catch(() => {}), 60 * 1000);
   bookingExpiryTimer.unref();
+  const paymentExpiryTimer = setInterval(() => cleanupExpiredPaymentOrders().catch(() => {}), 60 * 1000);
+  paymentExpiryTimer.unref();
+  const paymentCompensationTimer = setInterval(() => {
+    getPaymentService().runPaymentCompensation().catch((e) => console.warn('payment compensation:', e.message));
+  }, 60 * 1000);
+  paymentCompensationTimer.unref();
   const envName = (process.env.JUZHU_ENV || 'dev').trim().toLowerCase();
   const apiKey = (process.env[API_KEY_ENV] || '').trim();
   if (envName === 'prod' || envName === 'production') {
     if (!apiKey || apiKey === FORBIDDEN_API_KEY) {
       console.error(`FATAL: production requires ${API_KEY_ENV} (must not be empty or ${FORBIDDEN_API_KEY})`);
+      process.exit(1);
+    }
+    const paymentRequired = [
+      'OAUTH_GATEWAY_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET',
+      'PAY_APP_CODE', 'PAY_PROJECT_CODE', 'PAY_SHARE_BIZ_CODE',
+      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN',
+    ];
+    const missingPayment = paymentRequired.filter((key) => !String(process.env[key] || '').trim());
+    if (missingPayment.length) {
+      console.error(`FATAL: production payment config missing: ${missingPayment.join(', ')}`);
       process.exit(1);
     }
   } else if (!apiKey || apiKey === FORBIDDEN_API_KEY) {

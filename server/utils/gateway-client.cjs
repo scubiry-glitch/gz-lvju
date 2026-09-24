@@ -19,42 +19,40 @@
 
 const crypto = require('crypto');
 
-const ENV = (process.env.JUZHU_ENV || process.env.NODE_ENV || 'development').toLowerCase();
-const IS_PROD = ENV === 'prod' || ENV === 'production';
+function normalizeEnv(env) {
+  const value = String(env || '').trim().toLowerCase();
+  return value === 'prod' || value === 'production' ? 'prod' : 'test';
+}
 
 /**
  * 各环境网关客户端配置。
  * 生产：gz_lvju / Web_Server_KeIDC
  * 测试：gz_lvju_test / Web_Server_ThirdParty
- * 密钥可被环境变量 OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET 覆盖（生产推荐仅用环境变量）。
+ * 凭证必须由环境变量提供，禁止在源码中提供默认密钥。
  */
 const CLIENT_CONFIG = {
   production: {
-    clientId: process.env.OAUTH_CLIENT_ID || 'gz_lvjuBBu793Lfpvs6v20dPdoij1J',
-    clientSecret:
-      process.env.OAUTH_CLIENT_SECRET ||
-      'KKw4uCY9hXLpMtosS3iKmmu9QZIq9lesBjCizGq_CAtC8EYGUx5erVvOlzntRv84',
-    clientType: 'Web_Server_KeIDC',
+    clientId: process.env.OAUTH_CLIENT_ID || '',
+    clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
+    clientType: process.env.OAUTH_CLIENT_TYPE || 'Web_Server_KeIDC',
   },
   test: {
-    clientId: process.env.OAUTH_CLIENT_ID || 'gz_lvju_testDTYCRqK1XxcusagEYg',
-    clientSecret:
-      process.env.OAUTH_CLIENT_SECRET ||
-      'H75GEA1nWgwgls8N4O_RAiqtp6lZG8Ci5XkN3nSGEtJP2NETEgGWYwhsRCOOsuYx',
-    clientType: 'Web_Server_ThirdParty',
+    clientId: process.env.OAUTH_CLIENT_ID || '',
+    clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
+    clientType: process.env.OAUTH_CLIENT_TYPE || 'Web_Server_ThirdParty',
   },
 };
 
-function resolveClientConfig() {
-  return IS_PROD ? CLIENT_CONFIG.production : CLIENT_CONFIG.test;
+function resolveClientConfig(env) {
+  return normalizeEnv(env) === 'prod' ? CLIENT_CONFIG.production : CLIENT_CONFIG.test;
 }
 
-function resolveGatewayUrl() {
+function resolveGatewayUrl(env) {
   if (process.env.OAUTH_GATEWAY_URL) return process.env.OAUTH_GATEWAY_URL;
   // 未显式设置时按环境取默认网关
   // 生产内网：http://i.aroute.ke.com；
   // 测试外网（限制了只能一个accessToken 多实例部署需要注意：https://aroute-test.ke.com
-  return IS_PROD ? 'http://i.aroute.ke.com' : 'https://aroute-test.ke.com';
+  return normalizeEnv(env) === 'prod' ? 'http://i.aroute.ke.com' : 'https://aroute-test.ke.com';
 }
 
 // ---- 签名（与 oauth/signature.ts 算法完全一致）----
@@ -80,14 +78,19 @@ function createNonce() {
 }
 
 async function fetchServerTimestamp(gatewayUrl, epochPath) {
+  let timer = null;
   try {
-    const res = await fetch(`${gatewayUrl}${epochPath}`, { cache: 'no-store' });
+    const controller = new AbortController();
+    timer = setTimeout(() => controller.abort(), Number(process.env.PAY_HTTP_TIMEOUT_MS || 8000));
+    const res = await fetch(`${gatewayUrl}${epochPath}`, { cache: 'no-store', signal: controller.signal });
     if (!res.ok) return Date.now();
     const text = (await res.text()).trim();
     const ts = Number(text);
     return Number.isFinite(ts) ? ts : Date.now();
   } catch {
     return Date.now();
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -95,18 +98,32 @@ function isTokenValid(token) {
   return !!token && Date.now() < token.expiresAt;
 }
 
+class GatewayHttpError extends Error {
+  constructor(message, options = {}) {
+    super(message);
+    this.name = 'GatewayHttpError';
+    this.code = options.code || 'GATEWAY_HTTP_ERROR';
+    this.httpStatus = options.httpStatus;
+    this.traceId = options.traceId;
+    this.responseText = options.responseText;
+  }
+}
+
 class GatewayClient {
   /**
    * @param {object} [options]
+   * @param {string} [options.env] 运行环境
    * @param {string} [options.gatewayUrl] 覆盖网关地址（否则按环境解析）
    * @param {object} [options.clientConfig] 覆盖客户端配置 {clientId,clientSecret,clientType}
    * @param {string} [options.servicePrefix] 接口路径前缀（默认读 OAUTH_SERVICE_PREFIX 或空）
    * @param {string} [options.tokenPath]    token 端点，默认 /oauth2/token
    * @param {string} [options.epochPath]    时间戳端点，默认 /v1/time/epoch
+   * @param {number} [options.timeoutMs]    请求超时，默认 PAY_HTTP_TIMEOUT_MS 或 8000
    */
   constructor(options = {}) {
-    this.gatewayUrl = options.gatewayUrl || resolveGatewayUrl();
-    const cfg = options.clientConfig || resolveClientConfig();
+    this.env = normalizeEnv(options.env || process.env.JUZHU_ENV || process.env.NODE_ENV);
+    this.gatewayUrl = options.gatewayUrl || resolveGatewayUrl(this.env);
+    const cfg = options.clientConfig || resolveClientConfig(this.env);
     this.clientId = cfg.clientId;
     this.clientSecret = cfg.clientSecret;
     this.clientType = cfg.clientType;
@@ -116,13 +133,30 @@ class GatewayClient {
         : process.env.OAUTH_SERVICE_PREFIX || '';
     this.tokenPath = options.tokenPath || '/oauth2/token';
     this.epochPath = options.epochPath || '/v1/time/epoch';
+    this.timeoutMs = Number(options.timeoutMs || process.env.PAY_HTTP_TIMEOUT_MS || 8000);
     this._token = null;
+    this._tokenPromise = null;
   }
 
   /** 获取 access_token（带内存缓存，过期前 20% 时间窗口刷新） */
   async getToken(forceRefresh = false) {
     if (!forceRefresh && isTokenValid(this._token)) {
       return this._token.accessToken;
+    }
+    if (!forceRefresh && this._tokenPromise) return this._tokenPromise;
+    this._tokenPromise = this._requestToken();
+    try {
+      return await this._tokenPromise;
+    } finally {
+      this._tokenPromise = null;
+    }
+  }
+
+  async _requestToken() {
+    if (!this.clientId || !this.clientSecret) {
+      throw new GatewayHttpError('[gateway-client] 缺少 OAUTH_CLIENT_ID 或 OAUTH_CLIENT_SECRET', {
+        code: 'GATEWAY_CONFIG_ERROR',
+      });
     }
     const timestamp = String(await fetchServerTimestamp(this.gatewayUrl, this.epochPath));
     const nonce = createNonce();
@@ -135,17 +169,20 @@ class GatewayClient {
     const signature = buildOAuthSignature(this.tokenPath, 'POST', params, this.clientSecret);
     const body = new URLSearchParams({ ...params, signature });
 
-    const res = await fetch(`${this.gatewayUrl}${this.tokenPath}`, {
+    const res = await this._fetchWithTimeout(`${this.gatewayUrl}${this.tokenPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
       cache: 'no-store',
     });
-    const data = await res.json().catch(() => ({}));
+    const text = await res.text().catch(() => '');
+    const data = JSON.parse(text || '{}');
     if (!res.ok || !data.access_token) {
-      throw new Error(
-        `[gateway-client] 获取 access_token 失败: ${data.message || res.status}`,
-      );
+      throw new GatewayHttpError(`[gateway-client] 获取 access_token 失败: ${data.message || res.status}`, {
+        httpStatus: res.status,
+        traceId: res.headers.get('x-trace-id') || res.headers.get('trace-id'),
+        responseText: text,
+      });
     }
     this._token = {
       accessToken: data.access_token,
@@ -153,6 +190,23 @@ class GatewayClient {
       expiresAt: Date.now() + (Number(data.expires_in) || 7200) * 1000 * 0.8,
     };
     return this._token.accessToken;
+  }
+
+  async _fetchWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      return await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        throw new GatewayHttpError(`[gateway-client] 网关请求超时（${this.timeoutMs}ms）`, {
+          code: 'GATEWAY_TIMEOUT',
+        });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** 拼接 service 前缀与接口路径 */
@@ -201,7 +255,7 @@ class GatewayClient {
     }
 
     const doFetch = () =>
-      fetch(this._buildUrl(path, query), {
+      this._fetchWithTimeout(this._buildUrl(path, query), {
         method,
         headers: reqHeaders,
         body: payload,
@@ -225,7 +279,11 @@ class GatewayClient {
     const res = await this.fetch(path, options);
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`[gateway-client] 网关请求失败 (${res.status}): ${text}`);
+      throw new GatewayHttpError(`[gateway-client] 网关请求失败 (${res.status})`, {
+        httpStatus: res.status,
+        traceId: res.headers.get('x-trace-id') || res.headers.get('trace-id'),
+        responseText: text,
+      });
     }
     return res.json();
   }
@@ -248,6 +306,7 @@ async function gatewayJson(path, options) {
 
 module.exports = {
   GatewayClient,
+  GatewayHttpError,
   createGatewayClient,
   defaultClient,
   gatewayFetch,
@@ -255,4 +314,5 @@ module.exports = {
   // 工具函数（便于单独复用 / 单测）
   buildOAuthSignature,
   createNonce,
+  normalizeEnv,
 };

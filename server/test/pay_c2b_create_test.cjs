@@ -23,18 +23,27 @@
  */
 'use strict';
 
+const crypto = require('crypto');
 const path = require('path');
 const { payCenter, createPayCenter } = require(path.join(__dirname, '..', 'thirdApi', 'payCenter.cjs'));
+
+function generateAppOrderId(now = new Date()) {
+  const timestamp = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    .toISOString()
+    .replace(/\D/g, '')
+    .slice(0, 14);
+  return `XD_${timestamp}_${String(crypto.randomInt(0, 1000000)).padStart(6, '0')}`;
+}
 
 // 组装贴近真实联调的冒烟 body（参考支付中台 C2B 下单契约；必要字段给默认值，
 // 真实值请用环境变量 / 模块方式传完整 body 覆盖）。
 function buildSampleBody(overrides = {}) {
   const now = Date.now();
-  const appOrderId = overrides.appOrderId || `lvju_${now}`;
+  const appOrderId = overrides.appOrderId || generateAppOrderId(new Date(now));
   const amount = overrides.amount != null ? Number(overrides.amount) : 100.1;
   const shareBizCode = overrides.shareBizCode || process.env.PAY_SHARE_BIZ_CODE || '02037200000000';
-  const merchantNo = overrides.merchantNo || process.env.PAY_MERCHANT_NO || '20260917113504119043';
-  const callbackUrl = overrides.callbackUrl || process.env.PAY_CALLBACK_URL || 'https://www.baidu.com/';
+  const merchantNo = overrides.merchantNo || process.env.PAY_MERCHANT_NO || '20260917113809076098';
+  const callbackUrl = overrides.callbackUrl || process.env.PAY_NOTIFY_URL || process.env.PAY_CALLBACK_URL || 'https://www.baidu.com/';
   const payChannel = {
     cashierType: overrides.cashierType || '1',
     shareBizCode,
@@ -49,7 +58,7 @@ function buildSampleBody(overrides = {}) {
   return {
     amount,
     appCode: overrides.appCode || process.env.PAY_APP_CODE || 'lvju',
-    projectCode: overrides.appCode || process.env.PAY_APP_CODE || 'lvju',
+      projectCode: overrides.projectCode || process.env.PAY_PROJECT_CODE || 'lvju',
     appOrderId,
     appOrderName: overrides.appOrderName || `业务订单名称${String(appOrderId).replace('lvju_', '')}`,
     payChannel,
@@ -64,7 +73,7 @@ function buildSampleBody(overrides = {}) {
       expireTime: String( 30 * 60 ), // 30 分钟后过期
     },
     contractInfo: {
-      contractNo: overrides.contractNo || `业务合同号${appOrderId}`,
+        contractNo: overrides.contractNo || `BKG-TEST-${now}`,
       contractAmount: amount,
       startTime: overrides.startTime || '2026-09-21 00:00:00',
       endTime: overrides.endTime || '2026-12-21 00:00:00',
@@ -96,7 +105,9 @@ async function test(env, body = {}) {
   console.log(`[pay_c2b_create_test] env=${envName} → POST /pay/order/v2/createOrder`);
   console.log(JSON.stringify(finalBody, null, 2));
   const json = await pay.createC2BOrder(finalBody);
-  console.log(JSON.stringify(json, null, 2));
+  const safeJson = JSON.parse(JSON.stringify(json));
+  if (safeJson.data && safeJson.data.accessToken) safeJson.data.accessToken = '[redacted]';
+  console.log(JSON.stringify(safeJson, null, 2));
   return json;
 }
 
@@ -117,7 +128,7 @@ if (require.main === module) {
   })();
 }
 
-module.exports = { test, buildSampleBody };
+module.exports = { test, buildSampleBody, generateAppOrderId };
 
 
 //{

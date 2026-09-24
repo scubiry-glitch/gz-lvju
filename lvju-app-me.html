@@ -34,17 +34,13 @@
   .dial .num{font-size:21px;font-weight:800;color:#0b5d56;letter-spacing:.5px;}
   .dial .sub{font-size:11px;color:var(--muted);}
   .dial a.call{margin-left:auto;background:var(--brand,#0f766e);color:#fff;text-decoration:none;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;}
+  /* 去掉 overlay appbar 后，头部不再预留标题栏高度 */
+  .me-hd{padding-top:max(20px, env(safe-area-inset-top));}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar ghost">
-      <span class="bk" style="visibility:hidden">‹</span>
-      <div class="ttl">我的</div>
-      <div class="act" hidden data-deferred><a href="lvju-app-messages.html">🔔</a><span>⚙</span></div>
-    </div>
 
     <!-- 头部 -->
     <div class="me-hd">
@@ -53,18 +49,10 @@
         <div class="av" id="meAv" style="cursor:pointer">🧑</div>
         <div class="ui" id="meUi" style="cursor:pointer">
           <div class="nm" id="meName">点击登录</div>
-          <div class="ph" id="mePhone">登录后查看订单与收藏</div>
+          <div class="ph" id="mePhone">登录后查看订单</div>
         </div>
       </div>
       <div class="vip" hidden data-deferred>👑 旅居黑卡会员 · 享 9 折 + 优先派管家</div>
-    </div>
-
-    <!-- 资产 -->
-    <div class="mestat">
-      <a><b>12</b><span>收藏</span></a>
-      <a hidden data-deferred><b>28</b><span>足迹</span></a>
-      <a href="lvju-app-coupons.html" hidden data-deferred><b>3</b><span>优惠券</span></a>
-      <a href="lvju-app-wallet.html" hidden data-deferred><b>¥860</b><span>钱包</span></a>
     </div>
 
     <!-- 订单入口 -->
@@ -72,20 +60,10 @@
     <div class="ordbar">
       <a href="lvju-app-pay.html"><span class="bdg">1</span><span class="ic">💳</span>待支付</a>
       <a href="lvju-app-orders.html"><span class="bdg">1</span><span class="ic">🏨</span>待入住</a>
-      <a href="lvju-app-review.html"><span class="ic">✍️</span>待评价</a>
       <a href="lvju-app-refund.html"><span class="ic">↩️</span>退款售后</a>
     </div>
 
     <!-- 常用功能 -->
-    <div class="seg">常用功能</div>
-    <div class="menu">
-      <a href="lvju-app-wallet.html" hidden data-deferred><span class="ic">💰</span>我的钱包<span class="tip">¥860 · 3 券</span><span class="ar">›</span></a>
-      <a href="#" hidden data-deferred><span class="ic">🪪</span>实名认证<span class="tip" style="color:var(--ok)">已认证</span><span class="ar">›</span></a>
-      <a href="lvju-app-chat.html" hidden data-deferred><span class="ic">🛎</span>我的旅居管家<span class="tip">杨晓芳 L4</span><span class="ar">›</span></a>
-      <a class="last-visible" href="lvju-app-lvju.html"><span class="ic">❤️</span>我的收藏<span class="tip">12 套房源</span><span class="ar">›</span></a>
-      <a href="#" hidden data-deferred><span class="ic">🧾</span>发票管理<span class="ar">›</span></a>
-    </div>
-
     <div class="menu">
       <a href="javascript:void(0)" id="mTicket"><span class="ic">🛠</span>服务工单<span class="tip" id="ticketTip">报修 · 保洁 · 管家</span><span class="ar">›</span></a>
       <a href="javascript:void(0)" id="m400"><span class="ic">📞</span>400 在线客服<span class="tip" id="t400">热线 400-900-6688</span><span class="ar">›</span></a>
@@ -312,7 +290,7 @@
     if (!nm || !ph) return;
     if (!loggedIn) {
       nm.textContent = '点击登录';
-      ph.textContent = '登录后查看订单与收藏';
+      ph.textContent = '登录后查看订单';
       return;
     }
     nm.textContent = (user && user.name) || '旅居用户';
