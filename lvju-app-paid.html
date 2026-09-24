@@ -61,22 +61,35 @@
   // ── 旅居预订支付完成（channel=booking）：双因子查单回显 ──
   if (q.get('channel') === 'booking') {
     var bNo = q.get('order_no') || '', bPhone = q.get('phone') || '';
+    var appOrderId = q.get('app_order_id') || '';
     document.querySelector('.ttl').textContent = '支付完成';
-    document.getElementById('okTitle').textContent = '支付成功';
-    document.getElementById('okDesc').innerHTML = '资金已存管冻结，商家确认后订单生效<br>退改按房型取消政策执行，可在「订单」页查看或取消';
+    document.getElementById('okTitle').textContent = '支付结果确认中';
+    document.getElementById('okDesc').textContent = '正在向支付中台确认支付结果，请勿重复支付';
     if (bNo && bPhone) {
-      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) })
+      var token = '';
+      try { token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch (_) {}
+      var headers = {'Content-Type':'application/json'};
+      if (token) headers.Authorization = 'Bearer ' + token;
+      fetch('/api/juzhu/payment/query', { method:'POST', headers: headers,
+        body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, app_order_id: appOrderId }) })
+        .catch(function(){ return null; })
+        .then(function(){ return fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) }); })
         .then(function(r){ return r.json(); })
         .then(function(d){
           var o = d.order || {};
+          var paid = o.pay_status === 'paid';
+          document.getElementById('okTitle').textContent = paid ? '支付成功' : '支付结果确认中';
+          document.getElementById('okDesc').textContent = paid
+            ? '资金已存管冻结，商家确认后订单生效'
+            : '尚未确认支付成功，请稍后刷新或返回订单页查看';
           if (o.cancel_policy_text) {
             // textContent 赋值（页面无 esc helper；政策文案为服务端下发非用户输入）
-            document.getElementById('okDesc').textContent = '资金已存管冻结，商家确认后订单生效 · 🕒 ' + o.cancel_policy_text;
+            document.getElementById('okDesc').textContent = (paid ? '资金已存管冻结，商家确认后订单生效' : '支付结果确认中') + ' · 🕒 ' + o.cancel_policy_text;
           }
           document.getElementById('svcName').textContent = o.project_name || '旅居预订';
           document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
-          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · 已支付 · 待商家确认';
+          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · ' + (paid ? '已支付 · 待商家确认' : '支付结果确认中');
           document.getElementById('infoPanel').innerHTML =
             '<div class="kv"><span class="k">预订项目</span><span class="v">' + (o.project_name || ('#' + o.project_id)) + '</span></div>' +
             '<div class="kv"><span class="k">实付金额</span><span class="v">¥' + Number(o.price_total).toLocaleString() + '</span></div>' +

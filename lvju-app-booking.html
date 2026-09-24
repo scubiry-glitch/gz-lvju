@@ -573,9 +573,42 @@
         var payBtn = document.getElementById('okPay');
         if (payBtn) {
           if (res.j.pay_status === 'unpaid') {
-            payBtn.href = 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(res.j.order_no) +
-              '&phone=' + encodeURIComponent(body.contact_phone) + '&price=' + encodeURIComponent(res.j.price_total || '');
+            payBtn.href = '#';
             payBtn.style.display = 'inline-block';
+            payBtn.onclick = function(e){
+              e.preventDefault();
+              if (payBtn.dataset.submitting === '1') return;
+              payBtn.dataset.submitting = '1';
+              var label = payBtn.textContent;
+              payBtn.textContent = '正在拉起收银台…';
+              var reset = function(){ payBtn.dataset.submitting = ''; payBtn.textContent = label; };
+              var result = 'lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(res.j.order_no) +
+                '&phone=' + encodeURIComponent(body.contact_phone);
+              // 先查单校验，再向中台下单；cashier_type 由前端运行环境判断。
+              fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ order_no: res.j.order_no, contact_phone: body.contact_phone }) })
+                .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+                .then(function(lk){
+                  if (!lk.ok) { alert(lk.d.error || '订单校验失败'); reset(); return null; }
+                  var o = lk.d.order || {};
+                  if (o.pay_status === 'paid') { location.href = result; return null; }
+                  if (o.status !== 'pending') { alert('订单状态为「' + o.status + '」，无需支付'); reset(); return null; }
+                  var cashierType = sdkProbe() ? '1' : '2';
+                  var payHeaders = { 'Content-Type': 'application/json' };
+                  var pt = tok(); if (pt) payHeaders['Authorization'] = 'Bearer ' + pt;
+                  return fetch('/api/juzhu/booking/pay', { method:'POST', headers: payHeaders,
+                    body: JSON.stringify({ order_no: res.j.order_no, contact_phone: body.contact_phone, cashier_type: cashierType }) })
+                    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+                    .then(function(pay){
+                      if (!pay.ok) { alert(pay.d.error || '支付失败'); reset(); return; }
+                      var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
+                      // App 内由桥能力拉起；桥未注入或 H5 直接跳中台收银台地址。
+                      if (pay.d.cashier_url) { location.href = pay.d.cashier_url; return; }
+                      location.href = paid;
+                    });
+                })
+                .catch(function(){ alert('网络异常，请稍后再试'); reset(); });
+            };
           } else {
             payBtn.style.display = 'none';
           }
