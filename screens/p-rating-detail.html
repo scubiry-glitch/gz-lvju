@@ -540,9 +540,15 @@
         fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
           method:'POST', headers: authHeaders(),
           body: JSON.stringify({ action:'reject', note: note })
-        }).then(function(r){ return r.json(); }).then(function(){
+        }).then(function(r){
+          return r.json().then(function(j){ return { ok: r.ok, j: j }; });
+        }).then(function(res){
+          if (!res.ok || (res.j && res.j.error)) {
+            alert('驳回失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && /登录/.test(res.j.message || '') ? '（请刷新页面重新登录）' : ''));
+            return;
+          }
           alert('已驳回'); location.href = 'p-rating-review.html';
-        });
+        }).catch(function(){ alert('驳回请求失败：网络异常或服务未启动'); });
       };
       bar.querySelector('.btn-primary').onclick = function(){
         var fd = {};
@@ -554,9 +560,15 @@
         fetch('/api/juzhu/admin/ratings/'+encodeURIComponent(id)+'/review', {
           method:'POST', headers: authHeaders(),
           body: JSON.stringify({ action:'pass', dims: fd, note: note, checked: rating.checked, total: rating.total })
-        }).then(function(r){ return r.json(); }).then(function(){
+        }).then(function(r){
+          return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; });
+        }).then(function(res){
+          if (!res.ok || (res.j && res.j.error)) {
+            alert('复核失败：' + ((res.j && (res.j.message || res.j.error)) || 'HTTP ' + res.status) + (res.j && /登录/.test(res.j.message || '') ? '（请刷新页面重新登录）' : ''));
+            return;
+          }
           alert('复核通过，前台详情页将展示正式评级'); location.href = 'p-rating-review.html';
-        });
+        }).catch(function(){ alert('复核请求失败：网络异常或服务未启动'); });
       };
     }).catch(function(){
       document.querySelector('.page-header .sub').textContent = '未找到 '+id+' · 请确认 juzhu-admin 已提交且 server.py 在运行';

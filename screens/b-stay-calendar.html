@@ -283,7 +283,14 @@
     fu.innerHTML = '<option value="">整栋 / 不限房型</option>' + us.map(function(u){
       return '<option value="'+u.id+'">'+esc(u.name)+(u.layout_label?' · '+esc(u.layout_label):'')+'（'+(parseInt(u.total_qty,10)||1)+' 间）</option>';
     }).join('');
-    state.unitId = 0;
+    // 有户型时默认选中第一个户型（接口推送的房态都挂在户型上，默认整栋视图会让商家看不到推送结果；
+    // 整栋日历是 unit_id=0 的独立层，仍可手动切换）
+    if (us.length) {
+      fu.value = String(us[0].id);
+      state.unitId = us[0].id;
+    } else {
+      state.unitId = 0;
+    }
   }
 
   function loadConfig(){
@@ -324,7 +331,11 @@
     $('mLabel').textContent = state.month.replace('-', ' / ');
     $('calTitle').textContent = '房态月历 · ' + state.month;
     $('cal').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0;">加载房态…</div>';
-    var url = API + '/projects/' + state.pid + '/stay-calendar?month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '');
+    // 会话态走商家专用接口（owner 校验、不要求 online——draft/下架房源也要能管房态）；
+    // 只读降级态才走 C 端公开接口（公开接口仅 online+passed 房源可得，draft 会 404）
+    var url = state.writable
+      ? API + '/vendor/stay-calendar?project_id=' + state.pid + '&month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '')
+      : API + '/projects/' + state.pid + '/stay-calendar?month=' + state.month + (state.unitId ? '&unit_id=' + state.unitId : '');
     fetch(url).then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); }).then(function(j){
       var days = j.days || [];
       var p = currentProject();

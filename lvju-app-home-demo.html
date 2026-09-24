@@ -64,14 +64,7 @@
     opacity:.5;}
   .hero .mist{position:absolute;left:-10%;right:-10%;bottom:96px;height:120px;
     background:radial-gradient(50% 100% at 50% 100%,rgba(255,255,255,.22),transparent 70%);filter:blur(8px);z-index:1;}
-  .hero-in{position:relative;z-index:5;padding:0 20px;}
-  .h-top{display:flex;align-items:center;justify-content:space-between;}
-  .h-loc{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;}
-  .h-loc .pin{font-size:13px;}
-  .h-loc .city{display:flex;flex-direction:column;line-height:1.15;}
-  .h-loc .city small{font-size:9px;font-weight:400;opacity:.8;letter-spacing:.04em;}
-  .h-ico{display:flex;gap:8px;}
-  .h-ico span{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:14px;backdrop-filter:blur(4px);}
+  .hero-in{position:relative;z-index:5;padding:30px 20px 0;}
   .editorial{margin-top:34px;}
   .editorial .ek{font-size:10px;letter-spacing:.4em;text-transform:uppercase;opacity:.85;}
   .editorial h2{font-family:var(--serif);font-weight:700;font-size:30px;line-height:1.22;margin-top:8px;text-shadow:0 2px 18px rgba(0,0,0,.3);}
@@ -160,8 +153,7 @@
   .mcard .pr b small{font-size:10px;color:var(--muted);font-weight:400;font-family:var(--font);}
   .mcard .pr .bk{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 16px;border-radius:999px;}
 
-  /* 左上角城市切换（与桌面首页同源：localStorage bzf_jz_city + URL ?city=） */
-  .h-loc{cursor:pointer;user-select:none;}
+  /* 城市切换弹层（URL ?city= / localStorage bzf_jz_city） */
   .csheet{position:absolute;inset:0;z-index:60;display:none;}
   .csheet.on{display:block;}
   .cs-mask{position:absolute;inset:0;background:rgba(8,18,16,.45);}
@@ -194,13 +186,6 @@
       <div class="bgimg"></div>
       <div class="mist"></div>
       <div class="hero-in">
-        <div class="h-top">
-          <div class="h-loc" id="cityChip">
-            <span class="pin">📍</span>
-            <span class="city"><span id="cityName">贵阳 ▾</span><small id="citySub">贵州 · 旅居目的地</small></span>
-          </div>
-          <div class="h-ico"><span>♡</span><a href="lvju-app-messages.html" style="text-decoration:none" hidden data-deferred><span>☷</span></a></div>
-        </div>
         <div class="editorial">
           <div class="ek">Travel to Guizhou, Live More</div>
           <h2>旅居到贵州，<br>生活更精彩</h2>
@@ -310,7 +295,7 @@
 </script>
 <script>
 /* 精选好房 = 后台 is_featured 优先，不足 2 个时由特色旅居项目补齐，统一读 catalog。
-   左上角城市切换（口径与桌面首页一致）：URL ?city= > localStorage bzf_jz_city > 默认 贵阳；
+   城市口径：URL ?city= > localStorage bzf_jz_city > 默认 贵阳；
    切换后重拉目标城市 catalog 并重绘，频道链接携带 ?city= 供子页续读。 */
 (function(){
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -319,12 +304,6 @@
   // 城市提示：URL 直链 > 本地存储（与首页同一 bzf_jz_city 键）> 页面默认（旅居首页=贵阳）
   var qs = new URLSearchParams(location.search);
   var CITY = qs.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || '贵阳';
-
-  function paintChip(){
-    var prov = (window.BZF_JZ && BZF_JZ.provinceOf) ? (BZF_JZ.provinceOf(CITY) || '') : '';
-    document.getElementById('cityName').textContent = CITY + ' ▾';
-    document.getElementById('citySub').textContent = prov ? (prov + (prov === '贵州' ? ' · 旅居目的地' : ' · 找房')) : '旅居目的地';
-  }
 
   function chainCityLinks(){
     document.querySelectorAll('.app a[href*="lvju-app-"]').forEach(function(a){
@@ -446,10 +425,9 @@
       p.set('city', city);
       history.replaceState(null, '', location.pathname + '?' + p.toString());
     } catch(e){}
-    paintChip(); chainCityLinks(); closeSheet(); loadFeaturedPosts(); loadFeatured();
+    chainCityLinks(); closeSheet(); loadFeaturedPosts(); loadFeatured();
   }
 
-  document.getElementById('cityChip').addEventListener('click', openSheet);
   document.getElementById('citySheet').addEventListener('click', function(e){
     if (e.target.hasAttribute('data-close')) { closeSheet(); return; }
     var prov = e.target.closest('[data-prov]');
@@ -458,7 +436,6 @@
     if (pick) doSwitch(pick.getAttribute('data-city'));
   });
 
-  paintChip();
   chainCityLinks();
   loadFeaturedPosts();
   loadFeatured();

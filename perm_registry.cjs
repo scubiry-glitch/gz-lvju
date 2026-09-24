@@ -68,6 +68,7 @@ const PERMS = [
   { code: 'vendor.fund.read',     name: '商家资金只读', domain: 'vendor', action: 'read',  desc: '商家对账/佣金', roles: ['vendor_owner'] },
   { code: 'vendor.fund.write',    name: '商家费率管理', domain: 'vendor', action: 'write', desc: '商家佣金费率调整（按业务线两档，规则 20）', roles: ['platform_op', 'operator_admin'] },
   { code: 'vendor.onboarding.review', name: '商家入驻受理', domain: 'vendor', action: 'review', desc: '商家入驻申请单受理/核验/通过/驳回（服务认证中台）', roles: ['platform_op', 'operator_admin'] },
+  { code: 'vendor.review', name: '商家资质复审', domain: 'vendor', action: 'review', desc: 'jz_vendors 商家资质复审（reviewing/approved/rejected + status 联动；复审动作留痕）', roles: ['platform_op', 'operator_admin'] },
 ];
 
 /**
@@ -175,6 +176,9 @@ const ROUTES = [
   { method: 'GET',    re: '^/api/juzhu/admin/vendors/commission-history$', perm: 'vendor.fund.write', act: 'vendor.commission.history', res: 'vendors' },
   { method: 'PUT',    re: '^/api/juzhu/admin/vendors/commission-defaults$', perm: 'vendor.fund.write', act: 'vendor.commission.defaults', res: 'settings' },
   { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/commission$', perm: 'vendor.fund.write', act: 'vendor.commission.update', res: 'vendors', idGroup: 1 },
+  // 商家资质复审（jz_vendors.review_status；2026-09-22 补登记——此前未登记走 admin.write 兜底、复审无审计留痕）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors$', perm: 'admin.read', act: 'vendor.list', res: 'vendors' },
+  { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/review$', perm: 'vendor.review', act: 'vendor.review.update', res: 'vendors', idGroup: 1 },
   // IAM
   { method: 'POST',   re: '^/api/juzhu/admin/accounts$', perm: 'iam.write', act: 'account.create', res: 'account' },
   { method: 'PUT',    re: '^/api/juzhu/admin/accounts/(\\d+)$', perm: 'iam.write', act: 'account.update', res: 'account', idGroup: 1 },

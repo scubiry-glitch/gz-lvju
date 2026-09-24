@@ -91,6 +91,33 @@
     }
     @media (max-width: 600px){.impl-aligned{grid-template-columns:1fr 1fr !important;}}
 
+    /* ===== ● 绿色认证 · 全链路管控（§4 子面板） ===== */
+    .green-cert{margin-top:16px; border:1px solid #bbf7d0; border-radius:10px; overflow:hidden;}
+    .green-cert .gc-head{background:linear-gradient(90deg,#065f46,#16a34a); color:#fff; padding:10px 14px; font-size:13px; font-weight:700;}
+    .green-cert .gc-head .gc-sub{font-weight:400; font-size:11px; opacity:.85; margin-left:8px;}
+    .green-cert .gc-body{padding:14px; background:#f0fdf4;}
+    .gc-cards{display:grid; grid-template-columns:repeat(5,1fr); gap:8px;}
+    .gc-card{background:#fff; border:1px solid #d1fae5; border-radius:8px; padding:10px 12px;}
+    .gc-card .t{font-size:12px; font-weight:700; color:#065f46;}
+    .gc-card .d{font-size:11px; color:#334155; line-height:1.55; margin-top:5px;}
+    .gc-card .d b{color:#059669;}
+    .gc-flow-wrap{margin-top:14px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:14px;}
+    .gc-flow-wrap .ft{font-size:12px; font-weight:700; color:#0f172a;}
+    .gc-flow{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:10px;}
+    .gc-stage{min-width:0;}
+    .gc-arrow{height:40px; background:#1677ff; color:#fff; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700;
+      clip-path:polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%);}
+    .gc-stage:first-child .gc-arrow{clip-path:polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);}
+    .gc-note{margin-top:10px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-left:3px solid #1677ff; border-radius:6px;}
+    .gc-note .nt{font-size:11.5px; font-weight:700; color:#0f172a; line-height:1.4;}
+    .gc-note ul{margin:5px 0 0; padding-left:14px; font-size:10.5px; color:#475569; line-height:1.55;}
+    .gc-note ul b{color:#dc2626;}
+    @media (max-width:1100px){
+      .gc-cards{grid-template-columns:repeat(2,1fr);}
+      .gc-flow{grid-template-columns:repeat(2,1fr);}
+      .gc-stage:first-child .gc-arrow{clip-path:polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%);}
+    }
+
     /* ===== 综合星级总览 ===== */
     .star-hero{
       display:grid; grid-template-columns:1fr 2fr; gap:18px;
@@ -467,12 +494,12 @@
         </div>
         <div class="col">
           <div class="col-head">列 2 · 基础设施 / 公区</div>
-          <a href="p-standards.html" class="impl-pill">中台·标准体系<br/><small style="opacity:0.7;">标准 v2.4</small><span class="file">p-standards.html</span></a>
+          <a href="p-rating-review.html" class="impl-pill">中台·房源评级复核<br/><small style="opacity:0.7;">评级审核 · 过审自动上架</small><span class="file">p-rating-review.html</span></a>
         </div>
         <div class="col">
           <div class="col-head">列 3 · 房间配套 / 周边</div>
           <a href="p-cert-issue.html" class="impl-pill">中台·复核发证<br/><small style="opacity:0.7;">2.4k 张证书</small><span class="file">p-cert-issue.html</span></a>
-          <a href="detail.html" class="impl-pill">详情页·55 项达标<br/><small style="opacity:0.7;">折叠面板</small><span class="file">detail.html</span></a>
+          <a href="https://xjz.ke.com/juzhu-unit-detail.html?project=CCB%E5%BB%BA%E8%9E%8D%E5%AE%B6%E5%9B%AD%E6%96%B0%E5%B8%82%E5%B8%82%E5%BA%97&unit=35%E5%B9%B3&channel=bzf" target="_blank" rel="noopener" class="impl-pill">详情页·55 项达标<br/><small style="opacity:0.7;">C 端实机 · 建融家园 35平户型</small><span class="file">juzhu-unit-detail.html</span></a>
         </div>
       </div>
     </div>
@@ -528,6 +555,119 @@
           <div class="col-head">🛎 服务标准</div>
           <a href="service-workers.html" class="impl-pill">服务者公示<span class="file">service-workers.html</span></a>
           <a href="repair.html" class="impl-pill">报修服务<span class="file">repair.html</span></a>
+        </div>
+      </div>
+
+      <!-- ● 绿色认证 · 全链路管控 -->
+      <div class="green-cert">
+        <div class="gc-head">● 绿色认证 · 从材料源头到租后兜底的全链路管控
+          <span class="gc-sub">5 个抓手：源头胶水+板材认证 → 前置晾晒 → 溯源管理 → 甲醛报告 → 保险保障</span>
+        </div>
+        <div class="gc-body">
+          <div class="gc-cards">
+            <div class="gc-card">
+              <div class="t">🧴 源头胶水 + 板材认证</div>
+              <div class="d">甲醛第一源头是人造板<b>胶水</b>。与<b>万华</b>共建绿色材料相关标准，胶水/板材完成<b>绿色认证评级</b>；产品开发核心物资一律选用<b>低醛/无醛</b>环保材料，从源头压降释放量。</div>
+            </div>
+            <div class="gc-card">
+              <div class="t">🌬 前置晾晒</div>
+              <div class="d">竣工后<b>开窗通风 7 天</b>再进入上线流程，污染物 <b>TVOC 有效降低高达 50%</b>；晾晒是交付标配工序，未完成晾晒的房源不进入招租。</div>
+            </div>
+            <div class="gc-card">
+              <div class="t">🔎 溯源管理</div>
+              <div class="d">物资<b>二维码溯源 + 批次检验</b>；进场核验是否符合品牌标准并纳入<b>供应商分级考核</b>，施工中由<b>三方监理</b>现场物资检查，违规即<b>停工、降级、淘汰</b>。</div>
+            </div>
+            <div class="gc-card">
+              <div class="t">📋 甲醛报告</div>
+              <div class="d">选品要求提供<b>检测报告</b>，上线前必须<b>甲醛检测合格</b>方可招租；上市后将【室内空气质量检测报告<b>一次性合格率</b>】纳入考核，不合格采取<b>整改、下市</b>等措施。</div>
+            </div>
+            <div class="gc-card">
+              <div class="t">🛡 保险保障</div>
+              <div class="d"><b>租后兜底</b>：交付后出现甲醛超标，保险可<b>兜底赔付最高 10 万元</b>，把「绿色达标」从承诺变成可赔付的责任。</div>
+            </div>
+          </div>
+
+          <div class="gc-flow-wrap">
+            <div class="ft">🔗 绿色认证六阶段 · 全链路管控（材料源头 → 租后兜底）</div>
+            <div class="gc-flow">
+              <div class="gc-stage">
+                <div class="gc-arrow">开发前管理</div>
+                <div class="gc-note">
+                  <div class="nt">建立绿色相关标准</div>
+                  <ul>
+                    <li>与<b>万华</b>共建绿色材料相关标准</li>
+                    <li>完成物料<b>绿色认证评级</b></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="gc-stage">
+                <div class="gc-arrow">产品开发及管理</div>
+                <div class="gc-note">
+                  <div class="nt">产品开发与运营管理</div>
+                  <ul>
+                    <li>核心物资选用<b>低醛/无醛</b>等环保材料</li>
+                    <li>上市后将【室内空气质量检测报告<b>一次性合格率</b>】纳入考核，不合格<b>整改、下市</b></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="gc-stage">
+                <div class="gc-arrow">选品供应</div>
+                <div class="gc-note">
+                  <div class="nt">物资供应商管理</div>
+                  <ul>
+                    <li>要求提供符合要求的产品并提供<b>检测报告</b></li>
+                    <li><b>进场核验</b>是否符合品牌标准，纳入供应商<b>分级考核</b></li>
+                  </ul>
+                </div>
+              </div>
+              <div class="gc-stage">
+                <div class="gc-arrow">施工交付</div>
+                <div class="gc-note">
+                  <div class="nt">供应商管理</div>
+                  <ul>
+                    <li><b>施工</b>：<b>三方监理</b>现场物资检查，违规则<b>停工、降级、淘汰</b></li>
+                    <li><b>物资</b>：<b>二维码溯源</b>，批次检验</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="gc-stage">
+                <div class="gc-arrow">房源上线</div>
+                <div class="gc-note">
+                  <div class="nt">房源上线管理</div>
+                  <ul>
+                    <li>竣工后<b>开窗通风 7 天</b>，有效降低污染物 TVOC 高达 <b>50%</b></li>
+                    <li>必须通过<b>甲醛检测合格</b>后方可上线招租</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="gc-stage">
+                <div class="gc-arrow">租后管理</div>
+                <div class="gc-note">
+                  <div class="nt">保险品质兜底</div>
+                  <ul>
+                    <li>交付后出现甲醛超标，保险可<b>兜底赔付最高 10 万元</b></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="impl-aligned cols-3">
+            <div class="impl-banner">📎 绿色认证 · 已实现页面（佐证录入 / C 端展示 / 供应商管理）</div>
+            <div class="col">
+              <div class="col-head">📋 佐证录入</div>
+              <a href="b-house-rating-input.html" class="impl-pill">55 项自评含甲醛检测+保险<span class="file">b-house-rating-input.html</span></a>
+            </div>
+            <div class="col">
+              <div class="col-head">🌿 C 端展示</div>
+              <a href="detail.html" class="impl-pill">详情页·达标明细/保险展示<span class="file">detail.html</span></a>
+            </div>
+            <div class="col">
+              <div class="col-head">🏭 供应商管理</div>
+              <a href="suppliers.html" class="impl-pill">合格供应商公示<span class="file">suppliers.html</span></a>
+              <a href="m-supplier-catalog.html" class="impl-pill">商品目录（批次/质检）<span class="file">m-supplier-catalog.html</span></a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

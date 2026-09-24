@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS cities (
   name            VARCHAR(128) NOT NULL UNIQUE,
   slug            VARCHAR(128) NOT NULL UNIQUE,
   booking_phone   VARCHAR(32),
-  hero_bg_image   TEXT
+  hero_bg_image   TEXT,
+  hidden_home_tabs TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS districts (

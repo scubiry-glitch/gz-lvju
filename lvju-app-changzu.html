@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>长租 · 整租·合租·月付 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=5">
+<link rel="stylesheet" href="lvju-app.css?v=7">
+<script src="lvju-app-price.js?v=1"></script>
 </head>
 <body>
 <div class="app">
@@ -106,12 +107,17 @@
       // 标题：项目名 · 亮点 + 居室（如 “甲秀楼店 · 精装三居”），原始户型名放 meta
       var hi = pickHighlight(tags), room = cnRoom(u.layout_label);
       var title = p.name + (hi ? ' · ' + hi : '') + (room ? room : '');
+      // 价格：户型月租直读；无月租回落服务端展示价三件套（rule 16，页面不自行折算）
+      var pd = window.LVJU_PRICE ? LVJU_PRICE.parts(p) : null;
+      var price = u.rent_monthly
+        ? '¥' + fmt(u.rent_monthly) + '<small> /月</small>'
+        : (pd && pd.value != null ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>' : (pd ? pd.note : '价格面议'));
       return '<a class="lrow" href="lvju-app-detail.html?id=' + p.id + '">' + th +
         '<span class="star">' + esc(u.layout_label || '在租') + '</span></div>' +
         '<div class="info"><div class="nm">' + esc(title) + '</div>' +
         '<div class="meta">' + esc(meta) + '</div>' +
         '<div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在租</span>') + '</div>' +
-        '<div class="pr"><b>' + (u.rent_monthly ? '¥' + fmt(u.rent_monthly) + '<small> /月</small>' : '价格面议') + '</b>' +
+        '<div class="pr"><b>' + price + '</b>' +
         (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') +
         '<span class="unit">门店 · ' + esc(p.name) + '</span></div></div></a>';
     }).join('');

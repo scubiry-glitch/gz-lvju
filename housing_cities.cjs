@@ -1,6 +1,25 @@
 // housing_cities.cjs — 保租房/卖旧买新城市 CRUD 纯函数（不连库）
 'use strict';
 
+// 首页频道 ID 是前台 tab 的稳定契约；城市配置只能隐藏这些已知 tab，
+// 不把任意字符串写进配置，避免误隐藏后台/专题等非首页频道。
+const HOME_TAB_IDS = Object.freeze([
+  'rental', 'minsu', 'newhouse', 'resale', 'bzf', 'trade', 'jiazheng',
+]);
+
+function parseHiddenHomeTabs(raw) {
+  let value = raw;
+  if (typeof value === 'string') {
+    if (!value.trim()) return [];
+    try { value = JSON.parse(value); } catch (_) { return []; }
+  }
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value
+    .filter((id) => typeof id === 'string')
+    .map((id) => id.trim())
+    .filter((id) => HOME_TAB_IDS.includes(id))));
+}
+
 function slugifyCity(name) {
   const trimmed = String(name || '').replace(/[（(].*?[）)]/g, '').trim();
   return trimmed.replace(/\s+/g, '-') || 'city';
@@ -34,6 +53,24 @@ function validateCityWrite(body, opts) {
   }
   if (Object.prototype.hasOwnProperty.call(raw, 'hero_bg_image')) {
     fields.hero_bg_image = String(raw.hero_bg_image || '').trim() || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'hidden_home_tabs')) {
+    if (!Array.isArray(raw.hidden_home_tabs)) {
+      return { ok: false, error: 'hidden_home_tabs 必须是首页 tab ID 数组', status: 400 };
+    }
+    const hidden = [];
+    for (const value of raw.hidden_home_tabs) {
+      if (typeof value !== 'string') {
+        return { ok: false, error: 'hidden_home_tabs 包含未知首页 tab ID', status: 400 };
+      }
+      const id = value.trim();
+      if (!HOME_TAB_IDS.includes(id)) {
+        return { ok: false, error: 'hidden_home_tabs 包含未知首页 tab ID: ' + id, status: 400 };
+      }
+      if (!hidden.includes(id)) hidden.push(id);
+    }
+    fields.hidden_home_tabs = JSON.stringify(hidden);
   }
 
   if (partial && !Object.keys(fields).length) {
@@ -81,6 +118,8 @@ function classifyDupKey(err) {
 }
 
 module.exports = {
+  HOME_TAB_IDS,
+  parseHiddenHomeTabs,
   slugifyCity,
   validateCityWrite,
   canDeleteCity,
