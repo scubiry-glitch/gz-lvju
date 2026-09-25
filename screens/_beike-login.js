@@ -308,6 +308,73 @@
     return true;
   }
 
+  /* 接口 401：清本地票；贝壳 App 内弹原生登录（防连跳用 jumpedRecently）。
+     密码登录口本身的 401（账密错）不触发，避免填错密码被踢进原生登录。 */
+  function clearAuthTokens() {
+    setToken('');
+    try { localStorage.removeItem('BZF_SESSION_TOKEN'); } catch (e) {}
+    try { localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch (e) {}
+  }
+
+  function isCredentialLoginUrl(url) {
+    return /\/api\/auth\/login(?:\?|$)|\/api\/juzhu\/auth\/tenant(?:\?|$)/.test(String(url || ''));
+  }
+
+  function requestUrl(input) {
+    try {
+      if (typeof input === 'string') return input;
+      if (input && typeof input.url === 'string') return input.url;
+    } catch (e) {}
+    return '';
+  }
+
+  function requestHadAuth(input, init) {
+    try {
+      var h = init && init.headers;
+      if (h) {
+        if (typeof Headers !== 'undefined' && h instanceof Headers) {
+          return !!(h.get('Authorization') || h.get('authorization'));
+        }
+        if (typeof h === 'object') {
+          return !!(h.Authorization || h.authorization);
+        }
+      }
+      if (typeof Request !== 'undefined' && input instanceof Request) {
+        return !!(input.headers.get('Authorization') || input.headers.get('authorization'));
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function handleUnauthorized(opts) {
+    opts = opts || {};
+    clearAuthTokens();
+    if (!isBeikeApp()) return false;
+    if (!opts.force && jumpedRecently()) return false;
+    return jumpToLogin(opts.returnUrl || location.href);
+  }
+
+  function installFetch401() {
+    if (w.__BZF_FETCH_401_PATCHED) return;
+    w.__BZF_FETCH_401_PATCHED = true;
+    var raw = w.fetch;
+    if (typeof raw !== 'function') return;
+    w.fetch = function (input, init) {
+      var url = requestUrl(input);
+      var hadAuth = requestHadAuth(input, init);
+      return raw.apply(this, arguments).then(function (res) {
+        try {
+          if (res && res.status === 401 && isBeikeApp() && !isCredentialLoginUrl(url) &&
+              (hadAuth || /\/api\/juzhu\//.test(url) || /\/api\/auth\//.test(url))) {
+            handleUnauthorized();
+          }
+        } catch (e) {}
+        return res;
+      });
+    };
+  }
+  installFetch401();
+
   function resumeAfterLogin() {
     tryExchangeFromApp(function (ok) {
       var next = '';
@@ -400,6 +467,8 @@
     isBeikeApp: isBeikeApp,
     token: token,
     setToken: setToken,
+    clearAuthTokens: clearAuthTokens,
+    handleUnauthorized: handleUnauthorized,
     appUserInfo: appUserInfo,
     pickUser: pickUser,
     exchange: exchange,

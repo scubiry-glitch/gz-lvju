@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>周边玩法 · 必打卡 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=6">
+<link rel="stylesheet" href="lvju-app.css?v=8">
+<style>
+  .wrap{padding:4px 16px 8px;}
+  .empty{text-align:center;padding:36px 16px;color:var(--muted);font-size:12px;line-height:1.8;}
+  .empty a{display:inline-block;margin-top:12px;padding:8px 20px;border-radius:999px;background:var(--brand);color:#fff;font-weight:600;font-size:12px;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -14,7 +19,6 @@
     <div class="appbar ghost">
       <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
       <div class="ttl">周边玩法<small>必打卡 · 玩在贵州</small></div>
-      <div class="act"><span>🔍</span><span>♡</span></div>
     </div>
 
     <div class="hero-sm">
@@ -29,11 +33,11 @@
     <div class="filt" id="filt"></div>
 
     <div class="wrap" id="spotWrap">
-      <div style="text-align:center;color:#9aa5a1;padding:28px 0;font-size:12px;">加载中…</div>
+      <div class="empty">加载中…</div>
     </div>
 
-    <div class="banner gold">
-      <span class="bi">🏔</span>
+    <div class="banner">
+      <span class="bi">住</span>
       <div class="bt"><b>看上了这片山水？</b><p>找房枢纽按城市 / 价格 / 评分帮你挑好房</p></div>
       <a class="go" id="hubLink" href="lvju-app-search.html">订旅居 ›</a>
     </div>
@@ -41,15 +45,15 @@
   </div>
 
   <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
-    <a class="on"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
+    <a href="lvju-app-home-demo.html"><span class="ti"><img src="assets/lvju/icons/tab-home-off.svg" alt=""></span>首页</a>
+    <a href="lvju-app-search.html"><span class="ti"><img src="assets/lvju/icons/tab-search-off.svg" alt=""></span>找房</a>
+    <a class="on"><span class="ti"><img src="assets/lvju/icons/tab-content-on.svg" alt=""></span>内容</a>
+    <a href="lvju-app-orders.html"><span class="ti"><img src="assets/lvju/icons/tab-orders-off.svg" alt=""></span>订单</a>
+    <a href="lvju-app-me.html"><span class="ti"><img src="assets/lvju/icons/tab-me-off.svg" alt=""></span>我的</a>
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=8"></script>
+<script src="screens/_beike-login.js?v=9"></script>
 <script>
 /* 周边玩法列表：数据来自 GET /api/juzhu/spots?city=&type=（spots 表，规则 17 单一数据源；
    后台 juzhu-admin「内容」tab 维护）。卡片深链 → 笔记详情页 lvju-app-spot-post?id=。
@@ -75,11 +79,11 @@
     var bg = s.cover_image
       ? 'background-image:url(' + esc(s.cover_image) + ')'
       : FB[i % FB.length];
-    var lv = (s.tags && s.tags.length) ? '★ ' + s.tags.slice(0, 1).join('') : (s.type_label || '');
+    var lv = (s.tags && s.tags.length) ? s.tags.slice(0, 1).join('') : (s.type_label || '');
     var meta = [
-      s.address ? '📍 ' + s.address : '',
-      s.ticket ? '🎫 ' + s.ticket : '',
-      s.duration ? '⏱ ' + s.duration : ''
+      s.address || '',
+      s.ticket || '',
+      s.duration || ''
     ].filter(Boolean).map(function(m){ return '<span>' + esc(m) + '</span>'; }).join('');
     return '<a class="spot" href="lvju-app-spot-post.html?id=' + s.id + '">' +
       '<div class="bg ' + (s.cover_image ? '' : bg) + '"' + (s.cover_image ? ' style="' + bg + '"' : '') + '></div>' +
@@ -91,9 +95,8 @@
     var wrap = document.getElementById('spotWrap');
     var list = TYPE ? rows.filter(function(s){ return s.type === TYPE; }) : rows;
     if (!list.length) {
-      wrap.innerHTML = '<div style="text-align:center;padding:30px 16px;color:#9aa5a1;font-size:12px;line-height:1.8;">' +
-        '当前城市「' + esc(CITY) + '」暂无' + (TYPE ? '该类' : '') + '玩法内容 · 可到找房枢纽切换城市<br/>' +
-        '<a href="lvju-app-search.html?city=' + encodeURIComponent(CITY) + '" style="display:inline-block;margin-top:10px;padding:8px 22px;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-deep));color:#fff;font-weight:700;font-size:12.5px;">去找房枢纽</a></div>';
+      wrap.innerHTML = '<div class="empty">当前城市「' + esc(CITY) + '」暂无' + (TYPE ? '该类' : '') + '玩法内容<br/>可到找房枢纽切换城市' +
+        '<br/><a href="lvju-app-search.html?city=' + encodeURIComponent(CITY) + '">去找房枢纽</a></div>';
       return;
     }
     wrap.innerHTML = list.map(cardHtml).join('');
@@ -113,7 +116,7 @@
     })
     .catch(function(){
       document.getElementById('spotWrap').innerHTML =
-        '<div style="text-align:center;color:#b45309;padding:28px 0;font-size:12px;">无法连接内容数据 · 请稍后再试</div>';
+        '<div class="empty" style="color:#b45309;">无法连接内容数据 · 请稍后再试</div>';
     });
 })();
 </script>

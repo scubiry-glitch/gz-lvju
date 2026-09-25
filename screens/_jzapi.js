@@ -63,6 +63,9 @@
       options.headers['Content-Type'] = 'application/json';
     }
     return fetch(url, options).then(function (r) {
+      if (r.status === 401 && window.BZF_BEIKE_LOGIN && typeof BZF_BEIKE_LOGIN.handleUnauthorized === 'function') {
+        try { BZF_BEIKE_LOGIN.handleUnauthorized(); } catch (e) {}
+      }
       return r.json().then(function (data) {
         if (!r.ok) throw new Error(data.error || data.message || ('HTTP ' + r.status));
         return data;
