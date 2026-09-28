@@ -285,23 +285,28 @@
   <div id="tab-bar" data-series="lvju" data-active="home"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=9"></script>
-<script src="screens/_jzapi.js?v=9"></script>
+<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
   function dumpLogin(tag){
     var L = window.BZF_BEIKE_LOGIN;
     console.log('[login]', tag, {
+      isLoggedIn: L && L.isLoggedIn ? L.isLoggedIn() : false,
       BJZ_TOKEN: L && L.token ? L.token() : '',
       lianjia_token: L && L.beikeAccessToken ? L.beikeAccessToken() : (L && L.lianjiaToken ? L.lianjiaToken() : ''),
       accessToken: L && L.ljAccessToken ? L.ljAccessToken() : '',
       beikeLoggedIn: L && L.beikeLoggedIn ? L.beikeLoggedIn() : false,
       isBeikeApp: L && L.isBeikeApp ? L.isBeikeApp() : false,
-      userInfo: L && L.appUserInfo ? L.appUserInfo() : null,
-      cookie: (typeof document !== 'undefined' && document.cookie) || ''
+      user: L && L.lastUser ? L.lastUser() : null,
+      userInfo: L && L.appUserInfo ? L.appUserInfo() : null
     });
   }
   dumpLogin('boot');
+  // 首进 C 端对齐身份（有 lianjia_token 即 ok；BJZ 后台可选换）
+  if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
+    BZF_BEIKE_LOGIN.trySyncIdentity(function(ok){ dumpLogin('sync:' + (ok ? 'ok' : 'fail')); });
+  }
   window.addEventListener('pageshow', function(){ dumpLogin('pageshow'); });
 })();
 </script>

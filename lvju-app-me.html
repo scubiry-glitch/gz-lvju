@@ -239,8 +239,8 @@
 </div>
 
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=9"></script>
-<script src="screens/_jzapi.js?v=9"></script>
+<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -401,12 +401,15 @@
     return false;
   }
   function onMeHdClick(){
-    if (window.BZF_BEIKE_LOGIN && !BZF_BEIKE_LOGIN.token()) tryAppLogin();
+    if (window.BZF_BEIKE_LOGIN && !BZF_BEIKE_LOGIN.isLoggedIn()) tryAppLogin();
   }
   var meAv = $('meAv'), meUi = $('meUi');
   if (meAv) meAv.addEventListener('click', onMeHdClick);
   if (meUi) meUi.addEventListener('click', onMeHdClick);
   if (window.BZF_BEIKE_LOGIN) {
+    // 先画缓存用户 / 已有票，避免切到「我的」先闪「点击登录」再等换票
+    var cached = BZF_BEIKE_LOGIN.lastUser();
+    if (cached || BZF_BEIKE_LOGIN.isLoggedIn()) paintMe(true, cached || null);
     BZF_BEIKE_LOGIN.ensureAppLogin({
       onReady: function(){
         paintMe(true, BZF_BEIKE_LOGIN.lastUser() || BZF_BEIKE_LOGIN.pickUser(BZF_BEIKE_LOGIN.appUserInfo()));
