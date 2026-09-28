@@ -282,14 +282,7 @@
     </div>
   </div>
 
-  <!-- tab bar：未选中 off（描边）/ 当前选中 on（实心） -->
-  <div class="tabbar">
-    <a class="on"><span class="ti"><img src="assets/lvju/icons/tab-home-on.svg" alt=""></span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti"><img src="assets/lvju/icons/tab-search-off.svg" alt=""></span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti"><img src="assets/lvju/icons/tab-content-off.svg" alt=""></span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti"><img src="assets/lvju/icons/tab-orders-off.svg" alt=""></span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti"><img src="assets/lvju/icons/tab-me-off.svg" alt=""></span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="home"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_beike-login.js?v=9"></script>
@@ -470,5 +463,6 @@
   loadFeatured();
 })();
 </script>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

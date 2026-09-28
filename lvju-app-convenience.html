@@ -4,17 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>旅游便民 · 出行·向导 · 贝壳旅居·内容服务</title>
-<link rel="stylesheet" href="lvju-app.css?v=6">
+<link rel="stylesheet" href="lvju-app.css?v=7">
+<style>
+  /* 便民服务：白卡 2×4（不要青绿底） */
+  .conv-svc{margin:0 0 14px;padding:0 12px;}
+  .conv-svc-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  }
+  .conv-tile{
+    background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 4px 10px;
+    text-align:center;color:var(--ink);text-decoration:none;
+  }
+  .conv-tile .ic{
+    width:36px;height:36px;margin:0 auto;border-radius:9px;overflow:hidden;
+    display:block;
+  }
+  .conv-tile .ic img{width:100%;height:100%;display:block;object-fit:cover;}
+  .conv-tile b{display:block;margin-top:6px;font-size:11px;font-weight:600;line-height:1.2;color:#222;}
+  .conv-tile small{display:block;margin-top:3px;font-size:9px;line-height:1.2;color:#9aa5a1;}
+  .banner .bi{background:transparent;padding:0;overflow:hidden;}
+  .banner .bi img{width:100%;height:100%;display:block;object-fit:cover;}
+</style>
 </head>
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar ghost">
-      <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">旅游便民<small>出行 · 向导 · 服务</small></div>
-      <div class="act"><span>☎</span><span>♡</span></div>
-    </div>
 
     <div class="hero-sm">
       <div class="bg s-city"></div>
@@ -26,15 +40,41 @@
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2>便民服务</h2></div>
-    <div class="grid4">
-      <a class="tile" href="#"><div class="ic">🚐</div><b>包车出行</b><small>持证司导</small></a>
-      <a class="tile" href="#"><div class="ic">🧑‍🦱</div><b>本地向导</b><small>认证向导</small></a>
-      <a class="tile" href="#"><div class="ic">🎫</div><b>门票预订</b><small>免排队</small></a>
-      <a class="tile" href="#"><div class="ic">🧳</div><b>行李寄存</b><small>就近网点</small></a>
-      <a class="tile" href="#"><div class="ic">⛅</div><b>天气预报</b><small>景区实况</small></a>
-      <a class="tile" href="#"><div class="ic">🚑</div><b>医疗急救</b><small>就近医院</small></a>
-      <a class="tile" href="#"><div class="ic">🗣</div><b>翻译助手</b><small>方言/外语</small></a>
-      <a class="tile" href="#"><div class="ic">🔌</div><b>充电租赁</b><small>共享充电</small></a>
+    <div class="conv-svc">
+      <div class="conv-svc-grid">
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-charter.png" alt=""></span>
+          <b>包车出行</b><small>持证司导</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-guide.png" alt=""></span>
+          <b>本地向导</b><small>认证向导</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-ticket.png" alt=""></span>
+          <b>门票预订</b><small>免排队</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-luggage.png" alt=""></span>
+          <b>行李寄存</b><small>就近网点</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-weather.png" alt=""></span>
+          <b>天气预报</b><small>景区实况</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-medical.png" alt=""></span>
+          <b>医疗急救</b><small>就近医院</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-translate.png" alt=""></span>
+          <b>翻译助手</b><small>方言/外语</small>
+        </a>
+        <a class="conv-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/conv-charge.png" alt=""></span>
+          <b>充电租赁</b><small>共享充电</small>
+        </a>
+      </div>
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2>黔东南 · 今日实况</h2></div>
@@ -45,20 +85,15 @@
     </div>
 
     <div class="banner">
-      <span class="bi">☎</span>
+      <span class="bi"><img src="assets/lvju/icons/guide-bi.png" alt=""></span>
       <div class="bt"><b>贵州旅居服务热线</b><p>12301 · 投诉举报 / 咨询求助 7×24h</p></div>
       <a class="go" href="#">一键拨打 ›</a>
     </div>
 
   </div>
 
-  <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
-    <a class="on"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="spots"></div>
 </div>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>
