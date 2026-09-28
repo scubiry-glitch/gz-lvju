@@ -4,17 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>置业导购 · 看房·测算·顾问 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=6">
+<link rel="stylesheet" href="lvju-app.css?v=7">
+<style>
+  /* 导购服务：白卡 2×3（不要青绿底） */
+  .guide-svc{margin:0 0 14px;padding:0 18px;}
+  .guide-svc-grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  }
+  .guide-tile{
+    background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 6px 12px;
+    text-align:center;color:var(--ink);text-decoration:none;
+  }
+  .guide-tile .ic{
+    width:40px;height:40px;margin:0 auto;border-radius:10px;overflow:hidden;
+    display:block;
+  }
+  .guide-tile .ic img{width:100%;height:100%;display:block;object-fit:cover;}
+  .guide-tile b{display:block;margin-top:8px;font-size:12px;font-weight:600;line-height:1.2;color:#222;}
+  .guide-tile small{display:block;margin-top:4px;font-size:10px;line-height:1.2;color:#9aa5a1;}
+  .banner .bi{background:transparent;padding:0;overflow:hidden;}
+  .banner .bi img{width:100%;height:100%;display:block;object-fit:cover;}
+</style>
 </head>
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar ghost">
-      <a class="bk" href="lvju-app-home-demo.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">置业导购<small>看房 · 测算 · 顾问</small></div>
-      <div class="act"><span>♡</span><span>⤴</span></div>
-    </div>
 
     <div class="hero-sm">
       <div class="bg s-city"></div>
@@ -26,13 +40,33 @@
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2>导购服务</h2></div>
-    <div class="grid3">
-      <a class="tile" href="#"><div class="ic">🚌</div><b>看房团</b><small>周末发车</small></a>
-      <a class="tile" href="#"><div class="ic">🧮</div><b>贷款测算</b><small>月供秒算</small></a>
-      <a class="tile" href="#"><div class="ic">👤</div><b>1对1顾问</b><small>持证顾问</small></a>
-      <a class="tile" href="#"><div class="ic">📑</div><b>政策解读</b><small>限购/补贴</small></a>
-      <a class="tile" href="#"><div class="ic">🧾</div><b>税费计算</b><small>过户明细</small></a>
-      <a class="tile" href="#"><div class="ic">🛡</div><b>签约存管</b><small>资金安全</small></a>
+    <div class="guide-svc">
+      <div class="guide-svc-grid">
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-tour.png" alt=""></span>
+          <b>看房团</b><small>周末发车</small>
+        </a>
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-loan.png" alt=""></span>
+          <b>贷款测算</b><small>月供秒算</small>
+        </a>
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-advisor.png" alt=""></span>
+          <b>1对1顾问</b><small>持证顾问</small>
+        </a>
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-policy.png" alt=""></span>
+          <b>政策解读</b><small>限购/补贴</small>
+        </a>
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-tax.png" alt=""></span>
+          <b>税费计算</b><small>过户明细</small>
+        </a>
+        <a class="guide-tile" href="#">
+          <span class="ic"><img src="assets/lvju/icons/guide-escrow.png" alt=""></span>
+          <b>签约存管</b><small>资金安全</small>
+        </a>
+      </div>
     </div>
 
     <div class="sec-h"><span class="bar"></span><h2>贷款测算 · 示意</h2><span class="more">重新测算 ›</span></div>
@@ -46,7 +80,7 @@
     <div class="sec-h"><span class="bar"></span><h2>专属顾问</h2></div>
     <div class="wrap">
       <div class="lrow" style="align-items:center;">
-        <div class="th g3" style="width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-size:30px;">👩‍💼</div>
+        <div class="th g3" style="width:72px;height:72px;border-radius:50%;overflow:hidden;flex-shrink:0;"><img src="assets/lvju/icons/agent-avatar.png" alt="" style="width:100%;height:100%;display:block;object-fit:cover;"></div>
         <div class="info"><div class="nm">罗敏 · 资深置业顾问</div>
           <div class="meta">从业 8 年 · 观山湖 / 花溪片区 · 服务 1,200+ 客户</div>
           <div class="tags"><span>持证 ✓</span><span>★4.9</span><span>响应快</span></div>
@@ -55,20 +89,15 @@
     </div>
 
     <div class="banner">
-      <span class="bi">🏢</span>
+      <span class="bi"><img src="assets/lvju/icons/guide-bi.png" alt=""></span>
       <div class="bt"><b>看新房 / 二手房源</b><p>边看边问，顾问帮你比对</p></div>
       <a class="go" href="lvju-app-newhouse.html">去看房 ›</a>
     </div>
 
   </div>
 
-  <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="search"></div>
 </div>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

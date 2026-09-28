@@ -25,7 +25,8 @@
   .verify .qrimg{width:48px;height:48px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
   .verify .vb a{color:var(--brand);}
   .host{display:flex;align-items:center;gap:12px;margin-top:11px;}
-  .host .av{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-size:24px;flex-shrink:0;background:var(--brand-soft);}
+  .host .av{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-size:24px;flex-shrink:0;background:var(--brand-soft);overflow:hidden;}
+  .host .av img{width:100%;height:100%;display:block;object-fit:cover;}
   .host .hn{font-weight:700;font-size:14px;}
   .host .hm{font-size:11px;color:var(--muted);margin-top:2px;}
   .host .lvl{margin-left:auto;font-size:10px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-deep));padding:4px 10px;border-radius:999px;}
@@ -117,7 +118,7 @@
     <div class="block">
       <div class="bt">置业顾问</div>
       <div class="host">
-        <div class="av">🧑‍💼</div>
+        <div class="av"><img src="assets/lvju/icons/agent-avatar.png" alt=""></div>
         <div><div class="hn">李伟 · 贝壳认证置业顾问</div><div class="hm">山语城驻场 · 成交 128 套 · 客户评价 ★4.9</div></div>
         <span class="lvl">认证顾问</span>
       </div>
