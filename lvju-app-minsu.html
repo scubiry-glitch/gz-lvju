@@ -98,7 +98,7 @@
       var priceHtml = pd.value != null
         ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>'
         : '<span style="font-size:12px;color:#9aa5a1;">' + pd.note + '</span>';
-      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' + img + star + '<span class="like">♡</span>' +
+      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' + img + star +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +
         '<div class="pr"><b>' + priceHtml + '</b>' + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +

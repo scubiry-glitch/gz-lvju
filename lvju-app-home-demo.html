@@ -386,7 +386,7 @@
           ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
           : '<div class="img ' + (i % 2 ? 'b' : 'a') + '">';
         return '<div class="mcard">' + img +
-          '<span class="star">' + esc(star) + '</span><span class="like">♡</span>' +
+          '<span class="star">' + esc(star) + '</span>' +
           '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
           '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>精选</span>') + '</div>' +
           '<div class="pr"><b>' + (function(){ var pd = LVJU_PRICE.parts(p); return pd.value != null

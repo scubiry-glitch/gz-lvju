@@ -207,10 +207,8 @@
       else priceHtml = '<b>' + (pd.value != null
         ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>'
         : pd.note) + '</b>';
-      var favs = []; try { favs = JSON.parse(localStorage.getItem('bzf_fav') || '[]'); } catch (_) {}
-      var liked = favs.indexOf(String(p.id)) >= 0 || favs.indexOf(Number(p.id)) >= 0;
       return '<a class="mcard" data-project-id="' + p.id + '" href="lvju-app-detail.html?id=' + p.id + (n ? '&checkin=' + iso(ci) + (co ? '&checkout=' + iso(co) : '') : '') + '">' +
-        img + (star ? star : '') + '<button class="like' + (liked ? ' liked' : '') + '" type="button" aria-label="收藏房源">' + (liked ? '♥' : '♡') + '</button>' +
+        img + (star ? star : '') +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + ins + '</div>' +
         '<div class="pr">' + priceHtml + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +
@@ -223,17 +221,6 @@
     ev.preventDefault(); activeFilter = a.getAttribute('data-filter');
     Array.prototype.forEach.call(this.querySelectorAll('a'), function(x){ x.classList.toggle('on', x === a); });
     paint();
-  });
-
-  document.getElementById('listingWrap').addEventListener('click', function(ev){
-    var btn = ev.target.closest('.like'); if (!btn) return;
-    ev.preventDefault(); ev.stopPropagation();
-    var card = btn.closest('[data-project-id]'); if (!card) return;
-    var id = String(card.getAttribute('data-project-id')), favs = [];
-    try { favs = JSON.parse(localStorage.getItem('bzf_fav') || '[]').map(String); } catch (_) {}
-    var idx = favs.indexOf(id); if (idx >= 0) favs.splice(idx, 1); else favs.push(id);
-    try { localStorage.setItem('bzf_fav', JSON.stringify(favs)); } catch (_) {}
-    btn.classList.toggle('liked', idx < 0); btn.textContent = idx < 0 ? '♥' : '♡';
   });
 
   // 旅居视图 = rental + minsu 两频道中带「旅居」tag 的房源（两频道均支持旅居 tag）
