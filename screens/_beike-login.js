@@ -1,18 +1,16 @@
-/* _beike-login.js · C 端订房登录闸（只跳贝壳/链家 App 原生登录）
+/* _beike-login.js · C 端订房登录闸
  *
  * 用法（详情 / 下单 / 订单 / 我的，以及带 tabbar 的 C 端页）：
  *   <script src="jsbridgesdk.js?v=1"></script>
  *   <script src="screens/_beike-login.js"></script>
  *   BZF_BEIKE_LOGIN.gateThenGo(nextUrl);
- *   引入后自动拦截 tabbar「订单 / 我的」点击。
  *
- * 口径（wiki 登录常见问题 · APP端接入）：
- *  1. 已有 BJZ_TOKEN → 直接放行。
- *  2. 从 App 共享存储取 lianjia_token（$ljBridge.getAccessToken / cookie），
- *     POST /api/juzhu/auth/beike 由服务端 /token/verify 换 BJZ_TOKEN。
- *     不拿 getUserInfo 的 uid+手机号当身份。
- *  3. 没有 token：App 内 $ljBridge.actionLogin(当前页)；浏览器走密码门。
- *  4. 登录回跳无 JS 回调，回跳后再读 token。
+ * 口径（身份标准 = lianjia_token）：
+ *  1. App 内：bridge/cookie 取票；无票 → $ljBridge.actionLogin。
+ *  2. 普通浏览器：对齐 Morph mLogin —— clogin.ke.com?service=m.ke.com/my/checklogin?redirect=回跳；
+ *     回跳后 cookie / 可读票 → X-Lianjia-Token；HttpOnly 时同源 API 靠 Cookie。
+ *  3. BJZ_TOKEN 仅为可选短缓存；密码门仅作兜底。
+ *  文档：https://kedoc.ke.com/morph/docs/business/login ；源码 Morph/src/business/login/platform/m.ts
  */
 (function (w) {
   'use strict';
@@ -20,14 +18,24 @@
   var JUMP_KEY = 'bzf_beike_login_jumped';
   var NEXT_KEY = 'bzf_beike_login_next';
   var USER_KEY = 'bzf_beike_user';
+  var LJ_STORE_KEY = 'bzf_lj_token';
+  var cookieSessionOk = false;
+  var _loginCfg = null;
+  var _loginCfgP = null;
 
   function token() {
     try { return (localStorage.getItem(TOKEN_KEY) || '').trim(); } catch (e) { return ''; }
   }
   function setToken(t) {
     try {
-      if (t) localStorage.setItem(TOKEN_KEY, String(t).trim());
-      else localStorage.removeItem(TOKEN_KEY);
+      var v = t ? String(t).trim() : '';
+      if (v) {
+        localStorage.setItem(TOKEN_KEY, v);
+        localStorage.setItem('BZF_SESSION_TOKEN', v);
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('BZF_SESSION_TOKEN');
+      }
     } catch (e) {}
   }
   function absUrl(u) {
@@ -49,8 +57,40 @@
     return '';
   }
 
+  function storedLjToken() {
+    try { return (sessionStorage.getItem(LJ_STORE_KEY) || '').trim(); } catch (e) { return ''; }
+  }
+  function setStoredLjToken(t) {
+    try {
+      if (t) sessionStorage.setItem(LJ_STORE_KEY, String(t).trim());
+      else sessionStorage.removeItem(LJ_STORE_KEY);
+    } catch (e) {}
+  }
+
+  /* 部分回跳会把票放在 query/hash；读到后写入 sessionStorage 并 scrub URL */
+  function captureTokenFromUrl() {
+    try {
+      var u = new URL(location.href);
+      var t = (u.searchParams.get('lianjia_token') || u.searchParams.get('lj_token') || u.searchParams.get('token') || '').trim();
+      if (!t && u.hash) {
+        var m = String(u.hash).match(/(?:lianjia_token|lj_token|token)=([^&]+)/i);
+        if (m) t = decodeURIComponent(m[1] || '').trim();
+      }
+      if (!t) return;
+      setStoredLjToken(t);
+      u.searchParams.delete('lianjia_token');
+      u.searchParams.delete('lj_token');
+      u.searchParams.delete('token');
+      if (/lianjia_token|lj_token|(?:^|[&#])token=/i.test(u.hash || '')) u.hash = '';
+      if (w.history && history.replaceState) {
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      }
+    } catch (e) {}
+  }
+  captureTokenFromUrl();
+
   function lianjiaToken() {
-    return getCookie('lianjia_token') || getCookie('lj_token') || '';
+    return getCookie('lianjia_token') || getCookie('lj_token') || storedLjToken() || '';
   }
 
   function isBeikeApp() {
@@ -131,7 +171,6 @@
     return '';
   }
 
-  /* 换票用的票：App 共享存储 / cookie，不要用 getUserInfo */
   function beikeAccessToken() {
     return ljAccessToken() || lianjiaToken();
   }
@@ -146,11 +185,81 @@
     } catch (e) {}
   }
 
-  /* 贝壳侧已登录：有 lianjia_token 即可，getUserInfo 只作展示兜底 */
+  function isLoggedIn() {
+    return !!(beikeAccessToken() || token() || cookieSessionOk);
+  }
+
   function beikeLoggedIn() {
     if (beikeAccessToken()) return true;
     if (pickUser(appUserInfo())) return true;
     return false;
+  }
+
+  function authHeaders() {
+    var h = {};
+    var lj = beikeAccessToken();
+    if (lj) h['X-Lianjia-Token'] = lj;
+    var t = token();
+    if (t) h['Authorization'] = 'Bearer ' + t;
+    return h;
+  }
+
+  /* 浏览器 H5：对齐 Morph mLogin（clogin + m 站 checklogin?redirect=） */
+  function defaultLoginCfg() {
+    var host = location.hostname || '';
+    var domainEnv = /\.lianjia\.com$/i.test(host) ? 'lianjia.com' : 'ke.com';
+    var isTest = /\.tt[abc]\.test\.ke\.com$/i.test(host) || /\.test\.ke\.com$/i.test(host) ||
+      /localhost|127\.0\.0\.1/i.test(host);
+    var prefix = isTest ? 'test-' : '';
+    return {
+      login_base: 'https://' + prefix + 'clogin.' + domainEnv,
+      service_base: 'https://' + prefix + 'm.' + domainEnv + '/my/checklogin',
+      type: 2
+    };
+  }
+
+  function resolveLoginCfg(done) {
+    done = typeof done === 'function' ? done : function () {};
+    if (_loginCfg) { done(_loginCfg); return; }
+    if (w.__BZF_BEIKE_H5_LOGIN__) {
+      var o = w.__BZF_BEIKE_H5_LOGIN__;
+      if (typeof o === 'string') {
+        _loginCfg = Object.assign(defaultLoginCfg(), { login_base: String(o).replace(/\/$/, '') });
+      } else {
+        _loginCfg = Object.assign(defaultLoginCfg(), o || {});
+      }
+      done(_loginCfg);
+      return;
+    }
+    if (_loginCfgP) { _loginCfgP.then(done); return; }
+    _loginCfgP = fetch('/api/juzhu/auth/beike-config', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var d = defaultLoginCfg();
+        _loginCfg = {
+          login_base: (j && j.login_base) ? String(j.login_base).replace(/\/$/, '') : d.login_base,
+          service_base: (j && j.service_base) ? String(j.service_base).replace(/\/$/, '') : d.service_base,
+          type: (j && j.type != null) ? j.type : 2
+        };
+        return _loginCfg;
+      })
+      .catch(function () {
+        _loginCfg = defaultLoginCfg();
+        return _loginCfg;
+      });
+    _loginCfgP.then(done);
+  }
+
+  /* Morph m.ts: loginUrl?service=enc(serviceUrl?redirect=enc(url))&type=2 */
+  function browserH5LoginUrl(back) {
+    var cfg = _loginCfg || defaultLoginCfg();
+    var redirect = absUrl(back || location.href);
+    var service = cfg.service_base + '?redirect=' + encodeURIComponent(redirect);
+    return cfg.login_base + '/login?service=' + encodeURIComponent(service) + '&type=' + (cfg.type != null ? cfg.type : 2);
+  }
+
+  function resolveLoginBase(done) {
+    resolveLoginCfg(function (cfg) { done(cfg.login_base); });
   }
 
   var LJ_BRIDGE_SDK = '//s1.ljcdn.com/m-base/release/v04.4/asset/bridge_d0b9f70cd88e0a5q.js';
@@ -170,7 +279,6 @@
     return _ljP;
   }
 
-  // Morph 旧 bridge 回落：scheme://actionlogin?param=<encodeURIComponent(encodeURIComponent(回跳))>
   function nativeLoginUrl(back) {
     var path = 'actionlogin?param=' + encodeURIComponent(encodeURIComponent(back));
     try {
@@ -218,6 +326,7 @@
     if (!lj) return Promise.resolve(null);
     return fetch('/api/juzhu/auth/beike', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lianjia_token: lj })
     }).then(function (r) { return r.json(); }).then(function (j) {
@@ -234,22 +343,59 @@
     }).catch(function () { return null; });
   }
 
-  /* 登录回跳后：读 lianjia_token 换 BJZ_TOKEN。刚回跳时 bridge 可能要等几拍。 */
-  function tryExchangeFromApp(done) {
+  /* HttpOnly cookie：同源探 /api/auth/me（credentials），避免前端读不到票却已登录 */
+  function probeCookieSession() {
+    return fetch('/api/auth/me', {
+      credentials: 'same-origin',
+      headers: authHeaders()
+    }).then(function (r) {
+      if (!r.ok) return null;
+      return r.json();
+    }).then(function (j) {
+      if (j && j.account) {
+        cookieSessionOk = true;
+        setLastUser({
+          uid: String(j.account.idp_subject || j.account.id || ''),
+          phone: j.account.phone || '',
+          name: j.account.display_name || ''
+        });
+        return true;
+      }
+      return false;
+    }).catch(function () { return false; });
+  }
+
+  function trySyncIdentity(done) {
     done = typeof done === 'function' ? done : function () {};
-    if (token()) { done(true); return; }
     var tries = 0;
-    var hint = jumpedRecently() || !!beikeAccessToken();
-    var max = hint ? 8 : 1;
+    function maxTries() {
+      return (jumpedRecently() || isBeikeApp() || w.__BZF_IS_BEIKE_APP) ? 8 : 2;
+    }
     function once() {
-      if (token()) { done(true); return; }
-      if (beikeAccessToken()) {
-        exchange().then(function (j) { done(!!j); });
+      var lj = beikeAccessToken();
+      if (lj) {
+        done(true);
+        var prev = lastUser();
+        exchange().then(function (j) {
+          if (j) {
+            if (prev && prev.uid && j.uid && String(prev.uid) !== String(j.uid)) {
+              try { console.log('[login] beike account switched', prev.uid, '→', j.uid); } catch (e) {}
+            }
+            return;
+          }
+          clearAuthTokens();
+          setLastUser(null);
+          setStoredLjToken('');
+        });
         return;
       }
-      tries += 1;
-      if (tries < max) setTimeout(once, 400);
-      else done(false);
+      if (token()) { done(true); return; }
+      probeCookieSession().then(function (ok) {
+        if (ok) { done(true); return; }
+        tries += 1;
+        if (tries < maxTries()) setTimeout(once, 400);
+        else done(false);
+      });
     }
     loadLjBridge().then(function (lj) {
       if (lj && typeof lj.ready === 'function') {
@@ -264,6 +410,8 @@
       once();
     });
   }
+
+  function tryExchangeFromApp(done) { return trySyncIdentity(done); }
 
   function jumpedRecently() {
     try {
@@ -289,35 +437,39 @@
     return bare(a) === bare(b);
   }
 
+  /* App → 原生登录；浏览器 → Morph mLogin（clogin + checklogin） */
   function jumpToLogin(returnUrl) {
-    if (!isBeikeApp()) return false;
     if (returnUrl) saveNext(returnUrl);
-    // 回跳必须是当前页：把目标页传给 actionLogin 会先打开「我的/订单」，取消登录也会停在那里
     var back = location.href;
     markJumped();
-    initBridge();
-    morphAppLogin(back).then(function (ok) {
-      if (ok) return;
-      var url = nativeLoginUrl(back);
-      if (w.JsBridgeV3 && typeof w.JsBridgeV3.navigateTo === 'function') {
-        w.JsBridgeV3.navigateTo({ url: url, fail: function () { location.href = url; } });
-      } else {
-        location.href = url;
-      }
+    if (isBeikeApp()) {
+      initBridge();
+      morphAppLogin(back).then(function (ok) {
+        if (ok) return;
+        var url = nativeLoginUrl(back);
+        if (w.JsBridgeV3 && typeof w.JsBridgeV3.navigateTo === 'function') {
+          w.JsBridgeV3.navigateTo({ url: url, fail: function () { location.href = url; } });
+        } else {
+          location.href = url;
+        }
+      });
+      return true;
+    }
+    resolveLoginCfg(function () {
+      location.href = browserH5LoginUrl(back);
     });
     return true;
   }
 
-  /* 接口 401：清本地票；贝壳 App 内弹原生登录（防连跳用 jumpedRecently）。
-     密码登录口本身的 401（账密错）不触发，避免填错密码被踢进原生登录。 */
   function clearAuthTokens() {
     setToken('');
-    try { localStorage.removeItem('BZF_SESSION_TOKEN'); } catch (e) {}
+    cookieSessionOk = false;
+    setStoredLjToken('');
     try { localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch (e) {}
   }
 
   function isCredentialLoginUrl(url) {
-    return /\/api\/auth\/login(?:\?|$)|\/api\/juzhu\/auth\/tenant(?:\?|$)/.test(String(url || ''));
+    return /\/api\/auth\/login(?:\?|$)|\/api\/juzhu\/auth\/tenant(?:\?|$)|\/api\/juzhu\/auth\/beike(?:\?|$)/.test(String(url || ''));
   }
 
   function requestUrl(input) {
@@ -333,14 +485,17 @@
       var h = init && init.headers;
       if (h) {
         if (typeof Headers !== 'undefined' && h instanceof Headers) {
-          return !!(h.get('Authorization') || h.get('authorization'));
+          return !!(h.get('Authorization') || h.get('authorization') ||
+            h.get('X-Lianjia-Token') || h.get('x-lianjia-token'));
         }
         if (typeof h === 'object') {
-          return !!(h.Authorization || h.authorization);
+          return !!(h.Authorization || h.authorization ||
+            h['X-Lianjia-Token'] || h['x-lianjia-token']);
         }
       }
       if (typeof Request !== 'undefined' && input instanceof Request) {
-        return !!(input.headers.get('Authorization') || input.headers.get('authorization'));
+        return !!(input.headers.get('Authorization') || input.headers.get('authorization') ||
+          input.headers.get('X-Lianjia-Token') || input.headers.get('x-lianjia-token'));
       }
     } catch (e) {}
     return false;
@@ -349,22 +504,32 @@
   function handleUnauthorized(opts) {
     opts = opts || {};
     clearAuthTokens();
-    if (!isBeikeApp()) return false;
     if (!opts.force && jumpedRecently()) return false;
     return jumpToLogin(opts.returnUrl || location.href);
   }
 
-  function installFetch401() {
+  function installFetchAuth() {
     if (w.__BZF_FETCH_401_PATCHED) return;
     w.__BZF_FETCH_401_PATCHED = true;
     var raw = w.fetch;
     if (typeof raw !== 'function') return;
     w.fetch = function (input, init) {
       var url = requestUrl(input);
-      var hadAuth = requestHadAuth(input, init);
-      return raw.apply(this, arguments).then(function (res) {
+      var isApi = /\/api\/(juzhu|auth)\//.test(url);
+      if (isApi) {
+        init = Object.assign({ credentials: 'same-origin' }, init || {});
+        if (!init.credentials) init.credentials = 'same-origin';
+        var headers = new Headers(init.headers || (input && input.headers) || {});
+        var lj = beikeAccessToken();
+        if (lj && !headers.has('X-Lianjia-Token')) headers.set('X-Lianjia-Token', lj);
+        var t = token();
+        if (t && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + t);
+        init.headers = headers;
+      }
+      var hadAuth = requestHadAuth(input, init) || !!(isApi && (beikeAccessToken() || token() || cookieSessionOk));
+      return raw.call(this, input, init).then(function (res) {
         try {
-          if (res && res.status === 401 && isBeikeApp() && !isCredentialLoginUrl(url) &&
+          if (res && res.status === 401 && !isCredentialLoginUrl(url) &&
               (hadAuth || /\/api\/juzhu\//.test(url) || /\/api\/auth\//.test(url))) {
             handleUnauthorized();
           }
@@ -373,66 +538,48 @@
       });
     };
   }
-  installFetch401();
+  installFetchAuth();
 
   function resumeAfterLogin() {
-    tryExchangeFromApp(function (ok) {
+    trySyncIdentity(function (ok) {
       var next = '';
       try { next = sessionStorage.getItem(NEXT_KEY) || ''; } catch (e) {}
       if (!next || samePage(next, location.href)) return;
-      if (ok || token()) {
+      if (ok || isLoggedIn()) {
         try { sessionStorage.removeItem(NEXT_KEY); } catch (e) {}
         location.href = next;
       }
     });
   }
 
-  /* 详情页「订」/ tab「订单·我的」：没登录每次都弹登录，成功后再去目标页；取消留在当前页。
-     不读 jumpedRecently：那是防页面自动连跳，用户再点必须再弹。 */
   function gateThenGo(nextUrl) {
     var next = absUrl(nextUrl);
-    if (token()) { location.href = next; return; }
-    if (beikeAccessToken()) {
-      tryExchangeFromApp(function (ok) {
-        if (ok || token()) { location.href = next; return; }
-        if (isBeikeApp()) jumpToLogin(next);
-        else location.href = next;
-      });
-      return;
-    }
-    if (isBeikeApp()) {
+    trySyncIdentity(function (ok) {
+      if (ok || isLoggedIn()) { location.href = next; return; }
       jumpToLogin(next);
-      return;
-    }
-    location.href = next;
+    });
   }
 
-  /* 下单页：App 未登录跳登录；有身份则换票；否则走密码门 */
   function ensureAppLogin(opts) {
     opts = opts || {};
     var onReady = opts.onReady || function () {};
     var onNeedPassword = opts.onNeedPassword || function () {};
-    if (token()) { onReady(); return; }
-    tryExchangeFromApp(function (ok) {
-      if (ok || token()) { onReady(); return; }
-      if (isBeikeApp() || beikeLoggedIn()) {
-        if (!jumpedRecently()) jumpToLogin(location.href);
-        var once = function () {
-          if (document.visibilityState && document.visibilityState !== 'visible') return;
-          tryExchangeFromApp(function (again) {
-            if (again || token()) onReady();
-          });
-        };
-        w.addEventListener('pageshow', once);
-        document.addEventListener('visibilitychange', once);
-        setTimeout(function () {
-          if (!token()) onNeedPassword();
-        }, 4000);
-        return;
-      }
-      onNeedPassword();
+    trySyncIdentity(function (ok) {
+      if (ok || isLoggedIn()) { onReady(); return; }
+      if (!jumpedRecently()) jumpToLogin(location.href);
+      var once = function () {
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
+        trySyncIdentity(function (again) {
+          if (again || isLoggedIn()) onReady();
+        });
+      };
+      w.addEventListener('pageshow', once);
+      document.addEventListener('visibilitychange', once);
+      // 回跳失败 / 非 ke.com 域拿不到票 → 密码兜底
+      setTimeout(function () {
+        if (!isLoggedIn()) onNeedPassword();
+      }, 5000);
     });
-    return;
   }
 
   function isAuthTabHref(href) {
@@ -453,7 +600,9 @@
   }
   function bootLoginResume() {
     bindAuthTabs();
+    resolveLoginCfg(function () {});
     resumeAfterLogin();
+    trySyncIdentity(function () {});
     w.addEventListener('pageshow', resumeAfterLogin);
     document.addEventListener('visibilitychange', function () {
       if (!document.visibilityState || document.visibilityState === 'visible') resumeAfterLogin();
@@ -467,6 +616,8 @@
     isBeikeApp: isBeikeApp,
     token: token,
     setToken: setToken,
+    isLoggedIn: isLoggedIn,
+    authHeaders: authHeaders,
     clearAuthTokens: clearAuthTokens,
     handleUnauthorized: handleUnauthorized,
     appUserInfo: appUserInfo,
@@ -474,9 +625,13 @@
     exchange: exchange,
     jumpToLogin: jumpToLogin,
     nativeLoginUrl: nativeLoginUrl,
+    browserH5LoginUrl: browserH5LoginUrl,
+    resolveLoginCfg: resolveLoginCfg,
+    resolveLoginBase: resolveLoginBase,
     gateThenGo: gateThenGo,
     ensureAppLogin: ensureAppLogin,
     tryExchangeFromApp: tryExchangeFromApp,
+    trySyncIdentity: trySyncIdentity,
     getCookie: getCookie,
     lianjiaToken: lianjiaToken,
     ljAccessToken: ljAccessToken,

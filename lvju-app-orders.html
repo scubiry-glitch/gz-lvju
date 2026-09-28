@@ -44,7 +44,7 @@
 
     <div id="loginBox" class="panel" style="display:none;">
       <div class="pt">登录后自动展示我的预订</div>
-      <p class="ps" id="lgMsg">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</p>
+      <p class="ps" id="lgMsg">默认跳转贝壳登录；回跳失败时可用下方密码登录（首次输入密码即自动注册）</p>
       <div class="row">
         <input id="lgPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
         <input id="lgPwd" placeholder="密码（≥8位，首登自动注册）" type="password" style="flex:1.4;" />
@@ -81,7 +81,7 @@
   <div id="tab-bar" data-series="lvju" data-active="orders"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=9"></script>
+<script src="screens/_beike-login.js?v=15"></script>
 <script>
 /* 预订查单/取消：POST /api/juzhu/booking/lookup（order_no+手机号 双因子，规则9 禁 ?phone= 旁路）
    响应手机号为打码形式（规则10）。支持 ?order_no=&phone= 自动带入（下单成功页跳转）。 */
@@ -162,8 +162,24 @@
   var syncBox = document.getElementById('syncBox');
   function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; }
   function hideSync(){ if (syncBox) syncBox.style.display = 'none'; }
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
-  function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
+  function tok(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.token) return BZF_BEIKE_LOGIN.token() || '';
+      return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '';
+    } catch(e){ return ''; }
+  }
+  function authH(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) return BZF_BEIKE_LOGIN.authHeaders();
+    } catch(e){}
+    var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h;
+  }
+  function isAuthed(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isLoggedIn) return BZF_BEIKE_LOGIN.isLoggedIn();
+    } catch(e){}
+    return !!tok();
+  }
   function sdkProbe(){
     return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
   }
@@ -239,7 +255,7 @@
     return Promise.resolve(false);
   }
   function boot(){
-    if (tok()) { loadMine(); return; }
+    if (isAuthed()) { loadMine(); return; }
     if (window.BZF_BEIKE_LOGIN) {
       showSync();
       BZF_BEIKE_LOGIN.ensureAppLogin({
@@ -250,7 +266,7 @@
           var inApp = BZF_BEIKE_LOGIN.isBeikeApp() || (BZF_BEIKE_LOGIN.beikeLoggedIn && BZF_BEIKE_LOGIN.beikeLoggedIn());
           document.getElementById('lgMsg').textContent = inApp
             ? '没拿到 lianjia_token 或验票失败，请完成 App 登录后返回；也可使用密码登录'
-            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）';
+            : '贝壳登录回跳后未拿到票（若域名非 *.ke.com，cookie 可能带不过来），请用手机号密码登录';
           document.getElementById('lgSdk').style.display = BZF_BEIKE_LOGIN.isBeikeApp() ? 'block' : 'none';
         }
       });

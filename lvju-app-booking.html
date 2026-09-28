@@ -75,7 +75,7 @@
 
     <div id="loginGate" class="gate" style="display:none;">
       <div class="gt">🔒 预订需要先登录</div>
-      <div class="gs" id="gSub">贝壳 / 链家 App 内会跳转 App 登录页；浏览器请用手机号密码登录（首次输入即自动注册）</div>
+      <div class="gs" id="gSub">将跳转贝壳登录页；登录后自动回跳。也可使用下方手机号密码（兜底）</div>
       <input id="gPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
       <input id="gPwd" placeholder="密码（≥8位，首登自动注册）" type="password" />
       <div id="gErr" style="font-size:11px;color:#991b1b;margin-bottom:8px;display:none;"></div>
@@ -162,7 +162,7 @@
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=9"></script>
+<script src="screens/_beike-login.js?v=15"></script>
 <script>
 /* 预订下单（需登录）：GET /api/auth/me 判断登录态 →
    未登录：贝壳/链家 App 跳原生登录页；非 App 密码 JIT；
@@ -199,8 +199,24 @@
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n == null || isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   function asArr(v){ if (Array.isArray(v)) return v; if (typeof v === 'string') { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } } return v ? [v] : []; }
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
-  function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
+  function tok(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.token) return BZF_BEIKE_LOGIN.token() || '';
+      return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '';
+    } catch(e){ return ''; }
+  }
+  function authH(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) return BZF_BEIKE_LOGIN.authHeaders();
+    } catch(e){}
+    var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h;
+  }
+  function isAuthed(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isLoggedIn) return BZF_BEIKE_LOGIN.isLoggedIn();
+    } catch(e){}
+    return !!tok();
+  }
   function sdkProbe(){
     return window.JsBridgeV3 || window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
   }
@@ -214,14 +230,14 @@
     if (sub && msg) sub.textContent = msg;
   }
   function showGate(){
-    paintGate('贝壳 / 链家 App 内会跳转 App 登录页；浏览器请用手机号密码登录（首次输入即自动注册）');
+    paintGate('将跳转贝壳登录页；登录后自动回跳。也可使用下方手机号密码（兜底）');
     if (window.BZF_BEIKE_LOGIN) {
       BZF_BEIKE_LOGIN.ensureAppLogin({
         onReady: function(){ boot(); },
         onNeedPassword: function(){
           paintGate(BZF_BEIKE_LOGIN.isBeikeApp()
             ? '未从 App 取到登录态，请完成 App 登录后返回；也可使用密码登录'
-            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）');
+            : '贝壳登录回跳后未拿到票（若域名非 *.ke.com，cookie 可能带不过来），请用手机号密码登录');
         }
       });
     }
@@ -241,9 +257,8 @@
   }
 
   function checkMe(){
-    var t = tok();
-    if (!t) return Promise.resolve(null);
-    return fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + t } })
+    if (!isAuthed()) return Promise.resolve(null);
+    return fetch('/api/auth/me', { headers: authH() })
       .then(function(r){ if (!r.ok) return null; return r.json(); })
       .then(function(j){ return j && j.account ? j.account : null; })
       .catch(function(){ return null; });
@@ -560,8 +575,7 @@
       idempotency_key: 'lvju-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
     };
     submitBtn.disabled = true; submitBtn.style.opacity = '.55';
-    var bHeaders = { 'Content-Type': 'application/json' };
-    var bt = tok(); if (bt) bHeaders['Authorization'] = 'Bearer ' + bt;
+    var bHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
     fetch('/api/juzhu/booking', { method: 'POST', headers: bHeaders, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
       .then(function(res){
@@ -594,8 +608,7 @@
                   if (o.pay_status === 'paid') { location.href = result; return null; }
                   if (o.status !== 'pending') { alert('订单状态为「' + o.status + '」，无需支付'); reset(); return null; }
                   var cashierType = sdkProbe() ? '1' : '2';
-                  var payHeaders = { 'Content-Type': 'application/json' };
-                  var pt = tok(); if (pt) payHeaders['Authorization'] = 'Bearer ' + pt;
+                  var payHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
                   return fetch('/api/juzhu/booking/pay', { method:'POST', headers: payHeaders,
                     body: JSON.stringify({ order_no: res.j.order_no, contact_phone: body.contact_phone, cashier_type: cashierType }) })
                     .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })

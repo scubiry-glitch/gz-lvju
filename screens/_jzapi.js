@@ -88,6 +88,14 @@
   }
 
   function authHeaders() {
+    // C 端 App：优先走 _beike-login（X-Lianjia-Token 为主，BJZ 可选）
+    try {
+      if (typeof window !== 'undefined' && window.BZF_BEIKE_LOGIN &&
+          typeof window.BZF_BEIKE_LOGIN.authHeaders === 'function') {
+        var bh = window.BZF_BEIKE_LOGIN.authHeaders() || {};
+        if (bh['X-Lianjia-Token'] || bh.Authorization) return bh;
+      }
+    } catch (e) {}
     var t = sessionToken();
     if (t) return { Authorization: 'Bearer ' + t };
     var k = apiKey();
