@@ -56,7 +56,7 @@
     z-index:0;}
   .hero .bgimg::after,.hero .mist{display:none;}
   .hero-in{position:relative;z-index:5;padding:6px 20px 0;}
-  .hero-top{display:flex;align-items:center;justify-content:space-between;min-height:28px;}
+  .hero-top{display:none;}
   .city-sw{display:flex;flex-direction:column;gap:0;cursor:pointer;user-select:none;color:#fff;}
   .city-sw .cn{display:flex;align-items:center;gap:2px;font-size:14px;font-weight:600;line-height:14px;}
   .city-sw .cn .chev{width:8px;height:8px;display:inline-flex;align-items:center;justify-content:center;opacity:.95;}
@@ -92,7 +92,7 @@
 
   /* 频道卡 — 82×95 / r12 / 标题12·600 / 副标9·400 / 影 rgba(17,123,115,.1) */
   .chan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 11px;}
-  .chan a{position:relative;background:#fff;border:none;border-radius:12px;padding:12px 10px;text-align:center;
+  .chan a{position:relative;background:#fff;border:none;border-radius:12px;padding:12px 8px;text-align:center;
     box-shadow:0 0 10px rgba(17,123,115,.1);transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink);}
   .chan a:active{transform:scale(.97);}
   .chan .ic{width:35px;height:35px;margin:0;border-radius:10px;display:grid;place-items:center;background:transparent;}
@@ -225,12 +225,12 @@
       <!-- primary channels -->
       <div class="seg-h"><span class="bar"></span><h3>找房·全频道</h3></div>
       <div class="chan">
-        <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-lvju.svg?v=8" alt=""></div><b>旅居</b><small>短住·候鸟·康养</small></a>
-        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic"><img src="assets/lvju/icons/chan-minsu.svg?v=8" alt=""></div><b>民宿</b><small>整栋·庭院·管家</small></a>
-        <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-changzu.svg?v=8" alt=""></div><b>长租</b><small>整租·合租·月付</small></a>
+        <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-lvju.png?v=14" alt=""></div><b>旅居</b><small>短住·候鸟·康养</small></a>
+        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic"><img src="assets/lvju/icons/chan-minsu.png?v=15" alt=""></div><b>民宿</b><small>整栋·庭院·管家</small></a>
+        <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-changzu.png?v=14" alt=""></div><b>长租</b><small>整租·合租·月付</small></a>
         <a class="chan" href="lvju-app-newhouse.html" hidden data-deferred><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
         <a class="chan" href="lvju-app-resale.html" hidden data-deferred><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
-        <a class="chan" href="lvju-app-guide.html"><div class="ic"><img src="assets/lvju/icons/chan-guide.svg?v=8" alt=""></div><b>置业导购</b><small>看房·测算</small></a>
+        <a class="chan" href="lvju-app-guide.html"><div class="ic"><img src="assets/lvju/icons/chan-guide.png?v=14" alt=""></div><b>置业导购</b><small>看房·测算</small></a>
         <a class="chan" href="lvju-app-lifestyle.html" hidden data-deferred><div class="ic">🌿</div><b>生活方式</b><small>玩在贵州</small></a>
       </div>
 

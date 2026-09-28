@@ -42,13 +42,6 @@
   .me-hd .ui .nm{font-size:18px;font-weight:600;line-height:18px;color:#fff;}
   .me-hd .ui .ph{font-size:12px;font-weight:400;line-height:12px;color:#fff;margin-top:5px;opacity:.95;}
 
-  /* 收藏统计卡 — 叠在 hero 底部 */
-  .fav-stat{position:relative;z-index:5;margin:-75px 17px 0;background:#fff;border-radius:12px;
-    box-shadow:0 0 10px rgba(17,123,115,.1);padding:16px 10px;display:flex;justify-content:center;}
-  .fav-stat a{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ink);min-width:24px;}
-  .fav-stat .n{font-size:16px;font-weight:600;line-height:12px;}
-  .fav-stat .lb{font-size:12px;font-weight:400;line-height:12px;color:#6C7785;}
-
   /* 分区标题 */
   .sec{padding:0 16px;margin-top:24px;}
   .sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
@@ -134,14 +127,6 @@
       </div>
     </div>
 
-    <!-- 收藏统计 -->
-    <div class="fav-stat">
-      <a href="javascript:void(0)" title="收藏列表即将上线">
-        <span class="n" id="favCount">12</span>
-        <span class="lb">收藏</span>
-      </a>
-    </div>
-
     <!-- 我的订单 -->
     <div class="sec">
       <div class="sec-h">
@@ -149,9 +134,8 @@
         <a class="more" href="lvju-app-orders.html">全部订单<span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span></a>
       </div>
       <div class="ordbar">
-        <a href="lvju-app-pay.html"><span class="ic"><img src="assets/lvju/icons/me-ord-pay.svg?v=2" alt=""></span>待支付</a>
-        <a href="lvju-app-orders.html"><span class="ic"><img src="assets/lvju/icons/me-ord-stay.svg?v=2" alt=""></span>待入住</a>
-        <a href="lvju-app-orders.html"><span class="ic"><img src="assets/lvju/icons/me-ord-rate.svg?v=2" alt=""></span>待评价</a>
+        <a href="lvju-app-orders.html"><span class="ic"><img src="assets/lvju/icons/me-ord-stay.png?v=3" alt=""></span>待入住</a>
+        <a href="lvju-app-pay.html"><span class="ic"><img src="assets/lvju/icons/me-ord-pay.png?v=3" alt=""></span>待支付</a>
         <a href="lvju-app-refund.html"><span class="ic"><img src="assets/lvju/icons/me-ord-refund.svg?v=2" alt=""></span>退款售后</a>
       </div>
     </div>
@@ -159,20 +143,10 @@
     <!-- 常用功能 -->
     <div class="sec" style="margin-bottom:20px;">
       <div class="sec-h"><h3>常用功能</h3></div>
-      <a class="menu-card menu-row" href="javascript:void(0)" title="收藏列表即将上线">
-        <span class="left">
-          <span class="ic"><img src="assets/lvju/icons/me-menu-fav.svg" alt=""></span>
-          <span class="ttl">我的收藏</span>
-        </span>
-        <span class="right">
-          <span class="tip">12 套房源</span>
-          <span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span>
-        </span>
-      </a>
-      <div class="menu-card" style="margin-top:16px;">
+      <div class="menu-card">
         <a class="menu-row" href="javascript:void(0)" id="mTicket">
           <span class="left">
-            <span class="ic"><img src="assets/lvju/icons/me-menu-ticket.svg" alt=""></span>
+            <span class="ic"><img src="assets/lvju/icons/me-menu-ticket.png?v=3" alt=""></span>
             <span class="ttl">服务工单</span>
           </span>
           <span class="right">
@@ -182,7 +156,7 @@
         </a>
         <a class="menu-row" href="javascript:void(0)" id="m400">
           <span class="left">
-            <span class="ic"><img src="assets/lvju/icons/me-menu-phone.svg" alt=""></span>
+            <span class="ic"><img src="assets/lvju/icons/me-menu-phone.png?v=3" alt=""></span>
             <span class="ttl">400 在线客服</span>
           </span>
           <span class="right">
