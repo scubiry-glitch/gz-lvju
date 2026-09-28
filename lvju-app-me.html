@@ -3,27 +3,109 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<link rel="icon" href="data:,">
 <title>我的 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=6">
 <script src="lvju-app-config.js?v=1"></script>
 <style>
+  /* MasterGo 个人中心 3:25548 · PingFang / #F5F7F6 / #222 / #6B7785 / #0F766E */
+  :root{
+    --surface:#ffffff; --fg:#222222; --muted:#6B7785; --border:#EEEEEE;
+    --brand:#0F766E; --brand-deep:#0b5d56; --tab:#15A69B;
+    --brand-soft:rgba(230,245,241,.5);
+    --ink:#222222; --page:#F5F7F6;
+    --font:-apple-system,'PingFang SC','PingFangSC-Regular','Helvetica Neue',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;}
   [data-deferred]{display:none!important;}
-  .menu a.last-visible{border-bottom:0;}
+  html,body{margin:0;height:100%;}
+  body{background:#0b0f12;font-family:var(--font);font-size:12px;line-height:1.2;color:var(--fg);
+    -webkit-font-smoothing:antialiased;display:flex;justify-content:center;}
+  a{color:inherit;text-decoration:none;}
+
+  .app{width:100%;max-width:430px;height:100dvh;background:var(--page);color:var(--fg);
+    display:flex;flex-direction:column;overflow:hidden;position:relative;
+    box-shadow:0 0 80px rgba(0,0,0,.5);}
+  .scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px;}
+  .scr::-webkit-scrollbar{width:0;}
+
+  /* —— 头部 hero 375×245 —— */
+  .me-hd{position:relative;height:245px;color:#fff;overflow:hidden;flex-shrink:0;}
+  .me-hd .bg{position:absolute;inset:0;z-index:0;
+    background:#D8D8D8 url(assets/lvju/me-hero.jpg) center/cover no-repeat;}
+  .me-hd .bg::after{content:"";position:absolute;inset:0;background:#000;opacity:.3;}
+  .me-hd .u{position:relative;z-index:2;display:flex;align-items:center;gap:12px;
+    padding:max(44px, calc(env(safe-area-inset-top) + 20px)) 20px 0;}
+  .me-hd .av{width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;
+    background:#fff;cursor:pointer;}
+  .me-hd .av img{width:100%;height:100%;object-fit:cover;display:block;}
+  .me-hd .ui{cursor:pointer;min-width:0;}
+  .me-hd .ui .nm{font-size:18px;font-weight:600;line-height:18px;color:#fff;}
+  .me-hd .ui .ph{font-size:12px;font-weight:400;line-height:12px;color:#fff;margin-top:5px;opacity:.95;}
+
+  /* 收藏统计卡 — 叠在 hero 底部 */
+  .fav-stat{position:relative;z-index:5;margin:-75px 17px 0;background:#fff;border-radius:12px;
+    box-shadow:0 0 10px rgba(17,123,115,.1);padding:16px 10px;display:flex;justify-content:center;}
+  .fav-stat a{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ink);min-width:24px;}
+  .fav-stat .n{font-size:16px;font-weight:600;line-height:12px;}
+  .fav-stat .lb{font-size:12px;font-weight:400;line-height:12px;color:#6C7785;}
+
+  /* 分区标题 */
+  .sec{padding:0 16px;margin-top:24px;}
+  .sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .sec-h h3{margin:0;font-size:14px;font-weight:600;line-height:12px;color:var(--ink);}
+  .sec-h .more{font-size:12px;font-weight:400;line-height:12px;color:var(--muted);
+    display:inline-flex;align-items:center;gap:5px;}
+  .sec-h .more .ch{width:8px;height:8px;display:inline-flex;}
+  .sec-h .more .ch img{width:5px;height:8px;display:block;opacity:.7;}
+
+  /* 订单四态 */
+  .ordbar{display:flex;background:#fff;border-radius:16px;overflow:hidden;}
+  .ordbar a{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;
+    padding:12px 10px;color:var(--ink);position:relative;font-size:13px;font-weight:400;line-height:13px;}
+  .ordbar a .ic{width:35px;height:35px;display:grid;place-items:center;}
+  .ordbar a .ic img{width:35px;height:35px;display:block;object-fit:contain;}
+  .ordbar a .bdg{position:absolute;top:6px;right:calc(50% - 22px);background:#F44736;color:#fff;
+    font-size:9px;min-width:15px;height:15px;border-radius:999px;display:grid;place-items:center;
+    padding:0 3px;font-weight:700;line-height:1;}
+
+  /* 常用功能 */
+  .menu-card{background:#fff;border-radius:16px;overflow:hidden;}
+  .menu-card + .menu-card{margin-top:16px;}
+  .menu-row{display:flex;align-items:center;justify-content:space-between;padding:16px 12px;gap:12px;}
+  .menu-row .left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .menu-row .ic{width:24px;height:24px;flex-shrink:0;display:grid;place-items:center;}
+  .menu-row .ic img{width:22px;height:22px;display:block;object-fit:contain;}
+  .menu-row .ttl{font-size:13px;font-weight:400;line-height:13px;color:var(--ink);white-space:nowrap;}
+  .menu-row .right{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;margin-left:auto;}
+  .menu-row .tip{font-size:12px;font-weight:400;line-height:12px;color:var(--muted);white-space:nowrap;}
+  .menu-row .ch{width:8px;height:8px;display:inline-flex;flex-shrink:0;}
+  .menu-row .ch img{width:5px;height:8px;display:block;}
+  .menu-card .menu-row + .menu-row{border-top:1px solid #EEEEEE;}
+
+  /* tabbar — 对齐首页 demo */
+  .tabbar{flex-shrink:0;display:flex;background:#fff;
+    box-shadow:0 -2px 8px rgba(153,153,153,.12);padding:9px 0 0;z-index:25;min-height:56px;
+    padding-bottom:max(8px,env(safe-area-inset-bottom));}
+  .tabbar a{flex:1;text-align:center;font-size:10px;font-weight:400;line-height:11.7px;color:var(--tab);}
+  .tabbar a .ti{display:block;width:24px;height:24px;margin:0 auto 0;line-height:24px;}
+  .tabbar a .ti img{width:24px;height:24px;display:block;object-fit:contain;}
+  .tabbar a.on{color:#0F766E;font-weight:600;}
+
   /* —— 底部抽屉（服务工单 / 400 客服）—— */
   .mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
   .mask[hidden]{display:none;}
   .sheet{width:100%;max-width:430px;background:#fff;border-radius:18px 18px 0 0;padding:16px 16px 28px;max-height:84vh;overflow:auto;}
   .sheet h3{margin:0 0 12px;font-size:16px;display:flex;justify-content:space-between;align-items:center;color:var(--fg);}
   .sheet h3 .x{font-style:normal;color:var(--muted);font-size:22px;line-height:1;cursor:pointer;}
-  .tchip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:5px 13px;font-size:12.5px;margin:0 6px 8px 0;cursor:pointer;background:#fff;color:var(--fg);}
-  .tchip.on{background:#e6f4f2;border-color:var(--brand,#0f766e);color:var(--brand-deep,#0b5d56);font-weight:600;}
-  .sheet textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;min-height:60px;}
-  .sheet select,.sheet input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:10px;font:inherit;font-size:13px;background:#fff;}
+  .tchip{display:inline-block;border:1px solid #e7ece9;border-radius:999px;padding:5px 13px;font-size:12.5px;margin:0 6px 8px 0;cursor:pointer;background:#fff;color:var(--fg);}
+  .tchip.on{background:#e6f4f2;border-color:var(--brand);color:var(--brand-deep);font-weight:600;}
+  .sheet textarea{width:100%;border:1px solid #e7ece9;border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;min-height:60px;}
+  .sheet select,.sheet input[type=text]{width:100%;padding:8px 10px;border:1px solid #e7ece9;border-radius:10px;font:inherit;font-size:13px;background:#fff;}
   .sheet .lb{font-size:11.5px;color:var(--muted);margin:10px 0 5px;}
-  .sheet .go{width:100%;border:0;border-radius:11px;padding:11px 0;font:inherit;font-size:14px;font-weight:600;background:var(--brand,#0f766e);color:#fff;margin-top:12px;}
-  .sheet .ghost{width:100%;border:1px solid var(--border);border-radius:11px;padding:9px 0;font:inherit;font-size:13px;background:#fff;color:var(--fg);margin-top:8px;display:block;text-align:center;text-decoration:none;}
+  .sheet .go{width:100%;border:0;border-radius:11px;padding:11px 0;font:inherit;font-size:14px;font-weight:600;background:var(--brand);color:#fff;margin-top:12px;}
+  .sheet .ghost{width:100%;border:1px solid #e7ece9;border-radius:11px;padding:9px 0;font:inherit;font-size:13px;background:#fff;color:var(--fg);margin-top:8px;display:block;text-align:center;text-decoration:none;}
   .tkok{background:#e7f6ec;color:#15803d;border-radius:9px;padding:8px 11px;font-size:12px;margin-top:10px;}
-  .tk{display:flex;gap:9px;padding:9px 0;border-bottom:1px dashed var(--border);align-items:flex-start;}
+  .tk{display:flex;gap:9px;padding:9px 0;border-bottom:1px dashed #e7ece9;align-items:flex-start;}
   .tk .ic{font-size:17px;line-height:1.3;}
   .tk .meta{flex:1;font-size:12px;color:var(--muted);}
   .tk .meta b{display:block;font-size:12.5px;color:var(--fg);}
@@ -33,9 +115,7 @@
   .dial{display:flex;align-items:center;gap:12px;background:#e6f4f2;border-radius:12px;padding:14px;margin-bottom:12px;}
   .dial .num{font-size:21px;font-weight:800;color:#0b5d56;letter-spacing:.5px;}
   .dial .sub{font-size:11px;color:var(--muted);}
-  .dial a.call{margin-left:auto;background:var(--brand,#0f766e);color:#fff;text-decoration:none;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;}
-  /* 去掉 overlay appbar 后，头部不再预留标题栏高度 */
-  .me-hd{padding-top:max(20px, env(safe-area-inset-top));}
+  .dial a.call{margin-left:auto;background:var(--brand);color:#fff;text-decoration:none;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -44,59 +124,112 @@
 
     <!-- 头部 -->
     <div class="me-hd">
-      <div class="bg s-fanjing"></div>
+      <div class="bg"></div>
       <div class="u">
-        <div class="av" id="meAv" style="cursor:pointer">🧑</div>
-        <div class="ui" id="meUi" style="cursor:pointer">
+        <div class="av" id="meAv"><img src="assets/lvju/me-avatar.png" alt=""></div>
+        <div class="ui" id="meUi">
           <div class="nm" id="meName">点击登录</div>
           <div class="ph" id="mePhone">登录后查看订单</div>
         </div>
       </div>
-      <div class="vip" hidden data-deferred>👑 旅居黑卡会员 · 享 9 折 + 优先派管家</div>
     </div>
 
-    <!-- 订单入口 -->
-    <div class="seg" style="padding-bottom:0;">我的订单 <span style="float:right;color:var(--brand-deep);font-weight:600;font-size:11px;"><a href="lvju-app-orders.html">全部订单 ›</a></span></div>
-    <div class="ordbar">
-      <a href="lvju-app-pay.html"><span class="bdg">1</span><span class="ic">💳</span>待支付</a>
-      <a href="lvju-app-orders.html"><span class="bdg">1</span><span class="ic">🏨</span>待入住</a>
-      <a href="lvju-app-refund.html"><span class="ic">↩️</span>退款售后</a>
+    <!-- 收藏统计 -->
+    <div class="fav-stat">
+      <a href="javascript:void(0)" title="收藏列表即将上线">
+        <span class="n" id="favCount">12</span>
+        <span class="lb">收藏</span>
+      </a>
+    </div>
+
+    <!-- 我的订单 -->
+    <div class="sec">
+      <div class="sec-h">
+        <h3>我的订单</h3>
+        <a class="more" href="lvju-app-orders.html">全部订单<span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span></a>
+      </div>
+      <div class="ordbar">
+        <a href="lvju-app-pay.html"><span class="ic"><img src="assets/lvju/icons/me-ord-pay.svg?v=2" alt=""></span>待支付</a>
+        <a href="lvju-app-orders.html"><span class="ic"><img src="assets/lvju/icons/me-ord-stay.svg?v=2" alt=""></span>待入住</a>
+        <a href="lvju-app-orders.html"><span class="ic"><img src="assets/lvju/icons/me-ord-rate.svg?v=2" alt=""></span>待评价</a>
+        <a href="lvju-app-refund.html"><span class="ic"><img src="assets/lvju/icons/me-ord-refund.svg?v=2" alt=""></span>退款售后</a>
+      </div>
     </div>
 
     <!-- 常用功能 -->
-    <div class="menu">
-      <a href="javascript:void(0)" id="mTicket"><span class="ic">🛠</span>服务工单<span class="tip" id="ticketTip">报修 · 保洁 · 管家</span><span class="ar">›</span></a>
-      <a href="javascript:void(0)" id="m400"><span class="ic">📞</span>400 在线客服<span class="tip" id="t400">热线 400-900-6688</span><span class="ar">›</span></a>
-      <a class="last-visible" href="lvju-rating-standard.html" data-lvju-feature="caibei"><span class="ic">⭐</span>旅居星级评价体系<span class="ar">›</span></a>
-      <a href="screens/portal-index.html" hidden data-deferred><span class="ic">🔍</span>验真公示门户<span class="ar">›</span></a>
-      <a href="lvju-app-service.html" hidden data-deferred><span class="ic">🎧</span>客服中心 · 12301<span class="ar">›</span></a>
-      <a href="#" hidden data-deferred><span class="ic">⚙️</span>设置<span class="ar">›</span></a>
+    <div class="sec" style="margin-bottom:20px;">
+      <div class="sec-h"><h3>常用功能</h3></div>
+      <a class="menu-card menu-row" href="javascript:void(0)" title="收藏列表即将上线">
+        <span class="left">
+          <span class="ic"><img src="assets/lvju/icons/me-menu-fav.svg" alt=""></span>
+          <span class="ttl">我的收藏</span>
+        </span>
+        <span class="right">
+          <span class="tip">12 套房源</span>
+          <span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span>
+        </span>
+      </a>
+      <div class="menu-card" style="margin-top:16px;">
+        <a class="menu-row" href="javascript:void(0)" id="mTicket">
+          <span class="left">
+            <span class="ic"><img src="assets/lvju/icons/me-menu-ticket.svg" alt=""></span>
+            <span class="ttl">服务工单</span>
+          </span>
+          <span class="right">
+            <span class="tip" id="ticketTip">报修 · 保洁 · 管家</span>
+            <span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span>
+          </span>
+        </a>
+        <a class="menu-row" href="javascript:void(0)" id="m400">
+          <span class="left">
+            <span class="ic"><img src="assets/lvju/icons/me-menu-phone.svg" alt=""></span>
+            <span class="ttl">400 在线客服</span>
+          </span>
+          <span class="right">
+            <span class="tip" id="t400">热线 400-900-6688</span>
+            <span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span>
+          </span>
+        </a>
+        <a class="menu-row" href="lvju-rating-standard.html" data-lvju-feature="caibei">
+          <span class="left">
+            <span class="ic"><img src="assets/lvju/icons/me-menu-star.svg" alt=""></span>
+            <span class="ttl">旅居星级评价体系</span>
+          </span>
+          <span class="right">
+            <span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span>
+          </span>
+        </a>
+        <a class="menu-row" href="screens/portal-index.html" hidden data-deferred>
+          <span class="left"><span class="ttl">验真公示门户</span></span>
+          <span class="right"><span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span></span>
+        </a>
+        <a class="menu-row" href="lvju-app-service.html" hidden data-deferred>
+          <span class="left"><span class="ttl">客服中心 · 12301</span></span>
+          <span class="right"><span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span></span>
+        </a>
+        <a class="menu-row" href="#" hidden data-deferred>
+          <span class="left"><span class="ttl">设置</span></span>
+          <span class="right"><span class="ch"><img src="assets/lvju/icons/me-chevron.svg" alt=""></span></span>
+        </a>
+      </div>
     </div>
-
-    <div class="banner gold" style="margin:16px 16px 8px;" hidden data-deferred>
-      <span class="bi">👑</span>
-      <div class="bt"><b>升级旅居黑卡</b><p>全年 9 折 · 优先派管家 · 专属客服</p></div>
-      <a class="go" href="#">立即开通 ›</a>
-    </div>
-    <div style="height:10px;"></div>
   </div>
 
   <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a class="on"><span class="ti">👤</span>我的</a>
+    <a href="lvju-app-home-demo.html"><span class="ti"><img src="assets/lvju/icons/tab-home-off.svg" alt=""></span>首页</a>
+    <a href="lvju-app-search.html"><span class="ti"><img src="assets/lvju/icons/tab-search-off.svg" alt=""></span>找房</a>
+    <a href="lvju-app-spots.html"><span class="ti"><img src="assets/lvju/icons/tab-content-off.svg" alt=""></span>内容</a>
+    <a href="lvju-app-orders.html"><span class="ti"><img src="assets/lvju/icons/tab-orders-off.svg" alt=""></span>订单</a>
+    <a class="on"><span class="ti"><img src="assets/lvju/icons/tab-me-on.svg" alt=""></span>我的</a>
   </div>
 
   <!-- ===== 遮罩 + 底部抽屉 ===== -->
   <div class="mask" id="mask" hidden>
-    <!-- 服务工单 -->
     <div class="sheet" id="sheetTicket" hidden>
-      <h3>🛠 服务工单 <i class="x" id="closeT">✕</i></h3>
+      <h3>服务工单 <i class="x" id="closeT">✕</i></h3>
       <div class="lb">服务类型 <span style="color:#94a3b8;">（点「＋ 自定义」可新增）</span></div>
       <div id="typeChips"></div>
-      <div id="customRow" hidden style="background:#f8fafc;border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <div id="customRow" hidden style="background:#f8fafc;border:1px dashed #e7ece9;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
         <input type="text" id="customName" maxlength="8" placeholder="自定义类型名（≤8 字，例：泳池清洁）" style="margin-bottom:8px;">
         <div class="lb" style="margin:2px 0 4px;">选个图标</div>
         <div id="customIcons" style="display:flex;gap:6px;font-size:18px;flex-wrap:wrap;"></div>
@@ -118,9 +251,8 @@
       <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">工单实时进入中台「服务需求 · 工单池」（p-service-demand），派单 / 履约状态在此回显。</div>
     </div>
 
-    <!-- 400 在线客服 -->
     <div class="sheet" id="sheet400" hidden>
-      <h3>📞 400 在线客服 <i class="x" id="close4">✕</i></h3>
+      <h3>400 在线客服 <i class="x" id="close4">✕</i></h3>
       <div class="dial">
         <div>
           <div class="num" id="dialNum">400-900-6688</div>
@@ -139,8 +271,8 @@
 </div>
 
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=8"></script>
-<script src="screens/_jzapi.js?v=8"></script>
+<script src="screens/_beike-login.js?v=9"></script>
+<script src="screens/_jzapi.js?v=9"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -236,7 +368,7 @@
   });
   $('btnCustomCancel').addEventListener('click', function(){ $('customRow').hidden = true; });
 
-  var ME_PHONE = '138****6688'; // 演示身份手机号（服务端按 phone + source 限定回查）
+  var ME_PHONE = '138****6688';
   function renderMine(){
     JZ.listRepairs(ME_PHONE).then(function(all){
       var list = all.slice(0, 10);
@@ -280,7 +412,7 @@
 
   paint400();
 
-  /* 未登录：点「订单 / 我的」或进本页 → 贝壳 App 登录 */
+  /* 未登录：点头像/姓名 → 贝壳 App 登录 */
   function maskPhone(p){
     p = String(p || '');
     return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : (p || '已登录');
@@ -314,6 +446,19 @@
       onNeedPassword: function(){ paintMe(false); }
     });
   }
+
+  /* 城市参数透传（与首页一致） */
+  try {
+    var cq = new URLSearchParams(location.search).get('city');
+    if (cq) {
+      document.querySelectorAll('.app a[href*="lvju-app-"]').forEach(function(a){
+        var href = a.getAttribute('href');
+        if (!href || href.indexOf('javascript:') === 0) return;
+        var u = new URL(href, location.href);
+        if (!u.searchParams.get('city')) { u.searchParams.set('city', cq); a.setAttribute('href', u.pathname.replace(/^\//,'') + u.search + u.hash); }
+      });
+    }
+  } catch(e){}
 })();
 </script>
 </body>
