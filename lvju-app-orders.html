@@ -17,20 +17,14 @@
   .panel .btn{border:0;background:var(--brand);color:#fff;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;width:100%;}
   .panel .btn.soft{background:var(--brand-soft);color:var(--brand);border:1px solid transparent;margin-top:8px;}
   .panel .err{font-size:11px;color:#991b1b;margin-top:7px;display:none;}
-  .my-hd{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;}
+  .my-hd{padding:0 2px 8px;}
   .my-hd .pt{margin:0;}
-  .my-hd .out{font-size:11px;color:var(--muted);cursor:pointer;}
   #myBox{margin:14px 14px 20px;display:none;}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar">
-      <a class="bk" href="lvju-app-me.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">我的订单</div>
-    </div>
 
     <div id="syncBox" class="panel" style="display:none;">
       <div class="pt">正在同步贝壳登录…</div>
@@ -52,7 +46,6 @@
     <div id="myBox">
       <div class="my-hd">
         <div class="pt">我的预订 <span id="myCnt" style="font-size:11px;color:var(--muted);font-weight:400;"></span></div>
-        <a class="out" id="myOut">退出登录</a>
       </div>
       <div id="myList"></div>
     </div>
@@ -219,9 +212,6 @@
   document.getElementById('lgSdk').addEventListener('click', function(){
     if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.jumpToLogin(location.href)) return;
     trySdkLogin().then(function(ok){ if (!ok) { document.getElementById('lgErr').textContent = 'SDK 登录失败，请用密码登录'; document.getElementById('lgErr').style.display = 'block'; } });
-  });
-  document.getElementById('myOut').addEventListener('click', function(){
-    try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){} location.reload();
   });
   boot();
 })();
