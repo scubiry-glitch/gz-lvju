@@ -15,17 +15,12 @@
   .panel input{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;outline:0;background:#fff;color:var(--ink);}
   .panel input::placeholder{color:var(--ph);}
   .panel .btn{border:0;background:var(--brand);color:#fff;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;width:100%;}
-  .panel .btn.ghost{background:#fff;color:var(--danger,#b91c1c);border:1px solid var(--border);}
   .panel .btn.soft{background:var(--brand-soft);color:var(--brand);border:1px solid transparent;margin-top:8px;}
-  .panel .acts{display:flex;gap:8px;align-items:center;}
-  .panel .acts .btn{flex:1;}
   .panel .err{font-size:11px;color:#991b1b;margin-top:7px;display:none;}
-  .panel .hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45;}
   .my-hd{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;}
   .my-hd .pt{margin:0;}
   .my-hd .out{font-size:11px;color:var(--muted);cursor:pointer;}
-  #myBox{margin:14px 14px 0;display:none;}
-  #lookupBox{margin-bottom:20px;}
+  #myBox{margin:14px 14px 20px;display:none;}
 </style>
 </head>
 <body>
@@ -61,34 +56,15 @@
       </div>
       <div id="myList"></div>
     </div>
-
-    <div id="lookupBox" class="panel">
-      <div class="pt">预订查单 / 取消</div>
-      <p class="ps">免登录 · 订单号 + 下单手机号双因子</p>
-      <div class="row">
-        <input id="qNo" placeholder="订单号 BKG-…" />
-        <input id="qPhone" placeholder="下单手机号" inputmode="numeric" maxlength="11" />
-      </div>
-      <div class="acts">
-        <button class="btn" id="qGo">查询</button>
-        <button class="btn ghost" id="qCancel" style="display:none;">取消此订单</button>
-      </div>
-      <div class="hint" id="qMsg">输入订单号 + 下单手机号，可查询进度或取消待确认订单</div>
-      <div id="qCard" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;"></div>
-    </div>
   </div>
 
   <div id="tab-bar" data-series="lvju" data-active="orders"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_beike-login.js?v=18"></script>
 <script>
-/* 预订查单/取消：POST /api/juzhu/booking/lookup（order_no+手机号 双因子，规则9 禁 ?phone= 旁路）
-   响应手机号为打码形式（规则10）。支持 ?order_no=&phone= 自动带入（下单成功页跳转）。 */
+/* 我的预订：GET /api/juzhu/booking/my（登录会话） */
 (function(){
-  var q = new URLSearchParams(location.search);
-  document.getElementById('qNo').value = q.get('order_no') || '';
-  document.getElementById('qPhone').value = q.get('phone') || '';
   var STATUS = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
   function stOf(o){
     if (o.status === 'pending') {
@@ -103,59 +79,8 @@
   function payLink(o, phone){
     return 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(o.order_no) + '&phone=' + encodeURIComponent(phone || '');
   }
-  var cur = null;
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
-  function render(o){
-    cur = o;
-    var st = stOf(o);
-    var card = document.getElementById('qCard');
-    card.style.display = 'block';
-    card.innerHTML =
-      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-        '<span style="font-size:11px;color:var(--muted);">' + esc(o.order_no) + '</span>' +
-        '<span style="font-size:11px;font-weight:600;color:var(--brand);">' + esc(st[0]) + '</span>' +
-      '</div>' +
-      '<div style="font-size:14px;font-weight:600;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</div>' +
-      '<div style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-top:2px;">联系人 ' + esc(o.contact_name) + ' · ' + esc(o.contact_phone_masked) + '</div>' +
-      '<div style="font-size:13px;font-weight:600;color:var(--ink);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
-      (o.cancel_policy_text ? '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + esc(o.cancel_policy_text) + '</div>' : '') +
-      (o.status === 'pending' && o.pay_status === 'unpaid'
-        ? '<a href="' + payLink(o, document.getElementById('qPhone').value.trim()) + '" style="display:block;text-align:center;margin-top:8px;background:var(--brand);color:#fff;font-size:12px;font-weight:600;border-radius:999px;padding:9px 0;text-decoration:none;">去支付</a>'
-        : '') +
-      (o.pay_status === 'paid' ? '<div style="font-size:11px;color:#15803d;margin-top:4px;">已支付' + (o.pay_method ? ' · ' + esc(o.pay_method) : '') + '</div>' : '');
-    document.getElementById('qCancel').style.display = (o.status === 'pending' && o.can_cancel !== false) ? 'block' : 'none';
-  }
-  function msg(m, isErr){ var el = document.getElementById('qMsg'); el.textContent = m; el.style.color = isErr ? '#991b1b' : 'var(--muted)'; }
-  function lookup(){
-    var no = document.getElementById('qNo').value.trim(), ph = document.getElementById('qPhone').value.trim();
-    if (!no || !ph) { msg('请填订单号和下单手机号', true); return; }
-    msg('查询中…', false);
-    document.getElementById('qCancel').style.display = 'none';
-    document.getElementById('qCard').style.display = 'none';
-    fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ order_no: no, contact_phone: ph }) })
-      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
-      .then(function(res){
-        if (!res.ok) { msg(res.j.error || '查询失败', true); return; }
-        msg('查询成功（手机号已打码展示）', false);
-        render(res.j.order);
-      }).catch(function(){ msg('网络异常，请稍后再试', true); });
-  }
-  document.getElementById('qGo').addEventListener('click', lookup);
-  document.getElementById('qCancel').addEventListener('click', function(){
-    if (!cur || cur.status !== 'pending') return;
-    if (!confirm('确定取消订单 ' + cur.order_no + ' 吗？')) return;
-    fetch('/api/juzhu/booking/cancel', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ order_no: cur.order_no, contact_phone: document.getElementById('qPhone').value.trim() }) })
-      .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, j: j }; }); })
-      .then(function(res){
-        if (!res.ok) { msg(res.j.error || '取消失败', true); return; }
-        msg('已取消', false);
-        cur.status = 'cancelled';
-        render(cur);
-      }).catch(function(){ msg('网络异常，请稍后再试', true); });
-  });
-  if (q.get('order_no') && q.get('phone')) lookup();
 
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
@@ -229,7 +154,6 @@
       .then(function(r){
         if (r.status === 401) {
           try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){}
-          /* App 内由 _beike-login fetch 拦截统一弹原生登录；浏览器仍展示本页登录卡 */
           if (!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isBeikeApp && BZF_BEIKE_LOGIN.isBeikeApp())) {
             lgBox.style.display = 'block';
             myBox.style.display = 'none';
