@@ -146,9 +146,6 @@
   .ai-txt b{display:block;font-size:13px;color:var(--ink);}
   .ai-txt small{font-size:9px;color:var(--muted);display:block;}
   .ai-cta.soon .ai-txt small{color:var(--brand-deep);}
-  /* 房型区标题右侧：收藏（原底栏心形并入） */
-  .hd-fav{float:right;width:30px;height:26px;border:0;background:none;font-size:16px;line-height:1;color:#b9c4c0;cursor:pointer;padding:0;}
-  .hd-fav.on{color:#e0245e;}
   /* 「查看房型」滚动后引导选日期 */
   @keyframes barFlash{0%,100%{box-shadow:0 0 0 0 rgba(15,118,110,0);}30%{box-shadow:0 0 0 4px rgba(15,118,110,.25);}}
   .datebar.flash{animation:barFlash 1.1s ease-in-out 2;}
@@ -251,11 +248,6 @@
 <div class="app">
   <div class="scr">
 
-    <div class="appbar ghost">
-      <a class="bk" href="lvju-app-lvju.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <!-- 顶部收藏/分享暂隐藏 <div class="act"><span id="appFav" title="收藏">♡</span><span id="appShare" title="分享">⤴</span></div> -->
-    </div>
-
     <div class="pd-hero s-xijiang" id="dHero">
       <div class="badge">
         <span class="star" id="dStars" data-lvju-feature="caibei">★ 4.9 五星旅居</span>
@@ -287,7 +279,7 @@
     </nav>
 
     <div class="block section-anchor" id="dUnitsBlock">
-      <div class="bt">可预订房型 <button class="hd-fav" id="dFav" type="button" title="收藏房源">♡</button></div>
+      <div class="bt">可预订房型</div>
       <div class="datebar" id="datebar">
         <div class="ds"><small>入住</small><b class="ph" id="dbIn">请选择</b></div>
         <div class="mid"><b id="dbN">— 晚</b></div>
@@ -370,7 +362,7 @@
       <div id="dInsRows" style="margin-top:4px;"></div>
     </div>
 
-    <!-- 周边玩法（规则 17）：无 ?id= 时保留静态基线；线上按项目绑定的 商圈/景区 渲染杂志区块，空绑定显示空状态 -->
+    <!-- 周边玩法（规则 17）：无 ?id= 时保留静态基线；线上按绑定渲染，空绑定整块隐藏 -->
     <div class="block nearby section-anchor" id="dNearbyBlock">
       <div class="bt" style="margin-bottom:2px;">周边玩法 <span class="bs" style="font-weight:400;">按步程与车程编排 · 商家实地整理</span></div>
       <div class="nb-ek">Nearby · Editor's Picks</div>
@@ -386,8 +378,8 @@
   </div>
 
   <div class="cta">
-    <!-- 左下：咨询入口（商家维度 consult_mode 决定形态：consultant=咨询顾问/400 虚拟号；ai=AI 咨询，上线后经 __AI_CONSULT__ 接管） -->
-    <button class="ai-cta" id="aiCta" type="button">
+    <!-- 左下咨询入口暂隐藏（商家 consult_mode：consultant / ai） -->
+    <button class="ai-cta" id="aiCta" type="button" hidden>
       <span class="ai-orb">☎</span>
       <span class="ai-txt"><b>咨询顾问</b><small>400 专线 · 免费转接</small></span>
     </button>
@@ -525,7 +517,7 @@ var BZF_GAL = (function(){
 <script>
 /* 周边玩法 · 杂志区块渲染（规则 17）：数据来自 GET /api/juzhu/projects/:id 的 spots
    （项目绑定的维度地点，服务端已按 景区→商圈→美食→咖啡 + 绑定排序）。第 1 条 = 封面故事大卡，
-   其余按维度分组为编辑行；空绑定显示空状态（不回落静态演示内容，防异地项目挂错样例）。
+   其余按维度分组为编辑行；空绑定 → 整块隐藏（不回落静态演示、不显示 empty 文案）。
    深链：spot.link 优先（admin 覆写）→ 笔记详情页 lvju-app-spot-post.html?id= →
    已知 spot-detail 词条 → 回落 lvju-app-spots.html。 */
 window.__NEARBY_RENDER__ = (function(){
@@ -572,9 +564,9 @@ window.__NEARBY_RENDER__ = (function(){
     spots = spots.filter(function(s){ return s && s.name; });
     if (!spots.length) {
       if (stat) stat.style.display = 'none';
-      dyn.innerHTML = '<div class="nearby-empty">商家暂未配置周边玩法</div>';
-      block.classList.add('is-empty');
-      block.style.display = '';
+      dyn.innerHTML = '';
+      block.classList.remove('is-empty');
+      block.style.display = 'none';
       if (window.__DETAIL_SECTION_NAV__) window.__DETAIL_SECTION_NAV__.refresh();
       return;
     }
@@ -968,9 +960,7 @@ window.__NEARBY_RENDER__ = (function(){
     document.getElementById('dUnitsNote').textContent = canBook
       ? txLabels + ' · 总价按逐晚实价合计 · 连住 ' + minNights + ' 晚起 · 已订 / 关房不可选'
       : '该项目未配置可用交易方式 · 价格仅供参考 · 请电话咨询';
-    // 无可用交易方式时主按钮降级为电话咨询。
-    var orbEl = document.getElementById('aiCta');
-    if (orbEl) orbEl.style.display = canBook ? '' : 'none';
+    // ai-cta 暂隐藏，勿按 canBook 再显示
     window.__STAY__ = { projectId: id, minNights: minNights, basePrice: perNight, channel: p.channel,
       bookable: canBook, onlineBooking: !!p.online_booking, onlinePayment: !!p.online_payment,
       consultMode: p.consult_mode || 'consultant', units: unitsX };
@@ -1411,36 +1401,6 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
       todayBtn.style.display = 'none';
     });
   })();
-
-  // 收藏：房型区标题 + 顶部 appbar 双入口，同一 localStorage（bzf_fav）双向同步
-  var fav = $('dFav'), appFav = $('appFav');
-  var favKey = 'bzf_fav', favId = q.get('id') || 'demo', favMap = {};
-  try { favMap = JSON.parse(localStorage.getItem(favKey) || '{}') || {}; } catch (e) { favMap = {}; }
-  var paintFav = function(){
-    var on = !!favMap[favId], ch = on ? '♥' : '♡';
-    if (fav) { fav.textContent = ch; fav.classList.toggle('on', on); }
-    if (appFav) { appFav.textContent = ch; appFav.style.color = on ? '#ff6b81' : ''; }
-  };
-  var toggleFav = function(){
-    if (favMap[favId]) delete favMap[favId]; else favMap[favId] = 1;
-    try { localStorage.setItem(favKey, JSON.stringify(favMap)); } catch (e) {}
-    paintFav();
-  };
-  paintFav();
-  if (fav) fav.addEventListener('click', toggleFav);
-  if (appFav) appFav.addEventListener('click', toggleFav);
-  // 分享：navigator.share 优先，不支持降级复制链接
-  var appShare = $('appShare');
-  if (appShare) appShare.addEventListener('click', function(){
-    var payload = { title: document.title, url: location.href };
-    if (navigator.share) { navigator.share(payload).catch(function(){}); return; }
-    var done = function(){
-      appShare.textContent = '✓';
-      setTimeout(function(){ appShare.textContent = '⤴'; }, 1500);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(location.href).then(done, done);
-    else done();
-  });
 
   // 左下咨询入口（商家维度 consultMode）：consultant=咨询顾问（400 虚拟号，保租房咨询同链路）；
   // ai=AI 咨询（上线后定义 window.__AI_CONSULT__(ctx) 即可接管，ctx 含项目/日期/户型）

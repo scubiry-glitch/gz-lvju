@@ -2582,6 +2582,28 @@ async function handleApiDirect(urlPath, qs, req, res) {
       }
     }
 
+    // GET /api/juzhu/auth/beike-config —— 纯配置、不连库（须在 ensureSchema 之前，DB 慢/挂时仍能出登录链）
+    if (urlPath === '/api/juzhu/auth/beike-config' && req.method === 'GET') {
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+      const domainEnv = /\.lianjia\.com$/i.test(host) ? 'lianjia.com' : 'ke.com';
+      const isTestHost = /\.tt[abc]\.test\.ke\.com$/i.test(host)
+        || /\.test\.ke\.com$/i.test(host)
+        || /localhost|127\.0\.0\.1/i.test(host)
+        || !isProduction();
+      const prefix = isTestHost ? 'test-' : '';
+      const loginBase = (process.env.BEIKE_H5_LOGIN_URL || '').trim().replace(/\/$/, '')
+        || (`https://${prefix}clogin.${domainEnv}`);
+      const serviceBase = (process.env.BEIKE_H5_SERVICE_URL || '').trim().replace(/\/$/, '')
+        || (`https://${prefix}m.${domainEnv}/my/checklogin`);
+      return jsonReply(res, {
+        ok: true,
+        login_base: loginBase,
+        service_base: serviceBase,
+        type: 2,
+        https_required: true,
+      });
+    }
+
     await ensureSchema();
 
     // ===== 商家 HMAC 开放接口（api_doc.md：家政 /api/juzhu/jiazheng/vendor/*；房源 /api/juzhu/housing/vendor/*）=====
@@ -5396,30 +5418,6 @@ async function handleApiDirect(urlPath, qs, req, res) {
         return jsonReply(res, { error: '该手机号已注册，密码不对' }, 401);
       }
       return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
-    }
-
-    // GET /api/juzhu/auth/beike-config —— 浏览器 H5 登录（对齐 Morph mLogin）
-    // Morph/src/business/login/platform/m.ts + lib/config.ts：
-    //   https://[test-]clogin.ke.com/login?service=enc(checklogin?redirect=回跳)&type=2
-    if (urlPath === '/api/juzhu/auth/beike-config' && req.method === 'GET') {
-      const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
-      const domainEnv = /\.lianjia\.com$/i.test(host) ? 'lianjia.com' : 'ke.com';
-      const isTestHost = /\.tt[abc]\.test\.ke\.com$/i.test(host)
-        || /\.test\.ke\.com$/i.test(host)
-        || /localhost|127\.0\.0\.1/i.test(host)
-        || !isProduction();
-      const prefix = isTestHost ? 'test-' : '';
-      const loginBase = (process.env.BEIKE_H5_LOGIN_URL || '').trim().replace(/\/$/, '')
-        || (`https://${prefix}clogin.${domainEnv}`);
-      const serviceBase = (process.env.BEIKE_H5_SERVICE_URL || '').trim().replace(/\/$/, '')
-        || (`https://${prefix}m.${domainEnv}/my/checklogin`);
-      return jsonReply(res, {
-        ok: true,
-        login_base: loginBase,
-        service_base: serviceBase,
-        type: 2,
-        https_required: true,
-      });
     }
 
     // POST /api/juzhu/auth/beike —— 可选：用 lianjia_token 换短 TTL BJZ 缓存会话

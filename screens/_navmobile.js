@@ -452,8 +452,17 @@
     return `<span class="ti"><img src="${src}" alt=""></span>`;
   }
 
+  // 页面已内嵌静态骨架（首屏即可见）→ 只补样式，不 outerHTML 重画
+  function hasStaticTabbar(el){
+    if (!el) return false;
+    if (el.matches && el.matches('nav.tabbar') && el.querySelector('a')) return true;
+    if (el.querySelector && el.querySelector('nav.tabbar a, .tabbar > a')) return true;
+    return false;
+  }
+
   // 渲染底部 tabbar
   function renderTabbar(el){
+    if (hasStaticTabbar(el)) return;
     const series = el.dataset.series;
     const active = el.dataset.active;
     const base   = el.dataset.base;
@@ -471,7 +480,7 @@
         const href = on ? '' : ` href="${resolveHref(it.href, base)}"`;
         return `<a${cls}${href}>${lvjuTabIcon(it, on, assetBase)}${it.label}</a>`;
       }).join('');
-      el.outerHTML = `<nav class="tabbar nvm-lvju">${items}</nav>`;
+      el.outerHTML = `<nav class="tabbar nvm-lvju" data-series="${series}" data-active="${active || ''}">${items}</nav>`;
       return;
     }
 
@@ -585,10 +594,10 @@
     injectStyles();
     // 先记录 series/active 再 render（outerHTML 会破坏原元素的 dataset）
     let drawerSeries = null, drawerActive = null;
-    const headerEl = document.querySelector('#m-header, #m-tabbar, #tab-bar');
+    const headerEl = document.querySelector('#m-header, #m-tabbar, #tab-bar, nav.tabbar.nvm-lvju');
     if (headerEl) { drawerSeries = headerEl.dataset.series; drawerActive = headerEl.dataset.active; }
     document.querySelectorAll('#m-header').forEach(renderHeader);
-    document.querySelectorAll('#m-tabbar, #tab-bar').forEach(renderTabbar);
+    document.querySelectorAll('#m-tabbar, #tab-bar, nav.tabbar.nvm-lvju').forEach(renderTabbar);
     if (drawerSeries) renderDrawer(drawerSeries, drawerActive);
     bindDrawerEvents();
   }
