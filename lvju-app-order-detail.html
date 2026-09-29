@@ -11,17 +11,14 @@
   .qrbox .qrimg{width:78px;height:78px;border-radius:8px;border:3px solid #fff;outline:1px solid var(--border);display:block;background:#fff;}
   .qrbox .qt{font-family:var(--serif);font-weight:700;font-size:15px;color:var(--ink);}
   .qrbox .qs{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;}
+  .ic-timer{display:inline-block;width:12px;height:12px;vertical-align:-1.5px;margin-right:3px;object-fit:contain;}
+  .house-link{display:inline-flex;align-items:center;gap:2px;color:var(--brand-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px;}
+  .house-link:active{opacity:.7;}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar">
-      <a class="bk" href="lvju-app-orders.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">订单详情</div>
-      <div class="act"><a href="lvju-app-service.html">🎧</a></div>
-    </div>
 
     <div class="statusbar stay" id="dStatus">
       <div class="s1" id="dState">待入住 · 已确认</div>
@@ -65,7 +62,7 @@
       <div class="kv"><span class="k">下单时间</span><span class="v" id="dCreated">2026-06-13 15:42</span></div>
       <div class="kv"><span class="k">支付方式</span><span class="v">在线预订 · 到店付</span></div>
       <div class="kv"><span class="k">订单状态</span><span class="v" id="dKvState">待商家确认</span></div>
-      <div class="kv"><span class="k">房源详情</span><span class="v"><a id="dHouseLink" href="lvju-app-detail.html">查看房源 →</a></span></div>
+      <div class="kv"><span class="k">房源详情</span><span class="v"><a class="house-link" id="dHouseLink" href="lvju-app-detail.html">查看房源 →</a></span></div>
     </div>
 
     <div style="height:14px;"></div>
@@ -108,12 +105,13 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   }
   function render(o){
     var st = stOf(o);
+    var TIMER_IC = '<img class="ic-timer" src="assets/lvju/icons/booking-timer.png" alt="" width="12" height="12">';
     // 退改口径随单下发（units.ext.cancel_policy；旧服务无此字段时回落静态文案）
     var sub = o.cancel_policy_text
-      ? esc(o.checkin) + ' 入住 · 🕒 ' + esc(o.cancel_policy_text) + (o.can_cancel === false && o.status === 'pending' ? ' · 已不可取消' : '')
-      : esc(o.checkin) + ' 入住 · ' + st[1];
+      ? esc(o.checkin) + ' 入住 · ' + TIMER_IC + esc(o.cancel_policy_text) + (o.can_cancel === false && o.status === 'pending' ? ' · 已不可取消' : '')
+      : esc(o.checkin) + ' 入住 · ' + esc(st[1]);
     document.getElementById('dState').textContent = st[0];
-    document.getElementById('dStateSub').textContent = sub;
+    document.getElementById('dStateSub').innerHTML = sub;
     document.getElementById('dKvState').textContent = st[0];
     document.getElementById('dName').textContent = o.project_name || ('项目#' + o.project_id);
     document.getElementById('dMeta').textContent = o.channel === 'minsu' ? '民宿 · 整栋/庭院' : '租赁住宿';
