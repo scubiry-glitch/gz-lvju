@@ -20,6 +20,30 @@
   #myBox{display:none;}
   #myList{padding:14px 14px 20px;}
   .empty{padding:48px 24px;text-align:center;color:var(--muted);font-size:13px;}
+  .cx-mask{position:fixed;inset:0;z-index:90;background:rgba(8,18,16,.55);
+    display:flex;align-items:flex-end;justify-content:center;
+    padding:0;padding-bottom:env(safe-area-inset-bottom);}
+  .cx-mask[hidden]{display:none!important;}
+  .cx-card{width:100%;max-width:430px;background:#fff;border-radius:18px 18px 0 0;
+    padding:10px 18px 18px;box-shadow:0 -8px 28px rgba(15,42,38,.12);
+    animation:cxUp .22s ease-out;}
+  @keyframes cxUp{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+  .cx-handle{width:36px;height:4px;border-radius:999px;background:#E5EBE9;margin:2px auto 14px;}
+  .cx-card h3{margin:0 0 6px;font-size:17px;font-weight:700;color:var(--ink);text-align:center;}
+  .cx-card .cx-sub{margin:0 0 14px;font-size:12.5px;line-height:1.5;color:var(--muted);text-align:center;}
+  .cx-info{background:#F6F9F8;border:1px solid var(--border);border-radius:12px;padding:12px 13px;margin-bottom:12px;}
+  .cx-info .nm{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.35;}
+  .cx-info .meta{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.45;}
+  .cx-info .amt{font-size:12px;color:var(--ink);margin-top:8px;font-weight:600;}
+  .cx-info .amt b{color:var(--gold-deep,#b45309);font-size:15px;}
+  .cx-tip{font-size:11.5px;line-height:1.5;color:#92400e;background:#FFFBEB;border:1px solid #FDE68A;
+    border-radius:10px;padding:9px 11px;margin-bottom:16px;}
+  .cx-tip img{width:12px;height:12px;vertical-align:-1.5px;margin-right:3px;}
+  .cx-acts{display:flex;gap:10px;}
+  .cx-acts button{flex:1;border:0;border-radius:999px;padding:13px 0;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;}
+  .cx-acts button:disabled{opacity:.55;cursor:default;}
+  .cx-acts .no{background:#F1F4F3;color:var(--ink);}
+  .cx-acts .yes{background:#DC2626;color:#fff;}
 </style>
 </head>
 <body>
@@ -62,7 +86,24 @@
     <a href="lvju-app-me.html"><span class="ti"><img src="assets/lvju/icons/tab-me-off.svg" alt=""></span>我的</a>
   </nav>
   <script src="screens/_navmobile.js?v=4"></script>
-  
+
+  <div class="cx-mask" id="cxMask" hidden>
+    <div class="cx-card" role="dialog" aria-modal="true" aria-labelledby="cxTitle">
+      <div class="cx-handle" aria-hidden="true"></div>
+      <h3 id="cxTitle">确认取消订单？</h3>
+      <p class="cx-sub">取消后不可恢复，房态将立刻释放</p>
+      <div class="cx-info">
+        <div class="nm" id="cxName">—</div>
+        <div class="meta" id="cxMeta">—</div>
+        <div class="amt">合计 <b id="cxAmt">—</b></div>
+      </div>
+      <div class="cx-tip" id="cxTip" hidden></div>
+      <div class="cx-acts">
+        <button type="button" class="no" id="cxNo">再想想</button>
+        <button type="button" class="yes" id="cxYes">确认取消</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_beike-login.js?v=18"></script>
@@ -183,16 +224,59 @@
     }).join('');
     document.querySelectorAll('[data-myid]').forEach(function(a){
       a.onclick = function(){
-        if (!confirm('确定取消该预订吗？')) return;
         var o = items.filter(function(x){ return String(x.id) === a.getAttribute('data-myid'); })[0];
-        fetch('/api/juzhu/booking/cancel', { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
-          body: JSON.stringify({ order_no: o.order_no, contact_phone: o.contact_phone_raw || '' }) })
-          .then(function(r){ return r.json(); })
-          .then(function(j){ if (j.error) { alert(j.error); return; } loadMine(); })
-          .catch(function(){ alert('网络异常'); });
+        if (o) openCancel(o);
       };
     });
   }
+
+  var cxPending = null;
+  var cxMask = document.getElementById('cxMask');
+  var cxYes = document.getElementById('cxYes');
+  var cxNo = document.getElementById('cxNo');
+  function openCancel(o){
+    cxPending = o;
+    document.getElementById('cxName').textContent = o.project_name || ('项目#' + o.project_id);
+    document.getElementById('cxMeta').textContent =
+      (o.checkin || '') + ' → ' + (o.checkout || '') + ' · ' + (o.nights || '—') + ' 晚' +
+      (o.order_no ? ' · ' + o.order_no : '');
+    document.getElementById('cxAmt').textContent = '¥' + fmt(o.price_total);
+    var tip = document.getElementById('cxTip');
+    if (o.cancel_policy_text) {
+      tip.hidden = false;
+      tip.innerHTML = '<img src="assets/lvju/icons/booking-timer.png" alt="" width="12" height="12">' +
+        String(o.cancel_policy_text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    } else {
+      tip.hidden = true;
+      tip.textContent = '';
+    }
+    cxYes.disabled = false;
+    cxYes.textContent = '确认取消';
+    cxMask.hidden = false;
+  }
+  function closeCancel(){
+    cxMask.hidden = true;
+    cxPending = null;
+    cxYes.disabled = false;
+    cxYes.textContent = '确认取消';
+  }
+  cxNo.addEventListener('click', closeCancel);
+  cxMask.addEventListener('click', function(e){ if (e.target === cxMask) closeCancel(); });
+  cxYes.addEventListener('click', function(){
+    var o = cxPending;
+    if (!o || cxYes.disabled) return;
+    cxYes.disabled = true;
+    cxYes.textContent = '取消中…';
+    fetch('/api/juzhu/booking/cancel', { method:'POST', headers: Object.assign({'Content-Type':'application/json'}, authH()),
+      body: JSON.stringify({ order_no: o.order_no, contact_phone: o.contact_phone_raw || '' }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j.error) { alert(j.error); cxYes.disabled = false; cxYes.textContent = '确认取消'; return; }
+        closeCancel();
+        loadMine();
+      })
+      .catch(function(){ alert('网络异常'); cxYes.disabled = false; cxYes.textContent = '确认取消'; });
+  });
   function paintList(){
     myRender(allItems.filter(function(o){ return matchTab(o, curTab); }));
   }
