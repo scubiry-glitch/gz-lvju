@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>预订成功 · 贝壳找房旅居</title>
 <link rel="stylesheet" href="lvju-app.css?v=6">
+<style>
+  .ic-timer{display:inline-block;width:12px;height:12px;vertical-align:-1.5px;margin-right:3px;object-fit:contain;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -92,8 +95,9 @@
             ? '资金已存管冻结，商家确认后订单生效'
             : '尚未确认支付成功，请稍后刷新或返回订单页查看';
           if (o.cancel_policy_text) {
-            // textContent 赋值（页面无 esc helper；政策文案为服务端下发非用户输入）
-            document.getElementById('okDesc').textContent = (paid ? '资金已存管冻结，商家确认后订单生效' : '支付结果确认中') + ' · 🕒 ' + o.cancel_policy_text;
+            var base = paid ? '资金已存管冻结，商家确认后订单生效' : '支付结果确认中';
+            var escCp = String(o.cancel_policy_text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            document.getElementById('okDesc').innerHTML = base + ' · <img class="ic-timer" src="assets/lvju/icons/booking-timer.png" alt="" width="12" height="12">' + escCp;
           }
           document.getElementById('svcName').textContent = o.project_name || '旅居预订';
           document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
