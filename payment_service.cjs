@@ -479,9 +479,24 @@ function createPaymentService(options) {
     }
   }
 
+  /* 补偿查单最多 10 次，整个窗口总时长不超过 30 分钟；首次在 1 分钟后触发。
+     10 次延迟在「首项 60s」与「末项 x」之间等差，使总和 = 30 分钟：
+     10 * (60 + x) / 2 = 1800 → x = 300s；即 60s 起每次 +26.7s，第 10 次 300s。
+     retryCount >= 10 返回 null，写入 next_query_at=NULL，该记录退出补偿队列。 */
+  const MAX_QUERY_RETRIES = 10;
+  const FIRST_QUERY_DELAY_SECONDS = 60;
+  const TOTAL_QUERY_WINDOW_SECONDS = 30 * 60;
+  const LAST_QUERY_DELAY_SECONDS =
+    (TOTAL_QUERY_WINDOW_SECONDS * 2) / MAX_QUERY_RETRIES - FIRST_QUERY_DELAY_SECONDS;
+
   function nextRetryAt(retryCount) {
-    const seconds = [10, 30, 60, 180, 600][Math.min(Math.max(retryCount, 0), 4)];
-    return new Date(Date.now() + seconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
+    const n = Math.max(Number(retryCount) || 0, 0);
+    if (n >= MAX_QUERY_RETRIES) return null;
+    const step = Math.round(
+      FIRST_QUERY_DELAY_SECONDS
+      + n * (LAST_QUERY_DELAY_SECONDS - FIRST_QUERY_DELAY_SECONDS) / (MAX_QUERY_RETRIES - 1),
+    );
+    return new Date(Date.now() + step * 1000).toISOString().slice(0, 19).replace('T', ' ');
   }
 
   async function runPaymentCompensation(limit = 50) {
