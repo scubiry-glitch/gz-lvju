@@ -73,7 +73,8 @@
 
   <div class="cta" id="dCta">
     <a class="ghost" href="lvju-app-orders.html" style="border:1px solid var(--border);color:var(--brand-deep);padding:12px 20px;border-radius:999px;font-size:13.5px;font-weight:600;">返回订单</a>
-    <a class="btn" id="dCancel" style="margin-left:auto;background:#dc2626;">取消订单</a>
+    <a class="btn" id="dPay" href="#" style="display:none;">去支付</a>
+    <a class="btn" id="dCancel" style="background:#dc2626;">取消订单</a>
   </div>
 </div>
 <script src="screens/_qr.js"></script>
@@ -96,8 +97,17 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
   var ST = { pending: ['待商家确认', '退改口径见下方提示'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'] };
+  var UNPAID_PS = { unpaid:1, creating:1, paying:1, create_unknown:1 };
+  function stOf(o){
+    if (o.status === 'pending' && o.pay_status === 'unpaid') return ['待支付', '请尽快完成支付，超时将自动取消并释放房态'];
+    if (o.status === 'pending' && UNPAID_PS[o.pay_status]) return ['支付确认中', '正在确认支付结果，请稍候'];
+    if (o.status === 'pending' && o.pay_status === 'paid') return ['已支付 · 待商家确认', '支付成功，等待商家确认'];
+    if (o.pay_status === 'refunding') return ['退款处理中', '退款处理中，请留意到账通知'];
+    if (o.pay_status === 'refunded') return [o.status === 'cancelled' ? '已取消 · 已退款' : '已退款', '退款已完成'];
+    return ST[o.status] || [o.status, ''];
+  }
   function render(o){
-    var st = ST[o.status] || [o.status, ''];
+    var st = stOf(o);
     // 退改口径随单下发（units.ext.cancel_policy；旧服务无此字段时回落静态文案）
     var sub = o.cancel_policy_text
       ? esc(o.checkin) + ' 入住 · 🕒 ' + esc(o.cancel_policy_text) + (o.can_cancel === false && o.status === 'pending' ? ' · 已不可取消' : '')
@@ -118,9 +128,24 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     document.getElementById('dNo').textContent = o.order_no;
     document.getElementById('dCreated').textContent = (o.created_at || '').replace('T', ' ').slice(0, 16) || '—';
     document.getElementById('dHouseLink').href = 'lvju-app-detail.html?id=' + o.project_id;
+    var pay = document.getElementById('dPay');
+    var needPay = o.status === 'pending' && !!UNPAID_PS[o.pay_status];
+    if (pay) {
+      if (needPay) {
+        pay.style.display = '';
+        pay.style.marginLeft = 'auto';
+        pay.href = 'lvju-app-booking.html?order_no=' + encodeURIComponent(o.order_no);
+      } else {
+        pay.style.display = 'none';
+      }
+    }
     var cancel = document.getElementById('dCancel');
     // 取消入口由服务端 can_cancel 驱动（免费取消窗口）；旧服务无该字段时回落「pending 可取消」
     if (o.status !== 'pending' || o.can_cancel === false) cancel.style.display = 'none';
+    else {
+      cancel.style.display = '';
+      cancel.style.marginLeft = needPay ? '8px' : 'auto';
+    }
     cancel.onclick = function(){
       if (!confirm('确定取消订单 ' + o.order_no + ' 吗？')) return;
       fetch('/api/juzhu/booking/cancel', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -133,6 +158,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
           kv.textContent = '已取消';
           document.getElementById('dState').textContent = '已取消';
           var c = document.getElementById('dCancel'); if (c) c.style.display = 'none';
+          var p = document.getElementById('dPay'); if (p) p.style.display = 'none';
         })
         .catch(function(){ alert('网络异常'); });
     };
