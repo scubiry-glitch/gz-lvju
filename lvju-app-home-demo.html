@@ -327,35 +327,31 @@
 <script src="screens/_beike-login.js?v=18"></script>
 <script src="screens/_jzapi.js?v=10"></script>
 <script>
-/* 隐私协议闸：未登录不弹；已登录且本机未同意过则弹一次。
-   同意 → localStorage 记一次；不同意 → 关闭 WebView / 退出频道。 */
+/* 隐私协议闸：以 POST /api/juzhu/auth/beike 验票成功为准才弹；
+   本机同意过（localStorage）则不再弹；不同意 → 关闭 WebView / 退出频道。 */
 (function(){
   var PRIV_VER = 'v1';
   var mask = document.getElementById('privMask');
   if (!mask) return;
+  var meAcct = undefined; // undefined=未查 / null=未登录 / object=已登录
 
-  function uidKey(){
+  function uidKey(acct){
+    var id = '';
     try {
-      var L = window.BZF_BEIKE_LOGIN;
-      var u = L && L.lastUser ? L.lastUser() : null;
-      var id = (u && (u.uid || u.id)) || '';
-      if (!id && L && L.pickUser && L.appUserInfo) {
-        var p = L.pickUser(L.appUserInfo());
-        if (p && p.uid) id = p.uid;
+      if (acct) id = String(acct.uid || acct.id || '');
+      if (!id) {
+        var L = window.BZF_BEIKE_LOGIN;
+        var u = L && L.lastUser ? L.lastUser() : null;
+        id = (u && (u.uid || u.id)) || '';
       }
-      return 'bzf_lvju_privacy_' + PRIV_VER + (id ? ':' + id : '');
-    } catch (e) { return 'bzf_lvju_privacy_' + PRIV_VER; }
+    } catch (e) {}
+    return 'bzf_lvju_privacy_' + PRIV_VER + (id ? ':' + id : '');
   }
-  function agreed(){
-    try { return !!localStorage.getItem(uidKey()); } catch (e) { return false; }
+  function agreed(acct){
+    try { return !!localStorage.getItem(uidKey(acct)); } catch (e) { return false; }
   }
-  function markAgreed(){
-    try { localStorage.setItem(uidKey(), String(Date.now())); } catch (e) {}
-  }
-  function isLoggedIn(){
-    try {
-      return !!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isLoggedIn && BZF_BEIKE_LOGIN.isLoggedIn());
-    } catch (e) { return false; }
+  function markAgreed(acct){
+    try { localStorage.setItem(uidKey(acct), String(Date.now())); } catch (e) {}
   }
   function show(){ mask.hidden = false; }
   function hide(){ mask.hidden = true; }
@@ -381,25 +377,66 @@
     if (history.length > 1) history.back();
     else location.replace('about:blank');
   }
+  function ljToken(){
+    try {
+      var L = window.BZF_BEIKE_LOGIN;
+      return (L && L.beikeAccessToken) ? (L.beikeAccessToken() || '') : '';
+    } catch (e) { return ''; }
+  }
+  /* 验票：有可读票才打 /api/juzhu/auth/beike；ok 才算登录 */
+  function fetchBeike(){
+    var lj = ljToken();
+    if (!lj) return Promise.resolve(null);
+    return fetch('/api/juzhu/auth/beike', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lianjia_token: lj })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if (!(j && j.ok)) return null;
+      return {
+        id: j.uid || '',
+        uid: j.uid || '',
+        phone: j.phone_masked || '',
+        display_name: j.display_name || ''
+      };
+    }).catch(function(){ return null; });
+  }
+  function ensureMe(done){
+    if (meAcct !== undefined) { done(meAcct); return; }
+    fetchBeike().then(function(acct){
+      meAcct = acct;
+      done(acct);
+    });
+  }
   function maybeShow(){
-    if (!isLoggedIn()) { hide(); return; }
-    if (agreed()) { hide(); return; }
-    show();
+    ensureMe(function(acct){
+      if (!acct) { hide(); return; }
+      if (agreed(acct)) { hide(); return; }
+      show();
+    });
   }
 
   document.getElementById('privYes').addEventListener('click', function(){
-    markAgreed();
-    hide();
+    ensureMe(function(acct){
+      markAgreed(acct);
+      hide();
+    });
   });
   document.getElementById('privNo').addEventListener('click', function(){
     exitChannel();
   });
 
   function boot(){
-    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
-      BZF_BEIKE_LOGIN.trySyncIdentity(function(){ maybeShow(); }, { probe: true });
-    } else {
+    /* 先从 bridge/cookie 把可读票拉齐，再打 beike 验票 */
+    function afterSync(){
+      meAcct = undefined;
       maybeShow();
+    }
+    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
+      BZF_BEIKE_LOGIN.trySyncIdentity(afterSync);
+    } else {
+      afterSync();
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
