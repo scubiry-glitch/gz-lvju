@@ -17,9 +17,9 @@
   .panel .btn{border:0;background:var(--brand);color:#fff;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;width:100%;}
   .panel .btn.soft{background:var(--brand-soft);color:var(--brand);border:1px solid transparent;margin-top:8px;}
   .panel .err{font-size:11px;color:#991b1b;margin-top:7px;display:none;}
-  .my-hd{padding:0 2px 8px;}
-  .my-hd .pt{margin:0;}
-  #myBox{margin:14px 14px 20px;display:none;}
+  #myBox{display:none;}
+  #myList{padding:14px 14px 20px;}
+  .empty{padding:48px 24px;text-align:center;color:var(--muted);font-size:13px;}
 </style>
 </head>
 <body>
@@ -28,11 +28,11 @@
 
     <div id="syncBox" class="panel" style="display:none;">
       <div class="pt">正在同步贝壳登录…</div>
-      <p class="ps" style="margin:0;">登录成功后会自动展示我的预订，请稍候</p>
+      <p class="ps" style="margin:0;">登录成功后会自动展示订单，请稍候</p>
     </div>
 
     <div id="loginBox" class="panel" style="display:none;">
-      <div class="pt">登录后自动展示我的预订</div>
+      <div class="pt">登录后自动展示订单</div>
       <p class="ps" id="lgMsg">默认跳转贝壳登录；回跳失败时可用下方密码登录（首次输入密码即自动注册）</p>
       <div class="row">
         <input id="lgPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
@@ -44,8 +44,11 @@
     </div>
 
     <div id="myBox">
-      <div class="my-hd">
-        <div class="pt">我的预订 <span id="myCnt" style="font-size:11px;color:var(--muted);font-weight:400;"></span></div>
+      <div class="otabs" id="tabs">
+        <a class="on" data-tab="all">全部</a>
+        <a data-tab="unpaid">待支付</a>
+        <a data-tab="stay">待入住</a>
+        <a data-tab="refund">退款售后</a>
       </div>
       <div id="myList"></div>
     </div>
@@ -56,21 +59,55 @@
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_beike-login.js?v=18"></script>
 <script>
-/* 我的预订：GET /api/juzhu/booking/my（登录会话） */
+/* 我的订单：登录会话拉取 /api/juzhu/booking/my，按 ?tab= 客户端筛选。
+   tab: all | unpaid | stay | refund —— 与「我的」页入口对齐。 */
 (function(){
+  var q = new URLSearchParams(location.search);
+  var TAB_IDS = { all:1, unpaid:1, stay:1, refund:1 };
+  var curTab = TAB_IDS[q.get('tab')] ? q.get('tab') : 'all';
+  var allItems = [];
+  var REFUND_PS = { refunding:1, refunded:1, refund_failed:1, manual_review:1 };
+  var UNPAID_PS = { unpaid:1, creating:1, paying:1, create_unknown:1 };
   var STATUS = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
+
   function stOf(o){
+    if (REFUND_PS[o.pay_status] || REFUND_PS[o.refund_status]) {
+      if (o.pay_status === 'refunding' || o.refund_status === 'refunding') return ['退款处理中', 'wait'];
+      if (o.pay_status === 'refund_failed' || o.pay_status === 'manual_review'
+          || o.refund_status === 'refund_failed' || o.refund_status === 'manual_review') {
+        return ['退款异常', 'wait'];
+      }
+      if (o.status === 'cancelled') return ['已取消 · 已退款', 'done'];
+      return ['已退款', 'done'];
+    }
     if (o.status === 'pending') {
       if (o.pay_status === 'unpaid') return ['待支付', 'wait'];
+      if (UNPAID_PS[o.pay_status]) return ['支付确认中', 'wait'];
       if (o.pay_status === 'paid') return ['已支付 · 待商家确认', 'stay'];
       return STATUS.pending;
     }
-    if (o.status === 'confirmed' && o.pay_status === 'refunded') return ['已退款', 'done'];
-    if (o.status === 'cancelled' && o.pay_status === 'refunded') return ['已取消 · 已退款', 'done'];
+    if (o.status === 'confirmed') return STATUS.confirmed;
     return STATUS[o.status] || [o.status, 'stay'];
   }
-  function payLink(o, phone){
-    return 'lvju-app-pay.html?channel=booking&order_no=' + encodeURIComponent(o.order_no) + '&phone=' + encodeURIComponent(phone || '');
+  function matchTab(o, tab){
+    var ps = o.pay_status || '';
+    var rs = o.refund_status || '';
+    var isRefund = !!(REFUND_PS[ps] || REFUND_PS[rs]);
+    if (tab === 'unpaid') {
+      return !!UNPAID_PS[ps] && o.status !== 'cancelled';
+    }
+    if (tab === 'stay') {
+      if (isRefund || o.status === 'cancelled') return false;
+      if (o.status === 'confirmed') return true;
+      if (o.status === 'pending' && ps === 'paid') return true;
+      return false;
+    }
+    if (tab === 'refund') return isRefund;
+    return true;
+  }
+  function payLink(o){
+    // 待支付回预订页，由预订页「立即支付」拉起中台（与下单成功后同链路）
+    return 'lvju-app-booking.html?order_no=' + encodeURIComponent(o.order_no);
   }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
@@ -78,6 +115,7 @@
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
   var syncBox = document.getElementById('syncBox');
+
   function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; }
   function hideSync(){ if (syncBox) syncBox.style.display = 'none'; }
   function tok(){
@@ -101,9 +139,17 @@
   function sdkProbe(){
     return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
   }
+  function emptyHint(){
+    if (curTab === 'unpaid') return '暂无待支付订单';
+    if (curTab === 'stay') return '暂无待入住订单';
+    if (curTab === 'refund') return '暂无退款售后订单';
+    return '还没有预订 · 去「找房」挑一间';
+  }
   function myRender(items){
-    document.getElementById('myCnt').textContent = items.length ? '· ' + items.length + ' 笔' : '';
-    if (!items.length) { document.getElementById('myList').innerHTML = '<div class="ordcard" style="text-align:center;"><div style="font-size:12px;color:var(--muted);padding:14px 2px;">还没有预订 · 去「找房」挑一间</div></div>'; return; }
+    if (!items.length) {
+      document.getElementById('myList').innerHTML = '<div class="empty">' + emptyHint() + '</div>';
+      return;
+    }
     document.getElementById('myList').innerHTML = items.map(function(o){
       var st = stOf(o);
       var cover = o.project_cover
@@ -121,7 +167,7 @@
         '</div>' +
         '<div class="of">' +
           (o.status === 'pending' && o.can_cancel !== false ? '<a data-myid="' + o.id + '" style="color:var(--danger,#b91c1c);cursor:pointer;">取消订单</a>' : '') +
-          (o.status === 'pending' && o.pay_status === 'unpaid' ? '<a href="' + payLink(o, o.contact_phone_raw) + '" style="color:var(--brand);font-weight:600;cursor:pointer;">去支付</a>' : '') +
+          (o.status === 'pending' && UNPAID_PS[o.pay_status] ? '<a href="' + payLink(o) + '" style="color:var(--brand);font-weight:600;cursor:pointer;">去支付</a>' : '') +
           '<a href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
           '<a class="primary" href="lvju-app-order-detail.html?order_no=' + encodeURIComponent(o.order_no) + '">订单详情</a>' +
         '</div>' +
@@ -139,6 +185,24 @@
       };
     });
   }
+  function paintList(){
+    myRender(allItems.filter(function(o){ return matchTab(o, curTab); }));
+  }
+  function setTab(tab, pushUrl){
+    curTab = TAB_IDS[tab] ? tab : 'all';
+    document.querySelectorAll('#tabs a').forEach(function(a){
+      a.classList.toggle('on', a.getAttribute('data-tab') === curTab);
+    });
+    if (pushUrl !== false) {
+      try {
+        var u = new URL(location.href);
+        if (curTab === 'all') u.searchParams.delete('tab');
+        else u.searchParams.set('tab', curTab);
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      } catch(e){}
+    }
+    paintList();
+  }
   function loadMine(){
     hideSync();
     lgBox.style.display = 'none';
@@ -147,6 +211,7 @@
       .then(function(r){
         if (r.status === 401) {
           try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){}
+          /* App 内由 _beike-login fetch 拦截统一弹原生登录；浏览器仍展示本页登录卡 */
           if (!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isBeikeApp && BZF_BEIKE_LOGIN.isBeikeApp())) {
             lgBox.style.display = 'block';
             myBox.style.display = 'none';
@@ -155,8 +220,15 @@
         }
         return r.json();
       })
-      .then(function(j){ myRender(j.items || []); })
-      .catch(function(e){ if (e.message !== '401') { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:#991b1b;">加载失败</div>'; } });
+      .then(function(j){
+        allItems = j.items || [];
+        setTab(curTab, false);
+      })
+      .catch(function(e){
+        if (e.message !== '401') {
+          document.getElementById('myList').innerHTML = '<div class="empty" style="color:#991b1b;">加载失败</div>';
+        }
+      });
   }
   function afterLogin(j){
     try { localStorage.setItem('BJZ_TOKEN', j.token); localStorage.setItem('BZF_SESSION_TOKEN', j.token); } catch(e){}
@@ -172,6 +244,9 @@
     return Promise.resolve(false);
   }
   function boot(){
+    document.querySelectorAll('#tabs a').forEach(function(a){
+      a.classList.toggle('on', a.getAttribute('data-tab') === curTab);
+    });
     if (isAuthed()) { loadMine(); return; }
     if (window.BZF_BEIKE_LOGIN) {
       showSync();
@@ -197,6 +272,11 @@
       document.getElementById('lgSdk').style.display = sdkProbe() ? 'block' : 'none';
     });
   }
+  document.getElementById('tabs').addEventListener('click', function(e){
+    var t = e.target.closest('a'); if (!t) return;
+    e.preventDefault();
+    setTab(t.getAttribute('data-tab'));
+  });
   document.getElementById('lgGo').addEventListener('click', function(){
     var ph = document.getElementById('lgPhone').value.trim(), pw = document.getElementById('lgPwd').value;
     var eEl = document.getElementById('lgErr');
