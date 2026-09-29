@@ -182,6 +182,21 @@
   .tabbar a .ti{display:block;width:24px;height:24px;margin:0 auto 0;line-height:24px;}
   .tabbar a .ti img{width:24px;height:24px;display:block;object-fit:contain;}
   .tabbar a.on{color:#0F766E;font-weight:600;}
+
+  /* 隐私协议（登录后弹一次） */
+  .priv-mask{position:fixed;inset:0;z-index:80;background:rgba(15,23,42,.48);
+    display:flex;align-items:center;justify-content:center;padding:24px 20px;
+    padding-bottom:max(24px,env(safe-area-inset-bottom));}
+  .priv-mask[hidden]{display:none!important;}
+  .priv-card{width:100%;max-width:320px;background:#fff;border-radius:16px;padding:22px 20px 16px;
+    box-shadow:0 16px 40px rgba(15,42,38,.18);}
+  .priv-card h3{margin:0 0 10px;font-size:17px;font-weight:600;color:var(--ink);text-align:center;line-height:1.3;}
+  .priv-card .body{font-size:13px;line-height:1.55;color:var(--muted);max-height:42vh;overflow-y:auto;}
+  .priv-card .body a{color:var(--brand);font-weight:600;}
+  .priv-acts{display:flex;gap:10px;margin-top:18px;}
+  .priv-acts button{flex:1;border:0;border-radius:999px;padding:12px 0;font:inherit;font-size:14px;font-weight:600;cursor:pointer;}
+  .priv-acts .no{background:#F1F4F3;color:var(--ink);}
+  .priv-acts .yes{background:linear-gradient(90deg,#0F766E,#14B8A6);color:#fff;}
 </style>
 </head>
 <body>
@@ -289,12 +304,109 @@
     <a href="lvju-app-orders.html"><span class="ti"><img src="assets/lvju/icons/tab-orders-off.svg" alt=""></span>订单</a>
     <a href="lvju-app-me.html"><span class="ti"><img src="assets/lvju/icons/tab-me-off.svg" alt=""></span>我的</a>
   </nav>
-  <script src="screens/_navmobile.js?v=4"></script>
-  
+
+  <!-- 隐私协议：仅登录后弹一次；不同意则退出频道 -->
+  <div class="priv-mask" id="privMask" hidden>
+    <div class="priv-card" role="dialog" aria-labelledby="privTitle" aria-modal="true">
+      <h3 id="privTitle">用户隐私保护提示</h3>
+      <div class="body">
+        欢迎使用贝壳旅居频道。为向您提供找房、预订与客服等服务，我们需要收集、使用必要的账号与设备信息。详情请阅读
+        <a href="lvju-app-privacy.html" id="privPolicy">《隐私政策》</a>与
+        <a href="lvju-app-terms.html" id="privTerms">《用户服务协议》</a>。
+        点击「同意」即表示您已阅读并同意相关条款；若不同意，将退出本频道。
+      </div>
+      <div class="priv-acts">
+        <button type="button" class="no" id="privNo">不同意</button>
+        <button type="button" class="yes" id="privYes">同意</button>
+      </div>
+    </div>
+  </div>
 </div>
+<script src="screens/_navmobile.js?v=4"></script>
 <script src="jsbridgesdk.js?v=1"></script>
 <script src="screens/_beike-login.js?v=18"></script>
 <script src="screens/_jzapi.js?v=10"></script>
+<script>
+/* 隐私协议闸：未登录不弹；已登录且本机未同意过则弹一次。
+   同意 → localStorage 记一次；不同意 → 关闭 WebView / 退出频道。 */
+(function(){
+  var PRIV_VER = 'v1';
+  var mask = document.getElementById('privMask');
+  if (!mask) return;
+
+  function uidKey(){
+    try {
+      var L = window.BZF_BEIKE_LOGIN;
+      var u = L && L.lastUser ? L.lastUser() : null;
+      var id = (u && (u.uid || u.id)) || '';
+      if (!id && L && L.pickUser && L.appUserInfo) {
+        var p = L.pickUser(L.appUserInfo());
+        if (p && p.uid) id = p.uid;
+      }
+      return 'bzf_lvju_privacy_' + PRIV_VER + (id ? ':' + id : '');
+    } catch (e) { return 'bzf_lvju_privacy_' + PRIV_VER; }
+  }
+  function agreed(){
+    try { return !!localStorage.getItem(uidKey()); } catch (e) { return false; }
+  }
+  function markAgreed(){
+    try { localStorage.setItem(uidKey(), String(Date.now())); } catch (e) {}
+  }
+  function isLoggedIn(){
+    try {
+      return !!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isLoggedIn && BZF_BEIKE_LOGIN.isLoggedIn());
+    } catch (e) { return false; }
+  }
+  function show(){ mask.hidden = false; }
+  function hide(){ mask.hidden = true; }
+  function exitChannel(){
+    try {
+      if (window.JsBridgeV3 && typeof JsBridgeV3.closeWeb === 'function') {
+        JsBridgeV3.closeWeb({});
+        return;
+      }
+    } catch (e0) {}
+    try {
+      if (window.$ljBridge && typeof window.$ljBridge.closeWeb === 'function') {
+        window.$ljBridge.closeWeb();
+        return;
+      }
+    } catch (e1) {}
+    try {
+      if (window.JsBridgeV3 && typeof JsBridgeV3.navigateBack === 'function') {
+        JsBridgeV3.navigateBack({});
+        return;
+      }
+    } catch (e2) {}
+    if (history.length > 1) history.back();
+    else location.replace('about:blank');
+  }
+  function maybeShow(){
+    if (!isLoggedIn()) { hide(); return; }
+    if (agreed()) { hide(); return; }
+    show();
+  }
+
+  document.getElementById('privYes').addEventListener('click', function(){
+    markAgreed();
+    hide();
+  });
+  document.getElementById('privNo').addEventListener('click', function(){
+    exitChannel();
+  });
+
+  function boot(){
+    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
+      BZF_BEIKE_LOGIN.trySyncIdentity(function(){ maybeShow(); }, { probe: true });
+    } else {
+      maybeShow();
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  window.addEventListener('pageshow', function(){ maybeShow(); });
+})();
+</script>
 <script>
 (function(){
   function dumpLogin(tag){
