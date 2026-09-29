@@ -17,7 +17,6 @@
   .panel .btn{border:0;background:var(--brand);color:#fff;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;width:100%;}
   .panel .btn.soft{background:var(--brand-soft);color:var(--brand);border:1px solid transparent;margin-top:8px;}
   .panel .err{font-size:11px;color:#991b1b;margin-top:7px;display:none;}
-  .appbar .out{font-size:12px;color:var(--muted);cursor:pointer;padding:4px 2px;}
   #myBox{display:none;}
   #myList{padding:14px 14px 20px;}
   .empty{padding:48px 24px;text-align:center;color:var(--muted);font-size:13px;}
@@ -26,12 +25,6 @@
 <body>
 <div class="app">
   <div class="scr">
-
-    <div class="appbar">
-      <a class="bk" href="lvju-app-me.html" onclick="if(history.length>1){history.back();return false}">‹</a>
-      <div class="ttl">我的订单</div>
-      <div class="act"><a class="out" id="myOut" style="display:none;">退出</a></div>
-    </div>
 
     <div id="syncBox" class="panel" style="display:none;">
       <div class="pt">正在同步贝壳登录…</div>
@@ -64,7 +57,7 @@
   <div id="tab-bar" data-series="lvju" data-active="orders"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_beike-login.js?v=18"></script>
 <script>
 /* 我的订单：登录会话拉取 /api/juzhu/booking/my，按 ?tab= 客户端筛选。
    tab: all | unpaid | stay | refund —— 与「我的」页入口对齐。 */
@@ -122,9 +115,8 @@
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
   var syncBox = document.getElementById('syncBox');
-  var outBtn = document.getElementById('myOut');
 
-  function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; outBtn.style.display = 'none'; }
+  function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; }
   function hideSync(){ if (syncBox) syncBox.style.display = 'none'; }
   function tok(){
     try {
@@ -215,7 +207,6 @@
     hideSync();
     lgBox.style.display = 'none';
     myBox.style.display = 'block';
-    outBtn.style.display = 'block';
     fetch('/api/juzhu/booking/my', { headers: authH() })
       .then(function(r){
         if (r.status === 401) {
@@ -224,7 +215,6 @@
           if (!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isBeikeApp && BZF_BEIKE_LOGIN.isBeikeApp())) {
             lgBox.style.display = 'block';
             myBox.style.display = 'none';
-            outBtn.style.display = 'none';
           }
           throw new Error('401');
         }
@@ -302,9 +292,6 @@
   document.getElementById('lgSdk').addEventListener('click', function(){
     if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.jumpToLogin(location.href)) return;
     trySdkLogin().then(function(ok){ if (!ok) { document.getElementById('lgErr').textContent = 'SDK 登录失败，请用密码登录'; document.getElementById('lgErr').style.display = 'block'; } });
-  });
-  outBtn.addEventListener('click', function(){
-    try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){} location.reload();
   });
   boot();
 })();

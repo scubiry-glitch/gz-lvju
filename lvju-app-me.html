@@ -228,29 +228,23 @@
         </div>
         <a class="call" id="dialBtn" href="tel:4009006688">立即拨打</a>
       </div>
-      <div class="lb">热线号码配置</div>
-      <input type="text" id="cfg400" placeholder="例：400-900-6688" />
-      <button class="go" id="btnSave400">保存号码配置</button>
-      <div class="tkok" id="cfgMsg" hidden>✓ 已保存，本机立即生效（URL 参数 ?400= 优先级更高）</div>
-      <button class="ghost" id="btnCopy400">复制号码</button>
-      <div style="font-size:10.5px;color:var(--muted);margin-top:8px;">优先级：URL <code>?400=</code> &gt; 本机配置（localStorage BZF_LVJU_400）&gt; 默认号码。线上由平台设置统一下发。</div>
     </div>
   </div>
 </div>
 
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_beike-login.js?v=18"></script>
 <script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
   var $ = function(id){ return document.getElementById(id); };
 
-  /* ================= 400 在线客服（电话可配置） ================= */
+  /* ================= 400 在线客服（展示 + 拨打；号码可被 URL ?400= 覆盖） ================= */
   var DEFAULT_400 = '400-900-6688';
   function get400(){
     try { var u = new URLSearchParams(location.search).get('400'); if (u) return u; } catch(e){}
-    try { return localStorage.getItem('BZF_LVJU_400') || DEFAULT_400; } catch(e){ return DEFAULT_400; }
+    return DEFAULT_400;
   }
   function telHref(n){ return 'tel:' + String(n).replace(/[^0-9+]/g,''); }
   function paint400(){
@@ -258,23 +252,7 @@
     $('t400').textContent = '热线 ' + n;
     $('dialNum').textContent = n;
     $('dialBtn').setAttribute('href', telHref(n));
-    $('cfg400').value = n;
   }
-  $('btnSave400').addEventListener('click', function(){
-    var v = $('cfg400').value.trim();
-    if (!v) return;
-    try { localStorage.setItem('BZF_LVJU_400', v); } catch(e){}
-    paint400();
-    $('cfgMsg').hidden = false;
-    setTimeout(function(){ $('cfgMsg').hidden = true; }, 2600);
-  });
-  $('btnCopy400').addEventListener('click', function(){
-    var n = get400();
-    if (navigator.clipboard) { navigator.clipboard.writeText(n); }
-    else { var i=document.createElement('input'); i.value=n; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
-    $('btnCopy400').textContent = '已复制 ✓';
-    setTimeout(function(){ $('btnCopy400').textContent = '复制号码'; }, 1600);
-  });
 
   /* ================= 服务工单（真实工单 · _jzapi repairs 总线，MySQL） ================= */
   var BASE_TYPES = ['报修','保洁','管家','送物','家电安装','除螨消杀','接送','其他'];
@@ -380,7 +358,7 @@
 
   paint400();
 
-  /* 未登录：点头像/姓名 → 贝壳 App 登录 */
+  /* 默认「点击登录」；身份同步确认后才画姓名。未登录点头像/姓名 → 跳登录 */
   function maskPhone(p){
     p = String(p || '');
     return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : (p || '已登录');
@@ -396,27 +374,28 @@
     nm.textContent = (user && user.name) || '旅居用户';
     ph.textContent = user && user.phone ? maskPhone(user.phone) : '已登录';
   }
-  function tryAppLogin(){
-    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.jumpToLogin(location.href)) return true;
-    return false;
+  function meUser(){
+    if (!window.BZF_BEIKE_LOGIN) return null;
+    return BZF_BEIKE_LOGIN.lastUser() || BZF_BEIKE_LOGIN.pickUser(BZF_BEIKE_LOGIN.appUserInfo());
+  }
+  function refreshMe(){
+    if (!window.BZF_BEIKE_LOGIN) { paintMe(false); return; }
+    BZF_BEIKE_LOGIN.trySyncIdentity(function(ok){
+      if (!ok && !BZF_BEIKE_LOGIN.isLoggedIn()) { paintMe(false); return; }
+      paintMe(true, meUser());
+    }, { probe: true });
   }
   function onMeHdClick(){
-    if (window.BZF_BEIKE_LOGIN && !BZF_BEIKE_LOGIN.isLoggedIn()) tryAppLogin();
+    if (!window.BZF_BEIKE_LOGIN) return;
+    if (BZF_BEIKE_LOGIN.isLoggedIn()) return;
+    BZF_BEIKE_LOGIN.jumpToLogin(location.href);
   }
   var meAv = $('meAv'), meUi = $('meUi');
   if (meAv) meAv.addEventListener('click', onMeHdClick);
   if (meUi) meUi.addEventListener('click', onMeHdClick);
-  if (window.BZF_BEIKE_LOGIN) {
-    // 先画缓存用户 / 已有票，避免切到「我的」先闪「点击登录」再等换票
-    var cached = BZF_BEIKE_LOGIN.lastUser();
-    if (cached || BZF_BEIKE_LOGIN.isLoggedIn()) paintMe(true, cached || null);
-    BZF_BEIKE_LOGIN.ensureAppLogin({
-      onReady: function(){
-        paintMe(true, BZF_BEIKE_LOGIN.lastUser() || BZF_BEIKE_LOGIN.pickUser(BZF_BEIKE_LOGIN.appUserInfo()));
-      },
-      onNeedPassword: function(){ paintMe(false); }
-    });
-  }
+  paintMe(false);
+  refreshMe();
+  window.addEventListener('pageshow', function(){ refreshMe(); });
 
   /* 城市参数透传（与首页一致） */
   try {

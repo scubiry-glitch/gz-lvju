@@ -285,7 +285,7 @@
   <div id="tab-bar" data-series="lvju" data-active="home"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_beike-login.js?v=18"></script>
 <script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
@@ -303,10 +303,8 @@
     });
   }
   dumpLogin('boot');
-  // 首进 C 端对齐身份（有 lianjia_token 即 ok；BJZ 后台可选换）
-  if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
-    BZF_BEIKE_LOGIN.trySyncIdentity(function(ok){ dumpLogin('sync:' + (ok ? 'ok' : 'fail')); });
-  }
+  /* 不在此调 trySyncIdentity（bootLoginResume 已处理；再调会叠请求） */
+  setTimeout(function(){ dumpLogin('settled'); }, 1200);
   window.addEventListener('pageshow', function(){ dumpLogin('pageshow'); });
 })();
 </script>
