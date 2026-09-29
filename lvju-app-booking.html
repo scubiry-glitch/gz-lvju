@@ -64,8 +64,8 @@
 
     <div id="okBox" class="okbox" style="display:none;">
       <div style="font-size:26px;">✅</div>
-      <div style="font-size:14px;font-weight:700;margin:6px 0 2px;">预订提交成功</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">订单号（请留存，配合手机号查单/取消）</div>
+      <div id="okTitle" style="font-size:14px;font-weight:700;margin:6px 0 2px;">预订提交成功</div>
+      <div id="okSub" style="font-size:11px;color:var(--muted);margin-bottom:6px;">订单号（请留存，配合手机号查单/取消）</div>
       <div class="no" id="okNo"></div>
       <div style="font-size:11px;color:var(--muted);margin-top:6px;">商家确认后订单生效 · 状态可在「订单」页查询</div>
       <div style="font-size:11px;color:#92400e;margin-top:4px;" id="okCp"></div>
@@ -555,6 +555,116 @@
       });
   });
 
+  /* ── 立即支付（下单成功后 / 待支付订单回跳共用）── */
+  function wirePayNow(orderNo, contactPhone){
+    var payBtn = document.getElementById('okPay');
+    if (!payBtn) return;
+    payBtn.href = '#';
+    payBtn.style.display = 'inline-block';
+    payBtn.onclick = function(e){
+      e.preventDefault();
+      if (payBtn.dataset.submitting === '1') return;
+      payBtn.dataset.submitting = '1';
+      var label = payBtn.textContent;
+      payBtn.textContent = '正在拉起收银台…';
+      var reset = function(){ payBtn.dataset.submitting = ''; payBtn.textContent = label; };
+      var result = 'lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(orderNo) +
+        '&phone=' + encodeURIComponent(contactPhone || '');
+      // 先查单校验，再向中台下单；cashier_type 由前端运行环境判断。
+      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ order_no: orderNo, contact_phone: contactPhone }) })
+        .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+        .then(function(lk){
+          if (!lk.ok) { alert(lk.d.error || '订单校验失败'); reset(); return null; }
+          var o = lk.d.order || {};
+          if (o.pay_status === 'paid') { location.href = result; return null; }
+          if (o.status !== 'pending') { alert('订单状态为「' + o.status + '」，无需支付'); reset(); return null; }
+          var cashierType = sdkProbe() ? '1' : '2';
+          var payHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
+          return fetch('/api/juzhu/booking/pay', { method:'POST', headers: payHeaders,
+            body: JSON.stringify({ order_no: orderNo, contact_phone: contactPhone, cashier_type: cashierType }) })
+            .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
+            .then(function(pay){
+              if (!pay.ok) { alert(pay.d.error || '支付失败'); reset(); return; }
+              var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
+              if (!pay.d.cashier_url) { location.href = paid; return; }
+              // App 内走原生 navigateTo 打开收银台；H5 直接跳中台地址。
+              if (cashierType === '1' && window.JsBridgeV3 && typeof window.JsBridgeV3.navigateTo === 'function') {
+                window.JsBridgeV3.navigateTo({
+                  url: pay.d.cashier_url,
+                  fail: function(){ location.href = pay.d.cashier_url; },
+                });
+                return;
+              }
+              location.href = pay.d.cashier_url;
+            });
+        })
+        .catch(function(){ alert('网络异常，请稍后再试'); reset(); });
+    };
+  }
+  function showPaidSuccess(order){
+    var orderNo = order.order_no;
+    var phone = order.contact_phone_raw || order.contact_phone || q.get('phone') || '';
+    document.getElementById('okNo').textContent = orderNo;
+    document.getElementById('okTitle').textContent = '待支付订单';
+    document.getElementById('okSub').textContent =
+      (order.project_name || '旅居预订') +
+      (order.checkin ? ' · ' + order.checkin + ' → ' + (order.checkout || '') : '') +
+      (order.nights ? ' · ' + order.nights + ' 晚' : '') +
+      (order.price_total != null ? ' · ¥' + fmt(order.price_total) : '');
+    document.getElementById('okCp').textContent = order.cancel_policy_text
+      ? '🕒 ' + order.cancel_policy_text + (order.cancel_deadline ? '（截止 ' + order.cancel_deadline + '）' : '') : '';
+    var payBtn = document.getElementById('okPay');
+    if (payBtn && (order.pay_status === 'unpaid' || order.pay_status === 'creating'
+        || order.pay_status === 'paying' || order.pay_status === 'create_unknown')) {
+      wirePayNow(orderNo, phone);
+    } else if (payBtn) {
+      payBtn.style.display = 'none';
+    }
+    document.getElementById('okBox').style.display = 'block';
+    document.getElementById('formBox').style.display = 'none';
+    document.getElementById('cBar').style.display = 'none';
+    document.getElementById('loginGate').style.display = 'none';
+    var bk = document.querySelector('.appbar .bk');
+    if (bk) {
+      bk.setAttribute('href', 'lvju-app-order-detail.html?order_no=' + encodeURIComponent(orderNo));
+      bk.onclick = null;
+    }
+  }
+  function resumeUnpaidOrder(orderNo){
+    document.getElementById('formBox').style.display = 'none';
+    document.getElementById('cBar').style.display = 'none';
+    return fetch('/api/juzhu/booking/my', { headers: authH() })
+      .then(function(r){
+        if (r.status === 401) return null;
+        return r.json();
+      })
+      .then(function(j){
+        if (!j) return null;
+        var o = (j.items || []).filter(function(x){ return x.order_no === orderNo; })[0];
+        if (!o) {
+          document.getElementById('formBox').style.display = 'block';
+          showErr('未找到订单 ' + orderNo + '，请从「我的订单」进入');
+          return null;
+        }
+        if (o.pay_status === 'paid') {
+          location.replace('lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(orderNo));
+          return o;
+        }
+        if (o.status === 'cancelled') {
+          document.getElementById('formBox').style.display = 'block';
+          showErr('订单已取消，无法继续支付');
+          return o;
+        }
+        if (o.pay_status !== 'unpaid' && o.pay_status !== 'creating' && o.pay_status !== 'paying' && o.pay_status !== 'create_unknown') {
+          location.replace('lvju-app-order-detail.html?order_no=' + encodeURIComponent(orderNo));
+          return o;
+        }
+        showPaidSuccess(o);
+        return o;
+      });
+  }
+
   document.getElementById('bSubmit').addEventListener('click', function(){
     var submitBtn = document.getElementById('bSubmit');
     err.style.display = 'none';
@@ -587,48 +697,7 @@
         var payBtn = document.getElementById('okPay');
         if (payBtn) {
           if (res.j.pay_status === 'unpaid') {
-            payBtn.href = '#';
-            payBtn.style.display = 'inline-block';
-            payBtn.onclick = function(e){
-              e.preventDefault();
-              if (payBtn.dataset.submitting === '1') return;
-              payBtn.dataset.submitting = '1';
-              var label = payBtn.textContent;
-              payBtn.textContent = '正在拉起收银台…';
-              var reset = function(){ payBtn.dataset.submitting = ''; payBtn.textContent = label; };
-              var result = 'lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(res.j.order_no) +
-                '&phone=' + encodeURIComponent(body.contact_phone);
-              // 先查单校验，再向中台下单；cashier_type 由前端运行环境判断。
-              fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ order_no: res.j.order_no, contact_phone: body.contact_phone }) })
-                .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
-                .then(function(lk){
-                  if (!lk.ok) { alert(lk.d.error || '订单校验失败'); reset(); return null; }
-                  var o = lk.d.order || {};
-                  if (o.pay_status === 'paid') { location.href = result; return null; }
-                  if (o.status !== 'pending') { alert('订单状态为「' + o.status + '」，无需支付'); reset(); return null; }
-                  var cashierType = sdkProbe() ? '1' : '2';
-                  var payHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
-                  return fetch('/api/juzhu/booking/pay', { method:'POST', headers: payHeaders,
-                    body: JSON.stringify({ order_no: res.j.order_no, contact_phone: body.contact_phone, cashier_type: cashierType }) })
-                    .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
-                    .then(function(pay){
-                      if (!pay.ok) { alert(pay.d.error || '支付失败'); reset(); return; }
-                      var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
-                      if (!pay.d.cashier_url) { location.href = paid; return; }
-                      // App 内走原生 navigateTo 打开收银台；H5 直接跳中台地址。
-                      if (cashierType === '1' && window.JsBridgeV3 && typeof window.JsBridgeV3.navigateTo === 'function') {
-                        window.JsBridgeV3.navigateTo({
-                          url: pay.d.cashier_url,
-                          fail: function(){ location.href = pay.d.cashier_url; },
-                        });
-                        return;
-                      }
-                      location.href = pay.d.cashier_url;
-                    });
-                })
-                .catch(function(){ alert('网络异常，请稍后再试'); reset(); });
-            };
+            wirePayNow(res.j.order_no, body.contact_phone);
           } else {
             payBtn.style.display = 'none';
           }
@@ -640,9 +709,10 @@
       .catch(function(){ showErr('网络异常，请稍后再试'); });
   });
 
-  /* ── 启动：登录判断 → 联系人 → 房源 ── */
+  /* ── 启动：登录判断 → 联系人 → 房源（或 ?order_no= 续付）── */
   var isRetry = false;
   var qid = parseInt(q.get('id') || '', 10);
+  var resumeOrderNo = (q.get('order_no') || '').trim();
   function boot(){
     document.getElementById('fIn').addEventListener('change', function(){ refreshRooms(); calc(); });
     document.getElementById('fOut').addEventListener('change', function(){ refreshRooms(); calc(); });
@@ -672,8 +742,8 @@
     }
     checkMe().then(function(acc){
       if (!acc) {
-        // 未登录：指定房源无可用交易能力 → 直接给电话咨询引导卡（无需会话）；
-        // 可订房源仍先登录（预订单需要会话归属）
+        // 续付 / 可订房源均需登录；无交易能力的房源才给电话卡
+        if (resumeOrderNo) { showGate(); return; }
         if (!qid) { showGate(); return; }
         fetch('/api/juzhu/projects/' + qid).then(function(r){ return r.json(); }).then(function(p){
           if (p.bookable === false) load(qid); else showGate();
@@ -682,6 +752,10 @@
       }
       me = { id: acc.id, phone: acc.phone || '', display_name: acc.display_name || '' };
       document.getElementById('loginGate').style.display = 'none';
+      if (resumeOrderNo) {
+        resumeUnpaidOrder(resumeOrderNo).catch(function(){ showErr('加载待支付订单失败'); });
+        return;
+      }
       document.getElementById('formBox').style.display = 'block';
       document.getElementById('cBar').style.display = 'flex';
       loadContacts();
