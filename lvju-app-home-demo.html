@@ -22,159 +22,166 @@
 <script src="lvju-app-config.js?v=1"></script>
 <script src="lvju-app-price.js?v=1"></script>
 <style>
+  /* MasterGo 贵阳旅居首页 token：PingFang SC / #222 / #6B7785 / #0F766E */
   :root{
-    --surface:#ffffff; --fg:#0f172a; --muted:#6b7785; --border:#e7ece9;
-    --brand:#0f766e; --brand-deep:#0b5d56; --brand-2:#14b8a6;
-    --brand-soft:color-mix(in oklab,var(--brand) 12%,transparent);
-    --gold:#b48a3f; --gold-deep:#8c6224; --gold-soft:color-mix(in oklab,var(--gold) 16%,transparent);
-    --ink:#10171c;
-    --font:system-ui,-apple-system,'PingFang SC','Noto Sans CJK SC',sans-serif;
-    --serif:'Noto Serif SC','Songti SC','Source Han Serif SC',Georgia,'Times New Roman',serif;
+    --surface:#ffffff; --fg:#222222; --muted:#6B7785; --border:#e7ece9;
+    --brand:#0F766E; --brand-deep:#0b5d56; --brand-2:#14B8A6; --tab:#15A69B;
+    --brand-soft:#E6F5F1;
+    --gold:#AC8942; --gold-deep:#8c6224; --gold-soft:color-mix(in oklab,var(--gold) 16%,transparent);
+    --ink:#222222; --ph:#9E9E9E; --page:#F5F7F6;
+    --font:-apple-system,'PingFang SC','PingFangSC-Regular','Helvetica Neue',sans-serif;
+    --font-em:'FZLanTingHeiS-B-GB','PingFang SC','PingFangSC-Semibold',sans-serif;
   }
   *,*::before,*::after{box-sizing:border-box;}
   [data-deferred]{display:none!important;}
   html,body{margin:0;height:100%;}
-  body{background:radial-gradient(1000px 600px at 50% -10%,#13322e 0%,#0b0f12 60%);
-    font-family:var(--font);-webkit-font-smoothing:antialiased;display:flex;justify-content:center;}
+  body{background:#0b0f12;font-family:var(--font);font-size:12px;line-height:1.2;color:var(--fg);
+    -webkit-font-smoothing:antialiased;display:flex;justify-content:center;}
   a{color:inherit;text-decoration:none;}
-  h2,h3,h4{margin:0;}
+  h2,h3,h4{margin:0;font-weight:600;}
 
-  /* app column = the phone screen, full height */
-  .app{width:100%;max-width:430px;height:100dvh;background:#f5f7f6;color:var(--fg);
+  .app{width:100%;max-width:430px;height:100dvh;background:var(--page);color:var(--fg);
     display:flex;flex-direction:column;overflow:hidden;position:relative;
     box-shadow:0 0 80px rgba(0,0,0,.5);}
   .scr{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
   .scr::-webkit-scrollbar{width:0;}
 
-  /* 状态栏由原生壳绘制（见 capacitor.config.ts 的 StatusBar），页面内不再模拟。
-     hero 内容不再按 env(safe-area-inset-top) 让位——异形屏设备预设会报 ~47px，
-     凭空在顶部留一条空白；这里固定 10px，内容直接贴顶，图片仍全幅出血 */
-
-  /* immersive hero */
-  .hero{position:relative;padding:0 0 18px;color:#fff;overflow:hidden;}
+  /* immersive hero — 稿面字号：眉题 9/ls4、主标 23/lh33、副标 12/w300 */
+  .hero{position:relative;padding:0 0 0;color:#fff;overflow:hidden;}
   .hero .bgimg{position:absolute;inset:0;
     background:
-      linear-gradient(180deg,rgba(8,18,16,.55) 0%,rgba(8,18,16,.05) 32%,rgba(8,18,16,.0) 50%,rgba(245,247,246,.0) 78%,#f5f7f6 100%),
+      linear-gradient(180deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.15) 40%,rgba(245,247,246,0) 72%,#F5F7F6 100%),
+      linear-gradient(180deg,rgba(84,116,181,.2) 55%,rgba(91,148,162,.55) 78%,#DEE6E8 100%),
       url(assets/lvju/xijiang-night.jpg) center/cover;
     z-index:0;}
-  .hero .bgimg::after{content:"";position:absolute;left:0;right:0;bottom:120px;height:160px;
-    background:
-      radial-gradient(60% 100% at 20% 100%,rgba(11,93,86,.0) 0,rgba(7,40,38,.9) 100%),
-      repeating-linear-gradient(85deg,rgba(255,255,255,.05) 0 2px,transparent 2px 16px);
-    opacity:.5;}
-  .hero .mist{position:absolute;left:-10%;right:-10%;bottom:96px;height:120px;
-    background:radial-gradient(50% 100% at 50% 100%,rgba(255,255,255,.22),transparent 70%);filter:blur(8px);z-index:1;}
-  .hero-in{position:relative;z-index:5;padding:30px 20px 0;}
-  .editorial{margin-top:34px;}
-  .editorial .ek{font-size:10px;letter-spacing:.4em;text-transform:uppercase;opacity:.85;}
-  .editorial h2{font-family:var(--serif);font-weight:700;font-size:30px;line-height:1.22;margin-top:8px;text-shadow:0 2px 18px rgba(0,0,0,.3);}
-  .editorial p{font-size:12px;opacity:.9;margin-top:7px;max-width:24ch;}
-  .searchbar{margin:18px 20px 0;position:relative;z-index:5;background:rgba(255,255,255,.96);border-radius:999px;
-    padding:11px 16px;display:flex;align-items:center;gap:9px;box-shadow:0 12px 30px rgba(6,30,26,.28);}
-  .searchbar .ic{color:var(--brand);font-size:14px;}
-  .searchbar .ph{color:#9aa6a2;font-size:12.5px;flex:1;}
-  .searchbar .go{font-size:11px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:6px 13px;border-radius:999px;}
+  .hero .bgimg::after,.hero .mist{display:none;}
+  .hero-in{position:relative;z-index:5;padding:6px 20px 0;}
+  .hero-top{display:none;}
+  .city-sw{display:flex;flex-direction:column;gap:0;cursor:pointer;user-select:none;color:#fff;}
+  .city-sw .cn{display:flex;align-items:center;gap:2px;font-size:14px;font-weight:600;line-height:14px;}
+  .city-sw .cn .chev{width:8px;height:8px;display:inline-flex;align-items:center;justify-content:center;opacity:.95;}
+  .city-sw .cn .chev svg{width:6px;height:4px;display:block;}
+  .city-sw .sub{font-size:9px;font-weight:300;letter-spacing:1px;line-height:12px;padding-left:16px;margin-top:0;opacity:.95;}
+  .city-sw .pin{width:16px;height:16px;margin-right:0;flex-shrink:0;}
+  .fav-btn{width:28px;height:28px;border-radius:40px;background:#5B7081;display:grid;place-items:center;flex-shrink:0;}
+  .fav-btn svg{width:14px;height:13px;display:block;}
+  .editorial{margin:23px 0 0;}
+  .editorial .ek{font-size:9px;font-weight:400;letter-spacing:4px;text-transform:uppercase;line-height:14px;color:#fff;}
+  .editorial h2{font-family:var(--font-em);font-weight:400;font-size:23px;line-height:33px;letter-spacing:.14em;margin-top:5px;color:#fff;}
+  .editorial p{font-size:12px;font-weight:300;letter-spacing:1px;line-height:12px;margin-top:10px;color:#fff;max-width:none;}
+  .searchbar{margin:18px 18px 0;position:relative;z-index:5;background:#fff;border-radius:70px;
+    height:43px;padding:10px 12px;display:flex;align-items:center;gap:6px;box-sizing:border-box;}
+  .searchbar .ic{flex-shrink:0;display:grid;place-items:center;width:16px;height:16px;}
+  .searchbar .ic img{width:16px;height:16px;display:block;}
+  .searchbar .ph{color:var(--ph);font-size:11px;font-weight:400;line-height:12px;flex:1;}
+  .searchbar .go{font-size:10px;font-weight:600;letter-spacing:1px;line-height:12px;color:#fff;
+    background:linear-gradient(90deg,#0F766E 0%,#14B8A6 99%);padding:5px 11px;border-radius:40px;flex-shrink:0;}
 
-  /* sheet */
-  .sheet{position:relative;z-index:5;background:#f5f7f6;border-radius:22px 22px 0 0;margin-top:16px;padding:18px 0 10px;}
+  /* sheet — hero 高 245，搜索条叠在 y=186，正文自 y=269 起 = 距搜索底约 24 */
+  .sheet{position:relative;z-index:5;background:var(--page);border-radius:0;margin-top:24px;padding:0 0 10px;}
 
-  /* primary channels */
-  .seg-h{display:flex;align-items:baseline;gap:9px;padding:0 20px;margin:4px 0 13px;}
-  .seg-h .bar{width:3px;height:15px;border-radius:2px;background:linear-gradient(var(--brand),var(--gold));}
-  .seg-h h3{font-size:15px;font-weight:700;color:var(--ink);font-family:var(--serif);}
-  .seg-h .more{margin-left:auto;font-size:11px;color:var(--muted);}
-  .chan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 12px;}
-  .chan a{position:relative;background:#fff;border:1px solid var(--border);border-radius:15px;padding:14px 4px;text-align:center;
-    box-shadow:0 6px 16px rgba(15,42,38,.05);transition:.15s;display:block;color:var(--ink);}
+  /* section title — 14/600 #222；全部 12/400 #6B7785；色条 3×14 青绿金 */
+  .seg-h{display:flex;align-items:center;gap:8px;padding:0 16px;margin:0 0 16px;}
+  .seg-h .bar{width:3px;height:14px;border-radius:10px;background:linear-gradient(180deg,#16766B 0%,#AC8942 100%);flex-shrink:0;}
+  .seg-h h3{font-size:14px;font-weight:600;line-height:12px;color:var(--ink);font-family:var(--font);}
+  .seg-h .more{margin-left:auto;font-size:12px;font-weight:400;line-height:12px;color:var(--muted);
+    display:inline-flex;align-items:center;gap:5px;}
+  .seg-h .more::after{content:"";width:5px;height:8px;background:currentColor;opacity:.55;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 8'%3E%3Cpath fill='%23000' d='M1 0l4 4-4 4H0l4-4L0 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 8'%3E%3Cpath fill='%23000' d='M1 0l4 4-4 4H0l4-4L0 0z'/%3E%3C/svg%3E") center/contain no-repeat;}
+
+  /* 频道卡 — 82×95 / r12 / 标题12·600 / 副标9·400 / 影 rgba(17,123,115,.1) */
+  .chan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 11px;}
+  .chan a{position:relative;background:#fff;border:none;border-radius:12px;padding:12px 8px;text-align:center;
+    box-shadow:0 0 10px rgba(17,123,115,.1);transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--ink);}
   .chan a:active{transform:scale(.97);}
-  .chan a:hover{transform:translateY(-2px);box-shadow:0 12px 24px rgba(15,42,38,.12);border-color:color-mix(in oklab,var(--brand) 30%,var(--border));}
-  .chan .ic{width:40px;height:40px;margin:0 auto 8px;border-radius:12px;display:grid;place-items:center;font-size:20px;
-    background:linear-gradient(135deg,var(--brand-soft),#fff);}
-  .chan.feat .ic{background:linear-gradient(135deg,#1f6f5f,#0b5d56);color:#fff;box-shadow:0 6px 14px rgba(11,93,86,.3);}
-  .chan b{font-size:12px;font-weight:600;display:block;}
-  .chan small{font-size:10px;color:var(--muted);display:block;margin-top:2px;}
-  .chan .nb{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;color:#fff;
-    background:linear-gradient(90deg,var(--gold),var(--gold-deep));padding:1px 6px;border-radius:999px;letter-spacing:.04em;}
+  .chan .ic{width:35px;height:35px;margin:0;border-radius:10px;display:grid;place-items:center;background:transparent;}
+  .chan .ic img{width:35px;height:35px;display:block;object-fit:contain;}
+  .chan b{font-size:12px;font-weight:600;line-height:12px;display:block;}
+  .chan small{font-size:9px;font-weight:400;line-height:12px;color:#6C7785;display:block;margin:0;}
+  .chan .nb{position:absolute;top:8px;right:8px;font-size:9px;font-weight:600;line-height:12px;color:#fff;
+    background:#F44736;padding:0 5px;height:12px;border-radius:20px;letter-spacing:0;}
 
-  /* magazine cover card */
-  .feature{margin:20px 18px 4px;border-radius:18px;overflow:hidden;position:relative;height:172px;color:#fff;
-    box-shadow:0 16px 36px rgba(10,40,36,.22);display:block;}
+  /* magazine cover — 343×150 / r16 / 标题 17/lh22 ls14% / 眉 9 ls3 / 副 10 w300 */
+  .feature{margin:24px 16px 0;border-radius:16px;overflow:hidden;position:relative;height:150px;color:#fff;display:block;}
   .feature .fbg{position:absolute;inset:0;
-    background:linear-gradient(110deg,rgba(8,22,20,.78) 0%,rgba(8,22,20,.25) 60%,rgba(8,22,20,.05) 100%),
+    background:linear-gradient(90deg,rgba(3,59,55,.9) 0%,rgba(9,100,93,.1) 99%),
       url(assets/lvju/stilt-miao.jpg) center/cover;}
-  .feature .fin{position:relative;z-index:2;padding:18px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;}
-  .feature .fk{font-size:10px;letter-spacing:.34em;text-transform:uppercase;opacity:.9;margin-bottom:6px;}
-  .feature h4{font-family:var(--serif);font-size:21px;font-weight:700;line-height:1.25;}
-  .feature p{font-size:11px;opacity:.88;margin-top:6px;}
-  .feature .pg{position:absolute;top:14px;right:16px;font-size:11px;font-weight:700;letter-spacing:.1em;opacity:.85;z-index:2;}
+  .feature .fin{position:relative;z-index:2;padding:42px 16px 26px;height:100%;display:flex;flex-direction:column;justify-content:flex-start;}
+  .feature .fk{font-size:9px;font-weight:400;letter-spacing:3px;text-transform:uppercase;line-height:14px;margin-bottom:6px;}
+  .feature h4{font-family:'FZLanTingHeiS-DB-GB',var(--font-em);font-size:17px;font-weight:400;line-height:22px;letter-spacing:.14em;}
+  .feature p{font-size:10px;font-weight:300;line-height:12px;margin-top:6px;}
+  .feature .pg{display:none;}
 
-  /* content services */
-  .content4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 18px;}
-  .content4 a{background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 6px;text-align:center;color:var(--ink);transition:.15s;}
-  .content4 a:hover{border-color:color-mix(in oklab,var(--gold) 40%,var(--border));box-shadow:0 8px 18px rgba(140,98,36,.12);}
-  .content4 .ic{font-size:23px;}
-  .content4 b{font-size:12px;font-weight:600;display:block;margin-top:6px;}
-  .content4 small{font-size:9px;color:var(--muted);}
+  /* 内容服务 — 与频道卡同口径 */
+  .content4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 11px;}
+  .content4 a{background:#fff;border:none;border-radius:12px;padding:12px 10px;text-align:center;color:var(--ink);
+    box-shadow:0 0 10px rgba(17,123,115,.1);display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .content4 .ic{width:35px;height:35px;margin:0;display:grid;place-items:center;}
+  .content4 .ic img{width:35px;height:35px;display:block;object-fit:contain;}
+  .content4 b{font-size:12px;font-weight:600;line-height:12px;display:block;margin:0;}
+  .content4 small{font-size:9px;font-weight:400;line-height:12px;color:#6C7785;}
 
   /* curated local posts */
-  .poststrip{display:flex;gap:10px;overflow-x:auto;padding:0 18px 6px;scroll-snap-type:x mandatory;scroll-padding-left:18px;}
+  .poststrip{display:flex;gap:10px;overflow-x:auto;padding:0 16px 6px;scroll-snap-type:x mandatory;scroll-padding-left:16px;}
   .poststrip::-webkit-scrollbar{height:0;}
-  .postcard{flex:0 0 164px;background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;
-    box-shadow:0 6px 16px rgba(15,42,38,.06);scroll-snap-align:start;color:var(--ink);}
+  .postcard{flex:0 0 164px;background:#fff;border:none;border-radius:12px;overflow:hidden;
+    box-shadow:0 0 10px rgba(17,123,115,.1);scroll-snap-align:start;color:var(--ink);}
   .postcard .pic{height:108px;position:relative;background:center/cover no-repeat #dfe8e4;}
   .postcard .pic::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(8,18,16,.34));}
-  .postcard .type{position:absolute;z-index:2;left:8px;top:8px;font-size:9px;font-weight:700;color:#fff;
+  .postcard .type{position:absolute;z-index:2;left:8px;top:8px;font-size:9px;font-weight:600;color:#fff;
     background:rgba(8,18,16,.5);backdrop-filter:blur(5px);padding:2px 8px;border-radius:999px;}
   .postcard .pcopy{padding:9px 10px 11px;}
-  .postcard b{display:-webkit-box;min-height:35px;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    font-family:var(--serif);font-size:13px;line-height:1.35;}
+  .postcard b{display:-webkit-box;min-height:28px;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    font-size:12px;font-weight:600;line-height:1.35;}
   .postcard p{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.45;}
+    margin:5px 0 0;color:var(--muted);font-size:9px;line-height:1.4;}
 
-  /* listing magazine cards */
-  .list{padding:0 18px;}
-  .mcard{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:14px;
-    box-shadow:0 8px 22px rgba(15,42,38,.06);}
+  /* listing cards */
+  .list{padding:0 16px;}
+  .mcard{background:#fff;border:none;border-radius:12px;overflow:hidden;margin-bottom:12px;
+    box-shadow:0 0 10px rgba(17,123,115,.1);}
   .mcard .img{height:140px;position:relative;}
   .mcard .img.a{background:url(assets/lvju/xijiang-night.jpg) center/cover,#0c4d44;}
   .mcard .img.b{background:url(assets/lvju/xiaoqikong.jpg) center/cover,#0c4d44;}
   .mcard .img::before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.34),transparent 55%);}
   .mcard .img .star{position:absolute;top:11px;left:11px;background:rgba(8,18,16,.5);backdrop-filter:blur(6px);
-    color:#ffd98a;font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
+    color:#ffd98a;font-size:10px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid rgba(255,217,138,.35);}
   .mcard .img .like{position:absolute;top:11px;right:11px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.22);backdrop-filter:blur(4px);display:grid;place-items:center;font-size:13px;color:#fff;}
   .mcard .img .cap{position:absolute;left:13px;bottom:11px;color:#fff;}
-  .mcard .img .cap .nm{font-family:var(--serif);font-size:16px;font-weight:700;}
-  .mcard .img .cap .lo{font-size:10.5px;opacity:.92;margin-top:1px;}
+  .mcard .img .cap .nm{font-size:14px;font-weight:600;line-height:1.3;}
+  .mcard .img .cap .lo{font-size:10px;opacity:.92;margin-top:2px;}
   .mcard .ci{padding:11px 13px 13px;}
   .mcard .tags{display:flex;gap:6px;flex-wrap:wrap;}
-  .mcard .tags span{font-size:10px;color:var(--brand-deep);background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
+  .mcard .tags span{font-size:9px;color:var(--brand);background:var(--brand-soft);padding:2px 8px;border-radius:6px;}
   .mcard .pr{display:flex;align-items:baseline;justify-content:space-between;margin-top:10px;}
-  .mcard .pr b{color:var(--gold-deep);font-size:18px;font-family:var(--serif);}
+  .mcard .pr b{color:#D35106;font-size:16px;font-weight:600;}
   .mcard .pr b small{font-size:10px;color:var(--muted);font-weight:400;font-family:var(--font);}
-  .mcard .pr .bk{font-size:11px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--brand),var(--brand-2));padding:7px 16px;border-radius:999px;}
+  .mcard .pr .bk{font-size:10px;font-weight:600;letter-spacing:1px;color:#fff;background:linear-gradient(90deg,#0F766E,#14B8A6);padding:6px 14px;border-radius:40px;}
 
-  /* 城市切换弹层（URL ?city= / localStorage bzf_jz_city） */
   .csheet{position:absolute;inset:0;z-index:60;display:none;}
   .csheet.on{display:block;}
   .cs-mask{position:absolute;inset:0;background:rgba(8,18,16,.45);}
   .cs-panel{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:15px 16px max(16px,env(safe-area-inset-bottom));}
-  .cs-h{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-  .cs-x{font-size:13px;color:var(--muted);padding:2px 6px;}
+  .cs-h{font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cs-x{font-size:12px;color:var(--muted);padding:2px 6px;}
   .cs-body{display:flex;gap:14px;max-height:52vh;overflow:hidden;}
   .cs-prov{flex:0 0 84px;overflow-y:auto;border-right:1px solid var(--border);padding-right:8px;}
-  .cs-prov a{display:block;padding:9px 6px;font-size:13px;color:var(--muted);border-radius:8px;}
-  .cs-prov a.on{color:var(--brand-deep);font-weight:700;background:var(--brand-soft);}
+  .cs-prov a{display:block;padding:9px 6px;font-size:12px;color:var(--muted);border-radius:8px;}
+  .cs-prov a.on{color:var(--brand);font-weight:600;background:var(--brand-soft);}
   .cs-cities{flex:1;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;}
-  .cs-cities a{padding:9px 6px;text-align:center;font-size:13px;color:var(--ink);background:#f5f7f6;border-radius:9px;}
-  .cs-cities a.allp{color:var(--brand-deep);font-weight:600;}
-  .cs-cities a.on{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;}
+  .cs-cities a{padding:9px 6px;text-align:center;font-size:12px;color:var(--ink);background:var(--page);border-radius:9px;}
+  .cs-cities a.allp{color:var(--brand);font-weight:600;}
+  .cs-cities a.on{background:linear-gradient(90deg,#0F766E,#14B8A6);color:#fff;font-weight:600;}
 
-  /* tab bar */
-  .tabbar{flex-shrink:0;display:flex;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);
-    border-top:1px solid var(--border);padding:8px 0 max(10px,env(safe-area-inset-bottom));z-index:25;}
-  .tabbar a{flex:1;text-align:center;font-size:10px;color:#97a3a0;}
-  .tabbar a .ti{font-size:19px;display:block;}
-  .tabbar a.on{color:var(--brand);font-weight:700;}
+  /* tab — 10px；选中 #0F766E/600，未选 #15A69B/400 */
+  .tabbar{flex-shrink:0;display:flex;background:#fff;
+    box-shadow:0 -2px 8px rgba(153,153,153,.12);padding:9px 0 0;z-index:25;min-height:56px;
+    padding-bottom:max(8px,env(safe-area-inset-bottom));}
+  .tabbar a{flex:1;text-align:center;font-size:10px;font-weight:400;line-height:11.7px;color:var(--tab);}
+  .tabbar a .ti{display:block;width:24px;height:24px;margin:0 auto 0;line-height:24px;}
+  .tabbar a .ti img{width:24px;height:24px;display:block;object-fit:contain;}
+  .tabbar a.on{color:#0F766E;font-weight:600;}
 </style>
 </head>
 <body>
@@ -186,14 +193,27 @@
       <div class="bgimg"></div>
       <div class="mist"></div>
       <div class="hero-in">
+        <div class="hero-top">
+          <div class="city-sw" id="citySw" role="button" tabindex="0">
+            <div class="cn">
+              <svg class="pin" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.5c-2.6 0-4.7 2.1-4.7 4.7 0 3.5 4.7 8.3 4.7 8.3s4.7-4.8 4.7-8.3C12.7 3.6 10.6 1.5 8 1.5zm0 6.4a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z" fill="#fff"/></svg>
+              <span id="cityName">贵阳</span>
+              <span class="chev"><svg viewBox="0 0 6 4" fill="none" aria-hidden="true"><path d="M0 0l3 4 3-4H0z" fill="#FFF6F6"/></svg></span>
+            </div>
+            <div class="sub" id="citySub">贵州·旅居目的地</div>
+          </div>
+          <div class="fav-btn" aria-hidden="true">
+            <svg viewBox="0 0 15 13" fill="none"><path d="M7.5 12.3l-.7-.6C3.3 8.4 1 6.3 1 3.7 1 1.8 2.5.4 4.4.4c1.1 0 2.1.5 2.8 1.3C7.9.9 8.9.4 10 .4 11.9.4 13.4 1.8 13.4 3.7c0 2.6-2.3 4.7-5.8 8l-.1.6z" fill="#fff"/></svg>
+          </div>
+        </div>
         <div class="editorial">
           <div class="ek">Travel to Guizhou, Live More</div>
           <h2>旅居到贵州，<br>生活更精彩</h2>
-          <p>旅居 · 置业 · 民宿 · 长租，一处入口，精彩无限</p>
+          <p>旅居·置业·民宿·长租一处入口，精彩无限</p>
         </div>
       </div>
       <a class="searchbar" href="lvju-app-search.html" style="text-decoration:none;">
-        <span class="ic">🔍</span>
+        <span class="ic"><img src="assets/lvju/icons/search-ic.svg?v=1" alt=""></span>
         <span class="ph">搜目的地 / 楼盘 / 民宿 / 景区</span>
         <span class="go">搜索</span>
       </a>
@@ -203,21 +223,20 @@
     <div class="sheet">
 
       <!-- primary channels -->
-      <div class="seg-h"><span class="bar"></span><h3>找房 · 全频道</h3><span class="more">全部 ›</span></div>
+      <div class="seg-h"><span class="bar"></span><h3>找房·全频道</h3></div>
       <div class="chan">
-        <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic">🏔</div><b>旅居</b><small>短住·候鸟·康养</small></a>
-        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic">🏨</div><b>民宿</b><small>整栋·庭院·管家</small></a>
-        <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic">🗝</div><b>长租</b><small>整租·合租·月付</small></a>
+        <a class="chan feat" href="lvju-app-lvju.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-lvju.png?v=14" alt=""></div><b>旅居</b><small>短住·候鸟·康养</small></a>
+        <a class="chan feat" href="lvju-app-minsu.html"><div class="ic"><img src="assets/lvju/icons/chan-minsu.png?v=15" alt=""></div><b>民宿</b><small>整栋·庭院·管家</small></a>
+        <a class="chan feat" href="lvju-app-changzu.html"><span class="nb">新</span><div class="ic"><img src="assets/lvju/icons/chan-changzu.png?v=14" alt=""></div><b>长租</b><small>整租·合租·月付</small></a>
         <a class="chan" href="lvju-app-newhouse.html" hidden data-deferred><div class="ic">🏢</div><b>新房</b><small>楼盘·特价房</small></a>
         <a class="chan" href="lvju-app-resale.html" hidden data-deferred><div class="ic">🔑</div><b>二手</b><small>在售·真房源</small></a>
-        <a class="chan" href="lvju-app-guide.html"><div class="ic">🧭</div><b>置业导购</b><small>看房·测算</small></a>
+        <a class="chan" href="lvju-app-guide.html"><div class="ic"><img src="assets/lvju/icons/chan-guide.png?v=14" alt=""></div><b>置业导购</b><small>看房·测算</small></a>
         <a class="chan" href="lvju-app-lifestyle.html" hidden data-deferred><div class="ic">🌿</div><b>生活方式</b><small>玩在贵州</small></a>
       </div>
 
       <!-- magazine cover -->
       <a class="feature" href="lvju-app-routes.html">
         <div class="fbg"></div>
-        <div class="pg">本期 · ISSUE 06</div>
         <div class="fin">
           <div class="fk">Editor's Pick · 旅居周刊</div>
           <h4>黔东南秘境<br>住进千户苗寨的云端</h4>
@@ -226,26 +245,26 @@
       </a>
 
       <!-- content services -->
-      <div class="seg-h"><span class="bar"></span><h3>内容服务 · 玩在贵州</h3><span class="more">更多 ›</span></div>
+      <div class="seg-h" style="margin-top:24px;"><span class="bar"></span><h3>内容服务 · 玩在贵州</h3></div>
       <div class="content4">
-        <a href="lvju-app-spots.html"><div class="ic">⛰</div><b>旅游景点</b><small>必打卡</small></a>
-        <a href="lvju-app-routes.html"><div class="ic">🧭</div><b>旅游路线</b><small>精选行程</small></a>
-        <a href="lvju-app-food.html"><div class="ic">🍲</div><b>旅游美食</b><small>本地味道</small></a>
-        <a href="lvju-app-convenience.html"><div class="ic">🛎</div><b>旅游便民</b><small>出行·向导</small></a>
+        <a href="lvju-app-spots.html"><div class="ic"><img src="assets/lvju/icons/svc-spots.png?v=9" alt=""></div><b>旅游景点</b><small>必打卡</small></a>
+        <a href="lvju-app-routes.html"><div class="ic"><img src="assets/lvju/icons/svc-routes.png?v=9" alt=""></div><b>旅游路线</b><small>精选行程</small></a>
+        <a href="lvju-app-food.html"><div class="ic"><img src="assets/lvju/icons/svc-food.png?v=9" alt=""></div><b>旅游美食</b><small>本地味道</small></a>
+        <a href="lvju-app-convenience.html"><div class="ic"><img src="assets/lvju/icons/svc-convenience.png?v=9" alt=""></div><b>旅游便民</b><small>出行·向导</small></a>
       </div>
 
       <!-- curated posts -->
       <div id="postSec">
-        <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选笔记 · 在地发现</h3><a class="more" id="postMore" href="lvju-app-spots.html">更多 ›</a></div>
+        <div class="seg-h" style="margin-top:24px;"><span class="bar"></span><h3>精选笔记 · 在地发现</h3></div>
         <div class="poststrip" id="postList">
-          <div style="color:#9aa5a1;padding:22px 0;font-size:12px;">加载中…</div>
+          <div style="color:#9E9E9E;padding:22px 0;font-size:12px;">加载中…</div>
         </div>
       </div>
 
       <!-- curated listings -->
-      <div class="seg-h" style="margin-top:20px;"><span class="bar"></span><h3>精选好房 · 特色旅居</h3><span class="more">查看列表 ›</span></div>
+      <div class="seg-h" style="margin-top:24px;"><span class="bar"></span><h3>精选好房 · 特色旅居</h3></div>
       <div class="list" id="featList">
-        <div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">加载中…</div>
+        <div style="text-align:center;color:#9E9E9E;padding:24px 0;font-size:12px;">加载中…</div>
       </div>
     </div>
 
@@ -263,33 +282,31 @@
     </div>
   </div>
 
-  <!-- tab bar -->
-  <div class="tabbar">
-    <a class="on"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="home"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=8"></script>
-<script src="screens/_jzapi.js?v=8"></script>
+<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
   function dumpLogin(tag){
     var L = window.BZF_BEIKE_LOGIN;
     console.log('[login]', tag, {
+      isLoggedIn: L && L.isLoggedIn ? L.isLoggedIn() : false,
       BJZ_TOKEN: L && L.token ? L.token() : '',
       lianjia_token: L && L.beikeAccessToken ? L.beikeAccessToken() : (L && L.lianjiaToken ? L.lianjiaToken() : ''),
       accessToken: L && L.ljAccessToken ? L.ljAccessToken() : '',
       beikeLoggedIn: L && L.beikeLoggedIn ? L.beikeLoggedIn() : false,
       isBeikeApp: L && L.isBeikeApp ? L.isBeikeApp() : false,
-      userInfo: L && L.appUserInfo ? L.appUserInfo() : null,
-      cookie: (typeof document !== 'undefined' && document.cookie) || ''
+      user: L && L.lastUser ? L.lastUser() : null,
+      userInfo: L && L.appUserInfo ? L.appUserInfo() : null
     });
   }
   dumpLogin('boot');
+  // 首进 C 端对齐身份（有 lianjia_token 即 ok；BJZ 后台可选换）
+  if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.trySyncIdentity) {
+    BZF_BEIKE_LOGIN.trySyncIdentity(function(ok){ dumpLogin('sync:' + (ok ? 'ok' : 'fail')); });
+  }
   window.addEventListener('pageshow', function(){ dumpLogin('pageshow'); });
 })();
 </script>
@@ -305,6 +322,11 @@
   var qs = new URLSearchParams(location.search);
   var CITY = qs.get('city') || (function(){ try { return localStorage.getItem('bzf_jz_city') || ''; } catch(e){ return ''; } })() || '贵阳';
 
+  function paintCity(){
+    var n = document.getElementById('cityName');
+    if (n) n.textContent = CITY;
+  }
+
   function chainCityLinks(){
     document.querySelectorAll('.app a[href*="lvju-app-"]').forEach(function(a){
       var parts = a.getAttribute('href').split('?');
@@ -316,7 +338,7 @@
   }
 
   function loadFeatured(){
-    document.getElementById('featList').innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">加载中…</div>';
+    document.getElementById('featList').innerHTML = '<div style="text-align:center;color:#9E9E9E;padding:24px 0;font-size:12px;">加载中…</div>';
     fetch('/api/juzhu/catalog?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(cat){
       var el = document.getElementById('featList');
       var dmap = {}; (cat.districts || []).forEach(function(d){ dmap[d.id] = d; });
@@ -348,7 +370,7 @@
       }
 
       if (!src.length) {
-        el.innerHTML = '<div style="text-align:center;color:#9aa5a1;padding:24px 0;font-size:12px;">' + esc(CITY) + '暂无在架精选房源 · 可切换城市查看</div>';
+        el.innerHTML = '<div style="text-align:center;color:#9E9E9E;padding:60px 0 0;font-size:12px;line-height:12px;">' + esc(CITY) + '暂无在架精选房源 · 可切换城市查看</div>';
         return;
       }
       el.innerHTML = src.map(function(p, i){
@@ -362,7 +384,7 @@
           ? '<div class="img" style="background:url(' + esc(p.cover_image) + ') center/cover,#0c4d44;">'
           : '<div class="img ' + (i % 2 ? 'b' : 'a') + '">';
         return '<div class="mcard">' + img +
-          '<span class="star">' + esc(star) + '</span><span class="like">♡</span>' +
+          '<span class="star">' + esc(star) + '</span>' +
           '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
           '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>精选</span>') + '</div>' +
           '<div class="pr"><b>' + (function(){ var pd = LVJU_PRICE.parts(p); return pd.value != null
@@ -379,8 +401,7 @@
     var sec = document.getElementById('postSec');
     var el = document.getElementById('postList');
     sec.hidden = false;
-    el.innerHTML = '<div style="color:#9aa5a1;padding:22px 0;font-size:12px;">加载中…</div>';
-    document.getElementById('postMore').href = 'lvju-app-spots.html?city=' + encodeURIComponent(CITY);
+    el.innerHTML = '<div style="color:#9E9E9E;padding:22px 0;font-size:12px;">加载中…</div>';
     fetch('/api/juzhu/spots?city=' + encodeURIComponent(CITY)).then(function(r){ return r.json(); }).then(function(data){
       var posts = (data.spots || []).slice(0, 3);
       if (!posts.length) { sec.hidden = true; return; }
@@ -425,7 +446,7 @@
       p.set('city', city);
       history.replaceState(null, '', location.pathname + '?' + p.toString());
     } catch(e){}
-    chainCityLinks(); closeSheet(); loadFeaturedPosts(); loadFeatured();
+    paintCity(); chainCityLinks(); closeSheet(); loadFeaturedPosts(); loadFeatured();
   }
 
   document.getElementById('citySheet').addEventListener('click', function(e){
@@ -435,11 +456,18 @@
     var pick = e.target.closest('[data-city]');
     if (pick) doSwitch(pick.getAttribute('data-city'));
   });
+  var citySw = document.getElementById('citySw');
+  if (citySw) {
+    citySw.addEventListener('click', openSheet);
+    citySw.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(); } });
+  }
 
+  paintCity();
   chainCityLinks();
   loadFeaturedPosts();
   loadFeatured();
 })();
 </script>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

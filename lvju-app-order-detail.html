@@ -77,6 +77,8 @@
   </div>
 </div>
 <script src="screens/_qr.js"></script>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js?v=15"></script>
 <script>
 document.querySelectorAll('a.qrlink').forEach(function(a){
   var img=a.querySelector('img.qrimg'); if(!img) return;
@@ -137,9 +139,17 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   }
   function renderPhone(p){ document.getElementById('dPhone').textContent = p; }
 
-  var token = ''; try { token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e) {}
-  if (token) {
-    fetch('/api/juzhu/booking/my', { headers: { 'Authorization': 'Bearer ' + token } })
+  var authH = {};
+  try {
+    if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) authH = BZF_BEIKE_LOGIN.authHeaders();
+    else {
+      var token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '';
+      if (token) authH = { Authorization: 'Bearer ' + token };
+    }
+  } catch(e) {}
+  var hasAuth = !!(authH['X-Lianjia-Token'] || authH.Authorization);
+  if (hasAuth) {
+    fetch('/api/juzhu/booking/my', { headers: authH })
       .then(function(r){ return r.json(); })
       .then(function(j){
         var o = (j.items || []).filter(function(x){ return x.order_no === orderNo; })[0];

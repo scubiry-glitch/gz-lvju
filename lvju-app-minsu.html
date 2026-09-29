@@ -51,13 +51,7 @@
 
   </div>
 
-  <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="search"></div>
 </div>
 <script>
 /* 民宿/民宿频道（channel=minsu，彩贝 5 维评级口径）数据统一读新居住数据库 catalog。
@@ -98,7 +92,7 @@
       var priceHtml = pd.value != null
         ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>'
         : '<span style="font-size:12px;color:#9aa5a1;">' + pd.note + '</span>';
-      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' + img + star + '<span class="like">♡</span>' +
+      return '<a class="mcard" href="lvju-app-detail.html?id=' + p.id + '">' + img + star +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + '</div>' +
         '<div class="pr"><b>' + priceHtml + '</b>' + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +
@@ -153,5 +147,6 @@
   });
 })();
 </script>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

@@ -52,7 +52,9 @@
   </div>
 </div>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=8"></script>
+<script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js?v=15"></script>
+<script src="screens/_jzapi.js?v=10"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -66,10 +68,16 @@
     document.getElementById('okTitle').textContent = '支付结果确认中';
     document.getElementById('okDesc').textContent = '正在向支付中台确认支付结果，请勿重复支付';
     if (bNo && bPhone) {
-      var token = '';
-      try { token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch (_) {}
       var headers = {'Content-Type':'application/json'};
-      if (token) headers.Authorization = 'Bearer ' + token;
+      try {
+        if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) {
+          var ah = BZF_BEIKE_LOGIN.authHeaders() || {};
+          Object.keys(ah).forEach(function(k){ headers[k] = ah[k]; });
+        } else {
+          var token = localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '';
+          if (token) headers.Authorization = 'Bearer ' + token;
+        }
+      } catch (_) {}
       fetch('/api/juzhu/payment/query', { method:'POST', headers: headers,
         body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, app_order_id: appOrderId }) })
         .catch(function(){ return null; })

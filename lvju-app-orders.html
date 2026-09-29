@@ -5,7 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <link rel="icon" href="data:,">
 <title>我的订单 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=6">
+<link rel="stylesheet" href="lvju-app.css?v=8">
+<style>
+  .panel{margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;
+    box-shadow:0 0 10px rgba(17,123,115,.06);}
+  .panel .pt{font-size:13px;font-weight:600;color:var(--ink);margin:0 0 4px;}
+  .panel .ps{font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.45;}
+  .panel .row{display:flex;gap:8px;margin-bottom:8px;}
+  .panel input{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13px;outline:0;background:#fff;color:var(--ink);}
+  .panel input::placeholder{color:var(--ph);}
+  .panel .btn{border:0;background:var(--brand);color:#fff;font:inherit;font-weight:600;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;width:100%;}
+  .panel .btn.ghost{background:#fff;color:var(--danger,#b91c1c);border:1px solid var(--border);}
+  .panel .btn.soft{background:var(--brand-soft);color:var(--brand);border:1px solid transparent;margin-top:8px;}
+  .panel .acts{display:flex;gap:8px;align-items:center;}
+  .panel .acts .btn{flex:1;}
+  .panel .err{font-size:11px;color:#991b1b;margin-top:7px;display:none;}
+  .panel .hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45;}
+  .my-hd{display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;}
+  .my-hd .pt{margin:0;}
+  .my-hd .out{font-size:11px;color:var(--muted);cursor:pointer;}
+  #myBox{margin:14px 14px 0;display:none;}
+  #lookupBox{margin-bottom:20px;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -14,59 +35,53 @@
     <div class="appbar">
       <a class="bk" href="lvju-app-me.html" onclick="if(history.length>1){history.back();return false}">‹</a>
       <div class="ttl">我的订单</div>
-      <div class="act"><span>🔍</span></div>
     </div>
 
-    <div id="syncBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
-      <div style="font-size:13px;font-weight:700;color:var(--ink);">正在同步贝壳登录…</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">登录成功后会自动展示我的预订，请稍候</div>
+    <div id="syncBox" class="panel" style="display:none;">
+      <div class="pt">正在同步贝壳登录…</div>
+      <p class="ps" style="margin:0;">登录成功后会自动展示我的预订，请稍候</p>
     </div>
 
-    <div id="loginBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 15px;display:none;">
-      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:4px;">登录后自动展示我的预订</div>
-      <div id="lgMsg" style="font-size:11px;color:var(--muted);margin-bottom:10px;">默认使用贝壳 App 登录；当前环境未检测到贝壳 SDK，已切换为密码登录（首次输入密码即自动注册）</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input id="lgPhone" placeholder="手机号" inputmode="numeric" maxlength="11" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13px;outline:0;" />
-        <input id="lgPwd" placeholder="密码（≥8位，首登自动注册）" type="password" style="flex:1.4;border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:13px;outline:0;" />
+    <div id="loginBox" class="panel" style="display:none;">
+      <div class="pt">登录后自动展示我的预订</div>
+      <p class="ps" id="lgMsg">默认跳转贝壳登录；回跳失败时可用下方密码登录（首次输入密码即自动注册）</p>
+      <div class="row">
+        <input id="lgPhone" placeholder="手机号" inputmode="numeric" maxlength="11" />
+        <input id="lgPwd" placeholder="密码（≥8位，首登自动注册）" type="password" style="flex:1.4;" />
       </div>
-      <button id="lgGo" style="width:100%;border:0;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:10px 0;cursor:pointer;">密码登录 / 注册</button>
-      <button id="lgSdk" style="width:100%;margin-top:8px;border:1px solid var(--brand);background:var(--brand-soft);color:var(--brand-deep);font-weight:700;font-size:13px;border-radius:999px;padding:9px 0;cursor:pointer;display:none;">🐚 贝壳 SDK 登录（检测到 App 环境）</button>
-      <div id="lgErr" style="font-size:11px;color:#991b1b;margin-top:7px;display:none;"></div>
+      <button class="btn" id="lgGo">密码登录 / 注册</button>
+      <button class="btn soft" id="lgSdk" style="display:none;">贝壳 SDK 登录</button>
+      <div class="err" id="lgErr"></div>
     </div>
 
-    <div id="myBox" style="margin:14px 14px 0;display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--ink);">📋 我的预订 <span id="myCnt" style="font-size:11px;color:var(--muted);font-weight:400;"></span></div>
-        <a id="myOut" style="font-size:11px;color:var(--muted);cursor:pointer;">退出登录</a>
+    <div id="myBox">
+      <div class="my-hd">
+        <div class="pt">我的预订 <span id="myCnt" style="font-size:11px;color:var(--muted);font-weight:400;"></span></div>
+        <a class="out" id="myOut">退出登录</a>
       </div>
       <div id="myList"></div>
     </div>
 
-    <div id="lookupBox" style="margin:14px 14px 0;background:#fff;border:1px solid var(--border);border-radius:14px;padding:13px 15px;">
-      <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">🔍 预订查单 / 取消（免登录）</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input id="qNo" placeholder="订单号 BKG-…" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:0;" />
-        <input id="qPhone" placeholder="下单手机号" inputmode="numeric" maxlength="11" style="flex:1;border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;outline:0;" />
+    <div id="lookupBox" class="panel">
+      <div class="pt">预订查单 / 取消</div>
+      <p class="ps">免登录 · 订单号 + 下单手机号双因子</p>
+      <div class="row">
+        <input id="qNo" placeholder="订单号 BKG-…" />
+        <input id="qPhone" placeholder="下单手机号" inputmode="numeric" maxlength="11" />
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button id="qGo" style="flex:1;border:0;background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:9px 0;cursor:pointer;">查询</button>
-        <button id="qCancel" style="flex:1;border:1px solid var(--border);background:#fff;color:var(--danger);font-weight:600;font-size:13px;border-radius:999px;padding:9px 0;cursor:pointer;display:none;">取消此订单</button>
+      <div class="acts">
+        <button class="btn" id="qGo">查询</button>
+        <button class="btn ghost" id="qCancel" style="display:none;">取消此订单</button>
       </div>
-      <div id="qMsg" style="font-size:11px;color:var(--muted);margin-top:7px;">输入订单号 + 下单手机号（双因子），可查询进度或取消待确认订单</div>
+      <div class="hint" id="qMsg">输入订单号 + 下单手机号，可查询进度或取消待确认订单</div>
       <div id="qCard" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px;"></div>
     </div>
   </div>
 
-  <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a href="lvju-app-search.html"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a class="on"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="orders"></div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_beike-login.js?v=8"></script>
+<script src="screens/_beike-login.js?v=15"></script>
 <script>
 /* 预订查单/取消：POST /api/juzhu/booking/lookup（order_no+手机号 双因子，规则9 禁 ?phone= 旁路）
    响应手机号为打码形式（规则10）。支持 ?order_no=&phone= 自动带入（下单成功页跳转）。 */
@@ -99,18 +114,17 @@
     card.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;">' +
         '<span style="font-size:11px;color:var(--muted);">' + esc(o.order_no) + '</span>' +
-        '<span style="font-size:11px;font-weight:700;color:var(--brand-deep);">' + esc(st[0]) + '</span>' +
+        '<span style="font-size:11px;font-weight:600;color:var(--brand);">' + esc(st[0]) + '</span>' +
       '</div>' +
-      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</div>' +
+      '<div style="font-size:14px;font-weight:600;color:var(--ink);margin:5px 0 2px;">' + esc(o.project_name || ('项目 #' + o.project_id)) + ' · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</div>' +
       '<div style="font-size:12px;color:var(--muted);">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
       '<div style="font-size:12px;color:var(--muted);margin-top:2px;">联系人 ' + esc(o.contact_name) + ' · ' + esc(o.contact_phone_masked) + '</div>' +
-      '<div style="font-size:13px;font-weight:700;color:var(--gold-deep);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
-      (o.cancel_policy_text ? '<div style="font-size:11px;color:var(--muted);margin-top:4px;">🕒 ' + esc(o.cancel_policy_text) + '</div>' : '') +
+      '<div style="font-size:13px;font-weight:600;color:var(--ink);margin-top:5px;">合计 ¥' + fmt(o.price_total) + '</div>' +
+      (o.cancel_policy_text ? '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + esc(o.cancel_policy_text) + '</div>' : '') +
       (o.status === 'pending' && o.pay_status === 'unpaid'
-        ? '<a href="' + payLink(o, document.getElementById('qPhone').value.trim()) + '" style="display:block;text-align:center;margin-top:8px;background:var(--brand-deep);color:#fff;font-size:12px;font-weight:700;border-radius:9px;padding:9px 0;text-decoration:none;">去支付 →</a>'
+        ? '<a href="' + payLink(o, document.getElementById('qPhone').value.trim()) + '" style="display:block;text-align:center;margin-top:8px;background:var(--brand);color:#fff;font-size:12px;font-weight:600;border-radius:999px;padding:9px 0;text-decoration:none;">去支付</a>'
         : '') +
-      (o.pay_status === 'paid' ? '<div style="font-size:11px;color:var(--success);margin-top:4px;">✓ 已支付' + (o.pay_method ? ' · ' + esc(o.pay_method) : '') + '</div>' : '');
-    // 取消入口由服务端 can_cancel 驱动（免费取消窗口）；旧服务无该字段时回落「pending 可取消」
+      (o.pay_status === 'paid' ? '<div style="font-size:11px;color:#15803d;margin-top:4px;">已支付' + (o.pay_method ? ' · ' + esc(o.pay_method) : '') + '</div>' : '');
     document.getElementById('qCancel').style.display = (o.status === 'pending' && o.can_cancel !== false) ? 'block' : 'none';
   }
   function msg(m, isErr){ var el = document.getElementById('qMsg'); el.textContent = m; el.style.color = isErr ? '#991b1b' : 'var(--muted)'; }
@@ -143,40 +157,53 @@
   });
   if (q.get('order_no') && q.get('phone')) lookup();
 
-  /* ── 登录（贝壳 SDK 默认 → 密码兜底）+ 我的预订 ── */
   var lgBox = document.getElementById('loginBox');
   var myBox = document.getElementById('myBox');
   var syncBox = document.getElementById('syncBox');
   function showSync(){ if (syncBox) syncBox.style.display = 'block'; lgBox.style.display = 'none'; myBox.style.display = 'none'; }
   function hideSync(){ if (syncBox) syncBox.style.display = 'none'; }
-  function tok(){ try { return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
-  function authH(){ var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h; }
+  function tok(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.token) return BZF_BEIKE_LOGIN.token() || '';
+      return localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '';
+    } catch(e){ return ''; }
+  }
+  function authH(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) return BZF_BEIKE_LOGIN.authHeaders();
+    } catch(e){}
+    var h = {}; var t = tok(); if (t) h['Authorization'] = 'Bearer ' + t; return h;
+  }
+  function isAuthed(){
+    try {
+      if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isLoggedIn) return BZF_BEIKE_LOGIN.isLoggedIn();
+    } catch(e){}
+    return !!tok();
+  }
   function sdkProbe(){
-    // App 内 jsbridge3 / jsbridgesdk 注入的全局；E2E 可用 window.__beikeSdk 模拟
     return window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
   }
   function myRender(items){
     document.getElementById('myCnt').textContent = items.length ? '· ' + items.length + ' 笔' : '';
-    if (!items.length) { document.getElementById('myList').innerHTML = '<div class="ordcard" style="text-align:center;"><div style="font-size:12px;color:var(--muted);padding:10px 2px;">还没有预订 · 去「找房」挑一间</div></div>'; return; }
-    var ST = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
+    if (!items.length) { document.getElementById('myList').innerHTML = '<div class="ordcard" style="text-align:center;"><div style="font-size:12px;color:var(--muted);padding:14px 2px;">还没有预订 · 去「找房」挑一间</div></div>'; return; }
     document.getElementById('myList').innerHTML = items.map(function(o){
       var st = stOf(o);
       var cover = o.project_cover
         ? '<div class="th" style="background:url(' + esc(o.project_cover) + ') center/cover;"></div>'
         : '<div class="th s-xijiang"></div>';
       return '<div class="ordcard">' +
-        '<div class="oh"><span class="shop">🐚 贝壳旅居 · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
+        '<div class="oh"><span class="shop">贝壳旅居 · ' + esc(o.channel === 'minsu' ? '民宿' : '租赁住宿') + '</span><span class="stt ' + st[1] + '">' + esc(st[0]) + '</span></div>' +
         '<div class="ob">' + cover +
           '<div class="oi">' +
             '<div class="nm">' + esc(o.project_name || ('项目#' + o.project_id)) + '</div>' +
             '<div class="meta">' + esc(o.checkin) + ' → ' + esc(o.checkout) + ' · ' + o.nights + ' 晚</div>' +
-            (o.cancel_policy_text ? '<div class="meta" style="color:#92400e;">🕒 ' + esc(o.cancel_policy_text) + '</div>' : '') +
+            (o.cancel_policy_text ? '<div class="meta">' + esc(o.cancel_policy_text) + '</div>' : '') +
             '<div class="amt">合计 <b>¥' + fmt(o.price_total) + '</b> · 订单号 …' + esc(o.order_no.slice(-4)) + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="of">' +
-          (o.status === 'pending' && o.can_cancel !== false ? '<a data-myid="' + o.id + '" style="color:var(--danger);cursor:pointer;">取消订单</a>' : '') +
-          (o.status === 'pending' && o.pay_status === 'unpaid' ? '<a href="' + payLink(o, o.contact_phone_raw) + '" style="color:var(--brand-deep);font-weight:700;cursor:pointer;">去支付 →</a>' : '') +
+          (o.status === 'pending' && o.can_cancel !== false ? '<a data-myid="' + o.id + '" style="color:var(--danger,#b91c1c);cursor:pointer;">取消订单</a>' : '') +
+          (o.status === 'pending' && o.pay_status === 'unpaid' ? '<a href="' + payLink(o, o.contact_phone_raw) + '" style="color:var(--brand);font-weight:600;cursor:pointer;">去支付</a>' : '') +
           '<a href="lvju-app-detail.html?id=' + o.project_id + '">房源详情</a>' +
           '<a class="primary" href="lvju-app-order-detail.html?order_no=' + encodeURIComponent(o.order_no) + '">订单详情</a>' +
         '</div>' +
@@ -199,7 +226,18 @@
     lgBox.style.display = 'none';
     myBox.style.display = 'block';
     fetch('/api/juzhu/booking/my', { headers: authH() })
-      .then(function(r){ if (r.status === 401) { try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){} lgBox.style.display = 'block'; myBox.style.display = 'none'; throw new Error('401'); } return r.json(); })
+      .then(function(r){
+        if (r.status === 401) {
+          try { localStorage.removeItem('BJZ_TOKEN'); localStorage.removeItem('BZF_SESSION_TOKEN'); } catch(e){}
+          /* App 内由 _beike-login fetch 拦截统一弹原生登录；浏览器仍展示本页登录卡 */
+          if (!(window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.isBeikeApp && BZF_BEIKE_LOGIN.isBeikeApp())) {
+            lgBox.style.display = 'block';
+            myBox.style.display = 'none';
+          }
+          throw new Error('401');
+        }
+        return r.json();
+      })
       .then(function(j){ myRender(j.items || []); })
       .catch(function(e){ if (e.message !== '401') { document.getElementById('myList').innerHTML = '<div style="font-size:12px;color:#991b1b;">加载失败</div>'; } });
   }
@@ -217,17 +255,9 @@
     return Promise.resolve(false);
   }
   function boot(){
-    if (tok()) { loadMine(); return; }
+    if (isAuthed()) { loadMine(); return; }
     if (window.BZF_BEIKE_LOGIN) {
       showSync();
-      console.log('[orders] boot', {
-        BJZ_TOKEN: tok(),
-        lianjia_token: BZF_BEIKE_LOGIN.beikeAccessToken ? BZF_BEIKE_LOGIN.beikeAccessToken() : (BZF_BEIKE_LOGIN.lianjiaToken && BZF_BEIKE_LOGIN.lianjiaToken()),
-        isBeikeApp: BZF_BEIKE_LOGIN.isBeikeApp(),
-        beikeLoggedIn: BZF_BEIKE_LOGIN.beikeLoggedIn && BZF_BEIKE_LOGIN.beikeLoggedIn(),
-        userInfo: BZF_BEIKE_LOGIN.appUserInfo && BZF_BEIKE_LOGIN.appUserInfo(),
-        city: q.get('city') || ''
-      });
       BZF_BEIKE_LOGIN.ensureAppLogin({
         onReady: function(){ loadMine(); },
         onNeedPassword: function(){
@@ -236,7 +266,7 @@
           var inApp = BZF_BEIKE_LOGIN.isBeikeApp() || (BZF_BEIKE_LOGIN.beikeLoggedIn && BZF_BEIKE_LOGIN.beikeLoggedIn());
           document.getElementById('lgMsg').textContent = inApp
             ? '没拿到 lianjia_token 或验票失败，请完成 App 登录后返回；也可使用密码登录'
-            : '当前不在贝壳 App 内，请用手机号密码登录（首次输入密码即自动注册）';
+            : '贝壳登录回跳后未拿到票（若域名非 *.ke.com，cookie 可能带不过来），请用手机号密码登录';
           document.getElementById('lgSdk').style.display = BZF_BEIKE_LOGIN.isBeikeApp() ? 'block' : 'none';
         }
       });
@@ -272,5 +302,6 @@
   boot();
 })();
 </script>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

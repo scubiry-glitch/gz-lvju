@@ -135,12 +135,13 @@
           { id: 'journey',         label: '全链路旅程与需求范围', href: 'lvju-journey.html', icon: 'map' },
         ]},
       ],
+      /* 移动 tabbar 实际由 _navmobile.js MOBILE.lvju 挂载（on/off SVG）；此处仅作桌面侧栏/总览镜像 */
       tabbar: [
-        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: '🏠' },
-        { id: 'search', label: '找房', href: 'lvju-app-search.html',   icon: '🔎' },
-        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: '📖' },
-        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: '🧾' },
-        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: '👤' },
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: 'home' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',    icon: 'search' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: 'book' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: 'list' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: 'user' },
       ],
     },
 

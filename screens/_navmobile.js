@@ -107,6 +107,25 @@
         { id: 'profile',      label: '个人',       href: 'profile.html',          icon: 'user' },
       ],
     },
+    /* 旅居找房 App（根目录 lvju-app-*.html）：inline .tabbar + on/off SVG */
+    lvju: {
+      primary: '#0F766E', primaryDeep: '#0b5d56', accent2: '#15A69B',
+      stamp: '贝壳找房 · 旅居',
+      layout: 'inline',
+      tabbar: [
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', iconAsset: 'home' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',    iconAsset: 'search' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     iconAsset: 'content' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    iconAsset: 'orders' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        iconAsset: 'me' },
+      ],
+    },
+  };
+
+  // 旅居 tab 图标文件名（MasterGo 导出 on/off 成对）
+  const LVJU_TAB_ICON = {
+    home: 'tab-home', search: 'tab-search', content: 'tab-content',
+    orders: 'tab-orders', me: 'tab-me',
   };
 
   // 内联 SVG 图标库（与 _nav.js 同步）
@@ -178,6 +197,21 @@
       .nvm-tabbar a.active{color:var(--nvm-primary, #1e40af); font-weight:600;}
       .nvm-tabbar a svg{width:20px; height:20px;}
       @media (min-width: 600px){ .nvm-tabbar{ max-width:760px; } }
+
+      /* 旅居 App inline tabbar（与 lvju-app.css 同口径；页面已写则覆盖无害） */
+      .tabbar.nvm-lvju{
+        flex-shrink:0;display:flex;background:#fff;
+        box-shadow:0 -2px 8px rgba(153,153,153,.12);padding:9px 0 0;z-index:25;min-height:56px;
+        padding-bottom:max(8px,env(safe-area-inset-bottom,0px));
+        font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      }
+      .tabbar.nvm-lvju a{
+        flex:1;text-align:center;font-size:10px;font-weight:400;line-height:11.7px;
+        color:#15A69B;text-decoration:none;
+      }
+      .tabbar.nvm-lvju a .ti{display:block;width:24px;height:24px;margin:0 auto;line-height:24px;}
+      .tabbar.nvm-lvju a .ti img{width:24px;height:24px;display:block;object-fit:contain;}
+      .tabbar.nvm-lvju a.on{color:#0F766E;font-weight:600;}
 
       /* 汉堡按钮（位于 .nvm-header 左侧） */
       .nvm-menu{
@@ -407,6 +441,17 @@
     return base + href;
   }
 
+  // 旅居图标根路径：根目录页 → assets/…；screens/ 下 → ../assets/…
+  function lvjuAssetBase(el){
+    if (el.dataset.assetBase) return el.dataset.assetBase;
+    return /\/screens\//.test(location.pathname) ? '../assets/lvju/icons/' : 'assets/lvju/icons/';
+  }
+  function lvjuTabIcon(it, isOn, assetBase){
+    const stem = LVJU_TAB_ICON[it.iconAsset] || ('tab-' + it.iconAsset);
+    const src = assetBase + stem + (isOn ? '-on' : '-off') + '.svg';
+    return `<span class="ti"><img src="${src}" alt=""></span>`;
+  }
+
   // 渲染底部 tabbar
   function renderTabbar(el){
     const series = el.dataset.series;
@@ -415,7 +460,22 @@
     const cfg = MOBILE[series];
     if (!cfg || !cfg.tabbar) { el.outerHTML = ''; return; }
     const canM = window.BZF_NAV_CAN; // 未注入=未登录/演示态 → 全显
-    const items = cfg.tabbar.filter(it => !it.perms || !canM || it.perms.some(p => { try { return !!canM(p); } catch (_) { return true; } })).map(it => {
+    const tabs = cfg.tabbar.filter(it => !it.perms || !canM || it.perms.some(p => { try { return !!canM(p); } catch (_) { return true; } }));
+
+    // 旅居：文档流 inline .tabbar + on/off SVG（不 fixed，适配 .app flex 布局）
+    if (cfg.layout === 'inline' || series === 'lvju') {
+      const assetBase = lvjuAssetBase(el);
+      const items = tabs.map(it => {
+        const on = it.id === active;
+        const cls = on ? ' class="on"' : '';
+        const href = on ? '' : ` href="${resolveHref(it.href, base)}"`;
+        return `<a${cls}${href}>${lvjuTabIcon(it, on, assetBase)}${it.label}</a>`;
+      }).join('');
+      el.outerHTML = `<nav class="tabbar nvm-lvju">${items}</nav>`;
+      return;
+    }
+
+    const items = tabs.map(it => {
       const isActive = it.id === active ? ' active' : '';
       return `<a class="${isActive ? 'active' : ''}" href="${resolveHref(it.href, base)}">${ico(it.icon)}${it.label}</a>`;
     }).join('');

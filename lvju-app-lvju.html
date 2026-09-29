@@ -11,7 +11,8 @@
 <style>
   /* 入住时间段（连续区间 · 连住 15 晚起） */
   .staybar{margin:10px 16px 0;background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;}
-  .staybar .ic{font-size:16px;}
+  .staybar .ic{display:block;width:16px;height:16px;flex-shrink:0;}
+  .staybar .ic img{width:16px;height:16px;display:block;object-fit:contain;}
   .staybar .tx{flex:1;font-size:13px;color:var(--ink);min-width:0;}
   .staybar .tx small{display:block;font-size:10.5px;color:var(--muted);margin-top:1px;}
   .staybar .tx.on{color:var(--brand-deep);font-weight:600;}
@@ -80,7 +81,7 @@
     </div>
 
     <div class="staybar" id="staybar">
-      <span class="ic">📅</span>
+      <span class="ic"><img src="assets/lvju/icons/stay-cal.png" alt=""></span>
       <span class="tx" id="sbText">选择入住时间段<small>旅居房源须连续入住 · 连住 15 晚起</small></span>
       <span class="clr" id="sbClear" style="display:none;">清除</span>
       <span class="arr">⌄</span>
@@ -116,13 +117,7 @@
 
   </div>
 
-  <div class="tabbar">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <div id="tab-bar" data-series="lvju" data-active="search"></div>
 </div>
 <script>
 /* 房源数据统一读新居住数据库（catalog），不再硬编码。
@@ -207,10 +202,8 @@
       else priceHtml = '<b>' + (pd.value != null
         ? '¥' + fmt(pd.value) + '<small>' + LVJU_PRICE.unitText(p) + '</small>'
         : pd.note) + '</b>';
-      var favs = []; try { favs = JSON.parse(localStorage.getItem('bzf_fav') || '[]'); } catch (_) {}
-      var liked = favs.indexOf(String(p.id)) >= 0 || favs.indexOf(Number(p.id)) >= 0;
       return '<a class="mcard" data-project-id="' + p.id + '" href="lvju-app-detail.html?id=' + p.id + (n ? '&checkin=' + iso(ci) + (co ? '&checkout=' + iso(co) : '') : '') + '">' +
-        img + (star ? star : '') + '<button class="like' + (liked ? ' liked' : '') + '" type="button" aria-label="收藏房源">' + (liked ? '♥' : '♡') + '</button>' +
+        img + (star ? star : '') +
         '<div class="cap"><div class="nm">' + esc(p.name) + '</div><div class="lo">' + esc(loc) + '</div></div></div>' +
         '<div class="ci"><div class="tags">' + (tags.length ? tags.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') : '<span>在架</span>') + ins + '</div>' +
         '<div class="pr">' + priceHtml + (p.bookable ? '<span class="bk">预订</span>' : '<span class="bk tel">📞 咨询</span>') + '</div></div>' +
@@ -223,17 +216,6 @@
     ev.preventDefault(); activeFilter = a.getAttribute('data-filter');
     Array.prototype.forEach.call(this.querySelectorAll('a'), function(x){ x.classList.toggle('on', x === a); });
     paint();
-  });
-
-  document.getElementById('listingWrap').addEventListener('click', function(ev){
-    var btn = ev.target.closest('.like'); if (!btn) return;
-    ev.preventDefault(); ev.stopPropagation();
-    var card = btn.closest('[data-project-id]'); if (!card) return;
-    var id = String(card.getAttribute('data-project-id')), favs = [];
-    try { favs = JSON.parse(localStorage.getItem('bzf_fav') || '[]').map(String); } catch (_) {}
-    var idx = favs.indexOf(id); if (idx >= 0) favs.splice(idx, 1); else favs.push(id);
-    try { localStorage.setItem('bzf_fav', JSON.stringify(favs)); } catch (_) {}
-    btn.classList.toggle('liked', idx < 0); btn.textContent = idx < 0 ? '♥' : '♡';
   });
 
   // 旅居视图 = rental + minsu 两频道中带「旅居」tag 的房源（两频道均支持旅居 tag）
@@ -331,5 +313,6 @@
   renderCal(); syncBar();
 })();
 </script>
+<script src="screens/_navmobile.js?v=3"></script>
 </body>
 </html>

@@ -45,7 +45,7 @@ const authCenter = require('./auth_center.cjs'); // 账号与权限中心（阶�
 const permRegistry = require('./perm_registry.cjs'); // 权限点注册表（admin 域路由闸与细粒度审计的唯一依据）
 const idpOidc = require('./idp_oidc.cjs'); // OIDC Relying Party（阶段3 联邦登录）
 const imgThumbs = require('./img_thumbs.cjs'); // 图片缩略图自维护（性能：列表/卡片提速）
-const sessionToken = require('./session_token.cjs'); // 贝壳 lianjia_token → /token/verify
+const beikeAuth = require('./beike_auth.cjs'); // C 端 App：lianjia_token → ucid → accounts
 const { payCenter } = require('./server/thirdApi/payCenter.cjs');
 const { createPaymentService } = require('./payment_service.cjs');
 authCenter.init({
@@ -55,6 +55,14 @@ authCenter.init({
   expectedApiKey,
   expectedAdminPassword,
   isProduction,
+  // App C 端身份标准：X-Lianjia-Token → 验票 → accounts（不依赖 BJZ）
+  resolveLianjiaToken: (lj, req) => {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+    const referer = (process.env.SESSION_REFERER || '').trim() || ('http://' + host + '/');
+    const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    const ua = req.headers['user-agent'] || '';
+    return beikeAuth.resolveLianjiaPrincipal(lj, { queryRows, authCenter }, { referer, ip, ua });
+  },
 });
 
 const PORT = process.env.PORT || 9000;
@@ -627,6 +635,7 @@ function isCEndPublicApi(urlPath, method) {
     && p === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}`) return true;
   if (m === 'POST' && p === '/api/juzhu/payment/query') return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
+  if (m === 'GET' && p === '/api/juzhu/auth/beike-config') return true;
   if (m === 'POST' && p === '/api/juzhu/jiazheng/wechat-link') return true;
   // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
   if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
@@ -5389,62 +5398,55 @@ async function handleApiDirect(urlPath, qs, req, res) {
       return jsonReply(res, { ok: true, token: login.token, role: 'user', phone_masked: maskPhoneStd(phone), display_name: login.account ? login.account.display_name : name });
     }
 
-    // POST /api/juzhu/auth/beike —— App H5 用 lianjia_token 换旅居会话
-    // 只信 session /token/verify 的 ucid，不信前端传来的 uid/手机号
+    // GET /api/juzhu/auth/beike-config —— 浏览器 H5 登录（对齐 Morph mLogin）
+    // Morph/src/business/login/platform/m.ts + lib/config.ts：
+    //   https://[test-]clogin.ke.com/login?service=enc(checklogin?redirect=回跳)&type=2
+    if (urlPath === '/api/juzhu/auth/beike-config' && req.method === 'GET') {
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+      const domainEnv = /\.lianjia\.com$/i.test(host) ? 'lianjia.com' : 'ke.com';
+      const isTestHost = /\.tt[abc]\.test\.ke\.com$/i.test(host)
+        || /\.test\.ke\.com$/i.test(host)
+        || /localhost|127\.0\.0\.1/i.test(host)
+        || !isProduction();
+      const prefix = isTestHost ? 'test-' : '';
+      const loginBase = (process.env.BEIKE_H5_LOGIN_URL || '').trim().replace(/\/$/, '')
+        || (`https://${prefix}clogin.${domainEnv}`);
+      const serviceBase = (process.env.BEIKE_H5_SERVICE_URL || '').trim().replace(/\/$/, '')
+        || (`https://${prefix}m.${domainEnv}/my/checklogin`);
+      return jsonReply(res, {
+        ok: true,
+        login_base: loginBase,
+        service_base: serviceBase,
+        type: 2,
+        https_required: true,
+      });
+    }
+
+    // POST /api/juzhu/auth/beike —— 可选：用 lianjia_token 换短 TTL BJZ 缓存会话
+    // App 内身份标准已是 X-Lianjia-Token；本接口仅作浏览器旁路/离线缓存，不信前端 uid/手机号
     if (urlPath === '/api/juzhu/auth/beike' && req.method === 'POST') {
       const body = await readBody(req);
       const ljToken = String(body.lianjia_token || body.token || '').trim();
       if (!ljToken) return jsonReply(res, { error: '缺少 lianjia_token' }, 400);
       const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
       const referer = (process.env.SESSION_REFERER || '').trim() || ('http://' + host + '/');
-      const verified = await sessionToken.verify(ljToken, { referer });
-      if (!verified.ok) return jsonReply(res, { error: verified.error, error_code: verified.error_code }, verified.status || 502);
-      const uid = verified.ucid;
-      const phone = verified.phone || '';
-      const name = verified.displayName || '';
-      const loginName = 'bk' + uid;
       const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
       const ua = req.headers['user-agent'] || '';
-      let accRows = await queryRows(
-        `SELECT id FROM accounts WHERE idp_type='beike' AND idp_subject=? LIMIT 1`,
-        [uid],
-      );
-      if (!accRows.length) {
-        accRows = await queryRows('SELECT id FROM accounts WHERE login_name=? LIMIT 1', [loginName]);
-        if (accRows.length) {
-          await queryRows(
-            `UPDATE accounts SET idp_type='beike', idp_subject=? WHERE id=? AND (idp_type IS NULL OR idp_type='beike')`,
-            [uid, accRows[0].id],
-          );
-        }
-      }
-      if (!accRows.length) {
-        const created = await authCenter.createAccount({
-          login_name: loginName, password: 'bk-' + crypto.randomBytes(12).toString('hex'),
-          roles: ['user'], principal_type: 'user', phone: phone || undefined,
-          display_name: name || ('贝壳用户' + uid.slice(-4)),
-        }, { ip, ua });
-        if (created.error) return jsonReply(res, { error: created.error }, 400);
-        await queryRows(
-          `UPDATE accounts SET idp_type='beike', idp_subject=? WHERE id=?`,
-          [uid, created.account.id],
-        );
-      } else if (phone) {
-        await queryRows('UPDATE accounts SET phone=COALESCE(NULLIF(?,""),phone), display_name=COALESCE(NULLIF(?,""),display_name) WHERE id=?', [phone, name, accRows[0].id]).catch(() => {});
-      }
-      accRows = await queryRows(
-        `SELECT id FROM accounts WHERE idp_type='beike' AND idp_subject=? LIMIT 1`,
-        [uid],
-      );
-      const sess = await authCenter.createSession(accRows[0].id, ip, ua);
+      const verified = await beikeAuth.verifyMemoized(ljToken, { referer });
+      if (!verified.ok) return jsonReply(res, { error: verified.error, error_code: verified.error_code }, verified.status || 502);
+      const ensured = await beikeAuth.ensureBeikeAccount(verified, { queryRows, authCenter }, { ip, ua });
+      if (ensured.error) return jsonReply(res, { error: ensured.error }, ensured.status || 400);
+      const sess = await authCenter.createSession(ensured.accountId, ip, ua, {
+        ttlSeconds: beikeAuth.BEIKE_SESSION_TTL_SECONDS,
+      });
       return jsonReply(res, {
         ok: true,
         token: sess.token,
         role: 'user',
         expires_at: sess.expires_at,
-        uid,
-        display_name: name || ('贝壳用户' + uid.slice(-4)),
-        phone_masked: phone ? maskPhoneStd(phone) : '',
+        uid: ensured.ucid,
+        display_name: ensured.displayName,
+        phone_masked: ensured.phone ? maskPhoneStd(ensured.phone) : '',
       });
     }
 
@@ -7935,7 +7937,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Session-Token',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Session-Token, X-Lianjia-Token',
     });
     res.end();
     return;

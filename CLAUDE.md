@@ -273,3 +273,13 @@ C 端首页（`index.html`）的频道 tab（保租房/长租/卖旧买新/生�
 - **服务端是过滤主体**：`GET /api/juzhu/catalog` 出参 `channels` 已按当前城市过滤完（改配置走 `catalogMemoInvalidateAll()` 立即生效，不走 15s TTL）；`juzhu/app.js` 的 `enabledChannels()` 只按 `cache.hidden_home_tabs` 做兜底再过滤。页面只准消费 `JUZHU.enabledChannels()`，不得各造 tab 清单。
 - **写入口**：后台 `juzhu-admin.html`「字典」tab 城市行「首页隐藏 Tab」勾选 → `PUT /admin/cities/:id`（权限点 `dict.write`；服务端 `validateCityWrite` 校验白名单）。直改 DB 不走写通道时注意 catalog 有 15s 进程内 memo。
 - **隐藏 ≠ 下架**：只裁首页入口，`?channel=` 直链与数据接口照常；隐藏 tab 深链（如沈阳 `?tab=resale`）由 `paintTabs()` 回落到该城市第一个可见 tab，避免空 pane。
+
+## 规则 25 · App C 端身份标准 = `lianjia_token`（2026-09-28 拍板）
+
+**贝壳/链家 App 内 H5 的登录身份以 `lianjia_token` 为准，不依赖 BJZ 会话作主身份。**
+
+- **链路**：端上 bridge/cookie 取 `lianjia_token` → 请求头 `X-Lianjia-Token` → 服务端 `beike_auth.cjs` 调 session `/token/verify` → `ucid` → `accounts`（`idp_type=beike`）。验票结果进程内短缓存（约 2 分钟），避免每个 API 都打 session。
+- **优先级**：请求带了 `X-Lianjia-Token` 时**只信验票**；验不过**不回落**旧 BJZ（防 App 外换号串号）。无该头时仍走 `Authorization: Bearer` 会话（浏览器密码旁路 / 管理台）。
+- **BJZ 可选短缓存**：`POST /api/juzhu/auth/beike` 仍可换 BJZ，TTL **2h**（非 30d）；前端 `_beike-login.js` 有票即放行，换票只在后台暖缓存，不阻塞「我的/订单」。
+- **普通浏览器 H5**：对齐 Morph `mLogin`——跳 `https://[test-]clogin.ke.com/login?service=enc(https://[test-]m.ke.com/my/checklogin?redirect=回跳)&type=2`（`GET /api/juzhu/auth/beike-config` / `BEIKE_H5_LOGIN_URL`+`BEIKE_H5_SERVICE_URL` 可覆盖）。须 **HTTPS**。回跳后 cookie 落在 `*.ke.com`；外域（如 meizu.life）可能拿不到票，密码门兜底。服务端除 `X-Lianjia-Token` 外也认 Cookie `lianjia_token`。
+- **前端入口**：`screens/_beike-login.js`（`authHeaders` / `isLoggedIn` / fetch 自动注入 `X-Lianjia-Token`）；业务页不要再只读 `BJZ_TOKEN` 判登录。浏览器密码登录仍写 `BJZ_TOKEN` + `BZF_SESSION_TOKEN`。
