@@ -6,16 +6,23 @@
 <title>家政服务</title>
 <link rel="stylesheet" href="lvju-app.css?v=7">
 <style>
+  .app{--muted:#596575;}
   .scr{padding-bottom:24px;}
   .appbar{position:sticky;}
+  .appbar .bk,.appbar .act span{width:44px;height:44px;flex-shrink:0;}
+  .appbar svg,.search svg{width:24px;height:24px;display:block;flex-shrink:0;}
+  .appbar .ttl{min-width:0;font-size:18px;line-height:1.3;}
+  .appbar .ttl small{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .appbar .act{gap:4px;flex-shrink:0;color:var(--ink);}
   .search-wrap{padding:10px 16px 0;background:#fff;}
-  .list-sticky{position:sticky;top:58px;z-index:20;background:#fff;border-bottom:1px solid #f0f3f1;padding-bottom:10px;}
+  .list-sticky{position:sticky;top:calc(57px + max(12px,env(safe-area-inset-top)));z-index:20;background:#fff;border-bottom:1px solid #f0f3f1;padding-bottom:10px;}
   .search{display:flex;align-items:center;gap:10px;background:#f3f5f4;border:1px solid #eef2f1;border-radius:18px;padding:12px 14px;}
-  .search input{border:0;outline:0;background:transparent;flex:1;font-size:14px;color:var(--ink);font-family:inherit;}
-  .search .loc{font-size:12px;font-weight:600;color:var(--cat-brand,var(--brand));}
+  .search input{border:0;outline:0;background:transparent;flex:1;min-width:0;font-size:16px;color:var(--ink);font-family:inherit;}
+  .search svg{color:var(--muted);}
+  .search .loc{font-size:14px;font-weight:600;flex-shrink:0;color:var(--cat-deep,var(--brand-deep));}
   .sub-tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 8px;background:#fff;border-top:1px solid #f0f3f1;scrollbar-width:none;}
   .sub-tabs::-webkit-scrollbar{display:none;}
-  .sub-tabs a{flex:0 0 auto;padding:8px 14px;border-radius:999px;background:#f5f7f6;color:var(--muted);font-size:12px;border:1px solid transparent;}
+  .sub-tabs a{flex:0 0 auto;padding:10px 14px;min-height:44px;border-radius:999px;background:#f5f7f6;color:var(--muted);font-size:14px;border:1px solid transparent;}
   .sub-tabs a.on{background:linear-gradient(90deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-weight:700;}
   .hero-card{margin:10px 16px 0;border-radius:18px;padding:14px 16px;color:#fff;position:relative;overflow:hidden;
     background:linear-gradient(135deg,#0b5d56,#1b4f47 48%,#c58d36);box-shadow:0 12px 26px rgba(15,42,38,.14);}
@@ -36,11 +43,11 @@
   .hero-card::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 86% 22%,rgba(255,255,255,.22),transparent 22%),
     repeating-linear-gradient(100deg,rgba(255,255,255,.05) 0 2px,transparent 2px 16px);opacity:.8;}
   .hero-card .in{position:relative;z-index:2;}
-  .hero-card .eyebrow{font-size:10px;letter-spacing:.24em;opacity:.88;}
+  .hero-card .eyebrow{font-size:12px;letter-spacing:.18em;opacity:.94;}
   .hero-card h1{font-family:var(--serif);font-size:22px;line-height:1.16;margin-top:5px;}
-  .hero-card p{font-size:12px;opacity:.92;margin-top:5px;max-width:28ch;line-height:1.45;}
+  .hero-card p{font-size:14px;margin-top:7px;line-height:1.6;}
   .hero-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
-  .hero-meta span{font-size:10px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);}
+  .hero-meta span{font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);}
   .hero-cta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
   .hero-cta .price{font-family:var(--serif);font-size:22px;}
   .hero-cta .price small{font-family:var(--font);font-size:11px;opacity:.86;margin-left:4px;}
@@ -50,9 +57,9 @@
   .toolbar .tag.hot{color:#ef4444;border-color:#fee2e2;background:#fff5f5;}
   .toolbar .sep{margin-left:auto;}
   .list{padding:4px 16px 24px;}
-  .svc-card{display:flex;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:8px;margin-bottom:8px;
+  .svc-card{display:flex;gap:10px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:10px;
     box-shadow:0 5px 14px rgba(15,42,38,.06);}
-  .svc-poster{flex:0 0 82px;width:82px;min-height:122px;border-radius:8px;color:#fff;position:relative;overflow:hidden;
+  .svc-poster{flex:0 0 88px;width:88px;min-height:146px;border-radius:8px;color:#fff;position:relative;overflow:hidden;
     padding:11px 8px;display:flex;flex-direction:column;justify-content:space-between;
     background:linear-gradient(135deg,#0f766e,#14b8a6);}
   .svc-poster.repair{background:linear-gradient(135deg,#ea580c,#fb923c);}
@@ -68,21 +75,21 @@
   .svc-poster.community{background:linear-gradient(135deg,#6d28d9,#c4b5fd);}
   .svc-poster::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.18));}
   .svc-poster .t1,.svc-poster .t2,.svc-poster .t3,.svc-poster svg{position:relative;z-index:2;}
-  .svc-poster .t1{font-size:10px;opacity:.92;}
+  .svc-poster .t1{font-size:12px;}
   .svc-poster .t2{font-size:16px;line-height:1.35;font-weight:700;}
   .svc-poster svg{width:60px;height:32px;margin:2px 0;}
-  .svc-poster .t3{font-size:10px;opacity:.95;}
+  .svc-poster .t3{font-size:12px;}
   .svc-main{flex:1;min-width:0;display:flex;flex-direction:column;}
-  .svc-main h3{font-size:14px;font-weight:800;line-height:1.25;color:var(--ink);}
-  .svc-meta{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35;}
+  .svc-main h3{font-size:17px;font-weight:800;line-height:1.4;color:var(--ink);}
+  .svc-meta{font-size:14px;color:var(--muted);margin-top:5px;line-height:1.55;overflow-wrap:anywhere;}
   .svc-tags{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 0;}
-  .svc-tags span{font-size:10px;padding:2px 5px;border-radius:4px;background:var(--cat-soft,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
-  .svc-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3px;}
+  .svc-tags span{font-size:12px;padding:3px 6px;border-radius:4px;background:var(--cat-soft,#eef6f4);color:var(--cat-deep,var(--brand-deep));}
+  .svc-bottom{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;margin-top:auto;padding-top:10px;}
   .svc-price{color:#ef5a2a;}
-  .svc-price b{font-family:var(--serif);font-size:18px;line-height:1;}
-  .svc-price small{font-size:11px;color:var(--muted);}
-  .svc-book{display:inline-flex;align-items:center;justify-content:center;padding:6px 13px;border-radius:11px;
-    background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-size:12px;font-weight:800;
+  .svc-price b{font-family:var(--serif);font-size:22px;line-height:1;}
+  .svc-price small{font-size:12px;color:var(--muted);}
+  .svc-book{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-left:auto;padding:10px 13px;border-radius:11px;
+    background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));color:#fff;font-size:14px;font-weight:800;
     box-shadow:0 8px 16px color-mix(in oklab,var(--cat-brand,var(--brand)) 26%,transparent);}
   .empty{padding:48px 24px;text-align:center;color:var(--muted);}
 </style>
@@ -91,15 +98,15 @@
 <div class="app">
   <div class="scr">
     <div class="appbar">
-      <a class="bk" href="index.html">‹</a>
+      <a class="bk" href="index.html" aria-label="返回首页"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg></a>
       <div class="ttl" id="ttl">家政服务<small id="ttlSub">南京 · 新居住频道</small></div>
-      <div class="act"><span>⌕</span><span>⌖</span></div>
+      <div class="act"><span role="img" aria-label="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></span><span role="img" aria-label="定位"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg></span></div>
     </div>
 
     <div class="list-sticky">
       <div class="search-wrap">
         <div class="search">
-          <span style="font-size:16px;color:#96a39f;">⌕</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
           <input id="searchInput" placeholder="搜索服务，如深度清洁、空调清洗、育儿嫂" />
           <span class="loc" id="cityLoc">南京</span>
         </div>
