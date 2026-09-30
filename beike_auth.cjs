@@ -37,8 +37,23 @@ function memoSet(h, value, ttl) {
 }
 
 function lianjiaTokenOf(req) {
-  const h = (req && req.headers) || {};
-  return String(h['x-lianjia-token'] || h['X-Lianjia-Token'] || '').trim();
+  // 与 auth_center 对齐：只认 Cookie，不读 X-Lianjia-Token
+  const raw = (req && req.headers && req.headers.cookie) || '';
+  const parts = String(raw).split(';');
+  for (const name of ['lianjia_token', 'lj_token']) {
+    for (const part of parts) {
+      const p = part.trim();
+      const eq = p.indexOf('=');
+      if (eq <= 0) continue;
+      if (p.slice(0, eq).trim() !== name) continue;
+      try {
+        return decodeURIComponent(p.slice(eq + 1).trim());
+      } catch {
+        return p.slice(eq + 1).trim();
+      }
+    }
+  }
+  return '';
 }
 
 /**

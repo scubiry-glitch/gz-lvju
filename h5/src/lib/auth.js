@@ -1,47 +1,28 @@
-/** 贝壳 App 内身份：lianjia_token；浏览器登录走 @ke/morph Login.toLogin（对齐 Morph 文档） */
+/** C 端身份 = Cookie `lianjia_token`（Morph getCookie）；不换 BJZ */
 
-import { Login } from '@ke/morph';
+import { Login, getCookie } from '@ke/morph';
 
-const TOKEN_KEYS = ['lianjia_token', 'lianjia_tokne', 'lj_token'];
-
-function readCookie(name) {
+/** 只从 cookie 取 lianjia_token（Morph 口径须传名字） */
+export function getLianjiaToken() {
   try {
-    const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
-    return m ? decodeURIComponent(m[1]) : '';
+    const v = getCookie('lianjia_token') || getCookie('lj_token') || '';
+    return String(v).trim();
   } catch {
     return '';
   }
 }
 
-export function getLianjiaToken() {
-  for (const k of TOKEN_KEYS) {
-    const v = (readCookie(k) || '').trim();
-    if (v) return v;
-  }
-  try {
-    const q = new URLSearchParams(location.search).get('lianjia_token');
-    if (q) return q.trim();
-  } catch {
-    /* ignore */
-  }
-  return '';
-}
-
+/** 本地可读 cookie；HttpOnly 时以壳层 /auth/me 为准 */
 export function isLoggedIn() {
-  return !!getLianjiaToken() || !!(localStorage.getItem('BJZ_TOKEN') || '').trim();
+  return !!getLianjiaToken();
 }
 
+/**
+ * C 端：请求只靠 Cookie `lianjia_token`（credentials），服务端不读 X-Lianjia-Token。
+ * 可读 cookie 仅用于本地 isLoggedIn 判断；HttpOnly 时以 /auth/me 为准。
+ */
 export function authHeaders(extra = {}) {
-  const h = { ...extra };
-  const lj = getLianjiaToken();
-  if (lj) h['X-Lianjia-Token'] = lj;
-  const bjz = (localStorage.getItem('BJZ_TOKEN') || localStorage.getItem('BZF_SESSION_TOKEN') || '').trim();
-  if (bjz && !lj) h.Authorization = 'Bearer ' + bjz;
-  if (!h.Authorization && !h['X-Lianjia-Token']) {
-    const k = (localStorage.getItem('JUZHU_API_KEY') || '').trim();
-    if (k) h.Authorization = 'Bearer ' + k;
-  }
-  return h;
+  return { ...extra };
 }
 
 export function maskPhone(p) {
@@ -60,7 +41,6 @@ export function isBeikeApp() {
   }
 }
 
-/** Morph cookie 只落在 *.ke.com；本地域 / meizu.life 自动跳转回不来票 */
 export function morphCookieLikely() {
   const h = location.hostname || '';
   if (isBeikeApp()) return true;
@@ -75,7 +55,6 @@ function absUrl(u) {
   }
 }
 
-/** Morph apiEnv：localhost / *.test.ke.com → test，其余 production */
 function morphApiEnv() {
   const h = location.hostname || '';
   if (/localhost|127\.0\.0\.1/i.test(h) || /\.test\.ke\.com$/i.test(h) || /\.tt[abc]\.test\.ke\.com$/i.test(h)) {
@@ -84,10 +63,7 @@ function morphApiEnv() {
   return 'production';
 }
 
-/**
- * App → Morph env=app（原生）；浏览器 H5 → 强制 env=m（避免桌面被判成 pc）。
- * 文档：https://kedoc.ke.com/morph/docs/business/login
- */
+/** App → env=app；浏览器 → env=m。https://kedoc.ke.com/morph/docs/business/login */
 export function jumpToLogin(returnUrl) {
   const back = absUrl(returnUrl || location.href);
   Login.toLogin({
@@ -96,31 +72,4 @@ export function jumpToLogin(returnUrl) {
     apiEnv: morphApiEnv(),
   });
   return true;
-}
-
-export async function ensureBeikeSession() {
-  const lj = getLianjiaToken();
-  if (!lj) return null;
-  try {
-    const r = await fetch('/api/juzhu/auth/beike', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Lianjia-Token': lj },
-      body: JSON.stringify({ lianjia_token: lj }),
-      credentials: 'same-origin',
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!(j && j.ok)) return null;
-    if (j.token) {
-      try {
-        localStorage.setItem('BJZ_TOKEN', j.token);
-        localStorage.setItem('BZF_SESSION_TOKEN', j.token);
-      } catch {
-        /* ignore */
-      }
-    }
-    return j;
-  } catch {
-    /* ignore */
-  }
-  return null;
 }

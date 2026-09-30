@@ -723,11 +723,8 @@ function cookieOf(req, name) {
   return '';
 }
 
-function lianjiaTokenHeader(req) {
-  const h = (req && req.headers) || {};
-  const fromHeader = String(h['x-lianjia-token'] || h['X-Lianjia-Token'] || '').trim();
-  if (fromHeader) return fromHeader;
-  // 浏览器 H5 登录回跳后 cookie 常为 HttpOnly，同源 API 靠 Cookie 携带
+function lianjiaTokenOf(req) {
+  // C 端身份只认 Cookie lianjia_token（不读 X-Lianjia-Token）
   return cookieOf(req, 'lianjia_token') || cookieOf(req, 'lj_token') || '';
 }
 
@@ -737,15 +734,21 @@ function lianjiaTokenHeader(req) {
  *   { type:'legacy' }                    旧全局 JUZHU_API_KEY（过渡期：admin 域只读）
  *   null                                 匿名/无效
  *
- * C 端 App 标准：若带 X-Lianjia-Token，只信验票→ucid→accounts（DI.resolveLianjiaToken）；
- * 验不过不回落 BJZ，避免 App 外换号后仍挂旧会话。
- * 无该头时仍走 Bearer 会话 / API Key（浏览器密码旁路、管理台）。
+ * 分流：
+ *   - 管理台 / B 端 / 密码旁路：Authorization Bearer 会话（或 API Key）—— 不走 cookie 身份
+ *   - C 端 H5：仅 Cookie `lianjia_token` 验票→ucid→accounts（不读 X-Lianjia-Token、不换 BJZ）
  */
 async function principalOf(req) {
   const d = di();
   const ip = clientIp(req);
   const ua = (req && req.headers && req.headers['user-agent']) || '';
-  const lj = lianjiaTokenHeader(req);
+
+  // 其它端：有 Bearer 先认会话，避免浏览器残留 lianjia_token cookie 抢身份
+  const sess = await verifySessionToken(bearerToken(req));
+  if (sess) return { type: 'account', ip, ua, ...sess };
+
+  // C 端：只读 Cookie
+  const lj = lianjiaTokenOf(req);
   if (lj && typeof d.resolveLianjiaToken === 'function') {
     const full = await d.resolveLianjiaToken(lj, req).catch(() => null);
     if (full && full.account) {
@@ -753,8 +756,7 @@ async function principalOf(req) {
     }
     return null;
   }
-  const sess = await verifySessionToken(bearerToken(req));
-  if (sess) return { type: 'account', ip, ua, ...sess };
+
   const key = apiKeyOf(req);
   if (!key) return null;
   // 机器账号 key（只存哈希，timingSafe 比对）

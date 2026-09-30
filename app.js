@@ -64,7 +64,7 @@ authCenter.init({
   expectedApiKey,
   expectedAdminPassword,
   isProduction,
-  // App C 端身份标准：X-Lianjia-Token → 验票 → accounts（不依赖 BJZ）
+  // C 端 H5：Cookie lianjia_token → 验票 → accounts（不读 X-Lianjia-Token；其它端走 Bearer）
   resolveLianjiaToken: (lj, req) => {
     const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
     const referer = (process.env.SESSION_REFERER || '').trim() || ('http://' + host + '/');

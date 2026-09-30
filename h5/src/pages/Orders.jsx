@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cancelBooking, myBookings } from '../lib/api.js';
+import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice } from '../lib/price.js';
 import '../styles/orders.css';
@@ -62,6 +63,7 @@ function emptyHint(tab) {
 
 function OrdersBody() {
   const [params, setParams] = useSearchParams();
+  const { clearSession, goLogin } = useAuthUser();
   const tab = TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'all';
   const [items, setItems] = useState([]);
   const [loadErr, setLoadErr] = useState('');
@@ -76,19 +78,14 @@ function OrdersBody() {
       .then((j) => setItems(j.items || []))
       .catch((e) => {
         if (e.status === 401) {
-          try {
-            localStorage.removeItem('BJZ_TOKEN');
-            localStorage.removeItem('BZF_SESSION_TOKEN');
-          } catch {
-            /* ignore */
-          }
-          location.reload();
+          clearSession();
+          goLogin('/orders');
           return;
         }
         setLoadErr('加载失败');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [clearSession, goLogin]);
 
   useEffect(() => {
     loadMine();

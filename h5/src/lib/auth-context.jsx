@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ensureBeikeSession, isLoggedIn, jumpToLogin } from './auth.js';
+import { jumpToLogin } from './auth.js';
 import { authMe } from './api.js';
 
 export const AuthUserContext = createContext({
@@ -21,7 +21,7 @@ export function useRequireLogin() {
   const { ready, loggedIn, goLogin } = useAuthUser();
   return useCallback(
     (next) => {
-      if (!ready) return true; // 仍在暖身份：先拦住点击
+      if (!ready) return true;
       if (loggedIn) return false;
       goLogin(next);
       return true;
@@ -30,72 +30,39 @@ export function useRequireLogin() {
   );
 }
 
-function pickUser(me, beike) {
+function pickUser(me) {
   const a = me && me.account;
-  if (a) {
-    return {
-      id: a.id,
-      display_name: a.display_name || a.login_name || '',
-      phone: a.phone || '',
-      login_name: a.login_name || '',
-    };
-  }
-  if (beike && beike.ok) {
-    return {
-      id: beike.uid || '',
-      display_name: beike.display_name || beike.login_name || '',
-      phone: beike.phone || '',
-      phone_masked: beike.phone_masked || '',
-    };
-  }
-  return null;
+  if (!a) return null;
+  return {
+    id: a.id,
+    display_name: a.display_name || a.login_name || '',
+    phone: a.phone || '',
+    login_name: a.login_name || '',
+  };
 }
 
-function clearLocalTokens() {
-  try {
-    localStorage.removeItem('BJZ_TOKEN');
-    localStorage.removeItem('BZF_SESSION_TOKEN');
-  } catch {
-    /* ignore */
-  }
-}
-
-/** 壳层启动即暖身份：一律探 /api/auth/me（credentials 带 Cookie，含 HttpOnly）；
- *  可读 lianjia_token 时再并行换 BJZ。不得因本地无票就跳过请求。 */
+/** 壳层暖身份：只探 /api/auth/me（X-Lianjia-Token 头 + Cookie）；C 端不换 BJZ */
 export async function loadAuthUser() {
-  const beikeP = ensureBeikeSession().catch(() => null);
-  let me = null;
   try {
-    me = await authMe();
+    return pickUser(await authMe());
   } catch {
-    /* 401 / 无会话 */
+    return null;
   }
-  const beike = await beikeP;
-  if (!me && beike && beike.ok) {
-    try {
-      me = await authMe();
-    } catch {
-      /* ignore */
-    }
-  }
-  return pickUser(me, beike);
 }
 
 function loginNextPath(next) {
   const raw = next == null || next === '' ? location.pathname + location.search : String(next);
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
   const path = raw.startsWith('/') ? raw : '/' + raw;
-  // BrowserRouter basename=/h5
   return location.origin + '/h5' + path;
 }
 
-/** 挂在 AppShell：首页进站就探身份；点击侧用 goLogin / useRequireLogin */
+/** 挂在 AppShell：进站探身份；点击侧 goLogin / useRequireLogin */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
   const clearSession = useCallback(() => {
-    clearLocalTokens();
     setUser(null);
     setReady(true);
   }, []);
@@ -103,15 +70,10 @@ export function AuthProvider({ children }) {
   const refresh = useCallback(async () => {
     try {
       const u = await loadAuthUser();
-      if (!u) {
-        // 本地有票但服务端不认 → 清 BJZ，避免假登录；无本地票则只标未登录
-        if (isLoggedIn()) clearLocalTokens();
-        setUser(null);
-        return null;
-      }
       setUser(u);
       return u;
     } catch {
+      setUser(null);
       return null;
     } finally {
       setReady(true);
@@ -121,7 +83,6 @@ export function AuthProvider({ children }) {
   const goLogin = useCallback((next) => {
     const ret = next == null || next === '' ? location.pathname + location.search : String(next);
     const nextQ = ret.startsWith('/') ? ret : '/' + ret.replace(/^\//, '');
-    // 一律 Morph clogin（App 走原生）；不进 /h5/login、不落页内密码卡
     jumpToLogin(loginNextPath(nextQ));
   }, []);
 

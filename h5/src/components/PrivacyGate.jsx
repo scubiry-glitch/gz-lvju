@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ensureBeikeSession, getLianjiaToken } from '../lib/auth.js';
+import { useAuthUser } from '../lib/auth-context.jsx';
 
 const PRIV_VER = 'v1';
 
@@ -45,36 +45,27 @@ function exitChannel() {
   else location.replace('about:blank');
 }
 
-/** 登录验票成功后弹一次隐私协议（与 home-demo 同口径） */
+/** 壳层已登录后弹一次隐私协议；不再自己打 /auth/beike */
 export default function PrivacyGate() {
+  const { ready, user } = useAuthUser();
   const [show, setShow] = useState(false);
   const [acct, setAcct] = useState(null);
 
   useEffect(() => {
-    let alive = true;
-    async function boot() {
-      if (!getLianjiaToken()) {
-        if (alive) setShow(false);
-        return;
-      }
-      const j = await ensureBeikeSession();
-      if (!alive) return;
-      if (!(j && j.ok)) {
-        setShow(false);
-        return;
-      }
-      const a = { id: j.uid || '', uid: j.uid || '', display_name: j.display_name || '' };
-      setAcct(a);
-      setShow(!agreed(a));
+    if (!ready) return;
+    if (!user) {
+      setShow(false);
+      setAcct(null);
+      return;
     }
-    boot();
-    const onShow = () => boot();
-    window.addEventListener('pageshow', onShow);
-    return () => {
-      alive = false;
-      window.removeEventListener('pageshow', onShow);
+    const a = {
+      id: user.id || '',
+      uid: user.id || '',
+      display_name: user.display_name || '',
     };
-  }, []);
+    setAcct(a);
+    setShow(!agreed(a));
+  }, [ready, user]);
 
   if (!show) return null;
 

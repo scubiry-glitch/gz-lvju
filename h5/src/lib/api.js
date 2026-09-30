@@ -104,13 +104,6 @@ export function cancelBooking(body) {
   });
 }
 
-export function tenantLogin(phone, password) {
-  return api('/api/juzhu/auth/tenant', {
-    method: 'POST',
-    body: JSON.stringify({ phone, password }),
-  });
-}
-
 /** 精选好房：与 lvju-app-home-demo 同口径 */
 export function pickFeaturedProjects(cat) {
   const dmap = {};
