@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cancelBooking, myBookings } from '../lib/api.js';
 import { assetUrl } from '../lib/asset.js';
-import AuthGate from '../components/AuthGate.jsx';
 import { formatPrice } from '../lib/price.js';
 import '../styles/orders.css';
 
@@ -238,9 +237,5 @@ function OrdersBody() {
 }
 
 export default function Orders() {
-  return (
-    <AuthGate title="登录后查看订单">
-      <OrdersBody />
-    </AuthGate>
-  );
+  return <OrdersBody />;
 }

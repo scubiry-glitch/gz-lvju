@@ -52,7 +52,7 @@ export default function Paid() {
   const paid = order && order.pay_status === 'paid';
 
   return (
-    <div className="bk">
+    <div className="booking-page">
       <div className="steps">
         <span className="st">
           <span className="n">1</span>预定下单

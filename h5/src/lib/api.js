@@ -35,6 +35,15 @@ export function spots(params = {}) {
   return api('/api/juzhu/spots' + (q ? '?' + q : ''));
 }
 
+export function spot(id) {
+  return api('/api/juzhu/spots/' + encodeURIComponent(id));
+}
+
+export function routes(params = {}) {
+  const q = new URLSearchParams(params).toString();
+  return api('/api/juzhu/routes' + (q ? '?' + q : ''));
+}
+
 export function project(id) {
   return api('/api/juzhu/projects/' + encodeURIComponent(id));
 }

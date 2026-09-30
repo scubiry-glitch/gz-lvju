@@ -11,8 +11,11 @@
   --page: #f5f7f6;
   --ph: #9e9e9e;
   --gold: #ac8942;
+  --gold-deep: #8c6224;
+  --gold-soft: color-mix(in oklab, var(--gold) 16%, transparent);
   --ink: #222222;
   --font: -apple-system, 'PingFang SC', 'PingFangSC-Regular', 'Helvetica Neue', sans-serif;
+  --serif: 'Noto Serif SC', 'Songti SC', 'Source Han Serif SC', Georgia, 'Times New Roman', serif;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 

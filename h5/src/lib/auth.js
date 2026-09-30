@@ -47,10 +47,28 @@ export function maskPhone(p) {
   return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : p || '已登录';
 }
 
+export function isBeikeApp() {
+  try {
+    if (window.__BZF_IS_BEIKE_APP) return true;
+    const ua = navigator.userAgent || '';
+    if (/lianjia|beike|ke\.com/i.test(ua) && (window.JsBridgeV3 || window.LJBridge || window.jsbridge3)) return true;
+    return !!(window.JsBridgeV3 || window.BeiKeSdk || window.__beikeSdk);
+  } catch {
+    return false;
+  }
+}
+
 function hostEnv() {
   const h = location.hostname || '';
   if (/^(localhost|127\.0\.0\.1)$/i.test(h) || /\.test\.ke\.com$/i.test(h)) return 'test';
   return 'prod';
+}
+
+/** Morph cookie 只落在 *.ke.com；本地域 / meizu.life 自动跳转回不来票 */
+export function morphCookieLikely() {
+  const h = location.hostname || '';
+  if (isBeikeApp()) return true;
+  return /\.ke\.com$/i.test(h);
 }
 
 /** Morph H5：clogin → checklogin → 回跳 */

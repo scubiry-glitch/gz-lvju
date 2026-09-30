@@ -5,7 +5,10 @@ import { project, projectUnits, stayCalendar, virtualPhone } from '../lib/api.js
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, priceParts, unitNight } from '../lib/price.js';
 import { md, monthKey, nightCount, parseIso, sumRange, nightsBetween } from '../lib/stay.js';
+import { featureEnabled } from '../lib/features.js';
 import '../styles/detail.css';
+
+const CAIBEI = featureEnabled('caibei');
 
 function asArr(v) {
   if (Array.isArray(v)) return v;
@@ -421,10 +424,6 @@ export default function Detail() {
 
   return (
     <div className="pd" ref={scrRef}>
-      <button type="button" className="pd-back" onClick={() => nav(-1)} aria-label="返回">
-        ←
-      </button>
-
       <div
         className="pd-hero"
         style={heroUrls[0] ? { backgroundImage: `url(${heroUrls[heroIdx] || heroUrls[0]})` } : undefined}
@@ -444,11 +443,13 @@ export default function Detail() {
         ) : null}
         <div className="badge">
           <span className="star">
-            {st === 'passed' && rating.stars
+            {CAIBEI && st === 'passed' && rating.stars
               ? `★ ${rating.stars} 星 · ${rating.star_label || ''}`
-              : st === 'pending'
+              : CAIBEI && st === 'pending'
                 ? '评级复核中'
-                : '待评级'}
+                : CAIBEI
+                  ? '待评级'
+                  : '精选好房'}
           </span>
           <div className="nm">{p.name}</div>
           <div className="lo">{p.address || ''}</div>
@@ -689,6 +690,7 @@ export default function Detail() {
         </>
       ) : null}
 
+      {CAIBEI ? (
       <div className="pd-block" id="dRatingBlock">
         <div className="bt">{p.channel === 'minsu' ? '旅居彩贝评价 · 5 维' : '好房子评价 · 4 维'}</div>
         <div className="bs">{p.channel === 'minsu' ? '按旅居住宿维度评定' : '按好房子维度评定'}</div>
@@ -737,6 +739,7 @@ export default function Detail() {
           </div>
         ) : null}
       </div>
+      ) : null}
 
       {keeper ? (
         <div className="pd-block" id="dHostBlock">
@@ -791,7 +794,7 @@ export default function Detail() {
           {spots[0] ? (
             <a
               className="nb-feat"
-              href={spots[0].link || `/lvju-app-spot-post.html?id=${spots[0].id}`}
+              href={spots[0].link || `/h5/spot/${spots[0].id}`}
             >
               <div
                 className="bg"
@@ -815,7 +818,7 @@ export default function Detail() {
             <a
               key={s.id}
               className="nb-row"
-              href={s.link || `/lvju-app-spot-post.html?id=${s.id}`}
+              href={s.link || `/h5/spot/${s.id}`}
             >
               <div
                 className="th"

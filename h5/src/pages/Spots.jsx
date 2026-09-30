@@ -108,7 +108,7 @@ export default function Spots() {
             const lv = s.tags?.length ? s.tags.slice(0, 1).join('') : s.type_label || '';
             const meta = [s.address, s.ticket, s.duration].filter(Boolean);
             return (
-              <a key={s.id} className="spot" href={`/lvju-app-spot-post.html?id=${s.id}`}>
+              <Link key={s.id} className="spot" to={`/spot/${s.id}`}>
                 <div className="bg" style={{ backgroundImage: `url(${bg})` }} />
                 {lv ? <span className="lv">{lv}</span> : null}
                 <div className="in">
@@ -121,7 +121,7 @@ export default function Spots() {
                         : null}
                   </div>
                 </div>
-              </a>
+              </Link>
             );
           })
         )}

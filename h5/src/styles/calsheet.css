@@ -1,22 +1,25 @@
-/* 房态日历底部滑层（对齐 lvju-app-detail .calsheet）；fixed 钉在视口，宽对齐 #root */
+/* 房态日历底部滑层（对齐 lvju-app-detail .calsheet）
+   全部挂在 .calsheet 下，避免与城市选择器 .csheet .cs-* 撞名 */
 .calsheet {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  right: auto;
+  top: 0;
+  bottom: 0;
   z-index: 80;
-  display: flex;
-  justify-content: center;
+  width: 100%;
+  max-width: 430px;
+  transform: translateX(-50%);
 }
 .calsheet .cs-mask {
   position: absolute;
   inset: 0;
   background: rgba(8, 18, 16, 0.45);
 }
-.cs-panel {
+.calsheet .cs-panel {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 430px;
+  left: 0;
+  right: 0;
   bottom: 0;
   height: 93%;
   background: #fff;
@@ -24,8 +27,10 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.28);
+  /* 覆盖城市选择器同名 .cs-panel 的 padding */
+  padding: 0;
 }
-.cs-grip {
+.calsheet .cs-grip {
   flex-shrink: 0;
   width: 38px;
   height: 4px;
@@ -33,19 +38,19 @@
   background: #d8e0dd;
   margin: 8px auto 0;
 }
-.cs-head {
+.calsheet .cs-head {
   flex-shrink: 0;
   padding: 6px 16px 11px;
   border-bottom: 1px solid var(--border);
 }
-.cs-h1 {
+.calsheet .cs-h1 {
   display: flex;
   align-items: center;
   font-weight: 700;
   font-size: 16px;
   color: var(--ink);
 }
-.cs-x {
+.calsheet .cs-x {
   margin-left: auto;
   width: 28px;
   height: 28px;
@@ -55,26 +60,29 @@
   place-items: center;
   font-size: 12px;
   color: var(--muted);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
-.cs-range {
+.calsheet .cs-range {
   display: flex;
   align-items: center;
   gap: 9px;
   margin-top: 11px;
 }
-.cs-range .csd {
+.calsheet .cs-range .csd {
   flex: 1;
   min-width: 0;
   background: #f4f9f8;
   border-radius: 11px;
   padding: 7px 11px;
 }
-.cs-range .csd small {
+.calsheet .cs-range .csd small {
   display: block;
   font-size: 9.5px;
   color: var(--muted);
 }
-.cs-range .csd b {
+.calsheet .cs-range .csd b {
   display: block;
   font-size: 14px;
   font-weight: 700;
@@ -82,17 +90,17 @@
   margin-top: 1px;
   white-space: nowrap;
 }
-.cs-range .csd b.ph {
+.calsheet .cs-range .csd b.ph {
   color: #a3afaa;
   font-weight: 600;
   font-size: 12.5px;
 }
-.cs-range .carr {
+.calsheet .cs-range .carr {
   flex-shrink: 0;
   color: #b6c2bd;
   font-size: 15px;
 }
-.cs-range .cnn {
+.calsheet .cs-range .cnn {
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 700;
@@ -101,33 +109,33 @@
   padding: 5px 11px;
   border-radius: 999px;
 }
-.cs-tip {
+.calsheet .cs-tip {
   font-size: 10.5px;
   color: var(--muted);
   margin-top: 9px;
 }
-.cs-tip.warn {
+.calsheet .cs-tip.warn {
   color: #b91c1c;
   font-weight: 600;
 }
-.cs-months {
+.calsheet .cs-months {
   flex: 1;
   overflow-y: auto;
   padding: 0 12px;
 }
-.cs-months::-webkit-scrollbar {
+.calsheet .cs-months::-webkit-scrollbar {
   width: 0;
 }
-.csm {
+.calsheet .csm {
   padding-top: 16px;
 }
-.csm-t {
+.calsheet .csm-t {
   font-weight: 700;
   font-size: 14.5px;
   color: var(--ink);
   padding: 0 4px 9px;
 }
-.cs-wk {
+.calsheet .cs-wk {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   text-align: center;
@@ -135,26 +143,26 @@
   color: var(--muted);
   padding-bottom: 6px;
 }
-.cs-wk span:first-child,
-.cs-wk span:last-child {
+.calsheet .cs-wk span:first-child,
+.calsheet .cs-wk span:last-child {
   color: #cf8b84;
 }
-.cs-grid {
+.calsheet .cs-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   row-gap: 3px;
 }
-.cd {
+.calsheet .cd {
   position: relative;
   text-align: center;
   padding: 5px 0 4px;
   cursor: pointer;
   min-height: 46px;
 }
-.cd.blank {
+.calsheet .cd.blank {
   visibility: hidden;
 }
-.cd .dn {
+.calsheet .cd .dn {
   display: block;
   width: 30px;
   height: 30px;
@@ -165,7 +173,7 @@
   color: var(--ink);
   border-radius: 50%;
 }
-.cd .dp {
+.calsheet .cd .dp {
   display: block;
   font-size: 8.5px;
   color: var(--gold);
@@ -173,50 +181,50 @@
   line-height: 1.25;
   white-space: nowrap;
 }
-.cd.wknd .dp {
+.calsheet .cd.wknd .dp {
   color: #b45309;
 }
-.cd.tdy .dn {
+.calsheet .cd.tdy .dn {
   box-shadow: inset 0 0 0 1.5px var(--brand);
   color: var(--brand-deep);
 }
-.cd.past .dn,
-.cd.dis .dn {
+.calsheet .cd.past .dn,
+.calsheet .cd.dis .dn {
   color: #ccd4d0;
   font-weight: 500;
 }
-.cd.noslot {
+.calsheet .cd.noslot {
   cursor: default;
   background: #f7f8f8;
 }
-.cd.noslot .dn {
+.calsheet .cd.noslot .dn {
   color: #c3ccc8;
   font-weight: 500;
 }
-.cd.noslot .dp {
+.calsheet .cd.noslot .dp {
   color: #e0a3a3;
 }
-.cd.low .dp {
+.calsheet .cd.low .dp {
   color: #b45309;
   font-weight: 600;
 }
-.cd.range {
+.calsheet .cd.range {
   background: var(--brand-soft);
 }
-.cd.range .dp {
+.calsheet .cd.range .dp {
   color: var(--brand-deep);
 }
-.cd.end .dn {
+.calsheet .cd.end .dn {
   background: linear-gradient(135deg, var(--brand), var(--brand-deep));
   color: #fff;
   font-weight: 700;
   box-shadow: 0 4px 10px rgba(11, 93, 86, 0.35);
 }
-.cd.end .dp {
+.calsheet .cd.end .dp {
   color: var(--brand-deep);
   font-weight: 700;
 }
-.cs-legend {
+.calsheet .cs-legend {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
@@ -224,7 +232,7 @@
   color: var(--muted);
   padding: 16px 4px 20px;
 }
-.cs-legend i {
+.calsheet .cs-legend i {
   display: inline-block;
   width: 9px;
   height: 9px;
@@ -232,7 +240,7 @@
   margin-right: 4px;
   vertical-align: -1px;
 }
-.cs-bar {
+.calsheet .cs-bar {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -241,18 +249,18 @@
   border-top: 1px solid var(--border);
   background: #fff;
 }
-.cs-tot {
+.calsheet .cs-tot {
   flex: 1;
   font-size: 10.5px;
   color: var(--muted);
   line-height: 1.35;
 }
-.cs-tot b {
+.calsheet .cs-tot b {
   font-size: 19px;
   color: #92400e;
   margin: 0 2px;
 }
-.cs-ok {
+.calsheet .cs-ok {
   flex-shrink: 0;
   background: linear-gradient(90deg, var(--brand), var(--brand-2));
   color: #fff;
@@ -260,8 +268,10 @@
   font-size: 14px;
   padding: 12px 32px;
   border-radius: 999px;
+  border: 0;
+  cursor: pointer;
 }
-.cs-ok:disabled {
+.calsheet .cs-ok:disabled {
   background: #e3e9e7;
   color: #a2aea9;
   cursor: default;

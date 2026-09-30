@@ -3,9 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { catalog, topics as fetchTopics } from '../lib/api.js';
 import { assetUrl } from '../lib/asset.js';
 import { resolveHomeCity, writeStoredCity, provinceOf } from '../lib/city.js';
+import { featureEnabled } from '../lib/features.js';
 import { priceParts, priceUnitText, formatPrice } from '../lib/price.js';
 import CitySheet from '../components/CitySheet.jsx';
 import '../styles/search.css';
+
+const CAIBEI = featureEnabled('caibei');
 
 const SEGS = [
   { id: 'all', label: '推荐', kind: 'mixed' },
@@ -32,7 +35,7 @@ const SORT_OPTS = [
   { id: 'def', label: '综合排序' },
   { id: 'price', label: '价格优先' },
   { id: 'star', label: '星级优先' },
-];
+].filter((o) => o.id !== 'star' || CAIBEI);
 const TOPIC_DESC = {
   houniao: '温暖过冬 · 候鸟南飞',
   kangyang: '森林温泉 · 慢节奏疗愈',
@@ -183,7 +186,7 @@ export default function Search() {
         const v = priceOf(p);
         if (v == null || v < priceOpt.min || v >= priceOpt.max) return false;
       }
-      if (starOpt && starOpt.min != null) {
+      if (CAIBEI && starOpt && starOpt.min != null) {
         const s = starsOf(p);
         if (s == null || s < starOpt.min) return false;
       }
@@ -206,7 +209,7 @@ export default function Search() {
         return pa - pb;
       });
     }
-    if (F.sort === 'star') {
+    if (CAIBEI && F.sort === 'star') {
       return ps.slice().sort((a, b) => {
         const sa = starsOf(a),
           sb = starsOf(b);
@@ -299,6 +302,7 @@ export default function Search() {
   }
 
   function openFilter(f) {
+    if (f === 'star' && !CAIBEI) return;
     if ((f === 'price' || f === 'star') && famKind !== 'stay') return;
     setFs(f);
   }
@@ -426,7 +430,7 @@ export default function Search() {
             <span className="ch">{channelChip(p)}</span>
           </div>
           <div className="meta">
-            {fam === 'stay' && p.rating_status === 'passed' && r.stars ? (
+            {fam === 'stay' && CAIBEI && p.rating_status === 'passed' && r.stars ? (
               <>
                 <span className="sc">★{r.stars}</span>
                 <i style={{ fontStyle: 'normal', opacity: 0.55 }}>{channelChip(p)}</i>
@@ -563,7 +567,9 @@ export default function Search() {
       </div>
 
       <div className="fbar">
-        {['dist', 'price', 'star', 'sort'].map((f) => {
+        {['dist', 'price', 'star', 'sort']
+          .filter((f) => f !== 'star' || CAIBEI)
+          .map((f) => {
           const dis = f !== 'dist' && f !== 'sort' && famKind !== 'stay';
           return (
             <button
@@ -580,9 +586,11 @@ export default function Search() {
       </div>
 
       <div className="countline">
+        {/* 城市选择暂隐：沿用首页/URL 城市，不在找房页切换
         <button type="button" className="city-chip" onClick={() => setSheetCity(true)}>
           {cityName} ▾
         </button>
+        */}
         <span>
           {err ? (
             err
@@ -629,6 +637,7 @@ export default function Search() {
             当前城市「{cityName}」暂无符合条件的{SEG_BY[seg].label}房源
             {kw ? ' · 换个关键词或筛选试试' : ''}
             {guiyangHint ? ' · 旅居房源目前集中在贵阳' : ''}
+            {/* 城市切换入口暂隐
             <br />
             {guiyangHint ? (
               <button type="button" className="go-btn" onClick={() => pickCity('贵阳')}>
@@ -639,6 +648,7 @@ export default function Search() {
                 切换城市
               </button>
             )}
+            */}
           </div>
         ) : (
           rows.map(renderCard)
@@ -678,7 +688,7 @@ export default function Search() {
         </div>
       ) : null}
 
-      <CitySheet open={sheetCity} city={city} onClose={() => setSheetCity(false)} onPick={pickCity} allowProvince={false} />
+      {/* <CitySheet open={sheetCity} city={city} onClose={() => setSheetCity(false)} onPick={pickCity} allowProvince={false} /> */}
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import AuthGate from '../components/AuthGate.jsx';
 import {
   authMe,
   bookingContacts,
@@ -16,7 +15,12 @@ import {
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, priceParts, unitNight } from '../lib/price.js';
 import { mdWeek, nightCount, nightsBetween, rangeMonths, sumRange, mds, WK } from '../lib/stay.js';
+import { featureEnabled } from '../lib/features.js';
 import '../styles/booking.css';
+
+const COVER_FALLBACK = '/assets/lvju/xijiang-night.jpg';
+const TIMER_IC = '/assets/lvju/icons/booking-timer.png';
+const CAIBEI = featureEnabled('caibei');
 
 function asArr(v) {
   if (Array.isArray(v)) return v;
@@ -160,7 +164,24 @@ function BookingInner() {
   const curUnit = units.find((u) => u.id === Number(unitId));
   const minNights = curUnit?.min_stay_nights || p?.min_stay_nights || 15;
   const perNight = curUnit ? unitNight(curUnit) : priceParts(p || {}).value || 0;
-  const cancelText = curUnit?.cancel_policy_text || '';
+  const cancelText = unitId
+    ? curUnit?.cancel_policy_text || ''
+    : '整栋预订未指定房型 · 未开通免费取消，提交后不可取消';
+  const rating =
+    typeof p?.rating === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(p.rating) || {};
+          } catch {
+            return {};
+          }
+        })()
+      : p?.rating || {};
+  const starLine =
+    CAIBEI && p?.rating_status === 'passed' && rating.stars
+      ? '★ ' + rating.stars + ' 星 · 已评级'
+      : '精选房源';
+  const coverSrc = assetUrl(p?.cover_image) || COVER_FALLBACK;
 
   useEffect(() => {
     if (!checkin || !checkout || !id || noBook) return;
@@ -196,6 +217,10 @@ function BookingInner() {
   const n = nightCount(checkin, checkout);
   const nightList = nightsBetween(checkin, checkout);
   const range = sumRange(nightList, nightMap, perNight);
+  const stayNote =
+    n >= 1 && n < minNights
+      ? `⚠ 该房源须连续入住 ≥ ${minNights} 晚，当前 ${n} 晚`
+      : `旅居房源须连续入住 · 连住 ${minNights} 晚起`;
   const maxRooms = useMemo(() => {
     const qty = curUnit ? parseInt(curUnit.total_qty, 10) || 1 : 1;
     const min = range.minRemaining;
@@ -356,7 +381,7 @@ function BookingInner() {
 
   if (loading) {
     return (
-      <div className="bk">
+      <div className="booking-page">
         <div className="bk-pad muted">加载中…</div>
       </div>
     );
@@ -364,7 +389,7 @@ function BookingInner() {
 
   if (noBook && p) {
     return (
-      <div className="bk">
+      <div className="booking-page">
         <div className="nobook">
           <div className="ic">📞</div>
           <div className="t">{p.name} · 仅支持电话咨询</div>
@@ -380,7 +405,7 @@ function BookingInner() {
 
   if (ok) {
     return (
-      <div className="bk">
+      <div className="booking-page">
         <div className="steps">
           <span className="st on">
             <span className="n">1</span>预定下单
@@ -431,7 +456,7 @@ function BookingInner() {
   }
 
   return (
-    <div className="bk">
+    <div className="booking-page">
       <div className="steps">
         <span className="st on">
           <span className="n">1</span>预定下单
@@ -465,15 +490,11 @@ function BookingInner() {
       </div>
 
       <div className="minihouse">
-        <div
-          className="th"
-          style={
-            p?.cover_image ? { backgroundImage: `url(${assetUrl(p.cover_image)})` } : undefined
-          }
-        />
+        <div className="th" style={{ backgroundImage: `url(${coverSrc})` }} />
         <div className="mi">
           <div className="nm">{p?.name || '—'}</div>
           <div className="meta">{p?.address || ''}</div>
+          <div className="st">{starLine}</div>
         </div>
       </div>
 
@@ -498,12 +519,17 @@ function BookingInner() {
           修改
         </Link>
       </div>
-      <div className="note warn">
-        {n >= 1 && n < minNights
-          ? `⚠ 该房源须连续入住 ≥ ${minNights} 晚，当前 ${n} 晚`
-          : `总价按商家逐晚实价合计 × 间数 · 连住 ${minNights} 晚起`}
+      <div className="bfield note-row warn">
+        <span className="l">{stayNote}</span>
       </div>
-      {cancelText ? <div className="note muted">{cancelText}</div> : null}
+      {cancelText ? (
+        <div className="bfield note-row muted">
+          <span className="l">
+            <img className="ic-timer" src={TIMER_IC} alt="" width="12" height="12" />
+            退改：{cancelText}
+          </span>
+        </div>
+      ) : null}
 
       <div className="bfield">
         <span className="l">房型</span>
@@ -671,7 +697,7 @@ export default function Booking() {
   const resume = (sp.get('order_no') || '').trim();
   if (!id && !resume) {
     return (
-      <div className="bk">
+      <div className="booking-page">
         <div className="berr">未指定房源 · 请从详情页进入预订</div>
         <div className="bk-pad">
           <Link to="/search">← 去找房</Link>
@@ -679,9 +705,5 @@ export default function Booking() {
       </div>
     );
   }
-  return (
-    <AuthGate title="预订需要先登录">
-      <BookingInner />
-    </AuthGate>
-  );
+  return <BookingInner />;
 }

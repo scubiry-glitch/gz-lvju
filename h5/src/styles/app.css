@@ -252,13 +252,13 @@
   display: block;
 }
 
-.cs-mask {
+.csheet .cs-mask {
   position: absolute;
   inset: 0;
   background: rgba(8, 18, 16, 0.45);
 }
 
-.cs-panel {
+.csheet .cs-panel {
   position: absolute;
   left: 0;
   right: 0;
@@ -268,7 +268,7 @@
   padding: 15px 16px max(16px, env(safe-area-inset-bottom));
 }
 
-.cs-h {
+.csheet .cs-h {
   font-size: 14px;
   font-weight: 600;
   color: var(--fg);
@@ -278,27 +278,30 @@
   margin-bottom: 12px;
 }
 
-.cs-x {
+.csheet .cs-x {
   font-size: 12px;
   color: var(--muted);
   padding: 2px 6px;
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 
-.cs-body {
+.csheet .cs-body {
   display: flex;
   gap: 14px;
   max-height: 52vh;
   overflow: hidden;
 }
 
-.cs-prov {
+.csheet .cs-prov {
   flex: 0 0 84px;
   overflow-y: auto;
   border-right: 1px solid var(--border);
   padding-right: 8px;
 }
 
-.cs-prov a {
+.csheet .cs-prov a {
   display: block;
   padding: 9px 6px;
   font-size: 12px;
@@ -306,13 +309,13 @@
   border-radius: 8px;
 }
 
-.cs-prov a.on {
+.csheet .cs-prov a.on {
   color: var(--brand);
   font-weight: 600;
   background: var(--brand-soft);
 }
 
-.cs-cities {
+.csheet .cs-cities {
   flex: 1;
   overflow-y: auto;
   display: grid;
@@ -321,7 +324,7 @@
   align-content: start;
 }
 
-.cs-cities a {
+.csheet .cs-cities a {
   padding: 9px 6px;
   text-align: center;
   font-size: 12px;
@@ -330,8 +333,14 @@
   border-radius: 9px;
 }
 
-.cs-cities a.allp {
+.csheet .cs-cities a.allp {
   color: var(--brand);
   font-weight: 600;
+}
+
+.csheet .cs-cities a.on {
+  color: #fff;
+  font-weight: 600;
+  background: var(--brand);
 }
 

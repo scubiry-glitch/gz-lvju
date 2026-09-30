@@ -4,16 +4,10 @@ import { catalog, pickFeaturedProjects, spots } from '../lib/api.js';
 import { assetUrl } from '../lib/asset.js';
 import { resolveHomeCity, syncCityToUrl, writeStoredCity } from '../lib/city.js';
 import { priceLabel } from '../lib/price.js';
+import { featureEnabled } from '../lib/features.js';
 import CitySheet from '../components/CitySheet.jsx';
 import PrivacyGate from '../components/PrivacyGate.jsx';
 import '../styles/home.css';
-
-function cityHref(path, city) {
-  const [base, qs] = path.split('?');
-  const p = new URLSearchParams(qs || '');
-  p.set('city', city);
-  return base + '?' + p.toString();
-}
 
 function locOf(p, dmap) {
   const d = dmap[p.district_id];
@@ -23,7 +17,7 @@ function locOf(p, dmap) {
 
 function starOf(p) {
   const r = p.rating || {};
-  if (p.rating_status === 'passed' && r.stars) return `★ ${r.stars} 五彩贝旅居`;
+  if (featureEnabled('caibei') && p.rating_status === 'passed' && r.stars) return `★ ${r.stars} 五彩贝旅居`;
   return '精选好房';
 }
 
@@ -135,39 +129,39 @@ export default function Home() {
           <h3>找房·全频道</h3>
         </div>
         <div className="chan">
-          <a className="chan feat" href={cityHref('/lvju-app-lvju.html', city)}>
+          <Link className="chan feat" to={`/lvju?city=${encodeURIComponent(city)}`}>
             <span className="nb">新</span>
             <div className="ic">
               <img src="/assets/lvju/icons/chan-lvju.png?v=14" alt="" />
             </div>
             <b>旅居</b>
             <small>短住·候鸟·康养</small>
-          </a>
-          <a className="chan feat" href={cityHref('/lvju-app-minsu.html', city)}>
+          </Link>
+          <Link className="chan feat" to={`/minsu?city=${encodeURIComponent(city)}`}>
             <div className="ic">
               <img src="/assets/lvju/icons/chan-minsu.png?v=15" alt="" />
             </div>
             <b>民宿</b>
             <small>整栋·庭院·管家</small>
-          </a>
-          <a className="chan feat" href={cityHref('/lvju-app-changzu.html', city)}>
+          </Link>
+          <Link className="chan feat" to={`/changzu?city=${encodeURIComponent(city)}`}>
             <span className="nb">新</span>
             <div className="ic">
               <img src="/assets/lvju/icons/chan-changzu.png?v=14" alt="" />
             </div>
             <b>长租</b>
             <small>整租·合租·月付</small>
-          </a>
-          <a className="chan" href={cityHref('/lvju-app-guide.html', city)}>
+          </Link>
+          <Link className="chan" to={`/guide?city=${encodeURIComponent(city)}`}>
             <div className="ic">
               <img src="/assets/lvju/icons/chan-guide.png?v=14" alt="" />
             </div>
             <b>置业导购</b>
             <small>看房·测算</small>
-          </a>
+          </Link>
         </div>
 
-        <a className="feature" href={cityHref('/lvju-app-routes.html', city)}>
+        <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
           <div className="fbg" />
           <div className="fin">
             <div className="fk">Editor&apos;s Pick · 旅居周刊</div>
@@ -178,7 +172,7 @@ export default function Home() {
             </h4>
             <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
           </div>
-        </a>
+        </Link>
 
         <div className="seg-h" style={{ marginTop: 24 }}>
           <span className="bar" />
@@ -192,27 +186,27 @@ export default function Home() {
             <b>旅游景点</b>
             <small>必打卡</small>
           </Link>
-          <a href={cityHref('/lvju-app-routes.html', city)}>
+          <Link to={`/routes?city=${encodeURIComponent(city)}`}>
             <div className="ic">
               <img src="/assets/lvju/icons/svc-routes.png?v=9" alt="" />
             </div>
             <b>旅游路线</b>
             <small>精选行程</small>
-          </a>
-          <a href={cityHref('/lvju-app-food.html', city)}>
+          </Link>
+          <Link to={`/food?city=${encodeURIComponent(city)}`}>
             <div className="ic">
               <img src="/assets/lvju/icons/svc-food.png?v=9" alt="" />
             </div>
             <b>旅游美食</b>
             <small>本地味道</small>
-          </a>
-          <a href={cityHref('/lvju-app-convenience.html', city)}>
+          </Link>
+          <Link to={`/convenience?city=${encodeURIComponent(city)}`}>
             <div className="ic">
               <img src="/assets/lvju/icons/svc-convenience.png?v=9" alt="" />
             </div>
             <b>旅游便民</b>
             <small>出行·向导</small>
-          </a>
+          </Link>
         </div>
 
         {!postsHide ? (
@@ -228,7 +222,7 @@ export default function Home() {
                 </div>
               ) : (
                 posts.map((s) => (
-                  <a key={s.id} className="postcard" href={`/lvju-app-spot-post.html?id=${s.id}`}>
+                  <Link key={s.id} className="postcard" to={`/spot/${s.id}`}>
                     <div
                       className="pic"
                       style={{
@@ -241,7 +235,7 @@ export default function Home() {
                       <b>{s.name}</b>
                       <p>{s.summary || ''}</p>
                     </div>
-                  </a>
+                  </Link>
                 ))
               )}
             </div>

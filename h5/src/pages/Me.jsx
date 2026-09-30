@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ensureBeikeSession, maskPhone } from '../lib/auth.js';
-import AuthGate from '../components/AuthGate.jsx';
 import {
   BASE_TYPES,
   CUSTOM_EMOJIS,
@@ -12,8 +11,10 @@ import {
   listRepairs,
   saveCustomType,
 } from '../lib/repairs.js';
+import { featureEnabled } from '../lib/features.js';
 import '../styles/me.css';
 
+const CAIBEI = featureEnabled('caibei');
 const ME_PHONE = '138****6688';
 const DEFAULT_400 = '400-900-6688';
 const OPEN_ST = ['pending', 'dispatched', 'accepted', 'serving'];
@@ -41,11 +42,7 @@ function Chevron() {
 }
 
 export default function Me() {
-  return (
-    <AuthGate title="登录后进入「我的」">
-      <MeBody />
-    </AuthGate>
-  );
+  return <MeBody />;
 }
 
 function MeBody() {
@@ -204,6 +201,7 @@ function MeBody() {
               <Chevron />
             </span>
           </button>
+          {CAIBEI ? (
           <a className="menu-row" href="/lvju-rating-standard.html">
             <span className="left">
               <span className="ic">
@@ -215,6 +213,7 @@ function MeBody() {
               <Chevron />
             </span>
           </a>
+          ) : null}
         </div>
       </div>
 

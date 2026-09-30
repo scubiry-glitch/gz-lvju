@@ -1,41 +1,68 @@
 import { useEffect, useState } from 'react';
-import { ensureBeikeSession, isLoggedIn, jumpToLogin } from '../lib/auth.js';
-import { tenantLogin } from '../lib/api.js';
+import { isLoggedIn, jumpToLogin, morphCookieLikely, ensureBeikeSession } from '../lib/auth.js';
+import { authMe, tenantLogin } from '../lib/api.js';
+import { AuthUserContext } from '../lib/auth-context.js';
+
+function pickUser(me, beike) {
+  const a = me && me.account;
+  if (a) {
+    return {
+      id: a.id,
+      display_name: a.display_name || a.login_name || '',
+      phone: a.phone || '',
+      login_name: a.login_name || '',
+    };
+  }
+  if (beike && beike.ok) {
+    return {
+      id: beike.uid || '',
+      display_name: beike.display_name || beike.login_name || '',
+      phone: beike.phone || '',
+      phone_masked: beike.phone_masked || '',
+    };
+  }
+  return null;
+}
+
+async function loadUser() {
+  const beike = await ensureBeikeSession().catch(() => null);
+  let me = null;
+  try {
+    me = await authMe();
+  } catch {
+    /* 401 / 无会话 */
+  }
+  return pickUser(me, beike);
+}
 
 /**
- * 订单 / 我的：未登录强制 Morph；浏览器非 *.ke.com 回跳拿不到票时可用密码兜底。
+ * 强制登录闸 + 拉用户资料进 Context。
+ * 清单在 App.jsx RequireAuth 子路由；页面用 useAuthUser()。
  */
 export default function AuthGate({ children, title = '登录后继续' }) {
-  const [phase, setPhase] = useState('boot'); // boot | login | ok
+  const [phase, setPhase] = useState(() => (isLoggedIn() ? 'load' : 'login')); // load | login | ok
+  const [user, setUser] = useState(null);
   const [phone, setPhone] = useState('');
   const [pwd, setPwd] = useState('');
   const [err, setErr] = useState('');
-  const [jumping, setJumping] = useState(false);
+  const canMorph = morphCookieLikely();
 
   useEffect(() => {
+    if (phase !== 'load') return;
     let alive = true;
-    let timer;
-    (async () => {
-      if (isLoggedIn()) {
-        await ensureBeikeSession().catch(() => null);
-        if (!alive) return;
-        if (isLoggedIn()) {
-          setPhase('ok');
-          return;
-        }
-      }
+    loadUser().then((u) => {
       if (!alive) return;
-      setPhase('login');
-      setJumping(true);
-      timer = setTimeout(() => {
-        if (alive) jumpToLogin(location.href);
-      }, 120);
-    })();
+      if (!isLoggedIn()) {
+        setPhase('login');
+        return;
+      }
+      setUser(u);
+      setPhase('ok');
+    });
     return () => {
       alive = false;
-      clearTimeout(timer);
     };
-  }, []);
+  }, [phase]);
 
   async function onPwd() {
     setErr('');
@@ -53,21 +80,28 @@ export default function AuthGate({ children, title = '登录后继续' }) {
           /* ignore */
         }
       }
-      setPhase('ok');
+      setUser(
+        pickUser(null, {
+          ok: true,
+          display_name: j.display_name || '',
+          phone: phone,
+          phone_masked: j.phone_masked || '',
+        }),
+      );
+      setPhase('load');
     } catch (e) {
       setErr(e.message || '登录失败');
     }
   }
 
-  if (phase === 'ok') return children;
+  if (phase === 'ok') {
+    return <AuthUserContext.Provider value={{ user }}>{children}</AuthUserContext.Provider>;
+  }
 
-  if (phase === 'boot') {
+  if (phase === 'load') {
     return (
       <div className="auth-gate">
-        <div className="pt">正在同步贝壳登录…</div>
-        <p className="ps" style={{ margin: 0 }}>
-          请稍候
-        </p>
+        <div className="pt">加载中…</div>
       </div>
     );
   }
@@ -76,20 +110,15 @@ export default function AuthGate({ children, title = '登录后继续' }) {
     <div className="auth-gate">
       <div className="pt">{title}</div>
       <p className="ps">
-        {jumping
-          ? '正在跳转贝壳登录…若未自动跳转，请点下方按钮；本地域名回跳拿不到票可用密码'
-          : '需登录后查看。默认贝壳 Morph；拿不到票时可用密码登录'}
+        {canMorph
+          ? '需登录后继续；可用贝壳登录，或手机号密码（首次即注册）'
+          : '需登录后继续；当前域名回跳拿不到贝壳票，请用手机号密码登录（首次即注册）'}
       </p>
-      <button
-        type="button"
-        className="btn"
-        onClick={() => {
-          setJumping(true);
-          jumpToLogin(location.href);
-        }}
-      >
-        贝壳 Morph 登录
-      </button>
+      {canMorph ? (
+        <button type="button" className="btn" onClick={() => jumpToLogin(location.href)}>
+          贝壳登录
+        </button>
+      ) : null}
       <div className="row">
         <input
           value={phone}
@@ -106,20 +135,10 @@ export default function AuthGate({ children, title = '登录后继续' }) {
           style={{ flex: 1.4 }}
         />
       </div>
-      <button type="button" className="btn soft" onClick={onPwd}>
+      <button type="button" className={'btn' + (canMorph ? ' soft' : '')} onClick={onPwd}>
         密码登录 / 注册
       </button>
       {err ? <div className="err">{err}</div> : null}
     </div>
   );
-}
-
-/** Tab「订单 / 我的」未登录拦截 → Morph，回跳目标为对应 /h5 路径 */
-export function guardAuthTab(e, path) {
-  if (isLoggedIn()) return false;
-  e.preventDefault();
-  const base = (import.meta.env.BASE_URL || '/h5/').replace(/\/?$/, '');
-  const dest = location.origin + base + (path.startsWith('/') ? path : '/' + path);
-  jumpToLogin(dest);
-  return true;
 }

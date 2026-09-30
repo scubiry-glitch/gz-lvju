@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import TabBar from './TabBar.jsx';
 
-const HIDE_TAB = [/^\/detail/, /^\/booking/, /^\/pay/, /^\/paid/, /^\/ticket/];
+const HIDE_TAB = [/^\/detail/, /^\/booking/, /^\/pay/, /^\/paid/, /^\/ticket/, /^\/spot\//];
 
 export default function AppShell() {
   const { pathname } = useLocation();
