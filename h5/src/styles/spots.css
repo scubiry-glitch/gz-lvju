@@ -1,0 +1,222 @@
+/* 内容/周边玩法 — 对齐 lvju-app-spots.html */
+.spots-page .hero-sm {
+  position: relative;
+  color: #fff;
+  padding: 56px 20px 28px;
+  overflow: hidden;
+}
+
+.spots-page .hero-sm .bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: url(/assets/lvju/wanfenglin.jpg) center / cover;
+}
+
+.spots-page .hero-sm .bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 18, 16, 0.35), rgba(8, 18, 16, 0.55) 60%, #f5f7f6);
+}
+
+.spots-page .hero-sm .in {
+  position: relative;
+  z-index: 2;
+}
+
+.spots-page .hero-sm .ek {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  line-height: 14px;
+  opacity: 0.95;
+}
+
+.spots-page .hero-sm h1 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 30px;
+  letter-spacing: 0.04em;
+  margin: 8px 0 0;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
+}
+
+.spots-page .hero-sm p {
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  line-height: 18px;
+  opacity: 0.92;
+  margin: 8px 0 0;
+  max-width: 32ch;
+}
+
+.spots-page .filt {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 16px 8px;
+}
+
+.spots-page .filt::-webkit-scrollbar {
+  height: 0;
+}
+
+.spots-page .filt a {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.spots-page .filt a.on {
+  background: var(--brand);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.spots-page .wrap {
+  padding: 4px 16px 8px;
+}
+
+.spots-page .empty {
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.spots-page .empty a {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.spots-page .spot {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  height: 148px;
+  color: #fff;
+  margin-bottom: 12px;
+  box-shadow: 0 0 10px rgba(17, 123, 115, 0.1);
+  display: block;
+}
+
+.spots-page .spot .bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-color: #0c4d44;
+}
+
+.spots-page .spot .bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.55), transparent 58%);
+}
+
+.spots-page .spot .lv {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.spots-page .spot .in {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 2;
+}
+
+.spots-page .spot .nm {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.spots-page .spot .meta {
+  font-size: 11px;
+  opacity: 0.9;
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-weight: 400;
+}
+
+.spots-page .banner {
+  margin: 14px 16px 20px;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  background: linear-gradient(110deg, #0f766e, #15a69b);
+  box-shadow: 0 0 10px rgba(17, 123, 115, 0.14);
+}
+
+.spots-page .banner .bi {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.spots-page .banner .bt {
+  flex: 1;
+  min-width: 0;
+}
+
+.spots-page .banner .bt b {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+}
+
+.spots-page .banner .bt p {
+  margin: 3px 0 0;
+  font-size: 11px;
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+.spots-page .banner .go {
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 7px 12px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  color: #fff;
+}

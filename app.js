@@ -217,7 +217,60 @@ function isPublicStatic(urlPath) {
   if (parts.some(isSensitivePart)) return false;
   if (parts.length === 1 && ROOT_BLOCKED_FILES.has(parts[0].toLowerCase())) return false;
   if (parts[0] === 'node_modules' || parts[0] === 'scripts' || parts[0] === '.git' || parts[0] === 'commerce') return false;
+  // React C 端源码/依赖不走通用静态根；成品由 serveH5Spa 从 h5/dist 挂 /h5/*
+  if (parts[0] === 'h5' && (parts[1] === 'src' || parts[1] === 'node_modules' || parts[1] === 'public')) return false;
   return true;
+}
+
+/** C 端 React SPA：/h5 → h5/dist，未知路径回落 index.html（不删 lvju-app-*.html） */
+function serveH5Spa(rawPath, res) {
+  const dist = path.join(ROOT, 'h5', 'dist');
+  const relRaw = String(rawPath || '').replace(/^\/h5\/?/, '') || 'index.html';
+  const rel = path.posix.normalize('/' + relRaw).replace(/^\/+/, '') || 'index.html';
+  if (rel.split('/').some((p) => p === '..')) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+  const candidate = path.resolve(dist, rel);
+  if (candidate !== dist && !candidate.startsWith(dist + path.sep)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+  const sendFile = (filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(500);
+        res.end('Internal Server Error');
+        return;
+      }
+      const headers = { 'Content-Type': contentType };
+      if (ext === '.html') headers['Cache-Control'] = 'no-cache';
+      else if (ext === '.js' || ext === '.css' || ext === '.woff2' || ext === '.webp' || ext === '.png' || ext === '.jpg' || ext === '.svg') {
+        headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+      }
+      res.writeHead(200, headers);
+      res.end(data);
+    });
+  };
+  fs.stat(candidate, (err, st) => {
+    if (!err && st.isFile()) {
+      sendFile(candidate);
+      return;
+    }
+    const indexPath = path.join(dist, 'index.html');
+    fs.stat(indexPath, (err2, st2) => {
+      if (err2 || !st2.isFile()) {
+        res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('H5 not built. Run: npm run h5:build');
+        return;
+      }
+      sendFile(indexPath);
+    });
+  });
 }
 
 function expectedApiKey() {
@@ -7949,6 +8002,11 @@ const server = http.createServer((req, res) => {
   // /api/auth/* —— 账号中心登录/登出/身份（handleApiDirect 之外的独立轻路由）
   if (rawPath.startsWith('/api/auth')) {
     return handleAuthRoutes(rawPath, qs, req, res);
+  }
+
+  // React C 端 SPA（与 lvju-app-*.html 并存；源码在 h5/，成品 h5/dist）
+  if (rawPath === '/h5' || rawPath.startsWith('/h5/')) {
+    return serveH5Spa(rawPath, res);
   }
 
   if (!isPublicStatic(rawPath)) {

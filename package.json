@@ -4,6 +4,8 @@
   "description": "新居住服务平台",
   "main": "app.js",
   "scripts": {
+    "h5:dev": "npm --prefix h5 run dev",
+    "h5:build": "npm --prefix h5 run build",
     "commerce:dev": "node commerce/server.cjs",
     "commerce:test": "node --test scripts/commerce/domain.test.cjs scripts/commerce/http.test.cjs",
     "build:android": "npx cap sync android",

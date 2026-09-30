@@ -1,0 +1,69 @@
+:root {
+  --surface: #ffffff;
+  --fg: #222222;
+  --muted: #6b7785;
+  --border: #e7ece9;
+  --brand: #0f766e;
+  --brand-deep: #0b5d56;
+  --brand-2: #14b8a6;
+  --tab: #15a69b;
+  --brand-soft: #e6f5f1;
+  --page: #f5f7f6;
+  --ph: #9e9e9e;
+  --gold: #ac8942;
+  --ink: #222222;
+  --font: -apple-system, 'PingFang SC', 'PingFangSC-Regular', 'Helvetica Neue', sans-serif;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: #0b0f12;
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+}
+
+/* 对齐 html 页 .app：作为 body flex 子项必须自带 width，否则会按内容收缩（曾缩到 ~362px） */
+#root {
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
