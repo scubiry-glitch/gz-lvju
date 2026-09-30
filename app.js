@@ -343,32 +343,42 @@ function verifyVendorLoginToken(token) {
   return { role: 'vendor', vendorId: vid };
 }
 
+/** 账号主体 → 业务会话形态（platform / vendor / user）。入口闸已挂 req.principal 时可复用，避免再打 principalOf。 */
+function sessionFromPrincipal(principal) {
+  if (!principal || principal.type !== 'account') return null;
+  const perms = authCenter.permissionsOf(principal);
+  // 真平台主体：'*' 全权，或（无商家/机构绑定的）平台管理读账号。
+  // 有 vendor_id 的账号即使带 admin.read（如 operator_admin）也按 vendor 归属隔离，
+  // 防止运营商账号借管理读权限看到全部项目。
+  const isTruePlatform = perms.has('*') ||
+    (perms.has(authCenter.P.ADMIN_READ) && !principal.account.vendor_id && !principal.account.org_id);
+  if (isTruePlatform) {
+    return { role: 'platform', account: principal.account, roles: principal.roles, principal };
+  }
+  if (principal.account.vendor_id) {
+    return { role: 'vendor', vendorId: principal.account.vendor_id, account: principal.account, roles: principal.roles, principal };
+  }
+  // 其余账号角色（user 租客等）→ 登录用户
+  // 有机构绑定的管理读账号（gov/bank/holding 等）此前有一段死代码「升格 platform」，已不可达；
+  // 写权限仍由 requirePerm 收紧，读侧按 user 不放大数据面。
+  return { role: 'user', account: principal.account, roles: principal.roles, principal };
+}
+
 // 统一会话：vendor token 最先判定（token 自证，纯函数无共享状态，杜绝被误判为 platform），
 // 其次账号中心主体，再次 admin 会话/全局 Key（过渡）
 async function requestSession(req) {
   const vtok = verifyVendorLoginToken(extractBearerToken(req));
   if (vtok) return vtok;
+  // 入口闸（requireApiKey / requirePerm 等）已解析过则复用，少一次远程 sessions+账号查询
+  if (req && req.principal && req.principal.type === 'account') {
+    return sessionFromPrincipal(req.principal);
+  }
   try {
     const principal = await authCenter.principalOf(req);
-    if (principal && principal.type === 'account') {
-      const perms = authCenter.permissionsOf(principal);
-      // 真平台主体：'*' 全权，或（无商家/机构绑定的）平台管理读账号。
-      // 有 vendor_id 的账号即使带 admin.read（如 operator_admin）也按 vendor 归属隔离，
-      // 防止运营商账号借管理读权限看到全部项目。
-      const isTruePlatform = perms.has('*') ||
-        (perms.has(authCenter.P.ADMIN_READ) && !principal.account.vendor_id && !principal.account.org_id);
-      if (isTruePlatform) {
-        return { role: 'platform', account: principal.account, roles: principal.roles, principal };
-      }
-      if (principal.account.vendor_id) {
-        return { role: 'vendor', vendorId: principal.account.vendor_id, account: principal.account, roles: principal.roles, principal };
-      }
-      // 其余账号角色（user 租客等）→ 登录用户
-      return { role: 'user', account: principal.account, roles: principal.roles, principal };
-      if (perms.has(authCenter.P.ADMIN_READ)) {
-        // 有机构绑定的管理读账号（gov/bank/holding 等）：读按平台，写仍由权限闸收紧
-        return { role: 'platform', account: principal.account, roles: principal.roles, principal };
-      }
+    const sess = sessionFromPrincipal(principal);
+    if (sess) {
+      if (req) req.principal = principal; // 后续同请求可再复用
+      return sess;
     }
   } catch (_) { /* 账号库暂不可用时退回旧通道 */ }
   // 兜底仅限旧式 admin token（账号中心之前的会话）。

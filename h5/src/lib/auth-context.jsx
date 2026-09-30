@@ -1,16 +1,33 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { ensureBeikeSession, isLoggedIn } from './auth.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ensureBeikeSession, isLoggedIn, jumpToLogin } from './auth.js';
 import { authMe } from './api.js';
 
 export const AuthUserContext = createContext({
   user: null,
   ready: false,
+  loggedIn: false,
   refresh: async () => null,
   setUser: () => {},
+  clearSession: () => {},
+  goLogin: () => {},
 });
 
 export function useAuthUser() {
   return useContext(AuthUserContext);
+}
+
+/** 未登录则 jumpToLogin → clogin；已登录返回 false 供调用方继续业务 */
+export function useRequireLogin() {
+  const { ready, loggedIn, goLogin } = useAuthUser();
+  return useCallback(
+    (next) => {
+      if (!ready) return true; // 仍在暖身份：先拦住点击
+      if (loggedIn) return false;
+      goLogin(next);
+      return true;
+    },
+    [ready, loggedIn, goLogin],
+  );
 }
 
 function pickUser(me, beike) {
@@ -34,6 +51,15 @@ function pickUser(me, beike) {
   return null;
 }
 
+function clearLocalTokens() {
+  try {
+    localStorage.removeItem('BJZ_TOKEN');
+    localStorage.removeItem('BZF_SESSION_TOKEN');
+  } catch {
+    /* ignore */
+  }
+}
+
 /** 壳层启动即暖身份：有票先 /auth/me，贝壳换票并行不挡页面 */
 export async function loadAuthUser() {
   const beikeP = ensureBeikeSession().catch(() => null);
@@ -54,10 +80,24 @@ export async function loadAuthUser() {
   return pickUser(me, beike);
 }
 
-/** 挂在 AppShell：首页进站就知道是谁，订单/我的直接读 Context */
+function loginNextPath(next) {
+  const raw = next == null || next === '' ? location.pathname + location.search : String(next);
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const path = raw.startsWith('/') ? raw : '/' + raw;
+  // BrowserRouter basename=/h5
+  return location.origin + '/h5' + path;
+}
+
+/** 挂在 AppShell：首页进站就知道是谁；点击侧用 goLogin / useRequireLogin */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(() => !isLoggedIn());
+
+  const clearSession = useCallback(() => {
+    clearLocalTokens();
+    setUser(null);
+    setReady(true);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!isLoggedIn()) {
@@ -67,6 +107,12 @@ export function AuthProvider({ children }) {
     }
     try {
       const u = await loadAuthUser();
+      if (!u) {
+        // 本地有票但服务端不认 → 清掉，避免假登录
+        clearLocalTokens();
+        setUser(null);
+        return null;
+      }
       setUser(u);
       return u;
     } catch {
@@ -76,11 +122,29 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const goLogin = useCallback((next) => {
+    const ret = next == null || next === '' ? location.pathname + location.search : String(next);
+    const nextQ = ret.startsWith('/') ? ret : '/' + ret.replace(/^\//, '');
+    // 一律 Morph clogin（App 走原生）；不进 /h5/login、不落页内密码卡
+    jumpToLogin(loginNextPath(nextQ));
+  }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return (
-    <AuthUserContext.Provider value={{ user, ready, refresh, setUser }}>{children}</AuthUserContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      ready,
+      loggedIn: !!user,
+      refresh,
+      setUser,
+      clearSession,
+      goLogin,
+    }),
+    [user, ready, refresh, clearSession, goLogin],
   );
+
+  return <AuthUserContext.Provider value={value}>{children}</AuthUserContext.Provider>;
 }

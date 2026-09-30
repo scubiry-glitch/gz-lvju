@@ -1,4 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
+import { useRequireLogin } from '../lib/auth-context.jsx';
 
 const TABS = [
   { to: '/', end: true, label: '首页', on: '/assets/lvju/icons/tab-home-on.svg', off: '/assets/lvju/icons/tab-home-off.svg' },
@@ -16,13 +17,26 @@ const TABS = [
     on: '/assets/lvju/icons/tab-content-on.svg',
     off: '/assets/lvju/icons/tab-content-off.svg',
   },
-  /* 鉴权在 RequireAuth layout，Tab 直接进页 */
-  { to: '/orders', label: '订单', on: '/assets/lvju/icons/tab-orders-on.svg', off: '/assets/lvju/icons/tab-orders-off.svg' },
-  { to: '/me', label: '我的', on: '/assets/lvju/icons/tab-me-on.svg', off: '/assets/lvju/icons/tab-me-off.svg' },
+  {
+    to: '/orders',
+    label: '订单',
+    needAuth: true,
+    on: '/assets/lvju/icons/tab-orders-on.svg',
+    off: '/assets/lvju/icons/tab-orders-off.svg',
+  },
+  {
+    to: '/me',
+    label: '我的',
+    needAuth: true,
+    on: '/assets/lvju/icons/tab-me-on.svg',
+    off: '/assets/lvju/icons/tab-me-off.svg',
+  },
 ];
 
 export default function TabBar() {
   const { pathname } = useLocation();
+  const requireLogin = useRequireLogin();
+
   return (
     <nav className="tabbar" aria-label="主导航">
       {TABS.map((t) => {
@@ -33,6 +47,10 @@ export default function TabBar() {
             to={t.to}
             end={t.end}
             className={({ isActive }) => ((active != null ? active : isActive) ? 'on' : undefined)}
+            onClick={(e) => {
+              if (!t.needAuth) return;
+              if (requireLogin(t.to)) e.preventDefault();
+            }}
           >
             {({ isActive }) => {
               const on = active != null ? active : isActive;
