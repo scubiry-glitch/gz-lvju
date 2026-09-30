@@ -60,7 +60,8 @@ function clearLocalTokens() {
   }
 }
 
-/** 壳层启动即暖身份：有票先 /auth/me，贝壳换票并行不挡页面 */
+/** 壳层启动即暖身份：一律探 /api/auth/me（credentials 带 Cookie，含 HttpOnly）；
+ *  可读 lianjia_token 时再并行换 BJZ。不得因本地无票就跳过请求。 */
 export async function loadAuthUser() {
   const beikeP = ensureBeikeSession().catch(() => null);
   let me = null;
@@ -88,10 +89,10 @@ function loginNextPath(next) {
   return location.origin + '/h5' + path;
 }
 
-/** 挂在 AppShell：首页进站就知道是谁；点击侧用 goLogin / useRequireLogin */
+/** 挂在 AppShell：首页进站就探身份；点击侧用 goLogin / useRequireLogin */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [ready, setReady] = useState(() => !isLoggedIn());
+  const [ready, setReady] = useState(false);
 
   const clearSession = useCallback(() => {
     clearLocalTokens();
@@ -100,16 +101,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!isLoggedIn()) {
-      setUser(null);
-      setReady(true);
-      return null;
-    }
     try {
       const u = await loadAuthUser();
       if (!u) {
-        // 本地有票但服务端不认 → 清掉，避免假登录
-        clearLocalTokens();
+        // 本地有票但服务端不认 → 清 BJZ，避免假登录；无本地票则只标未登录
+        if (isLoggedIn()) clearLocalTokens();
         setUser(null);
         return null;
       }
