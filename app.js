@@ -6785,7 +6785,9 @@ async function handleApiDirect(urlPath, qs, req, res) {
       if (m && req.method === 'POST') {
         if (!(await requireApiKey(req, res))) return;
         const code = decodeURIComponent(m[1]);
-        const idMatch = code.match(/-(\d+)$/);
+        // 与公开 GET /ratings/:code 同口径：<前缀>-{id} 或纯数字（含补零）都按 id——
+        // b-listing-mgmt 老链接在项目无 rating code 时回退 p.id，纯数字不应 400 invalid code
+        const idMatch = code.match(/-(\d+)$/) || code.match(/^0*(\d+)$/);
         if (!idMatch) return jsonReply(res, { error: 'invalid code' }, 400);
         const pid = parseInt(idMatch[1]);
         const body = await readBody(req);
