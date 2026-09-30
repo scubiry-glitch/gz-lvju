@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ensureBeikeSession, maskPhone } from '../lib/auth.js';
+import { maskPhone } from '../lib/auth.js';
+import { useAuthUser } from '../lib/auth-context.jsx';
 import {
   BASE_TYPES,
   CUSTOM_EMOJIS,
@@ -46,8 +47,11 @@ export default function Me() {
 }
 
 function MeBody() {
-  const [name, setName] = useState('旅居用户');
-  const [phoneLine, setPhoneLine] = useState('已登录');
+  const { user, ready } = useAuthUser();
+  const name = (user && (user.display_name || user.login_name)) || '';
+  const phoneLine =
+    (user && (user.phone_masked || (user.phone ? maskPhone(user.phone) : ''))) || '';
+  const showProfile = ready && !!user;
   const [sheet, setSheet] = useState(null); // 'ticket' | '400' | null
   const [hotline] = useState(() => get400());
   const [ticketTip, setTicketTip] = useState('报修 · 保洁 · 管家');
@@ -64,18 +68,9 @@ function MeBody() {
 
   const types = useMemo(() => BASE_TYPES.concat(customTypes().map((c) => c.n)), [typeTick]);
 
-  useEffect(() => {
-    ensureBeikeSession().then((j) => {
-      if (j && j.ok) {
-        setName(j.display_name || j.login_name || '旅居用户');
-        setPhoneLine(j.phone_masked || (j.phone ? maskPhone(j.phone) : '已登录'));
-      }
-    });
-  }, []);
-
   const loadMine = useCallback(() => {
     setMineErr('');
-    listRepairs(ME_PHONE)
+    listRepairs(user?.phone || ME_PHONE)
       .then((all) => {
         setMine(all.slice(0, 10));
         const openN = all.filter((o) => OPEN_ST.includes(o.status)).length;
@@ -85,7 +80,7 @@ function MeBody() {
         setMine([]);
         setMineErr('工单加载失败（需访问凭据或登录账号）');
       });
-  }, []);
+  }, [user?.phone]);
 
   function openTicket() {
     setSheet('ticket');
@@ -115,7 +110,7 @@ function MeBody() {
         type: curType,
         desc: desc.trim() || curType + '服务需求',
         house: '我的旅居 · 贵阳',
-        phone: ME_PHONE,
+        phone: user?.phone || ME_PHONE,
         expectTime,
         source: '旅居客 App · 我的',
       });
@@ -131,15 +126,17 @@ function MeBody() {
     <div className="me-page">
       <div className="me-hd">
         <div className="bg" />
-        <div className="u">
-          <div className="av" id="meAv" aria-hidden>
-            <img src="/assets/lvju/me-avatar.png" alt="" />
+        {showProfile ? (
+          <div className="u">
+            <div className="av" id="meAv" aria-hidden>
+              <img src="/assets/lvju/me-avatar.png" alt="" />
+            </div>
+            <div className="ui" id="meUi">
+              <div className="nm">{name}</div>
+              <div className="ph">{phoneLine}</div>
+            </div>
           </div>
-          <div className="ui" id="meUi">
-            <div className="nm">{name}</div>
-            <div className="ph">{phoneLine}</div>
-          </div>
-        </div>
+        ) : null}
       </div>
 
       <div className="me-sec">

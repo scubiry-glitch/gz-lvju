@@ -1,68 +1,18 @@
-import { useEffect, useState } from 'react';
-import { isLoggedIn, jumpToLogin, morphCookieLikely, ensureBeikeSession } from '../lib/auth.js';
-import { authMe, tenantLogin } from '../lib/api.js';
-import { AuthUserContext } from '../lib/auth-context.js';
-
-function pickUser(me, beike) {
-  const a = me && me.account;
-  if (a) {
-    return {
-      id: a.id,
-      display_name: a.display_name || a.login_name || '',
-      phone: a.phone || '',
-      login_name: a.login_name || '',
-    };
-  }
-  if (beike && beike.ok) {
-    return {
-      id: beike.uid || '',
-      display_name: beike.display_name || beike.login_name || '',
-      phone: beike.phone || '',
-      phone_masked: beike.phone_masked || '',
-    };
-  }
-  return null;
-}
-
-async function loadUser() {
-  const beike = await ensureBeikeSession().catch(() => null);
-  let me = null;
-  try {
-    me = await authMe();
-  } catch {
-    /* 401 / 无会话 */
-  }
-  return pickUser(me, beike);
-}
+import { useState } from 'react';
+import { isLoggedIn, jumpToLogin, morphCookieLikely } from '../lib/auth.js';
+import { tenantLogin } from '../lib/api.js';
+import { useAuthUser } from '../lib/auth-context.jsx';
 
 /**
- * 强制登录闸 + 拉用户资料进 Context。
- * 清单在 App.jsx RequireAuth 子路由；页面用 useAuthUser()。
+ * 强制登录闸：只拦未登录。身份由壳层 AuthProvider 已拉好，不再卡「加载中」。
  */
 export default function AuthGate({ children, title = '登录后继续' }) {
-  const [phase, setPhase] = useState(() => (isLoggedIn() ? 'load' : 'login')); // load | login | ok
-  const [user, setUser] = useState(null);
+  const { setUser, refresh } = useAuthUser();
+  const [needLogin, setNeedLogin] = useState(() => !isLoggedIn());
   const [phone, setPhone] = useState('');
   const [pwd, setPwd] = useState('');
   const [err, setErr] = useState('');
   const canMorph = morphCookieLikely();
-
-  useEffect(() => {
-    if (phase !== 'load') return;
-    let alive = true;
-    loadUser().then((u) => {
-      if (!alive) return;
-      if (!isLoggedIn()) {
-        setPhase('login');
-        return;
-      }
-      setUser(u);
-      setPhase('ok');
-    });
-    return () => {
-      alive = false;
-    };
-  }, [phase]);
 
   async function onPwd() {
     setErr('');
@@ -80,31 +30,20 @@ export default function AuthGate({ children, title = '登录后继续' }) {
           /* ignore */
         }
       }
-      setUser(
-        pickUser(null, {
-          ok: true,
-          display_name: j.display_name || '',
-          phone: phone,
-          phone_masked: j.phone_masked || '',
-        }),
-      );
-      setPhase('load');
+      setUser({
+        id: j.account_id || '',
+        display_name: j.display_name || '',
+        phone,
+        phone_masked: j.phone_masked || '',
+      });
+      setNeedLogin(false);
+      refresh();
     } catch (e) {
       setErr(e.message || '登录失败');
     }
   }
 
-  if (phase === 'ok') {
-    return <AuthUserContext.Provider value={{ user }}>{children}</AuthUserContext.Provider>;
-  }
-
-  if (phase === 'load') {
-    return (
-      <div className="auth-gate">
-        <div className="pt">加载中…</div>
-      </div>
-    );
-  }
+  if (!needLogin && isLoggedIn()) return children;
 
   return (
     <div className="auth-gate">
