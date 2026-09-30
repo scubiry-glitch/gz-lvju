@@ -40,4 +40,11 @@ if [ ! -d "node_modules/mysql2" ]; then
   _install_pkg named-placeholders named-placeholders-1.1.6
 fi
 
+# React C 端：成品进 h5/dist，app.js 挂 /h5/*
+if [ -f h5/package.json ]; then
+  echo "Building H5 SPA…"
+  npm --prefix h5 install --no-fund --no-audit
+  npm --prefix h5 run build
+fi
+
 echo "Build complete"
