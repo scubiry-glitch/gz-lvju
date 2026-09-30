@@ -109,7 +109,12 @@ try { channelBrand = require('./channel_brand.cjs'); } catch (_) {}
 let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfigFromDb = null;
-try { loadVendorConfigFromDb = require('./vendor_config.cjs').loadVendorConfigFromDb; } catch (_) {}
+let resetVendorConfigCache = null;
+try {
+  const vendorConfig = require('./vendor_config.cjs');
+  loadVendorConfigFromDb = vendorConfig.loadVendorConfigFromDb;
+  resetVendorConfigCache = vendorConfig.resetVendorConfigCache;
+} catch (_) {}
 let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 
@@ -1115,6 +1120,25 @@ function notifyVendorBooking(vendorId, event, order) {
   })().catch((e) => console.warn('[webhook] notify error:', e.message));
 }
 
+async function runVendorWebhookTest(vendorId) {
+  const conn = await mysql2.createConnection(getDbConfig());
+  let v = null;
+  try {
+    const [rows] = await conn.execute('SELECT webhook_url, hmac_key FROM jz_vendors WHERE id=? LIMIT 1', [vendorId]);
+    v = rows[0] || null;
+  } finally { await conn.end(); }
+  if (!v || !v.webhook_url) return { ok: false, badRequest: true, error: '请先保存 webhook_url' };
+  if (!v.hmac_key) return { ok: false, badRequest: true, error: '商家未配置 hmac_key，无法签名' };
+  const ts = Date.now();
+  const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  const payload = { event: 'webhook.test', vendor_id: vendorId, data };
+  const out = await guardedPostJson(v.webhook_url, {
+    event: payload.event, vendor_id: vendorId, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts),
+  }, 5000);
+  return out.ok ? { ok: true, status: out.status }
+                : { ok: false, error: out.error || ('HTTP ' + out.status), status: out.status || null };
+}
+
 /** 下发商家 webhook（通用事件，2026-09-22 商家诉求 3.2）：签名体 = {event, vendor_id, data}，
  *  同开放接口算法；当前用于 rating.reviewed（评级复核结果）。未配 webhook_url = 不推送。 */
 function notifyVendorEvent(vendorId, event, data) {
@@ -1631,6 +1655,7 @@ const handleAdminRoutes = createAdminRouter({
   stayConfigOf, cancelPolicyOf, cancelPolicyTextOf, minStayNightsOf,
   transactionCapabilitiesOf, wholeHousePriceUnit, unitNightPrice,
   vendorRate, settingValue, vendorApi, notifyVendorEvent,
+  resetVendorConfigCache, runVendorWebhookTest,
   imgThumbs, maskPhoneStd, stripVendorSecrets,
   idpOidc, permRegistry, ADMIN_PREFIX,
   catalogMemoInvalidateAll, catalogMemoInvalidateTopics,
@@ -1698,6 +1723,7 @@ const handleApiDirect = createApiDirectRouter({
   requireAnyPerm,
   requireApiKey,
   requirePerm,
+  resetVendorConfigCache,
   stayCfg,
   stayConfigOf,
   stripContactPhone,

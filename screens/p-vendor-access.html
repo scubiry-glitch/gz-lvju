@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>商家接入配置（webhook/密钥）· 服务认证中台</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --surface:#fff; --fg:#0f172a; --muted:#64748b; --border:#e2e8f0;
+    --accent:#4f46e5; --accent-deep:#3730a3; --accent-soft:#eef2ff;
+    --ok:#16a34a; --warn:#ea580c; --danger:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font-family:system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.6;font-size:14px;}
+  .console{display:grid;grid-template-columns:240px 1fr;min-height:100vh;}
+  .top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;}
+  .crumb{font-size:12.5px;color:var(--muted);} .crumb b{color:var(--fg);}
+  .content{padding:20px 24px;display:grid;grid-template-columns:1fr;gap:16px;align-items:start;}
+  @media (max-width:1023px){ .console{grid-template-columns:1fr;} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .pill{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;background:var(--accent-soft);color:var(--accent-deep);font-weight:600;}
+  .note{font-size:11.5px;color:var(--muted);background:#f8fafc;border:1px dashed var(--border);border-radius:9px;padding:8px 12px;margin-top:10px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media (max-width:700px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+  .kpi{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
+  .kpi b{display:block;font-size:20px;line-height:1.3;} .kpi span{font-size:11.5px;color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{background:#f8fafc;color:#334155;font-weight:600;font-size:11.5px;}
+  tbody tr:hover td{background:var(--accent-soft);}
+  .badge{display:inline-block;font-size:10.5px;border-radius:999px;padding:2px 9px;font-weight:600;}
+  .b-active{background:#e7f6ec;color:#15803d;} .b-suspended{background:#fee2e2;color:#b91c1c;}
+  .b-reviewing{background:#dbeafe;color:#1d4ed8;} .b-approved{background:#e7f6ec;color:#15803d;} .b-rejected{background:#fee2e2;color:#b91c1c;}
+  .b-on{background:#e7f6ec;color:#15803d;} .b-off{background:#f1f5f9;color:#64748b;}
+  .b-warn{background:#fef3c7;color:#92400e;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .chips button{font:inherit;font-size:12.5px;border:1px solid var(--border);background:#fff;border-radius:999px;padding:5px 14px;cursor:pointer;color:var(--muted);}
+  .chips button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  .btn{font:inherit;font-size:12.5px;border:0;border-radius:8px;padding:7px 16px;cursor:pointer;}
+  .btn.pri{background:var(--accent);color:#fff;}
+  .btn.ghost{background:#fff;border:1px solid var(--border);color:var(--fg);}
+  .btn.danger{background:#fff;border:1px solid var(--danger);color:var(--danger);}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .empty{color:var(--muted);font-size:12.5px;padding:14px 4px;}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(15,23,42,.92);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .hist-del{color:#b91c1c;text-decoration:line-through;} .hist-add{color:#15803d;font-weight:600;}
+  /* ── 抽屉（受理台同款）── */
+  .drawer{position:fixed;top:0;right:-540px;width:520px;max-width:94vw;height:100vh;background:#fff;box-shadow:-8px 0 30px rgba(15,23,42,.15);z-index:50;transition:right .25s;overflow-y:auto;padding:20px 22px 40px;}
+  .drawer.open{right:0;}
+  .drawer h3{margin:0 0 4px;font-size:16px;} .drawer .no{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .kv{width:100%;border-collapse:collapse;font-size:12.5px;margin:10px 0;}
+  .kv td{padding:6px 8px;border-bottom:1px solid #f1f5f9;} .kv td:first-child{color:var(--muted);width:110px;}
+  .sec{border-top:1px solid var(--border);margin-top:16px;padding-top:12px;}
+  .sec h4{margin:0 0 8px;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .field{margin:8px 0;}
+  .field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:12.5px;background:#fff;}
+  .field textarea{min-height:52px;}
+  .secret-box{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:10px 12px;font-size:12px;word-break:break-all;line-height:1.5;margin:8px 0;}
+  .secret-box .warn{color:#fbbf24;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="console">
+  <div id="side-nav" data-series="p" data-active="vendor-access"></div>
+  <main class="main">
+    <div class="top">
+      <div class="crumb">控制台 / ⭐ 服务认证中台 / <b>商家接入配置（webhook/密钥）</b></div>
+      <div style="font-size:11.5px;color:var(--muted);">读写 vendor.config.write · 复审 vendor.review · 审计 vendor.config.update / vendor.hmac_key.rotate</div>
+    </div>
+    <div class="content">
+
+      <div class="card">
+        <h3>接入概览 <span class="pill">jz_vendors</span></h3>
+        <div class="kpis">
+          <div class="kpi"><b id="kTotal">0</b><span>接入商家</span></div>
+          <div class="kpi"><b id="kWebhook">0</b><span>已配回调 webhook_url</span></div>
+          <div class="kpi"><b id="kUrllink">0</b><span>已配 url_link</span></div>
+          <div class="kpi"><b id="kNokey">0</b><span>密钥未设</span></div>
+        </div>
+        <div class="note">接入三件套：<b>webhook_url</b>（订单/评级事件回调推送，<span class="mono">VARCHAR(500)</span>）、<b>url_link</b>（小程序 URL Link 生成接口，必配）、<b>order_detail_url</b>（订单详情查询，可选）。
+          <b>hmac_key 等同密码</b>：本台只显前 8 位 + 长度；重置由平台一键生成（64 位 hex），完整新钥只展示一次，<b>不支持手工录入</b>。
+          改动即时生效（写入即失效进程缓存）；重置会让商家在跑的集成当场 401，请先约定窗口。</div>
+      </div>
+
+      <div class="card">
+        <h3>商家列表 <span class="pill">GET /admin/vendors/config</span></h3>
+        <div class="chips" id="filterChips"></div>
+        <table>
+          <thead><tr><th>商家</th><th>类型</th><th>状态</th><th>回调</th><th>url_link</th><th>hmac_key</th><th>操作</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>暂无商家</div>
+      </div>
+
+      <div class="card">
+        <h3>变更历史 <span class="pill">audit_log · config / rotate / test</span></h3>
+        <table>
+          <thead><tr><th>时间</th><th>商家</th><th>类型</th><th>变更</th></tr></thead>
+          <tbody id="histRows"></tbody>
+        </table>
+        <div class="empty" id="histEmpty" hidden>暂无变更记录</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="drawer" id="drawer">
+  <h3 id="dvName">—</h3>
+  <div class="no" id="dvNo">—</div>
+  <table class="kv" id="dvBase"></table>
+
+  <div class="sec">
+    <h4>接入接口三件套 <span class="pill">PUT .../config</span></h4>
+    <div class="field"><label>webhook_url · 事件回调推送（http/https，≤500 字符；留空 = 清除）</label>
+      <input type="text" id="fWebhook" placeholder="https://merchant.example.com/juzhu/callback" /></div>
+    <div class="field"><label>url_link · 小程序 URL Link 生成接口（必配）</label>
+      <input type="text" id="fUrllink" placeholder="https://merchant.example.com/.../generate/urllink" /></div>
+    <div class="field"><label>order_detail_url · 订单详情查询接口（可选）</label>
+      <input type="text" id="fDetail" placeholder="https://merchant.example.com/.../order/detail" /></div>
+    <div class="note">签名：body 去 sign → 加毫秒 timestamp → 嵌套展平 → 字典序 <span class="mono">k1=v1&amp;k2=v2</span> → hmac_key 做 HMAC-SHA256 hex 小写。校验失败 401。</div>
+    <div style="margin-top:10px;"><button class="btn pri" id="btnSave">保存接入配置</button></div>
+  </div>
+
+  <div class="sec">
+    <h4>接入密钥 hmac_key <span class="pill">POST .../hmac-key/rotate</span></h4>
+    <div id="dvKey" style="font-size:12.5px;">—</div>
+    <div style="margin-top:8px;"><button class="btn danger" id="btnRotate">一键重置密钥</button></div>
+    <div id="dvSecret" hidden></div>
+  </div>
+
+  <div class="sec">
+    <h4>连通性测试 <span class="pill">POST .../webhook-test</span></h4>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn ghost" id="btnTest">发送 webhook.test 事件</button>
+      <span id="dvTest" style="font-size:12.5px;color:var(--muted);">先保存回调地址，再试推（对方应收到 webhook.test，可用 hmac_key 验签）</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h4>资质复审 <span class="pill">PUT .../review（vendor.review）</span></h4>
+    <div class="field"><label>复审结论（approved=在营 / rejected=停用，服务端联动 status）</label>
+      <select id="fReview">
+        <option value="reviewing">reviewing · 核验中</option>
+        <option value="approved">approved · 通过（→ 在营）</option>
+        <option value="rejected">rejected · 驳回（→ 停用）</option>
+      </select></div>
+    <div class="field"><label>审核意见 / 驳回理由（留痕）</label><textarea id="fReviewNote" placeholder="核验意见、驳回理由"></textarea></div>
+    <button class="btn pri" id="btnReview">提交复审</button>
+  </div>
+
+  <div class="sec">
+    <h4>本商家变更历史</h4>
+    <div id="dvHist" style="font-size:12px;color:var(--muted);">—</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="_console-login.js"></script>
+<script src="_region.js?v=2"></script>
+<script src="_nav.js"></script>
+<script>
+/* 商家接入配置（平台代管，商家不可自改）：
+   GET  /api/juzhu/admin/vendors/config                     （vendor.config.write）汇总 + 密钥掩码
+   GET  /api/juzhu/admin/vendors/:id/config                 （vendor.config.write）详情（URL 明文 + 掩码）
+   PUT  /api/juzhu/admin/vendors/:id/config                 （vendor.config.write）三条 URL；缺省不改 / 空串清除
+   POST /api/juzhu/admin/vendors/:id/config/hmac-key/rotate （vendor.config.write）一键重置，完整新钥只返回一次
+   POST /api/juzhu/admin/vendors/:id/config/webhook-test    （vendor.config.write）连通性试推
+   GET  /api/juzhu/admin/vendors/config-history             （vendor.config.write）审计详单
+   PUT  /api/juzhu/admin/vendors/:id/review                 （vendor.review，复用既有复审） */
+const $ = id => document.getElementById(id);
+let FILTER = '';
+let CACHE = [];      // 汇总行缓存
+let CUR = null;      // 抽屉当前商家 id
+let DETAIL = null;   // 抽屉详情缓存
+let CUR_NAME = '';
+const VTYPE = { platform: '平台自营', housing_operator: '房源运营商', lvju_host: '旅居房东', homestay: '民宿房东', homestay_ops: '民宿运营',
+                developer: '开发商', agent: '经纪', service: '服务商',
+                cleaning: '保洁', repair: '维修', moving: '搬家', nanny: '保姆/月嫂',
+                community: '社区服务', recycle: '二手回收', asset: '资产服务', home_maintain: '居家养护',
+                health_care: '健康养老', consumer_finance: '消费金融', insurance: '保险服务', telecom: '电讯服务', hotel: '酒店通兑' };
+const RTYPE = { 'vendor.config.update': '接入配置', 'vendor.hmac_key.rotate': '密钥重置', 'vendor.webhook.test': '连通性测试' };
+
+let toastTimer = null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3000); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function statusBadge(s){ return '<span class="badge ' + (s === 'active' ? 'b-active' : 'b-suspended') + '">' + (s === 'active' ? '在营' : '停用') + '</span>'; }
+function reviewBadge(r){
+  const m = { pending: ['b-warn', '待审'], reviewing: ['b-reviewing', '核验中'], approved: ['b-approved', '复审通过'], rejected: ['b-rejected', '已驳回'] };
+  const x = m[r] || ['b-off', r || '—'];
+  return '<span class="badge ' + x[0] + '">' + x[1] + '</span>';
+}
+function setBadge(v){ return '<span class="badge ' + (v ? 'b-on' : 'b-off') + '">' + (v ? '已配' : '未配') + '</span>'; }
+function keyBadge(x){
+  if (!x || !x.has_hmac_key) return '<span class="badge b-warn">未设</span>';
+  return '<span class="badge b-on">已设</span> <span class="mono" style="font-size:11px;color:var(--muted);">' + esc(x.hmac_key_head || '') + '… (' + (x.hmac_key_len || 0) + ')</span>';
+}
+
+function renderChips(){
+  const defs = [['','全部'],['active','在营'],['suspended','停用'],['pending','待复审'],['rejected','已驳回']];
+  $('filterChips').innerHTML = defs.map(d =>
+    '<button class="' + (FILTER===d[0]?'on':'') + '" data-s="' + d[0] + '">' + d[1] + '</button>').join('');
+  [...document.querySelectorAll('#filterChips button')].forEach(b =>
+    b.addEventListener('click', () => { FILTER = b.getAttribute('data-s'); renderChips(); paintRows(); }));
+}
+
+function paintKpis(){
+  $('kTotal').textContent = CACHE.length;
+  $('kWebhook').textContent = CACHE.filter(v => v.webhook_url_set).length;
+  $('kUrllink').textContent = CACHE.filter(v => v.url_link_set).length;
+  $('kNokey').textContent = CACHE.filter(v => !v.has_hmac_key).length;
+}
+
+function paintRows(){
+  const rows = CACHE.filter(v => {
+    if (FILTER === 'active' || FILTER === 'suspended') return v.status === FILTER;
+    if (FILTER === 'pending') return v.review_status !== 'approved' && v.review_status !== 'rejected';
+    if (FILTER === 'rejected') return v.review_status === 'rejected';
+    return true;
+  });
+  $('rows').innerHTML = rows.map(v =>
+    '<tr data-id="' + v.id + '">' +
+    '<td><b>' + esc(v.name) + '</b><span style="color:var(--muted);"> #' + v.id + '</span></td>' +
+    '<td>' + esc(VTYPE[v.type] || v.type || '-') + '</td>' +
+    '<td>' + statusBadge(v.status) + ' ' + reviewBadge(v.review_status) + '</td>' +
+    '<td>' + setBadge(v.webhook_url_set) + '</td>' +
+    '<td>' + setBadge(v.url_link_set) + '</td>' +
+    '<td>' + keyBadge(v) + '</td>' +
+    '<td><button class="btn pri" data-open="' + v.id + '">配置</button></td></tr>'
+  ).join('');
+  $('empty').hidden = !!rows.length;
+  [...document.querySelectorAll('[data-open]')].forEach(b =>
+    b.addEventListener('click', () => openDetail(parseInt(b.getAttribute('data-open'), 10))));
+}
+
+async function load(){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/config');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    CACHE = j.items || [];
+    paintKpis(); paintRows();
+  } catch(e){ toast('加载失败：' + e.message); }
+}
+
+async function openDetail(id){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + id + '/config');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    DETAIL = j.vendor; CUR = id; CUR_NAME = j.vendor.name || ('#' + id);
+    paintDrawer();
+    $('drawer').classList.add('open');
+    loadVendorHistory(id);
+  } catch(e){ toast('加载失败：' + e.message); }
+}
+
+function paintDrawer(){
+  const v = DETAIL;
+  $('dvName').textContent = v.name || '—';
+  $('dvNo').textContent = 'vendor #' + v.id + ' · ' + (VTYPE[v.type] || v.type || '-');
+  $('dvBase').innerHTML =
+    '<tr><td>状态</td><td>' + statusBadge(v.status) + ' ' + reviewBadge(v.review_status) + '</td></tr>' +
+    '<tr><td>接入密钥</td><td>' + keyBadge(v) + '</td></tr>' +
+    '<tr><td>更新时间</td><td>' + esc((v.updated_at || '').replace('T', ' ').slice(0, 19)) + '</td></tr>';
+  $('fWebhook').value = v.webhook_url || '';
+  $('fUrllink').value = v.url_link || '';
+  $('fDetail').value = v.order_detail_url || '';
+  $('dvKey').innerHTML = v.has_hmac_key
+    ? '已配置 · 前 8 位 <span class="mono">' + esc(v.hmac_key_head || '') + '</span> · 长度 ' + (v.hmac_key_len || 0) + '（全文不可查看，重置后一次性展示）'
+    : '<span style="color:var(--warn);font-weight:600;">未配置</span>——商家开放接口（HMAC 签名 / url_link / webhook）均不可用，请重置生成。';
+  $('dvSecret').hidden = true; $('dvSecret').innerHTML = '';
+  $('dvTest').textContent = '先保存回调地址，再试推（对方应收到 webhook.test，可用 hmac_key 验签）';
+  $('fReview').value = v.review_status === 'rejected' ? 'rejected' : (v.review_status === 'approved' ? 'approved' : 'reviewing');
+  $('fReviewNote').value = '';
+}
+
+/* 密钥一次性展示：只渲染在黑底框里 + 复制按钮，不写进任何 input / localStorage，刷新即不可再取 */
+function paintOneTimeSecret(key){
+  const box = $('dvSecret');
+  box.hidden = false;
+  box.innerHTML =
+    '<div class="secret-box"><span class="warn">新密钥只展示这一次</span>——请立即复制并线下交付商家，关闭后平台侧不再可见（仅剩前 8 位掩码）。<br/>' +
+    '<span class="mono" id="secretVal">' + esc(key) + '</span></div>' +
+    '<button class="btn pri" id="btnCopySecret">复制新密钥</button>';
+  $('btnCopySecret').onclick = function(){ copyText(key, '新 hmac_key 已复制'); };
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyText(text, tip){
+  function done(){ toast(tip || '已复制'); }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, legacy);
+  else legacy();
+  function legacy(){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0;';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败，请手动选择'); }
+    ta.remove();
+  }
+}
+
+$('btnSave').onclick = async function(){
+  if (!CUR) return;
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + CUR + '/config', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ webhook_url: $('fWebhook').value.trim(), url_link: $('fUrllink').value.trim(), order_detail_url: $('fDetail').value.trim() }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    toast('接入配置已保存（即时生效）');
+    await load(); await openDetail(CUR);
+  } catch(e){ toast('保存失败：' + e.message); }
+};
+
+$('btnRotate').onclick = async function(){
+  if (!CUR) return;
+  if (!confirm('重置后旧 hmac_key 立即作废，商家侧所有调用将当场 401（webhook 验签 / url_link / 订单回查）。确定继续？')) return;
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + CUR + '/config/hmac-key/rotate', { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    toast('密钥已重置：' + (j.hmac_key_head || '') + '…（' + (j.hmac_key_len || 0) + ' 位）');
+    await load(); await openDetail(CUR);
+    paintOneTimeSecret(j.hmac_key);   // openDetail 重绘抽屉会把展示区清掉，重置结果最后补回
+  } catch(e){ toast('重置失败：' + e.message); }
+};
+
+$('btnTest').onclick = async function(){
+  if (!CUR) return;
+  $('btnTest').disabled = true;
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + CUR + '/config/webhook-test', { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    $('dvTest').innerHTML = j.ok
+      ? '<span style="color:var(--ok);font-weight:600;">测试已送达（HTTP ' + j.status + '）</span>——对方服务应收到 webhook.test 事件，可用 hmac_key 验签'
+      : '<span style="color:var(--danger);font-weight:600;">未送达</span>' + (j.status ? '（HTTP ' + j.status + '）' : '') + '：' + esc(j.error || '');
+    await loadHistory();
+  } catch(e){ $('dvTest').innerHTML = '<span style="color:var(--danger);">' + esc(e.message) + '</span>'; }
+  $('btnTest').disabled = false;
+};
+
+$('btnReview').onclick = async function(){
+  if (!CUR) return;
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/' + CUR + '/review', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ review_status: $('fReview').value, review_note: $('fReviewNote').value.trim() }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    toast('复审已提交：' + j.review_status + '（status → ' + j.status + '）');
+    await load(); await openDetail(CUR);
+  } catch(e){ toast('复审失败：' + e.message); }
+};
+
+function histSeg(x){
+  if (x.action === 'vendor.hmac_key.rotate') {
+    const b = (x.before && x.before.hmac_key) || {}, a = (x.after && x.after.hmac_key) || {};
+    return '密钥 <span class="mono">' + esc(b.head || '—') + '</span> → <span class="mono">' + esc(a.head || '—') + '</span>（' + (a.len || 64) + ' 位，旧钥作废）';
+  }
+  if (x.action === 'vendor.webhook.test') {
+    const a = x.after || {};
+    return a.ok ? '<span class="hist-add">送达 HTTP ' + esc(a.status == null ? '-' : a.status) + '</span>'
+                : '<span class="hist-del">未送达</span>' + (a.error ? '：' + esc(a.error) : '');
+  }
+  const name = { webhook_url: 'webhook_url', url_link: 'url_link', order_detail_url: 'order_detail_url' };
+  return Object.keys(name).map(k => {
+    const b = x.before ? x.before[k] : undefined, a = x.after ? x.after[k] : undefined;
+    if (b === undefined && a === undefined) return '';
+    const f = (v) => v == null || v === '' ? '<span style="color:var(--muted);">清除</span>'
+      : '<span class="mono" title="' + esc(v) + '">' + esc(String(v).slice(0, 40)) + (String(v).length > 40 ? '…' : '') + '</span>';
+    const changed = String(b || '') !== String(a || '');
+    if (!changed) return '';
+    return '<div>' + name[k] + '：' + f(b) + ' → ' + f(a) + '</div>';
+  }).join('') || '—';
+}
+
+async function loadHistory(){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/config-history');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const rows = j.items || [];
+    $('histRows').innerHTML = rows.map(x =>
+      '<tr><td>' + esc((x.created_at || '').replace('T', ' ').slice(0, 19)) + '</td>' +
+      '<td>' + esc(x.vendor_id ? '商家 #' + x.vendor_id : '-') + '</td>' +
+      '<td>' + esc(RTYPE[x.action] || x.action) + '</td>' +
+      '<td>' + histSeg(x) + '</td></tr>').join('');
+    $('histEmpty').hidden = !!rows.length;
+  } catch(e){ /* 历史加载失败不阻塞主表 */ }
+}
+
+async function loadVendorHistory(id){
+  try {
+    const r = await fetch('/api/juzhu/admin/vendors/config-history?vendor_id=' + id);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const rows = j.items || [];
+    $('dvHist').innerHTML = rows.length
+      ? rows.map(x => '<div style="padding:4px 0;border-bottom:1px dashed #f1f5f9;">' +
+          esc((x.created_at || '').replace('T', ' ').slice(0, 19)) + ' · ' + esc(RTYPE[x.action] || x.action) +
+          '<div style="color:var(--fg);">' + histSeg(x) + '</div></div>').join('')
+      : '暂无变更记录';
+  } catch(e){ $('dvHist').textContent = '历史加载失败'; }
+}
+
+renderChips();
+BZF_CONSOLE.requireLogin({ hint: '商家接入配置台（vendor.config.write）' }).then(function(){
+  load(); loadHistory();
+});
+</script>
+</body>
+</html>

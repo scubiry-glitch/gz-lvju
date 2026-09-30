@@ -26,7 +26,7 @@ function createApiDirectRouter(deps) {
       normalizeCancelPolicyInput, outboundJson, parseExtObj, parseJsonFields,
       parseSkuJsonFields, permRegistry, photoCfg, projectPublishEligibility,
       queryRows, readBody, releaseStayQty, requestSession,
-      requireAnyPerm, requireApiKey, requirePerm, stayCfg,
+      requireAnyPerm, requireApiKey, requirePerm, resetVendorConfigCache, stayCfg,
       stayConfigOf, stripContactPhone, stripVendorSecrets, validateStaff,
       vendorApi, vendorRate, verifyVendorLoginToken, webhookSign,
       wholeHousePriceUnit, withStayRules,
@@ -1027,6 +1027,52 @@ function createApiDirectRouter(deps) {
           });
         } catch (_) {}
         return jsonReply(res, { ok: true, webhook_url: url || null });
+      }
+
+      // POST /api/juzhu/vendor/access —— 商家自配接入接口 url_link / order_detail_url（2026-09-30）
+      //（vendor=自己；platform 带 vendor_id 代管；webhook_url 走上一条路由；hmac_key 平台独占，只走 admin rotate）
+      if (urlPath === '/api/juzhu/vendor/access' && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess || (sess.role !== 'vendor' && sess.role !== 'platform')) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        const targetVid = sess.role === 'vendor' ? sess.vendorId : (parseInt(body.vendor_id, 10) || 0);
+        if (!targetVid) return jsonReply(res, { error: 'vendor_id 必填（平台代管）' }, 400);
+        if (sess.role === 'platform') {
+          const ex = await queryRows('SELECT id FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+          if (!ex.length) return jsonReply(res, { error: '商家不存在' }, 404);
+        }
+        const LIMIT = { url_link: 2000, order_detail_url: 2000 };
+        const next = {};
+        for (const f of Object.keys(LIMIT)) {
+          if (!(f in body)) continue;
+          const s = String(body[f] == null ? '' : body[f]).trim();
+          if (s) {
+            if (!/^https?:\/\//i.test(s)) return jsonReply(res, { error: f + ' 须以 http:// 或 https:// 开头' }, 400);
+            if (s.length > LIMIT[f]) return jsonReply(res, { error: f + ' 过长（≤' + LIMIT[f] + ' 字符）' }, 400);
+          }
+          next[f] = s || null;
+        }
+        if (!Object.keys(next).length) return jsonReply(res, { error: '无可更新字段（url_link / order_detail_url）' }, 400);
+        const beforeRows = await queryRows('SELECT url_link, order_detail_url FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+        const before = {
+          url_link: (beforeRows[0] && beforeRows[0].url_link) || null,
+          order_detail_url: (beforeRows[0] && beforeRows[0].order_detail_url) || null,
+        };
+        const sets = [], vals = [];
+        for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
+        await queryRows(`UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+          [...vals, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+        if (resetVendorConfigCache) resetVendorConfigCache();
+        try {
+          await authCenter.audit({
+            accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+            action: 'vendor.access.update', resource: 'vendor', resourceId: String(targetVid),
+            before, after: Object.assign({}, before, next), result: 'ok',
+          });
+        } catch (_) {}
+        return jsonReply(res, { ok: true, vendor_id: targetVid,
+          url_link: next.url_link !== undefined ? next.url_link : before.url_link,
+          order_detail_url: next.order_detail_url !== undefined ? next.order_detail_url : before.order_detail_url });
       }
 
       // POST /api/juzhu/vendor/webhook/test —— 同步试推一次 webhook.test（单次不重试，回传送达结果）
