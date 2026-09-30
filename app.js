@@ -8009,6 +8009,13 @@ const server = http.createServer((req, res) => {
     return serveH5Spa(rawPath, res);
   }
 
+  // 旧首页入口 → React /h5（保留 ?city= 等查询串）
+  if (rawPath === '/lvju-app-home-demo.html') {
+    res.writeHead(302, { Location: '/h5' + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
+    res.end();
+    return;
+  }
+
   if (!isPublicStatic(rawPath)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Not Found');
