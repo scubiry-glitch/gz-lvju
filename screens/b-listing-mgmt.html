@@ -143,15 +143,24 @@
     </div>
 
     <div id="whCard" style="display:none; margin:0 0 12px; padding:12px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:10px;">
-      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔔 Webhook 通知</div>
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔔 商家接入配置（Webhook 回调 / 接口地址）</div>
       <div id="whStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <select id="whVendor" style="display:none; max-width:280px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;"></select>
         <input id="whUrl" placeholder="https://你的服务/回调地址" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
-        <button class="btn btn-primary" id="whSave">保存</button>
+        <button class="btn btn-primary" id="whSave">保存回调</button>
         <button class="btn btn-ghost" id="whTest">发送测试</button>
       </div>
       <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">推送事件：评级审核结果（rating.reviewed）、订单事件（booking.created / paid / cancelled）、连通性测试（webhook.test）。签名与开放接口同算法；响应 2xx 视为送达，失败重试 5s/30s/120s。内网 / 保留地址会被拒绝。</div>
+      <div style="border-top:1px dashed #e5e7eb; margin:10px 0 8px;"></div>
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔗 开放接口地址（url_link / 订单详情）</div>
+      <div id="acStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="acUrllink" placeholder="url_link：小程序 URL Link 生成接口（必配）" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <input id="acDetail" placeholder="order_detail_url：订单详情查询接口（可选）" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <button class="btn btn-primary" id="acSave">保存接口</button>
+      </div>
+      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">两个地址都是你方服务：url_link 用于平台拉起你的小程序（必配），order_detail_url 供平台回查订单详情（可选）。留空 = 清除；保存即时生效。接入密钥 hmac_key 由平台签发/重置，遗失请走平台「商家接入配置」台重置。</div>
     </div>
 
     <div class="lst-card">
@@ -498,15 +507,25 @@
     document.getElementById('chkAll').checked=false; bindChk();
   };
 
-  // ---- Webhook 通知配置（商家自助 + 平台代管，2026-09-22）----
+  // ---- 商家接入配置（webhook 回调 + 开放接口地址；商家自助 + 平台代管，2026-09-22 / 2026-09-30）----
   var whRole = null, whVendors = [];
   function whShow(msg){ document.getElementById('whStatus').innerHTML = msg; }
+  function acShow(msg){ document.getElementById('acStatus').innerHTML = msg; }
   function whEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function whCurVid(){ return whRole === 'platform' ? (parseInt(document.getElementById('whVendor').value, 10) || 0) : 0; }
+  function acFill(v){
+    document.getElementById('acUrllink').value = v.url_link || '';
+    document.getElementById('acDetail').value = v.order_detail_url || '';
+    acShow((v.url_link || v.order_detail_url)
+      ? '已配置：url_link ' + (v.url_link ? '<code>' + whEsc(String(v.url_link).slice(0, 48)) + (String(v.url_link).length > 48 ? '…' : '') + '</code>' : '未配') +
+        ' · order_detail ' + (v.order_detail_url ? '已配' : '未配')
+      : '未配置——配置后平台才能拉起你的小程序 / 回查订单详情');
+  }
   function whFillFromSel(){
     var vid = whCurVid();
     var v = whVendors.filter(function(x){ return x.id === vid; })[0] || {};
     document.getElementById('whUrl').value = v.webhook_url || '';
+    acFill(v);
     whShow(v.webhook_url ? '已配置：<code>' + whEsc(v.webhook_url) + '</code>' : '未配置——配置后评级审核结果与订单事件将实时推送到该商家的服务');
   }
   function loadWebhook(){
@@ -526,7 +545,9 @@
         sel.onchange = whFillFromSel;
       } else {
         document.getElementById('whVendor').style.display = 'none';
+        whVendors = [{ id: 0, webhook_url: j.webhook_url || '', url_link: j.url_link || '', order_detail_url: j.order_detail_url || '' }];
         document.getElementById('whUrl').value = j.webhook_url || '';
+        acFill(whVendors[0]);
         whShow(j.webhook_url
           ? '已配置：<code>' + whEsc(j.webhook_url) + '</code>'
           : '未配置——配置后评级审核结果与订单事件将实时推送到你的服务');
@@ -554,6 +575,20 @@
         ? '<span style="color:#065f46;">测试已送达（HTTP ' + j.status + '）——对方服务应收到 webhook.test 事件，可用 hmac_key 验签</span>'
         : '<span style="color:#991b1b;">送达失败：' + whEsc(j.error || '未知') + '</span>');
     }).catch(function(e){ whShow('<span style="color:#991b1b;">测试失败：' + whEsc(e.message) + '</span>'); })
+      .then(function(){ btn.disabled = false; });
+  };
+  document.getElementById('acSave').onclick = function(){
+    var vid = whCurVid();
+    var btn = document.getElementById('acSave'); btn.disabled = true;
+    post(API + '/vendor/access', { vendor_id: vid || undefined,
+      url_link: document.getElementById('acUrllink').value.trim(),
+      order_detail_url: document.getElementById('acDetail').value.trim() }).then(function(j){
+      var v = whRole === 'platform'
+        ? whVendors.filter(function(x){ return x.id === vid; })[0]
+        : whVendors[0];
+      if (v) { v.url_link = j.url_link || ''; v.order_detail_url = j.order_detail_url || ''; }
+      acFill(v || {});
+    }).catch(function(e){ acShow('<span style="color:#991b1b;">保存失败：' + whEsc(e.message) + '</span>'); })
       .then(function(){ btn.disabled = false; });
   };
   loadWebhook();

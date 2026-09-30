@@ -94,6 +94,7 @@ function leaksFullKey(text) {
     hmac_key: vendor.hmac_key,
   };
   const oldKey = String(saved.hmac_key).trim();
+  let tvid = null;   // 商家自配段临时商家（finally 清理）
   const sign = (payload) => {
     const hmac = require('../hmac_auth.cjs');
     return hmac.generateSignature(oldKey, Object.assign({ vendor_id: vid }, payload));
@@ -209,13 +210,55 @@ function leaksFullKey(text) {
       && acts.includes('vendor.hmac_key.rotate') && acts.includes('vendor.webhook.test'), JSON.stringify(acts));
     r = await api('/api/juzhu/admin/vendors/config-history', { headers: AH });
     check('历史全量 200', r.status === 200 && Array.isArray(r.j.items), 'HTTP ' + r.status);
+
+    // ── 8. 商家自配 url_link / order_detail_url（POST /vendor/access；临时商家，finally 清理）──
+    const bcrypt = require('bcryptjs');
+    const tmpName = '接入自配回归-可删-' + RUN;
+    const [tins] = await conn.execute(
+      "INSERT INTO jz_vendors(type, name, status, login_name, password_hash, review_status, hmac_key, created_at, updated_at) " +
+      "VALUES ('service', ?, 'active', ?, ?, 'approved', ?, NOW(), NOW())",
+      [tmpName, 'vac-self-' + process.pid, bcrypt.hashSync('Vac-temp-2026!', 8), 'b'.repeat(64)]);
+    tvid = tins.insertId;
+    const tlogin = await api('/api/juzhu/vendor/login', { method: 'POST', body: { login_name: 'vac-self-' + process.pid, password: 'Vac-temp-2026!' } });
+    const tTok = tlogin.j && tlogin.j.token;
+    check('临时商家登录', tlogin.status === 200 && !!tTok, JSON.stringify(tlogin.j).slice(0, 100));
+    const TH = { Authorization: 'Bearer ' + tTok };
+    r = await api('/api/juzhu/vendor/webhook', { headers: TH });
+    check('商家 GET webhook 带出接口三件套字段', r.status === 200 && r.j.role === 'vendor'
+      && 'url_link' in r.j && 'order_detail_url' in r.j, JSON.stringify(r.j).slice(0, 120));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: TH, body: { url_link: 'https://vac-self.example.com/urllink' } });
+    check('商家自配 url_link → 200 锁定自己', r.status === 200 && r.j.vendor_id === tvid && r.j.url_link === 'https://vac-self.example.com/urllink', JSON.stringify(r.j).slice(0, 140));
+    const [tdb] = await conn.execute('SELECT url_link FROM jz_vendors WHERE id=?', [tvid]);
+    check('商家自配落库', tdb[0].url_link === 'https://vac-self.example.com/urllink', JSON.stringify(tdb[0]));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: TH, body: { url_link: 'ftp://x.example.com' } });
+    check('商家自配非 http(s) 400', r.status === 400, JSON.stringify(r.j));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: TH, body: { order_detail_url: 'https://' + 'b'.repeat(2000) + '.com' } });
+    check('商家自配超长 400', r.status === 400, JSON.stringify(r.j).slice(0, 120));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: TH, body: {} });
+    check('商家自配空 body 400', r.status === 400, JSON.stringify(r.j));
+    const [beforeHijack] = await conn.execute('SELECT url_link FROM jz_vendors WHERE id=?', [vid]);
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: TH, body: { vendor_id: vid, url_link: 'https://hijack.example.com/u' } });
+    check('vendor 会话带他人 vendor_id → 仍写自己', r.status === 200 && r.j.vendor_id === tvid, JSON.stringify(r.j).slice(0, 120));
+    const [hijack] = await conn.execute('SELECT url_link FROM jz_vendors WHERE id=?', [vid]);
+    check('他人商家行未被改动', hijack[0].url_link === beforeHijack[0].url_link, JSON.stringify({ before: beforeHijack[0], after: hijack[0] }));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', headers: AH, body: { vendor_id: tvid, url_link: 'https://vac-admin.example.com/u' } });
+    check('平台代管（admin 会话带 vendor_id）→ 200', r.status === 200 && r.j.vendor_id === tvid && r.j.url_link === 'https://vac-admin.example.com/u', JSON.stringify(r.j).slice(0, 140));
+    r = await api('/api/juzhu/vendor/access', { method: 'POST', body: { url_link: 'https://x.example.com' } });
+    check('匿名 401', r.status === 401, 'HTTP ' + r.status);
+    const [arow2] = await conn.execute(
+      "SELECT before_json, after_json FROM audit_log WHERE action='vendor.access.update' AND resource_id=? ORDER BY id DESC LIMIT 1", [String(tvid)]);
+    check('商家自配审计 before/after', arow2.length > 0 && JSON.parse(arow2[0].after_json).url_link === 'https://vac-admin.example.com/u', JSON.stringify(arow2[0] || {}).slice(0, 160));
   } finally {
-    // ── 清理：商家接入配置原值还原（密钥 / 三条 URL）──
+    // ── 清理：商家接入配置原值还原（密钥 / 三条 URL）+ 临时商家（含懒建档 accounts 行）──
     await conn.execute(
       'UPDATE jz_vendors SET webhook_url=?, url_link=?, order_detail_url=?, hmac_key=? WHERE id=?',
       [saved.webhook_url, saved.url_link, saved.order_detail_url, saved.hmac_key, vid]);
+    if (tvid) {
+      await conn.execute('DELETE FROM accounts WHERE vendor_id=? AND principal_type="user"', [tvid]);
+      await conn.execute('DELETE FROM jz_vendors WHERE id=?', [tvid]);
+    }
     await conn.end();
-    console.log('\ncleanup done（商家 webhook_url / url_link / order_detail_url / hmac_key 原值已还原；审计留痕保留）');
+    console.log('\ncleanup done（商家 webhook_url / url_link / order_detail_url / hmac_key 原值已还原，临时商家已清；审计留痕保留）');
   }
 
   console.log(failed ? `\n${failed} 项 FAIL` : '\n全部 PASS');
