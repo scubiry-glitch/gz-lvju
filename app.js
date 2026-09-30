@@ -92,6 +92,9 @@ let grOrders = null;
 try { grOrders = require('./gr_orders.cjs'); } catch (_) {}
 let loadVendorConfigFromDb = null;
 try { loadVendorConfigFromDb = require('./vendor_config.cjs').loadVendorConfigFromDb; } catch (_) {}
+// admin「商家接入配置」写路由用：改 hmac_key / url_link / order_detail_url 后失效进程内缓存
+let resetVendorConfigCache = null;
+try { resetVendorConfigCache = require('./vendor_config.cjs').resetVendorConfigCache; } catch (_) {}
 let juzhuImportAll = null;
 try { juzhuImportAll = require('./juzhu_import.cjs').importAll; } catch (_) {}
 let vendorApi = null;
@@ -934,6 +937,27 @@ function webhookSign(secretKey, payload, timestamp) {
   flat.timestamp = String(timestamp);
   return require('crypto').createHmac('sha256', secretKey)
     .update(hmacAuth.buildStringToSign(flat), 'utf8').digest('hex');
+}
+
+/** 试推一次 webhook.test 事件（单次不重试）。B 端 /vendor/webhook/test 与 admin 接入配置台共用；
+ *  只做取数（直读表不走进程缓存）+ 签名 + guardedPostJson，审计由调用方按各自 action 口径记。 */
+async function runVendorWebhookTest(vendorId) {
+  const conn = await mysql2.createConnection(getDbConfig());
+  let v = null;
+  try {
+    const [rows] = await conn.execute('SELECT webhook_url, hmac_key FROM jz_vendors WHERE id=? LIMIT 1', [vendorId]);
+    v = rows[0] || null;
+  } finally { await conn.end(); }
+  if (!v || !v.webhook_url) return { ok: false, badRequest: true, error: '请先保存 webhook_url' };
+  if (!v.hmac_key) return { ok: false, badRequest: true, error: '商家未配置 hmac_key，无法签名' };
+  const ts = Date.now();
+  const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  const payload = { event: 'webhook.test', vendor_id: vendorId, data };
+  const out = await guardedPostJson(v.webhook_url, {
+    event: payload.event, vendor_id: vendorId, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts),
+  }, 5000);   // 出网统一走 SSRF 防护层
+  return out.ok ? { ok: true, status: out.status }
+                : { ok: false, error: out.error || ('HTTP ' + out.status), status: out.status || null };
 }
 
 async function deliverWebhook(vendor, event, data, attempt) {
@@ -2549,7 +2573,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         const out = await queryRows('SELECT * FROM vendor_onboarding WHERE id=?', [id]);
         return jsonReply(res, Object.assign({}, out[0], {
           message: next === 'approved'
-            ? '已通过。密钥（vendor_id + hmac_key）按线下流程发放；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '') + backfillNote
+            ? '已通过。密钥（vendor_id + hmac_key）由平台在「商家接入配置」台发放/一键重置；费率基准 10%' + (discount != null ? ' · 折扣 ' + discount : '') + backfillNote
             : (next === 'reviewing' ? '已转入核验中' : '已驳回（已留痕）'),
         }));
       }
@@ -2762,6 +2786,192 @@ async function handleApiDirect(urlPath, qs, req, res) {
           });
           return jsonReply(res, { ok: true, id: vid, review_status: reviewStatus, status: nextStatus });
         } finally { await conn.end(); }
+      }
+    }
+
+    // ===== 商家接入配置（webhook_url / url_link / order_detail_url / hmac_key；权限点 vendor.config.write，仅平台代管，商家不可自改）=====
+    // 密钥只在 rotate 响应里全文出现一次；所有读出参只带 head8 + 长度。改配置后必须 resetVendorConfigCache()。
+
+    // GET /admin/vendors/config —— 接入配置汇总（掩码；页面 KPI + 列表徽标）
+    if (urlPath === '/api/juzhu/admin/vendors/config' && req.method === 'GET') {
+      const rows = await queryRows(
+        `SELECT v.id, v.name, v.type, v.status, v.review_status, v.updated_at,
+                (v.webhook_url IS NOT NULL AND v.webhook_url <> '') AS webhook_url_set,
+                (v.url_link IS NOT NULL AND v.url_link <> '') AS url_link_set,
+                (v.order_detail_url IS NOT NULL AND v.order_detail_url <> '') AS order_detail_url_set,
+                (v.hmac_key IS NOT NULL AND TRIM(v.hmac_key) <> '') AS has_hmac_key,
+                LEFT(TRIM(v.hmac_key), 8) AS hmac_key_head,
+                (CASE WHEN v.hmac_key IS NULL OR TRIM(v.hmac_key)='' THEN 0 ELSE CHAR_LENGTH(TRIM(v.hmac_key)) END) AS hmac_key_len
+         FROM jz_vendors v ORDER BY v.id DESC LIMIT 500`);
+      return jsonReply(res, { items: rows });
+    }
+
+    // GET /admin/vendors/config-history —— 接入配置变更历史（audit_log 三种 action；挂 vendor.config.write
+    // 不借道 /admin/audit 的 audit.read，同 commission-history 先例）
+    if (urlPath === '/api/juzhu/admin/vendors/config-history' && req.method === 'GET') {
+      const qp = new URLSearchParams(qs);
+      let sql = 'SELECT id, action, resource_id, result, before_json, after_json, created_at FROM audit_log WHERE action IN (?, ?, ?)';
+      const params = ['vendor.config.update', 'vendor.hmac_key.rotate', 'vendor.webhook.test'];
+      const vid = parseInt(qp.get('vendor_id') || '', 10);
+      if (vid) { sql += ' AND resource_id=?'; params.push(String(vid)); }
+      sql += ' ORDER BY id DESC LIMIT 50';
+      const rows = await queryRows(sql, params);
+      return jsonReply(res, {
+        items: rows.map((r0) => {
+          let before = {}, after = {};
+          try { before = JSON.parse(r0.before_json || '{}'); } catch (_) {}
+          try { after = JSON.parse(r0.after_json || '{}'); } catch (_) {}
+          return { id: r0.id, action: r0.action, vendor_id: parseInt(r0.resource_id, 10) || null, result: r0.result, before, after, created_at: r0.created_at };
+        }),
+      });
+    }
+
+    // GET /admin/vendors/:id/config —— 单商家接入配置详情（URL 明文 + 密钥掩码）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/config$/);
+      if (m && req.method === 'GET') {
+        const vid = parseInt(m[1], 10);
+        const rows = await queryRows(
+          `SELECT id, name, type, status, review_status, webhook_url, url_link, order_detail_url,
+                  (hmac_key IS NOT NULL AND TRIM(hmac_key) <> '') AS has_hmac_key,
+                  LEFT(TRIM(hmac_key), 8) AS hmac_key_head,
+                  (CASE WHEN hmac_key IS NULL OR TRIM(hmac_key)='' THEN 0 ELSE CHAR_LENGTH(TRIM(hmac_key)) END) AS hmac_key_len,
+                  updated_at
+           FROM jz_vendors WHERE id=?`, [vid]);
+        if (!rows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+        return jsonReply(res, { vendor: rows[0] });
+      }
+    }
+
+    // PUT /admin/vendors/:id/config —— 改三条接入 URL（缺省不改 / 空串清除；hmac_key 不接受手工录入，只走 rotate）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/config$/);
+      if (m && req.method === 'PUT') {
+        const body = await readBody(req);
+        if (body.hmac_key != null && body.hmac_key !== '') {
+          return jsonReply(res, { error: 'hmac_key 不支持手工录入，请使用一键重置（POST .../config/hmac-key/rotate）' }, 400);
+        }
+        if (body.hmac_key_rotate !== undefined) {
+          return jsonReply(res, { error: '密钥重置请改用 POST .../config/hmac-key/rotate' }, 400);
+        }
+        // webhook_url 列 VARCHAR(500)，url_link / order_detail_url 是 TEXT——长度上限分开校验，避免超长落成 SQL 报错
+        const LIMIT = { webhook_url: 500, url_link: 2000, order_detail_url: 2000 };
+        const next = {};
+        for (const f of Object.keys(LIMIT)) {
+          if (!(f in body)) continue;
+          const s = String(body[f] == null ? '' : body[f]).trim();
+          if (s) {
+            if (!/^https?:\/\//i.test(s)) return jsonReply(res, { error: f + ' 须以 http:// 或 https:// 开头' }, 400);
+            if (s.length > LIMIT[f]) return jsonReply(res, { error: f + ' 过长（≤' + LIMIT[f] + ' 字符）' }, 400);
+          }
+          next[f] = s || null;
+        }
+        if (!Object.keys(next).length) {
+          return jsonReply(res, { error: '无可更新字段（webhook_url / url_link / order_detail_url）' }, 400);
+        }
+        const vid = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [curRows] = await conn.execute(
+            'SELECT id, name, webhook_url, url_link, order_detail_url FROM jz_vendors WHERE id=?', [vid]);
+          if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          const before = {
+            webhook_url: curRows[0].webhook_url || null,
+            url_link: curRows[0].url_link || null,
+            order_detail_url: curRows[0].order_detail_url || null,
+          };
+          const sets = [], vals = [];
+          for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
+          await conn.execute(
+            `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+          );
+          if (resetVendorConfigCache) resetVendorConfigCache();   // url_link / order_detail_url 也在进程缓存里，改完即失效
+          // 接入配置变更：处理器内记 before/after（role.update 金标准）；只记 URL，不涉密钥
+          const after = Object.assign({}, before, next);
+          const p = req.principal || {};
+          await authCenter.audit({
+            accountId: p.account && p.account.id,
+            principalType: 'account',
+            roles: p.roles,
+            action: 'vendor.config.update',
+            resource: 'vendors',
+            resourceId: String(vid),
+            scopeLevel: authCenter.bestScopeLevel(p),
+            result: 'ok',
+            before,
+            after,
+            ip: p.ip, ua: p.ua,
+          });
+          return jsonReply(res, { ok: true, vendor: Object.assign({ id: vid, name: curRows[0].name }, after) });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // POST /admin/vendors/:id/config/hmac-key/rotate —— 一键重置接入密钥（crypto 随机 64 位 hex；
+    // 旧钥即刻作废；完整新钥只在本次响应返回一次，审计只记 head/长度，不落明文）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/config\/hmac-key\/rotate$/);
+      if (m && req.method === 'POST') {
+        const vid = parseInt(m[1], 10);
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          const [curRows] = await conn.execute('SELECT id, name, hmac_key FROM jz_vendors WHERE id=?', [vid]);
+          if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          const oldKey = String(curRows[0].hmac_key || '').trim();
+          const newKey = crypto.randomBytes(32).toString('hex');
+          await conn.execute(
+            'UPDATE jz_vendors SET hmac_key=?, updated_at=? WHERE id=?',
+            [newKey, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+          );
+          if (resetVendorConfigCache) resetVendorConfigCache();
+          const maskKey = (k) => (k ? { head: k.slice(0, 8), len: k.length } : null);
+          const p = req.principal || {};
+          await authCenter.audit({
+            accountId: p.account && p.account.id,
+            principalType: 'account',
+            roles: p.roles,
+            action: 'vendor.hmac_key.rotate',
+            resource: 'vendors',
+            resourceId: String(vid),
+            scopeLevel: authCenter.bestScopeLevel(p),
+            result: 'ok',
+            before: { hmac_key: maskKey(oldKey) },
+            after: { hmac_key: { rotated: true, head: newKey.slice(0, 8), len: newKey.length } },
+            ip: p.ip, ua: p.ua,
+          });
+          return jsonReply(res, {
+            ok: true,
+            vendor: { id: vid, name: curRows[0].name },
+            hmac_key: newKey, hmac_key_head: newKey.slice(0, 8), hmac_key_len: newKey.length,
+          });
+        } finally { await conn.end(); }
+      }
+    }
+
+    // POST /admin/vendors/:id/config/webhook-test —— 平台侧连通性试推（与 B 端 /vendor/webhook/test 共用 helper；
+    // B 端那条不在 perm 闸内，平台代管任意商家必须走这条挂权限点的路由）
+    {
+      const m = urlPath.match(/^\/api\/juzhu\/admin\/vendors\/(\d+)\/config\/webhook-test$/);
+      if (m && req.method === 'POST') {
+        const vid = parseInt(m[1], 10);
+        const out = await runVendorWebhookTest(vid);
+        if (out.badRequest) return jsonReply(res, { error: out.error }, 400);
+        const p = req.principal || {};
+        await authCenter.audit({
+          accountId: p.account && p.account.id,
+          principalType: 'account',
+          roles: p.roles,
+          action: 'vendor.webhook.test',
+          resource: 'vendors',
+          resourceId: String(vid),
+          scopeLevel: authCenter.bestScopeLevel(p),
+          result: out.ok ? 'ok' : 'fail',
+          after: { ok: out.ok, status: out.status == null ? null : out.status, error: out.error || null },
+          ip: p.ip, ua: p.ua,
+        });
+        return jsonReply(res, out.ok ? { ok: true, status: out.status }
+                                     : { ok: false, error: out.error, status: out.status == null ? null : out.status });
       }
     }
 
@@ -4313,7 +4523,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
           const vrows = await queryRows('SELECT * FROM jz_vendors WHERE id=?', [product.vendor_id]);
           if (vrows.length) {
             vendor = vrows[0];
-            for (const f of ['hmac_key', 'url_link', 'order_detail_url']) delete vendor[f];
+            for (const f of ['hmac_key', 'url_link', 'order_detail_url', 'webhook_url']) delete vendor[f];
             parseJsonFields(vendor, ['badges']);
             composeRank(vendor);
             vendor.auth_badges = vendorAuthBadges(vendor);
@@ -5951,15 +6161,8 @@ async function handleApiDirect(urlPath, qs, req, res) {
       const body = await readBody(req);
       const targetVid = sess.role === 'vendor' ? sess.vendorId : (parseInt(body.vendor_id, 10) || 0);
       if (!targetVid) return jsonReply(res, { error: 'vendor_id 必填（平台代管）' }, 400);
-      const vrows = await queryRows('SELECT webhook_url, hmac_key FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
-      const v = vrows[0];
-      if (!v || !v.webhook_url) return jsonReply(res, { error: '请先保存 webhook_url' }, 400);
-      if (!v.hmac_key) return jsonReply(res, { error: '商家未配置 hmac_key，无法签名' }, 400);
-      const ts = Date.now();
-      const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
-      const payload = { event: 'webhook.test', vendor_id: targetVid, data };
-      const signed = { event: payload.event, vendor_id: targetVid, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts) };
-      const out = await guardedPostJson(v.webhook_url, signed, 5000);
+      const out = await runVendorWebhookTest(targetVid);
+      if (out.badRequest) return jsonReply(res, { error: out.error }, 400);
       try {
         await authCenter.audit({
           accountId: (sess.account && sess.account.id) || null, principalType: 'user',
@@ -6141,7 +6344,7 @@ async function handleApiDirect(urlPath, qs, req, res) {
         hasContact ? 'C 端拨号走虚拟号（TP 实时绑号，双方号码不外泄）' : '商家与房源均未登记联系电话',
         hasContact ? '' : '在房源上配置咨询电话', 'b-listing-mgmt.html');
       add('hmac', '开放接口密钥', !!v.hmac_key, 'warn',
-        v.hmac_key ? 'HMAC 密钥已配置（可对接开放接口）' : '未接入商家开放接口（密钥由平台线下发放）',
+        v.hmac_key ? 'HMAC 密钥已配置（可对接开放接口）' : '未接入商家开放接口（密钥由平台在「商家接入配置」台发放）',
         v.hmac_key ? '' : '对接文档见开放平台', 'property-intake-api.html');
       let photoCount = 0;
       if (sellIds.length) {

@@ -274,6 +274,7 @@
           { id: 'b-whitelist',     label: '★ 白名单审定 + 同业开放', href: 'p-b-whitelist.html',         icon: 'check' },
           { id: 'vendor-onboarding', label: '商家入驻受理（房源）', href: 'p-vendor-onboarding.html',  icon: 'plug', perms: ['vendor.onboarding.review'] },
           { id: 'vendor-rates',      label: '商家费率（抽佣分档）',   href: 'p-vendor-rates.html',      icon: 'coin', perms: ['vendor.fund.write'] },
+          { id: 'vendor-access',     label: '商家接入配置（webhook/密钥）', href: 'p-vendor-access.html', icon: 'settings', perms: ['vendor.config.write'] },
           { id: 'rating-review',   label: '🐚 房源评级复核 · AI引擎', href: 'p-rating-review.html',       icon: 'star',   badge: '23' },
           { id: 'b-rating',        label: '好房子评级录入 ↗',        href: 'b-house-rating-input.html',  icon: 'star' },
           { id: 'b-console',       label: 'B 运营商工作台 ↗',        href: 'b-operator-console.html',    icon: 'home' },

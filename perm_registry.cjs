@@ -69,6 +69,7 @@ const PERMS = [
   { code: 'vendor.fund.write',    name: '商家费率管理', domain: 'vendor', action: 'write', desc: '商家佣金费率调整（按业务线两档，规则 20）', roles: ['platform_op', 'operator_admin'] },
   { code: 'vendor.onboarding.review', name: '商家入驻受理', domain: 'vendor', action: 'review', desc: '商家入驻申请单受理/核验/通过/驳回（服务认证中台）', roles: ['platform_op', 'operator_admin'] },
   { code: 'vendor.review', name: '商家资质复审', domain: 'vendor', action: 'review', desc: 'jz_vendors 商家资质复审（reviewing/approved/rejected + status 联动；复审动作留痕）', roles: ['platform_op', 'operator_admin'] },
+  { code: 'vendor.config.write', name: '商家接入配置', domain: 'vendor', action: 'write', desc: 'jz_vendors 接入配置：webhook_url / url_link / order_detail_url / hmac_key 一键重置（仅平台代管，商家不可改；读也走本点，密钥 head 不给 admin.read 群体）', roles: ['platform_op', 'operator_admin'] },
 ];
 
 /**
@@ -179,6 +180,13 @@ const ROUTES = [
   // 商家资质复审（jz_vendors.review_status；2026-09-22 补登记——此前未登记走 admin.write 兜底、复审无审计留痕）
   { method: 'GET',    re: '^/api/juzhu/admin/vendors$', perm: 'admin.read', act: 'vendor.list', res: 'vendors' },
   { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/review$', perm: 'vendor.review', act: 'vendor.review.update', res: 'vendors', idGroup: 1 },
+  // 商家接入配置（webhook_url / url_link / order_detail_url / hmac_key；仅平台代管，商家不可改；读也挂写点——密钥 head 与回调地址不对 admin.read 群体开放）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/config$', perm: 'vendor.config.write', act: null, res: 'vendors' },
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/config-history$', perm: 'vendor.config.write', act: null, res: 'vendors' },
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/(\\d+)/config$', perm: 'vendor.config.write', act: null, res: 'vendors', idGroup: 1 },
+  { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/config$', perm: 'vendor.config.write', act: 'vendor.config.update', res: 'vendors', idGroup: 1 },
+  { method: 'POST',   re: '^/api/juzhu/admin/vendors/(\\d+)/config/hmac-key/rotate$', perm: 'vendor.config.write', act: 'vendor.hmac_key.rotate', res: 'vendors', idGroup: 1 },
+  { method: 'POST',   re: '^/api/juzhu/admin/vendors/(\\d+)/config/webhook-test$', perm: 'vendor.config.write', act: 'vendor.webhook.test', res: 'vendors', idGroup: 1 },
   // IAM
   { method: 'POST',   re: '^/api/juzhu/admin/accounts$', perm: 'iam.write', act: 'account.create', res: 'account' },
   { method: 'PUT',    re: '^/api/juzhu/admin/accounts/(\\d+)$', perm: 'iam.write', act: 'account.update', res: 'account', idGroup: 1 },
