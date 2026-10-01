@@ -519,3 +519,8 @@
 .plan-dots{justify-content:flex-start;padding:9px 18px 0}
 .plan-slide{flex-shrink:0}
 .plan-swiper{margin:0 -18px}
+
+/* ── 我的会员记录：标题与区块标题字阶对齐（此前无样式，落在浏览器默认 h2 ≈18px 黑体）── */
+.member-records h2{font:600 16px/1.4 var(--serif);margin:0 0 4px;letter-spacing:.01em}
+.member-records{padding:16px 18px}
+.member-record b{font-weight:600}
