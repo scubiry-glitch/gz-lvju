@@ -69,6 +69,10 @@ test('unified workflow uses isolated MySQL and actual shared migrations',{skip:!
   await assert.rejects(w.previewAdjustment(maker,{...input,expected_revision:2,delta_minor:'1'}),{status:409});
   assert.equal((await w.detail(maker,{id:f.item})).payable_minor,'10000','original payment obligation is not enlarged');
  });
+ await t.test('B is a cash movement and cannot be amended as a fictitious platform payable',async()=>{
+  const f=await makeFixture({kind:'platform_transfer',amount:'2000'});await assert.rejects(w.previewAdjustment(maker,{id:f.item,expected_revision:1,kind:'ENTITLEMENT_ADJUSTMENT',planned_minor:'1000',delta_minor:'-1000',reason:'尝试改变佣金合同'}),{code:'platform_transfer_requires_business_revision'});
+  assert.equal((await w.previewAdjustment(maker,{id:f.item,expected_revision:1,kind:'PAYMENT_ARRANGEMENT',planned_minor:'1000',reason:'佣金分次到账安排'})).after.planned_minor,'1000');
+ });
  await t.test('Q waits for B receipt; retry binds an actual commission lot before authorization',async()=>{
   const f=await makeFixture({kind:'promoter',amount:'1000'}),input={id:f.item,expected_revision:1,...key()};await assert.rejects(w.authorizeItem(maker,input),{code:'commission_funding_pending'});
   const child=uuid();await q("INSERT INTO commerce_funding_sources(id,context_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,'PLATFORM_COMMISSION','TEST','ISOLATED_TEST','CNY',?,'contract',2000,'AVAILABLE','{}')",[child,f.context,f.platformAccount]);
@@ -91,6 +95,9 @@ test('unified workflow uses isolated MySQL and actual shared migrations',{skip:!
   const account=await C.create(maker,{kind:'accounts',party_id:'new-party',provider:'TEST',environment:'ISOLATED_TEST',merchant_no:'new-merchant',contract_no:'contract',currency:'CNY',capabilities:{operations:['SPLIT']},...key()});
   await assert.rejects(C.approve(maker,{kind:'accounts',id:account.id,...key()}),{status:403});await C.approve(reviewer,{kind:'accounts',id:account.id,...key()});
   const binding=await C.create(maker,{kind:'bindings',party_id:'new-party',source_domain:'jiazheng',source_entity_type:'vendor',source_entity_id:'7',...key()});await C.approve(reviewer,{kind:'bindings',id:binding.id,...key()});
+  const restricted=principal('merchant-admin',['settlement.policy.write','settlement.policy.review'],{level:'all',party_ids:['new-party']});
+  await assert.rejects(C.create(restricted,{kind:'bindings',party_id:'new-party',source_domain:'platform',source_entity_type:'entity',source_entity_id:'unauthorized-platform',...key()}),{status:403});
+  const platformBinding=await C.create(maker,{kind:'bindings',party_id:'new-party',source_domain:'platform',source_entity_type:'entity',source_entity_id:'test-platform',...key()});await assert.rejects(C.approve(restricted,{kind:'bindings',id:platformBinding.id,...key()}),{status:403});await C.approve(reviewer,{kind:'bindings',id:platformBinding.id,...key()});
   const profile=await C.create(maker,{kind:'profiles',party_id:'new-party',biz_type:'jiazheng',payment_mode:'pay_center',snapshot:{contract_ref:'contract',calculation:{mode:'PROPORTIONAL',commission_bps:1000,rounding:'FLOOR_BPS_V1'},recognition_policy:{mode:'CUSTOMER_ACCEPTANCE'},funding_mode:'CONTROLLED_COLLECTION',source_account_id:account.id,merchant_account_id:account.id,platform_account_id:account.id,funding_evidence_ref:'TEST',contract_mapping_version:'TEST',collection:{mapping_version:'collection-test',contract_no:'contract',source_merchant_no:'new-merchant',provider:'TEST',environment:'ISOLATED_TEST'}},...key()});
   await C.approve(reviewer,{kind:'profiles',id:profile.id,...key()});assert.equal((await C.forOrder(pool,{biz_type:'jiazheng',entity_id:'7',payment_mode:'pay_center'})).profile_id,profile.id);
  });
