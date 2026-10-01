@@ -159,6 +159,7 @@
   </div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_cashier.js?v=2"></script>
 <script src="screens/_beike-login.js?v=18"></script>
 <script>
 /* 预订下单（需登录）：GET /api/auth/me 判断登录态 →
@@ -558,35 +559,6 @@
       });
   });
 
-  /* ── App 收银台：JsBridgeV3.callAndBack 拉起钱包收银台 ──
-     中台 cashier_url 形如 WalletSDK://bkjf?...，需再包一层 App scheme 后双向回调。 */
-  function openAppCashier(cashierUrl, paidUrl, reset){
-    window.payAndBack = function(res){
-      try {
-        var result = typeof res === 'string' ? JSON.parse(res) : (res || {});
-        if (String(result.code) === '-1') {
-          alert('支付取消');
-          if (typeof reset === 'function') reset();
-          return;
-        }
-      } catch (e) {}
-      location.href = paidUrl;
-    };
-    var schemeLink = 'bkjfwallet?url=';
-    var prefix = '';
-    try {
-      if (window.JsBridgeV3 && typeof window.JsBridgeV3.getSchemeLink === 'function') {
-        prefix = window.JsBridgeV3.getSchemeLink(schemeLink) || '';
-      }
-    } catch (e) {}
-    var actionUrl = prefix + encodeURIComponent(cashierUrl);
-    if (window.JsBridgeV3 && typeof window.JsBridgeV3.callAndBack === 'function') {
-      window.JsBridgeV3.callAndBack({ actionUrl: actionUrl, functionName: 'payAndBack' });
-      return;
-    }
-    location.href = cashierUrl;
-  }
-
   /* ── 立即支付（下单成功后 / 待支付订单回跳共用）── */
   function wirePayNow(orderNo, contactPhone){
     var payBtn = document.getElementById('okPay');
@@ -603,7 +575,7 @@
       var result = 'lvju-app-paid.html?channel=booking&order_no=' + encodeURIComponent(orderNo) +
         '&phone=' + encodeURIComponent(contactPhone || '');
       // 先查单校验，再向中台下单；cashier_type 由前端运行环境判断。
-      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+      fetch('/api/juzhu/booking/lookup', { method:'POST', headers:Object.assign({'Content-Type':'application/json'},authH()),
         body: JSON.stringify({ order_no: orderNo, contact_phone: contactPhone }) })
         .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
         .then(function(lk){
@@ -611,25 +583,44 @@
           var o = lk.d.order || {};
           if (o.pay_status === 'paid') { location.href = result; return null; }
           if (o.status !== 'pending') { alert('订单状态为「' + o.status + '」，无需支付'); reset(); return null; }
-          var cashierType = sdkProbe() ? '1' : '2';
+          var cashier = window.BZF_CASHIER;
+          if (!cashier) throw new Error('支付组件加载失败，请刷新页面');
+          var cashierType = cashier.cashierType();
+          var key = cashier.requestKey('booking-pay:' + orderNo + ':' + cashierType, payBtn.dataset.newAttempt === '1');
+          payBtn.dataset.newAttempt = '';
           var payHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
+          payHeaders['Idempotency-Key'] = key;
           return fetch('/api/juzhu/booking/pay', { method:'POST', headers: payHeaders,
-            body: JSON.stringify({ order_no: orderNo, contact_phone: contactPhone, cashier_type: cashierType }) })
+            body: JSON.stringify({ order_no: orderNo, contact_phone: contactPhone, cashier_type: cashierType, idempotency_key: key }) })
             .then(function(r){ return r.json().then(function(d){ return { ok: r.ok, d: d }; }); })
-            .then(function(pay){
+            .then(async function(pay){
               if (!pay.ok) { alert(pay.d.error || '支付失败'); reset(); return; }
-              var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
-              if (!pay.d.cashier_url) { location.href = paid; return; }
-              // App：callAndBack 拉起钱包收银台并等回调；H5：直跳 cashier_url。
-              if (cashierType === '1') {
-                openAppCashier(pay.d.cashier_url, paid, reset);
-                return;
+              pay.d=cashier.normalize(pay.d);
+              if(cashierType==='1')await cashier.ensureAppBridge();
+              if (!pay.d.cashier_url && pay.d.pay_status !== 'paid' && pay.d.next_action !== 'new_attempt') {
+                pay.d = await cashier.waitForCashier(function(){
+                  return fetch('/api/juzhu/payment/query', { method:'POST', headers:payHeaders,
+                    body:JSON.stringify({order_no:orderNo,contact_phone:contactPhone}) }).then(function(r){
+                    return r.json().then(function(d){ if(!r.ok)throw new Error(d.error||'支付查询失败');return d; });
+                  });
+                });
               }
-              location.href = pay.d.cashier_url;
+              var paid = result + '&app_order_id=' + encodeURIComponent(pay.d.app_order_id || '');
+              if(pay.d.next_action==='new_attempt'){
+                payBtn.dataset.newAttempt='1';reset();alert('原支付已关闭，请再次点击支付开启新的付款尝试');return;
+              }
+              if(!cashier.open(pay.d,{onResult:function(){location.href=paid;},onCancel:reset})){
+                reset();alert(pay.d.next_action==='closed'?'订单已关闭，请重新预订':'支付结果确认中，请稍后从订单页继续查看');
+              }
             });
         })
-        .catch(function(){ alert('网络异常，请稍后再试'); reset(); });
+        .catch(function(error){ alert(error.message||'网络异常，请稍后再试'); reset(); });
     };
+    // A browser may restore this exact document from its back/forward cache
+    // after the H5 cashier, including the former disabled-button state.
+    window.addEventListener('pageshow',function(){
+      if(payBtn.dataset.submitting==='1'){payBtn.dataset.submitting='';payBtn.textContent='立即支付 →';}
+    });
   }
   function showPaidSuccess(order){
     var orderNo = order.order_no;
@@ -705,9 +696,10 @@
       checkout: document.getElementById('fOut').value,
       contact_name: document.getElementById('fName').value.trim(),
       contact_phone: document.getElementById('fPhone').value.trim(),
-      transaction_mode: txSel.value,
-      idempotency_key: 'lvju-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
+      transaction_mode: txSel.value
     };
+    if(!window.BZF_CASHIER){showErr('支付组件加载失败，请刷新页面');return;}
+    body.idempotency_key=window.BZF_CASHIER.requestKey('booking-create:'+JSON.stringify(body));
     submitBtn.disabled = true; submitBtn.style.opacity = '.55';
     var bHeaders = Object.assign({ 'Content-Type': 'application/json' }, authH());
     fetch('/api/juzhu/booking', { method: 'POST', headers: bHeaders, body: JSON.stringify(body) })
@@ -730,7 +722,7 @@
         document.getElementById('formBox').style.display = 'none';
         document.getElementById('cBar').style.display = 'none';
       })
-      .catch(function(){ showErr('网络异常，请稍后再试'); });
+      .catch(function(){ submitBtn.disabled=false;submitBtn.style.opacity='';showErr('网络异常，请稍后再试'); });
   });
 
   /* ── 启动：登录判断 → 联系人 → 房源（或 ?order_no= 续付）── */

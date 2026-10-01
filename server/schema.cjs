@@ -956,6 +956,9 @@ function createSchema(deps) {
       try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_paid_payment (paid_payment_order_id)'); } catch (_) {}
       try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_latest_refund (latest_refund_id)'); } catch (_) {}
       try { await conn.execute('ALTER TABLE booking_orders ADD KEY idx_bo_refund_status (refund_status)'); } catch (_) {}
+      // Versioned shared-payment migrations fail explicitly; no blanket ALTER
+      // suppression is allowed for the cashier's concurrency guarantees.
+      await require('./payment/migrate.cjs').migrate(conn);
       schemaEnsured = true;
     } finally {
       await conn.end();

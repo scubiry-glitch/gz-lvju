@@ -274,8 +274,9 @@
   <div class="text">正在生成预约链接…</div>
 </div>
 <script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_beike-login.js?v=18"></script>
 <script src="screens/_region.js"></script>
-<script src="screens/_jzapi.js?v=9"></script>
+<script src="screens/_jzapi.js?v=12"></script>
 <script src="jz-datepick.js?v=2"></script>
 <script>
 (function(){
@@ -654,6 +655,14 @@
       }).catch(function(e){toast(e.message||'请稍后再试');});
       return;
     }
+    if (!product || !product.payment_mode) return toast('商家尚未开通支付，请联系服务商咨询');
+    if (product.payment_mode === 'pay_center') {
+      if (!(Number(product.price) > 0)) return toast('此项为咨询或估价服务，无需付款，请联系服务商');
+      var checkout = JZ.chainCity('jiazheng-booking.html?sku=' + encodeURIComponent(slug) + '&product=' + encodeURIComponent(product.id) + '&vendor=' + encodeURIComponent(product.vendor_id));
+      if (window.BZF_BEIKE_LOGIN) BZF_BEIKE_LOGIN.gateThenGo(checkout); else location.href = checkout;
+      return;
+    }
+    if (product.payment_mode !== 'wechat_mini') return toast('商家支付方式不可用');
     // 登录拦截：ensureUserId 统一身份（测试环境模拟登录 / 生产 App 内 jsbridge3），
     // 取不到（非 App 环境或未登录）不生成小程序链接
     JZ.ensureUserId().then(function(uid){
@@ -669,7 +678,7 @@
       // C 端预约：wechat-link 匿名可调，勿依赖 localStorage API Key
       fetch('/api/juzhu/jiazheng/wechat-link', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({}, JZ.authHeaders(), { 'Content-Type': 'application/json', 'Idempotency-Key': JZ.requestKey('wechat:' + product.id + ':' + uid) }),
         body: JSON.stringify({ product_id: product.id, user_id: uid })
       }).then(function(r){ return r.json(); })
         .then(function(res){

@@ -27,6 +27,7 @@
 
     <div class="otabs" id="tabs">
       <a class="on" data-s="">全部</a>
+      <a data-s="pending">待付款</a>
       <a data-s="paid">已支付</a>
       <a data-s="assigned">已派单</a>
       <a data-s="serving">服务中</a>
@@ -38,7 +39,8 @@
 </div>
 <script src="screens/_console-login.js"></script>
 <script src="jsbridgesdk.js?v=1"></script>
-<script src="screens/_jzapi.js?v=9"></script>
+<script src="screens/_beike-login.js?v=18"></script>
+<script src="screens/_jzapi.js?v=11"></script>
 <script>
 (function(){
   var JZ = window.BZF_JZ;
@@ -46,6 +48,7 @@
   var curStatus = q.get('status') || '';
   var CAT_ICON = { cleaning: '🧹', repair: '🔧', moving: '📦', nanny: '👶' };
   var STATUS_UI = {
+    pending:   { label: '待付款', cls: 'paid' },
     paid:      { label: '已支付', cls: 'paid' },
     assigned:  { label: '已派单', cls: 'assigned' },
     serving:   { label: '服务中', cls: 'serving' },
@@ -69,6 +72,12 @@
     }
     document.getElementById('list').innerHTML = list.map(function(o){
       var st = STATUS_UI[o.status] || { label: o.status, cls: 'done' };
+      if (o.refund_status) st = { label: o.refund_status === 'refunded' ? '已退款' : '退款处理中', cls: 'cancelled' };
+      if (o.pay_status === 'closing') st = { label: '取消处理中', cls: 'cancelled' };
+      if (o.is_commerce && o.pay_status === 'paid' && o.fulfillment_status !== 'fulfilled') st = { label: '已付款 · 权益发放中', cls: 'paid' };
+      if (o.is_commerce && o.pay_status === 'partially_refunded') st = { label: '部分退款', cls: 'done' };
+      var payable = o.status === 'pending' && !['paid','closing','closed','refunded','refund_pending','partially_refunded'].includes(o.pay_status);
+      var payHref = o.is_internal_service ? 'lvju-app-pay.html?channel=jiazheng&order=' + encodeURIComponent(o.order_ref) : o.cashier_href;
       var name = o.product_name || '服务（已下架）';
       var icon = CAT_ICON[o.category_id] || '🧰';
       return '<div class="ordcard">' +
@@ -80,19 +89,22 @@
           '<div class="oi">' +
             '<div class="nm">' + esc(name) + '</div>' +
             '<div class="meta">' + esc(o.city || '') + ' · 下单 ' + esc((o.created_at || '').slice(0, 16)) + '</div>' +
-            '<div class="amt">实付 <b>' + fmtYuan(o.fee) + '</b> · 订单号 ' + esc((o.order_ref || '').slice(-6)) + '</div>' +
+            '<div class="amt">订单金额 <b>' + fmtYuan(o.fee) + '</b> · 订单号 ' + esc((o.order_ref || '').slice(-6)) + '</div>' +
           '</div>' +
         '</div>' +
-        '<div class="of"><a class="primary" href="juzhu-jiazheng-order-detail.html?order_ref=' +
+        '<div class="of">' + (payable && payHref ? '<a class="primary" href="' + esc(payHref) + '">去付款</a>' : '') + '<a class="primary" href="juzhu-jiazheng-order-detail.html?order_ref=' +
           encodeURIComponent(o.order_ref) + '">查看详情</a></div>' +
       '</div>';
     }).join('');
   }
 
   function load(){
-    if(window.BZF_CONSOLE?.token()){
-      fetch('/api/juzhu/gr/orders?source=account',{headers:{Authorization:'Bearer '+BZF_CONSOLE.token()}}).then(r=>r.json()).then(res=>{if(!res.ok)throw Error(res.error||'加载失败');render(curStatus?(res.list||[]).filter(o=>o.status===curStatus):res.list);}).catch(e=>{document.getElementById('list').textContent=e.message;});return;
-    }
+    fetch('/api/juzhu/gr/orders?source=account',{headers:JZ.authHeaders()}).then(function(r){
+      if(r.status===401)return loadExternal();
+      return r.json().then(function(res){if(!res.ok)throw Error(res.error||'加载失败');render(curStatus?(res.list||[]).filter(function(o){return o.status===curStatus;}):res.list);});
+    }).catch(function(e){document.getElementById('list').textContent=e.message;});
+  }
+  function loadExternal(){
     // 身份：ensureUserId 统一入口（测试环境模拟登录 / 生产 App 内 jsbridge3）；
     // 取不到（非 App 环境或未登录）提示登录，不发请求
     JZ.ensureUserId().then(function(uid){

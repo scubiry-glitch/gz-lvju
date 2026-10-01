@@ -146,12 +146,22 @@ let paymentService = null;
 function getPaymentService() {
   if (!paymentService) {
     paymentService = createPaymentService({
-      createConnection: () => mysql2.createConnection(getDbConfig()),
+      createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }),
       payCenter,
-      notifyVendorBooking,
+      jobHandlers: { booking_webhook: deliverPaymentWebhook },
     });
   }
   return paymentService;
+}
+
+function getPaymentCore() { return getPaymentService().core; }
+function getBookingPaymentAdapter() { return getPaymentService().bookingAdapter; }
+let jiazhengPaymentAdapter;
+function getJiazhengAdapter() {
+  if (!jiazhengPaymentAdapter) jiazhengPaymentAdapter = require('./server/payment/jiazheng-adapter.cjs').createJiazhengAdapter({
+    createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }), paymentCore: getPaymentCore(), config: process.env,
+  });
+  return jiazhengPaymentAdapter;
 }
 
 // 与 juzhu/server.py is_public_static 对齐：整仓静态根不得暴露密钥/源码/部署产物。
@@ -497,11 +507,13 @@ async function restrictOrdersRead(req, res) {
 async function grUserQuery(req,qp){
   const raw=String(qp.get('user_id')||'');
   if(qp.get('source')==='account'||raw.startsWith('commerce-account-')){
-    const session=await authCenter.verifySessionToken(extractBearerToken(req)).catch(()=>null);
-    if(!session||session.account.status!=='active'||session.account.principal_type!=='user')return {ok:false,status:401,error:'请使用新居住账号登录'};
+    const session=await requestSession(req);
+    if(!session?.account||session.account.status!=='active'||session.account.principal_type!=='user')return {ok:false,status:401,error:'请使用新居住账号登录'};
     const userId=require('./commerce/main-system.cjs').accountUser(session.account.id);
     if(raw&&raw!==userId)return {ok:false,status:403,error:'不能查看其他账号的订单'};
-    return {ok:true,userId};
+    const userIds = [userId];
+    if (session.account.idp_type === 'beike' && session.account.idp_subject) userIds.push(String(session.account.idp_subject));
+    return {ok:true,userId,userIds};
   }
   return grOrders.validateUserIdQuery(raw);
 }
@@ -665,7 +677,7 @@ async function nextEmpNo(conn) {
   return prefix + String(base + 1).padStart(4, '0');
 }
 
-const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url'];
+const VENDOR_SECRET_FIELDS = ['hmac_key', 'url_link', 'order_detail_url', 'pay_merchant_no', 'payment_config_json'];
 
 function stripVendorSecrets(obj) {
   if (!obj || typeof obj !== 'object') return obj;
@@ -735,6 +747,16 @@ function isCEndPublicApi(urlPath, method) {
   return false;
 }
 
+function isPaymentCustomerApi(p, method) {
+  const m = String(method || 'GET').toUpperCase();
+  return (m === 'POST' && (p === '/api/juzhu/jiazheng/orders' || p === '/api/juzhu/jz/orders' || /^\/api\/juzhu\/jiazheng\/orders\/[^/]+\/(pay|payment|cancel)$/.test(p)))
+    || (m === 'GET' && (p === '/api/juzhu/jiazheng/orders' || /^\/api\/juzhu\/jiazheng\/orders\/(?!stats$)[^/]+$/.test(p) || /^\/api\/juzhu\/jiazheng\/orders\/[^/]+\/payment$/.test(p)))
+    || (m === 'GET' && /^\/api\/juzhu\/jz\/orders\/(?!(?:overview|stats)$)[^/]+$/.test(p))
+    || (['GET', 'POST'].includes(m) && p === '/api/juzhu/booking/contacts')
+    || (m === 'DELETE' && /^\/api\/juzhu\/booking\/contacts\/\d+$/.test(p))
+    || (m === 'GET' && p === '/api/juzhu/booking/my');
+}
+
 async function assertApiAuthorized(urlPath, req, res) {
   if (isAdminAuthExempt(urlPath, req.method)) return true;
   const p = String(urlPath || '').replace(/\/+$/, '') || '/';
@@ -750,6 +772,14 @@ async function assertApiAuthorized(urlPath, req, res) {
     }
     if (await requestSession(req)) return true;
     jsonReply(res, { error: 'unauthorized', message: '商家凭据无效或已过期，请重新 POST /api/juzhu/vendor/login' }, 401);
+    return false;
+  }
+  if (isPaymentCustomerApi(p, req.method)) {
+    const session = await requestSession(req);
+    if (session?.account?.status === 'active') return true;
+    // Management reads retain their existing role/permission gate.
+    if (req.method === 'GET') return requireApiKey(req, res, urlPath);
+    jsonReply(res, { error: 'unauthorized', message: '请先登录本人账号' }, 401);
     return false;
   }
   if (isVendorHmacPath(urlPath, req.method)) return true;
@@ -926,92 +956,41 @@ function bookingPaymentExpired(row) {
     && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
 }
 
+// Historical caller compatibility: expiry requests durable closure and never releases stock here.
 async function expireBooking(conn, row) {
-  if (!bookingPaymentExpired(row)) return false;
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  const [updated] = await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending' AND pay_status='unpaid'", [now, row.id]);
-  if (!updated.affectedRows) return false;
-  // 多间库存释放（2026-09-10）：按订单区间递减 booked_qty，纯占用行删行（商家夜价/qty 差异行保留）
-  await releaseStayQty(connExec(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
+  if (!row || row.pay_status == null || !row.payment_expires_at || !require('./server/payment/primitives.cjs').expired(row.payment_expires_at)) return false;
+  const guard = await getBookingPaymentAdapter().prepare(conn, row);
+  if (guard.paid_payment_id) return false;
+  await getPaymentCore().requestClose({ bizType: 'booking', orderId: row.order_no, reason: 'booking_expired' }, conn);
   return true;
 }
 
-async function cleanupExpiredBookingOrders() {
-  let conn;
+let paymentMaintenanceRunning = false;
+let lastPaymentExpiryScan = 0;
+async function runUnifiedPaymentMaintenance() {
+  if (paymentMaintenanceRunning) return;
+  paymentMaintenanceRunning = true;
   try {
-    conn = await getPool().getConnection();
-    await conn.beginTransaction();
-    const [rows] = await conn.execute(
-      `SELECT * FROM booking_orders
-         WHERE status='pending' AND pay_status='unpaid'
-           AND payment_expires_at IS NOT NULL AND payment_expires_at <= UTC_TIMESTAMP()
-         ORDER BY id LIMIT 100 FOR UPDATE`);
-    if (!rows.length) { await conn.commit(); return; }
-    for (const row of rows) await expireBooking(conn, row);
-    await conn.commit();
-  } catch (e) {
-    if (conn) { try { await conn.rollback(); } catch (_) {} }
-    if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(e && e.code)) console.warn('cleanupExpiredBookingOrders:', e.message);
-  } finally { if (conn) conn.release(); }
-}
-
-// 已创建收银台的订单必须先由中台确认关单，才可释放库存，避免晚到支付成功。
-async function cleanupExpiredPaymentOrders() {
-  let scanConn;
-  try {
-    scanConn = await getPool().getConnection();
-    const [rows] = await scanConn.execute(
-      `SELECT b.* FROM booking_orders b
-       JOIN payment_orders p ON p.biz_order_no=b.order_no
-       WHERE b.status='pending'
-         AND b.payment_expires_at IS NOT NULL AND b.payment_expires_at <= UTC_TIMESTAMP()
-         AND p.pay_status IN ('creating','create_unknown','paying','closing','close_unknown')
-       ORDER BY p.id DESC LIMIT 100`,
-    );
-    for (const row of rows) {
-      let closeResult;
-      try {
-        closeResult = await getPaymentService().closePaymentByOrder(row.order_no, 'booking_expired');
-      } catch (error) {
-        console.warn('cleanupExpiredPaymentOrders close:', row.order_no, error.message);
-        continue;
-      }
-      if (closeResult.skipped) continue;
-      const conn = await getPool().getConnection();
-      try {
-        await conn.beginTransaction();
-        const [locked] = await conn.execute(`SELECT * FROM booking_orders WHERE id=? FOR UPDATE`, [row.id]);
-        const booking = locked[0];
-        if (booking && booking.status === 'pending' && !booking.paid_payment_order_id) {
-          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-          await conn.execute(
-            `UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=?`,
-            [now, booking.id],
-          );
-          await releaseStayQty(connExec(conn), {
-            project_id: booking.project_id, unit_id: booking.unit_id, rooms: booking.rooms,
-            checkin: booking.checkin, checkout: booking.checkout, now,
-          });
-        }
-        await conn.commit();
-      } catch (error) {
-        try { await conn.rollback(); } catch (_) {}
-        console.warn('cleanupExpiredPaymentOrders expire:', row.order_no, error.message);
-      } finally {
-        conn.release();
+    await ensureSchema();
+    const core = getPaymentCore(), booking = getBookingPaymentAdapter(), life = getJiazhengAdapter();
+    await core.runJobs(50);
+    await core.consumeEvents('booking', booking.handleEvent, 50);
+    await core.consumeEvents('jiazheng', life.handleEvent, 50);
+    if (Date.now() - lastPaymentExpiryScan >= 30000) {
+      lastPaymentExpiryScan = Date.now();
+      for (const [label, scan] of [['legacy recovery', () => booking.recoverLegacy(100)], ['booking expiry', () => booking.expire(100)], ['life expiry', () => life.expire(100)]]) {
+        try {
+          const result = await scan();
+          for (const error of result?.errors || []) console.warn(label + ':', error.orderNo, error.code);
+        } catch (error) { console.warn(label + ':', error.code || error.name); }
       }
     }
-  } catch (error) {
-    if (!['ECONNREFUSED', 'ETIMEDOUT', 'PROTOCOL_CONNECTION_LOST'].includes(error && error.code)) {
-      console.warn('cleanupExpiredPaymentOrders:', error.message);
-    }
-  } finally {
-    if (scanConn) scanConn.release();
-  }
+  } finally { paymentMaintenanceRunning = false; }
 }
 
 // ===== 商家 Webhook 推送（平台 → 商家，HMAC 签名与开放接口同算法）=====
-// 事件：booking.created / booking.paid / booking.cancelled。只通知不担保必达：
+// 普通事件 booking.created / booking.cancelled 使用有限重试；booking.paid 由持久任务投递。
+// 以下普通事件只通知不担保必达：
 // 重试 3 次（5s/30s/120s）仍失败即放弃，商家以 bookings/list 拉取对账兜底。
 const WEBHOOK_RETRY_DELAYS = [5000, 30000, 120000];
 
@@ -1120,6 +1099,19 @@ function notifyVendorBooking(vendorId, event, order) {
   })().catch((e) => console.warn('[webhook] notify error:', e.message));
 }
 
+// Payment fulfillment enqueues this delivery in the same transaction as the order update.
+// A process restart cannot lose the delivery; the receiver deduplicates by event + payment_id.
+async function deliverPaymentWebhook(job) {
+  const { vendorId, event, order } = job.payload;
+  const rows = await queryRows('SELECT hmac_key,webhook_url FROM jz_vendors WHERE id=?', [vendorId]);
+  const vendor = rows[0];
+  if (!vendor || !vendor.hmac_key || !vendor.webhook_url) return;
+  const timestamp = Date.now();
+  const payload = { event, vendor_id: vendorId, order };
+  const result = await guardedPostJson(vendor.webhook_url, { ...payload, timestamp, sign: webhookSign(vendor.hmac_key, payload, timestamp) }, 5000);
+  if (!result.ok) throw new Error('booking webhook delivery failed');
+}
+
 async function runVendorWebhookTest(vendorId) {
   const conn = await mysql2.createConnection(getDbConfig());
   let v = null;
@@ -1181,6 +1173,8 @@ module.exports.requireApiKey = requireApiKey;
 module.exports.assertAdminAuthorized = assertAdminAuthorized;
 module.exports.assertApiAuthorized = assertApiAuthorized;
 module.exports.isCEndPublicApi = isCEndPublicApi;
+module.exports.isPaymentCustomerApi = isPaymentCustomerApi;
+module.exports.grUserQuery = grUserQuery;
 module.exports.isVendorHmacPath = isVendorHmacPath;
 module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
@@ -1628,7 +1622,7 @@ const handleBookingRoutes = createBookingRouter({
   transactionCapabilitiesOf, minStayNightsOf,
   cancelPolicyOf, cancelPolicyTextOf, wholeHousePriceUnit,
   fallbackUnitRowFor, settingValue, vendorRate,
-  getPaymentService, notifyVendorBooking, bookingPaymentExpired,
+  getPaymentService, getBookingPaymentAdapter, notifyVendorBooking, bookingPaymentExpired,
   expireBooking,
 });
 
@@ -1640,6 +1634,7 @@ const handleJiazhengRoutes = createJiazhengRouter({
   requireCEndWrite, restrictOrdersRead, requireDispatchPerm, requireApiKey,
   authCenter, auditIfAccount,
   getVendorConfig, hmacAuth, grOrders, outboundJson, stripVendorSecrets,
+  requestSession, getPaymentCore, getJiazhengAdapter,
 });
 
 const handleAdminRoutes = createAdminRouter({
@@ -1689,6 +1684,7 @@ const handleApiDirect = createApiDirectRouter({
   expireBooking,
   getDbConfig,
   getVendorConfig,
+  getBookingPaymentAdapter,
   grOrders,
   grUserQuery,
   guardRatingSubmit,
@@ -1900,13 +1896,17 @@ function reqLogCategory(path) {
 // 请求开始：详细模式打印分段头；简洁模式只打印接口 URI
 function reqLogBegin(req, rawPath, qs) {
   reqSeq += 1;
-  const uri = rawPath + (qs ? '?' + qs : '');
+  const safePath = rawPath.replace(/(\/payment\/notify\/)[^/]+/, '$1[redacted]');
+  const safeQuery = new URLSearchParams(qs);
+  for (const key of safeQuery.keys()) if (/token|secret|key|phone|ucid/i.test(key)) safeQuery.set(key, '[redacted]');
+  const query = safeQuery.toString();
+  const uri = safePath + (query ? '?' + query : '');
   if (!logDetailOn()) {
     console.log(`${logTs()} ${req.method} ${uri}`);
     return;
   }
   const lines = [LOG_SEP, `#${reqSeq} ${logTs()} [${reqLogCategory(rawPath)}] ${req.method} ${uri}`];
-  if (qs) lines.push(`  >> 参数(query): ${qs}`);
+  if (query) lines.push(`  >> 参数(query): ${query}`);
   if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
     lines.push(`  >> 参数(headers): content-type=${req.headers['content-type'] || '-'}, content-length=${req.headers['content-length'] || 0}`);
   }
@@ -1916,7 +1916,9 @@ function reqLogBegin(req, rawPath, qs) {
 // 请求体（JSON）原文打印：与 Python _body() 一致，超长截断
 function reqLogBody(rawBody) {
   if (!logDetailOn() || !rawBody) return;
-  const text = String(rawBody);
+  let text;
+  try { text = JSON.stringify(require('./server/payment/primitives.cjs').sanitize(JSON.parse(String(rawBody)))); }
+  catch (_) { text = '[non-JSON body omitted]'; }
   const body = text.length > LOG_BODY_LIMIT ? `${text.slice(0, LOG_BODY_LIMIT)}…[截断，共 ${text.length} 字符]` : text;
   console.log(`  >> 参数(body): ${body.replace(/\n/g, '\n  | ')}`);
 }
@@ -1965,8 +1967,10 @@ function resLogWrap(req, res) {
     const ct = contentType || res.getHeader('content-type') || '-';
     const lines = [`  << 状态: ${res.statusCode} · ${size}B · ${Date.now() - started}ms · ${ct}`];
     if (body.length || bodyTruncated) {
-      let text = body;
-      if (bodyTruncated) text += `…[截断，共 ${size} 字节]`;
+      let text = '[body omitted]';
+      if (!bodyTruncated) {
+        try { text = JSON.stringify(require('./server/payment/primitives.cjs').sanitize(JSON.parse(body))); } catch (_) {}
+      } else text = `[body omitted: ${size} bytes]`;
       lines.push(`  << 返回: ${text.replace(/\n/g, '\n  | ')}`);
     }
     console.log(lines.join('\n'));
@@ -1993,7 +1997,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Session-Token, X-Lianjia-Token',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-Session-Token, X-Lianjia-Token, Idempotency-Key',
     });
     res.end();
     return;
@@ -2072,14 +2076,8 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  const bookingExpiryTimer = setInterval(() => cleanupExpiredBookingOrders().catch(() => {}), 60 * 1000);
-  bookingExpiryTimer.unref();
-  const paymentExpiryTimer = setInterval(() => cleanupExpiredPaymentOrders().catch(() => {}), 60 * 1000);
-  paymentExpiryTimer.unref();
-  const paymentCompensationTimer = setInterval(() => {
-    getPaymentService().runPaymentCompensation().catch((e) => console.warn('payment compensation:', e.message));
-  }, 60 * 1000);
-  paymentCompensationTimer.unref();
+  const paymentTimer = setInterval(() => runUnifiedPaymentMaintenance().catch((e) => console.warn('payment maintenance:', e.code || e.message)), 2000);
+  paymentTimer.unref();
   const envName = (process.env.JUZHU_ENV || 'dev').trim().toLowerCase();
   const apiKey = (process.env[API_KEY_ENV] || '').trim();
   if (envName === 'prod' || envName === 'production') {

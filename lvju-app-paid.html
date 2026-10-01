@@ -56,8 +56,9 @@
 </div>
 <script src="screens/_region.js"></script>
 <script src="jsbridgesdk.js?v=1"></script>
+<script src="screens/_cashier.js?v=2"></script>
 <script src="screens/_beike-login.js?v=18"></script>
-<script src="screens/_jzapi.js?v=10"></script>
+<script src="screens/_jzapi.js?v=12"></script>
 <script>
 (function(){
   var q = new URLSearchParams(location.search);
@@ -70,7 +71,7 @@
     document.querySelector('.ttl').textContent = '支付完成';
     document.getElementById('okTitle').textContent = '支付结果确认中';
     document.getElementById('okDesc').textContent = '正在向支付中台确认支付结果，请勿重复支付';
-    if (bNo && bPhone) {
+    if (bNo) {
       var headers = {'Content-Type':'application/json'};
       try {
         if (window.BZF_BEIKE_LOGIN && BZF_BEIKE_LOGIN.authHeaders) {
@@ -81,27 +82,32 @@
           if (token) headers.Authorization = 'Bearer ' + token;
         }
       } catch (_) {}
-      fetch('/api/juzhu/payment/query', { method:'POST', headers: headers,
+      var bookingTries=0, bookingTimer=null, bookingPayment=null, bookingInFlight=false;
+      function refreshBooking(){
+      if(bookingInFlight)return;
+      bookingInFlight=true;bookingPayment=null;clearTimeout(bookingTimer);
+      return fetch('/api/juzhu/payment/query', { method:'POST', headers: headers,
         body: JSON.stringify({ order_no: bNo, contact_phone: bPhone, app_order_id: appOrderId }) })
-        .catch(function(){ return null; })
-        .then(function(){ return fetch('/api/juzhu/booking/lookup', { method:'POST', headers:{'Content-Type':'application/json'},
+        .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'支付查询失败');bookingPayment=d;});})
+        .catch(function(){ /* Legacy lookup remains the fallback when query is temporarily unavailable. */ })
+        .then(function(){ return fetch('/api/juzhu/booking/lookup', { method:'POST', headers:headers,
           body: JSON.stringify({ order_no: bNo, contact_phone: bPhone }) }); })
-        .then(function(r){ return r.json(); })
+        .then(function(r){ return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'订单查询失败');return d;}); })
         .then(function(d){
           var o = d.order || {};
-          var paid = o.pay_status === 'paid';
-          document.getElementById('okTitle').textContent = paid ? '支付成功' : '支付结果确认中';
-          document.getElementById('okDesc').textContent = paid
-            ? '资金已存管冻结，商家确认后订单生效'
-            : '尚未确认支付成功，请稍后刷新或返回订单页查看';
+          var state=window.BZF_CASHIER.orderStatus(bookingPayment,o),paid=state==='paid';
+          var closed=state==='closed'||state==='expired',refunded=state==='refunded'||state==='partially_refunded';
+          var title=paid?'支付成功':state==='refunded'?'退款已完成':state==='partially_refunded'?'已部分退款':state==='refunding'?'退款处理中':closed?'订单已关闭':'支付结果确认中';
+          document.getElementById('okTitle').textContent = title;
+          var desc=paid?'资金已存管冻结，商家确认后订单生效':(refunded||state==='refunding')?'退款进度以订单页为准':closed?'该预订已结束，可在订单页查看详情':'尚未确认支付成功，请稍后刷新或返回订单页查看';
+          document.getElementById('okDesc').textContent = desc;
           if (o.cancel_policy_text) {
-            var base = paid ? '资金已存管冻结，商家确认后订单生效' : '支付结果确认中';
             var escCp = String(o.cancel_policy_text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            document.getElementById('okDesc').innerHTML = base + ' · <img class="ic-timer" src="assets/lvju/icons/booking-timer.png" alt="" width="12" height="12">' + escCp;
+            document.getElementById('okDesc').innerHTML = desc + ' · <img class="ic-timer" src="assets/lvju/icons/booking-timer.png" alt="" width="12" height="12">' + escCp;
           }
           document.getElementById('svcName').textContent = o.project_name || '旅居预订';
           document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
-          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · ' + (paid ? '已支付 · 待商家确认' : '支付结果确认中');
+          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · ' + (paid ? '已支付 · 待商家确认' : title);
           document.getElementById('infoPanel').innerHTML =
             '<div class="kv"><span class="k">预订项目</span><span class="v">' + (o.project_name || ('#' + o.project_id)) + '</span></div>' +
             '<div class="kv"><span class="k">实付金额</span><span class="v">¥' + Number(o.price_total).toLocaleString() + '</span></div>' +
@@ -110,7 +116,12 @@
           var bo = document.getElementById('btnOrder');
           bo.href = 'lvju-app-orders.html';
           bo.textContent = '查看我的预订';
-        }).catch(function(){});
+          if(!paid&&!closed&&!refunded&&bookingTries++<6)bookingTimer=setTimeout(refreshBooking,1500);
+        }).catch(function(error){document.getElementById('okDesc').textContent=error.message||'查询暂不可用，请从订单页重试';})
+        .then(function(){bookingInFlight=false;});
+      }
+      refreshBooking();
+      document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){clearTimeout(bookingTimer);bookingTries=0;refreshBooking();}});
     }
     document.getElementById('btnOrder').href = 'lvju-app-orders.html';
     return;
@@ -118,21 +129,30 @@
 
   if (!oid || q.get('channel') !== 'jiazheng') return;
   var JZ = window.BZF_JZ;
-  JZ.get(oid).then(function(o){
-    document.querySelector('.ttl').textContent = '支付完成';
-    document.getElementById('okTitle').textContent = '支付成功';
-    document.getElementById('okDesc').innerHTML = '资金已存管冻结，中台将按规则派单<br>可在进度页查看服务者接单状态';
-    document.getElementById('svcName').textContent = o.category;
-    document.getElementById('svcMeta').textContent = o.house + ' · ' + o.expectTime;
-    document.getElementById('svcSt').textContent = '订单号 ' + o.id + ' · 待派单';
-    document.getElementById('segLabel').textContent = '服务须知';
-    document.getElementById('infoPanel').innerHTML =
-      '<div class="kv"><span class="k">服务类型</span><span class="v">' + JZ.esc(o.type) + '</span></div>' +
-      '<div class="kv"><span class="k">实付金额</span><span class="v">¥' + Number(o.fee).toLocaleString() + '</span></div>' +
-      '<div class="kv"><span class="k">服务者标准</span><span class="v">L2+ 持证 · 已投保</span></div>' +
-      '<div class="kv"><span class="k">中台派单</span><span class="v"><a href="screens/p-service-demand.html" style="color:var(--brand);">查看工单池 →</a></span></div>';
-    document.getElementById('btnOrder').href = 'juzhu-order-progress.html?order=' + encodeURIComponent(o.id);
-  });
+  document.querySelector('.ttl').textContent = '支付结果';
+  document.getElementById('okTitle').textContent = '正在确认支付结果';
+  document.getElementById('okDesc').textContent = '请稍候，可返回订单页查看进度';
+  document.getElementById('svcName').textContent = '生活服务';
+  document.getElementById('svcMeta').textContent = '';
+  document.getElementById('svcSt').textContent = '订单号 ' + oid;
+  document.getElementById('infoPanel').textContent = '';
+  document.getElementById('btnOrder').href = 'juzhu-jiazheng-order-detail.html?order_ref=' + encodeURIComponent(oid);
+  function checkJzResult(){
+    JZ.paymentStatus(oid).then(function(payment){
+      var paid = payment.order_pay_status === 'paid';
+      document.getElementById('okTitle').textContent = paid ? '支付成功' : (payment.order_pay_status === 'refunded' ? '已退款' : payment.order_pay_status === 'closed' ? '订单已关闭' : '支付结果确认中');
+      document.getElementById('okDesc').textContent = paid ? '已确认付款，服务进度以订单页为准' : '尚未确认支付成功，请稍后刷新或返回订单查看';
+    }).catch(function(error){ document.getElementById('okTitle').textContent = '暂未确认支付'; document.getElementById('okDesc').textContent = error.message; });
+    JZ.get(oid).then(function(order){
+      document.getElementById('svcName').textContent = order.product_name || order.category;
+      document.getElementById('svcMeta').textContent = order.house + ' · ' + order.expectTime;
+      var amount=order.amount_minor!=null?Number(order.amount_minor)/100:Number(order.fee)/(order.payment_mode==='pay_center'?100:1);
+      document.getElementById('infoPanel').textContent = '订单金额 ¥' + amount.toFixed(2);
+    }).catch(function(){});
+  }
+  checkJzResult();
+  var checkCount=0, checkTimer=setInterval(function(){if(++checkCount>8){clearInterval(checkTimer);return;}checkJzResult();},1500);
+
 })();
 </script>
 </body>

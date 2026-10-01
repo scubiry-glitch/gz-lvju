@@ -5,6 +5,7 @@ import {
   bookingContacts,
   bookingLookup,
   bookingPay,
+  bookingPaymentQuery,
   createBooking,
   project,
   projectUnits,
@@ -35,10 +36,6 @@ function asArr(v) {
   return v ? [v] : [];
 }
 
-function sdkProbe() {
-  return window.JsBridgeV3 || window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
-}
-
 function BookingInner() {
   const { id } = useParams();
   const [sp] = useSearchParams();
@@ -49,6 +46,7 @@ function BookingInner() {
   const [me, setMe] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [err, setErr] = useState('');
+  const [newPayAttempt, setNewPayAttempt] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [unitId, setUnitId] = useState(() => parseInt(sp.get('unit') || '', 10) || '');
@@ -299,8 +297,9 @@ function BookingInner() {
         contact_name: name.trim(),
         contact_phone: phone.trim(),
         transaction_mode: tx,
-        idempotency_key: 'h5-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10),
       };
+      if (!window.BZF_CASHIER) throw new Error('支付组件加载失败，请刷新页面');
+      body.idempotency_key = window.BZF_CASHIER.requestKey('booking-create:' + JSON.stringify(body));
       const j = await createBooking(body);
       setOk({
         order_no: j.order_no,
@@ -338,19 +337,31 @@ function BookingInner() {
         alert('订单状态为「' + o.status + '」，无需支付');
         return;
       }
-      const cashierType = sdkProbe() ? '1' : '2';
-      const pay = await bookingPay({
+      const cashier = window.BZF_CASHIER;
+      if (!cashier) throw new Error('支付组件加载失败，请刷新页面');
+      const cashierType = cashier.cashierType();
+      if (cashierType === '1') await cashier.ensureAppBridge();
+      const requestKey = cashier.requestKey('booking-pay:' + ok.order_no + ':' + cashierType, newPayAttempt);
+      setNewPayAttempt(false);
+      let pay = cashier.normalize(await bookingPay({
         order_no: ok.order_no,
         contact_phone: contactPhone,
         cashier_type: cashierType,
-      });
+        idempotency_key: requestKey,
+      }));
+      if (!pay.cashier_url && pay.pay_status !== 'paid' && pay.next_action !== 'new_attempt') {
+        pay = await cashier.waitForCashier(() => bookingPaymentQuery({ order_no: ok.order_no, contact_phone: contactPhone }));
+      }
       const paid =
         result + '&app_order_id=' + encodeURIComponent(pay.app_order_id || '');
-      if (!pay.cashier_url) {
-        location.href = paid;
+      if (pay.next_action === 'new_attempt') {
+        setNewPayAttempt(true);
+        alert('原支付已关闭，请再次点击支付以开启新的付款尝试');
         return;
       }
-      location.href = pay.cashier_url;
+      if (!cashier.open(pay, { onResult: () => { location.href = paid; }, onCancel: () => setPaying(false) })) {
+        setErr(pay.next_action === 'closed' ? '订单已关闭，请重新预订' : '支付结果确认中，请稍后继续查看订单');
+      }
     } catch (e) {
       alert(e.message || '支付失败');
     } finally {

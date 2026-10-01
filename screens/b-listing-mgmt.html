@@ -156,11 +156,11 @@
       <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔗 开放接口地址（url_link / 订单详情）</div>
       <div id="acStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <input id="acUrllink" placeholder="url_link：小程序 URL Link 生成接口（必配）" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <input id="acUrllink" placeholder="url_link：小程序模式必配的 URL Link 接口" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
         <input id="acDetail" placeholder="order_detail_url：订单详情查询接口（可选）" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
         <button class="btn btn-primary" id="acSave">保存接口</button>
       </div>
-      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">两个地址都是你方服务：url_link 用于平台拉起你的小程序（必配），order_detail_url 供平台回查订单详情（可选）。留空 = 清除；保存即时生效。接入密钥 hmac_key 由平台签发/重置，遗失请走平台「商家接入配置」台重置。</div>
+      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">小程序支付模式需要 url_link；order_detail_url 为可选订单查询接口。中台支付商家无需配置小程序接口。支付方式及收款主体由平台配置，变更仅影响新订单。接入密钥由平台签发或重置。</div>
     </div>
 
     <div class="lst-card">

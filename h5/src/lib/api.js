@@ -66,7 +66,11 @@ export function createBooking(body) {
 }
 
 export function bookingPay(body) {
-  return api('/api/juzhu/booking/pay', { method: 'POST', body: JSON.stringify(body) });
+  return api('/api/juzhu/booking/pay', { method: 'POST', headers: { 'Idempotency-Key': body.idempotency_key }, body: JSON.stringify(body) });
+}
+
+export function bookingPaymentQuery(body) {
+  return api('/api/juzhu/payment/query', { method: 'POST', body: JSON.stringify(body) });
 }
 
 export function bookingLookup(body) {

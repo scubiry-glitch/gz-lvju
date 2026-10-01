@@ -8,7 +8,7 @@ function loadEnvironment() {
   if (!fs.existsSync(file)) return;
   for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
     const m = raw.trim().match(/^(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$/); if (!m) continue;
-    if (!/^(MYSQL_|JUZHU_DB_|JUZHU_API_KEY$|JUZHU_ADMIN_PASSWORD$|AUTH_)/.test(m[1])) continue;
+    if (!/^(MYSQL_|JUZHU_DB_|JUZHU_API_KEY$|JUZHU_ADMIN_PASSWORD$|AUTH_|PAY_NEW_INTENTS_ENABLED$|COMMERCE_DB_NAME$|COMMERCE_PAY_(?:ENABLED|MERCHANT_NO|APP_CODE|PROJECT_CODE|SHARE_BIZ_CODE|NOTIFY_URL|CONFIG_VERSION)$|COMMERCE_COLLECTION_MODE$)/.test(m[1])) continue;
     if (process.env[m[1]] === undefined) process.env[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
   }
 }
@@ -22,7 +22,15 @@ function config() {
 function createPool() { return mysql.createPool({ ...config(), connectionLimit: 8, waitForConnections: true, queueLimit: 50 }); }
 function initAuth(pool) {
   const auth = require('../auth_center.cjs');
-  auth.init({ query: async (sql, args) => (await pool.execute(sql, args || []))[0], exec: async (sql, args) => (await pool.execute(sql, args || []))[0], expectedApiKey: () => process.env.JUZHU_API_KEY || '', expectedAdminPassword: () => process.env.JUZHU_ADMIN_PASSWORD || '', isProduction: () => true });
+  const queryRows = async (sql, args) => (await pool.execute(sql, args || []))[0];
+  auth.init({ query: queryRows, exec: queryRows, expectedApiKey: () => process.env.JUZHU_API_KEY || '', expectedAdminPassword: () => process.env.JUZHU_ADMIN_PASSWORD || '', isProduction: () => true,
+    resolveLianjiaToken: (token, req) => {
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+      return require('../beike_auth.cjs').resolveLianjiaPrincipal(token, { queryRows, authCenter: auth }, {
+        referer: process.env.SESSION_REFERER || 'http://' + host + '/', ip: req.socket.remoteAddress, ua: req.headers['user-agent'] || '',
+      });
+    },
+  });
   return auth;
 }
 module.exports = { createPool, config, initAuth, loadEnvironment };

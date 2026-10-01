@@ -193,6 +193,8 @@ async function applyInstrument(c,type,rowId,status,note,controlled=false){
  const table=INSTRUMENT[type].table;
  const [rows]=await c.execute(`SELECT * FROM ${table} WHERE id=? FOR UPDATE`,[rowId]);assert(rows.length,'指令不存在',404);
  const row=rows[0];
+ if(type==='refund')assert(row.payment_mode!=='pay_center','真实退款只能由支付中台回执确认，不能使用沙箱回执',409,'live_receipt_required');
+ if(type==='payout'&&row.batch_id){const [[live]]=await c.execute("SELECT COUNT(*) n FROM commerce_settlement_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.batch_id=? AND o.payment_mode='pay_center'",[row.batch_id]);assert(!Number(live.n),'真实结算不能使用沙箱回执',409,'live_receipt_required');}
  if(row.status==='paid'&&status!=='paid')assert(false,'指令已回执成功，不能改为失败或未知',409,'receipt_conflict');
  if(['paid','cancelled'].includes(row.status)||(row.status==='failed'&&!controlled))return {id:rowId,status:row.status,unchanged:true};
  if(status==='paid'&&row.status==='failed'&&!controlled)assert(false,'已明确失败的指令不能经回执直接改为成功，请走受控重试',409,'receipt_conflict');
@@ -330,6 +332,7 @@ async function batchAction(service,p,perm,key,input,action){
  });
 }
 async function executeBatch(c,service,p,batch,input){
+ const [[live]]=await c.execute("SELECT COUNT(*) n FROM commerce_settlement_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.batch_id=? AND o.payment_mode='pay_center'",[batch.id]);assert(!Number(live.n),'真实商户结算通道尚未开通，不能使用沙箱代发',409,'live_payout_unavailable');
  const [items]=await c.execute("SELECT COALESCE(SUM(payable_minor),0) total FROM commerce_settlement_items WHERE batch_id=? AND status='pending'",[batch.id]);
  const payable=Number(items[0].total);
  assert(payable>0,'批次没有可结算明细（可能已全部冲回）',409,'nothing_to_settle');
@@ -393,7 +396,23 @@ async function ingestReceipt(service,p,input){
   return {deduplicated:false,receipt:{type,request_no:input.request_no,outcome:input.outcome},instrument:applied};
  });
 }
+async function realRefundResponse(service,p,key,action){
+ const [row]=await service.get(service.pool,'SELECT payment_mode FROM commerce_refund_orders WHERE id=?',[key]);
+ if(row?.payment_mode!=='pay_center')return null;
+ assert(service.payments,'真实退款通道尚未就绪',503);
+ // Keep the v1 refund envelopes. The adapter validates action/state atomically
+ // and queries/retries the original refund; query cannot initiate a new refund.
+ const instrument=await service.payments.executeRefund(Number(key),{action,principal:p});
+ const remote=instrument.status==='paid'?'paid':instrument.status==='failed'?'failed':'processing';
+ const common={id:Number(key),request_no:instrument.request_no,status:instrument.status,
+  payment_refund_id:instrument.payment_refund_id,instrument};
+ if(action==='execute')return {...common,submit:instrument.status==='unknown'?'timeout':remote};
+ if(action==='retry')return {...common,retry_count:Number(instrument.retry_count||0)};
+ const [job]=await service.get(service.pool,"SELECT attempts FROM payment_jobs WHERE kind='refund_query' AND target_id=?",[instrument.payment_refund_id]);
+ return {...common,remote_status:remote,query_count:Number(job?.attempts||0)};
+}
 async function queryInstrument(service,p,type,key){
+ if(type==='refund'){const live=await realRefundResponse(service,p,key,'query');if(live)return live;}
  return service.tx(async c=>{
   const table=INSTRUMENT[type].table;
   const [rows]=await c.execute(`SELECT * FROM ${table} WHERE id=? FOR UPDATE`,[key]);assert(rows.length,'指令不存在',404);
@@ -411,6 +430,7 @@ async function queryInstrument(service,p,type,key){
  });
 }
 async function retryInstrument(service,p,type,key){
+ if(type==='refund'){const live=await realRefundResponse(service,p,key,'retry');if(live)return live;}
  return service.tx(async c=>{
   const table=INSTRUMENT[type].table;
   const [rows]=await c.execute(`SELECT * FROM ${table} WHERE id=? FOR UPDATE`,[key]);assert(rows.length,'指令不存在',404);
@@ -445,17 +465,18 @@ async function createRefundOrder(service,p,input,key){
   const coupon=coupons[0],snapshot=parse(coupon.snapshot);
   assert(snapshot.is_demo!==true,'演示卡券不发生资金退款',409,'demo_excluded');
   assert(coupon.status==='frozen','卡券应处于退款冻结状态',409,'coupon_state');
-  const [orders]=await c.execute('SELECT id FROM commerce_orders WHERE id=?',[coupon.order_id]);assert(orders.length,'原订单缺失',409);
+  const [orders]=await c.execute('SELECT id,payment_mode,paid_payment_order_id FROM commerce_orders WHERE id=?',[coupon.order_id]);assert(orders.length,'原订单缺失',409);if(orders[0].payment_mode==='pay_center')assert(orders[0].paid_payment_order_id,'原订单尚未确认实收',409);
   const refundNo=no('RF'),requestNo=no('PR');
   const kind=/到期|expiry|自动/.test(cs.reason||'')?'expiry':'unused';
   const [r]=await c.execute(`INSERT INTO commerce_refund_orders
-   (refund_no,case_id,coupon_id,order_id,account_id,merchant_id,city_id,amount_minor,kind,request_no,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-   [refundNo,input.case_id,coupon.id,coupon.order_id,coupon.account_id,coupon.merchant_id,coupon.city_id,coupon.allocation_minor,kind,requestNo,p.account.id]);
+   (refund_no,case_id,coupon_id,order_id,account_id,merchant_id,city_id,amount_minor,kind,request_no,created_by,payment_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+   [refundNo,input.case_id,coupon.id,coupon.order_id,coupon.account_id,coupon.merchant_id,coupon.city_id,coupon.allocation_minor,kind,requestNo,p.account.id,orders[0].payment_mode||null]);
   await service.audit(c,p,'refund.create',refundNo,{case_id:input.case_id,amount:coupon.allocation_minor,kind},{city_id:coupon.city_id,merchant_id:coupon.merchant_id});
   return {id:r.insertId,refund_no:refundNo,status:'pending'};
  }));
 }
 async function refundAction(service,p,key,action,input){
+ if(action==='execute'){const live=await realRefundResponse(service,p,key,'execute');if(live)return live;}
  return service.tx(async c=>{
   const [rows]=await c.execute('SELECT * FROM commerce_refund_orders WHERE id=? FOR UPDATE',[key]);assert(rows.length,'退款指令不存在',404);
   const row=rows[0];
@@ -593,6 +614,8 @@ async function runReconciliation(service,p,input,key){
   const [r]=await c.execute('INSERT INTO commerce_recon_batches(recon_no,period_start,period_end,created_by) VALUES(?,?,?,?)',[reconNo,input.period_start,input.period_end,p.account.id]);
   const reconId=r.insertId;
   const [bills]=await c.execute('SELECT * FROM commerce_provider_requests WHERE DATE(CONVERT_TZ(created_at,\'+00:00\',\'+08:00\')) BETWEEN ? AND ?',[input.period_start,input.period_end]);
+  const [[realCount]]=await c.execute("SELECT COUNT(*) n FROM commerce_refund_orders WHERE payment_mode='pay_center'");
+  if(Number(realCount.n)){const [verified]=await c.execute(`SELECT ro.request_no,pr.amount_minor,IF(pr.refund_status='refunded','paid','processing') simulated FROM commerce_refund_orders ro JOIN payment_refunds pr ON pr.id=ro.payment_refund_id WHERE ro.payment_mode='pay_center' AND DATE(CONVERT_TZ(pr.created_at,'+00:00','+08:00')) BETWEEN ? AND ?`,[input.period_start,input.period_end]);bills.push(...verified);}
   const locals=new Map();
   for(const row of (await c.execute('SELECT * FROM commerce_payout_instructions',[]))[0])locals.set(row.request_no,{type:'payout',row});
   for(const row of (await c.execute('SELECT * FROM commerce_refund_orders',[]))[0])locals.set(row.request_no,{type:'refund',row});
@@ -614,7 +637,7 @@ async function runReconciliation(service,p,input,key){
   for(const d of diffs)await c.execute('INSERT INTO commerce_recon_diffs(recon_id,diff_no,biz_type,biz_id,kind,expected_minor,actual_minor,detail) VALUES(?,?,?,?,?,?,?,?)',[reconId,no('DF'),d.bizType,d.bizId,d.kind,d.expected,d.actual,d.detail]);
   await c.execute('UPDATE commerce_recon_batches SET total_instructions=?,matched_count=?,diff_count=?,status=\'completed\' WHERE id=?',[bills.length,matched,diffs.length,reconId]);
   await service.audit(c,p,'reconciliation.run',reconNo,{period:input.period_start+'..'+input.period_end,bills:bills.length,matched,diffs:diffs.length},{});
-  return {recon_id:reconId,recon_no:reconNo,period_start:input.period_start,period_end:input.period_end,total:bills.length,matched,diff_count:diffs.length};
+  return {recon_id:reconId,recon_no:reconNo,period_start:input.period_start,period_end:input.period_end,total:bills.length,matched,diff_count:diffs.length,source_note:'演练指令核对沙箱镜像；真实退款核对支付中台已核验记录，不代替机构日账单对账'};
  }));
 }
 async function reconDetail(service,p,key){
@@ -659,6 +682,14 @@ async function diffAction(service,p,reconId,diffId,input,action){
 
 // ── conservation invariants (goal acceptance #8) ──
 async function verifyInvariants(pool){
+ // Read provider facts and business postings from one snapshot; an outbox commit
+ // between separate pool reads must not appear as an accounting discrepancy.
+ if(typeof pool.getConnection==='function'){
+  const conn=await pool.getConnection();
+  try{await conn.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');await conn.query('START TRANSACTION WITH CONSISTENT SNAPSHOT');const result=await verifyInvariants(conn);await conn.commit();return result;}
+  catch(error){await conn.rollback();throw error;}
+  finally{conn.release();}
+ }
  const rowsOf=async(sql,args=[])=>(await pool.execute(sql,args))[0];
  const oneRow=async(sql,args=[])=>(await pool.execute(sql,args))[0][0];
  const notDemo=`NOT (JSON_EXTRACT(cc.snapshot,'$.is_demo') <=> TRUE)`;
@@ -681,7 +712,7 @@ async function verifyInvariants(pool){
  const paidDup=await rowsOf(`SELECT source_id,source_type,COUNT(*) n FROM commerce_ledger_entries
   WHERE (account='provider_payout_out' OR account='provider_refund_out') GROUP BY source_id,source_type HAVING n>1`);
  checks.push({name:'I4a 每笔指令最多一次出金过账（重复回执不重复付款）',passed:!paidDup.length,detail:paidDup.map(r=>r.source_id)});
- const orders=await rowsOf(`SELECT id,amount_minor FROM commerce_orders WHERE status='fulfilled' AND NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE) LIMIT 500`);
+ const orders=await rowsOf(`SELECT id,amount_minor FROM commerce_orders o WHERE (status='fulfilled' OR (status='refunded' AND EXISTS(SELECT 1 FROM commerce_coupons cc WHERE cc.order_id=o.id))) AND NOT (JSON_EXTRACT(snapshot,'$.is_demo') <=> TRUE) LIMIT 500`);
  let conservation=true;const badOrders=[];
  for(const o of orders){
   const row=await oneRow(`SELECT
@@ -692,13 +723,41 @@ async function verifyInvariants(pool){
   if(confirmed+refunded+pool0!==Number(o.amount_minor)){conservation=false;badOrders.push({order:o.id,confirmed,refunded,pool:pool0,amount:Number(o.amount_minor)});}
  }
  checks.push({name:'I2 订单资金守恒（实付=已核销+已退款+未核销池）',passed:conservation,detail:badOrders});
+ // Payment facts may precede coupon grants (or may be late/duplicate receipts).
+ // Include these orders even before commerce has consumed payment.received.
+ const liveOrders=await rowsOf("SELECT id FROM commerce_orders WHERE payment_mode='pay_center'");
+ const liveFunds=[];
+ for(const order of liveOrders){
+  const fact=await oneRow(`SELECT
+   (SELECT COALESCE(SUM(amount_minor),0) FROM payment_orders WHERE biz_type='commerce' AND biz_order_no=REPLACE(?,'-','') AND pay_status='paid') received,
+   (SELECT COALESCE(SUM(amount_minor),0) FROM payment_refunds WHERE biz_type='commerce' AND biz_order_no=REPLACE(?,'-','') AND refund_status='refunded') refunded,
+   (SELECT COALESCE(SUM(allocation_minor),0) FROM commerce_coupons WHERE order_id=? AND status IN ('available','frozen')) coupon_pool,
+   (SELECT COALESCE(SUM(r.allocation_minor),0) FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id WHERE c.order_id=? AND r.status='confirmed') confirmed`,[order.id,order.id,order.id,order.id]);
+  const ledger=await rowsOf(`SELECT l.account,l.side,SUM(l.amount_minor) amount FROM commerce_ledger_entries l WHERE
+   (l.source_type='payment_received' AND EXISTS(SELECT 1 FROM payment_orders p WHERE p.id=l.source_id AND p.biz_type='commerce' AND p.biz_order_no=REPLACE(?,'-',''))) OR
+   (l.source_type='funding' AND l.source_id=?) OR
+   (l.source_type='refund' AND EXISTS(SELECT 1 FROM commerce_refund_orders r WHERE r.refund_no=l.source_id AND r.order_id=?)) OR
+   (l.source_type='payment_refund' AND EXISTS(SELECT 1 FROM payment_refunds r WHERE r.id=l.source_id AND r.biz_type='commerce' AND r.biz_order_no=REPLACE(?,'-',''))) OR
+   (l.source_type='redemption' AND EXISTS(SELECT 1 FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id WHERE r.id=l.source_id AND c.order_id=?)) OR
+   (l.source_type='reversal' AND EXISTS(SELECT 1 FROM commerce_redemption_reversals v JOIN commerce_redemptions r ON r.id=v.redemption_id JOIN commerce_coupons c ON c.id=r.coupon_id WHERE v.reversal_no=l.source_id AND c.order_id=?))
+   GROUP BY l.account,l.side`,Array(6).fill(order.id));
+  const balance=(account,side='credit')=>ledger.filter(r=>r.account===account).reduce((n,r)=>n+(r.side===side?1:-1)*Number(r.amount),0);
+  const received=Number(fact.received),refunded=Number(fact.refunded),posted=balance('provider_receivable','debit'),out=balance('provider_refund_out');
+  const pending=balance('payment_pending_liability'),unredeemed=balance('unredeemed_liability'),confirmed=Number(fact.confirmed),couponPool=Number(fact.coupon_pool);
+  if(!received&&!posted&&!refunded&&!pending&&!unredeemed&&!out)continue;
+  const valid=posted===received&&out===refunded&&pending>=0&&unredeemed>=0&&unredeemed===couponPool&&posted===pending+unredeemed+confirmed+out;
+  liveFunds.push({order:order.id,passed:valid,state:posted<received?'pending_receipt_posting':out<refunded?'pending_refund_posting':valid?'balanced':'mismatch',verified_received_minor:received,posted_received_minor:posted,pending_receipt_minor:Math.max(0,received-posted),pending_refund_minor:Math.max(0,refunded-out),payment_pending_liability:pending,unredeemed_liability:unredeemed,provider_refund_out:out,confirmed_minor:confirmed});
+ }
+ checks.push({name:'I2b 真实到账与履约负债守恒（含待入账、待发券、晚到及重复支付退款）',passed:liveFunds.every(r=>r.passed),detail:liveFunds});
  const paidMirror=await oneRow(`SELECT
   (SELECT COALESCE(SUM(amount_minor),0) FROM commerce_payout_instructions WHERE status='paid') local_paid,
   (SELECT COALESCE(SUM(pr.amount_minor),0) FROM commerce_provider_requests pr JOIN commerce_payout_instructions ins ON ins.request_no=pr.request_no WHERE pr.simulated='paid' AND ins.status='paid') mirror_for_local_paid,
-  (SELECT COALESCE(SUM(amount_minor),0) FROM commerce_refund_orders WHERE status='paid') local_refund_paid,
+  (SELECT COALESCE(SUM(amount_minor),0) FROM commerce_refund_orders WHERE status='paid' AND COALESCE(payment_mode,'')<>'pay_center') local_refund_paid,
   (SELECT COALESCE(SUM(pr.amount_minor),0) FROM commerce_provider_requests pr JOIN commerce_refund_orders ro ON ro.request_no=pr.request_no WHERE pr.simulated='paid' AND ro.status='paid') mirror_for_local_refund`);
  const mirrorOk=Number(paidMirror.local_paid)===Number(paidMirror.mirror_for_local_paid)&&Number(paidMirror.local_refund_paid)===Number(paidMirror.mirror_for_local_refund);
  checks.push({name:'I4b 本地已付指令逐笔有机构镜像（无重复付款；镜像盈余走对账差异）',passed:mirrorOk,detail:[paidMirror]});
+ const liveRefunds=await rowsOf("SELECT id FROM commerce_refund_orders WHERE payment_mode='pay_center' AND status='paid' LIMIT 1");
+ if(liveRefunds.length){const invalid=await rowsOf("SELECT ro.refund_no FROM commerce_refund_orders ro LEFT JOIN payment_refunds pr ON pr.id=ro.payment_refund_id WHERE ro.payment_mode='pay_center' AND ro.status='paid' AND (pr.id IS NULL OR pr.refund_status<>'refunded' OR pr.amount_minor<>ro.amount_minor OR pr.biz_type<>'commerce' OR pr.biz_order_no<>REPLACE(ro.order_id,'-',''))");checks.push({name:'I4c 真实退款对应原支付中台已核验结果',passed:!invalid.length,detail:invalid.map(r=>r.refund_no)});}
  const closedRefunds=await rowsOf(`SELECT s.id FROM commerce_cases s JOIN commerce_coupons cc ON cc.id=s.coupon_id WHERE s.kind='refund' AND s.status='closed' AND cc.status NOT IN ('refunded') AND ${notDemo}`);
  checks.push({name:'I7 退款结单与卡券状态一致',passed:!closedRefunds.length,detail:closedRefunds.map(r=>r.id)});
  const compWithoutRecovery=await rowsOf(`SELECT cp.compensation_no FROM commerce_compensation_cases cp WHERE cp.status='paid' AND NOT EXISTS (SELECT 1 FROM commerce_recovery_cases rc WHERE rc.reason LIKE CONCAT('%',cp.compensation_no,'%') AND rc.debtor_kind='merchant' AND rc.amount_minor=cp.amount_minor)`);
@@ -714,7 +773,7 @@ async function overview(service){
  const n=v=>Number(v)||0;
  const batches=await one("SELECT COUNT(*) total,SUM(status='draft') draft,SUM(status='submitted') submitted,SUM(status='approved') approved,SUM(status='executing') executing,SUM(status='completed') completed,SUM(status='frozen') frozen,SUM(status='closed') closed FROM commerce_settlement_batches");
  const instructions=await one("SELECT COUNT(*) total,COALESCE(SUM(amount_minor),0) amount,SUM(status='submitted') submitted,SUM(status='unknown') unknown,SUM(status='failed') failed,SUM(status='paid') paid FROM commerce_payout_instructions");
- const refunds=await one("SELECT COUNT(*) total,SUM(status='pending') pending,SUM(status='submitted') submitted,SUM(status='unknown') unknown,SUM(status='failed') failed,SUM(status='refunded') refunded FROM commerce_refund_orders");
+ const refunds=await one("SELECT COUNT(*) total,SUM(status='pending') pending,SUM(status='submitted') submitted,SUM(status='unknown') unknown,SUM(status='failed') failed,SUM(status='paid') refunded FROM commerce_refund_orders");
  const redemptions=await one(`SELECT COUNT(*) total,COALESCE(SUM(r.supplier_minor),0) supplier_minor,COALESCE(SUM(r.channel_minor),0) channel_minor,SUM(r.status='reversed') reversed FROM commerce_redemptions r JOIN commerce_coupons cc ON cc.id=r.coupon_id WHERE NOT (JSON_EXTRACT(cc.snapshot,'$.is_demo') <=> TRUE)`);
  const recoveries=await one("SELECT COUNT(*) total,COALESCE(SUM(amount_minor-recovered_minor),0) open_minor FROM commerce_recovery_cases WHERE status='open'");
  const compensations=await one("SELECT COUNT(*) total,SUM(status='pending') pending,SUM(status='paid') paid,COALESCE(SUM(CASE WHEN status='paid' THEN amount_minor END),0) paid_minor FROM commerce_compensation_cases");
@@ -817,6 +876,7 @@ async function reviewCompensation(service,p,key,input){
    return {id:key,status:'cancelled'};
   }
   // 平台自有资金先行赔付（沙箱口径，无真实资金），同时挂应收商户代偿，进入追偿闭环。
+  const [[sourceOrder]]=await c.execute('SELECT payment_mode FROM commerce_orders WHERE id=?',[comp.order_id]);assert(sourceOrder?.payment_mode!=='pay_center','真实赔付通道尚未开通，不能使用沙箱标记到账',409,'live_compensation_unavailable');
   await post(c,{sourceType:'compensation',sourceId:comp.compensation_no,lines:[
    {side:'debit',account:'compensation_expense',amount:Number(comp.amount_minor)},
    {side:'credit',account:'platform_own_compensation_cash',amount:Number(comp.amount_minor)}],memo:'compensation '+comp.compensation_no});

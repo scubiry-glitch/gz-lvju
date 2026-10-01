@@ -91,7 +91,7 @@
         <h3>商家列表 <span class="pill">GET /admin/vendors/config</span></h3>
         <div class="chips" id="filterChips"></div>
         <table>
-          <thead><tr><th>商家</th><th>类型</th><th>状态</th><th>回调</th><th>url_link</th><th>hmac_key</th><th>操作</th></tr></thead>
+          <thead><tr><th>商家</th><th>类型</th><th>支付方式</th><th>状态</th><th>回调</th><th>url_link</th><th>hmac_key</th><th>操作</th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
         <div class="empty" id="empty" hidden>暂无商家</div>
@@ -116,9 +116,14 @@
 
   <div class="sec">
     <h4>接入接口三件套 <span class="pill">PUT .../config</span></h4>
+    <div class="field"><label>支付方式（变更仅影响新订单）</label><select id="fPaymentMode"><option value="">尚未开通付费交易</option><option value="wechat_mini">商家小程序支付</option><option value="pay_center">本站中台收银台</option></select></div>
+    <div class="field"><label>中台收款商户号（中台模式必填）</label><input id="fPayMerchant" autocomplete="off" placeholder="支付机构分配的收款商户号" /></div>
+    <div class="field"><label>支付应用编码（可选，留空使用平台配置）</label><input id="fPayApp" /></div>
+    <div class="field"><label>支付项目编码（可选，留空使用平台配置）</label><input id="fPayProject" /></div>
+    <div class="field"><label>支付业务编码（可选，留空使用平台配置）</label><input id="fPayShare" /></div>
     <div class="field"><label>webhook_url · 事件回调推送（http/https，≤500 字符；留空 = 清除）</label>
       <input type="text" id="fWebhook" placeholder="https://merchant.example.com/juzhu/callback" /></div>
-    <div class="field"><label>url_link · 小程序 URL Link 生成接口（必配）</label>
+    <div class="field"><label>url_link · 小程序 URL Link 生成接口（小程序模式必配）</label>
       <input type="text" id="fUrllink" placeholder="https://merchant.example.com/.../generate/urllink" /></div>
     <div class="field"><label>order_detail_url · 订单详情查询接口（可选）</label>
       <input type="text" id="fDetail" placeholder="https://merchant.example.com/.../order/detail" /></div>
@@ -228,6 +233,7 @@ function paintRows(){
     '<tr data-id="' + v.id + '">' +
     '<td><b>' + esc(v.name) + '</b><span style="color:var(--muted);"> #' + v.id + '</span></td>' +
     '<td>' + esc(VTYPE[v.type] || v.type || '-') + '</td>' +
+    '<td>' + (v.payment_mode==='pay_center'?'中台收银台':v.payment_mode==='wechat_mini'?'商家小程序':'未开通') + '</td>' +
     '<td>' + statusBadge(v.status) + ' ' + reviewBadge(v.review_status) + '</td>' +
     '<td>' + setBadge(v.webhook_url_set) + '</td>' +
     '<td>' + setBadge(v.url_link_set) + '</td>' +
@@ -272,6 +278,12 @@ function paintDrawer(){
   $('fWebhook').value = v.webhook_url || '';
   $('fUrllink').value = v.url_link || '';
   $('fDetail').value = v.order_detail_url || '';
+  $('fPaymentMode').value = v.payment_mode || '';
+  $('fPayMerchant').value = v.pay_merchant_no || '';
+  var payConfig = {}; try { payConfig = JSON.parse(v.payment_config_json || '{}'); } catch (_) {}
+  $('fPayApp').value = payConfig.appCode || '';
+  $('fPayProject').value = payConfig.projectCode || '';
+  $('fPayShare').value = payConfig.shareBizCode || '';
   $('dvKey').innerHTML = v.has_hmac_key
     ? '已配置 · 前 8 位 <span class="mono">' + esc(v.hmac_key_head || '') + '</span> · 长度 ' + (v.hmac_key_len || 0) + '（全文不可查看，重置后一次性展示）'
     : '<span style="color:var(--warn);font-weight:600;">未配置</span>——商家开放接口（HMAC 签名 / url_link / webhook）均不可用，请重置生成。';
@@ -311,7 +323,9 @@ $('btnSave').onclick = async function(){
   try {
     const r = await fetch('/api/juzhu/admin/vendors/' + CUR + '/config', { method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ webhook_url: $('fWebhook').value.trim(), url_link: $('fUrllink').value.trim(), order_detail_url: $('fDetail').value.trim() }) });
+      body: JSON.stringify({ webhook_url: $('fWebhook').value.trim(), url_link: $('fUrllink').value.trim(), order_detail_url: $('fDetail').value.trim(),
+        payment_mode: $('fPaymentMode').value || null, pay_merchant_no: $('fPayMerchant').value.trim(),
+        payment_config_json: { appCode: $('fPayApp').value.trim(), projectCode: $('fPayProject').value.trim(), shareBizCode: $('fPayShare').value.trim() } }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     toast('接入配置已保存（即时生效）');

@@ -41,6 +41,7 @@ async function migrate(pool) {
   }
   await require('./exchange-codes.cjs').migrate(conn);
   await require('./settlement.cjs').migrate(conn);
+  await require('./payment-migrate.cjs').migrate(conn);
  } finally { await conn.query("SELECT RELEASE_LOCK('commerce_m1a_migrate')").catch(()=>{}); conn.release(); }
 }
 module.exports={migrate,statements};

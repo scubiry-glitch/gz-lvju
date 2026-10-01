@@ -7,8 +7,11 @@ const FUND_READ='commerce.fund.read',FUND_WRITE='commerce.fund.write',FUND_REVIE
 // settings KV 与主系统共表（app.js ensureSchema 建表）；表缺失（隔离测试库）时回落空串=功能开放缺省。
 async function settingValue(pool,key){try{const [rows]=await pool.execute('SELECT value FROM settings WHERE `key`=? LIMIT 1',[key]);return rows.length?String(rows[0].value??''):'';}catch{return '';}}
 const prefix='/api/commerce/v1';
-function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=process.env.JUZHU_ENV==='test'}){
+function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=process.env.JUZHU_ENV==='test',paymentCore,paymentConfig=process.env,sharedDatabaseVerified=false}){
  const service=new Service(pool,auth);
+ const paymentAdapter=require('./payment-adapter.cjs');
+ if(paymentCore===undefined&&fs.existsSync(path.resolve(__dirname,'../server/payment/core.cjs')))paymentCore=require('../server/payment/core.cjs').createPaymentCore({createConnection:paymentAdapter.pooledConnection(pool),config:paymentConfig});
+ service.payments=paymentAdapter.createPaymentAdapter({service,core:paymentCore,config:paymentConfig,sharedDatabaseVerified});
  const server=http.createServer(async(req,res)=>{
   const reply=(status,data,error,code)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(error===undefined?{data}:{...(code?{code}:{}),error}));};
   let principal=null,method=req.method,pathname='';
@@ -16,7 +19,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const url=new URL(req.url,'http://localhost');pathname=url.pathname;
    if(!pathname.startsWith(prefix+'/')){
     if(staticFiles&&req.method==='GET'){
-     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:commerce-[a-z-]+\.html|_commerce[a-z0-9-]*\.(?:js|css)|_console-login\.js|_qr\.js|_nav\.js))$/;
+     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:commerce-[a-z-]+\.html|_commerce[a-z0-9-]*\.(?:js|css)|_cashier\.js|_beike-login\.js|_console-login\.js|_qr\.js|_nav\.js))$/;
      if(valid.test(pathname)){const file=path.resolve(__dirname,'..','.'+pathname);if(fs.existsSync(file)){res.writeHead(200,{'Content-Type':pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.webp')?'image/webp':'text/javascript'});res.end(fs.readFileSync(file));return;}}
     }
     throw new Fault(404,'接口不存在');
@@ -25,24 +28,29 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const origin=publicOrigin||`http://${req.headers.host}`;
    assert(req.headers.host===new URL(origin).host,'请求来源无效',403);
    if(method!=='GET')assert(!req.headers.origin||req.headers.origin===origin,'不允许跨站操作',403);
-   if(pathname===prefix+'/meta'&&method==='GET'){await pool.query('SELECT 1');return reply(200,{mode:'mysql-m1a',payment_enabled:false,version:'M1-A',authentication:'account-center'});}
-   if(pathname===prefix+'/healthz'&&method==='GET'){try{const result=(await pool.query('SELECT 1 AS ok, (SELECT MAX(version) FROM commerce_migrations) AS migration').catch(()=>[[{ok:0}]]))[0];if(result[0]&&Number(result[0].ok)===1)return reply(200,{status:'ok',database:true,migration:result[0].migration||null,payment_enabled:false});}catch(e){}return reply(503,{status:'unavailable',database:false});}
+   if(pathname===prefix+'/meta'&&method==='GET'){await pool.query('SELECT 1');return reply(200,{mode:'mysql-m1a',payment_enabled:await service.payments.capability(),version:'M1-A',authentication:'account-center'});}
+   if(pathname===prefix+'/healthz'&&method==='GET'){try{const result=(await pool.query('SELECT 1 AS ok, (SELECT MAX(version) FROM commerce_migrations) AS migration').catch(()=>[[{ok:0}]]))[0];if(result[0]&&Number(result[0].ok)===1)return reply(200,{status:'ok',database:true,migration:result[0].migration||null,payment_enabled:await service.payments.capability()});}catch(e){}return reply(503,{status:'unavailable',database:false});}
    if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));
     try{await pool.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',['referral:'+data.kind+':'+data.id,'referral.click',JSON.stringify({aid:data.aid,kind:data.kind,id:data.id})]);}catch{}
     return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
-   if(pathname===prefix+'/catalog'&&method==='GET')return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,demo_purchase_enabled:demoEnabled&&p.is_demo})));
+   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready,demo_purchase_enabled:demoEnabled&&p.is_demo})));}
    if(pathname===prefix+'/hotels'&&method==='GET')return reply(200,await service.hotels(Object.fromEntries(url.searchParams)));
-   // No legacy API key, M0 role selector, arbitrary account header, or machine token fallback.
-   const session=await auth.verifySessionToken(auth.bearerToken(req));
+   // Account-center Bearer or verified Beike cookie; legacy/machine keys never authorize commerce.
+   let session=await auth.verifySessionToken(auth.bearerToken(req));
+   if(!session&&typeof auth.principalOf==='function'&&/(?:^|;\s*)(?:lianjia_token|lj_token)=/.test(req.headers.cookie||'')){
+    const cookiePrincipal=await auth.principalOf(req);if(cookiePrincipal?.type==='account'&&cookiePrincipal.via==='lianjia_token')session=cookiePrincipal;
+   }
    assert(session&&session.account.status==='active'&&session.account.principal_type==='user','请登录后继续',401);
    principal={type:'account',...session};
    let body={};
    if(method!=='GET'){assert((req.headers['content-type']||'').split(';')[0]==='application/json','请求格式必须为JSON',415);let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;assert(bytes<=65536,'请求内容过大',413);text+=chunk;}try{body=JSON.parse(text||'{}');}catch{throw new Fault(400,'请求内容不是有效JSON');}assert(body&&typeof body==='object'&&!Array.isArray(body),'请求格式无效',400);}
-   if(pathname===prefix+'/me'&&method==='GET')return reply(200,{account:{id:principal.account.id,display_name:principal.account.display_name},permissions:[...auth.permissionsOf(principal)],scope:auth.scopeOf(principal)});
+   if(pathname===prefix+'/me'&&method==='GET')return reply(200,{account:{id:principal.account.id,display_name:principal.account.display_name,payment_identity_ready:principal.account.idp_type==='beike'&&!!principal.account.idp_subject},permissions:[...auth.permissionsOf(principal)],scope:auth.scopeOf(principal)});
    if(pathname===prefix+'/my'&&method==='GET')return reply(200,await service.my(principal));
    const track=pathname.match(/^\/api\/commerce\/v1\/my\/orders\/([a-f0-9-]{36})$/);
    if(track&&method==='GET')return reply(200,await service.track(principal,track[1]));
-   if(pathname===prefix+'/orders'&&method==='POST')throw new Fault(409,'购买暂未开放，请关注开售通知');
+   if(pathname===prefix+'/orders'&&method==='POST')return reply(201,await service.payments.purchase(principal,body,req.headers['idempotency-key']));
+   const paymentOrder=pathname.match(/^\/api\/commerce\/v1\/orders\/([a-f0-9-]{36})\/(pay|payment|cancel)$/);
+   if(paymentOrder){const [,id,action]=paymentOrder;if(action==='pay'&&method==='POST')return reply(202,await service.payments.pay(principal,id,body,req.headers['idempotency-key'],req.socket.remoteAddress));if(action==='payment'&&method==='GET')return reply(200,await service.payments.status(principal,id,url.searchParams.get('refresh')==='1'));if(action==='cancel'&&method==='POST')return reply(202,await service.payments.close(principal,id));}
    if(pathname===prefix+'/demo-orders'&&method==='POST'){assert(demoEnabled,'演示购买未开放',409);return reply(201,await require('./demo-order.cjs').demoOrder(service,principal,body,req.headers['idempotency-key']));}
    if(pathname===prefix+'/exchange'&&method==='POST'){assert(demoEnabled,'兑换暂未开放',409);return reply(201,await require('./exchange-codes.cjs').exchange(service,principal,body,req.headers['idempotency-key']));}
    if(pathname===prefix+'/appointments'&&method==='POST')return reply(201,await service.appointment(principal,body,req.headers['idempotency-key']));
@@ -161,4 +169,4 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
  server.requestTimeout=15000;server.headersTimeout=10000;server.service=service;return server;
 }
 module.exports={createServer};
-if(require.main===module){const {createPool,initAuth}=require('./db.cjs'),{migrate}=require('./migrate.cjs');const pool=createPool();migrate(pool).then(()=>{const server=createServer({pool,auth:initAuth(pool),publicOrigin:process.env.COMMERCE_PUBLIC_ORIGIN||''});server.listen(Number(process.env.COMMERCE_PORT||38780),'127.0.0.1',()=>console.log('Commerce M1-A API ready; payments disabled'));const task=setInterval(()=>server.service.expire().catch(e=>console.error('Commerce expiry failed:',e.code||e.name)),30000);task.unref();const stop=()=>{clearInterval(task);server.close(()=>pool.end().then(()=>process.exit(0)));};process.on('SIGTERM',stop);process.on('SIGINT',stop);}).catch(e=>{console.error('Commerce startup failed:',e.code||e.message);pool.end();process.exitCode=1;});}
+if(require.main===module){const {createPool,initAuth}=require('./db.cjs'),{migrate}=require('./migrate.cjs');const pool=createPool();migrate(pool).then(()=>{const server=createServer({pool,auth:initAuth(pool),publicOrigin:process.env.COMMERCE_PUBLIC_ORIGIN||''});server.listen(Number(process.env.COMMERCE_PORT||38780),'127.0.0.1',()=>console.log('Commerce API ready; payment availability follows configured admission'));let consuming=false;const paymentTask=setInterval(async()=>{if(consuming)return;consuming=true;try{await server.service.payments.consume();await server.service.payments.queueExpiryRefunds();}catch(e){console.error('Commerce payment recovery failed:',e.code||e.name);}finally{consuming=false;}},1500);paymentTask.unref();const task=setInterval(()=>server.service.expire().catch(e=>console.error('Commerce expiry failed:',e.code||e.name)),30000);task.unref();const stop=()=>{clearInterval(task);clearInterval(paymentTask);server.close(()=>pool.end().then(()=>process.exit(0)));};process.on('SIGTERM',stop);process.on('SIGINT',stop);}).catch(e=>{console.error('Commerce startup failed:',e.code||e.message);pool.end();process.exitCode=1;});}

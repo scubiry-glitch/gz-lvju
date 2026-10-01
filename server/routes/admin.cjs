@@ -1,4 +1,5 @@
 'use strict';
+const vendorPayment = require('../payment/vendor-payment.cjs');
 /**
  * /api/juzhu/admin/* 管理域（从 app.js 拆出）。
  * 权限闸仍在 app.js（perm_registry）；此处只做业务处理。
@@ -381,7 +382,7 @@ queryRows,
     // GET /admin/vendors/config —— 接入配置汇总（掩码；页面 KPI + 列表徽标）
     if (urlPath === '/api/juzhu/admin/vendors/config' && req.method === 'GET') {
       const rows = await queryRows(
-        `SELECT v.id, v.name, v.type, v.status, v.review_status, v.updated_at,
+        `SELECT v.id, v.name, v.type, v.status, v.review_status, v.updated_at, v.payment_mode,v.payment_config_version,v.pay_merchant_no,
                 (v.webhook_url IS NOT NULL AND v.webhook_url <> '') AS webhook_url_set,
                 (v.url_link IS NOT NULL AND v.url_link <> '') AS url_link_set,
                 (v.order_detail_url IS NOT NULL AND v.order_detail_url <> '') AS order_detail_url_set,
@@ -418,6 +419,7 @@ queryRows,
         const vid = parseInt(m[1], 10);
         const rows = await queryRows(
           `SELECT id, name, type, status, review_status, webhook_url, url_link, order_detail_url,
+                  payment_mode,payment_config_version,payment_config_json,pay_merchant_no,
                   (hmac_key IS NOT NULL AND TRIM(hmac_key) <> '') AS has_hmac_key,
                   LEFT(TRIM(hmac_key), 8) AS hmac_key_head,
                   (CASE WHEN hmac_key IS NULL OR TRIM(hmac_key)='' THEN 0 ELSE CHAR_LENGTH(TRIM(hmac_key)) END) AS hmac_key_len,
@@ -441,6 +443,15 @@ queryRows,
         }
         const LIMIT = { webhook_url: 500, url_link: 2000, order_detail_url: 2000 };
         const next = {};
+        try {
+          if ('payment_mode' in body) next.payment_mode = vendorPayment.normalizeMode(body.payment_mode);
+          if ('payment_config_json' in body) next.payment_config_json = JSON.stringify(vendorPayment.paymentConfig(body.payment_config_json));
+          if ('pay_merchant_no' in body) {
+            const value = String(body.pay_merchant_no || '').trim();
+            if (value && !/^[A-Za-z0-9_.:-]{1,64}$/.test(value)) return jsonReply(res, { error: '收款商户号格式无效（最多 64 位）' }, 400);
+            next.pay_merchant_no = value || null;
+          }
+        } catch (error) { return jsonReply(res, { error: error.message }, error.status || 400); }
         for (const f of Object.keys(LIMIT)) {
           if (!(f in body)) continue;
           const s = String(body[f] == null ? '' : body[f]).trim();
@@ -456,22 +467,30 @@ queryRows,
         const vid = parseInt(m[1], 10);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
+          await conn.beginTransaction();
           const [curRows] = await conn.execute(
-            'SELECT id, name, webhook_url, url_link, order_detail_url FROM jz_vendors WHERE id=?', [vid]);
+            'SELECT id,name,webhook_url,url_link,order_detail_url,hmac_key,payment_mode,payment_config_version,payment_config_json,pay_merchant_no FROM jz_vendors WHERE id=? FOR UPDATE', [vid]);
           if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
+          try { vendorPayment.validateVendorPayment({ ...curRows[0], ...next }); }
+          catch (error) { return jsonReply(res, { error: error.message }, error.status || 400); }
           const before = {
             webhook_url: curRows[0].webhook_url || null,
             url_link: curRows[0].url_link || null,
             order_detail_url: curRows[0].order_detail_url || null,
+            payment_mode: curRows[0].payment_mode || null,
+            pay_merchant_no: curRows[0].pay_merchant_no || null,
+            payment_config_json: curRows[0].payment_config_json || null,
+            payment_config_version: Number(curRows[0].payment_config_version || 0),
           };
           const sets = [], vals = [];
           for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
           await conn.execute(
-            `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+            `UPDATE jz_vendors SET ${sets.join(', ')},payment_config_version=COALESCE(payment_config_version,0)+1, updated_at=? WHERE id=?`,
             [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
           );
+          await conn.commit();
           if (resetVendorConfigCache) resetVendorConfigCache();
-          const after = Object.assign({}, before, next);
+          const after = Object.assign({}, before, next, { payment_config_version: before.payment_config_version + 1 });
           const p = req.principal || {};
           await authCenter.audit({
             accountId: p.account && p.account.id,

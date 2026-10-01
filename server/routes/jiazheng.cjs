@@ -1,4 +1,34 @@
 'use strict';
+const crypto = require('node:crypto');
+const { fail, stripPaymentSecrets } = require('../payment/vendor-payment.cjs');
+const legacyCompat = require('../payment/jiazheng-compat.cjs');
+function customerOrder(order) {
+  const out = { ...order };
+  if (out.payment_mode === 'pay_center') out.amount_minor = Number(out.fee);
+  try { const snapshot = JSON.parse(out.payment_config_snapshot || '{}'); out.product_name = snapshot.productTitle; out.cancel_policy = snapshot.cancelPolicy; } catch (_) {}
+  delete out.payment_config_snapshot; delete out.request_hash; delete out.request_key;
+  return out;
+}
+function customerPayment(result, order) {
+  const out = { ...result, order: customerOrder(order) };
+  const refundStates = ['refunding', 'refunded', 'partially_refunded'];
+  const state = refundStates.includes(order.refund_status) ? order.refund_status
+    : refundStates.includes(order.pay_status) ? order.pay_status
+    : order.status === 'cancelled' ? (order.pay_status === 'expired' ? 'expired' : 'closed')
+    : ['closing', 'closed', 'expired'].includes(order.pay_status) ? order.pay_status : null;
+  if (state) {
+    // The payment attempt remains a truthful ledger record. Business success
+    // must instead reflect the latest owned service order after cancellation.
+    out.order_pay_status = state;
+    out.cashier_url = null;
+    out.next_action = ['refunding', 'closing'].includes(state) ? 'poll'
+      : ['closed', 'expired'].includes(state) ? 'closed' : 'none';
+    if ('cashierUrl' in out) out.cashierUrl = null;
+    if ('orderPayStatus' in out) out.orderPayStatus = state;
+    if ('nextAction' in out) out.nextAction = out.next_action;
+  }
+  return out;
+}
 /**
  * 家政 C 端路由 /api/juzhu/jiazheng/*（从 app.js 拆出；不含 /api/juzhu/jz/* 管理台）。
  * 调用：
@@ -15,6 +45,7 @@ function createJiazhengRouter(deps) {
       requireCEndWrite, restrictOrdersRead, requireDispatchPerm, requireApiKey,
       authCenter, auditIfAccount,
       getVendorConfig, hmacAuth, grOrders, outboundJson, stripVendorSecrets,
+      requestSession, getPaymentCore, getJiazhengAdapter,
     } = deps;
 
     // --- extracted from app.js L4345-4710 ---
@@ -151,7 +182,7 @@ function createJiazhengRouter(deps) {
         // products：同 SPU 全部上架商品（双维度城市过滤，对齐 Python list_channel_sku_products）
         let prodSql = `SELECT p.*, v.name AS vendor_name, v.logo AS vendor_logo,
                          v.rating AS vendor_rating, v.review_count AS vendor_review_count,
-                         v.type AS vendor_type
+                         v.type AS vendor_type, v.payment_mode, v.payment_config_version
                        FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id
                        WHERE p.channel_sku_id=? AND p.status='on' AND v.status='active'`;
         const prodParams = [item.id];
@@ -174,7 +205,7 @@ function createJiazhengRouter(deps) {
           const vrows = await queryRows('SELECT * FROM jz_vendors WHERE id=?', [product.vendor_id]);
           if (vrows.length) {
             vendor = vrows[0];
-            for (const f of ['hmac_key', 'url_link', 'order_detail_url']) delete vendor[f];
+            stripPaymentSecrets(vendor);
             parseJsonFields(vendor, ['badges']);
             composeRank(vendor);
             vendor.auth_badges = vendorAuthBadges(vendor);
@@ -280,7 +311,10 @@ function createJiazhengRouter(deps) {
     // GET /api/juzhu/jiazheng/orders （须 API Key；phone 仅作过滤）
     if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'GET') {
       const qp = new URLSearchParams(qs);
-      const workerFilter = await restrictOrdersRead(req, res);
+      const sess = requestSession ? await requestSession(req) : null;
+      if (!sess?.account && !(await requireApiKey(req, res, urlPath))) return;
+      const ownAccount = sess?.role === 'user' && sess.account && !sess.account.worker_id ? String(sess.account.id) : null;
+      const workerFilter = ownAccount ? undefined : await restrictOrdersRead(req, res);
       if (workerFilter === null) return;
       const phone = (qp.get('phone') || '').trim();
       // type_label：产品化下单路径 type=category_id（英文 key），join 出中文名；
@@ -291,6 +325,7 @@ function createJiazhengRouter(deps) {
                  LEFT JOIN jz_skus s ON s.id=o.sku_id
                  LEFT JOIN jz_categories c ON c.id=o.category_id WHERE 1=1`;
       const params = [];
+      if (ownAccount) { sql += ' AND o.account_id=?'; params.push(ownAccount); }
       if (workerFilter) { sql += " AND o.worker_json IS NOT NULL AND JSON_VALID(o.worker_json) AND JSON_UNQUOTE(JSON_EXTRACT(o.worker_json, '$.id'))=?"; params.push(workerFilter); }
       if (phone) { sql += ' AND o.phone=?'; params.push(phone); }
       if (qp.get('status')) {
@@ -304,7 +339,7 @@ function createJiazhengRouter(deps) {
       const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
       sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
-      return jsonReply(res, { items: rows });
+      return jsonReply(res, { items: ownAccount ? rows.map(customerOrder) : rows });
     }
 
     // GET /api/juzhu/jiazheng/orders/stats （需 API Key，必须在 orders/:id 之前）
@@ -363,6 +398,14 @@ function createJiazhengRouter(deps) {
     {
       const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)$/);
       if (m && req.method === 'GET') {
+        const sess = requestSession ? await requestSession(req) : null;
+        if (!sess?.account && !(await requireApiKey(req, res, urlPath))) return;
+        if (sess?.role === 'user' && sess.account && !sess.account.worker_id && !/^[a-f0-9-]{36}$/.test(m[1])) {
+          const owned = await queryRows('SELECT * FROM jz_orders WHERE id=? AND account_id=?', [m[1], String(sess.account.id)]);
+          if (!owned.length) return jsonReply(res, { error: '订单不存在或无权查看' }, 404);
+          const order = customerOrder(owned[0]);
+          return jsonReply(res, { ...order, order });
+        }
         if(req.principal?.account?.principal_type==='user'&&/^[a-f0-9-]{36}$/.test(m[1])){const owned=await queryRows('SELECT w.* FROM jz_orders w JOIN commerce_cases c ON BINARY c.id=BINARY w.id WHERE w.id=? AND c.account_id=?',[m[1],req.principal.account.id]);if(owned.length)return jsonReply(res,{order:owned[0]});}
         const workerFilter = await restrictOrdersRead(req, res);
         if (workerFilter === null) return;
@@ -388,44 +431,23 @@ function createJiazhengRouter(deps) {
     // ===== 家政 C 端写接口 =====
 
     // POST /api/juzhu/jiazheng/orders（下单）
-    if (urlPath === '/api/juzhu/jiazheng/orders' && req.method === 'POST') {
-      if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
+    if (['/api/juzhu/jiazheng/orders', '/api/juzhu/jz/orders'].includes(urlPath) && req.method === 'POST') {
+      const sess = await requestSession(req);
+      if (!sess?.account || sess.account.principal_type !== 'user') return jsonReply(res, { error: '请先登录本人账号' }, 401);
       const body = await readBody(req);
-      const productId = body.product_id || body.sku_id;
-      if (!productId) return jsonReply(res, { error: 'product_id 必填' }, 400);
-      if (!body.house) return jsonReply(res, { error: 'house 必填' }, 400);
-      if (!body.phone) return jsonReply(res, { error: 'phone 必填' }, 400);
-      if (!body.expectTime) return jsonReply(res, { error: 'expectTime 必填' }, 400);
-
-      const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const [prods] = await conn.execute(
-          `SELECT p.*, s.category_id, s.name AS sku_name, c.name AS category_name
-           FROM jz_products p
-           JOIN jz_skus s ON s.id=p.channel_sku_id
-           JOIN jz_categories c ON c.id=s.category_id
-           WHERE p.id=? AND p.status='on' AND s.enabled=1 AND c.enabled=1`,
-          [productId]
-        );
-        if (!prods.length) { conn.end(); return jsonReply(res, { error: '商品不存在或已下架' }, 400); }
-        const prod = prods[0];
-
-        const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-        const orderId = 'WO-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-        const fee = body.fee != null ? parseInt(body.fee) : Math.round((prod.price || 0) * 100);
-        const log = [{ at: now, action: 'created', note: `来源: ${body.source || 'c_web'}` }];
-
-        await conn.execute(
-          `INSERT INTO jz_orders(id,sku_id,category_id,type,house,phone,expect_time,\`desc\`,fee,pay_status,status,slot_id,source,created_at,updated_at,log_json)
-           VALUES (?,?,?,?,?,?,?,?,?,'unpaid','pending',?,?,?,?,?)`,
-          [orderId, prod.channel_sku_id || null, prod.category_id, prod.category_id,
-           body.house, body.phone, body.expectTime, body.desc || null,
-           fee, body.slot_id || null, body.source || 'c_web', now, now, JSON.stringify(log)]
-        );
-        await conn.commit();
-        const [orders] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
-        return jsonReply(res, { ok: true, order: orders[0] }, 201);
-      } finally { await conn.end(); }
+        const requestKey = String(req.headers['idempotency-key'] || body.idempotency_key || '').trim();
+        const input = await legacyCompat.createInput({ body, account: sess.account, requestKey,
+          legacyPath: urlPath === '/api/juzhu/jz/orders' }, queryRows);
+        const result = await getJiazhengAdapter().createOrder(input);
+        const order = customerOrder(result.order);
+        if (urlPath === '/api/juzhu/jz/orders') Object.assign(order, {
+          fee: order.amount_minor / 100, address: order.house, scheduled_at: order.expect_time,
+          product_title: order.product_name, product_sub: order.desc || null, product_price: order.amount_minor / 100,
+          worker_id: null, worker: null, rating: null,
+        });
+        return jsonReply(res, { ok: true, reused: result.reused, order }, requestKey && result.reused ? 200 : 201);
+      } catch (error) { return jsonReply(res, { error: error.message }, error.status || 400); }
     }
 
     // POST /api/juzhu/jiazheng/repairs（旅居客报修下单：sku-less 免支付，口径同 commerce/main-system.cjs linkCase 先例）
@@ -466,14 +488,15 @@ function createJiazhengRouter(deps) {
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            "SELECT id,status,worker_json FROM jz_orders WHERE id=? AND phone=? AND source LIKE '旅居客 App%'",
+            "SELECT id,status,worker_json FROM jz_orders WHERE id=? AND phone=? AND source LIKE '旅居客 App%' AND pay_status='not_required' AND sku_id IS NULL AND payment_mode IS NULL",
             [m[1], phone]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           if (rows[0].status !== 'pending' || rows[0].worker_json) {
             conn.end(); return jsonReply(res, { error: '已派单，请联系 400 客服取消' }, 409);
           }
-          await conn.execute('DELETE FROM jz_orders WHERE id=?', [m[1]]);
+          const [removed] = await conn.execute("DELETE FROM jz_orders WHERE id=? AND status='pending' AND worker_json IS NULL AND pay_status='not_required' AND sku_id IS NULL AND payment_mode IS NULL AND NOT EXISTS (SELECT 1 FROM payment_order_guards g WHERE g.biz_type='jiazheng' AND g.biz_order_no=jz_orders.id)", [m[1]]);
+          if (!removed.affectedRows) return jsonReply(res, { error: '工单状态已变化，请刷新后重试' }, 409);
           await conn.commit();
           return jsonReply(res, { ok: true });
         } finally { await conn.end(); }
@@ -482,37 +505,29 @@ function createJiazhengRouter(deps) {
 
     // POST /api/juzhu/jiazheng/orders/:id/pay
     {
-      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/pay$/);
-      if (m && req.method === 'POST') {
-        if (!(await requireCEndWrite(req, res, authCenter.P.ORDER_CREATE))) return;
-        const orderId = m[1];
-        const body = await readBody(req);
-        const conn = await mysql2.createConnection(getDbConfig());
+      const m = urlPath.match(/^\/api\/juzhu\/jiazheng\/orders\/([^/]+)\/(pay|payment|cancel)$/);
+      if (m && ((m[2] === 'payment' && req.method === 'GET') || (m[2] !== 'payment' && req.method === 'POST'))) {
+        const sess = await requestSession(req);
+        if (!sess?.account || sess.account.principal_type !== 'user') return jsonReply(res, { error: '请先登录本人账号' }, 401);
         try {
-          const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
-          if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
-          const order = rows[0];
-          if (order.pay_status === 'paid') { conn.end(); return jsonReply(res, { ok: true, order }); }
-          if(order.pay_status==='not_required')return jsonReply(res,{error:'售后工单无需支付'},409);
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-          if (order.slot_id) {
-            const [slotRes] = await conn.execute(
-              'UPDATE jz_sku_slots SET booked=booked+1 WHERE id=? AND status=? AND booked<capacity',
-              [order.slot_id, 'open']
-            );
-            if (slotRes.affectedRows === 0) { conn.end(); return jsonReply(res, { error: '档期已满，请重新选择' }, 400); }
-          }
-          let log = [];
-          try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
-          log.push({ at: now, action: 'paid', pay_method: body.pay_method || 'online' });
-          await conn.execute(
-            "UPDATE jz_orders SET pay_status='paid', pay_method=?, pay_at=?, updated_at=?, log_json=? WHERE id=?",
-            [body.pay_method || 'online', now, now, JSON.stringify(log), orderId]
-          );
-          await conn.commit();
-          const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
-          return jsonReply(res, { ok: true, order: updated[0] });
-        } finally { await conn.end(); }
+          const [order] = await queryRows('SELECT * FROM jz_orders WHERE id=? AND account_id=?', [m[1], String(sess.account.id)]);
+          if (!order || order.payment_mode !== 'pay_center' || order.pay_status === 'not_required') throw fail('订单不存在或不支持在线支付', 404);
+          const body = req.method === 'POST' ? await readBody(req) : {};
+          const common = { bizType: 'jiazheng', orderId: order.id, account: sess.account, accountId: String(sess.account.id) };
+          let result;
+          if (m[2] === 'payment') result = await getPaymentCore().getStatus({ ...common, refresh: true });
+          else if (m[2] === 'cancel') result = await getJiazhengAdapter().cancel({ account: sess.account, orderId: order.id, reason: body.reason, requestKey: req.headers['idempotency-key'] });
+          else result = await legacyCompat.pay({ core: getPaymentCore(), adapter: getJiazhengAdapter(), queryRows,
+            order, account: sess.account, body, requestKey: String(req.headers['idempotency-key'] || body.idempotency_key || '').trim(),
+            clientIp: req.socket?.remoteAddress || '' });
+          if (m[2] === 'pay' || m[2] === 'payment') {
+            const [current] = await queryRows('SELECT * FROM jz_orders WHERE id=? AND account_id=?', [order.id, String(sess.account.id)]);
+            if (!current) throw fail('订单不存在', 404);
+            result = customerPayment(result, current);
+          } else if (result.order) result = customerPayment(result, result.order);
+          const legacyPay = m[2] === 'pay' && !String(req.headers['idempotency-key'] || body.idempotency_key || '').trim();
+          return jsonReply(res, { ok: true, ...result }, !legacyPay && ['creating', 'closing', 'create_unknown', 'close_unknown'].includes(result.pay_status) ? 202 : 200);
+        } catch (error) { return jsonReply(res, { error: error.message }, error.status || 400); }
       }
     }
 
@@ -525,10 +540,12 @@ function createJiazhengRouter(deps) {
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
+          await conn.beginTransaction();
+          await conn.execute("SELECT biz_order_no FROM payment_order_guards WHERE biz_type='jiazheng' AND biz_order_no=? FOR UPDATE", [orderId]);
           const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
-          if (!(['paid','not_required'].includes(order.pay_status)) || order.status !== 'pending') {
+          if (!(['paid','not_required'].includes(order.pay_status)) || order.status !== 'pending' || order.refund_status) {
             conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
           }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -537,10 +554,15 @@ function createJiazhengRouter(deps) {
           let worker = body.worker || null;
           if (!worker) {
             const [cands] = await conn.execute(
-              "SELECT id,name,level FROM jz_workers WHERE status='active' ORDER BY credit_score DESC, completed_orders DESC LIMIT 1"
+              "SELECT id,name,level FROM jz_workers WHERE status='active' AND (? IS NULL OR vendor_id=?) ORDER BY credit_score DESC, completed_orders DESC LIMIT 1", [order.vendor_id || null, order.vendor_id || null]
             );
             if (!cands.length) { conn.end(); return jsonReply(res, { error: '暂无可派服务者，请先在主站维护服务者名单' }, 400); }
             worker = { id: cands[0].id, name: cands[0].name, level: cands[0].level, auto: true };
+          }
+          if (order.payment_mode === 'pay_center') {
+            const [eligible] = await conn.execute("SELECT id,name,level FROM jz_workers WHERE id=? AND vendor_id=? AND status='active'", [worker.id, order.vendor_id]);
+            if (!eligible.length) throw fail('服务者不属于订单商家或已停用');
+            worker = { ...eligible[0], auto: !!worker.auto };
           }
           let log = [];
           try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
@@ -549,6 +571,7 @@ function createJiazhengRouter(deps) {
             "UPDATE jz_orders SET status='dispatched', worker_json=?, updated_at=?, log_json=? WHERE id=?",
             [worker ? JSON.stringify(worker) : null, now, JSON.stringify(log), orderId]
           );
+          if (order.payment_mode === 'pay_center') await getJiazhengAdapter().projectOrder(conn, { ...order, status: 'dispatched', updated_at: now });
           await conn.commit();
           await auditIfAccount(req, 'order.dispatch', 'jz_orders', String(orderId), { worker });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
@@ -567,6 +590,7 @@ function createJiazhengRouter(deps) {
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           await conn.beginTransaction();
+          await conn.execute("SELECT biz_order_no FROM payment_order_guards WHERE biz_type='jiazheng' AND biz_order_no=? FOR UPDATE", [orderId]);
           const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=? FOR UPDATE', [orderId]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
@@ -584,6 +608,7 @@ function createJiazhengRouter(deps) {
             [nextStatus, now, JSON.stringify(log), orderId]
           );
           if(nextStatus==='done')await require('./commerce/main-system.cjs').workCompleted(conn,order);
+          if (order.payment_mode === 'pay_center') await getJiazhengAdapter().projectOrder(conn, { ...order, status: nextStatus, updated_at: now });
           await conn.commit();
           await auditIfAccount(req, 'order.advance', 'jz_orders', String(orderId), { from: order.status, to: nextStatus });
           const [updated] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
@@ -607,6 +632,10 @@ function createJiazhengRouter(deps) {
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
           if (order.status !== 'done') { conn.end(); return jsonReply(res, { error: '仅已完成订单可评价' }, 400); }
+          if (order.payment_mode === 'pay_center') {
+            const sess = await requestSession(req);
+            if (!sess?.account || String(sess.account.id) !== String(order.account_id)) return jsonReply(res, { error: '订单不存在或无权评价' }, 404);
+          }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
           const rating = { score, tags: body.tags || [], text: body.text || '' };
           let log = [];
@@ -660,59 +689,68 @@ function createJiazhengRouter(deps) {
       const body = await readBody(req);
       const parsed = grOrders.validateWechatLinkBody(body);
       if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
+      parsed.productId = Number(parsed.productId);
+      if (!Number.isSafeInteger(parsed.productId) || parsed.productId <= 0) return jsonReply(res, { ok: false, error: 'product_id 无效' }, 400);
+      const linkSession = requestSession ? await requestSession(req) : null;
+      if (linkSession?.account?.id) parsed.userId = 'commerce-account-' + String(linkSession.account.id);
+      if (!linkSession?.account && parsed.userId?.startsWith('commerce-account-')) return jsonReply(res, { error: '请先登录本人账号' }, 401);
+      let requestKey = String(req.headers['idempotency-key'] || body.idempotency_key || '').trim();
+      // HEAD also permits product-only anonymous mini-program links. With no
+      // owner identity each request stays a separate unowned external booking.
+      if (!parsed.userId) requestKey = 'legacy-anon:' + crypto.randomUUID();
+      else if (!requestKey) {
+        const terminal = await queryRows(`SELECT id FROM gr_orders WHERE user_id=? AND sku=? AND payment_mode='wechat_mini'
+          AND status<>'pending' ORDER BY id DESC LIMIT 1`, [parsed.userId, String(parsed.productId)]);
+        requestKey = 'legacy-link:' + crypto.createHash('sha256').update(JSON.stringify({
+          productId: String(parsed.productId), userId: parsed.userId, generation: terminal[0]?.id || 'initial' })).digest('hex');
+      }
+      if (!/^[A-Za-z0-9_.:-]{8,100}$/.test(requestKey)) return jsonReply(res, { ok: false, error: '请提供有效的 Idempotency-Key' }, 400);
+      const requestHash = crypto.createHash('sha256').update(JSON.stringify({ productId: parsed.productId, userId: parsed.userId })).digest('hex');
       const products = await queryRows(
-        `SELECT p.*, s.slug AS sku_slug FROM jz_products p
+        `SELECT p.*, s.slug AS sku_slug,v.payment_mode,v.payment_config_version,v.status AS vendor_status,c.name AS city_name FROM jz_products p
          LEFT JOIN jz_skus s ON s.id=p.channel_sku_id
-         WHERE p.id=? AND p.status='on'`,
+         JOIN jz_vendors v ON v.id=p.vendor_id LEFT JOIN cities c ON c.id=p.city_id
+         WHERE p.id=?`,
         [parsed.productId]
       );
       if (!products.length) return jsonReply(res, { ok: false, error: '产品未找到' }, 404);
       const product = products[0];
       if(String(product.query||'').startsWith('guiyang-life-demo-v1:'))return jsonReply(res,{ok:false,error:'演示商品请前往生活权益体验，不生成真实服务商预约链接'},409);
-      const pagePath = product.path || 'pages-sub/goods/goods';
-      const productQuery = product.query || '';
-      const vendorId = String(product.vendor_id || '');
-      const vendors = await getVendorConfig();
-      const vendor = vendors[vendorId];
-      if (!vendor || !vendor.url_link) {
-        return jsonReply(res, {
-          ok: false,
-          error: `vendor_id=${vendorId} 未配置 url_link，请检查 jz_vendors 表配置`,
-        }, 500);
-      }
-      if (!hmacAuth || !vendor.key) {
-        return jsonReply(res, {
-          ok: false,
-          error: `vendor_id=${vendorId} 未配置 hmac_key，无法按文档带签名调用 url_link`,
-        }, 500);
-      }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
-        const orderRef = await grOrders.generateOrderRef(conn);
-        // 平台 → 商家 urllink：按 api_doc.md 加 HMAC-SHA256 签名（vendor_id 必带）
-        const linkBody = hmacAuth.generateSignature(vendor.key, {
-          vendor_id: Number(vendorId),
-          path: pagePath,
-          query: productQuery,
-          order_ref: orderRef,
-        });
-        const outbound = await outboundJson('POST', vendor.url_link, linkBody, 10000);
-        if (!outbound.json || outbound.json.code !== 200) {
-          return jsonReply(res, { ok: false, error: (outbound.json && outbound.json.msg) || 'URL Link 生成失败' }, 502);
+        await conn.beginTransaction();
+        const [existing] = await conn.execute('SELECT * FROM gr_orders WHERE user_id=? AND request_key=? FOR UPDATE', [parsed.userId, requestKey]);
+        let order = existing[0];
+        if (order && (order.request_hash !== requestHash || order.payment_mode !== 'wechat_mini')) throw fail('同一请求键对应不同预约内容');
+        if (!order) {
+          const [latest] = await conn.execute("SELECT p.*,v.payment_mode,v.payment_config_version,v.url_link,v.hmac_key,v.status AS vendor_status FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id WHERE p.id=? AND p.status='on' FOR UPDATE", [parsed.productId]);
+          const current = latest[0];
+          if (!current || current.payment_mode !== 'wechat_mini' || current.vendor_status !== 'active') throw fail('该商家未开通小程序支付，请返回商品页');
+          if (!current.url_link || !current.hmac_key || !hmacAuth) throw fail('商家小程序接入配置尚未完成');
+          const orderRef = await grOrders.generateOrderRef(conn);
+          const snapshot = { paymentConfigVersion: current.payment_config_version, path: current.path || 'pages-sub/goods/goods', query: current.query || '', urlLink: current.url_link };
+          await grOrders.createOrder(conn, orderRef, String(parsed.productId), { vendor_id: current.vendor_id, user_id: parsed.userId,
+            city: product.city_name, request_key: requestKey, request_hash: requestHash, snapshot });
+          order = { order_ref: orderRef, vendor_id: current.vendor_id, order_snapshot: JSON.stringify(snapshot) };
         }
-        await grOrders.createOrder(conn, orderRef, String(parsed.productId), {
-          vendor_id: product.vendor_id,
-          user_id: parsed.userId,
+        await conn.commit();
+        const snapshot = JSON.parse(order.order_snapshot || '{}');
+        const [[credentials]] = await conn.execute('SELECT hmac_key FROM jz_vendors WHERE id=?', [order.vendor_id]);
+        if (!credentials?.hmac_key || !hmacAuth || !snapshot.urlLink) throw fail('原渠道接入配置不可用，请联系服务商');
+        const linkBody = hmacAuth.generateSignature(credentials.hmac_key, {
+          vendor_id: Number(order.vendor_id), path: snapshot.path, query: snapshot.query, order_ref: order.order_ref,
         });
-        return jsonReply(res, {
-          ok: true,
-          url_link: outbound.json.data || '',
-          order_ref: orderRef,
-        });
-      } finally {
-        await conn.end();
-      }
+        const outbound = await outboundJson('POST', snapshot.urlLink, linkBody, 10000);
+        if (!outbound.json || outbound.json.code !== 200 || !/^(https?:\/\/|weixin:\/\/)/i.test(String(outbound.json.data || ''))) {
+          return jsonReply(res, { ok: false, error: '预约链接暂未生成，请使用同一订单重试' }, 502);
+        }
+        return jsonReply(res, { ok: true, url_link: outbound.json.data, order_ref: order.order_ref });
+      } catch (error) {
+        await conn.rollback().catch(() => {});
+        return jsonReply(res, { ok: false, error: error.code === 'ER_LOCK_DEADLOCK' || error.code === 'ER_DUP_ENTRY' ? '同一预约正在处理，请重试' : error.message }, error.status || 409);
+      } finally { await conn.end(); }
     }
+
     // --- extracted from app.js L7018-7061 ---
     // GET /api/juzhu/jiazheng/skus/:slug/detail
     {

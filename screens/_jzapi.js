@@ -67,7 +67,11 @@
         try { BZF_BEIKE_LOGIN.handleUnauthorized(); } catch (e) {}
       }
       return r.json().then(function (data) {
-        if (!r.ok) throw new Error(data.error || data.message || ('HTTP ' + r.status));
+        if (!r.ok) {
+          var error = new Error(data.error || data.message || ('HTTP ' + r.status));
+          error.status = r.status; error.code = data.code; error.data = data;
+          throw error;
+        }
         return data;
       });
     });
@@ -145,25 +149,127 @@
   }
 
   function create(payload) {
+    payload = payload || {};
+    var headers = authHeaders();
+    // Legacy callers had no request key. Let the server deduplicate their full
+    // body and advance its generation after the original order is terminal.
+    // The current checkout supplies an explicit key and retains it on retry.
+    if (payload.idempotency_key) headers['Idempotency-Key'] = payload.idempotency_key;
     return fetchJSON('/api/juzhu/jiazheng/orders', {
       method: 'POST',
-      headers: authHeaders(),
+      headers: headers,
       body: JSON.stringify(payload)
     }).then(function (res) {
       notify();
-      return normalizeItem(res.order);
+      return normalizeItem(res.order || res);
     });
   }
 
-  function pay(id, payMethod) {
+  var memoryRequestKeys = Object.create(null), cashierLoading;
+  function requestKey(scope, renew) {
+    if (window.BZF_CASHIER) return BZF_CASHIER.requestKey('jiazheng:' + scope, !!renew);
+    var key = 'jz.request.' + scope, value = memoryRequestKeys[key];
+    try { value = sessionStorage.getItem(key) || value; } catch (_) {}
+    if (!value || renew) {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') value = window.crypto.randomUUID();
+      else if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+        var random = new Uint8Array(16); window.crypto.getRandomValues(random);
+        value = Array.from(random, function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+      } else value = 'jz-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+      memoryRequestKeys[key] = value;
+      try { sessionStorage.setItem(key, value); } catch (_) {}
+    }
+    return value;
+  }
+
+  function paymentResult(res) {
+    res = res || {};
+    var order = normalizeItem(res.order);
+    var payment = Object.assign({}, order || {}, res);
+    if (window.BZF_CASHIER && BZF_CASHIER.normalize) payment = BZF_CASHIER.normalize(payment);
+    else {
+      payment.pay_status = payment.pay_status || payment.payStatus;
+      payment.cashier_url = payment.cashier_url || payment.cashierUrl;
+      payment.cashier_type = payment.cashier_type || payment.cashierType;
+    }
+    if (!payment.order_pay_status && order) payment.order_pay_status = order.status === 'cancelled' ? 'closed' : order.pay_status;
+    return payment;
+  }
+  function cashier() {
+    if (window.BZF_CASHIER) return Promise.resolve(window.BZF_CASHIER);
+    if (!cashierLoading) cashierLoading = new Promise(function (resolve, reject) {
+      var script = document.createElement('script'); script.src = '/screens/_cashier.js?v=2';
+      script.onload = function () { resolve(window.BZF_CASHIER); };
+      script.onerror = function () { cashierLoading = null; reject(new Error('收银台组件加载失败，请刷新后重试')); };
+      document.head.appendChild(script);
+    });
+    return cashierLoading;
+  }
+  async function legacyPayment(id, payment) {
+    var sdk = await cashier();
+    function confirmed(p) {
+      var order = p.order || {};
+      if (sdk.orderStatus) return sdk.orderStatus(p, order) === 'paid';
+      if (order.status === 'cancelled' || ['refunding', 'refunded', 'partially_refunded'].indexOf(order.refund_status) >= 0
+        || ['refunding', 'refunded', 'partially_refunded'].indexOf(order.pay_status) >= 0) return false;
+      return p.order_pay_status === 'paid' || (!p.order_pay_status && p.pay_status === 'paid');
+    }
+    async function paidOrder(p) {
+      // Payment replies can precede cancellation/refund projection. Always
+      // read the latest business order before an old success continuation.
+      var order = await get(id);
+      if (!confirmed({ order: order, order_pay_status: order.pay_status })) throw new Error('尚未确认支付成功，请从订单页查看结果');
+      return normalizeItem(order);
+    }
+    if (confirmed(payment)) return paidOrder(payment);
+    if (!payment.cashier_url) payment = await sdk.waitForCashier(function () { return paymentStatus(id); });
+    if (confirmed(payment)) return paidOrder(payment);
+    if (!payment.cashier_url) throw new Error('支付结果确认中，请到订单页查看，请勿重复下单');
+    if (String(payment.cashier_type || sdk.cashierType()) === '1' && sdk.ensureAppBridge) await sdk.ensureAppBridge();
+    return new Promise(function (resolve, reject) {
+      var opened = sdk.open(payment, {
+        onCancel: function () { reject(new Error('支付已取消，可从原订单继续付款')); },
+        onResult: function () {
+          paymentStatus(id).then(function (p) {
+            if (!confirmed(p)) throw new Error('尚未确认支付成功，请从订单页查看结果');
+            return paidOrder(p);
+          }).then(resolve, reject);
+        }
+      });
+      if (!opened) reject(new Error('订单当前不可付款，请从订单页查看结果'));
+    });
+  }
+  function payIntent(id, renew, payMethod) {
+    renew = renew === true;
+    var cashierType = window.BZF_CASHIER ? BZF_CASHIER.cashierType()
+      : (window.__BZF_IS_BEIKE_APP || /beike|lianjia/i.test(navigator.userAgent || '') ? '1' : '2');
+    var headers = authHeaders(); headers['Idempotency-Key'] = requestKey('pay:' + id + ':' + cashierType, renew);
+    var body = { cashier_type: cashierType };
+    if (payMethod) body.pay_method = payMethod;
     return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/pay', {
       method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({ pay_method: payMethod || '贝壳支付' })
+      headers: headers,
+      body: JSON.stringify(body)
     }).then(function (res) {
+      res = paymentResult(res);
+      if (res.next_action === 'new_attempt' && !renew) return payIntent(id, true, payMethod);
       notify();
-      return normalizeItem(res.order);
+      return res;
     });
+  }
+  // Original public method: its optional second argument was a payment label,
+  // and success continuations assume a completed payment. Intent creation has
+  // a separate name so omitted/undefined/null labels keep that old contract.
+  function pay(id, payMethod) {
+    return payIntent(id, false, payMethod || '贝壳支付').then(function (payment) { return legacyPayment(id, payment); });
+  }
+  function paymentStatus(id) {
+    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/payment', { headers: authHeaders() }).then(paymentResult);
+  }
+  function cancelOrder(id, reason) {
+    var headers = authHeaders(); headers['Idempotency-Key'] = requestKey('cancel:' + id);
+    return fetchJSON('/api/juzhu/jiazheng/orders/' + encodeURIComponent(id) + '/cancel', { method: 'POST', headers: headers,
+      body: JSON.stringify({ reason: reason || '用户取消' }) }).then(function (res) { notify(); return res; });
   }
 
   function dispatch(id, worker) {
@@ -603,6 +709,11 @@
     stats: stats,
     create: create,
     pay: pay,
+    payIntent: payIntent,
+    paymentStatus: paymentStatus,
+    cancelOrder: cancelOrder,
+    requestKey: requestKey,
+    authHeaders: authHeaders,
     dispatch: dispatch,
     advance: advance,
     rate: rate,
