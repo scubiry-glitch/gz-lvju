@@ -310,3 +310,15 @@
 .commerce-consumer .product-card .money{font-size:16px}
 .commerce-consumer .product-card .btn{min-height:34px;padding:6px 11px;font-size:11px;border-radius:9px}
 @media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card{padding:10px 10px 9px}.commerce-consumer .product-card h3{font-size:13px;min-height:39px}}
+
+/* ── 2026-10-02 选券页头部压紧：去营销大标题，控件贴身（首屏 ≈240px 见第一张卡）──
+   仅作用于选券页（.consumer-shop-head），其余视图仍保持 44px 触达与标题层级。 */
+.consumer-shop-head{margin-top:2px}
+.consumer-shop-head .consumer-shop-tabs{margin-bottom:10px}
+.consumer-shop-head .consumer-shop-tabs button{min-height:38px;padding:7px 5px;font-size:13px}
+.consumer-shop-head .consumer-search{margin-bottom:10px}
+.consumer-shop-head .consumer-search input{min-height:38px;padding:8px 11px;font-size:12px}
+.consumer-shop-head .consumer-search button{min-height:38px;padding:0 12px;font-size:12px}
+.consumer-shop-head .consumer-category{margin-bottom:10px}
+.consumer-shop-head .cat-chips button{min-height:32px;padding:5px 12px;font-size:11px}
+.consumer-shop-head .consumer-section-title{margin-bottom:10px}
