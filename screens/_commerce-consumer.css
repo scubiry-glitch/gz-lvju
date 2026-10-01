@@ -465,3 +465,12 @@
 .plan-price{font-size:15px;flex-shrink:0}
 .plan-slide-actions .btn{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
 .plan-owned-chip{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
+
+/* ── 会员中心：标题/提示合一行（三行松散文字 → 单行 section-title 形态）── */
+.member-heading{padding:2px 2px 0}
+.member-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.member-hint{font-size:11px;color:#828778;white-space:nowrap}
+/* 已开通卡：整卡降饱和去「可购感」，chip 改对勾描边（非按钮观感） */
+.plan-slide.is-owned{filter:saturate(.45) brightness(.96)}
+.plan-owned-chip{background:transparent;border:1px solid #ffffff59;color:#eef0e6;font-weight:500}
+.plan-owned-chip::before{content:"✓ ";font-weight:600}
