@@ -474,3 +474,12 @@
 .plan-slide.is-owned{filter:saturate(.45) brightness(.96)}
 .plan-owned-chip{background:transparent;border:1px solid #ffffff59;color:#eef0e6;font-weight:500}
 .plan-owned-chip::before{content:"✓ ";font-weight:600}
+
+/* ── 沈阳页字号/载体和谐：压过 M1-A 层 26px 旧规则（同特异性后行胜）；权益列表 >3 项折叠 ── */
+.commerce-consumer .member-heading h1{font-size:19px;margin:0 0 3px}
+.commerce-consumer .member-heading p{font-size:11px;margin:0}
+.member-benefit-fold{margin:2px 0 0}
+.member-benefit-fold>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#41604b;padding:11px 2px;border-top:1px solid #eeeae1}
+.member-benefit-fold>summary::-webkit-details-marker{display:none}
+.member-benefit-fold .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.member-benefit-fold[open] .fold-arrow{transform:rotate(90deg)}
