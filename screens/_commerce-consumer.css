@@ -83,7 +83,9 @@
 .commerce-consumer .product-card{padding:18px}
 .commerce-consumer .product-card{position:relative;padding:13px 14px 12px 70px;border-radius:12px;min-height:128px}
 .commerce-consumer .consumer-product-top{margin:0 0 6px;justify-content:flex-end}
-.commerce-consumer .consumer-product-icon{position:absolute;left:14px;top:17px;width:43px;height:43px}
+/* 旧「图标左栏」布局（icon absolute + left:14/top:17 + 卡片 padding-left:70px）已废弃删除：
+   它的 left/top 残留会给下方紧凑卡的 position:relative icon 一个 (14,17) 的相对位移，
+   图标会漂进标题区（2026-10-02 踩过）。紧凑卡样式以本文件后段 ~283 行块为准。 */
 .commerce-consumer .product-card h3{font-size:16px;line-height:1.5;margin:0 0 5px}
 .commerce-consumer .product-card>p{font-size:10px;margin:3px 0}
 .commerce-consumer .product-card .product-benefits{margin:6px 0;gap:4px}
@@ -280,7 +282,9 @@
 .consumer-products>.commerce-empty,.consumer-products>.consumer-sale-note{grid-column:1/-1}
 .commerce-consumer .product-card{display:flex;flex-direction:column;padding:12px 12px 11px;min-height:0;border-radius:13px;cursor:pointer}
 .commerce-consumer .consumer-product-top{margin:0 0 9px;justify-content:flex-start;gap:6px;flex-wrap:wrap}
-.commerce-consumer .consumer-product-icon{position:static;width:38px;height:38px;border-radius:11px}
+/* position:relative 而非 static：icon 是 .pc-img 的定位上下文（见文末 C9 规则），
+   static 会让主图向上找到 .app 铺满整页盖住文字；relative 无偏移、文档流不变。 */
+.commerce-consumer .consumer-product-icon{position:relative;width:38px;height:38px;border-radius:11px}
 .consumer-product-top .channel-tag{margin-left:0}
 /* kind 信息由 tab/benefits 行表达，顶部只留 icon + 渠道 tag（tag 靠右，半宽卡不再折行） */
 .commerce-consumer .consumer-product-top .channel-tag{margin-left:auto}
@@ -398,3 +402,7 @@
 .plan-dots{display:flex;gap:6px;justify-content:center;padding:10px 0 0}
 .plan-dots i{width:6px;height:6px;border-radius:999px;background:#c9cbb9;transition:background .15s,width .15s;cursor:pointer}
 .plan-dots i.on{background:#365c49;width:16px}
+
+/* ── 会员卡组：已购方案态（金描边 + 「已开通」chip 替代开通按钮）── */
+.plan-slide.is-owned{border-color:#cbb87e}
+.plan-owned-chip{background:#e9d9ae;color:#4c3c24;border-radius:10px;display:inline-flex;align-items:center;padding:8px 12px;font-size:12px;font-weight:600;min-height:38px}
