@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN" data-console-login="off">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>演示账号 · 新居住权益工作台</title><link rel="stylesheet" href="../lvju-app.css"><link rel="stylesheet" href="_commerce.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>演示账号 · 新居住权益工作台</title><link rel="stylesheet" href="../lvju-app.css"><link rel="stylesheet" href="_commerce.css?v=20261002-1"></head>
 <body class="commerce-page commerce-desktop" data-commerce-view="admin" data-section="demo-accounts"><div class="console"><aside id="commerce-nav" data-view="admin" data-active="demo-accounts"></aside><div class="main"><header class="appbar"><a class="bk" href="../overview.html" aria-label="返回全站总览">‹</a><div class="ttl">演示账号<small>新居住 · 权益工作台（仅 sytest 演示环境）</small></div></header><nav id="commerce-tabs" class="commerce-tabs" aria-label="权益管理导航"></nav><main id="commerce-content" class="commerce-content">
 
 <section class="commerce-card wide commerce-hero"><div class="eyebrow">NEW LIVING · DEMO ACCOUNTS</div><h2>演示账号一览</h2><p>主站 IAM 测试账号（admin / va_owner / op_admin / w_worker1 / holding_viewer1 等 6 个）另见 <a href="demo-accounts.html"><b>演示账号速查</b></a>。以下为权益结算演示账号，由 <code>scripts/commerce/settlement-demo-seed.cjs</code> 生成，覆盖权益四端的演示视角。密码统一为 <b>Demo#2026</b>；全部为「演示」前缀账号，仅存在于 sytest 预览环境，机构为沙箱口径，<b>不代表真实资金</b>。<b>演示凭据禁止用于生产环境</b>，生产权限一律经账号中心（IAM）审批授予。</p></section>
@@ -24,6 +24,6 @@
 <li><b>资金视角回看</b>：商户「应结与到账」、推广员「已到账」、客户「退款进度」三端同看一账。</li>
 </ol><p>数据与口径详见 <code>docs/verification/guiyang-closed-loop/DEMO-DATA.md</code>；清理与重建：<code>node scripts/commerce/settlement-demo-seed.cjs clean|seed</code>。</p></section>
 
-</main></div></div><script src="_console-login.js"></script><script src="_commerce-nav.js?v=20261002-1"></script><script>
+</main></div></div><script src="_console-login.js"></script><script src="_commerce-nav.js?v=20261002-3"></script><script>
 document.querySelector('#commerce-tabs').innerHTML='<a class="on" href="commerce-demo-accounts.html" aria-current="page">演示账号</a>'+'<a href="commerce-admin-settlement.html">结算账单</a><a href="commerce-admin-reconciliation.html">对账中心</a><a href="commerce-admin-stats.html">运营统计</a>';
 </script></body></html>

@@ -221,4 +221,15 @@
 .commerce-consumer input:focus-visible,.commerce-consumer select:focus-visible,.commerce-consumer summary:focus-visible{outline:3px solid #d6ab67;outline-offset:3px}
 .commerce-consumer button,.commerce-consumer .btn,.commerce-consumer .member-benefit-expand{transition:background-color .15s ease,transform .15s ease,box-shadow .15s ease}
 .commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:translateY(1px)}
+
+/* ── 2026-10-02 美化轮：悬浮反馈与浮层质感（hover 设备生效，触屏不变） ── */
+.commerce-consumer .product-card,.commerce-consumer .consumer-topic{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.commerce-consumer .consumer-detail-buy{backdrop-filter:blur(6px);background:#fffcf7e6;box-shadow:0 -6px 24px #16382c12}
+@media(hover:hover){
+ .commerce-consumer .product-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px #233c3112;border-color:#193d371f}
+ .commerce-consumer .consumer-topic:hover{transform:translateY(-2px);box-shadow:0 10px 24px #233c310f}
+ .commerce-consumer .consumer-member:hover{border-color:#cdb887;box-shadow:0 10px 26px #8a6a1f1a}
+ .commerce-consumer .coupon-filter button:hover{border-color:#41604b;color:#365c49}
+ .commerce-consumer .consumer-shortcut:hover svg{background:#e0e8da;color:#365c49}
+}
 @media(prefers-reduced-motion:reduce){.commerce-consumer *{animation:none!important;transition:none!important}.commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:none}}

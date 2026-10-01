@@ -111,3 +111,12 @@ button.commerce-kpi:focus-visible{outline:3px solid #d6ab67;outline-offset:2px}
 .commerce-promoter .empty-mark{color:var(--brand-2)}
 @media(max-width:359px){.commerce-promoter .commerce-content{padding-left:13px;padding-right:13px}.commerce-promoter .commerce-hero{padding:20px 16px}.commerce-promoter .commerce-hero h2{font-size:21px}}
 @media(prefers-reduced-motion:reduce){.commerce-promoter *{scroll-behavior:auto!important;transition:none!important}}
+
+/* ── 2026-10-02 美化轮：决策卡悬浮反馈（hover 设备生效，触屏不变） ── */
+.promoter-mini{transition:transform .15s ease,box-shadow .15s ease}
+@media(hover:hover){
+ .promoter-mini:hover{transform:translateY(-2px);box-shadow:0 10px 24px #233c3112}
+ .promoter-footer a{transition:border-color .15s ease,color .15s ease}
+ .promoter-footer a:hover{border-color:var(--brand-deep);color:var(--brand-deep)}
+}
+@media(prefers-reduced-motion:reduce){.promoter-mini{transition:none}}
