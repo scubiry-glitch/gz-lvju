@@ -18,6 +18,7 @@
 - 不要只改单页面就提交。修页面 + 改 `_nav.js` + 改 `overview.html` 应该在同一 commit。
 - 若改动很多页面，按系列分批提交，但每个 commit 内三者必须同步。
 - 新建系列（如未来加 V 端供应商）时，先在 `_nav.js` 增加系列定义，再建页面。
+- **例外（2026-10-02 拍板，commerce 权益域「前端彻底自含」）**：`screens/commerce-admin*.html`、`commerce-merchant*.html`、`commerce-demo-accounts.html` 38 个工作台/演示页与 C 端权益页**不挂共享 `#side-nav`/`_nav.js`**，改挂权益域自有导航 `<aside id="commerce-nav" data-view="admin|merchant" data-active="模块key">` + `<script src="_commerce-nav.js">`（域内完整菜单 + `COMMERCE.can` 权限裁剪，未登录全显）；`_nav.js` 的 SERIES.commerce 只保留模块入口目录。**三同步对象相应变为：页面 + `_commerce-nav.js` + `overview.html` 同 commit**；`_nav.js` 仅在模块入口增减时才动。不要把"权益页不在 `_nav.js`"当缺陷修回。
 
 ## 规则 2 · 共享导航的使用
 

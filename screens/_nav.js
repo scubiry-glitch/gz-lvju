@@ -56,6 +56,9 @@
 
   // ============ 6 系列定义（单一数据源） ============
   const SERIES = {
+    // 权益工作台（2026-10-02 拍板：commerce 前端「彻底自含」——38 个工作台/演示页改挂
+    // screens/_commerce-nav.js（域内完整菜单 + 权限裁剪），本系列只保留模块入口目录。
+    // 页面 + _commerce-nav.js + overview.html 三者仍须同 commit 同步（CLAUDE.md 规则 1 例外条款）。
     commerce: {
       name: '新居住 · 权益工作台', short: '券包与会员 · 业务中心', icon: '券',
       primary: '#0f766e', primaryDeep: '#0b5d56',
@@ -68,37 +71,6 @@
         {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
         {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},
         {id:'demo-accounts',label:'演示账号',href:'commerce-demo-accounts.html',icon:'book'},
-      ]},
-      {name:'配置管理',items:[
-        {id:'commerce-merchants',label:'商户管理',href:'commerce-admin-merchants.html',icon:'bank',perms:['commerce.admin.read']},
-        {id:'commerce-stores',label:'门店管理',href:'commerce-admin-stores.html',icon:'home',perms:['commerce.admin.read']},
-        {id:'commerce-staff',label:'核销人员',href:'commerce-admin-staff.html',icon:'user',perms:['commerce.admin.read']},
-        {id:'commerce-skus',label:'券商品',href:'commerce-admin-skus.html',icon:'box',perms:['commerce.admin.read']},
-        {id:'commerce-rules',label:'报价与分配规则',href:'commerce-admin-rules.html',icon:'settings',perms:['commerce.admin.read']},
-        {id:'commerce-packages',label:'券包配置',href:'commerce-admin-packages.html',icon:'layers',perms:['commerce.admin.read']},
-        {id:'commerce-plans',label:'会员方案',href:'commerce-admin-plans.html',icon:'award',perms:['commerce.admin.read']},
-      ]},
-      {name:'履约运营',items:[
-        {id:'commerce-inventory',label:'库存管理',href:'commerce-admin-inventory.html',icon:'list',perms:['commerce.admin.read']},
-        {id:'commerce-capacity',label:'预约产能',href:'commerce-admin-capacity.html',icon:'target',perms:['commerce.admin.read']},
-        {id:'commerce-orders',label:'订单与发放',href:'commerce-admin-orders.html',icon:'file',perms:['commerce.admin.read']},
-        {id:'commerce-appointments',label:'预约管理',href:'commerce-admin-appointments.html',icon:'bell',perms:['commerce.admin.read']},
-        {id:'commerce-redemptions',label:'核销记录',href:'commerce-admin-redemptions.html',icon:'check',perms:['commerce.admin.read']},
-        {id:'commerce-exchanges',label:'兑换码管理',href:'commerce-admin-exchanges.html',icon:'coin',perms:['commerce.admin.read']},
-      ]},
-      {name:'客户与售后',items:[
-        {id:'commerce-coupons',label:'卡券发放',href:'commerce-admin-coupons.html',icon:'wallet',perms:['commerce.admin.read']},
-        {id:'commerce-memberships',label:'会员记录',href:'commerce-admin-memberships.html',icon:'star',perms:['commerce.admin.read']},
-        {id:'commerce-cases',label:'售后工单',href:'commerce-admin-cases.html',icon:'chat',perms:['commerce.admin.read']},
-      ]},
-      {name:'数据与审计',items:[
-        {id:'commerce-stats',label:'运营统计',href:'commerce-admin-stats.html',icon:'pulse',perms:['commerce.admin.read']},
-        {id:'commerce-audit',label:'操作审计',href:'commerce-admin-audit.html',icon:'book',perms:['commerce.admin.read']},
-      ]},
-      {name:'结算与对账',items:[
-        {id:'commerce-settlement',label:'结算账单',href:'commerce-admin-settlement.html',icon:'coin',perms:['commerce.fund.read']},
-        {id:'commerce-refunds',label:'退款执行',href:'commerce-admin-refunds.html',icon:'wallet',perms:['commerce.fund.read']},
-        {id:'commerce-reconciliation',label:'对账中心',href:'commerce-admin-reconciliation.html',icon:'check',perms:['commerce.fund.read']},
       ]}],
     },
     // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
