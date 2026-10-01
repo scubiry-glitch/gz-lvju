@@ -279,7 +279,7 @@
 /* ── 2026-10-02 选券页信息流卡（对齐手淘商品卡骨架）：大图占卡 → 标题 → 摘要 →
    标签 → 价格贴底；无按钮，整卡可点（data-action 在 article 上）。
    骨架口诀：图是卡、文贴图、价沉底。 ── */
-.consumer-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.consumer-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .consumer-products>.commerce-empty,.consumer-products>.consumer-sale-note{grid-column:1/-1}
 .commerce-consumer .product-card{display:flex;flex-direction:column;padding:0;min-height:0;border-radius:13px;overflow:hidden;cursor:pointer}
 /* 图区：铺满卡宽（1:1），.pc-img 的定位上下文必须是这层——position:relative 不可改回 static，
@@ -291,18 +291,20 @@
 .consumer-product-top .channel-tag{margin-left:0}
 /* 渠道 tag 叠在图右上角（手淘「广告」位） */
 .commerce-consumer .product-card .consumer-product-top .channel-tag{position:absolute;top:8px;right:8px;margin:0;z-index:2;box-shadow:0 2px 8px #16382c26}
-/* 文区：标题/摘要不预留两行高度（min-height 会在单行标题下挖洞）；内容自然贴合，
+/* 文区（2026-10-02 二次压紧：目标行距 ~210px、一屏 2.5 排）——标题/说明不预留行高
+   （min-height 会在单行下挖洞），说明压到一行做引子，规格详情留给详情页；
    行内富余交给 margin-top:auto 的价格行 → 留白沉底、价格贴卡底。 */
-.commerce-consumer .product-card h3{padding:9px 12px 0;font:600 15px/1.45 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 4px}
-.commerce-consumer .product-card-summary{padding:0 12px;font-size:11px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:0}
-.commerce-consumer .product-card .product-benefits{padding:7px 12px 0;margin:0;gap:4px}
-.commerce-consumer .product-card .product-benefits span{padding:2px 6px;font-size:9px}
-.commerce-consumer .product-card .product-bottom{border:0;padding:8px 12px 11px;margin-top:auto;gap:6px}
+.commerce-consumer .product-card h3{padding:6px 11px 0;font:600 14px/1.4 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 3px}
+/* 选择器带 >p 提特异性：压掉上方 .product-card>p{margin:3px 0}（0,2,1>0,2,0，踩过） */
+.commerce-consumer .product-card>p.product-card-summary{padding:0 11px;margin:0;font-size:10px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;min-height:0}
+.commerce-consumer .product-card .product-benefits{padding:3px 11px 0;margin:0;gap:4px}
+.commerce-consumer .product-card .product-benefits span{padding:1px 5px;font-size:8px}
+.commerce-consumer .product-card .product-bottom{border:0;padding:5px 11px 9px;margin-top:auto;gap:6px}
 /* 价格锚点：手淘式大价 + 灰小字后缀（演示价贴在价后基线对齐，全宽行放得下不再竖排）。
-   显式声明 22px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
+   显式声明 19px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
    不显式覆盖就会被旧块回填（2026-10-02 连踩两次残留声明复活）。 */
-.commerce-consumer .product-card .product-bottom .money{font-size:22px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:5px;min-width:0;white-space:nowrap}
-.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:10px;color:#8a8e7f}
+.commerce-consumer .product-card .product-bottom .money{font-size:19px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:4px;min-width:0;white-space:nowrap}
+.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:9px;color:#8a8e7f}
 /* 整卡可点，卡上不再放按钮（手淘信息流同款） */
 .commerce-consumer .product-card .btn{display:none}
 @media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card h3{font-size:14px;padding:8px 10px 0}.commerce-consumer .product-card-summary{padding:0 10px}.commerce-consumer .product-card .product-benefits{padding:6px 10px 0}.commerce-consumer .product-card .product-bottom{padding:7px 10px 10px}}
@@ -419,7 +421,9 @@
 
 /* ── 2026-10-02 商品卡横幅图变体：卡顶 16:9 横带（替代误铺满卡的整图），卡形更扁；无图回落品类图标 ── */
 .commerce-consumer .consumer-product-icon{position:relative}
-.pc-banner{position:relative;aspect-ratio:16/9;margin:-12px -12px 9px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
+/* margin 不能用负值：卡 padding 是 0，-12px 会把横幅顶部/两侧各裁 12px（海报角标被切就是它）。
+   16/7 压扁横幅给文区让高（2026-10-02 一屏 2.5 排）。 */
+.pc-banner{position:relative;aspect-ratio:16/7;margin:0 0 8px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
 .pc-banner-img{width:100%;height:100%;object-fit:cover;display:block}
 .pc-banner-badge{position:absolute;left:9px;bottom:9px;width:30px;height:30px;border-radius:9px;background:#fffc;display:grid;place-items:center;color:var(--cat-fg,#365c49);box-shadow:0 1px 6px #16382c1a}
 .pc-banner-badge svg{width:17px;height:17px}
@@ -483,3 +487,22 @@
 .member-benefit-fold>summary::-webkit-details-marker{display:none}
 .member-benefit-fold .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
 .member-benefit-fold[open] .fold-arrow{transform:rotate(90deg)}
+
+/* ── 2026-10-02 首页字阶与配比和谐化：上方文字提一档、下方分区标题降一档、封面收敛 ──
+   统一字阶：9(kicker) / 12(正文) / 14-15(卡题) / 16(分区题) / 19(会员卡题) / 28(封面题) */
+.commerce-consumer .consumer-cover{height:230px}
+.commerce-consumer .consumer-cover h1{font-size:28px;margin:0 0 16px}
+.commerce-consumer .consumer-cover-copy{margin-top:20px}
+.commerce-consumer .consumer-cover-copy p{font-size:12px}
+.consumer-cover-label{font-size:11px}
+.consumer-shortcut span{font-size:12px}
+.consumer-shortcut svg{width:46px;height:46px}
+.consumer-member{min-height:122px;padding:16px 18px}
+.consumer-kicker{font-size:9px;letter-spacing:.14em}
+.consumer-member strong{font-size:19px}
+.consumer-member-copy>span:not(.consumer-kicker){font-size:12px}
+.commerce-consumer .consumer-section-title h2{font-size:16px}
+.consumer-section-title>span{font-size:11px}
+.commerce-consumer .consumer-topic h3{font-size:15px}
+.commerce-consumer .consumer-products .product-card h3{font-size:15px}
+.commerce-consumer .consumer-content{gap:18px}
