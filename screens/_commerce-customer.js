@@ -15,6 +15,12 @@ function setupDetailChrome(){const bar=document.querySelector('.appbar'),scr=doc
   if(immersed&&!bar.classList.contains('ghost')){bar.classList.add('ghost');if(fromScroll)scr.scrollTop=top+barH;}
   else if(!immersed&&bar.classList.contains('ghost')){bar.classList.remove('ghost');if(fromScroll)scr.scrollTop=Math.max(0,top-barH);}};
  scr.addEventListener('scroll',()=>{if(!ticking){ticking=true;requestAnimationFrame(()=>update(true));}},{passive:true});update(false);}
+// 选券页吸顶工具条：tabs+搜索 sticky；sentinel 离开视口即视为已吸住，加投影分隔（IntersectionObserver，无滚动监听）。
+// renderCatalog 每次重建 DOM 后重挂（旧 sentinel 随内容移除，observer 自然失效）。
+function setupShopSticky(){const head=document.querySelector('.consumer-shop-head'),sticky=head?.querySelector('.shop-sticky'),scr=document.querySelector('.scr');if(!sticky||!scr)return;
+ const sent=document.createElement('div');sent.className='sticky-sentinel';sticky.before(sent);
+ if(!window.IntersectionObserver)return;
+ new IntersectionObserver(entries=>{sticky.classList.toggle('is-stuck',!entries[0].isIntersecting);},{root:scr,threshold:0}).observe(sent);}
 const U=promoter?null:window.COMMERCE_CONSUMER;
 const isShop=document.body.dataset.productShop==='true';
 const isDetail=document.body.dataset.productDetail==='true';
@@ -29,7 +35,7 @@ const couponLabel=U?.couponLabel||(r=>C.label(r.status));
 let couponFilter='all';
 if(U&&city){document.querySelectorAll('.appbar a,.consumer-footer a').forEach(a=>{const u=new URL(a.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});}
 const filter={kind:query.get('kind')||'',topic:query.get('topic')||'',q:'',category:query.get('category')||''};
-function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
+function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(tab==='shop')setupShopSticky();if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
 if(U){content.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter.kind=b.dataset.filter;filter.topic='';filter.category='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-coupon-filter]');if(!b)return;couponFilter=b.dataset.couponFilter;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-search')return;e.preventDefault();filter.q=new FormData(e.target).get('q').trim();filter.topic='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;filter.category=b.dataset.cat;renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});}
 if(U&&isHotels){content.addEventListener('click',e=>{const b=e.target.closest('[data-tier]');if(!b)return;hotelFilter.tier=hotelFilter.tier===b.dataset.tier?'':b.dataset.tier;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-hotel-search')return;e.preventDefault();hotelFilter.q=new FormData(e.target).get('q').trim();load();});content.addEventListener('change',e=>{if(e.target.id==='consumer-hotel-brand'){hotelFilter.brand=e.target.value;load();}});}
 if(promoter)content.addEventListener('click',e=>{
