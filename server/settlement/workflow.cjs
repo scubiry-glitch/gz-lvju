@@ -112,6 +112,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   const after={planned_minor:minor(input.planned_minor??i.planned_minor??i.payable_minor),account_id:input.account_id??i.account_id,not_before_at:sqlDate(input.not_before_at??i.not_before_at),delta_minor:minor(input.delta_minor??0,{signed:true}),source_id:input.source_id||i.source_id,hold_reason:input.hold_reason===null?null:input.hold_reason??i.hold_reason};
   assert(kind==='ENTITLEMENT_ADJUSTMENT'||after.delta_minor==='0','付款安排不能修改应结总额');
   const delta=BigInt(after.delta_minor),available=remaining(i);assert(delta>=-available,'已清偿金额应转追偿，不得直接调减',409);
+  assert(kind!=='ENTITLEMENT_ADJUSTMENT'||delta!==0n,'应结权益变更必须有非零金额差额；仅调整时间或账户请使用付款安排',400,'entitlement_delta_required');
   assert(i.line_kind!=='platform_transfer'||delta===0n,'平台佣金划拨只调整付款安排；合同佣金变更须撤销原确认后重新认定',409,'platform_transfer_requires_business_revision');
   if(delta>0n){const [source]=await rows(c,"SELECT * FROM commerce_funding_sources WHERE id=? AND status='AVAILABLE'",[after.source_id]);assert(source&&source.context_id===ctx.id&&['platform_own','supplement'].includes(source.source_type)&&source.currency===ctx.currency&&await supplementCapacity(c,source)>=delta,'补差缺少本订单已确认的独立资金来源',409);await ownSourcePermission(c,p,ctx,source,'settlement.fund.adjust');}
   else assert(BigInt(after.planned_minor)<=available+delta,'本次计划超过可付余额',409);

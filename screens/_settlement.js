@@ -47,7 +47,16 @@
     if (path === '/admin/execution-plans' && body !== undefined) body = { ...body, request_key: key };
     try { response = await fetch(BASE + path, { method: body === undefined ? 'GET' : 'POST', headers: headers(body === undefined ? null : key || requestKey()), credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body) }); }
     catch (_) { throw new Error('网络中断，提交结果暂未确认。请保留当前页面重试，系统会沿用同一请求编号。'); }
-    let data; try { data = await response.json(); } catch (_) { throw new Error('服务暂未返回有效结果，请稍后刷新查询。'); }
+    const invalidResponse = () => {
+      const message = response.status === 401 ? '请登录后继续。'
+        : response.status === 404 ? '结算服务尚未就绪，请稍后重试。'
+        : response.status >= 500 ? '结算服务暂时不可用，请稍后重试。'
+        : response.status === 403 ? '当前账号暂时无法访问结算服务。'
+        : '结算服务响应异常，请稍后重新加载。';
+      const error = new Error(message); error.status = response.status; error.code = 'invalid_response'; return error;
+    };
+    let data; try { data = await response.json(); } catch (_) { throw invalidResponse(); }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw invalidResponse();
     if (!response.ok || data.error) { const e = new Error(data.error?.message || (typeof data.error === 'string' && data.error) || '操作未完成，请稍后重试。'); e.status = response.status; e.code = data.code; throw e; }
     return Object.prototype.hasOwnProperty.call(data, 'data') ? data.data : data;
   }

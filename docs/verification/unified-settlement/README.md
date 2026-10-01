@@ -93,10 +93,43 @@ TZ=Asia/Shanghai npm run settlement:test
 
 SETTLEMENT_TEST_SOCKET=/tmp/sy-settlement-实例/mysql.sock \
 node scripts/commerce/settlement-test.cjs --browser
+
+PAYMENT_TEST_SOCKET=/tmp/sy-settlement-实例/mysql.sock \
+TZ=Asia/Shanghai node --test \
+  server/test/unified_payment_core_test.cjs \
+  server/test/payment_gateway_compat_test.cjs \
+  server/test/payment_service_test.cjs \
+  server/test/jiazheng_cashier_test.cjs \
+  server/test/jiazheng_legacy_compat_test.cjs \
+  server/test/legacy_payment_boundary_test.cjs \
+  scripts/commerce/payment-integration.test.cjs \
+  scripts/commerce/legacy-api-compat.test.cjs
 ```
 
 统一测试覆盖精确计算、AUTO 累计额度并发、会签、改单失效、账户版本、幂等与撤权重放、原请求超时、部分结果、两跳资金、退款／追偿／退票、补差、外部缺资料正常出账、版本／跨期、真实格式导出、HTTP 行级权限和浏览器。`settlement_runtime_test.cjs` 使用真实运行时和 HTTP，特意使用返回 Date 的连接并先设置非 UTC 会话，验证服务本身完成归一。
 
-完整统一回归输出保存在 [settlement-test.txt](settlement-test.txt)。旧权益结算的业务和浏览器证据在 [newliving-commerce-settlement](../newliving-commerce-settlement/)；公共支付、生活服务及权益旧接口还执行了对应的隔离兼容回归。
+完整统一回归输出保存在 [settlement-test.txt](settlement-test.txt)，原权益结算与浏览器重跑输出见 [legacy-settlement-test.txt](legacy-settlement-test.txt)，公共支付、生活服务及权益旧接口兼容回归输出见 [payment-compatibility-test.txt](payment-compatibility-test.txt)。原权益的详细业务和浏览器证据另在 [newliving-commerce-settlement](../newliving-commerce-settlement/)。
+
+2026-10-02 最终隔离验收结果：
+
+| 验证组 | 结果 |
+| --- | --- |
+| 共享计算、工作流、资金执行、逆向、账单、HTTP、真实运行时 | 81 项通过，0 失败、0 跳过 |
+| 统一工作台和收款方浏览器 | 21 项检查通过，包含 18 次模拟接口写入 |
+| 公共支付、生活服务、权益支付及旧接口兼容 | 79 项通过，0 失败、0 跳过 |
+| 原权益结算业务和浏览器 | 19 个场景通过 |
+| 交付静态检查 | 48 个 JavaScript 文件语法通过；权限注册、文档资源及导航链接通过；旧 004／005 迁移段逐字保持不变 |
+
+最终用例包含跨主体资金路线申请／审批拒绝、平台法律主体独立准入、B 资金腿禁止经济调额、零金额权益调账拒绝且不改变明细版本。`git diff --check` 通过。此处通过仅指隔离程序验收，不替代真实机构准入和实款联调。
+
+页面验收截图：[管理工作台](admin-desktop.png)、[收款方账单](statements-desktop.png)、[手机账单](statements-mobile.png)。
 
 验证期间，旧权限脚本曾按默认配置调用本机运行站点，完成权限和认证回归，并在 scope 回归中发现两个旧 stats 断言不匹配。随后停止了该组测试；本次残留的 7 个测试账号与 1 个测试机构已按唯一运行标识清理，测试项目已删除。该组不计入本次隔离全绿结论，没有调用支付或分账接口；后续验证均使用隔离库和模拟机构。
+
+## 2026-10-02 测试站页面接入修复
+
+用户反馈收款方页面显示“暂时无法读取结算数据”。实际定位为 `/api/settlement/v1/me` 被通用 `/api/` 路由送至旧主进程 `8766`，收到 `200 text/html` 首页；已运行的独立 commerce 服务 `38780` 能正常处理共享结算接口。两个进程的数据库目标已核对一致。
+
+已在 `deploy/commerce/nginx-location.conf` 及 sytest 当前 nginx 配置中加入 `/api/settlement/v1/` 专用转发，配置备份、`nginx -t` 后平滑重载。前端保留非 JSON 响应的 HTTP 状态，分别呈现登录、服务未就绪、暂不可用和响应异常；两个页面脚本版本升至 `20261002-3`。未变更账务数据、未启用真实付款或修改报表调度开关。
+
+本地浏览器回归增至 27 项，补充 HTML 401／404／502／503／200、重定向至 HTML 及服务恢复后重新加载。测试站实际浏览器验证 7 项通过：匿名登录提示、授权身份和账单 JSON、桌面账单、手机布局、管理页及脚本无异常，见 [live-route-check.json](live-route-check.json)、[桌面截图](live-statements-desktop.png)、[手机截图](live-statements-mobile.png)。线上验证仅登录及只读查询，结束后撤销本次验证会话。

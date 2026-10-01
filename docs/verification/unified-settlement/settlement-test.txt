@@ -6,482 +6,500 @@ TAP version 13
 # Subtest: authorization hash freezes all fields except the embedded hash
 ok 1 - authorization hash freezes all fields except the embedded hash
   ---
-  duration_ms: 13.07195
+  duration_ms: 2.845153
   type: 'test'
   ...
 # Subtest: actual payment core shares source/refund guards and freezes verified collection contracts
 ok 2 - actual payment core shares source/refund guards and freezes verified collection contracts
   ---
-  duration_ms: 14104.904649
+  duration_ms: 12814.570882
   type: 'test'
   ...
 # Subtest: isolated MySQL settlement execution and reverse fault recovery
     # Subtest: default disabled capability and external scope never reserve or call transport
     ok 1 - default disabled capability and external scope never reserve or call transport
       ---
-      duration_ms: 401.870545
+      duration_ms: 544.543943
       type: 'test'
       ...
     # Subtest: identical concurrent requests converge; separate plans cannot double reserve
     ok 2 - identical concurrent requests converge; separate plans cannot double reserve
       ---
-      duration_ms: 315.254687
+      duration_ms: 902.174384
       type: 'test'
       ...
     # Subtest: lost response and expired worker lease query the original request without resending
     ok 3 - lost response and expired worker lease query the original request without resending
       ---
-      duration_ms: 254.954663
+      duration_ms: 707.936966
       type: 'test'
       ...
     # Subtest: mismatched receipt preserves UNKNOWN and all reservations until a matching query
     ok 4 - mismatched receipt preserves UNKNOWN and all reservations until a matching query
       ---
-      duration_ms: 227.10945
+      duration_ms: 567.119079
       type: 'test'
       ...
     # Subtest: pausing new execution blocks unsent requests while old UNKNOWN still queries
     ok 5 - pausing new execution blocks unsent requests while old UNKNOWN still queries
       ---
-      duration_ms: 366.090861
+      duration_ms: 1049.854024
       type: 'test'
       ...
     # Subtest: disabling a selected policy blocks a reserved but unsent plan
     ok 6 - disabling a selected policy blocks a reserved but unsent plan
       ---
-      duration_ms: 172.743991
+      duration_ms: 737.989719
       type: 'test'
       ...
     # Subtest: local receipt transaction failure after remote debit recovers by original-number query
     ok 7 - local receipt transaction failure after remote debit recovers by original-number query
       ---
-      duration_ms: 321.092455
+      duration_ms: 876.358618
       type: 'test'
       ...
     # Subtest: paying less preserves the residual payable but a completed authorization cannot be reused
     ok 8 - paying less preserves the residual payable but a completed authorization cannot be reused
       ---
-      duration_ms: 362.694137
+      duration_ms: 1003.044435
       type: 'test'
       ...
     # Subtest: partial settlement creates no B lot until B receipt; payout consumes only that lot
     ok 9 - partial settlement creates no B lot until B receipt; payout consumes only that lot
       ---
-      duration_ms: 320.009627
+      duration_ms: 803.839615
       type: 'test'
       ...
     # Subtest: definitive no-debit releases only failed lines; no whole-order retry
     ok 10 - definitive no-debit releases only failed lines; no whole-order retry
       ---
-      duration_ms: 172.780027
+      duration_ms: 414.169561
       type: 'test'
       ...
     # Subtest: implicit merchant release requires full S approval and due date; sends no second release
     ok 11 - implicit merchant release requires full S approval and due date; sends no second release
       ---
-      duration_ms: 240.644218
+      duration_ms: 696.706981
       type: 'test'
       ...
     # Subtest: zero merchant leg is omitted; zero B uses only the separately verified release operation
     ok 12 - zero merchant leg is omitted; zero B uses only the separately verified release operation
       ---
-      duration_ms: 722.484929
+      duration_ms: 1212.774502
       type: 'test'
       ...
     # Subtest: reverse needs second reviewer; cumulative return cannot reopen historical payable
     ok 13 - reverse needs second reviewer; cumulative return cannot reopen historical payable
       ---
-      duration_ms: 593.515402
+      duration_ms: 1893.544096
       type: 'test'
       ...
     # Subtest: B cannot be returned after its cash is reserved for Q; successful return restores original source only
     ok 14 - B cannot be returned after its cash is reserved for Q; successful return restores original source only
       ---
-      duration_ms: 866.605894
+      duration_ms: 2029.163437
       type: 'test'
       ...
     # Subtest: consumer refund waits for exact return dependency and durable payment receipt
     ok 15 - consumer refund waits for exact return dependency and durable payment receipt
       ---
-      duration_ms: 1177.971633
+      duration_ms: 2870.540669
       type: 'test'
       ...
     # Subtest: external common refund receipt reduces source once and blocks spending refunded cash
     ok 16 - external common refund receipt reduces source once and blocks spending refunded cash
       ---
-      duration_ms: 799.629573
+      duration_ms: 1029.543528
       type: 'test'
       ...
     # Subtest: bank RETURNED retains successful history and records separate repayment liability once
     ok 17 - bank RETURNED retains successful history and records separate repayment liability once
       ---
-      duration_ms: 935.224454
+      duration_ms: 1244.732686
       type: 'test'
       ...
     # Subtest: services authorize actual stored context and do not trust a supplied party
     ok 18 - services authorize actual stored context and do not trust a supplied party
       ---
-      duration_ms: 628.689439
+      duration_ms: 527.064156
       type: 'test'
       ...
     # Subtest: confirmed unpaid obligations block refunds until shared reversal cancels reviews and payables
     ok 19 - confirmed unpaid obligations block refunds until shared reversal cancels reviews and payables
       ---
-      duration_ms: 639.450497
+      duration_ms: 911.660879
       type: 'test'
       ...
     # Subtest: re-redeeming a reversed coupon creates one new unit and preserves old settlement history
     ok 20 - re-redeeming a reversed coupon creates one new unit and preserves old settlement history
       ---
-      duration_ms: 676.367091
+      duration_ms: 976.923757
       type: 'test'
       ...
     # Subtest: shared reversal rejects UNKNOWN money, then cancels unpaid remainder and opens only paid recovery
     ok 21 - shared reversal rejects UNKNOWN money, then cancels unpaid remainder and opens only paid recovery
       ---
-      duration_ms: 1517.929737
+      duration_ms: 1273.29348
       type: 'test'
       ...
     # Subtest: shared paid reversal reverses economics once; B internal return and beneficiary cash recover independently
     ok 22 - shared paid reversal reverses economics once; B internal return and beneficiary cash recover independently
       ---
-      duration_ms: 1439.71504
+      duration_ms: 3521.998282
       type: 'test'
       ...
     1..22
 ok 3 - isolated MySQL settlement execution and reverse fault recovery
   ---
-  duration_ms: 19521.11656
+  duration_ms: 40457.212939
   type: 'test'
   ...
 # Subtest: real session required; inactive, service and legacy cookie identities denied
 ok 4 - real session required; inactive, service and legacy cookie identities denied
   ---
-  duration_ms: 103.139415
+  duration_ms: 491.319081
   type: 'test'
   ...
 # Subtest: GET never invokes POST-only methods, including approvals and retries
 ok 5 - GET never invokes POST-only methods, including approvals and retries
   ---
-  duration_ms: 56.878818
+  duration_ms: 378.054826
   type: 'test'
   ...
 # Subtest: JSON, bounded idempotency header and same-origin checks precede all mutation calls
 ok 6 - JSON, bounded idempotency header and same-origin checks precede all mutation calls
   ---
-  duration_ms: 53.167188
+  duration_ms: 132.626473
   type: 'test'
   ...
 # Subtest: cookie writes require same-origin browser proof
 ok 7 - cookie writes require same-origin browser proof
   ---
-  duration_ms: 10.265856
+  duration_ms: 54.702586
   type: 'test'
   ...
 # Subtest: execution list has one rows layer; receiving account choices contain only approved requested-party rows
 ok 8 - execution list has one rows layer; receiving account choices contain only approved requested-party rows
   ---
-  duration_ms: 9.884183
+  duration_ms: 81.019246
   type: 'test'
   ...
 # Subtest: all mutation routes pass the correct entity parameter and trusted request key
 ok 9 - all mutation routes pass the correct entity parameter and trusted request key
   ---
-  duration_ms: 124.57875
+  duration_ms: 582.057948
   type: 'test'
   ...
 # Subtest: funding and recovery lists are read-only service calls
 ok 10 - funding and recovery lists are read-only service calls
   ---
-  duration_ms: 12.859871
+  duration_ms: 35.604033
   type: 'test'
   ...
 # Subtest: statement metadata, dispute list and binary downloads use the actual service DTO
 ok 11 - statement metadata, dispute list and binary downloads use the actual service DTO
   ---
-  duration_ms: 19.108585
+  duration_ms: 110.449057
   type: 'test'
   ...
 # Subtest: merchant submit is limited to own-party unverified reports and cannot import, link, review or accrue
 ok 12 - merchant submit is limited to own-party unverified reports and cannot import, link, review or accrue
   ---
-  duration_ms: 18.251247
+  duration_ms: 44.34412
   type: 'test'
   ...
 # Subtest: finance import aliases do not grant review or financial entitlement modification
 ok 13 - finance import aliases do not grant review or financial entitlement modification
   ---
-  duration_ms: 25.157088
+  duration_ms: 120.248905
   type: 'test'
   ...
 # Subtest: allocation and accrual roles authorize only their specific route operations
 ok 14 - allocation and accrual roles authorize only their specific route operations
   ---
-  duration_ms: 12.278903
+  duration_ms: 55.691792
   type: 'test'
   ...
 # Subtest: permission and scope stay on the same role; beneficiary ids and missing dimensions cannot bypass restrictions
 ok 15 - permission and scope stay on the same role; beneficiary ids and missing dimensions cannot bypass restrictions
   ---
-  duration_ms: 0.594206
+  duration_ms: 8.735057
   type: 'test'
   ...
 # Subtest: operation delegation remains bound to principal and concurrent async chain
 ok 16 - operation delegation remains bound to principal and concurrent async chain
   ---
-  duration_ms: 5.252973
+  duration_ms: 9.956101
   type: 'test'
   ...
 # Subtest: own-funds rejects unsupported money values without floating-point conversion
 ok 17 - own-funds rejects unsupported money values without floating-point conversion
   ---
-  duration_ms: 1.408249
+  duration_ms: 2.775598
   type: 'test'
   ...
 # Subtest: isolated source admission, compensation approval and payment-driven recovery
 ok 18 - isolated source admission, compensation approval and payment-driven recovery
   ---
-  duration_ms: 6738.482613
+  duration_ms: 14798.353028
   type: 'test'
   ...
 # Subtest: real settlement runtime and HTTP work on Date-returning isolated MySQL
     # Subtest: runtime normalizes an existing pooled session back to UTC before SQL
     ok 1 - runtime normalizes an existing pooled session back to UTC before SQL
       ---
-      duration_ms: 15.981218
+      duration_ms: 18.166533
       type: 'test'
       ...
     # Subtest: external automatic sync and monthly publication require no institution execution mapping
     ok 2 - external automatic sync and monthly publication require no institution execution mapping
       ---
-      duration_ms: 394.845476
+      duration_ms: 462.796862
       type: 'test'
       ...
     # Subtest: HTTP write replay and actual worker export revalidate current identity
     ok 3 - HTTP write replay and actual worker export revalidate current identity
       ---
-      duration_ms: 463.490926
+      duration_ms: 246.098718
       type: 'test'
       ...
     # Subtest: approved external contract, maker checker and both debt-party policies integrate through HTTP
     ok 4 - approved external contract, maker checker and both debt-party policies integrate through HTTP
       ---
-      duration_ms: 322.599999
+      duration_ms: 375.312337
       type: 'test'
       ...
     # Subtest: paid life-service acceptance creates exact obligations once and adjustments flow to a statement
     ok 5 - paid life-service acceptance creates exact obligations once and adjustments flow to a statement
       ---
-      duration_ms: 513.679875
+      duration_ms: 346.229051
       type: 'test'
       ...
     1..5
 ok 19 - real settlement runtime and HTTP work on Date-returning isolated MySQL
   ---
-  duration_ms: 12588.433038
+  duration_ms: 15132.732703
   type: 'test'
   ...
 # Subtest: statement text neutralizes spreadsheet formulas
 ok 20 - statement text neutralizes spreadsheet formulas
   ---
-  duration_ms: 1.603407
+  duration_ms: 1.341122
   type: 'test'
   ...
 # Subtest: external evidence and unified statements use isolated MySQL
     # Subtest: external sync includes pending and excludes internal projections, and requires approved binding
     ok 1 - external sync includes pending and excludes internal projections, and requires approved binding
       ---
-      duration_ms: 349.268983
+      duration_ms: 143.318582
       type: 'test'
       ...
     # Subtest: incomplete external evidence still produces frozen downloadable statements
     ok 2 - incomplete external evidence still produces frozen downloadable statements
       ---
-      duration_ms: 126.519723
+      duration_ms: 88.484485
       type: 'test'
       ...
     # Subtest: candidate becomes one verified transaction using alias and independent review
     ok 3 - candidate becomes one verified transaction using alias and independent review
       ---
-      duration_ms: 144.126817
+      duration_ms: 75.586883
       type: 'test'
       ...
     # Subtest: same transaction with changed amount is a conflict rather than a second payment
     ok 4 - same transaction with changed amount is a conflict rather than a second payment
       ---
-      duration_ms: 52.402982
+      duration_ms: 25.0431
       type: 'test'
       ...
     # Subtest: external approved accrual, actual commission receipt and proportional refund remain separate
     ok 5 - external approved accrual, actual commission receipt and proportional refund remain separate
       ---
-      duration_ms: 427.459685
+      duration_ms: 187.320936
       type: 'test'
       ...
     # Subtest: new evidence yields new version without rewriting old content or duplicating receipts
     ok 6 - new evidence yields new version without rewriting old content or duplicating receipts
       ---
-      duration_ms: 113.711717
+      duration_ms: 64.757838
       type: 'test'
       ...
     # Subtest: different refund reviews serialize on original payment and reject aggregate overrefund
     ok 7 - different refund reviews serialize on original payment and reject aggregate overrefund
       ---
-      duration_ms: 155.035181
+      duration_ms: 85.065193
       type: 'test'
       ...
     # Subtest: batch imports retain unmatched and invalid rows and deduplicate canonical trades
     ok 8 - batch imports retain unmatched and invalid rows and deduplicate canonical trades
       ---
-      duration_ms: 62.593794
+      duration_ms: 51.932296
       type: 'test'
       ...
     # Subtest: exports share immutable snapshot, include Chinese, and recheck current authorization
     ok 9 - exports share immutable snapshot, include Chinese, and recheck current authorization
       ---
-      duration_ms: 2445.296778
+      duration_ms: 1929.634317
       type: 'test'
       ...
     # Subtest: confirmation and dispute do not mutate frozen amounts and need independent resolution
     ok 10 - confirmation and dispute do not mutate frozen amounts and need independent resolution
       ---
-      duration_ms: 53.908217
+      duration_ms: 53.187499
       type: 'test'
       ...
     # Subtest: write keys replay atomically, reject changed bodies, and recheck revoked permissions
     ok 11 - write keys replay atomically, reject changed bodies, and recheck revoked permissions
       ---
-      duration_ms: 75.832441
+      duration_ms: 36.616833
       type: 'test'
       ...
     # Subtest: monthly scheduler issues without payment or split switches and catches due periods
     ok 12 - monthly scheduler issues without payment or split switches and catches due periods
       ---
-      duration_ms: 164.67316
+      duration_ms: 102.76299
       type: 'test'
       ...
     # Subtest: coverage requires independently reviewed completeness and preserves old versions
     ok 13 - coverage requires independently reviewed completeness and preserves old versions
       ---
-      duration_ms: 98.693944
+      duration_ms: 66.609085
       type: 'test'
       ...
     # Subtest: batch allocations match multiple orders without counting full receipt twice
     ok 14 - batch allocations match multiple orders without counting full receipt twice
       ---
-      duration_ms: 293.262481
+      duration_ms: 111.099859
       type: 'test'
       ...
     # Subtest: approved fixed-cost contract supports two refunds after commission was fully received
     ok 15 - approved fixed-cost contract supports two refunds after commission was fully received
       ---
-      duration_ms: 354.885978
+      duration_ms: 290.174296
       type: 'test'
       ...
     # Subtest: internal original obligations and successful release events conserve period balances
     ok 16 - internal original obligations and successful release events conserve period balances
       ---
-      duration_ms: 106.773359
+      duration_ms: 120.194902
       type: 'test'
       ...
     # Subtest: shared reversal cancels unpaid obligations and reconstructs recovery only from immutable facts
     ok 17 - shared reversal cancels unpaid obligations and reconstructs recovery only from immutable facts
       ---
-      duration_ms: 163.401128
+      duration_ms: 153.122546
+      type: 'test'
+      ...
+    # Subtest: compensation payment and both recovery debt directions export without treating bank returns as repayment
+    ok 18 - compensation payment and both recovery debt directions export without treating bank returns as repayment
+      ---
+      duration_ms: 707.360643
+      type: 'test'
+      ...
+    # Subtest: contract-filtered statements include only explicitly associated orders and obligations
+    ok 19 - contract-filtered statements include only explicitly associated orders and obligations
+      ---
+      duration_ms: 185.684953
       type: 'test'
       ...
     # Subtest: signed callbacks retain paid, fulfillment and refund history before binding and consume only external facts
-    ok 18 - signed callbacks retain paid, fulfillment and refund history before binding and consume only external facts
+    ok 20 - signed callbacks retain paid, fulfillment and refund history before binding and consume only external facts
       ---
-      duration_ms: 344.119524
+      duration_ms: 288.459565
       type: 'test'
       ...
-    1..18
+    1..20
 ok 21 - external evidence and unified statements use isolated MySQL
   ---
-  duration_ms: 8131.252938
+  duration_ms: 7776.315734
   type: 'test'
   ...
 # Subtest: approved arithmetic uses exact minor units and explicit fixed cost
 ok 22 - approved arithmetic uses exact minor units and explicit fixed cost
   ---
-  duration_ms: 4.851524
+  duration_ms: 2.687308
   type: 'test'
   ...
 # Subtest: unified workflow uses isolated MySQL and actual shared migrations
     # Subtest: scope follows the role granting each permission, including on idempotent replay
     ok 1 - scope follows the role granting each permission, including on idempotent replay
       ---
-      duration_ms: 103.735369
+      duration_ms: 106.227574
       type: 'test'
       ...
     # Subtest: maker checker and sequential ALL/ANY approval
     ok 2 - maker checker and sequential ALL/ANY approval
       ---
-      duration_ms: 133.473822
+      duration_ms: 141.852639
       type: 'test'
       ...
     # Subtest: adjustment preserves paid history, invalidates stale approval and returns visible balances
     ok 3 - adjustment preserves paid history, invalidates stale approval and returns visible balances
       ---
-      duration_ms: 154.640503
+      duration_ms: 162.247351
       type: 'test'
       ...
     # Subtest: parallel AUTO grants include earlier unspent authorizations in cumulative cap
     ok 4 - parallel AUTO grants include earlier unspent authorizations in cumulative cap
       ---
-      duration_ms: 161.996212
+      duration_ms: 98.930277
       type: 'test'
       ...
     # Subtest: positive amendments use approved own funds and cannot promise the same cash twice
     ok 5 - positive amendments use approved own funds and cannot promise the same cash twice
       ---
-      duration_ms: 97.156605
+      duration_ms: 111.75879
+      type: 'test'
+      ...
+    # Subtest: B is a cash movement and cannot be amended as a fictitious platform payable
+    ok 6 - B is a cash movement and cannot be amended as a fictitious platform payable
+      ---
+      duration_ms: 65.960618
       type: 'test'
       ...
     # Subtest: Q waits for B receipt; retry binds an actual commission lot before authorization
-    ok 6 - Q waits for B receipt; retry binds an actual commission lot before authorization
+    ok 7 - Q waits for B receipt; retry binds an actual commission lot before authorization
       ---
-      duration_ms: 79.953968
+      duration_ms: 96.819832
       type: 'test'
       ...
     # Subtest: ledger deduplicates immutable events and reports balance errors
-    ok 7 - ledger deduplicates immutable events and reports balance errors
+    ok 8 - ledger deduplicates immutable events and reports balance errors
       ---
-      duration_ms: 54.818863
+      duration_ms: 53.000569
       type: 'test'
       ...
     # Subtest: disabling a policy revokes unspent authorization and supersedes pending review
-    ok 8 - disabling a policy revokes unspent authorization and supersedes pending review
+    ok 9 - disabling a policy revokes unspent authorization and supersedes pending review
       ---
-      duration_ms: 183.817512
+      duration_ms: 155.286922
       type: 'test'
       ...
     # Subtest: configuration maker checker and frozen order profile
-    ok 9 - configuration maker checker and frozen order profile
+    ok 10 - configuration maker checker and frozen order profile
       ---
-      duration_ms: 84.539664
+      duration_ms: 181.965178
       type: 'test'
       ...
     # Subtest: paid life order is recognized only once on customer acceptance
-    ok 10 - paid life order is recognized only once on customer acceptance
+    ok 11 - paid life order is recognized only once on customer acceptance
       ---
-      duration_ms: 182.663538
+      duration_ms: 215.857443
       type: 'test'
       ...
-    1..10
+    1..11
 ok 23 - unified workflow uses isolated MySQL and actual shared migrations
   ---
-  duration_ms: 12934.64259
+  duration_ms: 12722.010632
   type: 'test'
   ...
 1..23
-# tests 78
+# tests 81
 # suites 0
-# pass 78
+# pass 81
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 76882.556698
+# duration_ms 108189.388875
 {"passed":true,"checks":["authorized-scope","unauthenticated-empty","bigint-money","xss-escaping","adjustment-preview-submit","auto-policy-disabled-nodes","approval-revision","external-evidence-id","csv-xlsx-pdf-download","mobile-no-overflow","configuration-create-and-independent-approval","customer-acceptance-server-eligibility","acceptance-script-references","utc-sql-date-to-business-period","profile-collection-contract-separation","own-funds-explicit-capability-and-independent-approval","compensation-original-unit-independent-source","recovery-payment-progress","policy-disable-confirmation","directional-commission-metrics","dispute-evidence-required"],"requests":18,"screenshots":["/tmp/settlement-admin-desktop.png","/tmp/settlement-statement-desktop.png","/tmp/settlement-statements-mobile.png"]}

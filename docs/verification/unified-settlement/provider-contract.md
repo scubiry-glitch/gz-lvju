@@ -1,6 +1,6 @@
 # 机构执行契约与验收
 
-真实执行入口是 `server/settlement/execution.cjs`，机构适配器是 `server/settlement/provider.cjs`。默认 `execution_enabled` 未设为 `true` 时拒绝产生执行请求。本文没有机构真实字段、凭据或可直接用于生产的成功码。
+真实执行入口是 `server/settlement/execution.cjs`，机构适配器是 `server/settlement/provider.cjs`。默认 `execution_enabled` 未设为 `true` 时拒绝产生新的执行请求。部署运行时由 `SETTLEMENT_ENABLED=1` 且 `SETTLEMENT_WORKER_ENABLED=1` 同时开启新增资金执行，并从 `SETTLEMENT_PROVIDER_CONTRACTS` JSON 读取机构映射。`SETTLEMENT_REPORTS_ENABLED=1` 独立运行账单与历史请求查询／恢复；暂停新增资金执行时应保留该任务。本文没有机构真实字段、凭据或可直接用于生产的成功码。
 
 部署配置由共享结算工厂传入 `config`，需包含：
 
@@ -45,7 +45,7 @@
 
 `result` 是返回 JSON 字段路径映射，需有 `request_no`、`contract_no`、`source_merchant_no`、`currency`、`lines`，可有 `root` 和 `provider_order_no`。`result.line` 必须映射 `id`、`amount`、`payee_merchant_no`、`currency`、`status`、`provider_line_id`。`result.statuses` 将书面核验的原状态码映射为 `SUCCEEDED`、`FAILED_FINAL`、`PROCESSING` 或 `UNKNOWN`。`FAILED_FINAL` 还必须具备严格布尔值 `no_debit=true` 与 `reservation_released=true`；否则系统仍保留未知和预占。成功必须有机构明细凭据，并逐项匹配原请求、合同、付款方、收款方、币种和金额。
 
-账户需经双人准入，`status=approved` 或 `active`，并具备 `capabilities={operations:[...], receive:true, evidence_ref:'...'}`。`operations` 按账户实际支持的机构动作填写，不能把所有动作默认开启。业务快照 `settlement_profile` 必须固定 `version`、`contract_mapping_version`、`funding_mode`、`platform_account_id` 和 `implicit_merchant_release`。当前支持受控收款 `CONTROLLED_COLLECTION`、商户受控原款 `MERCHANT_CONTROLLED_RECEIPT`；商户已自由结算款不能通过此模块凭空回收。
+账户需经双人准入并发布为 `status=approved`，具备 `capabilities={operations:[...], receive:true, evidence_ref:'...'}`；执行器保留对历史 `active` 值的兼容，配置、业务及审批全链路均要求 `approved`。`operations` 按账户实际支持的机构动作填写，不能把所有动作默认开启。业务快照 `settlement_profile` 必须固定 `version`、`contract_mapping_version`、`funding_mode`、`platform_account_id` 和 `implicit_merchant_release`。当前支持受控收款 `CONTROLLED_COLLECTION`、商户受控原款 `MERCHANT_CONTROLLED_RECEIPT`；商户已自由结算款不能通过此模块凭空回收。
 
 开启前应取得每种操作的机构书面契约及联调证据，确认订单级/明细级幂等、结果查询、部分成功、冻结释放、有效来源与合同、资金账入账及银行卡到账的区别、回退与退款依赖。配置版本内容被改动会阻止旧请求执行/查询，必须保留旧不可变版本直到在途请求全部核清。
 

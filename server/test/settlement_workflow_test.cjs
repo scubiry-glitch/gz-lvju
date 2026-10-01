@@ -49,6 +49,8 @@ test('unified workflow uses isolated MySQL and actual shared migrations',{skip:!
   const f=await makeFixture(),old=await w.authorizeItem(maker,{id:f.item,expected_revision:1,...key()});
   await q('UPDATE commerce_settlement_items SET discharged_minor=3000,planned_minor=7000 WHERE id=?',[f.item]);
   const input={id:f.item,expected_revision:1,kind:'ENTITLEMENT_ADJUSTMENT',planned_minor:'6000',delta_minor:'-1000',reason:'合同差额调整'};
+  await assert.rejects(w.adjust(maker,{...input,delta_minor:'0',...key()}),{code:'entitlement_delta_required'});
+  assert.equal((await w.detail(maker,{id:f.item})).revision,1,'zero economic change cannot create an approval or invalidate the item');
   const preview=await w.previewAdjustment(maker,input);assert.equal(preview.after.remaining_minor,'6000');assert.equal(preview.after.payable_minor,'9000');
   const a=await w.adjust(maker,{...input,...key()});assert.equal(a.revision,2);assert.equal((await q('SELECT status FROM commerce_settlement_authorizations WHERE id=?',[old.authorization_id]))[0].status,'REVOKED');
   await assert.rejects(w.approve(reviewer,{id:a.approval_id,revision:1,action:'approve',note:'确认',...key()}),{status:409});
@@ -100,6 +102,15 @@ test('unified workflow uses isolated MySQL and actual shared migrations',{skip:!
   const platformBinding=await C.create(maker,{kind:'bindings',party_id:'new-party',source_domain:'platform',source_entity_type:'entity',source_entity_id:'test-platform',...key()});await assert.rejects(C.approve(restricted,{kind:'bindings',id:platformBinding.id,...key()}),{status:403});await C.approve(reviewer,{kind:'bindings',id:platformBinding.id,...key()});
   const profile=await C.create(maker,{kind:'profiles',party_id:'new-party',biz_type:'jiazheng',payment_mode:'pay_center',snapshot:{contract_ref:'contract',calculation:{mode:'PROPORTIONAL',commission_bps:1000,rounding:'FLOOR_BPS_V1'},recognition_policy:{mode:'CUSTOMER_ACCEPTANCE'},funding_mode:'CONTROLLED_COLLECTION',source_account_id:account.id,merchant_account_id:account.id,platform_account_id:account.id,funding_evidence_ref:'TEST',contract_mapping_version:'TEST',collection:{mapping_version:'collection-test',contract_no:'contract',source_merchant_no:'new-merchant',provider:'TEST',environment:'ISOLATED_TEST'}},...key()});
   await C.approve(reviewer,{kind:'profiles',id:profile.id,...key()});assert.equal((await C.forOrder(pool,{biz_type:'jiazheng',entity_id:'7',payment_mode:'pay_center'})).profile_id,profile.id);
+  const otherAccount=await C.create(maker,{kind:'accounts',party_id:'central-platform',provider:'TEST',environment:'ISOLATED_TEST',merchant_no:'platform-merchant',contract_no:'contract',currency:'CNY',capabilities:{operations:['SPLIT']},...key()});await C.approve(reviewer,{kind:'accounts',id:otherAccount.id,...key()});
+  const original=P.parse((await q('SELECT snapshot FROM commerce_settlement_profiles WHERE id=?',[profile.id]))[0].snapshot);
+  const route={kind:'profiles',party_id:'new-party',biz_type:'jiazheng',payment_mode:'pay_center',snapshot:{...original,platform_account_id:otherAccount.id}};
+  await assert.rejects(C.create(restricted,{...route,...key()}),{status:403});
+  await assert.rejects(C.create(restricted,{...route,snapshot:{...original,source_account_id:otherAccount.id},...key()}),{status:403});
+  const routed=await C.create(maker,{...route,...key()});await assert.rejects(C.approve(restricted,{kind:'profiles',id:routed.id,...key()}),{status:403});
+  await assert.rejects(C.approve(reviewer,{kind:'profiles',id:routed.id,...key()}),{code:'platform_party_not_approved'});
+  const centralBinding=await C.create(maker,{kind:'bindings',party_id:'central-platform',source_domain:'platform',source_entity_type:'entity',source_entity_id:'approved-central-platform',...key()});await C.approve(reviewer,{kind:'bindings',id:centralBinding.id,...key()});
+  assert.equal((await C.approve(reviewer,{kind:'profiles',id:routed.id,...key()})).status,'approved');
  });
  await t.test('paid life order is recognized only once on customer acceptance',async()=>{
   await q('CREATE TABLE IF NOT EXISTS jz_orders(id VARCHAR(100) PRIMARY KEY,account_id VARCHAR(64),payment_mode VARCHAR(24),status VARCHAR(24),pay_status VARCHAR(24),payment_config_snapshot JSON,fee BIGINT,vendor_id INT,city_id INT)');

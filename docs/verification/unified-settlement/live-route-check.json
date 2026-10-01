@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-01T19:33:43.488Z",
+  "origin": "https://sytest.meizu.life",
+  "checks": [
+    {
+      "name": "public settlement route returns JSON 401 instead of homepage HTML",
+      "passed": true
+    },
+    {
+      "name": "anonymous page renders login prompt",
+      "passed": true
+    },
+    {
+      "name": "authorized identity loads through public route",
+      "passed": true,
+      "partyCount": 1
+    },
+    {
+      "name": "authorized statement list loads through public route",
+      "passed": true,
+      "rowCount": 1
+    },
+    {
+      "name": "signed-in statement page renders without error",
+      "passed": true
+    },
+    {
+      "name": "mobile statement page fits viewport",
+      "passed": true
+    },
+    {
+      "name": "shared admin page and browser scripts remain healthy",
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "path": "/api/settlement/v1/me",
+      "status": 200
+    },
+    {
+      "path": "/api/settlement/v1/me/settlement-statements",
+      "status": 200
+    },
+    {
+      "path": "/api/settlement/v1/me",
+      "status": 200
+    },
+    {
+      "path": "/api/settlement/v1/admin/items",
+      "status": 200
+    }
+  ]
+}

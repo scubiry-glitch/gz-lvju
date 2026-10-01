@@ -113,7 +113,7 @@ const ROUTES = [
     ['POST','/admin/statement-disputes/[a-f0-9-]{36}/resolve','settlement.statement.review'],
     ['GET','/admin/external-(?:evidence|facts)','settlement.external.read'],
     ['POST','/me/external-(?:evidence|coverage)-submissions','settlement.external.submit'],
-    ['POST','/admin/(?:external-orders/sync|external-evidence|external-imports)','settlement.external.import'],
+    ['POST','/admin/(?:external-orders/sync|external-evidence|external-imports|external-coverage)','settlement.external.import'],
     ['POST','/admin/external-(?:evidence|imports|coverage|accruals)/[a-f0-9-]{36}/reviews','settlement.external.review'],
     ['POST','/admin/external-allocations','settlement.external.link'],
     ['POST','/admin/external-(?:accruals|accrual-adjustments|settlements)','settlement.accrual.adjust'],
