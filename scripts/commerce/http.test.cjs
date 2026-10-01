@@ -29,7 +29,8 @@ test('HTTP boundary, isolation, sessions, idempotency, permissions and cross-ori
   const other = (await req('/test-sessions', { identity: 'user-b' })).data;
   assert.equal((await req('/me/coupons/' + state.coupons[0].id, undefined, other.token)).status, 403);
   for (const p of ['/commerce/domain.cjs','/commerce/server.cjs','/.env','/package.json','/scripts/commerce/domain.test.cjs','/docs/prd/PLAN-新居住券包与会员卡-v1.9.md','/%2e%2e/.env']) assert.equal((await fetch(base + p)).status, 404, p);
-  for (const p of ['/juzhu-commerce.html','/juzhu-promoter.html','/screens/commerce-merchant.html','/screens/commerce-admin.html','/screens/_commerce-ui.js']) assert.equal((await fetch(base + p)).status, 200, p);
+  for (const p of ['/juzhu-commerce.html','/juzhu-promoter.html','/screens/commerce-merchant.html','/screens/commerce-admin.html']) assert.equal((await fetch(base + p)).status, 200, p);
+  // M0 遗留视图层 _commerce-ui.js / 登录封装 _commerce-api.js 已删除（2026-10-02 清理），不再放行也不再断言。
   assert.equal((await req('/orders/' + first.data.id + '/pay', {}, session.token)).status, 404, 'no real payment endpoint exists');
   assert.equal((await req('/callbacks/payments/live', {}, session.token)).status, 404);
 });
