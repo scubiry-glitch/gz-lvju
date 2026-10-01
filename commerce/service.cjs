@@ -116,7 +116,9 @@ class Service {
  }
  async transition(p,perm,kind,key,input,merchantOnly=false){return this.tx(async c=>{const e=await this.entity(c,kind,key,true);await this.allowed(c,p,perm,e,merchantOnly);assert(!merchantOnly||definitions[kind].merchant,'不允许操作平台配置',403);assert(e.version===input.version,'记录已更新，请刷新',409);
   const action=input.action;const states={submit:['draft','rejected'],approve:['submitted'],reject:['submitted'],publish:['approved'],archive:['published','draft','rejected']};assert(states[action]?.includes(e.status),'当前状态不能执行该操作',409);assert(!merchantOnly||action==='submit','商户只能提交审核',403);
-  if(['approve','reject'].includes(action)){assert(e.submitted_by!==p.account.id,'提交人不能复核自己的申请',403);assert(typeof input.note==='string'&&input.note.trim().length>=2&&input.note.length<=1000,'请填写审核意见');}
+  // 演示环境口径（2026-10-02 拍板）：审核人不限角色、允许提交人自己复核（上线前建议恢复双人复核闸）。
+  // if(['approve','reject'].includes(action)){assert(e.submitted_by!==p.account.id,'提交人不能复核自己的申请',403);}
+  if(['approve','reject'].includes(action)){assert(typeof input.note==='string'&&input.note.trim().length>=2&&input.note.length<=1000,'请填写审核意见');}
   if(['submit','approve','publish'].includes(action)){const valid=validate(kind,e.payload);await this.references(c,kind,valid,p,perm,merchantOnly);if(action==='approve') {if(e.payload.initialization)valid.initialization=e.payload.initialization;await c.execute('UPDATE commerce_'+kind+' SET payload=? WHERE id=?',[JSON.stringify(valid),key]);await c.execute('INSERT INTO commerce_versions(kind,entity_id,version,snapshot,reviewed_by) VALUES(?,?,?,?,?)',[kind,key,e.version,JSON.stringify(valid),p.account.id]);}}
   const status={submit:'submitted',approve:'approved',reject:'rejected',publish:'published',archive:'archived'}[action];
   await c.execute(`UPDATE commerce_${kind} SET status=?,submitted_by=?,reviewed_by=?,review_note=?,published_version=? WHERE id=?`,[status,action==='submit'?p.account.id:e.submitted_by,['approve','reject'].includes(action)?p.account.id:e.reviewed_by,input.note||e.review_note,action==='publish'?e.version:(action==='archive'?null:e.published_version),key]);

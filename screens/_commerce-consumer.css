@@ -276,26 +276,36 @@
 /* 核销码弹窗：关闭钮不再吃 showModal 的默认焦点金框（焦点已由 JS 移到 dialog 本体） */
 .voucher-code-dialog .dialog-close:focus-visible{outline:none}
 
-/* ── 2026-10-02 选券页电商式紧凑卡：双列网格 + 整卡可点 ──
-   data-action 在 article 上（整卡都是触达目标），按钮可以做小（34px）。 */
+/* ── 2026-10-02 选券页信息流卡（对齐手淘商品卡骨架）：大图占卡 → 标题 → 摘要 →
+   标签 → 价格贴底；无按钮，整卡可点（data-action 在 article 上）。
+   骨架口诀：图是卡、文贴图、价沉底。 ── */
 .consumer-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .consumer-products>.commerce-empty,.consumer-products>.consumer-sale-note{grid-column:1/-1}
-.commerce-consumer .product-card{display:flex;flex-direction:column;padding:12px 12px 11px;min-height:0;border-radius:13px;cursor:pointer}
-.commerce-consumer .consumer-product-top{margin:0 0 9px;justify-content:flex-start;gap:6px;flex-wrap:wrap}
-/* position:relative 而非 static：icon 是 .pc-img 的定位上下文（见文末 C9 规则），
-   static 会让主图向上找到 .app 铺满整页盖住文字；relative 无偏移、文档流不变。 */
-.commerce-consumer .consumer-product-icon{position:relative;width:38px;height:38px;border-radius:11px}
+.commerce-consumer .product-card{display:flex;flex-direction:column;padding:0;min-height:0;border-radius:13px;overflow:hidden;cursor:pointer}
+/* 图区：铺满卡宽（1:1），.pc-img 的定位上下文必须是这层——position:relative 不可改回 static，
+   否则主图 abs 定位会向上找到 .app 铺满整页盖住文字（2026-10-02 踩过两次）。
+   无图商品回落品类底色 + 居中大图标（svg 在 img 下层，图加载成功即盖住）。 */
+.commerce-consumer .consumer-product-top{display:block;position:relative;margin:0}
+.commerce-consumer .product-card .consumer-product-icon{position:relative;display:grid;place-items:center;width:100%;height:auto;aspect-ratio:1/1;border-radius:0}
+.commerce-consumer .product-card .consumer-product-icon svg{width:44px;height:44px;opacity:.9}
 .consumer-product-top .channel-tag{margin-left:0}
-/* kind 信息由 tab/benefits 行表达，顶部只留 icon + 渠道 tag（tag 靠右，半宽卡不再折行） */
-.commerce-consumer .consumer-product-top .channel-tag{margin-left:auto}
-.commerce-consumer .product-card h3{font:600 14px/1.5 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:42px;margin:0 0 5px}
-.commerce-consumer .product-card-summary{font-size:10px;line-height:1.55;min-height:31px}
-.commerce-consumer .product-card .product-benefits{margin:5px 0 0;gap:4px}
+/* 渠道 tag 叠在图右上角（手淘「广告」位） */
+.commerce-consumer .product-card .consumer-product-top .channel-tag{position:absolute;top:8px;right:8px;margin:0;z-index:2;box-shadow:0 2px 8px #16382c26}
+/* 文区：标题/摘要不预留两行高度（min-height 会在单行标题下挖洞）；内容自然贴合，
+   行内富余交给 margin-top:auto 的价格行 → 留白沉底、价格贴卡底。 */
+.commerce-consumer .product-card h3{padding:9px 12px 0;font:600 15px/1.45 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 4px}
+.commerce-consumer .product-card-summary{padding:0 12px;font-size:11px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:0}
+.commerce-consumer .product-card .product-benefits{padding:7px 12px 0;margin:0;gap:4px}
 .commerce-consumer .product-card .product-benefits span{padding:2px 6px;font-size:9px}
-.commerce-consumer .product-card .product-bottom{border:0;padding-top:9px;margin-top:auto;gap:6px}
-.commerce-consumer .product-card .money{font-size:16px}
-.commerce-consumer .product-card .btn{min-height:34px;padding:6px 11px;font-size:11px;border-radius:9px}
-@media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card{padding:10px 10px 9px}.commerce-consumer .product-card h3{font-size:13px;min-height:39px}}
+.commerce-consumer .product-card .product-bottom{border:0;padding:8px 12px 11px;margin-top:auto;gap:6px}
+/* 价格锚点：手淘式大价 + 灰小字后缀（演示价贴在价后基线对齐，全宽行放得下不再竖排）。
+   显式声明 22px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
+   不显式覆盖就会被旧块回填（2026-10-02 连踩两次残留声明复活）。 */
+.commerce-consumer .product-card .product-bottom .money{font-size:22px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:5px;min-width:0;white-space:nowrap}
+.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:10px;color:#8a8e7f}
+/* 整卡可点，卡上不再放按钮（手淘信息流同款） */
+.commerce-consumer .product-card .btn{display:none}
+@media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card h3{font-size:14px;padding:8px 10px 0}.commerce-consumer .product-card-summary{padding:0 10px}.commerce-consumer .product-card .product-benefits{padding:6px 10px 0}.commerce-consumer .product-card .product-bottom{padding:7px 10px 10px}}
 
 /* ── 2026-10-02 选券页头部压紧：去营销大标题，控件贴身（首屏 ≈240px 见第一张卡）──
    仅作用于选券页（.consumer-shop-head），其余视图仍保持 44px 触达与标题层级。 */
