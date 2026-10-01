@@ -416,3 +416,52 @@
 /* ── 会员卡组：已购方案态（金描边 + 「已开通」chip 替代开通按钮）── */
 .plan-slide.is-owned{border-color:#cbb87e}
 .plan-owned-chip{background:#e9d9ae;color:#4c3c24;border-radius:10px;display:inline-flex;align-items:center;padding:8px 12px;font-size:12px;font-weight:600;min-height:38px}
+
+/* ── 2026-10-02 商品卡横幅图变体：卡顶 16:9 横带（替代误铺满卡的整图），卡形更扁；无图回落品类图标 ── */
+.commerce-consumer .consumer-product-icon{position:relative}
+.pc-banner{position:relative;aspect-ratio:16/9;margin:-12px -12px 9px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
+.pc-banner-img{width:100%;height:100%;object-fit:cover;display:block}
+.pc-banner-badge{position:absolute;left:9px;bottom:9px;width:30px;height:30px;border-radius:9px;background:#fffc;display:grid;place-items:center;color:var(--cat-fg,#365c49);box-shadow:0 1px 6px #16382c1a}
+.pc-banner-badge svg{width:17px;height:17px}
+.product-card.has-media .consumer-product-top{position:absolute;top:9px;right:9px;z-index:2;margin:0}
+.product-card.has-media .consumer-product-top .channel-tag{margin-left:0;background:#fffce0;backdrop-filter:blur(4px)}
+
+/* ── 2026-10-02 会员中心压紧：heading 单行化 + pass 卡扁横化（278→约180，比例 1.55:1）── */
+.member-heading{padding:4px 2px 0}
+.member-heading h1{font:600 19px/1.3 var(--serif);margin:0 0 3px}
+.member-heading p{font-size:11px;margin:0;line-height:1.5}
+.plan-swiper-label{margin:12px 0 8px}
+.member-pass.plan-slide{padding:13px 16px 12px}
+.member-pass-top{font-size:11px;letter-spacing:1px}
+.plan-slide .member-wordmark{margin-top:7px;font-size:8px;letter-spacing:2px}
+.commerce-consumer .member-pass.plan-slide h1{font-size:19px;margin:3px 0}
+.plan-slide .member-pass-highlights{margin-top:7px}
+.plan-slide .member-pass-highlights span{padding:3px 8px;font-size:10px}
+.plan-slide-actions{margin-top:9px;padding-top:8px}
+.plan-price{font-size:17px}
+.plan-slide-actions .btn{min-height:33px;padding:7px 11px;font-size:11px}
+.plan-owned-chip{min-height:33px;padding:7px 11px;font-size:11px}
+/* 单方案直出的 pass 卡同步压扁 */
+.commerce-consumer .member-pass{min-height:0;padding:13px 16px 12px}
+.commerce-consumer .member-pass .member-wordmark{margin-top:7px;font-size:8px}
+.commerce-consumer .member-pass h1{font-size:19px;margin:3px 0}
+.commerce-consumer .member-pass .member-pass-highlights{margin-top:7px}
+.commerce-consumer .member-pass .member-pass-highlights span{padding:3px 8px;font-size:10px}
+.commerce-consumer .member-pass .member-pass-bottom{margin-top:9px;padding-top:8px}
+
+/* ── 会员滑动卡二次压扁：去 NEW LIVING CLUB 装饰行，280x225 → 约 280x190（1.47:1 横卡）── */
+.plan-slide .member-wordmark{display:none}
+.plan-slide .member-pass-top{font-size:10px}
+.commerce-consumer .member-pass.plan-slide h1{font-size:18px;margin:2px 0}
+.plan-slide .member-pass-highlights{margin-top:6px}
+.plan-slide .member-pass-highlights span{padding:2px 7px;font-size:9px}
+.plan-slide-actions{margin-top:7px;padding-top:7px}
+.plan-price{font-size:16px}
+.plan-slide-actions .btn{min-height:31px;padding:6px 10px;font-size:11px}
+.plan-owned-chip{min-height:31px;padding:6px 10px;font-size:11px}
+
+/* ── 会员滑动卡动作合并单行：价格 | 权益明细 | 立即开通（消除按钮独占行）── */
+.plan-slide-actions{flex-wrap:nowrap;gap:6px}
+.plan-price{font-size:15px;flex-shrink:0}
+.plan-slide-actions .btn{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
+.plan-owned-chip{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
