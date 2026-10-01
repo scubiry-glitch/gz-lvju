@@ -289,7 +289,7 @@ function createSchema(deps) {
           checkout VARCHAR(10) NOT NULL,
           nights INT NOT NULL,
           rooms INT NOT NULL DEFAULT 1,
-          price_total INT NOT NULL,
+          price_total DECIMAL(12,2) NOT NULL,
           commission_rate DECIMAL(5,2),
           commission_fee DECIMAL(10,2),
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
@@ -733,6 +733,7 @@ function createSchema(deps) {
         ['booking_orders', 'payment_expires_at VARCHAR(32)'],
         ['booking_orders', 'commission_rate DECIMAL(5,2)'],   // 下单锁定的商家生效费率快照（规则 20，调价不追溯）
         ['booking_orders', 'commission_fee DECIMAL(10,2)'],
+        ['booking_orders', 'payment_config_snapshot JSON NULL'], // 新订单冻结共享结算协议；历史订单不追溯补录
         ['booking_orders', 'rooms INT NOT NULL DEFAULT 1'],   // 订购间数（整栋单恒 1）
         ['stay_calendar', 'qty INT'],                         // 该晚放出间数覆盖（NULL = units.total_qty；项目级恒 1）
         ['stay_calendar', 'booked_qty INT NOT NULL DEFAULT 0'],  // 该晚已订间数（占用计数，释放时递减）

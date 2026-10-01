@@ -66,6 +66,7 @@ function createBookingRouter(deps) {
           const cpUnit = o.unit_ext ? { ext: o.unit_ext } : (firstExtByProject[o.project_id] != null ? { ext: firstExtByProject[o.project_id] } : null);
           const cancelInfo = orderCancelInfoOf(cpUnit, o);
           return Object.assign({}, o, {
+            price_total: Number(o.price_total),
             contact_phone: maskPhoneStd(o.contact_phone),
             contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
             contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
@@ -171,7 +172,7 @@ function createBookingRouter(deps) {
           if (existing.length) {
             if (existing[0].request_hash !== requestHash) return jsonReply(res, { error: '同一请求标识对应不同预订内容' }, 409);
             return jsonReply(res, { ok: true, order_no: existing[0].order_no, nights: existing[0].nights, rooms: existing[0].rooms,
-              price_total: existing[0].price_total, status: existing[0].status, pay_status: existing[0].pay_status,
+              price_total: Number(existing[0].price_total), status: existing[0].status, pay_status: existing[0].pay_status,
               idempotent_replay: true });
           }
         }
@@ -186,7 +187,7 @@ function createBookingRouter(deps) {
             if (existing[0].request_hash !== requestHash) { await conn.rollback(); return jsonReply(res, { error: '同一请求标识对应不同预订内容' }, 409); }
             await conn.commit();
             return jsonReply(res, { ok: true, order_no: existing[0].order_no, nights: existing[0].nights, rooms: existing[0].rooms,
-              price_total: existing[0].price_total, status: existing[0].status, pay_status: existing[0].pay_status,
+              price_total: Number(existing[0].price_total), status: existing[0].status, pay_status: existing[0].pay_status,
               idempotent_replay: true });
           }
         }
@@ -305,11 +306,16 @@ function createBookingRouter(deps) {
         );
         const orderNo = `BKG-${proj.channel.toUpperCase()}-${String(ins.insertId).padStart(5, '0')}`;
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
-        if (transactionMode === 'payment') await getBookingPaymentAdapter().prepare(conn, {
+        const createdOrder = {
           id: ins.insertId, order_no: orderNo, user_id: bookingUserId, owner_vendor_id: proj.owner_vendor_id,
-          project_id: projectId, unit_id: unitId, checkin, checkout, rooms, price_total: priceTotal.toFixed(2),
+          project_id: projectId, unit_id: unitId, channel: proj.channel, city_id: proj.city_id,
+          checkin, checkout, nights, rooms, price_total: priceTotal.toFixed(2),
+          commission_rate: rate, commission_fee: commissionFee, created_at: now,
           pay_status: initialPayStatus, status: 'pending', payment_expires_at: paymentExpiresAt,
-        }, bookingAccount);
+        };
+        const paymentAdapter = getBookingPaymentAdapter();
+        await paymentAdapter.captureOrder(conn, createdOrder, { newOrder: true });
+        if (transactionMode === 'payment') await paymentAdapter.prepare(conn, createdOrder, bookingAccount);
         // 下单即占库存（多间口径，2026-09-10）：① 补缺行（无行=默认可订 的落库形态，INSERT IGNORE 依赖
         // uk_sc 幂等，不动 price_night/qty）→ ② booked_qty 条件递增（booking_id 仅首占用时写）。
         // 不再翻整行 status：booked 由 remaining<=0 派生；区间可用性已被上方 FOR UPDATE 校验锁定
@@ -382,7 +388,7 @@ function createBookingRouter(deps) {
           id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
           project_name: o.project_name,
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
-          checkin: o.checkin, checkout: o.checkout, nights: o.nights, rooms: o.rooms, price_total: o.price_total,
+          checkin: o.checkin, checkout: o.checkout, nights: o.nights, rooms: o.rooms, price_total: Number(o.price_total),
           status: o.status, pay_status: o.pay_status, pay_method: o.pay_method, payment_expires_at: o.payment_expires_at, created_at: o.created_at,
           cancel_policy_text: cancelInfo.cancel_policy_text, cancel_deadline: cancelInfo.cancel_deadline, can_cancel: cancelInfo.can_cancel,
         },
@@ -434,7 +440,7 @@ function createBookingRouter(deps) {
         notifyVendorBooking(rows[0].owner_vendor_id, 'booking.cancelled', {
           id: rows[0].id, order_no: orderNo, project_id: rows[0].project_id, unit_id: rows[0].unit_id || null,
           channel: rows[0].channel, checkin: rows[0].checkin, checkout: rows[0].checkout,
-          nights: rows[0].nights, price_total: rows[0].price_total,
+          nights: rows[0].nights, price_total: Number(rows[0].price_total),
           status: 'cancelled', pay_status: null, cancel_by: 'customer',
         });
         return jsonReply(res, { ok: true, order_no: orderNo, status: 'cancelled', pay_status: null });

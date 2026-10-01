@@ -14,6 +14,32 @@ const {createJiazhengRouter}=require('../routes/jiazheng.cjs');
 const grOrders=require('../../gr_orders.cjs');
 const socketPath=process.env.PAYMENT_TEST_SOCKET;
 
+test('mixed-collation legacy migration preserves commerce exclusion and booking snapshots', {skip:!socketPath,timeout:60000},async t=>{
+  assert.match(socketPath,/^\/tmp\/[\w-]*(?:cashier|settlement)[\w-]*\/[^/]+\.sock$/);
+  const database='cashier_mixed_'+process.pid+'_'+crypto.randomBytes(3).toString('hex'),options={socketPath,user:'root',timezone:'Z'};
+  const admin=await mysql.createConnection(options);await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');
+  const c=await mysql.createConnection({...options,database});t.after(async()=>{await c.end();await admin.query('DROP DATABASE `'+database+'`');await admin.end();});
+  await c.query('CREATE TABLE jz_vendors(id INT PRIMARY KEY,url_link TEXT) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci');
+  await c.query('CREATE TABLE jz_products(id INT PRIMARY KEY,vendor_id INT) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci');
+  await c.query('CREATE TABLE gr_orders(id INT PRIMARY KEY,user_id VARCHAR(64),order_ref VARCHAR(64),sku VARCHAR(64),vendor_id INT) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci');
+  await c.query('CREATE TABLE commerce_orders(id VARCHAR(64) PRIMARY KEY) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci');
+  await c.query("INSERT INTO jz_vendors VALUES(1,'https://example.test/mini'),(2,NULL)");await c.query('INSERT INTO jz_products VALUES(101,1)');
+  await c.query("INSERT INTO commerce_orders VALUES('abcdef00-1234-4567-8901-abcdef123456')");
+  await c.query("INSERT INTO gr_orders VALUES(1,'fixture','ABCDEF00-1234-4567-8901-ABCDEF123456','101',1),(2,'fixture','EXTERNAL-MIXED-001','101',1),(3,'fixture','WRONG-VENDOR','101',2),(4,'fixture','NOT-PRODUCT','not-numeric',1)");
+  // Exercise the immutable legacy snapshot migration against real old evidence
+  // under a different log collation as well, without changing its checksum.
+  for(const ddl of require('../payment/migrate.cjs').TABLES)await c.query(ddl.replace('DEFAULT CHARSET=utf8mb4','DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci'));
+  await c.query('ALTER TABLE payment_gateway_logs CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
+  await c.query("INSERT INTO payment_orders(id,biz_order_no,app_order_id,amount,payer_ucid,payer_user_type,merchant_no,share_biz_code,cashier_type,pay_status,callback_url,created_at,updated_at) VALUES(1,'BOOK-MIXED-001','MIXED-APP-001',12.34,'fixture-user','1','fixture-merchant','fixture-share','2','unpaid','https://example.test/callback',UTC_TIMESTAMP(),UTC_TIMESTAMP())");
+  await c.execute("INSERT INTO payment_gateway_logs(payment_order_id,app_order_id,operation_type,request_no,request_json,started_at) VALUES(1,'MIXED-APP-001','pay_create','MIXED-LOG-001',?,UTC_TIMESTAMP())",[JSON.stringify({appOrderId:'MIXED-APP-001',appCode:'original-app',projectCode:'original-project'})]);
+  await migrate(c);await migrate(c);
+  const [orders]=await c.query('SELECT id,biz_type,payment_mode FROM gr_orders ORDER BY id');
+  assert.deepEqual(orders.map(r=>[r.id,r.biz_type,r.payment_mode]),[[1,null,null],[2,'jiazheng','wechat_mini'],[3,null,null],[4,null,null]]);
+  const [[payment]]=await c.query('SELECT app_code,project_code FROM payment_orders WHERE id=1');assert.deepEqual(payment,{app_code:'original-app',project_code:'original-project'});
+  const [collations]=await c.query("SELECT TABLE_NAME,COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND (TABLE_NAME='commerce_orders' AND COLUMN_NAME='id' OR TABLE_NAME='gr_orders' AND COLUMN_NAME='order_ref') ORDER BY TABLE_NAME");
+  assert.deepEqual(collations.map(r=>r.COLLATION_NAME),['utf8mb4_general_ci','utf8mb4_0900_ai_ci'],'migration must not convert existing business tables');
+});
+
 test('life service legacy request contracts preserve real payments and ownership', {skip:!socketPath,timeout:120000},async t=>{
   assert.match(socketPath,/^\/tmp\/[\w-]*(?:cashier|settlement)[\w-]*\/[^/]+\.sock$/);
   const database='cashier_life_legacy_'+process.pid+'_'+crypto.randomBytes(3).toString('hex');

@@ -290,7 +290,7 @@ async function migrateBusinessTables(conn) {
       AND p.id=CAST(g.sku AS UNSIGNED) AND p.vendor_id=g.vendor_id
       SET g.biz_type='jiazheng',g.payment_mode='wechat_mini'
       WHERE g.payment_mode IS NULL AND (g.biz_type IS NULL OR g.biz_type='jiazheng')
-      AND g.vendor_id IS NOT NULL${present.has('commerce_orders') ? ' AND NOT EXISTS (SELECT 1 FROM commerce_orders co WHERE co.id=g.order_ref)' : ''}`);
+      AND g.vendor_id IS NOT NULL${present.has('commerce_orders') ? ' AND NOT EXISTS (SELECT 1 FROM commerce_orders co WHERE co.id COLLATE utf8mb4_general_ci=g.order_ref COLLATE utf8mb4_general_ci)' : ''}`);
     await conn.execute('INSERT INTO payment_migrations(version,checksum) VALUES(?,?)', [businessVersion, CHECKSUM]);
   }
 }

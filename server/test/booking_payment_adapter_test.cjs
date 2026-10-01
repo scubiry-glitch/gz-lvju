@@ -7,7 +7,7 @@ const mysql = require('mysql2/promise');
 const { createPaymentCore } = require('../payment/core.cjs');
 const { createBookingPaymentAdapter } = require('../payment/booking-adapter.cjs');
 const { migrate } = require('../payment/migrate.cjs');
-const { sqlDate } = require('../payment/primitives.cjs');
+const { sqlDate, parse } = require('../payment/primitives.cjs');
 const { createCashier } = require('../../screens/_cashier.js');
 const { createBookingRouter } = require('../routes/booking.cjs');
 
@@ -42,6 +42,139 @@ test('shared cashier preserves request keys and only uses native App bridges', (
 });
 
 const socketPath = process.env.PAYMENT_TEST_SOCKET;
+test('booking shared settlement freezes creation terms and projects money atomically', { skip: !socketPath, timeout: 180000 }, async t => {
+  assert.match(socketPath, /^\/tmp\//);
+  const database = 'cashier_booking_shared_' + process.pid + '_' + crypto.randomBytes(4).toString('hex');
+  const options = { socketPath, user: 'root', timezone: 'Z', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true };
+  const admin = await mysql.createConnection(options);
+  await admin.query('CREATE DATABASE `' + database + '` CHARACTER SET utf8mb4');
+  const pool = mysql.createPool({ ...options, database, connectionLimit: 5 });
+  const createConnection = () => mysql.createConnection({ ...options, database });
+  const q = async (sql, args = []) => (await pool.execute(sql, args))[0];
+  t.after(async () => { await pool.end(); await admin.query('DROP DATABASE `' + database + '`'); await admin.end(); });
+  await q(`CREATE TABLE booking_orders(id INT AUTO_INCREMENT PRIMARY KEY,order_no VARCHAR(32) UNIQUE,user_id VARCHAR(64),owner_vendor_id INT,
+    project_id INT,unit_id INT,city_id INT,channel VARCHAR(20),checkin VARCHAR(16),checkout VARCHAR(16),rooms INT,nights INT,
+    price_total DECIMAL(12,2),commission_rate DECIMAL(5,2),commission_fee DECIMAL(12,2),contact_phone VARCHAR(32),status VARCHAR(24),
+    pay_status VARCHAR(24),payment_expires_at VARCHAR(32),paid_payment_order_id BIGINT,pay_method VARCHAR(50),pay_at DATETIME,
+    created_at DATETIME,updated_at DATETIME,refund_status VARCHAR(30),latest_refund_id BIGINT,refunded_at DATETIME)`);
+  await q('CREATE TABLE jz_vendors(id INT PRIMARY KEY,pay_merchant_no VARCHAR(64),commission_housing DECIMAL(5,2))');
+  await q("INSERT INTO jz_vendors VALUES(7,'old-vendor-route',98.00)");
+  await require('../settlement/index.cjs').migrate(pool);
+  const sourceAccount = crypto.randomUUID(), platformAccount = crypto.randomUUID(), profileId = crypto.randomUUID();
+  for (const [id, party, merchant] of [[sourceAccount, 'booking-fixture', 'controlled-fixture'], [platformAccount, 'platform-fixture', 'platform-fixture']]) {
+    await q(`INSERT INTO commerce_payment_accounts(id,party_id,provider,environment,merchant_no,contract_no,currency,status,capabilities,created_by,reviewed_by)
+      VALUES(?,?,'ISOLATED','TEST',?,'fixture-contract','CNY','approved','{}','maker','reviewer')`, [id, party, merchant]);
+  }
+  await q(`INSERT INTO commerce_settlement_party_bindings(id,source_domain,source_entity_type,source_entity_id,party_id,status,created_by,reviewed_by)
+    VALUES(?,'booking','vendor','7','booking-fixture','approved','maker','reviewer')`, [crypto.randomUUID()]);
+  const profile = { contract_ref: 'fixture-contract', funding_mode: 'CONTROLLED_COLLECTION', source_account_id: sourceAccount,
+    merchant_account_id: sourceAccount, platform_account_id: platformAccount, contract_no: 'fixture-contract',
+    contract_mapping_version: 'fixture-collection', funding_evidence_ref: 'isolated-test-only',
+    collection: { mapping_version: 'fixture-collection', contract_no: 'fixture-contract', source_merchant_no: 'controlled-fixture', provider: 'ISOLATED', environment: 'TEST' },
+    calculation: { mode: 'PROPORTIONAL', commission_bps: 500, channel_bps: 0, rounding: 'FLOOR_BPS_V1' },
+    recognition_policy: { mode: 'BOOKING_CHECKOUT_DELAY' } };
+  for (const mode of ['pay_center', 'offline']) await q(`INSERT INTO commerce_settlement_profiles(id,party_id,biz_type,payment_mode,version,status,created_by,reviewed_by,snapshot)
+    VALUES(?,'booking-fixture','booking',?,1,'approved','maker','reviewer',?)`, [mode === 'pay_center' ? profileId : crypto.randomUUID(), mode, JSON.stringify(profile)]);
+  const config = { SETTLEMENT_ENABLED: '1', PAY_APP_CODE: 'fixture-app', PAY_PROJECT_CODE: 'fixture-project', PAY_SHARE_BIZ_CODE: 'fixture-share', PAY_NOTIFY_URL: 'https://example.test/notify',
+    settlement_payment_contracts: { 'fixture-collection': { enabled: true, verified: true, evidence_ref: 'isolated-only', provider: 'ISOLATED', environment: 'TEST', funding_modes: ['CONTROLLED_COLLECTION'],
+      request_template: { recAndShareInfo: { merchantNo: { $ref: 'collection.source_merchant_no' }, shareOrderMode: 'fixture' }, contractInfo: { contractNo: { $ref: 'collection.contract_no' } } },
+      result: { contract_no: 'contractNo', source_merchant_no: 'merchantNo', control_status: 'controlStatus', controlled_values: ['HELD'] } } } };
+  const core = createPaymentCore({ createConnection, config, payCenter: {
+    async createC2BOrder(input) {
+      assert.equal(input.recAndShareInfo.merchantNo, 'controlled-fixture');
+      assert.equal(input.contractInfo.contractNo, 'fixture-contract');
+      return { errno: 0, data: { cashierUrl: 'https://example.test/isolated-booking' } };
+    },
+  }, logger: { warn() {} } });
+  const adapter = createBookingPaymentAdapter({ core, createConnection, config, releaseStayQty: async () => {} });
+  const account = { id: 'booking-user', idp_type: 'beike', idp_subject: 'booking-ucid' };
+  async function create(orderNo, payStatus = 'unpaid', capture = true) {
+    return core.transaction(async c => {
+      await c.execute(`INSERT INTO booking_orders(order_no,user_id,owner_vendor_id,project_id,unit_id,city_id,channel,checkin,checkout,rooms,nights,price_total,
+        commission_rate,commission_fee,status,pay_status,payment_expires_at,created_at,updated_at)
+        VALUES(?,'booking-user',7,1,1,1,'minsu','2099-10-02','2099-10-03',1,1,100,12.34,12.34,'pending',?,'2099-01-01 00:00:00',UTC_TIMESTAMP(),UTC_TIMESTAMP())`, [orderNo, payStatus]);
+      if (capture) await adapter.captureOrder(c, { order_no: orderNo }, { newOrder: true });
+      return (await c.execute('SELECT * FROM booking_orders WHERE order_no=?', [orderNo]))[0][0];
+    });
+  }
+  let order, payment;
+  await t.test('new order freezes actual commission and controlled collection; later vendor and profile edits do not change it', async () => {
+    order = await create('BKG-SHARED-FROZEN');
+    const snapshot = parse(order.payment_config_snapshot);
+    assert.equal(snapshot.booking.commission_fee, '12.34');
+    assert.equal(snapshot.settlement_profile.calculation.fixed_cost_minor, '8766');
+    assert.equal(snapshot.settlement_profile.calculation.fixed_commission_minor, '1234');
+    await q("UPDATE jz_vendors SET pay_merchant_no='changed-route',commission_housing=1 WHERE id=7");
+    await q("UPDATE commerce_settlement_profiles SET snapshot=JSON_SET(snapshot,'$.calculation.commission_bps',9900) WHERE id=?", [profileId]);
+    payment = await adapter.intent({ orderNo: order.order_no, account, requestKey: 'booking-shared-fixture', cashierType: '2' });
+    const [guard] = await q('SELECT * FROM payment_order_guards WHERE biz_order_no=?', [order.order_no]);
+    assert.equal(guard.merchant_no, 'controlled-fixture');
+    assert.deepEqual(parse(guard.snapshot).settlement_profile, snapshot.settlement_profile);
+    const recaptured = await core.transaction(c => adapter.captureOrder(c, { order_no: order.order_no }, { newOrder: true }));
+    assert.deepEqual(recaptured, snapshot);
+  });
+  await t.test('accepted-payment projection and source receipt share a transaction and replay without duplicating the ledger', async () => {
+    await core.runJobs(1, { kind: 'pay_create', targetId: payment.payment_id });
+    await core.reconcilePayment(payment.payment_id, { errno: 0, data: { appOrderId: payment.app_order_id, merchantNo: 'controlled-fixture', amount: '100.00',
+      orderStatus: '30', payNo: 'isolated-paid-proof', contractNo: 'fixture-contract', controlStatus: 'HELD' } });
+    await q("UPDATE commerce_payment_accounts SET status='draft' WHERE id=?", [sourceAccount]);
+    // payment.received precedes payment.accepted; the first carries no business
+    // funding effect and may commit while acceptance itself must roll back.
+    assert.equal((await core.consumeEvents('booking', adapter.handleEvent, 2, { orderId: order.order_no })).processed, 1);
+    assert.equal((await q("SELECT status FROM payment_events WHERE biz_order_no=? AND event_type='payment.accepted'", [order.order_no]))[0].status, 'failed');
+    assert.equal((await q('SELECT pay_status FROM booking_orders WHERE order_no=?', [order.order_no]))[0].pay_status, 'unpaid');
+    assert.equal((await q('SELECT * FROM commerce_funding_sources')).length, 0);
+    await q("UPDATE commerce_payment_accounts SET status='approved' WHERE id=?", [sourceAccount]);
+    await q("UPDATE payment_events SET next_run_at='2000-01-01' WHERE biz_order_no=?", [order.order_no]);
+    assert.equal((await core.consumeEvents('booking', adapter.handleEvent, 1, { orderId: order.order_no })).processed, 1);
+    await core.transaction(async c => {
+      const [[event]] = await c.execute("SELECT * FROM payment_events WHERE biz_order_no=? AND event_type='payment.accepted'", [order.order_no]);
+      const [[guard]] = await c.execute('SELECT * FROM payment_order_guards WHERE biz_order_no=?', [order.order_no]);
+      await adapter.handleEvent(c, event, guard);
+    });
+    const [source] = await q('SELECT * FROM commerce_funding_sources');
+    assert.equal(source.received_minor, '10000'); assert.equal((await q('SELECT * FROM commerce_funding_sources')).length, 1);
+    assert.equal((await q("SELECT * FROM commerce_ledger_events WHERE event_key LIKE 'funding:received:%'")).length, 1);
+    assert.equal((await q('SELECT * FROM commerce_settlement_units')).length, 0, 'paid and merchant-confirmed states are not checkout eligibility');
+    await adapter.confirm({ orderNo: order.order_no, source: 'vendor', vendorId: 7 });
+    assert.equal((await q('SELECT * FROM commerce_settlement_units')).length, 0);
+  });
+  await t.test('original cancellation refund still respects source reservations and records one actual refund', async () => {
+    await q('UPDATE commerce_funding_sources SET reserved_minor=1');
+    await assert.rejects(adapter.cancel({ orderNo: order.order_no, source: 'vendor', vendorId: 7 }), { code: 'settlement_refund_funds_unavailable' });
+    assert.equal((await q('SELECT * FROM payment_refunds')).length, 0);
+    await q('UPDATE commerce_funding_sources SET reserved_minor=0');
+    await adapter.cancel({ orderNo: order.order_no, source: 'vendor', vendorId: 7 });
+    const [refund] = await q('SELECT * FROM payment_refunds');
+    await core.reconcileRefund(refund.id, { errno: 0, data: { appOrderId: refund.app_order_id, merchantNo: 'controlled-fixture', refundAmount: '100.00', orderStatus: '30' } });
+    await core.consumeEvents('booking', adapter.handleEvent, 10, { orderId: order.order_no });
+    await core.transaction(async c => {
+      const [[event]] = await c.execute("SELECT * FROM payment_events WHERE biz_order_no=? AND event_type='refund.succeeded'", [order.order_no]);
+      const [[guard]] = await c.execute('SELECT * FROM payment_order_guards WHERE biz_order_no=?', [order.order_no]);
+      await adapter.handleEvent(c, event, guard);
+    });
+    assert.equal((await q('SELECT returned_minor FROM commerce_funding_sources'))[0].returned_minor, '10000');
+    assert.equal((await q("SELECT * FROM commerce_ledger_events WHERE event_key LIKE 'payment:refund:%'")).length, 1);
+    assert.equal((await q("SELECT event_id FROM commerce_ledger_entries GROUP BY event_id HAVING SUM(IF(side='debit',amount_minor,-amount_minor))<>0")).length, 0);
+    assert.equal((await q('SELECT pay_status FROM booking_orders WHERE order_no=?', [order.order_no]))[0].pay_status, 'refunded');
+  });
+  await t.test('offline creation only records a report context; unprofiled historical preparations do not adopt a new contract', async () => {
+    const offline = await create('BKG-SHARED-OFFLINE', null, false);
+    const reportsOnly = createBookingPaymentAdapter({ core, createConnection, config: { ...config, SETTLEMENT_ENABLED: '0' } });
+    await core.transaction(c => reportsOnly.captureOrder(c, offline, { newOrder: true }));
+    const [ctx] = await q('SELECT * FROM commerce_settlement_business_contexts WHERE biz_order_no=?', [offline.order_no]);
+    assert.equal(ctx.payment_mode, 'offline'); assert.equal(ctx.execution_scope, 'EXTERNAL_RECORD_ONLY');
+    assert.equal((await q('SELECT * FROM commerce_funding_sources WHERE context_id=?', [ctx.id])).length, 0);
+    await assert.rejects(adapter.intent({ orderNo: offline.order_no, account, requestKey: 'offline-fixture-intent', cashierType: '2' }), { code: 'payment_not_required' });
+    const legacy = await create('BKG-SHARED-LEGACY', 'unpaid', false);
+    await adapter.intent({ orderNo: legacy.order_no, account, requestKey: 'legacy-no-adopt-profile', cashierType: '2' });
+    const [guard] = await q('SELECT * FROM payment_order_guards WHERE biz_order_no=?', [legacy.order_no]);
+    assert.equal(parse(guard.snapshot).settlement_profile, undefined);
+    assert.equal((await q('SELECT payment_config_snapshot FROM booking_orders WHERE order_no=?', [legacy.order_no]))[0].payment_config_snapshot, null);
+    await assert.rejects(core.transaction(c => adapter.captureOrder(c, { order_no: legacy.order_no }, { newOrder: true })), { code: 'booking_snapshot_already_registered' });
+    assert.equal((await q('SELECT * FROM commerce_settlement_business_contexts WHERE biz_order_no=?', [legacy.order_no])).length, 0);
+  });
+});
 test('booking adapter preserves payment and inventory invariants', { skip: !socketPath, timeout: 120000 }, async t => {
   assert.match(socketPath, /^\/tmp\//, 'Only an explicit isolated temporary MySQL socket is permitted');
   const database = 'cashier_booking_test_' + process.pid + '_' + crypto.randomBytes(4).toString('hex');
@@ -266,6 +399,7 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     const request = { method: 'POST', headers: { 'idempotency-key': 'parallel-create-booking' }, body };
     const results = await Promise.all(Array.from({ length: 6 }, () => router('/api/juzhu/booking', '', request, {})));
     assert.ok(results.every(result => result.status === 200), JSON.stringify(results));
+    assert.ok(results.every(result => result.data.price_total === 123.45), 'creation and every idempotent replay keep numeric decimal totals');
     assert.equal(new Set(results.map(result => result.data.order_no)).size, 1);
     assert.equal(results.filter(result => result.data.idempotent_replay).length, 5);
     const [reserved] = await db('SELECT booked_qty FROM stay_calendar WHERE project_id=2 AND unit_id=2');

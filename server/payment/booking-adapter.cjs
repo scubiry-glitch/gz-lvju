@@ -1,7 +1,7 @@
 'use strict';
 
 const stay = require('../../stay_config.cjs');
-const { assert, toMinor, sqlDate, expired, normalizeBizOrderNo } = require('./primitives.cjs');
+const { assert, parse, toMinor, sqlDate, expired, normalizeBizOrderNo } = require('./primitives.cjs');
 
 function createBookingPaymentAdapter({ core, createConnection, config = process.env, notifyVendorBooking,
   releaseStayQty = stay.releaseStayQty, orderCancelInfoOf = stay.orderCancelInfoOf }) {
@@ -52,6 +52,28 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
     }
   }
 
+  // This is called only by the order-creation transaction. Status, expiry and
+  // legacy recovery must never attach today's contract to a historical payment.
+  async function captureOrder(conn, booking, { newOrder = false } = {}) {
+    assert(newOrder, '结算协议只能在新建预订时锁定', 409, 'booking_snapshot_creation_only');
+    if (config.SETTLEMENT_ENABLED !== '1' && booking.pay_status != null) return null;
+    const order = await load(conn, booking.order_no, true);
+    if (config.SETTLEMENT_ENABLED !== '1' && order.pay_status != null) return null;
+    if (order.payment_config_snapshot) return parse(order.payment_config_snapshot);
+    if (order.pay_status != null) {
+      const [guards] = await conn.execute("SELECT biz_order_no FROM payment_order_guards WHERE biz_type='booking' AND biz_order_no=?", [order.order_no]);
+      const [attempts] = await conn.execute("SELECT id FROM payment_orders WHERE biz_type='booking' AND biz_order_no=? LIMIT 1", [order.order_no]);
+      assert(!guards.length && !attempts.length, '已存在支付快照的预订不能补套新协议', 409, 'booking_snapshot_already_registered');
+    }
+    const snapshot = await require('../settlement/booking.cjs').captureBookingSnapshot(conn, order,
+      { config, payment_mode: order.pay_status == null ? 'offline' : 'pay_center' });
+    if (snapshot) {
+      await conn.execute('UPDATE booking_orders SET payment_config_snapshot=? WHERE id=?', [JSON.stringify(snapshot), order.id]);
+      booking.payment_config_snapshot = snapshot;
+    }
+    return snapshot;
+  }
+
   async function prepare(conn, booking, account) {
     const orderNo = typeof booking === 'string' ? booking : booking.order_no;
     normalizeBizOrderNo('booking', orderNo);
@@ -83,9 +105,12 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
         '在线支付需要订单所属贝壳账号', 403, 'beike_identity_required');
       payerUcid = payer.idp_subject;
     }
-    const [vendors] = legacy ? [[]] : await conn.execute('SELECT pay_merchant_no FROM jz_vendors WHERE id=?', [order.owner_vendor_id]);
-    const merchantNo = legacy && legacy.merchant_no || vendors[0] && vendors[0].pay_merchant_no;
+    const frozen = parse(order.payment_config_snapshot), collection = frozen.settlement_profile && frozen.settlement_profile.collection;
+    const [vendors] = legacy || collection ? [[]] : await conn.execute('SELECT pay_merchant_no FROM jz_vendors WHERE id=?', [order.owner_vendor_id]);
+    const merchantNo = legacy && legacy.merchant_no || collection && collection.source_merchant_no || vendors[0] && vendors[0].pay_merchant_no;
     assert(merchantNo, '商家尚未配置收款商户号', 409, 'merchant_not_ready');
+    if (collection) assert(String(merchantNo) === collection.source_merchant_no,
+      '原支付收款方与锁定结算协议不一致', 409, 'payment_snapshot_conflict');
     const expiresAt = order.payment_expires_at || legacy && (legacy.expires_at ||
       (order.paid_payment_order_id && (legacy.paid_at || legacy.created_at)));
     assert(expiresAt, '预订缺少付款期限，需要核对原订单', 409, 'migration_conflict');
@@ -97,7 +122,9 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
       shareBizCode: legacy && legacy.share_biz_code || undefined, callbackUrl: legacy && legacy.callback_url || undefined,
       expiresAt: sqlDate(expiresAt), title: '住宿预订 ' + order.order_no,
       configVersion: 1, snapshot: { projectId: order.project_id, unitId: order.unit_id, vendorId: order.owner_vendor_id,
-        checkin: order.checkin, checkout: order.checkout, rooms: order.rooms },
+        checkin: order.checkin, checkout: order.checkout, rooms: order.rooms,
+        commission_rate: order.commission_rate == null ? null : String(order.commission_rate),
+        commission_fee: order.commission_fee == null ? null : String(order.commission_fee), ...frozen },
       legacyPaidPaymentId: order.paid_payment_order_id || null,
       requireAuthoritativePaid: true,
       legacyFulfilled: Boolean(order.paid_payment_order_id),
@@ -245,7 +272,7 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
 
   async function handleEvent(conn, event, guard) {
     const order = await load(conn, event.biz_order_no, true);
-    const payload = event.payload || {};
+    const payload = parse(event.payload);
     if (event.event_type === 'payment.accepted') {
       assert(Number(guard.paid_payment_id) === Number(payload.paymentId), '有效支付关联不一致', 409, 'payment_mismatch');
       // Cancellation can win after acceptance but before this event is consumed.
@@ -253,11 +280,12 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
       const [payments] = await conn.execute('SELECT pay_method,paid_at FROM payment_orders WHERE id=?', [payload.paymentId]);
       await conn.execute("UPDATE booking_orders SET paid_payment_order_id=?,pay_status='paid',pay_method=?,pay_at=?,updated_at=? WHERE id=?",
         [payload.paymentId, payments[0] && payments[0].pay_method || null, payments[0] && payments[0].paid_at || sqlDate(), sqlDate(), order.id]);
+      await require('../settlement/business.cjs').onPaymentAccepted(conn, { biz_type: 'booking', order, guard });
       if (order.owner_vendor_id) await core.enqueueJob(conn, 'booking_webhook', payload.paymentId, {
         vendorId: order.owner_vendor_id, event: 'booking.paid', order: {
           id: order.id, order_no: order.order_no, project_id: order.project_id, unit_id: order.unit_id,
           checkin: order.checkin, checkout: order.checkout, nights: order.nights, rooms: order.rooms,
-          price_total: order.price_total, status: order.status, pay_status: 'paid', payment_id: payload.paymentId,
+          price_total: Number(order.price_total), status: order.status, pay_status: 'paid', payment_id: payload.paymentId,
         },
       });
     }
@@ -268,6 +296,7 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
       await release(conn, order);
     }
     if (event.event_type === 'refund.succeeded' && Number(guard.paid_payment_id) === Number(payload.paymentId)) {
+      await require('../settlement/business.cjs').onRefundSucceeded(conn, { biz_type: 'booking', order, payload });
       const [[sum]] = await conn.execute("SELECT COALESCE(SUM(amount_minor),0) AS total FROM payment_refunds WHERE payment_order_id=? AND refund_status='refunded'", [payload.paymentId]);
       const refunded = Number(sum.total) >= Number(guard.amount_minor);
       await conn.execute('UPDATE booking_orders SET refund_status=?,pay_status=?,latest_refund_id=?,refunded_at=?,updated_at=? WHERE id=?',
@@ -276,7 +305,7 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
     }
   }
 
-  return { prepare, intent, status, cancel, confirm, expire, recoverLegacy, handleEvent };
+  return { captureOrder, prepare, intent, status, cancel, confirm, expire, recoverLegacy, handleEvent };
 }
 
 module.exports = { createBookingPaymentAdapter };

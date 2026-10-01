@@ -10,7 +10,7 @@ const { migrate } = require('../payment/migrate.cjs');
 
 const socketPath = process.env.PAYMENT_TEST_SOCKET;
 test('legacy lodging service and HTTP payment contracts remain usable', { skip: !socketPath, timeout: 120000 }, async t => {
-  assert.match(socketPath, /^\/tmp\/[\w-]*cashier[\w-]*\/[^/]+\.sock$/);
+  assert.match(socketPath, /^\/tmp\/(?:[\w-]*cashier[\w-]*|sy-settlement-[\w-]+)\/[^/]+\.sock$/);
   const database='cashier_booking_compat_'+process.pid+'_'+crypto.randomBytes(3).toString('hex');
   const options={socketPath,user:'root',timezone:'Z',dateStrings:true,supportBigNumbers:true,bigNumberStrings:true};
   const admin=await mysql.createConnection(options);await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');
@@ -28,7 +28,8 @@ test('legacy lodging service and HTTP payment contracts remain usable', { skip: 
   await db('CREATE TABLE jz_vendors(id INT PRIMARY KEY,pay_merchant_no VARCHAR(64))');
   await db("INSERT INTO jz_vendors VALUES(1,'fixture-merchant')");
   await db('CREATE TABLE units(id INT PRIMARY KEY,project_id INT,sort_order INT DEFAULT 0,ext TEXT)');
-  const c=await createConnection();try{await migrate(c);}finally{await c.end();}
+  await db('CREATE TABLE projects(id INT PRIMARY KEY,name VARCHAR(100))');
+  const c=await createConnection();try{await migrate(c);await require('../settlement/booking-schema.cjs').migrate(c);}finally{await c.end();}
   const payments=new Map(),refunds=new Map(),calls={create:[],query:[],refundCreate:[],refundQuery:[],close:[]};
   const gateway={
     async createC2BOrder(p){calls.create.push(p);await new Promise(resolve=>setTimeout(resolve,45));payments.set(p.appOrderId,{appOrderId:p.appOrderId,appCode:p.appCode,projectCode:p.projectCode,merchantNo:p.recAndShareInfo.merchantNo,amount:p.amount,orderStatus:'10'});return{errno:0,data:{cashierUrl:'https://fixture.invalid/cashier/'+p.appOrderId}};},
@@ -58,12 +59,32 @@ test('legacy lodging service and HTTP payment contracts remain usable', { skip: 
     return {id:inserted.insertId,appId};
   }
   const router=createBookingRouter({readBody:async req=>req.body,requestSession:async req=>req.session===null?null:{role:'user',account:req.account||account},
+    queryRows:db,maskPhoneStd:value=>String(value).slice(0,3)+'****'+String(value).slice(-4),orderCancelInfoOf:()=>({can_cancel:true}),
     getPaymentService:()=>service,getBookingPaymentAdapter:()=>service.bookingAdapter,jsonReply:(res,data,status=200)=>Object.assign(res,{data,status})});
   const http=async(path,body,extra={})=>{const response={};await router(path,'',{method:'POST',headers:{},socket:{remoteAddress:'127.0.0.1'},body,...extra},response);return response;};
 
   await t.test('all public legacy service methods are still callable',()=>{
     for(const name of ['createOrReusePayment','queryPayment','createOrReuseRefund','requestRefund','queryRefund','closePaymentByOrder','runPaymentCompensation','handleNotify','advancePaymentState','advanceRefundState','generateAppOrderId'])assert.equal(typeof service[name],'function',name);
     assert.match(service.generateAppOrderId('XD'),/^XD_\d{14}_\d{6}$/);
+  });
+  await t.test('decimal room totals stay numeric in customer and merchant DTOs without exposing the funding snapshot',async()=>{
+    const orderNo=await booking();
+    await db("UPDATE booking_orders SET price_total=246.35,payment_config_snapshot=? WHERE order_no=?",[JSON.stringify({booking:{price_total:'246.35'},settlement_profile:{internal_only:'fixture'}}),orderNo]);
+    const [stored]=await db('SELECT * FROM booking_orders WHERE order_no=?',[orderNo]);
+    assert.equal(stored.price_total,'246.35','mysql2 returns the exact DECIMAL as a string');
+    await db("INSERT INTO projects VALUES(?,'小数金额住宿')",[stored.project_id]);
+    const lookup=await http('/api/juzhu/booking/lookup',{order_no:orderNo,contact_phone:'13800000000'});
+    assert.equal(lookup.status,200);assert.equal(lookup.data.order.price_total,246.35);assert.equal(lookup.data.order.payment_config_snapshot,undefined);
+    const mine=await http('/api/juzhu/booking/my',null,{method:'GET'});
+    assert.equal(mine.status,200);assert.equal(mine.data.items.find(row=>row.order_no===orderNo).price_total,246.35);
+    const vendor=require('../../vendor_api.cjs'),conn=await createConnection();
+    try{
+      const list=await vendor.HOUSING_ROUTES['/api/juzhu/housing/vendor/bookings/list'](conn,{},1);
+      assert.equal(list.data.list.find(row=>row.order_no===orderNo).price_total,246.35);
+      const detail=await vendor.HOUSING_ROUTES['/api/juzhu/housing/vendor/bookings/detail'](conn,{id:stored.id},1);
+      assert.equal(detail.data.booking.price_total,246.35);assert.equal(detail.data.booking.payment_config_snapshot,undefined);
+    }finally{await conn.end();}
+    assert.equal((await db('SELECT price_total,payment_config_snapshot FROM booking_orders WHERE order_no=?',[orderNo]))[0].payment_config_snapshot.booking.price_total,'246.35');
   });
   await t.test('minsu and rental old HTTP clients without keys receive immediate URL and old fields',async()=>{
     for(const channel of ['minsu','rental']){

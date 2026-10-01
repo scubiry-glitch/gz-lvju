@@ -13,7 +13,7 @@ const { createBookingPaymentAdapter } = require('../payment/booking-adapter.cjs'
 
 const socketPath = process.env.PAYMENT_TEST_SOCKET;
 test('booking legacy data survives additive migration and recovery', { skip: !socketPath, timeout: 120000 }, async t => {
-  assert.match(socketPath, /^\/tmp\/[\w-]*cashier[\w-]*\/[^/]+\.sock$/);
+  assert.match(socketPath, /^\/tmp\/(?:[\w-]*cashier[\w-]*|sy-settlement-[\w-]+)\/[^/]+\.sock$/);
   const database = 'cashier_booking_legacy_' + process.pid + '_' + crypto.randomBytes(3).toString('hex');
   const options = { socketPath, user: 'root', timezone: 'Z', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true };
   const admin = await mysql.createConnection(options);

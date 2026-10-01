@@ -1304,7 +1304,7 @@ async function housingBookingsList(conn, body, vendorId) {
   if (b.project_id != null && b.project_id !== '') { sql += ' AND b.project_id=?'; params.push(parseInt(b.project_id, 10)); }
   sql += ' ORDER BY b.id DESC LIMIT 200';
   const [rows] = await conn.execute(sql, params);
-  const list = rows.map((r) => Object.assign({}, r, { contact_phone: maskPhone(r.contact_phone) }));
+  const list = rows.map((r) => Object.assign({}, r, { contact_phone: maskPhone(r.contact_phone), price_total: Number(r.price_total) }));
   return reply(200, { code: 0, message: 'success', list, total: list.length });
 }
 
@@ -1322,8 +1322,10 @@ async function housingBookingsDetail(conn, body, vendorId) {
   const [p] = await conn.execute('SELECT name AS project_name FROM projects WHERE id=?', [row.project_id]);
   const out = Object.assign({}, row, {
     contact_phone: maskPhone(row.contact_phone),
+    price_total: Number(row.price_total),
     project_name: p.length ? p[0].project_name : null,
   });
+  delete out.payment_config_snapshot; // Internal funding contract is not merchant order detail.
   return reply(200, { code: 0, message: 'success', booking: out });
 }
 
