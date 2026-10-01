@@ -79,7 +79,7 @@ test('前端仅按服务端新尝试指令换请求键，并隔离收银台类�
 
 const socket = process.env.PAYMENT_TEST_SOCKET || process.env.CASHIER_TEST_SOCKET;
 test('隔离 MySQL：生活服务建单幂等、价格归属、支付、取消退款、档期守恒', { skip: !socket }, async t => {
-  assert.match(socket, /^\/tmp\/[\w-]*cashier[\w-]*\/[^/]+\.sock$/, '只接受显式隔离测试 socket');
+  assert.match(socket, /^\/tmp\/[\w-]*(?:cashier|settlement)[\w-]*\/[^/]+\.sock$/, '只接受显式隔离测试 socket');
   const mysql = require('mysql2/promise');
   const database = 'cashier_life_test_' + process.pid;
   const admin = await mysql.createConnection({ socketPath: socket, user: 'root' });

@@ -70,6 +70,8 @@
         {id:'promoter',label:'权益推广',href:'../juzhu-promoter.html',icon:'radio'},
         {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
         {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},
+        {id:'unified-settlement',label:'统一结算工作台',href:'settlement-admin.html',icon:'bank',perms:['settlement.fund.read','settlement.approval.act','settlement.policy.write','settlement.external.import','settlement.external.review']},
+        {id:'settlement-statements',label:'收款方对账单',href:'settlement-statements.html',icon:'file',perms:['settlement.statement.read']},
         {id:'demo-accounts',label:'演示账号',href:'commerce-demo-accounts.html',icon:'book'},
       ]}],
     },

@@ -6,7 +6,7 @@
 // 挂载：<aside id="commerce-nav" data-view="admin|merchant" data-active="模块key"></aside>
 // data-active 缺省回落 body[data-section]（工作台壳页都有）。登录后自动重渲染，
 // 也可手动 window.BZF_COMMERCE_NAV.refresh()。
-const V='20261002-4';
+const V='20261002-7';
 const MODULES={dashboard:'经营概览',merchants:'商户管理',stores:'门店管理',staff:'核销人员',skus:'券商品',rules:'报价与分配规则',packages:'券包配置',plans:'会员方案',inventory:'库存管理',capacity:'预约产能',orders:'订单管理',coupons:'卡券发放',memberships:'会员记录',appointments:'预约管理',redemptions:'核销记录',cases:'售后工单',audit:'操作审计',exchanges:'兑换码管理',stats:'运营统计',settlement:'结算账单',refunds:'退款执行',reconciliation:'对账中心'};
 const ICONS={
  home:'<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>',
@@ -50,14 +50,18 @@ const VIEW_MENUS={
   {name:'履约运营',items:[mod('inventory','list',READ_A),mod('capacity','target',READ_A),mod('orders','file',READ_A,'订单与发放'),mod('appointments','bell',READ_A),mod('redemptions','check',READ_A),mod('exchanges','coin',READ_A)]},
   {name:'客户与售后',items:[mod('coupons','wallet',READ_A),mod('memberships','star',READ_A),mod('cases','chat',READ_A)]},
   {name:'数据与审计',items:[mod('stats','pulse',READ_A),mod('audit','book',READ_A)]},
-  {name:'结算与对账',items:[mod('settlement','coin',FUND),mod('refunds','wallet',FUND),mod('reconciliation','check',FUND)]},
+  {name:'结算与对账',items:[mod('settlement','coin',FUND),mod('refunds','wallet',FUND),mod('reconciliation','check',FUND),{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
  ]},
  merchant:{title:'新居住 · 权益商户中心',sub:'MERCHANT',primary:'#0f766e',deep:'#0b5d56',groups:[
   {name:'业务入口',items:[...ENTRY.filter(e=>e.id!=='vouchers'),{id:'admin',label:'运营概览',icon:'chart',href:'commerce-admin.html',perms:READ_A},{id:'demo-accounts',label:'演示账号',icon:'book',href:'commerce-demo-accounts.html'}]},
   {name:'商户与门店',items:[mmod('dashboard','chart',READ_M),mmod('merchants','bank',READ_M),mmod('stores','home',READ_M),mmod('staff','user',READ_M)]},
   {name:'商品与产能',items:[mmod('skus','box',READ_M),mmod('inventory','list',READ_M),mmod('capacity','target',READ_M)]},
   {name:'履约',items:[mmod('orders','file',READ_M),mmod('appointments','bell',READ_M),mmod('redemptions','check',READ_M),mmod('coupons','wallet',READ_M,'卡券台账')]},
-  {name:'售后与结算',items:[mmod('cases','chat',READ_M),mmod('settlement','coin',READ_M,'应结与到账')]},
+  {name:'售后与结算',items:[mmod('cases','chat',READ_M),mmod('settlement','coin',READ_M,'应结与到账'),{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
+ ]},
+ settlement:{title:'新居住 · 统一结算中心',sub:'SETTLEMENT',primary:'#0f766e',deep:'#0b5d56',groups:[
+  {name:'结算与对账',items:[{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read','settlement.approval.act','settlement.policy.write','settlement.policy.review','settlement.external.import','settlement.external.review']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
+  {name:'业务入口',items:[{id:'commerce-admin',label:'权益运营中心',icon:'chart',href:'commerce-admin.html',perms:READ_A},{id:'commerce-merchant',label:'权益商户中心',icon:'home',href:'commerce-merchant.html',perms:READ_M},{id:'all-business',label:'全部业务入口',icon:'grid',href:'../overview.html'}]},
  ]},
 };
 const css=''
@@ -87,16 +91,17 @@ function injectOnce(){
 }
 function canShow(item){
  const perms=item.perms;if(!perms)return true;
- const C=window.COMMERCE;
+ const C=window.BZF_SETTLEMENT||window.COMMERCE;
  if(!C||!C.identity)return true; // 未登录/演示态全显
  return perms.some(p=>C.can(p));
 }
 function userBox(){
- const C=window.COMMERCE,me=C&&C.identity&&C.identity.account;
+ const C=window.BZF_SETTLEMENT||window.COMMERCE,me=C&&C.identity&&C.identity.account;
  if(!me)return '<div class="commerce-nav-user" style="cursor:default"><div class="commerce-nav-avatar">券</div><div class="commerce-nav-uinfo"><div class="commerce-nav-uname">权益业务中心</div><div class="commerce-nav-uorg">使用新居住账号与授权范围</div></div></div>';
  const name=me.display_name||me.login_name||('#'+(me.id||''));
  const org=(C.identity.roles||[]).map(r=>r.role_code||r).join('/')||me.principal_type||'';
- return '<div class="commerce-nav-user" data-cnv-logout="1" title="点击退出登录"><div class="commerce-nav-avatar">'+(name[0]||'?').toUpperCase()+'</div><div class="commerce-nav-uinfo"><div class="commerce-nav-uname">'+name+'</div><div class="commerce-nav-uorg">'+org+' · 退出 ↩</div></div></div>';
+ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ return '<div class="commerce-nav-user" data-cnv-logout="1" title="点击退出登录"><div class="commerce-nav-avatar">'+esc((name[0]||'?').toUpperCase())+'</div><div class="commerce-nav-uinfo"><div class="commerce-nav-uname">'+esc(name)+'</div><div class="commerce-nav-uorg">'+esc(org)+' · 退出 ↩</div></div></div>';
 }
 function render(el){
  const menu=VIEW_MENUS[el.dataset.view]||VIEW_MENUS.admin; // 未知 view 按 admin 兜底

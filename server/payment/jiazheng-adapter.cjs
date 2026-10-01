@@ -82,6 +82,9 @@ function createJiazhengAdapter({ createConnection, paymentCore, config = process
       const snapshot = { ...settings, merchantNo, productTitle: product.title, skuName: product.sku_name,
         categoryName: product.category_name, cityName: product.city_name, priceMinor: fee,
         cancelPolicy: 'before_dispatch_full_refund' };
+      const settlementProfile = await require('../settlement/business.cjs').captureProfile(conn, { biz_type: 'jiazheng', entity_id: product.vendor_id, payment_mode: 'pay_center' }, config);
+      if(settlementProfile&&settlementProfile.collection.source_merchant_no!==merchantNo)throw fail('商户收款配置与已批准的受控结算账户不一致');
+      if (settlementProfile) snapshot.settlement_profile = settlementProfile;
       const order = { id, account_id: String(account.id), product_id: product.id, vendor_id: product.vendor_id,
         city_id: product.city_id, sku_id: product.channel_sku_id, category_id: product.category_id, type: product.category_id,
         house: data.house, phone: data.phone, expect_time: data.expectTime, desc: data.desc, source: '新居住中台支付', fee, pay_status: 'unpaid', status: 'pending',
@@ -142,6 +145,7 @@ function createJiazhengAdapter({ createConnection, paymentCore, config = process
       await conn.execute(`UPDATE jz_orders SET pay_status='paid',pay_at=COALESCE(pay_at,?),pay_method='pay_center',
         slot_reserved=CASE WHEN slot_reserved=1 THEN 2 ELSE slot_reserved END,updated_at=? WHERE id=?`, [utc(), utc(), order.id]);
       order.pay_status = 'paid'; order.pay_at = order.pay_at || utc();
+      await require('../settlement/business.cjs').onPaymentAccepted(conn,{biz_type:'jiazheng',order,guard});
     } else if (event.event_type === 'order.closed') {
       if (order.pay_status === 'paid' || order.refund_status) return;
       await releaseSlot(conn, order);
@@ -149,7 +153,9 @@ function createJiazhengAdapter({ createConnection, paymentCore, config = process
       order.status = 'cancelled'; order.pay_status = 'closed';
     } else if (event.event_type === 'refund.succeeded') {
       if (String(payload.paymentId || '') !== String(guard.paid_payment_id || '') || !guard.paid_payment_id) return;
-      if (Number(payload.amountMinor) !== Number(order.fee)) throw fail('生活服务退款金额不一致');
+      const sharedRefund=await require('../settlement/business.cjs').onRefundSucceeded(conn,{biz_type:'jiazheng',order,payload});
+      if (!sharedRefund && Number(payload.amountMinor) !== Number(order.fee)) throw fail('生活服务退款金额不一致');
+      if(sharedRefund){const [[totals]]=await conn.execute("SELECT COALESCE(SUM(amount_minor),0) amount FROM payment_refunds WHERE payment_order_id=? AND refund_status='refunded'",[guard.paid_payment_id]);if(BigInt(totals.amount)<BigInt(order.fee)){await conn.execute("UPDATE jz_orders SET refund_status='partially_refunded',updated_at=? WHERE id=?",[utc(),order.id]);order.refund_status='partially_refunded';order.updated_at=utc();await projectOrder(conn,order);return;}}
       await releaseSlot(conn, order);
       await conn.execute("UPDATE jz_orders SET status='cancelled',pay_status='refunded',refund_status='refunded',updated_at=? WHERE id=?", [utc(), order.id]);
       order.status = 'cancelled'; order.pay_status = 'refunded'; order.refund_status = 'refunded';

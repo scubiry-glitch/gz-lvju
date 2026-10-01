@@ -15,7 +15,7 @@ const grOrders=require('../../gr_orders.cjs');
 const socketPath=process.env.PAYMENT_TEST_SOCKET;
 
 test('life service legacy request contracts preserve real payments and ownership', {skip:!socketPath,timeout:120000},async t=>{
-  assert.match(socketPath,/^\/tmp\/[\w-]*cashier[\w-]*\/[^/]+\.sock$/);
+  assert.match(socketPath,/^\/tmp\/[\w-]*(?:cashier|settlement)[\w-]*\/[^/]+\.sock$/);
   const database='cashier_life_legacy_'+process.pid+'_'+crypto.randomBytes(3).toString('hex');
   const options={socketPath,user:'root',timezone:'Z',dateStrings:true,supportBigNumbers:true,bigNumberStrings:true};
   const admin=await mysql.createConnection(options);await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');

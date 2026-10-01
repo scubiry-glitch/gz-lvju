@@ -17,9 +17,9 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     else await c.end();
   }
   async function tx(fn, existing) {
-    if (existing) return fn(existing);
+    if (existing) { if(typeof existing.query==='function')await existing.query("SET time_zone='+00:00'");return fn(existing); }
     const c = await createConnection();
-    try { await c.beginTransaction(); const result = await fn(c); await c.commit(); return result; }
+    try { if(typeof c.query==='function')await c.query("SET time_zone='+00:00'");await c.beginTransaction(); const result = await fn(c); await c.commit(); return result; }
     catch (e) { await c.rollback().catch(() => {}); throw e; }
     finally { await close(c); }
   }
@@ -74,6 +74,8 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     const g = await guard(c, { bizType: type, orderId: no });
     for (const key of ['account_id', 'amount_minor', 'payer_ucid', 'merchant_no', 'share_biz_code', 'app_code', 'project_code'])
       assert(String(g[key]) === String(snapshot[key]), '订单支付快照冲突，禁止更换金额或收款方', 409, 'payment_snapshot_conflict');
+    assert(digest(g.snapshot.settlement_profile || null) === digest(snapshot.snapshot.settlement_profile || null),
+      '订单受控收款合同快照冲突，不能给历史支付静默换合同',409,'payment_snapshot_conflict');
     // Only the registering transaction can import legacy attempts. No request may create a blank guard over an old payment.
     if (registered) {
       const previous = await rows(c, 'SELECT * FROM payment_orders WHERE biz_type=? AND biz_order_no=? ORDER BY id FOR UPDATE', [type, no]);
@@ -238,6 +240,7 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     }
     const [sum] = await rows(c, "SELECT COALESCE(SUM(amount_minor),0) reserved FROM payment_refunds WHERE payment_order_id=? AND refund_status<>'voided'", [p.id]);
     assert(Number(sum.reserved) + amount <= Number(p.amount_minor), '退款累计金额超过实付金额', 409, 'refund_limit');
+    await guardSharedRefund(c,g,p,input,amount,key);
     let insert;
     for (let i = 0; i < 5; i++) {
       try {
@@ -249,6 +252,44 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     }
     await enqueue(c, 'refund_create', insert.insertId, { sent: false });
     return (await rows(c, 'SELECT * FROM payment_refunds WHERE id=?', [insert.insertId]))[0];
+  }
+  async function guardSharedRefund(c,g,p,input,amount,key) {
+    // Legacy payment-only installations have no shared ledger. Once a receipt is
+    // admitted to shared settlement, every refund route uses the SAME source.
+    const [installed]=await rows(c,"SELECT 1 present FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='commerce_funding_sources'");
+    if(!installed){assert(!input.reference?.execution_order_id && !g.snapshot.settlement_profile,'共享退款模块尚未安装',409,'settlement_refund_invalid');return;}
+    const sources=await rows(c,'SELECT * FROM commerce_funding_sources WHERE payment_id=? ORDER BY id FOR UPDATE',[String(p.id)]);
+    if(!sources.length){assert(!input.reference?.execution_order_id,'执行退款没有原资金来源',409,'settlement_refund_invalid');assert(!g.snapshot.settlement_profile || String(g.paid_payment_id)!==String(p.id),'受控支付正在登记资金来源，请稍后退款',409,'settlement_source_pending');return;}
+    assert(sources.length===1,'同一支付重复登记资金来源，退款暂停核验',409,'settlement_source_conflict');
+    const source=sources[0];assert(['AVAILABLE','CONFIRMED'].includes(String(source.status).toUpperCase()),'原资金来源已冻结',409,'settlement_source_frozen');
+    const hasExecution=(await rows(c,"SELECT 1 present FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='commerce_execution_refund_plans'"))[0];
+    if(hasExecution) {
+      const [registered]=await rows(c,'SELECT order_id FROM commerce_execution_refund_plans WHERE request_key=?',[key]);
+      assert(!registered || String(input.reference?.execution_order_id)===registered.order_id,'共享退款请求号只能由对应批准的执行计划使用',409,'settlement_refund_invalid');
+    }
+    let approvedAllowance=0n;
+    if(input.reference?.execution_order_id) {
+      assert(hasExecution,'共享逆向执行模块尚未安装',409,'settlement_refund_invalid');
+      const [approved]=await rows(c,`SELECT o.*,r.request_key,r.amount_minor refund_amount,r.source_reserved,r.refund_input
+       FROM commerce_execution_orders o JOIN commerce_execution_refund_plans r ON r.order_id=o.id WHERE o.id=? FOR UPDATE`,[input.reference.execution_order_id]);
+      assert(approved && approved.operation==='REFUND' && approved.status==='SUBMITTING' && approved.approved_by && approved.approved_by!==approved.created_by && Number(approved.source_reserved)===1 && approved.source_id===source.id && approved.context_id===input.reference.context_id && approved.request_key===key && BigInt(approved.refund_amount)===BigInt(amount),'执行退款必须精确对应已双人批准、已预占的原支付退款计划',409,'settlement_refund_invalid');
+      const frozen=parse(approved.refund_input);
+      assert(String(frozen.paymentId)===String(p.id) && frozen.requestKey===key && Number(frozen.amountMinor)===amount && BigInt(source.reserved_minor)>=BigInt(amount),'执行退款预占或请求快照不匹配',409,'settlement_refund_invalid');
+      approvedAllowance=BigInt(amount);
+    }
+    const refunds=await rows(c,"SELECT * FROM payment_refunds WHERE payment_order_id=? AND refund_status<>'voided' ORDER BY id",[p.id]);
+    const [hasUnits]=await rows(c,"SELECT 1 present FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='commerce_settlement_units'");
+    if(hasUnits){const units=await rows(c,"SELECT calculation FROM commerce_settlement_units WHERE source_id=? AND status='CONFIRMED' ORDER BY id FOR UPDATE",[source.id]);const committed=units.reduce((sum,u)=>{const value=parse(u.calculation);return sum+BigInt(value.merchant_minor)+BigInt(value.commission_minor);},0n), priorRefunds=refunds.reduce((sum,r)=>sum+BigInt(r.amount_minor),0n);assert(BigInt(source.received_minor)-committed-priorRefunds>=BigInt(amount),'已确认履约义务尚未撤销，不可占用该款给消费者退款',409,'settlement_refund_obligation_active');}
+    let successful=0n,inFlightSuccess=0n,unreservedPending=0n;
+    for(const refund of refunds) {
+      const [execution]=hasExecution?await rows(c,'SELECT r.source_reserved,o.status FROM commerce_execution_refund_plans r JOIN commerce_execution_orders o ON o.id=r.order_id WHERE r.request_key=? AND o.source_id=?',[refund.idempotency_key,source.id]):[];
+      const reserved=execution && Number(execution.source_reserved)===1 && !['SUCCEEDED','FAILED_FINAL','CANCELLED'].includes(execution.status);
+      if(refund.refund_status==='refunded'){successful+=BigInt(refund.amount_minor);if(reserved)inFlightSuccess+=BigInt(refund.amount_minor);}
+      else if(!reserved)unreservedPending+=BigInt(refund.amount_minor);
+    }
+    const notReflected=successful-BigInt(source.returned_minor)-inFlightSuccess;
+    const available=BigInt(source.received_minor)-BigInt(source.consumed_minor)-BigInt(source.reserved_minor)-BigInt(source.returned_minor)-(notReflected>0n?notReflected:0n)-unreservedPending+approvedAllowance;
+    assert(available>=BigInt(amount),'原支付可退资金已用于分账或被预占，请先回退或批准自有资金垫付',409,'settlement_refund_funds_unavailable');
   }
   async function requestRefund(input, existing) {
     return tx(async c => {

@@ -64,8 +64,12 @@ test('unmarked historic mini-program orders remain external without consulting a
 });
 
 test('the old signed vendor callback keeps code/message, fee units and lailai_oid alias', async () => {
-  let order = { ...legacyExternal }, updates = 0;
-  const conn = { execute: async (sql, values) => {
+  let order = { ...legacyExternal }, updates = 0, transaction = null, commits = 0;
+  const conn = {
+    beginTransaction:async()=>{assert.equal(transaction,null);transaction={...order};},
+    commit:async()=>{assert.ok(transaction);transaction=null;commits++;},
+    rollback:async()=>{if(transaction)order=transaction;transaction=null;},
+    execute: async (sql, values) => {
     if (sql.startsWith('SELECT status, review_status')) return [[{ status: 'active', review_status: 'approved' }]];
     if (sql.startsWith('SELECT * FROM gr_orders')) return [[order]];
     if (/UPDATE gr_orders/.test(sql)) {
@@ -79,7 +83,7 @@ test('the old signed vendor callback keeps code/message, fee units and lailai_oi
   const body = hmac.generateSignature(key, { vendor_id: 41, order_ref: order.order_ref, lailai_oid: 'old-provider-order', status: 'paid', fee: 12900 });
   const vendors = { 41: { key } };
   assert.deepEqual(await vendorApi.handleRequest('/api/juzhu/callback', body, conn, vendors), { status: 200, data: { code: 0, message: 'success' } });
-  assert.equal(order.vendor_oid, 'old-provider-order'); assert.equal(updates, 1);
+  assert.equal(order.vendor_oid, 'old-provider-order'); assert.equal(updates, 1);assert.equal(commits,1);assert.equal(transaction,null);
   order.payment_mode = 'pay_center';
   assert.equal((await vendorApi.handleRequest('/api/juzhu/callback', body, conn, vendors)).status, 403);
   order.payment_mode = null; order.vendor_id = 42;

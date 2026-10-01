@@ -154,7 +154,7 @@ function confirmLines(r){
  const lines=[{side:'debit',account:'unredeemed_liability',amount:Number(r.allocation_minor)},
   {side:'credit',account:'merchant_payable:'+Number(r.merchant_id),amount:Number(r.supplier_minor)}];
  if(Number(r.channel_minor)>0)lines.push({side:'credit',account:'channel_commission:'+Number(r.source_account_id||0),amount:Number(r.channel_minor)});
- lines.push({side:'credit',account:'platform_retained',amount:Number(r.retained_minor)});
+ if(Number(r.retained_minor)>0)lines.push({side:'credit',account:'platform_retained',amount:Number(r.retained_minor)});
  return lines;
 }
 const reverseLines=r=>confirmLines(r).map(l=>({side:l.side==='debit'?'credit':'debit',account:l.account,amount:l.amount}));
@@ -533,6 +533,8 @@ async function reviewReversal(service,p,key,input){
  });
 }
 async function applyReversal(c,service,p,reversal,note){
+ const shared=await require('../server/settlement/reversal.cjs').applySharedReversal(c,{service,principal:p,reversal,note});
+ if(shared)return shared;
  const [rows]=await c.execute(`SELECT r.*,cc.id coupon_id,cc.status coupon_status,cc.snapshot coupon_snapshot,cc.order_id,
   COALESCE(o.source_account_id,0) source_account_id FROM commerce_redemptions r
   JOIN commerce_coupons cc ON cc.id=r.coupon_id LEFT JOIN commerce_orders o ON o.id=cc.order_id WHERE r.id=? FOR UPDATE`,[reversal.redemption_id]);
@@ -929,7 +931,10 @@ async function operationalAlerts(service){
  return {checked_at:new Date().toISOString(),total:rules.length,triggered_count:triggered.length,critical:triggered.some(r=>r.severity==='critical'),rules};
 }
 
-module.exports={migrate,post,confirmLines,reverseLines,generateBatches,batchAction,batchView,listBatches,ingestReceipt,queryInstrument,retryInstrument,listInstructions,
+// The legacy entry remains the sole commerce facade. Shared recognitions use
+// the unified ledger and do not post a second legacy confirmation.
+async function confirmSharedRedemption(c,input){return require('../server/settlement/business.cjs').onRedemption(c,input);}
+module.exports={migrate,post,confirmLines,reverseLines,confirmSharedRedemption,generateBatches,batchAction,batchView,listBatches,ingestReceipt,queryInstrument,retryInstrument,listInstructions,
  createRefundOrder,refundAction,requestReversal,reviewReversal,listReversals,recover,writeOffRecovery,listRecoveries,
  createCompensation,reviewCompensation,listCompensations,
  runReconciliation,reconDetail,listRecons,diffAction,verifyInvariants,overview,merchantSettlement,promoterSettlement,listRefundOrders,

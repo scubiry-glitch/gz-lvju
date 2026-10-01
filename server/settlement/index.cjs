@@ -1,0 +1,69 @@
+'use strict';
+const {rows,parse,assert}=require('./primitives.cjs');
+const {createAuthorizer,systemPrincipal}=require('./access.cjs');
+async function migrate(pool){
+ await require('../../commerce/migrate.cjs').migrate(pool);
+ const c=await pool.getConnection();try{
+  const [[lock]]=await c.query("SELECT GET_LOCK(CONCAT(DATABASE(),':shared_settlement'),30) acquired");assert(lock.acquired,'结算迁移锁不可用',503);
+  await require('../payment/migrate.cjs').migrate(c);
+  await require('./schema.cjs').migrate(c);
+  await require('./execution-schema.cjs').migrate(c);
+  await require('./statement-schema.cjs').migrate(c);
+  await require('./own-funds.cjs').migrate(c);
+  await require('./reversal.cjs').migrate(c);
+ }finally{await c.query("SELECT RELEASE_LOCK(CONCAT(DATABASE(),':shared_settlement'))").catch(()=>{});c.release();}
+}
+function createSettlement({pool,auth,paymentCore,payCenter,config=process.env,now=Date.now,authorize:override}) {
+ require('./primitives.cjs').configurePool(pool);
+ const authorize=override||createAuthorizer({pool});
+ const workflow=require('./workflow.cjs').createWorkflow({pool,authorize,config,now});
+ const configuration=require('./configuration.cjs').createConfiguration({pool,workflow,authorize});
+ let providerContracts=config.provider_contracts||{};if(config.SETTLEMENT_PROVIDER_CONTRACTS)try{providerContracts=JSON.parse(config.SETTLEMENT_PROVIDER_CONTRACTS);}catch{providerContracts={};}
+ const executionConfig={...config,provider_contracts:providerContracts,execution_enabled:config.execution_enabled===true||(config.SETTLEMENT_ENABLED==='1'&&config.SETTLEMENT_WORKER_ENABLED==='1')};
+ const execution=require('./execution.cjs').createExecution({pool,authorize,config:executionConfig,now,paymentCore,payCenter});
+ const statements=require('./statements.cjs').createStatements({pool,authorize,now,config:{...config,resolvePrincipal:async aid=>{const p=await auth.getAccountWithRoles(aid);return p?{type:'account',...p}:null;}}});
+ const business=require('./business.cjs').createBusiness({pool,authorize,configuration,workflow,config});
+ const ownFunds=require('./own-funds.cjs').createOwnFunds({pool,workflow,authorize});
+ const reversals=require('./reversal.cjs').createReversals({pool,authorize});
+ async function me(p){const permissions=[...new Set((p.roles||[]).flatMap(r=>r.permissions||[]))],all=(p.roles||[]).some(r=>(r.scope?.level==='all')&&(r.permissions||[]).some(x=>x==='*'||x==='settlement.policy.write'));
+  const candidates=await rows(pool,"SELECT party_id FROM commerce_settlement_party_bindings WHERE status='approved' UNION SELECT party_id FROM commerce_payment_accounts WHERE status='approved' UNION SELECT party_id FROM commerce_settlement_business_contexts UNION SELECT party_id FROM commerce_payee_statement_policies"),parties=[];
+  candidates.push({party_id:'account:'+p.account.id});
+  const permissionsForDirectory=['settlement.statement.read','settlement.fund.read','settlement.fund.write','settlement.policy.write','settlement.policy.review','settlement.external.read','settlement.external.submit','settlement.external.import'];
+  for(const row of candidates){let visible=false;for(const biz of ['commerce','jiazheng'])for(const payment_mode of ['pay_center','wechat_mini'])for(const permission of permissionsForDirectory){if(visible)break;try{await authorize(p,permission,{party_id:row.party_id,biz_type:biz,payment_mode});visible=true;}catch(e){if(e.status!==403)throw e;}}if(visible&&!parties.some(x=>x.id===row.party_id))parties.push({id:row.party_id,name:row.party_id});}
+  return {account:{id:p.account.id,display_name:p.account.display_name},permissions,parties,can_manage_parties:all,scope:auth?.scopeOf?auth.scopeOf(p):null};
+ }
+ async function acceptanceStatus(p,input){const [o]=await rows(pool,'SELECT * FROM jz_orders WHERE id=? AND account_id=?',[input.id,String(p.account.id)]);assert(o,'服务订单不存在',404);const snapshot=parse(o.payment_config_snapshot),profile=snapshot.settlement_profile;
+  const records=await rows(pool,'SELECT * FROM commerce_settlement_fulfillment WHERE order_no=? AND account_id=?',[o.id,String(p.account.id)]);const confirmed=records.some(x=>x.event_kind==='CUSTOMER_ACCEPTANCE');const eligible=!confirmed&&!o.refund_status&&o.payment_mode==='pay_center'&&o.pay_status==='paid'&&['done','rated'].includes(o.status)&&profile?.recognition_policy?.mode==='CUSTOMER_ACCEPTANCE';
+  return {id:o.id,eligible,confirmed,reason:confirmed?'已确认服务完成':eligible?'服务已完成，请确认验收':!profile?'当前订单沿用原结算规则':'服务尚未达到确认条件'};
+ }
+ async function fundingSources(p,input){const list=await rows(pool,'SELECT s.*,c.party_id,c.biz_type,c.payment_mode FROM commerce_funding_sources s JOIN commerce_settlement_business_contexts c ON c.id=s.context_id ORDER BY s.created_at DESC LIMIT 500'),out=[];for(const r of list){try{await authorize(p,'settlement.fund.read',r);if(!input.source_type||r.source_type===input.source_type)out.push(r);}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
+ async function executionOrders(p,input){const args=[],clauses=[];if(input.item_id){clauses.push('l.item_id=?');args.push(input.item_id);}const list=await rows(pool,`SELECT DISTINCT o.* FROM commerce_execution_orders o JOIN commerce_execution_lines l ON l.order_id=o.id${clauses.length?' WHERE '+clauses.join(' AND '):''} ORDER BY o.created_at DESC LIMIT 200`,args),out=[];for(const o of list){try{const ctx=await workflow.context(pool,o.context_id);await authorize(p,'settlement.fund.read',ctx);out.push(o);}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
+ let busy=false,lastReportScan=0;
+ async function maintenance(){if(busy)return;busy=true;const results={errors:[]};const attempt=async(label,fn)=>{try{return await fn();}catch(e){results.errors.push({operation:label,code:e.code||'settlement_error'});return null;}};try{
+  await attempt('exports',()=>statements.runExports(systemPrincipal,{limit:10}));
+  if(now()-lastReportScan>=60000){
+   const bindings=await rows(pool,"SELECT party_id,source_entity_id vendor_id FROM commerce_settlement_party_bindings WHERE source_domain='jiazheng' AND source_entity_type='vendor' AND status='approved'");
+   for(const binding of bindings){let after_id='0';for(let page=0;page<100;page++){const result=await attempt('external.sync',()=>statements.syncExternalOrders(systemPrincipal,{party_id:binding.party_id,vendor_id:binding.vendor_id,after_id,limit:500}));if(!result?.has_more)break;after_id=result.next_after_id;}}
+   const payees=await rows(pool,'SELECT DISTINCT i.beneficiary_party_id party_id,c.biz_type,c.currency FROM commerce_settlement_items i JOIN commerce_settlement_business_contexts c ON c.id=i.context_id WHERE i.beneficiary_party_id IS NOT NULL UNION SELECT r.creditor_party_id,c.biz_type,r.currency FROM commerce_compensation_recoveries r JOIN commerce_settlement_business_contexts c ON c.id=r.context_id UNION SELECT r.debtor_party_id,c.biz_type,r.currency FROM commerce_compensation_recoveries r JOIN commerce_settlement_business_contexts c ON c.id=r.context_id');
+   for(const payee of payees)await attempt('statement.policy',()=>statements.setStatementPolicy(systemPrincipal,{party_id:payee.party_id,biz_types:[payee.biz_type],payment_modes:['pay_center'],currency:payee.currency}));
+   const externalParties=await rows(pool,"SELECT DISTINCT o.creditor_party_id party_id,o.currency FROM commerce_external_obligations o JOIN commerce_external_obligation_events e ON e.obligation_id=o.id WHERE e.status='POSTED' UNION SELECT DISTINCT o.debtor_party_id party_id,o.currency FROM commerce_external_obligations o JOIN commerce_external_obligation_events e ON e.obligation_id=o.id WHERE e.status='POSTED'");
+   for(const payee of externalParties)await attempt('external.statement.policy',()=>statements.setStatementPolicy(systemPrincipal,{party_id:payee.party_id,biz_types:['jiazheng'],payment_modes:['wechat_mini'],currency:payee.currency}));
+   lastReportScan=now();
+  }
+  await attempt('statements',()=>statements.runScheduled(systemPrincipal,{}));
+  await attempt('execution.jobs',()=>execution.runJobs({limit:30}));
+  await attempt('compensation.recoveries',()=>ownFunds.syncRecoveries());
+  if(config.SETTLEMENT_ENABLED!=='1'||config.SETTLEMENT_WORKER_ENABLED!=='1')return results;
+  const items=await rows(pool,"SELECT i.id,i.revision FROM commerce_settlement_items i JOIN commerce_payment_accounts a ON a.id=i.account_id AND a.status='approved' WHERE i.context_id IS NOT NULL AND i.status='DRAFT' AND (i.line_kind<>'promoter' OR i.component_key LIKE 'supplement:%' OR EXISTS (SELECT 1 FROM commerce_commission_funding_lots l JOIN commerce_funding_sources s ON s.id=l.source_id WHERE l.context_id=i.context_id AND l.unit_id=i.unit_id AND l.status='AVAILABLE' AND s.status='AVAILABLE' AND s.received_minor-s.reserved_minor-s.consumed_minor-s.returned_minor>=i.planned_minor)) ORDER BY i.id LIMIT 50");
+  for(const i of items)await attempt('auto.authorize:'+i.id,()=>workflow.authorizeItem(systemPrincipal,{id:i.id,expected_revision:Number(i.revision),request_key:'auto-evaluate:'+i.id+':'+i.revision}));
+  const ready=await rows(pool,"SELECT i.id,i.revision,i.source_id,i.authorization_id,JSON_EXTRACT(c.snapshot,'$.settlement_profile.implicit_merchant_release') implicit_release FROM commerce_settlement_items i JOIN commerce_settlement_business_contexts c ON c.id=i.context_id WHERE i.status='AUTHORIZED' AND (i.not_before_at IS NULL OR i.not_before_at<=UTC_TIMESTAMP()) ORDER BY i.source_id,i.id LIMIT 500");
+  const groups=new Map();for(const i of ready){if(!groups.has(i.source_id))groups.set(i.source_id,[]);groups.get(i.source_id).push(i);}
+  for(const group of groups.values()){
+   const chunks=[];if(group[0].implicit_release===true||group[0].implicit_release==='true')chunks.push(group);else for(let n=0;n<group.length;n+=100)chunks.push(group.slice(n,n+100));
+   for(const chunk of chunks)await attempt('auto.plan',()=>execution.createPlan(systemPrincipal,{item_ids:chunk.map(i=>String(i.id)),request_key:'auto-execute:'+require('./primitives.cjs').hash(chunk.map(i=>({id:String(i.id),revision:i.revision,authorization_id:i.authorization_id})))}));
+  }
+  return results;
+ }finally{busy=false;}}
+ return {pool,authorize,workflow,configuration,execution,statements,business,ownFunds,reversals,me,acceptanceStatus,fundingSources,executionOrders,maintenance};
+}
+module.exports={migrate,createSettlement};

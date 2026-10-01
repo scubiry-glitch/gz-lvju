@@ -18,13 +18,19 @@
     "build:apk": "bash scripts/build-apk.sh",
     "commerce:m1a": "node commerce/app.cjs",
     "commerce:migrate": "node commerce/migrate.cjs",
+    "settlement:migrate": "node scripts/settlement/manage.cjs migrate",
+    "settlement:worker": "node scripts/settlement/manage.cjs worker-once",
+    "settlement:verify": "node scripts/settlement/manage.cjs verify",
+    "settlement:test": "node scripts/settlement/test.cjs",
     "commerce:m1a:test": "node scripts/commerce/m1a-test.cjs --browser",
     "commerce:init": "node scripts/commerce/initialize-topics.cjs"
   },
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
     "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
     "mysql2": "^3.23.3",
+    "pdfkit": "^0.20.2",
     "sharp": "^0.35.4"
   },
   "devDependencies": {

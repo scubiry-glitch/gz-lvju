@@ -325,6 +325,13 @@ async function handleCallback(conn, body, vendorId) {
   const original = await grOrders.getOrderByRef(conn, parsed.orderRef);
   if (!original || String(original.vendor_id) !== String(vendorId)) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
   if (!require('./server/payment/vendor-payment.cjs').isExternalOrder(original)) return reply(403, { code: 403, message: '该订单不接受商家资金或状态回调' });
+  const externalEvidence=require('./server/settlement/external.cjs');
+  const captureExternal=original.biz_type==='jiazheng'&&original.payment_mode==='wechat_mini';
+  // This minimal durable inbox works before the shared settlement migration or
+  // party approval. DDL stays outside the order transaction (MySQL auto-commit).
+  if(captureExternal)await externalEvidence.ensureCallbackInbox(conn);
+  await conn.beginTransaction();
+  try {
   let order;
   if (parsed.status === 'paid') order = await grOrders.getOrderByRef(conn, parsed.orderRef);
   else order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
@@ -338,7 +345,7 @@ async function handleCallback(conn, body, vendorId) {
       order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
     }
   }
-  if (!order) return reply(404, { code: 404, message: '订单不存在' });
+  if (!order) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在' }); }
   await grOrders.updateOrderCallback(conn, {
     order_ref: parsed.orderRef,
     vendor_oid: parsed.vendorOid,
@@ -350,7 +357,10 @@ async function handleCallback(conn, body, vendorId) {
     cancel_reason: parsed.cancelReason,
     vendor_id: vendorId,
   });
+  if(captureExternal)await externalEvidence.recordVerifiedVendorCallback(conn,{order:original,body,vendorId});
+  await conn.commit();
   return reply(200, { code: 0, message: 'success' });
+  } catch(error) { await conn.rollback(); throw error; }
 }
 
 const VENDOR_ROUTES = {

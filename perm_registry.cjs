@@ -21,6 +21,12 @@
 
 const PERMS = [
   ...[
+    ['settlement.fund.read','统一结算查看'],['settlement.fund.write','统一结算执行'],['settlement.fund.review','统一资金复核'],['settlement.fund.adjust','单笔结算调整'],
+    ['settlement.policy.write','结算规则配置'],['settlement.policy.review','结算规则与账户准入复核'],['settlement.approval.act','结算节点审批'],
+    ['settlement.statement.read','本主体对账单查看'],['settlement.statement.export','本主体对账单下载'],['settlement.statement.generate','对账单生成'],['settlement.statement.confirm','本主体账单确认'],['settlement.statement.dispute','账单异议提交'],['settlement.statement.review','账单异议处理'],
+    ['settlement.external.read','外部交易核验查看'],['settlement.external.write','外部交易资料提交与导入'],['settlement.external.submit','本主体外部资料提交'],['settlement.external.import','外部账单导入'],['settlement.external.review','外部交易独立核验'],['settlement.external.link','外部交易关联'],['settlement.accrual.adjust','合同应计调整'],
+  ].map(([code,name])=>({code,name,domain:'settlement',action:code.split('.').pop(),desc:name,roles:[]})),
+  ...[
     ['commerce.admin.read','权益运营数据查看'], ['commerce.admin.write','权益配置与履约管理'],
     ['commerce.admin.review','权益双人复核'], ['commerce.merchant.read','本商户权益数据查看'],
     ['commerce.merchant.write','本商户权益配置提审'], ['commerce.merchant.redeem','指定门店权益核销'],
@@ -79,6 +85,39 @@ const PERMS = [
  * guard = 特殊闸（app.js 内实现），exempt = 完全免闸。
  */
 const ROUTES = [
+  // Shared settlement HTTP handler also validates the actual database context;
+  // these entries are the permission catalog, not a substitute for row scope.
+  ...[
+    ['GET','/admin/(items(?:/[0-9]+)?|accounts|funding-sources|own-fund-sources|compensations|compensation-recoveries|recoveries|execution-plans(?:/[a-f0-9-]{36})?|execution-orders|invariants|policies|configuration/(?:accounts|profiles|bindings))','settlement.fund.read'],
+    ['POST','/admin/items/[0-9]+/adjustments(?:/preview)?','settlement.fund.adjust'],
+    ['POST','/admin/items/[0-9]+/authorize','settlement.fund.write'],
+    ['POST','/admin/(?:execution-plans|return-plans|refund-plans|returned-funds|own-fund-sources|compensations)','settlement.fund.write'],
+    ['POST','/admin/execution-plans/[a-f0-9-]{36}/cancel','settlement.fund.write'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/query','settlement.fund.read'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/retry','settlement.fund.write'],
+    ['POST','/admin/(?:returned-funds|own-fund-sources|compensations)/[a-f0-9-]{36}/approve','settlement.fund.review'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/approve-reverse','settlement.fund.review'],
+    ['POST','/admin/(?:policies|configuration/(?:accounts|profiles|bindings))','settlement.policy.write'],
+    ['POST','/admin/policies/[a-f0-9-]{36}/publish','settlement.policy.review'],
+    ['POST','/admin/policies/[a-f0-9-]{36}/disable','settlement.policy.write'],
+    ['POST','/admin/configuration/(?:accounts|profiles|bindings)/[a-f0-9-]{36}/approve','settlement.policy.review'],
+    ['GET','/admin/approval-tasks','settlement.approval.act'],
+    ['POST','/admin/approval-tasks/[a-f0-9-]{36}/actions','settlement.approval.act'],
+    ['POST','/admin/(?:settlement-statements/generate|statement-policies)','settlement.statement.generate'],
+    ['GET','/me/settlement-statements(?:/[a-f0-9-]{36}(?:/disputes)?)?','settlement.statement.read'],
+    ['GET','/me/statement-exports/[a-f0-9-]{36}(?:/download)?','settlement.statement.export'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/exports','settlement.statement.export'],
+    ['POST','/me/statement-exports/[a-f0-9-]{36}/retry','settlement.statement.export'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/confirmations','settlement.statement.confirm'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/disputes','settlement.statement.dispute'],
+    ['POST','/admin/statement-disputes/[a-f0-9-]{36}/resolve','settlement.statement.review'],
+    ['GET','/admin/external-(?:evidence|facts)','settlement.external.read'],
+    ['POST','/me/external-(?:evidence|coverage)-submissions','settlement.external.submit'],
+    ['POST','/admin/(?:external-orders/sync|external-evidence|external-imports)','settlement.external.import'],
+    ['POST','/admin/external-(?:evidence|imports|coverage|accruals)/[a-f0-9-]{36}/reviews','settlement.external.review'],
+    ['POST','/admin/external-allocations','settlement.external.link'],
+    ['POST','/admin/external-(?:accruals|accrual-adjustments|settlements)','settlement.accrual.adjust'],
+  ].map(([method,re,perm])=>({method,re:'^/api/settlement/v1'+re+'$',perm,act:method==='POST'?perm:null,res:'settlement'})),
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.write',act:'commerce.code.issue',res:'commerce'},
   {method:'GET',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.read',act:null,res:'commerce'},
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes/([0-9a-f-]{36})/disable$',perm:'commerce.admin.write',act:'commerce.code.disable',res:'commerce',idGroup:1},

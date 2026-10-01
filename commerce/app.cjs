@@ -7,19 +7,22 @@ const FUND_READ='commerce.fund.read',FUND_WRITE='commerce.fund.write',FUND_REVIE
 // settings KV 与主系统共表（app.js ensureSchema 建表）；表缺失（隔离测试库）时回落空串=功能开放缺省。
 async function settingValue(pool,key){try{const [rows]=await pool.execute('SELECT value FROM settings WHERE `key`=? LIMIT 1',[key]);return rows.length?String(rows[0].value??''):'';}catch{return '';}}
 const prefix='/api/commerce/v1';
-function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=process.env.JUZHU_ENV==='test',paymentCore,paymentConfig=process.env,sharedDatabaseVerified=false}){
+function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=process.env.JUZHU_ENV==='test',paymentCore,paymentConfig=process.env,payCenter=require('../server/thirdApi/payCenter.cjs').payCenter,sharedDatabaseVerified=false}){
  const service=new Service(pool,auth);
  const paymentAdapter=require('./payment-adapter.cjs');
- if(paymentCore===undefined&&fs.existsSync(path.resolve(__dirname,'../server/payment/core.cjs')))paymentCore=require('../server/payment/core.cjs').createPaymentCore({createConnection:paymentAdapter.pooledConnection(pool),config:paymentConfig});
+ if(paymentCore===undefined&&fs.existsSync(path.resolve(__dirname,'../server/payment/core.cjs')))paymentCore=require('../server/payment/core.cjs').createPaymentCore({createConnection:paymentAdapter.pooledConnection(pool),config:paymentConfig,payCenter});
  service.payments=paymentAdapter.createPaymentAdapter({service,core:paymentCore,config:paymentConfig,sharedDatabaseVerified});
+ const sharedSettlement=require('../server/settlement/index.cjs').createSettlement({pool,auth,paymentCore,payCenter,config:paymentConfig});
+ const sharedSettlementHandler=require('../server/settlement/http.cjs').createHandler({service:sharedSettlement,auth,publicOrigin});
  const server=http.createServer(async(req,res)=>{
   const reply=(status,data,error,code)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(error===undefined?{data}:{...(code?{code}:{}),error}));};
   let principal=null,method=req.method,pathname='';
   try{
    const url=new URL(req.url,'http://localhost');pathname=url.pathname;
+   if(pathname.startsWith('/api/settlement/v1/'))return sharedSettlementHandler(req,res);
    if(!pathname.startsWith(prefix+'/')){
     if(staticFiles&&req.method==='GET'){
-     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:commerce-[a-z-]+\.html|_commerce[a-z0-9-]*\.(?:js|css)|_cashier\.js|_beike-login\.js|_console-login\.js|_qr\.js|_nav\.js))$/;
+     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:(?:commerce|settlement)-[a-z-]+\.html|_settlement[a-z-]*\.(?:js|css)|_commerce[a-z0-9-]*\.(?:js|css)|_cashier\.js|_beike-login\.js|_console-login\.js|_qr\.js|_nav\.js))$/;
      if(valid.test(pathname)){const file=path.resolve(__dirname,'..','.'+pathname);if(fs.existsSync(file)){res.writeHead(200,{'Content-Type':pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.webp')?'image/webp':'text/javascript'});res.end(fs.readFileSync(file));return;}}
     }
     throw new Fault(404,'接口不存在');
@@ -166,7 +169,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    reply(e.status||500,null,e.status?e.message:'服务暂时不可用，请稍后重试',e.status?e.code:undefined);
   }
  });
- server.requestTimeout=15000;server.headersTimeout=10000;server.service=service;return server;
+ server.requestTimeout=15000;server.headersTimeout=10000;server.service=service;server.sharedSettlement=sharedSettlement;return server;
 }
 module.exports={createServer};
-if(require.main===module){const {createPool,initAuth}=require('./db.cjs'),{migrate}=require('./migrate.cjs');const pool=createPool();migrate(pool).then(()=>{const server=createServer({pool,auth:initAuth(pool),publicOrigin:process.env.COMMERCE_PUBLIC_ORIGIN||''});server.listen(Number(process.env.COMMERCE_PORT||38780),'127.0.0.1',()=>console.log('Commerce API ready; payment availability follows configured admission'));let consuming=false;const paymentTask=setInterval(async()=>{if(consuming)return;consuming=true;try{await server.service.payments.consume();await server.service.payments.queueExpiryRefunds();}catch(e){console.error('Commerce payment recovery failed:',e.code||e.name);}finally{consuming=false;}},1500);paymentTask.unref();const task=setInterval(()=>server.service.expire().catch(e=>console.error('Commerce expiry failed:',e.code||e.name)),30000);task.unref();const stop=()=>{clearInterval(task);clearInterval(paymentTask);server.close(()=>pool.end().then(()=>process.exit(0)));};process.on('SIGTERM',stop);process.on('SIGINT',stop);}).catch(e=>{console.error('Commerce startup failed:',e.code||e.message);pool.end();process.exitCode=1;});}
+if(require.main===module){const {createPool,initAuth}=require('./db.cjs'),{migrate}=require('./migrate.cjs');const pool=createPool();migrate(pool).then(()=>{const server=createServer({pool,auth:initAuth(pool),publicOrigin:process.env.COMMERCE_PUBLIC_ORIGIN||''});server.listen(Number(process.env.COMMERCE_PORT||38780),'127.0.0.1',()=>console.log('Commerce API ready; payment availability follows configured admission'));let consuming=false;const paymentTask=setInterval(async()=>{if(consuming)return;consuming=true;try{await server.service.payments.consume();await server.service.payments.queueExpiryRefunds();if(process.env.SETTLEMENT_REPORTS_ENABLED==='1'||process.env.SETTLEMENT_WORKER_ENABLED==='1'){const result=await server.sharedSettlement.maintenance();for(const error of result?.errors||[])console.error('Shared settlement recovery:',error.operation,error.code);}}catch(e){console.error('Commerce payment recovery failed:',e.code||e.name);}finally{consuming=false;}},1500);paymentTask.unref();const task=setInterval(()=>server.service.expire().catch(e=>console.error('Commerce expiry failed:',e.code||e.name)),30000);task.unref();const stop=()=>{clearInterval(task);clearInterval(paymentTask);server.close(()=>pool.end().then(()=>process.exit(0)));};process.on('SIGTERM',stop);process.on('SIGINT',stop);}).catch(e=>{console.error('Commerce startup failed:',e.code||e.message);pool.end();process.exitCode=1;});}

@@ -83,12 +83,15 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
     actor(p);
     return service.reserveOrder(p, input, key, { live: true, register: async (c, order) => {
       const snapshot = { ...order.snapshot, payment: { collection_mode: policy.collectionMode, config_version: policy.configVersion } };
+      const settlementProfiles = await require('../server/settlement/business.cjs').captureCommerceProfiles(c, order, config);
+      if(settlementProfiles)assert(Object.values(settlementProfiles)[0].collection.source_merchant_no===policy.merchantNo,'收银台收款配置与结算协议不一致',409);
+      if (settlementProfiles) snapshot.settlement_profiles = settlementProfiles;
       await core.registerOrder(c, {
         bizType: 'commerce', orderId: order.id, accountId: p.account.id, amountMinor: order.amount_minor,
         merchantNo: policy.merchantNo, payerUcid: p.account.idp_subject, payerUserType: '2',
         appCode: policy.appCode, projectCode: policy.projectCode, shareBizCode: policy.shareBizCode,
         callbackUrl: policy.callbackUrl, expiresAt: order.expires_at, title: snapshot.name || '新居住生活权益',
-        configVersion: policy.configVersion, snapshot: { collection_mode: policy.collectionMode, product_kind: order.product_kind, product_version: input.version },
+        configVersion: policy.configVersion, snapshot: { collection_mode: policy.collectionMode, product_kind: order.product_kind, product_version: input.version, ...(settlementProfiles ? { settlement_profile: Object.values(settlementProfiles)[0] } : {}) },
       });
       await c.execute("UPDATE commerce_orders SET payment_mode='pay_center',stock_status='reserved',snapshot=? WHERE id=?", [JSON.stringify(snapshot), order.id]);
       order.snapshot = snapshot; order.payment_mode = 'pay_center';
@@ -128,6 +131,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
     const paymentId = Number(payload.paymentId || payload.payment_id);
     const amount = Number(payload.amountMinor ?? payload.amount_minor);
     assert(Number.isSafeInteger(amount) && amount > 0 && refundId, '退款事件金额无效', 409);
+    const sharedRefund = await require('../server/settlement/business.cjs').onRefundSucceeded(c,{biz_type:'commerce',order,payload});
     const [refund] = await service.get(c, 'SELECT * FROM commerce_refund_orders WHERE payment_refund_id=? FOR UPDATE', [refundId]);
     if (refund) {
       assert(refund.order_id === order.id && refund.payment_mode === 'pay_center' && Number(refund.amount_minor) === amount, '退款事件与权益退款不一致', 409);
@@ -138,11 +142,11 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       await c.execute("UPDATE commerce_coupons SET status='refunded',token_hash=NULL,token_expires_at=NULL WHERE id=?", [coupon.id]);
       await c.execute("UPDATE commerce_cases SET status='closed',resolution=CONCAT_WS(' / ',NULLIF(resolution,''),'原路退款已由支付机构确认') WHERE id=?", [refund.case_id]);
       await main.resolveWork(c, refund.case_id, '原路退款已由支付机构确认');
-      await postOnce(c, 'refund', refund.refund_no, [{side:'debit',account:'unredeemed_liability',amount},{side:'credit',account:'provider_refund_out',amount}]);
+      if(!sharedRefund)await postOnce(c, 'refund', refund.refund_no, [{side:'debit',account:'unredeemed_liability',amount},{side:'credit',account:'provider_refund_out',amount}]);
     } else {
       // Late/duplicate payments need a refund even though no coupon was issued.
-      assert(['late_pay','duplicate_pay','fulfillment_failed'].includes(payload.reason), '退款缺少可核对的权益退款指令', 409);
-      if (!await postOnce(c, 'payment_refund', refundId, [{side:'debit',account:'payment_pending_liability',amount},{side:'credit',account:'provider_refund_out',amount}])) return;
+      assert(sharedRefund||['late_pay','duplicate_pay','fulfillment_failed'].includes(payload.reason), '退款缺少可核对的权益退款指令', 409);
+      if (!sharedRefund&&!await postOnce(c, 'payment_refund', refundId, [{side:'debit',account:'payment_pending_liability',amount},{side:'credit',account:'provider_refund_out',amount}])) return;
     }
     if (refund || (!order.paid_payment_order_id && order.status !== 'refunded') || Number(order.paid_payment_order_id) === paymentId) {
       const total = Number(order.refunded_minor || 0) + amount;
@@ -173,6 +177,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
     if (event.event_type === 'payment.accepted') {
       assert(Number(guard.paid_payment_id) === paymentId && amount === Number(order.amount_minor), '有效支付事件不匹配', 409);
       if (order.status === 'refunded' && Number(order.paid_payment_order_id) === paymentId) return;
+      await require('../server/settlement/business.cjs').onPaymentAccepted(c,{biz_type:'commerce',order,guard});
       await service.fulfillPaidOrder(order.id, 'payment:' + paymentId, amount, { connection:c, verified:true, fundingRecorded:true });
       await c.execute("UPDATE commerce_orders SET payment_status='paid',paid_payment_order_id=?,paid_at=COALESCE(paid_at,UTC_TIMESTAMP()),fulfillment_status='fulfilled',stock_status='granted' WHERE id=?", [paymentId,order.id]);
       await main.linkOrder(c, {...order,status:'fulfilled',payment_status:'paid'});

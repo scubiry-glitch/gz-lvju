@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const P = require('./primitives.cjs');
 const { assert, parse, sqlDate, expired, toAmount, toMinor, minor, sanitize, notificationKey } = P;
+const {buildPaymentCollection,verifyPaymentCollection,paymentCollectionContract}=require('../settlement/provider.cjs');
 
 function createWorker(I) {
   const { config, payCenter, logger, now, clock, due, tx, rows, guard, payment, enqueue, emit, finishClosed, closeGuard, refundInTransaction } = I;
@@ -115,6 +116,11 @@ function createWorker(I) {
       const g = await guard(c, { bizType: reference.biz_type, orderId: reference.biz_order_no });
       const p = await payment(c, id), code = remoteStatus(data); checkIdentity(data, p, null, { allowLegacySparse: context === trustedQuery });
       if (code === '30') {
+        if(g.snapshot?.settlement_profile) {
+          const [created]=await rows(c,"SELECT payload FROM payment_jobs WHERE job_key=?",['pay_create:'+p.id]);
+          assert(created && parse(created.payload).collection_contract_hash===paymentCollectionContract(config,g.snapshot).hash,'受控支付原请求契约缺失或版本内容被改变',409,'payment_collection_contract_changed');
+        }
+        verifyPaymentCollection(config,g.snapshot,p,data);
         if (p.pay_status === 'paid') return { terminal: true, state: 'paid' };
         const providerRef = providerReference(data, p);
         await c.execute("UPDATE payment_orders SET pay_status='paid',gateway_order_status=?,pay_method=?,pay_no=?,paid_at=?,next_query_at=NULL,updated_at=?,version=version+1 WHERE id=?", [code, data.payMethod || data.pay_method || null, providerRef, clock(), clock(), p.id]);
@@ -204,12 +210,15 @@ function createWorker(I) {
           if (g.lifecycle === 'open' && expired(g.expires_at, now())) await closeGuard(c, g, 'expired', false);
           await finishClosed(c, g); return { skip: true };
         }
-        await c.execute('UPDATE payment_jobs SET payload=? WHERE id=? AND lease_token=?', [JSON.stringify({ ...parse(j.payload), sent: true }), j.id, job.lease_token]);
-        return { current };
+        // Validate the reviewed controlled-collection request BEFORE recording
+        // sent. Missing mappings make no network request and remain cancellable.
+        const collection=buildPaymentCollection(config,g.snapshot,current,createPayload(current));
+        await c.execute('UPDATE payment_jobs SET payload=? WHERE id=? AND lease_token=?', [JSON.stringify({ ...parse(j.payload), sent: true,create_request:collection.body,collection_contract_hash:collection.contract_hash }), j.id, job.lease_token]);
+        return { current,request:collection.body };
       });
       if (prepared.skip) return { terminal: true };
       if (prepared.query) { await queryPayment(p); return { terminal: true, queryAgain: true }; }
-      const result = await gateway('pay_create', target, createPayload(prepared.current), body => payCenter.createC2BOrder(body));
+      const result = await gateway('pay_create', target, prepared.request, body => payCenter.createC2BOrder(body));
       const data = rawData(result); checkIdentity(data, p, null, { requireSuccessEvidence: false });
       await tx(async c => {
         const g = await guard(c, { bizType: p.biz_type, orderId: p.biz_order_no });

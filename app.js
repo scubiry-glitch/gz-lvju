@@ -155,6 +155,20 @@ function getPaymentService() {
 }
 
 function getPaymentCore() { return getPaymentService().core; }
+let settlementRuntimePromise;
+async function getSettlementRuntime() {
+  if (!settlementRuntimePromise) settlementRuntimePromise = (async () => {
+    await ensureSchema();
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: 'Z', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, connectionLimit: 8 });
+    try {
+      const module = require('./server/settlement/index.cjs');
+      await module.migrate(pool);
+      const service = module.createSettlement({ pool, auth: authCenter, paymentCore: getPaymentCore(), payCenter, config: process.env });
+      return { service, handler: require('./server/settlement/http.cjs').createHandler({ service, auth: authCenter }) };
+    } catch (e) { await pool.end(); throw e; }
+  })().catch(e => { settlementRuntimePromise = null; throw e; });
+  return settlementRuntimePromise;
+}
 function getBookingPaymentAdapter() { return getPaymentService().bookingAdapter; }
 let jiazhengPaymentAdapter;
 function getJiazhengAdapter() {
@@ -976,6 +990,10 @@ async function runUnifiedPaymentMaintenance() {
     await core.runJobs(50);
     await core.consumeEvents('booking', booking.handleEvent, 50);
     await core.consumeEvents('jiazheng', life.handleEvent, 50);
+    if (process.env.SETTLEMENT_WORKER_ENABLED === '1' || process.env.SETTLEMENT_REPORTS_ENABLED === '1') {
+      const result = await (await getSettlementRuntime()).service.maintenance();
+      for (const error of result?.errors || []) console.warn('settlement maintenance:', error.operation, error.code);
+    }
     if (Date.now() - lastPaymentExpiryScan >= 30000) {
       lastPaymentExpiryScan = Date.now();
       for (const [label, scan] of [['legacy recovery', () => booking.recoverLegacy(100)], ['booking expiry', () => booking.expire(100)], ['life expiry', () => life.expire(100)]]) {
@@ -1989,6 +2007,13 @@ const server = http.createServer((req, res) => {
 
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
   const apiReq = rawPath.startsWith('/api/juzhu');
+  if (rawPath.startsWith('/api/settlement/v1/')) {
+    getSettlementRuntime().then(runtime => runtime.handler(req, res)).catch(() => {
+      if (!res.headersSent) res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: '结算服务暂时不可用', code: 'settlement_unavailable' }));
+    });
+    return;
+  }
   reqLogBegin(req, rawPath, qs);
   if (apiReq) resLogWrap(req, res);
 
