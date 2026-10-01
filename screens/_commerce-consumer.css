@@ -380,3 +380,21 @@
 .merchant-pill{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 13px;border:1px solid #d8dccb;border-radius:999px;background:#fff;color:#41604b;font-size:11px;cursor:pointer;min-height:32px}
 .merchant-more{display:block;width:100%;box-sizing:border-box;text-align:center;margin-top:14px;padding:12px 16px;border:1px solid #d8ddd0;border-radius:999px;background:#fff;color:#41604b;font-size:13px;text-decoration:none;transition:border-color .15s,background .15s}
 .merchant-more:hover{border-color:#41604b;background:#f6f8f2}
+
+/* ── 2026-10-02 会员中心多方案：左右滑动 pass 卡组（scroll-snap）+ 圆点指示器 + 权益区联动 ── */
+.plan-swiper-label{margin:2px 0 8px;font-size:11px;letter-spacing:.04em;color:#828778}
+.plan-swiper{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:2px 18px 4px}
+.plan-swiper::-webkit-scrollbar{display:none}
+.plan-slide{flex:0 0 88%;scroll-snap-align:center;display:flex;flex-direction:column;min-height:0}
+.member-pass.plan-slide{padding:18px 20px 16px;min-height:0}
+.plan-slide .member-wordmark{margin-top:14px}
+.plan-slide .member-pass-highlights{margin-top:12px}
+.plan-slide-actions{margin-top:14px;padding-top:12px;border-top:1px solid #d7c79d33;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plan-price{font:700 19px var(--serif);color:#f5e7bf;margin-right:auto;display:flex;align-items:baseline;gap:4px}
+.plan-price small{font:10px var(--font);color:#ded6ba;font-weight:400}
+.plan-slide-actions .btn{min-height:38px;padding:8px 12px;font-size:12px;border-radius:10px}
+.plan-slide-actions .btn.plan-view{background:transparent;border:1px solid #a39b7399;color:#f3e6c5}
+.plan-slide-actions .btn.pri{background:#e9d9ae;border-color:#e9d9ae;color:#4c3c24}
+.plan-dots{display:flex;gap:6px;justify-content:center;padding:10px 0 0}
+.plan-dots i{width:6px;height:6px;border-radius:999px;background:#c9cbb9;transition:background .15s,width .15s;cursor:pointer}
+.plan-dots i.on{background:#365c49;width:16px}

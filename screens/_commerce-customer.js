@@ -21,6 +21,14 @@ function setupShopSticky(){const head=document.querySelector('.consumer-shop-hea
  const sent=document.createElement('div');sent.className='sticky-sentinel';sticky.before(sent);
  if(!window.IntersectionObserver)return;
  new IntersectionObserver(entries=>{sticky.classList.toggle('is-stuck',!entries[0].isIntersecting);},{root:scr,threshold:0}).observe(sent);}
+// 会员中心多方案滑动卡组：圆点指示器与滑动位置联动（rAF），点击圆点平滑换卡；权益明细区跟随当前卡切换。
+function setupPlanSwiper(){const sw=document.querySelector('#plan-swiper');if(!sw)return;const dots=[...document.querySelectorAll('.plan-dots [data-dot]')],slides=[...sw.querySelectorAll('.plan-slide')],benefits=[...document.querySelectorAll('[data-plan-benefit]')];
+ const sync=()=>{const i=Math.max(0,Math.min(slides.length-1,Math.round(sw.scrollLeft/sw.clientWidth)));
+  dots.forEach((d,j)=>d.classList.toggle('on',j===i));
+  benefits.forEach(b=>{b.hidden=b.dataset.planBenefit!==slides[i]?.dataset.planId;});};
+ sw.addEventListener('scroll',()=>requestAnimationFrame(sync),{passive:true});
+ dots.forEach((d,j)=>d.addEventListener('click',()=>sw.scrollTo({left:j*sw.clientWidth,behavior:'smooth'})));
+ sync();}
 const U=promoter?null:window.COMMERCE_CONSUMER;
 const isShop=document.body.dataset.productShop==='true';
 const isDetail=document.body.dataset.productDetail==='true';
@@ -115,7 +123,7 @@ async function load(){const version=++loadVersion;C.status('');navigation();cont
    +'<p class="consumer-footnote">佣金为按分佣规则预估，实际以核销结算为准；演示商品不发生资金与佣金。点击 / 转化统计从分享链接被打开开始累计。</p>';
   if(products.length)renderPromoterGrid();
   return;}
- if(U&&tab==='memberships'){const [catalogue,personal]=await Promise.all([api('/catalog'+(city?'?city='+encodeURIComponent(city):'')),C.identity?api('/my'):{}]);if(version!==loadVersion)return;products=catalogue;assets=personal;content.innerHTML=U.memberships(products,assets);return;}
+ if(U&&tab==='memberships'){const [catalogue,personal]=await Promise.all([api('/catalog'+(city?'?city='+encodeURIComponent(city):'')),C.identity?api('/my'):{}]);if(version!==loadVersion)return;products=catalogue;assets=personal;content.innerHTML=U.memberships(products,assets);setupPlanSwiper();return;}
  if(U&&tab==='account'){const personal=C.identity?await api('/my'):{};if(version!==loadVersion)return;assets=personal;content.innerHTML=U.account(assets);return;}
  if(U&&!C.identity){content.innerHTML=U.heading(tab,tabs[tab])+U.empty(tab,false);return;}
  if(!C.identity){content.innerHTML=C.empty('登录后查看'+tabs[tab],'使用新居住账号，安全管理您的生活权益。',button('账号登录','login','',true));return;}
