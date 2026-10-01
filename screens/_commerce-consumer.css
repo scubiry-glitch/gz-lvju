@@ -235,25 +235,7 @@
 @media(prefers-reduced-motion:reduce){.commerce-consumer *{animation:none!important;transition:none!important}.commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:none}}
 
 /* ── 2026-10-02 视觉优化：品类识别 / 票券卡面 / 详情头图 / 档位色 ──
-   品类词汇表（浅底 + 深字，随奶油纸底校准）；C 端权益域自有一套，与家政域 _jzapi.js CAT_THEME 无耦合。 */
-.cat-cleaning{--cat-bg:#e8f0e3;--cat-fg:#4c7442}
-.cat-repair{--cat-bg:#fcede4;--cat-fg:#b05a1c}
-.cat-moving{--cat-bg:#e6f0fc;--cat-fg:#1f62c6}
-.cat-nanny{--cat-bg:#f9e9ec;--cat-fg:#b0506b}
-.cat-telecom{--cat-bg:#eeeafa;--cat-fg:#6353b8}
-.cat-insurance{--cat-bg:#e7eef6;--cat-fg:#33618f}
-.cat-consumer_finance{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
-.cat-health_care{--cat-bg:#e3f0ec;--cat-fg:#1d7367}
-.cat-home_maintain{--cat-bg:#f1e9dd;--cat-fg:#8a6a45}
-.cat-asset{--cat-bg:#e8eaf2;--cat-fg:#4a5482}
-.cat-recycle{--cat-bg:#edf0dd;--cat-fg:#6d7a2f}
-.cat-community{--cat-bg:#eceee4;--cat-fg:#5f6d4f}
-.cat-hotel_exchange{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
-.cat-scenic_ticket{--cat-bg:#fdeae6;--cat-fg:#c05a44}
-.cat-dining{--cat-bg:#f8e8e3;--cat-fg:#a84a35}
-.cat-online_service{--cat-bg:#e4f1f2;--cat-fg:#22707d}
-.cat-packages{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
-.cat-plans{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
+   品类色板已上移到共享 _commerce.css（C 端/推广端共用）；本文件只留 C 端消费规则。 */
 .product-card[class*=" cat-"] .consumer-product-icon{background:var(--cat-bg);color:var(--cat-fg)}
 /* 详情头：品类浅色渐变横幅，icon 底随品类 */
 .consumer-product-detail.cat-hero{background:linear-gradient(140deg,var(--cat-bg),#fffdf6 74%)}
@@ -356,3 +338,45 @@
 .shop-sticky .consumer-shop-tabs,.shop-sticky .consumer-search{margin-bottom:0}
 .shop-sticky.is-stuck{box-shadow:0 8px 18px #16382c14;border-bottom:1px solid #193d3712}
 .sticky-sentinel{height:0}
+
+/* ── 2026-10-02 A1 购买/兑换成功弹层 ── */
+.pay-success{text-align:center;padding:4px 0 2px}
+.ps-ring{display:grid;place-items:center;width:64px;height:64px;margin:6px auto 14px;border-radius:50%;background:#e4f1e9;color:#0f766e;animation:ps-pop .34s cubic-bezier(.2,1.5,.45,1)}
+.ps-ring svg{width:30px;height:30px}
+@keyframes ps-pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.ps-sub{font-size:13px;color:#3e5948;margin:0 0 14px}
+.ps-sub b{color:#0f766e}
+.ps-card{display:flex;flex-direction:column;gap:5px;text-align:left;background:#f7f5ec;border:1px dashed #d8d2bc;border-radius:12px;padding:13px 15px;margin-bottom:14px}
+.ps-card b{font:600 15px var(--serif);color:#193d37}
+.ps-card span{font-size:11px;color:#8a8e7f;line-height:1.6}
+.ps-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ── 2026-10-02 B6/B7/B8：券包明细折叠 / 卡券历史折叠 / 排序 chips / 回顶 ── */
+.pkg-fold{margin:2px 0 4px}
+.pkg-fold>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#41604b;padding:11px 2px;border-top:1px dashed #e4e6dc;border-bottom:1px dashed #e4e6dc}
+.pkg-fold>summary::-webkit-details-marker{display:none}
+.pkg-fold .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.pkg-fold[open] .fold-arrow{transform:rotate(90deg)}
+.coupon-group{margin-top:4px}
+.coupon-group>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#66736a;padding:13px 2px;border-top:1px dashed #e4e6dc}
+.coupon-group>summary::-webkit-details-marker{display:none}
+.coupon-group .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.coupon-group[open] .fold-arrow{transform:rotate(90deg)}
+.shop-sort{display:flex;gap:7px;margin:0 0 12px}
+.shop-sort button{border:1px solid #d8dccb;background:#fff;color:#4d5c49;border-radius:999px;padding:5px 13px;font-size:11px;min-height:32px;cursor:pointer;flex-shrink:0}
+.shop-sort button[aria-pressed="true"]{background:#123f3a;border-color:#123f3a;color:#f3e6c5}
+.back-top{position:absolute;right:16px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:25;width:44px;height:44px;border-radius:50%;border:1px solid #193d371f;background:#fffcf7f2;color:#365c49;display:grid;place-items:center;box-shadow:0 6px 18px #16382c1f;cursor:pointer}
+.commerce-consumer .app{position:relative}
+.back-top[hidden]{display:none}
+.back-top svg{width:18px;height:18px}
+
+/* ── 2026-10-02 C9 商品主图：缩略图盖品类图标（onerror 回落 svg）；详情 hero 照片化（遮罩加深保对比度）── */
+.consumer-product-icon{position:relative;overflow:hidden}
+.pc-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.consumer-detail-hero .hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.consumer-detail-hero.has-img::before{background:radial-gradient(circle at 86% 10%,#d6ab673d,transparent 52%),linear-gradient(0deg,#0000007a,transparent 40%),linear-gradient(120deg,#0b1f198f,#0b1f194d)}
+
+/* ── 2026-10-02 C10 商户维度：筛选胶囊 + 详情页「更多来自该商户」入口 ── */
+.merchant-pill{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 13px;border:1px solid #d8dccb;border-radius:999px;background:#fff;color:#41604b;font-size:11px;cursor:pointer;min-height:32px}
+.merchant-more{display:block;width:100%;box-sizing:border-box;text-align:center;margin-top:14px;padding:12px 16px;border:1px solid #d8ddd0;border-radius:999px;background:#fff;color:#41604b;font-size:13px;text-decoration:none;transition:border-color .15s,background .15s}
+.merchant-more:hover{border-color:#41604b;background:#f6f8f2}

@@ -36,11 +36,15 @@
 .promoter-sort button[aria-pressed="true"]{background:var(--brand-deep);border-color:var(--brand-deep);color:#f4ead0}
 .pf-sep{flex-shrink:0;width:1px;height:16px;background:#193d3720}
 .promoter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.promoter-mini{display:flex;flex-direction:column;padding:13px;border-radius:14px}
-.pm-top{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:7px}
-.pm-kind{background:#e9eee5;color:#446456;border-radius:6px;padding:2px 7px;font-size:10px}
-.pm-channel{background:#f3ecd9;color:#8a6a1f;border-radius:6px;padding:2px 7px;font-size:10px}
-.pm-rate{margin-left:auto;background:#f6ecd7;color:#8a6a1f;font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px}
+/* 2026-10-02 对齐电商紧凑卡：整卡可点（data-action 在 article），品类图标随 --cat-bg/--cat-fg（共享 _commerce.css 色板） */
+.promoter-mini{display:flex;flex-direction:column;padding:12px 12px 11px;border-radius:14px;cursor:pointer}
+.pm-top{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.pm-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:var(--cat-bg,#e9eee5);color:var(--cat-fg,#446456);flex-shrink:0}
+.pm-icon svg{width:20px;height:20px}
+.pm-channel{background:#f3ecd9;color:#8a6a1f;border-radius:6px;padding:2px 7px;font-size:10px;flex-shrink:0}
+.pm-icon+*{margin-left:auto}
+.pm-rate{background:#f6ecd7;color:#8a6a1f;font-weight:700;border-radius:6px;padding:2px 7px;font-size:11px;flex-shrink:0}
+.pm-rate.is-demo{background:#eef0ec;color:#737c70;font-weight:600}
 .promoter-mini h3{font:600 13px/1.45 var(--serif);margin:0 0 8px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px}
 .pm-money{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .pm-money .money{font:700 17px var(--serif);color:var(--gold-deep)}

@@ -132,3 +132,34 @@
 .management-filter input:focus,.management-filter select:focus{border-color:var(--brand);outline:none;box-shadow:0 0 0 3px var(--brand-soft)}
 .pagination .btn{padding:6px 11px;font-size:12px}
 @media(prefers-reduced-motion:reduce){.commerce-dialog[open],#commerce-status:not(:empty){animation:none}.commerce-desktop .commerce-kpi,.commerce-page .btn{transition:none}.commerce-dialog::backdrop{backdrop-filter:none}}
+
+/* ── 2026-10-02 品类色板（C 端 + 推广端共用；浅底/深字随奶油纸底校准，与家政域 _jzapi.js CAT_THEME 无耦合）── */
+.cat-cleaning{--cat-bg:#e8f0e3;--cat-fg:#4c7442}
+.cat-repair{--cat-bg:#fcede4;--cat-fg:#b05a1c}
+.cat-moving{--cat-bg:#e6f0fc;--cat-fg:#1f62c6}
+.cat-nanny{--cat-bg:#f9e9ec;--cat-fg:#b0506b}
+.cat-telecom{--cat-bg:#eeeafa;--cat-fg:#6353b8}
+.cat-insurance{--cat-bg:#e7eef6;--cat-fg:#33618f}
+.cat-consumer_finance{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
+.cat-health_care{--cat-bg:#e3f0ec;--cat-fg:#1d7367}
+.cat-home_maintain{--cat-bg:#f1e9dd;--cat-fg:#8a6a45}
+.cat-asset{--cat-bg:#e8eaf2;--cat-fg:#4a5482}
+.cat-recycle{--cat-bg:#edf0dd;--cat-fg:#6d7a2f}
+.cat-community{--cat-bg:#eceee4;--cat-fg:#5f6d4f}
+.cat-hotel_exchange{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
+.cat-scenic_ticket{--cat-bg:#fdeae6;--cat-fg:#c05a44}
+.cat-dining{--cat-bg:#f8e8e3;--cat-fg:#a84a35}
+.cat-online_service{--cat-bg:#e4f1f2;--cat-fg:#22707d}
+.cat-packages{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
+.cat-plans{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
+
+/* ── 2026-10-02 A3 骨架屏（C 端 + 推广端共用）── */
+.skel-wrap{display:grid;gap:14px;padding:2px 0}
+.skel{display:block;height:64px;border-radius:13px;background:#ebe9dd;position:relative;overflow:hidden}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,#f9f8f2b3,transparent);animation:skel-sweep 1.4s infinite}
+@keyframes skel-sweep{to{transform:translateX(100%)}}
+.skel-hero{height:140px;border-radius:16px}
+.skel-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.skel-cards .skel{height:200px}
+.skel-row{height:40px;border-radius:999px}
+@media(prefers-reduced-motion:reduce){.skel::after{animation:none}}
