@@ -21,15 +21,25 @@ function setupShopSticky(){const head=document.querySelector('.consumer-shop-hea
  const sent=document.createElement('div');sent.className='sticky-sentinel';sticky.before(sent);
  if(!window.IntersectionObserver)return;
  new IntersectionObserver(entries=>{sticky.classList.toggle('is-stuck',!entries[0].isIntersecting);},{root:scr,threshold:0}).observe(sent);}
+// 选券/权益首页：下滑收起顶栏（吸顶区只留 tabs+搜索），上滑或回顶即还原。
+// 方向滞回 ±2px 防抖动；只挂在有 .shop-sticky 的列表页——详情页有自己的 setupDetailChrome 逻辑。
+function setupShopHeadCollapse(){const scr=document.querySelector('.scr'),bar=document.querySelector('.appbar');
+ if(!scr||!bar||!document.querySelector('.shop-sticky'))return;
+ if(scr.dataset.headCollapse)return;scr.dataset.headCollapse='1'; // renderCatalog 每次重渲染都会进来，滚动监听只挂一次
+ let last=scr.scrollTop,ticking=false;
+ scr.addEventListener('scroll',()=>{if(ticking)return;ticking=true;requestAnimationFrame(()=>{ticking=false;const top=scr.scrollTop,delta=top-last;last=top;
+  if(top<80||delta<-2)bar.classList.remove('head-off');
+  else if(delta>2)bar.classList.add('head-off');});},{passive:true});}
 // 会员中心多方案滑动卡组：圆点指示器与滑动位置联动（rAF），点击圆点平滑换卡；权益明细区跟随当前卡切换。
 function setupPlanSwiper(){const sw=document.querySelector('#plan-swiper');if(!sw)return;const dots=[...document.querySelectorAll('.plan-dots [data-dot]')],slides=[...sw.querySelectorAll('.plan-slide')],benefits=[...document.querySelectorAll('[data-plan-benefit]')];
  const start=Math.max(0,Math.min(slides.length-1,Number(sw.dataset.start)||0));
- if(start>0)sw.scrollLeft=start*sw.clientWidth; // 已开通用户初始定位到已购方案卡（无动画）
- const sync=()=>{const i=Math.max(0,Math.min(slides.length-1,Math.round(sw.scrollLeft/sw.clientWidth)));
+const step=slides.length>1?slides[1].offsetLeft-slides[0].offsetLeft:sw.clientWidth;
+ if(start>0)sw.scrollLeft=start*step; // 已开通用户初始定位到已购方案卡（无动画）
+ const sync=()=>{const i=Math.max(0,Math.min(slides.length-1,Math.round(sw.scrollLeft/step)));
   dots.forEach((d,j)=>d.classList.toggle('on',j===i));
   benefits.forEach(b=>{b.hidden=b.dataset.planBenefit!==slides[i]?.dataset.planId;});};
  sw.addEventListener('scroll',()=>requestAnimationFrame(sync),{passive:true});
- dots.forEach((d,j)=>d.addEventListener('click',()=>sw.scrollTo({left:j*sw.clientWidth,behavior:'smooth'})));
+ dots.forEach((d,j)=>d.addEventListener('click',()=>sw.scrollTo({left:j*step,behavior:'smooth'})));
  sync();}
 const U=promoter?null:window.COMMERCE_CONSUMER;
 const isShop=document.body.dataset.productShop==='true';
@@ -45,7 +55,7 @@ const couponLabel=U?.couponLabel||(r=>C.label(r.status));
 let couponFilter='all';
 if(U&&city){document.querySelectorAll('.appbar a,.consumer-footer a').forEach(a=>{const u=new URL(a.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});}
 const filter={kind:query.get('kind')||'',topic:query.get('topic')||'',q:'',category:query.get('category')||'',merchant:query.get('merchant')||''};
-function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(tab==='shop')setupShopSticky();if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
+function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(tab==='shop'){setupShopSticky();setupShopHeadCollapse();}if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
 if(U){content.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter.kind=b.dataset.filter;filter.topic='';filter.category='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-coupon-filter]');if(!b)return;couponFilter=b.dataset.couponFilter;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-search')return;e.preventDefault();filter.q=new FormData(e.target).get('q').trim();filter.topic='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;filter.category=b.dataset.cat;renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-sort]');if(!b)return;filter.sort=b.dataset.sort;renderCatalog();});content.addEventListener('click',e=>{const b=e.target.closest('[data-clear-merchant]');if(!b)return;filter.merchant='';renderCatalog();});}
 if(U&&isHotels){content.addEventListener('click',e=>{const b=e.target.closest('[data-tier]');if(!b)return;hotelFilter.tier=hotelFilter.tier===b.dataset.tier?'':b.dataset.tier;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-hotel-search')return;e.preventDefault();hotelFilter.q=new FormData(e.target).get('q').trim();load();});content.addEventListener('change',e=>{if(e.target.id==='consumer-hotel-brand'){hotelFilter.brand=e.target.value;load();}});}
 if(promoter)content.addEventListener('click',e=>{

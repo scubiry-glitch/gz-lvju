@@ -294,17 +294,19 @@
 /* 文区（2026-10-02 二次压紧：目标行距 ~210px、一屏 2.5 排）——标题/说明不预留行高
    （min-height 会在单行下挖洞），说明压到一行做引子，规格详情留给详情页；
    行内富余交给 margin-top:auto 的价格行 → 留白沉底、价格贴卡底。 */
-.commerce-consumer .product-card h3{padding:6px 11px 0;font:600 14px/1.4 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 3px}
+.commerce-consumer .product-card h3{padding:5px 11px 0;font:600 13px/1.35 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 2px}
 /* 选择器带 >p 提特异性：压掉上方 .product-card>p{margin:3px 0}（0,2,1>0,2,0，踩过） */
-.commerce-consumer .product-card>p.product-card-summary{padding:0 11px;margin:0;font-size:10px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;min-height:0}
-.commerce-consumer .product-card .product-benefits{padding:3px 11px 0;margin:0;gap:4px}
-.commerce-consumer .product-card .product-benefits span{padding:1px 5px;font-size:8px}
-.commerce-consumer .product-card .product-bottom{border:0;padding:5px 11px 9px;margin-top:auto;gap:6px}
+/* 2026-10-02 试用：卡面只留标题，说明整行去掉（规格/活动语看详情页）；标题已在海报上重复一次，
+   靠价格行 margin-top:auto 沉底对齐。要恢复说明整行，去掉 display:none 即可。 */
+.commerce-consumer .product-card>p.product-card-summary{display:none}
+.commerce-consumer .product-card .product-benefits{padding:2px 11px 0;margin:0;gap:3px}
+.commerce-consumer .product-card .product-benefits span{padding:1px 5px;font-size:8px;line-height:1.4}
+.commerce-consumer .product-card .product-bottom{border:0;padding:4px 11px 7px;margin-top:auto;gap:5px}
 /* 价格锚点：手淘式大价 + 灰小字后缀（演示价贴在价后基线对齐，全宽行放得下不再竖排）。
-   显式声明 19px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
+   显式声明 17px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
    不显式覆盖就会被旧块回填（2026-10-02 连踩两次残留声明复活）。 */
-.commerce-consumer .product-card .product-bottom .money{font-size:19px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:4px;min-width:0;white-space:nowrap}
-.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:9px;color:#8a8e7f}
+.commerce-consumer .product-card .product-bottom .money{font-size:17px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:4px;min-width:0;white-space:nowrap}
+.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:8px;color:#8a8e7f}
 /* 整卡可点，卡上不再放按钮（手淘信息流同款） */
 .commerce-consumer .product-card .btn{display:none}
 @media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card h3{font-size:14px;padding:8px 10px 0}.commerce-consumer .product-card-summary{padding:0 10px}.commerce-consumer .product-card .product-benefits{padding:6px 10px 0}.commerce-consumer .product-card .product-bottom{padding:7px 10px 10px}}
@@ -327,6 +329,10 @@
    空 status 段落不占位（错误提示出现时 hero 才下移）。 */
 .commerce-consumer #commerce-status:empty{display:none;margin:0}
 .commerce-consumer .appbar{transition:background-color .22s ease,border-color .22s ease}
+/* 选券/权益列表页：下滑收起顶栏（head-off 由 _commerce-customer.js setupShopHeadCollapse 按滚动方向加/撤），
+   吸顶区只留 tabs+搜索；max-height+padding 过渡防内容外溢，收起后 sticky 头顶到 .scr 真顶。 */
+.commerce-consumer .appbar{overflow:hidden;transition:background-color .22s ease,border-color .22s ease,max-height .26s ease,padding .26s ease}
+.commerce-consumer .appbar.head-off{max-height:0;padding-top:0;padding-bottom:0;border-bottom-width:0}
 /* lvju-app.css 的 .appbar.ghost 与 .commerce-consumer .appbar 同特异性但先加载，透明底会被奶油底盖掉——这里抬一级 */
 .commerce-consumer .appbar.ghost{background:transparent;border-bottom-color:transparent;backdrop-filter:none}
 .commerce-consumer .appbar.ghost .ttl{color:#fff;text-shadow:0 1px 8px #0004}
@@ -423,7 +429,7 @@
 .commerce-consumer .consumer-product-icon{position:relative}
 /* margin 不能用负值：卡 padding 是 0，-12px 会把横幅顶部/两侧各裁 12px（海报角标被切就是它）。
    16/7 压扁横幅给文区让高（2026-10-02 一屏 2.5 排）。 */
-.pc-banner{position:relative;aspect-ratio:16/7;margin:0 0 8px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
+.pc-banner{position:relative;aspect-ratio:16/9;margin:0 0 8px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
 .pc-banner-img{width:100%;height:100%;object-fit:cover;display:block}
 .pc-banner-badge{position:absolute;left:9px;bottom:9px;width:30px;height:30px;border-radius:9px;background:#fffc;display:grid;place-items:center;color:var(--cat-fg,#365c49);box-shadow:0 1px 6px #16382c1a}
 .pc-banner-badge svg{width:17px;height:17px}
@@ -506,3 +512,10 @@
 .commerce-consumer .consumer-topic h3{font-size:15px}
 .commerce-consumer .consumer-products .product-card h3{font-size:15px}
 .commerce-consumer .consumer-content{gap:18px}
+
+/* ── 会员卡组对齐重构：卡对齐内容左缘（snap-start），右侧露边暗示滑动；dots 左对齐随内容 ── */
+.plan-swiper{scroll-padding-left:18px}
+.plan-slide{flex:0 0 calc(100% - 64px);scroll-snap-align:start}
+.plan-dots{justify-content:flex-start;padding:9px 18px 0}
+.plan-slide{flex-shrink:0}
+.plan-swiper{margin:0 -18px}
