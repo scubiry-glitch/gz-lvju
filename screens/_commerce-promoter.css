@@ -6,8 +6,8 @@
 /* ── 顶栏 ── */
 .commerce-promoter .appbar{flex-shrink:0;padding:13px 18px;background:var(--paper);border-bottom:1px solid #193d370a;gap:11px}
 .commerce-promoter .bk{background:#fff9;border:1px solid #193d370d;color:var(--ink);font-size:25px}
-.commerce-promoter .ttl{font-size:18px;letter-spacing:.04em}
-.commerce-promoter .ttl small{font-size:10px;letter-spacing:.04em;color:#737c70;margin-top:4px}
+.commerce-promoter .ttl{font-size:18px;letter-spacing:.04em;min-width:0;flex:1}
+.commerce-promoter .ttl small{font-size:10px;letter-spacing:.04em;color:#737c70;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .promoter-account{margin-left:auto;flex-shrink:0;display:flex;align-items:center;gap:8px;min-width:0}
 .promoter-account span{font-size:11px;color:#737c70;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .promoter-account button{background:transparent;border:1px solid #193d3726;border-radius:20px;color:var(--brand-deep);padding:8px 14px;font-size:12px;flex-shrink:0}
@@ -22,7 +22,7 @@
 .commerce-promoter .commerce-card p{font-size:12px;color:#6c7967}
 /* ── 推广封面 hero ── */
 .commerce-promoter .commerce-hero{position:relative;isolation:isolate;overflow:hidden;border:0;padding:24px 20px;color:#fff;background:linear-gradient(135deg,#14594f,#0b3d36 55%,#0e2f2a)}
-.commerce-promoter .commerce-hero::after{content:"";position:absolute;right:-42px;top:-42px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,#d6ab6738,transparent 68%)}
+.commerce-promoter .commerce-hero::after{content:"";position:absolute;right:-42px;top:-42px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,#d6ab674a,transparent 68%)}
 .commerce-promoter .commerce-hero .eyebrow{color:#f6f4efb3;margin-bottom:10px}
 .commerce-promoter .commerce-hero h2{font:500 24px/1.4 var(--serif);letter-spacing:.04em;color:#fffcef;margin:0 0 8px}
 .commerce-promoter .commerce-hero p{color:#fffce8b8;font-size:12px;line-height:1.8;margin:0}
@@ -30,7 +30,7 @@
 .promoter-controls{display:grid;gap:7px}
 .promoter-row{display:flex;align-items:center;gap:9px;min-width:0}
 .pr-label{flex-shrink:0;font-size:10px;color:#8a938a;letter-spacing:.08em}
-.promoter-sort{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;min-width:0;padding:2px}
+.promoter-sort{display:flex;gap:7px;align-items:center;overflow-x:auto;scrollbar-width:none;min-width:0;padding:2px;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent)}
 .promoter-sort::-webkit-scrollbar{display:none}
 .promoter-sort button{border:1px solid #193d3726;background:#fff9;border-radius:999px;padding:6px 13px;font-size:11px;color:#5c6a5f;cursor:pointer;flex-shrink:0}
 .promoter-sort button[aria-pressed="true"]{background:var(--brand-deep);border-color:var(--brand-deep);color:#f4ead0}
@@ -63,7 +63,8 @@
 .commerce-promoter .commerce-kpi{background:#fff;border:1px solid #193d370f;border-radius:12px;padding:13px 14px;box-shadow:0 2px 10px #233c3105}
 .commerce-promoter .commerce-kpi span{display:block;font-size:10px;letter-spacing:.05em;color:#737c70}
 .commerce-promoter .commerce-kpi b{font:700 21px var(--serif);color:var(--brand-deep);margin:6px 0 0}
-.commerce-promoter .commerce-kpi:nth-child(3) b{color:var(--gold-deep)}
+/* 金额链路（佣金→结算中→已到账）统一金色；量级指标保持青绿 */
+.commerce-promoter .commerce-kpi:nth-child(3) b,.commerce-promoter .commerce-kpi:nth-child(5) b,.commerce-promoter .commerce-kpi:nth-child(6) b{color:var(--gold-deep)}
 /* KPI 即入口：数字可点击，箭头暗示 + 按压反馈 */
 button.commerce-kpi{cursor:pointer;text-align:left;font:inherit;width:100%;position:relative;transition:transform .12s}
 button.commerce-kpi::after{content:"›";position:absolute;top:11px;right:12px;font-size:13px;color:#b3bab2}
@@ -93,7 +94,10 @@ button.commerce-kpi:focus-visible{outline:3px solid #d6ab67;outline-offset:2px}
 .promoter-record .pr-top b{font-weight:600;color:var(--ink);min-width:0;overflow-wrap:anywhere}
 .promoter-record .pr-top .money{font:700 16px var(--serif);color:var(--gold-deep);flex-shrink:0}
 .promoter-record .pr-sub{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:5px;font-size:11px;color:#737c70}
-.promoter-record .pr-sub em{font-style:normal;color:var(--brand-deep);flex-shrink:0}
+.promoter-record .pr-sub em{font-style:normal;color:#737c70;flex-shrink:0}
+.promoter-record .pr-sub em.is-run{color:var(--brand-deep)}
+.promoter-record .pr-sub em.is-paid{color:var(--gold-deep)}
+.promoter-record .pr-sub em.is-bad{color:#ad4438}
 .promoter-record .commerce-badge{margin:0 6px 0 0;vertical-align:1px}
 /* ── 底部跨端导航 ── */
 .promoter-footer{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:16px 14px 26px;margin-top:6px}
@@ -108,8 +112,12 @@ button.commerce-kpi:focus-visible{outline:3px solid #d6ab67;outline-offset:2px}
 .commerce-promoter .commerce-dialog{max-width:430px;border-radius:20px;background:#fffef9}
 .commerce-promoter #share-result textarea{font-size:11px;line-height:1.6;background:#f7f6f0;word-break:break-all}
 .commerce-promoter #share-result .btn{margin-top:10px;border-radius:12px}
+/* 分享链接二维码：面对面推广扫码即达 */
+.commerce-promoter .share-qr{width:176px;margin:2px auto 12px;padding:9px;background:#fff;border:1px solid #e7e1d2;border-radius:12px;box-shadow:0 2px 10px #233c3108}
+.commerce-promoter .share-qr svg{display:block;width:100%;height:auto}
+.commerce-promoter #share-result{text-align:left}
 .commerce-promoter .empty-mark{color:var(--brand-2)}
-@media(max-width:359px){.commerce-promoter .commerce-content{padding-left:13px;padding-right:13px}.commerce-promoter .commerce-hero{padding:20px 16px}.commerce-promoter .commerce-hero h2{font-size:21px}}
+@media(max-width:359px){.commerce-promoter .commerce-content{padding-left:13px;padding-right:13px}.commerce-promoter .commerce-hero{padding:20px 16px}.commerce-promoter .commerce-hero h2{font-size:21px}.promoter-account span{display:none}}
 @media(prefers-reduced-motion:reduce){.commerce-promoter *{scroll-behavior:auto!important;transition:none!important}}
 
 /* ── 2026-10-02 美化轮：决策卡悬浮反馈（hover 设备生效，触屏不变） ── */

@@ -15,7 +15,7 @@
 .commerce-consumer svg{width:24px;height:24px;flex-shrink:0}
 .commerce-consumer h1,.commerce-consumer h2,.commerce-consumer h3{color:var(--consumer-ink)}
 .commerce-consumer .consumer-cover{position:relative;isolation:isolate;overflow:hidden;border:0;padding:20px;height:254px;flex-shrink:0;color:white;background:#344c40 url('../assets/commerce/living.webp') center 58%/cover}
-.consumer-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#132d26df,#132d2670 65%,#132d2626)}
+.consumer-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,#132d26a6,transparent 52%),linear-gradient(90deg,#132d26df,#132d2670 65%,#132d2626)}
 .consumer-cover-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.1em;color:#f6f4efe6}
 .consumer-cover-label span{font-size:8px;letter-spacing:.2em}
 .consumer-cover-copy{margin-top:25px}
@@ -233,3 +233,61 @@
  .commerce-consumer .consumer-shortcut:hover svg{background:#e0e8da;color:#365c49}
 }
 @media(prefers-reduced-motion:reduce){.commerce-consumer *{animation:none!important;transition:none!important}.commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:none}}
+
+/* ── 2026-10-02 视觉优化：品类识别 / 票券卡面 / 详情头图 / 档位色 ──
+   品类词汇表（浅底 + 深字，随奶油纸底校准）；C 端权益域自有一套，与家政域 _jzapi.js CAT_THEME 无耦合。 */
+.cat-cleaning{--cat-bg:#e8f0e3;--cat-fg:#4c7442}
+.cat-repair{--cat-bg:#fcede4;--cat-fg:#b05a1c}
+.cat-moving{--cat-bg:#e6f0fc;--cat-fg:#1f62c6}
+.cat-nanny{--cat-bg:#f9e9ec;--cat-fg:#b0506b}
+.cat-telecom{--cat-bg:#eeeafa;--cat-fg:#6353b8}
+.cat-insurance{--cat-bg:#e7eef6;--cat-fg:#33618f}
+.cat-consumer_finance{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
+.cat-health_care{--cat-bg:#e3f0ec;--cat-fg:#1d7367}
+.cat-home_maintain{--cat-bg:#f1e9dd;--cat-fg:#8a6a45}
+.cat-asset{--cat-bg:#e8eaf2;--cat-fg:#4a5482}
+.cat-recycle{--cat-bg:#edf0dd;--cat-fg:#6d7a2f}
+.cat-community{--cat-bg:#eceee4;--cat-fg:#5f6d4f}
+.cat-hotel_exchange{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
+.cat-scenic_ticket{--cat-bg:#fdeae6;--cat-fg:#c05a44}
+.cat-dining{--cat-bg:#f8e8e3;--cat-fg:#a84a35}
+.cat-online_service{--cat-bg:#e4f1f2;--cat-fg:#22707d}
+.cat-packages{--cat-bg:#f7f1e2;--cat-fg:#8a6d2f}
+.cat-plans{--cat-bg:#f6ecd7;--cat-fg:#8a6a1f}
+.product-card[class*=" cat-"] .consumer-product-icon{background:var(--cat-bg);color:var(--cat-fg)}
+/* 详情头：品类浅色渐变横幅，icon 底随品类 */
+.consumer-product-detail.cat-hero{background:linear-gradient(140deg,var(--cat-bg),#fffdf6 74%)}
+.consumer-product-detail.cat-hero .consumer-product-icon{background:#fffc;color:var(--cat-fg)}
+.consumer-product-detail.cat-hero .consumer-kicker{color:var(--cat-fg)}
+/* 券包摘要：分隔点并入前词（nowrap 单元间才可断行），不再出现行首孤立「·」 */
+.product-card-summary .pt{white-space:nowrap}
+.commerce-consumer .product-card-summary,.commerce-consumer .asset-summary{text-wrap:pretty}
+/* 我的卡券：票券书脊（状态语义色）+ 齿孔虚线已在 asset-meta */
+.commerce-consumer .consumer-asset-card{position:relative;overflow:hidden;padding-left:20px}
+.commerce-consumer .consumer-asset-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--spine,#365c49)}
+.commerce-consumer .consumer-asset-card.status-available{--spine:#2f7a5c}
+.commerce-consumer .consumer-asset-card.status-used{--spine:#8b9590}
+.commerce-consumer .consumer-asset-card.status-expired{--spine:#b0a893}
+.commerce-consumer .consumer-asset-card.status-frozen{--spine:#c07a45}
+/* 卡面按钮层级：主操作（预约/出示码）保持实底，详情/售后降为文字钮 */
+.commerce-consumer .consumer-asset-card .btn.txt{grid-column:auto;background:transparent;border:0;color:#0f766e;padding:10px 4px;justify-self:start;text-align:left}
+/* 选券页分类 chips（替代原生 select，滚动行右缘渐隐提示可滑） */
+.consumer-category{display:block;margin:0 0 14px;font-size:12px;color:#6c7967}
+.cc-label{display:block;margin-bottom:8px}
+.cat-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent)}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chips button{border:1px solid #d8dccb;background:#fff;color:#4d5c49;border-radius:20px;padding:7px 14px;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.cat-chips button[aria-pressed="true"]{background:#123f3a;border-color:#123f3a;color:#f3e6c5}
+/* 酒店档位 chips：与卡片 tier-badge 同源六档色（未选=彩点提示，选中=整块档位色） */
+.consumer-shop-tabs button[class*="tier-"]::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--tier-dot,#9aa598)}
+.consumer-shop-tabs button.tier-t80{--tier-dot:#3d6b5c}.consumer-shop-tabs button.tier-t100{--tier-dot:#2c5f52}
+.consumer-shop-tabs button.tier-t120{--tier-dot:#123f3a}.consumer-shop-tabs button.tier-t160{--tier-dot:#8a6d2f}
+.consumer-shop-tabs button.tier-t180{--tier-dot:#74541f}.consumer-shop-tabs button.tier-t200{--tier-dot:#4f3d16}
+.consumer-shop-tabs button.tier-t80[aria-pressed="true"]{background:#3d6b5c}
+.consumer-shop-tabs button.tier-t100[aria-pressed="true"]{background:#2c5f52}
+.consumer-shop-tabs button.tier-t120[aria-pressed="true"]{background:#123f3a}
+.consumer-shop-tabs button.tier-t160[aria-pressed="true"]{background:#8a6d2f}
+.consumer-shop-tabs button.tier-t180[aria-pressed="true"]{background:#74541f}
+.consumer-shop-tabs button.tier-t200[aria-pressed="true"]{background:#4f3d16}
+/* 核销码弹窗：关闭钮不再吃 showModal 的默认焦点金框（焦点已由 JS 移到 dialog 本体） */
+.voucher-code-dialog .dialog-close:focus-visible{outline:none}
