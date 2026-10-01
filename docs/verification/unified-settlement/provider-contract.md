@@ -91,11 +91,12 @@
 
 worker 通过 `runJobs({limit})` 拉取持久作业，领取短租约后提交数据库事务，再调用机构。请求一旦记录 `submitted_at`，恢复只查询原号；网络超时、不存在、返回不匹配均不释放预占。各成功/最终未扣款明细独立结转，`PARTIAL` 不会整体重发。暂停新增执行仍允许历史查询；未发送的 READY 在写发送标记前再次检查开关。消费者退款交给统一 paymentCore 的持久退款入口，不在执行模块重复记录其现金账。数据库会话使用 UTC。
 
-隔离测试只有 `server/test/settlement_execution_test.cjs` 注入模拟机构，不存在运行时模拟付款开关。测试需要明确 `/tmp` 本地 MySQL socket，创建并销毁唯一临时库：
+真实机构适配器的故障测试通过 `server/test/settlement_execution_test.cjs` 注入测试端口。测试站另有受严格标记约束的 `SYTEST_MOCK` 本地端口，边界见下文。隔离测试需要明确 `/tmp` 本地 MySQL socket，创建并销毁唯一临时库：
 
 ```sh
 SETTLEMENT_TEST_SOCKET=/tmp/sy-settlement-实例/mysql.sock \
-  node --test server/test/settlement_execution_test.cjs
+  node --test server/test/settlement_execution_test.cjs \
+    server/test/settlement_sytest_provider_test.cjs
 ```
 
 覆盖关闭能力、跨域权限、金额凭据不符、并发防重、网络调用期间无数据库锁、超时查询、部分成功、B 到账再 Q、隐含 S 授权和付款时间、分账回退累积额度、逆向双人审核、退款依赖、共同退款来源镜像及退票历史保留。
@@ -105,3 +106,17 @@ SETTLEMENT_TEST_SOCKET=/tmp/sy-settlement-实例/mysql.sock \
 共享误核销撤销由原 `commerce/settlement.cjs` 审核入口转入 `server/settlement/reversal.cjs`。在途资金必须先核清；待付余额取消并撤销授权/审批，已成功付款保留原清偿历史，逐原机构行建立追偿。原核销及相关经济调额只反记一次。B 在平台与原款之间的返还记录为 `INTERNAL_RETURN`，不会制造对平台自身的外部应收。S/Q 受益人追偿按 `settlement_recovery:{原执行行}` 记账，回收只随真实机构回退或已独立核验银行退票入账。撤销后迟到退票冲原追偿，不产生重付义务；卡券重核销使用新单位版本，保留原单位历史。
 
 消费者退款还受经济义务约束：确认履约单位的 S+B 尚未撤销时，即使机构余额尚未实际付款也不能用于消费者退款；已成功及在途退款均计入累计额度。固定成本模式另有合同保留用途的余额按原合同可用额度处理。
+
+## 测试站的持久化走查端口
+
+`server/settlement/sytest-provider.cjs` 仅在 `JUZHU_ENV=test` 且 `SETTLEMENT_DEMO_ENABLED=1` 时启用。走查保留 `SETTLEMENT_ENABLED=0`、`SETTLEMENT_WORKER_ENABLED=0`，通过 `SETTLEMENT_REPORTS_ENABLED=1` 运行账单及已提交模拟任务。页面仍调用正常 API，审批、执行单、逐行回执、账务和账单都写入真实测试库；只有机构端口在本地返回明确标识为模拟的结果，不访问支付机构。
+
+每次执行同时校验以下边界：
+
+- 上下文 `snapshot.demo.seed_key`、来源 `evidence.demo_seed_key`、账户 `capabilities.demo_seed_key` 均为 `settlement-walkthrough-v1`。
+- 来源与账户均为 `provider=SYTEST_MOCK`、`environment=SANDBOX`，协议版本为 `sytest-mock-v1`；业务仍须满足 `INTERNAL_FUNDED` 与 `pay_center`。
+- 模拟来源必须 `payment_id=NULL`，计划不能混入真实资金。模拟退款使用执行模块的独立回执及一次现金分录，不调用 `paymentCore`，不创建 `payment_orders`、`payment_refunds`、`payment_jobs` 或 `payment_events`。
+
+B 成功后产生的佣金资金批次继承隔离标记，Q 仍只能消耗所属批次的实收金额；补差及赔付继续使用独立已复核资金。支持成功、明确未扣款失败、部分成功以及 `UNKNOWN` 后按同一请求号查询的场景。只有 `snapshot.demo.auto_settle=true` 的上下文参与自动授权和新建计划；其他待审批、待执行场景保留给人工走查。明确通过 API 创建的模拟执行作业正常运行。
+
+仅启用走查时，资金 worker 只领取本批次模拟作业；`runJobs({limit,order_ids})` 可进一步限定种子脚本刚创建的订单。种子中的未知结果可把下次查询时间推迟，主动查询接口会恢复原请求号查询。种子状态可用 `node scripts/settlement/demo-seed.cjs status` 只读查看；建数、账号及部署记录见 [统一结算运行说明](README.md)。此端口的成功记录不能作为真实机构联调或实际收付款凭据。

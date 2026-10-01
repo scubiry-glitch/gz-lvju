@@ -22,8 +22,8 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname.startsWith('/api/settlement/v1/'))return sharedSettlementHandler(req,res);
    if(!pathname.startsWith(prefix+'/')){
     if(staticFiles&&req.method==='GET'){
-     const valid=/^\/(?:assets\/commerce\/living\.webp|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:(?:commerce|settlement)-[a-z-]+\.html|_settlement[a-z-]*\.(?:js|css)|_commerce[a-z0-9-]*\.(?:js|css)|_cashier\.js|_beike-login\.js|_console-login\.js|_qr\.js|_nav\.js))$/;
-     if(valid.test(pathname)){const file=path.resolve(__dirname,'..','.'+pathname);if(fs.existsSync(file)){res.writeHead(200,{'Content-Type':pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.webp')?'image/webp':'text/javascript'});res.end(fs.readFileSync(file));return;}}
+     const valid=/^\/(?:assets\/commerce\/(?:living\.webp|covers\/[\w-]+\.(?:jpg|jpeg|webp|png)|posters\/[\w-]+\.svg)|assets\/(?:lxn-banner\.png|lvju\/(?:food-banquet|food-sourfish|huangguoshu|wanfenglin)\.jpg)|juzhu-(?:commerce|promoter|voucher|vouchers|hotels)\.html|(?:lvju|jiazheng)-app\.css|screens\/(?:(?:commerce|settlement)-[a-z-]+\.html|_settlement[a-z-]*\.(?:js|css)|_commerce[a-z0-9-]*\.(?:js|css)|_cashier\.js|_beike-login\.js|_console-login\.js|_qr\.js|_nav\.js))$/;
+     if(valid.test(pathname)){const file=path.resolve(__dirname,'..','.'+pathname);if(fs.existsSync(file)){res.writeHead(200,{'Content-Type':pathname.endsWith('.html')?'text/html; charset=utf-8':pathname.endsWith('.css')?'text/css':pathname.endsWith('.webp')?'image/webp':pathname.endsWith('.svg')?'image/svg+xml':pathname.endsWith('.png')?'image/png':/\.(jpe?g)$/.test(pathname)?'image/jpeg':'text/javascript'});res.end(fs.readFileSync(file));return;}}
     }
     throw new Fault(404,'接口不存在');
    }
