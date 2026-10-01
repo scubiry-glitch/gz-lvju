@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const {createProvider, authorizationHash, digest, minor, fault} = require('./provider.cjs');
 const {parse, sqlDate, postLedger: defaultPostLedger} = require('./primitives.cjs');
+const sytest=require('./sytest-provider.cjs');
 const uuid = () => crypto.randomUUID();
 const rows = async (c, sql, args = []) => (await c.execute(sql,args))[0];
 const json = value => JSON.stringify(value);
@@ -13,7 +14,7 @@ const amountOf = value => minor(value ?? 0);
 
 function createExecution(options) {
  const {pool, config={}, payCenter={}, paymentCore, authorize} = options;
- const provider=createProvider({config,payCenter}), postLedger=options.postLedger || defaultPostLedger;
+ const provider=createProvider({config,payCenter}), mockProvider=sytest.createProvider(config), postLedger=options.postLedger || defaultPostLedger;
  const clock=() => sqlDate(options.now ? options.now() : Date.now());
  const after=(seconds) => sqlDate(new Date(clock().replace(' ','T')+'Z').getTime()+seconds*1000);
  async function permission(principal,name,context={}) {
@@ -43,6 +44,7 @@ function createExecution(options) {
   const a=(await rows(c,'SELECT * FROM commerce_payment_accounts WHERE id=?',[id]))[0];
   ensure(a && ['ACTIVE','APPROVED'].includes(upper(a.status)),'机构账户未激活');
   ensure(a.provider===source.provider && a.environment===source.environment && a.currency===source.currency,'机构账户币种或环境不一致');
+  if(source.provider===sytest.PROVIDER){sytest.assertSource(source);sytest.assertAccount(a);}
   a.capabilities=parse(a.capabilities); return a;
  }
  function capability(a,operation) {
@@ -94,7 +96,7 @@ function createExecution(options) {
   const units=await rows(c,"SELECT calculation FROM commerce_settlement_units WHERE source_id=? AND status='CONFIRMED' ORDER BY id FOR UPDATE",[source.id]);
   const committed=units.reduce((n,u)=>{const value=parse(u.calculation);return n+minor(value.merchant_minor)+minor(value.commission_minor);},0n);
   const refunds=source.payment_id?await rows(c,"SELECT idempotency_key,amount_minor FROM payment_refunds WHERE payment_order_id=? AND refund_status<>'voided'",[source.payment_id]):[];
-  const refundAmount=refunds.filter(r=>r.idempotency_key!==requestKey).reduce((n,r)=>n+minor(r.amount_minor),0n);
+  const refundAmount=source.payment_id?refunds.filter(r=>r.idempotency_key!==requestKey).reduce((n,r)=>n+minor(r.amount_minor),0n):amountOf(source.returned_minor);
   ensure(amountOf(source.received_minor)-committed-refundAmount>=amount,'已确认履约义务尚未撤销，不可退款','SETTLEMENT_REFUND_OBLIGATION_ACTIVE');
  }
  async function validateAuthorization(c,item,context,source,existingLine=false) {
@@ -103,6 +105,7 @@ function createExecution(options) {
   ensure(a && ['AUTHORIZED','ACTIVE'].includes(upper(a.status)) && upper(a.purpose)==='FUND_EXECUTION','缺少有效资金执行授权');
   const snapshot=parse(a.snapshot), currentAmount=minor(item.planned_minor,true).toString();
   if(snapshot.policy_id) {const policy=(await rows(c,'SELECT status,version FROM commerce_settlement_policies WHERE id=?',[snapshot.policy_id]))[0];ensure(policy && upper(policy.status)==='APPROVED' && Number(policy.version)===Number(snapshot.policy_version),'执行策略已停用或版本变化，须重新授权');}
+  if(context.biz_type==='booking'){const bp=require('./booking-policy.cjs'),policy=await bp.selectPolicy(c,context,item);ensure(policy&&policy.id===snapshot.policy_id,'民宿结算规则已变化，须重新授权');const timing=bp.assertDue(context,policy,clock());ensure(snapshot.booking_timing&&digest(snapshot.booking_timing)===digest(timing),'民宿结算日期或规则已变化，须重新授权');}
   ensure(a.hash===authorizationHash(snapshot),'执行授权快照被修改');
   ensure(String(a.item_id)===String(item.id) && Number(a.item_revision)===Number(item.revision),'执行授权版本已过期');
   ensure(!a.expires_at || sqlDate(a.expires_at)>clock(),'执行授权已到期');
@@ -125,14 +128,16 @@ function createExecution(options) {
   const id=uuid(); await c.execute('INSERT INTO commerce_execution_plans(id,request_key,request_hash,created_by,status,snapshot,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',[id,input.request_key,fingerprint,actor(principal),'READY',json(snapshot),clock(),clock()]); return {id,exists:false};
  }
  async function putOrder(c,planId,principal,source,context,operation,effects,status='READY',extras={}) {
+  const mock=sytest.assertRoute(config,context,source),port=mock?mockProvider:provider;
   const id=uuid(), requestNo='XS'+id.replaceAll('-',''), sourceAccount=await account(c,extras.payer_account_id||source.account_id,source);
   if(operation!=='REFUND')capability(sourceAccount,operation);
   const input={request_no:requestNo,source_id:source.id,payment_id:source.payment_id,contract_no:source.contract_no,payer_account_id:sourceAccount.id,payer_account_version:Number(sourceAccount.version),source_merchant_no:sourceAccount.merchant_no,currency:source.currency,amount_minor:effects.reduce((sum,l)=>sum+minor(l.amount_minor),0n).toString(),explicit_amount_minor:effects.filter(l=>!l.implicit).reduce((sum,l)=>sum+minor(l.amount_minor),0n).toString(),lines:effects.filter(l=>!l.implicit),effects,...extras};
+  if(mock)input.demo={seed_key:sytest.SEED_KEY,scenario:context.snapshot.demo.scenario||'SUCCESS'};
   let built={};
-  if(operation!=='REFUND') {
-   const capability=provider.contract(context.profile.contract_mapping_version,operation);
+  if(operation!=='REFUND'||mock) {
+   const capability=port.contract(context.profile.contract_mapping_version,operation);
    ensure(capability.provider===source.provider && capability.environment===source.environment,'机构契约环境不匹配');
-   built=provider.build(context.profile.contract_mapping_version,operation,input);
+   built=port.build(context.profile.contract_mapping_version,operation,input);
   }
   await c.execute('INSERT INTO commerce_execution_orders(id,plan_id,context_id,source_id,operation,provider,environment,mapping_version,contract_hash,request_no,amount_minor,status,canonical_request,request_payload,query_payload,payload_hash,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[id,planId,context.id,source.id,operation,source.provider,source.environment,context.profile.contract_mapping_version,built.contract_hash||null,requestNo,input.amount_minor,status,json(input),built.submit?json(built.submit):null,built.query?json(built.query):null,built.submit?digest(built.submit):null,actor(principal),clock(),clock()]);
   for(const effect of effects) {
@@ -160,6 +165,8 @@ function createExecution(options) {
    const plan=await insertPlan(c,principal,input,{operation:'FUND_EXECUTION',item_ids:ids});if(plan.exists)return plan.id;
    let items=await rows(c,`SELECT * FROM commerce_settlement_items WHERE id IN (${ids.map(()=>'?').join(',')}) ORDER BY id`,ids);ensure(items.length===ids.length,'结算明细不存在');
    const sources=await lockSources(c,items.map(i=>i.source_id));
+   const modes=new Set();for(const source of sources.values())modes.add(sytest.assertRoute(config,await loadContext(c,source.context_id),source)?'mock':'real');
+   ensure(modes.size===1,'模拟资金与真实资金不得进入同一执行计划','SYTEST_MIXED_PLAN_DENIED');
    items=await rows(c,`SELECT * FROM commerce_settlement_items WHERE id IN (${ids.map(()=>'?').join(',')}) ORDER BY id FOR UPDATE`,ids);
    const groups=new Map();
    for(const item of items) {
@@ -231,6 +238,12 @@ function createExecution(options) {
    if(snapshot.recovery_source_id) await c.execute('UPDATE commerce_funding_sources SET reserved_minor=reserved_minor-?,returned_minor=returned_minor+? WHERE id=?',[amount.toString(),amount.toString(),snapshot.recovery_source_id]);
    await ledger(c,order,line,'return',`settlement_cash:${original.source_id}`,snapshot.recovery_source_id?`settlement_cash:${snapshot.recovery_source_id}`:`settlement_recovery:${original.id}`,amount);
    await require('./reversal.cjs').recordRecovery(c,{original_line_id:original.id,amount_minor:amount.toString(),event_key:'RETURN:'+line.id,kind:'SPLIT_RETURN'});
+  } else if(line.effect_kind==='REFUND') {
+   const source=(await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[line.source_id]))[0],context=await loadContext(c,line.context_id);
+   ensure(sytest.assertRoute(config,context,source)&&order.provider===sytest.PROVIDER,'消费者退款必须由独立模拟端口或统一支付入口确认','SYTEST_MOCK_SCOPE_DENIED');
+   await c.execute('UPDATE commerce_funding_sources SET reserved_minor=reserved_minor-?,returned_minor=returned_minor+? WHERE id=?',[amount.toString(),amount.toString(),line.source_id]);
+   await c.execute('UPDATE commerce_execution_refund_plans SET payment_refund_id=? WHERE order_id=?',[result.provider_line_id,order.id]);
+   await ledger(c,order,line,'mock-refund',context.biz_type==='commerce'?'unredeemed_liability':'service_pending_liability',`settlement_cash:${line.source_id}`,amount);
   } else {
    await c.execute('UPDATE commerce_funding_sources SET reserved_minor=reserved_minor-?,consumed_minor=consumed_minor+? WHERE id=?',[amount.toString(),amount.toString(),line.source_id]);
    await c.execute("UPDATE commerce_settlement_items SET reserved_minor=reserved_minor-?,discharged_minor=discharged_minor+?,status=IF(discharged_minor+cancelled_minor+offset_minor>=payable_minor,'PAID','PARTIALLY_PAID') WHERE id=?",[amount.toString(),amount.toString(),line.item_id]);
@@ -239,12 +252,12 @@ function createExecution(options) {
     const source=(await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[line.source_id]))[0], child=uuid();
     const receivedAccount=(await rows(c,'SELECT * FROM commerce_payment_accounts WHERE id=?',[line.account_id]))[0];
     const childStatus=Number(receivedAccount.version)===snapshot.account_version && receivedAccount.merchant_no===snapshot.payee_merchant_no && ['ACTIVE','APPROVED'].includes(upper(receivedAccount.status))?'AVAILABLE':'FROZEN';
-    await c.execute("INSERT INTO commerce_funding_sources(id,context_id,payment_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,NULL,'PLATFORM_COMMISSION',?,?,?,?,?,?,?,?)",[child,line.context_id,source.provider,source.environment,source.currency,line.account_id,snapshot.account_contract_no||source.contract_no,amount.toString(),childStatus,json({provider_line_id:result.provider_line_id,execution_line_id:line.id,source_id:source.id,account_version:snapshot.account_version,payee_merchant_no:snapshot.payee_merchant_no})]);
+    await c.execute("INSERT INTO commerce_funding_sources(id,context_id,payment_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,NULL,'PLATFORM_COMMISSION',?,?,?,?,?,?,?,?)",[child,line.context_id,source.provider,source.environment,source.currency,line.account_id,snapshot.account_contract_no||source.contract_no,amount.toString(),childStatus,json({provider_line_id:result.provider_line_id,execution_line_id:line.id,source_id:source.id,account_version:snapshot.account_version,payee_merchant_no:snapshot.payee_merchant_no,...(source.provider===sytest.PROVIDER?{demo_seed_key:sytest.SEED_KEY}:{})})]);
     await c.execute("INSERT INTO commerce_commission_funding_lots(id,source_execution_line_id,source_id,context_id,unit_id,received_minor,status,created_at) VALUES(?,?,?,?,?,?,'AVAILABLE',?)",[uuid(),line.id,child,line.context_id,line.unit_id,amount.toString(),clock()]);
     await ledger(c,order,line,'success',`settlement_cash:${child}`,`settlement_cash:${line.source_id}`,amount);
    } else { const item=(await rows(c,'SELECT beneficiary_party_id FROM commerce_settlement_items WHERE id=?',[line.item_id]))[0]; await ledger(c,order,line,'success',`payable:${item.beneficiary_party_id}`,`settlement_cash:${line.source_id}`,amount); }
   }
-  const allocationColumn=line.effect_kind==='MERCHANT_RELEASE'?'merchant_released_minor':'transferred_minor';
+  const allocationColumn=line.effect_kind==='REFUND'?'returned_minor':line.effect_kind==='MERCHANT_RELEASE'?'merchant_released_minor':'transferred_minor';
   await c.execute(`UPDATE commerce_execution_allocations SET reserved_minor=0,${allocationColumn}=${allocationColumn}+?,status='SUCCEEDED' WHERE line_id=?`,[amount.toString(),line.id]);
   await event(c,order,line,line.effect_kind+'_SUCCEEDED',amount,{provider_line_id:result.provider_line_id});
  }
@@ -287,11 +300,16 @@ function createExecution(options) {
    const {order,lines}=await lockOrderResources(c,orderId);
    if(terminal(order.status))return {order,skip:true};
    ensure(order.status!=='DRAFT','逆向单未审批');
-   if(order.operation==='REFUND')return {order,refund:true};
+   const context=await loadContext(c,order.context_id),source=(await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[order.source_id]))[0];
+   const mock=sytest.assertRoute(config,context,source),port=mock?mockProvider:provider;
+   if(mock){
+    ensure(order.provider===sytest.PROVIDER&&order.environment===sytest.ENVIRONMENT,'模拟执行记录归属不符','SYTEST_MOCK_SCOPE_DENIED');
+    for(const accountId of new Set([parse(order.canonical_request).payer_account_id,...lines.map(l=>l.account_id)])){const a=(await rows(c,'SELECT * FROM commerce_payment_accounts WHERE id=?',[accountId]))[0];ensure(a,'模拟账户不存在');sytest.assertAccount(a);}
+   }
+   if(order.operation==='REFUND')return {order,refund:true,mock};
    let action='query';
    if(order.status==='READY' && !order.submitted_at) {
-    ensure(provider.build(order.mapping_version,order.operation,parse(order.canonical_request)).contract_hash===order.contract_hash,'机构契约已变化，禁止发送旧计划','PROVIDER_CONTRACT_CHANGED');
-    const context=await loadContext(c,order.context_id), source=(await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[order.source_id]))[0];
+    ensure(port.build(order.mapping_version,order.operation,parse(order.canonical_request)).contract_hash===order.contract_hash,'机构契约已变化，禁止发送旧计划','PROVIDER_CONTRACT_CHANGED');
     ensure(['AVAILABLE','CONFIRMED'].includes(upper(source.status)),'资金来源执行前被冻结');
     const canonical=parse(order.canonical_request),payer=await account(c,canonical.payer_account_id,source);
     ensure(Number(payer.version)===canonical.payer_account_version,'机构付款账户版本变化');capability(payer,order.operation);
@@ -305,24 +323,26 @@ function createExecution(options) {
     ensure(digest(parse(order.request_payload))===order.payload_hash,'机构请求快照发生变化');
     await c.execute("UPDATE commerce_execution_orders SET status='SUBMITTING',submitted_at=?,updated_at=? WHERE id=?",[clock(),clock(),orderId]);action='submit';
    }
-   return {order,action};
+   return {order,action,mock};
   });
  }
- async function claimJob() {
+ async function claimJob(orderIds=null) {
   return tx(async c=>{
-   const job=(await rows(c,"SELECT * FROM commerce_execution_jobs WHERE status IN ('READY','RETRY','RUNNING') AND next_run_at<=? AND (lease_until IS NULL OR lease_until<?) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED",[clock(),clock()]))[0];
+   const mockOnly=sytest.enabled(config)&&config.execution_enabled!==true;
+   const job=(await rows(c,"SELECT * FROM commerce_execution_jobs WHERE status IN ('READY','RETRY','RUNNING') AND next_run_at<=? AND (lease_until IS NULL OR lease_until<?)"+(mockOnly?" AND order_id IN (SELECT o.id FROM commerce_execution_orders o JOIN commerce_settlement_business_contexts x ON x.id=o.context_id JOIN commerce_funding_sources s ON s.id=o.source_id WHERE o.provider='SYTEST_MOCK' AND o.environment='SANDBOX' AND JSON_UNQUOTE(JSON_EXTRACT(x.snapshot,'$.demo.seed_key'))='settlement-walkthrough-v1' AND JSON_UNQUOTE(JSON_EXTRACT(s.evidence,'$.demo_seed_key'))='settlement-walkthrough-v1')":"")+(orderIds?' AND order_id IN ('+orderIds.map(()=>'?').join(',')+')':'')+" ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED",[clock(),clock(),...(orderIds||[])]))[0];
    if(!job)return null;const token=uuid();await c.execute("UPDATE commerce_execution_jobs SET status='RUNNING',lease_token=?,lease_until=?,attempts=attempts+1 WHERE id=?",[token,after(Number(config.lease_seconds)||60),job.id]);return {...job,lease_token:token};
   });
  }
- async function runJobs({limit=10}={}) {
+ async function runJobs({limit=10,order_ids}={}) {
   ensure(Number.isInteger(limit) && limit>0 && limit<=100,'worker limit 无效');const results=[];
+  let orderIds=null;if(order_ids!==undefined){ensure(Array.isArray(order_ids)&&order_ids.length<=100&&order_ids.every(id=>typeof id==='string'&&/^[a-f0-9-]{36}$/.test(id)),'worker order_ids 无效');orderIds=[...new Set(order_ids)];if(!orderIds.length)return results;}
   for(let n=0;n<limit;n++) {
-   const job=await claimJob();if(!job)break;let status,error;
+   const job=await claimJob(orderIds);if(!job)break;let status,error;
    try {
     const ready=await prepare(job.order_id);
     if(ready.skip)status=ready.order.status;
-    else if(ready.refund)status=await processRefund(ready.order);
-    else status=await applyReceipt(job.order_id,await provider.invoke(ready.order,ready.action),ready.action);
+    else if(ready.refund)status=await processRefund(ready.order,ready.mock);
+    else status=await applyReceipt(job.order_id,await (ready.mock?mockProvider:provider).invoke(ready.order,ready.action),ready.action);
    }catch(e) {
     error=e;status='UNKNOWN';
     await tx(async c=>{
@@ -369,20 +389,22 @@ function createExecution(options) {
   });return getPlan(principal,{plan_id:id});
  }
  async function createRefund(principal,input) {
-  ensure(actor(principal),'操作人缺失');ensure(paymentCore && typeof paymentCore.requestRefund==='function','统一退款能力未接入');
+  ensure(actor(principal),'操作人缺失');
   const amount=minor(input.amount_minor,true),deps=[...new Set(input.return_line_ids||[])].sort();
   const id=await tx(async c=>{
    const plan=await insertPlan(c,principal,input,{operation:'REFUND',source_id:input.source_id,context_id:input.context_id,amount_minor:amount.toString(),dependencies:deps,reason:input.reason||''});if(plan.exists)return plan.id;
    const sources=await lockSources(c,[input.source_id],{allowRefund:true}),source=sources.get(input.source_id),context=await loadContext(c,input.context_id);await permission(principal,'settlement.fund.write',context);
-   ensure(source.context_id===context.id && source.payment_id && source.source_type!=='PLATFORM_COMMISSION','退款必须绑定原支付来源');
+   const mock=sytest.assertRoute(config,context,source);
+   if(!mock)ensure(paymentCore && typeof paymentCore.requestRefund==='function','统一退款能力未接入');
+   ensure(source.context_id===context.id && (mock?source.source_type==='PAYMENT':source.payment_id&&source.source_type!=='PLATFORM_COMMISSION'),'退款必须绑定原支付来源');
    await refundEconomicCapacity(c,source,amount);
    for(const dep of deps) {const line=(await rows(c,"SELECT * FROM commerce_execution_lines WHERE id=? AND effect_kind='RETURN'",[dep]))[0];ensure(line && line.source_id===source.id && line.context_id===context.id,'回退依赖归属不符');}
    const a=await account(c,source.account_id,source),line={id:uuid(),account_id:a.id,account_version:Number(a.version),payee_merchant_no:a.merchant_no,effect_kind:'REFUND',amount_minor:amount.toString()};
    const orderId=await putOrder(c,plan.id,principal,source,context,'REFUND',[line],'DRAFT');
-   const payment=(await rows(c,'SELECT * FROM payment_orders WHERE id=?',[source.payment_id]))[0];
-   const refundInput={bizType:context.biz_type,orderId:context.biz_order_no,paymentId:String(source.payment_id),requestKey:'settlement:'+orderId,amountMinor:Number(amount),reason:input.reason||'settlement refund',source:'settlement',reference:{execution_order_id:orderId,context_id:context.id}};
+   const payment=mock?null:(await rows(c,'SELECT * FROM payment_orders WHERE id=?',[source.payment_id]))[0];
+   const refundInput={bizType:context.biz_type,orderId:context.biz_order_no,paymentId:mock?null:String(source.payment_id),requestKey:'settlement:'+orderId,amountMinor:Number(amount),reason:input.reason||'settlement refund',source:mock?'sytest-mock':'settlement',reference:{execution_order_id:orderId,context_id:context.id},...(mock?{demo_seed_key:sytest.SEED_KEY}:{})};
    const paymentOrderNo=context.biz_type==='commerce'?String(context.biz_order_no).replaceAll('-','').toLowerCase():String(context.biz_order_no);
-   ensure(amount<=BigInt(Number.MAX_SAFE_INTEGER) && payment.biz_type===context.biz_type && String(payment.biz_order_no)===paymentOrderNo,'原支付与业务订单不符或金额超统一退款接口范围');
+   ensure(amount<=BigInt(Number.MAX_SAFE_INTEGER) && (mock||payment&&payment.biz_type===context.biz_type && String(payment.biz_order_no)===paymentOrderNo),'原支付与业务订单不符或金额超统一退款接口范围');
    await c.execute('INSERT INTO commerce_execution_refund_plans(order_id,amount_minor,dependencies,request_key,refund_input) VALUES(?,?,?,?,?)',[orderId,amount.toString(),json(deps),refundInput.requestKey,json(refundInput)]);await c.execute("UPDATE commerce_execution_plans SET status='DRAFT' WHERE id=?",[plan.id]);return plan.id;
   });return getPlan(principal,{plan_id:id});
  }
@@ -400,7 +422,7 @@ function createExecution(options) {
    const status=order.operation==='REFUND'?'WAITING_DEPENDENCIES':'READY';await c.execute('UPDATE commerce_execution_orders SET approved_by=?,status=?,updated_at=? WHERE id=?',[actor(principal),status,clock(),order.id]);await c.execute('UPDATE commerce_execution_lines SET status=? WHERE order_id=?',[status,order.id]);await enqueue(c,order.id);await updatePlanStatus(c,order.plan_id);return {order_id:order.id,status};
   });
  }
- async function processRefund(order) {
+ async function processRefund(order,mock=false) {
   const prepared=await tx(async c=>{
    const locked=await lockOrderResources(c,order.id), current=locked.order;
    const refund=(await rows(c,'SELECT * FROM commerce_execution_refund_plans WHERE order_id=? FOR UPDATE',[order.id]))[0];
@@ -413,6 +435,7 @@ function createExecution(options) {
    }
    await c.execute("UPDATE commerce_execution_orders SET status='SUBMITTING',submitted_at=COALESCE(submitted_at,?),updated_at=? WHERE id=?",[clock(),clock(),order.id]);return {refund};
   });if(prepared.waiting)return 'WAITING_DEPENDENCIES';
+  if(mock)return applyReceipt(order.id,await mockProvider.invoke(order,order.submitted_at?'query':'submit'),order.submitted_at?'query':'submit');
   // This method only creates a durable unified payment refund/outbox. It never
   // calls an institution while our source/item transaction holds locks.
   const response=await paymentCore.requestRefund(parse(prepared.refund.refund_input));

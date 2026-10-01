@@ -68,6 +68,7 @@ function createHandler({service,auth,publicOrigin=''}) {
  route('POST',/^\/me\/service-orders\/([^/]+)\/acceptance$/,(p,i,m)=>service.business.acceptService(p,{...i,id:decodeURIComponent(m[1])}));
  route('POST','/admin/settlement-statements/generate',(p,i)=>S.generateStatement(p,i));
  route('POST','/admin/statement-policies',(p,i)=>S.setStatementPolicy(p,i));
+ route('GET','/me/statement-policy',(p,i)=>S.listStatementPolicies(p,i));
  route('GET','/me/settlement-statements',(p,i)=>S.listStatements(p,i));
  route('GET',new RegExp('^/me/settlement-statements/'+UUID+'$'),(p,i,m)=>S.getStatement(p,{...i,statement_id:m[1]}));
  for(const [action,fn] of [['exports','requestExport'],['confirmations','confirmStatement'],['disputes','raiseDispute']])

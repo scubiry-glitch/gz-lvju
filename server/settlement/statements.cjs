@@ -2,7 +2,7 @@
 
 const {createExternal,id,hash,json,check,fail,money,time,text}=require('./external.cjs');
 const {buildExport}=require('./exports.cjs');
-const MODES=['pay_center','wechat_mini'],BIZ=['commerce','jiazheng'];
+const MODES=['pay_center','wechat_mini','offline'],BIZ=['commerce','jiazheng','booking'];
 const arr=(v,allowed,label)=>{const values=v==null?allowed:[...new Set(Array.isArray(v)?v:[v])];check(values.length>0&&values.every(x=>allowed.includes(x)),label+'无效',422);return values.sort();};
 function boundary(v){check(typeof v==='string'&&v.length<=40,'账期日期无效',422);return time(/^\d{4}-\d{2}-\d{2}$/.test(v)?v+'T00:00:00+08:00':v);}
 function before(a,b){return String(a||'').slice(0,23)<String(b).slice(0,23);}
@@ -15,7 +15,7 @@ function createStatements(options){
   async function allowed(p,permission,scope,soft=false){
     const scopes=[];
     for(const biz of scope.biz_types)for(const mode of scope.payment_modes){
-      if(biz==='commerce'&&mode==='wechat_mini')continue;
+      if(mode==='wechat_mini'&&biz!=='jiazheng'||mode==='offline'&&biz!=='booking')continue;
       try{await auth(p,permission,{party_id:scope.party_id,biz_type:biz,payment_mode:mode});scopes.push({biz_type:biz,payment_mode:mode});}
       catch(e){if(!soft||![401,403].includes(e.status))throw e;}
     }
@@ -131,8 +131,8 @@ function createStatements(options){
     const orders=new Set(),unknownOrders=new Set(),knownPaymentOrders=new Set(),lines=[];
     for(const line of allLines){
       const at=line.posted_at||line.occurred_at||line.received_at,active=inside(at,start,end),unresolved=['PENDING_EVIDENCE','CONFLICT','PENDING_REVIEW'].includes(line.verification_status);
-      if(!active&&!unresolved&&!['ORDER_COVERAGE','INTERNAL_OBLIGATION','EXTERNAL_OBLIGATION','RECOVERY_OBLIGATION'].includes(line.record_type))continue;
-      if(line.record_type==='ORDER_COVERAGE'&&line.occurred_at&&!before(line.occurred_at,end))continue;
+      if(!active&&!unresolved&&!['ORDER_COVERAGE','BOOKING_ORDER','INTERNAL_OBLIGATION','EXTERNAL_OBLIGATION','RECOVERY_OBLIGATION'].includes(line.record_type))continue;
+      if(['ORDER_COVERAGE','BOOKING_ORDER'].includes(line.record_type)&&line.occurred_at&&!before(line.occurred_at,end))continue;
       lines.push(line);if(line.context_id)orders.add(line.context_id);
       if(line.record_type==='ORDER_COVERAGE')unknownOrders.add(line.context_id);
       if(line.record_type==='EXTERNAL_TRADE'&&line.event_kind==='PAYMENT'&&line.amount_minor!=null&&line.currency)knownPaymentOrders.add(line.context_id);
@@ -194,7 +194,7 @@ function createStatements(options){
       await rows(c,'SELECT scope_key FROM commerce_payee_statement_locks WHERE scope_key=? FOR UPDATE',[lockKey]);
       const internal=await (config.statementSource||defaultInternalSource)(c,scope,asOf),outside=await externalSource(c,scope,asOf);
       check(Array.isArray(internal.lines)&&Array.isArray(internal.financial_events||[]),'站内账单来源协议无效',500);
-      const {summary,lines}=summarize([...internal.lines,...outside.lines],internal.financial_events||[],currency,start,end);
+      const {summary,lines}=summarize([...internal.lines,...outside.lines,...await require('./booking-reports.cjs').source(c,scope,asOf)],internal.financial_events||[],currency,start,end);
       lines.sort((a,b)=>a.line_key.localeCompare(b.line_key));
       let coverage=scope.payment_modes.includes('wechat_mini')?outside.coverage_status:internal.coverage_status||'PARTIAL';
       if(scope.payment_modes.includes('wechat_mini')){
@@ -243,10 +243,47 @@ function createStatements(options){
   }
   async function retryExport(p,input){const job=await getExport(p,input);check(['FAILED','READY'].includes(job.status),'当前任务不能重建');await pool.execute("UPDATE commerce_statement_export_jobs SET status='QUEUED',attempts=0,error_code=NULL,file_blob=NULL WHERE id=?",[job.id]);return {id:job.id,status:'QUEUED'};}
   function monthly(nowMs){const beijing=new Date(nowMs+8*3600000),y=beijing.getUTCFullYear(),m=beijing.getUTCMonth();return {start:new Date(Date.UTC(y,m-1,1)-8*3600000),end:new Date(Date.UTC(y,m,1)-8*3600000),due:new Date(Date.UTC(y,m,1,8)-8*3600000),next:new Date(Date.UTC(y,m+1,1,8)-8*3600000)};}
-  async function setStatementPolicy(p,input){const scope=scopeOf(input);await allowed(p,'settlement.statement.generate',scope);const currency=text(input.currency||'CNY','币种',3);const month=monthly(now()),next=now()>=month.due.getTime()?month.due:month.next;const policyId=id();await pool.execute('INSERT INTO commerce_payee_statement_policies(id,party_id,currency,scope_json,scope_hash,next_run_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE status=\'ACTIVE\'',[policyId,scope.party_id,currency,JSON.stringify(scope),hash(scope),time(next),actor(p),clock()]);return {party_id:scope.party_id,currency,next_run_at:time(next)};}
+  // 账单日（T+N 账期）出账窗口：账单日 08:00（北京）出上一账单日至今的账单。
+  // 1–28 规避月尾长度差异；缺省与 1 日都按自然月，行为与历史完全一致。
+  function cycleWindow(nowMs,billingDay){
+    const day=Number(billingDay)||0;
+    if(!(day>=2))return monthly(nowMs);
+    const beijing=new Date(nowMs+8*3600000),y=beijing.getUTCFullYear(),m=beijing.getUTCMonth();
+    const at=(mm,hour=0)=>new Date(Date.UTC(y,mm,day,hour)-8*3600000);
+    if(nowMs>=at(m,8).getTime())return {start:at(m-1),end:at(m),due:at(m,8),next:at(m+1,8)};
+    return {start:at(m-2),end:at(m-1),due:at(m-1,8),next:at(m,8)};
+  }
+  function windowOf(nextRunAt,billingDay){const fireAt=new Date(time(nextRunAt).replace(' ','T')+'Z').getTime();return billingDay?cycleWindow(fireAt,billingDay):monthly(fireAt);}
+  // 账单日单一数据源是结算规则（booking 策略 conditions.billing_day）；出账策略只是随动镜像。
+  async function bookingBillingDay(scope){
+    if(!scope.biz_types.includes('booking'))return null;
+    const placeholders=scope.payment_modes.map(()=>'?').join(',');
+    const candidates=await rows(pool,"SELECT conditions FROM commerce_settlement_policies WHERE status='approved' AND biz_type='booking' AND payment_mode IN ("+placeholders+") AND (party_id=? OR party_id IS NULL) ORDER BY (party_id IS NULL),priority DESC,created_at DESC",[...scope.payment_modes,scope.party_id]);
+    for(const row of candidates){const day=json(row.conditions)?.billing_day;if(day!=null)return day;}
+    return null;
+  }
+  async function setStatementPolicy(p,input){
+    const scope=scopeOf(input);await allowed(p,'settlement.statement.generate',scope);
+    const currency=text(input.currency||'CNY','币种',3);
+    const explicit=input.billing_day!==undefined,billingDay=explicit?(input.billing_day==null?null:(day=>{check(Number.isInteger(day)&&day>=1&&day<=28,'账单日须为每月 1–28 日的整数，留空则按自然月出账',422);return day;})(Number(input.billing_day))):await bookingBillingDay(scope);
+    const [current]=(await rows(pool,'SELECT * FROM commerce_payee_statement_policies WHERE party_id=? AND currency=? AND scope_hash=?',[scope.party_id,currency,hash(scope)]));
+    const cycleChanged=!current||Number(current.billing_day||0)!==Number(billingDay||0);
+    const win=cycleWindow(now(),billingDay),next=now()>=win.due.getTime()?win.due:win.next;
+    const updates=cycleChanged?"status='ACTIVE',billing_day=VALUES(billing_day),next_run_at=VALUES(next_run_at)":"status='ACTIVE',billing_day=VALUES(billing_day)";
+    await pool.execute('INSERT INTO commerce_payee_statement_policies(id,party_id,currency,scope_json,scope_hash,billing_day,next_run_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE '+updates,[id(),scope.party_id,currency,JSON.stringify(scope),hash(scope),billingDay,time(next),actor(p),clock()]);
+    return {party_id:scope.party_id,currency,billing_day:billingDay,next_run_at:time(next)};
+  }
+  async function listStatementPolicies(p){
+    const all=await rows(pool,"SELECT * FROM commerce_payee_statement_policies WHERE status='ACTIVE' ORDER BY party_id,currency"),out=[];
+    for(const row of all){const scope=json(row.scope_json);try{await allowed(p,'settlement.statement.read',scope,true);}catch(e){if(![401,403].includes(e.status))throw e;continue;}
+      const win=windowOf(row.next_run_at,row.billing_day);
+      out.push({party_id:row.party_id,currency:row.currency,biz_types:scope.biz_types,payment_modes:scope.payment_modes,billing_day:row.billing_day==null?null:Number(row.billing_day),next_run_at:time(row.next_run_at),current_period:{period_start:win.start.toISOString(),period_end:win.end.toISOString()}});
+    }
+    return {rows:out};
+  }
   async function runScheduled(p,input={}){
     actor(p);const policies=await rows(pool,"SELECT * FROM commerce_payee_statement_policies WHERE status='ACTIVE' AND next_run_at<=? ORDER BY next_run_at LIMIT 100",[clock()]),result=[];
-    for(const policy of policies){const scope=json(policy.scope_json);try{const month=monthly(new Date(time(policy.next_run_at).replace(' ','T')+'Z').getTime());const s=await generateStatement(p,{...scope,currency:policy.currency,period_start:month.start.toISOString(),period_end:month.end.toISOString()});await pool.execute('UPDATE commerce_payee_statement_policies SET next_run_at=? WHERE id=? AND next_run_at=?',[time(month.next),policy.id,policy.next_run_at]);result.push({policy_id:policy.id,statement_id:s.id});}catch(e){result.push({policy_id:policy.id,error:e.code||e.message});}}
+    for(const policy of policies){const scope=json(policy.scope_json);try{const win=windowOf(policy.next_run_at,policy.billing_day);const s=await generateStatement(p,{...scope,currency:policy.currency,period_start:win.start.toISOString(),period_end:win.end.toISOString()});await pool.execute('UPDATE commerce_payee_statement_policies SET next_run_at=? WHERE id=? AND next_run_at=?',[time(win.next),policy.id,policy.next_run_at]);result.push({policy_id:policy.id,statement_id:s.id});}catch(e){result.push({policy_id:policy.id,error:e.code||e.message});}}
     return {rows:result};
   }
   async function syncExternalOrders(p,input){return tx(async c=>{
@@ -256,7 +293,7 @@ function createStatements(options){
     await c.execute("INSERT INTO commerce_payee_statement_policies(id,party_id,currency,scope_json,scope_hash,next_run_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE id=id",[id(),scope.party_id,'CNY',JSON.stringify(scope),hash(scope),time(next),actor(p),clock()]);
     return {...out,statement_policy_registered:true};
   });}
-  const api={...Object.fromEntries(Object.entries(external).filter(([k])=>k!=='_internals')),syncExternalOrders,generateStatement,getStatement,listStatements,confirmStatement,raiseDispute,listDisputes,resolveDispute,requestExport,getExport,runExports,downloadExport,retryExport,setStatementPolicy,runScheduled};
+  const api={...Object.fromEntries(Object.entries(external).filter(([k])=>k!=='_internals')),syncExternalOrders,generateStatement,getStatement,listStatements,listStatementPolicies,confirmStatement,raiseDispute,listDisputes,resolveDispute,requestExport,getExport,runExports,downloadExport,retryExport,setStatementPolicy,runScheduled};
   const writeNames=['syncExternalOrders','ingestEvidence','reviewEvidence','allocateExternalTrade','importExternalEvidence','reviewImport','submitCoverage','reviewCoverage','recordExternalAccrual','reviewExternalAccrual','generateStatement','confirmStatement','raiseDispute','resolveDispute','requestExport','retryExport','setStatementPolicy'];
   const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
   async function guardWrite(p,name,input){

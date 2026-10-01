@@ -1,0 +1,121 @@
+{
+  "seed_key": "booking-walkthrough-v1",
+  "origin": "https://sytest.meizu.life",
+  "financial_mutations": false,
+  "export_tasks": false,
+  "checks": [
+    "six-real-identities-and-booking-scopes",
+    "published-booking-rules-N3-auto-and-review",
+    "paid-waiting-staying-offline-and-approval-states",
+    "browser-booking-items-rules-and-read-only-approval",
+    "booking-order-facts-and-three-party-statement-isolation",
+    "mobile-booking-statements-without-page-overflow"
+  ],
+  "requests": [
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer2",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/policies",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/items",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/admin/approval-tasks",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/e3ead0f1-da2a-48bd-ad30-83df5b09579f",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/03533316-c7d8-456f-96fe-5ef5a8d6bc27",
+      "status": 403
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/03533316-c7d8-456f-96fe-5ef5a8d6bc27",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/e3ead0f1-da2a-48bd-ad30-83df5b09579f",
+      "status": 403
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/9096652d-508f-40a4-8e82-67d42b456bea",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/e3ead0f1-da2a-48bd-ad30-83df5b09579f",
+      "status": 403
+    }
+  ],
+  "screenshots": [
+    "01-booking-items.png",
+    "02-booking-policies-N3.png",
+    "03-booking-independent-review.png",
+    "04-booking-statement-merchant.png",
+    "04-booking-order-facts.png",
+    "04-booking-statement-promoter.png",
+    "04-booking-statement-platform.png",
+    "06-booking-mobile.png"
+  ],
+  "downloads": [],
+  "started_at": "2026-10-01T20:49:15.480Z",
+  "paid_channel_commission_minor": "996",
+  "passed": true,
+  "finished_at": "2026-10-01T20:49:46.580Z"
+}

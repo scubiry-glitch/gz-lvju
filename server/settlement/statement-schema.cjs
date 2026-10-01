@@ -84,7 +84,8 @@ callbackInboxDdl,
 ) ENGINE=InnoDB`,
 `CREATE TABLE IF NOT EXISTS commerce_payee_statement_policies (
  id VARCHAR(36) PRIMARY KEY, party_id VARCHAR(64) NOT NULL, currency CHAR(3) NOT NULL,
- scope_json JSON NOT NULL, scope_hash CHAR(64) NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+ scope_json JSON NOT NULL, scope_hash CHAR(64) NOT NULL, billing_day TINYINT NULL,
+ status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
  next_run_at DATETIME(3) NOT NULL, created_by VARCHAR(64) NOT NULL, created_at DATETIME(3) NOT NULL,
  UNIQUE KEY policy_scope(party_id,currency,scope_hash), KEY due_idx(status,next_run_at)
 ) ENGINE=InnoDB`,
@@ -130,5 +131,9 @@ callbackInboxDdl,
 ) ENGINE=InnoDB`,
 ];
 
-async function migrate(c) { for (const sql of ddl) await c.query(sql); }
+async function migrate(c) {
+ for (const sql of ddl) await c.query(sql);
+ // 账单日（T+N 账期出账）：NULL = 自然月（缺省），1–28 = 每月该日出账。
+ await require('./schema.cjs').column(c,'commerce_payee_statement_policies','billing_day','TINYINT NULL');
+}
 module.exports = { ddl, migrate, callbackInboxDdl };

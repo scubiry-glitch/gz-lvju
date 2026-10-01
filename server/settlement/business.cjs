@@ -49,14 +49,14 @@ async function funding(c,ctx,paymentId) {
 async function onPaymentAccepted(c,{biz_type,order,guard}) {
  const snapshot=parse(biz_type==='commerce'?order.snapshot:order.payment_config_snapshot),profiles=snapshot.settlement_profiles;
  const profile=biz_type==='commerce'?Object.values(profiles||{})[0]:snapshot.settlement_profile;if(!profile)return null;
- const ctx=await registerContext(c,{biz_type,source_order_system:biz_type==='commerce'?'commerce_orders':'jz_orders',biz_order_no:order.id,party_id:profile.party_id,snapshot:{settlement_profile:profile,...(profiles?{profiles}:{}),account_id:String(order.account_id),vendor_id:order.vendor_id||null,city_id:order.city_id||null}});
+ const ctx=await registerContext(c,{biz_type,source_order_system:biz_type==='commerce'?'commerce_orders':biz_type==='booking'?'booking_orders':'jz_orders',biz_order_no:biz_type==='booking'?order.order_no:order.id,party_id:profile.party_id,snapshot:{settlement_profile:profile,...(profiles?{profiles}:{}),...(biz_type==='booking'?{booking:snapshot.booking}:{}),account_id:String(biz_type==='booking'?order.user_id:order.account_id),vendor_id:order.owner_vendor_id||order.vendor_id||null,city_id:order.city_id||null}});
  return funding(c,ctx,guard.paid_payment_id);
 }
 async function onRefundSucceeded(c,{biz_type,order,payload}) {
  const snapshot=parse(biz_type==='commerce'?order.snapshot:order.payment_config_snapshot);if(!snapshot.settlement_profile&&!snapshot.settlement_profiles)return false;
  const paymentId=String(payload.paymentId??payload.payment_id),refundId=String(payload.refundId??payload.refund_id);
  const [source]=await rows(c,"SELECT s.*,x.biz_order_no,x.biz_type FROM commerce_funding_sources s JOIN commerce_settlement_business_contexts x ON x.id=s.context_id WHERE s.payment_id=? AND s.source_type='PAYMENT' FOR UPDATE",[paymentId]);if(!source)return false;
- assert(source.biz_type===biz_type&&source.biz_order_no===order.id,'退款与原款业务身份不符',409);
+ assert(source.biz_type===biz_type&&source.biz_order_no===String(biz_type==='booking'?order.order_no:order.id),'退款与原款业务身份不符',409);
  const [refund]=await rows(c,"SELECT * FROM payment_refunds WHERE id=? AND payment_order_id=? AND refund_status='refunded'",[refundId,paymentId]);assert(refund&&String(refund.amount_minor)===minor(payload.amountMinor??payload.amount_minor),'退款机构事实与金额不符',409);
  if(payload.reference?.execution_order_id){const [plan]=await rows(c,'SELECT r.payment_refund_id FROM commerce_execution_refund_plans r JOIN commerce_execution_orders o ON o.id=r.order_id WHERE o.id=? AND o.source_id=?',[payload.reference.execution_order_id,source.id]);assert(plan&&String(plan.payment_refund_id)===refundId,'执行退款关联未确认',409);}
  await postLedger(c,{event_key:'payment:refund:'+refundId,context_id:source.context_id,source_type:'payment_refund',source_id:refundId,lines:[{side:'debit',account:biz_type==='commerce'?'unredeemed_liability':'service_pending_liability',amount_minor:String(refund.amount_minor)},{side:'credit',account:'settlement_cash:'+source.id,amount_minor:String(refund.amount_minor)}]});
@@ -69,7 +69,8 @@ async function onRefundSucceeded(c,{biz_type,order,payload}) {
 }
 async function recognize(c,{ctx,unit_key,recognition_id,amount_minor,source,profile,evidence,merchant_id=null,promoter_account_id=null,coupon_id=null,redemption_id=null,order_id=null,city_id=null,already_posted=false}) {
  const [prior]=await rows(c,'SELECT * FROM commerce_settlement_units WHERE context_id=? AND unit_key=? FOR UPDATE',[ctx.id,unit_key]);if(prior){if(prior.status==='REVERSED'){unit_key=unit_key+':'+recognition_id;const [revision]=await rows(c,'SELECT * FROM commerce_settlement_units WHERE context_id=? AND unit_key=? FOR UPDATE',[ctx.id,unit_key]);if(revision)return {...revision,calculation:parse(revision.calculation)};}else{assert(prior.recognition_id===recognition_id,'同一结算单位已由其他事实确认',409);return {...prior,calculation:parse(prior.calculation)};}}
- const promoterParty=promoter_account_id?'account:'+promoter_account_id:null;
+ let promoterParty=promoter_account_id?'account:'+promoter_account_id:null;
+ if(promoter_account_id){const [binding]=await rows(c,"SELECT party_id FROM commerce_settlement_party_bindings WHERE source_domain='identity' AND source_entity_type='account' AND source_entity_id=? AND status='approved'",[String(promoter_account_id)]);if(binding)promoterParty=binding.party_id;}
  const rule={...profile.calculation,promoter_party_id:promoterParty,amount_minor:minor(amount_minor)};const calc=calculate(rule),unitId=id();
  const [currentSource]=await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=? FOR UPDATE',[source.id]);
  const allocatedRows=await rows(c,"SELECT basis_minor FROM commerce_settlement_units WHERE source_id=? AND status='CONFIRMED' ORDER BY id FOR UPDATE",[source.id]),allocated=allocatedRows.reduce((sum,r)=>sum+BigInt(r.basis_minor),0n);

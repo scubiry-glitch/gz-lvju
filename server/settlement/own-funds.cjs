@@ -11,7 +11,7 @@ async function migrate(c){
  await column(c,'commerce_compensation_recoveries','return_due_minor','BIGINT NOT NULL DEFAULT 0');
  await column(c,'commerce_compensation_recoveries','sync_version','INT NOT NULL DEFAULT 0');
 }
-function createOwnFunds({pool,workflow,authorize}){
+function createOwnFunds({pool,workflow,authorize,config={}}){
  const actor=p=>String(p.account.id),text=(v,name,max)=>{assert(typeof v==='string'&&v.trim().length>0&&v.length<=max,name+'无效',422);return v.trim();};
  async function context(c,contextId){const ctx=await workflow.context(c,contextId);assert(ctx.payment_mode==='pay_center'&&ctx.execution_scope==='INTERNAL_FUNDED'&&ctx.currency,'仅支持已接入真实站内结算的订单',409);assert(ctx.snapshot?.is_demo!==true&&ctx.snapshot?.initialization?.mode!=='demo','演示订单不可使用真实资金',409);assert(ctx.snapshot.settlement_profile,'订单缺少结算合同',409);return ctx;}
  async function access(p,permission,ctx){assert(await authorize(p,permission,ctx)===true,'无此主体资金权限',403);}
@@ -41,7 +41,12 @@ function createOwnFunds({pool,workflow,authorize}){
    const [prior]=await rows(c,'SELECT * FROM commerce_own_fund_receipts WHERE provider=? AND environment=? AND provider_reference=? FOR UPDATE',[a.provider,a.environment,reference]);
    if(prior){assert(prior.payload_hash===fingerprint,'该机构流水已登记，内容或归属不能改变',409,'own_receipt_conflict');return {...prior,reused:true};}
    const receiptId=id(),sourceId=id();
-   await c.execute("INSERT INTO commerce_funding_sources(id,context_id,payment_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,NULL,?,?,?,?,?,?,?,'DRAFT',?)",[sourceId,ctx.id,sourceType,a.provider,a.environment,a.currency,a.id,a.contract_no,amount,JSON.stringify({own_receipt_id:receiptId,provider_reference:reference,evidence_ref:evidence,own_funds_evidence_ref:a.capabilities.own_funds_evidence_ref})]);
+   const sourceEvidence={own_receipt_id:receiptId,provider_reference:reference,evidence_ref:evidence,own_funds_evidence_ref:a.capabilities.own_funds_evidence_ref};
+   if(a.provider==='SYTEST_MOCK'){
+    const sytest=require('./sytest-provider.cjs'),[original]=await rows(c,"SELECT * FROM commerce_funding_sources WHERE context_id=? AND source_type IN ('PAYMENT','ORIGINAL_PAYMENT') ORDER BY created_at LIMIT 1",[ctx.id]);
+    assert(original,'走查订单缺少原始模拟来源',409);sytest.assertRoute(config,current,original);sytest.assertAccount(a);sourceEvidence.demo_seed_key=sytest.SEED_KEY;
+   }
+   await c.execute("INSERT INTO commerce_funding_sources(id,context_id,payment_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,NULL,?,?,?,?,?,?,?,'DRAFT',?)",[sourceId,ctx.id,sourceType,a.provider,a.environment,a.currency,a.id,a.contract_no,amount,JSON.stringify(sourceEvidence)]);
    await c.execute('INSERT INTO commerce_own_fund_receipts(id,source_id,context_id,account_id,provider,environment,provider_reference,currency,amount_minor,evidence_ref,payload_hash,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[receiptId,sourceId,ctx.id,a.id,a.provider,a.environment,reference,a.currency,amount,evidence,fingerprint,actor(p)]);
    await workflow.audit(c,p,'own-funds.source.create',receiptId,{source_id:sourceId,amount_minor:amount,provider_reference:reference});return {id:receiptId,source_id:sourceId,status:'DRAFT',amount_minor:amount};
   });
@@ -61,7 +66,9 @@ function createOwnFunds({pool,workflow,authorize}){
  }
  async function compensationInputs(c,ctx,input){
   const [unit]=await rows(c,"SELECT * FROM commerce_settlement_units WHERE id=? AND context_id=? AND status='CONFIRMED'",[input.original_unit_id,ctx.id]);assert(unit&&BigInt(unit.basis_minor)>0n,'赔付必须关联真实已确认履约单位',409);
-  const [original]=await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[unit.source_id]);assert(original&&original.payment_id&&original.context_id===ctx.id&&!['platform_own','supplement','PLATFORM_COMMISSION'].includes(original.source_type),'缺少真实原支付来源',409);
+  const [original]=await rows(c,'SELECT * FROM commerce_funding_sources WHERE id=?',[unit.source_id]);
+  const walkthrough=original?.provider==='SYTEST_MOCK'&&require('./sytest-provider.cjs').assertRoute(config,ctx,original);
+  assert(original&&(original.payment_id||walkthrough)&&original.context_id===ctx.id&&!['platform_own','supplement','PLATFORM_COMMISSION'].includes(original.source_type),'缺少真实原支付来源',409);
   const customer=String(ctx.snapshot.account_id||'');assert(customer,'缺少原订单客户归属',409);
   const account=await approvedAccount(c,input.account_id);
   let own=account.party_id==='account:'+customer;
@@ -125,9 +132,11 @@ function createOwnFunds({pool,workflow,authorize}){
   }
   return amount;
  }
- async function syncRecoveries(){
+ async function syncRecoveries({context_ids}={}){
   // Round-robin all records: a bank return can arrive after a fully paid case.
-  const pending=await rows(pool,'SELECT id FROM commerce_compensation_recoveries ORDER BY updated_at,id LIMIT 100'),out=[];
+  const ids=context_ids===undefined?null:[...new Set(context_ids.map(String))];
+  if(ids&&!ids.length)return {rows:[]};
+  const pending=await rows(pool,'SELECT id FROM commerce_compensation_recoveries'+(ids?' WHERE context_id IN ('+ids.map(()=>'?').join(',')+')':'')+' ORDER BY updated_at,id LIMIT 100',ids||[]),out=[];
   for(const record of pending)await transaction(pool,async c=>{
    const [r]=await rows(c,'SELECT r.*,p.item_id FROM commerce_compensation_recoveries r JOIN commerce_real_compensations p ON p.id=r.compensation_id WHERE r.id=? FOR UPDATE',[record.id]);
    const paid=await netCompensationPaid(c,r.item_id),target=paid>BigInt(r.amount_minor)?BigInt(r.amount_minor):paid,delta=target-BigInt(r.activated_minor);

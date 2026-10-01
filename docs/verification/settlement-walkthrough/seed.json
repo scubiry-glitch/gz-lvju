@@ -1,0 +1,316 @@
+{
+  "seed_key": "settlement-walkthrough-v1",
+  "run_id": "settlement-walkthrough-v1",
+  "provider": "SYTEST_MOCK",
+  "environment": "SANDBOX",
+  "generated_at": "2026-10-01T20:08:31.513Z",
+  "actors": {
+    "operator": {
+      "login": "settlement_demo_operator",
+      "account_id": "376",
+      "party_ids": [
+        "demo-cleaning",
+        "demo-moving",
+        "demo-rights",
+        "demo-external",
+        "demo-promoter",
+        "demo-platform",
+        "demo-customer"
+      ]
+    },
+    "reviewer": {
+      "login": "settlement_demo_reviewer",
+      "account_id": "377",
+      "party_ids": [
+        "demo-cleaning",
+        "demo-moving",
+        "demo-rights",
+        "demo-external",
+        "demo-promoter",
+        "demo-platform",
+        "demo-customer"
+      ]
+    },
+    "merchant": {
+      "login": "settlement_demo_merchant",
+      "account_id": "378",
+      "party_ids": [
+        "demo-cleaning",
+        "demo-moving",
+        "demo-rights",
+        "demo-external"
+      ]
+    },
+    "promoter": {
+      "login": "settlement_demo_promoter",
+      "account_id": "379",
+      "party_ids": [
+        "demo-promoter"
+      ]
+    },
+    "platform": {
+      "login": "settlement_demo_platform",
+      "account_id": "380",
+      "party_ids": [
+        "demo-platform"
+      ]
+    },
+    "reviewer2": {
+      "login": "settlement_demo_reviewer2",
+      "account_id": "381",
+      "party_ids": [
+        "demo-cleaning",
+        "demo-moving",
+        "demo-rights",
+        "demo-external",
+        "demo-promoter",
+        "demo-platform",
+        "demo-customer"
+      ]
+    }
+  },
+  "party_ids": [
+    "demo-cleaning",
+    "demo-moving",
+    "demo-rights",
+    "demo-external",
+    "demo-promoter",
+    "demo-platform",
+    "demo-customer"
+  ],
+  "allowed_party_ids": [
+    "demo-cleaning",
+    "demo-moving",
+    "demo-rights",
+    "demo-external",
+    "demo-promoter",
+    "demo-platform",
+    "demo-customer"
+  ],
+  "context_ids": [
+    "4851f02d-67da-45c9-aef2-975b8481c5c4",
+    "600b59e9-6ce1-49a1-ab85-ca97d4ade998",
+    "658aded5-361e-4d12-a84d-3b3d2a6c7820",
+    "5338e445-6b9b-4ec1-ac11-6fb33a58e7b0",
+    "6e0443d9-ea03-4d34-ae69-e469352b9ac5",
+    "0cb741f7-bc0b-49c1-a64b-6d0b3ef1c848",
+    "d508b689-c682-4262-a3f8-c89ebcffdfca",
+    "b025aa40-1508-4d89-ac29-acec76f24a2f",
+    "9d4533ff-c6d4-4ecb-a695-164319edb6c0",
+    "319e6be7-3830-4e94-a6cd-7cc340931ae2",
+    "aae47ba9-9cb2-43cb-adf5-21000ea1b760",
+    "da3961bf-1171-4c74-a931-af657d5d3c5d",
+    "b57d1725-7172-42e2-a2f2-e71f2e736f50",
+    "bfa3dba1-23ba-4857-ba57-10ff56782142",
+    "412003b8-b238-4a97-9e42-1df48f86a263",
+    "e21da5e3-a302-4b97-9398-abcfb85c114d",
+    "0a662af6-457c-4392-9e29-3d22d8a94461"
+  ],
+  "allowed_context_ids": [
+    "4851f02d-67da-45c9-aef2-975b8481c5c4",
+    "600b59e9-6ce1-49a1-ab85-ca97d4ade998",
+    "658aded5-361e-4d12-a84d-3b3d2a6c7820",
+    "5338e445-6b9b-4ec1-ac11-6fb33a58e7b0",
+    "6e0443d9-ea03-4d34-ae69-e469352b9ac5",
+    "0cb741f7-bc0b-49c1-a64b-6d0b3ef1c848",
+    "d508b689-c682-4262-a3f8-c89ebcffdfca",
+    "b025aa40-1508-4d89-ac29-acec76f24a2f",
+    "9d4533ff-c6d4-4ecb-a695-164319edb6c0",
+    "319e6be7-3830-4e94-a6cd-7cc340931ae2",
+    "aae47ba9-9cb2-43cb-adf5-21000ea1b760",
+    "da3961bf-1171-4c74-a931-af657d5d3c5d",
+    "b57d1725-7172-42e2-a2f2-e71f2e736f50",
+    "bfa3dba1-23ba-4857-ba57-10ff56782142",
+    "412003b8-b238-4a97-9e42-1df48f86a263",
+    "e21da5e3-a302-4b97-9398-abcfb85c114d",
+    "0a662af6-457c-4392-9e29-3d22d8a94461"
+  ],
+  "allowed_item_ids": [
+    "52",
+    "53",
+    "54",
+    "64",
+    "65",
+    "66",
+    "74",
+    "37",
+    "38",
+    "39",
+    "73",
+    "46",
+    "47",
+    "48",
+    "41",
+    "42",
+    "40",
+    "45",
+    "43",
+    "44",
+    "50",
+    "51",
+    "49",
+    "61",
+    "62",
+    "63",
+    "68",
+    "69",
+    "67",
+    "58",
+    "59",
+    "60",
+    "56",
+    "57",
+    "55",
+    "70",
+    "71",
+    "72"
+  ],
+  "accounts": {
+    "demo-cleaning": "59844aa7-154c-4f15-b726-9ed2cf4c0d98",
+    "demo-moving": "c19865b1-5b0b-4394-b486-b469fd819fa8",
+    "demo-rights": "12b38569-76d9-4a06-96ca-f50b6c45f935",
+    "demo-external": "7ca92554-c2c8-413d-be26-34dca3157084",
+    "demo-promoter": "c7ea1cd5-ed17-4f85-8b94-8f1dee358a89",
+    "demo-platform": "7eae63f6-0428-4653-81bd-1be2f5fd1124",
+    "demo-customer": "a10019c8-e409-4827-b160-7746ea268df1",
+    "cleaning_alternate": "b2c22044-56ce-4da5-8e06-017cac0c7a65"
+  },
+  "profiles": {
+    "demo-cleaning": "5189b936-18a0-4d72-8234-8d4d0d851722",
+    "demo-moving": "f7b42c41-ca3c-4780-ba5f-1f717c599066",
+    "demo-rights": "90941ffc-ac63-44f3-a9a0-a783031e2a8f",
+    "demo-external": "8ab49c2c-7060-485c-a21a-526056d5e940"
+  },
+  "policies": {
+    "clean-auto": "cc8ab6ae-c891-4e53-b1fe-1705b9795332",
+    "moving-review": "4bbb8877-5eda-4d95-888d-ad8220cbd870",
+    "rights-auto": "835d2de0-2501-4144-b784-56bd3655d01d",
+    "clean-compensation": "bbf5cef7-5c12-45ff-9abd-e77e73b5ff90",
+    "moving-draft": "814f05d4-c33e-4b77-bdd7-dd696063a149"
+  },
+  "scenarios": {
+    "unknown": {
+      "item_id": "43",
+      "context_id": "658aded5-361e-4d12-a84d-3b3d2a6c7820",
+      "execution_order_id": "3af0df65-4df3-4fd6-85c0-97694a5a4850",
+      "request_no": "XS3af0df654df34fd685c097694a5a4850"
+    },
+    "adjustment": {
+      "item_id": "52",
+      "context_id": "0cb741f7-bc0b-49c1-a64b-6d0b3ef1c848",
+      "beneficiary_party_id": "demo-cleaning",
+      "alternate_account_id": "b2c22044-56ce-4da5-8e06-017cac0c7a65",
+      "expected_revision": 1
+    },
+    "refund": {
+      "context_id": "b57d1725-7172-42e2-a2f2-e71f2e736f50",
+      "source_id": "8f93e415-6945-4604-a609-b3b297fa05f1",
+      "completed_order_id": "6cac5862-55b9-4071-b7a3-0897e8596419",
+      "pending_order_id": "d44818fc-4701-4cec-9819-5cbcda2b136c"
+    },
+    "external": {
+      "party_id": "demo-external",
+      "context_id": "0a662af6-457c-4392-9e29-3d22d8a94461",
+      "order_ref": "DEMO-EXT-WALKTHROUGH",
+      "event_id": "96f1e777-265a-49e9-87c7-7a98c509524c",
+      "candidate_event_id": "96f1e777-265a-49e9-87c7-7a98c509524c",
+      "evidence_id": "e9fb6ef8-eaba-4b51-89ec-956e5a421134",
+      "amount_minor": "26800",
+      "environment": "sandbox",
+      "channel": "wechat_mini",
+      "merchant_account": "1910000901",
+      "occurred_at": "2026-09-25T04:00:00Z"
+    }
+  },
+  "statements": [
+    {
+      "id": "f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "party_id": "demo-external",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-f04195c854fc4b39966a14d40cfe48fd"
+    },
+    {
+      "id": "ddcf0805-9330-4c1b-a63a-c83d9656cbbb",
+      "party_id": "demo-external",
+      "version": 2,
+      "actor": "merchant",
+      "statement_no": "ST-ddcf080593304c1ba63ac83d9656cbbb"
+    },
+    {
+      "id": "60cd3523-1205-435a-89f5-d0f3d66242ff",
+      "party_id": "demo-cleaning",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-60cd35231205435a89f5d0f3d66242ff"
+    },
+    {
+      "id": "ba9df8be-3dee-4f26-9eeb-a8d8532cac76",
+      "party_id": "demo-moving",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-ba9df8be3dee4f269eeba8d8532cac76"
+    },
+    {
+      "id": "c7734b53-15a0-4bf2-8c53-49e42510401f",
+      "party_id": "demo-rights",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-c7734b5315a04bf28c5349e42510401f"
+    },
+    {
+      "id": "59fa8140-1016-4d2e-ad30-e7e3c5c47ad2",
+      "party_id": "demo-promoter",
+      "version": 1,
+      "actor": "promoter",
+      "statement_no": "ST-59fa814010164d2ead30e7e3c5c47ad2"
+    },
+    {
+      "id": "8043f7bc-612c-4ec8-951a-2c48fb3300d3",
+      "party_id": "demo-platform",
+      "version": 1,
+      "actor": "platform",
+      "statement_no": "ST-8043f7bc612c4ec8951a2c48fb3300d3"
+    },
+    {
+      "id": "d8eb941a-5484-4f6c-801c-e29f8c0e3e8f",
+      "party_id": "demo-cleaning",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-d8eb941a54844f6c801ce29f8c0e3e8f"
+    },
+    {
+      "id": "374937b0-f3eb-48d4-8554-5096e2338acf",
+      "party_id": "demo-customer",
+      "version": 1,
+      "actor": "operator",
+      "statement_no": "ST-374937b0f3eb48d485545096e2338acf"
+    },
+    {
+      "id": "bbe248f2-52dd-4354-b6b6-31fb78b8840b",
+      "party_id": "demo-platform",
+      "version": 1,
+      "actor": "platform",
+      "statement_no": "ST-bbe248f252dd4354b6b631fb78b8840b"
+    },
+    {
+      "id": "fac41039-5411-4620-a2d2-3bd93aff2d2c",
+      "party_id": "demo-external",
+      "version": 1,
+      "actor": "merchant",
+      "statement_no": "ST-fac4103954114620a2d23bd93aff2d2c"
+    },
+    {
+      "id": "f5c617d6-9006-49ad-add6-57a5d5211a99",
+      "party_id": "demo-promoter",
+      "version": 1,
+      "actor": "promoter",
+      "statement_no": "ST-f5c617d6900649adadd657a5d5211a99"
+    }
+  ],
+  "notes": [
+    "所有凭证均为明确演示记录；仅本地模拟机构。",
+    "所有金额由真实结算服务、不可变事件和版本账单计算。"
+  ],
+  "walkthrough_transaction_id": "walkthrough-46c8579bfeee9e9b8fa31a5e"
+}

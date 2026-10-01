@@ -112,6 +112,17 @@ test('unified workflow uses isolated MySQL and actual shared migrations',{skip:!
   const centralBinding=await C.create(maker,{kind:'bindings',party_id:'central-platform',source_domain:'platform',source_entity_type:'entity',source_entity_id:'approved-central-platform',...key()});await C.approve(reviewer,{kind:'bindings',id:centralBinding.id,...key()});
   assert.equal((await C.approve(reviewer,{kind:'profiles',id:routed.id,...key()})).status,'approved');
  });
+ await t.test('recognition honors approved promoter legal-party binding and keeps the legacy fallback',async()=>{
+  const f=await makeFixture(),party='approved-promoter-'+uuid(),account=uuid();
+  await q("INSERT INTO commerce_settlement_party_bindings(id,source_domain,source_entity_type,source_entity_id,party_id,status,created_by,reviewed_by) VALUES(?,'identity','account','900000',?,'approved','maker','reviewer')",[uuid(),party]);
+  await q("INSERT INTO commerce_payment_accounts(id,party_id,provider,environment,merchant_no,contract_no,currency,status,capabilities,created_by,reviewed_by) SELECT ?,?,provider,environment,?,contract_no,currency,status,capabilities,created_by,reviewed_by FROM commerce_payment_accounts WHERE id=?",[account,party,account,f.sourceAccount]);
+  const business=require('../settlement/business.cjs');
+  for(const promoter of ['900000','900001']){
+   const unit=await P.transaction(pool,async c=>business.recognize(c,{ctx:await w.context(c,f.context),unit_key:uuid(),recognition_id:uuid(),amount_minor:'10000',source:(await q('SELECT * FROM commerce_funding_sources WHERE id=?',[f.source]))[0],profile:f.profile,evidence:{kind:'test-confirmed'},promoter_account_id:promoter}));
+   const [line]=await q("SELECT beneficiary_party_id,account_id,payable_minor FROM commerce_settlement_items WHERE unit_id=? AND line_kind='promoter'",[unit.id]);
+   assert.equal(line.beneficiary_party_id,promoter==='900000'?party:'account:900001');assert.equal(line.payable_minor,'1000');assert.equal(line.account_id,promoter==='900000'?account:null);
+  }
+ });
  await t.test('paid life order is recognized only once on customer acceptance',async()=>{
   await q('CREATE TABLE IF NOT EXISTS jz_orders(id VARCHAR(100) PRIMARY KEY,account_id VARCHAR(64),payment_mode VARCHAR(24),status VARCHAR(24),pay_status VARCHAR(24),payment_config_snapshot JSON,fee BIGINT,vendor_id INT,city_id INT)');
   const f=await makeFixture({biz:'jiazheng'}),orderId='WO-'+crypto.randomBytes(14).toString('hex'),customer=principal('customer',[]),core=require('../payment/core.cjs').createPaymentCore({createConnection:()=>pool.getConnection(),config:{PAY_APP_CODE:'test',PAY_PROJECT_CODE:'test',PAY_SHARE_BIZ_CODE:'test',PAY_NOTIFY_URL:'https://example.test/notify'}});

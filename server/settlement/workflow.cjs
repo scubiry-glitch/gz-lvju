@@ -1,4 +1,5 @@
 'use strict';
+const bookingPolicy=require('./booking-policy.cjs');
 const P=require('./primitives.cjs');
 const {assert,id,parse,hash,minor,sqlDate,transaction,rows,calculate,postLedger}=P;
 function createWorkflow({pool,authorize,now=Date.now,config={}}) {
@@ -33,7 +34,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
  async function detail(p,input){const i=await item(pool,input.id),ctx=await context(pool,i.context_id);await permit(p,'settlement.fund.read',ctx);
   return {...i,biz_type:ctx.biz_type,payment_mode:ctx.payment_mode,remaining_minor:remaining(i).toString(),context:ctx,authorizations:await rows(pool,'SELECT * FROM commerce_settlement_authorizations WHERE item_id=? ORDER BY created_at DESC',[i.id]),adjustments:await rows(pool,'SELECT * FROM commerce_settlement_adjustments WHERE item_id=? ORDER BY created_at DESC',[i.id])};}
  async function listItems(p,input={}) {const args=[],where=['i.context_id IS NOT NULL'];for(const k of ['biz_type','payment_mode','party_id'])if(input[k]){where.push(`c.${k}=?`);args.push(input[k]);}
-  const candidates=await rows(pool,`SELECT i.*,c.biz_type,c.payment_mode,c.party_id,c.execution_scope FROM commerce_settlement_items i JOIN commerce_settlement_business_contexts c ON c.id=i.context_id WHERE ${where.join(' AND ')} ORDER BY i.id DESC LIMIT 500`,args),out=[];
+  const candidates=await rows(pool,`SELECT i.*,c.biz_type,c.payment_mode,c.party_id,c.execution_scope,c.biz_order_no FROM commerce_settlement_items i JOIN commerce_settlement_business_contexts c ON c.id=i.context_id WHERE ${where.join(' AND ')} ORDER BY i.id DESC LIMIT 500`,args),out=[];
   for(const r of candidates){try{await permit(p,'settlement.fund.read',r);out.push({...r,remaining_minor:remaining(r).toString()});}catch(e){if(e.status!==403)throw e;}}
   return {rows:out};
  }
@@ -52,10 +53,11 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
  async function authSnapshot(c,i,ctx,policy) {
   const profile=ctx.snapshot.settlement_profile||{};
   const selected=i.account_id?await account(c,i.account_id,i.beneficiary_party_id,ctx.currency):null;
-  return {item_id:String(i.id),item_revision:Number(i.revision),amount_minor:minor(i.planned_minor??i.payable_minor),source_id:i.source_id||null,account_id:i.account_id||null,account_version:Number(selected?.version||0),not_before_at:sqlDate(i.not_before_at),context_id:i.context_id,policy_id:policy?.id||null,policy_version:Number(policy?.version||0),rule_hash:i.rule_ref,profile_version:Number(profile.version||0),funding_mode:profile.funding_mode||null,implicit_merchant_release:Boolean(profile.implicit_merchant_release)};
+  return {...(ctx.biz_type==='booking'?{booking_timing:bookingPolicy.dueAt(ctx,policy)}:{}),item_id:String(i.id),item_revision:Number(i.revision),amount_minor:minor(i.planned_minor??i.payable_minor),source_id:i.source_id||null,account_id:i.account_id||null,account_version:Number(selected?.version||0),not_before_at:sqlDate(i.not_before_at),context_id:i.context_id,policy_id:policy?.id||null,policy_version:Number(policy?.version||0),rule_hash:i.rule_ref,profile_version:Number(profile.version||0),funding_mode:profile.funding_mode||null,implicit_merchant_release:Boolean(profile.implicit_merchant_release)};
  }
  async function grant(c,i,ctx,policy,mode) {
   assert(ctx.execution_scope==='INTERNAL_FUNDED','外部账单不能签发资金授权',409,'execution_scope_denied');
+  if(ctx.biz_type==='booking'){const current=await selectPolicy(c,ctx,i);assert(current&&current.id===policy?.id,'民宿结算规则已变化，请重新评估',409,'booking_policy_changed');bookingPolicy.assertDue(ctx,policy,now());}
   const amount=BigInt(i.planned_minor??i.payable_minor);assert(amount>0n&&amount<=remaining(i),'本次金额超过剩余应付',409);
   assert(i.account_id,'尚未选择已准入收款账户',409);const snapshot=await authSnapshot(c,i,ctx,policy);
   const authHash=require('./execution.cjs').authorizationHash(snapshot),authorizationId=id();
@@ -64,12 +66,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   return {id:String(i.id),status:'AUTHORIZED',authorization_id:authorizationId,revision:Number(i.revision)};
  }
  function normalizeNodes(nodes){assert(Array.isArray(nodes)&&nodes.length>0&&nodes.length<=10,'人工审批至少配置一个节点');return nodes.map(n=>{assert(n&&typeof n.name==='string'&&n.name.length<=80,'节点名称无效');assert(['ANY','ALL'].includes(n.mode||'ANY'),'会签方式无效');const ids=[...new Set((n.approver_ids||[]).map(String))];assert(ids.length<=30&&((n.mode||'ANY')!=='ALL'||ids.length>0),'会签必须指定审批人');return {name:n.name,mode:n.mode||'ANY',approver_ids:ids};});}
- async function selectPolicy(c,ctx,i){
-  const candidates=await rows(c,"SELECT * FROM commerce_settlement_policies WHERE status='approved' AND biz_type=? AND payment_mode=? AND (party_id IS NULL OR party_id=?) ORDER BY priority DESC",[ctx.biz_type,ctx.payment_mode,ctx.party_id]);
-  const amount=BigInt(i.planned_minor??i.payable_minor),matched=candidates.filter(p=>{const v=parse(p.conditions);return (v.min_minor==null||amount>=BigInt(v.min_minor))&&(v.max_minor==null||amount<=BigInt(v.max_minor))&&(!v.line_kind||v.line_kind===i.line_kind);});
-  if(!matched.length)return null;
-  assert(matched.length===1||Number(matched[0].priority)!==Number(matched[1].priority),'同级结算策略冲突，需处理后授权',409,'policy_conflict');return matched[0];
- }
+ const selectPolicy=bookingPolicy.selectPolicy;
  async function openApproval(c,p,i,ctx,policy,purpose='FUND_EXECUTION',snapshot={}) {
   const instanceId=id(),nodes=policy?normalizeNodes(parse(policy.nodes,[])):[{name:'财务独立复核',mode:'ANY',approver_ids:[]}];
   await c.execute("INSERT INTO commerce_settlement_approval_instances(id,item_id,item_revision,policy_id,purpose,status,nodes,created_by,snapshot) VALUES(?,?,?,?,?,'PENDING',?,?,?)",[instanceId,i.id,i.revision,policy?.id||null,purpose,JSON.stringify(nodes),actor(p),JSON.stringify(snapshot)]);
@@ -93,6 +90,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   }
   const policy=await selectPolicy(c,ctx,i);
   if(!policy||policy.mode==='HOLD'){await c.execute("UPDATE commerce_settlement_items SET status='HOLD',hold_reason=? WHERE id=?",[policy?'策略暂缓':'无已批准的结算策略',i.id]);return {id:String(i.id),status:'HOLD'};}
+  if(ctx.biz_type==='booking'){const timing=bookingPolicy.dueAt(ctx,policy);if(!i.not_before_at||sqlDate(i.not_before_at)<timing.not_before_at){await c.execute('UPDATE commerce_settlement_items SET not_before_at=?,revision=revision+1 WHERE id=?',[timing.not_before_at,i.id]);i.not_before_at=timing.not_before_at;i.revision=Number(i.revision)+1;}if(timing.not_before_at>clock())return {id:String(i.id),status:'DRAFT',revision:Number(i.revision),not_before_at:timing.not_before_at,booking_timing:timing};}
   // Any material manual change always uses independent review, even for AUTO merchants.
   const changed=(await rows(c,"SELECT id FROM commerce_settlement_adjustments WHERE item_id=? AND status='APPLIED' LIMIT 1",[i.id])).length>0;
   const limits=parse(policy.conditions);
@@ -120,6 +118,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   const profile=ctx.snapshot.settlement_profile||{};
   if(after.account_id!==i.account_id&&profile.funding_mode==='MERCHANT_CONTROLLED_RECEIPT'&&i.line_kind==='merchant')assert(profile.directed_transfer_verified===true,'原款模式不支持改机构收款账户，请办理机构结算银行卡变更',409);
   if(after.not_before_at&&profile.expires_at)assert(after.not_before_at<=sqlDate(profile.expires_at),'计划时间超出机构资金期限',409);
+  if(ctx.biz_type==='booking'){const policy=await selectPolicy(c,ctx,{...i,planned_minor:after.planned_minor});assert(policy,'需先配置民宿结算规则',409);const timing=bookingPolicy.dueAt(ctx,policy);assert(after.not_before_at&&after.not_before_at>=timing.not_before_at,'付款时间不得早于离店后 N 天',409,'booking_payment_too_early');}
   after.payable_minor=(BigInt(i.payable_minor)+delta).toString();after.remaining_minor=(available+delta).toString();
   return {i,ctx,before:{planned_minor:String(i.planned_minor??i.payable_minor),account_id:i.account_id,not_before_at:sqlDate(i.not_before_at),payable_minor:String(i.payable_minor),remaining_minor:available.toString(),revision:Number(i.revision)},after,kind,requires_review:true};
  }
@@ -157,14 +156,32 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   else {const [policy]=await rows(c,"SELECT * FROM commerce_settlement_policies WHERE id=? AND status='approved'",[a.policy_id]);assert(policy,'策略已停用，请重新评估',409);result=await grant(c,i,ctx,policy,'WORKFLOW');}
   await c.execute("UPDATE commerce_settlement_approval_instances SET status='APPROVED' WHERE id=?",[a.id]);await audit(c,p,'approval.complete',a.id,result);return result;
  });}
- async function savePolicy(p,input){await permit(p,'settlement.policy.write',input);return command(p,'policy.create',input,async c=>{assert(['commerce','jiazheng'].includes(input.biz_type),'业务类型无效');assert(['pay_center','wechat_mini'].includes(input.payment_mode),'支付渠道无效');assert(['AUTO','REVIEW','HOLD'].includes(input.mode),'策略模式无效');const conditions=input.conditions||{};for(const key of ['min_minor','max_minor','cumulative_minor'])if(conditions[key]!=null)conditions[key]=minor(conditions[key]);const nodes=input.mode==='REVIEW'?normalizeNodes(input.nodes):input.nodes?.length?normalizeNodes(input.nodes):[{name:'财务独立复核',mode:'ANY',approver_ids:[]}];const policyId=id();await c.execute('INSERT INTO commerce_settlement_policies(id,party_id,biz_type,payment_mode,priority,mode,conditions,nodes,created_by) VALUES(?,?,?,?,?,?,?,?,?)',[policyId,input.party_id||null,input.biz_type,input.payment_mode,Number(input.priority||0),input.mode,JSON.stringify(conditions),JSON.stringify(nodes),actor(p)]);await audit(c,p,'policy.create',policyId,input);return {id:policyId,status:'draft'};});}
+ async function savePolicy(p,input){await permit(p,'settlement.policy.write',input);return command(p,'policy.create',input,async c=>{assert(['commerce','jiazheng','booking'].includes(input.biz_type),'业务类型无效');assert(input.payment_mode==='pay_center'||input.biz_type==='jiazheng'&&input.payment_mode==='wechat_mini'||input.biz_type==='booking'&&input.payment_mode==='offline','支付渠道无效');assert(['AUTO','REVIEW','HOLD'].includes(input.mode),'策略模式无效');const conditions=input.conditions||{};if(input.biz_type==='booking'){bookingPolicy.delayDays(conditions);bookingPolicy.billingDay(conditions);}for(const key of ['min_minor','max_minor','cumulative_minor'])if(conditions[key]!=null)conditions[key]=minor(conditions[key]);const nodes=input.mode==='REVIEW'?normalizeNodes(input.nodes):input.nodes?.length?normalizeNodes(input.nodes):[{name:'财务独立复核',mode:'ANY',approver_ids:[]}];const policyId=id();await c.execute('INSERT INTO commerce_settlement_policies(id,party_id,biz_type,payment_mode,priority,mode,conditions,nodes,created_by) VALUES(?,?,?,?,?,?,?,?,?)',[policyId,input.party_id||null,input.biz_type,input.payment_mode,Number(input.priority||0),input.mode,JSON.stringify(conditions),JSON.stringify(nodes),actor(p)]);await audit(c,p,'policy.create',policyId,input);return {id:policyId,status:'draft'};});}
+ async function resetBookingPolicyItems(c,policy){
+  if(policy.biz_type==='booking'){
+   const affected=await rows(c,"SELECT i.*,x.party_id ctx_party,x.payment_mode ctx_mode,x.snapshot ctx_snapshot FROM commerce_settlement_items i JOIN commerce_settlement_business_contexts x ON x.id=i.context_id WHERE x.biz_type='booking' AND x.payment_mode=? AND (? IS NULL OR x.party_id=?) AND i.reserved_minor=0 AND i.status IN ('DRAFT','AUTHORIZED','IN_REVIEW','HOLD') ORDER BY i.id FOR UPDATE",[policy.payment_mode,policy.party_id,policy.party_id]);
+   for(const i of affected){
+    if(i.hold_reason&&!['无已批准的结算策略','策略暂缓'].includes(i.hold_reason))continue;
+    await invalidate(c,i);
+    const [adjustment]=await rows(c,"SELECT after_snapshot FROM commerce_settlement_adjustments WHERE item_id=? AND status='APPLIED' ORDER BY updated_at DESC,id DESC LIMIT 1",[i.id]);
+    const manual=adjustment?parse(adjustment.after_snapshot).not_before_at:null;
+    // 规则变更即按当前已批准规则重算 T+N/账单日，而不是留空等待下次授权补算。
+    let timing=manual||null;
+    if(!timing){const ctx={id:i.context_id,biz_type:'booking',party_id:i.ctx_party,payment_mode:i.ctx_mode,snapshot:parse(i.ctx_snapshot)};const best=await selectPolicy(c,ctx,i);if(best)timing=bookingPolicy.dueAt(ctx,best).not_before_at;}
+    await c.execute("UPDATE commerce_settlement_items SET status='DRAFT',not_before_at=?,authorization_id=NULL,hold_reason=NULL,revision=revision+1 WHERE id=?",[timing,i.id]);
+   }
+  }
+ }
  async function publishPolicy(p,input){return command(p,'policy.publish',input,async c=>{
   const [policy]=await rows(c,'SELECT * FROM commerce_settlement_policies WHERE id=? FOR UPDATE',[input.id]);assert(policy,'策略不存在',404);await permit(p,'settlement.policy.review',policy);assert(policy.created_by!==actor(p),'策略发布须独立复核',403);assert(policy.status==='draft','策略版本已发布或停用',409);
+  if(policy.biz_type==='booking'){bookingPolicy.delayDays(policy.conditions);bookingPolicy.billingDay(policy.conditions);}
   await c.execute("UPDATE commerce_settlement_policies SET status='approved',reviewed_by=? WHERE id=?",[actor(p),policy.id]);
   await c.execute("UPDATE commerce_settlement_items i JOIN commerce_settlement_business_contexts x ON x.id=i.context_id SET i.status='DRAFT',i.hold_reason=NULL,i.revision=i.revision+1 WHERE i.status='HOLD' AND i.hold_reason IN ('无已批准的结算策略','策略暂缓') AND i.reserved_minor=0 AND x.biz_type=? AND x.payment_mode=? AND (? IS NULL OR x.party_id=?)",[policy.biz_type,policy.payment_mode,policy.party_id,policy.party_id]);
+  // 先批准再重算：重算须按含新规则在内的当前已批准规则推导 T+N/账单日。
+  await resetBookingPolicyItems(c,policy);
   await audit(c,p,'policy.publish',policy.id,{version:policy.version});return {...policy,status:'approved'};
  });}
- async function listPolicies(p){const all=await rows(pool,'SELECT * FROM commerce_settlement_policies ORDER BY created_at DESC LIMIT 500'),out=[];for(const r of all){try{await permit(p,'settlement.fund.read',r);out.push({...r,conditions:parse(r.conditions),nodes:parse(r.nodes)});}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
+ async function listPolicies(p,input={}){const clauses=[],args=[];for(const key of ['biz_type','payment_mode','party_id'])if(input[key]){clauses.push(key+'=?');args.push(input[key]);}const all=await rows(pool,'SELECT * FROM commerce_settlement_policies'+(clauses.length?' WHERE '+clauses.join(' AND '):'')+' ORDER BY created_at DESC LIMIT 500',args),out=[];for(const r of all){try{await permit(p,'settlement.fund.read',r);out.push({...r,conditions:parse(r.conditions),nodes:parse(r.nodes)});}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
  async function pausePolicy(p,input){return command(p,'policy.disable',input,async c=>{
   const [policy]=await rows(c,'SELECT * FROM commerce_settlement_policies WHERE id=? FOR UPDATE',[input.id]);assert(policy,'策略不存在',404);await permit(p,'settlement.policy.write',policy);
   await c.execute("UPDATE commerce_settlement_policies SET status='disabled' WHERE id=?",[policy.id]);
@@ -172,8 +189,9 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   for(const row of unused){await c.execute("UPDATE commerce_settlement_authorizations SET status='REVOKED' WHERE id=?",[row.auth_id]);await c.execute("UPDATE commerce_settlement_items SET status='DRAFT',authorization_id=NULL,revision=revision+1 WHERE id=?",[row.id]);}
   const pending=await rows(c,"SELECT a.id,a.item_id FROM commerce_settlement_approval_instances a JOIN commerce_settlement_items i ON i.id=a.item_id WHERE a.policy_id=? AND a.status='PENDING' AND i.reserved_minor=0 ORDER BY i.id FOR UPDATE",[policy.id]);
   for(const a of pending){await c.execute("UPDATE commerce_settlement_approval_instances SET status='SUPERSEDED' WHERE id=?",[a.id]);await c.execute("UPDATE commerce_settlement_items SET status='DRAFT',authorization_id=NULL,revision=revision+1 WHERE id=?",[a.item_id]);}
+  await resetBookingPolicyItems(c,policy);
   await audit(c,p,'policy.disable',policy.id,{revoked_authorizations:unused.length});return {id:policy.id,status:'disabled',revoked_authorizations:unused.length};
  });}
- return {command,context,item,remaining,detail,listItems,authorizeItem,previewAdjustment,adjust,approvalTasks,approve,savePolicy,publishPolicy,pausePolicy,listPolicies,account,audit,calculate,postLedger};
+ return {selectPolicy,command,context,item,remaining,detail,listItems,authorizeItem,previewAdjustment,adjust,approvalTasks,approve,savePolicy,publishPolicy,pausePolicy,listPolicies,account,audit,calculate,postLedger};
 }
 module.exports={createWorkflow};

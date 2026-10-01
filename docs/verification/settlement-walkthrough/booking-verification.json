@@ -1,0 +1,99 @@
+{
+  "checked_at": "2026-10-01T20:49:15.761Z",
+  "booking_sources": 5,
+  "all_sources_mock_and_unlinked": true,
+  "all_sources_balanced": true,
+  "schema": [
+    {
+      "COLUMN_NAME": "price_total",
+      "COLUMN_TYPE": "decimal(12,2)"
+    },
+    {
+      "COLUMN_NAME": "payment_config_snapshot",
+      "COLUMN_TYPE": "json"
+    }
+  ],
+  "items": [
+    {
+      "id": 75,
+      "line_kind": "merchant",
+      "status": "PAID",
+      "not_before_at": "2026-10-01T20:45:19.000Z",
+      "payable_minor": 44820,
+      "discharged_minor": 44820,
+      "biz_order_no": "DEMO-STAY-PAID"
+    },
+    {
+      "id": 76,
+      "line_kind": "platform_transfer",
+      "status": "PAID",
+      "not_before_at": "2026-10-01T20:45:19.000Z",
+      "payable_minor": 4980,
+      "discharged_minor": 4980,
+      "biz_order_no": "DEMO-STAY-PAID"
+    },
+    {
+      "id": 77,
+      "line_kind": "promoter",
+      "status": "PAID",
+      "not_before_at": "2026-10-01T20:45:19.000Z",
+      "payable_minor": 996,
+      "discharged_minor": 996,
+      "biz_order_no": "DEMO-STAY-PAID"
+    },
+    {
+      "id": 78,
+      "line_kind": "merchant",
+      "status": "IN_REVIEW",
+      "not_before_at": "2026-10-01T20:45:21.000Z",
+      "payable_minor": 170820,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-REVIEW"
+    },
+    {
+      "id": 79,
+      "line_kind": "platform_transfer",
+      "status": "AUTHORIZED",
+      "not_before_at": "2026-10-01T20:45:21.000Z",
+      "payable_minor": 18980,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-REVIEW"
+    },
+    {
+      "id": 80,
+      "line_kind": "promoter",
+      "status": "DRAFT",
+      "not_before_at": "2026-09-30T16:00:00.000Z",
+      "payable_minor": 3796,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-REVIEW"
+    },
+    {
+      "id": 81,
+      "line_kind": "merchant",
+      "status": "DRAFT",
+      "not_before_at": "2026-10-03T16:00:00.000Z",
+      "payable_minor": 116820,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-WAITING"
+    },
+    {
+      "id": 82,
+      "line_kind": "platform_transfer",
+      "status": "DRAFT",
+      "not_before_at": "2026-10-03T16:00:00.000Z",
+      "payable_minor": 12980,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-WAITING"
+    },
+    {
+      "id": 83,
+      "line_kind": "promoter",
+      "status": "DRAFT",
+      "not_before_at": "2026-10-03T16:00:00.000Z",
+      "payable_minor": 2596,
+      "discharged_minor": 0,
+      "biz_order_no": "DEMO-STAY-WAITING"
+    }
+  ]
+}

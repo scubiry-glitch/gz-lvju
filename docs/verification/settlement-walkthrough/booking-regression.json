@@ -1,0 +1,46 @@
+{
+  "checked_at": "2026-10-01T20:52:06.939Z",
+  "shared_settlement": {
+    "passed": 103,
+    "failed": 0,
+    "skipped": 0
+  },
+  "booking_recognition_and_execution": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+  },
+  "shared_ui": {
+    "passed": 32
+  },
+  "legacy_commerce_settlement": {
+    "passed": 19
+  },
+  "isolated_seed": {
+    "passed": true,
+    "scenarios": 6,
+    "items": 9,
+    "statements": 3,
+    "replay_preserves_state": true
+  },
+  "booking_payment_and_service": {
+    "passed": 28,
+    "failed": 0,
+    "skipped": 0
+  },
+  "booking_legacy_recovery": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  "live": {
+    "full_checks": 7,
+    "requests": 30,
+    "screenshots": 8,
+    "downloads": 3,
+    "final_readonly_checks": 6,
+    "final_get_requests": 15,
+    "final_screenshots": 8,
+    "cache_version": "20261002-7"
+  }
+}

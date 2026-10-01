@@ -2,8 +2,8 @@
 
 const fs = require('node:fs');
 const { check,time } = require('./external.cjs');
-const fields = ['line_key','record_type','biz_type','payment_mode','execution_scope','order_ref','event_kind','amount_minor','currency','verification_status','occurred_at','received_at','obligation_direction','debtor_party_id','creditor_party_id','note','recovery_id','recovery_kind','principal_minor','initial_recovered_minor'];
-const labels = ['明细标识','记录类型','业务','支付渠道','执行范围','订单号','事实类型','金额(最小单位)','币种','核验状态','实际发生时间','接收时间','债务方向','债务主体','债权主体','说明','追偿编号','追偿类型','原追偿本金(最小单位)','追偿创建前已回收(最小单位)'];
+const fields = ['line_key','record_type','biz_type','payment_mode','execution_scope','order_ref','event_kind','amount_minor','currency','verification_status','occurred_at','received_at','obligation_direction','debtor_party_id','creditor_party_id','note','recovery_id','recovery_kind','principal_minor','initial_recovered_minor','booking_checkin','booking_checkout','booking_rooms','booking_category','quoted_minor','commission_minor','order_status','pay_status'];
+const labels = ['明细标识','记录类型','业务','支付渠道','执行范围','订单号','事实类型','金额(最小单位)','币种','核验状态','实际发生时间','接收时间','债务方向','债务主体','债权主体','说明','追偿编号','追偿类型','原追偿本金(最小单位)','追偿创建前已回收(最小单位)','入住日期','订单离店日期','预订间数','预订品类','下单房费(最小单位，非收款)','锁定佣金(最小单位，非实收)','预订状态','支付状态'];
 function safe(value) {
   if (value == null) return '';
   const s = String(value);
@@ -21,7 +21,7 @@ function metadata(s) {
 }
 async function buildExport(statement, format, config = {}) {
   check(['csv','xlsx','pdf'].includes(format),'导出格式无效',422);
-  const lines=statement.snapshot.lines,meta=metadata(statement);
+  const lines=statement.snapshot.lines.map(l=>({...l,booking_checkin:l.booking?.checkin,booking_checkout:l.booking?.checkout,booking_rooms:l.booking?.rooms,booking_category:require('./booking-policy.cjs').categoryLabel(l.booking?.category)})),meta=metadata(statement);
   check(lines.length<=100000,'账单超过单文件导出上限，请缩小账期',422);
   const filename=statement.statement_no+'-v'+statement.version+'.'+format;
   if(format==='csv'){

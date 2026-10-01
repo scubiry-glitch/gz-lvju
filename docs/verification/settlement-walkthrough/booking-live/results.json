@@ -1,0 +1,250 @@
+{
+  "seed_key": "booking-walkthrough-v1",
+  "origin": "https://sytest.meizu.life",
+  "financial_mutations": false,
+  "export_tasks": true,
+  "checks": [
+    "six-real-identities-and-booking-scopes",
+    "published-booking-rules-N3-auto-and-review",
+    "paid-waiting-staying-offline-and-approval-states",
+    "browser-booking-items-rules-and-read-only-approval",
+    "booking-order-facts-and-three-party-statement-isolation",
+    "real-csv-xlsx-pdf-and-export-permission-isolation",
+    "mobile-booking-statements-without-page-overflow"
+  ],
+  "requests": [
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer2",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/policies",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/items",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/admin/approval-tasks",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/03533316-c7d8-456f-96fe-5ef5a8d6bc27",
+      "status": 403
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/03533316-c7d8-456f-96fe-5ef5a8d6bc27",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/9096652d-508f-40a4-8e82-67d42b456bea",
+      "status": 403
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/9096652d-508f-40a4-8e82-67d42b456bea",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/03533316-c7d8-456f-96fe-5ef5a8d6bc27",
+      "status": 403
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/a9bab2b7-21ab-4d74-bb95-2020d59fbc62",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/a9bab2b7-21ab-4d74-bb95-2020d59fbc62",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/a9bab2b7-21ab-4d74-bb95-2020d59fbc62",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/statement-exports/a9bab2b7-21ab-4d74-bb95-2020d59fbc62",
+      "status": 403
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/2a0b216e-951a-4c38-b957-fa31c7390c6a",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/2a0b216e-951a-4c38-b957-fa31c7390c6a",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/2a0b216e-951a-4c38-b957-fa31c7390c6a",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/statement-exports/2a0b216e-951a-4c38-b957-fa31c7390c6a",
+      "status": 403
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/32299c72-40f8-4223-a6ff-92a4e29b03b9",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/32299c72-40f8-4223-a6ff-92a4e29b03b9",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/32299c72-40f8-4223-a6ff-92a4e29b03b9",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/statement-exports/32299c72-40f8-4223-a6ff-92a4e29b03b9",
+      "status": 403
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/a93f23dc-90fa-4582-aab7-68d25bfad7a0/exports",
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "01-booking-items.png",
+    "02-booking-policies-N3.png",
+    "03-booking-independent-review.png",
+    "04-booking-statement-merchant.png",
+    "04-booking-order-facts.png",
+    "04-booking-statement-promoter.png",
+    "04-booking-statement-platform.png",
+    "05-booking-downloads.png",
+    "06-booking-mobile.png"
+  ],
+  "downloads": [
+    {
+      "format": "csv",
+      "path": "booking-statement.csv",
+      "bytes": 6875,
+      "sha256": "f7aee7f32b125e67f6800132aece43e481061009205896db352461ee352a6d62"
+    },
+    {
+      "format": "xlsx",
+      "path": "booking-statement.xlsx",
+      "bytes": 11063,
+      "sha256": "e96913963695318770b100c73a6780a781a11646463344f3825f5cc4a958b8a1"
+    },
+    {
+      "format": "pdf",
+      "path": "booking-statement.pdf",
+      "bytes": 89806,
+      "sha256": "24a55cab2c198cac354388565b6601160c6bb99f7bde0fa341b8a92faa570327"
+    }
+  ],
+  "started_at": "2026-10-01T21:53:05.589Z",
+  "paid_channel_commission_minor": "996",
+  "passed": true,
+  "finished_at": "2026-10-01T21:53:30.947Z"
+}

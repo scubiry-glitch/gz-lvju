@@ -41,8 +41,8 @@ function createAuthorizer({pool}) {
    if(scope.party_ids?.map(String).includes(String(party)))return true;
    if(String(party)==='account:'+String(p.account.id)&&permission.startsWith('settlement.statement.'))return true;
    const vendor=scope.vendor_id??p.account.vendor_id;
-   if(vendor!=null&&resource.biz_type==='jiazheng'){
-    const matches=await rows(pool,"SELECT id FROM commerce_settlement_party_bindings WHERE source_domain='jiazheng' AND source_entity_type='vendor' AND source_entity_id=? AND party_id=? AND status='approved'",[String(vendor),String(party)]);
+   if(vendor!=null&&['jiazheng','booking'].includes(resource.biz_type)){
+    const matches=await rows(pool,"SELECT id FROM commerce_settlement_party_bindings WHERE source_domain=? AND source_entity_type='vendor' AND source_entity_id=? AND party_id=? AND status='approved'",[resource.biz_type,String(vendor),String(party)]);
     if(matches.length)return true;
    }
    if(vendor!=null&&resource.biz_type==='commerce'){

@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "seed_key": "settlement-walkthrough-v1",
+  "counts": {
+    "contexts": 23,
+    "sources": 22,
+    "items": 47,
+    "ledger_events": 51,
+    "execution_orders": 13,
+    "statements": 26
+  },
+  "states": {
+    "items": {
+      "PAID": 13,
+      "PARTIALLY_PAID": 1,
+      "AUTHORIZED": 7,
+      "DRAFT": 22,
+      "IN_REVIEW": 4
+    },
+    "orders": {
+      "SUCCEEDED": 10,
+      "PARTIAL": 1,
+      "FAILED_FINAL": 1,
+      "DRAFT": 1
+    }
+  },
+  "errors": []
+}
