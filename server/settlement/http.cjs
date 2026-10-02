@@ -33,6 +33,7 @@ function createHandler({service,auth,publicOrigin=''}) {
   return {...result,rows:result.rows.filter(a=>a.status==='approved'&&(!i.party_id||String(a.party_id)===String(i.party_id)))};
  });
  route('GET','/admin/funding-sources',(p,i)=>service.fundingSources(p,i));
+ route('GET','/admin/vendor-directory',(p,i)=>service.vendorDirectory(p,i));
  route('GET','/admin/own-fund-sources',(p,i)=>service.ownFunds.listSources(p,i));
  route('POST','/admin/own-fund-sources',(p,i)=>service.ownFunds.createSource(p,i));
  route('POST',new RegExp('^/admin/own-fund-sources/'+UUID+'/approve$'),(p,i,m)=>service.ownFunds.approveSource(p,{...i,id:m[1]}));

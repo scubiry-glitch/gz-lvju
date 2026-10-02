@@ -325,7 +325,7 @@
   function partyField() {
     const parties = state.identity.parties || [];
     const lookup = '<small class="lookup-links"><button type="button" class="link" data-action="lookup-party">查询已有主体 →</button></small>';
-    if (state.identity.can_manage_parties === true) return '<label class="field"><span>法律主体标识</span>' + input('party_id', state.filters.party_id || '', 'required maxlength="64" pattern="[A-Za-z0-9_.:-]{1,64}" list="settlement-party-list"') + '<datalist id="settlement-party-list">' + parties.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('') + '</datalist><small>选择已有主体，或录入经确认的新法律主体标识。业务绑定复核后生效。</small>' + lookup + '</label>';
+    if (state.identity.can_manage_parties === true) return '<label class="field"><span>法律主体标识</span>' + input('party_id', state.filters.party_id || '', 'required maxlength="64" pattern="[A-Za-z0-9_.:-]{1,64}" list="settlement-party-list"') + '<datalist id="settlement-party-list">' + parties.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('') + '</datalist><small>法人主体代号，自己定义（如 bianxi），同一法人多业务复用同一代号；要并入已有主体就填已有代号。业务绑定复核后生效。</small>' + lookup + '</label>';
     return '<label class="field"><span>结算主体</span>' + select('party_id', parties.map(p => [p.id, p.name]), state.filters.party_id, 'required') + lookup + '</label>';
   }
   // 主体/业务编号查询：数据来自结算域自己的绑定与账户接口，点击行回填来源表单。
@@ -347,7 +347,19 @@
           return '<tr data-fill="' + esc(id) + '" style="cursor:pointer"><td><strong>' + esc(id) + '</strong></td><td class="break">' + esc(list.length ? list.map(b => label(b.source_domain) + ' · ' + (b.source_entity_id || '—') + (/^approved$/i.test(b.status) ? '' : '（待复核）')).join('；') : '尚未绑定') + '</td><td>' + (accountCount.get(id) || 0) + '</td><td>' + (approved ? '已批准' : list.length ? '待复核' : '—') + '</td></tr>'; })) : '<p class="subtle">主体目录为空：还没有任何主体绑定或收款账户。</p>');
       } else {
         const rows = bindings.slice().sort((a, b) => (/^approved$/i.test(b.status) ? 1 : 0) - (/^approved$/i.test(a.status) ? 1 : 0));
-        body.innerHTML = '<p class="subtle">点击行回填业务主体编号（主体字段为空时一并回填）。</p>' + (rows.length ? table(['业务来源', '业务主体编号', '法律主体', '状态'], rows.map(b => '<tr data-fill="' + esc(b.source_entity_id || '') + '" data-party="' + esc(b.party_id || '') + '" style="cursor:pointer"><td>' + esc(label(b.source_domain)) + '</td><td><strong>' + esc(b.source_entity_id || '—') + '</strong></td><td>' + esc(b.party_id || '—') + '</td><td>' + badge(b.status) + '</td></tr>')) : '<p class="subtle">尚无业务主体绑定。</p>');
+        body.innerHTML = '<div class="form-grid"><label class="field"><span>商家目录搜索</span>' + input('vendor-query', '', 'maxlength="64" placeholder="按商家编号或名称搜索，如 151 / 蓝犀牛"') + '<small class="lookup-links"><button type="button" class="link" data-action="search-vendor">搜索商家 →</button>（按编号或名称，找到后点击行回填编号）</small></label></div><div id="vendor-search-results"></div>' + '<p class="subtle">已绑定的业务编号（点击行回填；主体字段为空时一并回填）：</p>' + (rows.length ? table(['业务来源', '业务主体编号', '法律主体', '状态'], rows.map(b => '<tr data-fill="' + esc(b.source_entity_id || '') + '" data-party="' + esc(b.party_id || '') + '" style="cursor:pointer"><td>' + esc(label(b.source_domain)) + '</td><td><strong>' + esc(b.source_entity_id || '—') + '</strong></td><td>' + esc(b.party_id || '—') + '</td><td>' + badge(b.status) + '</td></tr>')) : '<p class="subtle">尚无业务主体绑定，请用上方搜索找到商家。</p>');
+        const results = $('#vendor-search-results', body), queryInput = $('[name=vendor-query]', body);
+        const doSearch = async () => {
+          const q = queryInput.value.trim(); if (!q) return;
+          results.innerHTML = '<p class="subtle">正在搜索商家…</p>';
+          try {
+            const found = rowsOf(await api('/admin/vendor-directory' + qs({ query: q })));
+            results.innerHTML = found.length ? table(['商家编号', '名称', '类型', '状态'], found.map(v => '<tr data-fill="' + esc(String(v.id)) + '" style="cursor:pointer"><td><strong>' + esc(String(v.id)) + '</strong></td><td>' + esc(v.name || '—') + '</td><td>' + esc(v.type || '—') + '</td><td>' + badge(v.review_status || v.status || 'PENDING') + '</td></tr>')) : '<p class="subtle">没有匹配的商家，可改用编号或名称关键词。</p>';
+            results.querySelectorAll('tr[data-fill]').forEach(tr => tr.addEventListener('click', () => { fillField('source_entity_id', tr.dataset.fill); d.close(); }));
+          } catch (e) { results.innerHTML = '<p class="notice">' + esc(e.message) + '</p>'; }
+        };
+        $('[data-action=search-vendor]', body).addEventListener('click', doSearch);
+        queryInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
       }
       body.querySelectorAll('tr[data-fill]').forEach(tr => tr.addEventListener('click', () => { const value = tr.dataset.fill; if (!value) return;
         if (partyMode) fillField('party_id', value);
@@ -357,7 +369,7 @@
   }
   async function newConfiguration(kind) {
     let fields = partyField(), profileAccounts = [];
-    if (kind === 'bindings') fields += field('业务来源', select('source_domain', [['commerce','生活权益商户'],['jiazheng','生活服务商户'],['booking','预订商户（民宿/长租）'],['identity','推广账号'],['platform','平台法律主体']])) + '<label class="field"><span>业务主体编号</span>' + input('source_entity_id', '', 'required maxlength="64"') + '<small>使用业务系统中的真实编号，不能用另一业务的同号主体代替。</small><small class="lookup-links"><button type="button" class="link" data-action="lookup-entity">查询已绑定业务编号 →</button> · <a href="p-vendor-rates.html" target="_blank" rel="noopener">商家档案（费率台）↗</a>（需商家费率权限）</small></label>';
+    if (kind === 'bindings') fields += field('业务来源', select('source_domain', [['commerce','生活权益商户'],['jiazheng','生活服务商户'],['booking','预订商户（民宿/长租）'],['identity','推广账号'],['platform','平台法律主体']])) + '<label class="field"><span>业务主体编号</span>' + input('source_entity_id', '', 'required maxlength="64"') + '<small>业务系统里的真实编号，如搬家商家 151、服务商 18；不能用另一业务的同号主体代替。</small><small class="lookup-links"><button type="button" class="link" data-action="lookup-entity">查询已绑定业务编号 →</button> · <a href="p-vendor-rates.html" target="_blank" rel="noopener">商家档案（费率台）↗</a>（需商家费率权限）</small></label>';
     if (kind === 'accounts') fields += field('支付机构', input('provider', '', 'required maxlength="32"')) + field('环境', select('environment', [['production','正式环境'],['sandbox','测试环境']])) + field('机构商户号', input('merchant_no', '', 'required maxlength="128"')) + field('机构资金合同号', input('contract_no', '', 'required maxlength="128"')) + field('币种', select('currency', [['CNY','人民币']])) + field('已核验能力', '<div class="actions"><label class="check-label"><input type="checkbox" name="receive">收款</label>' + Object.entries(operationNames).map(([k,t]) => '<label class="check-label"><input type="checkbox" name="operation" value="' + k + '">' + t + '</label>').join('') + '</div>', '仅勾选已由机构材料验证的能力，机构未开通的操作无法执行。', true) + field('独立自有资金能力', '<label class="check-label"><input type="checkbox" name="own_funds_verified">已核验独立自有资金，非顾客原支付或佣金专款</label>', '', true) + field('独立自有资金核验凭证', input('own_funds_evidence_ref', '', 'maxlength="500"')) + field('机构核验材料', input('evidence_ref', '', 'required maxlength="500"'), '填写合同、联调验收记录等可独立核验的材料引用。', true);
     if (kind === 'profiles') {
       const accounts = rowsOf(await api('/admin/accounts')).filter(a => /^approved$/i.test(a.status));

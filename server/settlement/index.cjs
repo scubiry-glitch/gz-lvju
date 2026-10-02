@@ -49,6 +49,17 @@ function createSettlement({pool,auth,paymentCore,payCenter,config=process.env,no
   return {id:o.id,eligible,confirmed,reason:confirmed?'已确认服务完成':eligible?'服务已完成，请确认验收':!profile?'当前订单沿用原结算规则':'服务尚未达到确认条件'};
  }
  async function fundingSources(p,input){const list=await rows(pool,'SELECT s.*,c.party_id,c.biz_type,c.payment_mode FROM commerce_funding_sources s JOIN commerce_settlement_business_contexts c ON c.id=s.context_id ORDER BY s.created_at DESC LIMIT 500'),out=[];for(const r of list){try{await authorize(p,'settlement.fund.read',r);if(!input.source_type||r.source_type===input.source_type)out.push(r);}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
+ // 商家目录（只读，供业务主体绑定填编号）。全局目录不是主体维度数据，不按 scope.party_ids
+ // 收窄：持有 settlement.policy.write（即可发起绑定准入）即可查；出参不含联系方式与密钥。
+ async function vendorDirectory(p,input){
+  const permitted=(p.roles||[]).some(r=>(r.permissions||[]).some(x=>x==='*'||x==='settlement.policy.write'));
+  assert(permitted,'无结算配置权限',403,'settlement_forbidden');
+  const exists=await rows(pool,"SELECT 1 FROM information_schema.tables WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='jz_vendors'");if(!exists.length)return {rows:[]};
+  const query=String(input.query||'').trim().slice(0,64);assert(query.length>=1,'请输入商家编号或名称关键词',422);
+  const numeric=/^\d{1,12}$/.test(query),like='%'+query.replace(/([%_])/g,'\\$1')+'%';
+  const found=await rows(pool,'SELECT id,name,type,status,review_status FROM jz_vendors WHERE '+(numeric?'(id=? OR name LIKE ?)':'name LIKE ?')+' ORDER BY id LIMIT 20',numeric?[Number(query),like]:[like]);
+  return {rows:found.map(v=>({id:String(v.id),name:v.name||'',type:v.type||'',status:v.status||'',review_status:v.review_status||''}))};
+ }
  async function executionOrders(p,input){const args=[],clauses=[];if(input.item_id){clauses.push('l.item_id=?');args.push(input.item_id);}const list=await rows(pool,`SELECT DISTINCT o.* FROM commerce_execution_orders o JOIN commerce_execution_lines l ON l.order_id=o.id${clauses.length?' WHERE '+clauses.join(' AND '):''} ORDER BY o.created_at DESC LIMIT 200`,args),out=[];for(const o of list){try{const ctx=await workflow.context(pool,o.context_id);await authorize(p,'settlement.fund.read',ctx);out.push(o);}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
  let busy=false,lastReportScan=0;
  async function maintenance(){if(busy)return;busy=true;const results={errors:[]};const attempt=async(label,fn)=>{try{return await fn();}catch(e){results.errors.push({operation:label,code:e.code||'settlement_error'});return null;}};try{
@@ -83,6 +94,6 @@ function createSettlement({pool,auth,paymentCore,payCenter,config=process.env,no
   }
   return results;
  }finally{busy=false;}}
- return {pool,authorize,workflow,configuration,execution,statements,business,booking,ownFunds,reversals,me,acceptanceStatus,fundingSources,executionOrders,maintenance};
+ return {pool,authorize,workflow,configuration,execution,statements,business,booking,ownFunds,reversals,me,acceptanceStatus,fundingSources,vendorDirectory,executionOrders,maintenance};
 }
 module.exports={migrate,createSettlement};
