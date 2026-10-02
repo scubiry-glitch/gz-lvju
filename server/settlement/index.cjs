@@ -1,5 +1,5 @@
 'use strict';
-const {rows,parse,assert}=require('./primitives.cjs');
+const {rows,parse,assert,makerCheckerRequired}=require('./primitives.cjs');
 const {createAuthorizer,systemPrincipal}=require('./access.cjs');
 const sytest=require('./sytest-provider.cjs');
 async function migrate(pool){
@@ -42,7 +42,7 @@ function createSettlement({pool,auth,paymentCore,payCenter,config=process.env,no
   }
   const permissionsForDirectory=['settlement.statement.read','settlement.fund.read','settlement.fund.write','settlement.policy.write','settlement.policy.review','settlement.external.read','settlement.external.submit','settlement.external.import'];
   for(const row of candidates){let visible=false;for(const biz of ['commerce','jiazheng','booking'])for(const payment_mode of (biz==='booking'?['pay_center','offline']:biz==='jiazheng'?['pay_center','wechat_mini']:['pay_center']))for(const permission of permissionsForDirectory){if(visible)break;try{await authorize(p,permission,{party_id:row.party_id,biz_type:biz,payment_mode});visible=true;}catch(e){if(e.status!==403)throw e;}}if(visible&&!parties.some(x=>x.id===row.party_id))parties.push({id:row.party_id,name:partyLabels.get(row.party_id)||row.party_id});}
-  return {account:{id:p.account.id,display_name:p.account.display_name},permissions,parties,can_manage_parties:all,scope:auth?.scopeOf?auth.scopeOf(p):null};
+  return {account:{id:p.account.id,display_name:p.account.display_name},permissions,parties,can_manage_parties:all,maker_checker:makerCheckerRequired(),scope:auth?.scopeOf?auth.scopeOf(p):null};
  }
  async function acceptanceStatus(p,input){const [o]=await rows(pool,'SELECT * FROM jz_orders WHERE id=? AND account_id=?',[input.id,String(p.account.id)]);assert(o,'服务订单不存在',404);const snapshot=parse(o.payment_config_snapshot),profile=snapshot.settlement_profile;
   const records=await rows(pool,'SELECT * FROM commerce_settlement_fulfillment WHERE order_no=? AND account_id=?',[o.id,String(p.account.id)]);const confirmed=records.some(x=>x.event_kind==='CUSTOMER_ACCEPTANCE');const eligible=!confirmed&&!o.refund_status&&o.payment_mode==='pay_center'&&o.pay_status==='paid'&&['done','rated'].includes(o.status)&&profile?.recognition_policy?.mode==='CUSTOMER_ACCEPTANCE';

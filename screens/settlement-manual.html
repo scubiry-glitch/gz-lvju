@@ -95,7 +95,7 @@
     <p><strong>双人复核原则</strong>默认贯穿全域：规则、绑定、账户、协议、审批、异议，申请人与复核人须为两个账号，自审批在服务端直接 403。演示/单账号线可用 <code>SETTLEMENT_MAKER_CHECKER=0</code> 关闭（关闭后起草人可自行发布与批准，包括指定审批人名单）；生产环境建议保持开启。</p>
 
     <h2 class="sec" id="onboarding">2. 主体与协议准入（授权主体从哪来）</h2>
-    <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>完成准入，全部是<strong>草稿 → 另一人复核批准</strong>：</p>
+    <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>完成准入，全部是<strong>草稿 → 复核批准</strong>（默认须另一人；<code>SETTLEMENT_MAKER_CHECKER=0</code> 时可自行批准）：</p>
     <div class="flow"><span>① 业务主体绑定</span><em>→</em><span>② 机构收款账户</span><em>→</em><span>③ 商户结算协议</span><em>→</em><span>④ 进入结算与出账</span></div>
     <table>
       <tr><th>准入项</th><th>关键字段</th><th>说明</th></tr>
@@ -138,7 +138,7 @@
     <div class="panel">
       <h3>例：给商家 151 开通结算（五步）</h3>
       <ol>
-        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（点「搜索商家 / 查询已绑定」在弹窗顶部搜索 151 直接找到商家），法人代号填 <code>bianxi</code>——法律主体标识自动拼成 <code>bianxi:jiazheng:151</code>（法人:业务:编号，可改）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（点「搜索商家 / 查询已绑定」在弹窗顶部搜索 151 直接找到商家），法人代号填 <code>bianxi</code>——法律主体标识自动拼成 <code>bianxi:jiazheng:151</code>（法人:业务:编号，可改）→ 保存草稿 → 复核批准（默认须另一人，关闭双人复核后可自批）。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>机构收款账户</strong>：给主体 <code>bianxi</code> 准入机构账户（支付机构 / 环境 / 商户号 / 资金合同号，勾选已核验能力）→ 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。平台对 151 的抽佣比例另在<a href="p-vendor-rates.html" target="_blank" rel="noopener">商家费率台</a>维护，下单时冻结为佣金权威值，协议按合同口径消费。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>结算规则</strong>：结算规则 → 新建规则，选业务与主体，配置自动结算或审核后结算及金额区间 → 审核发布。<span class="goto">前往：<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a> ↗</span></li>
@@ -148,7 +148,7 @@
     </div>
 
     <h2 class="sec" id="rules">3. 结算规则：逐笔 / 审批 / 账单日（T+N）</h2>
-    <p>「<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a>」按 业务 × 主体 × 渠道 × 金额区间 配置，优先级高者生效，同级冲突会阻止自动结算。模式：<strong>自动结算 AUTO / 审核后结算 REVIEW / 暂停 HOLD</strong>。草稿由另一位授权人员「审核发布」后生效。</p>
+    <p>「<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a>」按 业务 × 主体 × 渠道 × 金额区间 配置，优先级高者生效，同级冲突会阻止自动结算。模式：<strong>自动结算 AUTO / 审核后结算 REVIEW / 暂停 HOLD</strong>。草稿经「审核发布」后生效（默认须另一人；关闭双人复核后可自发布）。</p>
     <div class="tip"><strong>三业务的时间口径不同</strong>：下面的「离店等待天数 / 账单日」仅适用预订（民宿/长租）。生活权益（券）核销即资格、生活服务客户验收即资格，等待时间在商户结算协议上配「履约后结算等待（小时）」；外部小程序渠道（生活服务）没有本站资金动作，建议常态配置「审核后结算」仅作对账纪律。</div>
     <div class="panel">
       <h3>预订（民宿/长租）的时间口径</h3>
