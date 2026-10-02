@@ -125,11 +125,22 @@
       <p style="margin-bottom:0">新增绑定时，表单按这三段<strong>自动拼装</strong>法律主体标识（如 <code>bianxi:jiazheng:151</code>），可手动覆盖。为什么必须有绑定、不能拿业务编号直接结算：绑定是「业务身份 → 法人」的复核映射，是资金准入链的第一环——没有它，收款账户、结算协议、结算规则就没有挂靠点，资金动作也就没有经双人复核的准入依据。角色差异（收款方/推广/平台/客户）由绑定的身份类型与推广合成主体（<code>account:编号</code>）承载，同一法人既做商家又做推广会是两个主体、互不混淆。约定为推荐不强制，存量主体（如 <code>demo-stay</code>）不受影响。</p>
     </div>
     <div class="panel">
+      <h3>费率协议 ≠ 商户结算协议（两份配置，别混）</h3>
+      <table>
+        <tr><th></th><th>费率协议（<a href="p-vendor-rates.html" target="_blank" rel="noopener">商家费率台</a>）</th><th>商户结算协议（统一结算工作台 → 账户与协议）</th></tr>
+        <tr><td>回答什么</td><td>平台从这笔生意里<strong>抽多少</strong>（佣金比例）</td><td>这笔钱<strong>怎么算、算给谁、何时算、走哪条机构通道</strong></td></tr>
+        <tr><td>挂在谁身上</td><td>业务商家（<code>jz_vendors</code> id，按业务线两档：房源预订 / 家政）</td><td>法律主体 × 业务 × 支付渠道（一份合同快照）</td></tr>
+        <tr><td>怎么生效</td><td>平台单方条款：费率台直接改（留存审计），商家只读；生效链=商家差异化 → 全局基准 → 内置 10%</td><td>草稿 → 另一位授权人员复核批准；版本化，改了不追溯</td></tr>
+        <tr><td>在哪消费</td><td><strong>下单时刻</strong>冻结进订单快照（佣金率与佣金金额为权威值，后续对账/结算一律读快照）</td><td><strong>整个结算域</strong>：授权、执行、分账、账单都引用它；预订场景下单时协议被改写为「固定服务成本 + 冻结佣金」模式消费业务侧费率</td></tr>
+      </table>
+      <p style="margin-bottom:0" class="subtle">一句话：费率协议是<strong>业务条款（抽多少）</strong>，是结算协议的输入之一；商户结算协议是<strong>资金域合同（怎么算、怎么付）</strong>，是执行的依据。</p>
+    </div>
+    <div class="panel">
       <h3>例：给商家 151 开通结算（五步）</h3>
       <ol>
         <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（点「搜索商家 / 查询已绑定」在弹窗顶部搜索 151 直接找到商家），法人代号填 <code>bianxi</code>——法律主体标识自动拼成 <code>bianxi:jiazheng:151</code>（法人:业务:编号，可改）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>机构收款账户</strong>：给主体 <code>bianxi</code> 准入机构账户（支付机构 / 环境 / 商户号 / 资金合同号，勾选已核验能力）→ 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
-        <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。平台对 151 的抽佣比例另在<a href="p-vendor-rates.html" target="_blank" rel="noopener">商家费率台</a>维护，下单时冻结为佣金权威值，协议按合同口径消费。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>结算规则</strong>：结算规则 → 新建规则，选业务与主体，配置自动结算或审核后结算及金额区间 → 审核发布。<span class="goto">前往：<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a> ↗</span></li>
         <li><strong>验证</strong>：商家 151 的新订单完成履约（客户验收）后，「应结与付款」出现该主体的应结明细；收款方对账单按出账周期自动生成。<span class="goto">前往：<a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">统一结算工作台 → 应结与付款</a> ↗ ｜ <a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a> ↗</span></li>
       </ol>
