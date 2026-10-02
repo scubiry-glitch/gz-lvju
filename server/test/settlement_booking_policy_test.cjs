@@ -93,6 +93,24 @@ test('booking policies, manual timing and statement coverage use actual shared s
   const [policyRow]=await q('SELECT next_run_at FROM commerce_payee_statement_policies');
   assert.equal(policyRow.next_run_at,'2026-11-20 00:00:00');
  });
+ await t.test('SETTLEMENT_MAKER_CHECKER=0 时起草人可自行发布与批准（默认模式仍 403）',async()=>{
+  await assert.rejects(w.publishPolicy(maker,{id:(await w.savePolicy(maker,{party_id:'booking-merchant',biz_type:'booking',payment_mode:'pay_center',mode:'AUTO',priority:9,conditions:{booking_checkout_delay_days:0},nodes:[{name:'预订财务复核',mode:'ANY',approver_ids:['reviewer']}],...key()})).id,...key()}),{status:403},'默认模式下起草人不能发布自己的草稿');
+  process.env.SETTLEMENT_MAKER_CHECKER='0';
+  try{
+   const draft=await w.savePolicy(maker,{party_id:'booking-merchant',biz_type:'booking',payment_mode:'pay_center',mode:'AUTO',priority:8,conditions:{booking_checkout_delay_days:0},nodes:[{name:'预订财务复核',mode:'ANY',approver_ids:['reviewer']}],...key()});
+   assert.equal((await w.publishPolicy(maker,{id:draft.id,...key()})).status,'approved','同人发布自己的草稿');
+   const review=await rule(0,'REVIEW',9);
+   const src=P.id();
+   await q("INSERT INTO commerce_funding_sources(id,context_id,source_type,provider,environment,currency,account_id,contract_no,received_minor,status,evidence) VALUES(?,?,'PAYMENT','TEST','ISOLATED_TEST','CNY',?,'test',5000,'AVAILABLE','{}')",[src,ctx,account]);
+   const selfItem=String((await q("INSERT INTO commerce_settlement_items(context_id,line_kind,beneficiary_party_id,account_id,source_id,rule_ref,basis_minor,payable_minor,planned_minor,original_payable_minor,status) VALUES(?,'merchant','booking-merchant',?,?,'booking-self-review',5000,5000,5000,5000,'DRAFT')",[ctx,account,src])).insertId);
+   let i=await w.detail(maker,{id:selfItem});const opened=await w.authorizeItem(maker,{id:selfItem,expected_revision:i.revision,...key()});
+   assert.equal(opened.status,'IN_REVIEW');
+   assert.equal((await w.approve(maker,{id:opened.approval_id,revision:opened.revision,action:'approve',note:'同人自审',...key()})).status,'AUTHORIZED','同人批准自己的审批');
+   const configuration=require('../settlement/configuration.cjs').createConfiguration({pool,workflow:w,authorize});
+   const draftAccount=await configuration.create(maker,{kind:'accounts',party_id:'booking-merchant',provider:'TEST',environment:'ISOLATED_TEST',merchant_no:'self-review',contract_no:'test',currency:'CNY',capabilities:{evidence_ref:'self',receive:true},...key()});
+   assert.equal((await configuration.approve(maker,{kind:'accounts',id:draftAccount.id,...key()})).status,'approved','同人批准自己的配置');
+  }finally{delete process.env.SETTLEMENT_MAKER_CHECKER;}
+ });
  await t.test('offline and unpaid bookings appear as immutable order facts without financial accrual',async()=>{
   await q("INSERT INTO commerce_settlement_party_bindings(id,source_domain,source_entity_type,source_entity_id,party_id,status,created_by) VALUES(?,'booking','vendor','18','booking-merchant','approved','maker')",[P.id()]);
   for(const [id,paid]of [[1,null],[2,'unpaid']])await q("INSERT INTO booking_orders(id,order_no,project_id,owner_vendor_id,user_id,checkin,checkout,rooms,price_total,commission_rate,commission_fee,status,pay_status,created_at) VALUES(?,?,1,18,'42','2026-10-08','2026-10-10',2,1298,10,129.8,'pending',?,'2026-10-01 00:00:00')",[id,'BKG-REPORT-'+id,paid]);

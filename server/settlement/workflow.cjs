@@ -1,7 +1,7 @@
 'use strict';
 const bookingPolicy=require('./booking-policy.cjs');
 const P=require('./primitives.cjs');
-const {assert,id,parse,hash,minor,sqlDate,transaction,rows,calculate,postLedger}=P;
+const {assert,id,parse,hash,minor,sqlDate,transaction,rows,calculate,postLedger,makerCheckerRequired}=P;
 function createWorkflow({pool,authorize,now=Date.now,config={}}) {
  const clock=()=>sqlDate(now()), actor=p=>String(p.account.id), tx=fn=>transaction(pool,fn);
  const audit=(c,p,action,resource,payload)=>c.execute('INSERT INTO commerce_settlement_audit(actor_id,action,resource_id,payload) VALUES(?,?,?,?)',[actor(p),action,String(resource),JSON.stringify(payload)]);
@@ -143,13 +143,13 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
  async function approve(p,input){return command(p,'approval.action',input,async c=>{
   const [reference]=await rows(c,'SELECT * FROM commerce_settlement_approval_instances WHERE id=?',[input.id]);assert(reference,'审批不存在',404);
   const i=await item(c,reference.item_id,true),ctx=await context(c,i.context_id);const [a]=await rows(c,'SELECT * FROM commerce_settlement_approval_instances WHERE id=? FOR UPDATE',[input.id]);await permit(p,'settlement.approval.act',ctx);
-  assert(a.status==='PENDING'&&Number(a.item_revision)===Number(i.revision)&&Number(input.revision)===Number(i.revision),'审批版本已失效',409);assert(actor(p)!==a.created_by,'不能审批自己申请的事项',403);
-  const nodes=parse(a.nodes),node=nodes[a.current_node];assert(!node.approver_ids.length||node.approver_ids.includes(actor(p)),'不属于当前节点审批人',403);
+  assert(a.status==='PENDING'&&Number(a.item_revision)===Number(i.revision)&&Number(input.revision)===Number(i.revision),'审批版本已失效',409);if(makerCheckerRequired())assert(actor(p)!==a.created_by,'不能审批自己申请的事项',403);
+  const selfReview=!makerCheckerRequired(),nodes=parse(a.nodes),node=nodes[a.current_node];assert(selfReview||!node.approver_ids.length||node.approver_ids.includes(actor(p)),'不属于当前节点审批人',403);
   assert(['approve','reject'].includes(input.action),'审批动作无效');assert(typeof input.note==='string'&&input.note.trim().length>=2,'请填写审批意见');
   await c.execute('INSERT INTO commerce_settlement_approval_actions(id,instance_id,node_index,account_id,action,note) VALUES(?,?,?,?,?,?)',[id(),a.id,a.current_node,actor(p),input.action,input.note]);
   if(input.action==='reject'){await c.execute("UPDATE commerce_settlement_approval_instances SET status='REJECTED' WHERE id=?",[a.id]);await c.execute("UPDATE commerce_settlement_items SET status='HOLD',hold_reason='审批未通过' WHERE id=?",[i.id]);if(a.purpose==='ADJUSTMENT')await c.execute("UPDATE commerce_settlement_adjustments SET status='REJECTED' WHERE id=?",[parse(a.snapshot).adjustment_id]);return {status:'REJECTED'};}
   const actions=await rows(c,"SELECT account_id FROM commerce_settlement_approval_actions WHERE instance_id=? AND node_index=? AND action='approve'",[a.id,a.current_node]);
-  if(node.mode==='ALL'&&!node.approver_ids.every(x=>actions.some(y=>String(y.account_id)===x)))return {status:'PENDING',node:a.current_node};
+  if(node.mode==='ALL'&&!selfReview&&!node.approver_ids.every(x=>actions.some(y=>String(y.account_id)===x)))return {status:'PENDING',node:a.current_node};
   if(Number(a.current_node)+1<nodes.length){await c.execute('UPDATE commerce_settlement_approval_instances SET current_node=current_node+1 WHERE id=?',[a.id]);return {status:'PENDING',node:Number(a.current_node)+1};}
   let result;
   if(a.purpose==='ADJUSTMENT'){await applyAdjustment(c,p,a,i,ctx);result={status:'APPLIED',id:String(i.id)};}
@@ -173,7 +173,7 @@ function createWorkflow({pool,authorize,now=Date.now,config={}}) {
   }
  }
  async function publishPolicy(p,input){return command(p,'policy.publish',input,async c=>{
-  const [policy]=await rows(c,'SELECT * FROM commerce_settlement_policies WHERE id=? FOR UPDATE',[input.id]);assert(policy,'策略不存在',404);await permit(p,'settlement.policy.review',policy);assert(policy.created_by!==actor(p),'策略发布须独立复核',403);assert(policy.status==='draft','策略版本已发布或停用',409);
+  const [policy]=await rows(c,'SELECT * FROM commerce_settlement_policies WHERE id=? FOR UPDATE',[input.id]);assert(policy,'策略不存在',404);await permit(p,'settlement.policy.review',policy);if(makerCheckerRequired())assert(policy.created_by!==actor(p),'策略发布须独立复核',403);assert(policy.status==='draft','策略版本已发布或停用',409);
   if(policy.biz_type==='booking'){bookingPolicy.delayDays(policy.conditions);bookingPolicy.billingDay(policy.conditions);}
   await c.execute("UPDATE commerce_settlement_policies SET status='approved',reviewed_by=? WHERE id=?",[actor(p),policy.id]);
   await c.execute("UPDATE commerce_settlement_items i JOIN commerce_settlement_business_contexts x ON x.id=i.context_id SET i.status='DRAFT',i.hold_reason=NULL,i.revision=i.revision+1 WHERE i.status='HOLD' AND i.hold_reason IN ('无已批准的结算策略','策略暂缓') AND i.reserved_minor=0 AND x.biz_type=? AND x.payment_mode=? AND (? IS NULL OR x.party_id=?)",[policy.biz_type,policy.payment_mode,policy.party_id,policy.party_id]);

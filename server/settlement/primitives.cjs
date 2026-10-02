@@ -68,4 +68,6 @@ async function postLedger(c, event) {
   for (const l of lines) await c.execute('INSERT INTO commerce_ledger_entries(group_no,side,account,amount_minor,source_type,source_id,rule_ref,memo,event_id,context_id) VALUES(?,?,?,?,?,?,?,?,?,?)',[eventId,l.side,l.account,l.amount_minor,event.source_type || 'shared_settlement',String(event.source_id || eventId).slice(0,48),event.rule_ref || null,event.memo || null,eventId,event.context_id || null]);
   return eventId;
 }
-module.exports = { fault, assert, id, parse, canonical, hash, minor, sqlDate, transaction, configurePool, rows, calculate, postLedger };
+// 双人复核（起草人≠复核人）总开关：SETTLEMENT_MAKER_CHECKER=0 时允许起草人自行发布/批准（演示/单账号线）。
+const makerCheckerRequired = () => (process.env.SETTLEMENT_MAKER_CHECKER ?? '1') !== '0';
+module.exports = { fault, assert, id, parse, canonical, hash, minor, sqlDate, transaction, configurePool, rows, calculate, postLedger, makerCheckerRequired };

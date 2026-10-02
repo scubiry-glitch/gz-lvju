@@ -1,5 +1,5 @@
 'use strict';
-const {assert,id,parse,hash,rows,minor,calculate}=require('./primitives.cjs');
+const {assert,id,parse,hash,rows,minor,calculate,makerCheckerRequired}=require('./primitives.cjs');
 function createConfiguration({pool,workflow,authorize}) {
  const tables={accounts:'commerce_payment_accounts',profiles:'commerce_settlement_profiles',bindings:'commerce_settlement_party_bindings'};
  async function list(p,input){assert(tables[input.kind],'配置类型无效');const all=await rows(pool,`SELECT * FROM ${tables[input.kind]} ORDER BY created_at DESC LIMIT 500`),out=[];for(const r of all){try{await authorize(p,'settlement.fund.read',r);if(input.kind==='accounts'){const capabilities=parse(r.capabilities);r.account_label=capabilities.account_label||null;r.name=r.account_label;}out.push(r);}catch(e){if(e.status!==403)throw e;}}return {rows:out};}
@@ -28,7 +28,7 @@ function createConfiguration({pool,workflow,authorize}) {
   await workflow.audit(c,p,'configuration.create',key,{kind:input.kind,party_id:input.party_id});return {id:key,status:'draft'};
  });}
  async function approve(p,input){assert(tables[input.kind],'配置类型无效');return workflow.command(p,'configuration.approve.'+input.kind,input,async c=>{
-  const [r]=await rows(c,`SELECT * FROM ${tables[input.kind]} WHERE id=? FOR UPDATE`,[input.id]);assert(r,'配置不存在',404);await authorize(p,'settlement.policy.review',r);assert(r.created_by!==String(p.account.id),'配置准入需要非申请人复核',403);assert(r.status==='draft','配置已审批',409);
+  const [r]=await rows(c,`SELECT * FROM ${tables[input.kind]} WHERE id=? FOR UPDATE`,[input.id]);assert(r,'配置不存在',404);await authorize(p,'settlement.policy.review',r);if(makerCheckerRequired())assert(r.created_by!==String(p.account.id),'配置准入需要非申请人复核',403);assert(r.status==='draft','配置已审批',409);
   if(input.kind==='bindings'&&r.source_domain==='platform')await authorize(p,'settlement.policy.review',{});
   if(input.kind==='profiles'&&r.payment_mode==='pay_center'){
    const s=parse(r.snapshot);for(const field of ['source_account_id','merchant_account_id','platform_account_id']){const [a]=await rows(c,"SELECT * FROM commerce_payment_accounts WHERE id=? AND status='approved'",[s[field]]);assert(a,'账户尚未完成准入',409);if(field==='merchant_account_id')assert(a.party_id===r.party_id,'商户账户主体不一致',409);if(field==='source_account_id'){const collection=s.collection;assert(collection&&collection.mapping_version&&collection.contract_no===a.contract_no&&collection.source_merchant_no===a.merchant_no&&collection.provider===a.provider&&collection.environment===a.environment,'收款契约映射与原款账户不一致',409);}}

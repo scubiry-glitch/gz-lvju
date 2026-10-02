@@ -92,7 +92,7 @@
       </ul>
     </div>
     <div class="tip"><strong>为什么结算主体下拉里没有"全部"？</strong>下拉=「有业务痕迹的主体 ∩ 你有权限的主体」。选「全部授权主体」只是不按主体过滤查询，列表仍逐行做行级权限——scope 之外的主体一行都不会出现。要扩大可见范围，去<a href="account-center.html" target="_blank" rel="noopener">账号中心</a>改 scope，或在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>补主体准入。</div>
-    <p><strong>双人复核原则</strong>贯穿全域：规则、绑定、账户、协议、审批、异议，申请人与复核人必须是两个账号；自审批在服务端直接 403。</p>
+    <p><strong>双人复核原则</strong>默认贯穿全域：规则、绑定、账户、协议、审批、异议，申请人与复核人须为两个账号，自审批在服务端直接 403。演示/单账号线可用 <code>SETTLEMENT_MAKER_CHECKER=0</code> 关闭（关闭后起草人可自行发布与批准，包括指定审批人名单）；生产环境建议保持开启。</p>
 
     <h2 class="sec" id="onboarding">2. 主体与协议准入（授权主体从哪来）</h2>
     <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>完成准入，全部是<strong>草稿 → 另一人复核批准</strong>：</p>
