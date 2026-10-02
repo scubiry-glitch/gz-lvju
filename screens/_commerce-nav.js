@@ -50,17 +50,17 @@ const VIEW_MENUS={
   {name:'履约运营',items:[mod('inventory','list',READ_A),mod('capacity','target',READ_A),mod('orders','file',READ_A,'订单与发放'),mod('appointments','bell',READ_A),mod('redemptions','check',READ_A),mod('exchanges','coin',READ_A)]},
   {name:'客户与售后',items:[mod('coupons','wallet',READ_A),mod('memberships','star',READ_A),mod('cases','chat',READ_A)]},
   {name:'数据与审计',items:[mod('stats','pulse',READ_A),mod('audit','book',READ_A)]},
-  {name:'结算与对账',items:[mod('settlement','coin',FUND),mod('refunds','wallet',FUND),mod('reconciliation','check',FUND),{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
+  {name:'结算与对账',items:[mod('settlement','coin',FUND),mod('refunds','wallet',FUND),mod('reconciliation','check',FUND),{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']},{id:'settlement-manual',label:'结算手册',icon:'book',href:'settlement-manual.html'}]},
  ]},
  merchant:{title:'新居住 · 权益商户中心',sub:'MERCHANT',primary:'#0f766e',deep:'#0b5d56',groups:[
   {name:'业务入口',items:[...ENTRY.filter(e=>e.id!=='vouchers'),{id:'admin',label:'运营概览',icon:'chart',href:'commerce-admin.html',perms:READ_A},{id:'demo-accounts',label:'演示账号',icon:'book',href:'commerce-demo-accounts.html'}]},
   {name:'商户与门店',items:[mmod('dashboard','chart',READ_M),mmod('merchants','bank',READ_M),mmod('stores','home',READ_M),mmod('staff','user',READ_M)]},
   {name:'商品与产能',items:[mmod('skus','box',READ_M),mmod('inventory','list',READ_M),mmod('capacity','target',READ_M)]},
   {name:'履约',items:[mmod('orders','file',READ_M),mmod('appointments','bell',READ_M),mmod('redemptions','check',READ_M),mmod('coupons','wallet',READ_M,'卡券台账')]},
-  {name:'售后与结算',items:[mmod('cases','chat',READ_M),mmod('settlement','coin',READ_M,'应结与到账'),{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
+  {name:'售后与结算',items:[mmod('cases','chat',READ_M),mmod('settlement','coin',READ_M,'应结与到账'),{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']},{id:'settlement-manual',label:'结算手册',icon:'book',href:'settlement-manual.html'}]},
  ]},
  settlement:{title:'新居住 · 统一结算中心',sub:'SETTLEMENT',primary:'#0f766e',deep:'#0b5d56',groups:[
-  {name:'结算与对账',items:[{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read','settlement.approval.act','settlement.policy.write','settlement.policy.review','settlement.external.import','settlement.external.review']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']}]},
+  {name:'结算与对账',items:[{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read','settlement.approval.act','settlement.policy.write','settlement.policy.review','settlement.external.import','settlement.external.review']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']},{id:'settlement-manual',label:'结算手册',icon:'book',href:'settlement-manual.html'}]},
   {name:'业务入口',items:[{id:'commerce-admin',label:'权益运营中心',icon:'chart',href:'commerce-admin.html',perms:READ_A},{id:'commerce-merchant',label:'权益商户中心',icon:'home',href:'commerce-merchant.html',perms:READ_M},{id:'all-business',label:'全部业务入口',icon:'grid',href:'../overview.html'}]},
  ]},
 };

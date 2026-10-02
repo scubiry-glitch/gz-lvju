@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>结算手册 · 新居住统一结算中心</title>
+<style>
+  :root{
+    --ink:#132e35;--muted:#64777a;--brand:#0f766e;--deep:#0b5d56;--line:#dce6e5;--wash:#f3f7f6;
+    --warn:#996416;--warn-soft:#fdf6ec;--danger:#b42318;--ok:#166534;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:#fff;line-height:1.75}
+  a{color:var(--brand)}
+  .shell{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+  .main{min-width:0;display:flex;flex-direction:column}
+  .top{height:66px;border-bottom:1px solid var(--line);background:#fff;display:flex;align-items:center;gap:14px;padding:0 32px;position:sticky;top:0;z-index:5}
+  .top .brand{font-weight:700;color:var(--ink);text-decoration:none}
+  .top .sub{color:var(--muted);font-size:13px}
+  .top .spacer{flex:1}
+  .top .cta{font-size:13px;color:#fff;background:var(--brand);border-radius:8px;padding:7px 14px;text-decoration:none}
+  .top .cta.ghost{background:#fff;color:var(--brand);border:1px solid var(--line)}
+  .content{padding:28px 40px 64px;max-width:1080px}
+  .cover{background:linear-gradient(135deg,var(--deep),var(--brand));color:#fff;border-radius:16px;padding:30px 34px;margin-bottom:24px}
+  .cover h1{margin:0 0 6px;font-size:26px;letter-spacing:.5px}
+  .cover p{margin:4px 0 0;opacity:.92;font-size:14px}
+  .cover .meta{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+  .cover .meta span{background:rgba(255,255,255,.16);border-radius:999px;padding:3px 12px;font-size:12px}
+  .switch{display:flex;gap:8px;margin-bottom:18px}
+  .switch button{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:999px;padding:9px 22px;font-size:14px;cursor:pointer}
+  .switch button[aria-selected=true]{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+  .toc{background:var(--wash);border:1px solid var(--line);border-radius:12px;padding:14px 20px;margin-bottom:26px;font-size:14px}
+  .toc h2{margin:2px 0 8px;font-size:14px;color:var(--muted);font-weight:600}
+  .toc ol{margin:0;padding-left:20px}
+  .toc a{text-decoration:none}
+  section.view{display:none}
+  section.view.active{display:block}
+  h2.sec{font-size:19px;margin:34px 0 10px;padding-left:12px;border-left:4px solid var(--brand)}
+  h3{font-size:15px;margin:20px 0 6px}
+  p{margin:8px 0}
+  .panel{border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:12px 0;background:#fff}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:var(--wash);font-weight:600;white-space:nowrap}
+  td ul{margin:2px 0;padding-left:18px}
+  code{background:var(--wash);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .tip{border-left:4px solid var(--brand);background:var(--wash);border-radius:0 10px 10px 0;padding:10px 16px;margin:12px 0;font-size:13.5px}
+  .warn{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;padding:10px 16px;margin:12px 0;font-size:13.5px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;font-size:13.5px}
+  .flow span{background:var(--wash);border:1px solid var(--line);border-radius:8px;padding:5px 12px}
+  .flow em{color:var(--muted);font-style:normal}
+  footer.foot{border-top:1px solid var(--line);margin-top:44px;padding:18px 0;color:var(--muted);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
+  @media(max-width:900px){.shell{grid-template-columns:1fr}.content{padding:20px 18px 56px}.top{padding:0 18px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside id="commerce-nav" data-view="settlement" data-active="settlement-manual"></aside>
+<div class="main">
+<header class="top"><a class="brand" href="../overview.html">新居住</a><span class="sub">资金与结算 · 结算手册</span><span class="spacer"></span><a class="cta ghost" href="settlement-admin.html">统一结算工作台</a><a class="cta" href="settlement-statements.html">收款方对账单</a></header>
+<div class="content">
+  <div class="cover">
+    <h1>结算手册</h1>
+    <p>统一结算中心操作与运营指引 —— 平台方与商户两个视角</p>
+    <div class="meta"><span>v1.1</span><span>2026-10-02</span><span>覆盖三业务：生活权益（券）· 生活服务 · 预订（民宿+长租）</span><span>主体准入 / 结算规则 / 逐笔与账单日 / 审批执行 / 对账出账</span></div>
+  </div>
+
+  <div class="switch" role="tablist" aria-label="视角切换">
+    <button type="button" role="tab" data-view="platform" aria-selected="true">🏢 平台方 · 运营视角</button>
+    <button type="button" role="tab" data-view="merchant" aria-selected="false">🤝 商户 · 收款方视角</button>
+  </div>
+
+  <!-- ══════════════════ 平台方视角 ══════════════════ -->
+  <section class="view active" id="view-platform">
+    <div class="toc"><h2>📑 平台方目录</h2><ol>
+      <li><a href="#roles">角色与权限准备</a></li>
+      <li><a href="#onboarding">主体与协议准入（授权主体从哪来）</a></li>
+      <li><a href="#rules">结算规则：逐笔 / 审批 / 账单日（T+N）</a></li>
+      <li><a href="#operations">日常资金运营：应结 · 调整 · 审批 · 执行</a></li>
+      <li><a href="#statements">对账与出账</a></li>
+      <li><a href="#boundaries">边界与红线</a></li>
+    </ol></div>
+
+    <h2 class="sec" id="roles">1. 角色与权限准备</h2>
+    <p>统一结算中心的页面本身不带权限，所有校验都在服务端；一个账号能看什么、能做什么，由账号中心的<strong>功能权限 + 数据权限（scope）</strong>共同决定。</p>
+    <div class="panel">
+      <h3>在账号中心（账号与权限 → 数据权限）配置</h3>
+      <ul>
+        <li><strong>功能权限</strong>（挂在角色上）：<code>settlement.fund.read / fund.write / fund.adjust / fund.review</code>、<code>settlement.approval.act</code>、<code>settlement.policy.write / policy.review</code>、<code>settlement.statement.read / generate / export / confirm / dispute / review</code>、<code>settlement.external.*</code>、<code>settlement.accrual.adjust</code>。</li>
+        <li><strong>数据权限 scope</strong>（挂在账号角色上）：<code>level:'all'</code> 且不配 <code>party_ids</code> = 可见全部主体；配置了 <code>party_ids:[…]</code> = 仅名单内主体（即使 level=all 也会被名单收窄）。改完保存会吊销该账号会话，重新登录生效。</li>
+      </ul>
+    </div>
+    <div class="tip"><strong>为什么结算主体下拉里没有"全部"？</strong>下拉=「有业务痕迹的主体 ∩ 你有权限的主体」。选「全部授权主体」只是不按主体过滤查询，列表仍逐行做行级权限——scope 之外的主体一行都不会出现。要扩大可见范围，去账号中心改 scope，或在「账户与协议」补主体准入。</div>
+    <p><strong>双人复核原则</strong>贯穿全域：规则、绑定、账户、协议、审批、异议，申请人与复核人必须是两个账号；自审批在服务端直接 403。</p>
+
+    <h2 class="sec" id="onboarding">2. 主体与协议准入（授权主体从哪来）</h2>
+    <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在「结算工作台 → 账户与协议」完成准入，全部是<strong>草稿 → 另一人复核批准</strong>：</p>
+    <div class="flow"><span>① 业务主体绑定</span><em>→</em><span>② 机构收款账户</span><em>→</em><span>③ 商户结算协议</span><em>→</em><span>④ 进入结算与出账</span></div>
+    <table>
+      <tr><th>准入项</th><th>关键字段</th><th>说明</th></tr>
+      <tr><td>业务主体绑定</td><td>业务来源（booking / jiazheng / commerce / identity / platform）· 业务主体编号 · 法律主体标识</td><td>把业务系统里的真实编号（如商家/服务商 id）映射到法律主体。表单里提供「查询已有主体 / 查询已绑定业务编号」链接，录入前先查重。</td></tr>
+      <tr><td>机构收款账户</td><td>支付机构 / 环境 / 商户号 / 资金合同号 / 币种 / 已核验能力</td><td>机构未开通的操作不能勾选；站内来源、商户、平台账户须同机构同币种。</td></tr>
+      <tr><td>商户结算协议</td><td>计算方式（比例 / 固定成本+独立佣金）· 履约确认 · 原款存放方式 · 收款契约 · 分账契约版本</td><td>预订（民宿/长租）履约固定为「按订单离店日期」；等待时间等在结算规则配置。</td></tr>
+    </table>
+    <p>主体只有出现以下<strong>任一业务痕迹</strong>才会进入主体目录：已批准绑定、已批准账户、业务上下文（有过订单）、出账策略。</p>
+    <div class="panel">
+      <h3>三业务的履约确认与支付渠道（结算协议准入时选定）</h3>
+      <table>
+        <tr><th>业务</th><th>履约确认方式</th><th>支付渠道</th><th>资格时间</th></tr>
+        <tr><td><strong>生活权益（券）</strong></td><td>权益有效核销（<code>COUPON_REDEMPTION</code>）</td><td>站内收银台</td><td>券核销即取得资格，可另加协议「履约后结算等待（小时）」</td></tr>
+        <tr><td><strong>生活服务</strong></td><td>客户验收确认（<code>CUSTOMER_ACCEPTANCE</code>，客户在订单页点击确认）</td><td>站内收银台；外部小程序（<code>wechat_mini</code>，仅对账不付款）</td><td>客户验收即取得资格，可另加协议「履约后结算等待（小时）」</td></tr>
+        <tr><td><strong>预订（民宿/长租）</strong></td><td>按订单离店日期（<code>BOOKING_CHECKOUT_DELAY</code>，在结算规则配置 N 与账单日）</td><td>站内收银台；线下收款（仅对账）</td><td>离店 + N 天，可选账单日批量</td></tr>
+      </table>
+      <p class="tip" style="margin-bottom:0">跨法律结算主体的权益商品必须按主体拆单；每个结算单位会按协议拆成商户应结、平台佣金划拨与推广佣金三种应结成分。</p>
+    </div>
+
+    <h2 class="sec" id="rules">3. 结算规则：逐笔 / 审批 / 账单日（T+N）</h2>
+    <p>「结算规则」按 业务 × 主体 × 渠道 × 金额区间 配置，优先级高者生效，同级冲突会阻止自动结算。模式：<strong>自动结算 AUTO / 审核后结算 REVIEW / 暂停 HOLD</strong>。草稿由另一位授权人员「审核发布」后生效。</p>
+    <div class="tip"><strong>三业务的时间口径不同</strong>：下面的「离店等待天数 / 账单日」仅适用预订（民宿/长租）。生活权益（券）核销即资格、生活服务客户验收即资格，等待时间在商户结算协议上配「履约后结算等待（小时）」；外部小程序渠道（生活服务）没有本站资金动作，建议常态配置「审核后结算」仅作对账纪律。</div>
+    <div class="panel">
+      <h3>预订（民宿/长租）的时间口径</h3>
+      <ul>
+        <li><strong>离店后等待天数 N</strong>（必填，0–3650）：按订单锁定离店日期 + N 个北京自然日取得<strong>结算资格</strong>。</li>
+        <li><strong>账单日 billing_day</strong>（选填，每月 1–28 日）：<em>不填 = 逐笔</em>，每笔订单资格后各自可结算；<em>填写 = 账单日模式</em>，订单在资格后统一等到最近一个账单日，随账单批量结算——这就是 T+N 的账期含义。</li>
+      </ul>
+      <table>
+        <tr><th></th><th>逐笔（不填账单日）</th><th>账单日（如每月 25 日）</th></tr>
+        <tr><td>可结算时间</td><td>离店 + N 当日</td><td>max(离店+N, 最近账单日)</td></tr>
+        <tr><td>资金动作</td><td>每笔独立授权/付款</td><td>账单日集中授权/付款，避免逐笔滚动</td></tr>
+        <tr><td>出账周期</td><td>自然月</td><td>上个账单日 00:00 → 本账单日 00:00，账单日 08:00 自动出账</td></tr>
+      </table>
+      <p>账单日是<strong>结算规则的单一数据源</strong>：出账周期由系统按主体自动派生，无需另配。</p>
+    </div>
+    <p>规则发布/停用时，尚未占用资金的明细会按当前已批准规则<strong>即时重估</strong>最早付款时间；已进入执行或已付款的事实保留不变。</p>
+
+    <h2 class="sec" id="operations">4. 日常资金运营：应结 · 调整 · 审批 · 执行</h2>
+    <ul>
+      <li><strong>应结与付款</strong>：列表按 进度（草稿→审核中→已授权→执行中→已付）与「最早付款时间」管理；未到时间不会打开审批或授权。每笔应结由成分构成：<em>商户应结（merchant）/ 平台佣金划拨（platform_transfer）/ 推广佣金（promoter）</em>，各自独立授权与付款。</li>
+      <li><strong>单笔调整</strong>分两类：<em>付款安排</em>（金额/时间/账户，不改应结总额）与<em>应结权益变更</em>（补付/减免，必须填依据并重走审批）。改期不得早于离店+N（或账单日）。</li>
+      <li><strong>审批待办</strong>：多节点会签/或签按序推进；平台佣金划拨与商户款联动受控（勾选联动释放的必须同时授权）。</li>
+      <li><strong>执行</strong>：创建执行计划 → 机构队列 → 回执确认；「结果待查询（UNKNOWN）」只能查原单，禁止重试或换号；退票/失败释放按页面指引处理。</li>
+      <li><strong>补差与赔付</strong>：仅登记已核验的独立自有资金；客户赔付审批通过并实际付款后才形成可追偿金额。</li>
+    </ul>
+
+    <h2 class="sec" id="statements">5. 对账与出账</h2>
+    <ul>
+      <li><strong>出账周期</strong>：自然月（缺省）或账单日周期；主体有新订单/义务后系统自动登记出账策略，账单日 08:00 自动出账，也可手动「生成账单」。</li>
+      <li><strong>账单版本</strong>：同一账期内容变化生成新版本，历史版本保留；核验进度（已核对/待处理/存在差异）与资料覆盖（齐全/待补）逐版标注。</li>
+      <li><strong>外部对账资料（生活服务）</strong>：外部小程序渠道的收款/退款/履约/佣金到账由商户报送（自助提交或 CSV 批量导入）或平台导入，另一位复核人核验后才计入已核验金额；核验后的佣金按应收/应付入账并可出具覆盖报告。外部渠道<strong>仅对账，不产生本站付款</strong>。</li>
+      <li><strong>生活权益（券）</strong>：有效核销即进入账单成分，无需外部凭证；演示券永不出账（见红线）。</li>
+      <li><strong>差异处理</strong>：收款方提出异议 → 独立复核关闭；金额修正必须另行批准调整，不倒改已出账单。</li>
+    </ul>
+
+    <h2 class="sec" id="boundaries">6. 边界与红线</h2>
+    <div class="warn">
+      <ul>
+        <li>线下/外部渠道只作对账资料，不在结算工作台发起付款。</li>
+        <li>演示数据（带 is_demo 标记的演示券包、演示订单）永不进入资金域与结算账单。</li>
+        <li>收款账户必须经机构准入且属于受益主体；缺少已核验能力的动作（代付/释放等）保持关闭。</li>
+        <li>机构结果未知 = 查原单；失败重试受控（≤3 次）且沿用原请求编号。</li>
+        <li>所有出金都要求有效资金授权；规则停用/版本变化会使未使用的授权失效。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ══════════════════ 商户视角 ══════════════════ -->
+  <section class="view" id="view-merchant">
+    <div class="toc"><h2>📑 商户目录</h2><ol>
+      <li><a href="#m-onboard">从入驻到结算的链路</a></li>
+      <li><a href="#m-when">我的钱什么时候到（逐笔 / 账单日）</a></li>
+      <li><a href="#m-bill">对账单怎么用</a></li>
+      <li><a href="#m-faq">常见问题</a></li>
+    </ol></div>
+
+    <h2 class="sec" id="m-onboard">1. 从入驻到结算的链路</h2>
+    <div class="flow"><span>提供资质与结算信息</span><em>→</em><span>平台录入主体绑定 / 结算协议 / 收款账户</span><em>→</em><span>双人复核批准</span><em>→</em><span>订单进入结算</span></div>
+    <p>商户侧不需要自己操作系统录入：法律主体标识、机构收款商户号、佣金与履约口径由平台方在「统一结算工作台 → 账户与协议」录入并复核。生活权益商户（券）、生活服务商户与预订商户（民宿/长租）均走同一条链路。你拿到的是两个入口：<a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a>（看账、确认、异议、下载）与本手册。</p>
+
+    <h2 class="sec" id="m-when">2. 我的钱什么时候到（逐笔 / 账单日）</h2>
+    <p>平台与你在合同里约定结算节奏，对账单页顶部的<strong>「出账周期」</strong>会写明你适用哪种：</p>
+    <table>
+      <tr><th>节奏</th><th>规则</th><th>举例（民宿/长租）</th></tr>
+      <tr><td><strong>逐笔 T+N</strong></td><td>每笔订单在<strong>离店日后 N 天</strong>各自取得结算资格，随即可付（或按合同进入人工审核）</td><td>离店 10 月 1 日、N=3 → 10 月 4 日起可结算</td></tr>
+      <tr><td><strong>账单日模式</strong></td><td>资格日后<strong>等到最近一个账单日</strong>，随当期对账单批量结算</td><td>资格日 10 月 4 日、账单日每月 25 日 → 10 月 25 日随账单结算</td></tr>
+      <tr><td><strong>生活权益（券）</strong></td><td>客户<strong>核销券</strong>即按核销入账（可含协议约定的等待小时），出账按对账周期</td><td>客户 10 月 2 日核销 → 该笔进入当期账单，按出账周期结付</td></tr>
+      <tr><td><strong>生活服务</strong></td><td>客户<strong>验收确认</strong>后取得结算资格；站内收银台渠道可结算，外部小程序渠道仅对账（资金在渠道侧，平台按报送+核验出账）</td><td>客户 10 月 2 日确认服务完成 → 10 月 2 日起可结算（站内渠道）</td></tr>
+    </table>
+    <ul>
+      <li>预订订单按<strong>下单锁定的离店日期</strong>计算，不要求客户点击确认。</li>
+      <li>存在退款/取消的订单会先冻结结算，由平台核验净履约金额。</li>
+      <li>渠道/推广佣金在平台佣金到账后单独支付，不占用你的应结款。</li>
+    </ul>
+
+    <h2 class="sec" id="m-bill">3. 对账单怎么用</h2>
+    <ul>
+      <li><strong>列表</strong>：按账期列出每版账单，关注「核验进度 / 资料覆盖 / 发布状态」三个徽标。</li>
+      <li><strong>明细</strong>：逐行展示订单（品类：民宿/长租；入住/离店；下单房费与锁定佣金）、平台结付与外部流水；标注「待补凭证/待复核」的行不计入已核验合计。</li>
+      <li><strong>确认账单</strong>：确认展示内容，不代表资金已到账。</li>
+      <li><strong>提出异议</strong>：指明明细与凭证提交；处理结论由平台独立复核给出，金额修正不倒改已出账单。</li>
+      <li><strong>下载</strong>：CSV / XLSX / PDF 三种格式，含账单汇总与逐笔明细。</li>
+    </ul>
+
+    <h2 class="sec" id="m-faq">4. 常见问题</h2>
+    <div class="panel">
+      <p><strong>为什么我看不到某个主体/账单？</strong> 账号的数据权限按主体授权，仅显示授权范围内主体；需要扩大范围请联系平台管理员在账号中心调整。</p>
+      <p><strong>「金额待补」是什么意思？</strong> 该笔记录还没有可核验的金额凭证，未按零元计入合计；补齐资料并核验后会生成新的账单版本。</p>
+      <p><strong>状态怎么看？</strong> 待补凭证 / 待复核 = 资料在途；已核验 = 可计入；存在差异 = 有冲突需处理；已出账 = 账单已发布。</p>
+      <p><strong>换了收款账户怎么办？</strong> 联系平台办理机构结算账户变更，通过复核后新订单使用新账户；在途款按原单查询结果。</p>
+      <p><strong>生活服务外部小程序的收款，为什么不能在工作台付款？</strong> 外部渠道的钱在渠道侧结算，平台只做对账：由你报送（或平台导入）收款/退款流水，平台独立复核后计入账单与佣金口径，不会替渠道发起付款。</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <a href="settlement-admin.html">统一结算工作台 →</a>
+    <a href="settlement-statements.html">收款方对账单 →</a>
+    <a href="../overview.html">全站导航总览 →</a>
+    <span>本手册描述当前原型实现；资金与权限校验均在服务端。</span>
+  </footer>
+</div>
+</div>
+</div>
+<script>
+(function(){
+  'use strict';
+  var buttons=document.querySelectorAll('.switch button');
+  function show(name){
+    document.querySelectorAll('section.view').forEach(function(s){s.classList.toggle('active',s.id==='view-'+name);});
+    buttons.forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.view===name));});
+  }
+  buttons.forEach(function(b){b.addEventListener('click',function(){location.hash=b.dataset.view;show(b.dataset.view);});});
+  window.addEventListener('hashchange',function(){if(location.hash==='#merchant')show('merchant');else if(location.hash==='#platform')show('platform');});
+  if(location.hash==='#merchant')show('merchant');
+})();
+</script>
+<script src="_commerce-nav.js?v=20261002-8"></script>
+</body>
+</html>

@@ -89,7 +89,8 @@
   function qs(values) { const p = new URLSearchParams(); Object.entries(values).forEach(([k, v]) => { if (v !== '' && v != null) p.set(k, v); }); return '?' + p.toString(); }
   function filterHTML() {
     const f = state.filters; const parties = (state.identity?.parties || []).map(p => [p.id, p.name]);
-    return '<form id="settlement-filter" class="panel filters">' + field('业务', select('biz_type', [['', '全部业务'], ['commerce', '生活权益'], ['jiazheng', '生活服务'], ['booking', '预订（民宿/长租）']], f.biz_type)) + field('支付渠道', select('payment_mode', [['', '全部渠道'], ['pay_center', '站内收银台'], ['wechat_mini', '外部小程序'], ['offline', '线下支付（仅对账）']], f.payment_mode)) + field('结算主体', select('party_id', isAdmin && state.tab !== 'external' ? [['', '全部授权主体'], ...parties] : parties, f.party_id)) + '<div class="filter-actions"><button class="primary" type="submit">查询</button>' + button('刷新', 'refresh') + '</div></form>';
+    const partyFilterField = '<label class="field"><span>结算主体</span>' + select('party_id', isAdmin && state.tab !== 'external' ? [['', '全部授权主体'], ...parties] : parties, f.party_id) + '<small>仅显示授权范围内主体：主体在「账户与协议 · 业务主体绑定」双人复核准入，账号可见范围由账号中心「数据权限」控制，详见 <a href="settlement-manual.html#roles" target="_blank" rel="noopener">结算手册</a>。</small></label>';
+    return '<form id="settlement-filter" class="panel filters">' + field('业务', select('biz_type', [['', '全部业务'], ['commerce', '生活权益'], ['jiazheng', '生活服务'], ['booking', '预订（民宿/长租）']], f.biz_type)) + field('支付渠道', select('payment_mode', [['', '全部渠道'], ['pay_center', '站内收银台'], ['wechat_mini', '外部小程序'], ['offline', '线下支付（仅对账）']], f.payment_mode)) + partyFilterField + '<div class="filter-actions"><button class="primary" type="submit">查询</button>' + button('刷新', 'refresh') + '</div></form>';
   }
   function tabsHTML() { return '<nav class="tabs" role="tablist" aria-label="结算工作区">' + [['items', '应结与付款', 'settlement.fund.read'], ['approvals', '审批待办', 'settlement.approval.act'], ['policies', '结算规则', 'settlement.policy.write'], ['external', '外部对账资料', 'settlement.external.import'], ['configuration', '账户与协议', 'settlement.policy.write'], ['own-funds', '补差与赔付', 'settlement.fund.read']].filter(([, , p]) => can(p) || (p === 'settlement.policy.write' && can('settlement.policy.review')) || (p === 'settlement.external.import' && can('settlement.external.review'))).map(([id, title]) => '<button type="button" role="tab" data-action="tab" data-id="' + id + '" aria-selected="' + (state.tab === id) + '">' + title + '</button>').join('') + '</nav>'; }
   async function initialize() {
@@ -323,12 +324,40 @@
   }
   function partyField() {
     const parties = state.identity.parties || [];
-    if (state.identity.can_manage_parties === true) return field('法律主体标识', input('party_id', state.filters.party_id || '', 'required maxlength="64" pattern="[A-Za-z0-9_.:-]{1,64}" list="settlement-party-list"') + '<datalist id="settlement-party-list">' + parties.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('') + '</datalist>', '选择已有主体，或录入经确认的新法律主体标识。业务绑定复核后生效。');
-    return field('结算主体', select('party_id', parties.map(p => [p.id, p.name]), state.filters.party_id, 'required'));
+    const lookup = '<small class="lookup-links"><button type="button" class="link" data-action="lookup-party">查询已有主体 →</button></small>';
+    if (state.identity.can_manage_parties === true) return '<label class="field"><span>法律主体标识</span>' + input('party_id', state.filters.party_id || '', 'required maxlength="64" pattern="[A-Za-z0-9_.:-]{1,64}" list="settlement-party-list"') + '<datalist id="settlement-party-list">' + parties.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join('') + '</datalist><small>选择已有主体，或录入经确认的新法律主体标识。业务绑定复核后生效。</small>' + lookup + '</label>';
+    return '<label class="field"><span>结算主体</span>' + select('party_id', parties.map(p => [p.id, p.name]), state.filters.party_id, 'required') + lookup + '</label>';
+  }
+  // 主体/业务编号查询：数据来自结算域自己的绑定与账户接口，点击行回填来源表单。
+  async function partyLookupDialog(source, kind) {
+    const partyMode = kind !== 'entity';
+    const d = modal(partyMode ? '查询已有结算主体' : '查询已绑定业务编号', '<div id="party-lookup-body"><p class="subtle">正在读取主体目录…</p></div>');
+    const fillField = (name, value) => { if (!source || !source.isConnected) return; const target = source.querySelector('[name=' + name + ']'); if (!target || !target.isConnected) return;
+      if (target.tagName === 'SELECT') { let option = [...target.options].find(o => o.value === value); if (!option) { option = document.createElement('option'); option.value = value; option.textContent = value; target.append(option); } target.value = value; }
+      else target.value = value; };
+    try {
+      const [bindingResult, accountResult] = await Promise.all([api('/admin/configuration/bindings'), api('/admin/accounts')]);
+      const bindings = rowsOf(bindingResult), accounts = rowsOf(accountResult), body = $('#party-lookup-body', d);
+      if (partyMode) {
+        const byParty = new Map(), accountCount = new Map();
+        for (const b of bindings) { const list = byParty.get(b.party_id) || []; list.push(b); byParty.set(b.party_id, list); }
+        for (const a of accounts) accountCount.set(a.party_id, (accountCount.get(a.party_id) || 0) + 1);
+        const ids = [...new Set([...byParty.keys(), ...accounts.map(a => a.party_id)])].sort();
+        body.innerHTML = '<p class="subtle">点击行回填主体标识。</p>' + (ids.length ? table(['法律主体标识', '业务绑定', '已批准账户', '状态'], ids.map(id => { const list = byParty.get(id) || [], approved = list.some(b => /^approved$/i.test(b.status));
+          return '<tr data-fill="' + esc(id) + '" style="cursor:pointer"><td><strong>' + esc(id) + '</strong></td><td class="break">' + esc(list.length ? list.map(b => label(b.source_domain) + ' · ' + (b.source_entity_id || '—') + (/^approved$/i.test(b.status) ? '' : '（待复核）')).join('；') : '尚未绑定') + '</td><td>' + (accountCount.get(id) || 0) + '</td><td>' + (approved ? '已批准' : list.length ? '待复核' : '—') + '</td></tr>'; })) : '<p class="subtle">主体目录为空：还没有任何主体绑定或收款账户。</p>');
+      } else {
+        const rows = bindings.slice().sort((a, b) => (/^approved$/i.test(b.status) ? 1 : 0) - (/^approved$/i.test(a.status) ? 1 : 0));
+        body.innerHTML = '<p class="subtle">点击行回填业务主体编号（主体字段为空时一并回填）。</p>' + (rows.length ? table(['业务来源', '业务主体编号', '法律主体', '状态'], rows.map(b => '<tr data-fill="' + esc(b.source_entity_id || '') + '" data-party="' + esc(b.party_id || '') + '" style="cursor:pointer"><td>' + esc(label(b.source_domain)) + '</td><td><strong>' + esc(b.source_entity_id || '—') + '</strong></td><td>' + esc(b.party_id || '—') + '</td><td>' + badge(b.status) + '</td></tr>')) : '<p class="subtle">尚无业务主体绑定。</p>');
+      }
+      body.querySelectorAll('tr[data-fill]').forEach(tr => tr.addEventListener('click', () => { const value = tr.dataset.fill; if (!value) return;
+        if (partyMode) fillField('party_id', value);
+        else { fillField('source_entity_id', value); const partyInput = source.querySelector('[name=party_id]'); if (tr.dataset.party && partyInput && !partyInput.value) fillField('party_id', tr.dataset.party); }
+        d.close(); }));
+    } catch (e) { const body = $('#party-lookup-body', d); if (body) body.innerHTML = '<p class="notice">' + esc(e.message) + '</p>'; }
   }
   async function newConfiguration(kind) {
     let fields = partyField(), profileAccounts = [];
-    if (kind === 'bindings') fields += field('业务来源', select('source_domain', [['commerce','生活权益商户'],['jiazheng','生活服务商户'],['booking','预订商户（民宿/长租）'],['identity','推广账号'],['platform','平台法律主体']])) + field('业务主体编号', input('source_entity_id', '', 'required maxlength="64"'), '使用业务系统中的真实编号，不能用另一业务的同号主体代替。');
+    if (kind === 'bindings') fields += field('业务来源', select('source_domain', [['commerce','生活权益商户'],['jiazheng','生活服务商户'],['booking','预订商户（民宿/长租）'],['identity','推广账号'],['platform','平台法律主体']])) + '<label class="field"><span>业务主体编号</span>' + input('source_entity_id', '', 'required maxlength="64"') + '<small>使用业务系统中的真实编号，不能用另一业务的同号主体代替。</small><small class="lookup-links"><button type="button" class="link" data-action="lookup-entity">查询已绑定业务编号 →</button> · <a href="p-vendor-rates.html" target="_blank" rel="noopener">商家档案（费率台）↗</a>（需商家费率权限）</small></label>';
     if (kind === 'accounts') fields += field('支付机构', input('provider', '', 'required maxlength="32"')) + field('环境', select('environment', [['production','正式环境'],['sandbox','测试环境']])) + field('机构商户号', input('merchant_no', '', 'required maxlength="128"')) + field('机构资金合同号', input('contract_no', '', 'required maxlength="128"')) + field('币种', select('currency', [['CNY','人民币']])) + field('已核验能力', '<div class="actions"><label class="check-label"><input type="checkbox" name="receive">收款</label>' + Object.entries(operationNames).map(([k,t]) => '<label class="check-label"><input type="checkbox" name="operation" value="' + k + '">' + t + '</label>').join('') + '</div>', '仅勾选已由机构材料验证的能力，机构未开通的操作无法执行。', true) + field('独立自有资金能力', '<label class="check-label"><input type="checkbox" name="own_funds_verified">已核验独立自有资金，非顾客原支付或佣金专款</label>', '', true) + field('独立自有资金核验凭证', input('own_funds_evidence_ref', '', 'maxlength="500"')) + field('机构核验材料', input('evidence_ref', '', 'required maxlength="500"'), '填写合同、联调验收记录等可独立核验的材料引用。', true);
     if (kind === 'profiles') {
       const accounts = rowsOf(await api('/admin/accounts')).filter(a => /^approved$/i.test(a.status));
@@ -400,6 +429,8 @@
       else if (action === 'review-own-source') reviewOwnRecord(id, false);
       else if (action === 'review-compensation') reviewOwnRecord(id, true);
       else if (action === 'new-configuration') await newConfiguration(id);
+      else if (action === 'lookup-party') partyLookupDialog(b.closest('dialog'), 'party');
+      else if (action === 'lookup-entity') partyLookupDialog(b.closest('dialog'), 'entity');
       else if (action === 'review-configuration') reviewConfiguration(id);
       else if (action === 'config-kind') { state.configKind = id; await load(); }
       else if (action === 'add-node') appendNode(b.closest('dialog'));
