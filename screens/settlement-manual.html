@@ -91,11 +91,11 @@
         <li><strong>数据权限 scope</strong>（挂在账号角色上）：<code>level:'all'</code> 且不配 <code>party_ids</code> = 可见全部主体；配置了 <code>party_ids:[…]</code> = 仅名单内主体（即使 level=all 也会被名单收窄）。改完保存会吊销该账号会话，重新登录生效。</li>
       </ul>
     </div>
-    <div class="tip"><strong>为什么结算主体下拉里没有"全部"？</strong>下拉=「有业务痕迹的主体 ∩ 你有权限的主体」。选「全部授权主体」只是不按主体过滤查询，列表仍逐行做行级权限——scope 之外的主体一行都不会出现。要扩大可见范围，去<a href="account-center.html" target="_blank" rel="noopener">账号中心</a>改 scope，或在<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>补主体准入。</div>
+    <div class="tip"><strong>为什么结算主体下拉里没有"全部"？</strong>下拉=「有业务痕迹的主体 ∩ 你有权限的主体」。选「全部授权主体」只是不按主体过滤查询，列表仍逐行做行级权限——scope 之外的主体一行都不会出现。要扩大可见范围，去<a href="account-center.html" target="_blank" rel="noopener">账号中心</a>改 scope，或在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>补主体准入。</div>
     <p><strong>双人复核原则</strong>贯穿全域：规则、绑定、账户、协议、审批、异议，申请人与复核人必须是两个账号；自审批在服务端直接 403。</p>
 
     <h2 class="sec" id="onboarding">2. 主体与协议准入（授权主体从哪来）</h2>
-    <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>完成准入，全部是<strong>草稿 → 另一人复核批准</strong>：</p>
+    <p>「结算主体（party）」是法律结算主体标识（如 <code>demo-stay</code>），不是商户 id。一个主体要出现在结算中心，必须在<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a>完成准入，全部是<strong>草稿 → 另一人复核批准</strong>：</p>
     <div class="flow"><span>① 业务主体绑定</span><em>→</em><span>② 机构收款账户</span><em>→</em><span>③ 商户结算协议</span><em>→</em><span>④ 进入结算与出账</span></div>
     <table>
       <tr><th>准入项</th><th>关键字段</th><th>说明</th></tr>
@@ -117,17 +117,17 @@
     <div class="panel">
       <h3>例：给商家 151 开通结算（五步）</h3>
       <ol>
-        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（可用弹窗里的「商家目录搜索」输入 151 直接找到商家），法律主体标识起一个法人代号（如 <code>bianxi</code>）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
-        <li><strong>机构收款账户</strong>：给主体 <code>bianxi</code> 准入机构账户（支付机构 / 环境 / 商户号 / 资金合同号，勾选已核验能力）→ 复核批准。<span class="goto">前往：<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
-        <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。<span class="goto">前往：<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
-        <li><strong>结算规则</strong>：结算规则 → 新建规则，选业务与主体，配置自动结算或审核后结算及金额区间 → 审核发布。<span class="goto">前往：<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a> ↗</span></li>
-        <li><strong>验证</strong>：商家 151 的新订单完成履约（客户验收）后，「应结与付款」出现该主体的应结明细；收款方对账单按出账周期自动生成。<span class="goto">前往：<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 应结与付款</a> ↗ ｜ <a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a> ↗</span></li>
+        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（可用弹窗里的「商家目录搜索」输入 151 直接找到商家），法律主体标识起一个法人代号（如 <code>bianxi</code>）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>机构收款账户</strong>：给主体 <code>bianxi</code> 准入机构账户（支付机构 / 环境 / 商户号 / 资金合同号，勾选已核验能力）→ 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>结算规则</strong>：结算规则 → 新建规则，选业务与主体，配置自动结算或审核后结算及金额区间 → 审核发布。<span class="goto">前往：<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a> ↗</span></li>
+        <li><strong>验证</strong>：商家 151 的新订单完成履约（客户验收）后，「应结与付款」出现该主体的应结明细；收款方对账单按出账周期自动生成。<span class="goto">前往：<a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">统一结算工作台 → 应结与付款</a> ↗ ｜ <a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a> ↗</span></li>
       </ol>
       <p class="subtle" style="margin-bottom:0">预订商家（民宿/长租）同理：业务来源选 booking，履约确认固定为按订单离店日期，在结算规则里配置离店等待天数与账单日。</p>
     </div>
 
     <h2 class="sec" id="rules">3. 结算规则：逐笔 / 审批 / 账单日（T+N）</h2>
-    <p>「<a href="settlement-admin.html" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a>」按 业务 × 主体 × 渠道 × 金额区间 配置，优先级高者生效，同级冲突会阻止自动结算。模式：<strong>自动结算 AUTO / 审核后结算 REVIEW / 暂停 HOLD</strong>。草稿由另一位授权人员「审核发布」后生效。</p>
+    <p>「<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a>」按 业务 × 主体 × 渠道 × 金额区间 配置，优先级高者生效，同级冲突会阻止自动结算。模式：<strong>自动结算 AUTO / 审核后结算 REVIEW / 暂停 HOLD</strong>。草稿由另一位授权人员「审核发布」后生效。</p>
     <div class="tip"><strong>三业务的时间口径不同</strong>：下面的「离店等待天数 / 账单日」仅适用预订（民宿/长租）。生活权益（券）核销即资格、生活服务客户验收即资格，等待时间在商户结算协议上配「履约后结算等待（小时）」；外部小程序渠道（生活服务）没有本站资金动作，建议常态配置「审核后结算」仅作对账纪律。</div>
     <div class="panel">
       <h3>预订（民宿/长租）的时间口径</h3>
@@ -147,18 +147,18 @@
 
     <h2 class="sec" id="operations">4. 日常资金运营：应结 · 调整 · 审批 · 执行</h2>
     <ul>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">应结与付款 ↗</a></strong>：列表按 进度（草稿→审核中→已授权→执行中→已付）与「最早付款时间」管理；未到时间不会打开审批或授权。每笔应结由成分构成：<em>商户应结（merchant）/ 平台佣金划拨（platform_transfer）/ 推广佣金（promoter）</em>，各自独立授权与付款。</li>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">单笔调整 ↗</a></strong>分两类：<em>付款安排</em>（金额/时间/账户，不改应结总额）与<em>应结权益变更</em>（补付/减免，必须填依据并重走审批）。改期不得早于离店+N（或账单日）。</li>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">审批待办 ↗</a></strong>：多节点会签/或签按序推进；平台佣金划拨与商户款联动受控（勾选联动释放的必须同时授权）。</li>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">执行 ↗</a></strong>：创建执行计划 → 机构队列 → 回执确认；「结果待查询（UNKNOWN）」只能查原单，禁止重试或换号；退票/失败释放按页面指引处理。</li>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">补差与赔付 ↗</a></strong>：仅登记已核验的独立自有资金；客户赔付审批通过并实际付款后才形成可追偿金额。</li>
+      <li><strong><a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">应结与付款 ↗</a></strong>：列表按 进度（草稿→审核中→已授权→执行中→已付）与「最早付款时间」管理；未到时间不会打开审批或授权。每笔应结由成分构成：<em>商户应结（merchant）/ 平台佣金划拨（platform_transfer）/ 推广佣金（promoter）</em>，各自独立授权与付款。</li>
+      <li><strong><a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">单笔调整 ↗</a></strong>分两类：<em>付款安排</em>（金额/时间/账户，不改应结总额）与<em>应结权益变更</em>（补付/减免，必须填依据并重走审批）。改期不得早于离店+N（或账单日）。</li>
+      <li><strong><a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">审批待办 ↗</a></strong>：多节点会签/或签按序推进；平台佣金划拨与商户款联动受控（勾选联动释放的必须同时授权）。</li>
+      <li><strong><a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">执行 ↗</a></strong>：创建执行计划 → 机构队列 → 回执确认；「结果待查询（UNKNOWN）」只能查原单，禁止重试或换号；退票/失败释放按页面指引处理。</li>
+      <li><strong><a href="settlement-admin.html#tab=items" target="_blank" rel="noopener">补差与赔付 ↗</a></strong>：仅登记已核验的独立自有资金；客户赔付审批通过并实际付款后才形成可追偿金额。</li>
     </ul>
 
     <h2 class="sec" id="statements">5. 对账与出账</h2>
     <ul>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">出账周期 / 生成账单 ↗</a></strong>：自然月（缺省）或账单日周期；主体有新订单/义务后系统自动登记出账策略，账单日 08:00 自动出账，也可手动「生成账单」。</li>
+      <li><strong><a href="settlement-statements.html" target="_blank" rel="noopener">出账周期 / 生成账单 ↗</a></strong>：自然月（缺省）或账单日周期；主体有新订单/义务后系统自动登记出账策略，账单日 08:00 自动出账，也可手动「生成账单」。</li>
       <li><strong><a href="settlement-statements.html" target="_blank" rel="noopener">账单版本 ↗</a></strong>：同一账期内容变化生成新版本，历史版本保留；核验进度（已核对/待处理/存在差异）与资料覆盖（齐全/待补）逐版标注。</li>
-      <li><strong><a href="settlement-admin.html" target="_blank" rel="noopener">外部对账资料（生活服务）↗</a></strong>：外部小程序渠道的收款/退款/履约/佣金到账由商户报送（自助提交或 CSV 批量导入）或平台导入，另一位复核人核验后才计入已核验金额；核验后的佣金按应收/应付入账并可出具覆盖报告。外部渠道<strong>仅对账，不产生本站付款</strong>。</li>
+      <li><strong><a href="settlement-admin.html#tab=external" target="_blank" rel="noopener">外部对账资料（生活服务）↗</a></strong>：外部小程序渠道的收款/退款/履约/佣金到账由商户报送（自助提交或 CSV 批量导入）或平台导入，另一位复核人核验后才计入已核验金额；核验后的佣金按应收/应付入账并可出具覆盖报告。外部渠道<strong>仅对账，不产生本站付款</strong>。</li>
       <li><strong>生活权益（券）</strong>：有效核销即进入账单成分，无需外部凭证；演示券永不出账（见红线）。</li>
       <li><strong><a href="settlement-statements.html" target="_blank" rel="noopener">差异处理 ↗</a></strong>：收款方提出异议 → 独立复核关闭；金额修正必须另行批准调整，不倒改已出账单。</li>
     </ul>
@@ -186,6 +186,7 @@
 
     <h2 class="sec" id="m-onboard">1. 从入驻到结算的链路</h2>
     <div class="flow"><span>提供资质与结算信息</span><em>→</em><span>平台录入主体绑定 / 结算协议 / 收款账户</span><em>→</em><span>双人复核批准</span><em>→</em><span>订单进入结算</span></div>
+    <p class="goto" style="margin-top:0">平台录入入口：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议 ↗</a>（由平台操作，商户无需自助）</p>
     <p>商户侧不需要自己操作系统录入：法律主体标识、机构收款商户号、佣金与履约口径由平台方在「统一结算工作台 → 账户与协议」录入并复核。生活权益商户（券）、生活服务商户与预订商户（民宿/长租）均走同一条链路。你拿到的是两个入口：<a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a>（看账、确认、异议、下载）与本手册。</p>
 
     <h2 class="sec" id="m-when">2. 我的钱什么时候到（逐笔 / 账单日）</h2>
@@ -215,11 +216,11 @@
 
     <h2 class="sec" id="m-faq">4. 常见问题</h2>
     <div class="panel">
-      <p><strong>为什么我看不到某个主体/账单？</strong> 账号的数据权限按主体授权，仅显示授权范围内主体；需要扩大范围请联系平台管理员在账号中心调整。</p>
-      <p><strong>「金额待补」是什么意思？</strong> 该笔记录还没有可核验的金额凭证，未按零元计入合计；补齐资料并核验后会生成新的账单版本。</p>
-      <p><strong>状态怎么看？</strong> 待补凭证 / 待复核 = 资料在途；已核验 = 可计入；存在差异 = 有冲突需处理；已出账 = 账单已发布。</p>
+      <p><strong>为什么我看不到某个主体/账单？</strong> 账号的数据权限按主体授权，仅显示授权范围内主体；需要扩大范围请联系平台管理员在<a href="account-center.html" target="_blank" rel="noopener">账号中心</a>调整。</p>
+      <p><strong>「金额待补」是什么意思？</strong> 该笔记录还没有可核验的金额凭证，未按零元计入合计；补齐资料并核验后会生成新的账单版本（在<a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a>查看最新版本）。</p>
+      <p><strong>状态怎么看？</strong> 待补凭证 / 待复核 = 资料在途；已核验 = 可计入；存在差异 = 有冲突需处理；已出账 = 账单已发布（<a href="settlement-statements.html" target="_blank" rel="noopener">打开对账单 ↗</a>）。</p>
       <p><strong>换了收款账户怎么办？</strong> 联系平台办理机构结算账户变更，通过复核后新订单使用新账户；在途款按原单查询结果。</p>
-      <p><strong>生活服务外部小程序的收款，为什么不能在工作台付款？</strong> 外部渠道的钱在渠道侧结算，平台只做对账：由你报送（或平台导入）收款/退款流水，平台独立复核后计入账单与佣金口径，不会替渠道发起付款。</p>
+      <p><strong>生活服务外部小程序的收款，为什么不能在工作台付款？</strong> 外部渠道的钱在渠道侧结算，平台只做对账：由你报送（或平台导入）收款/退款流水，平台独立复核后计入账单与佣金口径，不会替渠道发起付款（<a href="settlement-admin.html#tab=external" target="_blank" rel="noopener">外部对账资料 ↗</a>）。</p>
     </div>
   </section>
 

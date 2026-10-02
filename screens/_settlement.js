@@ -101,6 +101,8 @@
       $('#settlement-account').textContent = state.identity.account?.display_name || state.identity.account?.login_name || '已登录';
       $('[data-action=login]').hidden = true; $('[data-action=logout]').hidden = false;
       window.BZF_COMMERCE_NAV?.refresh();
+      const tabFromHash = /^[#]*tab=([\w-]+)$/.exec(location.hash || '');
+      if (isAdmin && tabFromHash) state.tab = tabFromHash[1];
       if (!isAdmin && !state.filters.party_id) state.filters.party_id = state.identity.parties?.[0]?.id || '';
       await load();
     } catch (e) {
@@ -420,6 +422,7 @@
   }
   function confirmAction(title, text, path, payload) { modal(title, '<p>' + esc(text) + '</p>', '确认提交', async (data, d, submit) => { await submit(path, payload); toast('操作已提交，请查看最新状态'); await load(); }); }
   document.addEventListener('submit', e => { if (e.target.id !== 'settlement-filter') return; e.preventDefault(); state.filters = Object.fromEntries(new FormData(e.target)); state.page = 1; load(); });
+  window.addEventListener('hashchange', () => { const m = /^[#]*tab=([\w-]+)$/.exec(location.hash || ''); if (isAdmin && m && m[1] !== state.tab) { state.tab = m[1]; state.page = 1; load(); } });
   document.addEventListener('change', e => { if (e.target.name === 'mode' && e.target.closest('dialog')) syncNodeMode(e.target.closest('dialog')); });
   document.addEventListener('click', async e => {
     const b = e.target.closest('[data-action]'); if (!b || b.disabled) return; const action = b.dataset.action, id = b.dataset.id; const original = b.textContent;
