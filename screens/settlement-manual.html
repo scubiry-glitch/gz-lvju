@@ -115,9 +115,19 @@
       <p class="tip" style="margin-bottom:0">跨法律结算主体的权益商品必须按主体拆单；每个结算单位会按协议拆成商户应结、平台佣金划拨与推广佣金三种应结成分。</p>
     </div>
     <div class="panel">
+      <h3>主体代号怎么起：法人 : 业务类型 : 业务内身份（推荐约定）</h3>
+      <table>
+        <tr><th>段</th><th>例</th><th>为什么</th></tr>
+        <tr><td>法人</td><td><code>bianxi</code></td><td>钱按法人归集对账；同一法人所有业务共用同一代号。</td></tr>
+        <tr><td>业务类型</td><td><code>jiazheng</code></td><td>隔离不同业务系统的编号，避免撞号（甲系统的 151 ≠ 乙系统的 151）。</td></tr>
+        <tr><td>业务内身份</td><td><code>151</code></td><td>该业务里的参与编号（商家/服务商 id），即"业务中参与身份"的标识。</td></tr>
+      </table>
+      <p style="margin-bottom:0">新增绑定时，表单按这三段<strong>自动拼装</strong>法律主体标识（如 <code>bianxi:jiazheng:151</code>），可手动覆盖。为什么必须有绑定、不能拿业务编号直接结算：绑定是「业务身份 → 法人」的复核映射，是资金准入链的第一环——没有它，收款账户、结算协议、结算规则就没有挂靠点，资金动作也就没有经双人复核的准入依据。角色差异（收款方/推广/平台/客户）由绑定的身份类型与推广合成主体（<code>account:编号</code>）承载，同一法人既做商家又做推广会是两个主体、互不混淆。约定为推荐不强制，存量主体（如 <code>demo-stay</code>）不受影响。</p>
+    </div>
+    <div class="panel">
       <h3>例：给商家 151 开通结算（五步）</h3>
       <ol>
-        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（可用弹窗里的「商家目录搜索」输入 151 直接找到商家），法律主体标识起一个法人代号（如 <code>bianxi</code>）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
+        <li><strong>业务主体绑定</strong>：账户与协议 → 新增业务主体绑定。业务来源选 <code>jiazheng</code>（生活服务商家），业务主体编号填 <code>151</code>（点「搜索商家 / 查询已绑定」在弹窗顶部搜索 151 直接找到商家），法人代号填 <code>bianxi</code>——法律主体标识自动拼成 <code>bianxi:jiazheng:151</code>（法人:业务:编号，可改）→ 保存草稿 → 另一位授权人员复核批准。以后商家 151 的每一笔订单都归到 <code>bianxi</code> 名下。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>机构收款账户</strong>：给主体 <code>bianxi</code> 准入机构账户（支付机构 / 环境 / 商户号 / 资金合同号，勾选已核验能力）→ 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>商户结算协议</strong>：主体 <code>bianxi</code> × 业务 <code>jiazheng</code> × 站内收银台，计算方式按合同（如比例佣金），履约确认=客户验收确认 → 复核批准。<span class="goto">前往：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议</a> ↗</span></li>
         <li><strong>结算规则</strong>：结算规则 → 新建规则，选业务与主体，配置自动结算或审核后结算及金额区间 → 审核发布。<span class="goto">前往：<a href="settlement-admin.html#tab=policies" target="_blank" rel="noopener">统一结算工作台 → 结算规则</a> ↗</span></li>
@@ -187,7 +197,7 @@
     <h2 class="sec" id="m-onboard">1. 从入驻到结算的链路</h2>
     <div class="flow"><span>提供资质与结算信息</span><em>→</em><span>平台录入主体绑定 / 结算协议 / 收款账户</span><em>→</em><span>双人复核批准</span><em>→</em><span>订单进入结算</span></div>
     <p class="goto" style="margin-top:0">平台录入入口：<a href="settlement-admin.html#tab=configuration" target="_blank" rel="noopener">统一结算工作台 → 账户与协议 ↗</a>（由平台操作，商户无需自助）</p>
-    <p>商户侧不需要自己操作系统录入：法律主体标识、机构收款商户号、佣金与履约口径由平台方在「统一结算工作台 → 账户与协议」录入并复核。生活权益商户（券）、生活服务商户与预订商户（民宿/长租）均走同一条链路。你拿到的是两个入口：<a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a>（看账、确认、异议、下载）与本手册。</p>
+    <p>商户侧不需要自己操作系统录入：法律主体标识、机构收款商户号、佣金与履约口径由平台方在「统一结算工作台 → 账户与协议」录入并复核。生活权益商户（券）、生活服务商户与预订商户（民宿/长租）均走同一条链路（主体代号按 <code>法人:业务:编号</code> 约定由表单自动拼装）。你拿到的是两个入口：<a href="settlement-statements.html" target="_blank" rel="noopener">收款方对账单</a>（看账、确认、异议、下载）与本手册。</p>
 
     <h2 class="sec" id="m-when">2. 我的钱什么时候到（逐笔 / 账单日）</h2>
     <p>平台与你在合同里约定结算节奏，<a href="settlement-statements.html" target="_blank" rel="noopener">对账单页</a>顶部的<strong>「出账周期」</strong>会写明你适用哪种：</p>
