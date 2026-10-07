@@ -1660,7 +1660,7 @@ function createApiDirectRouter(deps) {
         if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const data = await grOrders.listUserOrders(conn, parsed.userIds || parsed.userId, qp.get('limit'));
+          const data = await grOrders.listUserOrders(conn, parsed.userIds || parsed.userId, qp.get('limit'), qp.get('page'), qp.get('status') || '');
           return jsonReply(res, { ok: true, ...data });
         } finally {
           await conn.end();

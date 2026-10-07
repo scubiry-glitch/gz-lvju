@@ -49,7 +49,12 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(method!=='GET'){assert((req.headers['content-type']||'').split(';')[0]==='application/json','请求格式必须为JSON',415);let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;assert(bytes<=65536,'请求内容过大',413);text+=chunk;}try{body=JSON.parse(text||'{}');}catch{throw new Fault(400,'请求内容不是有效JSON');}assert(body&&typeof body==='object'&&!Array.isArray(body),'请求格式无效',400);}
    if(pathname===prefix+'/me'&&method==='GET')return reply(200,{account:{id:principal.account.id,display_name:principal.account.display_name,payment_identity_ready:principal.account.idp_type==='beike'&&!!principal.account.idp_subject},permissions:[...auth.permissionsOf(principal)],scope:auth.scopeOf(principal)});
    if(pathname===prefix+'/my'&&method==='GET')return reply(200,await service.my(principal));
+   const ownedAssets=pathname.match(/^\/api\/commerce\/v1\/my\/assets\/(orders|memberships|appointments|cases|redemptions)$/);
+   if(ownedAssets&&method==='GET')return reply(200,await service.myAssets(principal,ownedAssets[1],Object.fromEntries(url.searchParams)));
+   if(pathname===prefix+'/my/assets/after-sales'&&method==='GET')return reply(200,await service.myAfterSales(principal,Object.fromEntries(url.searchParams)));
    if(pathname===prefix+'/my/coupons'&&method==='GET')return reply(200,await service.myCoupons(principal,Object.fromEntries(url.searchParams)));
+   const availability=pathname.match(/^\/api\/commerce\/v1\/my\/coupons\/([a-f0-9-]{36})\/availability$/);
+   if(availability&&method==='GET')return reply(200,await service.couponAvailability(principal,availability[1],Object.fromEntries(url.searchParams)));
    const ownedCoupon=pathname.match(/^\/api\/commerce\/v1\/my\/coupons\/([a-f0-9-]{36})$/);
    if(ownedCoupon&&method==='GET')return reply(200,await service.myCoupon(principal,ownedCoupon[1]));
    const track=pathname.match(/^\/api\/commerce\/v1\/my\/orders\/([a-f0-9-]{36})$/);

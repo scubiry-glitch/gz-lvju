@@ -53,7 +53,7 @@ const withRef=u=>referral?u+(u.includes('?')?'&':'?')+'ref='+encodeURIComponent(
 const couponState=U?.couponState||(r=>r.status==='redeemed'?'used':r.status==='refunded'?'refunded':r.status==='frozen'?'frozen':new Date(r.expires_at)<=new Date()?'expired':r.status==='available'?'available':'frozen');
 const couponLabel=U?.couponLabel||(r=>C.label(r.status));
 const shanghaiDay=value=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
-let couponFilter='all',couponPage=1;
+let couponFilter='all',couponPage=1,assetPage=1,assetHasMore=false,memberPage=1;
 if(U&&city){document.querySelectorAll('.appbar a,.consumer-footer a').forEach(a=>{const u=new URL(a.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});}
 const filter={kind:query.get('kind')||'',topic:query.get('topic')||'',q:'',category:query.get('category')||'',merchant:query.get('merchant')||''};
 function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(tab==='shop'){setupShopSticky();setupShopHeadCollapse();}if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
@@ -123,7 +123,7 @@ function renderCouponWallet(hasMore){
  if(!rows.length)cards=couponFilter==='all'?U.empty('coupons',true):'<section class="commerce-card consumer-empty"><h2>该状态下暂无卡券</h2><p>切换其他状态查看，或去选一份生活权益。</p><button class="btn" data-coupon-filter="all">查看全部卡券</button></section>';
  content.innerHTML='<button type="button" class="consumer-back" data-tab="memberships">‹ 返回会员中心</button>'+U.heading('coupons',tabs.coupons)+chips+cards+(hasMore?'<button type="button" class="btn coupon-more" data-action="coupon-more">加载更多卡券</button>':'');
 }
-async function load(appendCoupons=false){const version=++loadVersion;C.status('');navigation();content.setAttribute('aria-busy','true');content.inert=true;try{
+async function load(appendCoupons=false,appendAssets=false){const version=++loadVersion;C.status('');navigation();content.setAttribute('aria-busy','true');content.inert=true;try{
  if(isDetail&&query.has('coupon')){tab='coupons';if(!C.identity){content.innerHTML=U.empty('coupons',false);return;}
   const detail=await api('/my/coupons/'+encodeURIComponent(query.get('coupon')));if(version!==loadVersion)return;
   const r=detail.coupon;assets={coupons:[r],appointments:detail.appointments||[],redemptions:detail.redemptions||[]};
@@ -155,7 +155,7 @@ async function load(appendCoupons=false){const version=++loadVersion;C.status(''
    +'<p class="consumer-footnote">佣金为按分佣规则预估，实际以核销结算为准；演示商品不发生资金与佣金。点击 / 转化统计从分享链接被打开开始累计。</p>';
   if(products.length)renderPromoterGrid();
   return;}
- if(U&&tab==='memberships'){const [catalogue,personal,couponSummary]=await Promise.all([api('/catalog'+(city?'?city='+encodeURIComponent(city):'')),C.identity?api('/my'):{},C.identity?api('/my/coupons?size=1'):{}]);if(version!==loadVersion)return;products=catalogue;assets={...personal,couponCounts:couponSummary.counts};content.innerHTML=U.memberships(products,assets,city);setupPlanSwiper();return;}
+ if(U&&tab==='memberships'){const page=appendAssets?memberPage+1:1;const [catalogue,members,couponSummary]=await Promise.all([api('/catalog'+(city?'?city='+encodeURIComponent(city):'')),C.identity?api('/my/assets/memberships?page='+page+'&size=30'):{rows:[]},C.identity?api('/my/coupons?size=1'):{}]);if(version!==loadVersion)return;products=catalogue;assets={memberships:appendAssets?[...(assets.memberships||[]),...members.rows]:members.rows,couponCounts:couponSummary.counts};memberPage=page;content.innerHTML=U.memberships(products,assets,city)+(members.has_more?'<button type="button" class="btn coupon-more" data-action="member-more">加载更多会员记录</button>':'');setupPlanSwiper();return;}
  if(U&&tab==='account'){const [personal,couponSummary]=C.identity?await Promise.all([api('/my'),api('/my/coupons?size=1')]):[{},{}];if(version!==loadVersion)return;assets={...personal,couponCounts:couponSummary.counts};content.innerHTML=U.account(assets);return;}
  if(U&&!C.identity){content.innerHTML=U.heading(tab,tabs[tab])+U.empty(tab,false);return;}
  if(!C.identity){content.innerHTML=C.empty('登录后查看'+tabs[tab],'使用新居住账号，安全管理您的生活权益。',button('账号登录','login','',true));return;}
@@ -180,12 +180,19 @@ async function load(appendCoupons=false){const version=++loadVersion;C.status(''
    +fold('orders','归因订单',orderCount+' 笔',orderRows)
    +fold('payouts','代发 / 到账记录',payCount+' 笔',payRows);
   return;}
- const personal=await api('/my');if(version!==loadVersion)return;assets=personal;let rows=assets[tab]||[];if(tab==='orders'&&query.get('order'))rows=rows.filter(r=>r.id===query.get('order'));
- content.innerHTML=!rows.length?C.empty('暂无'+tabs[tab]+'记录','相关业务发生后，会显示在这里。',button('浏览生活权益','catalog')):rows.map((r,i)=>'<article class="commerce-card">'+(r.is_demo?'<span class="commerce-badge demo-badge">演示权益 · 无实际支付</span>':'')+badge(r.status||(tab==='memberships'?(new Date(r.expires_at)>new Date()?'available':'expired'):''))+'<h3>'+esc(r.name||({appointments:'服务预约',cases:'售后申请',orders:'生活权益订单'})[tab]||'生活权益')+'</h3><p>'+esc(r.description||r.reason||'')+'</p><div class="detail-row"><span>编号</span><b>'+esc(r.id||r.order_id)+'</b></div>'+(r.expires_at?'<div class="detail-row"><span>有效期至</span><b>'+C.dateText(r.expires_at)+'</b></div>':'')+(r.amount_minor?'<div class="detail-row"><span>订单金额</span><b>'+money(r.amount_minor)+'</b></div>':'')+(r.service_date?'<div class="detail-row"><span>服务日期</span><b>'+C.dateText(r.service_date)+'</b></div>':'')+(r.conditions?'<p>'+esc(r.conditions)+'</p>':'')+(r.resolution?'<p>处理回复：'+esc(r.resolution)+'</p>':'')+'<div class="commerce-actions">'+(tab==='cases'&&r.work_order_id?'<a class="btn" href="juzhu-order-progress.html?order='+encodeURIComponent(r.work_order_id)+'">查看工单进度</a>':'')+(tab==='appointments'&&r.status==='booked'?button('改期','reschedule','data-index="'+i+'"')+button('取消预约','cancel','data-index="'+i+'"'):'')+'</div></article>').join('');
+ let personal;
+ if(tab==='orders'&&query.get('order')){const order=await api('/my/orders/'+encodeURIComponent(query.get('order')));personal={orders:[{...order,name:order.product_name}]};assetHasMore=false;}
+ else if(U&&['orders','appointments','cases'].includes(tab)){
+  const page=appendAssets?assetPage+1:1;
+  const data=await api('/my/assets/'+(tab==='cases'?'after-sales':tab)+'?page='+page+'&size=30');
+  if(version!==loadVersion)return;
+  personal={[tab]:appendAssets?[...(assets[tab]||[]),...data.rows]:data.rows};assetPage=page;assetHasMore=data.has_more;
+ }else{personal=await api('/my');assetHasMore=false;}
+ if(version!==loadVersion)return;assets=personal;let rows=assets[tab]||[];
+ content.innerHTML=!rows.length?C.empty('暂无'+tabs[tab]+'记录','相关业务发生后，会显示在这里。',button('浏览生活权益','catalog')):rows.map((r,i)=>'<article class="commerce-card">'+(r.is_demo?'<span class="commerce-badge demo-badge">演示权益 · 无实际支付</span>':'')+(r.display_status?'<span class="commerce-badge">'+esc(r.display_status)+'</span>':badge(r.status||(tab==='memberships'?(new Date(r.expires_at)>new Date()?'available':'expired'):'')))+'<h3>'+(r.entry_type==='refund'?'退款 · ':r.entry_type==='compensation'?'赔付 · ':'')+esc(r.name||({appointments:'服务预约',cases:'售后申请',orders:'生活权益订单'})[tab]||'生活权益')+'</h3><p>'+esc(r.description||r.reason||'')+'</p><div class="detail-row"><span>编号</span><b>'+esc(r.id||r.order_id)+'</b></div>'+(r.expires_at?'<div class="detail-row"><span>有效期至</span><b>'+C.dateText(r.expires_at)+'</b></div>':'')+(r.amount_minor?'<div class="detail-row"><span>'+(tab==='cases'?'处理金额':'订单金额')+'</span><b>'+money(r.amount_minor)+'</b></div>':'')+(r.service_date?'<div class="detail-row"><span>服务日期</span><b>'+C.dateText(r.service_date)+'</b></div>':'')+(r.conditions?'<p>'+esc(r.conditions)+'</p>':'')+(r.resolution?'<p>处理回复：'+esc(r.resolution)+'</p>':'')+'<div class="commerce-actions">'+(tab==='cases'&&r.work_order_id?'<a class="btn" href="juzhu-order-progress.html?order='+encodeURIComponent(r.work_order_id)+'">查看工单进度</a>':'')+(tab==='appointments'&&r.status==='booked'?button('改期','reschedule','data-index="'+i+'"')+button('取消预约','cancel','data-index="'+i+'"'):'')+'</div></article>').join('');
  if(tab==='orders'){content.innerHTML=rows.map(r=>'<article class="commerce-card">'+(r.is_demo?'<span class="commerce-badge">演示订单</span>':'')+'<h3>'+esc(r.name||'生活权益')+'</h3><div class="detail-row"><span>订单状态</span><b>'+esc(C.label(r.status))+'</b></div><div class="detail-row"><span>金额</span><b>'+money(r.amount_minor)+'</b></div><p>'+esc(r.id)+'</p>'+(r.payment_mode==='pay_center'?'<div class="commerce-actions">'+(['reserved'].includes(r.status)?button('继续付款','pay-order','data-order-id="'+esc(r.id)+'"',true)+button('取消订单','close-order','data-order-id="'+esc(r.id)+'"'):'')+button('刷新付款状态','refresh-payment','data-order-id="'+esc(r.id)+'"')+'</div>':'')+(r.status==='fulfilled'?'<a class="btn" href="juzhu-commerce.html?view=coupons">查看已到账权益</a>':'')+'<a class="btn" href="juzhu-jiazheng-orders.html">全部订单</a></article>').join('')||C.empty('订单不存在或无权查看','请从本人的订单中心进入。');}
  if(U)content.innerHTML=U.heading(tab,tabs[tab])+content.innerHTML;
- if(tab==='cases'&&(assets.refunds||[]).length){const refundStates={pending:'待执行',submitted:'退款处理中',paid:'已退款',refunded:'已退款',failed:'退款失败',unknown:'查询中',cancelled:'已作废'};let refundHtml='<section class="commerce-card"><h2>退款进度</h2>';assets.refunds.forEach(r=>{refundHtml+='<div class="detail-row"><span style="overflow-wrap:anywhere">'+esc(r.coupon_name||'生活权益')+' · '+esc(r.refund_no)+'</span><b>'+money(r.amount_minor)+'</b></div>';refundHtml+='<div class="detail-row"><span>状态</span><b>'+(refundStates[r.status]||r.status)+(r.settled_at?' · '+C.dateText(r.settled_at):'')+'</b></div>';if(r.fail_reason)refundHtml+='<div class="detail-row"><span>说明</span><b>'+esc(r.fail_reason)+'</b></div>';});refundHtml+='<p>退款按原路退回处理，到账以机构回执为准。</p></section>';content.innerHTML+=refundHtml;}
- if(tab==='cases'&&(assets.compensations||[]).length){const compStates={pending:'平台复核中',paid:'已先行赔付',cancelled:'未通过'};let compHtml='<section class="commerce-card"><h2>服务失败赔付</h2>';assets.compensations.forEach(r=>{compHtml+='<div class="detail-row"><span style="overflow-wrap:anywhere">'+esc(r.coupon_name||'生活权益')+' · '+esc(r.compensation_no)+'</span><b>'+money(r.amount_minor)+'</b></div>';compHtml+='<div class="detail-row"><span>状态</span><b>'+(compStates[r.status]||r.status)+'</b></div>';if(r.note)compHtml+='<div class="detail-row"><span>说明</span><b>'+esc(r.note)+'</b></div>';});compHtml+='<p>已核销服务经平台复核后先行赔付（当前为沙箱口径），并向商户追偿。</p></section>';content.innerHTML+=compHtml;}
+ if(U&&assetHasMore)content.innerHTML+='<button type="button" class="btn coupon-more" data-action="asset-more">加载更多'+tabs[tab]+'记录</button>';
  }catch(e){if(version!==loadVersion)return;C.status(e.message,true);content.innerHTML=C.empty('暂时无法加载',e.message,button('重新加载','reload'));}finally{if(version===loadVersion){content.removeAttribute('aria-busy');content.inert=false;}}}
 async function copyText(value,el){try{await navigator.clipboard.writeText(value);el.textContent='已复制';}catch{const input=document.createElement('textarea');input.value=value;(el.closest('dialog')||document.body).append(input);input.select();const ok=document.execCommand('copy');input.remove();el.textContent=ok?'已复制':'请长按上方编号复制';}}
 async function showCode(coupon){
@@ -201,15 +208,37 @@ async function showCode(coupon){
 async function book(target){ // target：卡券行或卡券编号（改期时仅有编号）。
   const couponRow=typeof target==='string'?(assets.coupons||[]).find(c=>c.id===target):target;
   if(!couponRow){C.status('未找到卡券，请刷新后重试',true);return;}
-  const dateField='<label class="field">服务日期<input name="service_date" type="date" min="'+shanghaiDay(Date.now()+86400000)+'" required></label>';
-  if(!couponRow.exchange_tier){dialog('预约服务','<p>请选择有效期内的日期，名额以提交结果为准。</p>'+dateField,async data=>{await api('/appointments','POST',{coupon_id:couponRow.id,service_date:data.get('service_date')});await load();});return;}
-  // 酒店通兑：两步选店——档内任选酒店 + 日期，提交即占用所选酒店当日名额。
-  let hotels=[];try{const data=await api('/hotels?tier='+encodeURIComponent(couponRow.exchange_tier));hotels=data.hotels||[];}catch{}
-  const d=openDialog('选酒店预约 · '+(couponRow.exchange_tier_label||couponRow.exchange_tier),'<p>同一价格档位内任选试点名单酒店；提交后占用所选酒店当日名额。</p><label class="field">选择酒店<select name="store_id" required>'+(hotels.map(h=>'<option value="'+h.store_id+'">'+esc(h.name)+' · '+esc(h.brand)+(h.region?'（'+esc(h.region)+'）':'')+'</option>').join('')||'<option value="">暂无可选酒店</option>')+'</select></label>'+dateField+'<p class="consumer-demo-note">试点名单演示；不提供真实入住，不发生资金往来。</p>',async data=>{await api('/appointments','POST',{coupon_id:couponRow.id,store_id:Number(data.get('store_id')),service_date:data.get('service_date')});await load();});
-  d.querySelector('[type=submit]').textContent='提交预约';
+  const exchange=!!couponRow.exchange_tier;
+  let hotels=[];
+  if(exchange){try{const data=await api('/hotels?tier='+encodeURIComponent(couponRow.exchange_tier));hotels=data.hotels||[];}catch(error){C.status(error.message,true);return;}}
+  const storeField=exchange?'<label class="field">选择酒店<select name="store_id" required>'+(hotels.map(h=>'<option value="'+h.store_id+'">'+esc(h.name)+' · '+esc(h.brand)+(h.region?'（'+esc(h.region)+'）':'')+'</option>').join('')||'<option value="">暂无可选酒店</option>')+'</select></label>':'';
+  const dateField='<label class="field">服务日期<select name="service_date" required disabled><option value="">正在查询可预约日期…</option></select></label><div class="commerce-actions availability-nav"><button type="button" class="btn" data-availability-prev>前 60 天</button><button type="button" class="btn" data-availability-next>后 60 天</button></div><p class="code-hint" role="status" data-availability-status></p>';
+  const d=openDialog(exchange?'选酒店预约 · '+(couponRow.exchange_tier_label||couponRow.exchange_tier):'预约服务',(exchange?'<p>同一价格档位内任选试点名单酒店；提交后占用所选酒店当日名额。</p>':'<p>先查看可预约日期与剩余名额，再提交预约。</p>')+storeField+dateField+(exchange?'<p class="consumer-demo-note">试点名单演示；不提供真实入住，不发生资金往来。</p>':''),async data=>{await api('/appointments','POST',{coupon_id:couponRow.id,service_date:data.get('service_date'),...(exchange?{store_id:Number(data.get('store_id'))}:{})});await load();});
+  const dateSelect=d.querySelector('[name=service_date]'),storeSelect=d.querySelector('[name=store_id]'),submit=d.querySelector('[type=submit]'),status=d.querySelector('[data-availability-status]'),prev=d.querySelector('[data-availability-prev]'),next=d.querySelector('[data-availability-next]');
+  const today=shanghaiDay(Date.now()),plusDays=(day,n)=>new Date(Date.parse(day+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);
+  let from=today,request=0;
+  async function refresh(){
+   const current=++request;dateSelect.disabled=true;submit.disabled=true;prev.disabled=true;next.disabled=true;status.textContent='正在查询日期与名额…';
+   if(exchange&&!storeSelect.value){status.textContent='当前档位暂无可预约酒店';return;}
+   const params=new URLSearchParams({from,days:'60'});if(exchange)params.set('store_id',storeSelect.value);
+   try{
+    const result=await api('/my/coupons/'+encodeURIComponent(couponRow.id)+'/availability?'+params);
+    if(current!==request||!d.isConnected)return;
+    dateSelect.innerHTML='<option value="">请选择可预约日期</option>'+result.dates.map(v=>'<option value="'+v.date+'" '+(v.available?'':'disabled')+'>'+v.date+' · '+(v.available?'剩余 '+v.remaining+' 个名额':({too_soon:'未到提前预约时间',expired:'超过卡券有效期',full:'已约满'})[v.reason]||'不可预约')+'</option>').join('');
+    const available=result.dates.filter(v=>v.available).length;
+    dateSelect.disabled=!available;status.textContent=available?'本段有 '+available+' 天可预约；名额以提交时为准。':'本段暂无可预约日期，请查看其他日期。';
+    prev.disabled=from<=today;next.disabled=Date.parse(plusDays(from,60)+'T00:00:00+08:00')>=new Date(couponRow.expires_at).getTime();
+   }catch(error){if(current!==request||!d.isConnected)return;dateSelect.innerHTML='<option value="">查询失败，请重试</option>';status.textContent=error.message;prev.disabled=from<=today;}
+  }
+  dateSelect.onchange=()=>{submit.disabled=!dateSelect.value;};
+  if(storeSelect)storeSelect.onchange=()=>{from=today;refresh();};
+  prev.onclick=()=>{from=plusDays(from,-60);if(from<today)from=today;refresh();};
+  next.onclick=()=>{from=plusDays(from,60);refresh();};
+  submit.textContent='提交预约';refresh();
 }
 content.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,r=(assets[tab]||[])[Number(b.dataset.index)];if(b.disabled)return;b.disabled=true;try{
  if(a==='coupon-more'){await load(true);return;}
+ if(a==='asset-more'||a==='member-more'){await load(false,true);return;}
  if(a==='pay-order'){await beginPay(b.dataset.orderId);return;}if(a==='refresh-payment'){await refreshPayment(b.dataset.orderId);return;}if(a==='close-order'){await api('/orders/'+encodeURIComponent(b.dataset.orderId)+'/cancel','POST',{});C.status('正在关闭订单，支付结果确认后更新状态');await load();return;}
  if(a==='clear-search'){filter.q='';filter.category='';filter.topic='';renderCatalog();}
  if(a==='exchange'){if(!C.identity){await C.login();await load();}const key=crypto.randomUUID();const d=openDialog('兑换生活权益','<p>输入领取的兑换码，单品券、会员和券包将自动存入当前账号。</p><label class="field">兑换码<input name="code" autocomplete="off" autocapitalize="characters" maxlength="80" placeholder="请输入兑换码" required></label><label class="field"><span><input type="checkbox" name="demo_ack" required> 我已知悉当前为无资金演示兑换</span></label>',async data=>{const result=await api('/exchange','POST',{code:data.get('code'),demo_ack:data.get('demo_ack')==='on'},{idempotencyKey:key});showPaySuccess({name:result.name,kind:'',items:[]},result,'兑换成功');return {successMessage:'兑换成功'};});d.querySelector('[type=submit]').textContent='确认兑换';}

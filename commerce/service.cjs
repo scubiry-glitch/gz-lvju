@@ -63,6 +63,10 @@ class Service {
   if(kind==='stores')assert(payload.city_id===scope.city_id,'门店城市必须与商户经营城市一致');
   if(kind==='staff'){const a=await this.get(c,'SELECT id,vendor_id,principal_type,status FROM accounts WHERE id=?',[payload.account_id]);assert(a.length&&a[0].principal_type==='user'&&a[0].status==='active'&&a[0].vendor_id===scope.vendor_id,'核销人员必须为本商户有效个人账号');}
   if(kind==='skus'&&payload.rule_id){const rule=await this.approved(c,'rules',payload.rule_id);assert(rule.merchant_id===payload.merchant_id,'单品分配规则商户不匹配');assert(payload.retail_minor-payload.supply_minor>=Math.floor(payload.retail_minor*rule.payload.beike_bps/10000),'单品售价不足以覆盖分配规则');payload.rule_version=rule.version;payload.rule=rule.payload;}
+  if(kind==='skus'&&payload.spot_ids?.length){
+   const spots=await this.get(c,`SELECT id FROM spots WHERE enabled=1 AND type='scenic' AND (city_id IS NULL OR city_id=?) AND id IN (${payload.spot_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.spot_ids]);
+   assert(spots.length===payload.spot_ids.length,'适用景点不存在、已下架或不是景区');
+  }
   if(kind==='packages'){
    for(const item of payload.items){const sku=await this.approved(c,'skus',item.sku_id),rule=await this.approved(c,'rules',item.rule_id);assert(sku.city_id===payload.city_id&&rule.merchant_id===sku.merchant_id,'券商品城市或分配规则商户不匹配');assert(item.allocation_minor>=sku.payload.supply_minor,'逐券分摊金额不得低于供货价');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.floor_bps/10000),'逐券佣金低于规则底线');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.beike_bps/10000),'分配金额不足以覆盖规则佣金');item.sku_version=sku.version;item.rule_version=rule.version;item.sku=sku.payload;item.rule=rule.payload;}
   }
@@ -70,7 +74,8 @@ class Service {
   await this.allowed(c,p,perm,scope,merchantOnly);return scope;
  }
  async lookups(p,perm,kind,merchantOnly=false){
-  assert(['cities','vendors','accounts','purchase_rules'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  assert(['cities','vendors','accounts','purchase_rules','spots'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  if(kind==='spots')return this.get(this.pool,"SELECT s.id,s.name,s.city_id,c.name city_name FROM spots s LEFT JOIN cities c ON c.id=s.city_id WHERE s.enabled=1 AND s.type='scenic' ORDER BY c.name,s.name LIMIT 1000");
   if(kind==='cities'){
    if(merchantOnly||scope.level==='vendor'){return this.get(this.pool,'SELECT DISTINCT c.id,c.name FROM cities c JOIN commerce_merchants m ON m.city_id=c.id WHERE m.vendor_id=? ORDER BY c.name',[scope.vendorId||-1]);}
    if(scope.level==='all')return this.get(this.pool,'SELECT id,name FROM cities ORDER BY name');
@@ -153,6 +158,7 @@ class Service {
      image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,
      topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,
      redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,
+     spot_ids:kind==='skus'&&Array.isArray(p.spot_ids)?p.spot_ids:[],
      exchange_tier:p.exchange_tier||null,
      exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,
      exchange_tier_minor:p.exchange_tier_minor||null,
@@ -266,6 +272,49 @@ class Service {
  out.refunds=(await this.get(this.pool,`SELECT ro.refund_no,ro.coupon_id,ro.order_id,ro.amount_minor,ro.kind,ro.status,ro.fail_reason,ro.created_at,ro.settled_at,JSON_UNQUOTE(JSON_EXTRACT(cc.snapshot,'$.sku.name')) coupon_name FROM commerce_refund_orders ro LEFT JOIN commerce_coupons cc ON cc.id=ro.coupon_id WHERE ro.account_id=? ORDER BY ro.id DESC LIMIT 100`,[p.account.id])).map(r=>({refund_no:r.refund_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,order_id:r.order_id,amount_minor:r.amount_minor,kind:r.kind,status:r.status==='paid'?'refunded':r.status,fail_reason:r.fail_reason,created_at:r.created_at,settled_at:r.settled_at}));
  out.compensations=(await this.get(this.pool,`SELECT cp.compensation_no,cp.coupon_id,cp.amount_minor,cp.status,cp.review_note,cp.created_at,JSON_UNQUOTE(JSON_EXTRACT(cpv.snapshot,'$.sku.name')) coupon_name FROM commerce_compensation_cases cp LEFT JOIN commerce_coupons cpv ON cpv.id=cp.coupon_id WHERE cp.account_id=? ORDER BY cp.id DESC LIMIT 100`,[p.account.id])).map(r=>({compensation_no:r.compensation_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,amount_minor:r.amount_minor,status:r.status,note:r.review_note,created_at:r.created_at}));
  return out;}
+ async myAssets(p,kind,query={}){
+  const orderBy={orders:'e.created_at DESC,e.id DESC',memberships:'e.expires_at DESC,e.order_id DESC',appointments:'e.service_date DESC,e.id DESC',cases:'e.created_at DESC,e.id DESC',redemptions:'e.created_at DESC,e.id DESC'};
+  assert(Object.hasOwn(orderBy,kind),'资产类型无效',404);
+  const page=Number(query.page||1),size=Number(query.size||30);
+  assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(size)&&size>=1&&size<=100,'分页参数无效',422);
+  const [count]=await this.get(this.pool,`SELECT COUNT(*) total FROM commerce_${kind} WHERE account_id=?`,[p.account.id]);
+  const joins=kind==='memberships'?' LEFT JOIN commerce_orders o ON o.id=e.order_id LEFT JOIN cities c ON c.id=o.city_id':'';
+  const select=kind==='memberships'?'e.*,o.city_id,o.product_id,o.product_version,c.name city_name':'e.*';
+  const rows=await this.get(this.pool,`SELECT ${select} FROM commerce_${kind} e${joins} WHERE e.account_id=? ORDER BY ${orderBy[kind]} LIMIT ${size} OFFSET ${(page-1)*size}`,[p.account.id]);
+  const projected=rows.map(value=>{
+   if(kind==='redemptions'){const r=row(value);return {id:r.id,coupon_id:r.coupon_id,created_at:r.created_at};}
+   const asset=row(value);delete asset.token_hash;delete asset.token_expires_at;delete asset.provider_ref;
+   if(asset.snapshot){const snapshot=asset.snapshot;asset.name=snapshot.name||snapshot.sku?.name;asset.description=snapshot.description||snapshot.sku?.description;asset.conditions=snapshot.sku?.conditions;asset.is_demo=snapshot.is_demo===true;asset.demo_price_minor=snapshot.demo_price_minor??null;asset.redeem_channel=snapshot.sku?.redeem_channel||'offline';if(kind==='memberships'){asset.valid_days=snapshot.valid_days;asset.items=(snapshot.package?.items||[]).map(i=>({name:i.sku?.name,quantity:i.quantity,description:i.sku?.description,conditions:i.sku?.conditions,valid_days:i.sku?.valid_days}));}delete asset.snapshot;}
+   if(kind==='orders'){for(const key of paymentColumns)delete asset[key];Object.assign(asset,paymentSummary(value));asset.main_order_ref=asset.id;}
+   if(kind==='cases')asset.work_order_id=asset.id;
+   return asset;
+  });
+  const total=Number(count.total);
+  return {rows:projected,total,page,size,has_more:page*size<total};
+ }
+ async myAfterSales(p,query={}){
+  const page=Number(query.page||1),size=Number(query.size||30);
+  assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(size)&&size>=1&&size<=100,'分页参数无效',422);
+  const [counts]=await this.get(this.pool,`SELECT
+   (SELECT COUNT(*) FROM commerce_cases WHERE account_id=?) +
+   (SELECT COUNT(*) FROM commerce_refund_orders WHERE account_id=?) +
+   (SELECT COUNT(*) FROM commerce_compensation_cases WHERE account_id=?) total`,[p.account.id,p.account.id,p.account.id]);
+  const rows=await this.get(this.pool,`SELECT * FROM (
+   SELECT CONCAT('case:',cs.id) id,'case' entry_type,cs.created_at,cs.coupon_id,cs.status,cs.kind,cs.reason,cs.resolution,cs.id work_order_id,NULL amount_minor,JSON_UNQUOTE(JSON_EXTRACT(c.snapshot,'$.sku.name')) name
+    FROM commerce_cases cs LEFT JOIN commerce_coupons c ON c.id=cs.coupon_id WHERE cs.account_id=?
+   UNION ALL
+   SELECT CONCAT('refund:',r.refund_no),'refund',r.created_at,r.coupon_id,r.status,r.kind,r.fail_reason,NULL,NULL,r.amount_minor,JSON_UNQUOTE(JSON_EXTRACT(c.snapshot,'$.sku.name'))
+    FROM commerce_refund_orders r LEFT JOIN commerce_coupons c ON c.id=r.coupon_id WHERE r.account_id=?
+   UNION ALL
+   SELECT CONCAT('compensation:',cp.compensation_no),'compensation',cp.created_at,cp.coupon_id,cp.status,'compensation',cp.reason,cp.review_note,NULL,cp.amount_minor,JSON_UNQUOTE(JSON_EXTRACT(c.snapshot,'$.sku.name'))
+    FROM commerce_compensation_cases cp LEFT JOIN commerce_coupons c ON c.id=cp.coupon_id WHERE cp.account_id=?
+   ) asset ORDER BY created_at DESC,id DESC LIMIT ${size} OFFSET ${(page-1)*size}`,[p.account.id,p.account.id,p.account.id]);
+  const refundStates={pending:'待执行',submitted:'退款处理中',paid:'已退款',refunded:'已退款',failed:'退款失败',unknown:'查询中',cancelled:'已作废'};
+  const compensationStates={pending:'平台复核中',paid:'已先行赔付',cancelled:'未通过'};
+  const projected=rows.map(r=>({...r,display_status:r.entry_type==='refund'?refundStates[r.status]||r.status:r.entry_type==='compensation'?compensationStates[r.status]||r.status:null}));
+  const total=Number(counts.total);
+  return {rows:projected,total,page,size,has_more:page*size<total};
+ }
  async myCoupons(p,query={}){
   const filters={
    all:'1=1',available:"c.status='available' AND c.expires_at>UTC_TIMESTAMP()",
@@ -301,6 +350,34 @@ class Service {
    this.get(this.pool,'SELECT id,coupon_id,status,created_at FROM commerce_redemptions WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id])
   ]);
   return {coupon:customerCoupon(coupon),appointments:appointments.map(row),redemptions: redemptions.map(row)};
+ }
+ async couponAvailability(p,key,query={}){
+  const coupon=await this.coupon(this.pool,key,false);
+  assert(coupon.account_id===p.account.id,'卡券不属于当前账号',403);
+  assert(coupon.status==='available'&&new Date(coupon.expires_at)>new Date(),'卡券不可预约',409);
+  assert(coupon.snapshot.sku?.redeem_channel!=='online','线上核销券无需预约',409);
+  const exchangeTier=coupon.snapshot.sku?.exchange_tier;
+  const chosen=Number(query.store_id),days=Number(query.days||60);
+  assert(Number.isSafeInteger(days)&&days>=1&&days<=90,'查询天数无效',422);
+  if(exchangeTier)assert(Number.isSafeInteger(chosen)&&chosen>0,'请选择要入住的酒店',422);
+  const store=await this.approved(this.pool,'stores',exchangeTier?chosen:coupon.store_id);
+  if(exchangeTier)assert(store.payload.kind==='hotel'&&store.payload.exchange_tier===exchangeTier,'请选择同档位试点名单内的酒店',422);
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const from=String(query.from||today);
+  const start=Date.parse(from+'T00:00:00Z');
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(from)&&from>=today&&Number.isFinite(start)&&new Date(start).toISOString().slice(0,10)===from&&start<new Date(coupon.expires_at).getTime(),'查询日期无效',422);
+  const end=new Date(start+days*86400000).toISOString().slice(0,10);
+  const capacity=await this.get(this.pool,'SELECT service_date,total,reserved FROM commerce_capacity WHERE store_id=? AND service_date>=? AND service_date<?',[store.id,from,end]);
+  const byDate=new Map(capacity.map(r=>[date(r.service_date).slice(0,10),r]));
+  const now=Date.now(),expires=new Date(coupon.expires_at).getTime(),lead=Number(store.payload.lead_hours||0),defaultTotal=Number(store.payload.capacity||0);
+  const dates=Array.from({length:days},(_,i)=>{
+   const day=new Date(start+i*86400000).toISOString().slice(0,10),row=byDate.get(day);
+   const remaining=Math.max(0,Number(row?.total??defaultTotal)-Number(row?.reserved||0));
+   const time=Date.parse(day+'T00:00:00+08:00');
+   const reason=time<now+lead*3600000?'too_soon':time>=expires?'expired':remaining===0?'full':null;
+   return {date:day,remaining:reason?0:remaining,available:!reason,reason};
+  });
+  return {store_id:store.id,from,days,dates};
  }
  async coupon(c,key,lock=true){const [v]=await this.get(c,`SELECT * FROM commerce_coupons WHERE id=?${lock?' FOR UPDATE':''}`,[key]);assert(v,'卡券不存在',404);return row(v);}
  async appointment(p,input,key){return this.tx(c=>this.idem(c,p,'appointment',key,input,async()=>{const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);assert(coupon.status==='available','卡券当前不可预约',409);

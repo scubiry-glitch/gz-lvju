@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { spot as fetchSpot } from '../lib/api.js';
+import { api, spot as fetchSpot } from '../lib/api.js';
 import { assetUrl } from '../lib/asset.js';
 import '../styles/spot-post.css';
 
@@ -64,6 +64,7 @@ export default function SpotPost() {
   const [starred, setStarred] = useState(() => !!readStars()[sid]);
   const [foll, setFoll] = useState(false);
   const [shareHint, setShareHint] = useState('');
+  const [matchedTickets, setMatchedTickets] = useState([]);
   const stripRef = useRef(null);
 
   useEffect(() => {
@@ -84,6 +85,17 @@ export default function SpotPost() {
 
   const s = data?.spot || {};
   const related = data?.related || [];
+  useEffect(() => {
+    setMatchedTickets([]);
+    if (s.type !== 'scenic' || !s.id) return;
+    let active = true;
+    api('/api/commerce/v1/catalog').then((response) => {
+      if (!active) return;
+      const products = Array.isArray(response?.data) ? response.data : [];
+      setMatchedTickets(products.filter((p) => p.kind === 'skus' && p.category_id === 'scenic_ticket' && (s.city_id == null || Number(p.city_id) === Number(s.city_id)) && (p.spot_ids || []).some((id) => Number(id) === Number(s.id))));
+    }).catch(() => { if (active) setMatchedTickets([]); });
+    return () => { active = false; };
+  }, [s.id, s.type]);
   const imgs = useMemo(() => {
     const out = [];
     if (s.cover_image) out.push(s.cover_image);
@@ -229,6 +241,18 @@ export default function SpotPost() {
             </div>
           ))}
           {s.type === 'scenic' ? (
+            <>
+              {matchedTickets.length ? (
+                <div className="matched-tickets">
+                  <b>适用此景点的门票券</b>
+                  {matchedTickets.map((ticket) => (
+                    <a key={ticket.id} href={`/juzhu-voucher.html?kind=skus&id=${encodeURIComponent(ticket.id)}&city=${encodeURIComponent(ticket.city_id)}`}>
+                      <span>{ticket.name}</span>
+                      <small>{ticket.in_stock ? `¥${(Number(ticket.price_minor || 0) / 100).toFixed(2)} · 查看权益` : '暂时缺货 · 查看详情'}</small>
+                    </a>
+                  ))}
+                </div>
+              ) : null}
             <a
               className="ticket-link"
               href={`/juzhu-vouchers.html?${s.city_id == null ? '' : `city=${encodeURIComponent(s.city_id)}&`}kind=skus&category=scenic_ticket`}
@@ -236,6 +260,7 @@ export default function SpotPost() {
               {s.city_id == null ? '浏览平台门票券' : '浏览该城市门票券'} <span aria-hidden="true">›</span>
               <small>适用景点与城市以券详情为准</small>
             </a>
+            </>
           ) : null}
         </div>
       ) : null}
