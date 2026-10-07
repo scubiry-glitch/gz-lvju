@@ -1,0 +1,49 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const crypto=require('node:crypto');
+const mysql=require('mysql2/promise');
+const business=require('../../server/settlement/business.cjs');
+const P=require('../../server/settlement/primitives.cjs');
+const couponUse=require('../../commerce/coupon-application.cjs');
+
+test('voucher and cash sources recognize one service without duplicating original funding', {skip:!process.env.SETTLEMENT_TEST_SOCKET,timeout:120000}, async()=>{
+  const socketPath=process.env.SETTLEMENT_TEST_SOCKET,database='coupon_settlement_'+crypto.randomBytes(5).toString('hex');
+  const admin=await mysql.createConnection({socketPath,user:'root'});
+  let pool;
+  try{
+    await admin.query('CREATE DATABASE '+mysql.escapeId(database)+' CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
+    pool=mysql.createPool({socketPath,user:'root',database,timezone:'Z',dateStrings:true,supportBigNumbers:true,bigNumberStrings:true,connectionLimit:8});
+    await require('../../server/settlement/index.cjs').migrate(pool);
+    const q=async(sql,args=[])=>(await pool.execute(sql,args))[0];
+    const sourceAccount=P.id(),merchantAccount=P.id(),platformAccount=P.id();
+    for(const [account,party,merchant] of [[sourceAccount,'platform','controlled-source'],[merchantAccount,'life-merchant','life-merchant-no'],[platformAccount,'platform','platform-merchant-no']])
+      await q("INSERT INTO commerce_payment_accounts(id,party_id,provider,environment,merchant_no,contract_no,currency,status,capabilities,created_by) VALUES(?,?,'TEST','ISOLATED_TEST',?,'test-contract','CNY','approved','{}','test')",[account,party,merchant]);
+    const originalProfile={party_id:'issuer',source_account_id:sourceAccount,platform_account_id:platformAccount,merchant_account_id:merchantAccount,contract_no:'test-contract',funding_mode:'CONTROLLED_COLLECTION',contract_mapping_version:'test',funding_evidence_ref:'TEST',calculation:{mode:'PROPORTIONAL',commission_bps:1000,rounding:'FLOOR_BPS_V1'}};
+    const targetProfile={party_id:'life-merchant',source_account_id:sourceAccount,platform_account_id:platformAccount,merchant_account_id:merchantAccount,contract_no:'test-contract',funding_mode:'CONTROLLED_COLLECTION',contract_mapping_version:'test',funding_evidence_ref:'TEST',settlement_delay_hours:0,calculation:{mode:'PROPORTIONAL',commission_bps:1000,rounding:'FLOOR_BPS_V1'}};
+    const originalOrder=crypto.randomUUID(),coupon=crypto.randomUUID(),compact=originalOrder.replace(/-/g,''),targetOrder='WO-COUPON-001';
+    await q("INSERT INTO commerce_orders(id,account_id,city_id,product_kind,product_id,product_version,amount_minor,status,expires_at,snapshot,payment_status,paid_payment_order_id) VALUES(?,101,3,'skus',1,1,10000,'fulfilled','2099-01-01',?,'paid',1)",[originalOrder,JSON.stringify({settlement_profiles:{1:originalProfile}})]);
+    const policy={name:'通用金额券',use_mode:'amount_offset',use_domains:['booking','jiazheng'],use_vendor_ids:[11],booking_project_ids:[301],life_product_ids:[201]};
+    await q("INSERT INTO commerce_coupons(id,order_id,item_id,unit_no,account_id,merchant_id,store_id,city_id,status,expires_at,allocation_minor,snapshot) VALUES(?,?,1,1,101,1,1,3,'available','2099-01-01',10000,?)",[coupon,originalOrder,JSON.stringify({sku:policy})]);
+    const originalPay=await q("INSERT INTO payment_orders(biz_type,biz_order_no,app_order_id,amount,amount_minor,payer_ucid,payer_user_type,merchant_no,share_biz_code,cashier_type,pay_status,callback_url,app_code,project_code,created_at,updated_at) VALUES('commerce',?,'COUPON_ORIGINAL_001',100,10000,'owner','2','controlled-source','test','2','paid','https://invalid.example.test','test','test',UTC_TIMESTAMP(),UTC_TIMESTAMP())",[compact]);
+    assert.equal(originalPay.insertId,1);
+    const cashPay=await q("INSERT INTO payment_orders(biz_type,biz_order_no,app_order_id,amount,amount_minor,payer_ucid,payer_user_type,merchant_no,share_biz_code,cashier_type,pay_status,callback_url,app_code,project_code,created_at,updated_at) VALUES('jiazheng',?,'COUPON_CASH_001',200,20000,'owner','2','controlled-source','test','2','paid','https://invalid.example.test','test','test',UTC_TIMESTAMP(),UTC_TIMESTAMP())",[targetOrder]);
+    await q("INSERT INTO payment_order_guards(biz_type,biz_order_no,account_id,amount_minor,merchant_no,payer_ucid,payer_user_type,share_biz_code,app_code,project_code,callback_url,title,config_version,snapshot,lifecycle,paid_payment_id,expires_at,created_at,updated_at) VALUES('commerce',?,101,10000,'controlled-source','owner','2','test','test','test','https://invalid.example.test','original',1,'{}','paid',?,'2099-01-01',UTC_TIMESTAMP(),UTC_TIMESTAMP()),('jiazheng',?,101,20000,'controlled-source','owner','2','test','test','test','https://invalid.example.test','cash',1,'{}','paid',?,'2099-01-01',UTC_TIMESTAMP(),UTC_TIMESTAMP())",[compact,originalPay.insertId,targetOrder,cashPay.insertId]);
+    const conn=await pool.getConnection();
+    let app;try{await conn.beginTransaction();app=await couponUse.reserve(conn,{couponId:coupon,accountId:101,bizType:'jiazheng',orderNo:targetOrder,cityId:3,vendorId:11,itemId:201,grossMinor:30000});await conn.commit();}finally{conn.release();}
+    assert.equal(Number(app.cash_minor),20000);
+    const recognize=async()=>P.transaction(pool,c=>couponUse.recognizeApplied(c,{bizType:'jiazheng',orderNo:targetOrder,profile:targetProfile,cashPaymentId:cashPay.insertId,recognitionId:'acceptance-001'}));
+    const result=await recognize();assert.equal(result.units.length,2);
+    assert.deepEqual(result.units.map(u=>u.calculation.amount_minor),['10000','20000']);
+    assert.deepEqual(result.units.map(u=>u.calculation.merchant_minor),['9000','18000']);
+    assert.deepEqual(result.units.map(u=>u.calculation.commission_minor),['1000','2000']);
+    const again=await recognize();assert.deepEqual(again.units.map(u=>u.id),result.units.map(u=>u.id));
+    const [state]=await q('SELECT status FROM commerce_coupons WHERE id=?',[coupon]);assert.equal(state.status,'redeemed');
+    const [application]=await q('SELECT status FROM coupon_applications WHERE id=?',[app.id]);assert.equal(application.status,'consumed');
+    const units=await q('SELECT source_id,basis_minor FROM commerce_settlement_units ORDER BY basis_minor');assert.equal(units.length,2);
+    assert.equal(units.reduce((sum,u)=>sum+Number(u.basis_minor),0),30000);
+    const sources=await q('SELECT id,received_minor FROM commerce_funding_sources');assert.equal(sources.length,2);
+    assert.equal(sources.reduce((sum,s)=>sum+Number(s.received_minor),0),30000);
+    const imbalanced=await q("SELECT group_no FROM commerce_ledger_entries GROUP BY group_no HAVING SUM(IF(side='debit',amount_minor,-amount_minor))<>0");assert.deepEqual(imbalanced,[]);
+  }finally{if(pool)await pool.end();await admin.query('DROP DATABASE IF EXISTS '+mysql.escapeId(database));await admin.end();}
+});

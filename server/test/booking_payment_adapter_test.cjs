@@ -194,7 +194,8 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
   await db(`CREATE TABLE stay_calendar (id INT AUTO_INCREMENT PRIMARY KEY,project_id INT,unit_id INT,stay_date VARCHAR(16),booked_qty INT DEFAULT 0,
     status VARCHAR(20),source VARCHAR(20),price_night DECIMAL(12,2),qty INT,qty_base INT,updated_at DATETIME,
     UNIQUE KEY uk_calendar(project_id,unit_id,stay_date))`);
-  const c = await createConnection(); try { await migrate(c); await migrate(c); } finally { await c.end(); }
+  await db('CREATE TABLE commerce_coupons (id VARCHAR(40) PRIMARY KEY,status VARCHAR(24),expires_at DATETIME)');
+  const c = await createConnection(); try { await migrate(c); await migrate(c); await require('../../commerce/coupon-application.cjs').migrate(c); } finally { await c.end(); }
   await db("INSERT INTO accounts VALUES('account-1','beike','ucid-one')");
   await db("INSERT INTO jz_vendors(id,pay_merchant_no) VALUES(1,'merchant-one')");
   await db('INSERT INTO units(id,project_id,ext) VALUES(1,1,?)', [JSON.stringify({ cancel_policy: { enabled: true, days_before: 0, cutoff_time: '18:00' } })]);
@@ -294,6 +295,24 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total), before - 1);
     await adapter.expire(); await consume();
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total), before - 1);
+  });
+
+  await t.test('fully exchanged booking expires without a payment and restores its voucher and inventory', async () => {
+    const orderNo = await booking('coupon_funded'), couponId=crypto.randomUUID(),applicationId=crypto.randomUUID();
+    await db("INSERT INTO commerce_coupons(id,status,expires_at) VALUES(?,'reserved','2099-12-31')",[couponId]);
+    await db(`INSERT INTO coupon_applications(id,coupon_id,account_id,biz_type,order_no,mode,city_id,vendor_id,item_id,
+      listed_minor,gross_minor,coupon_minor,cash_minor,original_order_id,original_payment_id,policy_snapshot,status)
+      VALUES(?,?,'1','booking',?,'exchange',1,1,1,20000,12345,12345,0,?,'1','{}','reserved')`,
+    [applicationId,couponId,orderNo,crypto.randomUUID()]);
+    await db("UPDATE booking_orders SET coupon_application_id=?,coupon_minor=12345,cash_due_minor=0,payment_expires_at='2020-01-01 00:00:00' WHERE order_no=?",[applicationId,orderNo]);
+    const before=Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total);
+    await assert.rejects(adapter.confirm({orderNo,source:'vendor',vendorId:1}),{code:'coupon_booking_expired'});
+    const result=await adapter.expire();assert.equal(result.errors.length,0);assert.equal(result.requested,1);
+    const [order]=await db('SELECT status,pay_status FROM booking_orders WHERE order_no=?',[orderNo]);
+    assert.deepEqual([order.status,order.pay_status],['cancelled','expired']);
+    assert.equal((await db('SELECT status FROM commerce_coupons WHERE id=?',[couponId]))[0].status,'available');
+    assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total),before-1);
+    assert.equal(Number((await db("SELECT COUNT(*) n FROM payment_order_guards WHERE biz_type='booking' AND biz_order_no=?",[orderNo]))[0].n),0);
   });
 
   await t.test('legacy paid and pending refund import retain original merchant and only query the refund', async () => {

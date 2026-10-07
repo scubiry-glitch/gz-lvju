@@ -141,6 +141,10 @@
         <div class="kv"><span class="k" id="pLine">房费 —</span><span class="v" id="pTotal">—</span></div>
         <div class="kv"><span class="k segnote" id="pNote">与详情页日历实价同口径</span><span></span></div>
         <div class="kv big"><span class="k">合计</span><span class="v" id="pSum">—</span></div>
+        <div class="bfield" id="couponRow" style="display:none;"><span class="l">使用权益券</span><select id="couponSelect" style="border:0;outline:0;text-align:right;background:transparent;max-width:65%;"></select></div>
+        <div class="kv" id="couponContract" style="display:none;"><span class="k">签约兑付价</span><span class="v" id="couponContractValue"></span></div>
+        <div class="kv" id="couponDiscount" style="display:none;"><span class="k">券抵</span><span class="v" id="couponDiscountValue"></span></div>
+        <div class="kv big" id="couponCash" style="display:none;"><span class="k">本单现金应付</span><span class="v" id="couponCashValue"></span></div>
       </div>
       <button type="button" class="nl-toggle" id="nlToggle">查看逐晚价格 ▾</button>
       <div class="nlist" id="nightList" style="display:none;"></div>
@@ -177,6 +181,37 @@
   var perNight = 0;
   var curId = 0;
   var txSel = document.getElementById('fTx');
+  var couponQuotes = [], selectedCouponId = '', couponQuoteKey = '', couponQuoteSeq = 0;
+  function selectedCoupon(){ return couponQuotes.filter(function(x){ return x.coupon_id === selectedCouponId; })[0] || null; }
+  function renderCouponPrice(){
+    var row=document.getElementById('couponRow'), select=document.getElementById('couponSelect'), chosen=selectedCoupon();
+    row.style.display=couponQuotes.length?'':'none';
+    if(couponQuotes.length){select.innerHTML='<option value="">不使用券</option>'+couponQuotes.map(function(x){return '<option value="'+esc(x.coupon_id)+'">'+esc(x.name)+' · '+(x.mode==='exchange'?'直接兑换':'抵用 ¥'+fmt(x.coupon_minor/100))+'</option>';}).join('');select.value=chosen?chosen.coupon_id:'';}
+    document.getElementById('couponContract').style.display=chosen&&chosen.mode==='exchange'?'':'none';
+    document.getElementById('couponDiscount').style.display=chosen?'':'none';
+    document.getElementById('couponCash').style.display=chosen?'':'none';
+    if(chosen){document.getElementById('couponContractValue').textContent='¥'+fmt(chosen.gross_minor/100);
+      document.getElementById('couponDiscountValue').textContent='−¥'+fmt(chosen.coupon_minor/100);
+      document.getElementById('couponCashValue').textContent='¥'+fmt(chosen.cash_minor/100);
+      document.getElementById('pSum').textContent='¥'+fmt(chosen.gross_minor/100);
+      document.querySelector('#cTotal b').textContent='¥'+fmt(chosen.cash_minor/100);}
+  }
+  function refreshCouponQuotes(listedMinor){
+    var ci=document.getElementById('fIn').value,co=document.getElementById('fOut').value;
+    var nights=rangeNights().n,rooms=unitSel.value?(parseInt(roomsSel.value,10)||1):1;
+    var online=Array.prototype.some.call(txSel.options,function(o){return o.value==='payment';});
+    var key=curId+'|'+unitSel.value+'|'+ci+'|'+co+'|'+rooms+'|'+listedMinor;
+    if(IS_PREVIEW||!online||!curId||nights<minNights||!listedMinor){couponQuoteSeq++;couponQuoteKey='';couponQuotes=[];selectedCouponId='';renderCouponPrice();return;}
+    if(key===couponQuoteKey)return;
+    couponQuoteKey=key;couponQuotes=[];selectedCouponId='';renderCouponPrice();var seq=++couponQuoteSeq;
+    fetch('/api/juzhu/booking/coupon-quotes',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authH()),
+      body:JSON.stringify({project_id:curId,unit_id:unitSel.value?Number(unitSel.value):null,rooms:rooms,checkin:ci,checkout:co})})
+      .then(function(r){return r.json().then(function(j){return r.ok?j:{quotes:[]};});})
+      .then(function(j){if(seq!==couponQuoteSeq)return;couponQuotes=j.quotes||[];
+        if(!selectedCoupon())selectedCouponId='';renderCouponPrice();})
+      .catch(function(){if(seq!==couponQuoteSeq)return;couponQuotes=[];selectedCouponId='';renderCouponPrice();});
+  }
+  document.getElementById('couponSelect').addEventListener('change',function(){selectedCouponId=this.value;if(selectedCouponId)txSel.value='payment';renderSteps();calc();});
 
   function renderSteps(){
     var paid = txSel.value === 'payment';
@@ -189,7 +224,7 @@
       ? '提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，支付后待商家确认。'
       : '提交即同意《旅居预订与退改协议》。本单在线预订，商家确认后线下收款。';
   }
-  txSel.addEventListener('change', renderSteps);
+  txSel.addEventListener('change', function(){if(txSel.value!=='payment')selectedCouponId='';renderSteps();calc();});
   var me = null;          // { phone, display_name, id }
   var contacts = [];      // 联系人簿
 
@@ -370,6 +405,8 @@
     if (short_) note.textContent = '⚠ 该房源须连续入住 ≥ ' + minNights + ' 晚，当前 ' + n + ' 晚';
     else note.textContent = '总价按商家逐晚实价合计 × 间数 · 连住 ' + minNights + ' 晚起';
     renderConfirm();
+    renderCouponPrice();
+    refreshCouponQuotes(Math.round(sum*100));
   }
   // 确认条（只读日期 + 修改回详情日历）
   function renderConfirm(){
@@ -698,6 +735,8 @@
       contact_phone: document.getElementById('fPhone').value.trim(),
       transaction_mode: txSel.value
     };
+    var coupon=selectedCoupon();
+    if(coupon){body.coupon_id=coupon.coupon_id;body.coupon_quote_gross_minor=coupon.gross_minor;body.transaction_mode='payment';}
     if(!window.BZF_CASHIER){showErr('支付组件加载失败，请刷新页面');return;}
     body.idempotency_key=window.BZF_CASHIER.requestKey('booking-create:'+JSON.stringify(body));
     submitBtn.disabled = true; submitBtn.style.opacity = '.55';

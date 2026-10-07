@@ -65,6 +65,10 @@ export function createBooking(body) {
   return api('/api/juzhu/booking', { method: 'POST', body: JSON.stringify(body) });
 }
 
+export function bookingCouponQuotes(body) {
+  return api('/api/juzhu/booking/coupon-quotes', { method: 'POST', body: JSON.stringify(body) });
+}
+
 export function bookingPay(body) {
   return api('/api/juzhu/booking/pay', { method: 'POST', headers: { 'Idempotency-Key': body.idempotency_key }, body: JSON.stringify(body) });
 }

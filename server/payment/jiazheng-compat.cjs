@@ -15,7 +15,7 @@ async function createInput({ body, account, requestKey, legacyPath = false }, qu
   const fields = normalizeOrder({ productId, house: legacyPath ? body.address || body.house : body.house,
     phone: body.phone, expectTime: legacyPath ? body.scheduled_at || body.expectTime : body.expectTime,
     desc: legacyPath ? body.desc || body.product_title : body.desc, slotId: body.slot_id,
-    priceMinor: body.price_minor, requestKey: requestKey || 'legacy-normalization' });
+    priceMinor: body.price_minor, couponId: body.coupon_id, requestKey: requestKey || 'legacy-normalization' });
   // While an identical service order is open, an old client's retry reuses it.
   // After a terminal order, permit a new generation without using a time bucket
   // which could split an ordinary network retry into two purchases.

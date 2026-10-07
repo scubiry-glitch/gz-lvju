@@ -13,6 +13,7 @@ function customerCoupon(value){
  coupon.conditions=sku.conditions;coupon.is_demo=snapshot.is_demo===true;
  coupon.demo_price_minor=snapshot.demo_price_minor??null;
  coupon.redeem_channel=sku.redeem_channel||'offline';coupon.exchange_tier=sku.exchange_tier||null;
+ coupon.use_mode=sku.use_mode||null;coupon.use_domains=sku.use_domains||[];
  coupon.exchange_tier_label=sku.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===sku.exchange_tier)||{}).label||null:null;
  coupon.exchange_tier_minor=sku.exchange_tier_minor||null;
  return coupon;
@@ -67,14 +68,35 @@ class Service {
    const spots=await this.get(c,`SELECT id FROM spots WHERE enabled=1 AND type='scenic' AND (city_id IS NULL OR city_id=?) AND id IN (${payload.spot_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.spot_ids]);
    assert(spots.length===payload.spot_ids.length,'适用景点不存在、已下架或不是景区');
   }
+  if(kind==='skus'&&payload.use_mode){
+   const vendors=await this.get(c,`SELECT id FROM jz_vendors WHERE status='active' AND id IN (${payload.use_vendor_ids.map(()=>'?').join(',')})`,payload.use_vendor_ids);
+   assert(vendors.length===payload.use_vendor_ids.length,'适用商家未全部准入');
+   if(payload.booking_project_ids?.length){
+    const projects=await this.get(c,`SELECT id,owner_vendor_id FROM projects WHERE city_id=? AND status='online' AND rating_status='passed' AND channel IN ('rental','minsu') AND id IN (${payload.booking_project_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.booking_project_ids]);
+    assert(projects.length===payload.booking_project_ids.length&&projects.every(v=>payload.use_vendor_ids.includes(Number(v.owner_vendor_id))),'适用住宿项目、城市或商家不匹配');
+   }
+   if(payload.life_product_ids?.length){
+    const products=await this.get(c,`SELECT id,vendor_id FROM jz_products WHERE city_id=? AND status='on' AND id IN (${payload.life_product_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.life_product_ids]);
+    assert(products.length===payload.life_product_ids.length&&products.every(v=>payload.use_vendor_ids.includes(Number(v.vendor_id))),'适用本地服务商品、城市或商家不匹配');
+   }
+  }
   if(kind==='packages'){
-   for(const item of payload.items){const sku=await this.approved(c,'skus',item.sku_id),rule=await this.approved(c,'rules',item.rule_id);assert(sku.city_id===payload.city_id&&rule.merchant_id===sku.merchant_id,'券商品城市或分配规则商户不匹配');assert(item.allocation_minor>=sku.payload.supply_minor,'逐券分摊金额不得低于供货价');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.floor_bps/10000),'逐券佣金低于规则底线');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.beike_bps/10000),'分配金额不足以覆盖规则佣金');item.sku_version=sku.version;item.rule_version=rule.version;item.sku=sku.payload;item.rule=rule.payload;}
+   for(const item of payload.items){const sku=await this.approved(c,'skus',item.sku_id),rule=await this.approved(c,'rules',item.rule_id);assert(sku.city_id===payload.city_id&&rule.merchant_id===sku.merchant_id,'券商品城市或分配规则商户不匹配');assert(item.allocation_minor>=sku.payload.supply_minor,'逐券分摊金额不得低于供货价');if(sku.payload.use_mode==='exchange')assert(item.allocation_minor===sku.payload.exchange_contract_minor,'直接兑换券分摊金额须等于签约兑付价');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.floor_bps/10000),'逐券佣金低于规则底线');assert(item.allocation_minor-sku.payload.supply_minor>=Math.floor(item.allocation_minor*rule.payload.beike_bps/10000),'分配金额不足以覆盖规则佣金');item.sku_version=sku.version;item.rule_version=rule.version;item.sku=sku.payload;item.rule=rule.payload;}
   }
   if(kind==='plans'){const pkg=await this.approved(c,'packages',payload.package_id);assert(pkg.city_id===payload.city_id,'会员与券包城市不一致');assert(payload.price_minor===pkg.payload.price_minor,'本阶段会员售价必须等于赠送券包分摊合计');payload.package_version=pkg.version;payload.package=pkg.payload;}
   await this.allowed(c,p,perm,scope,merchantOnly);return scope;
  }
  async lookups(p,perm,kind,merchantOnly=false){
-  assert(['cities','vendors','accounts','purchase_rules','spots'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  assert(['cities','vendors','accounts','purchase_rules','spots','projects','life_products'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  if(kind==='projects'||kind==='life_products'){
+   const table=kind==='projects'?'projects':'jz_products',name=kind==='projects'?'name':'title',vendor=kind==='projects'?'owner_vendor_id':'vendor_id';
+   let where=kind==='projects'?"status='online' AND rating_status='passed' AND channel IN ('rental','minsu')":"status='on'";const args=[];
+   if(merchantOnly||scope.level==='vendor'){where+=` AND ${vendor}=?`;args.push(scope.vendorId||-1);}
+   else if(scope.level==='city'&&scope.cityIds.length){where+=` AND city_id IN (${scope.cityIds.map(()=>'?').join(',')})`;args.push(...scope.cityIds);}
+   else if(scope.level==='org'){where+=` AND ${vendor} IN (SELECT id FROM jz_vendors WHERE org_id=?)`;args.push(scope.orgId||-1);}
+   else if(scope.level!=='all')where+=' AND 1=0';
+   return this.get(this.pool,`SELECT id,${name} name,city_id,${vendor} vendor_id FROM ${table} WHERE ${where} ORDER BY id DESC LIMIT 1000`,args);
+  }
   if(kind==='spots')return this.get(this.pool,"SELECT s.id,s.name,s.city_id,c.name city_name FROM spots s LEFT JOIN cities c ON c.id=s.city_id WHERE s.enabled=1 AND s.type='scenic' ORDER BY c.name,s.name LIMIT 1000");
   if(kind==='cities'){
    if(merchantOnly||scope.level==='vendor'){return this.get(this.pool,'SELECT DISTINCT c.id,c.name FROM cities c JOIN commerce_merchants m ON m.city_id=c.id WHERE m.vendor_id=? ORDER BY c.name',[scope.vendorId||-1]);}
@@ -319,7 +341,7 @@ class Service {
   const filters={
    all:'1=1',available:"c.status='available' AND c.expires_at>UTC_TIMESTAMP()",
    used:"c.status='redeemed'",expired:"c.status='expired' OR (c.status='available' AND c.expires_at<=UTC_TIMESTAMP())",
-   frozen:"c.status='frozen'",refunded:"c.status='refunded'"
+   reserved:"c.status='reserved'",frozen:"c.status='frozen'",refunded:"c.status='refunded'"
   };
   const status=String(query.status||'all'),page=Number(query.page||1),size=Number(query.size||30);
   assert(Object.hasOwn(filters,status),'卡券状态无效',422);
@@ -328,7 +350,7 @@ class Service {
    COALESCE(SUM(status='available' AND expires_at>UTC_TIMESTAMP()),0) available,
    COALESCE(SUM(status='redeemed'),0) used,
    COALESCE(SUM(status='expired' OR (status='available' AND expires_at<=UTC_TIMESTAMP())),0) expired,
-   COALESCE(SUM(status='frozen'),0) frozen,COALESCE(SUM(status='refunded'),0) refunded
+   COALESCE(SUM(status='reserved'),0) reserved,COALESCE(SUM(status='frozen'),0) frozen,COALESCE(SUM(status='refunded'),0) refunded
    FROM commerce_coupons WHERE account_id=?`,[p.account.id]);
   const counts=Object.fromEntries(Object.entries(countsRow).map(([key,value])=>[key,Number(value)]));
   const rows=await this.get(this.pool,`SELECT c.* FROM commerce_coupons c LEFT JOIN commerce_orders o ON o.id=c.order_id
@@ -345,11 +367,12 @@ class Service {
  async myCoupon(p,key){
   const [coupon]=await this.get(this.pool,'SELECT * FROM commerce_coupons WHERE id=? AND account_id=?',[key,p.account.id]);
   assert(coupon,'卡券不存在或无权查看',404);
-  const [appointments,redemptions]=await Promise.all([
+  const [appointments,redemptions,applications]=await Promise.all([
    this.get(this.pool,'SELECT * FROM commerce_appointments WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id]),
-   this.get(this.pool,'SELECT id,coupon_id,status,created_at FROM commerce_redemptions WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id])
+   this.get(this.pool,'SELECT id,coupon_id,status,created_at FROM commerce_redemptions WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id]),
+   this.get(this.pool,'SELECT id,biz_type,order_no,mode,gross_minor,coupon_minor,cash_minor,status,created_at,updated_at FROM coupon_applications WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id])
   ]);
-  return {coupon:customerCoupon(coupon),appointments:appointments.map(row),redemptions: redemptions.map(row)};
+  return {coupon:customerCoupon(coupon),appointments:appointments.map(row),redemptions: redemptions.map(row),applications:applications.map(row)};
  }
  async couponAvailability(p,key,query={}){
   const coupon=await this.coupon(this.pool,key,false);
@@ -470,7 +493,7 @@ class Service {
  async track(p,orderId){
   const [order]=await this.get(this.pool,'SELECT * FROM commerce_orders WHERE id=? AND account_id=?',[orderId,p.account.id]);assert(order,'订单不存在或无权查看',404);
   const snap=parse(order.snapshot);
-  const coupons=(await this.get(this.pool,"SELECT c.id,c.status,c.expires_at,JSON_UNQUOTE(JSON_EXTRACT(c.snapshot,'$.sku.name')) name,a.service_date appointment_date,a.status appointment_status,r.created_at redeemed_at FROM commerce_coupons c LEFT JOIN commerce_appointments a ON a.coupon_id=c.id AND a.status='booked' LEFT JOIN commerce_redemptions r ON r.coupon_id=c.id WHERE c.order_id=? ORDER BY c.item_id,c.unit_no",[orderId])).map(c=>({id:c.id,name:c.name||snap.name||'生活权益',status:c.status,expires_at:c.expires_at,appointment_date:c.appointment_date?date(c.appointment_date).slice(0,10):null,appointment_status:c.appointment_status||null,redeemed_at:c.redeemed_at}));
+  const coupons=(await this.get(this.pool,"SELECT c.id,c.status,c.expires_at,JSON_UNQUOTE(JSON_EXTRACT(c.snapshot,'$.sku.name')) name,a.service_date appointment_date,a.status appointment_status,COALESCE(ca.updated_at,r.created_at) redeemed_at,ca.biz_type target_biz_type,ca.order_no target_order_no FROM commerce_coupons c LEFT JOIN commerce_appointments a ON a.coupon_id=c.id AND a.status='booked' LEFT JOIN commerce_redemptions r ON r.coupon_id=c.id LEFT JOIN coupon_applications ca ON ca.coupon_id=c.id AND ca.status='consumed' WHERE c.order_id=? ORDER BY c.item_id,c.unit_no",[orderId])).map(c=>({id:c.id,name:c.name||snap.name||'生活权益',status:c.status,expires_at:c.expires_at,appointment_date:c.appointment_date?date(c.appointment_date).slice(0,10):null,appointment_status:c.appointment_status||null,redeemed_at:c.redeemed_at,target_biz_type:c.target_biz_type||null,target_order_no:c.target_order_no||null}));
   return {id:order.id,status:order.status,...paymentSummary(order),expires_at:order.expires_at,product_kind:order.product_kind,product_name:snap.name||'生活权益',amount_minor:order.amount_minor,is_demo:snap.is_demo===true,created_at:order.created_at,coupons};
  }
  // Operations overview: issuance, appointments, redemption, exchange and after-sales in one read.

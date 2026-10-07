@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var JZ = window.BZF_JZ, query = new URLSearchParams(location.search), slug = query.get('sku');
-  var product, busy = false, chosenTime = query.get('time') || '', request = null;
+  var product, busy = false, chosenTime = query.get('time') || '', request = null, couponQuotes = [], selectedCoupon = null;
   var button = document.getElementById('submitBtn');
   function money(value) { return '¥' + Number(value).toFixed(2); }
   function requestSignature(payload) {
@@ -33,7 +33,17 @@
     if (!product || product.payment_mode !== 'pay_center') throw new Error('该商品不支持本站付款，请返回详情页');
     if (!(Number(product.price) > 0)) throw new Error('此项为咨询或估价服务，无需付款');
     document.getElementById('productSummary').innerHTML = '<b>' + JZ.esc(product.title) + '</b><p>' + JZ.esc(product.vendor_name) + '</p>';
-    document.getElementById('priceBox').innerHTML = '<div class="row total"><span>应付金额</span><b>' + money(product.price) + '</b></div>';
+    function renderPrice() {
+      var box=document.getElementById('priceBox');
+      box.innerHTML='<div class="row"><span>服务价格</span><b>'+money(product.price)+'</b></div>'+
+        (couponQuotes.length?'<label class="row"><span>使用权益券</span><select id="couponSelect"><option value="">不使用券</option>'+couponQuotes.map(function(q){return '<option value="'+JZ.esc(q.coupon_id)+'">'+JZ.esc(q.name)+' · '+(q.mode==='exchange'?'直接兑换':'抵用 '+money(q.coupon_minor/100))+'</option>';}).join('')+'</select></label>':'')+
+        (selectedCoupon&&selectedCoupon.mode==='exchange'?'<div class="row"><span>签约兑付价</span><b>'+money(selectedCoupon.gross_minor/100)+'</b></div>':'')+
+        (selectedCoupon?'<div class="row"><span>券抵</span><b>−'+money(selectedCoupon.coupon_minor/100)+'</b></div>':'')+
+        '<div class="row total"><span>本单现金应付</span><b>'+money(selectedCoupon?selectedCoupon.cash_minor/100:product.price)+'</b></div>';
+      var select=document.getElementById('couponSelect');if(select){select.value=selectedCoupon?selectedCoupon.coupon_id:'';select.onchange=function(){selectedCoupon=couponQuotes.find(function(q){return q.coupon_id===select.value;})||null;renderPrice();};}
+    }
+    renderPrice();
+    JZ.couponQuotes(product.id).then(function(quotes){couponQuotes=quotes;renderPrice();}).catch(function(){});
     document.getElementById('backBtn').href = JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(slug));
     button.addEventListener('click', function (event) {
       event.preventDefault();
@@ -43,6 +53,7 @@
         phone: document.getElementById('phoneInput').value.trim(), expectTime: chosenTime,
         desc: document.getElementById('descInput').value.trim(), slot_id: query.get('slot') || null,
         price_minor: Math.round(Number(product.price) * 100) };
+      if(selectedCoupon)payload.coupon_id=selectedCoupon.coupon_id;
       if (!payload.house || !/^1\d{10}$/.test(payload.phone) || !payload.expectTime) return alert('请填写地址、手机号并选择时间');
       busy = true; button.textContent = '提交中…';
       requestSignature(payload).then(function (signature) {
@@ -58,7 +69,7 @@
         }
         return order;
       }).then(function (order) {
-        location.href = 'lvju-app-pay.html?channel=jiazheng&order=' + encodeURIComponent(order.id);
+        location.href = (order.pay_status === 'coupon_funded' ? 'lvju-app-paid.html' : 'lvju-app-pay.html') + '?channel=jiazheng&order=' + encodeURIComponent(order.id);
       }).catch(function (error) { busy = false; button.textContent = '确认下单'; alert(error.message || '提交失败，请重试'); });
     });
   }).catch(function (error) { summaryError(error.message); });

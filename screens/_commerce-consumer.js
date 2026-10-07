@@ -30,8 +30,8 @@
   const catIcon = p => C.catSvg(p);
   const shortText = (value, max=54) => { const text=String(value||'').replace(/\s+/g,' ').trim(); return text.length>max?text.slice(0,max-1)+'…':text; };
   const shanghaiDay = value => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
-  const couponState = r => r.status==='redeemed'?'used':r.status==='refunded'?'refunded':r.status==='frozen'?'frozen':r.status==='expired'||new Date(r.expires_at)<=new Date()?'expired':r.status==='available'?'available':'frozen';
-  const couponLabel = r => ({available:'可使用',used:'已核销',expired:'已过期',frozen:'售后处理中',refunded:'已退款'})[couponState(r)];
+  const couponState = r => r.status==='redeemed'?'used':r.status==='refunded'?'refunded':r.status==='reserved'?'reserved':r.status==='frozen'?'frozen':r.status==='expired'||new Date(r.expires_at)<=new Date()?'expired':r.status==='available'?'available':'frozen';
+  const couponLabel = r => ({available:'可使用',reserved:'已用于订单，待履约',used:'已核销',expired:'已过期',frozen:'售后处理中',refunded:'已退款'})[couponState(r)];
   function couponCard(r,index,appointment){
     const state=couponState(r),online=r.redeem_channel==='online',extra='data-index="'+index+'"',canCode=online||!!appointment&&shanghaiDay(appointment.service_date)===shanghaiDay(Date.now());
     let actions='';

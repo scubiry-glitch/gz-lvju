@@ -97,6 +97,7 @@ test('隔离 MySQL：生活服务建单幂等、价格归属、支付、取消�
   await conn.query('ALTER TABLE jz_vendors ADD pay_merchant_no VARCHAR(64),ADD hmac_key TEXT,ADD url_link TEXT');
   await conn.query('CREATE TABLE commerce_orders (id VARCHAR(36) PRIMARY KEY,account_id VARCHAR(64),snapshot TEXT)');
   await require('../payment/migrate.cjs').migrate(conn);
+  await require('../../commerce/coupon-application.cjs').migrate(conn);
   await conn.query("INSERT INTO cities(id,name,slug) VALUES(1,'测试城市','test')");
   await conn.query("INSERT INTO jz_categories(id,name) VALUES('cleaning','保洁')");
   await conn.query("INSERT INTO jz_skus(id,category_id,name,slug) VALUES(1,'cleaning','清洁服务','clean')");
