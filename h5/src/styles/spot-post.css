@@ -258,6 +258,27 @@
   font-size: 11.5px;
 }
 
+.spot-post .guide .ticket-link {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.spot-post .guide .ticket-link span { float: right; }
+.spot-post .guide .ticket-link small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 400;
+}
+
 .spot-post .rel {
   padding: 20px 0 8px;
 }

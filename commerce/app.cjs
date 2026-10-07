@@ -36,7 +36,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));
     try{await pool.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',['referral:'+data.kind+':'+data.id,'referral.click',JSON.stringify({aid:data.aid,kind:data.kind,id:data.id})]);}catch{}
     return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
-   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready,demo_purchase_enabled:demoEnabled&&p.is_demo})));}
+   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready&&p.in_stock,demo_purchase_enabled:demoEnabled&&p.is_demo&&p.in_stock})));}
    if(pathname===prefix+'/hotels'&&method==='GET')return reply(200,await service.hotels(Object.fromEntries(url.searchParams)));
    // Account-center Bearer or verified Beike cookie; legacy/machine keys never authorize commerce.
    let session=await auth.verifySessionToken(auth.bearerToken(req));
@@ -49,6 +49,9 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(method!=='GET'){assert((req.headers['content-type']||'').split(';')[0]==='application/json','请求格式必须为JSON',415);let bytes=0,text='';for await(const chunk of req){bytes+=chunk.length;assert(bytes<=65536,'请求内容过大',413);text+=chunk;}try{body=JSON.parse(text||'{}');}catch{throw new Fault(400,'请求内容不是有效JSON');}assert(body&&typeof body==='object'&&!Array.isArray(body),'请求格式无效',400);}
    if(pathname===prefix+'/me'&&method==='GET')return reply(200,{account:{id:principal.account.id,display_name:principal.account.display_name,payment_identity_ready:principal.account.idp_type==='beike'&&!!principal.account.idp_subject},permissions:[...auth.permissionsOf(principal)],scope:auth.scopeOf(principal)});
    if(pathname===prefix+'/my'&&method==='GET')return reply(200,await service.my(principal));
+   if(pathname===prefix+'/my/coupons'&&method==='GET')return reply(200,await service.myCoupons(principal,Object.fromEntries(url.searchParams)));
+   const ownedCoupon=pathname.match(/^\/api\/commerce\/v1\/my\/coupons\/([a-f0-9-]{36})$/);
+   if(ownedCoupon&&method==='GET')return reply(200,await service.myCoupon(principal,ownedCoupon[1]));
    const track=pathname.match(/^\/api\/commerce\/v1\/my\/orders\/([a-f0-9-]{36})$/);
    if(track&&method==='GET')return reply(200,await service.track(principal,track[1]));
    if(pathname===prefix+'/orders'&&method==='POST')return reply(201,await service.payments.purchase(principal,body,req.headers['idempotency-key']));

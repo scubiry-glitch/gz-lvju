@@ -253,6 +253,8 @@
 .commerce-consumer .consumer-asset-card.status-used{--spine:#8b9590}
 .commerce-consumer .consumer-asset-card.status-expired{--spine:#b0a893}
 .commerce-consumer .consumer-asset-card.status-frozen{--spine:#c07a45}
+.commerce-consumer .consumer-asset-card.status-refunded{--spine:#8b9590}
+.commerce-consumer .asset-status.status-refunded{background:#e9eee9;color:#66766a}
 /* 卡面按钮层级：主操作（预约/出示码）保持实底，详情/售后降为文字钮 */
 .commerce-consumer .consumer-asset-card .btn.txt{grid-column:auto;background:transparent;border:0;color:#0f766e;padding:10px 4px;justify-self:start;text-align:left}
 /* 选券页分类 chips（替代原生 select，滚动行右缘渐隐提示可滑） */

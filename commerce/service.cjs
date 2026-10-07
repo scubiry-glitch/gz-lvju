@@ -6,6 +6,17 @@ const id=()=>crypto.randomUUID();
 const digest=v=>crypto.createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
 const date=v=>new Date(v).toISOString().slice(0,19).replace('T',' ');
 const row=v=>v&&({...v,...(v.payload?{payload:parse(v.payload)}:{}),...(v.snapshot?{snapshot:parse(v.snapshot)}:{})});
+function customerCoupon(value){
+ const coupon=row(value),snapshot=coupon.snapshot||{},sku=snapshot.sku||{};
+ delete coupon.token_hash;delete coupon.token_expires_at;delete coupon.provider_ref;delete coupon.snapshot;
+ coupon.name=snapshot.name||sku.name;coupon.description=snapshot.description||sku.description;
+ coupon.conditions=sku.conditions;coupon.is_demo=snapshot.is_demo===true;
+ coupon.demo_price_minor=snapshot.demo_price_minor??null;
+ coupon.redeem_channel=sku.redeem_channel||'offline';coupon.exchange_tier=sku.exchange_tier||null;
+ coupon.exchange_tier_label=sku.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===sku.exchange_tier)||{}).label||null:null;
+ coupon.exchange_tier_minor=sku.exchange_tier_minor||null;
+ return coupon;
+}
 // Payment migration defaults are storage details, not a new state for historical
 // orders or zero-money demos. Keep their existing M1-A response unchanged.
 const paymentColumns=['payment_mode','payment_status','paid_payment_order_id','paid_at','refunded_minor','fulfillment_status','stock_status'];
@@ -124,7 +135,44 @@ class Service {
   await c.execute(`UPDATE commerce_${kind} SET status=?,submitted_by=?,reviewed_by=?,review_note=?,published_version=? WHERE id=?`,[status,action==='submit'?p.account.id:e.submitted_by,['approve','reject'].includes(action)?p.account.id:e.reviewed_by,input.note||e.review_note,action==='publish'?e.version:(action==='archive'?null:e.published_version),key]);
   await this.audit(c,p,`configuration.${action}`,`${kind}/${key}`,{version:e.version,note:input.note||null},e);return this.entity(c,kind,key);
  });}
- async catalog(city=''){const out=[],{isDemo}=require('./guiyang-demo.cjs');for(const kind of ['packages','plans','skus']){const args=[kind];let where="e.status<>'archived'";if(city){where+=' AND (c.name=? OR c.slug=? OR CAST(c.id AS CHAR)=?)';args.push(city,city,city);}const rows=await this.get(this.pool,`SELECT e.id,e.city_id,e.published_version,v.snapshot,c.name city_name,e.merchant_id,m.name merchant_name FROM commerce_${kind} e JOIN commerce_versions v ON v.kind=? AND v.entity_id=e.id AND v.version=e.published_version JOIN cities c ON c.id=e.city_id LEFT JOIN commerce_merchants m ON m.id=e.merchant_id WHERE ${where}`,args);for(const e of rows){const p=parse(e.snapshot),demo=isDemo(p)||p.is_demo===true;out.push({id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,purchase_ready:!demo&&(kind==='skus'?!!p.rule:(p.items||p.package?.items||[]).length>0&&(p.items||p.package?.items||[]).every(i=>!!i.rule)),category_id:p.category_id||null,merchant_id:e.merchant_id||null,merchant_name:e.merchant_name||null,image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,exchange_tier:p.exchange_tier||null,exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,exchange_tier_minor:p.exchange_tier_minor||null,items:(kind==='skus'?[{sku:p,quantity:1}]:(p.items||p.package?.items||[])).map(i=>({name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id}))});}}return out;}
+ async catalog(city=''){
+  const out=[],{isDemo}=require('./guiyang-demo.cjs');
+  for(const kind of ['packages','plans','skus']){
+   const args=[kind];let where="e.status<>'archived'";
+   if(city){where+=' AND (c.name=? OR c.slug=? OR CAST(c.id AS CHAR)=?)';args.push(city,city,city);}
+   const rows=await this.get(this.pool,`SELECT e.id,e.city_id,e.published_version,v.snapshot,c.name city_name,e.merchant_id,m.name merchant_name FROM commerce_${kind} e JOIN commerce_versions v ON v.kind=? AND v.entity_id=e.id AND v.version=e.published_version JOIN cities c ON c.id=e.city_id LEFT JOIN commerce_merchants m ON m.id=e.merchant_id WHERE ${where}`,args);
+   for(const e of rows){
+    const p=parse(e.snapshot),demo=isDemo(p)||p.is_demo===true;
+    const source=kind==='skus'?[{sku_id:e.id,sku:p,quantity:1}]:(p.items||p.package?.items||[]);
+    out.push({
+     id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,
+     name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,
+     valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,
+     purchase_ready:!demo&&source.length>0&&source.every(i=>!!(kind==='skus'?p.rule:i.rule)),
+     category_id:p.category_id||null,merchant_id:e.merchant_id||null,merchant_name:e.merchant_name||null,
+     image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,
+     topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,
+     redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,
+     exchange_tier:p.exchange_tier||null,
+     exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,
+     exchange_tier_minor:p.exchange_tier_minor||null,
+     items:source.map(i=>({sku_id:i.sku_id,name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id}))
+    });
+   }
+  }
+  const ids=[...new Set(out.flatMap(p=>p.items.map(i=>Number(i.sku_id))))].filter(Number.isSafeInteger);
+  const inventory=new Map();
+  if(ids.length){
+   const rows=await this.get(this.pool,`SELECT i.sku_id,i.total-i.reserved-i.granted remaining,e.status,e.published_version FROM commerce_inventory i JOIN commerce_skus e ON e.id=i.sku_id WHERE i.sku_id IN (${ids.map(()=>'?').join(',')})`,ids);
+   for(const r of rows)inventory.set(Number(r.sku_id),r.status!=='archived'&&r.published_version?Number(r.remaining):0);
+  }
+  for(const product of out){
+   const required=new Map();
+   for(const item of product.items)required.set(Number(item.sku_id),(required.get(Number(item.sku_id))||0)+Number(item.quantity));
+   product.in_stock=required.size>0&&[...required].every(([skuId,quantity])=>(inventory.get(skuId)||0)>=quantity);
+  }
+  return out;
+ }
  // 推广端选品目录：公开 catalog 同形状 + 逐商品预估佣金（与核销入账同式；演示商品恒 0，不进资金域）。
  async promoterCatalog(city=''){const {isDemo}=require('./guiyang-demo.cjs');
   const commissionOf=(kind,p,demo)=>{
@@ -214,10 +262,46 @@ class Service {
   const accounts=await this.get(this.pool,"SELECT id FROM accounts WHERE id=? AND status='active' AND principal_type='user'",[data.aid]);assert(accounts.length,'推广来源不可用',422);return data;
  }
 
- async my(p){const out={};for(const kind of ['orders','coupons','memberships','appointments','cases','redemptions']) {const rows=await this.get(this.pool,`SELECT * FROM commerce_${kind} WHERE account_id=? ORDER BY ${kind==='memberships'?'order_id':'id'} DESC LIMIT 100`,[p.account.id]);out[kind]=rows.map(r=>{const e=row(r);delete e.token_hash;delete e.token_expires_at;delete e.provider_ref;if(e.snapshot){const s=e.snapshot;e.name=s.name||s.sku?.name;e.description=s.description||s.sku?.description;e.conditions=s.sku?.conditions;e.is_demo=s.is_demo===true;e.demo_price_minor=s.demo_price_minor??null;e.redeem_channel=s.sku?.redeem_channel||'offline';e.exchange_tier=s.sku?.exchange_tier||null;e.exchange_tier_label=s.sku?.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===s.sku.exchange_tier)||{}).label||null:null;e.exchange_tier_minor=s.sku?.exchange_tier_minor||null;if(kind==='memberships'){e.valid_days=s.valid_days;e.items=(s.package?.items||[]).map(i=>({name:i.sku?.name,quantity:i.quantity,description:i.sku?.description,conditions:i.sku?.conditions,valid_days:i.sku?.valid_days}));}delete e.snapshot;}if(kind==='orders'){for(const key of paymentColumns)delete e[key];Object.assign(e,paymentSummary(r));e.main_order_ref=e.id;}if(kind==='cases')e.work_order_id=e.id;return e;});if(kind==='redemptions')out[kind]=out[kind].map(({id,coupon_id,created_at})=>({id,coupon_id,created_at}));}
+ async my(p){const out={};for(const kind of ['orders','coupons','memberships','appointments','cases','redemptions']) {const sql=kind==='memberships'?`SELECT m.*,o.city_id,o.product_id,o.product_version,c.name city_name FROM commerce_memberships m LEFT JOIN commerce_orders o ON o.id=m.order_id LEFT JOIN cities c ON c.id=o.city_id WHERE m.account_id=? ORDER BY m.expires_at DESC,m.order_id DESC LIMIT 100`:`SELECT * FROM commerce_${kind} WHERE account_id=? ORDER BY id DESC LIMIT 100`;const rows=await this.get(this.pool,sql,[p.account.id]);out[kind]=rows.map(r=>{const e=row(r);delete e.token_hash;delete e.token_expires_at;delete e.provider_ref;if(e.snapshot){const s=e.snapshot;e.name=s.name||s.sku?.name;e.description=s.description||s.sku?.description;e.conditions=s.sku?.conditions;e.is_demo=s.is_demo===true;e.demo_price_minor=s.demo_price_minor??null;e.redeem_channel=s.sku?.redeem_channel||'offline';e.exchange_tier=s.sku?.exchange_tier||null;e.exchange_tier_label=s.sku?.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===s.sku.exchange_tier)||{}).label||null:null;e.exchange_tier_minor=s.sku?.exchange_tier_minor||null;if(kind==='memberships'){e.valid_days=s.valid_days;e.items=(s.package?.items||[]).map(i=>({name:i.sku?.name,quantity:i.quantity,description:i.sku?.description,conditions:i.sku?.conditions,valid_days:i.sku?.valid_days}));}delete e.snapshot;}if(kind==='orders'){for(const key of paymentColumns)delete e[key];Object.assign(e,paymentSummary(r));e.main_order_ref=e.id;}if(kind==='cases')e.work_order_id=e.id;return e;});if(kind==='redemptions')out[kind]=out[kind].map(({id,coupon_id,created_at})=>({id,coupon_id,created_at}));}
  out.refunds=(await this.get(this.pool,`SELECT ro.refund_no,ro.coupon_id,ro.order_id,ro.amount_minor,ro.kind,ro.status,ro.fail_reason,ro.created_at,ro.settled_at,JSON_UNQUOTE(JSON_EXTRACT(cc.snapshot,'$.sku.name')) coupon_name FROM commerce_refund_orders ro LEFT JOIN commerce_coupons cc ON cc.id=ro.coupon_id WHERE ro.account_id=? ORDER BY ro.id DESC LIMIT 100`,[p.account.id])).map(r=>({refund_no:r.refund_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,order_id:r.order_id,amount_minor:r.amount_minor,kind:r.kind,status:r.status==='paid'?'refunded':r.status,fail_reason:r.fail_reason,created_at:r.created_at,settled_at:r.settled_at}));
  out.compensations=(await this.get(this.pool,`SELECT cp.compensation_no,cp.coupon_id,cp.amount_minor,cp.status,cp.review_note,cp.created_at,JSON_UNQUOTE(JSON_EXTRACT(cpv.snapshot,'$.sku.name')) coupon_name FROM commerce_compensation_cases cp LEFT JOIN commerce_coupons cpv ON cpv.id=cp.coupon_id WHERE cp.account_id=? ORDER BY cp.id DESC LIMIT 100`,[p.account.id])).map(r=>({compensation_no:r.compensation_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,amount_minor:r.amount_minor,status:r.status,note:r.review_note,created_at:r.created_at}));
  return out;}
+ async myCoupons(p,query={}){
+  const filters={
+   all:'1=1',available:"c.status='available' AND c.expires_at>UTC_TIMESTAMP()",
+   used:"c.status='redeemed'",expired:"c.status='expired' OR (c.status='available' AND c.expires_at<=UTC_TIMESTAMP())",
+   frozen:"c.status='frozen'",refunded:"c.status='refunded'"
+  };
+  const status=String(query.status||'all'),page=Number(query.page||1),size=Number(query.size||30);
+  assert(Object.hasOwn(filters,status),'卡券状态无效',422);
+  assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(size)&&size>=1&&size<=100,'分页参数无效',422);
+  const [countsRow]=await this.get(this.pool,`SELECT COUNT(*) total,
+   COALESCE(SUM(status='available' AND expires_at>UTC_TIMESTAMP()),0) available,
+   COALESCE(SUM(status='redeemed'),0) used,
+   COALESCE(SUM(status='expired' OR (status='available' AND expires_at<=UTC_TIMESTAMP())),0) expired,
+   COALESCE(SUM(status='frozen'),0) frozen,COALESCE(SUM(status='refunded'),0) refunded
+   FROM commerce_coupons WHERE account_id=?`,[p.account.id]);
+  const counts=Object.fromEntries(Object.entries(countsRow).map(([key,value])=>[key,Number(value)]));
+  const rows=await this.get(this.pool,`SELECT c.* FROM commerce_coupons c LEFT JOIN commerce_orders o ON o.id=c.order_id
+   WHERE c.account_id=? AND (${filters[status]})
+   ORDER BY CASE WHEN c.status='available' AND c.expires_at>UTC_TIMESTAMP() THEN 0 WHEN c.status='frozen' THEN 1 ELSE 2 END,
+   o.created_at DESC,c.item_id DESC,c.unit_no,c.id DESC LIMIT ${size} OFFSET ${(page-1)*size}`,[p.account.id]);
+  let appointments=[];
+  if(rows.length){
+   const ids=rows.map(r=>r.id);
+   appointments=await this.get(this.pool,`SELECT * FROM commerce_appointments WHERE account_id=? AND status='booked' AND coupon_id IN (${ids.map(()=>'?').join(',')})`,[p.account.id,...ids]);
+  }
+  return {rows:rows.map(customerCoupon),appointments:appointments.map(row),counts,page,size,has_more:page*size<counts[status]};
+ }
+ async myCoupon(p,key){
+  const [coupon]=await this.get(this.pool,'SELECT * FROM commerce_coupons WHERE id=? AND account_id=?',[key,p.account.id]);
+  assert(coupon,'卡券不存在或无权查看',404);
+  const [appointments,redemptions]=await Promise.all([
+   this.get(this.pool,'SELECT * FROM commerce_appointments WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id]),
+   this.get(this.pool,'SELECT id,coupon_id,status,created_at FROM commerce_redemptions WHERE coupon_id=? AND account_id=? ORDER BY created_at DESC,id DESC',[key,p.account.id])
+  ]);
+  return {coupon:customerCoupon(coupon),appointments:appointments.map(row),redemptions: redemptions.map(row)};
+ }
  async coupon(c,key,lock=true){const [v]=await this.get(c,`SELECT * FROM commerce_coupons WHERE id=?${lock?' FOR UPDATE':''}`,[key]);assert(v,'卡券不存在',404);return row(v);}
  async appointment(p,input,key){return this.tx(c=>this.idem(c,p,'appointment',key,input,async()=>{const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);assert(coupon.status==='available','卡券当前不可预约',409);
   assert(coupon.snapshot.sku?.redeem_channel!=='online','线上核销券无需预约，直接出示动态码',409,'no_appointment_needed');
@@ -244,7 +328,14 @@ class Service {
   if(old){await c.execute('UPDATE commerce_capacity SET reserved=reserved-1 WHERE store_id=? AND service_date=?',[old.store_id,date(old.service_date).slice(0,10)]);await c.execute("UPDATE commerce_appointments SET status='rescheduled' WHERE id=?",[old.id]);}
   const appointmentId=id();await c.execute('INSERT INTO commerce_appointments(id,coupon_id,account_id,merchant_id,store_id,city_id,service_date,status) VALUES(?,?,?,?,?,?,?,?)',[appointmentId,coupon.id,p.account.id,merchantId,storeId,coupon.city_id,input.service_date,'booked']);return {id:appointmentId,service_date:input.service_date,store_id:storeId};
  }));}
- async token(p,key){return this.tx(async c=>{const coupon=await this.coupon(c,key);assert(coupon.account_id===p.account.id,'卡券不属于当前账号',403);assert(coupon.status==='available'&&new Date(coupon.expires_at)>new Date(),'卡券不可核销',409);const token=crypto.randomBytes(16).toString('hex');await c.execute('UPDATE commerce_coupons SET token_hash=?,token_expires_at=? WHERE id=?',[digest(token),date(Date.now()+120000),key]);return {coupon_id:key,token,expires_in:120};});}
+ async token(p,key){return this.tx(async c=>{const coupon=await this.coupon(c,key);assert(coupon.account_id===p.account.id,'卡券不属于当前账号',403);assert(coupon.status==='available'&&new Date(coupon.expires_at)>new Date(),'卡券不可核销',409);
+  if(coupon.snapshot.sku?.redeem_channel!=='online'){
+   const [appointment]=await this.get(c,"SELECT service_date FROM commerce_appointments WHERE coupon_id=? AND status='booked' ORDER BY created_at DESC LIMIT 1",[key]);
+   assert(appointment,'请先完成预约，再出示核销码',409);
+   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+   assert(date(appointment.service_date).slice(0,10)===today,'请在预约服务当日出示核销码',409);
+  }
+  const token=crypto.randomBytes(16).toString('hex');await c.execute('UPDATE commerce_coupons SET token_hash=?,token_expires_at=? WHERE id=?',[digest(token),date(Date.now()+120000),key]);return {coupon_id:key,token,expires_in:120};});}
  // Two-stage fulfilment: preview validates everything redeem() validates without any side effect.
  async checkRedeemable(c,p,perm,input,merchantOnly=true){
   const coupon=await this.coupon(c,input.coupon_id);

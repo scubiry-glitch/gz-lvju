@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
+const {randomUUID}=require('node:crypto');
 const bjDate=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(v);
 const {seed}=require('../../commerce/guiyang-demo.cjs');
 const {demoOrder}=require('../../commerce/demo-order.cjs');
@@ -39,11 +40,14 @@ async function run({pool,sourceDatabase,service,actors,check,origin,auth}){
   const [[order]]=await pool.execute('SELECT amount_minor,provider_ref,source_account_id FROM commerce_orders WHERE id=?',[m.json.data.id]);assert.equal(order.amount_minor,0);assert.equal(order.provider_ref,null);assert.equal(order.source_account_id,null);
   const [coupons]=await pool.execute('SELECT allocation_minor FROM commerce_coupons WHERE order_id=?',[m.json.data.id]);assert(coupons.every(c=>c.allocation_minor===0));
   const [[member]]=await pool.execute('SELECT expires_at FROM commerce_memberships WHERE order_id=?',[m.json.data.id]);assert(new Date(member.expires_at)>new Date(Date.now()+364*86400000));
+  assert((await service.my(actors.user)).memberships.some(v=>v.order_id===m.json.data.id&&v.city_id===3&&v.product_id===plan.id));
   const [events]=await pool.execute('SELECT event_type FROM commerce_events WHERE aggregate_id=?',[m.json.data.id]);assert.deepEqual(events.map(e=>e.event_type),['demo.order.granted']);
  });
  await check('Demo stock concurrency cannot oversell; real products and disabled environment cannot use demo purchase',async()=>{
   await pool.execute('UPDATE commerce_inventory SET total=granted+1 WHERE sku_id=?',[single.id]);
   const outcomes=await Promise.allSettled([0,1,2].map(n=>demoOrder(service,actors.user,input(single),'demo-race-stock-'+n)));assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);
+  const soldOut=(await fetch(origin+'/api/commerce/v1/catalog?city=guiyang').then(r=>r.json())).data.find(p=>p.kind==='skus'&&p.id===single.id);
+  assert.equal(soldOut.in_stock,false);assert.equal(soldOut.demo_purchase_enabled,false);
   const real=(await service.catalog('acceptance')).find(p=>p.kind==='packages');await assert.rejects(()=>demoOrder(service,actors.user,input(real),'demo-real-denied'),/不支持演示/);
   const server=createServer({pool,auth,demoEnabled:false});await new Promise(r=>server.listen(0,'127.0.0.1',r));try{const r=await fetch('http://127.0.0.1:'+server.address().port+'/api/commerce/v1/demo-orders',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+actors.user.token},body:JSON.stringify(input(pkg))});assert.equal(r.status,409);}finally{await new Promise(r=>server.close(r));}
   // Restore enough stock for browser acceptance.
@@ -51,9 +55,29 @@ async function run({pool,sourceDatabase,service,actors,check,origin,auth}){
  });
  await check('Demo coupon appointment and refund remain a zero-funds service workflow',async()=>{
   const order=await demoOrder(service,actors.user,input(single),'demo-service-flow');const coupon=(await service.my(actors.user)).coupons.find(c=>c.order_id===order.id);
+  await assert.rejects(()=>service.token(actors.user,coupon.id),/请先完成预约/);
   await service.appointment(actors.user,{coupon_id:coupon.id,service_date:bjDate(Date.now()+2*86400000)},'demo-appointment');
+  await assert.rejects(()=>service.token(actors.user,coupon.id),/预约服务当日/);
   const result=await service.openCase(actors.user,{coupon_id:coupon.id,kind:'refund',reason:'演示取消未使用服务'},'demo-refund-case');
   const resolved=await service.resolveCase(actors.writer,'commerce.admin.write',result.id,{action:'accept',resolution:'演示订单取消，无实际资金退款'});assert.equal(resolved.status,'closed');
+ });
+ await check('Customer coupon pagination and direct detail keep ownership beyond 100 rows',async()=>{
+  const [sampleRows]=await pool.execute('SELECT * FROM commerce_coupons WHERE account_id=? LIMIT 1',[actors.user.account.id]);
+  const sample=sampleRows[0],ids=[];
+  try{
+   for(let n=1000;n<1101;n++){
+    const key=randomUUID();ids.push(key);
+    await pool.execute('INSERT INTO commerce_coupons(id,order_id,item_id,unit_no,account_id,merchant_id,store_id,city_id,status,expires_at,allocation_minor,snapshot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',[key,sample.order_id,sample.item_id,n,sample.account_id,sample.merchant_id,sample.store_id,sample.city_id,'available',sample.expires_at,sample.allocation_minor,sample.snapshot]);
+   }
+   const first=await service.myCoupons(actors.user,{size:30,page:1,status:'available'});
+   assert.equal(first.rows.length,30);assert.equal(first.has_more,true);assert(first.counts.available>=101);
+   const fourth=await service.myCoupons(actors.user,{size:30,page:4,status:'available'});
+   assert(fourth.rows.length>0);
+   const detail=await service.myCoupon(actors.user,ids[100]);assert.equal(detail.coupon.id,ids[100]);
+   await assert.rejects(()=>service.myCoupon(actors.other,ids[100]),/无权查看/);
+   const response=await fetch(origin+'/api/commerce/v1/my/coupons/'+ids[100],{headers:{Authorization:'Bearer '+actors.user.token}});
+   assert.equal(response.status,200);assert.equal((await response.json()).data.coupon.id,ids[100]);
+  }finally{if(ids.length)await pool.execute('DELETE FROM commerce_coupons WHERE id IN ('+ids.map(()=>'?').join(',')+')',ids);}
  });
 }
 module.exports={run};

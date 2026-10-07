@@ -219,7 +219,7 @@ export default function SpotPost() {
         </div>
       ) : null}
 
-      {guideRows.length ? (
+      {guideRows.length || s.type === 'scenic' ? (
         <div className="guide">
           <div className="gt">去之前 · 攻略信息</div>
           {guideRows.map(([k, v]) => (
@@ -228,6 +228,15 @@ export default function SpotPost() {
               <span>{v}</span>
             </div>
           ))}
+          {s.type === 'scenic' ? (
+            <a
+              className="ticket-link"
+              href={`/juzhu-vouchers.html?${s.city_id == null ? '' : `city=${encodeURIComponent(s.city_id)}&`}kind=skus&category=scenic_ticket`}
+            >
+              {s.city_id == null ? '浏览平台门票券' : '浏览该城市门票券'} <span aria-hidden="true">›</span>
+              <small>适用景点与城市以券详情为准</small>
+            </a>
+          ) : null}
         </div>
       ) : null}
 
