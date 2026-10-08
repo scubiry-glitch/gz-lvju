@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>地图找房 · 西江 · 贝壳找房旅居</title>
-<link rel="stylesheet" href="lvju-app.css?v=5">
+<link rel="stylesheet" href="lvju-app.css?v=6">
 </head>
 <body>
 <div class="app">
@@ -41,13 +41,15 @@
     </div>
   </div>
 
-  <div class="tabbar" style="flex-shrink:0;">
-    <a href="lvju-app-home-demo.html"><span class="ti">🏠</span>首页</a>
-    <a class="on"><span class="ti">🔎</span>找房</a>
-    <a href="lvju-app-spots.html"><span class="ti">📖</span>内容</a>
-    <a href="lvju-app-orders.html"><span class="ti">🧾</span>订单</a>
-    <a href="lvju-app-me.html"><span class="ti">👤</span>我的</a>
-  </div>
+  <nav class="tabbar nvm-lvju" data-series="lvju" data-active="search">
+    <a href="lvju-app-home-demo.html"><span class="ti"><img src="assets/lvju/icons/tab-home-off.svg" alt=""></span>首页</a>
+    <a class="on"><span class="ti"><img src="assets/lvju/icons/tab-search-on.svg" alt=""></span>找房</a>
+    <a href="lvju-app-spots.html"><span class="ti"><img src="assets/lvju/icons/tab-content-off.svg" alt=""></span>内容</a>
+    <a href="lvju-app-orders.html"><span class="ti"><img src="assets/lvju/icons/tab-orders-off.svg" alt=""></span>订单</a>
+    <a href="lvju-app-me.html"><span class="ti"><img src="assets/lvju/icons/tab-me-off.svg" alt=""></span>我的</a>
+  </nav>
+  <script src="screens/_navmobile.js?v=4"></script>
+  
 </div>
 </body>
 </html>

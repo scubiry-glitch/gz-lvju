@@ -142,6 +142,27 @@
       <a href="b-house-rating-input.html" style="margin-left:6px; color:#92400e; text-decoration:underline; font-weight:600;">立即处理 →</a>
     </div>
 
+    <div id="whCard" style="display:none; margin:0 0 12px; padding:12px 14px; background:#fff; border:1px solid #e5e7eb; border-radius:10px;">
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔔 商家接入配置（Webhook 回调 / 接口地址）</div>
+      <div id="whStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select id="whVendor" style="display:none; max-width:280px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;"></select>
+        <input id="whUrl" placeholder="https://你的服务/回调地址" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <button class="btn btn-primary" id="whSave">保存回调</button>
+        <button class="btn btn-ghost" id="whTest">发送测试</button>
+      </div>
+      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">推送事件：评级审核结果（rating.reviewed）、订单事件（booking.created / paid / cancelled）、连通性测试（webhook.test）。签名与开放接口同算法；响应 2xx 视为送达，失败重试 5s/30s/120s。内网 / 保留地址会被拒绝。</div>
+      <div style="border-top:1px dashed #e5e7eb; margin:10px 0 8px;"></div>
+      <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔗 开放接口地址（url_link / 订单详情）</div>
+      <div id="acStatus" style="font-size:12px; color:#6b7280; margin-bottom:8px;">加载中…</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="acUrllink" placeholder="url_link：小程序模式必配的 URL Link 接口" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <input id="acDetail" placeholder="order_detail_url：订单详情查询接口（可选）" style="flex:1; min-width:260px; padding:7px 10px; border:1px solid #e5e7eb; border-radius:8px; font-size:12.5px;" />
+        <button class="btn btn-primary" id="acSave">保存接口</button>
+      </div>
+      <div style="font-size:11.5px; color:#6b7280; margin-top:6px;">小程序支付模式需要 url_link；order_detail_url 为可选订单查询接口。中台支付商家无需配置小程序接口。支付方式及收款主体由平台配置，变更仅影响新订单。接入密钥由平台签发或重置。</div>
+    </div>
+
     <div class="lst-card">
       <table class="lst">
         <thead>
@@ -173,14 +194,14 @@
 </div>
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
-<script src="_nav.js"></script>
+<script src="_nav.js?v=20261002-settlement-1"></script>
 <script>
 /* 房源上下架管理：vendor 会话=本商家可管理；platform 会话=全量代管；无会话=只读。
    数据源：/api/juzhu/vendor/projects（会话态）→ 降级 /api/juzhu/catalog（只读态）。 */
 (function(){
   var API = '/api/juzhu';
   var state = { role:null, vendorName:'', grain:'unit', projects:[], units:[], districts:[], cities:[], tab:'all', tabKey:'rating' };
-  function tok(){ try { return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('JUZHU_VENDOR_TOKEN') || ''; } catch(e){ return ''; } }
+  function tok(){ try { return (window.BZF_CONSOLE && BZF_CONSOLE.token()) || localStorage.getItem('BZF_SESSION_TOKEN') || ''; } catch(e){ return ''; } }
   function adminTok(){ try { return localStorage.getItem('JUZHU_ADMIN_TOKEN') || ''; } catch(e){ return ''; } }
   function apiKey(){ try { return localStorage.getItem('JUZHU_API_KEY') || ''; } catch(e){ return ''; } }
   function authHeaders(){
@@ -220,7 +241,7 @@
   badge.onclick = function(){
     if (state.role) {
       if (state.role === 'vendor' && confirm('退出商家登录？')) {
-        try { localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload();
+        try { localStorage.removeItem('BZF_SESSION_TOKEN'); localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload();
       }
       return;
     }
@@ -232,7 +253,7 @@
       body: JSON.stringify({ login_name:name, password:pwd }) })
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if (j.token) { try { localStorage.setItem('JUZHU_VENDOR_TOKEN', j.token); } catch(e){} location.reload(); }
+        if (j.token) { try { localStorage.setItem('BZF_SESSION_TOKEN', j.token); localStorage.removeItem('JUZHU_VENDOR_TOKEN'); } catch(e){} location.reload(); }
         else alert(j.error || '登录失败');
       }).catch(function(){ alert('登录失败：服务不可用'); });
   };
@@ -485,6 +506,92 @@
     document.querySelectorAll('.rowchk').forEach(function(c){ c.checked=false; });
     document.getElementById('chkAll').checked=false; bindChk();
   };
+
+  // ---- 商家接入配置（webhook 回调 + 开放接口地址；商家自助 + 平台代管，2026-09-22 / 2026-09-30）----
+  var whRole = null, whVendors = [];
+  function whShow(msg){ document.getElementById('whStatus').innerHTML = msg; }
+  function acShow(msg){ document.getElementById('acStatus').innerHTML = msg; }
+  function whEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function whCurVid(){ return whRole === 'platform' ? (parseInt(document.getElementById('whVendor').value, 10) || 0) : 0; }
+  function acFill(v){
+    document.getElementById('acUrllink').value = v.url_link || '';
+    document.getElementById('acDetail').value = v.order_detail_url || '';
+    acShow((v.url_link || v.order_detail_url)
+      ? '已配置：url_link ' + (v.url_link ? '<code>' + whEsc(String(v.url_link).slice(0, 48)) + (String(v.url_link).length > 48 ? '…' : '') + '</code>' : '未配') +
+        ' · order_detail ' + (v.order_detail_url ? '已配' : '未配')
+      : '未配置——配置后平台才能拉起你的小程序 / 回查订单详情');
+  }
+  function whFillFromSel(){
+    var vid = whCurVid();
+    var v = whVendors.filter(function(x){ return x.id === vid; })[0] || {};
+    document.getElementById('whUrl').value = v.webhook_url || '';
+    acFill(v);
+    whShow(v.webhook_url ? '已配置：<code>' + whEsc(v.webhook_url) + '</code>' : '未配置——配置后评级审核结果与订单事件将实时推送到该商家的服务');
+  }
+  function loadWebhook(){
+    get(API + '/vendor/webhook').then(function(j){
+      document.getElementById('whCard').style.display = '';
+      whRole = j.role || 'vendor';
+      if (whRole === 'platform') {
+        whVendors = j.vendors || [];
+        var sel = document.getElementById('whVendor');
+        sel.style.display = '';
+        sel.innerHTML = whVendors.map(function(v){
+          return '<option value="' + v.id + '">' + whEsc(v.name) + '（' + v.id + '）' + (v.webhook_url ? ' ✓' : '') + '</option>';
+        }).join('');
+        var prefer = whVendors.filter(function(v){ return v.webhook_url; })[0];
+        if (prefer) sel.value = String(prefer.id);
+        whFillFromSel();
+        sel.onchange = whFillFromSel;
+      } else {
+        document.getElementById('whVendor').style.display = 'none';
+        whVendors = [{ id: 0, webhook_url: j.webhook_url || '', url_link: j.url_link || '', order_detail_url: j.order_detail_url || '' }];
+        document.getElementById('whUrl').value = j.webhook_url || '';
+        acFill(whVendors[0]);
+        whShow(j.webhook_url
+          ? '已配置：<code>' + whEsc(j.webhook_url) + '</code>'
+          : '未配置——配置后评级审核结果与订单事件将实时推送到你的服务');
+      }
+    }).catch(function(){ document.getElementById('whCard').style.display = 'none'; });   // 未登录只读态不展示
+  }
+  document.getElementById('whSave').onclick = function(){
+    var vid = whCurVid();
+    post(API + '/vendor/webhook', { vendor_id: vid || undefined, webhook_url: document.getElementById('whUrl').value.trim() }).then(function(j){
+      if (whRole === 'platform') {
+        var v = whVendors.filter(function(x){ return x.id === vid; })[0];
+        if (v) v.webhook_url = j.webhook_url || '';
+        var sel = document.getElementById('whVendor');
+        sel.innerHTML = whVendors.map(function(x){
+          return '<option value="' + x.id + '"' + (x.id === vid ? ' selected' : '') + '>' + whEsc(x.name) + '（' + x.id + '）' + (x.webhook_url ? ' ✓' : '') + '</option>';
+        }).join('');
+      }
+      whShow(j.webhook_url ? '已配置：<code>' + whEsc(j.webhook_url) + '</code>' : '已清除');
+    }).catch(function(e){ whShow('<span style="color:#991b1b;">保存失败：' + whEsc(e.message) + '</span>'); });
+  };
+  document.getElementById('whTest').onclick = function(){
+    var btn = document.getElementById('whTest'); btn.disabled = true;
+    post(API + '/vendor/webhook/test', { vendor_id: whCurVid() || undefined }).then(function(j){
+      whShow(j.ok
+        ? '<span style="color:#065f46;">测试已送达（HTTP ' + j.status + '）——对方服务应收到 webhook.test 事件，可用 hmac_key 验签</span>'
+        : '<span style="color:#991b1b;">送达失败：' + whEsc(j.error || '未知') + '</span>');
+    }).catch(function(e){ whShow('<span style="color:#991b1b;">测试失败：' + whEsc(e.message) + '</span>'); })
+      .then(function(){ btn.disabled = false; });
+  };
+  document.getElementById('acSave').onclick = function(){
+    var vid = whCurVid();
+    var btn = document.getElementById('acSave'); btn.disabled = true;
+    post(API + '/vendor/access', { vendor_id: vid || undefined,
+      url_link: document.getElementById('acUrllink').value.trim(),
+      order_detail_url: document.getElementById('acDetail').value.trim() }).then(function(j){
+      var v = whRole === 'platform'
+        ? whVendors.filter(function(x){ return x.id === vid; })[0]
+        : whVendors[0];
+      if (v) { v.url_link = j.url_link || ''; v.order_detail_url = j.order_detail_url || ''; }
+      acFill(v || {});
+    }).catch(function(e){ acShow('<span style="color:#991b1b;">保存失败：' + whEsc(e.message) + '</span>'); })
+      .then(function(){ btn.disabled = false; });
+  };
+  loadWebhook();
 
   renderBadge();
   load();

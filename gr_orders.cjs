@@ -46,8 +46,8 @@ function validateUserIdQuery(raw) {
 }
 
 function summarizeUserOrders(rows) {
-  const list = (rows || []).filter((r) => r && r.status !== 'pending');
-  const counts = { paid: 0, assigned: 0, serving: 0, completed: 0 };
+  const list = (rows || []).filter((r) => r && (r.status !== 'pending' || r.payment_mode === 'pay_center'));
+  const counts = { pending: 0, paid: 0, assigned: 0, serving: 0, completed: 0 };
   for (const it of list) {
     if (Object.prototype.hasOwnProperty.call(counts, it.status)) counts[it.status] += 1;
   }
@@ -82,39 +82,81 @@ async function createOrder(conn, orderRef, sku, opts) {
   const p = cstParts(now);
   const ts = `${p.y}-${p.m}-${p.day} ${p.hh}:${p.mm}:${p.ss}`;
   await conn.execute(
-    `INSERT INTO gr_orders(order_ref, vendor_id, user_id, sku, city, status, created_at)
-     VALUES(?,?,?,?,?,'pending',?)`,
-    [orderRef, o.vendor_id == null ? null : o.vendor_id, o.user_id || null, String(sku), o.city || '沈阳', ts]
+    `INSERT INTO gr_orders(order_ref,vendor_id,user_id,sku,city,status,created_at,biz_type,payment_mode,order_snapshot,request_key,request_hash)
+     VALUES(?,?,?,?,?,'pending',?,'jiazheng','wechat_mini',?,?,?)`,
+    [orderRef, o.vendor_id == null ? null : o.vendor_id, o.user_id || null, String(sku), o.city || '', ts,
+      JSON.stringify(o.snapshot || {}), o.request_key || null, o.request_hash || null]
   );
   return orderRef;
 }
 
-async function listUserOrders(conn, userId, limit) {
+async function listUserOrders(conn, userId, limit, pageValue, status='') {
+  const userIds = Array.isArray(userId) ? userId.map(String) : [String(userId)];
+  if (!userIds.length || userIds.length > 2 || userIds.some(id => !id)) throw new Error('订单身份无效');
   const lim = Math.min(Math.max(parseInt(limit || '50', 10) || 50, 1), 200);
+  const page = Math.min(Math.max(parseInt(pageValue || '1', 10) || 1, 1), 100000);
+  const allowedStatus = ['', 'pending', 'paid', 'assigned', 'serving', 'completed', 'cancelled'];
+  if (!allowedStatus.includes(status)) throw new Error('订单状态无效');
+  const ownerWhere = `BINARY o.user_id IN (${userIds.map(() => '?').join(',')}) AND (o.status != 'pending' OR o.payment_mode='pay_center')`;
+  const [totals] = await conn.execute(`SELECT o.status,COUNT(*) n FROM gr_orders o WHERE ${ownerWhere} GROUP BY o.status`, userIds);
+  const counts = { pending: 0, paid: 0, assigned: 0, serving: 0, completed: 0 };
+  let allTotal = 0;
+  for (const item of totals) { const n=Number(item.n);allTotal+=n;if(Object.hasOwn(counts,item.status))counts[item.status]=n; }
+  const total = status ? Number(totals.find(item=>item.status===status)?.n||0) : allTotal;
   const [rows] = await conn.execute(
     `SELECT o.*, p.title AS product_name, s.category_id AS category_id
      FROM gr_orders o
      LEFT JOIN jz_products p ON p.id = CAST(o.sku AS UNSIGNED)
      LEFT JOIN jz_skus s ON s.id = p.channel_sku_id
-     WHERE BINARY o.user_id = BINARY ? AND o.status != 'pending'
+     WHERE ${ownerWhere}${status?' AND o.status=?':''}
      ORDER BY o.created_at DESC, o.id DESC
-     LIMIT ${lim}`,
-    [userId]
+     LIMIT ${lim} OFFSET ${(page-1)*lim}`,
+    status?[...userIds,status]:userIds
   );
-  return summarizeUserOrders(rows);
+  const result=summarizeUserOrders(await enrichCustomerOrders(conn, rows));
+  return {...result,counts,total,page,size:lim,has_more:page*lim<total};
 }
 
 async function getUserOrder(conn, orderRef, userId) {
+  const userIds = Array.isArray(userId) ? userId.map(String) : [String(userId)];
+  if (!userIds.length || userIds.length > 2 || userIds.some(id => !id)) throw new Error('订单身份无效');
   const [rows] = await conn.execute(
     `SELECT o.*, p.title AS product_name, s.category_id AS category_id
      FROM gr_orders o
      LEFT JOIN jz_products p ON p.id = CAST(o.sku AS UNSIGNED)
      LEFT JOIN jz_skus s ON s.id = p.channel_sku_id
-     WHERE BINARY o.order_ref = BINARY ? AND BINARY o.user_id = BINARY ?
+     WHERE BINARY o.order_ref = BINARY ? AND BINARY o.user_id IN (${userIds.map(() => '?').join(',')})
      LIMIT 1`,
-    [orderRef, userId]
+    [orderRef, ...userIds]
   );
-  return rows[0] || null;
+  return (await enrichCustomerOrders(conn, rows))[0] || null;
+}
+
+async function enrichCustomerOrders(conn, rows) {
+  const enriched = await require('./commerce/main-system.cjs').enrichOrders(conn, rows);
+  const internal = enriched.filter(o => o.biz_type === 'jiazheng' && o.payment_mode === 'pay_center');
+  const map = new Map();
+  if (internal.length) {
+    const [orders] = await conn.execute('SELECT * FROM jz_orders WHERE id IN (' + internal.map(() => '?').join(',') + ')', internal.map(o => o.order_ref));
+    for (const order of orders) map.set(order.id, order);
+  }
+  return enriched.map(original => {
+    const out = { ...original }, order = map.get(out.order_ref);
+    if (order && out.user_id === 'commerce-account-' + order.account_id) {
+      let snapshot = {}; try { snapshot = JSON.parse(order.payment_config_snapshot || '{}'); } catch (_) {}
+      out.product_name = snapshot.productTitle || out.product_name;
+      out.category_id = order.category_id; out.pay_status = order.pay_status;
+      out.refund_status = order.refund_status; out.is_internal_service = true;
+      out.status = order.status === 'cancelled' ? 'cancelled' : ['done', 'rated'].includes(order.status) ? 'completed'
+        : order.status === 'serving' ? 'serving' : ['dispatched', 'accepted'].includes(order.status) ? 'assigned'
+        : order.pay_status === 'paid' ? 'paid' : 'pending';
+      out.paid_at = order.pay_at; out.fee = order.fee; out.expect_time = order.expect_time;
+      out.can_cancel = order.status === 'pending' && !order.refund_status && order.pay_status !== 'closing';
+      out.cancel_policy = snapshot.cancelPolicy;
+    }
+    delete out.order_snapshot; delete out.request_key; delete out.request_hash;
+    return out;
+  });
 }
 
 function nowCst() {
@@ -182,6 +224,10 @@ async function updateOrderCallback(conn, opts) {
   const o = opts || {};
   const now = nowCst();
   const vendorId = o.vendor_id == null ? null : o.vendor_id;
+  const order = await getOrderByRef(conn, o.order_ref);
+  if (!require('./server/payment/vendor-payment.cjs').isExternalOrder(order) || String(order.vendor_id) !== String(vendorId)) {
+    const error = new Error('回调不能修改其他商家或中台订单'); error.status = 403; throw error;
+  }
   if (o.status === 'paid') {
     await conn.execute(
       `UPDATE gr_orders
@@ -191,10 +237,11 @@ async function updateOrderCallback(conn, opts) {
       [vendorId, o.vendor_oid, o.status, o.fee, now, now, o.order_ref]
     );
   } else if (o.status === 'assigned') {
+    // 重新派单（含 serving 回退 assigned）：清空 serving_at，避免状态已回退但时间轴仍残留旧的服务开始时间
     await conn.execute(
       `UPDATE gr_orders
          SET vendor_id=COALESCE(?, vendor_id), vendor_oid=?, status=?,
-             worker_name=?, worker_phone=?, eta=?, updated_at=?
+             worker_name=?, worker_phone=?, eta=?, serving_at=NULL, updated_at=?
        WHERE order_ref=? AND vendor_oid=?`,
       [vendorId, o.vendor_oid, o.status, o.worker_name, o.worker_phone, o.eta, now, o.order_ref, o.vendor_oid]
     );

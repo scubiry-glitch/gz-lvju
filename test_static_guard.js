@@ -31,6 +31,8 @@ function assertAllow(p) {
   '/moma_deploy.js',
   '/migrate_to_mysql.cjs',
   '/vendor_api.cjs',
+  '/commerce/domain.cjs',
+  '/commerce/server.cjs',
   '/node_modules/mysql2/index.js',
 ].forEach(assertBlock);
 

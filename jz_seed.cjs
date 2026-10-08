@@ -257,7 +257,7 @@ async function seedAll(conn) {
     for (const s of JZ_DEFAULT_SKUS) {
       await conn.execute(
         `INSERT INTO jz_skus(id,category_id,name,slug,spec,price_from,price_unit,duration_min,
-          tags,badges,sales_text,rating_score,worker_min_level,includes_json,service_flow,service_notice,sort_order,enabled)
+          tags,badges,sales_text,rating_score,worker_min_level,includes,service_flow,service_notice,sort_order,enabled)
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
         [s.id,s.category_id,s.name,s.slug,s.spec,s.price_from,s.price_unit,s.duration_min,
          jd(s.tags),jd(s.badges),s.sales_text,s.rating_score,s.worker_min_level,
@@ -271,8 +271,8 @@ async function seedAll(conn) {
     for (const v of JZ_VENDORS) {
       await conn.execute(
         `INSERT INTO jz_vendors(id,type,name,logo,address,rating,review_count,rank_type,rank_label,
-          badges,live,start_price,unit,hours,status,sort_order,created_at,updated_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?)`,
+          badges,live,start_price,unit,hours,status,review_status,sort_order,created_at,updated_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','approved',?,?,?)`,
         [v.id,v.type,v.name,v.logo,v.address,v.rating,v.review_count,v.rank_type,v.rank_label,
          jd(v.badges),v.live,v.start_price,v.unit,v.hours,v.sort_order,now,now]
       );

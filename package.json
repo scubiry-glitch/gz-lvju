@@ -4,11 +4,26 @@
   "description": "新居住服务平台",
   "main": "app.js",
   "scripts": {
+    "h5:dev": "npm --prefix h5 run dev",
+    "h5:build": "npm --prefix h5 run build",
+    "h5:prepare": "npm --prefix h5 install --no-fund --no-audit",
+    "prestart": "npm run h5:prepare && npm run h5:build",
+    "start": "node app.js",
+    "commerce:dev": "node commerce/server.cjs",
+    "commerce:test": "node --test scripts/commerce/domain.test.cjs scripts/commerce/http.test.cjs",
     "build:android": "npx cap sync android",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android",
     "build:apk": "bash scripts/build-apk.sh",
+    "commerce:m1a": "node commerce/app.cjs",
+    "commerce:migrate": "node commerce/migrate.cjs",
+    "settlement:migrate": "node scripts/settlement/manage.cjs migrate",
+    "settlement:worker": "node scripts/settlement/manage.cjs worker-once",
+    "settlement:verify": "node scripts/settlement/manage.cjs verify",
+    "settlement:test": "node scripts/settlement/test.cjs",
+    "commerce:m1a:test": "node scripts/commerce/m1a-test.cjs --browser",
+    "commerce:init": "node scripts/commerce/initialize-topics.cjs"
     "s3:smoke": "node scripts/s3_smoke.cjs",
     "s3:probe": "node scripts/s3_region_probe.cjs",
     "test:img-ingest": "node scripts/img_ingest_regression.cjs",
@@ -17,8 +32,9 @@
   "dependencies": {
     "@lianjia/jsbridge3": "file:vendor/lianjia-jsbridge3-1.1.6.tgz",
     "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
     "mysql2": "^3.23.3",
-    "sharp": "^0.35.4"
+    "pdfkit": "^0.20.2"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
@@ -26,6 +42,20 @@
     "@capacitor/core": "^8.5.0",
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    },
+    "@capacitor/cli": {
+      "xcode": {
+        "uuid": "^11.1.1"
+      }
+    },
+    "minimatch@^10": {
+      "brace-expansion": "^5.0.12"
+    }
   }
 }

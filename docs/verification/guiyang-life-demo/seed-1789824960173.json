@@ -1,0 +1,616 @@
+{
+  "at": "2026-09-19T13:36:00.173Z",
+  "batch": "guiyang-life-demo-v1",
+  "created": [
+    {
+      "kind": "channel_vendors",
+      "id": 221
+    },
+    {
+      "kind": "merchants",
+      "id": 14
+    },
+    {
+      "kind": "stores",
+      "id": 14
+    },
+    {
+      "kind": "rules",
+      "id": 16
+    },
+    {
+      "kind": "channel_workers",
+      "id": 35
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 222
+    },
+    {
+      "kind": "merchants",
+      "id": 15
+    },
+    {
+      "kind": "stores",
+      "id": 15
+    },
+    {
+      "kind": "rules",
+      "id": 17
+    },
+    {
+      "kind": "channel_workers",
+      "id": 36
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 223
+    },
+    {
+      "kind": "merchants",
+      "id": 16
+    },
+    {
+      "kind": "stores",
+      "id": 16
+    },
+    {
+      "kind": "rules",
+      "id": 18
+    },
+    {
+      "kind": "channel_workers",
+      "id": 37
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 224
+    },
+    {
+      "kind": "merchants",
+      "id": 17
+    },
+    {
+      "kind": "stores",
+      "id": 17
+    },
+    {
+      "kind": "rules",
+      "id": 19
+    },
+    {
+      "kind": "channel_workers",
+      "id": 38
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 225
+    },
+    {
+      "kind": "merchants",
+      "id": 18
+    },
+    {
+      "kind": "stores",
+      "id": 18
+    },
+    {
+      "kind": "rules",
+      "id": 20
+    },
+    {
+      "kind": "channel_workers",
+      "id": 39
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 226
+    },
+    {
+      "kind": "merchants",
+      "id": 19
+    },
+    {
+      "kind": "stores",
+      "id": 19
+    },
+    {
+      "kind": "rules",
+      "id": 21
+    },
+    {
+      "kind": "channel_workers",
+      "id": 40
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 227
+    },
+    {
+      "kind": "merchants",
+      "id": 20
+    },
+    {
+      "kind": "stores",
+      "id": 20
+    },
+    {
+      "kind": "rules",
+      "id": 22
+    },
+    {
+      "kind": "channel_workers",
+      "id": 41
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 228
+    },
+    {
+      "kind": "merchants",
+      "id": 21
+    },
+    {
+      "kind": "stores",
+      "id": 21
+    },
+    {
+      "kind": "rules",
+      "id": 23
+    },
+    {
+      "kind": "channel_workers",
+      "id": 42
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 229
+    },
+    {
+      "kind": "merchants",
+      "id": 22
+    },
+    {
+      "kind": "stores",
+      "id": 22
+    },
+    {
+      "kind": "rules",
+      "id": 24
+    },
+    {
+      "kind": "channel_workers",
+      "id": 43
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 230
+    },
+    {
+      "kind": "merchants",
+      "id": 23
+    },
+    {
+      "kind": "stores",
+      "id": 23
+    },
+    {
+      "kind": "rules",
+      "id": 25
+    },
+    {
+      "kind": "channel_workers",
+      "id": 44
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 231
+    },
+    {
+      "kind": "merchants",
+      "id": 24
+    },
+    {
+      "kind": "stores",
+      "id": 24
+    },
+    {
+      "kind": "rules",
+      "id": 26
+    },
+    {
+      "kind": "channel_workers",
+      "id": 45
+    },
+    {
+      "kind": "channel_vendors",
+      "id": 232
+    },
+    {
+      "kind": "merchants",
+      "id": 25
+    },
+    {
+      "kind": "stores",
+      "id": 25
+    },
+    {
+      "kind": "rules",
+      "id": 27
+    },
+    {
+      "kind": "channel_workers",
+      "id": 46
+    },
+    {
+      "kind": "channel_products",
+      "id": 5255
+    },
+    {
+      "kind": "skus",
+      "id": 22
+    },
+    {
+      "kind": "channel_products",
+      "id": 5256
+    },
+    {
+      "kind": "skus",
+      "id": 23
+    },
+    {
+      "kind": "channel_products",
+      "id": 5257
+    },
+    {
+      "kind": "skus",
+      "id": 24
+    },
+    {
+      "kind": "channel_products",
+      "id": 5258
+    },
+    {
+      "kind": "skus",
+      "id": 25
+    },
+    {
+      "kind": "channel_products",
+      "id": 5259
+    },
+    {
+      "kind": "skus",
+      "id": 26
+    },
+    {
+      "kind": "channel_products",
+      "id": 5260
+    },
+    {
+      "kind": "skus",
+      "id": 27
+    },
+    {
+      "kind": "channel_products",
+      "id": 5261
+    },
+    {
+      "kind": "skus",
+      "id": 28
+    },
+    {
+      "kind": "channel_products",
+      "id": 5262
+    },
+    {
+      "kind": "skus",
+      "id": 29
+    },
+    {
+      "kind": "channel_products",
+      "id": 5263
+    },
+    {
+      "kind": "skus",
+      "id": 30
+    },
+    {
+      "kind": "channel_products",
+      "id": 5264
+    },
+    {
+      "kind": "skus",
+      "id": 31
+    },
+    {
+      "kind": "channel_products",
+      "id": 5265
+    },
+    {
+      "kind": "skus",
+      "id": 32
+    },
+    {
+      "kind": "channel_products",
+      "id": 5266
+    },
+    {
+      "kind": "skus",
+      "id": 33
+    },
+    {
+      "kind": "channel_products",
+      "id": 5267
+    },
+    {
+      "kind": "skus",
+      "id": 34
+    },
+    {
+      "kind": "channel_products",
+      "id": 5268
+    },
+    {
+      "kind": "skus",
+      "id": 35
+    },
+    {
+      "kind": "channel_products",
+      "id": 5269
+    },
+    {
+      "kind": "skus",
+      "id": 36
+    },
+    {
+      "kind": "channel_products",
+      "id": 5270
+    },
+    {
+      "kind": "skus",
+      "id": 37
+    },
+    {
+      "kind": "channel_products",
+      "id": 5271
+    },
+    {
+      "kind": "skus",
+      "id": 38
+    },
+    {
+      "kind": "channel_products",
+      "id": 5272
+    },
+    {
+      "kind": "skus",
+      "id": 39
+    },
+    {
+      "kind": "channel_products",
+      "id": 5273
+    },
+    {
+      "kind": "skus",
+      "id": 40
+    },
+    {
+      "kind": "channel_products",
+      "id": 5274
+    },
+    {
+      "kind": "skus",
+      "id": 41
+    },
+    {
+      "kind": "channel_products",
+      "id": 5275
+    },
+    {
+      "kind": "skus",
+      "id": 42
+    },
+    {
+      "kind": "channel_products",
+      "id": 5276
+    },
+    {
+      "kind": "skus",
+      "id": 43
+    },
+    {
+      "kind": "channel_products",
+      "id": 5277
+    },
+    {
+      "kind": "skus",
+      "id": 44
+    },
+    {
+      "kind": "channel_products",
+      "id": 5278
+    },
+    {
+      "kind": "skus",
+      "id": 45
+    },
+    {
+      "kind": "channel_products",
+      "id": 5279
+    },
+    {
+      "kind": "skus",
+      "id": 46
+    },
+    {
+      "kind": "channel_products",
+      "id": 5280
+    },
+    {
+      "kind": "channel_products",
+      "id": 5281
+    },
+    {
+      "kind": "channel_products",
+      "id": 5282
+    },
+    {
+      "kind": "channel_products",
+      "id": 5283
+    },
+    {
+      "kind": "channel_products",
+      "id": 5284
+    },
+    {
+      "kind": "channel_products",
+      "id": 5285
+    },
+    {
+      "kind": "skus",
+      "id": 47
+    },
+    {
+      "kind": "channel_products",
+      "id": 5286
+    },
+    {
+      "kind": "skus",
+      "id": 48
+    },
+    {
+      "kind": "channel_products",
+      "id": 5287
+    },
+    {
+      "kind": "skus",
+      "id": 49
+    },
+    {
+      "kind": "channel_products",
+      "id": 5288
+    },
+    {
+      "kind": "skus",
+      "id": 50
+    },
+    {
+      "kind": "channel_products",
+      "id": 5289
+    },
+    {
+      "kind": "skus",
+      "id": 51
+    },
+    {
+      "kind": "channel_products",
+      "id": 5290
+    },
+    {
+      "kind": "channel_products",
+      "id": 5291
+    },
+    {
+      "kind": "channel_products",
+      "id": 5292
+    },
+    {
+      "kind": "channel_products",
+      "id": 5293
+    },
+    {
+      "kind": "channel_products",
+      "id": 5294
+    },
+    {
+      "kind": "skus",
+      "id": 52
+    },
+    {
+      "kind": "channel_products",
+      "id": 5295
+    },
+    {
+      "kind": "skus",
+      "id": 53
+    },
+    {
+      "kind": "channel_products",
+      "id": 5296
+    },
+    {
+      "kind": "skus",
+      "id": 54
+    },
+    {
+      "kind": "channel_products",
+      "id": 5297
+    },
+    {
+      "kind": "skus",
+      "id": 55
+    },
+    {
+      "kind": "channel_products",
+      "id": 5298
+    },
+    {
+      "kind": "skus",
+      "id": 56
+    },
+    {
+      "kind": "channel_products",
+      "id": 5299
+    },
+    {
+      "kind": "skus",
+      "id": 57
+    },
+    {
+      "kind": "channel_products",
+      "id": 5300
+    },
+    {
+      "kind": "skus",
+      "id": 58
+    },
+    {
+      "kind": "skus",
+      "id": 59
+    },
+    {
+      "kind": "packages",
+      "id": 7
+    },
+    {
+      "kind": "packages",
+      "id": 8
+    },
+    {
+      "kind": "packages",
+      "id": 9
+    },
+    {
+      "kind": "packages",
+      "id": 10
+    },
+    {
+      "kind": "packages",
+      "id": 11
+    },
+    {
+      "kind": "packages",
+      "id": 12
+    },
+    {
+      "kind": "plans",
+      "id": 2
+    }
+  ],
+  "existing": [],
+  "city": {
+    "id": 3,
+    "name": "贵阳",
+    "slug": "guiyang"
+  }
+}

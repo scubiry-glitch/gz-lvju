@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: AC02/03: separate products, city availability, version changes and stop-sale preserve holdings
+ok 1 - AC02/03: separate products, city availability, version changes and stop-sale preserve holdings
+  ---
+  duration_ms: 14.277505
+  type: 'test'
+  ...
+# Subtest: AC05: repeated payment and grant retry issue one batch; failure retains full liability
+ok 2 - AC05: repeated payment and grant retry issue one batch; failure retains full liability
+  ---
+  duration_ms: 1.127482
+  type: 'test'
+  ...
+# Subtest: AC05: duplicate SKU units have independent instances; snapshots survive live product edits
+ok 3 - AC05: duplicate SKU units have independent instances; snapshots survive live product edits
+  ---
+  duration_ms: 6.438744
+  type: 'test'
+  ...
+# Subtest: AC05: idempotency request replay and conflict
+ok 4 - AC05: idempotency request replay and conflict
+  ---
+  duration_ms: 2.769216
+  type: 'test'
+  ...
+# Subtest: AC06: membership expiry independent from coupons; renewal extends period and uses a new grant
+ok 5 - AC06: membership expiry independent from coupons; renewal extends period and uses a new grant
+  ---
+  duration_ms: 6.698337
+  type: 'test'
+  ...
+# Subtest: AC07: 10 reservations fill a day; 11th fails; failed reschedule preserves slot; cancellation releases
+ok 6 - AC07: 10 reservations fill a day; 11th fails; failed reschedule preserves slot; cancellation releases
+  ---
+  duration_ms: 5.233444
+  type: 'test'
+  ...
+# Subtest: AC08/13: preview has no side effects; wrong merchant/store rejected; duplicate redemption rejected
+ok 7 - AC08/13: preview has no side effects; wrong merchant/store rejected; duplicate redemption rejected
+  ---
+  duration_ms: 4.112505
+  type: 'test'
+  ...
+# Subtest: AC08: expired short token and invalid dates cannot redeem or reserve
+ok 8 - AC08: expired short token and invalid dates cannot redeem or reserve
+  ---
+  duration_ms: 0.789082
+  type: 'test'
+  ...
+# Subtest: AC09/10: attributed five-coupon arithmetic, partial liability, projection privacy, no attribution zero commission
+ok 9 - AC09/10: attributed five-coupon arithmetic, partial liability, projection privacy, no attribution zero commission
+  ---
+  duration_ms: 7.685538
+  type: 'test'
+  ...
+# Subtest: AC10: signed attribution cannot be forged, reused for another product, or used after expiry
+ok 10 - AC10: signed attribution cannot be forged, reused for another product, or used after expiry
+  ---
+  duration_ms: 3.524721
+  type: 'test'
+  ...
+# Subtest: AC11: refund freezes redemption; expiry refunds once; no unearned commission reversals
+ok 11 - AC11: refund freezes redemption; expiry refunds once; no unearned commission reversals
+  ---
+  duration_ms: 1.408153
+  type: 'test'
+  ...
+# Subtest: AC11: redeemed service failure uses own-account compensation and recoverable supplier receivable
+ok 12 - AC11: redeemed service failure uses own-account compensation and recoverable supplier receivable
+  ---
+  duration_ms: 0.821957
+  type: 'test'
+  ...
+# Subtest: AC12: provider reserves, unknown does not release, query uses original request, release cannot double-credit
+ok 13 - AC12: provider reserves, unknown does not release, query uses original request, release cannot double-credit
+  ---
+  duration_ms: 4.221948
+  type: 'test'
+  ...
+# Subtest: AC13: consumer cannot read or mutate another owner; merchant cannot approve or release
+ok 14 - AC13: consumer cannot read or mutate another owner; merchant cannot approve or release
+  ---
+  duration_ms: 1.170038
+  type: 'test'
+  ...
+# Subtest: help/invoice acceptance is owned, deduplicated and auditable; not a real invoice
+ok 15 - help/invoice acceptance is owned, deduplicated and auditable; not a real invoice
+  ---
+  duration_ms: 1.570991
+  type: 'test'
+  ...
+# Subtest: money: balanced immutable groups and negative/unbalanced counterexamples rejected
+ok 16 - money: balanced immutable groups and negative/unbalanced counterexamples rejected
+  ---
+  duration_ms: 0.790423
+  type: 'test'
+  ...
+# Subtest: HTTP boundary, isolation, sessions, idempotency, permissions and cross-origin rejection
+ok 17 - HTTP boundary, isolation, sessions, idempotency, permissions and cross-origin rejection
+  ---
+  duration_ms: 389.965077
+  type: 'test'
+  ...
+# Subtest: configured HTTPS preview host accepts same-origin requests, rejects arbitrary hosts and origins
+ok 18 - configured HTTPS preview host accepts same-origin requests, rejects arbitrary hosts and origins
+  ---
+  duration_ms: 30.922597
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 875.530584

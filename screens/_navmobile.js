@@ -107,6 +107,25 @@
         { id: 'profile',      label: '个人',       href: 'profile.html',          icon: 'user' },
       ],
     },
+    /* 旅居找房 App（根目录 lvju-app-*.html）：inline .tabbar + on/off SVG */
+    lvju: {
+      primary: '#0F766E', primaryDeep: '#0b5d56', accent2: '#15A69B',
+      stamp: '贝壳找房 · 旅居',
+      layout: 'inline',
+      tabbar: [
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', iconAsset: 'home' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',    iconAsset: 'search' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     iconAsset: 'content' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    iconAsset: 'orders' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        iconAsset: 'me' },
+      ],
+    },
+  };
+
+  // 旅居 tab 图标文件名（MasterGo 导出 on/off 成对）
+  const LVJU_TAB_ICON = {
+    home: 'tab-home', search: 'tab-search', content: 'tab-content',
+    orders: 'tab-orders', me: 'tab-me',
   };
 
   // 内联 SVG 图标库（与 _nav.js 同步）
@@ -133,6 +152,8 @@
     chevronRight:'<polyline points="9 18 15 12 9 6"/>',
     close:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     star:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+    book:'<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>',
+    award:'<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
   };
   function ico(k){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'+(ICONS[k]||'')+'</svg>'; }
 
@@ -176,6 +197,21 @@
       .nvm-tabbar a.active{color:var(--nvm-primary, #1e40af); font-weight:600;}
       .nvm-tabbar a svg{width:20px; height:20px;}
       @media (min-width: 600px){ .nvm-tabbar{ max-width:760px; } }
+
+      /* 旅居 App inline tabbar（与 lvju-app.css 同口径；页面已写则覆盖无害） */
+      .tabbar.nvm-lvju{
+        flex-shrink:0;display:flex;background:#fff;
+        box-shadow:0 -2px 8px rgba(153,153,153,.12);padding:9px 0 0;z-index:25;min-height:56px;
+        padding-bottom:max(8px,env(safe-area-inset-bottom,0px));
+        font-family:system-ui,-apple-system,'PingFang SC',sans-serif;
+      }
+      .tabbar.nvm-lvju a{
+        flex:1;text-align:center;font-size:10px;font-weight:400;line-height:11.7px;
+        color:#15A69B;text-decoration:none;
+      }
+      .tabbar.nvm-lvju a .ti{display:block;width:24px;height:24px;margin:0 auto;line-height:24px;}
+      .tabbar.nvm-lvju a .ti img{width:24px;height:24px;display:block;object-fit:contain;}
+      .tabbar.nvm-lvju a.on{color:#0F766E;font-weight:600;}
 
       /* 汉堡按钮（位于 .nvm-header 左侧） */
       .nvm-menu{
@@ -405,15 +441,50 @@
     return base + href;
   }
 
+  // 旅居图标根路径：根目录页 → assets/…；screens/ 下 → ../assets/…
+  function lvjuAssetBase(el){
+    if (el.dataset.assetBase) return el.dataset.assetBase;
+    return /\/screens\//.test(location.pathname) ? '../assets/lvju/icons/' : 'assets/lvju/icons/';
+  }
+  function lvjuTabIcon(it, isOn, assetBase){
+    const stem = LVJU_TAB_ICON[it.iconAsset] || ('tab-' + it.iconAsset);
+    const src = assetBase + stem + (isOn ? '-on' : '-off') + '.svg';
+    return `<span class="ti"><img src="${src}" alt=""></span>`;
+  }
+
+  // 页面已内嵌静态骨架（首屏即可见）→ 只补样式，不 outerHTML 重画
+  function hasStaticTabbar(el){
+    if (!el) return false;
+    if (el.matches && el.matches('nav.tabbar') && el.querySelector('a')) return true;
+    if (el.querySelector && el.querySelector('nav.tabbar a, .tabbar > a')) return true;
+    return false;
+  }
+
   // 渲染底部 tabbar
   function renderTabbar(el){
+    if (hasStaticTabbar(el)) return;
     const series = el.dataset.series;
     const active = el.dataset.active;
     const base   = el.dataset.base;
     const cfg = MOBILE[series];
     if (!cfg || !cfg.tabbar) { el.outerHTML = ''; return; }
     const canM = window.BZF_NAV_CAN; // 未注入=未登录/演示态 → 全显
-    const items = cfg.tabbar.filter(it => !it.perms || !canM || it.perms.some(p => { try { return !!canM(p); } catch (_) { return true; } })).map(it => {
+    const tabs = cfg.tabbar.filter(it => !it.perms || !canM || it.perms.some(p => { try { return !!canM(p); } catch (_) { return true; } }));
+
+    // 旅居：文档流 inline .tabbar + on/off SVG（不 fixed，适配 .app flex 布局）
+    if (cfg.layout === 'inline' || series === 'lvju') {
+      const assetBase = lvjuAssetBase(el);
+      const items = tabs.map(it => {
+        const on = it.id === active;
+        const cls = on ? ' class="on"' : '';
+        const href = on ? '' : ` href="${resolveHref(it.href, base)}"`;
+        return `<a${cls}${href}>${lvjuTabIcon(it, on, assetBase)}${it.label}</a>`;
+      }).join('');
+      el.outerHTML = `<nav class="tabbar nvm-lvju" data-series="${series}" data-active="${active || ''}">${items}</nav>`;
+      return;
+    }
+
+    const items = tabs.map(it => {
       const isActive = it.id === active ? ' active' : '';
       return `<a class="${isActive ? 'active' : ''}" href="${resolveHref(it.href, base)}">${ico(it.icon)}${it.label}</a>`;
     }).join('');
@@ -523,10 +594,10 @@
     injectStyles();
     // 先记录 series/active 再 render（outerHTML 会破坏原元素的 dataset）
     let drawerSeries = null, drawerActive = null;
-    const headerEl = document.querySelector('#m-header, #m-tabbar, #tab-bar');
+    const headerEl = document.querySelector('#m-header, #m-tabbar, #tab-bar, nav.tabbar.nvm-lvju');
     if (headerEl) { drawerSeries = headerEl.dataset.series; drawerActive = headerEl.dataset.active; }
     document.querySelectorAll('#m-header').forEach(renderHeader);
-    document.querySelectorAll('#m-tabbar, #tab-bar').forEach(renderTabbar);
+    document.querySelectorAll('#m-tabbar, #tab-bar, nav.tabbar.nvm-lvju').forEach(renderTabbar);
     if (drawerSeries) renderDrawer(drawerSeries, drawerActive);
     bindDrawerEvents();
   }

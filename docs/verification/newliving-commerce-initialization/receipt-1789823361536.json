@@ -1,0 +1,421 @@
+{
+  "at": "2026-09-19T13:09:21.536Z",
+  "batch": "living-topics-v19-shenyang-v1",
+  "created": [
+    {
+      "kind": "merchants",
+      "id": 1,
+      "key": "merchant:1:1",
+      "name": "春晖家政"
+    },
+    {
+      "kind": "stores",
+      "id": 1,
+      "key": "store:1:1",
+      "name": "春晖家政 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 1,
+      "key": "rule:1:1",
+      "name": "春晖家政 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 1,
+      "key": "sku:raw-clean-new",
+      "name": "开荒保洁 · 新居服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 2,
+      "key": "merchant:21:1",
+      "name": "蚂蚁搬家"
+    },
+    {
+      "kind": "stores",
+      "id": 2,
+      "key": "store:21:1",
+      "name": "蚂蚁搬家 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 2,
+      "key": "rule:21:1",
+      "name": "蚂蚁搬家 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 2,
+      "key": "sku:moving-city-standard",
+      "name": "居民搬家 · 同城服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 3,
+      "key": "merchant:11:1",
+      "name": "快修家电"
+    },
+    {
+      "kind": "stores",
+      "id": 3,
+      "key": "store:11:1",
+      "name": "快修家电 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 3,
+      "key": "rule:11:1",
+      "name": "快修家电 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 3,
+      "key": "sku:appliance-repair",
+      "name": "家电维修 · 上门服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 4,
+      "key": "sku:ac-clean-wall",
+      "name": "空调清洗 · 挂机服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 5,
+      "key": "sku:pipe-unclog-fast",
+      "name": "管道疏通 · 当天服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 4,
+      "key": "merchant:2:1",
+      "name": "平台优选·保洁"
+    },
+    {
+      "kind": "stores",
+      "id": 4,
+      "key": "store:2:1",
+      "name": "平台优选·保洁 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 4,
+      "key": "rule:2:1",
+      "name": "平台优选·保洁 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 6,
+      "key": "sku:hood-clean-deep",
+      "name": "油烟机清洗 · 深度服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 5,
+      "key": "merchant:44:1",
+      "name": "康养到家"
+    },
+    {
+      "kind": "stores",
+      "id": 5,
+      "key": "store:44:1",
+      "name": "康养到家 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 5,
+      "key": "rule:44:1",
+      "name": "康养到家 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 7,
+      "key": "sku:health-elder-day",
+      "name": "养老陪护 · 日间服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 8,
+      "key": "sku:health-checkup-basic",
+      "name": "体检套餐 · 基础服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 6,
+      "key": "merchant:31:1",
+      "name": "阿姨来了"
+    },
+    {
+      "kind": "stores",
+      "id": 6,
+      "key": "store:31:1",
+      "name": "阿姨来了 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 6,
+      "key": "rule:31:1",
+      "name": "阿姨来了 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 9,
+      "key": "sku:nanny-livein-full",
+      "name": "住家保姆 · 全职服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 7,
+      "key": "merchant:45:1",
+      "name": "安居养护"
+    },
+    {
+      "kind": "stores",
+      "id": 7,
+      "key": "store:45:1",
+      "name": "安居养护 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 7,
+      "key": "rule:45:1",
+      "name": "安居养护 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 10,
+      "key": "sku:maintain-appliance",
+      "name": "家电保养 · 套餐服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 11,
+      "key": "sku:maintain-pipe-quarter",
+      "name": "管道养护 · 季度服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 8,
+      "key": "merchant:42:1",
+      "name": "安居财险专区"
+    },
+    {
+      "kind": "stores",
+      "id": 8,
+      "key": "store:42:1",
+      "name": "安居财险专区 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "merchants",
+      "id": 9,
+      "key": "merchant:43:1",
+      "name": "江苏银行消费金融"
+    },
+    {
+      "kind": "stores",
+      "id": 9,
+      "key": "store:43:1",
+      "name": "江苏银行消费金融 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "merchants",
+      "id": 10,
+      "key": "merchant:46:1",
+      "name": "贝壳资产顾问"
+    },
+    {
+      "kind": "stores",
+      "id": 10,
+      "key": "store:46:1",
+      "name": "贝壳资产顾问 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 8,
+      "key": "rule:46:1",
+      "name": "贝壳资产顾问 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 12,
+      "key": "sku:asset-appraisal",
+      "name": "资产评估 · 房产服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 11,
+      "key": "merchant:47:1",
+      "name": "绿色回收站"
+    },
+    {
+      "kind": "stores",
+      "id": 11,
+      "key": "store:47:1",
+      "name": "绿色回收站 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "merchants",
+      "id": 12,
+      "key": "merchant:41:1",
+      "name": "联通装维优选"
+    },
+    {
+      "kind": "stores",
+      "id": 12,
+      "key": "store:41:1",
+      "name": "联通装维优选 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 9,
+      "key": "rule:41:1",
+      "name": "联通装维优选 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 13,
+      "key": "sku:telecom-broadband",
+      "name": "宽带新装 · 千兆服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 14,
+      "key": "sku:cleaning-daily-2h",
+      "name": "日常保洁 · 2小时服务券"
+    },
+    {
+      "kind": "merchants",
+      "id": 13,
+      "key": "merchant:48:1",
+      "name": "邻里便民站"
+    },
+    {
+      "kind": "stores",
+      "id": 13,
+      "key": "store:48:1",
+      "name": "邻里便民站 · 沈阳服务点（待确认）"
+    },
+    {
+      "kind": "rules",
+      "id": 10,
+      "key": "rule:48:1",
+      "name": "邻里便民站 · 权益分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 15,
+      "key": "sku:community-errand",
+      "name": "便民代办 · 跑腿服务券"
+    },
+    {
+      "kind": "skus",
+      "id": 16,
+      "key": "sku:nanny-hourly-3h",
+      "name": "钟点工 · 3小时服务券"
+    },
+    {
+      "kind": "packages",
+      "id": 1,
+      "key": "package:topic:new-home",
+      "name": "新居入住季 · 专题券包"
+    },
+    {
+      "kind": "packages",
+      "id": 2,
+      "key": "package:topic:care",
+      "name": "康养到家周 · 专题券包"
+    },
+    {
+      "kind": "packages",
+      "id": 3,
+      "key": "package:topic:asset",
+      "name": "租住安心包 · 专题券包"
+    },
+    {
+      "kind": "packages",
+      "id": 4,
+      "key": "package:topic:green",
+      "name": "绿色焕新 · 专题券包"
+    },
+    {
+      "kind": "packages",
+      "id": 5,
+      "key": "package:topic:neighbor",
+      "name": "邻里日常 · 专题券包"
+    },
+    {
+      "kind": "skus",
+      "id": 17,
+      "key": "sku:membership:cleaning",
+      "name": "新居住会员 · 保洁权益券"
+    },
+    {
+      "kind": "rules",
+      "id": 11,
+      "key": "rule:membership:cleaning",
+      "name": "新居住会员 · 保洁分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 18,
+      "key": "sku:membership:repair",
+      "name": "新居住会员 · 维修权益券"
+    },
+    {
+      "kind": "rules",
+      "id": 12,
+      "key": "rule:membership:repair",
+      "name": "新居住会员 · 维修分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 19,
+      "key": "sku:membership:moving",
+      "name": "新居住会员 · 搬家权益券"
+    },
+    {
+      "kind": "rules",
+      "id": 13,
+      "key": "rule:membership:moving",
+      "name": "新居住会员 · 搬家分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 20,
+      "key": "sku:membership:travel",
+      "name": "新居住会员 · 旅居权益券"
+    },
+    {
+      "kind": "rules",
+      "id": 14,
+      "key": "rule:membership:travel",
+      "name": "新居住会员 · 旅居分配规则"
+    },
+    {
+      "kind": "skus",
+      "id": 21,
+      "key": "sku:membership:report",
+      "name": "新居住会员 · 报告权益券"
+    },
+    {
+      "kind": "rules",
+      "id": 15,
+      "key": "rule:membership:report",
+      "name": "新居住会员 · 报告分配规则"
+    },
+    {
+      "kind": "packages",
+      "id": 6,
+      "key": "package:membership:l1",
+      "name": "新居住基础权益礼包"
+    },
+    {
+      "kind": "plans",
+      "id": 1,
+      "key": "plan:membership:l1",
+      "name": "新居住会员"
+    }
+  ],
+  "existing": []
+}

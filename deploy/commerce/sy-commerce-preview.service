@@ -1,0 +1,21 @@
+[Unit]
+Description=Newliving commerce M1-A persistent business API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/proweb/run/sy
+Environment=NODE_ENV=production
+Environment=JUZHU_ENV=test
+Environment=COMMERCE_PORT=38780
+Environment=COMMERCE_PUBLIC_ORIGIN=https://sytest.meizu.life
+ExecStart=/root/.nvm/versions/node/v22.23.2/bin/node /proweb/run/sy/commerce/app.cjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

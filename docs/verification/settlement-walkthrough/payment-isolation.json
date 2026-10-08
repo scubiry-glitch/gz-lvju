@@ -1,0 +1,31 @@
+{
+  "at": "2026-10-01T20:10:34.952Z",
+  "payment_tables": {
+    "payment_orders": 0,
+    "payment_refunds": 0,
+    "payment_jobs": 0,
+    "payment_events": 0
+  },
+  "original_unknown_order": {
+    "id": "3af0df65-4df3-4fd6-85c0-97694a5a4850",
+    "request_no": "XS3af0df654df34fd685c097694a5a4850",
+    "status": "SUCCEEDED"
+  },
+  "exports": [
+    {
+      "format": "pdf",
+      "status": "READY",
+      "count": 1
+    },
+    {
+      "format": "xlsx",
+      "status": "READY",
+      "count": 1
+    },
+    {
+      "format": "csv",
+      "status": "READY",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+<!-- 智能门锁 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <rect x="2" y="1.333" width="8.667" height="13.333" rx="2" stroke="#333333" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="6.667" y="10" width="8" height="2.667" rx="4" fill="#F2FAF8" stroke="#333333" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="4.0" cy="4.0" r="0.667" fill="#333333"/>
+  <circle cx="6.334" cy="4.0" r="0.667" fill="#333333"/>
+  <circle cx="8.667" cy="4.0" r="0.667" fill="#333333"/>
+  <circle cx="4.0" cy="6.0" r="0.667" fill="#333333"/>
+  <circle cx="6.334" cy="6.0" r="0.667" fill="#333333"/>
+  <circle cx="8.667" cy="6.0" r="0.667" fill="#333333"/>
+  <circle cx="4.0" cy="8.0" r="0.667" fill="#333333"/>
+  <circle cx="6.334" cy="8.0" r="0.667" fill="#333333"/>
+  <circle cx="8.667" cy="8.0" r="0.667" fill="#333333"/>
+</svg>

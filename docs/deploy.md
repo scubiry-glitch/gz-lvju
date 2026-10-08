@@ -143,6 +143,10 @@ User=www
 | 日志 | `/var/log/juzhu-api.log` |
 | nginx conf | `/etc/nginx/conf.d/sytest.meizu.life.conf`（改前备份 `.bak.20260904-pre-mysql`） |
 
+2026-10-02 结算页面接入：当前 sytest 的 `/api/commerce/v1/` 与 `/api/settlement/v1/` 均转发到独立 commerce 服务 `127.0.0.1:38780`，共用同一业务库和账号会话；其他 `/api/` 仍走主服务 `8766`。对应片段为 `deploy/commerce/nginx-location.conf`，安装脚本会同步此片段。不能只发布静态结算页而遗漏 API 路由：旧主进程可能把未知 API 回落为首页 HTML，即使 HTTP 200 页面仍无法读取数据。
+
+接入后应分别检查未登录请求返回 `401 application/json`，以及授权账号的 `/api/settlement/v1/me` 和带 `party_id` 的账单查询返回 JSON；不得仅以 HTML 页面能打开作为部署通过。路由接通不自动开启分账付款或报表调度，运行开关见 [统一结算运行说明](verification/unified-settlement/README.md)。
+
 ## 5. 房源频道模型与新端点速查（2026-09-04，详见 CLAUDE.md 规则 15）
 
 - 频道：`projects.channel ∈ rental/minsu/newhouse/resale/trade`；**bzf 是 topic 不是 channel**（`settings` KV `topic_bzf`）。

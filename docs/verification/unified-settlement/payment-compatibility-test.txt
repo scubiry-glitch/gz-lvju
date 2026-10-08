@@ -1,0 +1,488 @@
+TAP version 13
+# Subtest: M1-A membership and coupon HTTP contracts with unified payment additions
+    # Subtest: catalog, account, admin plans/packages and disabled purchase preserve v1 envelopes
+    ok 1 - catalog, account, admin plans/packages and disabled purchase preserve v1 envelopes
+      ---
+      duration_ms: 641.935933
+      type: 'test'
+      ...
+    # Subtest: demo package and membership purchases stay synchronous, zero-money and idempotent
+    ok 2 - demo package and membership purchases stay synchronous, zero-money and idempotent
+      ---
+      duration_ms: 657.651431
+      type: 'test'
+      ...
+    # Subtest: appointment creation, rescheduling, cancellation and ownership retain method/status/fields
+    ok 3 - appointment creation, rescheduling, cancellation and ownership retain method/status/fields
+      ---
+      duration_ms: 264.451728
+      type: 'test'
+      ...
+    # Subtest: dynamic coupon code and preview/redeem preserve old fields without funding demos
+    ok 4 - dynamic coupon code and preview/redeem preserve old fields without funding demos
+      ---
+      duration_ms: 806.251075
+      type: 'test'
+      ...
+    # Subtest: exchange and after-sales retain zero-money membership/coupon contracts
+    ok 5 - exchange and after-sales retain zero-money membership/coupon contracts
+      ---
+      duration_ms: 405.745265
+      type: 'test'
+      ...
+    # Subtest: historical fulfilled orders keep legacy state; new real orders add fields and trust server price
+    ok 6 - historical fulfilled orders keep legacy state; new real orders add fields and trust server price
+      ---
+      duration_ms: 1129.225653
+      type: 'test'
+      ...
+    # Subtest: real refund execute/query/retry keep legacy envelopes, original IDs and retry ceiling
+    ok 7 - real refund execute/query/retry keep legacy envelopes, original IDs and retry ceiling
+      ---
+      duration_ms: 2859.41959
+      type: 'test'
+      ...
+    1..7
+ok 1 - M1-A membership and coupon HTTP contracts with unified payment additions
+  ---
+  duration_ms: 25290.015287
+  type: 'test'
+  ...
+# Subtest: commerce identifiers are lossless and never truncate malformed orders
+ok 2 - commerce identifiers are lossless and never truncate malformed orders
+  ---
+  duration_ms: 2.066341
+  type: 'test'
+  ...
+# Subtest: real commerce purchase, entitlement outbox, original partial refunds and closing races
+    # Subtest: configuration, identity, version and demo admission precede real purchase
+    ok 1 - configuration, identity, version and demo admission precede real purchase
+      ---
+      duration_ms: 386.164706
+      type: 'test'
+      ...
+    # Subtest: concurrent request replay registers one order, stock hold and payment attempt
+    ok 2 - concurrent request replay registers one order, stock hold and payment attempt
+      ---
+      duration_ms: 1553.192117
+      type: 'test'
+      ...
+    # Subtest: money is recorded despite grant failure; retry issues exactly once
+    ok 3 - money is recorded despite grant failure; retry issues exactly once
+      ---
+      duration_ms: 1433.707548
+      type: 'test'
+      ...
+    # Subtest: package partial refunds reserve the original paid amount and exclude sandbox receipts
+    ok 4 - package partial refunds reserve the original paid amount and exclude sandbox receipts
+      ---
+      duration_ms: 2230.062769
+      type: 'test'
+      ...
+    # Subtest: expired unresolved payment holds stock; late success refunds without issuing coupons
+    ok 5 - expired unresolved payment holds stock; late success refunds without issuing coupons
+      ---
+      duration_ms: 1553.274236
+      type: 'test'
+      ...
+    # Subtest: refund before final close keeps stock reserved until closure; multiple late payments refund separately
+    ok 6 - refund before final close keeps stock reserved until closure; multiple late payments refund separately
+      ---
+      duration_ms: 2182.930697
+      type: 'test'
+      ...
+    # Subtest: memberships retain independent coupons and extend an existing period
+    ok 7 - memberships retain independent coupons and extend an existing period
+      ---
+      duration_ms: 1885.840976
+      type: 'test'
+      ...
+    # Subtest: unused coupon expiry queues one original partial refund, never a sandbox success
+    ok 8 - unused coupon expiry queues one original partial refund, never a sandbox success
+      ---
+      duration_ms: 367.196163
+      type: 'test'
+      ...
+    # Subtest: HTTP purchase exposes only server prices, owned payment routes and real capability
+    ok 9 - HTTP purchase exposes only server prices, owned payment routes and real capability
+      ---
+      duration_ms: 536.361527
+      type: 'test'
+      ...
+    1..9
+ok 3 - real commerce purchase, entitlement outbox, original partial refunds and closing races
+  ---
+  duration_ms: 42531.44623
+  type: 'test'
+  ...
+# Subtest: 生活服务金额和商家模式拒绝歧义输入
+ok 4 - 生活服务金额和商家模式拒绝歧义输入
+  ---
+  duration_ms: 2.337669
+  type: 'test'
+  ...
+# Subtest: 生活订单读取验证匿名、本人、他人，并剥离收款快照
+ok 5 - 生活订单读取验证匿名、本人、他人，并剥离收款快照
+  ---
+  duration_ms: 5.134369
+  type: 'test'
+  ...
+# Subtest: 免费报修不能硬删除已付或已注册支付意图的订单
+ok 6 - 免费报修不能硬删除已付或已注册支付意图的订单
+  ---
+  duration_ms: 0.963049
+  type: 'test'
+  ...
+# Subtest: 内部待付款进入订单中心，小程序草稿仍隐藏
+ok 7 - 内部待付款进入订单中心，小程序草稿仍隐藏
+  ---
+  duration_ms: 0.406708
+  type: 'test'
+  ...
+# Subtest: 前端仅按服务端新尝试指令换请求键，并隔离收银台类型
+ok 8 - 前端仅按服务端新尝试指令换请求键，并隔离收银台类型
+  ---
+  duration_ms: 6.737688
+  type: 'test'
+  ...
+# Subtest: 隔离 MySQL：生活服务建单幂等、价格归属、支付、取消退款、档期守恒
+ok 9 - 隔离 MySQL：生活服务建单幂等、价格归属、支付、取消退款、档期守恒
+  ---
+  duration_ms: 7817.971682
+  type: 'test'
+  ...
+# Subtest: life service legacy request contracts preserve real payments and ownership
+    # Subtest: old product create without a key ignores client fee and returns 201 {ok,order}
+    ok 1 - old product create without a key ignores client fee and returns 201 {ok,order}
+      ---
+      duration_ms: 92.378108
+      type: 'test'
+      ...
+    # Subtest: concurrent identical legacy creates reuse one order; different appointments do not share keys
+    ok 2 - concurrent identical legacy creates reuse one order; different appointments do not share keys
+      ---
+      duration_ms: 176.099263
+      type: 'test'
+      ...
+    # Subtest: old sku_id remains the exact product-id alias despite different or colliding catalog SKU numbers
+    ok 3 - old sku_id remains the exact product-id alias despite different or colliding catalog SKU numbers
+      ---
+      duration_ms: 540.118465
+      type: 'test'
+      ...
+    # Subtest: real old /jz/orders alias accepts address and scheduled_at with verified product/vendor
+    ok 4 - real old /jz/orders alias accepts address and scheduled_at with verified product/vendor
+      ---
+      duration_ms: 53.801404
+      type: 'test'
+      ...
+    # Subtest: owned GET preserves flat fields plus order envelope; phone cannot claim somebody else order
+    ok 5 - owned GET preserves flat fields plus order envelope; phone cannot claim somebody else order
+      ---
+      duration_ms: 25.428582
+      type: 'test'
+      ...
+    # Subtest: old pay_method-only request returns HTTP 200 {ok,order,cashier_url} without faking paid
+    ok 6 - old pay_method-only request returns HTTP 200 {ok,order,cashier_url} without faking paid
+      ---
+      duration_ms: 419.677249
+      type: 'test'
+      ...
+    # Subtest: old repeated pay only returns paid after an authoritative query and projection
+    ok 7 - old repeated pay only returns paid after an authoritative query and projection
+      ---
+      duration_ms: 311.425016
+      type: 'test'
+      ...
+    # Subtest: paid cancellation overrides ledger paid in GET payment and old no-key pay until refund completes
+    ok 8 - paid cancellation overrides ledger paid in GET payment and old no-key pay until refund completes
+      ---
+      duration_ms: 324.960572
+      type: 'test'
+      ...
+    # Subtest: explicit modern keys still reject price or body changes and retain asynchronous response shape
+    ok 9 - explicit modern keys still reject price or body changes and retain asynchronous response shape
+      ---
+      duration_ms: 87.686883
+      type: 'test'
+      ...
+    # Subtest: legacy unowned or free orders cannot acquire ownership or become paid through the old endpoint
+    ok 10 - legacy unowned or free orders cannot acquire ownership or become paid through the old endpoint
+      ---
+      duration_ms: 18.033054
+      type: 'test'
+      ...
+    # Subtest: old identified anonymous mini-program request needs no key and retains its original channel
+    ok 11 - old identified anonymous mini-program request needs no key and retains its original channel
+      ---
+      duration_ms: 224.934204
+      type: 'test'
+      ...
+    # Subtest: HEAD product-only anonymous links stay independent and never create centre payments
+    ok 12 - HEAD product-only anonymous links stay independent and never create centre payments
+      ---
+      duration_ms: 83.208471
+      type: 'test'
+      ...
+    # Subtest: identified mini-program retry generations advance through same-second terminal orders
+    ok 13 - identified mini-program retry generations advance through same-second terminal orders
+      ---
+      duration_ms: 270.48428
+      type: 'test'
+      ...
+    # Subtest: a completed cancellation permits one new legacy booking generation and retries still converge
+    ok 14 - a completed cancellation permits one new legacy booking generation and retries still converge
+      ---
+      duration_ms: 118.850104
+      type: 'test'
+      ...
+    # Subtest: same-second reverse random IDs cannot strand a third legacy booking on a cancelled second order
+    ok 15 - same-second reverse random IDs cannot strand a third legacy booking on a cancelled second order
+      ---
+      duration_ms: 251.296369
+      type: 'test'
+      ...
+    1..15
+ok 10 - life service legacy request contracts preserve real payments and ownership
+  ---
+  duration_ms: 7646.361575
+  type: 'test'
+  ...
+# Subtest: legacy /jz/orders POST reaches the shared handler only after authorization and schema readiness
+ok 11 - legacy /jz/orders POST reaches the shared handler only after authorization and schema readiness
+  ---
+  duration_ms: 15.32226
+  type: 'test'
+  ...
+# Subtest: old customer /jz/orders/:id preserves yuan and address fields without exposing payment routing
+ok 12 - old customer /jz/orders/:id preserves yuan and address fields without exposing payment routing
+  ---
+  duration_ms: 2.459731
+  type: 'test'
+  ...
+# Subtest: unmarked historic mini-program orders remain external without consulting a changed/deleted product
+ok 13 - unmarked historic mini-program orders remain external without consulting a changed/deleted product
+  ---
+  duration_ms: 0.46846
+  type: 'test'
+  ...
+# Subtest: the old signed vendor callback keeps code/message, fee units and lailai_oid alias
+ok 14 - the old signed vendor callback keeps code/message, fee units and lailai_oid alias
+  ---
+  duration_ms: 6.135879
+  type: 'test'
+  ...
+# Subtest: real refund execution preserves v1 request_no/submit/instrument envelope
+ok 15 - real refund execution preserves v1 request_no/submit/instrument envelope
+  ---
+  duration_ms: 0.772426
+  type: 'test'
+  ...
+# Subtest: real refund query preserves v1 remote_status/instrument/query_count and invokes only query action
+ok 16 - real refund query preserves v1 remote_status/instrument/query_count and invokes only query action
+  ---
+  duration_ms: 0.499154
+  type: 'test'
+  ...
+# Subtest: real refund retry preserves v1 retry_count/instrument and successful state never comes from a fake submit
+ok 17 - real refund retry preserves v1 retry_count/instrument and successful state never comes from a fake submit
+  ---
+  duration_ms: 0.585385
+  type: 'test'
+  ...
+# Subtest: refund compatibility propagates authoritative state failures without claiming success
+ok 18 - refund compatibility propagates authoritative state failures without claiming success
+  ---
+  duration_ms: 1.178343
+  type: 'test'
+  ...
+# Subtest: public reconciliation stays strict, including attempted legacy-option injection
+ok 19 - public reconciliation stays strict, including attempted legacy-option injection
+  ---
+  duration_ms: 8.406168
+  type: 'test'
+  ...
+# Subtest: only authenticated booking query jobs accept legacy sparse success
+ok 20 - only authenticated booking query jobs accept legacy sparse success
+  ---
+  duration_ms: 10.356621
+  type: 'test'
+  ...
+# Subtest: trusted sparse booking responses still reject every echoed mismatch
+ok 21 - trusted sparse booking responses still reject every echoed mismatch
+  ---
+  duration_ms: 14.157813
+  type: 'test'
+  ...
+# Subtest: notification is only a query hint and cannot itself enable sparse reconciliation
+ok 22 - notification is only a query hint and cannot itself enable sparse reconciliation
+  ---
+  duration_ms: 6.22679
+  type: 'test'
+  ...
+# Subtest: successful sparse creation always proceeds to an authoritative query for every business
+ok 23 - successful sparse creation always proceeds to an authoritative query for every business
+  ---
+  duration_ms: 37.480279
+  type: 'test'
+  ...
+# Subtest: refund identity distinguishes explicit refund ID and original payment ID
+ok 24 - refund identity distinguishes explicit refund ID and original payment ID
+  ---
+  duration_ms: 1.512074
+  type: 'test'
+  ...
+# Subtest: refund query allows sparse booking only and retains mismatched amount protection
+ok 25 - refund query allows sparse booking only and retains mismatched amount protection
+  ---
+  duration_ms: 1.779241
+  type: 'test'
+  ...
+# Subtest: merchantId never substitutes for a collecting merchantNo
+ok 26 - merchantId never substitutes for a collecting merchantNo
+  ---
+  duration_ms: 0.581139
+  type: 'test'
+  ...
+# Subtest: provider references preserve string IDs and never store rounded numeric order IDs
+ok 27 - provider references preserve string IDs and never store rounded numeric order IDs
+  ---
+  duration_ms: 1.205659
+  type: 'test'
+  ...
+# Subtest: payment service generates Shanghai XD order identifiers
+ok 28 - payment service generates Shanghai XD order identifiers
+  ---
+  duration_ms: 6.17313
+  type: 'test'
+  ...
+# Subtest: payment notification key is stable for a duplicate payload
+ok 29 - payment notification key is stable for a duplicate payload
+  ---
+  duration_ms: 1.326186
+  type: 'test'
+  ...
+# Subtest: business identity is reversible and monetary conversions are exact
+ok 30 - business identity is reversible and monetary conversions are exact
+  ---
+  duration_ms: 2.347087
+  type: 'test'
+  ...
+# Subtest: isolated MySQL payment concurrency and recovery
+    # Subtest: migration preserves 32-byte business IDs and nonunique history indexes
+    ok 1 - migration preserves 32-byte business IDs and nonunique history indexes
+      ---
+      duration_ms: 13.351084
+      type: 'test'
+      ...
+    # Subtest: same or different request keys converge under concurrent connections
+    ok 2 - same or different request keys converge under concurrent connections
+      ---
+      duration_ms: 1044.785615
+      type: 'test'
+      ...
+    # Subtest: identical business numbers in different categories never share payments
+    ok 3 - identical business numbers in different categories never share payments
+      ---
+      duration_ms: 1186.629931
+      type: 'test'
+      ...
+    # Subtest: reused request stays bound to the old attempt after it closes
+    ok 4 - reused request stays bound to the old attempt after it closes
+      ---
+      duration_ms: 741.199444
+      type: 'test'
+      ...
+    # Subtest: cancelled guard prevents replay and locally unsent orders need no gateway close
+    ok 5 - cancelled guard prevents replay and locally unsent orders need no gateway close
+      ---
+      duration_ms: 882.884805
+      type: 'test'
+      ...
+    # Subtest: lost creation response queries original ID and never creates another payment
+    ok 6 - lost creation response queries original ID and never creates another payment
+      ---
+      duration_ms: 1424.435546
+      type: 'test'
+      ...
+    # Subtest: notification arriving during a terminal query is not lost
+    ok 7 - notification arriving during a terminal query is not lost
+      ---
+      duration_ms: 1043.459777
+      type: 'test'
+      ...
+    # Subtest: query not found while a creation is in flight cannot release the guard
+    ok 8 - query not found while a creation is in flight cannot release the guard
+      ---
+      duration_ms: 1134.580437
+      type: 'test'
+      ...
+    # Subtest: notification is a hint; forged success cannot mark payment paid
+    ok 9 - notification is a hint; forged success cannot mark payment paid
+      ---
+      duration_ms: 944.501156
+      type: 'test'
+      ...
+    # Subtest: successful evidence requires matching amount and merchant
+    ok 10 - successful evidence requires matching amount and merchant
+      ---
+      duration_ms: 869.593148
+      type: 'test'
+      ...
+    # Subtest: duplicate success after fulfillment never triggers an automatic refund
+    ok 11 - duplicate success after fulfillment never triggers an automatic refund
+      ---
+      duration_ms: 1007.027282
+      type: 'test'
+      ...
+    # Subtest: event failures recover and preserve per-order received-before-accepted order
+    ok 12 - event failures recover and preserve per-order received-before-accepted order
+      ---
+      duration_ms: 736.925886
+      type: 'test'
+      ...
+    # Subtest: concurrent partial refunds reserve the original payment amount once
+    ok 13 - concurrent partial refunds reserve the original payment amount once
+      ---
+      duration_ms: 971.627244
+      type: 'test'
+      ...
+    # Subtest: closed-order late success refunds once without creating fulfillment
+    ok 14 - closed-order late success refunds once without creating fulfillment
+      ---
+      duration_ms: 1464.528882
+      type: 'test'
+      ...
+    # Subtest: paid or refunded original order can never be charged again
+    ok 15 - paid or refunded original order can never be charged again
+      ---
+      duration_ms: 1962.009371
+      type: 'test'
+      ...
+    # Subtest: registration does not overwrite a previously closed guard
+    ok 16 - registration does not overwrite a previously closed guard
+      ---
+      duration_ms: 773.835054
+      type: 'test'
+      ...
+    # Subtest: pausing new payments preserves settlement and hides existing cashier links
+    ok 17 - pausing new payments preserves settlement and hides existing cashier links
+      ---
+      duration_ms: 818.058892
+      type: 'test'
+      ...
+    1..17
+ok 31 - isolated MySQL payment concurrency and recovery
+  ---
+  duration_ms: 19048.523461
+  type: 'test'
+  ...
+1..31
+# tests 79
+# suites 0
+# pass 79
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 104284.621105

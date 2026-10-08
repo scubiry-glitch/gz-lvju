@@ -86,7 +86,7 @@ strong{color:#111827}
 </tbody>
 </table>
 <blockquote>
-<p>管理台默认密钥：<code>dev-juzhu-key</code>（正式环境使用分配的生产密钥，通过环境变量 <code>API_KEY</code> 配置）。</p>
+<p>管理接口凭据：账号登录会话（<code>POST /api/auth/login</code> → <code>Authorization: Bearer &lt;token&gt;</code>）或机器账号 API Key（管理面分配，经环境变量 <code>JUZHU_API_KEY</code> 配置）。历史开发默认密钥 <code>dev-juzhu-key</code> 已全面停用，任何环境均拒绝。</p>
 </blockquote>
 <hr />
 <h2 id="2">2. 接口总览</h2>
@@ -633,8 +633,8 @@ strong{color:#111827}
 <h2 id="3">3. 认证方式</h2>
 <h3 id="31-api-key">3.1 API Key（管理台 / 订单流）</h3>
 <p>请求头二选一：</p>
-<pre><code>Authorization: Bearer dev-juzhu-key
-X-API-Key: dev-juzhu-key
+<pre><code>Authorization: Bearer &lt;账号会话 token&gt;
+X-API-Key: &lt;机器账号 API Key&gt;
 </code></pre>
 <p>未通过校验返回：</p>
 <pre><code class="language-json">{ &quot;error&quot;: &quot;unauthorized&quot;, &quot;message&quot;: &quot;请通过 Authorization: Bearer &lt;API_KEY&gt; 或 X-API-Key 传入有效 API Key&quot; }

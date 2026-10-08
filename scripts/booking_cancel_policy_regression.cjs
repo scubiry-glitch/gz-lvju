@@ -87,7 +87,7 @@ function dateStr(offsetDays) {
   console.log(`vendor: #${vendor.id} ${vendor.name}（${vendor.type}）· 测试手机 ${phone} · 入住 ${checkin}\n`);
 
   // ── 造数：已开通按晚预订的 rental 项目 + 3 房型（A 默认窗口 / B 已过窗口 / C 未开通）──
-  const projExt = JSON.stringify({ stay_bookable: true });
+  const projExt = JSON.stringify({ online_booking: true, online_payment: false });
   const [pins] = await conn.execute(
     `INSERT INTO projects(city_id, channel, name, slug, address, tags, status, rating_status, owner_vendor_id, ext, unit_count)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,

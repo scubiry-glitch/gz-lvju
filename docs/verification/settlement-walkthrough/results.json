@@ -1,0 +1,297 @@
+{
+  "run_id": "settlement-walkthrough-v1",
+  "origin": "https://sytest.meizu.life",
+  "read_only": false,
+  "checks": [
+    "six-real-logins-and-party-scope",
+    "all-admin-tabs-have-persisted-data",
+    "browser-adjustment-amount-time-account-independent-review",
+    "same-key-adjustment-replay",
+    "unknown-query-keeps-original-provider-request",
+    "merchant-external-evidence-independent-verification",
+    "merchant-promoter-platform-statement-isolation",
+    "browser-downloads-real-csv-xlsx-pdf",
+    "mobile-without-horizontal-page-overflow"
+  ],
+  "requests": [
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer2",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/items/52",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/accounts",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "POST",
+      "path": "/admin/items/52/adjustments/preview",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "POST",
+      "path": "/admin/items/52/adjustments",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/admin/approval-tasks",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "POST",
+      "path": "/admin/approval-tasks/ea8a5af5-4c9d-4b1f-b40c-e6c9f10f8af5/actions",
+      "status": 200
+    },
+    {
+      "role": "reviewer2",
+      "method": "GET",
+      "path": "/admin/approval-tasks",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/items/52",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "POST",
+      "path": "/admin/items/52/adjustments",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/execution-orders",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "POST",
+      "path": "/admin/execution-orders/3af0df65-4df3-4fd6-85c0-97694a5a4850/query",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/execution-orders",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/execution-orders",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/execution-orders",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/external-evidence",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/external-evidence-submissions",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "POST",
+      "path": "/admin/external-evidence/23d6ba2e-33b7-4eff-a371-d5895bbf8ded/reviews",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/external-evidence",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/59fa8140-1016-4d2e-ad30-e7e3c5c47ad2",
+      "status": 403
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/59fa8140-1016-4d2e-ad30-e7e3c5c47ad2",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 403
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/8043f7bc-612c-4ec8-951a-2c48fb3300d3",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 403
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/98192576-4ede-4eb2-a5fc-3d1510ad79d0",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/7a9cb4a9-1c5e-4f02-a1db-fb72fbd08ca0",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/7a9cb4a9-1c5e-4f02-a1db-fb72fbd08ca0",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/7a9cb4a9-1c5e-4f02-a1db-fb72fbd08ca0",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/statement-exports/0d46493c-107c-4f88-9c7d-503837566629",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "POST",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd/exports",
+      "status": 200
+    }
+  ],
+  "started_at": "2026-10-01T20:09:28.259Z",
+  "finished_at": "2026-10-01T20:10:06.143Z",
+  "passed": true,
+  "screenshots": [
+    "images/live/01-admin-items.png",
+    "images/live/02-adjustment-preview.png",
+    "images/live/03-reviewer-approval.png",
+    "images/live/04-statements-merchant.png",
+    "images/live/04-statements-promoter.png",
+    "images/live/04-statements-platform.png",
+    "images/live/05-statement-detail-downloads.png",
+    "images/live/06-statements-mobile.png"
+  ],
+  "downloads": [
+    {
+      "format": "csv",
+      "path": "downloads/statement-csv.csv",
+      "bytes": 5283,
+      "sha256": "642348f2ac321f7f5985efd15ed966ddebda20b7bfd4506039a94d9bb7ccde43"
+    },
+    {
+      "format": "xlsx",
+      "path": "downloads/statement-xlsx.xlsx",
+      "bytes": 10233,
+      "sha256": "dd4995d1cc0c6cf81081b97a8487d01b06b044f2215e2053ae161186d5538198"
+    },
+    {
+      "format": "pdf",
+      "path": "downloads/statement-pdf.pdf",
+      "bytes": 83062,
+      "sha256": "61d780530637d37d2003078bd088313e55139e7ba675e13294703c00704c983b"
+    }
+  ]
+}

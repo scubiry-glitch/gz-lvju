@@ -20,17 +20,25 @@
   'use strict';
 
   var TOKEN_KEY = 'BZF_SESSION_TOKEN';
+  // 旅居 App 系列（lvju-app-*）历史存同一账号中心会话于 BJZ_TOKEN。
+  // 会话本体同源（authCenter sessions 表），这里双读双写，保证跨系列登录态互通。
+  var LEGACY_KEYS = ['BJZ_TOKEN'];
   var overlayEl = null;
   var pending = [];      // 等登录后重放的 {resolve, reject, input, init}
   var overlayOpen = false;
 
   function token() {
-    try { return (localStorage.getItem(TOKEN_KEY) || '').trim(); } catch (_) { return ''; }
+    try {
+      var t = (localStorage.getItem(TOKEN_KEY) || '').trim();
+      for (var i = 0; !t && i < LEGACY_KEYS.length; i++) t = (localStorage.getItem(LEGACY_KEYS[i]) || '').trim();
+      return t;
+    } catch (_) { return ''; }
   }
   function setToken(t) {
     try {
-      if (t) localStorage.setItem(TOKEN_KEY, String(t).trim());
-      else localStorage.removeItem(TOKEN_KEY);
+      var v = t ? String(t).trim() : '';
+      var keys = [TOKEN_KEY].concat(LEGACY_KEYS);
+      for (var i = 0; i < keys.length; i++) { if (v) localStorage.setItem(keys[i], v); else localStorage.removeItem(keys[i]); }
     } catch (_) {}
   }
 

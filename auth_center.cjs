@@ -707,16 +707,56 @@ function clientIp(req) {
   return xf || (req && req.socket && req.socket.remoteAddress) || '';
 }
 
+function cookieOf(req, name) {
+  const raw = String((req && req.headers && req.headers.cookie) || '');
+  if (!raw || !name) return '';
+  const parts = raw.split(';');
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const eq = p.indexOf('=');
+    if (eq < 0) continue;
+    if (p.slice(0, eq).trim() !== name) continue;
+    try { return decodeURIComponent(p.slice(eq + 1).trim()); } catch (_) {
+      return p.slice(eq + 1).trim();
+    }
+  }
+  return '';
+}
+
+function lianjiaTokenOf(req) {
+  // C 端身份只认 Cookie lianjia_token（不读 X-Lianjia-Token）
+  return cookieOf(req, 'lianjia_token') || cookieOf(req, 'lj_token') || '';
+}
+
 /**
  * 解析请求主体。返回：
  *   { type:'account', account, roles }   会话或机器账号（scope 见 roles[].scope）
  *   { type:'legacy' }                    旧全局 JUZHU_API_KEY（过渡期：admin 域只读）
  *   null                                 匿名/无效
+ *
+ * 分流：
+ *   - 管理台 / B 端 / 密码旁路：Authorization Bearer 会话（或 API Key）—— 不走 cookie 身份
+ *   - C 端 H5：仅 Cookie `lianjia_token` 验票→ucid→accounts（不读 X-Lianjia-Token、不换 BJZ）
  */
 async function principalOf(req) {
   const d = di();
+  const ip = clientIp(req);
+  const ua = (req && req.headers && req.headers['user-agent']) || '';
+
+  // 其它端：有 Bearer 先认会话，避免浏览器残留 lianjia_token cookie 抢身份
   const sess = await verifySessionToken(bearerToken(req));
-  if (sess) return { type: 'account', ip: clientIp(req), ua: req.headers['user-agent'] || '', ...sess };
+  if (sess) return { type: 'account', ip, ua, ...sess };
+
+  // C 端：只读 Cookie
+  const lj = lianjiaTokenOf(req);
+  if (lj && typeof d.resolveLianjiaToken === 'function') {
+    const full = await d.resolveLianjiaToken(lj, req).catch(() => null);
+    if (full && full.account) {
+      return { type: 'account', via: 'lianjia_token', ip, ua, account: full.account, roles: full.roles };
+    }
+    return null;
+  }
+
   const key = apiKeyOf(req);
   if (!key) return null;
   // 机器账号 key（只存哈希，timingSafe 比对）
@@ -727,11 +767,11 @@ async function principalOf(req) {
   );
   if (rows.length) {
     const full = await getAccountWithRoles(rows[0].id);
-    return { type: 'account', via: 'api-key', ip: clientIp(req), ua: req.headers['user-agent'] || '', ...full };
+    return { type: 'account', via: 'api-key', ip, ua, ...full };
   }
   // 旧全局 key（过渡兼容）
   if (d.expectedApiKey() && timingSafeEq(sha256Hex(key), sha256Hex(d.expectedApiKey()))) {
-    return { type: 'legacy', ip: clientIp(req) };
+    return { type: 'legacy', ip };
   }
   return null;
 }

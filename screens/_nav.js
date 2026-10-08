@@ -56,6 +56,25 @@
 
   // ============ 6 系列定义（单一数据源） ============
   const SERIES = {
+    // 权益工作台（2026-10-02 拍板：commerce 前端「彻底自含」——38 个工作台/演示页改挂
+    // screens/_commerce-nav.js（域内完整菜单 + 权限裁剪），本系列只保留模块入口目录。
+    // 页面 + _commerce-nav.js + overview.html 三者仍须同 commit 同步（CLAUDE.md 规则 1 例外条款）。
+    commerce: {
+      name: '新居住 · 权益工作台', short: '券包与会员 · 业务中心', icon: '券',
+      primary: '#0f766e', primaryDeep: '#0b5d56',
+      user: { avatar: '券', name: '权益业务中心', org: '使用新居住账号与授权范围' },
+      groups: [{name:'业务入口',items:[
+        {id:'consumer',label:'生活权益',href:'../juzhu-commerce.html',icon:'wallet'},
+        {id:'vouchers',label:'选券页 · 用户端',href:'../juzhu-vouchers.html?city=贵阳',icon:'search'},
+        {id:'hotels',label:'酒店通兑名录',href:'../juzhu-hotels.html?city=贵阳',icon:'search'},
+        {id:'promoter',label:'权益推广',href:'../juzhu-promoter.html',icon:'radio'},
+        {id:'merchant',label:'商户中心',href:'commerce-merchant.html',icon:'check',perms:['commerce.merchant.read']},
+        {id:'admin',label:'运营概览',href:'commerce-admin.html',icon:'chart',perms:['commerce.admin.read']},
+        {id:'unified-settlement',label:'统一结算工作台',href:'settlement-admin.html',icon:'bank',perms:['settlement.fund.read','settlement.approval.act','settlement.policy.write','settlement.external.import','settlement.external.review']},
+        {id:'settlement-statements',label:'收款方对账单',href:'settlement-statements.html',icon:'file',perms:['settlement.statement.read']},
+        {id:'demo-accounts',label:'演示账号',href:'commerce-demo-accounts.html',icon:'book'},
+      ]}],
+    },
     // 贵州旅居 C 端（贝壳旅居 App 原型 · 数据统一读 /api/juzhu/catalog）
     lvju: {
       name: '旅居找房 App（C 端）', short: '旅居 · C 端移动原型', icon: '🏔',
@@ -90,12 +109,13 @@
           { id: 'journey',         label: '全链路旅程与需求范围', href: 'lvju-journey.html', icon: 'map' },
         ]},
       ],
+      /* 移动 tabbar 实际由 _navmobile.js MOBILE.lvju 挂载（on/off SVG）；此处仅作桌面侧栏/总览镜像 */
       tabbar: [
-        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: '🏠' },
-        { id: 'search', label: '找房', href: 'lvju-app-search.html',   icon: '🔎' },
-        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: '📖' },
-        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: '🧾' },
-        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: '👤' },
+        { id: 'home',   label: '首页', href: 'lvju-app-home-demo.html', icon: 'home' },
+        { id: 'search', label: '找房', href: 'lvju-app-search.html',    icon: 'search' },
+        { id: 'spots',  label: '内容', href: 'lvju-app-spots.html',     icon: 'book' },
+        { id: 'orders', label: '订单', href: 'lvju-app-orders.html',    icon: 'list' },
+        { id: 'me',     label: '我的', href: 'lvju-app-me.html',        icon: 'user' },
       ],
     },
 
@@ -206,6 +226,7 @@
           { id: 'credit-engine',   label: '信用规则引擎',        href: 'p-credit-engine.html', icon: 'cpu',      badge: '42' },
           { id: 'data-hub',        label: '数据中台',            href: 'p-data-hub.html',      icon: 'plug',     badge: '24/7' },
           { id: 'account-center',  label: '账号中心',            href: 'account-center.html',  icon: 'user',     badge: 'IAM', perms: ['iam.read', 'audit.read'] },
+          { id: 'demo-accounts',   label: '演示账号速查',        href: 'demo-accounts.html',   icon: 'user',     badge: '6' },
           { id: 'workflow',        label: 'BPMN 工作流引擎',     href: 'p-workflow.html',      icon: 'layers',   badge: '18' },
           { id: 'webhooks',        label: '事件总线 · Webhook',  href: 'p-webhooks.html',      icon: 'radio',    badge: '38', perms: ['admin.read'] },
           { id: 'api-gateway',     label: 'API 网关',            href: 'p-api-gateway.html',   icon: 'settings', badge: '86', perms: ['admin.read'] },
@@ -228,6 +249,7 @@
           { id: 'b-whitelist',     label: '★ 白名单审定 + 同业开放', href: 'p-b-whitelist.html',         icon: 'check' },
           { id: 'vendor-onboarding', label: '商家入驻受理（房源）', href: 'p-vendor-onboarding.html',  icon: 'plug', perms: ['vendor.onboarding.review'] },
           { id: 'vendor-rates',      label: '商家费率（抽佣分档）',   href: 'p-vendor-rates.html',      icon: 'coin', perms: ['vendor.fund.write'] },
+          { id: 'vendor-access',     label: '商家接入配置（webhook/密钥）', href: 'p-vendor-access.html', icon: 'settings', perms: ['vendor.config.write'] },
           { id: 'rating-review',   label: '🐚 房源评级复核 · AI引擎', href: 'p-rating-review.html',       icon: 'star',   badge: '23' },
           { id: 'b-rating',        label: '好房子评级录入 ↗',        href: 'b-house-rating-input.html',  icon: 'star' },
           { id: 'b-console',       label: 'B 运营商工作台 ↗',        href: 'b-operator-console.html',    icon: 'home' },
@@ -331,6 +353,7 @@
           { id: 'open-platform', label: '开放平台门户',        href: 'open-platform.html',            icon: 'plug' },
           { id: 'vendor-onboarding', label: '商家入驻申请', href: 'vendor-onboarding.html',    icon: 'user' },
           { id: 'intake-api',    label: '房源接入 API（调试台）', href: 'property-intake-api.html',    icon: 'plug' },
+          { id: 'api-changelog', label: '★ 房源接口变更说明（2026-09）', href: 'housing-api-changelog.html', icon: 'book' },
           { id: 'juzhu-api',     label: '本地生活 API 文档',    href: '../api-doc.html',               icon: 'book' },
           { id: 'moving-guide',  label: '搬家接入指引',         href: '../moving-vendor-guide.html',   icon: 'truck' },
           { id: 'vendor-manual', label: '商家运营手册',         href: '本地生活运营服务商操作手册.html', icon: 'book' },
@@ -352,7 +375,7 @@
         { name: '三大标准', items: [
           { id: 'people-standard',   label: '人的标准 · 服务者认证体系',        href: 'd-people-standard.html',   icon: 'user' },
           { id: 'property-standard', label: '房的标准 · 好房子四维度+综合星级',  href: 'd-property-standard.html', icon: 'star' },
-          { id: 'org-standard',      label: '机构的标准 · 五类机构生态',         href: 'd-org-standard.html',      icon: 'box' },
+          { id: 'org-standard',      label: '机构的标准 · 四类机构生态',         href: 'd-org-standard.html',      icon: 'box' },
         ]},
         { name: '专题', collapsed: true, items: [
           { id: 'research-platform', label: '研判中台 · ' + R.operator + '数据资产输出', href: 'd-research-platform.html', icon: 'cpu' },

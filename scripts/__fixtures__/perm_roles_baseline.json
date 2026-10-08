@@ -12,8 +12,10 @@
       "admin.write",
       "audit.read",
       "rating.review",
+      "vendor.config.write",
       "vendor.fund.write",
-      "vendor.onboarding.review"
+      "vendor.onboarding.review",
+      "vendor.review"
     ]
   },
   "holding_viewer": {
@@ -32,8 +34,10 @@
       "order.dispatch",
       "org.read",
       "org.write",
+      "vendor.config.write",
       "vendor.fund.write",
       "vendor.onboarding.review",
+      "vendor.review",
       "worker.manage"
     ]
   },

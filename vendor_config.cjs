@@ -77,4 +77,11 @@ async function loadVendorConfigFromDb(getConn) {
   }
 }
 
-module.exports = { parseVendorConfig, loadVendorConfig, loadVendorConfigFromDb };
+// 缓存失效：admin「商家接入配置」改 hmac_key / url_link / order_detail_url 后调用，
+// 下次请求重读表（webhook 投递侧不消费此缓存，直读表，不受影响）。
+function resetVendorConfigCache() {
+  _VENDOR_DB_CACHE = null;
+  _VENDOR_DB_LOADING = null;
+}
+
+module.exports = { parseVendorConfig, loadVendorConfig, loadVendorConfigFromDb, resetVendorConfigCache };

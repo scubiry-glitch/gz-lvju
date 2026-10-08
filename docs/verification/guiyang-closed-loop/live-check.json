@@ -1,0 +1,57 @@
+{
+  "at": "2026-09-19T16:27:15.401Z",
+  "origin": "http://127.0.0.1:38780 (Host: sytest.meizu.life)",
+  "checks": [
+    {
+      "name": "Live commerce API is the M1-A payment-disabled service",
+      "ok": true,
+      "detail": "{\"mode\":\"mysql-m1a\",\"payment_enabled\":false,\"version\":\"M1-A\",\"authentication\":\"account-center\"}"
+    },
+    {
+      "name": "Platform admin signs in through the account centre",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Account centre session reaches the commerce API",
+      "ok": true,
+      "detail": "1 permissions"
+    },
+    {
+      "name": "Operations stats aggregates issuance, appointments, redemption, exchange and after-sales",
+      "ok": true,
+      "detail": "coupons=6 redeemed=0 codes=2 cases=0"
+    },
+    {
+      "name": "Redemption record query works with a clean empty state",
+      "ok": true,
+      "detail": "0 redeemed on live (capability proven on isolated database)"
+    },
+    {
+      "name": "Published demo product available for issuance",
+      "ok": true,
+      "detail": "日常保洁 · 2小时 · 单品券（演示）"
+    },
+    {
+      "name": "Batch issuance returns distinct one-time codes",
+      "ok": true,
+      "detail": "2 codes for 日常保洁 · 2小时 · 单品券（演示）"
+    },
+    {
+      "name": "Issued codes can be disabled before use",
+      "ok": true,
+      "detail": "2 codes disabled"
+    },
+    {
+      "name": "Disabled codes leave the unused state",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Disabled codes remain auditable in the console",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "issued_note": "线上验证所发码已全部停用，不构成可兑换凭证；兑换记录能力由隔离库 34 项验收覆盖"
+}

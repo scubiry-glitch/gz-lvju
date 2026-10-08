@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: real settlement runtime and HTTP work on Date-returning isolated MySQL
+    # Subtest: runtime normalizes an existing pooled session back to UTC before SQL
+    ok 1 - runtime normalizes an existing pooled session back to UTC before SQL
+      ---
+      duration_ms: 14.602332
+      type: 'test'
+      ...
+    # Subtest: external automatic sync and monthly publication require no institution execution mapping
+    ok 2 - external automatic sync and monthly publication require no institution execution mapping
+      ---
+      duration_ms: 639.792449
+      type: 'test'
+      ...
+    # Subtest: HTTP write replay and actual worker export revalidate current identity
+    ok 3 - HTTP write replay and actual worker export revalidate current identity
+      ---
+      duration_ms: 442.706577
+      type: 'test'
+      ...
+    # Subtest: approved external contract, maker checker and both debt-party policies integrate through HTTP
+    ok 4 - approved external contract, maker checker and both debt-party policies integrate through HTTP
+      ---
+      duration_ms: 589.394323
+      type: 'test'
+      ...
+    # Subtest: paid life-service acceptance creates exact obligations once and adjustments flow to a statement
+    ok 5 - paid life-service acceptance creates exact obligations once and adjustments flow to a statement
+      ---
+      duration_ms: 612.241397
+      type: 'test'
+      ...
+    1..5
+ok 1 - real settlement runtime and HTTP work on Date-returning isolated MySQL
+  ---
+  duration_ms: 22173.423777
+  type: 'test'
+  ...
+# Subtest: approved arithmetic uses exact minor units and explicit fixed cost
+ok 2 - approved arithmetic uses exact minor units and explicit fixed cost
+  ---
+  duration_ms: 4.201015
+  type: 'test'
+  ...
+# Subtest: unified workflow uses isolated MySQL and actual shared migrations
+    # Subtest: scope follows the role granting each permission, including on idempotent replay
+    ok 1 - scope follows the role granting each permission, including on idempotent replay
+      ---
+      duration_ms: 414.66225
+      type: 'test'
+      ...
+    # Subtest: maker checker and sequential ALL/ANY approval
+    ok 2 - maker checker and sequential ALL/ANY approval
+      ---
+      duration_ms: 529.689993
+      type: 'test'
+      ...
+    # Subtest: adjustment preserves paid history, invalidates stale approval and returns visible balances
+    ok 3 - adjustment preserves paid history, invalidates stale approval and returns visible balances
+      ---
+      duration_ms: 748.197459
+      type: 'test'
+      ...
+    # Subtest: parallel AUTO grants include earlier unspent authorizations in cumulative cap
+    ok 4 - parallel AUTO grants include earlier unspent authorizations in cumulative cap
+      ---
+      duration_ms: 422.776065
+      type: 'test'
+      ...
+    # Subtest: positive amendments use approved own funds and cannot promise the same cash twice
+    ok 5 - positive amendments use approved own funds and cannot promise the same cash twice
+      ---
+      duration_ms: 537.78
+      type: 'test'
+      ...
+    # Subtest: Q waits for B receipt; retry binds an actual commission lot before authorization
+    ok 6 - Q waits for B receipt; retry binds an actual commission lot before authorization
+      ---
+      duration_ms: 200.201203
+      type: 'test'
+      ...
+    # Subtest: ledger deduplicates immutable events and reports balance errors
+    ok 7 - ledger deduplicates immutable events and reports balance errors
+      ---
+      duration_ms: 137.54282
+      type: 'test'
+      ...
+    # Subtest: disabling a policy revokes unspent authorization and supersedes pending review
+    ok 8 - disabling a policy revokes unspent authorization and supersedes pending review
+      ---
+      duration_ms: 385.469061
+      type: 'test'
+      ...
+    # Subtest: configuration maker checker and frozen order profile
+    ok 9 - configuration maker checker and frozen order profile
+      ---
+      duration_ms: 151.986016
+      type: 'test'
+      ...
+    # Subtest: paid life order is recognized only once on customer acceptance
+    ok 10 - paid life order is recognized only once on customer acceptance
+      ---
+      duration_ms: 468.805155
+      type: 'test'
+      ...
+    1..10
+ok 3 - unified workflow uses isolated MySQL and actual shared migrations
+  ---
+  duration_ms: 17225.293324
+  type: 'test'
+  ...
+1..3
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 40506.308641

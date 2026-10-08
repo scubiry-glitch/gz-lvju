@@ -91,7 +91,7 @@ function checkState(j, key, state) {
   const [pins] = await conn.execute(
     `INSERT INTO projects(city_id, channel, name, slug, tags, status, rating_status, owner_vendor_id, contact_phone, ext, unit_count)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [cities[0].id, 'rental', '自查回归房-' + RUN, RUN, JSON.stringify(['演示']), 'online', 'passed', vidA, TP, JSON.stringify({ stay_bookable: true }), 1]
+    [cities[0].id, 'rental', '自查回归房-' + RUN, RUN, JSON.stringify(['演示']), 'online', 'passed', vidA, TP, JSON.stringify({ online_booking: true, online_payment: false }), 1]
   );
   const pid = pins.insertId;
   await conn.execute(
@@ -123,7 +123,7 @@ function checkState(j, key, state) {
     check('全通过 → ready=true', j.ready === true && j.failed_count === 0, 'failed=' + j.failed_count + ' warns=' + j.warn_count);
     ['qualification', 'active', 'settlement', 'housing_approved', 'housing_online', 'units_complete', 'contact', 'photos'].forEach((k) =>
       check('  必须项通过 ' + k, checkState(j, k, 'pass'), JSON.stringify((j.checks || []).filter((x) => x.key === k)[0] || {})));
-    check('按晚预订通过（stay_bookable）', checkState(j, 'stay_bookable', 'pass'));
+    check('房源交易能力通过（兼容检查键 stay_bookable）', checkState(j, 'stay_bookable', 'pass'));
     check('取消政策通过（cancel_policy）', checkState(j, 'cancel_policy', 'pass'));
     check('费率未差异化 → warn（按基准）', checkState(j, 'commission', 'warn'));
     check('未接开放接口 → warn（hmac）', checkState(j, 'hmac', 'warn'));

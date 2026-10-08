@@ -384,6 +384,13 @@ window.JUZHU = (function () {
     if (_settings && !_settings.show_life_service) {
       list = list.filter(function(c) { return c.id !== 'jiazheng'; });
     }
+    var hidden = cache && cache.hidden_home_tabs;
+    if (typeof hidden === 'string') {
+      try { hidden = JSON.parse(hidden); } catch (e) { hidden = []; }
+    }
+    if (Array.isArray(hidden) && hidden.length) {
+      list = list.filter(function(c) { return hidden.indexOf(c.id) < 0; });
+    }
     return list.filter(function(c) { return c.enabled !== 0; })
       .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
   }
@@ -394,6 +401,10 @@ window.JUZHU = (function () {
    */
   function thumbUrl(src) {
     if (!src) return src;
+    // 2026-09 起服务端 catalog 出参已由 img_thumbs.mapThumbsDeep 改写为 .t240/.t640.webp
+    // （仅当缩略图文件存在时才改写）——这类路径保证可访问，直接用，不再叠加 thumbs/ 映射，
+    // 否则会拼出 thumbs/xxx.t640.webp（404，图全挂）。
+    if (/\.t(240|640)\.webp$/i.test(src)) return src;
     // Only thumbnail images under assets/juzhu/{city}/
     var m = src.match(/^(assets\/juzhu\/[^/]+\/)(.*)/);
     if (!m) return src;
