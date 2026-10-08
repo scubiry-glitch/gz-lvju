@@ -26,7 +26,7 @@ test('local service uses only the cash difference and full exchange creates no p
     const originalOrder=crypto.randomUUID();
     await pool.execute("INSERT INTO commerce_orders(id,account_id,city_id,product_kind,product_id,product_version,amount_minor,status,expires_at,snapshot,payment_status,paid_payment_order_id) VALUES(?,101,3,'skus',1,1,17809,'fulfilled','2099-01-01',?,'paid',55)",[originalOrder,JSON.stringify({settlement_profiles:{1:{source_account_id:'source-account'}}})]);
     const exchange=crypto.randomUUID(),offset=crypto.randomUUID();
-    const base={name:'服务权益',use_domains:['booking','jiazheng'],use_vendor_ids:[1],booking_project_ids:[301],life_product_ids:[201]};
+    const base={name:'服务权益',use_domains:['booking','jiazheng'],use_vendor_ids:[1],use_vendor_contracts:{1:{merchant_id:1,contract_ref:'C-1'}},booking_project_ids:[301],life_product_ids:[201]};
     for(const [id,unit,face,mode] of [[exchange,1,12809,'exchange'],[offset,2,5000,'amount_offset']])
       await pool.execute("INSERT INTO commerce_coupons(id,order_id,item_id,unit_no,account_id,merchant_id,store_id,city_id,status,expires_at,allocation_minor,snapshot) VALUES(?,?,1,?,101,1,1,3,'available','2099-01-01',?,?)",[id,originalOrder,unit,face,JSON.stringify({sku:{...base,use_mode:mode,...(mode==='exchange'?{exchange_contract_minor:12809}:{})}})]);
     business.captureProfile=async()=>({party_id:'target-party',source_account_id:'source-account',collection:{source_merchant_no:'merchant-1'},calculation:{mode:'PROPORTIONAL',rounding:'FLOOR_BPS_V1',commission_bps:1000}});

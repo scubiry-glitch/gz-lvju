@@ -36,7 +36,7 @@ function createBookingRouter(deps) {
       const t1 = Date.now();
       const rows = await queryRows(
         `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, p.name AS project_name,
-                b.checkin, b.checkout, b.nights, b.rooms, b.price_total, b.status, b.created_at,
+                b.checkin, b.checkout, b.nights, b.rooms, b.price_total, b.coupon_minor, b.cash_due_minor, b.status, b.created_at,
                 b.pay_status, b.pay_method,
                 b.contact_name, b.contact_phone, uu.ext AS unit_ext
          FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
@@ -67,6 +67,8 @@ function createBookingRouter(deps) {
           const cancelInfo = orderCancelInfoOf(cpUnit, o);
           return Object.assign({}, o, {
             price_total: Number(o.price_total),
+            coupon_minor: Number(o.coupon_minor || 0),
+            cash_due_minor: Number(o.cash_due_minor ?? Math.round(Number(o.price_total) * 100)),
             contact_phone: maskPhoneStd(o.contact_phone),
             contact_phone_masked: maskPhoneStd(o.contact_phone), // 别名：与 /booking/lookup 出参字段对齐
             contact_phone_raw: o.contact_phone, // 本人订单，取消/支付接口需要原号
@@ -139,20 +141,20 @@ function createBookingRouter(deps) {
       if (!sess?.account || sess.account.idp_type !== 'beike') return jsonReply(res,{error:'请先登录贝壳账号'},401);
       const body=await readBody(req),projectId=Number(body.project_id),unitId=body.unit_id?Number(body.unit_id):null;
       const checkin=String(body.checkin||''),checkout=String(body.checkout||''),rooms=unitId?Number(body.rooms||1):1;
-      if(!Number.isSafeInteger(projectId)||projectId<=0||unitId!=null&&(!Number.isSafeInteger(unitId)||unitId<=0)||!stayCfg.isValidDateString(checkin)||!stayCfg.isValidDateString(checkout)||checkin>=checkout||!Number.isInteger(rooms)||rooms<1||rooms>99)return jsonReply(res,{error:'请先选择有效项目、日期和间数'},400);
+      const nights=stayCfg.bookingNights(checkin,checkout);
+      if(!Number.isSafeInteger(projectId)||projectId<=0||unitId!=null&&(!Number.isSafeInteger(unitId)||unitId<=0)||!nights||!Number.isInteger(rooms)||rooms<1||rooms>99)return jsonReply(res,{error:`请先选择有效项目、日期和间数（最多 ${stayCfg.MAX_BOOKING_NIGHTS} 晚）`},400);
       const conn=await mysql2.createConnection(getDbConfig());
       try{
         const [[proj]]=await conn.execute("SELECT id,channel,city_id,owner_vendor_id,status,rating_status,price_from,ext,tags FROM projects WHERE id=?",[projectId]);
         if(!proj||!['rental','minsu'].includes(proj.channel)||proj.status!=='online'||proj.rating_status!=='passed'||!transactionCapabilitiesOf(proj).online_payment)return jsonReply(res,{error:'该项目暂不能在线用券'},409);
         const [units]=unitId?await conn.execute('SELECT * FROM units WHERE id=? AND project_id=?',[unitId,projectId]):[[]];
         if(unitId&&!units.length)return jsonReply(res,{error:'房型不属于该项目'},400);
-        const nights=Math.round((Date.parse(checkout)-Date.parse(checkin))/864e5);
         const stayUnit=units[0]||await fallbackUnitRowFor(connExec(conn),unitId,projectId);
         if(nights<minStayNightsOf(proj,stayUnit))return jsonReply(res,{error:'入住天数不足'},409);
         const night=await stayNightPrices(async(sql,p)=>(await conn.execute(sql,p))[0],proj,units[0]||wholeHousePriceUnit(proj,stayUnit),unitId,checkin,checkout);
         const grossMinor=Math.round(night.total*rooms*100);
         if(!Number.isSafeInteger(grossMinor)||grossMinor<=0)return jsonReply(res,{error:'该项目暂无有效价格'},409);
-        const quotes=await require('../../commerce/coupon-application.cjs').listQuotes(conn,{accountId:sess.account.id,bizType:'booking',cityId:proj.city_id,vendorId:proj.owner_vendor_id,itemId:projectId,grossMinor,unitCount:nights*rooms});
+        const quotes=await require('../../commerce/coupon-application.cjs').listQuotes(conn,{accountId:sess.account.id,bizType:'booking',cityId:proj.city_id,vendorId:proj.owner_vendor_id,itemId:projectId,unitId,grossMinor,unitCount:nights*rooms});
         return jsonReply(res,{ok:true,gross_minor:grossMinor,quotes,quote_expires_in:120});
       }catch(error){const status=Number.isInteger(error.status)?error.status:500;return jsonReply(res,{error:status>=500?'用券报价暂不可用':error.message},status);}finally{await conn.end();}
     }
@@ -180,8 +182,8 @@ function createBookingRouter(deps) {
       if (requestedTransactionMode && !['booking', 'payment'].includes(requestedTransactionMode)) {
         return jsonReply(res, { error: 'transaction_mode 须为 booking / payment' }, 400);
       }
-      const nights = Math.round((new Date(checkout) - new Date(checkin)) / 864e5);
-      if (!(nights >= 1)) return jsonReply(res, { error: '离店须晚于入住至少 1 晚' }, 400);
+      const nights = stayCfg.bookingNights(checkin,checkout);
+      if (!nights) return jsonReply(res, { error: `离店须晚于入住至少 1 晚，且最多可订 ${stayCfg.MAX_BOOKING_NIGHTS} 晚` }, 400);
       if (new Date(checkin) < new Date(new Date().toDateString())) return jsonReply(res, { error: '入住日期不能早于今天' }, 400);
       // 间数（多间库存 2026-09-10）：unit 单可订多间（上限 99），整栋单恒 1 间（整栋只有一份）
       const roomsRaw = parseInt(body.rooms, 10);
@@ -272,6 +274,7 @@ function createBookingRouter(deps) {
           unitId ? [projectId, checkin, checkout, unitId] : [projectId, checkin, checkout]
         );
         const stayDates = stayDateList(checkin, checkout);
+        if (stayDates.length !== nights) throw new Error('预订日期与计价日期不一致');
         let conflictDate = null;
         let conflictLeft = 0;
         for (const d of stayDates) {
@@ -323,7 +326,7 @@ function createBookingRouter(deps) {
         const couponUse = require('../../commerce/coupon-application.cjs');
         if (couponId) {
           const quoted = await couponUse.quote(conn, {couponId,accountId:bookingAccount.id,bizType:'booking',
-            cityId:proj.city_id,vendorId:proj.owner_vendor_id,itemId:projectId,
+            cityId:proj.city_id,vendorId:proj.owner_vendor_id,itemId:projectId,unitId,
             grossMinor:Math.round(listedPriceTotal*100),unitCount:nights*rooms});
           priceTotal = quoted.gross_minor / 100;
           if (body.coupon_quote_gross_minor != null && Number(body.coupon_quote_gross_minor) !== quoted.gross_minor) {
@@ -345,7 +348,7 @@ function createBookingRouter(deps) {
         await conn.execute('UPDATE booking_orders SET order_no=? WHERE id=?', [orderNo, ins.insertId]);
         const application = couponId ? await couponUse.reserve(conn, {
           couponId, accountId: bookingAccount.id, bizType: 'booking', orderNo,
-          cityId: proj.city_id, vendorId: proj.owner_vendor_id, itemId: projectId,
+          cityId: proj.city_id, vendorId: proj.owner_vendor_id, itemId: projectId, unitId,
           grossMinor: Math.round(listedPriceTotal * 100), unitCount:nights*rooms,
         }) : null;
         if (application && Number(application.gross_minor)!==Math.round(priceTotal*100)) throw new Error('用券报价在下单期间发生变化');

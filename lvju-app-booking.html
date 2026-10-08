@@ -12,6 +12,8 @@
   .bfield{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:#fff;}
   .bfield .l{font-size:13px;color:var(--muted);flex-shrink:0;}
   .bfield input,.bfield select{flex:1;text-align:right;border:0;outline:0;font-size:14px;color:var(--ink);background:transparent;font-family:var(--font);}
+  .coupon-status,.coupon-rule{margin:9px 14px;color:var(--muted);font-size:11px;line-height:1.65}.coupon-status button{min-height:44px;border:0;background:transparent;color:var(--brand-deep);font:inherit;text-decoration:underline}.coupon-rule{padding:8px 10px;background:#f0f7f3;border-left:3px solid var(--brand);border-radius:4px 9px 9px 4px}
+  @media(prefers-reduced-motion:no-preference){.coupon-rule{animation:coupon-in .24s ease-out both}@keyframes coupon-in{from{opacity:.45;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}}
   .okbox{margin:14px 18px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:14px;padding:16px;text-align:center;}
   .okbox .no{font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:700;color:var(--brand-deep);letter-spacing:.5px;}
   .okbox .ic-ok{display:block;width:26px;height:26px;margin:0 auto;object-fit:contain;}
@@ -140,11 +142,13 @@
       <div class="panel">
         <div class="kv"><span class="k" id="pLine">房费 —</span><span class="v" id="pTotal">—</span></div>
         <div class="kv"><span class="k segnote" id="pNote">与详情页日历实价同口径</span><span></span></div>
-        <div class="kv big"><span class="k">合计</span><span class="v" id="pSum">—</span></div>
+        <div class="kv big"><span class="k">房费合计（未用券）</span><span class="v" id="pSum">—</span></div>
         <div class="bfield" id="couponRow" style="display:none;"><span class="l">使用权益券</span><select id="couponSelect" style="border:0;outline:0;text-align:right;background:transparent;max-width:65%;"></select></div>
+        <div class="coupon-status" id="couponStatus" role="status"></div>
         <div class="kv" id="couponContract" style="display:none;"><span class="k">签约兑付价</span><span class="v" id="couponContractValue"></span></div>
         <div class="kv" id="couponDiscount" style="display:none;"><span class="k">券抵</span><span class="v" id="couponDiscountValue"></span></div>
         <div class="kv big" id="couponCash" style="display:none;"><span class="k">本单现金应付</span><span class="v" id="couponCashValue"></span></div>
+        <p class="coupon-rule" id="couponRule" style="display:none;"></p>
       </div>
       <button type="button" class="nl-toggle" id="nlToggle">查看逐晚价格 ▾</button>
       <div class="nlist" id="nightList" style="display:none;"></div>
@@ -181,7 +185,7 @@
   var perNight = 0;
   var curId = 0;
   var txSel = document.getElementById('fTx');
-  var couponQuotes = [], selectedCouponId = '', couponQuoteKey = '', couponQuoteSeq = 0;
+  var couponQuotes = [], selectedCouponId = '', couponQuoteKey = '', couponQuoteSeq = 0, couponQuoteStatus = 'idle', couponQuoteError = '', couponListedMinor = 0;
   function selectedCoupon(){ return couponQuotes.filter(function(x){ return x.coupon_id === selectedCouponId; })[0] || null; }
   function renderCouponPrice(){
     var row=document.getElementById('couponRow'), select=document.getElementById('couponSelect'), chosen=selectedCoupon();
@@ -190,26 +194,32 @@
     document.getElementById('couponContract').style.display=chosen&&chosen.mode==='exchange'?'':'none';
     document.getElementById('couponDiscount').style.display=chosen?'':'none';
     document.getElementById('couponCash').style.display=chosen?'':'none';
+    var status=document.getElementById('couponStatus'),rule=document.getElementById('couponRule');
+    status.innerHTML=couponQuoteStatus==='loading'?'正在核对房型、日期和可用券…':couponQuoteStatus==='error'?'可用券查询失败：'+esc(couponQuoteError)+'。可按原价继续，或 <button type="button" id="couponRetry">重试查询</button>':couponQuoteStatus==='empty'?'本单暂无适用券；请在卡券详情核对适用房型和有效期。':couponQuoteStatus==='ready'&&!chosen?'选择一张券，现金应付会立即更新。':'';
+    var retry=document.getElementById('couponRetry');if(retry)retry.onclick=function(){couponQuoteKey='';refreshCouponQuotes(couponListedMinor);};
+    rule.style.display=chosen?'':'none';rule.textContent=chosen?(chosen.mode==='exchange'?'直接兑换 1 项指定房型；签约价可能与原房费不同。':'整张抵用，不拆分找零。')+'提交时将重新核对适用范围与金额。':'';
     if(chosen){document.getElementById('couponContractValue').textContent='¥'+fmt(chosen.gross_minor/100);
       document.getElementById('couponDiscountValue').textContent='−¥'+fmt(chosen.coupon_minor/100);
       document.getElementById('couponCashValue').textContent='¥'+fmt(chosen.cash_minor/100);
-      document.getElementById('pSum').textContent='¥'+fmt(chosen.gross_minor/100);
       document.querySelector('#cTotal b').textContent='¥'+fmt(chosen.cash_minor/100);}
+    else {document.getElementById('pSum').textContent=document.getElementById('pTotal').textContent;
+      document.querySelector('#cTotal b').textContent=document.getElementById('pTotal').textContent;}
   }
   function refreshCouponQuotes(listedMinor){
+    couponListedMinor=listedMinor;
     var ci=document.getElementById('fIn').value,co=document.getElementById('fOut').value;
     var nights=rangeNights().n,rooms=unitSel.value?(parseInt(roomsSel.value,10)||1):1;
     var online=Array.prototype.some.call(txSel.options,function(o){return o.value==='payment';});
     var key=curId+'|'+unitSel.value+'|'+ci+'|'+co+'|'+rooms+'|'+listedMinor;
-    if(IS_PREVIEW||!online||!curId||nights<minNights||!listedMinor){couponQuoteSeq++;couponQuoteKey='';couponQuotes=[];selectedCouponId='';renderCouponPrice();return;}
+    if(IS_PREVIEW||!online||!curId||nights<minNights||!listedMinor){couponQuoteSeq++;couponQuoteKey='';couponQuotes=[];selectedCouponId='';couponQuoteStatus='idle';renderCouponPrice();return;}
     if(key===couponQuoteKey)return;
-    couponQuoteKey=key;couponQuotes=[];selectedCouponId='';renderCouponPrice();var seq=++couponQuoteSeq;
+    couponQuoteKey=key;couponQuotes=[];selectedCouponId='';couponQuoteStatus='loading';renderCouponPrice();var seq=++couponQuoteSeq;
     fetch('/api/juzhu/booking/coupon-quotes',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authH()),
       body:JSON.stringify({project_id:curId,unit_id:unitSel.value?Number(unitSel.value):null,rooms:rooms,checkin:ci,checkout:co})})
-      .then(function(r){return r.json().then(function(j){return r.ok?j:{quotes:[]};});})
+      .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||'查询失败');return j;});})
       .then(function(j){if(seq!==couponQuoteSeq)return;couponQuotes=j.quotes||[];
-        if(!selectedCoupon())selectedCouponId='';renderCouponPrice();})
-      .catch(function(){if(seq!==couponQuoteSeq)return;couponQuotes=[];selectedCouponId='';renderCouponPrice();});
+        if(!selectedCoupon())selectedCouponId='';couponQuoteStatus=couponQuotes.length?'ready':'empty';renderCouponPrice();})
+      .catch(function(error){if(seq!==couponQuoteSeq)return;couponQuotes=[];selectedCouponId='';couponQuoteStatus='error';couponQuoteError=error.message||'请稍后重试';renderCouponPrice();});
   }
   document.getElementById('couponSelect').addEventListener('change',function(){selectedCouponId=this.value;if(selectedCouponId)txSel.value='payment';renderSteps();calc();});
 

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN" data-console-login="off">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>本地生活抵用券 · 演示验收</title><link rel="stylesheet" href="_commerce-demo-life-checkout.css?v=1"></head>
+<body>
+ <main class="shell">
+  <header class="head"><a href="../juzhu-commerce.html?city=贵阳" class="back">← 返回生活权益</a><span class="pill">无资金演示</span></header>
+  <section class="hero"><div class="eyebrow">ADMIN · 券抵用流程验收</div><h1>从领券到下单，<br><em>每一笔金额都看得清。</em></h1><p>贵阳保洁品类测试数据。模拟券抵用与订单生成，不扣款、不派单、不进入结算。</p></section>
+  <section id="gate" class="panel"><h2>账号验证</h2><p id="gate-text">正在检查账号…</p><button id="login" class="button secondary" type="button" hidden>使用 admin 登录</button></section>
+  <section id="flow" hidden>
+   <div class="step"><span>01</span><div><h2>选择服务</h2><p>对应的本地生活品类测试商品</p></div></div>
+   <div id="product" class="panel product"></div>
+   <div class="step"><span>02</span><div><h2>领取抵用券</h2><p>演示购买实际支付 ¥0.00，生成一张可用测试券</p></div></div>
+   <div id="voucher" class="panel"></div>
+   <div class="step"><span>03</span><div><h2>核对抵用金额</h2><p>请选择一张券，查看这笔演示订单的价格组成</p></div></div>
+   <div id="quote" class="panel"></div>
+   <div class="step"><span>04</span><div><h2>确认演示下单</h2><p>订单和用券状态会保存，可在下方复核</p></div></div>
+   <div id="order" class="panel"></div>
+   <div class="step"><span>05</span><div><h2>最近演示订单</h2><p>仅显示当前 admin 账号创建的测试单</p></div></div>
+   <div id="history" class="panel"></div>
+  </section>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+ </main>
+ <script src="_console-login.js"></script><script src="_commerce-demo-life-checkout.js?v=1"></script>
+</body></html>

@@ -36,6 +36,8 @@ const COLUMNS = [
   ['jz_orders','coupon_application_id','VARCHAR(36) NULL'],
 ];
 const checksum = crypto.createHash('sha256').update(DDL.join('\n') + JSON.stringify(COLUMNS)).digest('hex');
+const QUOTE_INDEX_VERSION = '013_coupon_quote_index';
+const QUOTE_INDEX_SQL = 'ALTER TABLE commerce_coupons ADD KEY quote_idx(account_id,city_id,status,expires_at,id)';
 async function migrate(conn) {
   await conn.query('CREATE TABLE IF NOT EXISTS commerce_migrations(version VARCHAR(64) PRIMARY KEY,checksum CHAR(64) NOT NULL,applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB');
   const [found] = await conn.execute('SELECT checksum FROM commerce_migrations WHERE version=?', [VERSION]);
@@ -48,6 +50,12 @@ async function migrate(conn) {
     if (!existing.length) await conn.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${type}`);
   }
   if (!found.length) await conn.execute('INSERT INTO commerce_migrations(version,checksum) VALUES(?,?)', [VERSION, checksum]);
+  const indexChecksum = crypto.createHash('sha256').update(QUOTE_INDEX_SQL).digest('hex');
+  const [indexMigration] = await conn.execute('SELECT checksum FROM commerce_migrations WHERE version=?', [QUOTE_INDEX_VERSION]);
+  if (indexMigration.length && indexMigration[0].checksum !== indexChecksum) throw Error('Coupon quote index migration checksum changed');
+  const [index] = await conn.execute("SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='commerce_coupons' AND INDEX_NAME='quote_idx' LIMIT 1");
+  if (!index.length) await conn.query(QUOTE_INDEX_SQL);
+  if (!indexMigration.length) await conn.execute('INSERT INTO commerce_migrations(version,checksum) VALUES(?,?)', [QUOTE_INDEX_VERSION, indexChecksum]);
 }
 function policyOf(coupon) {
   const snapshot = typeof coupon.snapshot === 'string' ? JSON.parse(coupon.snapshot) : coupon.snapshot || {};
@@ -55,8 +63,8 @@ function policyOf(coupon) {
   const mode = sku.use_mode;
   assert(['exchange','amount_offset'].includes(mode), '此券未发布跨业务用券规则', 409);
   assert(Array.isArray(sku.use_domains) && sku.use_domains.length > 0, '此券缺少适用业务域', 409);
-  return { mode, domains: sku.use_domains, exchangeContractMinor: sku.exchange_contract_minor || null, bookingProjectIds: sku.booking_project_ids || [],
-    lifeProductIds: sku.life_product_ids || [], vendorIds: sku.use_vendor_ids || [],
+  return { mode, domains: sku.use_domains, exchangeContractMinor: sku.exchange_contract_minor || null, bookingProjectIds: sku.booking_project_ids || [], bookingUnitIds: sku.booking_unit_ids || [],
+    lifeProductIds: sku.life_product_ids || [], vendorIds: sku.use_vendor_ids || [], vendorContracts: sku.use_vendor_contracts || {},
     skuVersion: snapshot.sku_version, originalRule: snapshot.rule || null };
 }
 function calculate({ mode, grossMinor, faceMinor, contractMinor, unitCount = 1 }) {
@@ -72,14 +80,28 @@ function calculate({ mode, grossMinor, faceMinor, contractMinor, unitCount = 1 }
   assert(gross >= face, '合格金额低于券面值，暂不能使用此券', 409);
   return { listed_minor: listed, gross_minor: gross, coupon_minor: face, cash_minor: gross - face };
 }
-function validateScope(policy, { bizType, cityId, vendorId, itemId }) {
+function validateScope(policy, { bizType, cityId, vendorId, itemId, unitId = null }) {
   assert(policy.domains.includes(bizType), '此券不适用于该业务', 409);
   assert(policy.vendorIds.map(String).includes(String(vendorId)), '此券不适用于该商户', 409);
+  const contract=policy.vendorContracts?.[String(vendorId)];
+  assert(contract && contract.merchant_id && String(contract.contract_ref||'').trim(), '此券缺少目标商户已审核的履约合同', 409);
   const allowed = bizType === 'booking' ? policy.bookingProjectIds : policy.lifeProductIds;
   assert(allowed.map(String).includes(String(itemId)), '此券不适用于该项目或服务', 409);
+  if (bizType === 'booking' && (policy.mode === 'exchange' || policy.bookingUnitIds?.length)) {
+    assert(unitId && policy.bookingUnitIds?.map(String).includes(String(unitId)), '此券不适用于所选房型', 409);
+  }
   assert(Number.isSafeInteger(Number(cityId)) && Number(cityId) > 0, '用券城市无效', 409);
 }
-async function quote(conn, { couponId, accountId, bizType, cityId, vendorId, itemId, grossMinor, unitCount = 1, lock = false }) {
+async function fundedOwnerOrRecipient(conn,coupon,order,accountId) {
+  if(String(order.account_id)===String(accountId))return true;
+  const [rows]=await conn.execute(`SELECT di.id FROM commerce_distribution_items di
+    JOIN commerce_distribution_campaigns dc ON dc.id=di.campaign_id
+    WHERE di.coupon_id=? AND di.state='claimed' AND di.claimed_by=?
+      AND dc.order_id=? AND dc.sponsor_account_id=? LIMIT 1`,
+    [coupon.id,accountId,order.id,order.account_id]);
+  return rows.length===1;
+}
+async function quote(conn, { couponId, accountId, bizType, cityId, vendorId, itemId, unitId = null, grossMinor, unitCount = 1, lock = false }) {
   assert(['booking','jiazheng'].includes(bizType), '用券业务域无效', 400);
   assert(/^[0-9a-f-]{36,40}$/i.test(String(couponId)), '券编号无效', 400);
   const [coupons] = await conn.execute(`SELECT *,expires_at>UTC_TIMESTAMP() AS still_valid FROM commerce_coupons WHERE id=?${lock ? ' FOR UPDATE' : ''}`, [couponId]);
@@ -92,12 +114,12 @@ async function quote(conn, { couponId, accountId, bizType, cityId, vendorId, ite
   const [appointments]=await conn.execute("SELECT id FROM commerce_appointments WHERE coupon_id=? AND status='booked' LIMIT 1",[couponId]);
   assert(!appointments.length,'券已有到店预约，请先取消预约',409);
   const policy = policyOf(coupon);
-  validateScope(policy, { bizType, cityId, vendorId, itemId });
+  validateScope(policy, { bizType, cityId, vendorId, itemId, unitId });
   const [orders] = await conn.execute(`SELECT * FROM commerce_orders WHERE id=?${lock ? ' FOR UPDATE' : ''}`, [coupon.order_id]);
   const original = orders[0];
-  assert(original && String(original.account_id) === String(accountId) && String(original.city_id) === String(cityId)
-    && original.payment_status === 'paid' && original.paid_payment_order_id && Number(original.refunded_minor || 0) === 0,
-    '券原款未确认或已发生退款', 409);
+  assert(original && await fundedOwnerOrRecipient(conn,coupon,original,accountId) && String(original.city_id) === String(cityId)
+    && ['paid','partially_refunded'].includes(original.payment_status) && original.paid_payment_order_id,
+    '券原款未确认或原支付状态已变化', 409);
   const originalSnapshot = typeof original.snapshot === 'string' ? JSON.parse(original.snapshot) : original.snapshot || {};
   assert(originalSnapshot.settlement_profiles?.[coupon.merchant_id], '券原款缺少已批准的真实结算协议', 409);
   assert(Number(coupon.allocation_minor) > 0, '券没有可用的已筹资金额', 409);
@@ -106,19 +128,42 @@ async function quote(conn, { couponId, accountId, bizType, cityId, vendorId, ite
   return { coupon, original, policy, ...amounts };
 }
 async function listQuotes(conn, input) {
-  const [coupons] = await conn.execute("SELECT id FROM commerce_coupons WHERE account_id=? AND city_id=? AND status='available' AND expires_at>UTC_TIMESTAMP() ORDER BY expires_at,id LIMIT 100", [input.accountId,input.cityId]);
+  assert(['booking','jiazheng'].includes(input.bizType), '用券业务域无效', 400);
   const out=[];
-  for(const item of coupons){
-    try{
-      const q=await quote(conn,{...input,couponId:item.id});
-      const snapshot=typeof q.coupon.snapshot==='string'?JSON.parse(q.coupon.snapshot):q.coupon.snapshot||{};
-      out.push({coupon_id:item.id,name:snapshot.sku?.name||snapshot.name||'权益券',mode:q.policy.mode,
-        listed_minor:q.listed_minor,gross_minor:q.gross_minor,coupon_minor:q.coupon_minor,cash_minor:q.cash_minor,expires_at:q.coupon.expires_at});
-    }catch(error){if(!Number.isInteger(error.status)||error.status>=500)throw error;}
-  }
+  let last=null;
+  do {
+    const scopeColumn=input.bizType==='booking'?'booking_project_ids':'life_product_ids';
+    const [coupons]=await conn.execute(`SELECT c.id,c.expires_at FROM commerce_coupons c
+      JOIN commerce_orders o ON o.id=c.order_id
+      WHERE c.account_id=? AND c.city_id=? AND c.status='available' AND c.expires_at>UTC_TIMESTAMP()
+        AND (o.account_id=? OR EXISTS(SELECT 1 FROM commerce_distribution_items di JOIN commerce_distribution_campaigns dc ON dc.id=di.campaign_id WHERE di.coupon_id=c.id AND di.state='claimed' AND di.claimed_by=c.account_id AND dc.order_id=o.id AND dc.sponsor_account_id=o.account_id))
+        AND o.city_id=? AND o.payment_status IN ('paid','partially_refunded') AND o.paid_payment_order_id IS NOT NULL
+        AND NOT (JSON_EXTRACT(c.snapshot,'$.is_demo') <=> TRUE)
+        AND JSON_CONTAINS(JSON_EXTRACT(c.snapshot,'$.sku.use_domains'),?)
+        AND JSON_CONTAINS(JSON_EXTRACT(c.snapshot,'$.sku.use_vendor_ids'),?)
+        AND JSON_EXTRACT(c.snapshot,CONCAT('$.sku.use_vendor_contracts."',?,'"')) IS NOT NULL
+        AND JSON_EXTRACT(o.snapshot,CONCAT('$.settlement_profiles."',c.merchant_id,'"')) IS NOT NULL
+        AND JSON_CONTAINS(JSON_EXTRACT(c.snapshot,?),?)
+        AND NOT EXISTS (SELECT 1 FROM commerce_appointments ap WHERE ap.coupon_id=c.id AND ap.status='booked')
+        ${last?'AND (c.expires_at>? OR (c.expires_at=? AND c.id>?))':''}
+      ORDER BY c.expires_at,c.id LIMIT 50`,
+      [input.accountId,input.cityId,input.accountId,input.cityId,JSON.stringify(input.bizType),JSON.stringify(Number(input.vendorId)),String(input.vendorId),
+        '$.sku.'+scopeColumn,JSON.stringify(Number(input.itemId)),...(last?[last.expires_at,last.expires_at,last.id]:[])]);
+    for(const item of coupons){
+      try{
+        const q=await quote(conn,{...input,couponId:item.id});
+        const snapshot=typeof q.coupon.snapshot==='string'?JSON.parse(q.coupon.snapshot):q.coupon.snapshot||{};
+        out.push({coupon_id:item.id,name:snapshot.sku?.name||snapshot.name||'权益券',mode:q.policy.mode,
+          listed_minor:q.listed_minor,gross_minor:q.gross_minor,coupon_minor:q.coupon_minor,cash_minor:q.cash_minor,expires_at:q.coupon.expires_at});
+      }catch(error){if(!Number.isInteger(error.status)||error.status>=500)throw error;}
+      if(out.length===20)break;
+    }
+    if(coupons.length<50||out.length===20)break;
+    last=coupons[coupons.length-1];
+  } while(true);
   return out;
 }
-async function reserve(conn, { couponId, accountId, bizType, orderNo, cityId, vendorId, itemId, grossMinor, unitCount = 1 }) {
+async function reserve(conn, { couponId, accountId, bizType, orderNo, cityId, vendorId, itemId, unitId = null, grossMinor, unitCount = 1 }) {
   assert(/^[A-Za-z0-9_.:-]{3,64}$/.test(String(orderNo)), '目标订单号无效', 400);
   const [prior] = await conn.execute('SELECT * FROM coupon_applications WHERE biz_type=? AND order_no=? FOR UPDATE', [bizType, orderNo]);
   if (prior.length) {
@@ -126,7 +171,7 @@ async function reserve(conn, { couponId, accountId, bizType, orderNo, cityId, ve
     assert(a.coupon_id === couponId && String(a.account_id) === String(accountId) && Number(a.listed_minor) === Number(grossMinor) && a.status !== 'released', '目标订单用券记录冲突', 409);
     return a;
   }
-  const q = await quote(conn, { couponId, accountId, bizType, cityId, vendorId, itemId, grossMinor, unitCount, lock: true });
+  const q = await quote(conn, { couponId, accountId, bizType, cityId, vendorId, itemId, unitId, grossMinor, unitCount, lock: true });
   const id = crypto.randomUUID();
   await conn.execute(`INSERT INTO coupon_applications(id,coupon_id,account_id,biz_type,order_no,mode,city_id,vendor_id,item_id,
     listed_minor,gross_minor,coupon_minor,cash_minor,original_order_id,original_payment_id,policy_snapshot,status)
@@ -182,8 +227,8 @@ async function recognizeApplied(conn, { bizType, orderNo, profile, targetOrder, 
   assert(coupon && String(coupon.account_id) === String(app.account_id) && (coupon.status === 'reserved' || app.status === 'consumed'), '券身份或占用状态不一致', 409);
   const [orders] = await conn.execute('SELECT * FROM commerce_orders WHERE id=? FOR UPDATE', [app.original_order_id]);
   const original = orders[0];
-  assert(original && String(original.account_id) === String(app.account_id) && String(original.city_id) === String(app.city_id)
-    && original.payment_status === 'paid' && Number(original.refunded_minor || 0) === 0 && String(original.paid_payment_order_id) === String(app.original_payment_id), '券原款已变更或发生退款', 409);
+  assert(original && await fundedOwnerOrRecipient(conn,coupon,original,app.account_id) && String(original.city_id) === String(app.city_id)
+    && ['paid','partially_refunded'].includes(original.payment_status) && String(original.paid_payment_order_id) === String(app.original_payment_id), '券原款支付状态已变更', 409);
   const originalSnapshot = typeof original.snapshot === 'string' ? JSON.parse(original.snapshot) : original.snapshot || {};
   const profiles = originalSnapshot.settlement_profiles || {};
   const originalProfile = profiles[coupon.merchant_id];

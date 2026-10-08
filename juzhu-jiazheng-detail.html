@@ -166,6 +166,7 @@
   .cta .p b{color:#ef5a2a;}
   .cta #submitBtn{background:linear-gradient(135deg,var(--cat-brand,var(--brand)),var(--cat-brand-2,var(--brand-2)));
     box-shadow:0 6px 16px color-mix(in oklab,var(--cat-brand,var(--brand)) 28%,transparent);}
+  .cta #submitBtn.unavailable{background:#a5a9af;box-shadow:none;cursor:not-allowed;pointer-events:none;}
   /* loading 遮罩 */
   .loading-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
   .loading-overlay.on{display:flex;}
@@ -469,6 +470,7 @@
     product = p;
     document.getElementById('price').textContent = fmtPrice(p.price);
     document.getElementById('ctaPrice').textContent = fmtPrice(p.price);
+    updateOrderAction();
     document.getElementById('productList').querySelectorAll('.vrow').forEach(function(x){
       x.classList.toggle('cur', x.dataset.pid === String(p.id));
     });
@@ -476,6 +478,21 @@
   }
 
   function fmtPrice(n){ return '¥' + Number(n || 0).toLocaleString(); }
+
+  function isDemoProduct(p){ return !!p && String(p.query||'').startsWith('guiyang-life-demo-v1:'); }
+  function updateOrderAction(){
+    var mode = product && product.payment_mode;
+    var demo = isDemoProduct(product);
+    var available = !demo && (mode === 'pay_center' || mode === 'wechat_mini');
+    var button = document.getElementById('submitBtn');
+    button.textContent = available ? '下一步' : '暂不可下单';
+    button.classList.toggle('unavailable', !available);
+    button.setAttribute('aria-disabled', available ? 'false' : 'true');
+    button.tabIndex = available ? 0 : -1;
+    document.querySelector('.cta .p span').textContent = demo ? '演示服务不提供在线下单'
+      : mode === 'pay_center' ? '下一步填写预约信息'
+      : mode === 'wechat_mini' ? '前往商家小程序预约' : '商家尚未开通在线支付';
+  }
 
   function toast(msg){
     var el = document.getElementById('toast');
@@ -647,14 +664,7 @@
   document.getElementById('submitBtn').addEventListener('click', function(e){
     e.preventDefault();
     if (!item) return;
-    if(product && String(product.query||'').startsWith('guiyang-life-demo-v1:')){
-      fetch('/api/commerce/v1/catalog?city='+encodeURIComponent(JZ.regionCity())).then(function(r){if(!r.ok)throw Error('权益服务暂不可用');return r.json();}).then(function(data){
-        var coupon=(data.data||[]).find(function(p){return p.kind==='skus'&&p.channel_slug===slug&&p.is_demo;});
-        if(coupon)location.href='juzhu-commerce.html?city='+encodeURIComponent(JZ.regionCity())+'&product=skus-'+coupon.id;
-        else toast('此项为演示咨询入口，不发生投保、授信、估价成交或真实服务下单。');
-      }).catch(function(e){toast(e.message||'请稍后再试');});
-      return;
-    }
+    if (isDemoProduct(product)) return toast('此演示服务不支持在线下单');
     if (!product || !product.payment_mode) return toast('商家尚未开通支付，请联系服务商咨询');
     if (product.payment_mode === 'pay_center') {
       if (!(Number(product.price) > 0)) return toast('此项为咨询或估价服务，无需付款，请联系服务商');
@@ -709,9 +719,9 @@
       return;
     }
     render();
-    if(String(product.query||'').startsWith('guiyang-life-demo-v1:')){
+    updateOrderAction();
+    if(isDemoProduct(product)){
       var note=document.createElement('p');note.className='demo-service-note';note.textContent='贵阳演示服务 · 商家、人员、价格与服务说明均用于流程展示，不提供真实履约。';note.style.cssText='margin:12px 14px;padding:12px;border-radius:12px;background:#fff2d8;color:#73532b;font-size:12px;line-height:1.7';document.querySelector('.scr').prepend(note);
-      document.getElementById('submitBtn').textContent='体验演示流程';
     }
     renderVendors();
     renderProducts();

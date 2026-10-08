@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var JZ = window.BZF_JZ, query = new URLSearchParams(location.search), slug = query.get('sku');
-  var product, busy = false, chosenTime = query.get('time') || '', request = null, couponQuotes = [], selectedCoupon = null;
+  var product, busy = false, chosenTime = query.get('time') || '', request = null, couponQuotes = [], selectedCoupon = null, couponStatus = 'loading', couponError = '';
   var button = document.getElementById('submitBtn');
   function money(value) { return '¥' + Number(value).toFixed(2); }
   function requestSignature(payload) {
@@ -37,13 +37,18 @@
       var box=document.getElementById('priceBox');
       box.innerHTML='<div class="row"><span>服务价格</span><b>'+money(product.price)+'</b></div>'+
         (couponQuotes.length?'<label class="row"><span>使用权益券</span><select id="couponSelect"><option value="">不使用券</option>'+couponQuotes.map(function(q){return '<option value="'+JZ.esc(q.coupon_id)+'">'+JZ.esc(q.name)+' · '+(q.mode==='exchange'?'直接兑换':'抵用 '+money(q.coupon_minor/100))+'</option>';}).join('')+'</select></label>':'')+
+        '<p class="jz-coupon-status" role="status">'+(couponStatus==='loading'?'正在核对可用券…':couponStatus==='error'?'可用券查询失败：'+JZ.esc(couponError)+'。本单可按原价继续，或':'')+(couponStatus==='error'?'<button type="button" id="retryCoupons">重试查询</button>':couponStatus==='empty'?'本单暂无适用券。可在「我的卡券」查看适用商家和服务。':couponStatus==='ready'&&!selectedCoupon?'选择一张券，结算金额会立即更新。':'')+'</p>'+
         (selectedCoupon&&selectedCoupon.mode==='exchange'?'<div class="row"><span>签约兑付价</span><b>'+money(selectedCoupon.gross_minor/100)+'</b></div>':'')+
         (selectedCoupon?'<div class="row"><span>券抵</span><b>−'+money(selectedCoupon.coupon_minor/100)+'</b></div>':'')+
-        '<div class="row total"><span>本单现金应付</span><b>'+money(selectedCoupon?selectedCoupon.cash_minor/100:product.price)+'</b></div>';
+        '<div class="row total" aria-live="polite"><span>本单现金应付</span><b>'+money(selectedCoupon?selectedCoupon.cash_minor/100:product.price)+'</b></div>'+
+        (selectedCoupon?'<p class="jz-coupon-rule">'+(selectedCoupon.mode==='exchange'?'直接兑换 1 项签约服务；签约价与原服务标价可能不同。':'整张抵用，不拆分找零。')+'提交时将重新核对适用范围与金额。</p>':'');
       var select=document.getElementById('couponSelect');if(select){select.value=selectedCoupon?selectedCoupon.coupon_id:'';select.onchange=function(){selectedCoupon=couponQuotes.find(function(q){return q.coupon_id===select.value;})||null;renderPrice();};}
+      var retry=document.getElementById('retryCoupons');if(retry)retry.onclick=loadCouponQuotes;
+      button.textContent=busy?'提交中…':selectedCoupon?'确认用券下单':'确认下单';
     }
+    function loadCouponQuotes(){couponStatus='loading';couponError='';renderPrice();JZ.couponQuotes(product.id).then(function(quotes){couponQuotes=quotes;selectedCoupon=couponQuotes.find(function(q){return selectedCoupon&&q.coupon_id===selectedCoupon.coupon_id;})||null;couponStatus=couponQuotes.length?'ready':'empty';renderPrice();}).catch(function(error){couponQuotes=[];selectedCoupon=null;couponStatus='error';couponError=error.message||'请稍后重试';renderPrice();});}
     renderPrice();
-    JZ.couponQuotes(product.id).then(function(quotes){couponQuotes=quotes;renderPrice();}).catch(function(){});
+    loadCouponQuotes();
     document.getElementById('backBtn').href = JZ.chainCity('juzhu-jiazheng-detail.html?sku=' + encodeURIComponent(slug));
     button.addEventListener('click', function (event) {
       event.preventDefault();
@@ -70,7 +75,7 @@
         return order;
       }).then(function (order) {
         location.href = (order.pay_status === 'coupon_funded' ? 'lvju-app-paid.html' : 'lvju-app-pay.html') + '?channel=jiazheng&order=' + encodeURIComponent(order.id);
-      }).catch(function (error) { busy = false; button.textContent = '确认下单'; alert(error.message || '提交失败，请重试'); });
+      }).catch(function (error) { busy = false; renderPrice(); alert(error.message || '提交失败，请重试'); });
     });
   }).catch(function (error) { summaryError(error.message); });
 }());

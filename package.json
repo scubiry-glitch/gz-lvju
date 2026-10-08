@@ -30,8 +30,7 @@
     "bcryptjs": "^3.0.3",
     "exceljs": "^4.4.0",
     "mysql2": "^3.23.3",
-    "pdfkit": "^0.20.2",
-    "sharp": "^0.35.4"
+    "pdfkit": "^0.20.2"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
@@ -39,6 +38,20 @@
     "@capacitor/core": "^8.5.0",
     "@capacitor/splash-screen": "^8.0.0",
     "@capacitor/status-bar": "^8.0.0",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    },
+    "@capacitor/cli": {
+      "xcode": {
+        "uuid": "^11.1.1"
+      }
+    },
+    "minimatch@^10": {
+      "brace-expansion": "^5.0.12"
+    }
   }
 }

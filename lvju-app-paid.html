@@ -63,6 +63,7 @@
 (function(){
   var q = new URLSearchParams(location.search);
   var oid = q.get('order');
+  var htmlEscape = function(value){ return String(value == null ? '' : value).replace(/[&<>"']/g,function(char){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];}); };
 
   // ── 旅居预订支付完成（channel=booking）：双因子查单回显 ──
   if (q.get('channel') === 'booking') {
@@ -95,11 +96,11 @@
         .then(function(r){ return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'订单查询失败');return d;}); })
         .then(function(d){
           var o = d.order || {};
-          var state=window.BZF_CASHIER.orderStatus(bookingPayment,o),paid=state==='paid';
+          var state=window.BZF_CASHIER.orderStatus(bookingPayment,o),paid=state==='paid',couponFunded=state==='coupon_funded';
           var closed=state==='closed'||state==='expired',refunded=state==='refunded'||state==='partially_refunded';
-          var title=paid?'支付成功':state==='refunded'?'退款已完成':state==='partially_refunded'?'已部分退款':state==='refunding'?'退款处理中':closed?'订单已关闭':'支付结果确认中';
+          var title=paid?'支付成功':couponFunded?'用券预订成功':state==='refunded'?'退款已完成':state==='partially_refunded'?'已部分退款':state==='refunding'?'退款处理中':closed?'订单已关闭':'支付结果确认中';
           document.getElementById('okTitle').textContent = title;
-          var desc=paid?'资金已存管冻结，商家确认后订单生效':(refunded||state==='refunding')?'退款进度以订单页为准':closed?'该预订已结束，可在订单页查看详情':'尚未确认支付成功，请稍后刷新或返回订单页查看';
+          var desc=paid?'资金已存管冻结，商家确认后订单生效':couponFunded?'卡券已全额抵扣，现金应付 ¥0.00；商家确认后订单生效':(refunded||state==='refunding')?'退款进度以订单页为准':closed?'该预订已结束，可在订单页查看详情':'尚未确认支付成功，请稍后刷新或返回订单页查看';
           document.getElementById('okDesc').textContent = desc;
           if (o.cancel_policy_text) {
             var escCp = String(o.cancel_policy_text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -107,16 +108,17 @@
           }
           document.getElementById('svcName').textContent = o.project_name || '旅居预订';
           document.getElementById('svcMeta').textContent = o.checkin + ' → ' + o.checkout + ' · ' + o.nights + ' 晚';
-          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · ' + (paid ? '已支付 · 待商家确认' : title);
+          document.getElementById('svcSt').textContent = '订单号 ' + o.order_no + ' · ' + (paid ? '已支付 · 待商家确认' : couponFunded ? '券已抵扣 · 待商家确认' : title);
           document.getElementById('infoPanel').innerHTML =
-            '<div class="kv"><span class="k">预订项目</span><span class="v">' + (o.project_name || ('#' + o.project_id)) + '</span></div>' +
-            '<div class="kv"><span class="k">实付金额</span><span class="v">¥' + Number(o.price_total).toLocaleString() + '</span></div>' +
-            '<div class="kv"><span class="k">入住 / 离店</span><span class="v">' + o.checkin + ' / ' + o.checkout + '</span></div>' +
+            '<div class="kv"><span class="k">预订项目</span><span class="v">' + htmlEscape(o.project_name || ('#' + o.project_id)) + '</span></div>' +
+            (Number(o.coupon_minor)>0?'<div class="kv"><span class="k">签约结算价</span><span class="v">¥'+Number(o.price_total).toFixed(2)+'</span></div><div class="kv"><span class="k">券抵</span><span class="v">−¥'+(Number(o.coupon_minor)/100).toFixed(2)+'</span></div>':'') +
+            '<div class="kv"><span class="k">现金应付</span><span class="v">¥' + (o.cash_due_minor==null?Number(o.price_total):Number(o.cash_due_minor)/100).toFixed(2) + '</span></div>' +
+            '<div class="kv"><span class="k">入住 / 离店</span><span class="v">' + htmlEscape(o.checkin) + ' / ' + htmlEscape(o.checkout) + '</span></div>' +
             '<div class="kv"><span class="k">后续流程</span><span class="v">商家确认后订单生效</span></div>';
           var bo = document.getElementById('btnOrder');
           bo.href = 'lvju-app-orders.html';
           bo.textContent = '查看我的预订';
-          if(!paid&&!closed&&!refunded&&bookingTries++<6)bookingTimer=setTimeout(refreshBooking,1500);
+          if(!paid&&!couponFunded&&!closed&&!refunded&&bookingTries++<6)bookingTimer=setTimeout(refreshBooking,1500);
         }).catch(function(error){document.getElementById('okDesc').textContent=error.message||'查询暂不可用，请从订单页重试';})
         .then(function(){bookingInFlight=false;});
       }
@@ -139,15 +141,17 @@
   document.getElementById('btnOrder').href = 'juzhu-jiazheng-order-detail.html?order_ref=' + encodeURIComponent(oid);
   function checkJzResult(){
     JZ.paymentStatus(oid).then(function(payment){
-      var paid = payment.order_pay_status === 'paid';
-      document.getElementById('okTitle').textContent = paid ? '支付成功' : (payment.order_pay_status === 'refunded' ? '已退款' : payment.order_pay_status === 'closed' ? '订单已关闭' : '支付结果确认中');
-      document.getElementById('okDesc').textContent = paid ? '已确认付款，服务进度以订单页为准' : '尚未确认支付成功，请稍后刷新或返回订单查看';
+      var paid = payment.order_pay_status === 'paid', couponFunded = payment.order_pay_status === 'coupon_funded';
+      document.getElementById('okTitle').textContent = paid ? '支付成功' : couponFunded ? '用券下单成功' : (payment.order_pay_status === 'refunded' ? '已退款' : payment.order_pay_status === 'closed' ? '订单已关闭' : '支付结果确认中');
+      document.getElementById('okDesc').textContent = paid ? '已确认付款，服务进度以订单页为准' : couponFunded ? '卡券已全额抵扣，现金应付 ¥0.00；服务进度以订单页为准' : '尚未确认支付成功，请稍后刷新或返回订单查看';
     }).catch(function(error){ document.getElementById('okTitle').textContent = '暂未确认支付'; document.getElementById('okDesc').textContent = error.message; });
     JZ.get(oid).then(function(order){
       document.getElementById('svcName').textContent = order.product_name || order.category;
       document.getElementById('svcMeta').textContent = order.house + ' · ' + order.expectTime;
       var amount=order.amount_minor!=null?Number(order.amount_minor)/100:Number(order.fee)/(order.payment_mode==='pay_center'?100:1);
-      document.getElementById('infoPanel').textContent = '订单金额 ¥' + amount.toFixed(2);
+      document.getElementById('infoPanel').textContent = Number(order.coupon_minor)>0
+        ? '服务结算价 ¥' + (Number(order.fee)/100).toFixed(2) + ' · 券抵 −¥' + (Number(order.coupon_minor)/100).toFixed(2) + ' · 现金应付 ¥' + amount.toFixed(2)
+        : '现金应付 ¥' + amount.toFixed(2);
     }).catch(function(){});
   }
   checkJzResult();

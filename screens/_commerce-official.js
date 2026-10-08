@@ -31,7 +31,9 @@ function dialog(title,content,onSubmit){
   const b=d.querySelector('[type=submit]'),error=d.querySelector('.dialog-error'),originalText=b.textContent,messageVersion=statusMessageVersion;
   b.disabled=true;closeButtons.forEach(button=>button.disabled=true);b.textContent='提交中…';form.setAttribute('aria-busy','true');error.textContent='';
   try{
-   const result=await onSubmit(new FormData(form),d);d.close();
+   const result=await onSubmit(new FormData(form),d);
+   // A successful action may replace this dialog with its own result view.
+   if(d.isConnected&&d.open)d.close();
    // Callers can return a business-specific confirmation or set status themselves.
    if(result&&typeof result.successMessage==='string')status(result.successMessage);
    else if(statusMessageVersion===messageVersion)status('操作成功');

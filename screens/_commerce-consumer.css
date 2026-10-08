@@ -255,9 +255,23 @@
 .commerce-consumer .consumer-asset-card.status-expired{--spine:#b0a893}
 .commerce-consumer .consumer-asset-card.status-frozen{--spine:#c07a45}
 .commerce-consumer .consumer-asset-card.status-refunded{--spine:#8b9590}
+.commerce-consumer .consumer-asset-card.status-reserved{--spine:#b48743}
 .commerce-consumer .asset-status.status-refunded{background:#e9eee9;color:#66766a}
+.commerce-consumer .asset-status.status-reserved{background:#f8efda;color:#745420}
 /* 卡面按钮层级：主操作（预约/出示码）保持实底，详情/售后降为文字钮 */
 .commerce-consumer .consumer-asset-card .btn.txt{grid-column:auto;background:transparent;border:0;color:#0f766e;padding:10px 4px;justify-self:start;text-align:left}
+.commerce-consumer .asset-value{display:inline-block;margin:0 0 10px!important;padding:5px 9px;border-radius:8px;background:#edf4eb;color:#285948;font-size:12px;font-weight:600}
+.commerce-consumer .coupon-state-note{margin:14px 0;padding:11px 12px;border-left:3px solid #b48743;border-radius:5px 9px 9px 5px;background:#fbf4e7;color:#6e5633;font-size:12px;line-height:1.7}
+.commerce-consumer .coupon-scope{padding:12px 0;border-top:1px dashed #e4e6dc;font-size:12px;line-height:1.7}
+.commerce-consumer .coupon-scope strong{display:block;color:#3e5948}.commerce-consumer .coupon-scope p{margin:5px 0 0;color:#66736a}
+.commerce-consumer .coupon-rule-note{font-size:11px;line-height:1.75;color:#7d8378;margin:12px 0 0}
+.commerce-consumer .coupon-application{padding:12px 0;border-top:1px dashed #e4e6dc}.commerce-consumer .coupon-application:first-of-type{margin-top:8px}.commerce-consumer .coupon-application a{display:inline-flex;min-height:44px;align-items:center;color:#0f766e;font-size:12px;text-decoration:none}
+.commerce-consumer .distribution-preview{text-align:left!important}.commerce-consumer .distribution-preview h1{font:600 24px var(--serif)}.commerce-consumer .distribution-preview p{max-width:none!important;margin:10px 0!important}.commerce-consumer .distribution-preview .consumer-usage{margin:15px 0 18px;padding-left:22px}.commerce-consumer .distribution-preview .btn{width:100%;min-height:48px}
+@media(prefers-reduced-motion:no-preference){
+ .commerce-consumer .asset-status,.commerce-consumer .coupon-state-note,.commerce-consumer .coupon-application{animation:coupon-appear .24s cubic-bezier(.2,.7,.2,1) both}
+ .commerce-consumer .consumer-asset-card .btn:active,.commerce-consumer .distribution-preview .btn:active{transform:scale(.98)}
+}
+@keyframes coupon-appear{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 /* 选券页分类 chips（替代原生 select，滚动行右缘渐隐提示可滑） */
 .consumer-category{display:block;margin:0 0 14px;font-size:12px;color:#6c7967}
 .cc-label{display:block;margin-bottom:8px}
@@ -278,6 +292,11 @@
 .consumer-shop-tabs button.tier-t200[aria-pressed="true"]{background:#4f3d16}
 /* 核销码弹窗：关闭钮不再吃 showModal 的默认焦点金框（焦点已由 JS 移到 dialog 本体） */
 .voucher-code-dialog .dialog-close:focus-visible{outline:none}
+.voucher-code-dialog [hidden]{display:none!important}
+.voucher-code-dialog .code-success{display:flex;min-height:150px;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#0f766e;text-align:center}
+.voucher-code-dialog .code-success span{display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:#e4f1e9;font-size:27px}
+.voucher-code-dialog .code-success strong{font-size:17px}.voucher-code-dialog .code-success small{font-size:12px;color:#64756c}
+.voucher-code-dialog .code-result-link{display:flex;justify-content:center;align-items:center;min-height:44px;margin-top:14px;text-decoration:none}
 
 /* ── 2026-10-02 选券页信息流卡（对齐手淘商品卡骨架）：大图占卡 → 标题 → 摘要 →
    标签 → 价格贴底；无按钮，整卡可点（data-action 在 article 上）。
@@ -285,6 +304,7 @@
 .consumer-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .consumer-products>.commerce-empty,.consumer-products>.consumer-sale-note{grid-column:1/-1}
 .commerce-consumer .product-card{display:flex;flex-direction:column;padding:0;min-height:0;border-radius:13px;overflow:hidden;cursor:pointer}
+.commerce-consumer .product-card:focus-visible{outline:3px solid #d6ab67;outline-offset:3px}
 /* 图区：铺满卡宽（1:1），.pc-img 的定位上下文必须是这层——position:relative 不可改回 static，
    否则主图 abs 定位会向上找到 .app 铺满整页盖住文字（2026-10-02 踩过两次）。
    无图商品回落品类底色 + 居中大图标（svg 在 img 下层，图加载成功即盖住）。 */

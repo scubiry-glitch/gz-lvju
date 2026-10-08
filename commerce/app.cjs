@@ -3,9 +3,9 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const {Service,digest}=require('./service.cjs'),{definitions,Fault,assert}=require('./configuration.cjs');
 const registry=require('../perm_registry.cjs');
 const settlement=require('./settlement.cjs');
+const promotionReport=require('./promotion-report.cjs');
+const promotionClicks=require('./promotion-clicks.cjs');
 const FUND_READ='commerce.fund.read',FUND_WRITE='commerce.fund.write',FUND_REVIEW='commerce.fund.review';
-// settings KV 与主系统共表（app.js ensureSchema 建表）；表缺失（隔离测试库）时回落空串=功能开放缺省。
-async function settingValue(pool,key){try{const [rows]=await pool.execute('SELECT value FROM settings WHERE `key`=? LIMIT 1',[key]);return rows.length?String(rows[0].value??''):'';}catch{return '';}}
 const prefix='/api/commerce/v1';
 function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=process.env.JUZHU_ENV==='test',paymentCore,paymentConfig=process.env,payCenter=require('../server/thirdApi/payCenter.cjs').payCenter,sharedDatabaseVerified=false}){
  const service=new Service(pool,auth);
@@ -33,10 +33,11 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(method!=='GET')assert(!req.headers.origin||req.headers.origin===origin,'不允许跨站操作',403);
    if(pathname===prefix+'/meta'&&method==='GET'){await pool.query('SELECT 1');return reply(200,{mode:'mysql-m1a',payment_enabled:await service.payments.capability(),version:'M1-A',authentication:'account-center'});}
    if(pathname===prefix+'/healthz'&&method==='GET'){try{const result=(await pool.query('SELECT 1 AS ok, (SELECT MAX(version) FROM commerce_migrations) AS migration').catch(()=>[[{ok:0}]]))[0];if(result[0]&&Number(result[0].ok)===1)return reply(200,{status:'ok',database:true,migration:result[0].migration||null,payment_enabled:await service.payments.capability()});}catch(e){}return reply(503,{status:'unavailable',database:false});}
-   if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));
-    try{await pool.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',['referral:'+data.kind+':'+data.id,'referral.click',JSON.stringify({aid:data.aid,kind:data.kind,id:data.id})]);}catch{}
+   if(pathname===prefix+'/referral'&&method==='GET'){const token=url.searchParams.get('token'),data=await service.verifyReferral(token);
+    try{await promotionClicks.record(pool,token,data,{ip:req.socket.remoteAddress||'',userAgent:String(req.headers['user-agent']||'').slice(0,300)});}catch{}
     return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
-   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready&&p.in_stock,demo_purchase_enabled:demoEnabled&&p.is_demo&&p.in_stock})));}
+   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).filter(p=>!p.private_demo).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready&&p.in_stock,demo_purchase_enabled:demoEnabled&&p.is_demo&&p.in_stock})));}
+   if(pathname===prefix+'/distributions/preview'&&method==='GET')return reply(200,await require('./distribution.cjs').preview(pool,url.searchParams.get('token')));
    if(pathname===prefix+'/hotels'&&method==='GET')return reply(200,await service.hotels(Object.fromEntries(url.searchParams)));
    // Account-center Bearer or verified Beike cookie; legacy/machine keys never authorize commerce.
    let session=await auth.verifySessionToken(auth.bearerToken(req));
@@ -63,54 +64,81 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const paymentOrder=pathname.match(/^\/api\/commerce\/v1\/orders\/([a-f0-9-]{36})\/(pay|payment|cancel)$/);
    if(paymentOrder){const [,id,action]=paymentOrder;if(action==='pay'&&method==='POST')return reply(202,await service.payments.pay(principal,id,body,req.headers['idempotency-key'],req.socket.remoteAddress));if(action==='payment'&&method==='GET')return reply(200,await service.payments.status(principal,id,url.searchParams.get('refresh')==='1'));if(action==='cancel'&&method==='POST')return reply(202,await service.payments.close(principal,id));}
    if(pathname===prefix+'/demo-orders'&&method==='POST'){assert(demoEnabled,'演示购买未开放',409);return reply(201,await require('./demo-order.cjs').demoOrder(service,principal,body,req.headers['idempotency-key']));}
+   if(pathname.startsWith(prefix+'/demo-life/')){
+    assert(demoEnabled,'演示下单未开放',409);
+    const demo=require('./demo-life-checkout.cjs');
+    if(pathname===prefix+'/demo-life/config'&&method==='GET')return reply(200,await demo.config(pool,principal));
+    if(pathname===prefix+'/demo-life/quote'&&method==='GET')return reply(200,await demo.quote(pool,principal,url.searchParams.get('coupon_id')));
+    if(pathname===prefix+'/demo-life/orders'&&method==='POST')return reply(201,await demo.order(pool,principal,body,req.headers['idempotency-key']));
+   }
    if(pathname===prefix+'/exchange'&&method==='POST'){assert(demoEnabled,'兑换暂未开放',409);return reply(201,await require('./exchange-codes.cjs').exchange(service,principal,body,req.headers['idempotency-key']));}
    if(pathname===prefix+'/appointments'&&method==='POST')return reply(201,await service.appointment(principal,body,req.headers['idempotency-key']));
    if(pathname===prefix+'/cases'&&method==='POST')return reply(201,await service.openCase(principal,body,req.headers['idempotency-key']));
+   if(pathname===prefix+'/distributions/claim'&&method==='POST')return reply(201,await require('./distribution.cjs').claim(service,principal,body.token,req.headers['idempotency-key']));
    const coupon=pathname.match(/^\/api\/commerce\/v1\/coupons\/([a-f0-9-]{36})\/token$/);
    if(coupon&&method==='POST')return reply(200,await service.token(principal,coupon[1]));
    if(pathname===prefix+'/promotion'&&method==='GET'){
     // 演示归因单独拆列（demo_orders），订单/核销/佣金指标只算真实交易（规则 21：演示不进资金域）。
     const notDemo="NOT (JSON_EXTRACT(o.snapshot,'$.is_demo') <=> TRUE)";
-    const [rows]=await pool.execute(`SELECT COUNT(DISTINCT CASE WHEN ${notDemo} THEN o.id END) AS orders,COUNT(DISTINCT CASE WHEN JSON_EXTRACT(o.snapshot,'$.is_demo')=true THEN o.id END) AS demo_orders,COUNT(CASE WHEN r.id IS NOT NULL AND r.status='confirmed' AND ${notDemo} THEN 1 END) AS redemptions,COALESCE(SUM(CASE WHEN r.id IS NOT NULL AND r.status='confirmed' AND ${notDemo} THEN r.channel_minor END),0) AS confirmed_minor FROM commerce_orders o LEFT JOIN commerce_coupons c ON c.order_id=o.id LEFT JOIN commerce_redemptions r ON r.coupon_id=c.id WHERE o.source_account_id=?`,[principal.account.id]);
-    const gateOn=await settingValue(pool,'promoter_gate')==='1';
-    const qualified=!gateOn||principal.roles.some(r=>r.role_code==='promoter'||(r.permissions||[]).includes('*'));
-    return reply(200,{...rows[0],promoter_gate:gateOn,share_qualified:qualified,settlement:await settlement.promoterSettlement(pool,principal.account.id),withdrawal_enabled:false,demo_note:'演示订单不发生资金与佣金，统计与真实交易分开呈现'});
+    const [[rows],usage]=await Promise.all([
+     pool.execute(`SELECT COUNT(CASE WHEN ${notDemo} AND o.status='fulfilled' AND (o.payment_status='paid' OR COALESCE(o.payment_mode,'')<>'pay_center') THEN 1 END) AS orders,
+       COUNT(CASE WHEN JSON_EXTRACT(o.snapshot,'$.is_demo')=true THEN 1 END) AS demo_orders
+       FROM commerce_orders o WHERE o.source_account_id=?`,[principal.account.id]),
+     promotionReport.summary(pool,principal.account.id)
+    ]);
+    const {gateOn,qualified}=await service.promotionEligibility(principal.account.id);
+    return reply(200,{...rows[0],...usage,promoter_gate:gateOn,share_qualified:qualified,settlement:await settlement.promoterSettlement(pool,principal.account.id),withdrawal_enabled:false,demo_note:'演示订单不发生资金与佣金，统计与真实交易分开呈现'});
    }
    if(pathname===prefix+'/promotion/records'&&method==='GET'){
     // 推广员本人明细：逐券佣金（含批次/代发状态）、归因订单、代发到账记录。只读，仅本人 scope。
-    const [orders,redemptions,payouts]=await Promise.all([
+    const [orders,redemptions,payouts,applications,sharedPayouts]=await Promise.all([
      pool.execute(`SELECT o.id AS order_id,JSON_UNQUOTE(JSON_EXTRACT(o.snapshot,'$.name')) AS name,o.amount_minor,o.status,JSON_EXTRACT(o.snapshot,'$.is_demo')=true AS is_demo,o.created_at FROM commerce_orders o WHERE o.source_account_id=? ORDER BY o.created_at DESC LIMIT 50`,[principal.account.id]),
      pool.execute(`SELECT r.id,r.channel_minor,r.status,r.created_at,JSON_UNQUOTE(JSON_EXTRACT(rc.snapshot,'$.sku.name')) AS coupon_name,JSON_EXTRACT(rc.snapshot,'$.is_demo')=true AS is_demo,mb.name AS merchant_name,i.status AS item_status,bi.status AS batch_status,pi.status AS payout_status FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id JOIN commerce_orders o ON o.id=rc.order_id LEFT JOIN commerce_settlement_items i ON i.redemption_id=r.id AND i.line_kind='promoter' LEFT JOIN commerce_settlement_batches bi ON bi.id=i.batch_id LEFT JOIN commerce_payout_instructions pi ON pi.batch_id=bi.id LEFT JOIN commerce_merchants mb ON mb.id=r.merchant_id WHERE o.source_account_id=? ORDER BY r.created_at DESC LIMIT 50`,[principal.account.id]),
-     pool.execute(`SELECT instruction_no,amount_minor,status,submitted_at,settled_at FROM commerce_payout_instructions WHERE target_kind='promoter' AND promoter_account_id=? ORDER BY id DESC LIMIT 20`,[principal.account.id])
+     pool.execute(`SELECT instruction_no,amount_minor,status,submitted_at,settled_at FROM commerce_payout_instructions WHERE target_kind='promoter' AND promoter_account_id=? ORDER BY id DESC LIMIT 20`,[principal.account.id]),
+     promotionReport.applicationRecords(pool,principal.account.id),
+     promotionReport.applicationPayouts(pool,principal.account.id)
     ]);
-    return reply(200,{orders:orders[0],redemptions:redemptions[0],payouts:payouts[0]});
+    return reply(200,{orders:orders[0],redemptions:[...redemptions[0],...applications].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,50),payouts:[...payouts[0],...sharedPayouts].sort((a,b)=>String(b.settled_at||b.submitted_at).localeCompare(String(a.settled_at||a.submitted_at))).slice(0,20)});
    }
    if(pathname===prefix+'/promotion/products'&&method==='GET'){
     // 推广选品：目录 + 预估佣金 + 本人逐商品点击/归因/核销统计（转化帮助推广员决定分享哪个）。
     const products=await service.promoterCatalog(url.searchParams.get('city')||'');
     const aid=principal.account.id,notDemo="NOT (JSON_EXTRACT(o.snapshot,'$.is_demo') <=> TRUE)";
     const [ord,red,clk]=await Promise.all([
-     pool.execute(`SELECT product_kind,product_id,SUM(${notDemo}) orders,SUM(JSON_EXTRACT(o.snapshot,'$.is_demo')=true) demo_orders FROM commerce_orders o WHERE o.source_account_id=? GROUP BY product_kind,product_id`,[aid]),
-     pool.execute(`SELECT o.product_kind,o.product_id,COUNT(*) n,COALESCE(SUM(r.channel_minor),0) earned FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id JOIN commerce_orders o ON o.id=c.order_id WHERE o.source_account_id=? AND r.status='confirmed' AND ${notDemo} GROUP BY o.product_kind,o.product_id`,[aid]),
-     pool.execute("SELECT JSON_UNQUOTE(JSON_EXTRACT(payload,'$.kind')) k,JSON_UNQUOTE(JSON_EXTRACT(payload,'$.id')) i,COUNT(*) n FROM commerce_events WHERE event_type='referral.click' AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.aid'))=? GROUP BY k,i",[String(aid)])
+     pool.execute(`SELECT product_kind,product_id,SUM(${notDemo} AND o.status='fulfilled' AND (o.payment_status='paid' OR COALESCE(o.payment_mode,'')<>'pay_center')) orders,SUM(JSON_EXTRACT(o.snapshot,'$.is_demo')=true) demo_orders FROM commerce_orders o WHERE o.source_account_id=? GROUP BY product_kind,product_id`,[aid]),
+     promotionReport.productUsage(pool,aid),
+     pool.execute(`SELECT k,i,SUM(n) n FROM (
+       SELECT JSON_UNQUOTE(JSON_EXTRACT(payload,'$.kind')) k,JSON_UNQUOTE(JSON_EXTRACT(payload,'$.id')) i,COUNT(*) n
+         FROM commerce_events WHERE event_type='referral.click' AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.aid'))=? GROUP BY k,i
+       UNION ALL
+       SELECT product_kind k,CAST(product_id AS CHAR) i,SUM(clicks) n
+         FROM commerce_referral_daily WHERE promoter_account_id=? GROUP BY product_kind,product_id
+     ) counters GROUP BY k,i`,[String(aid),aid])
     ]);
     const key=(k,id)=>k+':'+id,ordMap={},redMap={},clkMap={};
     for(const r of ord[0])ordMap[key(r.product_kind,r.product_id)]={orders:Number(r.orders)||0,demo_orders:Number(r.demo_orders)||0};
-    for(const r of red[0])redMap[key(r.product_kind,r.product_id)]={n:Number(r.n)||0,earned:Number(r.earned)||0};
+    for(const r of red)redMap[key(r.product_kind,r.product_id)]={n:Number(r.n)||0,earned:Number(r.earned)||0};
     for(const r of clk[0])clkMap[key(r.k,r.i)]=Number(r.n)||0;
     for(const p of products){const o=ordMap[key(p.kind,p.id)]||{},st=redMap[key(p.kind,p.id)]||{};p.clicks=clkMap[key(p.kind,p.id)]||0;p.orders=o.orders||0;p.demo_orders=o.demo_orders||0;p.redemptions=st.n||0;p.earned_minor=st.earned||0;}
     return reply(200,{products});
    }
    if(pathname===prefix+'/shares'&&method==='POST'){
-    // 推广资格闸：settings.promoter_gate='1' 时仅「promoter」角色（或平台全权）可生成分享链接；缺省开放（过渡期，正式推广前收口）。
-    if(await settingValue(pool,'promoter_gate')==='1')assert(principal.roles.some(r=>r.role_code==='promoter'||(r.permissions||[]).includes('*')),'尚未开通推广资格，请联系平台开通',403,'promoter_required');
-    const products=await service.catalog(),product=products.find(v=>v.kind===body.kind&&v.id===body.product_id);assert(product,'商品尚未发布',404);
+    const {qualified}=await service.promotionEligibility(principal.account.id);
+    assert(qualified,'尚未开通推广资格，请联系平台开通',403,'promoter_required');
+    const products=await service.catalog(),product=products.find(v=>!v.private_demo&&v.kind===body.kind&&v.id===body.product_id);assert(product,'商品尚未发布',404);
     const payload=Buffer.from(JSON.stringify({aid:principal.account.id,kind:product.kind,id:product.id,v:product.version,exp:Math.floor(Date.now()/1000)+7*86400})).toString('base64url');
     const secret=process.env.JUZHU_API_KEY||process.env.JUZHU_ADMIN_PASSWORD;assert(secret,'分享服务暂不可用',503);const signature=crypto.createHmac('sha256',secret).update('commerce-share:'+payload).digest('base64url');
     await service.audit(pool,principal,'promotion.share',`${product.kind}/${product.id}`,{version:product.version},{city_id:product.city_id});
     return reply(201,{url:origin+'/juzhu-commerce.html?product='+product.kind+'-'+product.id+'&ref='+payload+'.'+signature,expires_days:7});
    }
    const route=registry.match(pathname,method);assert(route?.perm&&route.perm.startsWith('commerce.'),'接口不存在',404);assert(auth.hasPermission(principal,route.perm),'当前账号没有访问权限',403);
+   if(pathname===prefix+'/admin/distributions'&&method==='GET')return reply(200,await require('./distribution.cjs').list(service,principal));
+   if(pathname===prefix+'/admin/distributions'&&method==='POST')return reply(201,await require('./distribution.cjs').create(service,principal,body,req.headers['idempotency-key']));
+   const campaignAction=pathname.match(/^\/api\/commerce\/v1\/admin\/distributions\/([0-9a-f-]{36})\/(submit|review|activate|close)$/);
+   if(campaignAction&&method==='POST'){
+    const result=await require('./distribution.cjs').action(service,principal,campaignAction[1],campaignAction[2],body);
+    return reply(200,{...result,...(result.token?{url:origin+'/juzhu-commerce.html?campaign='+encodeURIComponent(result.token)}:{})});
+   }
    if(pathname===prefix+'/admin/exchange-codes'&&method==='POST'){assert(demoEnabled,'演示兑换码暂未开放',409);return reply(201,await require('./exchange-codes.cjs').issue(service,principal,body,req.headers['idempotency-key']));}
    if(pathname===prefix+'/admin/exchange-codes'&&method==='GET')return reply(200,await require('./exchange-codes.cjs').list(service,principal,route.perm,Object.fromEntries(url.searchParams)));
    const codeKey=pathname.match(/^\/api\/commerce\/v1\/admin\/exchange-codes\/([0-9a-f-]{36})\/disable$/);

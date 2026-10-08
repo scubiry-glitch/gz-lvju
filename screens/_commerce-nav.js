@@ -6,8 +6,8 @@
 // 挂载：<aside id="commerce-nav" data-view="admin|merchant" data-active="模块key"></aside>
 // data-active 缺省回落 body[data-section]（工作台壳页都有）。登录后自动重渲染，
 // 也可手动 window.BZF_COMMERCE_NAV.refresh()。
-const V='20261002-7';
-const MODULES={dashboard:'经营概览',merchants:'商户管理',stores:'门店管理',staff:'核销人员',skus:'券商品',rules:'报价与分配规则',packages:'券包配置',plans:'会员方案',inventory:'库存管理',capacity:'预约产能',orders:'订单管理',coupons:'卡券发放',memberships:'会员记录',appointments:'预约管理',redemptions:'核销记录',cases:'售后工单',audit:'操作审计',exchanges:'兑换码管理',stats:'运营统计',settlement:'结算账单',refunds:'退款执行',reconciliation:'对账中心'};
+const V='20261008-1';
+const MODULES={dashboard:'经营概览',merchants:'商户管理',stores:'门店管理',staff:'核销人员',skus:'券商品',rules:'报价与分配规则',packages:'券包配置',plans:'会员方案',inventory:'库存管理',capacity:'预约产能',orders:'订单管理',coupons:'卡券发放',memberships:'会员记录',appointments:'预约管理',redemptions:'核销记录',cases:'售后工单',audit:'操作审计',exchanges:'兑换码管理',distributions:'券活动分发',stats:'运营统计',settlement:'结算账单',refunds:'退款执行',reconciliation:'对账中心'};
 const ICONS={
  home:'<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>',
  chart:'<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
@@ -47,7 +47,7 @@ const VIEW_MENUS={
  admin:{title:'新居住 · 权益运营中心',sub:'OPERATIONS',primary:'#0f766e',deep:'#0b5d56',groups:[
   {name:'业务入口',items:[...ENTRY,{id:'merchant',label:'商户中心',icon:'home',href:'commerce-merchant.html',perms:READ_M},{id:'demo-accounts',label:'演示账号',icon:'book',href:'commerce-demo-accounts.html'}]},
   {name:'配置管理',items:[mod('merchants','bank',READ_A),mod('stores','home',READ_A),mod('staff','user',READ_A),mod('skus','box',READ_A),mod('rules','settings',READ_A),mod('packages','layers',READ_A),mod('plans','award',READ_A)]},
-  {name:'履约运营',items:[mod('inventory','list',READ_A),mod('capacity','target',READ_A),mod('orders','file',READ_A,'订单与发放'),mod('appointments','bell',READ_A),mod('redemptions','check',READ_A),mod('exchanges','coin',READ_A)]},
+  {name:'履约运营',items:[mod('inventory','list',READ_A),mod('capacity','target',READ_A),mod('orders','file',READ_A,'订单与发放'),mod('appointments','bell',READ_A),mod('redemptions','check',READ_A),mod('exchanges','coin',READ_A),mod('distributions','layers',READ_A)]},
   {name:'客户与售后',items:[mod('coupons','wallet',READ_A),mod('memberships','star',READ_A),mod('cases','chat',READ_A)]},
   {name:'数据与审计',items:[mod('stats','pulse',READ_A),mod('audit','book',READ_A)]},
   {name:'结算与对账',items:[mod('settlement','coin',FUND),mod('refunds','wallet',FUND),mod('reconciliation','check',FUND),{id:'unified-settlement',label:'统一结算工作台',icon:'bank',href:'settlement-admin.html',perms:['settlement.fund.read']},{id:'settlement-statements',label:'收款方对账单',icon:'file',href:'settlement-statements.html',perms:['settlement.statement.read']},{id:'settlement-manual',label:'结算手册',icon:'book',href:'settlement-manual.html'}]},

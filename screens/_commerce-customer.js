@@ -39,7 +39,7 @@ const step=slides.length>1?slides[1].offsetLeft-slides[0].offsetLeft:sw.clientWi
   dots.forEach((d,j)=>d.classList.toggle('on',j===i));
   benefits.forEach(b=>{b.hidden=b.dataset.planBenefit!==slides[i]?.dataset.planId;});};
  sw.addEventListener('scroll',()=>requestAnimationFrame(sync),{passive:true});
- dots.forEach((d,j)=>d.addEventListener('click',()=>sw.scrollTo({left:j*step,behavior:'smooth'})));
+ dots.forEach((d,j)=>d.addEventListener('click',()=>sw.scrollTo({left:j*step,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})));
  sync();}
 const U=promoter?null:window.COMMERCE_CONSUMER;
 const isShop=document.body.dataset.productShop==='true';
@@ -57,7 +57,7 @@ let couponFilter='all',couponPage=1,assetPage=1,assetHasMore=false,memberPage=1;
 if(U&&city){document.querySelectorAll('.appbar a,.consumer-footer a').forEach(a=>{const u=new URL(a.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});}
 const filter={kind:query.get('kind')||'',topic:query.get('topic')||'',q:'',category:query.get('category')||'',merchant:query.get('merchant')||''};
 function renderCatalog(){if(isDetail){const i=products.findIndex(p=>p.kind===query.get('kind')&&String(p.id)===query.get('id'));content.innerHTML=i>=0?U.detail(products[i],i):C.empty('该权益暂不可用','商品可能已下架，您可以返回生活权益继续选购。','<a class="btn" href="juzhu-commerce.html">返回生活权益</a>');return;}content.innerHTML=tab==='shop'?U.shop(products,filter):U.catalog(products);if(tab==='shop'){setupShopSticky();setupShopHeadCollapse();}if(city){content.querySelectorAll('a[href]').forEach(a=>{const u=new URL(a.getAttribute('href'),location.href);u.searchParams.set('city',city);a.href=u.pathname+u.search;});} }
-if(U){content.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter.kind=b.dataset.filter;filter.topic='';filter.category='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-coupon-filter]');if(!b)return;couponFilter=b.dataset.couponFilter;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-search')return;e.preventDefault();filter.q=new FormData(e.target).get('q').trim();filter.topic='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;filter.category=b.dataset.cat;renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-sort]');if(!b)return;filter.sort=b.dataset.sort;renderCatalog();});content.addEventListener('click',e=>{const b=e.target.closest('[data-clear-merchant]');if(!b)return;filter.merchant='';renderCatalog();});}
+if(U){content.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key))return;const card=e.target.closest('[role="link"][data-action="product"]');if(card&&e.target===card){e.preventDefault();card.click();}});content.addEventListener('click',e=>{const b=e.target.closest('[data-filter]');if(!b)return;filter.kind=b.dataset.filter;filter.topic='';filter.category='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-coupon-filter]');if(!b)return;couponFilter=b.dataset.couponFilter;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-search')return;e.preventDefault();filter.q=new FormData(e.target).get('q').trim();filter.topic='';renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-cat]');if(!b)return;filter.category=b.dataset.cat;renderCatalog();document.querySelector('#consumer-shop')?.scrollIntoView({block:'start'});});content.addEventListener('click',e=>{const b=e.target.closest('[data-sort]');if(!b)return;filter.sort=b.dataset.sort;renderCatalog();});content.addEventListener('click',e=>{const b=e.target.closest('[data-clear-merchant]');if(!b)return;filter.merchant='';renderCatalog();});}
 if(U&&isHotels){content.addEventListener('click',e=>{const b=e.target.closest('[data-tier]');if(!b)return;hotelFilter.tier=hotelFilter.tier===b.dataset.tier?'':b.dataset.tier;load();document.querySelector('.scr')?.scrollTo(0,0);});content.addEventListener('submit',e=>{if(e.target.id!=='consumer-hotel-search')return;e.preventDefault();hotelFilter.q=new FormData(e.target).get('q').trim();load();});content.addEventListener('change',e=>{if(e.target.id==='consumer-hotel-brand'){hotelFilter.brand=e.target.value;load();}});}
 if(promoter)content.addEventListener('click',e=>{
  const open=e.target.closest('[data-open]');if(open){const sec=document.getElementById('fold-'+open.dataset.open);if(sec&&!sec.open){sec.open=true;sec.scrollIntoView({behavior:'smooth',block:'start'});}return;}
@@ -111,24 +111,32 @@ if(!isDetail&&Object.hasOwn(tabs,query.get('view')))tab=query.get('view');if(isS
 function navigation(){const entries=U?['catalog','shop','memberships','account'].map(k=>[k,tabs[k]]):Object.entries(tabs);const current=isDetail?(query.has('coupon')||query.get('kind')==='plans'?'memberships':'shop'):U&&['orders','appointments','cases'].includes(tab)?'account':U&&tab==='coupons'?'memberships':tab;document.querySelector('#commerce-tabs').innerHTML=entries.map(([k,v])=>'<button type="button" data-tab="'+k+'" class="'+(current===k?'on':'')+'" '+(current===k?'aria-current="page"':'')+'>'+(U?U.icon(k):promoterIcons[k]||'')+'<span>'+v+'</span></button>').join('');if(U){document.querySelector('#account-login').hidden=!!C.identity;document.querySelector('#account-logout').hidden=true;}else if(promoter){const on=!!C.identity,loginBtn=document.querySelector('#account-login'),logoutBtn=document.querySelector('#account-logout');if(loginBtn)loginBtn.hidden=on;if(logoutBtn)logoutBtn.hidden=!on;}}
 let loadVersion=0;
 function renderCouponWallet(hasMore){
- const rows=assets.coupons||[],counts=assets.couponCounts||{},filters=[['all','全部'],['available','可用'],['used','已使用'],['expired','已过期'],['frozen','售后中'],['refunded','已退款']];
+ const rows=assets.coupons||[],counts=assets.couponCounts||{},filters=[['all','全部'],['available','可用'],['reserved','占用中'],['used','已使用'],['expired','已过期'],['frozen','售后中'],['refunded','已退款']];
  const chips='<div class="coupon-filter" role="group" aria-label="卡券状态筛选">'+filters.map(([key,label])=>'<button type="button" data-coupon-filter="'+key+'" aria-pressed="'+(couponFilter===key)+'">'+label+' '+(counts[key]||0)+'</button>').join('')+'</div>';
  const card=(r,i)=>U.couponCard(r,i,(assets.appointments||[]).find(a=>a.coupon_id===r.id&&a.status==='booked'));
  let cards='';
  if(couponFilter==='all'){
-  const live=rows.map((r,i)=>[r,i]).filter(([r])=>['available','frozen'].includes(couponState(r)));
-  const history=rows.map((r,i)=>[r,i]).filter(([r])=>!['available','frozen'].includes(couponState(r)));
+  const live=rows.map((r,i)=>[r,i]).filter(([r])=>['available','reserved','frozen'].includes(couponState(r)));
+  const history=rows.map((r,i)=>[r,i]).filter(([r])=>!['available','reserved','frozen'].includes(couponState(r)));
   cards=live.map(([r,i])=>card(r,i)).join('')+(history.length?'<details class="coupon-group"><summary>历史卡券 · 已加载 '+history.length+' 张<i class="fold-arrow" aria-hidden="true">›</i></summary>'+history.map(([r,i])=>card(r,i)).join('')+'</details>':'');
  }else cards=rows.map(card).join('');
  if(!rows.length)cards=couponFilter==='all'?U.empty('coupons',true):'<section class="commerce-card consumer-empty"><h2>该状态下暂无卡券</h2><p>切换其他状态查看，或去选一份生活权益。</p><button class="btn" data-coupon-filter="all">查看全部卡券</button></section>';
  content.innerHTML='<button type="button" class="consumer-back" data-tab="memberships">‹ 返回会员中心</button>'+U.heading('coupons',tabs.coupons)+chips+cards+(hasMore?'<button type="button" class="btn coupon-more" data-action="coupon-more">加载更多卡券</button>':'');
 }
 async function load(appendCoupons=false,appendAssets=false){const version=++loadVersion;C.status('');navigation();content.setAttribute('aria-busy','true');content.inert=true;try{
+ if(U&&query.has('campaign')&&!isDetail){
+  const campaign=await api('/distributions/preview?token='+encodeURIComponent(query.get('campaign')));
+  if(version!==loadVersion)return;
+  content.innerHTML='<section class="commerce-card consumer-empty distribution-preview"><span class="consumer-kicker">NEW LIVING BENEFITS</span><h1>领取生活权益</h1><p>本次活动剩余 <b>'+Number(campaign.remaining)+'</b> 张券，每人最多领取 <b>'+Number(campaign.per_user_limit)+'</b> 张，领取截止 '+C.dateText(campaign.expires_at)+'。</p><ol class="consumer-usage"><li>登录并领取，卡券会存入「我的卡券」</li><li>查看适用商家、服务与有效期</li><li>选择服务后，在结算页确认抵扣与现金应付</li></ol>'+(campaign.remaining?button(C.identity?'立即领取':'登录并领取','claim-distribution','',true):'<p>本次活动的券已领完。</p>')+'<p class="coupon-rule-note">领取后仍需按卡券适用范围使用，最终金额以结算页为准。</p></section>';
+  return;
+ }
  if(isDetail&&query.has('coupon')){tab='coupons';if(!C.identity){content.innerHTML=U.empty('coupons',false);return;}
   const detail=await api('/my/coupons/'+encodeURIComponent(query.get('coupon')));if(version!==loadVersion)return;
-  const r=detail.coupon;assets={coupons:[r],appointments:detail.appointments||[],redemptions:detail.redemptions||[]};
+  const r=detail.coupon;assets={coupons:[r],appointments:detail.appointments||[],redemptions:detail.redemptions||[],applications:detail.applications||[]};
   const chain=(assets.appointments.length||assets.redemptions.length)?'<section class="commerce-card"><h2>履约记录</h2>'+assets.appointments.map(a=>'<div class="detail-row"><span>预约 '+C.dateText(a.service_date)+'</span><b>'+C.label(a.status)+'</b></div>').join('')+assets.redemptions.map(x=>'<div class="detail-row"><span>核销时间</span><b>'+C.dateText(x.created_at)+' · '+(x.status==='reversed'?'已撤销':'已核销')+'</b></div>').join('')+'</section>':'';
-  content.innerHTML=U.couponDetail(r,0,assets.appointments.find(a=>a.status==='booked'))+chain;return;}
+  const applicationStates={reserved:'待付款',committed:'待履约',consumed:'已完成',released:'已释放'};
+  const applications=assets.applications.length?'<section class="commerce-card coupon-applications"><h2>用券订单</h2>'+assets.applications.map(a=>'<div class="coupon-application"><div class="detail-row"><span>'+(a.biz_type==='booking'?'住宿':'本地服务')+' · '+(a.mode==='exchange'?'直接兑换':'金额抵用')+'</span><b>'+esc(applicationStates[a.status]||a.status)+'</b></div><div class="detail-row"><span>券抵</span><b>'+money(a.coupon_minor)+'</b></div><div class="detail-row"><span>现金应付</span><b>'+money(a.cash_minor)+'</b></div><a href="'+(a.biz_type==='booking'?'/lvju-app-order-detail.html?order_no=':'/juzhu-jiazheng-order-detail.html?order_ref=')+encodeURIComponent(a.order_no)+'">查看用券订单 →</a></div>').join('')+'</section>':'';
+  content.innerHTML=U.couponDetail(r,0,assets.appointments.find(a=>a.status==='booked'))+applications+chain;return;}
  if(U&&tab==='coupons'){
   if(!C.identity){content.innerHTML=U.heading('coupons',tabs.coupons)+U.empty('coupons',false);return;}
   const page=appendCoupons?couponPage+1:1,data=await api('/my/coupons?status='+encodeURIComponent(couponFilter)+'&page='+page+'&size=30');if(version!==loadVersion)return;
@@ -161,7 +169,7 @@ async function load(appendCoupons=false,appendAssets=false){const version=++load
  if(!C.identity){content.innerHTML=C.empty('登录后查看'+tabs[tab],'使用新居住账号，安全管理您的生活权益。',button('账号登录','login','',true));return;}
  if(tab==='promotion'){const data=await api('/promotion');if(version!==loadVersion)return;const rec=await api('/promotion/records');if(version!==loadVersion)return;const st=data.settlement||{confirmed_minor:0,settling_minor:0,paid_minor:0,recovery_open_minor:0,awaiting_batch:0};const demoOrders=Number(data.demo_orders)||0;
   // 逐券佣金状态：核销撤销 > 未入批次 > 已到账 > 结算中 > 批次内。
-  const itemState=r=>r.status==='reversed'?'已冲回':!r.item_status?'待入账单':r.payout_status==='paid'?'已到账':r.item_status==='pending'&&r.batch_status==='executing'?'结算中':'批次复核中';
+  const itemState=r=>r.status==='reversed'?'已冲回':r.item_status==='not_applicable'?'无佣金':!r.item_status?'待入账单':r.payout_status==='paid'?'已到账':r.item_status==='pending'&&r.batch_status==='executing'?'结算中':'批次复核中';
   const payStates={pending:'待执行',processing:'处理中',paid:'已到账',failed:'代发失败',cancelled:'已作废'};
   // 状态语义色：钱已落袋=金、在途=青绿、异常=红、其余中性（对齐权益工作台 state-* 徽章语义）。
   const stateCls=s=>({'已到账':'is-paid','已退款':'is-paid','结算中':'is-run','批次复核中':'is-run','处理中':'is-run','已冲回':'is-bad','代发失败':'is-bad'})[s]||'';
@@ -200,9 +208,18 @@ async function showCode(coupon){
  const qr=qrcode(0,'M');qr.addData('NLV1:'+result.coupon_id+':'+result.token);qr.make();
  const d=openDialog('出示核销码','<p class="code-subtitle">'+esc(cleanName(coupon.name))+'</p><div class="voucher-qr">'+qr.createSvgTag({cellSize:4,margin:16,scalable:true,alt:'请门店扫描核销二维码'})+'</div><div class="code-toolbar"><p class="code-expiry" role="status"></p><button class="btn refresh-code" type="button">刷新核销码</button></div><div class="code-divider">或复制券编号，由门店录入</div><label class="field">券编号<input class="copy-value" readonly value="'+esc(result.coupon_id)+'"></label><button type="button" class="btn copy-coupon">复制券编号</button><details class="manual-token"><summary>手动核销动态码</summary><p>门店录入券编号后，还需核对本次动态码。</p><div class="commerce-code">'+esc(result.token)+'</div><button type="button" class="btn copy-token">复制动态码</button></details><p class="code-hint">'+(coupon.redeem_channel==='online'?'线上券无需预约；确认服务后向授权商户出示。':'服务完成后再出示；仅限预约门店于服务当日核销。')+'</p>');
  d.classList.add('voucher-code-dialog');d.querySelector('.copy-coupon').onclick=e=>copyText(result.coupon_id,e.target);d.querySelector('.copy-token').onclick=e=>copyText(result.token,e.target);
- d.querySelector('.refresh-code').onclick=async e=>{e.target.disabled=true;try{await showCode(coupon);d.close();}catch(error){d.querySelector('.dialog-error').textContent=error.message;e.target.disabled=false;}};
- const tick=()=>{if(!d.isConnected){clearInterval(timer);return;}const remaining=Math.max(0,Math.ceil((expires-Date.now())/1000));d.querySelector('.code-expiry').textContent=remaining?'动态码 '+remaining+' 秒后失效':'核销码已失效，请刷新后使用';if(!remaining){d.querySelector('.voucher-qr').innerHTML='<span class="qr-expired">二维码已失效<br><small>请点击“刷新核销码”重新生成</small></span>';d.querySelector('.manual-token').hidden=true;clearInterval(timer);}};
- const timer=setInterval(tick,1000);tick();d.addEventListener('close',()=>clearInterval(timer),{once:true});
+ d.querySelector('.refresh-code').onclick=async e=>{e.target.disabled=true;try{await showCode(coupon);if(d.isConnected&&d.open)d.close();}catch(error){d.querySelector('.dialog-error').textContent=error.message;e.target.disabled=false;}};
+ let redeemed=false,checking=false,timer,checkTimer;
+ const stop=()=>{clearInterval(timer);clearInterval(checkTimer);};
+ const tick=()=>{if(!d.isConnected){stop();return;}const remaining=Math.max(0,Math.ceil((expires-Date.now())/1000));d.querySelector('.code-expiry').textContent=remaining?'动态码 '+remaining+' 秒后失效':'核销码已失效，请刷新后使用';if(!remaining){d.querySelector('.voucher-qr').innerHTML='<span class="qr-expired">二维码已失效<br><small>请点击“刷新核销码”重新生成</small></span>';d.querySelector('.manual-token').hidden=true;clearInterval(timer);}};
+ const checkStatus=async()=>{if(redeemed||checking||!d.isConnected||document.hidden){if(!d.isConnected)stop();return;}checking=true;try{
+  const detail=await api('/my/coupons/'+encodeURIComponent(coupon.id));
+  if(!d.isConnected||detail.coupon?.status!=='redeemed')return;
+  redeemed=true;stop();d.querySelector('.voucher-qr').innerHTML='<div class="code-success" role="status"><span aria-hidden="true">✓</span><strong>服务已核销</strong><small>核销记录已更新</small></div>';
+  d.querySelector('.code-toolbar').hidden=true;d.querySelector('.code-divider').textContent='本券已使用，可回看核销记录';d.querySelector('.copy-value').parentElement.hidden=true;d.querySelector('.copy-coupon').hidden=true;d.querySelector('.manual-token').remove();d.querySelector('.code-hint').hidden=true;
+  const link=document.createElement('a');link.className='btn pri code-result-link';link.href='juzhu-voucher.html?coupon='+encodeURIComponent(coupon.id);link.textContent='查看卡券与核销记录';d.querySelector('.dialog-body').append(link);
+ }catch{}finally{checking=false;}};
+ timer=setInterval(tick,1000);checkTimer=setInterval(checkStatus,5000);tick();d.addEventListener('close',stop,{once:true});
 }
 
 async function book(target){ // target：卡券行或卡券编号（改期时仅有编号）。
@@ -237,6 +254,12 @@ async function book(target){ // target：卡券行或卡券编号（改期时仅
   submit.textContent='提交预约';refresh();
 }
 content.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,r=(assets[tab]||[])[Number(b.dataset.index)];if(b.disabled)return;b.disabled=true;try{
+ if(a==='claim-distribution'){
+  if(!C.identity)await C.login();
+  if(!C.identity)return;
+  const claimed=await api('/distributions/claim','POST',{token:query.get('campaign')},{idempotencyKey:crypto.randomUUID()});
+  location.href='juzhu-voucher.html?coupon='+encodeURIComponent(claimed.coupon_id);return;
+ }
  if(a==='coupon-more'){await load(true);return;}
  if(a==='asset-more'||a==='member-more'){await load(false,true);return;}
  if(a==='pay-order'){await beginPay(b.dataset.orderId);return;}if(a==='refresh-payment'){await refreshPayment(b.dataset.orderId);return;}if(a==='close-order'){await api('/orders/'+encodeURIComponent(b.dataset.orderId)+'/cancel','POST',{});C.status('正在关闭订单，支付结果确认后更新状态');await load();return;}
@@ -248,11 +271,11 @@ content.addEventListener('click',async e=>{const b=e.target.closest('[data-actio
  if(a==='cancel')dialog('取消预约','<p>取消后释放名额，卡券在有效期内仍可重新预约。</p>',async()=>{await api('/appointments','POST',{coupon_id:r.coupon_id,action:'cancel'});await load();});
  if(a==='copy-coupon-id'){await copyText(r.id,b);}
  if(a==='code'){await showCode(r);}
- if(a==='case')dialog('申请售后','<label class="field">申请类型<select name="kind"><option value="help">服务协助</option><option value="refund">未使用退款</option></select></label><label class="field">申请说明<textarea name="reason" minlength="5" maxlength="1000" required></textarea></label><p>退款申请会冻结卡券并取消未履约预约，实际退款以支付机构处理结果为准。</p>',async data=>{await api('/cases','POST',{coupon_id:r.id,...Object.fromEntries(data)});await load();});
+ if(a==='case')dialog('申请售后','<label class="field">申请类型<select name="kind"><option value="help">服务协助</option>'+(r.is_distributed?'':'<option value="refund">未使用退款</option>')+'</select></label><label class="field">申请说明<textarea name="reason" minlength="5" maxlength="1000" required></textarea></label><p>'+(r.is_distributed?'活动赠券的原款由发起人支付；服务问题可提交协助申请。':'退款申请会冻结卡券并取消未履约预约，实际退款以支付机构处理结果为准。')+'</p>',async data=>{await api('/cases','POST',{coupon_id:r.id,...Object.fromEntries(data)});await load();});
  }catch(error){C.status(error.message,true);}finally{b.disabled=false;}});
-document.querySelector('.app').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&tabs[b.dataset.tab]){if(b.dataset.tab==='orders'){location.href='juzhu-jiazheng-orders.html';return;}if(U&&b.dataset.tab==='shop'){location.href='juzhu-vouchers.html'+(city?'?city='+encodeURIComponent(city):'');return;}if(isDetail||isShop||isHotels){location.href='juzhu-commerce.html?view='+b.dataset.tab+(city?'&city='+encodeURIComponent(city):'');return;}tab=b.dataset.tab;load();document.querySelector('.scr').scrollTop=0;}});window.addEventListener('commerce-login',load);
+document.querySelector('.app').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b&&tabs[b.dataset.tab]){if(query.has('campaign')){query.delete('campaign');const clean=new URL(location.href);clean.searchParams.delete('campaign');history.replaceState(null,'',clean);}if(b.dataset.tab==='orders'){location.href='juzhu-jiazheng-orders.html';return;}if(U&&b.dataset.tab==='shop'){location.href='juzhu-vouchers.html'+(city?'?city='+encodeURIComponent(city):'');return;}if(isDetail||isShop||isHotels){location.href='juzhu-commerce.html?view='+b.dataset.tab+(city?'&city='+encodeURIComponent(city):'');return;}tab=b.dataset.tab;load();document.querySelector('.scr').scrollTop=0;}});window.addEventListener('commerce-login',load);
 // 回顶悬浮钮：长列表滚过一屏后出现（rAF 节流；smooth 回顶）。
-if(U){const bt=document.createElement('button');bt.type='button';bt.className='back-top';bt.setAttribute('aria-label','回到顶部');bt.hidden=true;bt.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-7 7 7-7 7 7"/></svg>';bt.onclick=()=>document.querySelector('.scr').scrollTo({top:0,behavior:'smooth'});document.querySelector('.app').append(bt);
+if(U){const bt=document.createElement('button');bt.type='button';bt.className='back-top';bt.setAttribute('aria-label','回到顶部');bt.hidden=true;bt.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-7 7 7-7 7 7"/></svg>';bt.onclick=()=>document.querySelector('.scr').scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});document.querySelector('.app').append(bt);
  let btT=false;document.querySelector('.scr').addEventListener('scroll',e=>{if(btT)return;btT=true;requestAnimationFrame(()=>{btT=false;bt.hidden=e.target.scrollTop<640;});},{passive:true});}
 await C.ready;if(activePaymentOrder&&!C.identity)await paymentLogin();await load();if(activePaymentOrder&&C.identity){if(query.get('pay')==='1'){const clean=new URL(location.href);clean.searchParams.delete('pay');history.replaceState(null,'',clean);beginPay(activePaymentOrder).catch(e=>C.status(e.message,true));}else refreshPayment(activePaymentOrder).catch(e=>C.status(e.message,true));}window.addEventListener('pageshow',()=>{if(activePaymentOrder&&C.identity)refreshPayment(activePaymentOrder).catch(e=>C.status(e.message,true));});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&activePaymentOrder&&C.identity)refreshPayment(activePaymentOrder).catch(e=>C.status(e.message,true));});const params=new URLSearchParams(location.search);if(params.get('ref')){try{await api('/referral?token='+encodeURIComponent(params.get('ref')));}catch(e){C.status(e.message,true);}}const selected=params.get('product');if(selected){const index=products.findIndex(p=>p.kind+'-'+p.id===selected);if(index>=0){if(U){location.href=withRef('juzhu-voucher.html?kind='+products[index].kind+'&id='+products[index].id+(city?'&city='+encodeURIComponent(city):''));return;}content.querySelector('[data-action=product][data-index="'+index+'"]')?.click();}}
 })();

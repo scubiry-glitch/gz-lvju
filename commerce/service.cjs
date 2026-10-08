@@ -6,14 +6,20 @@ const id=()=>crypto.randomUUID();
 const digest=v=>crypto.createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
 const date=v=>new Date(v).toISOString().slice(0,19).replace('T',' ');
 const row=v=>v&&({...v,...(v.payload?{payload:parse(v.payload)}:{}),...(v.snapshot?{snapshot:parse(v.snapshot)}:{})});
+function usageFields(sku={}){return {use_mode:sku.use_mode||null,use_domains:sku.use_domains||[],
+ booking_project_ids:sku.booking_project_ids||[],booking_unit_ids:sku.booking_unit_ids||[],
+ life_product_ids:sku.life_product_ids||[],exchange_contract_minor:sku.exchange_contract_minor||null,
+ use_targets:sku.use_targets||{booking:[],booking_units:[],jiazheng:[]}};}
 function customerCoupon(value){
  const coupon=row(value),snapshot=coupon.snapshot||{},sku=snapshot.sku||{};
  delete coupon.token_hash;delete coupon.token_expires_at;delete coupon.provider_ref;delete coupon.snapshot;
  coupon.name=snapshot.name||sku.name;coupon.description=snapshot.description||sku.description;
  coupon.conditions=sku.conditions;coupon.is_demo=snapshot.is_demo===true;
  coupon.demo_price_minor=snapshot.demo_price_minor??null;
+ coupon.is_distributed=!!snapshot.distribution?.campaign_id;
+ if(coupon.is_distributed)delete coupon.order_id;
  coupon.redeem_channel=sku.redeem_channel||'offline';coupon.exchange_tier=sku.exchange_tier||null;
- coupon.use_mode=sku.use_mode||null;coupon.use_domains=sku.use_domains||[];
+ Object.assign(coupon,usageFields(sku));
  coupon.exchange_tier_label=sku.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===sku.exchange_tier)||{}).label||null:null;
  coupon.exchange_tier_minor=sku.exchange_tier_minor||null;
  return coupon;
@@ -28,6 +34,16 @@ const paymentSummary=order=>order.payment_mode==='pay_center'?{
 const collection=['orders','coupons','memberships','appointments','redemptions','cases','audit','inventory','capacity'];
 class Service {
  constructor(pool,auth){this.pool=pool;this.auth=auth;}
+ async promotionEligibility(accountId){
+  // A failed settings read must never silently open a restricted campaign.
+  const setting=await this.get(this.pool,'SELECT value FROM settings WHERE `key`=? LIMIT 1',['promoter_gate']);
+  const gateOn=String(setting[0]?.value??'')==='1';
+  if(!gateOn)return {gateOn:false,qualified:true};
+  const accounts=await this.get(this.pool,"SELECT id FROM accounts WHERE id=? AND status='active' AND principal_type='user'",[accountId]);
+  if(!accounts.length)return {gateOn:true,qualified:false};
+  const roles=await this.get(this.pool,'SELECT r.role_code,r.permissions FROM account_roles ar JOIN roles r ON r.role_code=ar.role_code WHERE ar.account_id=?',[accountId]);
+  return {gateOn:true,qualified:roles.some(r=>r.role_code==='promoter'||(parse(r.permissions)||[]).includes('*'))};
+ }
  async tx(fn,depth=0){const c=await this.pool.getConnection();try{await c.beginTransaction();const result=await fn(c);await c.commit();c.release();return result;}catch(e){try{await c.rollback();}catch(_){}c.release();
   // 死锁/锁等待是并发调度冲突：事务体均为整事务回滚的纯 DB 序列，可安全重试（M1-A4 性能验收发现并修复）。
   if((e.code==='ER_LOCK_DEADLOCK'||e.code==='ER_LOCK_WAIT_TIMEOUT')&&depth<3)return this.tx(fn,depth+1);
@@ -71,13 +87,26 @@ class Service {
   if(kind==='skus'&&payload.use_mode){
    const vendors=await this.get(c,`SELECT id FROM jz_vendors WHERE status='active' AND id IN (${payload.use_vendor_ids.map(()=>'?').join(',')})`,payload.use_vendor_ids);
    assert(vendors.length===payload.use_vendor_ids.length,'适用商家未全部准入');
+   const contracts=await this.get(c,`SELECT m.id,m.vendor_id,m.published_version,JSON_UNQUOTE(JSON_EXTRACT(v.snapshot,'$.contract_ref')) contract_ref
+     FROM commerce_merchants m JOIN commerce_versions v ON v.kind='merchants' AND v.entity_id=m.id AND v.version=m.published_version
+     WHERE m.city_id=? AND m.status<>'archived' AND m.vendor_id IN (${payload.use_vendor_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.use_vendor_ids]);
+   assert(payload.use_vendor_ids.every(v=>contracts.some(m=>Number(m.vendor_id)===v&&String(m.contract_ref||'').trim())),'适用商家缺少已批准的履约合同');
+   payload.use_vendor_contracts=Object.fromEntries(payload.use_vendor_ids.map(v=>{const contract=contracts.find(m=>Number(m.vendor_id)===v&&String(m.contract_ref||'').trim());return [String(v),{merchant_id:Number(contract.id),version:Number(contract.published_version),contract_ref:contract.contract_ref}];}));
+   payload.use_targets={booking:[],jiazheng:[]};
    if(payload.booking_project_ids?.length){
-    const projects=await this.get(c,`SELECT id,owner_vendor_id FROM projects WHERE city_id=? AND status='online' AND rating_status='passed' AND channel IN ('rental','minsu') AND id IN (${payload.booking_project_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.booking_project_ids]);
+    const projects=await this.get(c,`SELECT id,name,owner_vendor_id FROM projects WHERE city_id=? AND status='online' AND rating_status='passed' AND channel IN ('rental','minsu') AND id IN (${payload.booking_project_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.booking_project_ids]);
     assert(projects.length===payload.booking_project_ids.length&&projects.every(v=>payload.use_vendor_ids.includes(Number(v.owner_vendor_id))),'适用住宿项目、城市或商家不匹配');
+    payload.use_targets.booking=projects.map(v=>({id:Number(v.id),name:v.name}));
+   }
+   if(payload.booking_unit_ids?.length){
+    const units=await this.get(c,`SELECT u.id,u.name,u.project_id,p.owner_vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE p.city_id=? AND p.status='online' AND p.rating_status='passed' AND u.id IN (${payload.booking_unit_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.booking_unit_ids]);
+    assert(units.length===payload.booking_unit_ids.length&&units.every(v=>payload.booking_project_ids.includes(Number(v.project_id))&&payload.use_vendor_ids.includes(Number(v.owner_vendor_id))),'适用房型必须属于已批准的住宿项目和商家');
+    payload.use_targets.booking_units=units.map(v=>({id:Number(v.id),project_id:Number(v.project_id),name:v.name}));
    }
    if(payload.life_product_ids?.length){
-    const products=await this.get(c,`SELECT id,vendor_id FROM jz_products WHERE city_id=? AND status='on' AND id IN (${payload.life_product_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.life_product_ids]);
+    const products=await this.get(c,`SELECT id,title,vendor_id FROM jz_products WHERE city_id=? AND status='on' AND id IN (${payload.life_product_ids.map(()=>'?').join(',')})`,[scope.city_id,...payload.life_product_ids]);
     assert(products.length===payload.life_product_ids.length&&products.every(v=>payload.use_vendor_ids.includes(Number(v.vendor_id))),'适用本地服务商品、城市或商家不匹配');
+    payload.use_targets.jiazheng=products.map(v=>({id:Number(v.id),name:v.title}));
    }
   }
   if(kind==='packages'){
@@ -87,7 +116,15 @@ class Service {
   await this.allowed(c,p,perm,scope,merchantOnly);return scope;
  }
  async lookups(p,perm,kind,merchantOnly=false){
-  assert(['cities','vendors','accounts','purchase_rules','spots','projects','life_products'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  assert(['cities','vendors','accounts','purchase_rules','spots','projects','units','life_products'].includes(kind),'选项类型不存在',404);const scope=this.scope(p,perm);if(kind==='purchase_rules'){const filter=this.filter(p,perm,'r',merchantOnly);return this.get(this.pool,"SELECT r.id,r.name FROM commerce_rules r WHERE r.published_version IS NOT NULL AND r.status<>'archived' AND "+filter.sql+' ORDER BY r.name LIMIT 1000',filter.args);}
+  if(kind==='units'){
+   let where="p.status='online' AND p.rating_status='passed' AND p.channel IN ('rental','minsu')",args=[];
+   if(merchantOnly||scope.level==='vendor'){where+=' AND p.owner_vendor_id=?';args=[scope.vendorId||-1];}
+   else if(scope.level==='city'&&scope.cityIds.length){where+=` AND p.city_id IN (${scope.cityIds.map(()=>'?').join(',')})`;args=scope.cityIds;}
+   else if(scope.level==='org'){where+=' AND p.owner_vendor_id IN (SELECT id FROM jz_vendors WHERE org_id=?)';args=[scope.orgId||-1];}
+   else if(scope.level!=='all')where+=' AND 1=0';
+   return this.get(this.pool,`SELECT u.id,CONCAT(p.name,' · ',u.name) name,p.city_id,p.owner_vendor_id vendor_id FROM units u JOIN projects p ON p.id=u.project_id WHERE ${where} ORDER BY u.id DESC LIMIT 1000`,args);
+  }
   if(kind==='projects'||kind==='life_products'){
    const table=kind==='projects'?'projects':'jz_products',name=kind==='projects'?'name':'title',vendor=kind==='projects'?'owner_vendor_id':'vendor_id';
    let where=kind==='projects'?"status='online' AND rating_status='passed' AND channel IN ('rental','minsu')":"status='on'";const args=[];
@@ -154,8 +191,7 @@ class Service {
  }
  async transition(p,perm,kind,key,input,merchantOnly=false){return this.tx(async c=>{const e=await this.entity(c,kind,key,true);await this.allowed(c,p,perm,e,merchantOnly);assert(!merchantOnly||definitions[kind].merchant,'不允许操作平台配置',403);assert(e.version===input.version,'记录已更新，请刷新',409);
   const action=input.action;const states={submit:['draft','rejected'],approve:['submitted'],reject:['submitted'],publish:['approved'],archive:['published','draft','rejected']};assert(states[action]?.includes(e.status),'当前状态不能执行该操作',409);assert(!merchantOnly||action==='submit','商户只能提交审核',403);
-  // 演示环境口径（2026-10-02 拍板）：审核人不限角色、允许提交人自己复核（上线前建议恢复双人复核闸）。
-  // if(['approve','reject'].includes(action)){assert(e.submitted_by!==p.account.id,'提交人不能复核自己的申请',403);}
+  if(['approve','reject'].includes(action))assert(String(e.submitted_by)!==String(p.account.id),'提交人不能复核自己的申请',403);
   if(['approve','reject'].includes(action)){assert(typeof input.note==='string'&&input.note.trim().length>=2&&input.note.length<=1000,'请填写审核意见');}
   if(['submit','approve','publish'].includes(action)){const valid=validate(kind,e.payload);await this.references(c,kind,valid,p,perm,merchantOnly);if(action==='approve') {if(e.payload.initialization)valid.initialization=e.payload.initialization;await c.execute('UPDATE commerce_'+kind+' SET payload=? WHERE id=?',[JSON.stringify(valid),key]);await c.execute('INSERT INTO commerce_versions(kind,entity_id,version,snapshot,reviewed_by) VALUES(?,?,?,?,?)',[kind,key,e.version,JSON.stringify(valid),p.account.id]);}}
   const status={submit:'submitted',approve:'approved',reject:'rejected',publish:'published',archive:'archived'}[action];
@@ -175,16 +211,18 @@ class Service {
      id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,
      name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,
      valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,
+     private_demo:p.initialization?.seed_key==='coupon-offset-demo-20261008',
      purchase_ready:!demo&&source.length>0&&source.every(i=>!!(kind==='skus'?p.rule:i.rule)),
      category_id:p.category_id||null,merchant_id:e.merchant_id||null,merchant_name:e.merchant_name||null,
      image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,
      topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,
      redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,
+     ...usageFields(kind==='skus'?p:{}),
      spot_ids:kind==='skus'&&Array.isArray(p.spot_ids)?p.spot_ids:[],
      exchange_tier:p.exchange_tier||null,
      exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,
      exchange_tier_minor:p.exchange_tier_minor||null,
-     items:source.map(i=>({sku_id:i.sku_id,name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id}))
+     items:source.map(i=>({sku_id:i.sku_id,name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id,face_minor:i.allocation_minor||i.sku.retail_minor,...usageFields(i.sku)}))
     });
    }
   }
@@ -214,7 +252,7 @@ class Service {
    return {minor:known?income:null,bps:known&&price>0?Math.round(income/price*10000):null};
   };
   const out=[];for(const kind of ['packages','plans','skus']){const args=[kind];let where="e.status<>'archived'";if(city){where+=' AND (c.name=? OR c.slug=? OR CAST(c.id AS CHAR)=?)';args.push(city,city,city);}const rows=await this.get(this.pool,`SELECT e.id,e.city_id,e.published_version,v.snapshot,c.name city_name,e.merchant_id,m.name merchant_name FROM commerce_${kind} e JOIN commerce_versions v ON v.kind=? AND v.entity_id=e.id AND v.version=e.published_version JOIN cities c ON c.id=e.city_id LEFT JOIN commerce_merchants m ON m.id=e.merchant_id WHERE ${where}`,args);for(const e of rows){const p=parse(e.snapshot),demo=isDemo(p)||p.is_demo===true,comm=commissionOf(kind,p,demo);
-   out.push({id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,purchase_ready:!demo&&(kind==='skus'?!!p.rule:(p.items||p.package?.items||[]).length>0&&(p.items||p.package?.items||[]).every(i=>!!i.rule)),category_id:p.category_id||null,merchant_id:e.merchant_id||null,merchant_name:e.merchant_name||null,image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,exchange_tier:p.exchange_tier||null,exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,exchange_tier_minor:p.exchange_tier_minor||null,items:(kind==='skus'?[{sku:p,quantity:1}]:(p.items||p.package?.items||[])).map(i=>({name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id})),commission_minor:comm.minor,commission_bps:comm.bps});}}
+   out.push({id:e.id,kind,city_id:e.city_id,city_name:e.city_name,version:e.published_version,name:p.name,description:p.description,price_minor:kind==='skus'?p.retail_minor:p.price_minor,valid_days:kind==='plans'?p.valid_days:null,is_demo:demo,purchase_ready:!demo&&(kind==='skus'?!!p.rule:(p.items||p.package?.items||[]).length>0&&(p.items||p.package?.items||[]).every(i=>!!i.rule)),category_id:p.category_id||null,merchant_id:e.merchant_id||null,merchant_name:e.merchant_name||null,image:p.image||p.cover_image||(Array.isArray(p.images)&&p.images[0])||null,topic_id:p.topic_id||p.initialization?.topic_id||null,channel_slug:p.channel_slug||null,redeem_channel:kind==='skus'?(p.redeem_channel||'offline'):null,...usageFields(kind==='skus'?p:{}),exchange_tier:p.exchange_tier||null,exchange_tier_label:p.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===p.exchange_tier)||{}).label||null:null,exchange_tier_minor:p.exchange_tier_minor||null,items:(kind==='skus'?[{sku:p,quantity:1}]:(p.items||p.package?.items||[])).map(i=>({name:i.sku.name,quantity:i.quantity,description:i.sku.description,conditions:i.sku.conditions,valid_days:i.sku.valid_days,store_id:i.sku.store_id,face_minor:i.allocation_minor||i.sku.retail_minor,...usageFields(i.sku)})),commission_minor:comm.minor,commission_bps:comm.bps});}}
   return out;}
  // 公开酒店名录（试点名单演示）：只读 published 快照中的演示酒店，输出公开字段与档位 facets。
  async hotels(query={}){
@@ -267,6 +305,7 @@ class Service {
  }
 
  async expireCoupons(){
+  await require('./distribution.cjs').expire(this);
   const candidates=await this.get(this.pool,"SELECT id,account_id FROM commerce_coupons WHERE status='available' AND expires_at<=UTC_TIMESTAMP() LIMIT 100");
   for(const candidate of candidates)await this.tx(async c=>{
    const coupon=await this.coupon(c,candidate.id);if(coupon.status!=='available'||new Date(coupon.expires_at)>new Date())return;
@@ -278,6 +317,7 @@ class Service {
    await require('./main-system.cjs').linkCase(c,{id:caseId,reason:'未使用权益到期处理'+(coupon.snapshot.is_demo?'（演示，无实际退款）':''),status:coupon.snapshot.is_demo?'closed':'awaiting_provider'},coupon);
    await c.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',[coupon.id,coupon.snapshot.is_demo?'demo.coupon.expired':'coupon.expired_refund_requested',JSON.stringify({coupon_id:coupon.id,case_id:caseId})]);
   });
+  await this.pool.execute('DELETE FROM commerce_referral_visits WHERE expires_at<UTC_TIMESTAMP() LIMIT 1000');
  }
  async verifyReferral(token,product){
   assert(typeof token==='string'&&token.length<1500,'推广链接无效',422);const [payload,signature,...rest]=token.split('.');assert(payload&&signature&&!rest.length,'推广链接无效',422);
@@ -287,10 +327,11 @@ class Service {
   assert(data.exp>Math.floor(Date.now()/1000)&&['packages','plans','skus'].includes(data.kind),'推广链接已过期',422);
   const entity=await this.approved(this.pool,data.kind,data.id);assert(entity.version===data.v,'推广商品已更新，请获取新链接',409);
   if(product)assert(product.kind===data.kind&&product.product_id===data.id,'推广链接与商品不匹配',422);
-  const accounts=await this.get(this.pool,"SELECT id FROM accounts WHERE id=? AND status='active' AND principal_type='user'",[data.aid]);assert(accounts.length,'推广来源不可用',422);return data;
+  const accounts=await this.get(this.pool,"SELECT id FROM accounts WHERE id=? AND status='active' AND principal_type='user'",[data.aid]);assert(accounts.length,'推广来源不可用',422);
+  const eligibility=await this.promotionEligibility(data.aid);assert(eligibility.qualified,'推广来源资格已失效',422);return data;
  }
 
- async my(p){const out={};for(const kind of ['orders','coupons','memberships','appointments','cases','redemptions']) {const sql=kind==='memberships'?`SELECT m.*,o.city_id,o.product_id,o.product_version,c.name city_name FROM commerce_memberships m LEFT JOIN commerce_orders o ON o.id=m.order_id LEFT JOIN cities c ON c.id=o.city_id WHERE m.account_id=? ORDER BY m.expires_at DESC,m.order_id DESC LIMIT 100`:`SELECT * FROM commerce_${kind} WHERE account_id=? ORDER BY id DESC LIMIT 100`;const rows=await this.get(this.pool,sql,[p.account.id]);out[kind]=rows.map(r=>{const e=row(r);delete e.token_hash;delete e.token_expires_at;delete e.provider_ref;if(e.snapshot){const s=e.snapshot;e.name=s.name||s.sku?.name;e.description=s.description||s.sku?.description;e.conditions=s.sku?.conditions;e.is_demo=s.is_demo===true;e.demo_price_minor=s.demo_price_minor??null;e.redeem_channel=s.sku?.redeem_channel||'offline';e.exchange_tier=s.sku?.exchange_tier||null;e.exchange_tier_label=s.sku?.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===s.sku.exchange_tier)||{}).label||null:null;e.exchange_tier_minor=s.sku?.exchange_tier_minor||null;if(kind==='memberships'){e.valid_days=s.valid_days;e.items=(s.package?.items||[]).map(i=>({name:i.sku?.name,quantity:i.quantity,description:i.sku?.description,conditions:i.sku?.conditions,valid_days:i.sku?.valid_days}));}delete e.snapshot;}if(kind==='orders'){for(const key of paymentColumns)delete e[key];Object.assign(e,paymentSummary(r));e.main_order_ref=e.id;}if(kind==='cases')e.work_order_id=e.id;return e;});if(kind==='redemptions')out[kind]=out[kind].map(({id,coupon_id,created_at})=>({id,coupon_id,created_at}));}
+ async my(p){const out={};for(const kind of ['orders','coupons','memberships','appointments','cases','redemptions']) {const sql=kind==='memberships'?`SELECT m.*,o.city_id,o.product_id,o.product_version,c.name city_name FROM commerce_memberships m LEFT JOIN commerce_orders o ON o.id=m.order_id LEFT JOIN cities c ON c.id=o.city_id WHERE m.account_id=? ORDER BY m.expires_at DESC,m.order_id DESC LIMIT 100`:`SELECT * FROM commerce_${kind} WHERE account_id=? ORDER BY id DESC LIMIT 100`;const rows=await this.get(this.pool,sql,[p.account.id]);out[kind]=rows.map(r=>{const e=row(r);delete e.token_hash;delete e.token_expires_at;delete e.provider_ref;if(e.snapshot){const s=e.snapshot;e.name=s.name||s.sku?.name;e.description=s.description||s.sku?.description;e.conditions=s.sku?.conditions;e.is_demo=s.is_demo===true;if(kind==='coupons'){e.is_distributed=!!s.distribution?.campaign_id;if(e.is_distributed)delete e.order_id;}e.demo_price_minor=s.demo_price_minor??null;e.redeem_channel=s.sku?.redeem_channel||'offline';e.exchange_tier=s.sku?.exchange_tier||null;e.exchange_tier_label=s.sku?.exchange_tier?(EXCHANGE_TIERS.find(t=>t.value===s.sku.exchange_tier)||{}).label||null:null;e.exchange_tier_minor=s.sku?.exchange_tier_minor||null;if(kind==='coupons')Object.assign(e,usageFields(s.sku));if(kind==='memberships'){e.valid_days=s.valid_days;e.items=(s.package?.items||[]).map(i=>({name:i.sku?.name,quantity:i.quantity,description:i.sku?.description,conditions:i.sku?.conditions,valid_days:i.sku?.valid_days}));}delete e.snapshot;}if(kind==='orders'){for(const key of paymentColumns)delete e[key];Object.assign(e,paymentSummary(r));e.main_order_ref=e.id;}if(kind==='cases')e.work_order_id=e.id;return e;});if(kind==='redemptions')out[kind]=out[kind].map(({id,coupon_id,created_at})=>({id,coupon_id,created_at}));}
  out.refunds=(await this.get(this.pool,`SELECT ro.refund_no,ro.coupon_id,ro.order_id,ro.amount_minor,ro.kind,ro.status,ro.fail_reason,ro.created_at,ro.settled_at,JSON_UNQUOTE(JSON_EXTRACT(cc.snapshot,'$.sku.name')) coupon_name FROM commerce_refund_orders ro LEFT JOIN commerce_coupons cc ON cc.id=ro.coupon_id WHERE ro.account_id=? ORDER BY ro.id DESC LIMIT 100`,[p.account.id])).map(r=>({refund_no:r.refund_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,order_id:r.order_id,amount_minor:r.amount_minor,kind:r.kind,status:r.status==='paid'?'refunded':r.status,fail_reason:r.fail_reason,created_at:r.created_at,settled_at:r.settled_at}));
  out.compensations=(await this.get(this.pool,`SELECT cp.compensation_no,cp.coupon_id,cp.amount_minor,cp.status,cp.review_note,cp.created_at,JSON_UNQUOTE(JSON_EXTRACT(cpv.snapshot,'$.sku.name')) coupon_name FROM commerce_compensation_cases cp LEFT JOIN commerce_coupons cpv ON cpv.id=cp.coupon_id WHERE cp.account_id=? ORDER BY cp.id DESC LIMIT 100`,[p.account.id])).map(r=>({compensation_no:r.compensation_no,coupon_id:r.coupon_id,coupon_name:r.coupon_name,amount_minor:r.amount_minor,status:r.status,note:r.review_note,created_at:r.created_at}));
  return out;}
@@ -355,7 +396,7 @@ class Service {
   const counts=Object.fromEntries(Object.entries(countsRow).map(([key,value])=>[key,Number(value)]));
   const rows=await this.get(this.pool,`SELECT c.* FROM commerce_coupons c LEFT JOIN commerce_orders o ON o.id=c.order_id
    WHERE c.account_id=? AND (${filters[status]})
-   ORDER BY CASE WHEN c.status='available' AND c.expires_at>UTC_TIMESTAMP() THEN 0 WHEN c.status='frozen' THEN 1 ELSE 2 END,
+   ORDER BY CASE WHEN c.status='available' AND c.expires_at>UTC_TIMESTAMP() THEN 0 WHEN c.status='reserved' THEN 1 WHEN c.status='frozen' THEN 2 ELSE 3 END,
    o.created_at DESC,c.item_id DESC,c.unit_no,c.id DESC LIMIT ${size} OFFSET ${(page-1)*size}`,[p.account.id]);
   let appointments=[];
   if(rows.length){
@@ -479,7 +520,7 @@ class Service {
   if(coupon.snapshot.is_demo!==true){const shared=await require('./settlement.cjs').confirmSharedRedemption(c,{coupon,order,redemption_id:redemption,merchant_id:merchantId,amounts:{supplier_minor:supplier,channel_minor:channel}});if(!shared)await require('./settlement.cjs').post(c,{sourceType:'redemption',sourceId:redemption,lines:require('./settlement.cjs').confirmLines({merchant_id:merchantId,allocation_minor:amount,supplier_minor:supplier,beike_minor:beike,channel_minor:channel,retained_minor:beike-channel,source_account_id:order.source_account_id}),rule_ref:'rule:'+coupon.snapshot.rule_id+'.v'+(coupon.snapshot.rule_version??'?'),memo:'redemption '+redemption});}
   await c.execute("UPDATE commerce_coupons SET status='redeemed',token_hash=NULL,token_expires_at=NULL WHERE id=?",[coupon.id]);if(appointment)await c.execute("UPDATE commerce_appointments SET status='completed' WHERE id=?",[appointment.id]);await this.audit(c,p,'coupon.redeem',coupon.id,{redemption},coupon);return {id:redemption,status:'redeemed',store_id:storeId,online};
  }));}
- async openCase(p,input,key){return this.tx(c=>this.idem(c,p,'case',key,input,async()=>{assert(['refund','help','compensation'].includes(input.kind)&&typeof input.reason==='string'&&input.reason.trim().length>=5&&input.reason.length<=1000,'请选择售后类型并填写至少5字说明');const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);const existing=await this.get(c,"SELECT id FROM commerce_cases WHERE coupon_id=? AND status IN ('open','processing','awaiting_provider')",[coupon.id]);assert(!existing.length,'已有处理中售后，请勿重复提交',409);
+ async openCase(p,input,key){return this.tx(c=>this.idem(c,p,'case',key,input,async()=>{assert(['refund','help','compensation'].includes(input.kind)&&typeof input.reason==='string'&&input.reason.trim().length>=5&&input.reason.length<=1000,'请选择售后类型并填写至少5字说明');const coupon=await this.coupon(c,input.coupon_id);assert(coupon.account_id===p.account.id,'不能操作其他人的卡券',403);assert(input.kind!=='refund'||!coupon.snapshot?.distribution?.campaign_id,'赠送券不能由领取人申请原款退款，请申请服务协助',409);const existing=await this.get(c,"SELECT id FROM commerce_cases WHERE coupon_id=? AND status IN ('open','processing','awaiting_provider')",[coupon.id]);assert(!existing.length,'已有处理中售后，请勿重复提交',409);
   if(input.kind==='refund'){assert(coupon.status==='available','卡券已使用或冻结，不能申请未使用退款',409);await c.execute("UPDATE commerce_coupons SET status='frozen',token_hash=NULL WHERE id=?",[coupon.id]);const appts=await this.get(c,"SELECT * FROM commerce_appointments WHERE coupon_id=? AND status='booked' FOR UPDATE",[coupon.id]);for(const a of appts){await c.execute("UPDATE commerce_appointments SET status='cancelled' WHERE id=?",[a.id]);await c.execute('UPDATE commerce_capacity SET reserved=reserved-1 WHERE store_id=? AND service_date=?',[a.store_id,date(a.service_date).slice(0,10)]);}}
   if(input.kind==='compensation'){assert(coupon.status==='redeemed'&&coupon.snapshot.is_demo!==true,'服务失败赔付仅面向已核销的非演示卡券（未核销请申请退款）',409);}
   const caseId=id();await c.execute('INSERT INTO commerce_cases(id,coupon_id,account_id,merchant_id,store_id,city_id,kind,reason,status) VALUES(?,?,?,?,?,?,?,?,?)',[caseId,coupon.id,p.account.id,coupon.merchant_id,coupon.store_id,coupon.city_id,input.kind,input.reason.trim(),'open']);await require('./main-system.cjs').linkCase(c,{id:caseId,reason:input.reason.trim(),status:'open'},coupon);return {id:caseId,status:'open',work_order_id:caseId};

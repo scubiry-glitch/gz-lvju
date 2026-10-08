@@ -7,6 +7,13 @@ const stay=require('../../stay_config.cjs');
 const vendorRate=require('../../vendor_rate.cjs');
 const {createBookingRouter}=require('../../server/routes/booking.cjs');
 
+test('booking dates cannot exceed the nights priced and reserved',()=>{
+  assert.equal(stay.bookingNights('2026-01-01','2027-01-02'),366);
+  assert.equal(stay.stayDateList('2026-01-01','2027-01-02').length,366);
+  assert.equal(stay.bookingNights('2026-01-01','2027-01-03'),0);
+  assert.equal(stay.bookingNights('2026-01-01','2037-01-01'),0);
+});
+
 test('lodging exchange uses contracted amount, rejects stale quotes, and creates no payment guard',
   {skip:!process.env.PAYMENT_TEST_SOCKET,timeout:90000},async()=>{
   const socketPath=process.env.PAYMENT_TEST_SOCKET,cfg=require('../../commerce/db.cjs').config();
@@ -25,7 +32,7 @@ test('lodging exchange uses contracted amount, rejects stale quotes, and creates
     const originalOrder=crypto.randomUUID(),coupon=crypto.randomUUID();
     await pool.execute("INSERT INTO commerce_orders(id,account_id,city_id,product_kind,product_id,product_version,amount_minor,status,expires_at,snapshot,payment_status,paid_payment_order_id) VALUES(?,101,3,'skus',1,1,12000,'fulfilled','2099-12-31',?,'paid',55)",[originalOrder,JSON.stringify({settlement_profiles:{1:{source_account_id:'source-account'}}})]);
     const sku={name:'单间一晚兑换券',use_mode:'exchange',exchange_contract_minor:12000,
-      use_domains:['booking','jiazheng'],use_vendor_ids:[1],booking_project_ids:[301],life_product_ids:[201]};
+      use_domains:['booking','jiazheng'],use_vendor_ids:[1],use_vendor_contracts:{1:{merchant_id:1,contract_ref:'C-1'}},booking_project_ids:[301],booking_unit_ids:[401],life_product_ids:[201]};
     await pool.execute("INSERT INTO commerce_coupons(id,order_id,item_id,unit_no,account_id,merchant_id,store_id,city_id,status,expires_at,allocation_minor,snapshot) VALUES(?,?,1,1,101,1,1,3,'available','2099-12-31',12000,?)",[coupon,originalOrder,JSON.stringify({sku})]);
     const connect=()=>mysql.createConnection({socketPath,user:'root',database,timezone:'Z',dateStrings:true});
     const queryRows=async(sql,args=[])=>(await pool.execute(sql,args))[0];
