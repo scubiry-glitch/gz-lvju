@@ -960,6 +960,10 @@ function createSchema(deps) {
       // Versioned shared-payment migrations fail explicitly; no blanket ALTER
       // suppression is allowed for the cashier's concurrency guarantees.
       await require('./payment/migrate.cjs').migrate(conn);
+      // commerce/migrate.cjs 创建所有 commerce_* 表（包含 commerce_coupons），
+      // coupon-application.cjs 依赖这些表已存在，必须先行。
+      const { getPool } = require('./db.cjs');
+      await require('../commerce/migrate.cjs').migrate(getPool());
       await require('../commerce/coupon-application.cjs').migrate(conn);
       schemaEnsured = true;
     } finally {
