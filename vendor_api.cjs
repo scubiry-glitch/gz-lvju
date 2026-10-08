@@ -1019,54 +1019,53 @@ async function housingPhotosAdd(conn, body, vendorId) {
   const sourcePath = b.source_path || (ref.kind === 'external' ? filePath : null);
   const isCover = b.is_cover ? 1 : 0;
   // 幂等（2026-09）：同实体同 URL / 同 external_id 已存在 → 原地更新，不再插重复行
-  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）
-  const [dup] = await conn.execute(
-    `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
-       AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
-    externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
-  if (dup.length) {
-    const sets = ['file_path=?', 'category=?'];
-    const vals = [filePath, category];
-    if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
-    if (b.source_path != null) { sets.push('source_path=?'); vals.push(b.source_path || null); }
-    // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
-    if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
-    if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
-    vals.push(dup[0].id);
-    await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
-    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-    const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
-    return reply(200, { code: 0, message: 'success', updated: true, photo: photoOut(upd[0]) });
-  }
-  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-  let nextSort;
-  if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
-    nextSort = parseInt(b.sort_order, 10);
-  } else {
-    const [mx] = await conn.execute(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
-      [entityType, entityId]);
-    nextSort = mx[0].n;
-  }
-  const [r] = await conn.execute(
-    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
-     VALUES (?,?,?,?,?,?,?,?)`,
-    [entityType, entityId, filePath, b.source_path || null, isCover, nextSort, category, externalId]);
-  if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-  if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
-  return reply(200, { code: 0, message: 'success', photo: photoOut(photo[0]) });
+  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）；更新与插入都走事务 + 归属行锁
   await conn.beginTransaction();
   try {
     // 归属行锁：并发「设为封面」/批量登记时保证 is_cover 唯一与 sort_order 不重复
     await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    const [dup] = await conn.execute(
+      `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
+         AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
+      externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
+    if (dup.length) {
+      const sets = ['file_path=?', 'category=?'];
+      const vals = [ref.ref, category];
+      if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
+      if (b.source_path != null) { sets.push('source_path=?'); vals.push(sourcePath); }
+      // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
+      if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
+      if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
+      vals.push(dup[0].id);
+      await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
+      if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+      if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
+      const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
+      await conn.commit();
+      return reply(200, {
+        code: 0, message: 'success', updated: true,
+        storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
+        file_path: ref.ref,
+        warned: ref.warn || undefined,
+        photo: photoOut(upd[0]),
+      });
+    }
     if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-    const [next] = await conn.execute('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    let nextSort;
+    if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
+      nextSort = parseInt(b.sort_order, 10);
+    } else {
+      const [mx] = await conn.execute(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+        [entityType, entityId]);
+      nextSort = mx[0].n;
+    }
     const [r] = await conn.execute(
-      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)`,
-      [entityType, entityId, ref.ref, sourcePath, isCover, next[0].n]);
-    if (entityType === 'project' && isCover) await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [entityType, entityId, ref.ref, sourcePath, isCover, nextSort, category, externalId]);
+    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
     const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
     await conn.commit();
     return reply(200, {
@@ -1074,7 +1073,7 @@ async function housingPhotosAdd(conn, body, vendorId) {
       storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
       file_path: ref.ref,
       warned: ref.warn || undefined,
-      photo: photo[0],
+      photo: photoOut(photo[0]),
     });
   } catch (e) {
     await conn.rollback().catch(() => {});
@@ -1136,33 +1135,46 @@ async function housingPhotosUpload(conn, body, vendorId) {
   if (!upload.ok) return reply(400, { code: 400, message: upload.error });
 
   const isCover = b.is_cover ? 1 : 0;
-  let sortOrder = b.sort_order == null || b.sort_order === '' ? null : parseInt(b.sort_order, 10);
-  if (sortOrder == null) {
-    const [next] = await conn.execute(
-      `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?`,
-      [entityType, entityId]
+  // 落库段：S3 已上传成功 → 失败必须补偿删对象（避免孤儿对象）；事务 + 归属行锁保 is_cover 唯一
+  await conn.beginTransaction();
+  try {
+    await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    let sortOrder = b.sort_order == null || b.sort_order === '' ? null : parseInt(b.sort_order, 10);
+    if (sortOrder == null) {
+      const [next] = await conn.execute(
+        `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?`,
+        [entityType, entityId]
+      );
+      sortOrder = next[0].n;
+    }
+    if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    const [ins] = await conn.execute(
+      'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+      [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
     );
-    sortOrder = next[0].n;
+    if (entityType === 'project' && isCover) {
+      await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
+    }
+    const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [ins.insertId]);
+    await conn.commit();
+    return reply(200, {
+      code: 0, message: 'success',
+      storage: upload.storage,
+      file_path: upload.url,
+      thumb_240: upload.thumb_240 || null,
+      thumb_640: upload.thumb_640 || null,
+      bytes: upload.bytes,
+      warned: upload.warned || undefined,
+      photo: photo[0],
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    // 补偿删除已上传的对象（原图 + 两档缩略图）；失败仅告警，不覆盖原始错误
+    if (imgStorage && typeof imgStorage.deleteObjectByRef === 'function' && upload.storage === 's3' && upload.url) {
+      try { await imgStorage.deleteObjectByRef(upload.url); } catch (_) {}
+    }
+    return reply(500, { code: 500, message: '上传落库失败（对象已回收）: ' + String(e.message || e) });
   }
-  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-  const [ins] = await conn.execute(
-    'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
-    [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
-  );
-  if (entityType === 'project' && isCover) {
-    await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
-  }
-  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [ins.insertId]);
-  return reply(200, {
-    code: 0, message: 'success',
-    storage: upload.storage,
-    file_path: upload.url,
-    thumb_240: upload.thumb_240 || null,
-    thumb_640: upload.thumb_640 || null,
-    bytes: upload.bytes,
-    warned: upload.warned || undefined,
-    photo: photo[0],
-  });
 }
 
 /** 图集出参：分类中文名映射在 photo_config（单一数据源） */
@@ -1235,6 +1247,9 @@ async function housingPhotosSync(conn, body, vendorId) {
   }));
   const keptIds = new Set(plan.filter((x) => x.hit).map((x) => x.hit.id));
   const delIds = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+  // 被覆盖删除的行（事务提交后按开关回收对象，默认不删防误删不可恢复）
+  const delRows = existing.filter((r) => !keptIds.has(r.id));
+  const deleteObjects = String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1';
 
   await conn.beginTransaction();
   try {
@@ -1266,6 +1281,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     else await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [cover, unitId]);
     await conn.commit();
 
+    // 对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时）：行删除已提交，再删对象；
+    // 本域 S3 引用才删（外部第三方 URL / 本地引用自动跳过，见 deleteObjectByRef）
+    let objectsRemoved = 0;
+    if (deleteObjects && delRows.length && imgStorage && typeof imgStorage.deleteObjectByRef === 'function') {
+      for (const r of delRows) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const del = await imgStorage.deleteObjectByRef(r.file_path);
+          if (del && del.ok) objectsRemoved += 1;
+        } catch (_) { /* 单张失败不阻断；残留对象由对账脚本兜底 */ }
+      }
+    }
+
     const warnings = norm.warnings.slice();
     const total = await galleryCountOf(conn, projectId);
     if (total < photoCfg.PHOTO_MIN_PUBLISH) {
@@ -1276,7 +1304,7 @@ async function housingPhotosSync(conn, body, vendorId) {
     return reply(200, {
       code: 0, message: 'success',
       entity_type: entityType, entity_id: entityId,
-      applied: items.length, added, updated, removed,
+      applied: items.length, added, updated, removed, objects_removed: objectsRemoved,
       cover, truncated: norm.truncated, warnings,
       gallery_total: total,
       photos: after.map(photoOut),

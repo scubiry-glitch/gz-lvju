@@ -21,6 +21,8 @@ const ROOT = path.join(__dirname, '..');
 const appSrc = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 const vendorSrc = fs.readFileSync(path.join(ROOT, 'vendor_api.cjs'), 'utf8');
 const imgSrc = fs.readFileSync(path.join(ROOT, 'img_storage.cjs'), 'utf8');
+// 2026-09-30 拆分重构后管理域路由在 server/routes/admin.cjs（app.js 只留入口与辅助函数）
+const adminSrc = fs.readFileSync(path.join(ROOT, 'server/routes/admin.cjs'), 'utf8');
 
 const app = require(path.join(ROOT, 'app.js'));
 const MP = app.__multipart;
@@ -146,9 +148,9 @@ t('scopeEntity：7 种 scope 与未知 scope', () => {
 
 // ── 入口契约（静态断言） ────────────────────────────────────────
 t('新增房源图片接口：multipart 直传分支已落地（原实现 multipart 直接 503）', () => {
-  const idx = appSrc.indexOf("urlPath.match(/^\\/api\\/juzhu\\/admin\\/units\\/(\\d+)\\/photos$/)");
+  const idx = adminSrc.indexOf("urlPath.match(/^\\/api\\/juzhu\\/admin\\/units\\/(\\d+)\\/photos$/)");
   assert.ok(idx > 0, '未找到 /admin/units/:id/photos 路由');
-  const seg = appSrc.slice(idx, idx + 4000);
+  const seg = adminSrc.slice(idx, idx + 4000);
   assert.ok(seg.includes('multipart/form-data'), '应按 content-type 分流 multipart');
   assert.ok(seg.includes('readImageMultipart'), '应走 multipart 解析器');
   assert.ok(seg.includes('imgStorage.uploadImage'), '应上传对象存储');
@@ -157,9 +159,9 @@ t('新增房源图片接口：multipart 直传分支已落地（原实现 multip
 });
 
 t('/admin/upload 与别名 /admin/photos/upload：multipart + scope 通道已落地（原实现 415）', () => {
-  const idx = appSrc.indexOf("urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload'");
+  const idx = adminSrc.indexOf("urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload'");
   assert.ok(idx > 0, '未找到 /admin/upload 路由');
-  const seg = appSrc.slice(idx, idx + 6000);
+  const seg = adminSrc.slice(idx, idx + 6000);
   assert.ok(seg.includes('readImageMultipart'), '应支持 multipart');
   assert.ok(seg.includes('scopeEntity'), '应识别 scope');
   assert.ok(seg.includes('file_path: up.url'), '响应必须保留 file_path（前端历史契约）');

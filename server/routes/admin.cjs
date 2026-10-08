@@ -77,7 +77,20 @@ queryRows,
       fallbackUnitRowFor,
       auditIfAccount,
       isAdminSessionAuthorized,
-      verifyAdminLoginToken
+      verifyAdminLoginToken,
+      // 房源图片对象存储（贝壳 ODS/S3，见 img_storage.cjs / docs/s3-image-storage.md）
+      imgStorage,
+      s3Client,
+      photoCfg,
+      readImageMultipart,
+      scopeEntity,
+      decodeImagePayload,
+      photoEntityOf,
+      assertPhotoEntity,
+      insertPhotoRow,
+      compensateUpload,
+      normImgRef,
+      normCoverRef
     } = deps;
 
     // --- from app.js L2677-4288 ---
@@ -1430,11 +1443,14 @@ queryRows,
           if (!v.length) { conn.end(); return jsonReply(res, { error: '商家不存在' }, 400); }
           ownerVendorId = parseInt(body.owner_vendor_id, 10);
         }
+        // 封面收口：脏值 400 拒绝；本地/对象存储引用归一化；第三方 URL 按 IMG_INGEST 决定是否镜像
+        const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: 0 });
+        if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
         await conn.execute(
           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
             sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
            VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
-          [cityId, districtId, channel, name, slug, body.cover_image || null, address,
+          [cityId, districtId, channel, name, slug, coverRef.ref, address,
            encodeTags(body.tags),
            body.sort_order || 999, body.price_from || null,
            body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
@@ -1484,7 +1500,14 @@ queryRows,
           }
           for (const col of ['address', 'cover_image', 'sort_order', 'price_from',
               'is_featured', 'featured_rank', 'old_house_hint', 'status']) {
-            if (col in body) put(col, body[col]);
+            if (!(col in body)) continue;
+            if (col === 'cover_image') {
+              const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: pid });
+              if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              put(col, coverRef.ref);
+              continue;
+            }
+            put(col, body[col]);
           }
           if ('ext' in body) {
             try {
@@ -1583,6 +1606,8 @@ queryRows,
           let unitExt = null;
           try { unitExt = normalizeUnitExtInput(body.ext, projs[0].channel); }
           catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+          const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: 0 });
+          if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
           await conn.execute(
             `INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,
               tags,unit_spec,promo_price,amenities,keeper,rent_detail,sort_order,cover_image,ext)
@@ -1594,7 +1619,7 @@ queryRows,
              body.amenities ? JSON.stringify(body.amenities) : null,
              body.keeper ? JSON.stringify(body.keeper) : null,
              body.rent_detail ? JSON.stringify(body.rent_detail) : null,
-             body.sort_order || 999, body.cover_image || null,
+             body.sort_order || 999, coverRef.ref,
              unitExt != null ? JSON.stringify(unitExt) : null]
           );
           const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
@@ -1647,7 +1672,14 @@ queryRows,
           }
           for (const col of ['area_sqm','layout_label','rent_monthly','price_total',
               'unit_spec','promo_price','sort_order','cover_image']) {
-            if (col in body) put(col, body[col]);
+            if (!(col in body)) continue;
+            if (col === 'cover_image') {
+              const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
+              if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              put(col, coverRef.ref);
+              continue;
+            }
+            put(col, body[col]);
           }
           if ('total_qty' in body) {
             // 总间数（多间库存 2026-09-10）：1-999；不得低于未来晚已订间数（否则隐性超售）
@@ -1728,44 +1760,90 @@ queryRows,
       }
     }
 
-    // POST /admin/units/:id/photos  （仅支持 JSON body，不支持文件上传）
+    // POST /admin/units/:id/photos —— 新增房源图片
+    // 三条入参通道：① multipart 直传（file / files）② file_path 引用（形态归一 + 可选镜像）③ base64/data_url/source_url
     {
       const m = urlPath.match(/^\/api\/juzhu\/admin\/units\/(\d+)\/photos$/);
       if (m && req.method === 'POST') {
-        const uid = parseInt(m[1]);
-        const ct = req.headers['content-type'] || '';
+        const uid = parseInt(m[1], 10);
+        if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+        const ct = String(req.headers['content-type'] || '');
+        let body = {};
+        let upload = null;
         if (ct.includes('multipart/form-data')) {
-          return jsonReply(res, { error: '文件上传请使用 /api/juzhu/admin/upload 接口，Serverless 环境不支持直接上传图片到本机文件系统' }, 503);
+          const mp = await readImageMultipart(req);
+          if (!mp.ok) return jsonReply(res, { error: mp.error }, mp.status);
+          if (!mp.files.length) return jsonReply(res, { error: '缺少 file 字段' }, 400);
+          body = mp.fields;
+          const f0 = mp.files[0];
+          upload = await imgStorage.uploadImage({
+            buffer: f0.buffer,
+            filename: f0.filename,
+            contentType: f0.contentType,
+            prefix: 'housing',
+            entityType: 'unit',
+            entityId: uid,
+            makeThumbs: mp.fields.make_thumbs !== 'false',
+          });
+          if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+        } else {
+          body = await readBody(req);
+          const filePath = String(body.file_path || '').trim();
+          if (filePath) {
+            const r = await normImgRef(filePath, {
+              mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid, makeThumbs: body.make_thumbs !== false,
+            });
+            if (!r.ok) return jsonReply(res, { error: r.error }, 400);
+            upload = {
+              ok: true,
+              storage: r.kind === 's3' ? 's3' : (r.kind === 'local' ? 'local' : 'external'),
+              url: r.ref,
+              key: r.mirrored && r.upload ? r.upload.key : null,
+              thumb_240: (r.upload && r.upload.thumb_240) || '',
+              thumb_640: (r.upload && r.upload.thumb_640) || '',
+              mirrored: !!r.mirrored,
+              warned: r.warn || undefined,
+            };
+            if (r.kind === 'external' && !body.source_path) body.source_path = r.ref;
+          } else if (body.base64 || body.data_url || body.source_url || body.url) {
+            const payload = decodeImagePayload(body);
+            if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+            upload = await imgStorage.uploadImage({
+              buffer: payload.buffer,
+              sourceUrl: payload.sourceUrl,
+              filename: payload.filename,
+              contentType: payload.contentType,
+              prefix: 'housing',
+              entityType: 'unit',
+              entityId: uid,
+              makeThumbs: body.make_thumbs !== false,
+            });
+            if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+          } else {
+            return jsonReply(res, { error: 'file_path 不能为空（也可提供 base64 / data_url / source_url，或改用 multipart 直传）' }, 400);
+          }
         }
-        const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [units] = await conn.execute('SELECT id FROM units WHERE id=?', [uid]);
-          if (!units.length) { conn.end(); return jsonReply(res, { error: 'unit not found' }, 404); }
-          const filePath = (body.file_path || '').trim();
-          if (!filePath) { conn.end(); return jsonReply(res, { error: 'file_path 不能为空' }, 400); }
-          const isCover = body.is_cover ? 1 : 0;
-          let sortOrder = body.sort_order;
-          if (sortOrder == null) {
-            const [r] = await conn.execute(
-              "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type='unit' AND entity_id=?",
-              [uid]
-            );
-            sortOrder = r[0].n;
+          if (!units.length) {
+            await compensateUpload(upload);
+            return jsonReply(res, { error: 'unit not found' }, 404);
           }
-          if (isCover) {
-            await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
-          }
-          await conn.execute(
-            "INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES ('unit', ?, ?, ?, ?, ?)",
-            [uid, filePath, body.source_path || null, isCover, sortOrder]
-          );
-          const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
-          const photoId = r[0].id;
-          await syncUnitCover(conn, uid);
-          await conn.commit();
-          const [photos] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
-          return jsonReply(res, { ok: true, photo: photos[0] }, 201);
+          const photo = await insertPhotoRow(conn, 'unit', uid, upload, body);
+          return jsonReply(res, {
+            ok: true,
+            storage: upload.storage,
+            file_path: upload.url,
+            thumb_240: upload.thumb_240 || null,
+            thumb_640: upload.thumb_640 || null,
+            warned: upload.warned || undefined,
+            upload,
+            photo,
+          }, 201);
+        } catch (e) {
+          await compensateUpload(upload);
+          return jsonReply(res, { error: '落库失败: ' + String((e && e.message) || e) }, 500);
         } finally {
           await conn.end();
         }
@@ -1785,29 +1863,44 @@ queryRows,
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const uid = rows[0].entity_id;
-          if (body.is_cover) {
-            await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
+          // file_path 收口：形态归一化（+可选镜像）；非法引用直接 400，避免脏值/危险协议入库
+          let fileRef = null;
+          if (body.file_path != null && String(body.file_path).trim()) {
+            const fr = await normImgRef(String(body.file_path).trim(), { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
+            if (!fr.ok) { conn.end(); return jsonReply(res, { error: 'file_path 非法: ' + fr.error }, 400); }
+            fileRef = fr.ref;
           }
-          let isCoverVal = null;
-          if ('is_cover' in body) isCoverVal = body.is_cover ? 1 : 0;
           let categoryVal = null;
           if ('category' in body) {
             try { categoryVal = photoCfg.normalizeCategoryInput(body.category); }
             catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
           }
-          await conn.execute(
-            `UPDATE photos SET
-               file_path=COALESCE(?, file_path),
-               sort_order=COALESCE(?, sort_order),
-               is_cover=COALESCE(?, is_cover),
-               category=COALESCE(?, category)
-             WHERE id=?`,
-            [body.file_path ? body.file_path.trim() : null,
-             body.sort_order != null ? body.sort_order : null,
-             isCoverVal, categoryVal, photoId]
-          );
-          await syncUnitCover(conn, uid);
-          await conn.commit();
+          let isCoverVal = null;
+          if ('is_cover' in body) isCoverVal = body.is_cover ? 1 : 0;
+          await conn.beginTransaction();
+          try {
+            // 归属行锁：并发「设为封面」时保证 is_cover 唯一
+            await conn.execute('SELECT id FROM units WHERE id=? FOR UPDATE', [uid]);
+            if (body.is_cover) {
+              await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
+            }
+            await conn.execute(
+              `UPDATE photos SET
+                 file_path=COALESCE(?, file_path),
+                 sort_order=COALESCE(?, sort_order),
+                 is_cover=COALESCE(?, is_cover),
+                 category=COALESCE(?, category)
+               WHERE id=?`,
+              [fileRef,
+               body.sort_order != null ? body.sort_order : null,
+               isCoverVal, categoryVal, photoId]
+            );
+            await syncUnitCover(conn, uid);
+            await conn.commit();
+          } catch (e) {
+            await conn.rollback().catch(() => {});
+            throw e;
+          }
           const [photos] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
           return jsonReply(res, { ok: true, photo: photoCfg.photoOut(photos[0]) });
         } finally {
@@ -1843,9 +1936,173 @@ queryRows,
       return jsonReply(res, { ok: true, stats: { note: 'Serverless 环境跳过 JSON 导出' } });
     }
 
-    // POST /admin/upload（图片上传需要对象存储，此处返回提示）
-    if (urlPath === '/api/juzhu/admin/upload' && req.method === 'POST') {
-      return jsonReply(res, { error: 'Serverless 环境不支持本地文件上传，请先在外部上传图片并使用图片 URL' }, 503);
+    // ===== 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传 / 自检 =====
+    // 统一入口：已配置 S3_* 走对象存储，否则自动回落 assets/uploads（口径见 img_storage.cjs）
+    if ((urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload') && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const ct = String(req.headers['content-type'] || '');
+      if (ct.includes('multipart/form-data')) {
+        // 前端历史调用方式：multipart/form-data + file + scope（7 种，语义对齐 juzhu/server.py:2424-2497）
+        const mp = await readImageMultipart(req);
+        if (!mp.ok) return jsonReply(res, { error: mp.error }, mp.status);
+        const file = mp.files.find((f) => f.field === 'file') || mp.files[0];
+        if (!file) return jsonReply(res, { error: '缺少 file 字段' }, 400);
+        const scope = String(mp.fields.scope || '').trim();
+        const ent = scopeEntity(mp.fields.scope, mp.fields);
+        if (scope && !ent) return jsonReply(res, { error: '未知 scope: ' + scope }, 400);
+        const t0 = Date.now();
+        let up = null;
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          let reuseKey = '';
+          let photoRow = null;
+          if (scope === 'unit_photo') {
+            if (!ent.photoId) return jsonReply(res, { error: '缺少 photo_id' }, 400);
+            const [rows] = await conn.execute("SELECT id, entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [ent.photoId]);
+            if (!rows.length) return jsonReply(res, { error: '图片记录不存在' }, 404);
+            photoRow = rows[0];
+            const pr = imgStorage.parse(photoRow.file_path);
+            // 既有引用已在对象存储 → 复用同一 key 覆盖：零孤儿对象、零改库
+            const extWant = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[String(file.contentType || '').toLowerCase().split(';')[0].trim()] || '';
+            const curExt = (String(pr.key || '').match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+            if (pr.kind === 's3' && pr.key && (!extWant || curExt.toLowerCase() === extWant)) reuseKey = pr.key;
+          } else if (scope === 'project_cover') {
+            const [p] = await conn.execute('SELECT id FROM projects WHERE id=?', [ent.entityId]);
+            if (!p.length) return jsonReply(res, { error: 'project not found' }, 404);
+          } else if (scope === 'unit_cover' || scope === 'unit_gallery' || scope === 'unit_keeper') {
+            const [u] = await conn.execute('SELECT id FROM units WHERE id=?', [ent.entityId]);
+            if (!u.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          }
+          up = await imgStorage.uploadImage({
+            buffer: file.buffer,
+            filename: file.filename,
+            contentType: file.contentType,
+            prefix: 'housing',
+            entityType: ent ? ent.entityType : 'misc',
+            entityId: ent ? ent.entityId : 0,
+            key: reuseKey || undefined,
+            makeThumbs: mp.fields.make_thumbs !== 'false',
+          });
+          if (!up.ok) return jsonReply(res, { error: up.error }, 400);
+          if (scope === 'unit_photo' && !reuseKey) {
+            await conn.execute('UPDATE photos SET file_path=?, source_path=COALESCE(source_path,?) WHERE id=?', [up.url, up.key || null, ent.photoId]);
+            await syncUnitCover(conn, photoRow.entity_id);
+            await conn.commit();
+          } else if (scope === 'city_hero') {
+            await conn.execute('UPDATE cities SET hero_bg_image=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)', [up.url]);
+            await conn.commit();
+          }
+          console.log(`[img] upload(multipart) scope=${scope || '-'} storage=${up.storage} key=${up.key} ${up.bytes}B ${Date.now() - t0}ms`);
+          return jsonReply(res, {
+            ok: true,
+            file_path: up.url,
+            scope: scope || null,
+            entity_type: ent ? ent.entityType : null,
+            entity_id: ent ? ent.entityId : null,
+            storage: up.storage,
+            thumb_240: up.thumb_240 || null,
+            thumb_640: up.thumb_640 || null,
+            warned: up.warned || undefined,
+            upload: up,
+            saved: !!ent,
+            elapsed_ms: Date.now() - t0,
+          }, 201);
+        } catch (e) {
+          await compensateUpload(up);
+          return jsonReply(res, { error: '上传落库失败: ' + String((e && e.message) || e) }, 500);
+        } finally {
+          await conn.end();
+        }
+      }
+      const body = await readBody(req);
+      const payload = decodeImagePayload(body);
+      if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+      const entity = photoEntityOf(body);
+      const t0 = Date.now();
+      const upload = await imgStorage.uploadImage({
+        buffer: payload.buffer,
+        sourceUrl: payload.sourceUrl,
+        filename: payload.filename,
+        contentType: payload.contentType,
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        makeThumbs: body.make_thumbs !== false,
+      });
+      if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+      if (body.save === false || !entity) {
+        return jsonReply(res, { ok: true, upload, saved: false, elapsed_ms: Date.now() - t0 }, 201);
+      }
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const bad = await assertPhotoEntity(conn, entity.entityType, entity.entityId);
+        if (bad) { await compensateUpload(upload); return jsonReply(res, { error: bad, upload }, 400); }
+        const photo = await insertPhotoRow(conn, entity.entityType, entity.entityId, upload, body);
+        console.log(`[img] upload ok storage=${upload.storage} key=${upload.key} → ${entity.entityType}#${entity.entityId} ${upload.bytes}B ${Date.now() - t0}ms`);
+        return jsonReply(res, { ok: true, upload, photo, saved: true, elapsed_ms: Date.now() - t0 }, 201);
+      } catch (e) {
+        await compensateUpload(upload);
+        return jsonReply(res, { error: '落库失败: ' + String(e && e.message || e), upload }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // POST /api/juzhu/admin/photos/presign —— 预签名直传（大图/批量前端直传对象存储，不经服务端中转）
+    if (urlPath === '/api/juzhu/admin/photos/presign' && req.method === 'POST') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      if (!s3Client.isConfigured()) {
+        return jsonReply(res, { error: 'S3 未配置（S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET）', mode: 'local' }, 503);
+      }
+      const body = await readBody(req);
+      const entity = photoEntityOf(body);
+      const ext = String(body.ext || 'jpg').replace(/^\./, '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp'].indexOf(ext) < 0) return jsonReply(res, { error: 'ext 仅支持 jpg/jpeg/png/webp' }, 400);
+      const key = imgStorage.keyFor({
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        ext,
+      });
+      const contentType = body.content_type || ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+      const p = s3Client.presign(key, { method: 'PUT', expires: body.expires, contentType });
+      return jsonReply(res, Object.assign({ ok: true, key, public_url: s3Client.publicUrl(key), content_type: contentType,
+        note: '前端直接 PUT 该 url（需带 Content-Type 头），完成后把 public_url 交给 /photos/add 或 /photos/upload?save=false 落库' }, p));
+    }
+
+    // GET /api/juzhu/admin/storage/status?probe=1 —— 对象存储自检（运维/联调用）
+    if (urlPath === '/api/juzhu/admin/storage/status' && req.method === 'GET') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      const c = s3Client.config();
+      const out = {
+        mode: imgStorage.storageMode(),
+        configured: s3Client.isConfigured(),
+        bucket: c.bucket,
+        endpoint: c.endpoint,
+        file_endpoint: c.fileEndpoint,
+        sign_version: c.signVersion,
+        region: c.region,
+        addressing: c.addressing,
+        file_style: c.fileStyle,
+        key_prefix: c.keyPrefix,
+        max_bytes: imgStorage.maxBytes(),
+        thumb_rewrite: String(process.env.S3_THUMB_REWRITE == null ? '1' : process.env.S3_THUMB_REWRITE) !== '0',
+        sample_public_url: c.bucket ? s3Client.publicUrl('housing/sample.jpg') : '',
+        // 新增开关回显（运维核对；口径见 docs/s3-intake-api-plan.md §5）
+        img_url_mode: typeof imgStorage.urlMode === 'function' ? imgStorage.urlMode() : null,
+        write_mode: typeof imgStorage.writeMode === 'function' ? imgStorage.writeMode() : null,
+        img_ingest: typeof imgStorage.ingestMode === 'function' ? imgStorage.ingestMode() : null,
+        img_normalize: typeof imgStorage.normalizeRewriteEnabled === 'function' ? imgStorage.normalizeRewriteEnabled() : null,
+        fail_on_unconfigured: typeof imgStorage.failOnUnconfigured === 'function' ? imgStorage.failOnUnconfigured() : null,
+        migrate_prefix: typeof imgStorage.migratePrefix === 'function' ? imgStorage.migratePrefix() : null,
+        source_url_allowlist: String(process.env.S3_SOURCE_URL_ALLOWLIST || '').trim() || null,
+        sharp: (() => { try { require('sharp'); return true; } catch (_) { return false; } })(),
+      };
+      if (new URLSearchParams(qs).get('probe') === '1' && s3Client.isConfigured()) {
+        const key = new URLSearchParams(qs).get('key') || '';
+        out.probe = await s3Client.detectSignVersion(key);
+      }
+      return jsonReply(res, out);
     }
 
     // POST /admin/projects/:id/rating/submit

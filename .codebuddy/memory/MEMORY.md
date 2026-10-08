@@ -3,7 +3,7 @@
 > 只放**稳定事实**：项目约定、环境坑、勿回退红线。日常过程记录见 `YYYY-MM-DD.md`。
 
 ## 项目性质
-- `sy2-no-assets-20260812` = 保租房/新居住/旅居/家政多业务线；静态 HTML 原型（~200 页）+ **Node 单入口后端 `app.js`**（约 7400 行）+ MySQL。`python` 层（`juzhu/server.py`）仅历史参考，不运行。
+- `sy2-no-assets-20260812` = 保租房/新居住/旅居/家政多业务线；静态 HTML 原型（~200 页）+ **Node 单入口后端 `app.js`**（入口 + 共享辅助；管理/C 端/家政/预订路由在 `server/routes/{admin,api_direct,jiazheng,booking}.cjs`，经 createXxxRouter(deps) 注入）+ MySQL。`python` 层（`juzhu/server.py`）仅历史参考，不运行。
 - 后端发行包 `package_backend.sh` **明确排除 `assets/`**（图片由前端仓库/CDN 承担）→ 任何「回落本地文件系统」的逻辑在生产都不可靠。
 - 权限/审计单一出口：`perm_registry.cjs` 的 `ROUTES`（**新增路由必须同步登记**，否则 401/不可达；改动后必须做数组空洞检查 + `permRegistry.match()` 抽查）。
 
