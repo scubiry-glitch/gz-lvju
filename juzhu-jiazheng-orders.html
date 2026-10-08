@@ -14,6 +14,7 @@
   .stt.cancelled{color:#94a3b8;}
   .empty{padding:56px 24px;text-align:center;color:var(--muted);font-size:13px;}
   .empty .ic{font-size:40px;display:block;margin-bottom:10px;}
+  .order-more{text-align:center;padding:12px 20px 24px}.order-more button{border:1px solid var(--brand);border-radius:8px;background:#fff;color:var(--brand);padding:10px 24px;font-size:13px}
 </style>
 </head>
 <body>
@@ -35,6 +36,7 @@
     </div>
 
     <div class="wrap" id="list" style="padding-top:14px;"></div>
+    <div class="order-more" id="order-more" role="status"></div>
   </div>
 </div>
 <script src="screens/_console-login.js"></script>
@@ -64,13 +66,12 @@
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
-  function render(list){
+  function render(list,append){
     if (!list || !list.length) {
-      document.getElementById('list').innerHTML =
-        '<div class="empty"><span class="ic">🧾</span>暂无订单</div>';
+      if(!append)document.getElementById('list').innerHTML = '<div class="empty"><span class="ic">🧾</span>暂无订单</div>';
       return;
     }
-    document.getElementById('list').innerHTML = list.map(function(o){
+    var cards = list.map(function(o){
       var st = STATUS_UI[o.status] || { label: o.status, cls: 'done' };
       if (o.refund_status) st = { label: o.refund_status === 'refunded' ? '已退款' : '退款处理中', cls: 'cancelled' };
       if (o.pay_status === 'closing') st = { label: '取消处理中', cls: 'cancelled' };
@@ -96,36 +97,32 @@
           encodeURIComponent(o.order_ref) + '">查看详情</a></div>' +
       '</div>';
     }).join('');
+    if(append)document.getElementById('list').insertAdjacentHTML('beforeend',cards);
+    else document.getElementById('list').innerHTML=cards;
   }
 
-  function load(){
-    fetch('/api/juzhu/gr/orders?source=account',{headers:JZ.authHeaders()}).then(function(r){
-      if(r.status===401)return loadExternal();
-      return r.json().then(function(res){if(!res.ok)throw Error(res.error||'加载失败');render(curStatus?(res.list||[]).filter(function(o){return o.status===curStatus;}):res.list);});
-    }).catch(function(e){document.getElementById('list').textContent=e.message;});
-  }
-  function loadExternal(){
-    // 身份：ensureUserId 统一入口（测试环境模拟登录 / 生产 App 内 jsbridge3）；
-    // 取不到（非 App 环境或未登录）提示登录，不发请求
-    JZ.ensureUserId().then(function(uid){
-      if (!uid) {
-        document.getElementById('list').innerHTML =
-          '<div class="empty"><span class="ic">🔒</span>登录后查看订单<br><button id="main-order-login" style="margin-top:16px;padding:10px 20px;border:0;border-radius:10px;background:#0f766e;color:#fff">账号登录</button></div>';
-        return;
+  var currentPage=1,requestSeq=0;
+  async function load(page,append){
+    page=page||1;append=!!append;var seq=++requestSeq,more=document.getElementById('order-more');
+    more.textContent='正在加载订单…';
+    var params=new URLSearchParams({limit:'30',page:String(page)});if(curStatus)params.set('status',curStatus);
+    try{
+      var response=await fetch('/api/juzhu/gr/orders?source=account&'+params,{headers:JZ.authHeaders()});
+      var result;
+      if(response.status===401){
+        var uid=await JZ.ensureUserId();
+        if(!uid){if(seq===requestSeq){document.getElementById('list').innerHTML='<div class="empty"><span class="ic">🔒</span>登录后查看订单<br><button id="main-order-login" style="margin-top:16px;padding:10px 20px;border:0;border-radius:10px;background:#0f766e;color:#fff">账号登录</button></div>';more.textContent='';}return;}
+        response=await fetch('/api/juzhu/gr/orders?user_id='+encodeURIComponent(uid)+'&'+params);
       }
-      fetch('/api/juzhu/gr/orders?user_id=' + encodeURIComponent(uid))
-        .then(function(r){ return r.json(); })
-        .then(function(res){
-          if (!res.ok) return render(null);
-          var list = res.list || [];
-          if (curStatus) list = list.filter(function(o){ return o.status === curStatus; });
-          render(list);
-        })
-        .catch(function(){ render(null); });
-    });
+      result=await response.json();if(seq!==requestSeq)return;
+      if(!response.ok||!result.ok)throw Error(result.error||'加载失败');
+      render(result.list||[],append);currentPage=page;
+      more.innerHTML=result.has_more?'<button type="button" id="load-more-orders">加载更多订单</button>':'';
+    }catch(error){if(seq===requestSeq){if(!append)document.getElementById('list').textContent=error.message;more.innerHTML=append?'<button type="button" id="load-more-orders">加载失败，点击重试</button>':'';}}
   }
 
-  document.getElementById('list').addEventListener('click',e=>{if(e.target.id==='main-order-login')BZF_CONSOLE.requireLogin({hint:'查看我的生活服务订单'}).then(load).catch(()=>{});});
+  document.getElementById('list').addEventListener('click',e=>{if(e.target.id==='main-order-login')BZF_CONSOLE.requireLogin({hint:'查看我的生活服务订单'}).then(()=>load()).catch(()=>{});});
+  document.getElementById('order-more').addEventListener('click',e=>{if(e.target.id==='load-more-orders')load(currentPage+1,true);});
   document.getElementById('tabs').addEventListener('click', function(e){
     var t = e.target.closest('a'); if (!t) return;
     curStatus = t.getAttribute('data-s');
@@ -139,7 +136,7 @@
       a.classList.toggle('on', a.getAttribute('data-s') === curStatus);
     });
   }
-  (JZ.loadChannelBrand ? JZ.loadChannelBrand() : Promise.resolve()).then(load);
+  (JZ.loadChannelBrand ? JZ.loadChannelBrand() : Promise.resolve()).then(()=>load());
 })();
 </script>
 </body>

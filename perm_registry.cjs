@@ -121,6 +121,10 @@ const ROUTES = [
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.write',act:'commerce.code.issue',res:'commerce'},
   {method:'GET',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.read',act:null,res:'commerce'},
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes/([0-9a-f-]{36})/disable$',perm:'commerce.admin.write',act:'commerce.code.disable',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/distributions$',perm:'commerce.admin.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions$',perm:'commerce.admin.write',act:'commerce.distribution.create',res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions/([0-9a-f-]{36})/(submit|activate|close)$',perm:'commerce.admin.write',act:'commerce.distribution.manage',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions/([0-9a-f-]{36})/review$',perm:'commerce.admin.review',act:'commerce.distribution.review',res:'commerce',idGroup:1},
   {method:'GET',re:'^/api/commerce/v1/admin/stats$',perm:'commerce.admin.read',act:null,res:'commerce'},
   {method:'POST',re:'^/api/commerce/v1/merchant/redeem/preview$',perm:'commerce.merchant.redeem',act:'commerce.redeem.preview',res:'commerce'},
   ...['admin','merchant'].flatMap(area => {

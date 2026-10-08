@@ -324,6 +324,11 @@ input, textarea, select { font: inherit; }
 .jz-price .row.disc b { color: var(--danger); }
 .jz-price .row.total { border-top: 1px dashed var(--line); margin-top: 8px; padding-top: 8px; font-size: 15px; font-weight: 600; color: var(--fg); }
 .jz-price .row.total b { color: var(--brand); font-size: 18px; }
+.jz-price .row select{max-width:65%;min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit;text-align:right}
+.jz-price .jz-coupon-status,.jz-price .jz-coupon-rule{margin:8px 0 10px;color:var(--muted);font-size:11px;line-height:1.65}
+.jz-price .jz-coupon-status:empty{display:none}.jz-price .jz-coupon-status button{border:0;background:transparent;color:var(--brand);font:inherit;text-decoration:underline;min-height:44px;padding:0 6px}
+.jz-price .jz-coupon-rule{border-left:3px solid var(--brand);padding:8px 10px;background:#eff7f3;border-radius:4px 8px 8px 4px}
+@media(prefers-reduced-motion:no-preference){.jz-price .row.total b{animation:jz-coupon-total .22s ease-out both}@keyframes jz-coupon-total{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
 
 /* 状态机进度 */
 .jz-status { padding: 16px; background: var(--surface); }

@@ -4,7 +4,7 @@ const { fail, stripPaymentSecrets } = require('../payment/vendor-payment.cjs');
 const legacyCompat = require('../payment/jiazheng-compat.cjs');
 function customerOrder(order) {
   const out = { ...order };
-  if (out.payment_mode === 'pay_center') out.amount_minor = Number(out.fee);
+  if (out.payment_mode === 'pay_center') out.amount_minor = Number(out.cash_due_minor ?? out.fee);
   try { const snapshot = JSON.parse(out.payment_config_snapshot || '{}'); out.product_name = snapshot.productTitle; out.cancel_policy = snapshot.cancelPolicy; } catch (_) {}
   delete out.payment_config_snapshot; delete out.request_hash; delete out.request_key;
   return out;
@@ -336,7 +336,7 @@ function createJiazhengRouter(deps) {
           params.push(...statuses);
         }
       }
-      if(qp.get('pay_status')){const states=qp.get('pay_status').split(',').filter(s=>['paid','unpaid','not_required'].includes(s));if(!states.length)return jsonReply(res,{error:'无效支付状态'},400);sql+=' AND o.pay_status IN ('+states.map(()=>'?').join(',')+')';params.push(...states);}
+      if(qp.get('pay_status')){const states=qp.get('pay_status').split(',').filter(s=>['paid','unpaid','not_required','coupon_funded'].includes(s));if(!states.length)return jsonReply(res,{error:'无效支付状态'},400);sql+=' AND o.pay_status IN ('+states.map(()=>'?').join(',')+')';params.push(...states);}
       const limit = Math.min(parseInt(qp.get('limit') || '100'), 200);
       sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
       const rows = await queryRows(sql, params);
@@ -431,6 +431,21 @@ function createJiazhengRouter(deps) {
     // --- extracted from app.js L6364-6691 ---
     // ===== 家政 C 端写接口 =====
 
+    if (urlPath === '/api/juzhu/jiazheng/coupon-quotes' && req.method === 'POST') {
+      const sess=await requestSession(req);
+      if(!sess?.account||sess.account.principal_type!=='user'||sess.account.idp_type!=='beike')return jsonReply(res,{error:'请先登录贝壳账号'},401);
+      const body=await readBody(req),productId=Number(body.product_id);
+      if(!Number.isSafeInteger(productId)||productId<=0)return jsonReply(res,{error:'商品编号无效'},400);
+      const conn=await mysql2.createConnection(getDbConfig());
+      try{
+        const [[product]]=await conn.execute("SELECT p.id,p.price,p.city_id,p.vendor_id,p.query,v.payment_mode,v.status AS vendor_status FROM jz_products p JOIN jz_vendors v ON v.id=p.vendor_id WHERE p.id=? AND p.status='on'",[productId]);
+        if(!product||product.vendor_status!=='active'||product.payment_mode!=='pay_center'||/^(guiyang|shenyang)-life-demo-v1:/.test(String(product.query||'')))return jsonReply(res,{error:'此商品暂不能在线用券'},409);
+        const grossMinor=require('../payment/jiazheng-adapter.cjs').amountMinor(product.price);
+        const quotes=await require('../../commerce/coupon-application.cjs').listQuotes(conn,{accountId:sess.account.id,bizType:'jiazheng',cityId:product.city_id,vendorId:product.vendor_id,itemId:product.id,grossMinor});
+        return jsonReply(res,{ok:true,gross_minor:grossMinor,quotes,quote_expires_in:120});
+      }catch(error){const status=Number.isInteger(error.status)?error.status:500;return jsonReply(res,{error:status>=500?'用券报价暂不可用':error.message},status);}finally{await conn.end();}
+    }
+
     // POST /api/juzhu/jiazheng/orders（下单）
     if (['/api/juzhu/jiazheng/orders', '/api/juzhu/jz/orders'].includes(urlPath) && req.method === 'POST') {
       const sess = await requestSession(req);
@@ -516,8 +531,10 @@ function createJiazhengRouter(deps) {
           const body = req.method === 'POST' ? await readBody(req) : {};
           const common = { bizType: 'jiazheng', orderId: order.id, account: sess.account, accountId: String(sess.account.id) };
           let result;
-          if (m[2] === 'payment') result = await getPaymentCore().getStatus({ ...common, refresh: true });
+          if (order.pay_status === 'coupon_funded' && m[2] === 'payment') result = { pay_status:'coupon_funded', order_pay_status:'coupon_funded', next_action:'none' };
+          else if (m[2] === 'payment') result = await getPaymentCore().getStatus({ ...common, refresh: true });
           else if (m[2] === 'cancel') result = await getJiazhengAdapter().cancel({ account: sess.account, orderId: order.id, reason: body.reason, requestKey: req.headers['idempotency-key'] });
+          else if (order.pay_status === 'coupon_funded') throw fail('此订单已由券全额覆盖，无需发起支付', 409);
           else result = await legacyCompat.pay({ core: getPaymentCore(), adapter: getJiazhengAdapter(), queryRows,
             order, account: sess.account, body, requestKey: String(req.headers['idempotency-key'] || body.idempotency_key || '').trim(),
             clientIp: req.socket?.remoteAddress || '' });
@@ -546,7 +563,7 @@ function createJiazhengRouter(deps) {
           const [rows] = await conn.execute('SELECT * FROM jz_orders WHERE id=?', [orderId]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const order = rows[0];
-          if (!(['paid','not_required'].includes(order.pay_status)) || order.status !== 'pending' || order.refund_status) {
+          if (!(['paid','not_required','coupon_funded'].includes(order.pay_status)) || order.status !== 'pending' || order.refund_status) {
             conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
           }
           const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');

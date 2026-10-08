@@ -465,12 +465,13 @@ async function createRefundOrder(service,p,input,key){
   const coupon=coupons[0],snapshot=parse(coupon.snapshot);
   assert(snapshot.is_demo!==true,'演示卡券不发生资金退款',409,'demo_excluded');
   assert(coupon.status==='frozen','卡券应处于退款冻结状态',409,'coupon_state');
-  const [orders]=await c.execute('SELECT id,payment_mode,paid_payment_order_id FROM commerce_orders WHERE id=?',[coupon.order_id]);assert(orders.length,'原订单缺失',409);if(orders[0].payment_mode==='pay_center')assert(orders[0].paid_payment_order_id,'原订单尚未确认实收',409);
+  const [orders]=await c.execute('SELECT id,account_id,payment_mode,paid_payment_order_id FROM commerce_orders WHERE id=?',[coupon.order_id]);assert(orders.length,'原订单缺失',409);if(orders[0].payment_mode==='pay_center')assert(orders[0].paid_payment_order_id,'原订单尚未确认实收',409);
+  if(snapshot.distribution?.campaign_id)assert(String(coupon.account_id)!==String(orders[0].account_id)&&String(snapshot.distribution.sponsor_account_id)===String(orders[0].account_id),'赠券原付款归属无效',409);
   const refundNo=no('RF'),requestNo=no('PR');
   const kind=/到期|expiry|自动/.test(cs.reason||'')?'expiry':'unused';
   const [r]=await c.execute(`INSERT INTO commerce_refund_orders
    (refund_no,case_id,coupon_id,order_id,account_id,merchant_id,city_id,amount_minor,kind,request_no,created_by,payment_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-   [refundNo,input.case_id,coupon.id,coupon.order_id,coupon.account_id,coupon.merchant_id,coupon.city_id,coupon.allocation_minor,kind,requestNo,p.account.id,orders[0].payment_mode||null]);
+   [refundNo,input.case_id,coupon.id,coupon.order_id,orders[0].account_id,coupon.merchant_id,coupon.city_id,coupon.allocation_minor,kind,requestNo,p.account.id,orders[0].payment_mode||null]);
   await service.audit(c,p,'refund.create',refundNo,{case_id:input.case_id,amount:coupon.allocation_minor,kind},{city_id:coupon.city_id,merchant_id:coupon.merchant_id});
   return {id:r.insertId,refund_no:refundNo,status:'pending'};
  }));
@@ -703,7 +704,8 @@ async function verifyInvariants(pool){
  checks.push({name:'I5 逐券计算依据可复算（订单锁定规则快照）',passed:!dangling.length,detail:dangling.map(r=>r.id)});
  const unattributed=await rowsOf(`SELECT i.id FROM commerce_settlement_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.line_kind='promoter' AND (o.source_account_id IS NULL OR o.source_account_id<>i.promoter_account_id)`);
  checks.push({name:'I6a 无归属订单不产生渠道佣金明细',passed:!unattributed.length,detail:unattributed.map(r=>r.id)});
- const dupItems=await rowsOf('SELECT redemption_id,line_kind,COUNT(*) n FROM commerce_settlement_items GROUP BY redemption_id,line_kind HAVING n>1');
+ const dupItems=await rowsOf(`SELECT redemption_id,line_kind,COUNT(*) n FROM commerce_settlement_items WHERE redemption_id IS NOT NULL GROUP BY redemption_id,line_kind HAVING n>1
+  UNION ALL SELECT unit_id AS redemption_id,component_key AS line_kind,COUNT(*) n FROM commerce_settlement_items WHERE unit_id IS NOT NULL GROUP BY unit_id,component_key HAVING n>1`);
  checks.push({name:'I3 同一明细不重复入账（跨批次防重）',passed:!dupItems.length,detail:dupItems.map(r=>r.redemption_id+':'+r.line_kind)});
  const badItems=await rowsOf(`SELECT i.id FROM commerce_settlement_items i
   JOIN commerce_coupons cc ON cc.id=i.coupon_id
@@ -718,9 +720,10 @@ async function verifyInvariants(pool){
  let conservation=true;const badOrders=[];
  for(const o of orders){
   const row=await oneRow(`SELECT
-   (SELECT COALESCE(SUM(r.allocation_minor),0) FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id WHERE rc.order_id=? AND r.status='confirmed') confirmed,
-   (SELECT COALESCE(SUM(cc.allocation_minor),0) FROM commerce_coupons cc WHERE cc.order_id=? AND cc.status IN ('available','frozen')) pool,
-   (SELECT COALESCE(SUM(ro.amount_minor),0) FROM commerce_refund_orders ro WHERE ro.order_id=? AND ro.status='paid') refunded`,[o.id,o.id,o.id]);
+   (SELECT COALESCE(SUM(r.allocation_minor),0) FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id WHERE rc.order_id=? AND r.status='confirmed')
+   +(SELECT COALESCE(SUM(a.coupon_minor),0) FROM coupon_applications a WHERE a.original_order_id=? AND a.status='consumed') confirmed,
+   (SELECT COALESCE(SUM(cc.allocation_minor),0) FROM commerce_coupons cc WHERE cc.order_id=? AND cc.status IN ('available','frozen','reserved')) pool,
+   (SELECT COALESCE(SUM(ro.amount_minor),0) FROM commerce_refund_orders ro WHERE ro.order_id=? AND ro.status='paid') refunded`,[o.id,o.id,o.id,o.id]);
   const confirmed=Number(row.confirmed),pool0=Number(row.pool),refunded=Number(row.refunded);
   if(confirmed+refunded+pool0!==Number(o.amount_minor)){conservation=false;badOrders.push({order:o.id,confirmed,refunded,pool:pool0,amount:Number(o.amount_minor)});}
  }
@@ -733,16 +736,18 @@ async function verifyInvariants(pool){
   const fact=await oneRow(`SELECT
    (SELECT COALESCE(SUM(amount_minor),0) FROM payment_orders WHERE biz_type='commerce' AND biz_order_no=REPLACE(?,'-','') AND pay_status='paid') received,
    (SELECT COALESCE(SUM(amount_minor),0) FROM payment_refunds WHERE biz_type='commerce' AND biz_order_no=REPLACE(?,'-','') AND refund_status='refunded') refunded,
-   (SELECT COALESCE(SUM(allocation_minor),0) FROM commerce_coupons WHERE order_id=? AND status IN ('available','frozen')) coupon_pool,
-   (SELECT COALESCE(SUM(r.allocation_minor),0) FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id WHERE c.order_id=? AND r.status='confirmed') confirmed`,[order.id,order.id,order.id,order.id]);
+   (SELECT COALESCE(SUM(allocation_minor),0) FROM commerce_coupons WHERE order_id=? AND status IN ('available','frozen','reserved')) coupon_pool,
+   (SELECT COALESCE(SUM(r.allocation_minor),0) FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id WHERE c.order_id=? AND r.status='confirmed')
+   +(SELECT COALESCE(SUM(a.coupon_minor),0) FROM coupon_applications a WHERE a.original_order_id=? AND a.status='consumed') confirmed`,[order.id,order.id,order.id,order.id,order.id]);
   const ledger=await rowsOf(`SELECT l.account,l.side,SUM(l.amount_minor) amount FROM commerce_ledger_entries l WHERE
    (l.source_type='payment_received' AND EXISTS(SELECT 1 FROM payment_orders p WHERE p.id=l.source_id AND p.biz_type='commerce' AND p.biz_order_no=REPLACE(?,'-',''))) OR
    (l.source_type='funding' AND l.source_id=?) OR
    (l.source_type='refund' AND EXISTS(SELECT 1 FROM commerce_refund_orders r WHERE r.refund_no=l.source_id AND r.order_id=?)) OR
    (l.source_type='payment_refund' AND EXISTS(SELECT 1 FROM payment_refunds r WHERE r.id=l.source_id AND r.biz_type='commerce' AND r.biz_order_no=REPLACE(?,'-',''))) OR
    (l.source_type='redemption' AND EXISTS(SELECT 1 FROM commerce_redemptions r JOIN commerce_coupons c ON c.id=r.coupon_id WHERE r.id=l.source_id AND c.order_id=?)) OR
+   (l.source_type='recognition' AND EXISTS(SELECT 1 FROM commerce_settlement_items i JOIN coupon_applications a ON a.coupon_id=i.coupon_id WHERE i.unit_id=l.source_id AND a.original_order_id=? AND a.status='consumed')) OR
    (l.source_type='reversal' AND EXISTS(SELECT 1 FROM commerce_redemption_reversals v JOIN commerce_redemptions r ON r.id=v.redemption_id JOIN commerce_coupons c ON c.id=r.coupon_id WHERE v.reversal_no=l.source_id AND c.order_id=?))
-   GROUP BY l.account,l.side`,Array(6).fill(order.id));
+   GROUP BY l.account,l.side`,Array(7).fill(order.id));
   const balance=(account,side='credit')=>ledger.filter(r=>r.account===account).reduce((n,r)=>n+(r.side===side?1:-1)*Number(r.amount),0);
   const received=Number(fact.received),refunded=Number(fact.refunded),posted=balance('provider_receivable','debit'),out=balance('provider_refund_out');
   const pending=balance('payment_pending_liability'),unredeemed=balance('unredeemed_liability'),confirmed=Number(fact.confirmed),couponPool=Number(fact.coupon_pool);
@@ -807,11 +812,18 @@ async function merchantSettlement(service,p){
    WHERE bi.kind='merchant' AND bi.merchant_id IN (${inClause})`))[0];
  const [confirmed]=await service.get(service.pool,`SELECT COALESCE(SUM(r.supplier_minor),0) total FROM commerce_redemptions r JOIN commerce_merchants m ON m.id=r.merchant_id
    WHERE m.vendor_id=? AND r.status='confirmed' AND NOT EXISTS (SELECT 1 FROM commerce_settlement_items i WHERE i.redemption_id=r.id AND i.line_kind='merchant')`,[s.vendorId]);
+ const [shared]=await service.get(service.pool,`SELECT COALESCE(SUM(i.payable_minor),0) confirmed_minor,
+   COALESCE(SUM(GREATEST(i.payable_minor-i.discharged_minor-i.cancelled_minor-i.offset_minor-i.reserved_minor,0)),0) pending_minor,
+   COALESCE(SUM(i.reserved_minor),0) settling_minor,COALESCE(SUM(i.discharged_minor),0) paid_minor
+   FROM commerce_settlement_items i JOIN commerce_settlement_units u ON u.id=i.unit_id AND u.status='CONFIRMED'
+   JOIN commerce_settlement_business_contexts ctx ON ctx.id=i.context_id
+   JOIN coupon_applications a ON a.biz_type=ctx.biz_type AND a.order_no=ctx.biz_order_no AND a.status='consumed'
+   WHERE i.line_kind='merchant' AND i.redemption_id IS NULL AND i.merchant_id=?`,[s.vendorId]);
  const [recovery]=await service.get(service.pool,`SELECT COALESCE(SUM(amount_minor-recovered_minor),0) open_minor,COUNT(*) n FROM commerce_recovery_cases WHERE debtor_kind='merchant' AND merchant_id IN (${inClause}) AND status='open'`);
  const batches=await service.get(service.pool,`SELECT id,batch_no,period_start,period_end,status,item_count,payable_minor,offset_minor,created_at FROM commerce_settlement_batches WHERE kind='merchant' AND merchant_id IN (${inClause}) ORDER BY id DESC LIMIT 50`);
  const instructions=await service.get(service.pool,`SELECT ins.id,ins.instruction_no,ins.batch_id,ins.request_no,ins.amount_minor,ins.status,ins.retry_count,ins.fail_reason,ins.submitted_at,ins.settled_at FROM commerce_payout_instructions ins JOIN commerce_settlement_batches bi ON bi.id=ins.batch_id WHERE bi.kind='merchant' AND bi.merchant_id IN (${inClause}) ORDER BY ins.id DESC LIMIT 50`);
- return {summary:{confirmed_minor:Number(confirmed.total)||0,pending_minor:Number(agg.pending_minor)||0,settling_minor:Number(agg.settling_minor)||0,paid_minor:Number(agg.paid_minor)||0,recovery_open_minor:Number(recovery.open_minor)||0,
-  note:'应结金额来自逐券核销快照；结算与到账经沙箱机构执行，不代表真实资金。'},batches,instructions,recovery_open:Number(recovery.n)||0};
+ return {summary:{confirmed_minor:(Number(confirmed.total)||0)+(Number(shared.confirmed_minor)||0),pending_minor:(Number(agg.pending_minor)||0)+(Number(shared.pending_minor)||0),settling_minor:(Number(agg.settling_minor)||0)+(Number(shared.settling_minor)||0),paid_minor:(Number(agg.paid_minor)||0)+(Number(shared.paid_minor)||0),recovery_open_minor:Number(recovery.open_minor)||0,
+  note:'含到店核销与跨业务用券结算；统一结算以已核验的机构回执为准。'},batches,instructions,recovery_open:Number(recovery.n)||0};
 }
 async function promoterSettlement(pool,accountId){
  const one=async(sql,args=[])=>(await pool.execute(sql,args))[0];
@@ -824,9 +836,13 @@ async function promoterSettlement(pool,accountId){
   LEFT JOIN commerce_settlement_batches bi ON bi.id=i.batch_id
   WHERE o.source_account_id=? AND r.status='confirmed' ${notDemo}`,[accountId]);
  const [paid]=await one(`SELECT COALESCE(SUM(amount_minor),0) paid_minor FROM commerce_payout_instructions WHERE target_kind='promoter' AND promoter_account_id=? AND status='paid'`,[accountId]);
+ const [shared]=await one(`SELECT COALESCE(SUM(i.payable_minor),0) confirmed_minor,
+  COALESCE(SUM(i.reserved_minor),0) settling_minor,COALESCE(SUM(i.discharged_minor),0) paid_minor
+  FROM commerce_settlement_items i JOIN commerce_settlement_units u ON u.id=i.unit_id AND u.status='CONFIRMED'
+  WHERE i.line_kind='promoter' AND i.redemption_id IS NULL AND i.coupon_id IS NOT NULL AND i.promoter_account_id=?`,[accountId]);
  const [awaiting]=await one(`SELECT COUNT(*) n FROM commerce_redemptions r JOIN commerce_coupons rc ON rc.id=r.coupon_id JOIN commerce_orders o ON o.id=rc.order_id WHERE o.source_account_id=? AND r.status='confirmed' ${notDemo} AND NOT EXISTS (SELECT 1 FROM commerce_settlement_items i WHERE i.redemption_id=r.id AND i.line_kind='promoter')`,[accountId]);
  const [recovery]=await one(`SELECT COALESCE(SUM(amount_minor-recovered_minor),0) open_minor FROM commerce_recovery_cases WHERE debtor_kind='promoter' AND promoter_account_id=? AND status='open'`,[accountId]);
- return {confirmed_minor:Number(totals.confirmed_minor)||0,settling_minor:Number(totals.settling_minor)||0,paid_minor:Number(paid.paid_minor)||0,recovery_open_minor:Number(recovery.open_minor)||0,awaiting_batch:Number(awaiting.n)||0};
+ return {confirmed_minor:(Number(totals.confirmed_minor)||0)+(Number(shared.confirmed_minor)||0),settling_minor:(Number(totals.settling_minor)||0)+(Number(shared.settling_minor)||0),paid_minor:(Number(paid.paid_minor)||0)+(Number(shared.paid_minor)||0),recovery_open_minor:Number(recovery.open_minor)||0,awaiting_batch:Number(awaiting.n)||0};
 }
 async function listBatches(service,p,query){
  let where='1=1',args=[];

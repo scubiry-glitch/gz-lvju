@@ -18,11 +18,14 @@ const STORE_CHANNELS = [
   { value: 'store', label: '线下门店' },
   { value: 'online', label: '线上服务台（虚拟门店）' },
 ];
+const SKU_CATEGORIES=[
+ ['cleaning','保洁'],['repair','维修'],['moving','搬家'],['nanny','保姆'],['telecom','电讯服务'],['insurance','财险服务'],['consumer_finance','消费金融'],['health_care','健康养老'],['home_maintain','居家维护'],['asset','资产服务'],['recycle','二手回收'],['community','社区服务'],['hotel_exchange','酒店通兑'],['scenic_ticket','景点门票'],['dining','餐饮'],['online_service','线上权益']
+].map(([value,label])=>({value,label}));
 const definitions = {
   merchants: { label: '商户管理', merchant: true, fields: [f('name','商户名称'),f('vendor_id','关联商家','reference',{source:'vendors'}),f('city_id','经营城市','reference',{source:'cities'}),f('contract_ref','合同编号'),f('contact','业务联系人'),f('phone','联系电话'),f('description','服务介绍','textarea')] },
   stores: { label: '门店管理', merchant: true, fields: [f('name','门店名称'),f('merchant_id','所属商户','reference',{ source:'merchants' }),f('city_id','城市','reference',{source:'cities'}),f('service_channel','门店类型','enum',{required:false,options:STORE_CHANNELS}),f('address','门店地址'),f('phone','服务电话'),f('capacity','每日预约名额','number'),f('lead_hours','提前预约小时','number',{min:0}),f('description','营业及服务说明','textarea')] },
   staff: { label: '核销人员', merchant: true, fields: [f('name','人员姓名'),f('merchant_id','所属商户','reference',{source:'merchants'}),f('store_id','所属门店','reference',{source:'stores'}),f('account_id','核销账号','reference',{source:'accounts'})] },
-  skus: { label: '券商品', merchant: true, fields: [f('name','服务名称'),f('merchant_id','供应商户','reference',{source:'merchants'}),f('store_id','服务门店','reference',{source:'stores'}),f('rule_id','单品购买分配规则','reference',{source:'purchase_rules',required:false}),f('redeem_channel','核销方式','enum',{required:false,options:REDEEM_CHANNELS}),f('exchange_tier','通兑档位（线下专用；选定后可在该档任选门店）','enum',{required:false,options:EXCHANGE_TIERS}),f('exchange_tier_minor','通兑档位展示价（元）','money',{required:false}),f('supply_minor','供货价（元）','money'),f('retail_minor','零售价（元）','money'),f('valid_days','有效天数','number'),f('description','服务内容','textarea'),f('conditions','使用条件及除外责任','textarea')] },
+  skus: { label: '券商品', merchant: true, fields: [f('name','服务名称'),f('merchant_id','供应商户','reference',{source:'merchants'}),f('store_id','服务门店','reference',{source:'stores'}),f('rule_id','单品购买分配规则','reference',{source:'purchase_rules',required:false}),f('redeem_channel','核销方式','enum',{required:false,options:REDEEM_CHANNELS}),f('exchange_tier','通兑档位（线下专用；选定后可在该档任选门店）','enum',{required:false,options:EXCHANGE_TIERS}),f('exchange_tier_minor','通兑档位展示价（元）','money',{required:false}),f('category_id','服务分类','enum',{required:false,options:SKU_CATEGORIES}),f('spot_ids','明确适用的景点（仅景点门票分类）','multi-reference',{required:false,source:'spots'}),f('use_mode','跨业务用券方式','enum',{required:false,options:[{value:'exchange',label:'直接兑换'},{value:'amount_offset',label:'金额抵用'}]}),f('exchange_contract_minor','单项签约兑付价（元）','money',{required:false}),f('use_domains','适用业务域','multi-enum',{required:false,options:[{value:'booking',label:'民宿/长租'},{value:'jiazheng',label:'本地生活服务'}]}),f('use_vendor_ids','适用商家','multi-reference',{required:false,source:'vendors'}),f('booking_project_ids','适用住宿项目','multi-reference',{required:false,source:'projects'}),f('booking_unit_ids','适用住宿房型（直接兑换必选）','multi-reference',{required:false,source:'units'}),f('life_product_ids','适用本地服务商品','multi-reference',{required:false,source:'life_products'}),f('supply_minor','供货价（元）','money'),f('retail_minor','零售价（元）','money'),f('valid_days','有效天数','number'),f('description','服务内容','textarea'),f('conditions','使用条件及除外责任','textarea')] },
   rules: { label: '报价与分配规则', fields: [f('name','规则名称'),f('merchant_id','适用商户','reference',{source:'merchants'}),f('beike_bps','贝壳比例（万分比）','number',{min:0,max:10000}),f('channel_bps','渠道占贝壳佣金（万分比）','number',{min:0,max:10000}),f('floor_bps','最低佣金率（万分比）','number',{min:0,max:10000}),f('description','规则及审批依据','textarea')] },
   packages: { label: '券包配置', fields: [f('name','券包名称'),f('city_id','适用城市','reference',{source:'cities'}),f('price_minor','券包售价（元）','money'),f('description','券包介绍','textarea'),f('items','券包明细','items')] },
   plans: { label: '会员方案', fields: [f('name','会员名称'),f('city_id','适用城市','reference',{source:'cities'}),f('package_id','赠送券包','reference',{source:'packages'}),f('price_minor','会员售价（元）','money'),f('valid_days','会员有效天数','number'),f('description','会员权益说明','textarea')] },
@@ -38,6 +41,8 @@ function validate(kind, input) {
     assert(value!==undefined && value!==null && value!=='',`请填写${field.label}`);
     if(['number','money','reference'].includes(field.type)) { assert(typeof value==='number' && Number.isSafeInteger(value) && value>=(field.min??1) && value<=(field.max??100000000),`${field.label}数值不合法`); out[field.key]=value; }
     else if(field.type==='enum') { assert(typeof value==='string' && field.options.some(o=>o.value===value),`${field.label}取值不合法`); out[field.key]=value; }
+    else if(field.type==='multi-reference'){assert(Array.isArray(value)&&value.length<=30&&value.every(v=>Number.isSafeInteger(v)&&v>0)&&new Set(value).size===value.length,`${field.label}编号不合法`);out[field.key]=value;}
+    else if(field.type==='multi-enum'){assert(Array.isArray(value)&&value.length<=field.options.length&&value.every(v=>field.options.some(o=>o.value===v))&&new Set(value).size===value.length,`${field.label}取值不合法`);out[field.key]=value;}
     else if(field.type==='items') { assert(Array.isArray(value)&&value.length>0&&value.length<=30,'券包应包含1至30项服务'); out.items=value.map(v=>{const item={}; for(const key of ['sku_id','rule_id','quantity','allocation_minor']) { assert(Number.isSafeInteger(v[key])&&v[key]>0&&v[key]<=100000000,'券包明细需填写有效的商品、规则、数量与逐券分摊金额'); item[key]=v[key]; } assert(item.quantity<=100,'单项数量不能超过100'); return item; }); assert(new Set(out.items.map(v=>v.sku_id)).size===out.items.length,'同一商品请合并数量'); }
     else { assert(typeof value==='string' && value.trim().length>0 && value.length<=(field.type==='textarea'?4000:255),`${field.label}长度不合法`); out[field.key]=value.trim(); }
   }
@@ -48,6 +53,15 @@ function validate(kind, input) {
     if(out.exchange_tier!==undefined){assert(out.redeem_channel==='offline','通兑档位仅适用于线下到店核销券');assert(out.exchange_tier_minor!==undefined,'请填写通兑档位展示价');}
     else assert(out.exchange_tier_minor===undefined,'请先选择通兑档位再填写档位展示价');
     if(out.redeem_channel==='online')assert(!out.exchange_tier,'线上核销不支持通兑档位');
+    if(out.spot_ids?.length)assert(out.category_id==='scenic_ticket','关联景点仅适用于景点门票券');
+    if(out.use_mode){
+      if(out.use_mode==='exchange')assert(out.exchange_contract_minor>0&&out.exchange_contract_minor===out.retail_minor,'直接兑换的签约兑付价须等于已筹资售价');
+      else assert(out.exchange_contract_minor===undefined,'金额抵用券不填写签约兑付价');
+      assert(out.use_domains?.length>0&&out.use_vendor_ids?.length>0,'跨业务用券须指定业务域和实际履约商家');
+      for(const domain of out.use_domains)assert((domain==='booking'?out.booking_project_ids:out.life_product_ids)?.length>0,'每个适用业务域须指定项目或服务');
+      if(out.use_mode==='exchange'&&out.use_domains.includes('booking'))assert(out.booking_unit_ids?.length>0,'住宿直接兑换须指定可兑换房型');
+      assert(out.retail_minor>0,'跨业务券必须有已筹资面值');
+    }else assert(out.exchange_contract_minor===undefined&&!out.use_domains?.length&&!out.use_vendor_ids?.length&&!out.booking_project_ids?.length&&!out.booking_unit_ids?.length&&!out.life_product_ids?.length,'请先选择跨业务用券方式');
   }
   if(kind==='packages') assert(out.items.reduce((s,v)=>s+v.quantity*v.allocation_minor,0)===out.price_minor,'逐券分摊金额合计必须等于券包售价');
   if(kind==='rules') assert(out.beike_bps>=out.floor_bps,'佣金比例低于最低标准');

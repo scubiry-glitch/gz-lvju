@@ -14,7 +14,7 @@
   function paint(payment) {
     if (cashier.normalize) payment = cashier.normalize(payment);
     var state = stateOf(payment);
-    if (state === 'paid') { result(); return payment; }
+    if (state === 'paid' || state === 'coupon_funded') { result(); return payment; }
     if (payment.next_action === 'new_attempt') { button.hidden = false; hint.textContent = '上次收银台已关闭，可重新付款'; return payment; }
     hint.textContent = statusText(state);
     button.hidden = ['closed', 'refunding', 'refunded', 'partially_refunded', 'closing', 'close_unknown'].includes(state);

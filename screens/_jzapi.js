@@ -141,11 +141,11 @@
 
   function byStatus(st) {
     var wanted = Array.isArray(st) ? st : [st];
-    return list({ status: wanted.join(','), pay_status: 'paid,not_required', limit: 100 });
+    return list({ status: wanted.join(','), pay_status: 'paid,not_required,coupon_funded', limit: 100 });
   }
 
   function all() {
-    return list({ limit: 100, pay_status: 'paid,not_required' });
+    return list({ limit: 100, pay_status: 'paid,not_required,coupon_funded' });
   }
 
   function create(payload) {
@@ -163,6 +163,12 @@
       notify();
       return normalizeItem(res.order || res);
     });
+  }
+
+  function couponQuotes(productId) {
+    return fetchJSON('/api/juzhu/jiazheng/coupon-quotes', {
+      method:'POST',headers:authHeaders(),body:JSON.stringify({product_id:productId})
+    }).then(function (result) { return result.quotes || []; });
   }
 
   var memoryRequestKeys = Object.create(null), cashierLoading;
@@ -708,6 +714,7 @@
     get: get,
     stats: stats,
     create: create,
+    couponQuotes: couponQuotes,
     pay: pay,
     payIntent: payIntent,
     paymentStatus: paymentStatus,

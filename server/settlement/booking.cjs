@@ -30,7 +30,11 @@ function bookingSnapshot(order,channel){
  assert(recordedFee===commission,'预订佣金金额与下单费率快照不一致',409,'booking_commission_mismatch');
  const checkin=dateOnly(order.checkin),checkout=dateOnly(order.checkout);assert(checkin<checkout,'预订离店日期须晚于入住日期',409,'booking_snapshot_invalid');
  const category=bookingPolicy.categoryOf(channel);
- return {id:String(order.id),order_no:String(order.order_no),owner_vendor_id:String(order.owner_vendor_id),category,category_label:bookingPolicy.categoryLabel(category),checkin,checkout,rooms:Number(order.rooms||1),nights:Number(order.nights||Math.round((Date.parse(checkout)-Date.parse(checkin))/86400000)),price_total:String(order.price_total),commission_rate:String(order.commission_rate),commission_fee:String(order.commission_fee),amount_minor:amount,commission_minor:commission,commission_bps:Number(rate),commission_basis:'BOOKING_ORDER_COMMISSION_SNAPSHOT'};
+ const split=order.coupon_application_id?{
+  coupon_application_id:String(order.coupon_application_id),coupon_minor:minor(order.coupon_minor),cash_due_minor:minor(order.cash_due_minor),
+ }:{};
+ if(order.coupon_application_id)assert(BigInt(split.coupon_minor)>0n&&BigInt(split.coupon_minor)+BigInt(split.cash_due_minor)===BigInt(amount),'预订券额与现金应付不守恒',409,'booking_coupon_split_invalid');
+ return {id:String(order.id),order_no:String(order.order_no),owner_vendor_id:String(order.owner_vendor_id),category,category_label:bookingPolicy.categoryLabel(category),checkin,checkout,rooms:Number(order.rooms||1),nights:Number(order.nights||Math.round((Date.parse(checkout)-Date.parse(checkin))/86400000)),price_total:String(order.price_total),commission_rate:String(order.commission_rate),commission_fee:String(order.commission_fee),amount_minor:amount,commission_minor:commission,commission_bps:Number(rate),commission_basis:'BOOKING_ORDER_COMMISSION_SNAPSHOT',...split};
 }
 
 // Called exactly once inside the booking creation transaction, never while
@@ -58,12 +62,43 @@ async function captureBookingSnapshot(c,order,{config=process.env,payment_mode=o
 
 function createBookingSettlement({pool,workflow,authorize,config=process.env,now=Date.now}){
  let cursor='0';
+ async function recognizeCouponBooking(c,p,order,guard){
+  assert(order.status==='confirmed'&&['paid','coupon_funded'].includes(order.pay_status)&&!order.refund_status,'用券预订尚未确认或存在退款',409,'booking_not_eligible');
+  const snapshot=parse(order.payment_config_snapshot),profile=snapshot.settlement_profile,frozen=snapshot.booking;
+  assert(profile&&profile.recognition_policy?.mode==='BOOKING_CHECKOUT_DELAY'&&frozen?.coupon_application_id,'用券预订缺少冻结协议',409,'booking_snapshot_missing');
+  await authorize(p,'settlement.fund.write',{biz_type:'booking',payment_mode:'pay_center',party_id:profile.party_id});
+  const current=bookingSnapshot(order,frozen.category!=null?(await projectChannel(c,order.project_id)??frozen.category):null);
+  for(const key of ['order_no','owner_vendor_id','checkin','checkout','amount_minor','commission_minor','commission_bps','rooms','nights','coupon_application_id','coupon_minor','cash_due_minor',...(frozen.category!=null?['category']:[])])assert(frozen[key]===current[key],'预订订单关键资料与下单快照不一致',409,'booking_snapshot_changed');
+  const checkout=bookingPolicy.dueAt({biz_type:'booking',snapshot},{id:null,version:0,conditions:{booking_checkout_delay_days:0}});
+  assert(checkout.not_before_at<=sqlDate(now()),'尚未到订单离店日期',409,'booking_checkout_not_due');
+  const cash=BigInt(frozen.cash_due_minor);
+  if(cash>0n){
+   assert(guard&&guard.lifecycle==='paid'&&guard.paid_payment_id!=null&&String(guard.paid_payment_id)===String(order.paid_payment_order_id)&&String(guard.account_id)===String(order.user_id)&&String(guard.amount_minor)===cash.toString()&&order.pay_status==='paid','预订差额支付身份或金额不一致',409,'booking_payment_mismatch');
+   const guardSnapshot=parse(guard.snapshot);assert(hash(guardSnapshot.settlement_profile||null)===hash(profile)&&hash(guardSnapshot.booking||null)===hash(frozen),'预订差额支付契约不是下单冻结版本',409,'booking_payment_snapshot_mismatch');
+   const [payment]=await rows(c,'SELECT * FROM payment_orders WHERE id=? FOR UPDATE',[guard.paid_payment_id]);
+   assert(payment&&payment.biz_type==='booking'&&payment.biz_order_no===order.order_no&&payment.pay_status==='paid'&&String(payment.amount_minor)===cash.toString()&&payment.merchant_no===guard.merchant_no,'预订差额原支付与订单不一致',409,'booking_payment_mismatch');
+   const refunds=await rows(c,"SELECT id FROM payment_refunds WHERE payment_order_id=? AND refund_status<>'voided' ORDER BY id FOR UPDATE",[payment.id]);
+   assert(!refunds.length,'预订差额支付存在退款，须先核验净履约金额',409,'booking_refund_requires_review');
+  } else assert(!guard&&order.pay_status==='coupon_funded'&&!order.paid_payment_order_id,'全额用券预订不应存在现金支付',409,'booking_zero_cash_mismatch');
+  const ctx=await business.registerContext(c,{biz_type:'booking',source_order_system:'booking_orders',biz_order_no:order.order_no,party_id:profile.party_id,
+   snapshot:{settlement_profile:profile,booking:frozen,account_id:String(order.user_id),vendor_id:order.owner_vendor_id,city_id:order.city_id||null}});
+  assert(hash(ctx.snapshot.settlement_profile)===hash(profile)&&hash(ctx.snapshot.booking)===hash(frozen),'用券预订结算上下文与订单快照不一致',409,'booking_context_mismatch');
+  const [prior]=await rows(c,"SELECT * FROM commerce_settlement_fulfillment WHERE context_id=? AND event_kind='BOOKING_CHECKOUT_DATE' FOR UPDATE",[ctx.id]);
+  if(prior){const units=await rows(c,'SELECT id FROM commerce_settlement_units WHERE context_id=? AND recognition_id IN (?,?)',[ctx.id,prior.id+':coupon',prior.id+':cash']);assert(units.length===(cash>0n?2:1),'用券离店记录缺少结算单位',409);return {id:order.order_no,status:'EXISTING',settlement_unit_ids:units.map(v=>v.id)};}
+  const recognition=id(),evidence={source:'BOOKING_CHECKOUT_DATE',timezone:'Asia/Shanghai',checkout:frozen.checkout,checkout_boundary_at:checkout.not_before_at,order_status:order.status,cash_payment_id:guard?.paid_payment_id||null,observed_at:sqlDate(now())};
+  await c.execute("INSERT INTO commerce_settlement_fulfillment(id,context_id,order_no,account_id,event_kind,evidence,confirmed_at) VALUES(?,?,?,?,'BOOKING_CHECKOUT_DATE',?,?)",[recognition,ctx.id,order.order_no,String(order.user_id),JSON.stringify(evidence),sqlDate(now())]);
+  const applied=await require('../../commerce/coupon-application.cjs').recognizeApplied(c,{bizType:'booking',orderNo:order.order_no,profile,cashPaymentId:guard?.paid_payment_id,recognitionId:recognition,context:ctx});
+  for(const unit of applied.units){const items=await rows(c,'SELECT * FROM commerce_settlement_items WHERE unit_id=? ORDER BY id',[unit.id]);for(const item of items){const policy=await workflow.selectPolicy(c,ctx,item),timing=policy?bookingPolicy.dueAt(ctx,policy):checkout;await c.execute('UPDATE commerce_settlement_items SET not_before_at=? WHERE id=?',[timing.not_before_at,item.id]);}}
+  await workflow.audit(c,p,'booking.checkout.recognize',order.order_no,{confirmation_id:recognition,unit_ids:applied.units.map(u=>u.id),evidence});
+  return {id:order.order_no,status:'RECOGNIZED',settlement_unit_ids:applied.units.map(u=>u.id),calculation:applied.calculation};
+ }
  async function recognizeOrder(p,orderId){return transaction(pool,async c=>{
   // The same guard -> business order -> payment -> refunds -> source order as
   // the cashier. Reading the identifier first takes no row lock.
   const [observed]=await rows(c,'SELECT order_no FROM booking_orders WHERE id=?',[orderId]);if(!observed)return {id:String(orderId),status:'SKIPPED'};
   const [guard]=await rows(c,"SELECT * FROM payment_order_guards WHERE biz_type='booking' AND biz_order_no=? FOR UPDATE",[observed.order_no]);
   const [order]=await rows(c,'SELECT * FROM booking_orders WHERE id=? FOR UPDATE',[orderId]);
+  if(order?.coupon_application_id)return recognizeCouponBooking(c,p,order,guard);
   assert(order&&order.status==='confirmed'&&order.pay_status==='paid'&&!order.refund_status,'预订订单尚未确认付款或存在退款',409,'booking_not_eligible');
   const snapshot=parse(order.payment_config_snapshot),profile=snapshot.settlement_profile;
   assert(profile&&profile.recognition_policy?.mode==='BOOKING_CHECKOUT_DELAY'&&snapshot.booking,'预订订单没有下单冻结的结算协议',409,'booking_snapshot_missing');
@@ -104,7 +139,7 @@ function createBookingSettlement({pool,workflow,authorize,config=process.env,now
   const exists=await rows(pool,"SELECT 1 FROM information_schema.tables WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='booking_orders'");if(!exists.length)return {rows:[],count:0,has_more:false,next_after_id:'0'};
   const start=String(after_id??cursor);assert(/^\d+$/.test(start),'预订扫描游标无效');
   const today=new Date(new Date(now()).getTime()+8*3600000).toISOString().slice(0,10);
-  const candidates=await rows(pool,"SELECT o.id FROM booking_orders o WHERE o.id>? AND o.status='confirmed' AND o.pay_status='paid' AND o.checkout<=? AND JSON_EXTRACT(o.payment_config_snapshot,'$.settlement_profile') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM commerce_settlement_fulfillment f JOIN commerce_settlement_business_contexts x ON x.id=f.context_id WHERE x.biz_type='booking' AND x.source_order_system='booking_orders' AND x.biz_order_no COLLATE utf8mb4_general_ci=o.order_no COLLATE utf8mb4_general_ci AND f.event_kind='BOOKING_CHECKOUT_DATE') ORDER BY o.id LIMIT ?",[start,today,String(size)]);
+  const candidates=await rows(pool,"SELECT o.id FROM booking_orders o WHERE o.id>? AND o.status='confirmed' AND o.pay_status IN ('paid','coupon_funded') AND o.checkout<=? AND JSON_EXTRACT(o.payment_config_snapshot,'$.settlement_profile') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM commerce_settlement_fulfillment f JOIN commerce_settlement_business_contexts x ON x.id=f.context_id WHERE x.biz_type='booking' AND x.source_order_system='booking_orders' AND x.biz_order_no COLLATE utf8mb4_general_ci=o.order_no COLLATE utf8mb4_general_ci AND f.event_kind='BOOKING_CHECKOUT_DATE') ORDER BY o.id LIMIT ?",[start,today,String(size)]);
   const out=[];for(const order of candidates){try{out.push(await recognizeOrder(p,order.id));}catch(e){if(!e.status||e.status>=500)throw e;out.push({id:String(order.id),status:'BLOCKED',code:e.code||'booking_settlement_blocked'});}}
   const next=candidates.length?String(candidates.at(-1).id):'0';if(after_id==null)cursor=candidates.length===size?next:'0';
   return {rows:out,count:out.length,has_more:candidates.length===size,next_after_id:next};

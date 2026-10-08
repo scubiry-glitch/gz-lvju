@@ -90,21 +90,31 @@ async function createOrder(conn, orderRef, sku, opts) {
   return orderRef;
 }
 
-async function listUserOrders(conn, userId, limit) {
+async function listUserOrders(conn, userId, limit, pageValue, status='') {
   const userIds = Array.isArray(userId) ? userId.map(String) : [String(userId)];
   if (!userIds.length || userIds.length > 2 || userIds.some(id => !id)) throw new Error('订单身份无效');
   const lim = Math.min(Math.max(parseInt(limit || '50', 10) || 50, 1), 200);
+  const page = Math.min(Math.max(parseInt(pageValue || '1', 10) || 1, 1), 100000);
+  const allowedStatus = ['', 'pending', 'paid', 'assigned', 'serving', 'completed', 'cancelled'];
+  if (!allowedStatus.includes(status)) throw new Error('订单状态无效');
+  const ownerWhere = `BINARY o.user_id IN (${userIds.map(() => '?').join(',')}) AND (o.status != 'pending' OR o.payment_mode='pay_center')`;
+  const [totals] = await conn.execute(`SELECT o.status,COUNT(*) n FROM gr_orders o WHERE ${ownerWhere} GROUP BY o.status`, userIds);
+  const counts = { pending: 0, paid: 0, assigned: 0, serving: 0, completed: 0 };
+  let allTotal = 0;
+  for (const item of totals) { const n=Number(item.n);allTotal+=n;if(Object.hasOwn(counts,item.status))counts[item.status]=n; }
+  const total = status ? Number(totals.find(item=>item.status===status)?.n||0) : allTotal;
   const [rows] = await conn.execute(
     `SELECT o.*, p.title AS product_name, s.category_id AS category_id
      FROM gr_orders o
      LEFT JOIN jz_products p ON p.id = CAST(o.sku AS UNSIGNED)
      LEFT JOIN jz_skus s ON s.id = p.channel_sku_id
-     WHERE BINARY o.user_id IN (${userIds.map(() => '?').join(',')}) AND (o.status != 'pending' OR o.payment_mode='pay_center')
+     WHERE ${ownerWhere}${status?' AND o.status=?':''}
      ORDER BY o.created_at DESC, o.id DESC
-     LIMIT ${lim}`,
-    userIds
+     LIMIT ${lim} OFFSET ${(page-1)*lim}`,
+    status?[...userIds,status]:userIds
   );
-  return summarizeUserOrders(await enrichCustomerOrders(conn, rows));
+  const result=summarizeUserOrders(await enrichCustomerOrders(conn, rows));
+  return {...result,counts,total,page,size:lim,has_more:page*lim<total};
 }
 
 async function getUserOrder(conn, orderRef, userId) {

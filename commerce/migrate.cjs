@@ -48,6 +48,9 @@ async function migrate(pool) {
   await require('../server/settlement/own-funds.cjs').migrate(conn);
   await require('../server/settlement/reversal.cjs').migrate(conn);
   await require('../server/settlement/booking-schema.cjs').migrate(conn);
+  await require('./coupon-application.cjs').migrate(conn);
+  await require('./promotion-clicks.cjs').migrate(conn);
+  await require('./distribution.cjs').migrate(conn);
  } finally { await conn.query("SELECT RELEASE_LOCK('commerce_m1a_migrate')").catch(()=>{}); conn.release(); }
 }
 module.exports={migrate,statements};

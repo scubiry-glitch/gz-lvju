@@ -58,6 +58,9 @@ async function onRefundSucceeded(c,{biz_type,order,payload}) {
  const [source]=await rows(c,"SELECT s.*,x.biz_order_no,x.biz_type FROM commerce_funding_sources s JOIN commerce_settlement_business_contexts x ON x.id=s.context_id WHERE s.payment_id=? AND s.source_type='PAYMENT' FOR UPDATE",[paymentId]);if(!source)return false;
  assert(source.biz_type===biz_type&&source.biz_order_no===String(biz_type==='booking'?order.order_no:order.id),'退款与原款业务身份不符',409);
  const [refund]=await rows(c,"SELECT * FROM payment_refunds WHERE id=? AND payment_order_id=? AND refund_status='refunded'",[refundId,paymentId]);assert(refund&&String(refund.amount_minor)===minor(payload.amountMinor??payload.amount_minor),'退款机构事实与金额不符',409);
+ const [[allocated]]=await c.execute("SELECT COALESCE(SUM(basis_minor),0) amount FROM commerce_settlement_units WHERE source_id=? AND status='CONFIRMED'",[source.id]);
+ const [[refundedTotal]]=await c.execute("SELECT COALESCE(SUM(amount_minor),0) amount FROM payment_refunds WHERE payment_order_id=? AND refund_status='refunded'",[paymentId]);
+ assert(BigInt(allocated.amount)+BigInt(refundedTotal.amount)<=BigInt(source.received_minor),'原款退款与已履约券额合计超过实收，须冻结并人工追偿',409,'funding_refund_overallocated');
  if(payload.reference?.execution_order_id){const [plan]=await rows(c,'SELECT r.payment_refund_id FROM commerce_execution_refund_plans r JOIN commerce_execution_orders o ON o.id=r.order_id WHERE o.id=? AND o.source_id=?',[payload.reference.execution_order_id,source.id]);assert(plan&&String(plan.payment_refund_id)===refundId,'执行退款关联未确认',409);}
  await postLedger(c,{event_key:'payment:refund:'+refundId,context_id:source.context_id,source_type:'payment_refund',source_id:refundId,lines:[{side:'debit',account:biz_type==='commerce'?'unredeemed_liability':'service_pending_liability',amount_minor:String(refund.amount_minor)},{side:'credit',account:'settlement_cash:'+source.id,amount_minor:String(refund.amount_minor)}]});
  if(!payload.reference?.execution_order_id){
@@ -67,7 +70,7 @@ async function onRefundSucceeded(c,{biz_type,order,payload}) {
  }
  return true;
 }
-async function recognize(c,{ctx,unit_key,recognition_id,amount_minor,source,profile,evidence,merchant_id=null,promoter_account_id=null,coupon_id=null,redemption_id=null,order_id=null,city_id=null,already_posted=false}) {
+async function recognize(c,{ctx,unit_key,recognition_id,amount_minor,source,profile,evidence,merchant_id=null,promoter_account_id=null,coupon_id=null,redemption_id=null,order_id=null,city_id=null,already_posted=false,liability_account=null}) {
  const [prior]=await rows(c,'SELECT * FROM commerce_settlement_units WHERE context_id=? AND unit_key=? FOR UPDATE',[ctx.id,unit_key]);if(prior){if(prior.status==='REVERSED'){unit_key=unit_key+':'+recognition_id;const [revision]=await rows(c,'SELECT * FROM commerce_settlement_units WHERE context_id=? AND unit_key=? FOR UPDATE',[ctx.id,unit_key]);if(revision)return {...revision,calculation:parse(revision.calculation)};}else{assert(prior.recognition_id===recognition_id,'同一结算单位已由其他事实确认',409);return {...prior,calculation:parse(prior.calculation)};}}
  let promoterParty=promoter_account_id?'account:'+promoter_account_id:null;
  if(promoter_account_id){const [binding]=await rows(c,"SELECT party_id FROM commerce_settlement_party_bindings WHERE source_domain='identity' AND source_entity_type='account' AND source_entity_id=? AND status='approved'",[String(promoter_account_id)]);if(binding)promoterParty=binding.party_id;}
@@ -85,7 +88,7 @@ async function recognize(c,{ctx,unit_key,recognition_id,amount_minor,source,prof
  for(const [kind,party,accountId,amount] of components){if(BigInt(amount)===0n)continue;
   await c.execute("INSERT INTO commerce_settlement_items(batch_id,line_kind,redemption_id,coupon_id,order_id,merchant_id,promoter_account_id,city_id,rule_ref,basis_minor,payable_minor,status,context_id,unit_id,component_key,beneficiary_party_id,account_id,source_id,original_payable_minor,planned_minor,not_before_at) VALUES(NULL,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?,?,?,?,?,?,?,?)",[kind,redemption_id,coupon_id,order_id,merchant_id,promoter_account_id,city_id,hash(rule),String(amount_minor),amount,ctx.id,unitId,kind,party,accountId,source.id,amount,amount,available]);
  }
- if(!already_posted){const lines=[{side:'debit',account:ctx.biz_type==='commerce'?'unredeemed_liability':'service_pending_liability',amount_minor:(BigInt(calc.merchant_minor)+BigInt(calc.commission_minor)).toString()},{side:'credit',account:'payable:'+profile.party_id,amount_minor:calc.merchant_minor},{side:'credit',account:'platform_retained',amount_minor:calc.retained_minor}];if(BigInt(calc.promoter_minor)>0n)lines.push({side:'credit',account:'payable:'+promoterParty,amount_minor:calc.promoter_minor});await postLedger(c,{event_key:'recognition:'+ctx.id+':'+recognition_id,context_id:ctx.id,source_type:'recognition',source_id:unitId,rule_ref:hash(rule),lines});}
+ if(!already_posted){assert(!liability_account||['unredeemed_liability','service_pending_liability'].includes(liability_account),'负债账户无效',409);const lines=[{side:'debit',account:liability_account||(ctx.biz_type==='commerce'?'unredeemed_liability':'service_pending_liability'),amount_minor:(BigInt(calc.merchant_minor)+BigInt(calc.commission_minor)).toString()},{side:'credit',account:'payable:'+profile.party_id,amount_minor:calc.merchant_minor},{side:'credit',account:'platform_retained',amount_minor:calc.retained_minor}];if(BigInt(calc.promoter_minor)>0n)lines.push({side:'credit',account:'payable:'+promoterParty,amount_minor:calc.promoter_minor});await postLedger(c,{event_key:'recognition:'+ctx.id+':'+recognition_id,context_id:ctx.id,source_type:'recognition',source_id:unitId,rule_ref:hash(rule),lines});}
  return {id:unitId,calculation:calc};
 }
 async function onRedemption(c,{coupon,order,redemption_id,merchant_id,amounts}) {
@@ -100,17 +103,20 @@ async function onRedemption(c,{coupon,order,redemption_id,merchant_id,amounts}) 
 }
 function createBusiness({pool,configuration:cfg,workflow,authorize,config={}}){
  async function acceptService(p,input){return workflow.command(p,'service.accept',input,async c=>{
-  const [g]=await rows(c,"SELECT * FROM payment_order_guards WHERE biz_type='jiazheng' AND biz_order_no=? FOR UPDATE",[input.id]);assert(g&&String(g.account_id)===String(p.account.id),'服务订单不存在或不属于本人',404);
-  const [o]=await rows(c,'SELECT * FROM jz_orders WHERE id=? FOR UPDATE',[input.id]);assert(o&&String(o.account_id)===String(p.account.id)&&o.payment_mode==='pay_center','订单身份不一致',403);assert(['done','rated'].includes(o.status)&&o.pay_status==='paid','服务尚未完成或未付款',409);
+  const [g]=await rows(c,"SELECT * FROM payment_order_guards WHERE biz_type='jiazheng' AND biz_order_no=? FOR UPDATE",[input.id]);
+  const [o]=await rows(c,'SELECT * FROM jz_orders WHERE id=? FOR UPDATE',[input.id]);assert(o&&String(o.account_id)===String(p.account.id)&&o.payment_mode==='pay_center','订单身份不一致',403);
+  assert(['done','rated'].includes(o.status)&&['paid','coupon_funded'].includes(o.pay_status),'服务尚未完成或未付款',409);
+  assert(o.coupon_application_id ? (Number(o.cash_due_minor)===0&&!g || Number(o.cash_due_minor)>0&&g&&String(g.account_id)===String(p.account.id)&&g.lifecycle==='paid') : g&&String(g.account_id)===String(p.account.id), '服务订单现金支付身份不一致',409);
   assert(!o.refund_status,'订单存在退款或售后，须先完成净履约金额核验',409,'service_refund_requires_review');
   const snapshot=parse(o.payment_config_snapshot),profile=snapshot.settlement_profile;assert(profile,'历史订单缺少已锁定的结算协议，请先核验',409);
   assert(profile.recognition_policy?.mode==='CUSTOMER_ACCEPTANCE','本合同未采用客户确认规则',409);
   const ctx=await registerContext(c,{biz_type:'jiazheng',source_order_system:'jz_orders',biz_order_no:o.id,party_id:profile.party_id,snapshot:{settlement_profile:profile,account_id:String(o.account_id),vendor_id:o.vendor_id,city_id:o.city_id}});
   const [prior]=await rows(c,"SELECT * FROM commerce_settlement_fulfillment WHERE context_id=? AND event_kind='CUSTOMER_ACCEPTANCE'",[ctx.id]);if(prior)return {id:o.id,status:'confirmed',confirmation_id:prior.id};
-  const source=await funding(c,ctx,g.paid_payment_id),confirmationId=id();
+  const source=o.coupon_application_id?null:await funding(c,ctx,g.paid_payment_id),confirmationId=id();
   await c.execute("INSERT INTO commerce_settlement_fulfillment(id,context_id,order_no,account_id,event_kind,evidence,confirmed_at) VALUES(?,?,?,?,'CUSTOMER_ACCEPTANCE',?,?)",[confirmationId,ctx.id,o.id,String(p.account.id),JSON.stringify({order_status:o.status,account_id:String(p.account.id),note:String(input.note||'客户确认服务完成').slice(0,500)}),sqlDate()]);
-  const out=await recognize(c,{ctx,unit_key:o.id,recognition_id:confirmationId,amount_minor:String(o.fee),source,profile,evidence:{confirmation_id:confirmationId},merchant_id:o.vendor_id,order_id:null,city_id:o.city_id});
-  await workflow.audit(c,p,'service.accept',o.id,{confirmation_id:confirmationId,unit_id:out.id});return {id:o.id,status:'confirmed',confirmation_id:confirmationId,settlement_unit_id:out.id};
+  const applied=o.coupon_application_id?await require('../../commerce/coupon-application.cjs').recognizeApplied(c,{bizType:'jiazheng',orderNo:o.id,profile,cashPaymentId:g?.paid_payment_id,recognitionId:confirmationId,context:ctx}):null;
+  const out=applied?null:await recognize(c,{ctx,unit_key:o.id,recognition_id:confirmationId,amount_minor:String(o.fee),source,profile,evidence:{confirmation_id:confirmationId},merchant_id:o.vendor_id,order_id:null,city_id:o.city_id});
+  await workflow.audit(c,p,'service.accept',o.id,{confirmation_id:confirmationId,unit_ids:applied?.units.map(u=>u.id)||[out.id]});return {id:o.id,status:'confirmed',confirmation_id:confirmationId,settlement_unit_id:out?.id||null,settlement_unit_ids:applied?.units.map(u=>u.id)||[out.id]};
  });}
  return {acceptService,captureProfile:(c,input)=>captureProfile(c,input,config)};
 }
