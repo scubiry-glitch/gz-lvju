@@ -210,6 +210,10 @@ const ROUTES = [
   { method: 'PUT',    re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.update', res: 'photos', idGroup: 1 },
   { method: 'DELETE', re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.delete', res: 'photos', idGroup: 1 },
   { method: 'POST',   re: '^/api/juzhu/admin/upload$', perm: 'house.write', act: 'upload', res: 'photos' },
+  // 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传（与 admin/upload 同权限面 house.write）
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/upload$', perm: 'house.write', act: 'photo.upload', res: 'photos' },
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
+  { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
   // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）
@@ -270,6 +274,14 @@ const ROUTES = [
 ];
 
 const _compiled = ROUTES.map((r) => Object.assign({}, r, { _re: new RegExp(r.re) }));
+// 防御：ROUTES 字面量里多写一个逗号会产生「数组空洞」，.map 会跳过它但 for...of 会取到 undefined，
+// 导致 permRegistry.match() 抛错 → 所有「凭据通过的 admin 请求」全部 500（2026-09-21 实际踩过）。
+// 这里在**模块加载期**直接失败，宁可起不来，也不要静默 500。
+for (let i = 0; i < _compiled.length; i += 1) {
+  if (!(i in _compiled) || !_compiled[i]) {
+    throw new Error(`perm_registry: ROUTES 第 ${i} 项为空（数组空洞/多余逗号），请检查 ROUTES 字面量`);
+  }
+}
 const _permByCode = new Map(PERMS.map((p) => [p.code, p]));
 
 /** 命中路由规则；未命中返回 null（调用方回退旧行为） */

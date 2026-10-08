@@ -6,12 +6,39 @@
  * - 启动时后台全量扫描补齐缺失缩略图（并发 4），每小时增量重扫（新上传自动生效）
  * - 原图 <60KB / 非 jpg·jpeg·png / 不在 assets/ 下 → 不生成，thumbOf 回退原图
  *
+ * 对象存储（S3）分支：非 /assets/ 的图片若来自 S3/CDN（见 img_storage.cjs），
+ * 缩略图由上传时一并写入（同 .t<size>.webp 约定），此处只做「已 HEAD 校验存在」的改写，
+ * 校验结果进程内缓存 → 首次原图、之后命中的策略与本地一致，绝不产生 404。
+ * 开关：S3_THUMB_REWRITE=0 可整体关闭对象存储缩略图改写。
+ *
  * 依赖 sharp（规则14：仅 Node）；生成失败不影响接口（thumbOf 回退原图）。
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) { /* 未接入对象存储时退化为仅本地 */ }
+
+function s3ThumbRewriteEnabled() {
+  return String(process.env.S3_THUMB_REWRITE == null ? '1' : process.env.S3_THUMB_REWRITE) !== '0';
+}
+
+/** 非本地图片（S3/CDN 直链）的缩略图改写；未校验通过返回原值 */
+function remoteThumb(url, size) {
+  if (!imgStorage || !s3ThumbRewriteEnabled()) return url;
+  try { return imgStorage.thumbCandidate(url, size) || url; } catch (_) { return url; }
+}
+
+/**
+ * 读侧引用出口：IMG_URL_MODE=s3 时把存量本地引用改写为迁移前缀下的公网 URL
+ * （不改库即可灰度验证切读；dual/local 下为 no-op）。见 docs/s3-intake-api-plan.md §5。
+ */
+function resolveRef(p) {
+  if (!imgStorage || typeof imgStorage.resolveForRead !== 'function') return p;
+  try { return imgStorage.resolveForRead(p) || p; } catch (_) { return p; }
+}
 
 const ROOT = __dirname;
 const ASSETS_DIR = path.join(ROOT, 'assets');
@@ -23,12 +50,15 @@ let sharp = null;
 try { sharp = require('sharp'); } catch (_) { console.warn('img_thumbs: sharp 未安装，缩略图功能关闭'); }
 
 const IMG_RE = /\.(jpe?g|png)$/i;
+const REMOTE_IMG_RE = /\.(jpe?g|png|webp)$/i;   // S3/CDN 直链（webp 原图也参与改写）
 const inflight = new Map();   // thumbPath → Promise<boolean>
 
 function isAssetImagePath(p) {
   if (!p || typeof p !== 'string') return false;
   const norm = String(p).replace(/^\/+/, '');
   if (!norm.startsWith('assets/')) return false;
+  // 防路径穿越（与 img_storage.isLocalPath 同口径）
+  if (norm.split(/[\\/]/).includes('..') || norm.includes('\\')) return false;
   return IMG_RE.test(norm);
 }
 
@@ -67,24 +97,31 @@ function ensureThumb(urlPath, size) {
  * size: 240（卡片/列表）| 640（详情/横幅）
  */
 function thumbOf(urlPath, size) {
-  if (!sharp || !isAssetImagePath(urlPath)) return urlPath;
-  const tUrl = decodeURIComponent(urlPath).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+  const ref = resolveRef(urlPath);                 // s3 模式下本地引用 → 迁移前缀公网 URL
+  if (!isAssetImagePath(ref)) return remoteThumb(ref, size);
+  if (!sharp) return ref;
+  const tUrl = decodeURIComponent(ref).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
   try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
-  ensureThumb(urlPath, size);   // 后台补，立即返回原图（本次回退，下次命中）
-  return urlPath;
+  ensureThumb(ref, size);   // 后台补，立即返回原图（本次回退，下次命中）
+  return ref;
 }
 
 /** 深度遍历响应对象，把所有 assets 图片字符串字段改写为缩略图路径（同步、已存在的才替换） */
 function mapThumbsDeep(obj, size) {
-  if (!sharp || obj == null) return obj;
+  if (obj == null) return obj;
   const walk = (v, depth) => {
     if (depth > 6) return v;
     if (typeof v === 'string') {
-      if (!isAssetImagePath(v) || !IMG_RE.test(v)) return v;
-      const tUrl = decodeURIComponent(v).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
+      const ref = resolveRef(v);                   // s3 模式下本地引用 → 迁移前缀公网 URL
+      if (!isAssetImagePath(ref)) {
+        // 对象存储/CDN 直链：仅对图片扩展名做缩略图改写（已 HEAD 校验存在）
+        return /^https?:\/\//i.test(ref) && REMOTE_IMG_RE.test(ref) ? remoteThumb(ref, size) : ref;
+      }
+      if (!IMG_RE.test(ref)) return ref;
+      const tUrl = decodeURIComponent(ref).replace(/(\.[^.]+)$/, '.t' + size + '.webp');
       try { if (fs.existsSync(path.join(ROOT, tUrl))) return tUrl; } catch (_) {}
-      ensureThumb(v, size);
-      return v;
+      ensureThumb(ref, size);
+      return ref;
     }
     if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = walk(v[i], depth + 1); return v; }
     if (v && typeof v === 'object') { for (const k of Object.keys(v)) v[k] = walk(v[k], depth + 1); return v; }
@@ -125,4 +162,4 @@ function initBackground() {
   setInterval(() => { scanAll().catch(() => {}); }, RESCAN_INTERVAL_MS).unref();
 }
 
-module.exports = { thumbOf, mapThumbsDeep, ensureThumb, scanAll, initBackground, isAssetImagePath };
+module.exports = { thumbOf, mapThumbsDeep, ensureThumb, scanAll, initBackground, isAssetImagePath, remoteThumb, resolveRef };

@@ -10,6 +10,26 @@ const photoCfg = require('./photo_config.cjs');
 const roomProfileCfg = require('./room_profile.cjs');
 const MIN_PUBLISH_PHOTOS = photoCfg.PHOTO_MIN_PUBLISH;   // 单一数据源 photo_config.cjs（改阈值只改那一处）
 
+// 图片存储（贝壳 ODS/S3，S3 优先 + 本地兜底）：商家直传通道用；模块缺失时该路由返回 500
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
+
+// ── 图片引用收口（规则 21：图片只走 img_storage；模块缺失时原样透传，不阻断业务）──
+// 外部 URL 是否镜像由环境变量 IMG_INGEST 决定（缺省 keep = 原样保留，零行为变化）
+async function normImgRef(ref, opts) {
+  if (!imgStorage || typeof imgStorage.ingestRef !== 'function') {
+    return { ok: true, ref: ref == null ? '' : String(ref) };
+  }
+  return imgStorage.ingestRef(ref, opts);
+}
+
+async function normCoverRef(ref, opts) {
+  const raw = String(ref == null ? '' : ref).trim();
+  if (!raw) return { ok: true, ref: null };
+  const r = await normImgRef(raw, opts);
+  return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
+}
+
 function reply(status, data) {
   return { status, data };
 }
@@ -458,7 +478,11 @@ async function publishEligibility(conn, row) {
   const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
     WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return { error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片` };
-  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return { error: '上架前须设置房源封面图' };
+  // cover_image 脏值（空 / '-' / 'todo'）不算封面（口径与 img_storage.isValidImageRef 一致）
+  const coverOk = (imgStorage && typeof imgStorage.isValidImageRef === 'function')
+    ? imgStorage.isValidImageRef(row.cover_image)
+    : !!row.cover_image;
+  if (!coverOk && !Number(ph[0].has_cover || 0)) return { error: '上架前须设置房源封面图' };
   // 图集抽检（2026-09）：真拉取前 N 张核对大小/分辨率——封面优先
   const check = await spotCheckPhotos(conn, row.id);
   if (check.error) return { error: check.error };
@@ -631,6 +655,8 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
     try { roomProfileCfg.mergeRoomProfileIntoExt(ext, u.room_profile); }
     catch (e) { throw new Error('units[].' + e.message); }
   }
+  const coverRef = await normCoverRef(u.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: projectId });
+  if (!coverRef.ok) throw new Error('units[].cover_image 非法: ' + coverRef.error);
   const [r] = await conn.execute(
     `INSERT INTO units(project_id, name, slug, area_sqm, layout_label, rent_monthly, price_total,
        tags, unit_spec, promo_price, total_qty, amenities, sort_order, cover_image, ext)
@@ -646,7 +672,7 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
       totalQty,
       tagsToDb(u.amenities),
       u.sort_order == null || u.sort_order === '' ? 99 : parseInt(u.sort_order, 10),
-      u.cover_image || null,
+      coverRef.ref,
       Object.keys(ext).length ? JSON.stringify(ext) : null,
     ]
   );
@@ -687,13 +713,15 @@ async function housingProjectsCreate(conn, body, vendorId) {
   if (status === 'online') return reply(400, { code: 400, message: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' });
   const slug = await uniqueProjectSlug(conn, channel, name, b.slug);
   const address = String(b.address || '').trim() || (city[0].name + ' · ' + name);
+  const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: 0 });
+  if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
   const [r] = await conn.execute(
     `INSERT INTO projects(city_id, district_id, channel, name, slug, cover_image, address, tags,
        sort_order, unit_count, price_from, is_featured, old_house_hint, contact_phone,
        owner_vendor_id, status, ext)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      cityId, districtId, channel, name, slug, b.cover_image || null, address, tagsToDb(b.tags),
+      cityId, districtId, channel, name, slug, coverRef.ref, address, tagsToDb(b.tags),
       b.sort_order == null || b.sort_order === '' ? 999 : parseInt(b.sort_order, 10),
       Array.isArray(b.units) ? b.units.length : 0,
       b.price_from == null || b.price_from === '' ? null : parseInt(b.price_from, 10),
@@ -724,6 +752,12 @@ async function housingProjectsUpdate(conn, body, vendorId) {
   }
   for (const col of PROJECT_UPDATABLE_COLS) {
     if (col === 'name') continue;
+    if (col === 'cover_image' && Object.prototype.hasOwnProperty.call(b, col)) {
+      const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: row.id });
+      if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
+      sets.push('`' + col + '`=?'); params.push(coverRef.ref);
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(b, col)) {
       let v = b[col];
       if (['sort_order', 'price_from', 'unit_count', 'managed_unit_count', 'featured_rank'].includes(col)) {
@@ -869,6 +903,12 @@ async function housingUnitsUpdate(conn, body, vendorId) {
   }
   const sets = [], params = [];
   for (const col of ['name', 'layout_label', 'unit_spec', 'cover_image']) {
+    if (col === 'cover_image' && Object.prototype.hasOwnProperty.call(b, col)) {
+      const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: rows[0].id });
+      if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
+      sets.push('`' + col + '`=?'); params.push(coverRef.ref);
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(b, col)) { sets.push('`' + col + '`=?'); params.push(b[col]); }
   }
   for (const col of ['area_sqm']) {
@@ -972,46 +1012,169 @@ async function housingPhotosAdd(conn, body, vendorId) {
   try { category = photoCfg.normalizeCategoryInput(b.category); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const externalId = b.external_id == null || b.external_id === '' ? null : String(b.external_id).trim().slice(0, 120);
+  // 图片引用收口：本地/对象存储引用归一化；第三方 URL 是否镜像由 IMG_INGEST 决定（缺省 keep）
+  const ref = await normImgRef(filePath, { mirror: true, prefix: 'housing', entityType, entityId });
+  if (!ref.ok) return reply(400, { code: 400, message: 'file_path 非法: ' + ref.error });
+  if (String(ref.ref).length > 500) return reply(400, { code: 400, message: 'file_path 归一化后长度超过 500' });
+  const sourcePath = b.source_path || (ref.kind === 'external' ? filePath : null);
   const isCover = b.is_cover ? 1 : 0;
   // 幂等（2026-09）：同实体同 URL / 同 external_id 已存在 → 原地更新，不再插重复行
-  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）
-  const [dup] = await conn.execute(
-    `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
-       AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
-    externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
-  if (dup.length) {
-    const sets = ['file_path=?', 'category=?'];
-    const vals = [filePath, category];
-    if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
-    if (b.source_path != null) { sets.push('source_path=?'); vals.push(b.source_path || null); }
-    // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
-    if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
-    if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
-    vals.push(dup[0].id);
-    await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
-    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-    const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
-    return reply(200, { code: 0, message: 'success', updated: true, photo: photoOut(upd[0]) });
+  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）；更新与插入都走事务 + 归属行锁
+  await conn.beginTransaction();
+  try {
+    // 归属行锁：并发「设为封面」/批量登记时保证 is_cover 唯一与 sort_order 不重复
+    await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    const [dup] = await conn.execute(
+      `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
+         AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
+      externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
+    if (dup.length) {
+      const sets = ['file_path=?', 'category=?'];
+      const vals = [ref.ref, category];
+      if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
+      if (b.source_path != null) { sets.push('source_path=?'); vals.push(sourcePath); }
+      // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
+      if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
+      if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
+      vals.push(dup[0].id);
+      await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
+      if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+      if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
+      const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
+      await conn.commit();
+      return reply(200, {
+        code: 0, message: 'success', updated: true,
+        storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
+        file_path: ref.ref,
+        warned: ref.warn || undefined,
+        photo: photoOut(upd[0]),
+      });
+    }
+    if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    let nextSort;
+    if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
+      nextSort = parseInt(b.sort_order, 10);
+    } else {
+      const [mx] = await conn.execute(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+        [entityType, entityId]);
+      nextSort = mx[0].n;
+    }
+    const [r] = await conn.execute(
+      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [entityType, entityId, ref.ref, sourcePath, isCover, nextSort, category, externalId]);
+    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
+    const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
+    await conn.commit();
+    return reply(200, {
+      code: 0, message: 'success',
+      storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
+      file_path: ref.ref,
+      warned: ref.warn || undefined,
+      photo: photoOut(photo[0]),
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    return reply(500, { code: 500, message: '登记房源图片失败: ' + String(e.message || e) });
   }
-  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-  let nextSort;
-  if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
-    nextSort = parseInt(b.sort_order, 10);
-  } else {
-    const [mx] = await conn.execute(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
-      [entityType, entityId]);
-    nextSort = mx[0].n;
+}
+
+/** 解析上传载荷：data_url / base64 / source_url 三选一（与 app.js 同口径，此处独立实现避免循环依赖） */
+function decodeImagePayload(body) {
+  const b = body || {};
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(b.data_url || '').trim());
+  if (m) return { contentType: m[1], buffer: Buffer.from(m[2], 'base64'), filename: b.filename || '' };
+  const raw = b.base64;
+  if (raw) return { contentType: b.content_type || '', buffer: Buffer.from(String(raw).replace(/^data:[^,]+,/, ''), 'base64'), filename: b.filename || '' };
+  const src = b.source_url || b.url;
+  if (src) return { sourceUrl: String(src).trim(), filename: b.filename || '', contentType: b.content_type || '' };
+  return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+}
+
+/**
+ * 图片上传（对象存储）：商家直传通道
+ * 走与 admin 同一 img_storage（S3 优先、本地兜底），owner 校验后落 photos 表；
+ * source_url 支持把商家自有 CDN 上的图片镜像到平台对象存储。
+ */
+async function housingPhotosUpload(conn, body, vendorId) {
+  if (!imgStorage) return reply(500, { code: 500, message: 'img_storage module missing' });
+  const b = body || {};
+  const projectId = parseInt(b.project_id, 10);
+  if (!projectId) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const row = await ownProject(conn, vendorId, projectId);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+
+  let entityType = 'project';
+  let entityId = projectId;
+  if (b.unit_id != null && b.unit_id !== '') {
+    const unitId = parseInt(b.unit_id, 10);
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+    entityType = 'unit'; entityId = unitId;
   }
-  const [r] = await conn.execute(
-    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
-     VALUES (?,?,?,?,?,?,?,?)`,
-    [entityType, entityId, filePath, b.source_path || null, isCover, nextSort, category, externalId]);
-  if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-  if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
-  return reply(200, { code: 0, message: 'success', photo: photoOut(photo[0]) });
+  if (b.is_cover && entityType === 'unit') {
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [entityId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+  }
+
+  const payload = decodeImagePayload(b);
+  if (payload.error) return reply(400, { code: 400, message: payload.error });
+
+  const upload = await imgStorage.uploadImage({
+    buffer: payload.buffer,
+    sourceUrl: payload.sourceUrl,
+    filename: payload.filename,
+    contentType: payload.contentType,
+    prefix: 'housing',
+    entityType,
+    entityId,
+    makeThumbs: b.make_thumbs !== false,
+  });
+  if (!upload.ok) return reply(400, { code: 400, message: upload.error });
+
+  const isCover = b.is_cover ? 1 : 0;
+  // 落库段：S3 已上传成功 → 失败必须补偿删对象（避免孤儿对象）；事务 + 归属行锁保 is_cover 唯一
+  await conn.beginTransaction();
+  try {
+    await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    let sortOrder = b.sort_order == null || b.sort_order === '' ? null : parseInt(b.sort_order, 10);
+    if (sortOrder == null) {
+      const [next] = await conn.execute(
+        `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?`,
+        [entityType, entityId]
+      );
+      sortOrder = next[0].n;
+    }
+    if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    const [ins] = await conn.execute(
+      'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+      [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
+    );
+    if (entityType === 'project' && isCover) {
+      await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
+    }
+    const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [ins.insertId]);
+    await conn.commit();
+    return reply(200, {
+      code: 0, message: 'success',
+      storage: upload.storage,
+      file_path: upload.url,
+      thumb_240: upload.thumb_240 || null,
+      thumb_640: upload.thumb_640 || null,
+      bytes: upload.bytes,
+      warned: upload.warned || undefined,
+      photo: photo[0],
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    // 补偿删除已上传的对象（原图 + 两档缩略图）；失败仅告警，不覆盖原始错误
+    if (imgStorage && typeof imgStorage.deleteObjectByRef === 'function' && upload.storage === 's3' && upload.url) {
+      try { await imgStorage.deleteObjectByRef(upload.url); } catch (_) {}
+    }
+    return reply(500, { code: 500, message: '上传落库失败（对象已回收）: ' + String(e.message || e) });
+  }
 }
 
 /** 图集出参：分类中文名映射在 photo_config（单一数据源） */
@@ -1084,6 +1247,9 @@ async function housingPhotosSync(conn, body, vendorId) {
   }));
   const keptIds = new Set(plan.filter((x) => x.hit).map((x) => x.hit.id));
   const delIds = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+  // 被覆盖删除的行（事务提交后按开关回收对象，默认不删防误删不可恢复）
+  const delRows = existing.filter((r) => !keptIds.has(r.id));
+  const deleteObjects = String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1';
 
   await conn.beginTransaction();
   try {
@@ -1115,6 +1281,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     else await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [cover, unitId]);
     await conn.commit();
 
+    // 对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时）：行删除已提交，再删对象；
+    // 本域 S3 引用才删（外部第三方 URL / 本地引用自动跳过，见 deleteObjectByRef）
+    let objectsRemoved = 0;
+    if (deleteObjects && delRows.length && imgStorage && typeof imgStorage.deleteObjectByRef === 'function') {
+      for (const r of delRows) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const del = await imgStorage.deleteObjectByRef(r.file_path);
+          if (del && del.ok) objectsRemoved += 1;
+        } catch (_) { /* 单张失败不阻断；残留对象由对账脚本兜底 */ }
+      }
+    }
+
     const warnings = norm.warnings.slice();
     const total = await galleryCountOf(conn, projectId);
     if (total < photoCfg.PHOTO_MIN_PUBLISH) {
@@ -1125,7 +1304,7 @@ async function housingPhotosSync(conn, body, vendorId) {
     return reply(200, {
       code: 0, message: 'success',
       entity_type: entityType, entity_id: entityId,
-      applied: items.length, added, updated, removed,
+      applied: items.length, added, updated, removed, objects_removed: objectsRemoved,
       cover, truncated: norm.truncated, warnings,
       gallery_total: total,
       photos: after.map(photoOut),
@@ -1454,6 +1633,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
   '/api/juzhu/housing/vendor/photos/sync': housingPhotosSync,
+  '/api/juzhu/housing/vendor/photos/upload': housingPhotosUpload,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
   '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
   '/api/juzhu/housing/vendor/stay-calendar/query': housingStayCalendarQuery,

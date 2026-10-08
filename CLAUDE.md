@@ -285,3 +285,20 @@ C 端首页（`index.html`）的频道 tab（保租房/长租/卖旧买新/生�
 - **BJZ 可选短缓存**：`POST /api/juzhu/auth/beike` 仍可换 BJZ，TTL **2h**（非 30d）；前端 `_beike-login.js` 有票即放行，换票只在后台暖缓存，不阻塞「我的/订单」。
 - **普通浏览器 H5**：对齐 Morph `mLogin`——跳 `https://[test-]clogin.ke.com/login?service=enc(https://[test-]m.ke.com/my/checklogin?redirect=回跳)&type=2`（`GET /api/juzhu/auth/beike-config` / `BEIKE_H5_LOGIN_URL`+`BEIKE_H5_SERVICE_URL` 可覆盖）。须 **HTTPS**。回跳后 cookie 落在 `*.ke.com`；外域（如 meizu.life）可能拿不到票，密码门兜底。服务端除 `X-Lianjia-Token` 外也认 Cookie `lianjia_token`。
 - **前端入口**：`screens/_beike-login.js`（`authHeaders` / `isLoggedIn` / fetch 自动注入 `X-Lianjia-Token`）；业务页不要再只读 `BJZ_TOKEN` 判登录。浏览器密码登录仍写 `BJZ_TOKEN` + `BZF_SESSION_TOKEN`。
+
+## 规则 21 · 房源图片对象存储单一出口（贝壳 ODS/S3）
+
+**图片上传/读取只走 `img_storage.cjs`（`s3_client.cjs` 为协议层），页面与接口不得直连 ODS、不得自行拼签名。**（2026-09-21 拍板，详见 `docs/s3-image-storage.md`）
+
+- **配置**：`S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_FILE_ENDPOINT/S3_BUCKET` + 形态开关（`S3_SIGN_VERSION` / `S3_REGION` / `S3_ADDRESSING` / `S3_FILE_STYLE` / `S3_KEY_PREFIX` / `S3_EXTRA_HEADERS`）。密钥只进运行时 env / 根 `.env` / `juzhu/.env.local`（均 gitignore），**禁止写进源码、前端、文档、测试**。未配置 S3 时自动回落 `assets/uploads/`（响应带 `storage:'local'` + `warned`），业务不中断。
+- **规范口径（勿凭直觉改）**：接入规范要求 **V4 签名**（缺省 `v4`）+ **虚拟主机寻址** + **读图 URL 含桶名** + **key 前缀 `lvju/`** + **额外请求头**；四项已生效实测，`S3_EXTRA_HEADERS` 缺省 `{"x-amz-acl":"public-read"}`。虚拟主机寻址代码已支持，但 `<bucket>.ods.lianjia.com` 本网络端口不通（80 空响应/443 握手重置）→ 暂用 `S3_ADDRESSING=path`，网关放开后改环境变量即可。**改任一项先跑 `npm run s3:smoke` 全绿**；403 定位用 `npm run s3:probe`。
+- **V4 实现红线（改签名代码勿回退）**：`host` **必须**参与签名；canonical URI 必须用 **URL 实际路径**（virtual→`/key`，path→`/bucket/key`）；`content-length` **不签**。历史误判「服务端不支持 V4」实为这三处实现缺陷，排查法：PUT 200 但 `ETag=d41d8cd9…`（空串 MD5）= 客户端没发 body；桶级 `HEAD/GET` 一律 403（无 ListBucket），**探测只用对象级 PUT 探针**。
+- **零 schema 变更**：`photos.file_path` 与各 `*.cover_image` 继续存「可直接进 `<img src>` 的字符串」——本地 `/assets/...` 原样、S3 存完整 URL；也接受 `s3://<key>` 与裸 key（读取/改写时自动补全）。历史数据不迁移。
+- **缩略图**：上传时同步写 `.t240.webp` / `.t640.webp`（同目录同命名约定）；C 端改写仍集中在 `img_thumbs.cjs`，S3 分支先 HEAD 校验（进程内缓存）再改写，**不得产生 404**；`S3_THUMB_REWRITE=0` 可整体关闭。
+- **上传入口**：`POST /api/juzhu/admin/photos/upload`（兼容别名 `/admin/upload`，**JSON 与 multipart+scope 双通道**）、`POST /api/juzhu/admin/units/{id}/photos`（**新增房源图片**：multipart 直传 / `file_path` / base64）、`/api/juzhu/admin/photos/presign`（前端直传）、商家侧 `/api/juzhu/housing/vendor/photos/upload`（HMAC + owner 校验）；前两者在 `perm_registry.ROUTES` 挂 `house.write`，自检 `GET /api/juzhu/admin/storage/status` 挂 `admin.read`。**新增图片路由必须同步登记 ROUTES**。
+- **写侧收口（勿绕过）**：所有 `file_path` / `cover_image` 写入必须经 `img_storage.ingestRef()`（形态归一化 + 可选镜像）；脏值与危险协议（`-` / `todo` / 含 `..` 的路径 / `javascript:`）一律 400 拒绝；落库失败要 `compensateUpload()` 补偿删除对象（否则上架闸因图数不足卡死）。
+- **读侧出口**：`GET /api/juzhu/img?p=`（公网白名单，**不依赖数据库**，位于 `ensureSchema()` 之前）；生产优先由 file 域 CDN 直出，服务端零流量。C 端引用改写集中在 `img_thumbs.cjs`（内部先过 `resolveForRead`，`IMG_URL_MODE=s3` 时把存量本地引用改写为迁移前缀 URL）。
+- **灰度/回滚主开关**：`IMG_URL_MODE=local|dual|s3`（缺省 dual）+ `IMG_INGEST=keep|mirror`、`IMG_NORMALIZE`、`S3_FAIL_ON_UNCONFIGURED`、`S3_MIGRATE_PREFIX`、`S3_SOURCE_URL_ALLOWLIST`、`S3_DELETE_ON_PHOTO_DELETE`（全部在 `storage/status` 回显）。**回滚口径固定为「保留 S3 引用 + 只回滚写侧」**，因此前端 `imgUrl()`（`juzhu-admin.html` / `juzhu-admin-unit.html` / `screens/p-rating-detail.html`）是回滚前置，不得回退。
+- **四条勿回退约束**：① 存量迁移 key 必须用 `legacyKeyOf()`（确定性），不能走 `keyFor()` 的 uuid，否则切读 404；② `readBody()` 是 utf8 拼串，multipart/二进制必须 `readRawBody()`，且分隔符要匹配 `\r\n--<boundary>`；③ `insertPhotoRow()` 必须事务 + 归属行锁（并发封面/排序唯一性）；④ `deleteObjectByRef()` 拒绝对外部 URL 反解 key（防误删同名对象）。
+- 上架闸不变（≥8 图 + 有封面 + 评级通过，封面判定用 `isValidImageRef`）；`sharp` 为可选依赖，缺失时跳过归一化与缩略图但不阻断上传。**生产必须配 S3**（后端发行包不含 `assets/`，回落本地 = 静默丢图，建议 `S3_FAIL_ON_UNCONFIGURED=1`）。
+- **回归入口**：`npm run test:img-ingest`（L1 纯函数）/ `test:admin-upload`（L2 multipart 与契约）/ `s3:smoke`（L3 协议）/ `node scripts/admin_upload_e2e.cjs`（L4 HTTP 集成，需 DB + 管理员账号）；分层判定口径见 `docs/s3-image-storage.md` §9。

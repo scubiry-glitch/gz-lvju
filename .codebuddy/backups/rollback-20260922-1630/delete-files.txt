@@ -1,0 +1,6 @@
+docs/s3-migration-plan.md
+scripts/admin_upload_multipart_regression.cjs
+scripts/img_url_mode_regression.cjs
+scripts/s3-migrate-images.cjs
+scripts/s3-verify-images.cjs
+scripts/s3_api_e2e.cjs
