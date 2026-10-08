@@ -2,6 +2,11 @@
    贝壳 APP · 找房·旅居频道 — 共享移动端外壳 / 组件
    lvju-app-*.html 系列子页面统一引用本文件 + 各页少量页内样式
    品牌色：青绿 var(--brand) + 金 var(--gold)（与 贵州旅居总览 对齐）
+
+   ⚠ 跨域依赖：权益 C 端（juzhu-commerce*.html / juzhu-promoter.html）与
+   权益工作台（screens/commerce-*.html）也复用本文件做基础外壳（GOAL-2026-09-19
+   「不改全站视觉体系」约束的历史结果，见 ROADMAP-新居住权益优化清单-20261002 §2.4）。
+   改动全局选择器 / :root 变量前，先 grep 权益页引用，避免误伤另一端。
    ============================================================ */
 :root{
   --surface:#ffffff; --fg:#222222; --muted:#6B7785; --border:#e7ece9;

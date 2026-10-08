@@ -322,6 +322,16 @@ async function productsDelete(conn, body, vendorId) {
 async function handleCallback(conn, body, vendorId) {
   const parsed = grOrders.validateCallbackBody(body);
   if (!parsed.ok) return reply(parsed.status, { code: parsed.code, message: parsed.message });
+  const original = await grOrders.getOrderByRef(conn, parsed.orderRef);
+  if (!original || String(original.vendor_id) !== String(vendorId)) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
+  if (!require('./server/payment/vendor-payment.cjs').isExternalOrder(original)) return reply(403, { code: 403, message: '该订单不接受商家资金或状态回调' });
+  const externalEvidence=require('./server/settlement/external.cjs');
+  const captureExternal=original.biz_type==='jiazheng'&&original.payment_mode==='wechat_mini';
+  // This minimal durable inbox works before the shared settlement migration or
+  // party approval. DDL stays outside the order transaction (MySQL auto-commit).
+  if(captureExternal)await externalEvidence.ensureCallbackInbox(conn);
+  await conn.beginTransaction();
+  try {
   let order;
   if (parsed.status === 'paid') order = await grOrders.getOrderByRef(conn, parsed.orderRef);
   else order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
@@ -335,7 +345,7 @@ async function handleCallback(conn, body, vendorId) {
       order = await grOrders.getOrderByRefAndVendor(conn, parsed.orderRef, parsed.vendorOid);
     }
   }
-  if (!order) return reply(404, { code: 404, message: '订单不存在' });
+  if (!order) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在' }); }
   await grOrders.updateOrderCallback(conn, {
     order_ref: parsed.orderRef,
     vendor_oid: parsed.vendorOid,
@@ -347,7 +357,10 @@ async function handleCallback(conn, body, vendorId) {
     cancel_reason: parsed.cancelReason,
     vendor_id: vendorId,
   });
+  if(captureExternal)await externalEvidence.recordVerifiedVendorCallback(conn,{order:original,body,vendorId});
+  await conn.commit();
   return reply(200, { code: 0, message: 'success' });
+  } catch(error) { await conn.rollback(); throw error; }
 }
 
 const VENDOR_ROUTES = {
@@ -1291,7 +1304,7 @@ async function housingBookingsList(conn, body, vendorId) {
   if (b.project_id != null && b.project_id !== '') { sql += ' AND b.project_id=?'; params.push(parseInt(b.project_id, 10)); }
   sql += ' ORDER BY b.id DESC LIMIT 200';
   const [rows] = await conn.execute(sql, params);
-  const list = rows.map((r) => Object.assign({}, r, { contact_phone: maskPhone(r.contact_phone) }));
+  const list = rows.map((r) => Object.assign({}, r, { contact_phone: maskPhone(r.contact_phone), price_total: Number(r.price_total) }));
   return reply(200, { code: 0, message: 'success', list, total: list.length });
 }
 
@@ -1309,18 +1322,30 @@ async function housingBookingsDetail(conn, body, vendorId) {
   const [p] = await conn.execute('SELECT name AS project_name FROM projects WHERE id=?', [row.project_id]);
   const out = Object.assign({}, row, {
     contact_phone: maskPhone(row.contact_phone),
+    price_total: Number(row.price_total),
     project_name: p.length ? p[0].project_name : null,
   });
+  delete out.payment_config_snapshot; // Internal funding contract is not merchant order detail.
   return reply(200, { code: 0, message: 'success', booking: out });
 }
 
-async function housingBookingsConfirm(conn, body, vendorId) {
+async function housingBookingsConfirm(conn, body, vendorId, options = {}) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const existing = await ownBooking(conn, vendorId, b.id);
+  if (!existing) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
+  if (existing.pay_status != null) {
+    if (!options.getBookingPaymentAdapter) return reply(503, { code: 503, message: '统一支付处理暂不可用' });
+    try {
+      const out = await options.getBookingPaymentAdapter().confirm({ orderNo: existing.order_no, source: 'vendor', vendorId });
+      return reply(200, { code: 0, message: 'success', id: existing.id, ...out });
+    } catch (error) { return reply(error.status || 409, { code: error.status || 409, message: error.message }); }
+  }
   await conn.beginTransaction();
   const [lockedRows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(b.id, 10)]);
   const row = lockedRows[0];
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
+  if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
     && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
     const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -1341,16 +1366,26 @@ async function housingBookingsConfirm(conn, body, vendorId) {
   return reply(200, { code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'confirmed' });
 }
 
-async function housingBookingsCancel(conn, body, vendorId) {
+async function housingBookingsCancel(conn, body, vendorId, options = {}) {
   const b = body || {};
   if (!b.id) return reply(400, { code: 400, message: '缺少 id 参数' });
+  const existing = await ownBooking(conn, vendorId, b.id);
+  if (!existing) return reply(404, { code: 404, message: '订单不存在或不属于该商家' });
+  if (existing.pay_status != null) {
+    if (!options.getBookingPaymentAdapter) return reply(503, { code: 503, message: '统一支付处理暂不可用' });
+    try {
+      const out = await options.getBookingPaymentAdapter().cancel({ orderNo: existing.order_no, source: 'vendor', vendorId, reason: 'vendor_cancel' });
+      return reply(out.pending ? 202 : 200, { code: 0, message: 'success', id: existing.id, ...out });
+    } catch (error) { return reply(error.status || 409, { code: error.status || 409, message: error.message }); }
+  }
   await conn.beginTransaction();
   const [lockedRows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(b.id, 10)]);
   const row = lockedRows[0];
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
+  if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再变更' }); }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-  const newPay = row.pay_status === 'paid' ? 'refunded' : row.pay_status;
+  const newPay = null; // Offline-only compatibility; online refunds use the payment adapter above.
   await conn.execute('UPDATE booking_orders SET status=?, pay_status=?, updated_at=? WHERE id=?', ['cancelled', newPay, now, row.id]);
   // 拒单/取消 → 释放库存（多间口径 2026-09-10：递减 booked_qty，商家差异行保留；与 B 端工作台同口径）
   await stayCfg.releaseStayQty(connRows(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
@@ -1429,7 +1464,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/bookings/cancel': housingBookingsCancel,
 };
 
-async function handleRequest(path, body, conn, vendors) {
+async function handleRequest(path, body, conn, vendors, options = {}) {
   const auth = verifyVendorAuth(body, vendors);
   if (auth.error) return reply(401, { code: 401, message: auth.error });
   const [vendorRows] = await conn.execute('SELECT status, review_status FROM jz_vendors WHERE id=?', [auth.vendorId]);
@@ -1442,7 +1477,7 @@ async function handleRequest(path, body, conn, vendors) {
   }
   const fn = VENDOR_ROUTES[path] || HOUSING_ROUTES[path];
   if (!fn) return reply(404, { code: 404, message: '未知 vendor 路由' });
-  return fn(conn, body, auth.vendorId);
+  return fn(conn, body, auth.vendorId, options);
 }
 
 module.exports = {

@@ -10,6 +10,26 @@ function createApiDirectRouter(deps) {
   // 周边玩法类型枚举（与 admin 路由同口径；C 端公开读也用）
   const SPOT_TYPES = ['scenic', 'biz', 'food', 'cafe'];
   const SPOT_TYPE_LABELS = { scenic: '景区', biz: '商圈', food: '美食', cafe: '咖啡' };
+  const publicOrder = order => {
+    const clean = { ...order };
+    delete clean.payment_config_snapshot;
+    delete clean.request_key;
+    delete clean.request_hash;
+    return clean;
+  };
+  const legacyCustomerOrder = order => {
+    const clean = publicOrder(order);
+    let snapshot = {};
+    try { snapshot = typeof order.payment_config_snapshot === 'string' ? JSON.parse(order.payment_config_snapshot) : order.payment_config_snapshot || {}; } catch (_) {}
+    if (order.payment_mode === 'pay_center') {
+      clean.amount_minor = Number(order.fee);
+      clean.fee = clean.amount_minor / 100;
+    }
+    clean.address = order.address || order.house;
+    clean.scheduled_at = order.scheduled_at || order.expect_time;
+    clean.product_title = snapshot.productTitle || order.product_title || order.sku_name || order.type;
+    return clean;
+  };
 
   return async function handleApiDirect(urlPath, qs, req, res) {
     const {
@@ -18,7 +38,7 @@ function createApiDirectRouter(deps) {
       bookableOf, bookingPaymentExpired, buildStayMonth, cancelPolicyOf,
       cancelPolicyTextOf, catalogMemoGet, catalogMemoSet, connExec,
       crypto, ensureSchema, expireBooking, getDbConfig,
-      getVendorConfig, grOrders, grUserQuery, guardRatingSubmit,
+      getVendorConfig, getBookingPaymentAdapter, grOrders, grUserQuery, guardRatingSubmit,
       guardedPostJson, handleAdminRoutes, handleBookingRoutes, handleJiazhengRoutes,
       hmacAuth, housingCities, housingHydrateCoverFields, housingParseJsonField,
       imgThumbs, isCEndPublicApi, isProduction, jsonReply,
@@ -26,7 +46,7 @@ function createApiDirectRouter(deps) {
       normalizeCancelPolicyInput, outboundJson, parseExtObj, parseJsonFields,
       parseSkuJsonFields, permRegistry, photoCfg, projectPublishEligibility,
       queryRows, readBody, releaseStayQty, requestSession,
-      requireAnyPerm, requireApiKey, requirePerm, stayCfg,
+      requireAnyPerm, requireApiKey, requirePerm, resetVendorConfigCache, stayCfg,
       stayConfigOf, stripContactPhone, stripVendorSecrets, validateStaff,
       vendorApi, vendorRate, verifyVendorLoginToken, webhookSign,
       wholeHousePriceUnit, withStayRules,
@@ -38,7 +58,9 @@ function createApiDirectRouter(deps) {
       if (!(await assertApiAuthorized(urlPath, req, res))) return;
 
       // 家政 C 端 /api/juzhu/jiazheng/* → server/routes/jiazheng.cjs（不含 /vendor HMAC）
-      if (urlPath.startsWith('/api/juzhu/jiazheng') && !urlPath.startsWith('/api/juzhu/jiazheng/vendor/')) {
+      if ((urlPath.startsWith('/api/juzhu/jiazheng') && !urlPath.startsWith('/api/juzhu/jiazheng/vendor/'))
+        || (urlPath === '/api/juzhu/jz/orders' && req.method === 'POST')) {
+        await ensureSchema();
         if ((await handleJiazhengRoutes(urlPath, qs, req, res)) !== false) return;
         return jsonReply(res, { error: 'not found' }, 404);
       }
@@ -125,7 +147,7 @@ function createApiDirectRouter(deps) {
         const vendors = await getVendorConfig();
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const out = await vendorApi.handleRequest(urlPath, body, conn, vendors);
+          const out = await vendorApi.handleRequest(urlPath, body, conn, vendors, { getBookingPaymentAdapter });
           return jsonReply(res, out.data, out.status);
         } catch (e) {
           return jsonReply(res, { code: 500, message: String(e.message || e) }, 500);
@@ -790,38 +812,15 @@ function createApiDirectRouter(deps) {
           const body = await readBody(req);
           const status = String(body.status || '');
           if (!['confirmed', 'cancelled'].includes(status)) return jsonReply(res, { error: 'status 须为 confirmed/cancelled' }, 400);
-          const conn = await mysql2.createConnection(getDbConfig());
+          if (!['vendor', 'platform', 'admin'].includes(sess.role)) return jsonReply(res, { error: 'forbidden' }, 403);
+          const rows = await queryRows('SELECT order_no,owner_vendor_id FROM booking_orders WHERE id=?', [parseInt(m[1], 10)]);
+          if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
+          if (sess.role === 'vendor' && String(rows[0].owner_vendor_id) !== String(sess.vendorId)) return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
           try {
-            await conn.beginTransaction();
-            const [rows] = await conn.execute('SELECT * FROM booking_orders WHERE id=? FOR UPDATE', [parseInt(m[1], 10)]);
-            if (!rows.length) { await conn.rollback(); return jsonReply(res, { error: 'not found' }, 404); }
-            if (sess.role === 'vendor' && rows[0].owner_vendor_id !== sess.vendorId) {
-              await conn.rollback();
-              return jsonReply(res, { error: 'forbidden：非本商家订单' }, 403);
-            }
-            if (bookingPaymentExpired(rows[0])) {
-              await expireBooking(conn, rows[0]);
-              await conn.commit();
-              return jsonReply(res, { error: '待支付订单已过期并释放房态' }, 400);
-            }
-            if (rows[0].status === 'cancelled') { await conn.rollback(); return jsonReply(res, { error: '订单已取消，不可再变更' }, 400); }
-            // 在线支付单 pay_status='unpaid' 时租客未支付，不可确认生效
-            if (status === 'confirmed' && rows[0].pay_status === 'unpaid') {
-              await conn.rollback();
-              return jsonReply(res, { error: '租客尚未支付（收银台待付），支付完成后可确认生效' }, 400);
-            }
-            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            await conn.execute('UPDATE booking_orders SET status=?, updated_at=? WHERE id=?', [status, now, rows[0].id]);
-            // 商家拒单 → 释放库存（多间口径 2026-09-10，与客户取消同 helper）；确认则保留占用
-            if (status === 'cancelled') {
-              await releaseStayQty(connExec(conn), {
-                project_id: rows[0].project_id, unit_id: rows[0].unit_id, rooms: rows[0].rooms,
-                checkin: rows[0].checkin, checkout: rows[0].checkout, now,
-              });
-            }
-            await conn.commit();
-            return jsonReply(res, { ok: true, order_no: rows[0].order_no, status });
-          } finally { await conn.end(); }
+            const input = { orderNo: rows[0].order_no, source: 'vendor', vendorId: rows[0].owner_vendor_id, reason: 'vendor_cancel' };
+            const out = await getBookingPaymentAdapter()[status === 'confirmed' ? 'confirm' : 'cancel'](input);
+            return jsonReply(res, out, out.pending ? 202 : 200);
+          } catch (error) { return jsonReply(res, { error: error.message, code: error.code }, error.status || 409); }
         }
       }
 
@@ -1027,6 +1026,53 @@ function createApiDirectRouter(deps) {
           });
         } catch (_) {}
         return jsonReply(res, { ok: true, webhook_url: url || null });
+      }
+
+      // POST /api/juzhu/vendor/access —— 商家自配接入接口 url_link / order_detail_url（2026-09-30）
+      //（vendor=自己；platform 带 vendor_id 代管；webhook_url 走上一条路由；hmac_key 平台独占，只走 admin rotate）
+      if (urlPath === '/api/juzhu/vendor/access' && req.method === 'POST') {
+        const sess = await requestSession(req);
+        if (!sess || (sess.role !== 'vendor' && sess.role !== 'platform')) return jsonReply(res, { error: 'unauthorized' }, 401);
+        const body = await readBody(req);
+        if (['payment_mode', 'pay_merchant_no', 'payment_config_json', 'payment_config_version'].some(k => Object.prototype.hasOwnProperty.call(body, k))) return jsonReply(res, { error: '支付方式与收款配置须由平台接入配置台管理' }, 403);
+        const targetVid = sess.role === 'vendor' ? sess.vendorId : (parseInt(body.vendor_id, 10) || 0);
+        if (!targetVid) return jsonReply(res, { error: 'vendor_id 必填（平台代管）' }, 400);
+        if (sess.role === 'platform') {
+          const ex = await queryRows('SELECT id FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+          if (!ex.length) return jsonReply(res, { error: '商家不存在' }, 404);
+        }
+        const LIMIT = { url_link: 2000, order_detail_url: 2000 };
+        const next = {};
+        for (const f of Object.keys(LIMIT)) {
+          if (!(f in body)) continue;
+          const s = String(body[f] == null ? '' : body[f]).trim();
+          if (s) {
+            if (!/^https?:\/\//i.test(s)) return jsonReply(res, { error: f + ' 须以 http:// 或 https:// 开头' }, 400);
+            if (s.length > LIMIT[f]) return jsonReply(res, { error: f + ' 过长（≤' + LIMIT[f] + ' 字符）' }, 400);
+          }
+          next[f] = s || null;
+        }
+        if (!Object.keys(next).length) return jsonReply(res, { error: '无可更新字段（url_link / order_detail_url）' }, 400);
+        const beforeRows = await queryRows('SELECT url_link, order_detail_url FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
+        const before = {
+          url_link: (beforeRows[0] && beforeRows[0].url_link) || null,
+          order_detail_url: (beforeRows[0] && beforeRows[0].order_detail_url) || null,
+        };
+        const sets = [], vals = [];
+        for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
+        await queryRows(`UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
+          [...vals, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+        if (resetVendorConfigCache) resetVendorConfigCache();
+        try {
+          await authCenter.audit({
+            accountId: (sess.account && sess.account.id) || null, principalType: 'user',
+            action: 'vendor.access.update', resource: 'vendor', resourceId: String(targetVid),
+            before, after: Object.assign({}, before, next), result: 'ok',
+          });
+        } catch (_) {}
+        return jsonReply(res, { ok: true, vendor_id: targetVid,
+          url_link: next.url_link !== undefined ? next.url_link : before.url_link,
+          order_detail_url: next.order_detail_url !== undefined ? next.order_detail_url : before.order_detail_url });
       }
 
       // POST /api/juzhu/vendor/webhook/test —— 同步试推一次 webhook.test（单次不重试，回传送达结果）
@@ -1614,7 +1660,7 @@ function createApiDirectRouter(deps) {
         if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const data = await grOrders.listUserOrders(conn, parsed.userId, qp.get('limit'));
+          const data = await grOrders.listUserOrders(conn, parsed.userIds || parsed.userId, qp.get('limit'), qp.get('page'), qp.get('status') || '');
           return jsonReply(res, { ok: true, ...data });
         } finally {
           await conn.end();
@@ -1632,8 +1678,9 @@ function createApiDirectRouter(deps) {
           if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
           const conn = await mysql2.createConnection(getDbConfig());
           try {
-            const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+            const order = await grOrders.getUserOrder(conn, orderRef, parsed.userIds || parsed.userId);
             if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
+            if (!require('../payment/vendor-payment.cjs').isExternalOrder(order)) return jsonReply(res, { ok: false, error: '本站订单不调用商家订单详情' }, 409);
             if (!order.vendor_id) return jsonReply(res, { ok: false, error: '订单未关联商家' });
             const vendors = await getVendorConfig();
             const vendor = vendors[String(order.vendor_id)] || {};
@@ -1687,7 +1734,7 @@ function createApiDirectRouter(deps) {
           if (!parsed.ok) return jsonReply(res, { ok: false, error: parsed.error }, parsed.status);
           const conn = await mysql2.createConnection(getDbConfig());
           try {
-            const order = await grOrders.getUserOrder(conn, orderRef, parsed.userId);
+            const order = await grOrders.getUserOrder(conn, orderRef, parsed.userIds || parsed.userId);
             if (!order) return jsonReply(res, { ok: false, error: '订单不存在' }, 404);
             return jsonReply(res, { ok: true, order });
           } finally {
@@ -1817,14 +1864,18 @@ function createApiDirectRouter(deps) {
       // GET /api/juzhu/jz/orders
       if (urlPath === '/api/juzhu/jz/orders' && req.method === 'GET') {
         if (!(await requireApiKey(req, res))) return;
+        const orderSession = await requestSession(req);
+        if (!orderSession?.account && orderSession?.role !== 'platform') return jsonReply(res, { error: '请先登录' }, 401);
         const qp = new URLSearchParams(qs);
         let sql = 'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE 1=1';
         const params = [];
+        if (orderSession.role === 'vendor') { sql += ' AND o.vendor_id=?'; params.push(orderSession.vendorId); }
+        else if (orderSession.role !== 'platform') { sql += ' AND o.account_id=?'; params.push(String(orderSession.account.id)); }
         if (qp.get('status')) { sql += ' AND o.status=?'; params.push(qp.get('status')); }
         const limit = Math.min(parseInt(qp.get('limit') || '50'), 200);
         sql += ' ORDER BY o.created_at DESC LIMIT ' + limit; // limit 已 parseInt+封顶，内联（mysql2 预处理不接受 LIMIT 绑定）
         const rows = await queryRows(sql, params);
-        return jsonReply(res, { list: rows });
+        return jsonReply(res, { list: orderSession.role === 'user' ? rows.map(publicOrder) : rows });
       }
 
       // GET /api/juzhu/jz/orders/overview —— gr_orders 指标概览（漏斗 + 日/月趋势；支持 city/vendor_id/start/end 筛选；必须在 orders/:id 之前）
@@ -1910,13 +1961,17 @@ function createApiDirectRouter(deps) {
       {
         const m = urlPath.match(/^\/api\/juzhu\/jz\/orders\/([^/]+)$/);
         if (m && req.method === 'GET') {
-          if (!(await requireApiKey(req, res))) return;
+          const orderSession = await requestSession(req);
+          if (orderSession?.role !== 'user' && !(await requireApiKey(req, res))) return;
+          if (!orderSession?.account && orderSession?.role !== 'platform') return jsonReply(res, { error: '请先登录' }, 401);
+          const ownerSql = orderSession.role === 'platform' ? '' : orderSession.role === 'vendor' ? ' AND o.vendor_id=?' : ' AND o.account_id=?';
+          const ownerArgs = orderSession.role === 'platform' ? [] : [orderSession.role === 'vendor' ? orderSession.vendorId : String(orderSession.account.id)];
           const rows = await queryRows(
-            'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?',
-            [m[1]]
+            'SELECT o.*, s.name AS sku_name FROM jz_orders o LEFT JOIN jz_skus s ON s.id=o.sku_id WHERE o.id=?' + ownerSql,
+            [m[1], ...ownerArgs]
           );
           if (!rows.length) return jsonReply(res, { error: 'not found' }, 404);
-          return jsonReply(res, rows[0]);
+          return jsonReply(res, orderSession.role === 'user' ? legacyCustomerOrder(rows[0]) : rows[0]);
         }
       }
 

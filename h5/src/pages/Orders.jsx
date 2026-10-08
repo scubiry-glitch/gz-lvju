@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { cancelBooking, myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
-import { formatPrice } from '../lib/price.js';
+import { formatPrice, formatMoney } from '../lib/price.js';
 import '../styles/orders.css';
 
 const TABS = [
@@ -32,6 +32,7 @@ function stOf(o) {
     if (o.pay_status === 'unpaid') return ['待支付', 'wait'];
     if (UNPAID_PS[o.pay_status]) return ['支付确认中', 'wait'];
     if (o.pay_status === 'paid') return ['已支付 · 待商家确认', 'stay'];
+    if (o.pay_status === 'coupon_funded') return ['已用券 · 待商家确认', 'stay'];
     return ['待商家确认', 'wait'];
   }
   if (o.status === 'confirmed') return ['已确认 · 待入住', 'stay'];
@@ -47,7 +48,7 @@ function matchTab(o, tab) {
   if (tab === 'stay') {
     if (isRefund || o.status === 'cancelled') return false;
     if (o.status === 'confirmed') return true;
-    if (o.status === 'pending' && ps === 'paid') return true;
+    if (o.status === 'pending' && (ps === 'paid' || ps === 'coupon_funded')) return true;
     return false;
   }
   if (tab === 'refund') return isRefund;
@@ -171,7 +172,7 @@ function OrdersBody() {
                     </div>
                     {o.cancel_policy_text ? <div className="meta">{o.cancel_policy_text}</div> : null}
                     <div className="amt">
-                      合计 <b>¥{formatPrice(o.price_total)}</b> · 订单号 …{(o.order_no || '').slice(-4)}
+                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 …{(o.order_no || '').slice(-4)}
                     </div>
                   </div>
                 </div>

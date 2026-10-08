@@ -3,18 +3,26 @@
 // 独立临时 MySQL 库；机构为沙箱镜像（commerce_provider_requests），金额单位分，全程断言金额守恒。
 // 场景各自使用独立账期窗口并回拨核销时间，模拟真实的账期滞后与跨期处理。
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path');
-const mysql=require('mysql2/promise'),{config,initAuth}=require('../../commerce/db.cjs'),{migrate}=require('../../commerce/migrate.cjs'),{Service}=require('../../commerce/service.cjs'),settlement=require('../../commerce/settlement.cjs'),{createServer}=require('../../commerce/app.cjs');
+const mysql=require('mysql2/promise'),{initAuth}=require('../../commerce/db.cjs'),{migrate}=require('../../commerce/migrate.cjs'),{Service}=require('../../commerce/service.cjs'),settlement=require('../../commerce/settlement.cjs'),{createServer}=require('../../commerce/app.cjs');
 const results=[];const check=async(name,fn)=>{await fn();results.push({name,passed:true});console.log('PASS '+name);};
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const bj=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(v);
 const day=n=>bj(new Date(Date.now()+n*86400000));
 (async()=>{
- const cfg=config(),database='commerce_settle_test_'+Date.now();let admin=await mysql.createConnection(cfg),testConfig=cfg;let pool,server,created=false;
+ const socket=process.env.SETTLEMENT_TEST_SOCKET;assert.match(socket||'',/^\/tmp\/sy-settlement-[\w-]+\/[^/]+\.sock$/,'SETTLEMENT_TEST_SOCKET must name the explicitly isolated temporary MySQL instance');
+ const cfg={socketPath:socket,user:'root',charset:'utf8mb4',timezone:'Z',supportBigNumbers:true,bigNumberStrings:false},database='commerce_settle_test_'+Date.now();let admin=await mysql.createConnection(cfg);let pool,server,created=false;
+ process.env.JUZHU_API_KEY=crypto.randomBytes(32).toString('hex');process.env.JUZHU_ADMIN_PASSWORD=crypto.randomBytes(32).toString('hex');
+ process.env.SETTLEMENT_ENABLED='0';process.env.SETTLEMENT_WORKER_ENABLED='0';
  try{
-  try{await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');}catch(e){if(e.code!=='ER_DBACCESS_DENIED_ERROR')throw e;await admin.end();testConfig={...cfg,user:'root',password:undefined,socketPath:'/var/lib/mysql/mysql.sock'};admin=await mysql.createConnection(testConfig);await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');}created=true;
-  pool=mysql.createPool({...testConfig,database,connectionLimit:12});
-  for(const table of ['accounts','roles','account_roles','sessions','cities','jz_vendors','gr_orders','jz_orders','jz_categories'])await pool.query('CREATE TABLE `'+table+'` LIKE `'+cfg.database+'`.`'+table+'`');
-  await pool.query('INSERT INTO jz_categories SELECT * FROM `'+cfg.database+'`.jz_categories');
+  await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');created=true;
+  pool=mysql.createPool({...cfg,database,connectionLimit:12});
+  // Reuse only literal checked-in DDL. This fixture never loads host credentials,
+  // connects to a host database, or copies a production table or production data.
+  for(const [file,tables]of [['../../auth_center.cjs',['accounts','roles','account_roles','sessions']],['../../server/schema.cjs',['cities','jz_vendors','gr_orders','jz_orders','jz_categories']]]){
+   const source=fs.readFileSync(path.resolve(__dirname,file),'utf8');
+   for(const table of tables){const match=source.match(new RegExp('`(CREATE TABLE IF NOT EXISTS '+table+' \\([\\s\\S]*?\\) CHARSET=utf8mb4)`'));assert(match,'Checked-in fixture DDL missing: '+table);assert(!match[1].includes('${'),'Fixture DDL must be literal');await pool.query(match[1].replace(/\\`/g,'`'));}
+  }
+  await pool.query("INSERT INTO jz_categories(id,name) VALUES('community','隔离测试社区服务')");
   await migrate(pool);await migrate(pool);
   const auth=initAuth(pool),service=new Service(pool,auth);
   await pool.query("INSERT INTO cities(id,name,slug) VALUES (1,'结算验收城市','settle')");

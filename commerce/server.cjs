@@ -7,7 +7,7 @@ const { randomUUID } = require('node:crypto');
 const { Commerce, DomainError, identities } = require('./domain.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const PREFIX = '/api/commerce/v1';
-const STATIC = new Set(['index.html', 'overview.html', 'juzhu-commerce.html', 'juzhu-promoter.html', 'screens/commerce-merchant.html', 'screens/commerce-admin.html', 'lvju-app.css', 'jiazheng-app.css', 'screens/_commerce.css', 'screens/_commerce-ui.js', 'screens/_commerce-api.js', 'screens/_commerce-entry.js', 'screens/_nav.js', 'screens/_region.js', 'screens/_navmobile.js', 'screens/_jzapi.js', 'juzhu/app.js', 'juzhu/cities.json', 'juzhu/data.json', 'juzhu/data-shenyang.json']);
+const STATIC = new Set(['index.html', 'overview.html', 'juzhu-commerce.html', 'juzhu-promoter.html', 'screens/commerce-merchant.html', 'screens/commerce-admin.html', 'lvju-app.css', 'jiazheng-app.css', 'screens/_commerce.css', 'screens/_commerce-entry.js', 'screens/_nav.js', 'screens/_region.js', 'screens/_navmobile.js', 'screens/_jzapi.js', 'juzhu/app.js', 'juzhu/cities.json', 'juzhu/data.json', 'juzhu/data-shenyang.json']);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2' };
 function send(res, status, value) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); res.end(JSON.stringify(value)); }
 async function bodyOf(req) {

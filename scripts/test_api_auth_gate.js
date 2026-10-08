@@ -7,6 +7,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const app = require(path.join(ROOT, 'app.js'));
+// Authentication gate tests use no host database or external identity provider.
+require('../auth_center.cjs').init({
+  query: async () => [], exec: async () => ({}),
+  expectedApiKey: app.expectedApiKey, expectedAdminPassword: () => '', isProduction: () => false,
+  jsonReply: (res, body, status = 200) => { res.writeHead(status); res.end(JSON.stringify(body)); },
+});
 
 function mockRes() {
   return {
@@ -64,7 +70,7 @@ async function run() {
     assert.strictEqual(res.statusCode, 401);
   }
 
-  // 旧全局 Key 已全面停用（规则 9）：C 端 GET 一律 401；仅涉写三路径过渡期放行
+  // 支付订单须本人账号；旧全局 Key 不能创建真实支付订单。
   const resLegacyGet = mockRes();
   assert.strictEqual(
     await app.assertApiAuthorized(
@@ -83,9 +89,28 @@ async function run() {
       { method: 'POST', headers: { 'x-api-key': 'local-only-change-me' } },
       resOk
     ),
-    true,
-    'legacy key 过渡期仅 C 端涉写放行'
+    false,
+    'legacy key 不允许创建真实支付订单'
   );
+
+  assert.strictEqual(resOk.statusCode, 401);
+  const principal = { type: 'account', account: { id: 'account-test', principal_type: 'user', status: 'active', idp_type: 'beike', idp_subject: 'ucid-test' }, roles: [] };
+  for (const [method, route] of [['GET','/api/juzhu/jiazheng/orders'], ['POST','/api/juzhu/jz/orders'], ['GET','/api/juzhu/jz/orders/WO-1'], ['POST','/api/juzhu/jiazheng/orders/WO-1/pay'], ['POST','/api/juzhu/jiazheng/orders/WO-1/payment'], ['GET','/api/juzhu/jiazheng/orders/WO-1/payment'], ['POST','/api/juzhu/jiazheng/orders/WO-1/cancel'], ['GET','/api/juzhu/booking/my']]) {
+    assert.strictEqual(app.isPaymentCustomerApi(route, method), true);
+    assert.strictEqual(await app.assertApiAuthorized(route, { method, headers: {}, principal }, mockRes()), true);
+  }
+  assert.strictEqual(app.isPaymentCustomerApi('/api/juzhu/jiazheng/orders/stats', 'GET'), false);
+  assert.strictEqual(app.isPaymentCustomerApi('/api/juzhu/jz/orders/overview', 'GET'), false);
+  assert.strictEqual(app.isPaymentCustomerApi('/api/juzhu/jz/orders', 'GET'), false);
+  for(const [method,route] of [['POST','/api/juzhu/jz/orders'],['GET','/api/juzhu/jz/orders/WO-1'],['GET','/api/juzhu/jiazheng/orders/WO-1/payment']]){
+    assert.strictEqual(app.isCEndPublicApi(route,method),false);
+    assert.strictEqual(await app.assertApiAuthorized(route,{method,headers:{}},mockRes()),false);
+    assert.strictEqual(await app.assertApiAuthorized(route,{method,headers:{'x-api-key':'local-only-change-me'}},mockRes()),false);
+  }
+  const mine = await app.grUserQuery({ headers: {}, principal }, new URLSearchParams('source=account'));
+  assert.deepStrictEqual(mine.userIds, ['commerce-account-account-test', 'ucid-test']);
+  const forged = await app.grUserQuery({ headers: {}, principal }, new URLSearchParams('source=account&user_id=commerce-account-other'));
+  assert.strictEqual(forged.status, 403);
 
   const leaked = app.stripVendorSecrets({
     id: 41,
@@ -93,11 +118,15 @@ async function run() {
     hmac_key: 'secret',
     url_link: 'https://x',
     order_detail_url: 'https://y',
+    pay_merchant_no: 'test-merchant',
+    payment_config_json: '{}',
   });
   assert.strictEqual(leaked.hmac_key, undefined);
   assert.strictEqual(leaked.url_link, undefined);
   assert.strictEqual(leaked.order_detail_url, undefined);
   assert.strictEqual(leaked.name, '来来');
+  assert.strictEqual(leaked.pay_merchant_no, undefined);
+  assert.strictEqual(leaked.payment_config_json, undefined);
 
   assert.strictEqual(app.isVendorHmacPath('/api/juzhu/callback', 'POST'), true);
   assert.strictEqual(app.isVendorHmacPath('/api/juzhu/jiazheng/vendor/products/list', 'POST'), true);

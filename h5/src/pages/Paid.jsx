@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { bookingLookup } from '../lib/api.js';
-import { formatPrice } from '../lib/price.js';
+import { bookingLookup, bookingPaymentQuery } from '../lib/api.js';
+import { formatMoney } from '../lib/price.js';
 import '../styles/booking.css';
 
 /** 支付回跳确认页：?channel=booking&order_no=&phone=&app_order_id= */
@@ -21,35 +21,46 @@ export default function Paid() {
     }
     let alive = true;
     let tries = 0;
-    const poll = () => {
-      bookingLookup({ order_no: orderNo, contact_phone: phone })
-        .then((j) => {
-          if (!alive) return;
-          const o = j.order || j;
-          setOrder(o);
-          setLoading(false);
-          if (
-            o.pay_status !== 'paid' &&
-            (o.pay_status === 'paying' || o.pay_status === 'creating' || o.pay_status === 'create_unknown') &&
-            tries < 6
-          ) {
-            tries += 1;
-            setTimeout(poll, 1500);
-          }
-        })
-        .catch((e) => {
-          if (!alive) return;
-          setErr(e.message || '查单失败');
-          setLoading(false);
-        });
+    let timer;
+    let inFlight = false;
+    const poll = async () => {
+      if (inFlight || !alive) return;
+      inFlight = true;
+      clearTimeout(timer);
+      try {
+        // Old deployments return a raw gateway envelope, and their query can
+        // fail while the business lookup remains available. Keep that fallback.
+        const payment = await bookingPaymentQuery({ order_no: orderNo, contact_phone: phone }).catch(() => null);
+        const lookup = await bookingLookup({ order_no: orderNo, contact_phone: phone });
+        if (!alive) return;
+        const original = lookup.order || lookup;
+        const state = window.BZF_CASHIER.orderStatus(payment, original);
+        const o = { ...original, pay_status: state };
+        setOrder(o);
+        setErr('');
+        setLoading(false);
+        if (!['paid', 'coupon_funded', 'closed', 'expired', 'refunded', 'partially_refunded'].includes(state) && tries++ < 6) {
+          timer = setTimeout(poll, 1500);
+        }
+      } catch (e) {
+        if (!alive) return;
+        setErr(e.message || '查单失败');
+        setLoading(false);
+      } finally { inFlight = false; }
     };
     poll();
+    const resume = () => { if (document.visibilityState === 'visible') { tries = 0; clearTimeout(timer); poll(); } };
+    document.addEventListener('visibilitychange', resume);
     return () => {
       alive = false;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', resume);
     };
   }, [orderNo, phone]);
 
   const paid = order && order.pay_status === 'paid';
+  const couponFunded = order && order.pay_status === 'coupon_funded';
+  const completed = paid || couponFunded;
 
   return (
     <div className="booking-page">
@@ -59,10 +70,10 @@ export default function Paid() {
         </span>
         <span className="sep">›</span>
         <span className="st">
-          <span className="n">2</span>在线支付
+          <span className="n">2</span>{couponFunded ? '用券结算' : '在线支付'}
         </span>
         <span className="sep">›</span>
-        <span className={'st' + (paid ? ' on' : '')}>
+        <span className={'st' + (completed ? ' on' : '')}>
           <span className="n">3</span>完成
         </span>
       </div>
@@ -72,22 +83,20 @@ export default function Paid() {
       ) : err ? (
         <div className="berr">{err}</div>
       ) : (
-        <div className="okbox" style={paid ? undefined : { background: '#fffbeb', borderColor: '#f59e0b' }}>
-          <div className="ok-ic" style={paid ? undefined : { background: '#b45309' }}>
-            {paid ? '✓' : '!'}
+        <div className="okbox" style={completed ? undefined : { background: '#fffbeb', borderColor: '#f59e0b' }}>
+          <div className="ok-ic" style={completed ? undefined : { background: '#b45309' }}>
+            {completed ? '✓' : '!'}
           </div>
-          <div className="ok-t">{paid ? '支付成功' : '支付处理中'}</div>
+          <div className="ok-t">{paid ? '支付成功' : couponFunded ? '用券预订成功' : ['closed', 'expired'].includes(order.pay_status) ? '订单已关闭' : order.pay_status === 'refunded' ? '退款已完成' : order.pay_status === 'partially_refunded' ? '已部分退款' : order.pay_status === 'refunding' ? '退款处理中' : '支付处理中'}</div>
           <div className="ok-s">
             {(order.project_name || '旅居预订') +
               (order.checkin ? ' · ' + order.checkin + ' → ' + (order.checkout || '') : '') +
               (order.nights ? ' · ' + order.nights + ' 晚' : '')}
           </div>
           <div className="ok-no">{order.order_no || orderNo}</div>
-          {order.price_total != null ? (
-            <div className="ok-hint">实付 ¥{formatPrice(order.price_total)}</div>
-          ) : null}
+          {order.price_total != null ? <div className="ok-hint">{Number(order.coupon_minor) > 0 ? <>结算价 ¥{formatMoney(order.price_total)} · 券抵 −¥{formatMoney(Number(order.coupon_minor) / 100)} · 现金应付 ¥{formatMoney(Number(order.cash_due_minor) / 100)}</> : <>现金应付 ¥{formatMoney(order.price_total)}</>}</div> : null}
           <div className="ok-hint">
-            {paid ? '商家确认后订单生效 · 可在订单页查看进度' : '若已完成支付，请稍后在订单页刷新状态'}
+            {paid ? '商家确认后订单生效 · 可在订单页查看进度' : couponFunded ? '卡券已全额抵扣，商家确认后订单生效' : ['refunding', 'refunded', 'partially_refunded'].includes(order.pay_status) ? '退款进度以订单页为准' : ['closed', 'expired'].includes(order.pay_status) ? '该预订已结束，可在订单页查看详情' : '若已完成支付，请稍后在订单页刷新状态'}
           </div>
           <Link className="btn" to="/orders">
             查看我的订单 →

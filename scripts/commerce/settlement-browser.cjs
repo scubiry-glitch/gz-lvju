@@ -6,7 +6,7 @@ async function run({origin,actors,check}){
  const browser=await chromium.launch({executablePath:process.env.COMMERCE_CHROME||'/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',headless:true,args:['--no-sandbox']});
  const errors=[],out=path.resolve(__dirname,'../../docs/verification/newliving-commerce-settlement');fs.mkdirSync(out,{recursive:true});
  async function context(actor,width=1440){const ctx=await browser.newContext({viewport:{width,height:1000}});if(actor)await ctx.addInitScript(token=>localStorage.setItem('BZF_SESSION_TOKEN',token),actor.token);const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));return {ctx,page};}
- async function ready(page){await page.waitForFunction(()=>!document.querySelector('#commerce-content')?.hasAttribute('aria-busy')&&document.querySelector('#commerce-content .commerce-card, #commerce-content .commerce-kpi'));}
+ async function ready(page){await page.waitForFunction(()=>document.querySelector('#commerce-content .commerce-card, #commerce-content .commerce-kpi')&&!document.querySelector('#commerce-content[aria-busy="true"], #commerce-content [aria-busy="true"]')&&!document.querySelector('#commerce-content').textContent.includes('正在加载业务数据'));}
  try{
   await check('Browser settlement admin page renders overview, batches and instructions',async()=>{
    const {ctx,page}=await context(actors.operator);

@@ -21,6 +21,12 @@
 
 const PERMS = [
   ...[
+    ['settlement.fund.read','统一结算查看'],['settlement.fund.write','统一结算执行'],['settlement.fund.review','统一资金复核'],['settlement.fund.adjust','单笔结算调整'],
+    ['settlement.policy.write','结算规则配置'],['settlement.policy.review','结算规则与账户准入复核'],['settlement.approval.act','结算节点审批'],
+    ['settlement.statement.read','本主体对账单查看'],['settlement.statement.export','本主体对账单下载'],['settlement.statement.generate','对账单生成'],['settlement.statement.confirm','本主体账单确认'],['settlement.statement.dispute','账单异议提交'],['settlement.statement.review','账单异议处理'],
+    ['settlement.external.read','外部交易核验查看'],['settlement.external.write','外部交易资料提交与导入'],['settlement.external.submit','本主体外部资料提交'],['settlement.external.import','外部账单导入'],['settlement.external.review','外部交易独立核验'],['settlement.external.link','外部交易关联'],['settlement.accrual.adjust','合同应计调整'],
+  ].map(([code,name])=>({code,name,domain:'settlement',action:code.split('.').pop(),desc:name,roles:[]})),
+  ...[
     ['commerce.admin.read','权益运营数据查看'], ['commerce.admin.write','权益配置与履约管理'],
     ['commerce.admin.review','权益双人复核'], ['commerce.merchant.read','本商户权益数据查看'],
     ['commerce.merchant.write','本商户权益配置提审'], ['commerce.merchant.redeem','指定门店权益核销'],
@@ -69,6 +75,7 @@ const PERMS = [
   { code: 'vendor.fund.write',    name: '商家费率管理', domain: 'vendor', action: 'write', desc: '商家佣金费率调整（按业务线两档，规则 20）', roles: ['platform_op', 'operator_admin'] },
   { code: 'vendor.onboarding.review', name: '商家入驻受理', domain: 'vendor', action: 'review', desc: '商家入驻申请单受理/核验/通过/驳回（服务认证中台）', roles: ['platform_op', 'operator_admin'] },
   { code: 'vendor.review', name: '商家资质复审', domain: 'vendor', action: 'review', desc: 'jz_vendors 商家资质复审（reviewing/approved/rejected + status 联动；复审动作留痕）', roles: ['platform_op', 'operator_admin'] },
+  { code: 'vendor.config.write', name: '商家接入配置', domain: 'vendor', action: 'write', desc: 'jz_vendors 接入配置：webhook_url / url_link / order_detail_url / hmac_key 一键重置（仅平台代管，商家不可改；读也走本点，密钥 head 不给 admin.read 群体）', roles: ['platform_op', 'operator_admin'] },
 ];
 
 /**
@@ -78,9 +85,46 @@ const PERMS = [
  * guard = 特殊闸（app.js 内实现），exempt = 完全免闸。
  */
 const ROUTES = [
+  // Shared settlement HTTP handler also validates the actual database context;
+  // these entries are the permission catalog, not a substitute for row scope.
+  ...[
+    ['GET','/admin/(items(?:/[0-9]+)?|accounts|funding-sources|own-fund-sources|compensations|compensation-recoveries|recoveries|execution-plans(?:/[a-f0-9-]{36})?|execution-orders|invariants|policies|configuration/(?:accounts|profiles|bindings))','settlement.fund.read'],
+    ['POST','/admin/items/[0-9]+/adjustments(?:/preview)?','settlement.fund.adjust'],
+    ['POST','/admin/items/[0-9]+/authorize','settlement.fund.write'],
+    ['POST','/admin/(?:execution-plans|return-plans|refund-plans|returned-funds|own-fund-sources|compensations)','settlement.fund.write'],
+    ['POST','/admin/execution-plans/[a-f0-9-]{36}/cancel','settlement.fund.write'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/query','settlement.fund.read'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/retry','settlement.fund.write'],
+    ['POST','/admin/(?:returned-funds|own-fund-sources|compensations)/[a-f0-9-]{36}/approve','settlement.fund.review'],
+    ['POST','/admin/execution-orders/[a-f0-9-]{36}/approve-reverse','settlement.fund.review'],
+    ['POST','/admin/(?:policies|configuration/(?:accounts|profiles|bindings))','settlement.policy.write'],
+    ['POST','/admin/policies/[a-f0-9-]{36}/publish','settlement.policy.review'],
+    ['POST','/admin/policies/[a-f0-9-]{36}/disable','settlement.policy.write'],
+    ['POST','/admin/configuration/(?:accounts|profiles|bindings)/[a-f0-9-]{36}/approve','settlement.policy.review'],
+    ['GET','/admin/approval-tasks','settlement.approval.act'],
+    ['POST','/admin/approval-tasks/[a-f0-9-]{36}/actions','settlement.approval.act'],
+    ['POST','/admin/(?:settlement-statements/generate|statement-policies)','settlement.statement.generate'],
+    ['GET','/me/settlement-statements(?:/[a-f0-9-]{36}(?:/disputes)?)?','settlement.statement.read'],
+    ['GET','/me/statement-exports/[a-f0-9-]{36}(?:/download)?','settlement.statement.export'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/exports','settlement.statement.export'],
+    ['POST','/me/statement-exports/[a-f0-9-]{36}/retry','settlement.statement.export'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/confirmations','settlement.statement.confirm'],
+    ['POST','/me/settlement-statements/[a-f0-9-]{36}/disputes','settlement.statement.dispute'],
+    ['POST','/admin/statement-disputes/[a-f0-9-]{36}/resolve','settlement.statement.review'],
+    ['GET','/admin/external-(?:evidence|facts)','settlement.external.read'],
+    ['POST','/me/external-(?:evidence|coverage)-submissions','settlement.external.submit'],
+    ['POST','/admin/(?:external-orders/sync|external-evidence|external-imports|external-coverage)','settlement.external.import'],
+    ['POST','/admin/external-(?:evidence|imports|coverage|accruals)/[a-f0-9-]{36}/reviews','settlement.external.review'],
+    ['POST','/admin/external-allocations','settlement.external.link'],
+    ['POST','/admin/external-(?:accruals|accrual-adjustments|settlements)','settlement.accrual.adjust'],
+  ].map(([method,re,perm])=>({method,re:'^/api/settlement/v1'+re+'$',perm,act:method==='POST'?perm:null,res:'settlement'})),
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.write',act:'commerce.code.issue',res:'commerce'},
   {method:'GET',re:'^/api/commerce/v1/admin/exchange-codes$',perm:'commerce.admin.read',act:null,res:'commerce'},
   {method:'POST',re:'^/api/commerce/v1/admin/exchange-codes/([0-9a-f-]{36})/disable$',perm:'commerce.admin.write',act:'commerce.code.disable',res:'commerce',idGroup:1},
+  {method:'GET',re:'^/api/commerce/v1/admin/distributions$',perm:'commerce.admin.read',act:null,res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions$',perm:'commerce.admin.write',act:'commerce.distribution.create',res:'commerce'},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions/([0-9a-f-]{36})/(submit|activate|close)$',perm:'commerce.admin.write',act:'commerce.distribution.manage',res:'commerce',idGroup:1},
+  {method:'POST',re:'^/api/commerce/v1/admin/distributions/([0-9a-f-]{36})/review$',perm:'commerce.admin.review',act:'commerce.distribution.review',res:'commerce',idGroup:1},
   {method:'GET',re:'^/api/commerce/v1/admin/stats$',perm:'commerce.admin.read',act:null,res:'commerce'},
   {method:'POST',re:'^/api/commerce/v1/merchant/redeem/preview$',perm:'commerce.merchant.redeem',act:'commerce.redeem.preview',res:'commerce'},
   ...['admin','merchant'].flatMap(area => {
@@ -179,6 +223,13 @@ const ROUTES = [
   // 商家资质复审（jz_vendors.review_status；2026-09-22 补登记——此前未登记走 admin.write 兜底、复审无审计留痕）
   { method: 'GET',    re: '^/api/juzhu/admin/vendors$', perm: 'admin.read', act: 'vendor.list', res: 'vendors' },
   { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/review$', perm: 'vendor.review', act: 'vendor.review.update', res: 'vendors', idGroup: 1 },
+  // 商家接入配置（webhook_url / url_link / order_detail_url / hmac_key；仅平台代管，商家不可改；读也挂写点——密钥 head 与回调地址不对 admin.read 群体开放）
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/config$', perm: 'vendor.config.write', act: null, res: 'vendors' },
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/config-history$', perm: 'vendor.config.write', act: null, res: 'vendors' },
+  { method: 'GET',    re: '^/api/juzhu/admin/vendors/(\\d+)/config$', perm: 'vendor.config.write', act: null, res: 'vendors', idGroup: 1 },
+  { method: 'PUT',    re: '^/api/juzhu/admin/vendors/(\\d+)/config$', perm: 'vendor.config.write', act: 'vendor.config.update', res: 'vendors', idGroup: 1 },
+  { method: 'POST',   re: '^/api/juzhu/admin/vendors/(\\d+)/config/hmac-key/rotate$', perm: 'vendor.config.write', act: 'vendor.hmac_key.rotate', res: 'vendors', idGroup: 1 },
+  { method: 'POST',   re: '^/api/juzhu/admin/vendors/(\\d+)/config/webhook-test$', perm: 'vendor.config.write', act: 'vendor.webhook.test', res: 'vendors', idGroup: 1 },
   // IAM
   { method: 'POST',   re: '^/api/juzhu/admin/accounts$', perm: 'iam.write', act: 'account.create', res: 'account' },
   { method: 'PUT',    re: '^/api/juzhu/admin/accounts/(\\d+)$', perm: 'iam.write', act: 'account.update', res: 'account', idGroup: 1 },

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>券流程页面评审 · 新居住</title>
+<link rel="stylesheet" href="/lvju-app.css?v=6">
+<link rel="stylesheet" href="./commerce.css?v=1">
+<link rel="stylesheet" href="./consumer.css?v=2">
+<style>
+  body{margin:0;background:#e9ede8;color:#193d37;font-family:system-ui,"PingFang SC",sans-serif}
+  .review-shell{max-width:1240px;margin:0 auto;padding:28px 18px 54px}
+  .review-head{padding:26px 28px;background:#123f3a;color:#fff8e8;border-radius:22px}
+  .review-head small{font-size:11px;letter-spacing:.18em;color:#d4c399}
+  .review-head h1{font-size:28px;margin:10px 0 6px;font-weight:600}
+  .review-head p{font-size:13px;line-height:1.7;margin:0;color:#e8eee6}
+  .review-note{margin:16px 0 22px;padding:12px 16px;border-radius:12px;background:#fff9ec;color:#6f5934;font-size:12px;line-height:1.7}
+  .review-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+  .review-panel{min-width:0}
+  .review-title{font-size:16px;margin:0 0 10px;padding-left:4px}
+  .review-subtitle{font-size:11px;color:#738175;margin:0 0 11px;padding-left:4px}
+  .review-device{border:8px solid #20352f;border-radius:28px;overflow:hidden;background:#f6f4ef;box-shadow:0 16px 36px #22382b25}
+  .review-device .app{height:620px;width:100%;max-width:none;min-height:0;box-shadow:none}
+  .review-device .scr{height:100%;overflow-y:auto}
+  .review-device .commerce-content{padding-bottom:22px}
+  .review-device .review-appbar{display:flex;align-items:center;gap:10px;padding:16px 18px;background:#f6f4ef;border-bottom:1px solid #193d3710;font-weight:600}
+  .review-device .review-appbar span:first-child{font-size:22px;color:#536f5b}
+  .review-device .review-appbar small{margin-left:auto;font-size:10px;color:#8b967f}
+  .review-device .coupon-filter{margin-top:12px}
+  .review-device .coupon-filter button{min-height:38px}
+  .review-device .commerce-card{margin-bottom:12px}
+  .review-device .commerce-content>.consumer-view-heading{padding-top:12px}
+  .review-device .commerce-content>.consumer-view-heading h1{font-size:23px}
+  .review-device .commerce-content>.consumer-view-heading p{margin:0}
+  .review-step{display:flex;gap:9px;align-items:center;margin:4px 0 16px;color:#5f7165;font-size:11px}
+  .review-step b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#316454;color:white;font-size:11px}
+  .review-price{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px dashed #dce3d6;font-size:12px}
+  .review-price strong{font-weight:600}
+  .review-price.total{font-size:16px;color:#0d6657;border:0;padding-top:15px}
+  .review-quote{padding:14px;margin-top:16px;border-left:3px solid #407b60;background:#eef6f0;border-radius:5px 12px 12px 5px}
+  .review-quote h3{font-size:14px;margin:0 0 9px}
+  .review-quote p{font-size:11px;line-height:1.7;margin:9px 0 0;color:#63756a}
+  .review-quote .review-price{border-color:#d8e7d8}
+  .review-cta{display:block;width:100%;min-height:46px;margin-top:14px;border:0;border-radius:10px;background:#16685b;color:#fff;font-weight:600}
+  .review-tips{font-size:11px;line-height:1.7;color:#728276}
+  .review-only{pointer-events:none}
+  .review-flow{display:flex;gap:5px;flex-wrap:wrap;margin-top:15px}.review-flow span{padding:5px 9px;border:1px solid #ffffff54;border-radius:99px;font-size:11px;color:#f7ead1}
+  .review-product{padding:14px;border-radius:12px;background:#e7ede5;border:1px solid #d8e2d8}.review-product-art{display:grid;place-items:center;height:116px;border-radius:9px;background:linear-gradient(145deg,#d9e8d8,#f5f0dc);font-size:35px;color:#246653}.review-product h3{font-size:16px;margin:12px 0 6px}.review-product p{font-size:11px;line-height:1.6;color:#64756a}.review-product-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:12px}.review-product-bottom strong{color:#0f766e;font-size:18px}.review-product-bottom span{padding:8px 15px;border-radius:9px;background:#16685b;color:white;font-size:12px}
+  .review-status{padding:12px;border-radius:10px;background:#eef6f0;color:#285948;font-size:12px;line-height:1.65}
+  .review-device .code-success{display:flex;min-height:180px;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#0f766e;text-align:center}
+  .review-device .code-success span{display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:#e4f1e9;font-size:27px}
+  .review-device .code-success strong{font-size:17px}.review-device .code-success small{font-size:12px;color:#64756c}
+  @media(max-width:1050px){.review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:690px){.review-shell{padding:12px 10px 30px}.review-grid{grid-template-columns:1fr;gap:26px}.review-head{padding:22px}.review-head h1{font-size:23px}.review-device{max-width:430px;margin:auto}}
+</style>
+</head>
+<body>
+<div class="review-shell">
+  <header class="review-head"><small>NEW LIVING · VOUCHER FLOW</small><h1>券流程页面评审</h1><p>从浏览选券、下单结算、购买到账，到出示与完成核销。请向下滚动各个手机视窗查看细节。</p><div class="review-flow"><span>浏览</span><span>下单</span><span>购买</span><span>核销</span></div></header>
+  <p class="review-note"><strong>静态评审页 · 示例数据。</strong>卡券列表与详情复用当前工作树组件，其余环节展示信息层级示意；按钮不会发起领取、订单、支付或核销。测试站原有业务入口仍运行旧工作树。</p>
+  <div class="review-grid">
+    <section class="review-panel"><h2 class="review-title">① 浏览选券</h2><p class="review-subtitle">先看服务内容、券价，再进入适用规则。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>选券<small>示例</small></div><div class="scr"><main class="commerce-content"><header class="consumer-view-heading"><span class="consumer-kicker">NEW LIVING BENEFITS</span><h1>生活权益</h1><p>为家挑一份刚好的服务</p></header><section class="commerce-card"><div class="review-product"><div class="review-product-art" aria-hidden="true">✧</div><h3>居住生活通用抵用券</h3><p>适用指定住宿房型与本地服务。购买后存入我的卡券，结算时整张抵用。</p><div class="review-product-bottom"><strong>¥50.00</strong><span>查看详情 →</span></div></div></section><section class="commerce-card"><h2>详情里先说明</h2><p class="review-tips">使用范围、有效期、直接兑换或金额抵用规则，再决定是否购买。演示商品明确显示实际支付为零。</p></section></main></div></div></div></section>
+    <section class="review-panel"><h2 class="review-title">② 我的卡券</h2><p class="review-subtitle">可用券与占用中券在当前列表，不折进历史。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>我的卡券<small>示例</small></div><div class="scr"><main class="commerce-content" id="wallet"></main></div></div></div></section>
+    <section class="review-panel"><h2 class="review-title">③ 券详情</h2><p class="review-subtitle">先看券面权益，再看适用范围与下一步。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>卡券详情<small>示例</small></div><div class="scr"><main class="commerce-content" id="detail"></main></div></div></div></section>
+    <section class="review-panel"><h2 class="review-title">④ 结算与后续</h2><p class="review-subtitle">抵扣、现金应付、核对提示与订单回看。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>确认订单<small>示例</small></div><div class="scr"><main class="commerce-content"><section class="commerce-card"><div class="review-step"><b>1</b>选服务 <span>›</span><b>2</b>确认券后金额 <span>›</span><b>3</b>提交订单</div><h2>价格明细</h2><div class="review-price"><span>本地服务 · 深度保洁</span><strong>¥120.00</strong></div><div class="review-quote"><h3>使用权益券 · 金额抵用</h3><div class="review-price"><span>券抵</span><strong>−¥50.00</strong></div><div class="review-price total"><span>本单现金应付</span><strong>¥70.00</strong></div><p>整张抵用，不拆分找零。提交时重新核对城市、商家、服务和金额。</p></div><button class="review-cta" type="button">确认用券下单</button></section><section class="commerce-card"><h2>直接兑换</h2><p class="review-tips">指定房型或服务，按签约兑付价结算。适用时展示“签约兑付价 → 券抵 → 本单现金应付 ¥0.00”。</p></section><section class="commerce-card"><h2>用券后</h2><div class="review-price"><span>券状态</span><strong>占用中 / 待履约</strong></div><div class="review-price"><span>用券订单</span><strong>可回看</strong></div><p class="review-tips">查询中、无适用券和查询失败都显示文字说明；失败时可以重试或按原价继续。</p></section></main></div></div></div></section>
+    <section class="review-panel"><h2 class="review-title">⑤ 购买与到账</h2><p class="review-subtitle">待支付、已支付与券全额覆盖分别表述。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>订单结果<small>示例</small></div><div class="scr"><main class="commerce-content"><section class="commerce-card"><div class="pay-success"><span class="ps-ring" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m4.5 12.5 5 5 10-11"/></svg></span><h2>用券下单成功</h2><p class="ps-sub">卡券已全额抵扣 · 现金应付 <b>¥0.00</b></p><div class="ps-card"><b>住宿直接兑换券</b><span>待商家确认后履约；卡券与订单进度均可回看。</span></div></div><div class="review-status">支付中的订单保持“结果确认中”；只有服务端确认后，才呈现成功状态。</div></section><section class="commerce-card"><h2>订单明细</h2><div class="review-price"><span>签约结算价</span><strong>¥120.00</strong></div><div class="review-price"><span>券抵</span><strong>−¥120.00</strong></div><div class="review-price total"><span>现金应付</span><strong>¥0.00</strong></div><button class="review-cta" type="button">查看用券订单</button></section></main></div></div></div></section>
+    <section class="review-panel"><h2 class="review-title">⑥ 核对与核销</h2><p class="review-subtitle">商户核对在先，核销完成后双方看到结果。</p><div class="review-device commerce-page commerce-consumer"><div class="app"><div class="review-appbar"><span>‹</span>核销结果<small>示例</small></div><div class="scr"><main class="commerce-content"><section class="commerce-card"><h2>商户核对服务</h2><div class="review-price"><span>服务项目</span><strong>深度保洁</strong></div><div class="review-price"><span>服务门店</span><strong>示例门店</strong></div><div class="review-price"><span>预约日期</span><strong>2026-10-09</strong></div><p class="review-tips">核对成功前，“完成核销”保持不可操作；券码变化后需重新核对。</p></section><section class="commerce-card"><div class="code-success" role="status"><span aria-hidden="true">✓</span><strong>服务已核销</strong><small>核销记录已更新</small></div><p class="review-tips">客户的动态码会从页面撤下，下一步可查看卡券与核销记录。</p><button class="review-cta" type="button">查看核销记录</button></section></main></div></div></div></section>
+  </div>
+</div>
+<script>
+  window.COMMERCE={
+    escape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+    money(minor){return '¥'+(Number(minor)/100).toFixed(2);},
+    dateText(value){return new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));},
+    button(label,action,extra='',primary=false){return '<button type="button" class="btn'+(primary?' pri':'')+'" data-action="'+action+'" '+extra+'>'+this.escape(label)+'</button>';}
+  };
+</script>
+<script src="./consumer.js?v=2"></script>
+<script>
+  const base={id:'demo-coupon-20261008',name:'居住生活通用抵用券',description:'适用于指定住宿房型与本地生活服务，结算时整张抵用。',conditions:'限指定城市、项目、商家和服务使用；具体以结算页报价为准。',status:'available',expires_at:'2026-12-31T15:59:59Z',allocation_minor:5000,use_mode:'amount_offset',use_domains:['booking','jiazheng'],use_targets:{booking:[{name:'示例民宿'}],booking_units:[{name:'一居室'}],jiazheng:[{name:'深度保洁'}]},redeem_channel:'offline'};
+  const reserved={...base,id:'demo-reserved-20261008',name:'住宿直接兑换券',description:'指定房型直接兑换一项签约服务。',status:'reserved',use_mode:'exchange',use_domains:['booking'],allocation_minor:12000,use_targets:{booking:[{name:'示例民宿'}],booking_units:[{name:'一居室'}],jiazheng:[]}};
+  const U=window.COMMERCE_CONSUMER;
+  document.querySelector('#wallet').innerHTML='<header class="consumer-view-heading"><span class="consumer-kicker">MY VOUCHERS</span><h1>我的卡券</h1><p>先看可用与占用中的权益</p></header><div class="coupon-filter"><button aria-pressed="true">全部 2</button><button>可用 1</button><button>占用中 1</button><button>已使用 0</button></div>'+U.couponCard(base,0)+U.couponCard(reserved,1);
+  document.querySelector('#detail').innerHTML=U.couponDetail(base,0,null)+'<section class="commerce-card coupon-applications"><h2>用券订单</h2><div class="coupon-application"><div class="detail-row"><span>本地服务 · 金额抵用</span><b>待履约</b></div><div class="detail-row"><span>券抵</span><b>¥50.00</b></div><div class="detail-row"><span>现金应付</span><b>¥70.00</b></div><a href="#">查看用券订单 →</a></div></section>';
+  document.querySelectorAll('.review-device a,.review-device button').forEach(el=>el.addEventListener('click',event=>event.preventDefault()));
+</script>
+</body>
+</html>

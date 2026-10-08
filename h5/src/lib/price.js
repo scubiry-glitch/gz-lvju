@@ -17,6 +17,11 @@ export function formatPrice(n) {
   return Number(n).toLocaleString('zh-CN');
 }
 
+export function formatMoney(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '';
+  return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function priceLabel(p) {
   const pd = priceParts(p);
   if (pd.value != null) return { kind: 'value', text: `¥${formatPrice(pd.value)}`, unit: priceUnitText(p) || '' };

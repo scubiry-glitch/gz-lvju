@@ -15,7 +15,7 @@
 .commerce-consumer svg{width:24px;height:24px;flex-shrink:0}
 .commerce-consumer h1,.commerce-consumer h2,.commerce-consumer h3{color:var(--consumer-ink)}
 .commerce-consumer .consumer-cover{position:relative;isolation:isolate;overflow:hidden;border:0;padding:20px;height:254px;flex-shrink:0;color:white;background:#344c40 url('../assets/commerce/living.webp') center 58%/cover}
-.consumer-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#132d26df,#132d2670 65%,#132d2626)}
+.consumer-cover::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,#132d26a6,transparent 52%),linear-gradient(90deg,#132d26df,#132d2670 65%,#132d2626)}
 .consumer-cover-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.1em;color:#f6f4efe6}
 .consumer-cover-label span{font-size:8px;letter-spacing:.2em}
 .consumer-cover-copy{margin-top:25px}
@@ -83,7 +83,9 @@
 .commerce-consumer .product-card{padding:18px}
 .commerce-consumer .product-card{position:relative;padding:13px 14px 12px 70px;border-radius:12px;min-height:128px}
 .commerce-consumer .consumer-product-top{margin:0 0 6px;justify-content:flex-end}
-.commerce-consumer .consumer-product-icon{position:absolute;left:14px;top:17px;width:43px;height:43px}
+/* 旧「图标左栏」布局（icon absolute + left:14/top:17 + 卡片 padding-left:70px）已废弃删除：
+   它的 left/top 残留会给下方紧凑卡的 position:relative icon 一个 (14,17) 的相对位移，
+   图标会漂进标题区（2026-10-02 踩过）。紧凑卡样式以本文件后段 ~283 行块为准。 */
 .commerce-consumer .product-card h3{font-size:16px;line-height:1.5;margin:0 0 5px}
 .commerce-consumer .product-card>p{font-size:10px;margin:3px 0}
 .commerce-consumer .product-card .product-benefits{margin:6px 0;gap:4px}
@@ -145,6 +147,7 @@
 .member-pass-top svg{width:29px;height:29px}.member-wordmark{display:block;font-size:9px;letter-spacing:3px;color:#b5bb9e;margin-top:23px}
 .commerce-consumer .member-pass h1{font-family:"Noto Serif SC","Songti SC",serif;font-size:25px;line-height:1.45;letter-spacing:1px;color:#f5e7bf;margin:7px 0}
 .commerce-consumer .member-pass p{font-size:12px;color:#c7d4c7;margin:0}.member-pass-bottom{border-top:1px solid #d7c79d33;margin-top:26px;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:11px;color:#ded6ba}.member-pass-bottom b{font-weight:500}.member-pass-bottom>span:last-child{font-family:Georgia,serif;font-size:19px}.member-pass-bottom small{font:10px sans-serif}.member-pass.is-owned .member-pass-bottom>span:last-child{font:11px sans-serif;white-space:nowrap;border:1px solid #a39b73;border-radius:20px;padding:4px 9px}
+.commerce-consumer .member-pass .member-pass-state{margin-top:10px;color:#f5e7bf}
 .commerce-consumer .member-wallet{display:flex;width:100%;align-items:center;gap:12px;padding:17px 18px;text-align:left;cursor:pointer;color:#253b35}
 .member-wallet-icon{display:grid;place-items:center;background:#f2ece0;color:#89774f;border-radius:12px;width:43px;height:43px;flex-shrink:0}.member-wallet-icon svg{width:23px;height:23px}.member-wallet>span:nth-child(2){flex:1}.member-wallet b{display:block;font-size:15px;font-weight:600}.member-wallet small{display:block;font-size:11px;color:#828378;margin-top:5px}.member-wallet>span:last-child{font-size:12px;color:#807353}.member-login{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.member-login span{font-size:11px;color:#8a877d}
 .commerce-consumer .member-benefits{padding:20px 18px}.member-benefits .consumer-section-title{margin-bottom:10px}.member-benefits .consumer-section-title h2{font-size:18px}.commerce-consumer .member-benefit-intro{font-size:12px;line-height:1.8;color:#818076;margin:0 0 13px}
@@ -221,4 +224,326 @@
 .commerce-consumer input:focus-visible,.commerce-consumer select:focus-visible,.commerce-consumer summary:focus-visible{outline:3px solid #d6ab67;outline-offset:3px}
 .commerce-consumer button,.commerce-consumer .btn,.commerce-consumer .member-benefit-expand{transition:background-color .15s ease,transform .15s ease,box-shadow .15s ease}
 .commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:translateY(1px)}
+
+/* ── 2026-10-02 美化轮：悬浮反馈与浮层质感（hover 设备生效，触屏不变） ── */
+.commerce-consumer .product-card,.commerce-consumer .consumer-topic{transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.commerce-consumer .consumer-detail-buy{backdrop-filter:blur(6px);background:#fffcf7e6;box-shadow:0 -6px 24px #16382c12}
+@media(hover:hover){
+ .commerce-consumer .product-card:hover{transform:translateY(-2px);box-shadow:0 10px 26px #233c3112;border-color:#193d371f}
+ .commerce-consumer .consumer-topic:hover{transform:translateY(-2px);box-shadow:0 10px 24px #233c310f}
+ .commerce-consumer .consumer-member:hover{border-color:#cdb887;box-shadow:0 10px 26px #8a6a1f1a}
+ .commerce-consumer .coupon-filter button:hover{border-color:#41604b;color:#365c49}
+ .commerce-consumer .consumer-shortcut:hover svg{background:#e0e8da;color:#365c49}
+}
 @media(prefers-reduced-motion:reduce){.commerce-consumer *{animation:none!important;transition:none!important}.commerce-consumer button:active:not(:disabled),.commerce-consumer a.btn:active{transform:none}}
+
+/* ── 2026-10-02 视觉优化：品类识别 / 票券卡面 / 详情头图 / 档位色 ──
+   品类色板已上移到共享 _commerce.css（C 端/推广端共用）；本文件只留 C 端消费规则。 */
+.product-card[class*=" cat-"] .consumer-product-icon{background:var(--cat-bg);color:var(--cat-fg)}
+/* 详情头：品类浅色渐变横幅，icon 底随品类 */
+.consumer-product-detail.cat-hero{background:linear-gradient(140deg,var(--cat-bg),#fffdf6 74%)}
+.consumer-product-detail.cat-hero .consumer-product-icon{background:#fffc;color:var(--cat-fg)}
+.consumer-product-detail.cat-hero .consumer-kicker{color:var(--cat-fg)}
+/* 券包摘要：分隔点并入前词（nowrap 单元间才可断行），不再出现行首孤立「·」 */
+.product-card-summary .pt{white-space:nowrap}
+.commerce-consumer .product-card-summary,.commerce-consumer .asset-summary{text-wrap:pretty}
+/* 我的卡券：票券书脊（状态语义色）+ 齿孔虚线已在 asset-meta */
+.commerce-consumer .consumer-asset-card{position:relative;overflow:hidden;padding-left:20px}
+.commerce-consumer .consumer-asset-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--spine,#365c49)}
+.commerce-consumer .consumer-asset-card.status-available{--spine:#2f7a5c}
+.commerce-consumer .consumer-asset-card.status-used{--spine:#8b9590}
+.commerce-consumer .consumer-asset-card.status-expired{--spine:#b0a893}
+.commerce-consumer .consumer-asset-card.status-frozen{--spine:#c07a45}
+.commerce-consumer .consumer-asset-card.status-refunded{--spine:#8b9590}
+.commerce-consumer .consumer-asset-card.status-reserved{--spine:#b48743}
+.commerce-consumer .asset-status.status-refunded{background:#e9eee9;color:#66766a}
+.commerce-consumer .asset-status.status-reserved{background:#f8efda;color:#745420}
+/* 卡面按钮层级：主操作（预约/出示码）保持实底，详情/售后降为文字钮 */
+.commerce-consumer .consumer-asset-card .btn.txt{grid-column:auto;background:transparent;border:0;color:#0f766e;padding:10px 4px;justify-self:start;text-align:left}
+.commerce-consumer .asset-value{display:inline-block;margin:0 0 10px!important;padding:5px 9px;border-radius:8px;background:#edf4eb;color:#285948;font-size:12px;font-weight:600}
+.commerce-consumer .coupon-state-note{margin:14px 0;padding:11px 12px;border-left:3px solid #b48743;border-radius:5px 9px 9px 5px;background:#fbf4e7;color:#6e5633;font-size:12px;line-height:1.7}
+.commerce-consumer .coupon-scope{padding:12px 0;border-top:1px dashed #e4e6dc;font-size:12px;line-height:1.7}
+.commerce-consumer .coupon-scope strong{display:block;color:#3e5948}.commerce-consumer .coupon-scope p{margin:5px 0 0;color:#66736a}
+.commerce-consumer .coupon-rule-note{font-size:11px;line-height:1.75;color:#7d8378;margin:12px 0 0}
+.commerce-consumer .coupon-application{padding:12px 0;border-top:1px dashed #e4e6dc}.commerce-consumer .coupon-application:first-of-type{margin-top:8px}.commerce-consumer .coupon-application a{display:inline-flex;min-height:44px;align-items:center;color:#0f766e;font-size:12px;text-decoration:none}
+.commerce-consumer .distribution-preview{text-align:left!important}.commerce-consumer .distribution-preview h1{font:600 24px var(--serif)}.commerce-consumer .distribution-preview p{max-width:none!important;margin:10px 0!important}.commerce-consumer .distribution-preview .consumer-usage{margin:15px 0 18px;padding-left:22px}.commerce-consumer .distribution-preview .btn{width:100%;min-height:48px}
+@media(prefers-reduced-motion:no-preference){
+ .commerce-consumer .asset-status,.commerce-consumer .coupon-state-note,.commerce-consumer .coupon-application{animation:coupon-appear .24s cubic-bezier(.2,.7,.2,1) both}
+ .commerce-consumer .consumer-asset-card .btn:active,.commerce-consumer .distribution-preview .btn:active{transform:scale(.98)}
+}
+@keyframes coupon-appear{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+/* 选券页分类 chips（替代原生 select，滚动行右缘渐隐提示可滑） */
+.consumer-category{display:block;margin:0 0 14px;font-size:12px;color:#6c7967}
+.cc-label{display:block;margin-bottom:8px}
+.cat-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 24px),transparent)}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chips button{border:1px solid #d8dccb;background:#fff;color:#4d5c49;border-radius:20px;padding:7px 14px;font-size:12px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.cat-chips button[aria-pressed="true"]{background:#123f3a;border-color:#123f3a;color:#f3e6c5}
+/* 酒店档位 chips：与卡片 tier-badge 同源六档色（未选=彩点提示，选中=整块档位色） */
+.consumer-shop-tabs button[class*="tier-"]::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--tier-dot,#9aa598)}
+.consumer-shop-tabs button.tier-t80{--tier-dot:#3d6b5c}.consumer-shop-tabs button.tier-t100{--tier-dot:#2c5f52}
+.consumer-shop-tabs button.tier-t120{--tier-dot:#123f3a}.consumer-shop-tabs button.tier-t160{--tier-dot:#8a6d2f}
+.consumer-shop-tabs button.tier-t180{--tier-dot:#74541f}.consumer-shop-tabs button.tier-t200{--tier-dot:#4f3d16}
+.consumer-shop-tabs button.tier-t80[aria-pressed="true"]{background:#3d6b5c}
+.consumer-shop-tabs button.tier-t100[aria-pressed="true"]{background:#2c5f52}
+.consumer-shop-tabs button.tier-t120[aria-pressed="true"]{background:#123f3a}
+.consumer-shop-tabs button.tier-t160[aria-pressed="true"]{background:#8a6d2f}
+.consumer-shop-tabs button.tier-t180[aria-pressed="true"]{background:#74541f}
+.consumer-shop-tabs button.tier-t200[aria-pressed="true"]{background:#4f3d16}
+/* 核销码弹窗：关闭钮不再吃 showModal 的默认焦点金框（焦点已由 JS 移到 dialog 本体） */
+.voucher-code-dialog .dialog-close:focus-visible{outline:none}
+.voucher-code-dialog [hidden]{display:none!important}
+.voucher-code-dialog .code-success{display:flex;min-height:150px;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#0f766e;text-align:center}
+.voucher-code-dialog .code-success span{display:grid;place-items:center;width:50px;height:50px;border-radius:50%;background:#e4f1e9;font-size:27px}
+.voucher-code-dialog .code-success strong{font-size:17px}.voucher-code-dialog .code-success small{font-size:12px;color:#64756c}
+.voucher-code-dialog .code-result-link{display:flex;justify-content:center;align-items:center;min-height:44px;margin-top:14px;text-decoration:none}
+
+/* ── 2026-10-02 选券页信息流卡（对齐手淘商品卡骨架）：大图占卡 → 标题 → 摘要 →
+   标签 → 价格贴底；无按钮，整卡可点（data-action 在 article 上）。
+   骨架口诀：图是卡、文贴图、价沉底。 ── */
+.consumer-products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.consumer-products>.commerce-empty,.consumer-products>.consumer-sale-note{grid-column:1/-1}
+.commerce-consumer .product-card{display:flex;flex-direction:column;padding:0;min-height:0;border-radius:13px;overflow:hidden;cursor:pointer}
+.commerce-consumer .product-card:focus-visible{outline:3px solid #d6ab67;outline-offset:3px}
+/* 图区：铺满卡宽（1:1），.pc-img 的定位上下文必须是这层——position:relative 不可改回 static，
+   否则主图 abs 定位会向上找到 .app 铺满整页盖住文字（2026-10-02 踩过两次）。
+   无图商品回落品类底色 + 居中大图标（svg 在 img 下层，图加载成功即盖住）。 */
+.commerce-consumer .consumer-product-top{display:block;position:relative;margin:0}
+.commerce-consumer .product-card .consumer-product-icon{position:relative;display:grid;place-items:center;width:100%;height:auto;aspect-ratio:1/1;border-radius:0}
+.commerce-consumer .product-card .consumer-product-icon svg{width:44px;height:44px;opacity:.9}
+.consumer-product-top .channel-tag{margin-left:0}
+/* 渠道 tag 叠在图右上角（手淘「广告」位） */
+.commerce-consumer .product-card .consumer-product-top .channel-tag{position:absolute;top:8px;right:8px;margin:0;z-index:2;box-shadow:0 2px 8px #16382c26}
+/* 文区（2026-10-02 二次压紧：目标行距 ~210px、一屏 2.5 排）——标题/说明不预留行高
+   （min-height 会在单行下挖洞），说明压到一行做引子，规格详情留给详情页；
+   行内富余交给 margin-top:auto 的价格行 → 留白沉底、价格贴卡底。 */
+.commerce-consumer .product-card h3{padding:5px 11px 0;font:600 13px/1.35 var(--serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 2px}
+/* 选择器带 >p 提特异性：压掉上方 .product-card>p{margin:3px 0}（0,2,1>0,2,0，踩过） */
+/* 2026-10-02 试用：卡面只留标题，说明整行去掉（规格/活动语看详情页）；标题已在海报上重复一次，
+   靠价格行 margin-top:auto 沉底对齐。要恢复说明整行，去掉 display:none 即可。 */
+.commerce-consumer .product-card>p.product-card-summary{display:none}
+.commerce-consumer .product-card .product-benefits{padding:2px 11px 0;margin:0;gap:3px}
+.commerce-consumer .product-card .product-benefits span{padding:1px 5px;font-size:8px;line-height:1.4}
+.commerce-consumer .product-card .product-bottom{border:0;padding:4px 11px 7px;margin-top:auto;gap:5px}
+/* 价格锚点：手淘式大价 + 灰小字后缀（演示价贴在价后基线对齐，全宽行放得下不再竖排）。
+   显式声明 17px/inline：上方旧块 .money(22px,flex baseline) 与 .money small(display:block) 都在同文件，
+   不显式覆盖就会被旧块回填（2026-10-02 连踩两次残留声明复活）。 */
+.commerce-consumer .product-card .product-bottom .money{font-size:17px;flex-direction:row;align-items:baseline;flex-wrap:nowrap;gap:4px;min-width:0;white-space:nowrap}
+.commerce-consumer .product-card .product-bottom .money small{display:inline;margin-top:0;font-size:8px;color:#8a8e7f}
+/* 整卡可点，卡上不再放按钮（手淘信息流同款） */
+.commerce-consumer .product-card .btn{display:none}
+@media(max-width:359px){.consumer-products{gap:8px}.commerce-consumer .product-card h3{font-size:14px;padding:8px 10px 0}.commerce-consumer .product-card-summary{padding:0 10px}.commerce-consumer .product-card .product-benefits{padding:6px 10px 0}.commerce-consumer .product-card .product-bottom{padding:7px 10px 10px}}
+
+/* ── 2026-10-02 选券页头部压紧：去营销大标题，控件贴身（首屏 ≈240px 见第一张卡）──
+   仅作用于选券页（.consumer-shop-head），其余视图仍保持 44px 触达与标题层级。 */
+.consumer-shop-head{margin-top:2px}
+.consumer-shop-head .consumer-shop-tabs{margin-bottom:10px}
+.consumer-shop-head .consumer-shop-tabs button{min-height:38px;padding:7px 5px;font-size:13px}
+.consumer-shop-head .consumer-search{margin-bottom:10px}
+.consumer-shop-head .consumer-search input{min-height:38px;padding:8px 11px;font-size:12px}
+.consumer-shop-head .consumer-search button{min-height:38px;padding:0 12px;font-size:12px}
+.consumer-shop-head .consumer-category{margin-bottom:10px}
+.consumer-shop-head .cat-chips button{min-height:32px;padding:5px 12px;font-size:11px}
+.consumer-shop-head .consumer-section-title{margin-bottom:10px}
+
+/* ── 2026-10-02 详情页电商沉浸式：全幅品类深色头图 + ghost appbar 浮层滚动转实底 + 价格带 ──
+   hero 区间 appbar 复用 lvju-app.css 的 .appbar.ghost（absolute 脱流浮在头图上），
+   JS 滚动切换 ghost 并 ±scrollTop 补偿占位变化，视觉零位移。
+   空 status 段落不占位（错误提示出现时 hero 才下移）。 */
+.commerce-consumer #commerce-status:empty{display:none;margin:0}
+.commerce-consumer .appbar{transition:background-color .22s ease,border-color .22s ease}
+/* 选券/权益列表页：下滑收起顶栏（head-off 由 _commerce-customer.js setupShopHeadCollapse 按滚动方向加/撤），
+   吸顶区只留 tabs+搜索；max-height+padding 过渡防内容外溢，收起后 sticky 头顶到 .scr 真顶。 */
+.commerce-consumer .appbar{overflow:hidden;transition:background-color .22s ease,border-color .22s ease,max-height .26s ease,padding .26s ease}
+.commerce-consumer .appbar.head-off{max-height:0;padding-top:0;padding-bottom:0;border-bottom-width:0}
+/* lvju-app.css 的 .appbar.ghost 与 .commerce-consumer .appbar 同特异性但先加载，透明底会被奶油底盖掉——这里抬一级 */
+.commerce-consumer .appbar.ghost{background:transparent;border-bottom-color:transparent;backdrop-filter:none}
+.commerce-consumer .appbar.ghost .ttl{color:#fff;text-shadow:0 1px 8px #0004}
+.commerce-consumer .appbar.ghost .ttl small{color:#fffd}
+.commerce-consumer .appbar.ghost .bk{background:#ffffff2e;border-color:#ffffff40;color:#fff}
+.commerce-consumer .appbar.ghost .consumer-account button{color:#fff;border-color:#ffffff59}
+.consumer-detail-hero{position:relative;isolation:isolate;overflow:hidden;margin:0 -18px;padding:88px 20px 20px;color:#fff;background:var(--cat-fg,#365c49);background:linear-gradient(140deg,var(--cat-fg,#365c49) 0%,color-mix(in srgb,var(--cat-fg,#365c49) 52%,#0b1f19) 100%)}
+.consumer-detail-hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(circle at 86% 10%,#d6ab6745,transparent 52%),linear-gradient(0deg,#00000052,transparent 58%)}
+.consumer-detail-hero .hero-art{position:absolute;right:-30px;bottom:-36px;width:180px;height:180px;opacity:.14;color:#fff;pointer-events:none}
+.consumer-detail-hero .hero-art svg{width:100%;height:100%}
+.consumer-detail-hero .hero-kicker{font-size:9px;letter-spacing:.18em;color:#fffc}
+.consumer-detail-hero h1{font:600 24px/1.4 var(--serif);color:#fffcef;letter-spacing:.02em;margin:10px 0 9px}
+.consumer-detail-hero .hero-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:11px;color:#fffc}
+.hero-chip{background:#ffffff21;border:1px solid #ffffff3d;border-radius:999px;padding:3px 10px;font-size:10px;color:#fff}
+.detail-price-card{display:flex;flex-direction:column;gap:9px;margin-top:-8px}
+.detail-price-card .money{font:700 26px var(--serif);color:#92713d;display:flex;align-items:baseline;gap:6px}
+.detail-price-card .money small{font:10px var(--font);color:#8a8e7f}
+.price-facts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:#6c7967}
+.price-facts i{width:3px;height:3px;border-radius:50%;background:#c2cabb}
+.detail-price-card+.consumer-demo-note{margin-top:-8px}
+
+/* ── 2026-10-02 选券页 tabs+搜索吸顶：sticky 于 .scr 顶（appbar 之下），吸住后出投影分隔 ──
+   负边距铺满全宽；品类 chips 在工具条外随内容滚动。 */
+.shop-sticky{position:sticky;top:0;z-index:15;display:grid;gap:8px;margin:0 -18px;padding:8px 18px 10px;background:var(--consumer-paper,#f6f4ef)}
+.shop-sticky .consumer-shop-tabs,.shop-sticky .consumer-search{margin-bottom:0}
+.shop-sticky.is-stuck{box-shadow:0 8px 18px #16382c14;border-bottom:1px solid #193d3712}
+.sticky-sentinel{height:0}
+
+/* ── 2026-10-02 A1 购买/兑换成功弹层 ── */
+.pay-success{text-align:center;padding:4px 0 2px}
+.ps-ring{display:grid;place-items:center;width:64px;height:64px;margin:6px auto 14px;border-radius:50%;background:#e4f1e9;color:#0f766e;animation:ps-pop .34s cubic-bezier(.2,1.5,.45,1)}
+.ps-ring svg{width:30px;height:30px}
+@keyframes ps-pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+.ps-sub{font-size:13px;color:#3e5948;margin:0 0 14px}
+.ps-sub b{color:#0f766e}
+.ps-card{display:flex;flex-direction:column;gap:5px;text-align:left;background:#f7f5ec;border:1px dashed #d8d2bc;border-radius:12px;padding:13px 15px;margin-bottom:14px}
+.ps-card b{font:600 15px var(--serif);color:#193d37}
+.ps-card span{font-size:11px;color:#8a8e7f;line-height:1.6}
+.ps-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* ── 2026-10-02 B6/B7/B8：券包明细折叠 / 卡券历史折叠 / 排序 chips / 回顶 ── */
+.pkg-fold{margin:2px 0 4px}
+.pkg-fold>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#41604b;padding:11px 2px;border-top:1px dashed #e4e6dc;border-bottom:1px dashed #e4e6dc}
+.pkg-fold>summary::-webkit-details-marker{display:none}
+.pkg-fold .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.pkg-fold[open] .fold-arrow{transform:rotate(90deg)}
+.coupon-group{margin-top:4px}
+.coupon-group>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#66736a;padding:13px 2px;border-top:1px dashed #e4e6dc}
+.coupon-group>summary::-webkit-details-marker{display:none}
+.coupon-group .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.coupon-group[open] .fold-arrow{transform:rotate(90deg)}
+.shop-sort{display:flex;gap:7px;margin:0 0 12px}
+.shop-sort button{border:1px solid #d8dccb;background:#fff;color:#4d5c49;border-radius:999px;padding:5px 13px;font-size:11px;min-height:32px;cursor:pointer;flex-shrink:0}
+.shop-sort button[aria-pressed="true"]{background:#123f3a;border-color:#123f3a;color:#f3e6c5}
+.back-top{position:absolute;right:16px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:25;width:44px;height:44px;border-radius:50%;border:1px solid #193d371f;background:#fffcf7f2;color:#365c49;display:grid;place-items:center;box-shadow:0 6px 18px #16382c1f;cursor:pointer}
+.commerce-consumer .app{position:relative}
+.back-top[hidden]{display:none}
+.back-top svg{width:18px;height:18px}
+
+/* ── 2026-10-02 C9 商品主图：缩略图盖品类图标（onerror 回落 svg）；详情 hero 照片化（遮罩加深保对比度）── */
+.consumer-product-icon{position:relative;overflow:hidden}
+.pc-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.consumer-detail-hero .hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+.consumer-detail-hero.has-img::before{background:radial-gradient(circle at 86% 10%,#d6ab673d,transparent 52%),linear-gradient(0deg,#0000007a,transparent 40%),linear-gradient(120deg,#0b1f198f,#0b1f194d)}
+
+/* ── 2026-10-02 C10 商户维度：筛选胶囊 + 详情页「更多来自该商户」入口 ── */
+.merchant-pill{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;padding:7px 13px;border:1px solid #d8dccb;border-radius:999px;background:#fff;color:#41604b;font-size:11px;cursor:pointer;min-height:32px}
+.merchant-more{display:block;width:100%;box-sizing:border-box;text-align:center;margin-top:14px;padding:12px 16px;border:1px solid #d8ddd0;border-radius:999px;background:#fff;color:#41604b;font-size:13px;text-decoration:none;transition:border-color .15s,background .15s}
+.merchant-more:hover{border-color:#41604b;background:#f6f8f2}
+
+/* ── 2026-10-02 会员中心多方案：左右滑动 pass 卡组（scroll-snap）+ 圆点指示器 + 权益区联动 ── */
+.plan-swiper-label{margin:2px 0 8px;font-size:11px;letter-spacing:.04em;color:#828778}
+.plan-swiper{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:2px 18px 4px}
+.plan-swiper::-webkit-scrollbar{display:none}
+.plan-slide{flex:0 0 88%;scroll-snap-align:center;display:flex;flex-direction:column;min-height:0}
+.member-pass.plan-slide{padding:18px 20px 16px;min-height:0}
+.plan-slide .member-wordmark{margin-top:14px}
+.plan-slide .member-pass-highlights{margin-top:12px}
+.plan-slide-actions{margin-top:14px;padding-top:12px;border-top:1px solid #d7c79d33;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plan-price{font:700 19px var(--serif);color:#f5e7bf;margin-right:auto;display:flex;align-items:baseline;gap:4px}
+.plan-price small{font:10px var(--font);color:#ded6ba;font-weight:400}
+.plan-slide-actions .btn{min-height:38px;padding:8px 12px;font-size:12px;border-radius:10px}
+.plan-slide-actions .btn.plan-view{background:transparent;border:1px solid #a39b7399;color:#f3e6c5}
+.plan-slide-actions .btn.pri{background:#e9d9ae;border-color:#e9d9ae;color:#4c3c24}
+.plan-dots{display:flex;gap:6px;justify-content:center;padding:10px 0 0}
+.plan-dots i{width:6px;height:6px;border-radius:999px;background:#c9cbb9;transition:background .15s,width .15s;cursor:pointer}
+.plan-dots i.on{background:#365c49;width:16px}
+
+/* ── 会员卡组：已购方案态（金描边 + 「已开通」chip 替代开通按钮）── */
+.plan-slide.is-owned{border-color:#cbb87e}
+.plan-owned-chip{background:#e9d9ae;color:#4c3c24;border-radius:10px;display:inline-flex;align-items:center;padding:8px 12px;font-size:12px;font-weight:600;min-height:38px}
+
+/* ── 2026-10-02 商品卡横幅图变体：卡顶 16:9 横带（替代误铺满卡的整图），卡形更扁；无图回落品类图标 ── */
+.commerce-consumer .consumer-product-icon{position:relative}
+/* margin 不能用负值：卡 padding 是 0，-12px 会把横幅顶部/两侧各裁 12px（海报角标被切就是它）。
+   16/7 压扁横幅给文区让高（2026-10-02 一屏 2.5 排）。 */
+.pc-banner{position:relative;aspect-ratio:16/9;margin:0 0 8px;overflow:hidden;border-radius:13px 13px 0 0;background:#ebe9dd}
+.pc-banner-img{width:100%;height:100%;object-fit:cover;display:block}
+.pc-banner-badge{position:absolute;left:9px;bottom:9px;width:30px;height:30px;border-radius:9px;background:#fffc;display:grid;place-items:center;color:var(--cat-fg,#365c49);box-shadow:0 1px 6px #16382c1a}
+.pc-banner-badge svg{width:17px;height:17px}
+.product-card.has-media .consumer-product-top{position:absolute;top:9px;right:9px;z-index:2;margin:0}
+.product-card.has-media .consumer-product-top .channel-tag{margin-left:0;background:#fffce0;backdrop-filter:blur(4px)}
+
+/* ── 2026-10-02 会员中心压紧：heading 单行化 + pass 卡扁横化（278→约180，比例 1.55:1）── */
+.member-heading{padding:4px 2px 0}
+.member-heading h1{font:600 19px/1.3 var(--serif);margin:0 0 3px}
+.member-heading p{font-size:11px;margin:0;line-height:1.5}
+.plan-swiper-label{margin:12px 0 8px}
+.member-pass.plan-slide{padding:13px 16px 12px}
+.member-pass-top{font-size:11px;letter-spacing:1px}
+.plan-slide .member-wordmark{margin-top:7px;font-size:8px;letter-spacing:2px}
+.commerce-consumer .member-pass.plan-slide h1{font-size:19px;margin:3px 0}
+.plan-slide .member-pass-highlights{margin-top:7px}
+.plan-slide .member-pass-highlights span{padding:3px 8px;font-size:10px}
+.plan-slide-actions{margin-top:9px;padding-top:8px}
+.plan-price{font-size:17px}
+.plan-slide-actions .btn{min-height:33px;padding:7px 11px;font-size:11px}
+.plan-owned-chip{min-height:33px;padding:7px 11px;font-size:11px}
+/* 单方案直出的 pass 卡同步压扁 */
+.commerce-consumer .member-pass{min-height:0;padding:13px 16px 12px}
+.commerce-consumer .member-pass .member-wordmark{margin-top:7px;font-size:8px}
+.commerce-consumer .member-pass h1{font-size:19px;margin:3px 0}
+.commerce-consumer .member-pass .member-pass-highlights{margin-top:7px}
+.commerce-consumer .member-pass .member-pass-highlights span{padding:3px 8px;font-size:10px}
+.commerce-consumer .member-pass .member-pass-bottom{margin-top:9px;padding-top:8px}
+
+/* ── 会员滑动卡二次压扁：去 NEW LIVING CLUB 装饰行，280x225 → 约 280x190（1.47:1 横卡）── */
+.plan-slide .member-wordmark{display:none}
+.plan-slide .member-pass-top{font-size:10px}
+.commerce-consumer .member-pass.plan-slide h1{font-size:18px;margin:2px 0}
+.plan-slide .member-pass-highlights{margin-top:6px}
+.plan-slide .member-pass-highlights span{padding:2px 7px;font-size:9px}
+.plan-slide-actions{margin-top:7px;padding-top:7px}
+.plan-price{font-size:16px}
+.plan-slide-actions .btn{min-height:31px;padding:6px 10px;font-size:11px}
+.plan-owned-chip{min-height:31px;padding:6px 10px;font-size:11px}
+
+/* ── 会员滑动卡动作合并单行：价格 | 权益明细 | 立即开通（消除按钮独占行）── */
+.plan-slide-actions{flex-wrap:nowrap;gap:6px}
+.plan-price{font-size:15px;flex-shrink:0}
+.plan-slide-actions .btn{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
+.plan-owned-chip{min-height:30px;padding:6px 8px;font-size:10px;white-space:nowrap}
+
+/* ── 会员中心：标题/提示合一行（三行松散文字 → 单行 section-title 形态）── */
+.member-heading{padding:2px 2px 0}
+.member-title-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.member-hint{font-size:11px;color:#828778;white-space:nowrap}
+/* 已开通卡：整卡降饱和去「可购感」，chip 改对勾描边（非按钮观感） */
+.plan-slide.is-owned{filter:saturate(.45) brightness(.96)}
+.plan-owned-chip{background:transparent;border:1px solid #ffffff59;color:#eef0e6;font-weight:500}
+.plan-owned-chip::before{content:"✓ ";font-weight:600}
+
+/* ── 沈阳页字号/载体和谐：压过 M1-A 层 26px 旧规则（同特异性后行胜）；权益列表 >3 项折叠 ── */
+.commerce-consumer .member-heading h1{font-size:19px;margin:0 0 3px}
+.commerce-consumer .member-heading p{font-size:11px;margin:0}
+.member-benefit-fold{margin:2px 0 0}
+.member-benefit-fold>summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:#41604b;padding:11px 2px;border-top:1px solid #eeeae1}
+.member-benefit-fold>summary::-webkit-details-marker{display:none}
+.member-benefit-fold .fold-arrow{font-style:normal;color:#8a938a;margin-left:auto;transition:transform .15s}
+.member-benefit-fold[open] .fold-arrow{transform:rotate(90deg)}
+
+/* ── 2026-10-02 首页字阶与配比和谐化：上方文字提一档、下方分区标题降一档、封面收敛 ──
+   统一字阶：9(kicker) / 12(正文) / 14-15(卡题) / 16(分区题) / 19(会员卡题) / 28(封面题) */
+.commerce-consumer .consumer-cover{height:230px}
+.commerce-consumer .consumer-cover h1{font-size:28px;margin:0 0 16px}
+.commerce-consumer .consumer-cover-copy{margin-top:20px}
+.commerce-consumer .consumer-cover-copy p{font-size:12px}
+.consumer-cover-label{font-size:11px}
+.consumer-shortcut span{font-size:12px}
+.consumer-shortcut svg{width:46px;height:46px}
+.consumer-member{min-height:122px;padding:16px 18px}
+.consumer-kicker{font-size:9px;letter-spacing:.14em}
+.consumer-member strong{font-size:19px}
+.consumer-member-copy>span:not(.consumer-kicker){font-size:12px}
+.commerce-consumer .consumer-section-title h2{font-size:16px}
+.consumer-section-title>span{font-size:11px}
+.commerce-consumer .consumer-topic h3{font-size:15px}
+.commerce-consumer .consumer-products .product-card h3{font-size:15px}
+.commerce-consumer .consumer-content{gap:18px}
+
+/* ── 会员卡组对齐重构：卡对齐内容左缘（snap-start），右侧露边暗示滑动；dots 左对齐随内容 ── */
+.plan-swiper{scroll-padding-left:18px}
+.plan-slide{flex:0 0 calc(100% - 64px);scroll-snap-align:start}
+.plan-dots{justify-content:flex-start;padding:9px 18px 0}
+.plan-slide{flex-shrink:0}
+.plan-swiper{margin:0 -18px}
+
+/* ── 我的会员记录：标题与区块标题字阶对齐（此前无样式，落在浏览器默认 h2 ≈18px 黑体）── */
+.member-records h2{font:600 16px/1.4 var(--serif);margin:0 0 4px;letter-spacing:.01em}
+.member-records{padding:16px 18px}
+.member-record b{font-weight:600}

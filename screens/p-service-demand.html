@@ -108,7 +108,7 @@
 <div class="toast" id="toast"></div>
 <script src="_console-login.js"></script>
 <script src="_region.js?v=2"></script>
-<script src="_jzapi.js?v=9"></script>
+<script src="_jzapi.js?v=11"></script>
 <script>
 const JZ = window.BZF_JZ;
 // 优先级按「类型中文名」查表；orders 接口下发 type_label（英文 category_id 已由服务端 join 成中文名），
@@ -150,7 +150,7 @@ function actionCell(o) {
 
 function render() {
   const rows = document.getElementById('liveRows');
-  JZ.list({ pay_status: 'paid,not_required', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
+  JZ.list({ pay_status: 'paid,not_required,coupon_funded', status: 'pending,dispatched,accepted,serving', limit: 50 }).then(function(list) {
     // 待派优先：状态序 pending→serving，同状态内按优先级 高→低（?? 不能写 ||——pending 序号 0 是 falsy）
     list.sort(function (a, b) {
       return ((ST_RANK[a.status] ?? 9) - (ST_RANK[b.status] ?? 9)) || (PRIO_RANK[prioTxt(a)] - PRIO_RANK[prioTxt(b)]);
@@ -200,6 +200,6 @@ JZ.onChange(render);
 window.addEventListener('pageshow', render);
 render();
 </script>
-<script src="_nav.js"></script>
+<script src="_nav.js?v=20261002-settlement-1"></script>
 </body>
 </html>

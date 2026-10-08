@@ -5,9 +5,11 @@ const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const accountUser=id=>'commerce-account-'+id;
 async function linkOrder(c,order){
  const p=parse(order.snapshot),now=new Date().toISOString(),[[city]]=await c.execute('SELECT name FROM cities WHERE id=?',[order.city_id]);
- const [existing]=await c.execute('SELECT user_id FROM gr_orders WHERE order_ref=?',[order.id]);
- if(existing.length){if(existing[0].user_id!==accountUser(order.account_id))throw Error('Main order owner conflict');return;}
- await c.execute('INSERT INTO gr_orders(order_ref,user_id,sku,city,status,fee,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?)',[order.id,accountUser(order.account_id),'commerce:'+order.product_kind,city?.name||'',order.status==='fulfilled'?'completed':order.status==='expired'?'cancelled':'pending',order.amount_minor,order.created_at?new Date(order.created_at).toISOString():now,now,order.status==='fulfilled'?now:null]);
+ const state=['fulfilled','partially_refunded'].includes(order.status)?'completed':['expired','cancelled','refunded'].includes(order.status)?'cancelled':'pending';
+ const [existing]=await c.execute('SELECT user_id FROM gr_orders WHERE order_ref=? FOR UPDATE',[order.id]);
+ if(existing.length){if(existing[0].user_id!==accountUser(order.account_id))throw Error('Main order owner conflict');await c.execute('UPDATE gr_orders SET status=?,updated_at=?,completed_at=COALESCE(completed_at,?) WHERE order_ref=?',[state,now,state==='completed'?now:null,order.id]);}
+ else await c.execute('INSERT INTO gr_orders(order_ref,user_id,sku,city,status,fee,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?)',[order.id,accountUser(order.account_id),'commerce:'+order.product_kind,city?.name||'',state,order.amount_minor,order.created_at?new Date(order.created_at).toISOString():now,now,state==='completed'?now:null]);
+ if(order.payment_mode==='pay_center'||p.payment_mode==='pay_center')await c.execute("UPDATE gr_orders SET biz_type='commerce',payment_mode='pay_center',account_id=?,pay_status=?,refund_status=?,order_snapshot=? WHERE order_ref=?",[String(order.account_id),order.payment_status||(['fulfilled','paid_pending_fulfillment'].includes(order.status)?'paid':'unpaid'),['refunded','partially_refunded','refund_pending'].includes(order.payment_status)?order.payment_status:null,JSON.stringify({product_name:p.name,kind:order.product_kind,amount_minor:order.amount_minor}),order.id]);
 }
 async function linkCase(c,entry,coupon){
  const p=parse(coupon.snapshot),now=new Date().toISOString(),category=p.sku?.category_id||'community';
@@ -28,7 +30,7 @@ async function workCompleted(c,work){
 }
 async function enrichOrders(c,rows){
  const owned=rows.filter(o=>String(o.user_id||'').startsWith('commerce-account-'));if(!owned.length)return rows;
- const [ext]=await c.execute('SELECT id,account_id,snapshot FROM commerce_orders WHERE id IN ('+owned.map(()=>'?').join(',')+')',owned.map(o=>o.order_ref));
- const map=new Map(ext.map(e=>[e.id,e]));return rows.map(o=>{const e=map.get(o.order_ref);if(!e||accountUser(e.account_id)!==o.user_id)return o;const p=parse(e.snapshot);return {...o,product_name:p.name,category_id:p.category_id||'community',is_commerce:true,is_demo:p.is_demo===true,demo_price_minor:p.demo_price_minor??null};});
+ const [ext]=await c.execute('SELECT * FROM commerce_orders WHERE id IN ('+owned.map(()=>'?').join(',')+')',owned.map(o=>o.order_ref));
+ const map=new Map(ext.map(e=>[e.id,e]));return rows.map(o=>{const e=map.get(o.order_ref);if(!e||accountUser(e.account_id)!==o.user_id)return o;const p=parse(e.snapshot);return {...o,product_name:p.name,category_id:p.category_id||'community',is_commerce:true,is_demo:p.is_demo===true,demo_price_minor:p.demo_price_minor??null,...(e.payment_mode==='pay_center'?{biz_type:'commerce',payment_mode:e.payment_mode,pay_status:e.payment_status,fulfillment_status:e.fulfillment_status,refunded_minor:Number(e.refunded_minor),cashier_href:'juzhu-commerce.html?view=orders&order='+encodeURIComponent(e.id)}:{})};});
 }
 module.exports={accountUser,linkOrder,linkCase,resolveWork,workCompleted,enrichOrders};

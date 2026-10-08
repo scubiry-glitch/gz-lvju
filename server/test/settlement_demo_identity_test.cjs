@@ -1,0 +1,26 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),mysql=require('mysql2/promise');
+const {ensureDemoAccounts}=require('../../scripts/settlement/demo-accounts.cjs');
+test('walkthrough identities remain inside their synthetic parties and preserve administrator changes',{skip:!process.env.SETTLEMENT_TEST_SOCKET},async t=>{
+ const socketPath=process.env.SETTLEMENT_TEST_SOCKET;assert.match(socketPath,/^\/tmp\/sy-settlement-[\w-]+\/[^/]+\.sock$/);
+ const admin=await mysql.createConnection({socketPath,user:'root'}),database='settlement_demo_identity_'+crypto.randomBytes(8).toString('hex');
+ await admin.query('CREATE DATABASE `'+database+'` CHARACTER SET utf8mb4');
+ const pool=mysql.createPool({socketPath,user:'root',database,connectionLimit:3});
+ t.after(async()=>{await pool.end();await admin.query('DROP DATABASE `'+database+'`');await admin.end();});
+ await pool.query('CREATE TABLE roles(role_code VARCHAR(32) PRIMARY KEY,name VARCHAR(64),permissions TEXT,builtin TINYINT)');
+ await pool.query('CREATE TABLE accounts(id INT PRIMARY KEY AUTO_INCREMENT,login_name VARCHAR(64) UNIQUE,display_name VARCHAR(64),principal_type VARCHAR(8),status VARCHAR(16),password_hash VARCHAR(256),created_at VARCHAR(32),updated_at VARCHAR(32))');
+ await pool.query('CREATE TABLE account_roles(account_id INT,role_code VARCHAR(32),scope TEXT,PRIMARY KEY(account_id,role_code))');
+ const password=crypto.randomBytes(24).toString('base64url'),actors=await ensureDemoAccounts(pool,{password});
+ assert.equal(Object.keys(actors).length,6);const twice=await ensureDemoAccounts(pool,{password:crypto.randomBytes(24).toString('hex')});
+ for(const key of Object.keys(actors))assert.equal(twice[key].id,actors[key].id,'rerun must preserve accounts');
+ const authorize=require('../settlement/access.cjs').createAuthorizer({pool});
+ assert.equal(await authorize(actors.operator.principal,'settlement.fund.write',{party_id:'demo-cleaning',biz_type:'jiazheng',payment_mode:'pay_center'}),true);
+ for(const actor of Object.values(actors))await assert.rejects(authorize(actor.principal,'settlement.statement.read',{party_id:'real-business',biz_type:'commerce',payment_mode:'pay_center'}),{status:403});
+ await assert.rejects(authorize(actors.operator.principal,'settlement.approval.act',{party_id:'demo-cleaning'}),{status:403});
+ await assert.rejects(authorize(actors.reviewer.principal,'settlement.fund.write',{party_id:'demo-cleaning'}),{status:403});
+ await assert.rejects(authorize(actors.merchant.principal,'settlement.statement.read',{party_id:'demo-platform'}),{status:403});
+ await assert.rejects(authorize(actors.promoter.principal,'settlement.statement.read',{party_id:'demo-cleaning'}),{status:403});
+ await pool.execute('UPDATE account_roles SET scope=? WHERE account_id=?',[JSON.stringify({level:'self'}),actors.operator.id]);
+ await assert.rejects(ensureDemoAccounts(pool,{password}),/scope was changed/);
+ const [[scope]]=await pool.execute('SELECT scope FROM account_roles WHERE account_id=?',[actors.operator.id]);assert.deepEqual(JSON.parse(scope.scope),{level:'self'});
+});

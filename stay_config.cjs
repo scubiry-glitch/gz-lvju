@@ -520,6 +520,15 @@ function stayDateList(checkin, checkout) {
   return out;
 }
 
+// Keep public booking requests below the date-list and SQL parameter limits.
+// Long-stay bookings may cover a full year, including a leap day.
+const MAX_BOOKING_NIGHTS = 366;
+function bookingNights(checkin, checkout) {
+  if (!isValidDateString(checkin) || !isValidDateString(checkout)) return 0;
+  const nights = (Date.parse(checkout) - Date.parse(checkin)) / 864e5;
+  return Number.isSafeInteger(nights) && nights >= 1 && nights <= MAX_BOOKING_NIGHTS ? nights : 0;
+}
+
 /** 严格校验 YYYY-MM-DD，拒绝 JS Date 会自动归一化的非法日期。 */
 function isValidDateString(value) {
   const s = String(value || '').trim();
@@ -686,6 +695,8 @@ module.exports = {
   isValidDateString,
   stayConfigOf,
   stayDateList,
+  MAX_BOOKING_NIGHTS,
+  bookingNights,
   buildStayMonth,
   releaseStayQty,
 };

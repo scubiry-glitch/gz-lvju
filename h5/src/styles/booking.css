@@ -273,6 +273,23 @@
   font-size: 11px;
 }
 
+.booking-coupon {
+  margin-top: 12px;
+  padding: 13px 0 2px;
+  border-top: 1px dashed var(--border);
+}
+.booking-coupon-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+.booking-coupon-head span { color: var(--brand-deep); font-size: 11px; }
+.booking-coupon select { width: 100%; min-height: 44px; margin-top: 10px; border: 1px solid var(--border); border-radius: 9px; background: #fff; color: var(--ink); padding: 8px; font: inherit; }
+.booking-coupon-status,.booking-coupon-breakdown p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+.booking-coupon-status:empty { display: none; }
+.booking-coupon-status button { min-height: 44px; border: 0; background: transparent; color: var(--brand-deep); font: inherit; text-decoration: underline; padding: 0 5px; }
+.booking-coupon-breakdown { margin-top: 8px; padding: 8px 10px 10px; background: #f0f7f3; border-left: 3px solid var(--brand); border-radius: 4px 9px 9px 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .booking-coupon-breakdown { animation: booking-coupon-in .24s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes booking-coupon-in { from { opacity: .45; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+}
+
 .nl-toggle {
   display: block;
   width: 100%;

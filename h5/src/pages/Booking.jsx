@@ -5,7 +5,9 @@ import {
   bookingContacts,
   bookingLookup,
   bookingPay,
+  bookingPaymentQuery,
   createBooking,
+  bookingCouponQuotes,
   project,
   projectUnits,
   saveBookingContact,
@@ -35,10 +37,6 @@ function asArr(v) {
   return v ? [v] : [];
 }
 
-function sdkProbe() {
-  return window.JsBridgeV3 || window.LJBridge || window.jsbridge3 || window.BeiKeSdk || window.__beikeSdk || null;
-}
-
 function BookingInner() {
   const { id } = useParams();
   const [sp] = useSearchParams();
@@ -49,6 +47,7 @@ function BookingInner() {
   const [me, setMe] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [err, setErr] = useState('');
+  const [newPayAttempt, setNewPayAttempt] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [unitId, setUnitId] = useState(() => parseInt(sp.get('unit') || '', 10) || '');
@@ -68,6 +67,15 @@ function BookingInner() {
   const [ok, setOk] = useState(null); // { order_no, pay_status, cancel_policy_text, cancel_deadline }
   const [paying, setPaying] = useState(false);
   const [noBook, setNoBook] = useState(false);
+  const [couponQuotes, setCouponQuotes] = useState([]);
+  const [couponId, setCouponId] = useState('');
+  const [quotedFor, setQuotedFor] = useState('');
+  const [couponStatus, setCouponStatus] = useState('idle');
+  const [couponError, setCouponError] = useState('');
+  const [couponRefresh, setCouponRefresh] = useState(0);
+  const couponContext = [me?.id || '',id,unitId,checkin,checkout,unitId ? rooms : 1].join('|');
+  const visibleQuotes = quotedFor === couponContext ? couponQuotes : [];
+  const selectedCoupon = visibleQuotes.find((q) => q.coupon_id === couponId);
 
   const resumeOrderNo = (sp.get('order_no') || '').trim();
 
@@ -78,7 +86,7 @@ function BookingInner() {
         if (!alive) return;
         const acc = j && j.account;
         if (acc) {
-          setMe({ id: acc.id, phone: acc.phone || '', display_name: acc.display_name || '' });
+          setMe({ id: acc.id, idp_type: acc.idp_type, phone: acc.phone || '', display_name: acc.display_name || '' });
           setName(acc.display_name || '');
           setPhone(acc.phone || '');
         }
@@ -135,7 +143,7 @@ function BookingInner() {
       bookingLookup({ order_no: resumeOrderNo, contact_phone: sp.get('phone') || phone || '' })
         .then((j) => {
           const o = j.order || {};
-          if (o.pay_status === 'paid') {
+          if (o.pay_status === 'paid' || o.pay_status === 'coupon_funded') {
             nav('/paid?channel=booking&order_no=' + encodeURIComponent(o.order_no) + '&phone=' + encodeURIComponent(o.contact_phone_raw || o.contact_phone || ''), { replace: true });
             return;
           }
@@ -233,6 +241,17 @@ function BookingInner() {
 
   const total = range.total * (unitId ? rooms : 1);
   const okStay = n >= minNights && !range.blocked;
+  useEffect(() => {
+    if (!me?.id || !p?.online_payment || !okStay || !checkin || !checkout) {
+      setCouponQuotes([]); setCouponId(''); setQuotedFor(''); setCouponStatus('idle'); return;
+    }
+    let alive = true;
+    setCouponStatus('loading'); setCouponError('');
+    bookingCouponQuotes({ project_id:Number(id),unit_id:unitId ? Number(unitId) : null,checkin,checkout,rooms:unitId ? rooms : 1 })
+      .then((result) => { if (alive) { const quotes=result.quotes || []; setCouponQuotes(quotes); setQuotedFor(couponContext); setCouponId((old) => quotes.some((q) => q.coupon_id === old) ? old : ''); setCouponStatus(quotes.length ? 'ready' : 'empty'); } })
+      .catch((error) => { if (alive) { setCouponQuotes([]); setCouponId(''); setQuotedFor(couponContext); setCouponError(error.message || '请稍后重试'); setCouponStatus('error'); } });
+    return () => { alive = false; };
+  }, [me?.id,p?.online_payment,id,unitId,checkin,checkout,rooms,okStay,couponRefresh,couponContext]);
 
   function applyContact(v) {
     setCSel(v);
@@ -299,15 +318,18 @@ function BookingInner() {
         contact_name: name.trim(),
         contact_phone: phone.trim(),
         transaction_mode: tx,
-        idempotency_key: 'h5-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10),
+        ...(selectedCoupon ? { coupon_id:selectedCoupon.coupon_id,coupon_quote_gross_minor:selectedCoupon.gross_minor } : {}),
       };
+      if (selectedCoupon) body.transaction_mode = 'payment';
+      if (!window.BZF_CASHIER?.requestKey && (!selectedCoupon || selectedCoupon.cash_minor > 0)) throw new Error('支付组件加载失败，请刷新页面');
+      body.idempotency_key = window.BZF_CASHIER?.requestKey?.('booking-create:' + JSON.stringify(body)) || window.crypto.randomUUID();
       const j = await createBooking(body);
       setOk({
         order_no: j.order_no,
         pay_status: j.pay_status,
         cancel_policy_text: j.cancel_policy_text,
         cancel_deadline: j.cancel_deadline,
-        title: '预订提交成功',
+        title: j.pay_status === 'coupon_funded' ? '用券预订成功，待商家确认' : '预订提交成功',
         sub: '订单号（请留存，配合手机号查单/取消）',
         contact_phone: phone.trim(),
       });
@@ -330,7 +352,7 @@ function BookingInner() {
     try {
       const lk = await bookingLookup({ order_no: ok.order_no, contact_phone: contactPhone });
       const o = lk.order || {};
-      if (o.pay_status === 'paid') {
+      if (o.pay_status === 'paid' || o.pay_status === 'coupon_funded') {
         nav('/paid?channel=booking&order_no=' + encodeURIComponent(ok.order_no) + '&phone=' + encodeURIComponent(contactPhone || ''));
         return;
       }
@@ -338,19 +360,31 @@ function BookingInner() {
         alert('订单状态为「' + o.status + '」，无需支付');
         return;
       }
-      const cashierType = sdkProbe() ? '1' : '2';
-      const pay = await bookingPay({
+      const cashier = window.BZF_CASHIER;
+      if (!cashier) throw new Error('支付组件加载失败，请刷新页面');
+      const cashierType = cashier.cashierType();
+      if (cashierType === '1') await cashier.ensureAppBridge();
+      const requestKey = cashier.requestKey('booking-pay:' + ok.order_no + ':' + cashierType, newPayAttempt);
+      setNewPayAttempt(false);
+      let pay = cashier.normalize(await bookingPay({
         order_no: ok.order_no,
         contact_phone: contactPhone,
         cashier_type: cashierType,
-      });
+        idempotency_key: requestKey,
+      }));
+      if (!pay.cashier_url && pay.pay_status !== 'paid' && pay.next_action !== 'new_attempt') {
+        pay = await cashier.waitForCashier(() => bookingPaymentQuery({ order_no: ok.order_no, contact_phone: contactPhone }));
+      }
       const paid =
         result + '&app_order_id=' + encodeURIComponent(pay.app_order_id || '');
-      if (!pay.cashier_url) {
-        location.href = paid;
+      if (pay.next_action === 'new_attempt') {
+        setNewPayAttempt(true);
+        alert('原支付已关闭，请再次点击支付以开启新的付款尝试');
         return;
       }
-      location.href = pay.cashier_url;
+      if (!cashier.open(pay, { onResult: () => { location.href = paid; }, onCancel: () => setPaying(false) })) {
+        setErr(pay.next_action === 'closed' ? '订单已关闭，请重新预订' : '支付结果确认中，请稍后继续查看订单');
+      }
     } catch (e) {
       alert(e.message || '支付失败');
     } finally {
@@ -563,7 +597,7 @@ function BookingInner() {
       ) : null}
       <div className="bfield">
         <span className="l">交易方式</span>
-        <select value={tx} onChange={(e) => setTx(e.target.value)}>
+        <select value={tx} onChange={(e) => { setTx(e.target.value); if (e.target.value === 'booking') setCouponId(''); }}>
           {p?.online_booking ? (
             <option value="booking">在线预订 · 商家确认后线下收款</option>
           ) : null}
@@ -637,9 +671,20 @@ function BookingInner() {
           </span>
         </div>
         <div className="kv big">
-          <span className="k">合计</span>
+          <span className="k">房费合计（未用券）</span>
           <span className="v">{okStay && total ? '¥' + formatPrice(total) : '—'}</span>
         </div>
+        {p?.online_payment ? <div className="booking-coupon" aria-busy={couponStatus === 'loading' || quotedFor !== couponContext}>
+          <div className="booking-coupon-head"><strong>使用权益券</strong><span>{couponStatus === 'ready' && visibleQuotes.length ? `${visibleQuotes.length} 张适用` : ''}</span></div>
+          {visibleQuotes.length ? <select aria-label="选择权益券" value={couponId} onChange={(e) => { setCouponId(e.target.value); if (e.target.value) setTx('payment'); }}>
+            <option value="">不使用券</option>
+            {visibleQuotes.map((q) => <option key={q.coupon_id} value={q.coupon_id}>{q.name} · {q.mode === 'exchange' ? '直接兑换' : '抵用 ¥' + formatPrice(q.coupon_minor / 100)}</option>)}
+          </select> : null}
+          <p role="status" className="booking-coupon-status">{!okStay ? '选定可预订日期后查询适用券。' : !me?.id ? '登录后可查看本单适用券。' : couponStatus === 'loading' || quotedFor !== couponContext ? '正在核对房型、日期和可用券…' : couponStatus === 'error' ? <>可用券查询失败：{couponError}。可按原价继续，或 <button type="button" onClick={() => setCouponRefresh((v) => v + 1)}>重试查询</button></> : couponStatus === 'empty' ? '本单暂无适用券，请在卡券详情核对适用房型和有效期。' : selectedCoupon ? '' : '选择一张券，现金应付会立即更新。'}</p>
+          {selectedCoupon ? <div className="booking-coupon-breakdown" key={selectedCoupon.coupon_id}>{selectedCoupon.mode === 'exchange' ? <div className="kv"><span className="k">签约兑付价</span><span className="v">¥{formatPrice(selectedCoupon.gross_minor / 100)}</span></div> : null}<div className="kv"><span className="k">券抵</span><span className="v">−¥{formatPrice(selectedCoupon.coupon_minor / 100)}</span></div>
+            <div className="kv big"><span className="k">本单现金应付</span><span className="v">¥{formatPrice(selectedCoupon.cash_minor / 100)}</span></div>
+            <p>{selectedCoupon.mode === 'exchange' ? '直接兑换 1 项指定房型；签约价可能与原房费不同。' : '整张抵用，不拆分找零。'}提交时将重新核对适用范围与金额。</p></div> : null}
+        </div> : null}
       </div>
       <button type="button" className="nl-toggle" onClick={() => setShowNights((v) => !v)}>
         {showNights ? '收起逐晚价格 ▴' : '查看逐晚价格 ▾'}
@@ -674,7 +719,7 @@ function BookingInner() {
 
       <div className="bk-cta">
         <div className="p">
-          <b>{okStay && total ? '¥' + formatPrice(total) : '—'}</b>
+          <b>{selectedCoupon ? '¥' + formatPrice(selectedCoupon.cash_minor / 100) : okStay && total ? '¥' + formatPrice(total) : '—'}</b>
           <span>
             {n >= 1 && n < minNights
               ? '连住不足 ' + minNights + ' 晚'

@@ -1,0 +1,108 @@
+{
+  "run_id": "settlement-walkthrough-v1",
+  "origin": "https://sytest.meizu.life",
+  "read_only": true,
+  "checks": [
+    "six-real-logins-and-party-scope",
+    "all-admin-tabs-have-persisted-data",
+    "merchant-promoter-platform-statement-isolation",
+    "mobile-without-horizontal-page-overflow"
+  ],
+  "requests": [
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "reviewer2",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/items/52",
+      "status": 200
+    },
+    {
+      "role": "operator",
+      "method": "GET",
+      "path": "/admin/accounts",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 200
+    },
+    {
+      "role": "merchant",
+      "method": "GET",
+      "path": "/me/settlement-statements/59fa8140-1016-4d2e-ad30-e7e3c5c47ad2",
+      "status": 403
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/59fa8140-1016-4d2e-ad30-e7e3c5c47ad2",
+      "status": 200
+    },
+    {
+      "role": "promoter",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 403
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/8043f7bc-612c-4ec8-951a-2c48fb3300d3",
+      "status": 200
+    },
+    {
+      "role": "platform",
+      "method": "GET",
+      "path": "/me/settlement-statements/f04195c8-54fc-4b39-966a-14d40cfe48fd",
+      "status": 403
+    }
+  ],
+  "started_at": "2026-10-01T20:15:02.432Z",
+  "finished_at": "2026-10-01T20:15:17.185Z",
+  "passed": true,
+  "screenshots": [
+    "images/final/01-admin-items.png",
+    "images/final/04-statements-merchant.png",
+    "images/final/04-statements-promoter.png",
+    "images/final/04-statements-platform.png",
+    "images/final/06-statements-mobile.png"
+  ],
+  "downloads": []
+}
