@@ -1649,6 +1649,7 @@ const handleJiazhengRoutes = createJiazhengRouter({
   cityMatchTokens, cityIdsClause,
   composeRank, merchantIntroOf, maskPhone, maskPhoneStd,
   parseSkuJsonFields, parseJsonFields, vendorAuthBadges, workerAuthBadges, reviewReply,
+  CATEGORY_REVIEW_FALLBACKS,
   requireCEndWrite, restrictOrdersRead, requireDispatchPerm, requireApiKey,
   authCenter, auditIfAccount,
   getVendorConfig, hmacAuth, grOrders, outboundJson, stripVendorSecrets,

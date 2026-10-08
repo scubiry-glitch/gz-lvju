@@ -36,7 +36,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname===prefix+'/referral'&&method==='GET'){const data=await service.verifyReferral(url.searchParams.get('token'));
     try{await pool.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',['referral:'+data.kind+':'+data.id,'referral.click',JSON.stringify({aid:data.aid,kind:data.kind,id:data.id})]);}catch{}
     return reply(200,{kind:data.kind,product_id:data.id,version:data.v});}
-   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready,demo_purchase_enabled:demoEnabled&&p.is_demo})));}
+   if(pathname===prefix+'/catalog'&&method==='GET'){const enabled=await service.payments.capability();return reply(200,(await service.catalog(url.searchParams.get('city')||'')).filter(p=>!p.private_demo).map(p=>({...p,purchase_enabled:enabled&&!p.is_demo&&p.purchase_ready,demo_purchase_enabled:demoEnabled&&p.is_demo})));}
    if(pathname===prefix+'/hotels'&&method==='GET')return reply(200,await service.hotels(Object.fromEntries(url.searchParams)));
    // Account-center Bearer or verified Beike cookie; legacy/machine keys never authorize commerce.
    let session=await auth.verifySessionToken(auth.bearerToken(req));
@@ -55,6 +55,13 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    const paymentOrder=pathname.match(/^\/api\/commerce\/v1\/orders\/([a-f0-9-]{36})\/(pay|payment|cancel)$/);
    if(paymentOrder){const [,id,action]=paymentOrder;if(action==='pay'&&method==='POST')return reply(202,await service.payments.pay(principal,id,body,req.headers['idempotency-key'],req.socket.remoteAddress));if(action==='payment'&&method==='GET')return reply(200,await service.payments.status(principal,id,url.searchParams.get('refresh')==='1'));if(action==='cancel'&&method==='POST')return reply(202,await service.payments.close(principal,id));}
    if(pathname===prefix+'/demo-orders'&&method==='POST'){assert(demoEnabled,'演示购买未开放',409);return reply(201,await require('./demo-order.cjs').demoOrder(service,principal,body,req.headers['idempotency-key']));}
+   if(pathname.startsWith(prefix+'/demo-life/')){
+    assert(demoEnabled,'演示下单未开放',409);
+    const demo=require('./demo-life-checkout.cjs');
+    if(pathname===prefix+'/demo-life/config'&&method==='GET')return reply(200,await demo.config(pool,principal));
+    if(pathname===prefix+'/demo-life/quote'&&method==='GET')return reply(200,await demo.quote(pool,principal,url.searchParams.get('coupon_id')));
+    if(pathname===prefix+'/demo-life/orders'&&method==='POST')return reply(201,await demo.order(pool,principal,body,req.headers['idempotency-key']));
+   }
    if(pathname===prefix+'/exchange'&&method==='POST'){assert(demoEnabled,'兑换暂未开放',409);return reply(201,await require('./exchange-codes.cjs').exchange(service,principal,body,req.headers['idempotency-key']));}
    if(pathname===prefix+'/appointments'&&method==='POST')return reply(201,await service.appointment(principal,body,req.headers['idempotency-key']));
    if(pathname===prefix+'/cases'&&method==='POST')return reply(201,await service.openCase(principal,body,req.headers['idempotency-key']));
@@ -96,7 +103,7 @@ function createServer({pool,auth,publicOrigin='',staticFiles=false,demoEnabled=p
    if(pathname===prefix+'/shares'&&method==='POST'){
     // 推广资格闸：settings.promoter_gate='1' 时仅「promoter」角色（或平台全权）可生成分享链接；缺省开放（过渡期，正式推广前收口）。
     if(await settingValue(pool,'promoter_gate')==='1')assert(principal.roles.some(r=>r.role_code==='promoter'||(r.permissions||[]).includes('*')),'尚未开通推广资格，请联系平台开通',403,'promoter_required');
-    const products=await service.catalog(),product=products.find(v=>v.kind===body.kind&&v.id===body.product_id);assert(product,'商品尚未发布',404);
+    const products=await service.catalog(),product=products.find(v=>!v.private_demo&&v.kind===body.kind&&v.id===body.product_id);assert(product,'商品尚未发布',404);
     const payload=Buffer.from(JSON.stringify({aid:principal.account.id,kind:product.kind,id:product.id,v:product.version,exp:Math.floor(Date.now()/1000)+7*86400})).toString('base64url');
     const secret=process.env.JUZHU_API_KEY||process.env.JUZHU_ADMIN_PASSWORD;assert(secret,'分享服务暂不可用',503);const signature=crypto.createHmac('sha256',secret).update('commerce-share:'+payload).digest('base64url');
     await service.audit(pool,principal,'promotion.share',`${product.kind}/${product.id}`,{version:product.version},{city_id:product.city_id});
