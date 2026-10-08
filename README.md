@@ -169,6 +169,8 @@ node app.js                               # 8766（守护自动拉起；验证�
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | 工作约定（20 条规则：导航同步 / 角色红线 / 单一数据源 / 频道模型 / 权限注册表 / 佣金口径…） |
 | [`docs/deploy.md`](docs/deploy.md) | 部署 / MySQL 迁移 |
+| [`docs/s3-image-storage.md`](docs/s3-image-storage.md) | 房源图片对象存储（贝壳 ODS/S3）：配置、上传/读取、缩略图、写入收口、灰度开关、实测口径、排障、验证分层 |
+| [`docs/s3-intake-api-plan.md`](docs/s3-intake-api-plan.md) | 新增房源 / 新增房源图片 接入 S3 的改造范围、风险、实施方案、回滚预案与验收标准 |
 | [`docs/account-and-auth-design.md`](docs/account-and-auth-design.md) | 账号中心与权限设计 |
 | [`docs/tp-sign-and-call.md`](docs/tp-sign-and-call.md) | 话务虚拟号签名与调用（密钥仅服务端） |
 | [`docs/juzhu-info-architecture.md`](docs/juzhu-info-architecture.md) | 新居住信息架构 |

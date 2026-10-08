@@ -424,6 +424,14 @@
   </script>
   <script>
   /* 新居住保租房 · SY-BZF-xxxxx 走 juzhu API 复核 */
+  /* 图片引用 → 可用于 <img src> 的值：绝对 URL / data:/blob: 原样，本地相对路径补前导 /
+     （兼容对象存储改造：库内可能存 https://file-domain/... 绝对地址） */
+  function imgUrl(p) {
+    var s = (p == null ? '' : String(p)).trim();
+    if (!s) return '';
+    if (/^(https?:)?\/\//i.test(s) || /^(data|blob):/i.test(s)) return s;
+    return '/' + s.replace(/^\/+/, '');
+  }
   (function(){
     var q = new URLSearchParams(location.search);
     var id = q.get('id');
@@ -473,7 +481,7 @@
 
       var hero = document.querySelector('.house-hero');
       if (hero && p.cover_image) {
-        hero.querySelector('.img').innerHTML = '<img src="/'+p.cover_image.replace(/^\//,'')+'" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" alt=""/>';
+        hero.querySelector('.img').innerHTML = '<img src="'+imgUrl(p.cover_image)+'" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" alt=""/>';
       }
       if (hero) {
         hero.querySelector('h4').textContent = p.name;
