@@ -713,6 +713,36 @@ function isVendorHmacPath(urlPath, method) {
   return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/') || p.startsWith('/api/juzhu/housing/vendor/'));
 }
 
+const OPEN_API_HOST_PREFIX = 'test-xjz-open';
+
+function requestHostnames(req) {
+  const headers = (req && req.headers) || {};
+  const names = [];
+  for (const value of [headers['x-forwarded-host'], headers.host]) {
+    for (const part of String(value || '').split(',')) {
+      const host = part.trim().toLowerCase().replace(/:\d+$/, '');
+      if (host) names.push(host);
+    }
+  }
+  return names;
+}
+
+function isOpenApiHost(req) {
+  return requestHostnames(req).some((host) => host.startsWith(OPEN_API_HOST_PREFIX));
+}
+
+function rejectUnlessOpenApi(req, res, urlPath) {
+  if (!isOpenApiHost(req) || isVendorHmacPath(urlPath, req.method)) return false;
+  const body = JSON.stringify({ error: 'not_found' });
+  res.writeHead(404, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
+  return true;
+}
+
 /**
  * C 端公开接口白名单（无 PII 的目录/房源展示 + 来来预约跳转 + 我的订单）。
  * 其余 /api/juzhu/* 一律要求 JUZHU_API_KEY（admin 走会话/Key，商家开放接口走 HMAC）。
@@ -1204,6 +1234,9 @@ module.exports.isCEndPublicApi = isCEndPublicApi;
 module.exports.isPaymentCustomerApi = isPaymentCustomerApi;
 module.exports.grUserQuery = grUserQuery;
 module.exports.isVendorHmacPath = isVendorHmacPath;
+module.exports.isOpenApiHost = isOpenApiHost;
+module.exports.rejectUnlessOpenApi = rejectUnlessOpenApi;
+module.exports.OPEN_API_HOST_PREFIX = OPEN_API_HOST_PREFIX;
 module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
@@ -2266,6 +2299,9 @@ function resLogWrap(req, res) {
 const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
+
+  // test-xjz-open* 只暴露商家 HMAC 开放接口，页面和其它 API 不回落到首页。
+  if (rejectUnlessOpenApi(req, res, rawPath)) return;
 
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
   const apiReq = rawPath.startsWith('/api/juzhu');
