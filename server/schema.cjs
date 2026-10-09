@@ -387,6 +387,7 @@ function createSchema(deps) {
           hours VARCHAR(200),
           vendor_no VARCHAR(100),
           whitelist_id INT,
+          hmac_key TEXT, url_link TEXT, order_detail_url TEXT,
           status VARCHAR(20) DEFAULT 'active',
           sort_order INT DEFAULT 0,
           created_at VARCHAR(30),
@@ -751,6 +752,11 @@ function createSchema(deps) {
         ['jz_vendors', 'whitelist_id INT'],
         ['jz_vendors', 'platform_certs TEXT'],
         ['jz_vendors', 'webhook_url VARCHAR(500)'],
+        // 商家开放接口 HMAC 三列（对齐 juzhu/mysql_schema.sql 与 vendor_config.cjs 的 SELECT；
+        // 旧库由 Python 流程建表时已有，Node ensureSchema 新建的表此前缺这三列 → Unknown column 'hmac_key'）
+        ['jz_vendors', 'hmac_key TEXT'],
+        ['jz_vendors', 'url_link TEXT'],
+        ['jz_vendors', 'order_detail_url TEXT'],
         ['jz_vendors', "consult_mode VARCHAR(20) DEFAULT 'consultant'"],   // 商家维度咨询优先展示：consultant=咨询顾问(400) / ai=AI 咨询（未上线）
         ['jz_vendors', 'commission_housing DECIMAL(5,2)'],   // 抽佣·房源预订档（%，NULL=按全局基准，规则 20）
         ['jz_vendors', 'commission_jiazheng DECIMAL(5,2)'],  // 抽佣·家政档（本期仅配置，消费在家政结算）
