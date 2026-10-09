@@ -617,7 +617,7 @@ function BookingInner() {
         <select value={cSel} onChange={(e) => applyContact(e.target.value)}>
           {me ? (
             <option value="acct">
-              我的资料（{me.display_name || ''} · {(me.phone || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}）
+              （{me.display_name || ''} · {(me.phone || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}）
             </option>
           ) : null}
           {contacts.map((c) => (
