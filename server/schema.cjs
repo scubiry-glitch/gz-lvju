@@ -387,6 +387,7 @@ function createSchema(deps) {
           hours VARCHAR(200),
           vendor_no VARCHAR(100),
           whitelist_id INT,
+          hmac_key TEXT, url_link TEXT, order_detail_url TEXT,
           status VARCHAR(20) DEFAULT 'active',
           sort_order INT DEFAULT 0,
           created_at VARCHAR(30),
