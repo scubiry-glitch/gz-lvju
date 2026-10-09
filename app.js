@@ -2452,6 +2452,16 @@ if (require.main === module) {
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
     console.log('auth: /api/juzhu/* default-deny API Key; C-end catalog/wechat-link/gr-orders public; vendor HMAC; admin session');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
+    // 对象存储启动自检：未配置时醒目告警（发行包不含 assets/，回落本地 = 静默丢图）
+    {
+      const S3 = require('./s3_client.cjs');
+      if (S3.isConfigured()) {
+        console.log(`[img] storage=s3 bucket=${S3.config().bucket} file=${S3.config().fileEndpoint} ingest=${process.env.IMG_INGEST || 'keep'}`);
+      } else {
+        console.warn('[img] WARNING: S3 未配置（缺 S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET 之一）');
+        console.warn('[img] WARNING: 图片上传/镜像将回落本地磁盘 assets/uploads/ —— 生产发行包不含 assets/，等于静默丢图；请补配置后重启（核对：GET /api/juzhu/admin/storage/status）');
+      }
+    }
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
