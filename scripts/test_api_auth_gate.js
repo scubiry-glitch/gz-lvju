@@ -149,6 +149,18 @@ async function run() {
   const vendor = mockRes();
   assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'POST' }, vendor, '/api/juzhu/housing/vendor/projects/list'), false);
   assert.strictEqual(vendor.statusCode, null);
+  for (const page of ['/screens/open-platform.html', '/screens/property-intake-api.html', '/screens/vendor-onboarding.html', '/screens/_region.js', '/screens/_nav.js']) {
+    const pageRes = mockRes();
+    assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'GET' }, pageRes, page), false, page);
+    assert.strictEqual(pageRes.statusCode, null);
+  }
+  const apply = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'POST' }, apply, '/api/juzhu/onboarding/apply'), false);
+  const status = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'GET' }, status, '/api/juzhu/onboarding/status'), false);
+  const adminPage = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'GET' }, adminPage, '/screens/p-vendor-onboarding.html'), true);
+  assert.strictEqual(adminPage.statusCode, 404);
   const otherHost = mockRes();
   assert.strictEqual(app.rejectUnlessOpenApi({ method: 'GET', headers: { host: 'localhost:8080' } }, otherHost, '/'), false);
 

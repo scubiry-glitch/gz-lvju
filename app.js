@@ -731,8 +731,26 @@ function isOpenApiHost(req) {
   return requestHostnames(req).some((host) => host.startsWith(OPEN_API_HOST_PREFIX));
 }
 
+const OPEN_API_PAGES = new Set([
+  '/screens/open-platform.html',
+  '/screens/property-intake-api.html',
+  '/screens/vendor-onboarding.html',
+  '/screens/_region.js',
+  '/screens/_nav.js',
+]);
+
+function isOpenApiAllowedPath(urlPath, method) {
+  if (isVendorHmacPath(urlPath, method)) return true;
+  const p = String(urlPath || '').split('?')[0].replace(/\/+$/, '') || '/';
+  const m = String(method || 'GET').toUpperCase();
+  if ((m === 'GET' || m === 'HEAD') && OPEN_API_PAGES.has(p)) return true;
+  if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
+  if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
+  return false;
+}
+
 function rejectUnlessOpenApi(req, res, urlPath) {
-  if (!isOpenApiHost(req) || isVendorHmacPath(urlPath, req.method)) return false;
+  if (!isOpenApiHost(req) || isOpenApiAllowedPath(urlPath, req.method)) return false;
   const body = JSON.stringify({ error: 'not_found' });
   res.writeHead(404, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -1235,6 +1253,7 @@ module.exports.isPaymentCustomerApi = isPaymentCustomerApi;
 module.exports.grUserQuery = grUserQuery;
 module.exports.isVendorHmacPath = isVendorHmacPath;
 module.exports.isOpenApiHost = isOpenApiHost;
+module.exports.isOpenApiAllowedPath = isOpenApiAllowedPath;
 module.exports.rejectUnlessOpenApi = rejectUnlessOpenApi;
 module.exports.OPEN_API_HOST_PREFIX = OPEN_API_HOST_PREFIX;
 module.exports.stripVendorSecrets = stripVendorSecrets;
@@ -2300,7 +2319,7 @@ const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
 
-  // test-xjz-open* 只暴露商家 HMAC 开放接口，页面和其它 API 不回落到首页。
+  // test-xjz-open* 只暴露商家 HMAC 开放接口、房源接入文档、入驻申请页及其接口。
   if (rejectUnlessOpenApi(req, res, rawPath)) return;
 
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
