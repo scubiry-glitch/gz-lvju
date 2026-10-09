@@ -42,7 +42,13 @@ export default function TabBar() {
             className={({ isActive }) => ((active != null ? active : isActive) ? 'on' : undefined)}
             onClick={(e) => {
               if (!t.needAuth) return;
-              if (requireLogin(t.to)) e.preventDefault();
+              const block = requireLogin(t.to);
+              try {
+                console.log('[bzf-auth] tab click', t.label, t.to, { block });
+              } catch {
+                /* ignore */
+              }
+              if (block) e.preventDefault();
             }}
           >
             {({ isActive }) => {

@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { jumpToLogin } from './auth.js';
+import { getLianjiaToken, jumpToLogin, morphEnv } from './auth.js';
 import { authMe } from './api.js';
+
+function authLog(...args) {
+  try {
+    console.log('[bzf-auth]', ...args);
+  } catch {
+    /* ignore */
+  }
+}
 
 export const AuthUserContext = createContext({
   user: null,
@@ -16,12 +24,14 @@ export function useAuthUser() {
   return useContext(AuthUserContext);
 }
 
-/** 未登录则 jumpToLogin → clogin；已登录返回 false 供调用方继续业务 */
+/** 未登录则 jumpToLogin；已登录返回 false 供调用方继续业务。
+ * ready 未完成时放行路由，交给 RequireAuth，避免 Tab 点了 preventDefault 却不跳登录（App 内像没反应）。 */
 export function useRequireLogin() {
   const { ready, loggedIn, goLogin } = useAuthUser();
   return useCallback(
     (next) => {
-      if (!ready) return true;
+      authLog('requireLogin', { next, ready, loggedIn });
+      if (!ready) return false;
       if (loggedIn) return false;
       goLogin(next);
       return true;
@@ -41,11 +51,34 @@ function pickUser(me) {
   };
 }
 
-/** 壳层暖身份：只探 /api/auth/me（X-Lianjia-Token 头 + Cookie）；C 端不换 BJZ */
+/** 壳层暖身份：只探 /api/auth/me（Cookie）；C 端不换 BJZ */
 export async function loadAuthUser() {
+  const env = morphEnv();
+  const readableToken = !!getLianjiaToken();
+  authLog('loadAuthUser start', {
+    hostEnv: env.hostEnv,
+    isApp: env.isApp,
+    readableLianjiaToken: readableToken,
+  });
   try {
-    return pickUser(await authMe());
-  } catch {
+    const me = await authMe();
+    const u = pickUser(me);
+    authLog('登录状态', {
+      loggedIn: !!u,
+      accountId: u && u.id,
+      display_name: u && u.display_name,
+      phone: u && u.phone,
+      hostEnv: env.hostEnv,
+    });
+    return u;
+  } catch (e) {
+    authLog('登录状态', {
+      loggedIn: false,
+      reason: (e && (e.message || e.status)) || 'auth/me failed',
+      status: e && e.status,
+      hostEnv: env.hostEnv,
+      readableLianjiaToken: readableToken,
+    });
     return null;
   }
 }
@@ -71,9 +104,11 @@ export function AuthProvider({ children }) {
     try {
       const u = await loadAuthUser();
       setUser(u);
+      authLog('AuthProvider ready', { loggedIn: !!u });
       return u;
     } catch {
       setUser(null);
+      authLog('AuthProvider ready', { loggedIn: false });
       return null;
     } finally {
       setReady(true);
@@ -83,8 +118,10 @@ export function AuthProvider({ children }) {
   const goLogin = useCallback((next) => {
     const ret = next == null || next === '' ? location.pathname + location.search : String(next);
     const nextQ = ret.startsWith('/') ? ret : '/' + ret.replace(/^\//, '');
-    jumpToLogin(loginNextPath(nextQ));
-  }, []);
+    const url = loginNextPath(nextQ);
+    authLog('goLogin', { next, url, currentlyLoggedIn: !!user });
+    jumpToLogin(url);
+  }, [user]);
 
   useEffect(() => {
     refresh();

@@ -2,13 +2,41 @@
  * @ke/morph 本地等价 shim（仅当 node_modules 里装不到真包时由 vite alias 兜底）。
  *
  * 背景：@ke/morph 是贝壳内网私有包（artifactory.intra.ke.com），预览机 / 外网环境
- * 装不到，构建会因这一个 import 整体失败。H5 全部源码只用到它的两个导出：
- *   getCookie(name[, cookies]) / Login.toLogin({url, env, apiEnv})
- * 这里按 screens/_beike-login.js 的既有口径等价实现；内网环境装到真包后
- * vite.config.js 的条件 alias 会优先走真包，本文件不参与打包。
+ * 装不到，构建会因这一个 import 整体失败。H5 用到的导出：
+ *   getCookie / Login.toLogin / getCurrentEnv
+ * 内网装到真包后 vite.config.js 条件 alias 优先走真包，本文件不参与打包。
  *
  * 口径：C 端身份 = Cookie lianjia_token（规则 25）。
+ * getCurrentEnv 文档：https://kedoc.ke.com/morph/docs/base/getCurrentEnv
  */
+
+/** 对齐 Morph getCurrentEnv（精简：够用 isApp / hostEnv / developmentEnv） */
+export function getCurrentEnv(userAgent, hostName) {
+  const ua = userAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '';
+  const host = hostName || (typeof location !== 'undefined' ? location.hostname : '') || '';
+  const isBeike = /lianjiabeike/gim.test(ua);
+  const isLianjia =
+    /Lianjia/gim.test(ua) &&
+    !/Alliance|lianjiabaichuan|lianjiaatom|Link|LiveInBeike|beikeanzhu|fanghuoji|beikesteward|beikejinggong|decorate|beike_rentplat|zhidao/gim.test(
+      ua,
+    );
+  const isApp = isBeike || isLianjia;
+  let hostEnv = 'm';
+  if (isBeike) hostEnv = 'beike';
+  else if (isLianjia) hostEnv = 'lianjia';
+  else if (/Macintosh|windows/gim.test(ua) && !/mobile/gim.test(ua)) hostEnv = 'pc';
+  let developmentEnv = 'production';
+  if (/test/.test(host)) developmentEnv = 'test';
+  else if (/preview/.test(host)) developmentEnv = 'preview';
+  else if (/0\.0\.0\.0|127\.0\.0\.1|localhost|dev/.test(host)) developmentEnv = 'development';
+  return {
+    isApp,
+    hostEnv,
+    domainEnv: host.indexOf('lianjia.com') > -1 ? 'lianjia.com' : 'ke.com',
+    developmentEnv,
+    os: /iphone|ipad/gim.test(ua) ? 'ios' : /android|adr/gim.test(ua) ? 'android' : 'android',
+  };
+}
 
 /* Morph getCookie：必须传名字；getCookie() 空调用的结果是 "" 而不是全文 */
 export function getCookie(cookieName, cookies) {
@@ -94,4 +122,4 @@ export const Login = {
   },
 };
 
-export default { getCookie, Login };
+export default { getCookie, getCurrentEnv, Login };

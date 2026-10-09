@@ -1,6 +1,6 @@
 /** C 端身份 = Cookie `lianjia_token`（Morph getCookie）；不换 BJZ */
 
-import { Login, getCookie } from '@ke/morph';
+import { Login, getCookie, getCurrentEnv } from '@ke/morph';
 
 /** 只从 cookie 取 lianjia_token（Morph 口径须传名字） */
 export function getLianjiaToken() {
@@ -30,32 +30,35 @@ export function maskPhone(p) {
   return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : p || '已登录';
 }
 
-/** 与 screens/_beike-login.js 同口径：UA / getAPPEnv 即可，不依赖页面是否引入 jsbridgesdk */
+function authLog(...args) {
+  try {
+    console.log('[bzf-auth]', ...args);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Morph getCurrentEnv：https://kedoc.ke.com/morph/docs/base/getCurrentEnv */
+export function morphEnv() {
+  try {
+    return getCurrentEnv() || {};
+  } catch (e) {
+    authLog('getCurrentEnv error', e && e.message);
+    return {};
+  }
+}
+
+/** C 端贝壳 / 链家 App（hostEnv=beike|lianjia） */
 export function isBeikeApp() {
   try {
     if (window.__BZF_IS_BEIKE_APP) return true;
   } catch {
     /* ignore */
   }
-  try {
-    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getAPPEnv === 'function') {
-      const env = window.JsBridgeV3.getAPPEnv();
-      if (env && (env.isBeike || env.isLianjiaApp)) return true;
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    const ua = navigator.userAgent || '';
-    return (
-      /lianjiabeike/i.test(ua) ||
-      /Lianjia\/Beike/i.test(ua) ||
-      (/Lianjia/i.test(ua) &&
-        !/Alliance|lianjiabaichuan|beikesteward|beike_rentplat|decorate|LiveInBeike|beikeanzhu|fanghuoji/i.test(ua))
-    );
-  } catch {
-    return false;
-  }
+  const env = morphEnv();
+  const ok = env.hostEnv === 'beike' || env.hostEnv === 'lianjia';
+  authLog('isBeikeApp', { ok, hostEnv: env.hostEnv, isApp: env.isApp });
+  return ok;
 }
 
 export function morphCookieLikely() {
@@ -73,6 +76,8 @@ function absUrl(u) {
 }
 
 function morphApiEnv() {
+  const env = morphEnv();
+  if (env.developmentEnv) return env.developmentEnv;
   const h = location.hostname || '';
   if (/localhost|127\.0\.0\.1/i.test(h) || /\.test\.ke\.com$/i.test(h) || /\.tt[abc]\.test\.ke\.com$/i.test(h)) {
     return 'test';
@@ -80,8 +85,8 @@ function morphApiEnv() {
   return 'production';
 }
 
-/** App 原生登录 scheme（Morph app 路径只认 $ljBridge，未注入时走此兜底） */
-function appLoginScheme(back) {
+/** App 原生登录 scheme */
+function appLoginScheme(back, hostEnv) {
   const path = 'actionlogin?param=' + encodeURIComponent(encodeURIComponent(back));
   try {
     if (window.JsBridgeV3 && typeof window.JsBridgeV3.getSchemeLink === 'function') {
@@ -91,7 +96,7 @@ function appLoginScheme(back) {
   } catch {
     /* ignore */
   }
-  let scheme = 'lianjiabeike';
+  let scheme = hostEnv === 'lianjia' ? 'lianjia' : 'lianjiabeike';
   try {
     if (window.JsBridgeV3 && typeof window.JsBridgeV3.getScheme === 'function') {
       scheme = window.JsBridgeV3.getScheme() || scheme;
@@ -99,37 +104,31 @@ function appLoginScheme(back) {
   } catch {
     /* ignore */
   }
-  try {
-    const env = window.JsBridgeV3 && window.JsBridgeV3.getAPPEnv && window.JsBridgeV3.getAPPEnv();
-    if (env && env.isLianjiaApp && !env.isBeike) scheme = 'lianjia';
-  } catch {
-    /* ignore */
-  }
   return scheme + '://' + path;
 }
 
 /**
- * App → 原生登录（$ljBridge / scheme）；浏览器 → Morph mLogin（clogin）。
- * https://kedoc.ke.com/morph/docs/business/login
+ * App → 原生 scheme（不依赖 $ljBridge.ready）；浏览器 → Morph mLogin（clogin）。
  */
 export function jumpToLogin(returnUrl) {
   const back = absUrl(returnUrl || location.href);
-  if (isBeikeApp()) {
-    try {
-      if (window.$ljBridge && typeof window.$ljBridge.ready === 'function') {
-        Login.toLogin({ url: back, env: 'app', apiEnv: morphApiEnv() });
-        return true;
-      }
-    } catch {
-      /* fall through */
-    }
-    location.href = appLoginScheme(back);
+  const env = morphEnv();
+  const inApp = env.hostEnv === 'beike' || env.hostEnv === 'lianjia' || !!window.__BZF_IS_BEIKE_APP;
+  const apiEnv = morphApiEnv();
+  authLog('jumpToLogin', { back, inApp, hostEnv: env.hostEnv, isApp: env.isApp, apiEnv });
+
+  if (inApp) {
+    const scheme = appLoginScheme(back, env.hostEnv);
+    authLog('jumpToLogin → scheme', scheme);
+    location.href = scheme;
     return true;
   }
+
+  authLog('jumpToLogin → clogin m', apiEnv);
   Login.toLogin({
     url: back,
     env: 'm',
-    apiEnv: morphApiEnv(),
+    apiEnv,
   });
   return true;
 }
