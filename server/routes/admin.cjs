@@ -93,6 +93,30 @@ queryRows,
       normCoverRef
     } = deps;
 
+    // ── 照片删除联动对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时，与商家 photos/sync 同口径）──
+    // 必须在「行删除已提交」后调用；删除前做全库引用计数，防跨实体共享对象被误删；
+    // 本地引用/外部 URL 由 deleteObjectByRef 内部跳过（不确定就不动）。
+    async function reclaimPhotoObjects(conn, refs) {
+      if (String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') !== '1') return 0;
+      if (!imgStorage || typeof imgStorage.deleteObjectByRef !== 'function') return 0;
+      let removed = 0;
+      const seen = new Set();
+      for (const raw of (refs || [])) {
+        const ref = String(raw == null ? '' : raw).trim();
+        if (!ref || seen.has(ref)) continue;
+        seen.add(ref);
+        try {
+          const [a] = await conn.execute('SELECT COUNT(*) n FROM photos WHERE file_path=?', [ref]);
+          const [b] = await conn.execute('SELECT COUNT(*) n FROM projects WHERE cover_image=?', [ref]);
+          const [c] = await conn.execute('SELECT COUNT(*) n FROM units WHERE cover_image=?', [ref]);
+          if ((a[0] && a[0].n) + (b[0] && b[0].n) + (c[0] && c[0].n) > 0) continue;
+          const d = await imgStorage.deleteObjectByRef(ref);
+          if (d && d.ok) removed += 1;
+        } catch (_) { /* best-effort：单张失败不阻断，残留由对账脚本兜底 */ }
+      }
+      return removed;
+    }
+
     // --- from app.js L2677-4288 ---
     // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
     if (urlPath === '/api/juzhu/admin/vendor-onboarding' && req.method === 'GET') {
@@ -1585,19 +1609,28 @@ queryRows,
         const pid = parseInt(m[1]);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT district_id FROM projects WHERE id=?', [pid]);
+          const [rows] = await conn.execute('SELECT district_id, cover_image FROM projects WHERE id=?', [pid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const did = rows[0].district_id;
-          // 删除关联 photos、units
+          const projectCover = rows[0].cover_image;
+          // 删除关联 photos、units（含项目级 photos 行——旧实现遗漏，删除项目后残留脏行）
           const [units] = await conn.execute('SELECT id FROM units WHERE project_id=?', [pid]);
+          const [unitPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?)", [pid]);
+          const [projPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           for (const u of units) {
             await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [u.id]);
           }
+          await conn.execute("DELETE FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           await conn.execute('DELETE FROM units WHERE project_id=?', [pid]);
           await conn.execute('DELETE FROM projects WHERE id=?', [pid]);
           if (did) await syncDistrictStats(conn, did);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, [
+            ...unitPhotos.map((x) => x.file_path), ...projPhotos.map((x) => x.file_path), projectCover,
+          ]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1759,11 +1792,14 @@ queryRows,
           const [rows] = await conn.execute('SELECT project_id FROM units WHERE id=?', [uid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const pid = rows[0].project_id;
+          const [photos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute('DELETE FROM units WHERE id=?', [uid]);
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, photos.map((x) => x.file_path));
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1942,14 +1978,16 @@ queryRows,
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'", [photoId]
+            "SELECT entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [photoId]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const uid = rows[0].entity_id;
           await conn.execute('DELETE FROM photos WHERE id=?', [photoId]);
           await syncUnitCover(conn, uid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          // 行删除已提交 → 按开关回收对象（无其它引用才删）
+          const objectsRemoved = await reclaimPhotoObjects(conn, [rows[0].file_path]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1986,6 +2024,8 @@ queryRows,
             const [rows] = await conn.execute("SELECT id, entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [ent.photoId]);
             if (!rows.length) return jsonReply(res, { error: '图片记录不存在' }, 404);
             photoRow = rows[0];
+            // entityId 语义修正：scopeEntity('unit_photo') 只带 photo_id，此处回填真实 unit id（新 key 不再出现 unit/0/...）
+            ent.entityId = photoRow.entity_id;
             const pr = imgStorage.parse(photoRow.file_path);
             // 既有引用已在对象存储 → 复用同一 key 覆盖：零孤儿对象、零改库
             const extWant = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[String(file.contentType || '').toLowerCase().split(';')[0].trim()] || '';
