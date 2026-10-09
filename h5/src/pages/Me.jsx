@@ -174,18 +174,6 @@ function MeBody() {
           <h3>常用功能</h3>
         </div>
         <div className="menu-card">
-          <button type="button" className="menu-row" onClick={openTicket}>
-            <span className="left">
-              <span className="ic">
-                <img src="/assets/lvju/icons/me-menu-ticket.png?v=3" alt="" />
-              </span>
-              <span className="ttl">服务工单</span>
-            </span>
-            <span className="right">
-              <span className="tip">{ticketTip}</span>
-              <Chevron />
-            </span>
-          </button>
           <button type="button" className="menu-row" onClick={() => setSheet('400')}>
             <span className="left">
               <span className="ic">
