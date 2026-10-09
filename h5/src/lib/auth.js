@@ -30,12 +30,29 @@ export function maskPhone(p) {
   return /^1\d{10}$/.test(p) ? p.slice(0, 3) + '****' + p.slice(7) : p || '已登录';
 }
 
+/** 与 screens/_beike-login.js 同口径：UA / getAPPEnv 即可，不依赖页面是否引入 jsbridgesdk */
 export function isBeikeApp() {
   try {
     if (window.__BZF_IS_BEIKE_APP) return true;
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getAPPEnv === 'function') {
+      const env = window.JsBridgeV3.getAPPEnv();
+      if (env && (env.isBeike || env.isLianjiaApp)) return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
     const ua = navigator.userAgent || '';
-    if (/lianjia|beike|ke\.com/i.test(ua) && (window.JsBridgeV3 || window.LJBridge || window.jsbridge3)) return true;
-    return !!(window.JsBridgeV3 || window.BeiKeSdk || window.__beikeSdk);
+    return (
+      /lianjiabeike/i.test(ua) ||
+      /Lianjia\/Beike/i.test(ua) ||
+      (/Lianjia/i.test(ua) &&
+        !/Alliance|lianjiabaichuan|beikesteward|beike_rentplat|decorate|LiveInBeike|beikeanzhu|fanghuoji/i.test(ua))
+    );
   } catch {
     return false;
   }
@@ -63,12 +80,55 @@ function morphApiEnv() {
   return 'production';
 }
 
-/** App → env=app；浏览器 → env=m。https://kedoc.ke.com/morph/docs/business/login */
+/** App 原生登录 scheme（Morph app 路径只认 $ljBridge，未注入时走此兜底） */
+function appLoginScheme(back) {
+  const path = 'actionlogin?param=' + encodeURIComponent(encodeURIComponent(back));
+  try {
+    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getSchemeLink === 'function') {
+      const linked = window.JsBridgeV3.getSchemeLink(path);
+      if (linked) return linked;
+    }
+  } catch {
+    /* ignore */
+  }
+  let scheme = 'lianjiabeike';
+  try {
+    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getScheme === 'function') {
+      scheme = window.JsBridgeV3.getScheme() || scheme;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const env = window.JsBridgeV3 && window.JsBridgeV3.getAPPEnv && window.JsBridgeV3.getAPPEnv();
+    if (env && env.isLianjiaApp && !env.isBeike) scheme = 'lianjia';
+  } catch {
+    /* ignore */
+  }
+  return scheme + '://' + path;
+}
+
+/**
+ * App → 原生登录（$ljBridge / scheme）；浏览器 → Morph mLogin（clogin）。
+ * https://kedoc.ke.com/morph/docs/business/login
+ */
 export function jumpToLogin(returnUrl) {
   const back = absUrl(returnUrl || location.href);
+  if (isBeikeApp()) {
+    try {
+      if (window.$ljBridge && typeof window.$ljBridge.ready === 'function') {
+        Login.toLogin({ url: back, env: 'app', apiEnv: morphApiEnv() });
+        return true;
+      }
+    } catch {
+      /* fall through */
+    }
+    location.href = appLoginScheme(back);
+    return true;
+  }
   Login.toLogin({
     url: back,
-    env: isBeikeApp() ? 'app' : 'm',
+    env: 'm',
     apiEnv: morphApiEnv(),
   });
   return true;
