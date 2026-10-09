@@ -36,6 +36,7 @@ function createBookingRouter(deps) {
       const t1 = Date.now();
       const rows = await queryRows(
         `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, p.name AS project_name,
+                p.status AS project_status, p.cover_image AS project_cover,
                 b.checkin, b.checkout, b.nights, b.rooms, b.price_total, b.coupon_minor, b.cash_due_minor, b.status, b.created_at,
                 b.pay_status, b.pay_method,
                 b.contact_name, b.contact_phone, uu.ext AS unit_ext
@@ -428,7 +429,7 @@ function createBookingRouter(deps) {
       const lookupSession = !phone ? await requestSession(req) : null;
       if (!orderNo || (!phone && !(lookupSession && lookupSession.account))) return jsonReply(res, { error: '订单号必填，请登录本人账号或提供预订手机号' }, 400);
       const rows = await queryRows(
-        `SELECT b.*, p.name AS project_name, uu.ext AS unit_ext FROM booking_orders b
+        `SELECT b.*, p.name AS project_name, p.status AS project_status, p.cover_image AS project_cover, uu.ext AS unit_ext FROM booking_orders b
          LEFT JOIN projects p ON p.id=b.project_id
          LEFT JOIN units uu ON uu.id=b.unit_id
          WHERE b.order_no=? AND ${phone ? 'b.contact_phone' : 'b.user_id'}=? LIMIT 1`, [orderNo, phone || String(lookupSession.account.id)]);
@@ -442,7 +443,7 @@ function createBookingRouter(deps) {
       return jsonReply(res, {
         order: {
           id: o.id, order_no: o.order_no, project_id: o.project_id, unit_id: o.unit_id, channel: o.channel,
-          project_name: o.project_name,
+          project_name: o.project_name, project_status: o.project_status, project_cover: o.project_cover,
           contact_name: o.contact_name, contact_phone_masked: maskPhoneStd(o.contact_phone),
           checkin: o.checkin, checkout: o.checkout, nights: o.nights, rooms: o.rooms, price_total: Number(o.price_total),
           coupon_minor: Number(o.coupon_minor || 0), cash_due_minor: Number(o.cash_due_minor ?? Math.round(Number(o.price_total)*100)),

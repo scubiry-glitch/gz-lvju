@@ -193,7 +193,13 @@ function OrdersBody() {
                       去支付
                     </Link>
                   ) : null}
-                  <Link to={`/detail/${o.project_id}`}>房源详情</Link>
+                  {o.project_id && o.project_status === 'online' ? (
+                    <Link to={`/detail/${o.project_id}`}>房源详情</Link>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12, color: 'var(--muted)', padding: '7px 0' }}>
+                      {o.project_id ? '房源已下架' : '暂无房源'}
+                    </span>
+                  )}
                   <Link className="primary" to={`/order/${encodeURIComponent(o.order_no)}`}>
                     订单详情
                   </Link>

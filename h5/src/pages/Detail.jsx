@@ -217,7 +217,8 @@ export default function Detail() {
       })
       .catch((e) => {
         if (!alive) return;
-        setErr(e.message || '加载失败');
+        const msg = e.message || '加载失败';
+        setErr(/not found|不存在|404/i.test(msg) ? '房源已下架或不存在' : msg);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -731,9 +732,7 @@ export default function Detail() {
                 <b>✓</b> 平台评级已通过 · 综合 {rating.score || '—'} 分
               </div>
               <div className="vb">
-                <a href={`/screens/portal-verify.html?code=${encodeURIComponent(rating.code)}`}>
-                  扫码验真 ↗
-                </a>
+                <Link to={`/verify?code=${encodeURIComponent(rating.code)}`}>扫码验真 ↗</Link>
               </div>
             </div>
           </div>
