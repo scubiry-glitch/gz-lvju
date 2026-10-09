@@ -144,21 +144,6 @@ export default function Home() {
             <b>民宿</b>
             <small>整栋·庭院·管家</small>
           </Link>
-          <Link className="chan feat" to={`/changzu?city=${encodeURIComponent(city)}`}>
-            <span className="nb">新</span>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-changzu.png?v=14" alt="" />
-            </div>
-            <b>长租</b>
-            <small>整租·合租·月付</small>
-          </Link>
-          <Link className="chan" to={`/guide?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-guide.png?v=14" alt="" />
-            </div>
-            <b>置业导购</b>
-            <small>看房·测算</small>
-          </Link>
         </div>
 
         <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
@@ -173,41 +158,6 @@ export default function Home() {
             <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
           </div>
         </Link>
-
-        <div className="seg-h" style={{ marginTop: 24 }}>
-          <span className="bar" />
-          <h3>内容服务 · 玩在贵州</h3>
-        </div>
-        <div className="content4">
-          <Link to="/spots">
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-spots.png?v=9" alt="" />
-            </div>
-            <b>旅游景点</b>
-            <small>必打卡</small>
-          </Link>
-          <Link to={`/routes?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-routes.png?v=9" alt="" />
-            </div>
-            <b>旅游路线</b>
-            <small>精选行程</small>
-          </Link>
-          <Link to={`/food?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-food.png?v=9" alt="" />
-            </div>
-            <b>旅游美食</b>
-            <small>本地味道</small>
-          </Link>
-          <Link to={`/convenience?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-convenience.png?v=9" alt="" />
-            </div>
-            <b>旅游便民</b>
-            <small>出行·向导</small>
-          </Link>
-        </div>
 
         {!postsHide ? (
           <div>
