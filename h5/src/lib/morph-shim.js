@@ -103,21 +103,39 @@ function appLoginUrl(back) {
 }
 
 /**
- * Morph m.ts：loginUrl?service=enc(serviceUrl?redirect=enc(url))&type=2
- * env='app' → 原生登录 scheme；env='m' → 浏览器 mLogin。
+ * 对齐 Morph Login.toLogin：不传 env 时按 getCurrentEnv 分流。
+ * https://kedoc.ke.com/morph/docs/business/login
  */
 export const Login = {
   toLogin(opts = {}) {
     const back = absUrl(opts.url);
-    let href;
-    if (opts.env === 'app') {
-      href = appLoginUrl(back);
-    } else {
-      const cfg = loginCfg();
-      const service = `${cfg.service_base}?redirect=${encodeURIComponent(back)}`;
-      href = `${cfg.login_base}/login?service=${encodeURIComponent(service)}&type=${cfg.type}`;
+    const forced = opts.env || '';
+    const cur = getCurrentEnv();
+    const hostEnv = forced || cur.hostEnv || 'm';
+    const useApp =
+      forced === 'app' ||
+      hostEnv === 'beike' ||
+      hostEnv === 'lianjia' ||
+      hostEnv === 'app' ||
+      (!forced && cur.isApp);
+    if (useApp) {
+      if (window.$ljBridge && typeof window.$ljBridge.ready === 'function') {
+        window.$ljBridge.ready((bridge, webStatus) => {
+          if (webStatus && webStatus.isApp) window.__BZF_IS_BEIKE_APP = true;
+          if (bridge && typeof bridge.actionLogin === 'function') {
+            bridge.actionLogin(encodeURIComponent(back));
+            return;
+          }
+          location.href = appLoginUrl(back);
+        });
+        return true;
+      }
+      location.href = appLoginUrl(back);
+      return true;
     }
-    location.href = href;
+    const cfg = loginCfg();
+    const service = `${cfg.service_base}?redirect=${encodeURIComponent(back)}`;
+    location.href = `${cfg.login_base}/login?service=${encodeURIComponent(service)}&type=${cfg.type}`;
     return true;
   },
 };

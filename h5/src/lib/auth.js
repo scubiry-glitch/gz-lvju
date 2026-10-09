@@ -2,6 +2,10 @@
 
 import { Login, getCookie, getCurrentEnv } from '@ke/morph';
 
+/** Morph App 登录依赖 $ljBridge；页面未注入时补载官方 bridge（与 Morph appLogin 配套） */
+const LJ_BRIDGE_SDK = '//s1.ljcdn.com/m-base/release/v04.4/asset/bridge_d0b9f70cd88e0a5q.js';
+let _ljBridgeP = null;
+
 /** 只从 cookie 取 lianjia_token（Morph 口径须传名字） */
 export function getLianjiaToken() {
   try {
@@ -38,7 +42,7 @@ function authLog(...args) {
   }
 }
 
-/** Morph getCurrentEnv：https://kedoc.ke.com/morph/docs/base/getCurrentEnv */
+/** https://kedoc.ke.com/morph/docs/base/getCurrentEnv */
 export function morphEnv() {
   try {
     return getCurrentEnv() || {};
@@ -48,7 +52,7 @@ export function morphEnv() {
   }
 }
 
-/** C 端贝壳 / 链家 App（hostEnv=beike|lianjia） */
+/** Morph：hostEnv=beike|lianjia，或 isApp */
 export function isBeikeApp() {
   try {
     if (window.__BZF_IS_BEIKE_APP) return true;
@@ -56,7 +60,7 @@ export function isBeikeApp() {
     /* ignore */
   }
   const env = morphEnv();
-  const ok = env.hostEnv === 'beike' || env.hostEnv === 'lianjia';
+  const ok = env.hostEnv === 'beike' || env.hostEnv === 'lianjia' || !!env.isApp;
   authLog('isBeikeApp', { ok, hostEnv: env.hostEnv, isApp: env.isApp });
   return ok;
 }
@@ -78,57 +82,55 @@ function absUrl(u) {
 function morphApiEnv() {
   const env = morphEnv();
   if (env.developmentEnv) return env.developmentEnv;
-  const h = location.hostname || '';
-  if (/localhost|127\.0\.0\.1/i.test(h) || /\.test\.ke\.com$/i.test(h) || /\.tt[abc]\.test\.ke\.com$/i.test(h)) {
-    return 'test';
-  }
   return 'production';
 }
 
-/** App 原生登录 scheme */
-function appLoginScheme(back, hostEnv) {
-  const path = 'actionlogin?param=' + encodeURIComponent(encodeURIComponent(back));
-  try {
-    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getSchemeLink === 'function') {
-      const linked = window.JsBridgeV3.getSchemeLink(path);
-      if (linked) return linked;
-    }
-  } catch {
-    /* ignore */
-  }
-  let scheme = hostEnv === 'lianjia' ? 'lianjia' : 'lianjiabeike';
-  try {
-    if (window.JsBridgeV3 && typeof window.JsBridgeV3.getScheme === 'function') {
-      scheme = window.JsBridgeV3.getScheme() || scheme;
-    }
-  } catch {
-    /* ignore */
-  }
-  return scheme + '://' + path;
+function ensureLjBridge() {
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  if (window.$ljBridge) return Promise.resolve(window.$ljBridge);
+  if (_ljBridgeP) return _ljBridgeP;
+  _ljBridgeP = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = (location.protocol === 'http:' ? 'https:' : location.protocol) + LJ_BRIDGE_SDK;
+    s.async = true;
+    s.onload = () => {
+      authLog('ljBridge script ok', !!window.$ljBridge);
+      resolve(window.$ljBridge || null);
+    };
+    s.onerror = () => {
+      authLog('ljBridge script fail');
+      resolve(null);
+    };
+    (document.head || document.documentElement).appendChild(s);
+  });
+  return _ljBridgeP;
 }
 
 /**
- * App → 原生 scheme（不依赖 $ljBridge.ready）；浏览器 → Morph mLogin（clogin）。
+ * 登录跳转走 @ke/morph Login.toLogin（文档与 getCurrentEnv 自动分流 App / m）。
+ * https://kedoc.ke.com/morph/docs/business/login
+ * App 路径内部用 $ljBridge.actionLogin，故先 ensure  bridge。
  */
 export function jumpToLogin(returnUrl) {
   const back = absUrl(returnUrl || location.href);
   const env = morphEnv();
-  const inApp = env.hostEnv === 'beike' || env.hostEnv === 'lianjia' || !!window.__BZF_IS_BEIKE_APP;
   const apiEnv = morphApiEnv();
-  authLog('jumpToLogin', { back, inApp, hostEnv: env.hostEnv, isApp: env.isApp, apiEnv });
-
-  if (inApp) {
-    const scheme = appLoginScheme(back, env.hostEnv);
-    authLog('jumpToLogin → scheme', scheme);
-    location.href = scheme;
-    return true;
-  }
-
-  authLog('jumpToLogin → clogin m', apiEnv);
-  Login.toLogin({
-    url: back,
-    env: 'm',
+  authLog('jumpToLogin → Morph Login.toLogin', {
+    back,
+    hostEnv: env.hostEnv,
+    isApp: env.isApp,
     apiEnv,
   });
+
+  const run = () => {
+    // 不传 env：Morph 用 getCurrentEnv().hostEnv / isApp 决定 beike→appLogin、m→clogin
+    Login.toLogin({ url: back, apiEnv });
+  };
+
+  if (env.isApp || env.hostEnv === 'beike' || env.hostEnv === 'lianjia') {
+    ensureLjBridge().then(run).catch(run);
+    return true;
+  }
+  run();
   return true;
 }
