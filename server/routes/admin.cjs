@@ -2113,6 +2113,104 @@ queryRows,
       }
     }
 
+    // POST /api/juzhu/admin/photos/migrate-images —— 存量图片引用迁移（本地路径/外链 → S3 绝对 URL）
+    // 口径（勿回退约束）：key 必须走 legacyKeyOf() 确定性前缀（与读侧改写 IMG_URL_MODE=s3 同 key，切读不 404）；
+    //   逐行 UPDATE（photos.file_path / projects.cover_image / units.cover_image），幂等可重跑；
+    //   单张失败不中断批次；limit 分批（每张含 sharp 重编码 + 2 缩略图上传，建议 10/批）。
+    // 用法：① 先 dry_run=true 预览规模 → ② 分批调用，直到 remaining=0；若 migrated=0 且 remaining>0，
+    //   说明剩余项无法自动迁移（failed 明细给出原因，多为本地文件缺失/外链不可达），需人工处置。
+    if (urlPath === '/api/juzhu/admin/photos/migrate-images' && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const body = await readBody(req);
+      const dryRun = body.dry_run === true;
+      const only = String(body.only || 'local').toLowerCase() === 'all' ? 'all' : 'local';
+      const includeCover = body.include_cover !== false;
+      const limit = Math.min(Math.max(parseInt(body.limit, 10) || 10, 1), 50);
+      const t0 = Date.now();
+
+      // 1) 扫描三处引用（SQL 粗筛 + JS 精筛；S3 引用不入选）
+      const items = [];
+      const grab = (rows, kind, col) => {
+        for (const r of rows) {
+          const ref = String(r[col] || '').trim();
+          if (!ref || imgStorage.isS3Url(ref)) continue;
+          if (imgStorage.isLocalPath(ref)) items.push({ kind, id: r.id, ref });
+          else if (only === 'all' && imgStorage.isExternalUrl(ref)) items.push({ kind, id: r.id, ref, external: true });
+        }
+      };
+      const phRows = await queryRows("SELECT id, file_path FROM photos WHERE file_path LIKE '%assets/%' OR file_path LIKE 'http%' ORDER BY id");
+      grab(phRows, 'photo', 'file_path');
+      if (includeCover) {
+        const pjRows = await queryRows("SELECT id, cover_image FROM projects WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(pjRows, 'project_cover', 'cover_image');
+        const unRows = await queryRows("SELECT id, cover_image FROM units WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(unRows, 'unit_cover', 'cover_image');
+      }
+      const totalLocal = items.filter((x) => !x.external).length;
+      const totalExternal = items.length - totalLocal;
+
+      if (dryRun) {
+        return jsonReply(res, {
+          ok: true, dry_run: true, only, total: items.length, total_local: totalLocal, total_external: totalExternal,
+          samples: items.slice(0, 8).map((x) => ({ target: x.kind + '#' + x.id, from: x.ref, to: imgStorage.isLocalPath(x.ref) ? 'legacyKey: ' + imgStorage.legacyKeyOf(x.ref) : '(镜像 S3)' })),
+          guide: '预览模式未上传/未写库。确认后去掉 dry_run 分批执行，limit 建议 10，直到 remaining=0',
+          elapsed_ms: Date.now() - t0,
+        });
+      }
+
+      // 2) 逐条迁移（串行；成功/失败都算"已处理"，避免失败项卡死批次）
+      const batch = items.slice(0, limit);
+      const failed = [];
+      const samples = [];
+      let migrated = 0;
+      for (const it of batch) {
+        const target = it.kind + '#' + it.id;
+        try {
+          let newRef = '';
+          if (imgStorage.isLocalPath(it.ref)) {
+            const read = await imgStorage.readImage(it.ref);
+            if (!read.ok) { failed.push({ target, from: it.ref, error: '本地文件不存在（发行包不含 assets/，无法自动迁移）' }); continue; }
+            const key = imgStorage.legacyKeyOf(it.ref);
+            // eslint-disable-next-line no-await-in-loop
+            const up = await imgStorage.uploadImage({
+              buffer: read.buffer, key,
+              filename: String(it.ref).split('/').pop(),
+              makeThumbs: true,
+            });
+            if (!up.ok || up.storage !== 's3') { failed.push({ target, from: it.ref, error: (up && (up.error || up.warned)) || '上传未落到 S3' }); continue; }
+            newRef = up.url;
+          } else {
+            // eslint-disable-next-line no-await-in-loop
+            const r = await imgStorage.ingestRef(it.ref, { mirror: true, prefix: 'housing' });
+            if (!r.ok || r.kind !== 's3') { failed.push({ target, from: it.ref, error: r.error || r.warn || '镜像未落到 S3' }); continue; }
+            newRef = r.ref;
+          }
+          if (it.kind === 'photo') await queryRows('UPDATE photos SET file_path=? WHERE id=?', [newRef, it.id]);
+          else if (it.kind === 'project_cover') await queryRows('UPDATE projects SET cover_image=? WHERE id=?', [newRef, it.id]);
+          else await queryRows('UPDATE units SET cover_image=? WHERE id=?', [newRef, it.id]);
+          migrated += 1;
+          if (samples.length < 5) samples.push({ target, from: it.ref, to: newRef });
+        } catch (e) {
+          failed.push({ target, from: it.ref, error: String((e && e.message) || e) });
+        }
+      }
+
+      const remaining = Math.max(items.length - batch.length, 0);
+      console.log(`[img] migrate-images processed=${batch.length} migrated=${migrated} failed=${failed.length} remaining=${remaining} ${Date.now() - t0}ms`);
+      return jsonReply(res, {
+        ok: true, dry_run: false, only,
+        total: items.length, total_local: totalLocal, total_external: totalExternal,
+        processed: batch.length, migrated, failed_count: failed.length,
+        remaining, next_round: remaining > 0,
+        failed: failed.slice(0, 20),
+        samples,
+        guide: migrated === 0 && remaining > 0
+          ? '本轮无进展：剩余项需人工处置（见 failed 明细），勿继续空转'
+          : '重复调用直到 remaining=0（已迁移项自动从扫描结果消失，幂等可重跑）',
+        elapsed_ms: Date.now() - t0,
+      });
+    }
+
     // POST /api/juzhu/admin/photos/presign —— 预签名直传（大图/批量前端直传对象存储，不经服务端中转）
     if (urlPath === '/api/juzhu/admin/photos/presign' && req.method === 'POST') {
       if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);

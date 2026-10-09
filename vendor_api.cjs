@@ -1012,27 +1012,41 @@ async function housingPhotosAdd(conn, body, vendorId) {
   try { category = photoCfg.normalizeCategoryInput(b.category); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const externalId = b.external_id == null || b.external_id === '' ? null : String(b.external_id).trim().slice(0, 120);
-  // 图片引用收口：本地/对象存储引用归一化；第三方 URL 是否镜像由 IMG_INGEST 决定（缺省 keep）
-  const ref = await normImgRef(filePath, { mirror: true, prefix: 'housing', entityType, entityId });
-  if (!ref.ok) return reply(400, { code: 400, message: 'file_path 非法: ' + ref.error });
+  // 源文件地址存档（2026-10-09）：无论镜像成功与否、无论入参形态（外链/对象引用/本地路径），
+  // 都把上游原始地址记入 source_path 便于追溯；商家显式传 source_path 时优先。
+  const rawSource = (typeof b.source_path === 'string' && b.source_path.trim()) ? b.source_path.trim() : filePath;
+  if (rawSource.length > 500) return reply(400, { code: 400, message: 'source_path 长度须 ≤500' });
+  const sourcePath = rawSource;
+  // 幂等前置（2026-10-09）：**同一原始地址**（file_path / source_path 存档）已登记且现存引用已在对象存储
+  // → 跳过重复镜像上传（mirror 每次会生成新 uuid key，反复推同一张图不再白传对象/缩略图）。
+  // 注意：仅按地址匹配——external_id 命中不适用（商家换图时 external_id 不变但地址变，须正常镜像新图）。
+  const [pre] = await conn.execute(
+    `SELECT id, file_path FROM photos WHERE entity_type=? AND entity_id=?
+       AND (file_path=? OR source_path=?) LIMIT 1`,
+    [entityType, entityId, filePath, filePath]);
+  let ref = null;
+  if (pre.length && imgStorage.parse(pre[0].file_path).kind === 's3') {
+    ref = { ok: true, ref: pre[0].file_path, kind: 's3', mirrored: true, warn: '' };  // 首次登记时已过校验/镜像，直接复用
+  } else {
+    // 图片引用收口：本地/对象存储引用归一化；第三方 URL 是否镜像由 IMG_INGEST 决定（缺省 keep）
+    ref = await normImgRef(filePath, { mirror: true, prefix: 'housing', entityType, entityId });
+    if (!ref.ok) return reply(400, { code: 400, message: 'file_path 非法: ' + ref.error });
+  }
   if (String(ref.ref).length > 500) return reply(400, { code: 400, message: 'file_path 归一化后长度超过 500' });
-  const sourcePath = b.source_path || (ref.kind === 'external' ? filePath : null);
   const isCover = b.is_cover ? 1 : 0;
-  // 幂等（2026-09）：同实体同 URL / 同 external_id 已存在 → 原地更新，不再插重复行
-  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）；更新与插入都走事务 + 归属行锁
+  // 幂等（2026-09/10）：同实体同原始地址（file_path 或 source_path 存档） / 同 external_id → 原地更新，不插重复行
   await conn.beginTransaction();
   try {
     // 归属行锁：并发「设为封面」/批量登记时保证 is_cover 唯一与 sort_order 不重复
     await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
     const [dup] = await conn.execute(
       `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
-         AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
-      externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
+         AND (file_path=? OR source_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
+      externalId ? [entityType, entityId, filePath, filePath, externalId] : [entityType, entityId, filePath, filePath]);
     if (dup.length) {
-      const sets = ['file_path=?', 'category=?'];
-      const vals = [ref.ref, category];
+      const sets = ['file_path=?', 'category=?', 'source_path=?'];
+      const vals = [ref.ref, category, sourcePath];
       if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
-      if (b.source_path != null) { sets.push('source_path=?'); vals.push(sourcePath); }
       // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
       if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
       if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
