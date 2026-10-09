@@ -172,7 +172,7 @@ function OrdersBody() {
                     </div>
                     {o.cancel_policy_text ? <div className="meta">{o.cancel_policy_text}</div> : null}
                     <div className="amt">
-                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 …{(o.order_no || '').slice(-4)}
+                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 {o.order_no || '—'}
                     </div>
                   </div>
                 </div>
