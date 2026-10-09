@@ -5,6 +5,7 @@ import Home from './pages/Home.jsx';
 import Search from './pages/Search.jsx';
 import Spots from './pages/Spots.jsx';
 import Orders from './pages/Orders.jsx';
+import OrderDetail from './pages/OrderDetail.jsx';
 import Me from './pages/Me.jsx';
 import Detail from './pages/Detail.jsx';
 import Booking from './pages/Booking.jsx';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="paid" element={<Paid />} />
         <Route element={<RequireAuth />}>
           <Route path="orders" element={<Orders />} />
+          <Route path="order/:orderNo" element={<OrderDetail />} />
           <Route path="me" element={<Me />} />
           <Route path="booking/:id" element={<Booking />} />
           <Route path="booking" element={<Booking />} />
