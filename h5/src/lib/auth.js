@@ -16,6 +16,28 @@ export function getLianjiaToken() {
   }
 }
 
+/** 调试：打印 Morph getCookie('lianjia_token') 是否有值 */
+export function logLianjiaTokenCookie(tag) {
+  let lj = '';
+  let alt = '';
+  try {
+    lj = String(getCookie('lianjia_token') || '').trim();
+    alt = String(getCookie('lj_token') || '').trim();
+  } catch {
+    /* ignore */
+  }
+  authLog('getCookie(lianjia_token)', {
+    tag: tag || '',
+    hasValue: !!lj,
+    length: lj.length,
+    value: lj || '(empty)',
+    lj_token_hasValue: !!alt,
+    lj_token_length: alt.length,
+    lj_token_value: alt || '(empty)',
+  });
+  return lj || alt;
+}
+
 /** 本地可读 cookie；HttpOnly 时以壳层 /auth/me 为准 */
 export function isLoggedIn() {
   return !!getLianjiaToken();

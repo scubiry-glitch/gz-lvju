@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getLianjiaToken, jumpToLogin, morphEnv } from './auth.js';
+import { getLianjiaToken, jumpToLogin, logLianjiaTokenCookie, morphEnv } from './auth.js';
 import { authMe } from './api.js';
 
 function authLog(...args) {
@@ -54,6 +54,7 @@ function pickUser(me) {
 /** 壳层暖身份：只探 /api/auth/me（Cookie）；C 端不换 BJZ */
 export async function loadAuthUser() {
   const env = morphEnv();
+  logLianjiaTokenCookie('loadAuthUser');
   const readableToken = !!getLianjiaToken();
   authLog('loadAuthUser start', {
     hostEnv: env.hostEnv,
@@ -63,6 +64,7 @@ export async function loadAuthUser() {
   try {
     const me = await authMe();
     const u = pickUser(me);
+    logLianjiaTokenCookie('after auth/me ok');
     authLog('登录状态', {
       loggedIn: !!u,
       accountId: u && u.id,
@@ -72,6 +74,7 @@ export async function loadAuthUser() {
     });
     return u;
   } catch (e) {
+    logLianjiaTokenCookie('after auth/me fail');
     authLog('登录状态', {
       loggedIn: false,
       reason: (e && (e.message || e.status)) || 'auth/me failed',
@@ -125,6 +128,28 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     refresh();
+  }, [refresh]);
+
+  /* 登录回跳 / App 回前台：再打 getCookie + 重探 /auth/me */
+  useEffect(() => {
+    logLianjiaTokenCookie('AuthProvider mount');
+    const onBack = (tag) => {
+      logLianjiaTokenCookie(tag);
+      refresh();
+    };
+    const onPageShow = (e) => {
+      if (e && e.persisted) onBack('pageshow persisted');
+      else logLianjiaTokenCookie('pageshow');
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') onBack('visibility visible');
+    };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, [refresh]);
 
   const value = useMemo(
