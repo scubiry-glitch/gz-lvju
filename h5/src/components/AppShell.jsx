@@ -2,7 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import TabBar from './TabBar.jsx';
 import { AuthProvider } from '../lib/auth-context.jsx';
 
-const HIDE_TAB = [/^\/detail/, /^\/booking/, /^\/pay/, /^\/paid/, /^\/ticket/, /^\/spot\//];
+const HIDE_TAB = [/^\/detail/, /^\/booking/, /^\/order\//, /^\/pay/, /^\/paid/, /^\/ticket/, /^\/spot\//];
 
 export default function AppShell() {
   const { pathname } = useLocation();

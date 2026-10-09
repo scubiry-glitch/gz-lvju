@@ -183,12 +183,20 @@ function OrdersBody() {
                     </button>
                   ) : null}
                   {o.status === 'pending' && UNPAID_PS[o.pay_status] ? (
-                    <a href={`/lvju-app-booking.html?order_no=${encodeURIComponent(o.order_no)}`}>去支付</a>
+                    <Link
+                      to={
+                        '/booking?order_no=' +
+                        encodeURIComponent(o.order_no) +
+                        (o.contact_phone_raw ? '&phone=' + encodeURIComponent(o.contact_phone_raw) : '')
+                      }
+                    >
+                      去支付
+                    </Link>
                   ) : null}
                   <Link to={`/detail/${o.project_id}`}>房源详情</Link>
-                  <a className="primary" href={`/lvju-app-order-detail.html?order_no=${encodeURIComponent(o.order_no)}`}>
+                  <Link className="primary" to={`/order/${encodeURIComponent(o.order_no)}`}>
                     订单详情
-                  </a>
+                  </Link>
                 </div>
               </div>
             );
