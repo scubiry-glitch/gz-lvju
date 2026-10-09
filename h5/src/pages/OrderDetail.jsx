@@ -239,9 +239,13 @@ export default function OrderDetail() {
         <div className="od-kv">
           <span className="k">房源详情</span>
           <span className="v">
-            <Link className="house-link" to={`/detail/${order.project_id}`}>
-              查看房源 →
-            </Link>
+            {order.project_id && order.project_status === 'online' ? (
+              <Link className="house-link" to={`/detail/${order.project_id}`}>
+                查看房源 →
+              </Link>
+            ) : (
+              <span className="muted">{order.project_id ? '房源已下架' : '暂无房源'}</span>
+            )}
           </span>
         </div>
       </div>
