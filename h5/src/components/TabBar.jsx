@@ -11,13 +11,6 @@ const TABS = [
     off: '/assets/lvju/icons/tab-search-off.svg',
   },
   {
-    to: '/spots',
-    label: '内容',
-    match: [/^\/spots/, /^\/routes/, /^\/food/, /^\/convenience/, /^\/spot\//],
-    on: '/assets/lvju/icons/tab-content-on.svg',
-    off: '/assets/lvju/icons/tab-content-off.svg',
-  },
-  {
     to: '/orders',
     label: '订单',
     needAuth: true,
