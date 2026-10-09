@@ -1474,7 +1474,13 @@ queryRows,
           [pid]
         );
         parseJsonFields(projs[0], ['tags', 'rating']);
-        return jsonReply(res, { ok: true, project: projs[0] }, 201);
+        return jsonReply(res, {
+          ok: true, project: projs[0],
+          // 镜像自证：库内存的 cover_image 是否已转对象存储；未转时 warned 给出原因
+          cover_image_storage: coverRef ? coverRef.storage : null,
+          cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+          cover_warned: (coverRef && coverRef.warn) || undefined,
+        }, 201);
       } finally {
         await conn.end();
       }
@@ -1492,6 +1498,7 @@ queryRows,
           if (!existing.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let coverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', body.slug || slugify(body.name));
@@ -1504,6 +1511,7 @@ queryRows,
             if (col === 'cover_image') {
               const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: pid });
               if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              coverRefInfo = coverRef;
               put(col, coverRef.ref);
               continue;
             }
@@ -1558,7 +1566,12 @@ queryRows,
             [pid]
           );
           parseJsonFields(projs[0], ['tags', 'rating']);
-          return jsonReply(res, { ok: true, project: projs[0] });
+          return jsonReply(res, {
+            ok: true, project: projs[0],
+            cover_image_storage: coverRefInfo ? coverRefInfo.storage : null,
+            cover_mirrored: coverRefInfo ? !!coverRefInfo.mirrored : false,
+            cover_warned: (coverRefInfo && coverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }
@@ -1628,7 +1641,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] }, 201);
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: coverRef ? coverRef.storage : null,
+            cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+            cover_warned: (coverRef && coverRef.warn) || undefined,
+          }, 201);
         } finally {
           await conn.end();
         }
@@ -1664,6 +1682,7 @@ queryRows,
           const pid = rows[0].project_id;
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let unitCoverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', await uniqueUnitSlug(conn, pid, body.name, body.slug, uid));
@@ -1676,6 +1695,7 @@ queryRows,
             if (col === 'cover_image') {
               const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
               if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              unitCoverRefInfo = coverRef;
               put(col, coverRef.ref);
               continue;
             }
@@ -1717,7 +1737,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] });
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: unitCoverRefInfo ? unitCoverRefInfo.storage : null,
+            cover_mirrored: unitCoverRefInfo ? !!unitCoverRefInfo.mirrored : false,
+            cover_warned: (unitCoverRefInfo && unitCoverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }

@@ -1926,12 +1926,19 @@ async function normImgRef(ref, opts) {
   return imgStorage.ingestRef(ref, opts);
 }
 
-/** cover_image 收口：空值 → null（不改既有"封面可不填"语义）；非空 → 形态归一化（+可选镜像） */
+/** cover_image 收口：空值 → null（不改既有"封面可不填"语义）；非空 → 形态归一化（+可选镜像）
+ *  返回透传 storage/mirrored/warn，供接口响应回显（排查镜像是否生效，不必翻日志） */
 async function normCoverRef(ref, opts) {
   const raw = String(ref == null ? '' : ref).trim();
-  if (!raw) return { ok: true, ref: null };
+  if (!raw) return { ok: true, ref: null, storage: null, mirrored: false, warn: '' };
   const r = await normImgRef(raw, opts);
-  return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
+  if (!r.ok) return { ok: false, error: r.error };
+  return {
+    ok: true, ref: r.ref, kind: r.kind, mirrored: !!r.mirrored,
+    storage: (r.upload && r.upload.storage) ? r.upload.storage
+      : (r.kind === 's3' ? 's3' : (r.kind === 'external' ? 'external' : 'local')),
+    warn: r.warn || '',
+  };
 }
 
 /** 上传成功但落库失败时的补偿删除（避免孤儿对象） */
