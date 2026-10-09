@@ -267,6 +267,30 @@ async function ingestRef(ref, opts) {
   const n = normalizeImageRef(ref);
   if (!n.ok) return { ok: false, ref: '', kind: n.kind, changed: false, mirrored: false, error: n.warn };
   if (n.kind !== 'external') {
+    // 本地引用镜像（no-assets 变体：生产发行包不含 assets/，本地引用必坏图）。
+    // IMG_INGEST=mirror 时读本地文件上对象存储；key 用 legacyKeyOf() 确定性前缀
+    // —— 与存量迁移/读侧改写（IMG_URL_MODE=s3）同口径，重复推送幂等覆盖、零孤儿。
+    if (n.kind === 'local' && o.mirror && ingestMode() === 'mirror') {
+      const read = await readImage(n.ref).catch(() => null);
+      if (read && read.ok && read.buffer && read.buffer.length) {
+        const key = legacyKeyOf(n.ref);
+        // eslint-disable-next-line no-await-in-loop
+        const up = await uploadImage({
+          buffer: read.buffer,
+          key,
+          // 注意：readImage 的 contentType 字段实为扩展名（如 'jpg'），此处传 filename 供格式推导
+          filename: path.posix.basename(decodeURIComponent(n.ref)),
+          makeThumbs: o.makeThumbs,
+        });
+        if (up.ok && up.storage === 's3') {
+          return { ok: true, ref: up.url, kind: 's3', changed: true, mirrored: true, upload: up, warn: up.warned || '' };
+        }
+        // 上传失败/回落本地：保留原本地引用（其本身有效，不因镜像失败拒绝业务），带 warn 便于排查
+        return { ok: true, ref: n.ref, kind: 'local', changed: n.changed, mirrored: false,
+          warn: `本地图片镜像对象存储未生效（${up && up.warned ? up.warned : '上传失败'}），保留本地引用` };
+      }
+      // 本地文件不存在（如 Serverless 无 assets/）：保留原引用
+    }
     return { ok: true, ref: n.ref, kind: n.kind, changed: n.changed, mirrored: false, warn: n.warn || '' };
   }
   if (!o.mirror || ingestMode() !== 'mirror') {
