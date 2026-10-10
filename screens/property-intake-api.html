@@ -400,7 +400,7 @@
       <tr><td><code>default_night_price</code></td><td>—</td><td><strong>只读出参</strong>（2026-09）：该户型的默认单夜价（按上面的顺序算好）。C 端详情页/下单页直接读它，<strong>不要再用 <code>rent_monthly/30</code> 自行折算</strong>——否则会与成交价脱节</td></tr>
       <tr><td><code>default_closed</code></td><td>bool</td><td>★ <strong>默认关房</strong>（2026-09，写 <code>units.ext.default_closed</code>）：开启后<strong>只有你们推送过放出量的晚才可订</strong>，没推过的晚一律不可订——多渠道商家防超售（见 3.6）。缺省关闭；<code>null</code> 清除</td></tr>
       <tr><td><code>room_profile</code></td><td>object</td><td>★ <strong>房间档案</strong>（2026-09 开放，写 <code>units.ext.room_profile</code>）：房源简介 / 面积口径 / 窗户 / 入住人数 / 床位 / 厨房 / 吸烟 等 21 个字段，C 端「房间档案」卡直接渲染（见 3.7）。传 <code>null</code> 清除</td></tr>
-      <tr><td><code>min_stay_nights_source</code></td><td>—</td><td><strong>只读出参</strong>：最短连住这个生效值的来源，<code>unit</code>（户型级显式配置）/ <code>project</code>（房源级）/ <code>default</code>（频道默认）。后台表单靠它区分「显式配的」与「继承来的」，避免保存时把继承值固化</td></tr>
+      <tr><td><code>min_stay_nights_source</code></td><td>—</td><td><strong>只读出参</strong>：生效值来自哪一层。<code>unit</code> 表示户型比房源生效值更长，<code>project</code> 表示房源比频道默认更长，<code>default</code> 表示兜底频道默认。短于下一级的配置不会出现在来源里。后台表单靠它避免把没生效的数再固化进去</td></tr>
       <tr><td><code>cancel_policy</code></td><td>object</td><td>★ 免费取消政策（房型级），写入 <code>units.ext.cancel_policy</code>：<code>{enabled, days_before, cutoff_time}</code>；免费取消窗口 = 入住日往前推 <code>days_before</code>（0-30，0=入住当天）天的 <code>cutoff_time</code>（HH:mm）时刻，窗口外 / 未开通一律不可取消不可退</td></tr>
       <tr><td><code>tags</code> / <code>unit_spec</code> / <code>cover_image</code> / <code>sort_order</code></td><td>—</td><td>★ 标签 / 房型说明 / 封面 / 排序（<code>sort_order</code> 升序展示，缺省 99，用于主推房型排前）</td></tr>
       <tr><td><code>amenities</code></td><td>string[]</td><td>★ 配套标识数组，按下表 10 个 id 传（C 端按 id 渲染图标）</td></tr>
@@ -613,7 +613,7 @@
   <span class="tok-key">"cancel_policy"</span>: { <span class="tok-key">"enabled"</span>: <span class="tok-str">true</span>, <span class="tok-key">"days_before"</span>: <span class="tok-num">1</span>, <span class="tok-key">"cutoff_time"</span>: <span class="tok-str">"18:00"</span> } }
 → 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-com">/*…含 default_night_price / min_stay_nights / room_profile 生效值…*/</span> } }</code></pre>
     <ul style="font-size:13.5px;">
-      <li><strong>最短连住</strong>：传入 <code>min_stay_nights</code>（rental 1-365 / minsu 15-365，越界 400）；传 <code>null</code> 或空串清除，回落房源级 → 频道默认。整栋单（不指定户型）按排序最前的户型执行。出参附 <code>min_stay_nights_source</code>（<code>unit</code>/<code>project</code>/<code>default</code>）。</li>
+      <li><strong>最短连住</strong>：传入 <code>min_stay_nights</code>（rental 1-365 / minsu 15-365，越界 400）；传 <code>null</code> 或空串清除。下单生效值只往更严收：户型大于房源生效值才取户型，房源大于频道默认（rental/minsu 均为 15）才取房源，否则兜底频道默认。短于下一级的配置会保存，但不会把下单下限放宽。整栋单（不指定户型）按排序最前的户型执行。出参 <code>min_stay_nights</code> 是生效值，<code>min_stay_nights_source</code> 标出真正抬高下限的那一层（<code>unit</code>/<code>project</code>/<code>default</code>）。</li>
       <li><strong>房间档案</strong>：传入 <code>room_profile</code>（见 3.7），<strong>只合并传入的键</strong>、未传的保持原值；传 <code>null</code> 清除整块；未知键静默丢弃，取值/长度非法 400。</li>
       <li><strong>取消政策</strong>：传入 <code>cancel_policy</code>（非法 <code>days_before</code>/<code>cutoff_time</code> 返回 400）；传 <code>null</code> 清除（= 未开通，客户不可取消）。免费取消窗口 = 入住日往前推 <code>days_before</code> 天的 <code>cutoff_time</code> 时刻；客户在窗口内取消自动退款并释放房态。</li>
       <li><strong>总间数（多间口径 2026-09-10）</strong>：<code>total_qty</code> 须为 1-999；调低到低于未来晚已订间数会返回 400（先处理订单再缩容）。</li>

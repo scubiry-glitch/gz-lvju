@@ -257,8 +257,9 @@ function createBookingRouter(deps) {
             return jsonReply(res, { error: `该房型总间数仅 ${stayCfg.totalQtyOf(unitRow)} 间，无法预订 ${rooms} 间` }, 400);
           }
         }
-        // 最短连住（2026-09 下放户型）：户型级 > 房源级 > 频道默认；整栋单按「排序最前户型」取，
-        // 与取消政策同一套回退（fallbackUnitRowFor）。三处同口径：C 端日历 / 下单页 / 本闸。
+        // 最短连住：户型只在长于房源生效值时采用，房源只在长于频道默认时采用，否则兜底频道默认。
+        // 整栋单按「排序最前户型」取，与取消政策同一套回退（fallbackUnitRowFor）。
+        // 三处同口径：C 端日历 / 下单页 / 本闸，都读 minStayNightsOf。
         const stayRuleUnit = unitRow || await fallbackUnitRowFor(connExec(conn), unitId, projectId);
         const minNights = minStayNightsOf(proj, stayRuleUnit);
         if (nights < minNights) {

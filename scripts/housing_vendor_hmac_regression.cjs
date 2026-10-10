@@ -429,7 +429,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
   // ── 5.9) 价格与连住口径（2026-09）：户型级夜价生效 / price_from 选填 / 最短连住下放户型 ──
   // 改动 1：rental 的 units.ext.price_night 从「收下不生效」变为最高优先（> 月租/30 > 起价/30）
   // 改动 2：price_from 改选填，上架闸换成「每个户型都能算出默认夜价 > 0」；展示价三件套随接口下发
-  // 改动 3：最短连住下放户型（户型 > 房源 > 频道默认），整栋单按排序最前户型
+  // 改动 3：最短连住只往更严收（户型长于房源生效值才取户型，房源长于频道默认才取房源），整栋单按排序最前户型
   // 建一个「可直接上架」的房源（评级置 passed + 8 张图）：§5.9 / §5.10 共用
   const mkPublishable = async (name, units, tags, projExtra) => {
     const cr = await call('/api/juzhu/housing/vendor/projects/create', signed(vendor, {
@@ -470,42 +470,47 @@ async function catalogEventually(base, projectId, citySlug, want) {
     r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid2, status: 'online' }));
     check('9-2b 每户型有价即可上架', r.status === 200 && r.j.status === 'online', JSON.stringify(r.j));
     r = await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid2 }));
-    check('9-2c 详情下发户型生效夜价 + 户型级最短连住',
-      r.status === 200 && r.j.units[0].default_night_price === 268 && r.j.units[0].min_stay_nights === 3,
-      JSON.stringify(r.j.units[0]).slice(0, 200));
+    check('9-2c 详情下发户型生效夜价；户型 3 晚短于频道 15，下单仍兜底 15',
+      r.status === 200 && r.j.units[0].default_night_price === 268
+      && r.j.units[0].min_stay_nights === 15 && r.j.units[0].min_stay_nights_source === 'default',
+      JSON.stringify(r.j.units[0]).slice(0, 240));
     r = await call('/api/juzhu/housing/vendor/projects/list', signed(vendor, { channel: 'rental' }));
     const listed = (r.j.list || []).filter((x) => x.id === pid2)[0];
     check('9-2d 列表出参带展示价（C 端卡片同口径）',
       !!listed && listed.price_unit === 'night' && listed.price_from_display === 268,
       JSON.stringify(listed || {}).slice(0, 200));
 
-    // 9-3) 户型级最短连住生效：1 晚被拒、3 晚放行；且计价用 price_night（改动 1）
-    const p2a = '2027-01-10', p2b = '2027-01-11', p2c = '2027-01-12', p2d = '2027-01-13';
+    // 9-3) 户型 18 晚长于频道 15，才抬高下单下限；计价用 price_night（改动 1）
+    const p2a = '2027-01-10', p2b = '2027-01-11', p2d = '2027-01-28';
     const u2 = (await call('/api/juzhu/housing/vendor/projects/detail', signed(vendor, { id: pid2 }))).j.units[0].id;
+    r = await call('/api/juzhu/housing/vendor/units/update', signed(vendor, { id: u2, min_stay_nights: 18 }));
+    check('9-3 户型 18 晚长于频道默认 → 生效 18',
+      r.status === 200 && r.j.unit.min_stay_nights === 18 && r.j.unit.min_stay_nights_source === 'unit',
+      JSON.stringify(r.j.unit).slice(0, 180));
     let b = await call('/api/juzhu/booking', {
       project_id: pid2, unit_id: u2, checkin: p2a, checkout: p2b,
       contact_name: '口径回归', contact_phone: bkPhone,
     });
-    check('9-3 户型级最短连住 3 晚 → 1 晚被拒 400', b.status === 400 && b.j.min_stay_nights === 3, JSON.stringify(b.j));
+    check('9-3b 户型级最短连住 18 晚 → 1 晚被拒 400', b.status === 400 && b.j.min_stay_nights === 18, JSON.stringify(b.j));
     b = await call('/api/juzhu/booking', {
       project_id: pid2, unit_id: u2, checkin: p2a, checkout: p2d,
       contact_name: '口径回归', contact_phone: bkPhone,
     });
-    check('9-3b 3 晚放行且按 ext.price_night 计价（268×3=804，旧口径会用 0）',
-      b.status === 200 && b.j.price_total === 804, JSON.stringify(b.j));
+    check('9-3c 18 晚放行且按 ext.price_night 计价（268×18=4824）',
+      b.status === 200 && b.j.price_total === 4824, JSON.stringify(b.j));
     if (b.status === 200 && b.j.order_no) bkIds.push(b.j.order_no);
 
     // 9-4) 整栋单（不传 unit_id）：连住取排序最前户型、价格无起价时同样回落该户型
-    const w1 = '2027-02-10', w2 = '2027-02-13';
+    const w1 = '2027-02-10', w2 = '2027-02-28';
     const bw = await call('/api/juzhu/booking', {
       project_id: pid2, checkin: w1, checkout: w2, contact_name: '口径回归', contact_phone: bkPhone,
     });
-    check('9-4 整栋单回落首个户型：连住 3 晚放行 + 单价 268×3=804',
-      bw.status === 200 && bw.j.price_total === 804, JSON.stringify(bw.j).slice(0, 200));
+    check('9-4 整栋单回落首个户型：连住 18 晚放行 + 单价 268×18=4824',
+      bw.status === 200 && bw.j.price_total === 4824, JSON.stringify(bw.j).slice(0, 200));
     const bwShort = await call('/api/juzhu/booking', {
       project_id: pid2, checkin: w1, checkout: '2027-02-11', contact_name: '口径回归', contact_phone: bkPhone,
     });
-    check('9-4b 整栋单同样受「首个户型 3 晚」约束', bwShort.status === 400 && bwShort.j.min_stay_nights === 3, JSON.stringify(bwShort.j));
+    check('9-4b 整栋单同样受「首个户型 18 晚」约束', bwShort.status === 400 && bwShort.j.min_stay_nights === 18, JSON.stringify(bwShort.j));
     if (bw.status === 200 && bw.j.order_no) bkIds.push(bw.j.order_no);
 
     // 9-5) 户型级最短连住可清除（回落房源级/频道默认），非法值被拒
@@ -522,8 +527,8 @@ async function catalogEventually(base, projectId, citySlug, want) {
   let pid3 = 0;
   {
     const p = await mkPublishable(RUN + '·净可售房源', [
-      // min_stay_nights=1：本段聚焦库存口径，先绕开连住闸
-      { name: '六间房型', layout_label: '1室1卫', area_sqm: 30, price_night: 300, total_qty: 6, min_stay_nights: 1 },
+      // 连住下限不能再被户型写成 1 晚放宽；本段预订都按频道兜底 15 晚下单
+      { name: '六间房型', layout_label: '1室1卫', area_sqm: 30, price_night: 300, total_qty: 6 },
     ], ['演示', '回归', '旅居']);
     pid3 = p.id;
     r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid3, status: 'online' }));
@@ -533,9 +538,9 @@ async function catalogEventually(base, projectId, citySlug, want) {
     await call('/api/juzhu/housing/vendor/units/update', signed(vendor, {
       id: u3, cancel_policy: { enabled: true, days_before: 30, cutoff_time: '18:00' },
     }));
-    const dA = '2027-03-10', dB = '2027-03-11', dC = '2027-03-12', dD = '2027-03-13';
+    const dA = '2027-04-01', dAEnd = '2027-04-16', dB = '2027-05-01', dBEnd = '2027-05-16', dD = '2027-03-13';
     const dayOf = async (d) => {
-      const q = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: pid3, unit_id: u3, month: '2027-03' }));
+      const q = await call('/api/juzhu/housing/vendor/stay-calendar/query', signed(vendor, { project_id: pid3, unit_id: u3, month: String(d).slice(0, 7) }));
       return (q.j.days || []).filter((x) => x.date === d)[0] || null;
     };
     const avail = (d, n) => call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
@@ -544,7 +549,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
 
     // 平台先卖 2 间（建立 booked_qty=2 的既成事实）
     const bookMulti = await call('/api/juzhu/booking', {
-      project_id: pid3, unit_id: u3, rooms: 2, checkin: dA, checkout: dB,
+      project_id: pid3, unit_id: u3, rooms: 2, checkin: dA, checkout: dAEnd,
       contact_name: '净可售回归', contact_phone: bkPhone,
     });
     check('10-1 平台先订 2 间', bookMulti.status === 200 && bookMulti.j.rooms === 2, JSON.stringify(bookMulti.j).slice(0, 160));
@@ -561,7 +566,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
 
     // 平台再卖 1 间 → 从这 2 里扣
     const book1 = await call('/api/juzhu/booking', {
-      project_id: pid3, unit_id: u3, checkin: dA, checkout: dB, contact_name: '净可售回归', contact_phone: bkPhone,
+      project_id: pid3, unit_id: u3, checkin: dA, checkout: dAEnd, contact_name: '净可售回归', contact_phone: bkPhone,
     });
     check('10-3 平台再订 1 间', book1.status === 200, JSON.stringify(book1.j).slice(0, 160));
     if (book1.status === 200 && book1.j.order_no) bkIds.push(book1.j.order_no);
@@ -578,7 +583,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
 
     // 物理余量上限：已订 5 时推净可售 2 → 实际只剩 1 间，兜到 1（防对账漏项导致超售）
     const bookMore = await call('/api/juzhu/booking', {
-      project_id: pid3, unit_id: u3, rooms: 3, checkin: dB, checkout: dC,
+      project_id: pid3, unit_id: u3, rooms: 3, checkin: dB, checkout: dBEnd,
       contact_name: '净可售回归', contact_phone: bkPhone,
     });
     if (bookMore.status === 200 && bookMore.j.order_no) bkIds.push(bookMore.j.order_no);
@@ -611,7 +616,7 @@ async function catalogEventually(base, projectId, citySlug, want) {
     check('10-5c available_qty 越界 → 400', r.status === 400, JSON.stringify(r.j));
 
     // 默认关房：开启后未推送放出的晚一律不可订（含只设过价的晚），推过的晚照常可订
-    const dE = '2027-03-20', dF = '2027-03-21', dG = '2027-03-22', dH = '2027-03-23';
+    const dE = '2027-03-20', dF = '2027-03-21';
     await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
       project_id: pid3, unit_id: u3, dates: [dF], status: 'open', price_night: 333,
     }));
@@ -623,13 +628,16 @@ async function catalogEventually(base, projectId, citySlug, want) {
     day = await dayOf(dF);
     check('10-6c 只设过价的晚也算未放出 → 剩余 0', day && day.remaining === 0, JSON.stringify(day));
     const blockedOrder = await call('/api/juzhu/booking', {
-      project_id: pid3, unit_id: u3, checkin: dE, checkout: dF,
+      project_id: pid3, unit_id: u3, checkin: '2027-03-01', checkout: '2027-03-16',
       contact_name: '净可售回归', contact_phone: bkPhone,
     });
     check('10-6d 未推送的晚下单被拒 400', blockedOrder.status === 400, JSON.stringify(blockedOrder.j).slice(0, 140));
-    await avail(dG, 2);
+    const gDates = Array.from({ length: 15 }, (_, i) => '2027-06-' + String(i + 1).padStart(2, '0'));
+    await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
+      project_id: pid3, unit_id: u3, dates: gDates, status: 'open', available_qty: 2,
+    }));
     const okOrder = await call('/api/juzhu/booking', {
-      project_id: pid3, unit_id: u3, checkin: dG, checkout: dH,
+      project_id: pid3, unit_id: u3, checkin: '2027-06-01', checkout: '2027-06-16',
       contact_name: '净可售回归', contact_phone: bkPhone,
     });
     check('10-6e 推过放出的晚可订（默认关房不影响）', okOrder.status === 200, JSON.stringify(okOrder.j).slice(0, 160));
