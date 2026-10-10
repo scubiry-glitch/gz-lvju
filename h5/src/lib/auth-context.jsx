@@ -24,14 +24,14 @@ export function useAuthUser() {
   return useContext(AuthUserContext);
 }
 
-/** 未登录则 jumpToLogin；已登录返回 false 供调用方继续业务。
- * ready 未完成时放行路由，交给 RequireAuth，避免 Tab 点了 preventDefault 却不跳登录（App 内像没反应）。 */
+/** Tab 点订单/我的：未登录则 Morph Login.toLogin({ url: 回跳地址 })，已登录放行路由。
+ * 进站未 ready 前整页不渲染，此处 ready 恒为 true；仍挡一层防竞态。 */
 export function useRequireLogin() {
   const { ready, loggedIn, goLogin } = useAuthUser();
   return useCallback(
     (next) => {
       authLog('requireLogin', { next, ready, loggedIn });
-      if (!ready) return false;
+      if (!ready) return true;
       if (loggedIn) return false;
       goLogin(next);
       return true;
@@ -86,11 +86,45 @@ export async function loadAuthUser() {
   }
 }
 
+const LOGIN_NEXT_KEY = 'bzf_h5_login_next';
+
 function loginNextPath(next) {
   const raw = next == null || next === '' ? location.pathname + location.search : String(next);
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
   const path = raw.startsWith('/') ? raw : '/' + raw;
+  /* 已是 /h5/... 时不要再拼一层 */
+  if (path === '/h5' || path.startsWith('/h5/')) return location.origin + path;
   return location.origin + '/h5' + path;
+}
+
+function saveLoginNext(path) {
+  try {
+    sessionStorage.setItem(LOGIN_NEXT_KEY, path);
+  } catch {
+    /* ignore */
+  }
+}
+
+function takeLoginNext() {
+  try {
+    const v = sessionStorage.getItem(LOGIN_NEXT_KEY) || '';
+    if (v) sessionStorage.removeItem(LOGIN_NEXT_KEY);
+    return v;
+  } catch {
+    return '';
+  }
+}
+
+/** App 原生登录常回到「当前 WebView」；若还停在别的路由，补跳到登录前目标页 */
+function resumeLoginNext() {
+  const next = takeLoginNext();
+  if (!next) return;
+  const path = next.startsWith('/') ? next : '/' + next;
+  const target = path === '/h5' || path.startsWith('/h5/') ? path : '/h5' + path;
+  const cur = location.pathname + location.search;
+  if (cur === target) return;
+  authLog('resumeLoginNext', { from: cur, to: target });
+  location.replace(location.origin + target);
 }
 
 /** 挂在 AppShell：进站探身份；点击侧 goLogin / useRequireLogin */
@@ -123,19 +157,25 @@ export function AuthProvider({ children }) {
     const nextQ = ret.startsWith('/') ? ret : '/' + ret.replace(/^\//, '');
     const url = loginNextPath(nextQ);
     authLog('goLogin', { next, url, currentlyLoggedIn: !!user });
+    saveLoginNext(nextQ);
     jumpToLogin(url);
   }, [user]);
 
   useEffect(() => {
-    refresh();
+    logLianjiaTokenCookie('AuthProvider mount');
+    /* 首屏也要消费 login next：App 登录后偶发整页回到首页，不会再走 visibility */
+    refresh().then((u) => {
+      if (u) resumeLoginNext();
+    });
   }, [refresh]);
 
-  /* 登录回跳 / App 回前台：再打 getCookie + 重探 /auth/me */
+  /* 登录回跳 / App 回前台：再打 getCookie + 重探 /auth/me；已登录则补跳目标页 */
   useEffect(() => {
-    logLianjiaTokenCookie('AuthProvider mount');
     const onBack = (tag) => {
       logLianjiaTokenCookie(tag);
-      refresh();
+      refresh().then((u) => {
+        if (u) resumeLoginNext();
+      });
     };
     const onPageShow = (e) => {
       if (e && e.persisted) onBack('pageshow persisted');
@@ -165,5 +205,10 @@ export function AuthProvider({ children }) {
     [user, ready, refresh, clearSession, goLogin],
   );
 
-  return <AuthUserContext.Provider value={value}>{children}</AuthUserContext.Provider>;
+  /* /api/auth/me 完成前不渲染业务页，避免未登录态闪一下再跳登录 */
+  return (
+    <AuthUserContext.Provider value={value}>
+      {ready ? children : null}
+    </AuthUserContext.Provider>
+  );
 }

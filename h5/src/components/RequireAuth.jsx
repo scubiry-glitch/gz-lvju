@@ -17,7 +17,11 @@ export default function RequireAuth() {
     } catch {
       /* ignore */
     }
-    if (!ready || loggedIn || jumped.current) return;
+    if (loggedIn) {
+      jumped.current = false;
+      return;
+    }
+    if (!ready || jumped.current) return;
     jumped.current = true;
     goLogin(pathname + search);
   }, [ready, loggedIn, pathname, search, goLogin]);
