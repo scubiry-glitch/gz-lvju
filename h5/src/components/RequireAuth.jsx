@@ -26,6 +26,19 @@ export default function RequireAuth() {
     goLogin(pathname + search);
   }, [ready, loggedIn, pathname, search, goLogin]);
 
-  if (!ready || !loggedIn) return null;
+  if (!ready) {
+    return (
+      <div className="auth-gate">
+        <p>加载中…</p>
+      </div>
+    );
+  }
+  if (!loggedIn) {
+    return (
+      <div className="auth-gate">
+        <p>正在前往登录…</p>
+      </div>
+    );
+  }
   return <Outlet />;
 }
