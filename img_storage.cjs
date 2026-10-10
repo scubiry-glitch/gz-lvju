@@ -267,9 +267,36 @@ async function ingestRef(ref, opts) {
   const n = normalizeImageRef(ref);
   if (!n.ok) return { ok: false, ref: '', kind: n.kind, changed: false, mirrored: false, error: n.warn };
   if (n.kind !== 'external') {
+    // 本地引用镜像（no-assets 变体：生产发行包不含 assets/，本地引用必坏图）。
+    // IMG_INGEST=mirror 时读本地文件上对象存储；key 用 legacyKeyOf() 确定性前缀
+    // —— 与存量迁移/读侧改写（IMG_URL_MODE=s3）同口径，重复推送幂等覆盖、零孤儿。
+    if (n.kind === 'local' && o.mirror && ingestMode() === 'mirror') {
+      const read = await readImage(n.ref).catch(() => null);
+      if (read && read.ok && read.buffer && read.buffer.length) {
+        const key = legacyKeyOf(n.ref);
+        // eslint-disable-next-line no-await-in-loop
+        const up = await uploadImage({
+          buffer: read.buffer,
+          key,
+          // 注意：readImage 的 contentType 字段实为扩展名（如 'jpg'），此处传 filename 供格式推导
+          filename: path.posix.basename(decodeURIComponent(n.ref)),
+          makeThumbs: o.makeThumbs,
+        });
+        if (up.ok && up.storage === 's3') {
+          return { ok: true, ref: up.url, kind: 's3', changed: true, mirrored: true, upload: up, warn: up.warned || '' };
+        }
+        // 上传失败/回落本地：保留原本地引用（其本身有效，不因镜像失败拒绝业务），带 warn 便于排查
+        console.warn('[img] 本地引用镜像未生效，保留本地引用 ' + n.ref + '：' + (up && up.warned ? up.warned : '上传失败'));
+        return { ok: true, ref: n.ref, kind: 'local', changed: n.changed, mirrored: false,
+          warn: `本地图片镜像对象存储未生效（${up && up.warned ? up.warned : '上传失败'}），保留本地引用` };
+      }
+      // 本地文件不存在（如 Serverless 无 assets/）：保留原引用
+      console.warn('[img] 本地引用镜像跳过（本地文件不存在）：' + n.ref);
+    }
     return { ok: true, ref: n.ref, kind: n.kind, changed: n.changed, mirrored: false, warn: n.warn || '' };
   }
   if (!o.mirror || ingestMode() !== 'mirror') {
+    console.warn('[img] 外部图片原样保留（mirror=' + !!o.mirror + ' IMG_INGEST=' + (process.env.IMG_INGEST || 'keep') + '）：' + n.ref);
     return { ok: true, ref: n.ref, kind: 'external', changed: false, mirrored: false,
       warn: '外部图片原样保留（IMG_INGEST != mirror）' };
   }
@@ -296,6 +323,12 @@ async function ingestRef(ref, opts) {
   if (up.storage !== 's3' && failOnUnconfigured()) {
     return { ok: false, ref: n.ref, kind: 'external', changed: false, mirrored: false, error: '镜像未落到对象存储: ' + (up.warned || '') };
   }
+  if (up.storage !== 's3') {
+    console.warn('[img] 外部图片镜像回落本地（保留原引用 ' + n.ref + ' → ' + up.url + '）：' + (up.warned || '原因未知'));
+    return { ok: true, ref: n.ref, kind: 'external', changed: false, mirrored: false,
+      warn: '镜像未落到对象存储（' + (up.warned || '原因未知') + '），保留原外部 URL' };
+  }
+  console.log('[img] 外部图片镜像成功 ' + n.ref + ' → ' + up.url);
   return { ok: true, ref: up.url, kind: 's3', changed: true, mirrored: true, upload: up, warn: up.warned || '' };
 }
 
@@ -510,6 +543,7 @@ async function uploadImage(opts) {
       // 上传失败 → 回落本地，业务不中断（同时把失败原因带回，便于排查）
       const reason = `S3 上传失败（HTTP ${up.status}${up.error ? ' ' + up.error : ''}）`;
       if (failOnUnconfigured()) return fail(`${reason}，且 S3_FAIL_ON_UNCONFIGURED=1 禁止回落本地`);
+      console.warn('[img] ' + reason + '，已回落本地存储 assets/uploads/（key=' + key + '）');
       const local = saveLocal(finalBuf, finalExt, '');
       return {
         ok: true, storage: 'local', url: local.urlPath, key: local.urlPath,
@@ -544,6 +578,7 @@ async function uploadImage(opts) {
   if (failOnUnconfigured() && urlMode() !== 'local') {
     return fail('S3 未配置（S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET），且 S3_FAIL_ON_UNCONFIGURED=1 禁止回落本地');
   }
+  console.warn('[img] 上传回落本地存储（storage=' + storageMode() + '）：S3 分支未生效，文件仅存服务器磁盘 assets/uploads/');
   const local = saveLocal(finalBuf, finalExt, '');
   return {
     ok: true, storage: 'local', url: local.urlPath, key: local.urlPath,

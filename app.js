@@ -713,6 +713,54 @@ function isVendorHmacPath(urlPath, method) {
   return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/') || p.startsWith('/api/juzhu/housing/vendor/'));
 }
 
+const OPEN_API_HOST_PREFIX = 'test-xjz-open';
+
+function requestHostnames(req) {
+  const headers = (req && req.headers) || {};
+  const names = [];
+  for (const value of [headers['x-forwarded-host'], headers.host]) {
+    for (const part of String(value || '').split(',')) {
+      const host = part.trim().toLowerCase().replace(/:\d+$/, '');
+      if (host) names.push(host);
+    }
+  }
+  return names;
+}
+
+function isOpenApiHost(req) {
+  return requestHostnames(req).some((host) => host.startsWith(OPEN_API_HOST_PREFIX));
+}
+
+const OPEN_API_PAGES = new Set([
+  '/screens/open-platform.html',
+  '/screens/property-intake-api.html',
+  '/screens/vendor-onboarding.html',
+  '/screens/_region.js',
+  '/screens/_nav.js',
+]);
+
+function isOpenApiAllowedPath(urlPath, method) {
+  if (isVendorHmacPath(urlPath, method)) return true;
+  const p = String(urlPath || '').split('?')[0].replace(/\/+$/, '') || '/';
+  const m = String(method || 'GET').toUpperCase();
+  if ((m === 'GET' || m === 'HEAD') && OPEN_API_PAGES.has(p)) return true;
+  if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
+  if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
+  return false;
+}
+
+function rejectUnlessOpenApi(req, res, urlPath) {
+  if (!isOpenApiHost(req) || isOpenApiAllowedPath(urlPath, req.method)) return false;
+  const body = JSON.stringify({ error: 'not_found' });
+  res.writeHead(404, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
+  return true;
+}
+
 /**
  * C 端公开接口白名单（无 PII 的目录/房源展示 + 来来预约跳转 + 我的订单）。
  * 其余 /api/juzhu/* 一律要求 JUZHU_API_KEY（admin 走会话/Key，商家开放接口走 HMAC）。
@@ -1204,6 +1252,10 @@ module.exports.isCEndPublicApi = isCEndPublicApi;
 module.exports.isPaymentCustomerApi = isPaymentCustomerApi;
 module.exports.grUserQuery = grUserQuery;
 module.exports.isVendorHmacPath = isVendorHmacPath;
+module.exports.isOpenApiHost = isOpenApiHost;
+module.exports.isOpenApiAllowedPath = isOpenApiAllowedPath;
+module.exports.rejectUnlessOpenApi = rejectUnlessOpenApi;
+module.exports.OPEN_API_HOST_PREFIX = OPEN_API_HOST_PREFIX;
 module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
@@ -1874,12 +1926,19 @@ async function normImgRef(ref, opts) {
   return imgStorage.ingestRef(ref, opts);
 }
 
-/** cover_image 收口：空值 → null（不改既有"封面可不填"语义）；非空 → 形态归一化（+可选镜像） */
+/** cover_image 收口：空值 → null（不改既有"封面可不填"语义）；非空 → 形态归一化（+可选镜像）
+ *  返回透传 storage/mirrored/warn，供接口响应回显（排查镜像是否生效，不必翻日志） */
 async function normCoverRef(ref, opts) {
   const raw = String(ref == null ? '' : ref).trim();
-  if (!raw) return { ok: true, ref: null };
+  if (!raw) return { ok: true, ref: null, storage: null, mirrored: false, warn: '' };
   const r = await normImgRef(raw, opts);
-  return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
+  if (!r.ok) return { ok: false, error: r.error };
+  return {
+    ok: true, ref: r.ref, kind: r.kind, mirrored: !!r.mirrored,
+    storage: (r.upload && r.upload.storage) ? r.upload.storage
+      : (r.kind === 's3' ? 's3' : (r.kind === 'external' ? 'external' : 'local')),
+    warn: r.warn || '',
+  };
 }
 
 /** 上传成功但落库失败时的补偿删除（避免孤儿对象） */
@@ -2267,6 +2326,9 @@ const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
 
+  // test-xjz-open* 只暴露商家 HMAC 开放接口、房源接入文档、入驻申请页及其接口。
+  if (rejectUnlessOpenApi(req, res, rawPath)) return;
+
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
   const apiReq = rawPath.startsWith('/api/juzhu');
   if (rawPath.startsWith('/api/settlement/v1/')) {
@@ -2390,6 +2452,16 @@ if (require.main === module) {
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
     console.log('auth: /api/juzhu/* default-deny API Key; C-end catalog/wechat-link/gr-orders public; vendor HMAC; admin session');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
+    // 对象存储启动自检：未配置时醒目告警（发行包不含 assets/，回落本地 = 静默丢图）
+    {
+      const S3 = require('./s3_client.cjs');
+      if (S3.isConfigured()) {
+        console.log(`[img] storage=s3 bucket=${S3.config().bucket} file=${S3.config().fileEndpoint} ingest=${process.env.IMG_INGEST || 'keep'}`);
+      } else {
+        console.warn('[img] WARNING: S3 未配置（缺 S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET 之一）');
+        console.warn('[img] WARNING: 图片上传/镜像将回落本地磁盘 assets/uploads/ —— 生产发行包不含 assets/，等于静默丢图；请补配置后重启（核对：GET /api/juzhu/admin/storage/status）');
+      }
+    }
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）

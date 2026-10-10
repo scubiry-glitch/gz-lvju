@@ -172,7 +172,7 @@ function OrdersBody() {
                     </div>
                     {o.cancel_policy_text ? <div className="meta">{o.cancel_policy_text}</div> : null}
                     <div className="amt">
-                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 …{(o.order_no || '').slice(-4)}
+                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 {o.order_no || '—'}
                     </div>
                   </div>
                 </div>
@@ -183,12 +183,26 @@ function OrdersBody() {
                     </button>
                   ) : null}
                   {o.status === 'pending' && UNPAID_PS[o.pay_status] ? (
-                    <a href={`/lvju-app-booking.html?order_no=${encodeURIComponent(o.order_no)}`}>去支付</a>
+                    <Link
+                      to={
+                        '/booking?order_no=' +
+                        encodeURIComponent(o.order_no) +
+                        (o.contact_phone_raw ? '&phone=' + encodeURIComponent(o.contact_phone_raw) : '')
+                      }
+                    >
+                      去支付
+                    </Link>
                   ) : null}
-                  <Link to={`/detail/${o.project_id}`}>房源详情</Link>
-                  <a className="primary" href={`/lvju-app-order-detail.html?order_no=${encodeURIComponent(o.order_no)}`}>
+                  {o.project_id && o.project_status === 'online' ? (
+                    <Link to={`/detail/${o.project_id}`}>房源详情</Link>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12, color: 'var(--muted)', padding: '7px 0' }}>
+                      {o.project_id ? '房源已下架' : '暂无房源'}
+                    </span>
+                  )}
+                  <Link className="primary" to={`/order/${encodeURIComponent(o.order_no)}`}>
                     订单详情
-                  </a>
+                  </Link>
                 </div>
               </div>
             );

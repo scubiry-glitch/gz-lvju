@@ -42,6 +42,7 @@ export default function TabBar() {
             className={({ isActive }) => ((active != null ? active : isActive) ? 'on' : undefined)}
             onClick={(e) => {
               if (!t.needAuth) return;
+              /* 未登录：拦截路由，Morph Login.toLogin({ url: 订单/我的回跳地址 }) */
               if (requireLogin(t.to)) e.preventDefault();
             }}
           >

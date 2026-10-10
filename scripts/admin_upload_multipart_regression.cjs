@@ -187,7 +187,8 @@ t('写侧收口：落库失败补偿删除 + 事务与行锁', () => {
 
 t('商家通道：photos/add 与 projects/create 已走 img_storage 收口', () => {
   const idx = vendorSrc.indexOf('async function housingPhotosAdd');
-  const seg = vendorSrc.slice(idx, idx + 2600);
+  // 采样窗取足函数主体（2026-10-09 源地址存档/幂等前置使函数增长，2600 → 4200）
+  const seg = vendorSrc.slice(idx, idx + 4200);
   assert.ok(seg.includes('normImgRef'), 'photos/add 应收口 file_path');
   assert.ok(seg.includes('beginTransaction'), 'photos/add 应有事务');
   assert.ok(vendorSrc.includes('normCoverRef(b.cover_image'), 'projects/units 的 cover_image 应收口');

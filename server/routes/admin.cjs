@@ -93,6 +93,30 @@ queryRows,
       normCoverRef
     } = deps;
 
+    // ── 照片删除联动对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时，与商家 photos/sync 同口径）──
+    // 必须在「行删除已提交」后调用；删除前做全库引用计数，防跨实体共享对象被误删；
+    // 本地引用/外部 URL 由 deleteObjectByRef 内部跳过（不确定就不动）。
+    async function reclaimPhotoObjects(conn, refs) {
+      if (String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') !== '1') return 0;
+      if (!imgStorage || typeof imgStorage.deleteObjectByRef !== 'function') return 0;
+      let removed = 0;
+      const seen = new Set();
+      for (const raw of (refs || [])) {
+        const ref = String(raw == null ? '' : raw).trim();
+        if (!ref || seen.has(ref)) continue;
+        seen.add(ref);
+        try {
+          const [a] = await conn.execute('SELECT COUNT(*) n FROM photos WHERE file_path=?', [ref]);
+          const [b] = await conn.execute('SELECT COUNT(*) n FROM projects WHERE cover_image=?', [ref]);
+          const [c] = await conn.execute('SELECT COUNT(*) n FROM units WHERE cover_image=?', [ref]);
+          if ((a[0] && a[0].n) + (b[0] && b[0].n) + (c[0] && c[0].n) > 0) continue;
+          const d = await imgStorage.deleteObjectByRef(ref);
+          if (d && d.ok) removed += 1;
+        } catch (_) { /* best-effort：单张失败不阻断，残留由对账脚本兜底 */ }
+      }
+      return removed;
+    }
+
     // --- from app.js L2677-4288 ---
     // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
     if (urlPath === '/api/juzhu/admin/vendor-onboarding' && req.method === 'GET') {
@@ -1474,7 +1498,13 @@ queryRows,
           [pid]
         );
         parseJsonFields(projs[0], ['tags', 'rating']);
-        return jsonReply(res, { ok: true, project: projs[0] }, 201);
+        return jsonReply(res, {
+          ok: true, project: projs[0],
+          // 镜像自证：库内存的 cover_image 是否已转对象存储；未转时 warned 给出原因
+          cover_image_storage: coverRef ? coverRef.storage : null,
+          cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+          cover_warned: (coverRef && coverRef.warn) || undefined,
+        }, 201);
       } finally {
         await conn.end();
       }
@@ -1492,6 +1522,7 @@ queryRows,
           if (!existing.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let coverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', body.slug || slugify(body.name));
@@ -1504,6 +1535,7 @@ queryRows,
             if (col === 'cover_image') {
               const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: pid });
               if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              coverRefInfo = coverRef;
               put(col, coverRef.ref);
               continue;
             }
@@ -1558,7 +1590,12 @@ queryRows,
             [pid]
           );
           parseJsonFields(projs[0], ['tags', 'rating']);
-          return jsonReply(res, { ok: true, project: projs[0] });
+          return jsonReply(res, {
+            ok: true, project: projs[0],
+            cover_image_storage: coverRefInfo ? coverRefInfo.storage : null,
+            cover_mirrored: coverRefInfo ? !!coverRefInfo.mirrored : false,
+            cover_warned: (coverRefInfo && coverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }
@@ -1572,19 +1609,28 @@ queryRows,
         const pid = parseInt(m[1]);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT district_id FROM projects WHERE id=?', [pid]);
+          const [rows] = await conn.execute('SELECT district_id, cover_image FROM projects WHERE id=?', [pid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const did = rows[0].district_id;
-          // 删除关联 photos、units
+          const projectCover = rows[0].cover_image;
+          // 删除关联 photos、units（含项目级 photos 行——旧实现遗漏，删除项目后残留脏行）
           const [units] = await conn.execute('SELECT id FROM units WHERE project_id=?', [pid]);
+          const [unitPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?)", [pid]);
+          const [projPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           for (const u of units) {
             await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [u.id]);
           }
+          await conn.execute("DELETE FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           await conn.execute('DELETE FROM units WHERE project_id=?', [pid]);
           await conn.execute('DELETE FROM projects WHERE id=?', [pid]);
           if (did) await syncDistrictStats(conn, did);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, [
+            ...unitPhotos.map((x) => x.file_path), ...projPhotos.map((x) => x.file_path), projectCover,
+          ]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1628,7 +1674,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] }, 201);
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: coverRef ? coverRef.storage : null,
+            cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+            cover_warned: (coverRef && coverRef.warn) || undefined,
+          }, 201);
         } finally {
           await conn.end();
         }
@@ -1664,6 +1715,7 @@ queryRows,
           const pid = rows[0].project_id;
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let unitCoverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', await uniqueUnitSlug(conn, pid, body.name, body.slug, uid));
@@ -1676,6 +1728,7 @@ queryRows,
             if (col === 'cover_image') {
               const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
               if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              unitCoverRefInfo = coverRef;
               put(col, coverRef.ref);
               continue;
             }
@@ -1717,7 +1770,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] });
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: unitCoverRefInfo ? unitCoverRefInfo.storage : null,
+            cover_mirrored: unitCoverRefInfo ? !!unitCoverRefInfo.mirrored : false,
+            cover_warned: (unitCoverRefInfo && unitCoverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }
@@ -1734,11 +1792,14 @@ queryRows,
           const [rows] = await conn.execute('SELECT project_id FROM units WHERE id=?', [uid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const pid = rows[0].project_id;
+          const [photos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute('DELETE FROM units WHERE id=?', [uid]);
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, photos.map((x) => x.file_path));
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1917,14 +1978,16 @@ queryRows,
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'", [photoId]
+            "SELECT entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [photoId]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const uid = rows[0].entity_id;
           await conn.execute('DELETE FROM photos WHERE id=?', [photoId]);
           await syncUnitCover(conn, uid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          // 行删除已提交 → 按开关回收对象（无其它引用才删）
+          const objectsRemoved = await reclaimPhotoObjects(conn, [rows[0].file_path]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1961,6 +2024,8 @@ queryRows,
             const [rows] = await conn.execute("SELECT id, entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [ent.photoId]);
             if (!rows.length) return jsonReply(res, { error: '图片记录不存在' }, 404);
             photoRow = rows[0];
+            // entityId 语义修正：scopeEntity('unit_photo') 只带 photo_id，此处回填真实 unit id（新 key 不再出现 unit/0/...）
+            ent.entityId = photoRow.entity_id;
             const pr = imgStorage.parse(photoRow.file_path);
             // 既有引用已在对象存储 → 复用同一 key 覆盖：零孤儿对象、零改库
             const extWant = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[String(file.contentType || '').toLowerCase().split(';')[0].trim()] || '';
@@ -2046,6 +2111,104 @@ queryRows,
       } finally {
         await conn.end();
       }
+    }
+
+    // POST /api/juzhu/admin/photos/migrate-images —— 存量图片引用迁移（本地路径/外链 → S3 绝对 URL）
+    // 口径（勿回退约束）：key 必须走 legacyKeyOf() 确定性前缀（与读侧改写 IMG_URL_MODE=s3 同 key，切读不 404）；
+    //   逐行 UPDATE（photos.file_path / projects.cover_image / units.cover_image），幂等可重跑；
+    //   单张失败不中断批次；limit 分批（每张含 sharp 重编码 + 2 缩略图上传，建议 10/批）。
+    // 用法：① 先 dry_run=true 预览规模 → ② 分批调用，直到 remaining=0；若 migrated=0 且 remaining>0，
+    //   说明剩余项无法自动迁移（failed 明细给出原因，多为本地文件缺失/外链不可达），需人工处置。
+    if (urlPath === '/api/juzhu/admin/photos/migrate-images' && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const body = await readBody(req);
+      const dryRun = body.dry_run === true;
+      const only = String(body.only || 'local').toLowerCase() === 'all' ? 'all' : 'local';
+      const includeCover = body.include_cover !== false;
+      const limit = Math.min(Math.max(parseInt(body.limit, 10) || 10, 1), 50);
+      const t0 = Date.now();
+
+      // 1) 扫描三处引用（SQL 粗筛 + JS 精筛；S3 引用不入选）
+      const items = [];
+      const grab = (rows, kind, col) => {
+        for (const r of rows) {
+          const ref = String(r[col] || '').trim();
+          if (!ref || imgStorage.isS3Url(ref)) continue;
+          if (imgStorage.isLocalPath(ref)) items.push({ kind, id: r.id, ref });
+          else if (only === 'all' && imgStorage.isExternalUrl(ref)) items.push({ kind, id: r.id, ref, external: true });
+        }
+      };
+      const phRows = await queryRows("SELECT id, file_path FROM photos WHERE file_path LIKE '%assets/%' OR file_path LIKE 'http%' ORDER BY id");
+      grab(phRows, 'photo', 'file_path');
+      if (includeCover) {
+        const pjRows = await queryRows("SELECT id, cover_image FROM projects WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(pjRows, 'project_cover', 'cover_image');
+        const unRows = await queryRows("SELECT id, cover_image FROM units WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(unRows, 'unit_cover', 'cover_image');
+      }
+      const totalLocal = items.filter((x) => !x.external).length;
+      const totalExternal = items.length - totalLocal;
+
+      if (dryRun) {
+        return jsonReply(res, {
+          ok: true, dry_run: true, only, total: items.length, total_local: totalLocal, total_external: totalExternal,
+          samples: items.slice(0, 8).map((x) => ({ target: x.kind + '#' + x.id, from: x.ref, to: imgStorage.isLocalPath(x.ref) ? 'legacyKey: ' + imgStorage.legacyKeyOf(x.ref) : '(镜像 S3)' })),
+          guide: '预览模式未上传/未写库。确认后去掉 dry_run 分批执行，limit 建议 10，直到 remaining=0',
+          elapsed_ms: Date.now() - t0,
+        });
+      }
+
+      // 2) 逐条迁移（串行；成功/失败都算"已处理"，避免失败项卡死批次）
+      const batch = items.slice(0, limit);
+      const failed = [];
+      const samples = [];
+      let migrated = 0;
+      for (const it of batch) {
+        const target = it.kind + '#' + it.id;
+        try {
+          let newRef = '';
+          if (imgStorage.isLocalPath(it.ref)) {
+            const read = await imgStorage.readImage(it.ref);
+            if (!read.ok) { failed.push({ target, from: it.ref, error: '本地文件不存在（发行包不含 assets/，无法自动迁移）' }); continue; }
+            const key = imgStorage.legacyKeyOf(it.ref);
+            // eslint-disable-next-line no-await-in-loop
+            const up = await imgStorage.uploadImage({
+              buffer: read.buffer, key,
+              filename: String(it.ref).split('/').pop(),
+              makeThumbs: true,
+            });
+            if (!up.ok || up.storage !== 's3') { failed.push({ target, from: it.ref, error: (up && (up.error || up.warned)) || '上传未落到 S3' }); continue; }
+            newRef = up.url;
+          } else {
+            // eslint-disable-next-line no-await-in-loop
+            const r = await imgStorage.ingestRef(it.ref, { mirror: true, prefix: 'housing' });
+            if (!r.ok || r.kind !== 's3') { failed.push({ target, from: it.ref, error: r.error || r.warn || '镜像未落到 S3' }); continue; }
+            newRef = r.ref;
+          }
+          if (it.kind === 'photo') await queryRows('UPDATE photos SET file_path=? WHERE id=?', [newRef, it.id]);
+          else if (it.kind === 'project_cover') await queryRows('UPDATE projects SET cover_image=? WHERE id=?', [newRef, it.id]);
+          else await queryRows('UPDATE units SET cover_image=? WHERE id=?', [newRef, it.id]);
+          migrated += 1;
+          if (samples.length < 5) samples.push({ target, from: it.ref, to: newRef });
+        } catch (e) {
+          failed.push({ target, from: it.ref, error: String((e && e.message) || e) });
+        }
+      }
+
+      const remaining = Math.max(items.length - batch.length, 0);
+      console.log(`[img] migrate-images processed=${batch.length} migrated=${migrated} failed=${failed.length} remaining=${remaining} ${Date.now() - t0}ms`);
+      return jsonReply(res, {
+        ok: true, dry_run: false, only,
+        total: items.length, total_local: totalLocal, total_external: totalExternal,
+        processed: batch.length, migrated, failed_count: failed.length,
+        remaining, next_round: remaining > 0,
+        failed: failed.slice(0, 20),
+        samples,
+        guide: migrated === 0 && remaining > 0
+          ? '本轮无进展：剩余项需人工处置（见 failed 明细），勿继续空转'
+          : '重复调用直到 remaining=0（已迁移项自动从扫描结果消失，幂等可重跑）',
+        elapsed_ms: Date.now() - t0,
+      });
     }
 
     // POST /api/juzhu/admin/photos/presign —— 预签名直传（大图/批量前端直传对象存储，不经服务端中转）

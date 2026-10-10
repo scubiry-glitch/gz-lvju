@@ -213,6 +213,7 @@ const ROUTES = [
   // 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传（与 admin/upload 同权限面 house.write）
   { method: 'POST',   re: '^/api/juzhu/admin/photos/upload$', perm: 'house.write', act: 'photo.upload', res: 'photos' },
   { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/migrate-images$', perm: 'house.write', act: 'photo.migrate', res: 'photos' },
   { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },

@@ -427,14 +427,14 @@ export default function Lvju() {
       </div>
 
       {CAIBEI ? (
-        <a className="banner" href="/lvju-rating-standard.html">
+        <Link className="banner" to="/rating-standard">
           <span className="bi">★</span>
           <div className="bt">
             <b>什么是旅居星级旅居？</b>
             <p>5 维评定 + 公安/住建/保险验真，扫码可查</p>
           </div>
           <span className="go">看标准 ›</span>
-        </a>
+        </Link>
       ) : null}
     </div>
   );

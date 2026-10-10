@@ -15,28 +15,43 @@ function wantVConsole() {
   return false;
 }
 
+function bootVConsole() {
+  try {
+    if (!window.__vc && window.VConsole) window.__vc = new window.VConsole();
+    return !!window.__vc;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 加载并实例化 vConsole；不需要或已就绪时立刻 resolve。
+ * 调用方应 await 后再挂 React，避免进站日志落在控制台出现之前。
+ */
 export function initVConsole() {
-  if (!wantVConsole() || window.__vc) return;
-  const s = document.createElement('script');
-  s.src = 'https://cdn.bootcdn.net/ajax/libs/vConsole/3.15.1/vconsole.min.js';
-  s.onload = () => {
-    try {
-      window.__vc = new window.VConsole();
-    } catch {
-      /* ignore */
-    }
-  };
-  s.onerror = () => {
-    const s2 = document.createElement('script');
-    s2.src = 'https://unpkg.com/vconsole@3.15.1/dist/vconsole.min.js';
-    s2.onload = () => {
-      try {
-        window.__vc = new window.VConsole();
-      } catch {
-        /* ignore */
-      }
+  if (!wantVConsole()) return Promise.resolve(false);
+  if (window.__vc) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(!!ok);
     };
-    document.head.appendChild(s2);
-  };
-  document.head.appendChild(s);
+
+    const s = document.createElement('script');
+    s.src = 'https://cdn.bootcdn.net/ajax/libs/vConsole/3.15.1/vconsole.min.js';
+    s.onload = () => done(bootVConsole());
+    s.onerror = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'https://unpkg.com/vconsole@3.15.1/dist/vconsole.min.js';
+      s2.onload = () => done(bootVConsole());
+      s2.onerror = () => done(false);
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+    /* CDN 挂了也不挡进站 */
+    setTimeout(() => done(bootVConsole()), 5000);
+  });
 }
