@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { catalog, topics as fetchTopics } from '../lib/api.js';
+import { SEARCH_SEGS as SEGS, hiddenHomeTabSet, channelShown as segShown, inShownChannels as inShownSegs } from '../lib/homeChannels.js';
 import { assetUrl } from '../lib/asset.js';
 import { resolveHomeCity, writeStoredCity, provinceOf } from '../lib/city.js';
 import { featureEnabled } from '../lib/features.js';
@@ -10,32 +11,7 @@ import '../styles/search.css';
 
 const CAIBEI = featureEnabled('caibei');
 
-// 与 H5 首页「找房·全频道」同一组入口：旅居、民宿。长租/新房/二手不在首页，不进找房类型条。
-const SEGS = [
-  { id: 'all', label: '推荐', kind: 'mixed' },
-  { id: 'lvju', label: '旅居', kind: 'stay' },
-  { id: 'minsu', label: '民宿', kind: 'stay' },
-];
 const SEG_BY = Object.fromEntries(SEGS.map((s) => [s.id, s]));
-// 民宿再受城市 hidden_home_tabs 裁剪。旅居不是首页 tab，不随这份配置隐藏。
-const SEG_HOME_TAB = { minsu: 'minsu' };
-
-function hiddenHomeTabSet(cat) {
-  const raw = cat?.city?.hidden_home_tabs;
-  return new Set(Array.isArray(raw) ? raw.map(String) : []);
-}
-function segShown(id, hidden) {
-  if (id === 'all' || id === 'lvju') return true;
-  const tab = SEG_HOME_TAB[id];
-  return !tab || !hidden.has(tab);
-}
-/** 推荐 = 首页仍展示的频道：旅居（含带标签的 rental/minsu）+ 未隐藏的民宿。 */
-function inShownSegs(p, hidden) {
-  const lvju = (p.channel === 'rental' || p.channel === 'minsu') && (p.tags || []).includes('旅居');
-  if (lvju) return true;
-  if (p.channel === 'minsu') return segShown('minsu', hidden);
-  return false;
-}
 const CHANNEL_LABEL = { rental: '长租', minsu: '民宿', newhouse: '新房', resale: '二手' };
 const PRICE_OPTS = [
   { id: 0, label: '不限' },

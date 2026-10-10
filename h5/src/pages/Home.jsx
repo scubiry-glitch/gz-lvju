@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { catalog, pickFeaturedProjects, spots } from '../lib/api.js';
+import { HOME_CHANNELS, channelHref, channelShown, hiddenHomeTabSet } from '../lib/homeChannels.js';
 import { assetUrl } from '../lib/asset.js';
 import { resolveHomeCity, syncCityToUrl, writeStoredCity } from '../lib/city.js';
 import { priceLabel } from '../lib/price.js';
@@ -29,12 +30,14 @@ export default function Home() {
   const [featured, setFeatured] = useState(null);
   const [dmap, setDmap] = useState({});
   const [featErr, setFeatErr] = useState('');
+  const [hiddenTabs, setHiddenTabs] = useState(() => new Set());
 
   const load = useCallback((c) => {
     setPosts(null);
     setPostsHide(false);
     setFeatured(null);
     setFeatErr('');
+    setHiddenTabs(new Set());
 
     spots({ city: c })
       .then((data) => {
@@ -54,6 +57,7 @@ export default function Home() {
     catalog({ city: c })
       .then((cat) => {
         const { projects, dmap: dm } = pickFeaturedProjects(cat || {});
+        setHiddenTabs(hiddenHomeTabSet(cat));
         setDmap(dm);
         setFeatured(projects);
       })
@@ -129,21 +133,16 @@ export default function Home() {
           <h3>找房·全频道</h3>
         </div>
         <div className="chan">
-          <Link className="chan feat" to={`/lvju?city=${encodeURIComponent(city)}`}>
-            <span className="nb">新</span>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-lvju.png?v=14" alt="" />
-            </div>
-            <b>旅居</b>
-            <small>短住·候鸟·康养</small>
-          </Link>
-          <Link className="chan feat" to={`/minsu?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-minsu.png?v=15" alt="" />
-            </div>
-            <b>民宿</b>
-            <small>整栋·庭院·管家</small>
-          </Link>
+          {HOME_CHANNELS.filter((ch) => channelShown(ch.id, hiddenTabs)).map((ch) => (
+            <Link key={ch.id} className="chan feat" to={channelHref(ch, city)}>
+              {ch.badge ? <span className="nb">{ch.badge}</span> : null}
+              <div className="ic">
+                {ch.icon ? <img src={ch.icon} alt="" /> : <span style={{ fontSize: 22, lineHeight: 1 }}>{ch.emoji}</span>}
+              </div>
+              <b>{ch.label}</b>
+              <small>{ch.hint}</small>
+            </Link>
+          ))}
         </div>
 
         <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
