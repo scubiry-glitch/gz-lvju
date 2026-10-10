@@ -121,10 +121,11 @@ function BookingInner() {
         setLoading(false);
         return;
       }
+      // 两项都开时默认在线支付；链接显式带 transaction_mode 时仍以链接为准。
       let nextTx = sp.get('transaction_mode') || '';
       if (nextTx !== 'booking' && nextTx !== 'payment') {
-        if (proj.online_booking) nextTx = 'booking';
-        else if (proj.online_payment) nextTx = 'payment';
+        if (proj.online_payment) nextTx = 'payment';
+        else if (proj.online_booking) nextTx = 'booking';
       }
       if (nextTx === 'booking' && !proj.online_booking && proj.online_payment) nextTx = 'payment';
       if (nextTx === 'payment' && !proj.online_payment && proj.online_booking) nextTx = 'booking';
