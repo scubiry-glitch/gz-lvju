@@ -333,11 +333,12 @@ export default function Search() {
   }
 
   function cardHref(p, fam) {
-    if (fam === 'stay') return `/detail/${p.id}`;
-    if (fam === 'newhouse') return `/lvju-app-newhouse-detail.html?id=${p.id}`;
-    const us = (umap[p.id] || []).slice().sort((a, b) => (a.price_total || 9e9) - (b.price_total || 9e9));
-    const u0 = us[0];
-    return `/lvju-app-resale-detail.html?id=${p.id}${u0 ? '&unit=' + u0.id : ''}`;
+    if (fam === 'resale') {
+      const us = (umap[p.id] || []).slice().sort((a, b) => (a.price_total || 9e9) - (b.price_total || 9e9));
+      const u0 = us[0];
+      return u0 ? `/detail/${p.id}?unit=${u0.id}` : `/detail/${p.id}`;
+    }
+    return `/detail/${p.id}`;
   }
 
   function renderCard(p) {
@@ -415,11 +416,9 @@ export default function Search() {
       cta = <span className="go">查看</span>;
     }
     const href = cardHref(p, fam);
-    const Comp = fam === 'stay' ? Link : 'a';
-    const linkProps = fam === 'stay' ? { to: href } : { href };
     const r = p.rating || {};
     return (
-      <Comp key={p.id} className="lcard" {...linkProps}>
+      <Link key={p.id} className="lcard" to={href}>
         <div className="im" style={cover}>
           {fam === 'stay' && p.is_featured ? <span className="bdg feat">精选</span> : null}
           {fam !== 'stay' ? <span className="bdg onsale">在售</span> : null}
@@ -452,7 +451,7 @@ export default function Search() {
             {cta}
           </div>
         </div>
-      </Comp>
+      </Link>
     );
   }
 
@@ -608,10 +607,10 @@ export default function Search() {
       {topicCards.length ? (
         <div className="topics">
           {topicCards.map(({ t, ps, bg }) => (
-            <a
+            <Link
               key={t.slug}
               className="tp"
-              href={`/lvju-app-topic.html?topic=${encodeURIComponent(t.slug)}&city=${encodeURIComponent(city)}`}
+              to={`/topic/${encodeURIComponent(t.slug)}?city=${encodeURIComponent(city)}`}
             >
               <div className="bg" style={bg ? { backgroundImage: `url(${bg})` } : undefined} />
               <span className="rn">{ps.length} 套在架</span>
@@ -619,7 +618,7 @@ export default function Search() {
                 <b>{t.label}</b>
                 <small>{t.desc || TOPIC_DESC[t.slug] || '编辑精选专题'}</small>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       ) : null}

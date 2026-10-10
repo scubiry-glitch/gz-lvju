@@ -12,7 +12,16 @@ export default function RequireAuth() {
   const jumped = useRef(false);
 
   useEffect(() => {
-    if (!ready || loggedIn || jumped.current) return;
+    try {
+      console.log('[bzf-auth] RequireAuth', { pathname, search, ready, loggedIn, jumped: jumped.current });
+    } catch {
+      /* ignore */
+    }
+    if (loggedIn) {
+      jumped.current = false;
+      return;
+    }
+    if (!ready || jumped.current) return;
     jumped.current = true;
     goLogin(pathname + search);
   }, [ready, loggedIn, pathname, search, goLogin]);

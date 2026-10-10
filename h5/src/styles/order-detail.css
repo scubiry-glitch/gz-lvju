@@ -125,6 +125,11 @@
   text-underline-offset: 2px;
 }
 
+.od-page .od-kv .muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .od-page .od-empty,
 .od-page .od-err {
   padding: 48px 24px;

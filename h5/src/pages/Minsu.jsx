@@ -221,9 +221,9 @@ export default function Minsu() {
             <b>每间民宿一张验真卡</b>
             <p>公安实名 · 住建备案 · 安心险，扫码核验</p>
           </div>
-          <a className="go" href="/lvju-rating-standard.html">
+          <Link className="go" to="/rating-standard">
             了解 ›
-          </a>
+          </Link>
         </div>
       ) : null}
     </div>

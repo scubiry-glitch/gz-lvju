@@ -246,20 +246,23 @@ export default function SpotPost() {
                 <div className="matched-tickets">
                   <b>适用此景点的门票券</b>
                   {matchedTickets.map((ticket) => (
-                    <a key={ticket.id} href={`/juzhu-voucher.html?kind=skus&id=${encodeURIComponent(ticket.id)}&city=${encodeURIComponent(ticket.city_id)}`}>
+                    <Link
+                      key={ticket.id}
+                      to={`/voucher?kind=skus&id=${encodeURIComponent(ticket.id)}&city=${encodeURIComponent(ticket.city_id)}`}
+                    >
                       <span>{ticket.name}</span>
                       <small>{ticket.in_stock ? `¥${(Number(ticket.price_minor || 0) / 100).toFixed(2)} · 查看权益` : '暂时缺货 · 查看详情'}</small>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               ) : null}
-            <a
+            <Link
               className="ticket-link"
-              href={`/juzhu-vouchers.html?${s.city_id == null ? '' : `city=${encodeURIComponent(s.city_id)}&`}kind=skus&category=scenic_ticket`}
+              to={`/vouchers?${s.city_id == null ? '' : `city=${encodeURIComponent(s.city_id)}&`}kind=skus&category=scenic_ticket`}
             >
               {s.city_id == null ? '浏览平台门票券' : '浏览该城市门票券'} <span aria-hidden="true">›</span>
               <small>适用景点与城市以券详情为准</small>
-            </a>
+            </Link>
             </>
           ) : null}
         </div>
