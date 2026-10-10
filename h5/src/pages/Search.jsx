@@ -19,6 +19,34 @@ const SEGS = [
   { id: 'resale', label: '二手', kind: 'resale' },
 ];
 const SEG_BY = Object.fromEntries(SEGS.map((s) => [s.id, s]));
+// 找房类型条对齐首页 hidden_home_tabs（catalog.city 已解析）。旅居不是首页 tab，房源来自 rental / minsu。
+const SEG_HOME_TAB = {
+  minsu: 'minsu',
+  changzu: 'rental',
+  newhouse: 'newhouse',
+  resale: 'resale',
+};
+const LISTING_CHANNELS = new Set(['rental', 'minsu', 'newhouse', 'resale']);
+
+function hiddenHomeTabSet(cat) {
+  const raw = cat?.city?.hidden_home_tabs;
+  return new Set(Array.isArray(raw) ? raw.map(String) : []);
+}
+function segShown(id, hidden) {
+  if (id === 'all' || id === 'lvju') return true;
+  const tab = SEG_HOME_TAB[id];
+  return !tab || !hidden.has(tab);
+}
+/** 推荐 = 当前仍展示的类型条房源。旅居条不随首页 tab 隐藏。 */
+function inShownSegs(p, hidden) {
+  if (!LISTING_CHANNELS.has(p.channel)) return false;
+  if ((p.channel === 'rental' || p.channel === 'minsu') && (p.tags || []).includes('旅居')) return true;
+  if (p.channel === 'minsu') return segShown('minsu', hidden);
+  if (p.channel === 'rental') return segShown('changzu', hidden);
+  if (p.channel === 'newhouse') return segShown('newhouse', hidden);
+  if (p.channel === 'resale') return segShown('resale', hidden);
+  return false;
+}
 const CHANNEL_LABEL = { rental: '长租', minsu: '民宿', newhouse: '新房', resale: '二手' };
 const PRICE_OPTS = [
   { id: 0, label: '不限' },
@@ -88,6 +116,10 @@ export default function Search() {
   const kwTimer = useRef(null);
   const kwRef = useRef(null);
 
+  const hiddenTabs = useMemo(() => hiddenHomeTabSet(cat), [cat]);
+  const visibleSegs = useMemo(() => SEGS.filter((s) => segShown(s.id, hiddenTabs)), [hiddenTabs]);
+  const activeSeg = segShown(seg, hiddenTabs) ? seg : 'all';
+
   const dmap = useMemo(() => {
     const m = {};
     (cat?.districts || []).forEach((d) => {
@@ -135,15 +167,22 @@ export default function Search() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!cat || segShown(seg, hiddenTabs)) return;
+    setSeg('all');
+    syncUrl(city, 'all', kw);
+  }, [cat, seg, hiddenTabs, city, kw, syncUrl]);
+
   function segProjects(sid) {
-    const ps = cat?.projects || [];
+    const ps = (cat?.projects || []).filter((p) => (sid === 'all' ? inShownSegs(p, hiddenTabs) : true));
+    if (!segShown(sid, hiddenTabs)) return [];
     if (sid === 'lvju') return ps.filter((p) => (p.channel === 'rental' || p.channel === 'minsu') && hasLvjuTag(p));
     if (sid === 'minsu') return ps.filter((p) => p.channel === 'minsu' && !hasLvjuTag(p));
     if (sid === 'changzu') return ps.filter((p) => p.channel === 'rental' && !hasLvjuTag(p));
     if (sid === 'newhouse') return ps.filter((p) => p.channel === 'newhouse');
     if (sid === 'resale') return ps.filter((p) => p.channel === 'resale');
     return ps
-      .filter((p) => CHANNEL_LABEL[p.channel])
+      .slice()
       .sort((a, b) => (b.is_featured || 0) - (a.is_featured || 0) || (a.featured_rank || 999) - (b.featured_rank || 999));
   }
 
@@ -222,12 +261,12 @@ export default function Search() {
     return ps;
   }
 
-  const famKind = SEG_BY[seg].kind;
+  const famKind = SEG_BY[activeSeg].kind;
   const rows = useMemo(() => {
     if (!cat) return null;
-    return sortProjects(applyFilters(segProjects(seg).filter(kwMatch)));
+    return sortProjects(applyFilters(segProjects(activeSeg).filter(kwMatch)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, seg, kw, F, dmap, umap]);
+  }, [cat, activeSeg, kw, F, dmap, umap, hiddenTabs]);
 
   const hot = useMemo(() => {
     const freq = {};
@@ -267,11 +306,11 @@ export default function Search() {
     return (t.tags || []).every((tag) => pt.includes(tag));
   }
 
-  const showTopics = seg === 'all' && !kw && topicList.length && cat;
+  const showTopics = activeSeg === 'all' && !kw && topicList.length && cat;
   const topicCards = showTopics
     ? topicList
         .map((t) => {
-          const ps = (cat.projects || []).filter((p) => topicMatches(t, p));
+          const ps = (cat.projects || []).filter((p) => inShownSegs(p, hiddenTabs) && topicMatches(t, p));
           if (!ps.length) return null;
           let bg = assetUrl(t.cover_image) || '';
           if (!bg) {
@@ -289,7 +328,7 @@ export default function Search() {
 
   function distOpts() {
     const seen = {};
-    segProjects(seg)
+    segProjects(activeSeg)
       .filter(kwMatch)
       .forEach((p) => {
         if (p.district_id) seen[p.district_id] = dmap[p.district_id];
@@ -348,13 +387,13 @@ export default function Search() {
         ? p.address
         : [d ? d.name : '', p.address || ''].filter(Boolean).join(' · ');
     const fam =
-      SEG_BY[seg].kind === 'mixed'
+      SEG_BY[activeSeg].kind === 'mixed'
         ? p.channel === 'newhouse'
           ? 'newhouse'
           : p.channel === 'resale'
             ? 'resale'
             : 'stay'
-        : SEG_BY[seg].kind;
+        : SEG_BY[activeSeg].kind;
     const cover = p.cover_image
       ? { backgroundImage: `url(${assetUrl(p.cover_image)})` }
       : {
@@ -543,13 +582,13 @@ export default function Search() {
       ) : null}
 
       <div className="chanbar">
-        {SEGS.map((s) => {
+        {visibleSegs.map((s) => {
           const n = cat ? segProjects(s.id).filter(kwMatch).length : 0;
           return (
             <a
               key={s.id}
               href={'#seg-' + s.id}
-              className={s.id === seg ? 'on' : undefined}
+              className={s.id === activeSeg ? 'on' : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 setSeg(s.id);
@@ -597,7 +636,7 @@ export default function Search() {
             '加载中…'
           ) : (
             <>
-              为你找到 <b>{rows?.length || 0}</b> 个「{SEG_BY[seg].label}
+              为你找到 <b>{rows?.length || 0}</b> 个「{SEG_BY[activeSeg].label}
               {kw ? ` · ${kw}` : ''}」结果
             </>
           )}
@@ -633,14 +672,14 @@ export default function Search() {
         ) : !rows?.length ? (
           <div className="search-empty">
             <div style={{ fontSize: 30, marginBottom: 6, opacity: 0.6 }}>🔍</div>
-            当前城市「{cityName}」暂无符合条件的{SEG_BY[seg].label}房源
+            当前城市「{cityName}」暂无符合条件的{SEG_BY[activeSeg].label}房源
             {kw ? ' · 换个关键词或筛选试试' : ''}
             {guiyangHint ? ' · 旅居房源目前集中在贵阳' : ''}
             {/* 城市切换入口暂隐
             <br />
             {guiyangHint ? (
               <button type="button" className="go-btn" onClick={() => pickCity('贵阳')}>
-                去贵阳看{SEG_BY[seg].label}
+                去贵阳看{SEG_BY[activeSeg].label}
               </button>
             ) : (
               <button type="button" className="go-btn" onClick={() => setSheetCity(true)}>
