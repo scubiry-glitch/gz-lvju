@@ -123,10 +123,24 @@ export default function CalSheet({
     return () => io.disconnect();
   }, [open, loadMonth, monthList]);
 
+  /** 第二下若不能成合法离店（连住不足 / 中间满房），改作新入住日起算，避免卡死在旧入住 */
+  function restartAsCheckin(d, reason) {
+    setCi(d);
+    setCo(null);
+    setTip(reason || '');
+  }
+
   function pick(d) {
     if (d < today || d > maxDay) return;
     const inf = dayInfo(d);
     if (dayBlocked(inf)) return;
+    /* 再点一次已选入住日 → 清空，便于重选 */
+    if (ci && !co && iso(d) === iso(ci)) {
+      setCi(null);
+      setCo(null);
+      setTip('');
+      return;
+    }
     if (!ci || (ci && co) || d <= ci) {
       setCi(d);
       setCo(null);
@@ -135,7 +149,10 @@ export default function CalSheet({
     }
     const n = Math.round((d - ci) / 864e5);
     if (n < minNights) {
-      setTip('须连续入住 ≥ ' + minNights + ' 晚 · 最早 ' + md(addDays(ci, minNights)) + ' 离店');
+      restartAsCheckin(
+        d,
+        '连住不足 ' + minNights + ' 晚 · 已改选 ' + md(d) + ' 为入住，请再选离店',
+      );
       return;
     }
     let firstBad = null;
@@ -147,7 +164,11 @@ export default function CalSheet({
       }
     }
     if (firstBad) {
-      setTip(md(firstBad) + (dayInfo(firstBad)?.status === 'booked' ? ' 已订' : ' 关房') + ' · 请调整日期或换房型');
+      const badLabel = dayInfo(firstBad)?.status === 'booked' ? '已订' : '关房';
+      restartAsCheckin(
+        d,
+        md(firstBad) + ' ' + badLabel + ' · 已改选 ' + md(d) + ' 为入住，请再选离店',
+      );
       return;
     }
     setCo(d);
@@ -199,7 +220,10 @@ export default function CalSheet({
             </div>
           </div>
           <div className={'cs-tip' + (tip ? ' warn' : '')}>
-            {tip || '连住 ' + minNights + ' 晚起 · 点选入住与离店日期，再点「确定」'}
+            {tip ||
+              (ci && !co
+                ? '已选入住 ' + md(ci) + ' · 再点离店；也可点其它可订日改选入住，或再点入住日清空'
+                : '连住 ' + minNights + ' 晚起 · 点选入住与离店日期，再点「确定」')}
           </div>
         </div>
         <div className="cs-months" ref={monthsRef}>
