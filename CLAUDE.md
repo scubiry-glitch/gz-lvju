@@ -275,7 +275,7 @@ C 端首页（`index.html`）的频道 tab（保租房/长租/卖旧买新/生�
 - **服务端是过滤主体**：`GET /api/juzhu/catalog` 出参 `channels` 已按当前城市过滤完（改配置走 `catalogMemoInvalidateAll()` 立即生效，不走 15s TTL）；`juzhu/app.js` 的 `enabledChannels()` 只按 `cache.hidden_home_tabs` 做兜底再过滤。页面只准消费 `JUZHU.enabledChannels()`，不得各造 tab 清单。
 - **写入口**：后台 `juzhu-admin.html`「字典」tab 城市行「首页隐藏 Tab」勾选 → `PUT /admin/cities/:id`（权限点 `dict.write`；服务端 `validateCityWrite` 校验白名单）。直改 DB 不走写通道时注意 catalog 有 15s 进程内 memo。
 - **隐藏 ≠ 下架**：只裁首页入口，`?channel=` 直链与数据接口照常；隐藏 tab 深链（如沈阳 `?tab=resale`）由 `paintTabs()` 回落到该城市第一个可见 tab，避免空 pane。
-- **H5 找房页同口径**（`h5/src/pages/Search.jsx`，读 catalog 随行的 `city.hidden_home_tabs`）：类型条 `长租=rental` / `民宿=minsu` / `新房=newhouse` / `二手=resale`，命中隐藏则整条不画。`旅居` 不是首页 tab，不随这份配置隐藏（长租条排除「旅居」标签，与首页长租 pane 同口径）。「推荐」与其下专题卡只统计仍展示类型的房源。`?seg=` 落到已隐藏类型时回落到「推荐」。
+- **H5 找房页**（`h5/src/pages/Search.jsx`）：类型条与 H5 首页「找房·全频道」同一组入口，只有旅居、民宿；长租/新房/二手不在首页，不进类型条，也不进「推荐」。民宿再读 catalog 随行的 `city.hidden_home_tabs`（`minsu` 命中则整条不画）。旅居不是首页 tab，不随这份配置隐藏。「推荐」与其下专题卡只统计仍展示的旅居、民宿。`?seg=` 落到未展示类型时回落到「推荐」。
 
 ## 规则 25 · App C 端身份标准 = `lianjia_token`（2026-09-28 拍板）
 

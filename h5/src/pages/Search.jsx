@@ -10,23 +10,15 @@ import '../styles/search.css';
 
 const CAIBEI = featureEnabled('caibei');
 
+// 与 H5 首页「找房·全频道」同一组入口：旅居、民宿。长租/新房/二手不在首页，不进找房类型条。
 const SEGS = [
   { id: 'all', label: '推荐', kind: 'mixed' },
   { id: 'lvju', label: '旅居', kind: 'stay' },
   { id: 'minsu', label: '民宿', kind: 'stay' },
-  { id: 'changzu', label: '长租', kind: 'stay' },
-  { id: 'newhouse', label: '新房', kind: 'newhouse' },
-  { id: 'resale', label: '二手', kind: 'resale' },
 ];
 const SEG_BY = Object.fromEntries(SEGS.map((s) => [s.id, s]));
-// 找房类型条对齐首页 hidden_home_tabs（catalog.city 已解析）。旅居不是首页 tab，房源来自 rental / minsu。
-const SEG_HOME_TAB = {
-  minsu: 'minsu',
-  changzu: 'rental',
-  newhouse: 'newhouse',
-  resale: 'resale',
-};
-const LISTING_CHANNELS = new Set(['rental', 'minsu', 'newhouse', 'resale']);
+// 民宿再受城市 hidden_home_tabs 裁剪。旅居不是首页 tab，不随这份配置隐藏。
+const SEG_HOME_TAB = { minsu: 'minsu' };
 
 function hiddenHomeTabSet(cat) {
   const raw = cat?.city?.hidden_home_tabs;
@@ -37,14 +29,11 @@ function segShown(id, hidden) {
   const tab = SEG_HOME_TAB[id];
   return !tab || !hidden.has(tab);
 }
-/** 推荐 = 当前仍展示的类型条房源。旅居条不随首页 tab 隐藏。 */
+/** 推荐 = 首页仍展示的频道：旅居（含带标签的 rental/minsu）+ 未隐藏的民宿。 */
 function inShownSegs(p, hidden) {
-  if (!LISTING_CHANNELS.has(p.channel)) return false;
-  if ((p.channel === 'rental' || p.channel === 'minsu') && (p.tags || []).includes('旅居')) return true;
+  const lvju = (p.channel === 'rental' || p.channel === 'minsu') && (p.tags || []).includes('旅居');
+  if (lvju) return true;
   if (p.channel === 'minsu') return segShown('minsu', hidden);
-  if (p.channel === 'rental') return segShown('changzu', hidden);
-  if (p.channel === 'newhouse') return segShown('newhouse', hidden);
-  if (p.channel === 'resale') return segShown('resale', hidden);
   return false;
 }
 const CHANNEL_LABEL = { rental: '长租', minsu: '民宿', newhouse: '新房', resale: '二手' };
