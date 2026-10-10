@@ -602,11 +602,11 @@ function BookingInner() {
       <div className="bfield">
         <span className="l">交易方式</span>
         <select value={tx} onChange={(e) => { setTx(e.target.value); if (e.target.value === 'booking') setCouponId(''); }}>
-          {p?.online_booking ? (
-            <option value="booking">在线预订 · 商家确认后线下收款</option>
-          ) : null}
           {p?.online_payment ? (
             <option value="payment">在线支付 · 支付后商家确认</option>
+          ) : null}
+          {p?.online_booking ? (
+            <option value="booking">在线预订 · 商家确认后线下收款</option>
           ) : null}
         </select>
       </div>
