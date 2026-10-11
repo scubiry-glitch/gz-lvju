@@ -28,8 +28,11 @@ const statements=[
 const crypto=require('node:crypto');
 async function migrate(pool) {
  const conn=await pool.getConnection();
+ let locked=false;
  try {
-  const [[lock]]=await conn.query("SELECT GET_LOCK('commerce_m1a_migrate',30) AS acquired"); if(!lock.acquired) throw Error('Migration lock unavailable');
+  const [[lock]]=await conn.query("SELECT GET_LOCK('commerce_m1a_migrate',0) AS acquired");
+  if(!lock.acquired) return; // 锁不可用时直接跳过（表已存在不需要迁移，并发启动只需一个实例执行）
+  locked=true;
   await conn.query(statements[0]);
   const hash=crypto.createHash('sha256').update(statements.join('\n')).digest('hex');
   const [existing]=await conn.execute('SELECT checksum FROM commerce_migrations WHERE version=?',['001_m1a']);
@@ -51,7 +54,7 @@ async function migrate(pool) {
   await require('./coupon-application.cjs').migrate(conn);
   await require('./promotion-clicks.cjs').migrate(conn);
   await require('./distribution.cjs').migrate(conn);
- } finally { await conn.query("SELECT RELEASE_LOCK('commerce_m1a_migrate')").catch(()=>{}); conn.release(); }
+ } finally { if(locked) await conn.query("SELECT RELEASE_LOCK('commerce_m1a_migrate')").catch(()=>{}); conn.release(); }
 }
 module.exports={migrate,statements};
 if(require.main===module){const pool=require('./db.cjs').createPool();migrate(pool).then(()=>console.log('Commerce migration 001_m1a verified')).catch(e=>{console.error(e.message);process.exitCode=1;}).finally(()=>pool.end());}

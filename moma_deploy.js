@@ -68,7 +68,7 @@ const os = require('os');
 
   async function httpRequest(method, url, headers, body) {
     const json = await httpFetch(method, url, headers, body);
-    if (json.errno !== 0) { console.error(`API error: ${json.msg || json.error}`); process.exit(1); }
+    if (json.errno !== 0) { console.error(`API error: ${json.msg || json.errmsg || json.error}`); process.exit(1); }
     return json;
   }
 
