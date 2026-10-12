@@ -714,6 +714,8 @@ function isVendorHmacPath(urlPath, method) {
 }
 
 const OPEN_API_HOST_PREFIX = 'test-xjz-open';
+// 暂时放开 test-xjz-open 的路径限制。判定与白名单留在下面，恢复时改回 true。
+const OPEN_API_HOST_GATE = false;
 
 function requestHostnames(req) {
   const headers = (req && req.headers) || {};
@@ -750,6 +752,7 @@ function isOpenApiAllowedPath(urlPath, method) {
 }
 
 function rejectUnlessOpenApi(req, res, urlPath) {
+  if (!OPEN_API_HOST_GATE) return false;
   if (!isOpenApiHost(req) || isOpenApiAllowedPath(urlPath, req.method)) return false;
   const body = JSON.stringify({ error: 'not_found' });
   res.writeHead(404, {
@@ -1256,6 +1259,7 @@ module.exports.isOpenApiHost = isOpenApiHost;
 module.exports.isOpenApiAllowedPath = isOpenApiAllowedPath;
 module.exports.rejectUnlessOpenApi = rejectUnlessOpenApi;
 module.exports.OPEN_API_HOST_PREFIX = OPEN_API_HOST_PREFIX;
+module.exports.OPEN_API_HOST_GATE = OPEN_API_HOST_GATE;
 module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
@@ -2326,7 +2330,7 @@ const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
 
-  // test-xjz-open* 只暴露商家 HMAC 开放接口、房源接入文档、入驻申请页及其接口。
+  // test-xjz-open* 的路径白名单仍由 rejectUnlessOpenApi 判定；OPEN_API_HOST_GATE 关闭时不拦截。
   if (rejectUnlessOpenApi(req, res, rawPath)) return;
 
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
