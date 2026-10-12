@@ -145,6 +145,7 @@ export default function Home() {
           ))}
         </div>
 
+        {/* 暂隐藏：旅居周刊入口卡
         <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
           <div className="fbg" />
           <div className="fin">
@@ -157,6 +158,7 @@ export default function Home() {
             <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
           </div>
         </Link>
+        */}
 
         {!postsHide ? (
           <div>
