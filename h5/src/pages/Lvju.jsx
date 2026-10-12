@@ -184,6 +184,7 @@ export default function Lvju() {
 
   return (
     <div className="chan-page">
+      {/* 暂隐藏：频道顶栏
       <div className="appbar ghost">
         <Link
           className="bk"
@@ -201,6 +202,7 @@ export default function Lvju() {
           旅居<small>短住 · 候鸟 · 康养</small>
         </div>
       </div>
+      */}
 
       <div className="hero-sm lvju">
         <div className="bg" />
