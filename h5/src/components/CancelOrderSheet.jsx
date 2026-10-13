@@ -25,12 +25,12 @@ export default function CancelOrderSheet({ order, onClose, onSuccess }) {
       if (!order.order_no || !phone) {
         throw new Error('缺少订单号或手机号，无法取消');
       }
-      await cancelBooking({
+      const res = await cancelBooking({
         order_no: order.order_no,
         contact_phone: phone,
       });
-      // 等列表/详情刷新完再收尾，避免只关弹窗不拉接口
-      await onSuccess?.(order);
+      // 把接口回包交给页面合并状态（closing/refunding/cancelled），再静默刷新
+      await onSuccess?.(order, res || { ok: true, status: 'cancelled' });
     } catch (e) {
       alert(e.message || '取消失败');
     } finally {

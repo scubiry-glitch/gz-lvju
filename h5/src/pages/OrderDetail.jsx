@@ -4,39 +4,14 @@ import CancelOrderSheet from '../components/CancelOrderSheet.jsx';
 import { myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
+import {
+  UNPAID_PS,
+  applyCancelResult,
+  bookingStatusOf,
+  canCancelBooking,
+} from '../lib/booking-status.js';
 import { formatMoney, formatPrice } from '../lib/price.js';
 import '../styles/order-detail.css';
-
-const REFUND_PS = { refunding: 1, refunded: 1, refund_failed: 1, manual_review: 1 };
-const UNPAID_PS = { unpaid: 1, creating: 1, paying: 1, create_unknown: 1 };
-
-function stOf(o) {
-  if (REFUND_PS[o.pay_status] || REFUND_PS[o.refund_status]) {
-    if (o.pay_status === 'refunding' || o.refund_status === 'refunding') {
-      return ['退款处理中', '退款处理中，请留意到账通知'];
-    }
-    if (
-      o.pay_status === 'refund_failed' ||
-      o.pay_status === 'manual_review' ||
-      o.refund_status === 'refund_failed' ||
-      o.refund_status === 'manual_review'
-    ) {
-      return ['退款异常', '请联系客服处理'];
-    }
-    if (o.status === 'cancelled') return ['已取消 · 已退款', '退款已完成'];
-    return ['已退款', '退款已完成'];
-  }
-  if (o.status === 'pending') {
-    if (o.pay_status === 'unpaid') return ['待支付', '请尽快完成支付，超时将自动取消并释放房态'];
-    if (UNPAID_PS[o.pay_status]) return ['支付确认中', '正在确认支付结果，请稍候'];
-    if (o.pay_status === 'paid') return ['已支付 · 待商家确认', '支付成功，等待商家确认'];
-    if (o.pay_status === 'coupon_funded') return ['已用券 · 待商家确认', '卡券已抵扣，等待商家确认'];
-    return ['待商家确认', '退改口径见下方提示'];
-  }
-  if (o.status === 'confirmed') return ['已确认 · 待入住', '商家已确认，按入住日期到店'];
-  if (o.status === 'cancelled') return ['已取消', '订单已取消'];
-  return [o.status || '—', ''];
-}
 
 function fmtNightAvg(o) {
   const nights = Math.max(Number(o.nights) || 1, 1);
@@ -95,8 +70,8 @@ export default function OrderDetail() {
     <CancelOrderSheet
       order={cxOpen ? order : null}
       onClose={() => setCxOpen(false)}
-      onSuccess={async (o) => {
-        if (o) setOrder({ ...o, status: 'cancelled', can_cancel: false });
+      onSuccess={async (o, res) => {
+        if (o) setOrder(applyCancelResult(o, res));
         setCxOpen(false);
         await load({ silent: true });
       }}
@@ -130,9 +105,9 @@ export default function OrderDetail() {
     );
   }
 
-  const st = stOf(order);
+  const st = bookingStatusOf(order);
   const needPay = order.status === 'pending' && !!UNPAID_PS[order.pay_status];
-  const canCancel = order.status === 'pending' && order.can_cancel !== false;
+  const canCancel = canCancelBooking(order);
   const cover = order.project_cover
     ? { backgroundImage: `url(${assetUrl(order.project_cover)})` }
     : { backgroundImage: 'url(/assets/lvju/xijiang-night.jpg)' };
@@ -145,7 +120,7 @@ export default function OrderDetail() {
     </>
   ) : (
     <>
-      {order.checkin} 入住 · {st[1]}
+      {order.checkin} 入住 · {st[2] || st[0]}
     </>
   );
 

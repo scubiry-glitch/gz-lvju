@@ -5,6 +5,13 @@ import { myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, formatMoney } from '../lib/price.js';
+import {
+  REFUND_PS,
+  UNPAID_PS,
+  applyCancelResult,
+  bookingStatusOf,
+  canCancelBooking,
+} from '../lib/booking-status.js';
 import '../styles/orders.css';
 
 const TABS = [
@@ -13,33 +20,6 @@ const TABS = [
   { id: 'stay', label: '待入住' },
   { id: 'refund', label: '退款售后' },
 ];
-const REFUND_PS = { refunding: 1, refunded: 1, refund_failed: 1, manual_review: 1 };
-const UNPAID_PS = { unpaid: 1, creating: 1, paying: 1, create_unknown: 1 };
-
-function stOf(o) {
-  if (REFUND_PS[o.pay_status] || REFUND_PS[o.refund_status]) {
-    if (o.pay_status === 'refunding' || o.refund_status === 'refunding') return ['退款处理中', 'wait'];
-    if (
-      o.pay_status === 'refund_failed' ||
-      o.pay_status === 'manual_review' ||
-      o.refund_status === 'refund_failed' ||
-      o.refund_status === 'manual_review'
-    )
-      return ['退款异常', 'wait'];
-    if (o.status === 'cancelled') return ['已取消 · 已退款', 'done'];
-    return ['已退款', 'done'];
-  }
-  if (o.status === 'pending') {
-    if (o.pay_status === 'unpaid') return ['待支付', 'wait'];
-    if (UNPAID_PS[o.pay_status]) return ['支付确认中', 'wait'];
-    if (o.pay_status === 'paid') return ['已支付 · 待商家确认', 'stay'];
-    if (o.pay_status === 'coupon_funded') return ['已用券 · 待商家确认', 'stay'];
-    return ['待商家确认', 'wait'];
-  }
-  if (o.status === 'confirmed') return ['已确认 · 待入住', 'stay'];
-  if (o.status === 'cancelled') return ['已取消', 'done'];
-  return [o.status || '—', 'stay'];
-}
 
 function matchTab(o, tab) {
   const ps = o.pay_status || '';
@@ -47,7 +27,7 @@ function matchTab(o, tab) {
   const isRefund = !!(REFUND_PS[ps] || REFUND_PS[rs]);
   if (tab === 'unpaid') return !!UNPAID_PS[ps] && o.status !== 'cancelled';
   if (tab === 'stay') {
-    if (isRefund || o.status === 'cancelled') return false;
+    if (isRefund || o.status === 'cancelled' || ps === 'closing') return false;
     if (o.status === 'confirmed') return true;
     if (o.status === 'pending' && (ps === 'paid' || ps === 'coupon_funded')) return true;
     return false;
@@ -144,7 +124,7 @@ function OrdersBody() {
           </div>
         ) : (
           shown.map((o) => {
-            const st = stOf(o);
+            const st = bookingStatusOf(o);
             const cover = o.project_cover
               ? { backgroundImage: `url(${assetUrl(o.project_cover)})` }
               : { backgroundImage: 'url(/assets/lvju/xijiang-night.jpg)' };
@@ -163,12 +143,22 @@ function OrdersBody() {
                     </div>
                     {o.cancel_policy_text ? <div className="meta">{o.cancel_policy_text}</div> : null}
                     <div className="amt">
-                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 {o.order_no || '—'}
+                      {Number(o.coupon_minor) > 0 ? (
+                        <>
+                          结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付{' '}
+                          <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b>
+                        </>
+                      ) : (
+                        <>
+                          合计 <b>¥{formatPrice(o.price_total)}</b>
+                        </>
+                      )}{' '}
+                      · 订单号 {o.order_no || '—'}
                     </div>
                   </div>
                 </div>
                 <div className="of">
-                  {o.status === 'pending' && o.can_cancel !== false ? (
+                  {canCancelBooking(o) ? (
                     <button type="button" className="cancel" onClick={() => setCx(o)}>
                       取消订单
                     </button>
@@ -204,14 +194,10 @@ function OrdersBody() {
       <CancelOrderSheet
         order={cx}
         onClose={() => setCx(null)}
-        onSuccess={async (o) => {
+        onSuccess={async (o, res) => {
           const no = o && o.order_no;
           if (no) {
-            setItems((prev) =>
-              prev.map((it) =>
-                it.order_no === no ? { ...it, status: 'cancelled', can_cancel: false } : it,
-              ),
-            );
+            setItems((prev) => prev.map((it) => (it.order_no === no ? applyCancelResult(it, res) : it)));
           }
           setCx(null);
           await loadMine({ silent: true });
