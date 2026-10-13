@@ -160,7 +160,7 @@ function BookingInner() {
             title: '待支付订单',
             sub:
               (o.project_name || '旅居预订') +
-              (o.checkin ? ' · ' + o.checkin + ' → ' + (o.checkout || '') : '') +
+              (o.checkin ? ' · ' + o.checkin + ' – ' + (o.checkout || '') : '') +
               (o.nights ? ' · ' + o.nights + ' 晚' : '') +
               (o.price_total != null ? ' · ¥' + formatPrice(o.price_total) : ''),
             contact_phone: o.contact_phone_raw || o.contact_phone || sp.get('phone') || '',
@@ -483,11 +483,11 @@ function BookingInner() {
           ok.pay_status === 'paying' ||
           ok.pay_status === 'create_unknown' ? (
             <button type="button" className="btn pay" onClick={onPay} disabled={paying}>
-              {paying ? '正在拉起收银台…' : '立即支付 →'}
+              {paying ? '正在拉起收银台…' : '立即支付'}
             </button>
           ) : null}
           <Link className="btn ghost" to="/orders">
-            去订单页查状态 →
+            去订单页查状态
           </Link>
         </div>
       </div>

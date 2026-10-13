@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
-import { cancelBooking, myBookings } from '../lib/api.js';
+import CancelOrderSheet from '../components/CancelOrderSheet.jsx';
+import { myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, formatMoney } from '../lib/price.js';
@@ -71,12 +71,14 @@ function OrdersBody() {
   const [loadErr, setLoadErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [cx, setCx] = useState(null);
-  const [cxBusy, setCxBusy] = useState(false);
 
-  const loadMine = useCallback(() => {
-    setLoading(true);
-    setLoadErr('');
-    myBookings()
+  const loadMine = useCallback((opts = {}) => {
+    const silent = !!opts.silent;
+    if (!silent) {
+      setLoading(true);
+      setLoadErr('');
+    }
+    return myBookings()
       .then((j) => setItems(j.items || []))
       .catch((e) => {
         if (e.status === 401) {
@@ -84,9 +86,11 @@ function OrdersBody() {
           goLogin('/orders');
           return;
         }
-        setLoadErr('加载失败');
+        if (!silent) setLoadErr('加载失败');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [clearSession, goLogin]);
 
   useEffect(() => {
@@ -98,20 +102,6 @@ function OrdersBody() {
     if (id === 'all') p.delete('tab');
     else p.set('tab', id);
     setParams(p, { replace: true });
-  }
-
-  async function confirmCancel() {
-    if (!cx || cxBusy) return;
-    setCxBusy(true);
-    try {
-      await cancelBooking({ order_no: cx.order_no, contact_phone: cx.contact_phone_raw || '' });
-      setCx(null);
-      loadMine();
-    } catch (e) {
-      alert(e.message || '取消失败');
-    } finally {
-      setCxBusy(false);
-    }
   }
 
   const shown = items.filter((o) => matchTab(o, tab));
@@ -211,43 +201,22 @@ function OrdersBody() {
         )}
       </div>
 
-      {cx
-        ? createPortal(
-            <div
-              className="cx-mask"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setCx(null);
-              }}
-              role="presentation"
-            >
-              <div className="cx-card" role="dialog" aria-modal="true">
-                <div className="cx-handle" aria-hidden />
-                <h3>确认取消订单？</h3>
-                <p className="cx-sub">取消后不可恢复，房态将立刻释放</p>
-                <div className="cx-info">
-                  <div className="nm">{cx.project_name || `项目#${cx.project_id}`}</div>
-                  <div className="meta">
-                    {cx.checkin} → {cx.checkout} · {cx.nights || '—'} 晚
-                    {cx.order_no ? ` · ${cx.order_no}` : ''}
-                  </div>
-                  <div className="amt">
-                    合计 <b>¥{formatPrice(cx.price_total)}</b>
-                  </div>
-                </div>
-                {cx.cancel_policy_text ? <div className="cx-tip">{cx.cancel_policy_text}</div> : null}
-                <div className="cx-acts">
-                  <button type="button" className="no" onClick={() => setCx(null)} disabled={cxBusy}>
-                    再想想
-                  </button>
-                  <button type="button" className="yes" onClick={confirmCancel} disabled={cxBusy}>
-                    {cxBusy ? '取消中…' : '确认取消'}
-                  </button>
-                </div>
-              </div>
-            </div>,
-            document.querySelector('.app-shell') || document.getElementById('root') || document.body,
-          )
-        : null}
+      <CancelOrderSheet
+        order={cx}
+        onClose={() => setCx(null)}
+        onSuccess={async (o) => {
+          const no = o && o.order_no;
+          if (no) {
+            setItems((prev) =>
+              prev.map((it) =>
+                it.order_no === no ? { ...it, status: 'cancelled', can_cancel: false } : it,
+              ),
+            );
+          }
+          setCx(null);
+          await loadMine({ silent: true });
+        }}
+      />
     </div>
   );
 }
