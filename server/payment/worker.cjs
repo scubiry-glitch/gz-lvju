@@ -23,36 +23,38 @@ function createWorker(I) {
   function checkIdentity(data, p, refund, { allowLegacySparse = false, requireSuccessEvidence = true } = {}) {
     const same = (value, expected) => String(value) === String(expected);
     const match = (ok, message) => assert(ok, message, 502, 'gateway_identity_mismatch');
+    // Gateway payloads use "" for fields the protocol did not fill. That is absence, same as null.
+    const given = value => value != null && value !== '';
     let orderEvidence = false;
     if (refund) {
-      if (data.refundAppOrderId != null) {
+      if (given(data.refundAppOrderId)) {
         match(same(data.refundAppOrderId, refund.app_order_id), '中台退款流水与原单不匹配');
         orderEvidence = true;
       }
-      if (data.appOrderId != null) {
+      if (given(data.appOrderId)) {
         // Some refund schemas explicitly name the refund and also echo the
         // original payment as appOrderId. Neither may refer to an unrelated order.
-        match(same(data.appOrderId, refund.app_order_id) || (data.refundAppOrderId != null && same(data.appOrderId, p.app_order_id)), '中台退款业务单与原单不匹配');
+        match(same(data.appOrderId, refund.app_order_id) || (given(data.refundAppOrderId) && same(data.appOrderId, p.app_order_id)), '中台退款业务单与原单不匹配');
         orderEvidence = orderEvidence || same(data.appOrderId, refund.app_order_id);
       }
-      if (data.businessOrderNo != null) {
+      if (given(data.businessOrderNo)) {
         match(same(data.businessOrderNo, p.app_order_id) || same(data.businessOrderNo, refund.app_order_id), '中台退款关联支付单不匹配');
         orderEvidence = orderEvidence || same(data.businessOrderNo, refund.app_order_id);
       }
     } else {
-      for (const value of [data.appOrderId, data.businessOrderNo]) if (value != null) {
+      for (const value of [data.appOrderId, data.businessOrderNo]) if (given(value)) {
         match(same(value, p.app_order_id), '中台流水与原单不匹配'); orderEvidence = true;
       }
     }
-    if (data.appCode != null) assert(String(data.appCode) === p.app_code, '中台应用不匹配', 502, 'gateway_identity_mismatch');
-    if (data.projectCode != null) assert(String(data.projectCode) === p.project_code, '中台项目不匹配', 502, 'gateway_identity_mismatch');
+    if (given(data.appCode)) assert(String(data.appCode) === p.app_code, '中台应用不匹配', 502, 'gateway_identity_mismatch');
+    if (given(data.projectCode)) assert(String(data.projectCode) === p.project_code, '中台项目不匹配', 502, 'gateway_identity_mismatch');
     // merchantId is an institution identifier in the existing gateway sample,
     // not the collecting merchantNo. Do not guess that these are aliases.
-    const merchants = [data.merchantNo, data.recAndShareInfo?.merchantNo].filter(value => value != null);
+    const merchants = [data.merchantNo, data.recAndShareInfo?.merchantNo].filter(given);
     for (const merchant of merchants) match(same(merchant, p.merchant_no), '中台商户不匹配');
-    for (const payer of [data.ucid, data.userInfo?.ucid]) if (payer != null) match(same(payer, p.payer_ucid), '中台付款身份不匹配');
-    if (data.currency != null) assert(['CNY', '156', 'RMB'].includes(String(data.currency)), '支付币种不匹配', 502, 'gateway_identity_mismatch');
-    const amounts = (refund ? [data.refundAmount ?? data.amount] : [data.amount, data.payAmount, data.orderAmount]).filter(value => value != null);
+    for (const payer of [data.ucid, data.userInfo?.ucid]) if (given(payer)) match(same(payer, p.payer_ucid), '中台付款身份不匹配');
+    if (given(data.currency)) assert(['CNY', '156', 'RMB'].includes(String(data.currency)), '支付币种不匹配', 502, 'gateway_identity_mismatch');
+    const amounts = (refund ? [given(data.refundAmount) ? data.refundAmount : data.amount] : [data.amount, data.payAmount, data.orderAmount]).filter(given);
     for (const amount of amounts) {
       assert(toMinor(amount) === Number(refund ? refund.amount_minor : p.amount_minor), '中台实付金额不匹配', 502, 'gateway_amount_mismatch');
     }
@@ -83,19 +85,38 @@ function createWorker(I) {
     };
   }
   const queryPayload = p => ({ appCode: p.app_code, projectCode: p.project_code, appOrderId: p.app_order_id });
+  // call() throws before `result` is assigned. The body then lives on the error
+  // (payResult for business failures, responseText for HTTP failures).
+  function capturedGatewayResponse(failure) {
+    const body = failure && failure.payResult;
+    if (body != null && typeof body === 'object') return body;
+    const text = failure && typeof failure.responseText === 'string' ? failure.responseText : '';
+    if (!text) return null;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_) { /* keep the raw text below */ }
+    return { httpStatus: failure.httpStatus == null ? null : failure.httpStatus, body: text.slice(0, 4000) };
+  }
+  function gatewayFailureSummary(failure, response) {
+    const code = String((failure && (failure.code || failure.name)) || 'gateway_error');
+    const detail = response && typeof response.error === 'string' ? response.error.trim() : '';
+    return (detail ? `${code}: ${detail}` : code).slice(0, 500);
+  }
   async function gateway(operation, target, request, call) {
     const started = clock(), requestNo = crypto.randomUUID();
     let result, failure;
     try { result = await call(request); rawData(result); return result; }
     catch (e) { failure = e; throw e; }
     finally {
+      const response = result != null ? result : capturedGatewayResponse(failure);
       try {
         await tx(c => c.execute(`INSERT INTO payment_gateway_logs(payment_order_id,payment_refund_id,app_order_id,operation_type,request_no,business_code,trace_id,success_flag,request_json,response_json,error_message,started_at,finished_at)
           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [target.paymentId || null, target.refundId || null, target.appOrderId, operation, requestNo,
-          result?.errno == null ? failure?.errno == null ? null : String(failure.errno) : String(result.errno), result?.traceId || failure?.traceId || null,
-          failure ? 0 : 1, JSON.stringify(sanitize(request)), result ? JSON.stringify(sanitize(result)) : null,
-          failure ? String(failure.code || failure.name || 'gateway_error').slice(0, 500) : null, started, clock()]));
+          response?.errno == null ? failure?.errno == null ? null : String(failure.errno) : String(response.errno), response?.traceId || failure?.traceId || null,
+          failure ? 0 : 1, JSON.stringify(sanitize(request)), response != null ? JSON.stringify(sanitize(response)) : null,
+          failure ? gatewayFailureSummary(failure, response) : null, started, clock()]));
       } catch (e) { logger.warn('payment gateway log failed:', e.code || e.name); }
     }
   }
