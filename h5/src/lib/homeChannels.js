@@ -17,16 +17,23 @@ export const SEARCH_SEGS = [
   { id: 'resale', label: '二手', kind: 'resale' },
 ];
 
+/** 临时全站隐藏（不依赖城市 hidden_home_tabs）；恢复时清空即可 */
+const FORCE_HIDDEN_TABS = new Set(['newhouse', 'resale']);
+
 export function hiddenHomeTabSet(cat) {
   const raw = cat?.city?.hidden_home_tabs;
-  return new Set(Array.isArray(raw) ? raw.map(String) : []);
+  const set = new Set(Array.isArray(raw) ? raw.map(String) : []);
+  FORCE_HIDDEN_TABS.forEach((id) => set.add(id));
+  return set;
 }
 
 /** 隐藏列表为空 = 全部展示。旅居不在 hidden_home_tabs 里。 */
 export function channelShown(id, hidden) {
   if (id === 'all' || id === 'lvju') return true;
+  if (FORCE_HIDDEN_TABS.has(id)) return false;
   const ch = HOME_CHANNELS.find((c) => c.id === id);
   if (!ch?.tab) return true;
+  if (FORCE_HIDDEN_TABS.has(ch.tab)) return false;
   return !hidden.has(ch.tab);
 }
 
