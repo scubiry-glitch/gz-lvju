@@ -350,7 +350,7 @@
 
   <section id="dict">
     <h2><span class="num">3</span> 数据字典</h2>
-    <p>字段与平台房源模型一致、即接口契约本身；带 ★ 为商家写入接口接受的字段，标 <strong>只读出参</strong> 的字段由平台计算下发、传入无效。</p>
+    <p>带 ★ 为商家写入接口接受的字段，标 <strong>只读出参</strong> 的字段由平台计算下发、传入无效。<strong>请求字段放在对象根上，与 §4 示例一致</strong>；说明里写「写入 <code>ext</code>」只表示落库位置，不是要求再包一层 <code>ext</code>。</p>
     <div class="callout info">
       <strong>2026-09 口径调整（价格与住宿规则下放到户型）：</strong>
       ① <code>price_from</code> 改为<strong>选填</strong>，上架闸改为<strong>逐户型校验「能算出默认夜价」</strong>；
@@ -379,7 +379,11 @@
       <tr><td><code>contact_phone</code></td><td>string</td><td>★ 真实联系电话，<strong>11 位手机号</strong>（<code>1</code> 开头；400 号码不接受）。仅入库用于 C 端拨号的虚拟号实时绑定，任何查询接口不回显；可经 <code>projects/update</code> 更新</td></tr>
       <tr><td><code>owner_vendor_id</code></td><td>int</td><td>数据归属商家（签名商家自动写入，不可改）。所有接口按它做行级隔离；订单佣金快照按它取商家档费率</td></tr>
       <tr><td><code>status</code></td><td>string</td><td>★ <code>draft</code> 草稿（默认，新建强制）/ <code>online</code> 上架 / <code>offline</code> 下架</td></tr>
-      <tr><td><code>ext</code></td><td>object</td><td>★ 房源能力与差异属性：<code>online_booking</code>（在线预订）+ <code>online_payment</code>（在线支付，两项至少开启一项，见 5.3）+ <code>insurance</code>（保险标识数组，见 7）+ <code>min_stay_nights</code>（最短连住，<strong>2026-09 起降级为「房源默认值」</strong>，户型级优先，见 5.2）</td></tr>
+      <tr><td><code>min_stay_nights</code></td><td>int</td><td>★ 房源默认最短连住（晚）。<strong>与 4.4 / 4.5 示例一样放在请求根上</strong>，平台写入 <code>projects.ext.min_stay_nights</code>。户型级优先，见 3.2 / 5.2。取值 rental 1–365、minsu 15–365；传 <code>null</code> 或空串清除。列表/详情出参的同名根字段是<strong>生效值</strong>：短于频道默认（rental / minsu 均为 15 晚）时回落 15，不会把下单下限放宽</td></tr>
+      <tr><td><code>insurance</code></td><td>string[]</td><td>★ 保险标识。<strong>放在请求根上</strong>（见 4.4）。枚举见 §7；清空传 <code>[]</code>。出参根字段同时给 <code>insurance</code>（key 数组）与 <code>insurance_types</code>（含 label/icon）</td></tr>
+      <tr><td><code>online_booking</code> / <code>online_payment</code></td><td>bool</td><td>★ 交易能力。<strong>放在请求根上</strong>（见 4.5 / 5.3）。两项至少开启一项；新建时都省略则默认仅开启 <code>online_booking</code></td></tr>
+      <tr><td><code>auto_publish</code></td><td>bool</td><td>★ 评级复核通过后自动上架。<strong>放在请求根上</strong>，<code>true</code> 开启，其它值关闭。见下方 Webhook 一节</td></tr>
+      <tr><td><code>ext</code></td><td>—</td><td><strong>不是入参包装层。</strong>上列能力字段的正式位置是请求根，与 §4 示例一致。详情出参可能带回库存 JSON，<strong>读 <code>min_stay_nights</code> / <code>insurance</code> / <code>online_booking</code> / <code>online_payment</code> 以根字段为准</strong>。同名字段若同时出现在根上和 <code>ext</code> 里，以根上为准</td></tr>
       <tr><td><code>rating_status</code> / <code>rating</code></td><td>—</td><td>审核/评级位：<code>draft → pending → passed / rejected</code>。<strong>passed 是上架前置</strong>；提审走 <code>projects/rating/submit</code>、进度与驳回原因走 <code>projects/rating/status</code>（4.12），列表/详情出参也随行返回</td></tr>
     </table>
 
@@ -550,7 +554,7 @@
     <h3>4.3 房源详情</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/detail</span><span class="desc">含户型明细</span></div>
 <pre><code>{ <span class="tok-key">"id"</span>: <span class="tok-num">1611</span> }
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 同 4.1，另含 address/tags/ext 等 */</span> }, <span class="tok-key">"units"</span>: [ <span class="tok-com">/* 户型数组 */</span> ] }</code></pre>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"project"</span>: { <span class="tok-com">/* 同 4.2 列表项，另含 address/tags；min_stay_nights、insurance、online_booking 在根上 */</span> }, <span class="tok-key">"units"</span>: [ <span class="tok-com">/* 户型数组，min_stay_nights 在户型根上 */</span> ] }</code></pre>
 
     <h3>4.4 创建房源（默认草稿，不入 C 端）</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/create</span><span class="desc">可带 units 一次建全</span></div>
@@ -564,7 +568,7 @@
   <span class="tok-key">"price_from"</span>: <span class="tok-num">2400</span>,             <span class="tok-com">// 选填（2026-09）；不传则各户型自带价</span>
   <span class="tok-key">"contact_phone"</span>: <span class="tok-str">"13800001234"</span>,       <span class="tok-com">// 仅入库（虚拟号绑定），永不回显</span>
   <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>,               <span class="tok-com">// 房源默认值；户型级优先（见 3.2 / §5.2）</span>
-  <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],   <span class="tok-com">// 保险标识（见 §6）</span>
+  <span class="tok-key">"insurance"</span>: [<span class="tok-str">"switch_rental"</span>, <span class="tok-str">"property"</span>],   <span class="tok-com">// 保险标识（见 §7），与最短连住一样放请求根上</span>
   <span class="tok-key">"units"</span>: [
     { <span class="tok-key">"name"</span>: <span class="tok-str">"一居 45㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"1室1厅"</span>, <span class="tok-key">"area_sqm"</span>: <span class="tok-num">45</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">2400</span> },
     <span class="tok-com">// 短租房源可只给夜价（rental 同样生效，2026-09）：</span>
@@ -573,7 +577,8 @@
   <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>                      <span class="tok-com">// 缺省 draft；draft/offline 不出 C 端</span>
 }
 
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"project"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>, <span class="tok-com">/*…*/</span> } }</code></pre>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"message"</span>: <span class="tok-str">"success"</span>, <span class="tok-key">"project"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"status"</span>: <span class="tok-str">"draft"</span>, <span class="tok-key">"min_stay_nights"</span>: <span class="tok-num">15</span>, <span class="tok-com">/* 生效值在根上，不要从 ext 里读 */</span> } }</code></pre>
+    <p class="opt" style="font-size:12.5px;"><code>min_stay_nights</code>、<code>insurance</code>、<code>online_booking</code>、<code>online_payment</code>、<code>auto_publish</code> 都放请求根上，与上面示例一致。不要包进 <code>ext</code>。</p>
 
     <h3>4.5 更新房源</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/projects/update</span><span class="desc">按 id 增量更新，仅传变更字段</span></div>
@@ -828,7 +833,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
     </ul>
 
     <h3>5.2 最短连住（min_stay_nights）</h3>
-    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=15</code> 晚。商家可覆盖，<strong>2026-09 起生效顺序为「户型 &gt; 房源 &gt; 频道默认」</strong>：户型级写 <code>units.ext.min_stay_nights</code>（<code>units/create</code> / <code>units/update</code> 直接传 <code>min_stay_nights</code>），房源级 <code>projects.ext.min_stay_nights</code> 降级为<strong>房源默认值</strong>。取值范围：rental 1–365 晚，minsu 15–365 晚、不得低于 15 晚（越界返回 400）。</p>
+    <p>旅居/短住按<strong>连续入住</strong>售卖：平台缺省口径为 <code>rental=15</code> 晚、<code>minsu=15</code> 晚。商家可覆盖，<strong>2026-09 起生效顺序为「户型 &gt; 房源 &gt; 频道默认」</strong>。入参都在对象根上，与 §4 示例一致：房源默认值用 <code>projects/create</code>、<code>projects/update</code> 的根字段 <code>min_stay_nights</code>（平台写入 <code>projects.ext</code>）；户型用 <code>units[]</code> / <code>units/create</code> / <code>units/update</code> 的根字段 <code>min_stay_nights</code>（平台写入 <code>units.ext</code>）。取值范围：rental 1–365 晚，minsu 15–365 晚、不得低于 15 晚（越界返回 400）。</p>
     <p><strong>整栋单（下单不指定户型）</strong>按<strong>排序最前的户型</strong>取值——与取消政策同一套回退，因此<strong>「最短连住」和「取消政策」两条住宿规则都可以只在户型上配</strong>，不必记住哪个在房源、哪个在户型。</p>
     <p><strong>三处同口径校验</strong>：C 端日历选段、下单页、平台下单接口 <code>POST /api/juzhu/booking</code>（不足返回 400「该房源须连住至少 N 晚」）。下单成功即占用这些晚，取消自动释放。户型数组与房态日历出参均随行返回<strong>生效值</strong> <code>min_stay_nights</code>，页面直接读，不要回落到房源级或自设默认值。</p>
 
@@ -851,7 +856,7 @@ app.post(<span class="tok-str">'/hooks/booking'</span>, (req, res) =&gt; {
   <section id="faq">
     <h2>Webhook 通知与审核自动上架（2026-09-22）</h2>
     <h3>审核通过自动上架（auto_publish）</h3>
-    <p>默认行为：评级复核通过后，商家仍需自行调 <code>projects/status</code> 推 <code>online</code>。若希望<strong>复核通过即自动上架</strong>，在 <code>projects/create</code> 或 <code>projects/update</code> 传 <code>auto_publish: true</code>（存 <code>ext.auto_publish</code>，随时可传 <code>false</code> 关闭）。自动上架复用与商家推送<strong>完全相同</strong>的上架闸（评级通过 / 逐户型默认夜价 &gt; 0 / 图片抽检）与交易方式校验：闸全过 → 直接 <code>online</code>；任一不过 → 保持 <code>draft</code>，具体原因通过 <code>rating.reviewed</code> webhook 的 <code>auto_publish.reason</code> 带回，商家补齐后自行推送上架即可。</p>
+    <p>默认行为：评级复核通过后，商家仍需自行调 <code>projects/status</code> 推 <code>online</code>。若希望<strong>复核通过即自动上架</strong>，在 <code>projects/create</code> 或 <code>projects/update</code> 的请求根上传 <code>auto_publish: true</code>（与 4.4 其它能力字段一样，不要包进 <code>ext</code>；传 <code>false</code> 或其它值即关闭）。自动上架复用与商家推送<strong>完全相同</strong>的上架闸（评级通过 / 逐户型默认夜价 &gt; 0 / 图片抽检）与交易方式校验：闸全过 → 直接 <code>online</code>；任一不过 → 保持 <code>draft</code>，具体原因通过 <code>rating.reviewed</code> webhook 的 <code>auto_publish.reason</code> 带回，商家补齐后自行推送上架即可。</p>
     <h3>评级审核结果 Webhook（rating.reviewed）</h3>
     <p>评级复核（通过 / 驳回）完成时，平台向商家 <code>webhook_url</code> POST 一条签名通知，商家无需再轮询 <code>rating/status</code>。<strong>webhook_url 由商家自助配置</strong>：B 端后台「房源管理」（<code>b-listing-mgmt.html</code>）顶部「🔔 Webhook 通知」卡填写并保存，支持一键发送 <code>webhook.test</code> 连通性测试（同步回传送达结果）；推送与测试统一经平台出网防护层（内网 / 环回 / 云元数据地址拒绝）。</p>
     <table>
