@@ -152,6 +152,7 @@ function getPaymentService() {
     paymentService = createPaymentService({
       createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }),
       payCenter,
+      notifyVendorBooking,
       jobHandlers: { booking_webhook: deliverPaymentWebhook },
     });
   }
