@@ -591,34 +591,58 @@ async function housingProjectsDetail(conn, body, vendorId) {
   });
 }
 
-/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错 */
+/** body.ext 入参源（2026-10-13 商家侧嵌套写法兼容）：ext 对象展开为伪顶层，null/'' 视为未传。
+ *  值可为对象或 JSON 字符串；其余类型/解析失败直接报错，不做静默丢弃。 */
+function extSrcFromBody(body) {
+  const raw = body == null ? null : body.ext;
+  if (raw == null || raw === '') return {};
+  if (typeof raw === 'string') {
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object' && !Array.isArray(o)) return o;
+    } catch (_) { /* 落到下方统一报错 */ }
+    throw new Error('ext 须为对象');
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('ext 须为对象');
+  return raw;
+}
+
+/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错。
+ *  字段来源兼容两处：body 顶层（优先）与 body.ext 对象（2026-10-13 兼容商家嵌套写法）。 */
 function extFromBody(body, baseExt, channel) {
+  const src = extSrcFromBody(body);
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k) || Object.prototype.hasOwnProperty.call(src, k);
+  const from = (k) => (Object.prototype.hasOwnProperty.call(body, k) ? body[k] : src[k]);
   let ext = Object.assign({}, stayCfg.parseExtObj(baseExt));
-  if (Object.prototype.hasOwnProperty.call(body, 'insurance')) {
-    if (body.insurance === null || body.insurance === '') ext.insurance = [];
-    else if (Array.isArray(body.insurance)) {
-      const unknown = body.insurance.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
+  if (has('insurance')) {
+    const v = from('insurance');
+    if (v === null || v === '') ext.insurance = [];
+    else if (Array.isArray(v)) {
+      const unknown = v.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
       if (unknown.length) throw new Error('insurance 含未知标识: ' + unknown.join(',') + '（可用: ' + stayCfg.INSURANCE_KEYS.join('/') + '）');
-      ext.insurance = body.insurance.map(String);
+      ext.insurance = v.map(String);
     } else throw new Error('insurance 须为标识数组: ' + stayCfg.INSURANCE_KEYS.join('/'));
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'min_stay_nights')) {
-    if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
+  if (has('min_stay_nights')) {
+    const v = from('min_stay_nights');
+    if (v === null || v === '') delete ext.min_stay_nights;
     else {
-      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, channel);
+      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(v, channel);
     }
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'default_closed')) {
-    if (body.default_closed === null || body.default_closed === '') delete ext.default_closed;
-    else if (stayCfg.normalizeDefaultClosedInput(body.default_closed)) ext.default_closed = true; else delete ext.default_closed;
+  if (has('default_closed')) {
+    const v = from('default_closed');
+    if (v === null || v === '') delete ext.default_closed;
+    else if (stayCfg.normalizeDefaultClosedInput(v)) ext.default_closed = true; else delete ext.default_closed;
   }
   // 审核通过后自动上架（2026-09-22 商家诉求 3.1）：true = 评级复核通过即由平台自动推 online
   //（仍走同一套上架闸与图片抽检；闸不过保持 draft，原因随 rating.reviewed webhook 带回）
-  if (Object.prototype.hasOwnProperty.call(body, 'auto_publish')) {
-    if (body.auto_publish === true || body.auto_publish === 'true') ext.auto_publish = true;
+  if (has('auto_publish')) {
+    const v = from('auto_publish');
+    if (v === true || v === 'true') ext.auto_publish = true;
     else delete ext.auto_publish;
   }
-  ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
+  ext = stayCfg.applyTransactionCapabilities(ext, Object.assign({}, src, body), channel);
   return ext;
 }
 
@@ -777,7 +801,8 @@ async function housingProjectsUpdate(conn, body, vendorId) {
   }
   if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
     || Object.prototype.hasOwnProperty.call(b, 'online_booking') || Object.prototype.hasOwnProperty.call(b, 'online_payment')
-    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')) {
+    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')
+    || b.ext != null && b.ext !== '') {
     let ext;
     try { ext = extFromBody(b, row.ext, row.channel); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }

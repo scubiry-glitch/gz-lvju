@@ -219,6 +219,23 @@ async function catalogEventually(base, projectId, citySlug, want) {
   r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, insurance: ['not_exist'] }));
   check('未知保险标识被拒 400', r.status === 400, JSON.stringify(r.j));
 
+  // ── 4.5) ext 对象嵌套写法（2026-10-13 商家侧兼容）：ext 内同名字段视同顶层 ──
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, {
+    id: pid, ext: { online_booking: true, online_payment: true, min_stay_nights: 25 },
+  }));
+  check('update ext 嵌套写法生效（能力位 + 收紧连住）', r.status === 200
+    && r.j.project.online_booking === true && r.j.project.online_payment === true
+    && r.j.project.min_stay_nights === 25, JSON.stringify(r.j));
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, ext: [1, 2] }));
+  check('ext 非对象被拒 400', r.status === 400 && /ext 须为对象/.test(r.j.message || ''), JSON.stringify(r.j));
+  // 还原（后续下单用例固定 20 晚，依赖 min_stay=20；能力位沿用 create 时的单开预订）
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, {
+    id: pid, online_booking: true, online_payment: false, min_stay_nights: 20,
+  }));
+  check('update 顶层数值还原（优先级：顶层 > ext）', r.status === 200
+    && r.j.project.online_booking === true && r.j.project.online_payment === false
+    && r.j.project.min_stay_nights === 20, JSON.stringify(r.j));
+
   // ── 5) 房态：关房 → 恢复默认价 ──
   const d1 = '2026-12-10', d2 = '2026-12-11';
   r = await call('/api/juzhu/housing/vendor/stay-calendar/set', signed(vendor, {
