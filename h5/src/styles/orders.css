@@ -230,19 +230,15 @@
   border-color: #fecaca;
 }
 
+/* 挂到 .app-shell 内 absolute 铺满，盖住底部 tab（z-index: 25） */
 .cx-mask {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  z-index: 90;
+  position: absolute;
+  inset: 0;
+  z-index: 200;
   background: rgba(8, 18, 16, 0.55);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  left: 50%;
-  width: 100%;
-  max-width: 430px;
-  transform: translateX(-50%);
   padding-bottom: env(safe-area-inset-bottom);
 }
 

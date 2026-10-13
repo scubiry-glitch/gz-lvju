@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cancelBooking, myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
@@ -210,40 +211,43 @@ function OrdersBody() {
         )}
       </div>
 
-      {cx ? (
-        <div
-          className="cx-mask"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setCx(null);
-          }}
-          role="presentation"
-        >
-          <div className="cx-card" role="dialog" aria-modal="true">
-            <div className="cx-handle" aria-hidden />
-            <h3>确认取消订单？</h3>
-            <p className="cx-sub">取消后不可恢复，房态将立刻释放</p>
-            <div className="cx-info">
-              <div className="nm">{cx.project_name || `项目#${cx.project_id}`}</div>
-              <div className="meta">
-                {cx.checkin} → {cx.checkout} · {cx.nights || '—'} 晚
-                {cx.order_no ? ` · ${cx.order_no}` : ''}
+      {cx
+        ? createPortal(
+            <div
+              className="cx-mask"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setCx(null);
+              }}
+              role="presentation"
+            >
+              <div className="cx-card" role="dialog" aria-modal="true">
+                <div className="cx-handle" aria-hidden />
+                <h3>确认取消订单？</h3>
+                <p className="cx-sub">取消后不可恢复，房态将立刻释放</p>
+                <div className="cx-info">
+                  <div className="nm">{cx.project_name || `项目#${cx.project_id}`}</div>
+                  <div className="meta">
+                    {cx.checkin} → {cx.checkout} · {cx.nights || '—'} 晚
+                    {cx.order_no ? ` · ${cx.order_no}` : ''}
+                  </div>
+                  <div className="amt">
+                    合计 <b>¥{formatPrice(cx.price_total)}</b>
+                  </div>
+                </div>
+                {cx.cancel_policy_text ? <div className="cx-tip">{cx.cancel_policy_text}</div> : null}
+                <div className="cx-acts">
+                  <button type="button" className="no" onClick={() => setCx(null)} disabled={cxBusy}>
+                    再想想
+                  </button>
+                  <button type="button" className="yes" onClick={confirmCancel} disabled={cxBusy}>
+                    {cxBusy ? '取消中…' : '确认取消'}
+                  </button>
+                </div>
               </div>
-              <div className="amt">
-                合计 <b>¥{formatPrice(cx.price_total)}</b>
-              </div>
-            </div>
-            {cx.cancel_policy_text ? <div className="cx-tip">{cx.cancel_policy_text}</div> : null}
-            <div className="cx-acts">
-              <button type="button" className="no" onClick={() => setCx(null)} disabled={cxBusy}>
-                再想想
-              </button>
-              <button type="button" className="yes" onClick={confirmCancel} disabled={cxBusy}>
-                {cxBusy ? '取消中…' : '确认取消'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.querySelector('.app-shell') || document.getElementById('root') || document.body,
+          )
+        : null}
     </div>
   );
 }
