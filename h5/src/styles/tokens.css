@@ -38,6 +38,8 @@ body,
   margin: 0;
   height: 100%;
   width: 100%;
+  /* 禁止双击/捏合放大（配合 viewport user-scalable=no） */
+  touch-action: manipulation;
 }
 
 body {
@@ -49,6 +51,7 @@ body {
   -webkit-font-smoothing: antialiased;
   display: flex;
   justify-content: center;
+  overscroll-behavior: none;
 }
 
 /* 对齐 html 页 .app：作为 body flex 子项必须自带 width，否则会按内容收缩（曾缩到 ~362px） */

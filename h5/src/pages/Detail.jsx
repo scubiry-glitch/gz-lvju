@@ -215,7 +215,6 @@ export default function Detail() {
         const first = qUnit && us.some((u) => u.id === qUnit) ? qUnit : us[0]?.id || 0;
         setSelUnit(first);
         setProfileUnit(first);
-        document.title = (proj.name || '房源详情') + ' · 贝壳找房旅居';
       })
       .catch((e) => {
         if (!alive) return;

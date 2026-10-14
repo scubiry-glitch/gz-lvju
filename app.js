@@ -1821,6 +1821,13 @@ function normalizeUnitExtInput(value, channel) {
     if (ext.default_closed === null || ext.default_closed === '') delete ext.default_closed;
     else if (stayCfg.normalizeDefaultClosedInput(ext.default_closed)) ext.default_closed = true; else delete ext.default_closed;
   }
+  // 免费取消政策（房型维度，2026-09-09）：与商家接口 units/create|update 同一口径（stay_config 单一数据源）；
+  // null/'' = 清除（回落「未启用，不可取消」）。原先仅在 PUT /admin/units/:id 里兜底，创建户型走的是
+  // 这里透传 → 管理端拼错口径会原样落库（读取侧静默回落 disabled）。
+  if ('cancel_policy' in ext) {
+    if (ext.cancel_policy === null || ext.cancel_policy === '') delete ext.cancel_policy;
+    else ext.cancel_policy = normalizeCancelPolicyInput(ext.cancel_policy);
+  }
   return ext;
 }
 

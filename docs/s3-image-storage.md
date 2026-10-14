@@ -219,6 +219,7 @@ POST /api/juzhu/housing/vendor/photos/upload
 | 读图 404 | key 拼错 / 对象未上传；用 `storage/status` 的 `sample_public_url` 对照 |
 | `PUT` 返回 200 但对象 0 字节 | 客户端未真正发送 body（诊断法：看 `ETag` 是否 `d41d8cd9…`＝空串 MD5） |
 | 上传成功但无缩略图 | 未安装 `sharp`（可选依赖）→ `npm install` |
+| 上架返回 `warnings: 抽检未取到图 …：服务端未安装图片解析库（sharp）` | **已修复（2026-10-14）**：抽检尺寸改由 `photo_config.readImageSize()` 零依赖解析（jpg/png/gif/webp/bmp），不再因缺 `sharp` 把服务端缺件当成「图片不可达」放行。`sharp` 现在只服务缩略图/归一化，装不上也只影响这两项 |
 | 桶级 `HEAD/GET` 403 | 无 ListBucket 权限，属正常；探测请用对象级 PUT 探针（脚本已如此实现） |
 | `400 file_path 非法` | 引用既非本地路径、也非本域 key/URL → 新逻辑**拒绝脏值**；`-` / `todo` / 含 `..` 的路径会被拒 |
 | `415 需要 multipart/form-data` | 走了 `/admin/units/:id/photos` 的 multipart 分支但请求不是 multipart；JSON 分支请带 `Content-Type: application/json` |

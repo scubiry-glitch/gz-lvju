@@ -205,6 +205,27 @@ async function catalogEventually(base, projectId, citySlug, want) {
     project_id: pid, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200,
   }));
   check('units/create → 200', r.status === 200 && r.j.unit && r.j.unit.id, JSON.stringify(r.j));
+
+  // 3-1 取消政策必须能**创建即落库**（2026-10-14 修复：createUnit 漏处理 cancel_policy，
+  //     字段被静默丢弃 → 出参回落 disabledCancelPolicy()（enabled:false / 18:00），商家看到 200 以为已生效）
+  {
+    r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, {
+      project_id: pid, name: '取消政策户型-临时',
+      cancel_policy: { enabled: true, days_before: 1, cutoff_time: '12:00' },
+    }));
+    const cpn = r.j && r.j.unit && r.j.unit.cancel_policy;
+    check('3-1 units/create 带 cancel_policy → 落库并回显 enabled=true / 12:00',
+      r.status === 200 && cpn && cpn.enabled === true && cpn.days_before === 1 && cpn.cutoff_time === '12:00'
+      && /12:00/.test(r.j.unit.cancel_policy_text || ''),
+      JSON.stringify(cpn || r.j).slice(0, 200));
+    const cpUnit = r.j && r.j.unit && r.j.unit.id;
+    r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, {
+      project_id: pid, name: '取消政策户型-非法', cancel_policy: { enabled: true, cutoff_time: '25:00' },
+    }));
+    check('3-1b units/create 非法 cutoff_time → 400（与 update 同口径）',
+      r.status === 400 && /cutoff_time/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 200));
+    if (cpUnit) await call('/api/juzhu/housing/vendor/units/delete', signed(vendor, { id: cpUnit }));
+  }
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'online' }));
   check('上架 online → 200', r.status === 200 && r.j.status === 'online', JSON.stringify(r.j));
   check('C 端 catalog 可见（online，等待 15s 缓存过期）', await catalogEventually(BASE, pid, city.slug, true));
@@ -697,6 +718,26 @@ async function catalogEventually(base, projectId, citySlug, want) {
       && r.j.cover === U(4) && r.j.photos.filter((x) => x.is_cover).length === 1,
       JSON.stringify((r.j.photos || []).map((x) => [x.file_path.slice(-6), x.sort_order, x.category])));
 
+    // 11-1c 图片引用收口（2026-10-14 修复）：sync 写库必须记 source_path 存档。
+    //  原先直接把入参 URL 原样入库、不记 source_path —— 商家推的是自家对象存储的**临时签名 URL**
+    //  （5 天失效），过期后 C 端整页 404；source_path 为空还会让 photos/add 的幂等前置
+    //  与 deleteObjectByRef「只删本域引用」失去依据。
+    check('11-1c sync 记 source_path 存档（原地址可追溯、幂等前置可匹配）',
+      r.status === 200 && r.j.photos.every((x) => !!x.source_path),
+      JSON.stringify((r.j.photos || []).map((x) => x.source_path && x.source_path.slice(-10))));
+    // 11-1d 未镜像（回归默认 IMG_INGEST=keep）时不得静默：**带签名的临时地址**必须给可诊断告警
+    //  （普通 CDN 直链不告警，避免每次推送刷屏）
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, {
+      project_id: pid4, unit_id: u4,
+      photos: [{ url: U(1) + '?X-Amz-Expires=432000&X-Amz-Signature=deadbeef', external_id: 'SIGNED-1', category: 'living' }],
+    }));
+    check('11-1d 带签名临时地址未镜像 → 响应带 warnings（原先静默原样入库）',
+      r.status === 200 && r.j.added === 1
+      && (r.j.warnings || []).some((w) => /带签名的临时地址/.test(w)),
+      JSON.stringify(r.j.warnings));
+    // 复原 g1 图集，供后续 11-2 起的用例继续做覆盖计数
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g1 }));
+
     // 11-2 再推一次：去掉 2 张、新增 1 张、改顺序与分类 → 图集应精确等于传入
     const g2 = gallery(6).concat([mk(99, { category: 'living' })]);
     g2.forEach((x, i) => { x.sort = i; });
@@ -794,6 +835,23 @@ async function catalogEventually(base, projectId, citySlug, want) {
       && photoCfg.ipIsBlocked('169.254.169.254') && photoCfg.ipIsBlocked('192.168.1.1')
       && photoCfg.ipIsBlocked('::1') && photoCfg.ipIsBlocked('fd00::1')
       && !photoCfg.ipIsBlocked('8.8.8.8') && !photoCfg.ipIsBlocked('2400:3200::1'));
+
+    // 11-9g 尺寸解析零依赖（sharp 缺失也必须能判；2026-10-14 线上「未安装 sharp」→ 抽检失效）
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(8), Buffer.from([0, 0, 0x04, 0x00, 0, 0, 0x03, 0x00])]);   // IHDR 1024×768
+    const jpg = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(6, 0xff),
+      Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x00, 0x04, 0x00, 0x03])]);  // SOF0 1024×768
+    const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'),
+      Buffer.from('VP8X'), Buffer.alloc(8), Buffer.from([0xff, 0x03, 0x00, 0xff, 0x02, 0x00])]); // 1024×768
+    const dim = (b) => photoCfg.readImageSize(b) || {};
+    check('11-9g 零依赖读尺寸：png/jpeg/webp 均取到 1024×768，HTML 非图 → null',
+      dim(png).width === 1024 && dim(png).height === 768
+      && dim(jpg).width === 1024 && dim(jpg).height === 768
+      && dim(webp).width === 1024 && dim(webp).height === 768
+      && photoCfg.readImageSize(Buffer.from('<html><body>404</body></html>')) === null,
+      JSON.stringify({ png: dim(png), jpg: dim(jpg), webp: dim(webp) }));
+    check('11-9h 非图（200 HTML）→ rejected 阻断，不再因缺 sharp 退化成 unreachable 放行',
+      photoCfg.judgeProbe({ bytes: 27, width: null, height: null, parseFailed: true }).status === 'rejected');
   }
 
   // ── 5.12) 房间档案 room_profile（Excel 房源字段，2026-09 开放给商家接口）──
