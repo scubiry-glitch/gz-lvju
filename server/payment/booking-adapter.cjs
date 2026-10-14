@@ -171,23 +171,23 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
   }
 
   // 与线下 C 端取消（booking.cjs）同一份订单摘要、同一时点：状态变为 cancelled 即推，
-  // 不等待退款到账。商家拒单与超时关单不推。
+  // 不等待退款到账。客户取消 cancel_by=customer；超时未支付 cancel_by=expired。商家拒单不推。
   function customerCancel(input) {
     return !['vendor', 'system'].includes(input && input.source);
   }
 
-  function emitCancelled(order, payStatus) {
+  function emitCancelled(order, payStatus, cancelBy = 'customer') {
     if (typeof notifyVendorBooking !== 'function' || !order || !order.owner_vendor_id) return;
     notifyVendorBooking(order.owner_vendor_id, 'booking.cancelled', {
       id: order.id, order_no: order.order_no, project_id: order.project_id, unit_id: order.unit_id || null,
       channel: order.channel || null, checkin: order.checkin, checkout: order.checkout,
       nights: order.nights, price_total: Number(order.price_total),
-      status: 'cancelled', pay_status: payStatus, cancel_by: 'customer',
+      status: 'cancelled', pay_status: payStatus, cancel_by: cancelBy,
     });
   }
 
-  function publishCancelled(order, payStatus, hooks) {
-    const send = () => emitCancelled(order, payStatus);
+  function publishCancelled(order, payStatus, hooks, cancelBy = 'customer') {
+    const send = () => emitCancelled(order, payStatus, cancelBy);
     if (hooks && typeof hooks.afterCommit === 'function') hooks.afterCommit(send);
     else send();
   }
@@ -267,16 +267,16 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
     const errors = [];
     for (const row of rows) {
       try {
-        requested += await transaction(async c => {
+        const outcome = await transaction(async c => {
           const initial = await load(c, row.order_no);
           if (initial.pay_status === 'coupon_funded') {
             const order = await load(c, row.order_no, true);
-            if (order.status !== 'pending' || order.pay_status !== 'coupon_funded' || !order.payment_expires_at || !expired(order.payment_expires_at)) return 0;
+            if (order.status !== 'pending' || order.pay_status !== 'coupon_funded' || !order.payment_expires_at || !expired(order.payment_expires_at)) return { n: 0 };
             await require('../../commerce/coupon-application.cjs').transition(c, {bizType:'booking',orderNo:order.order_no,
               from:['reserved','committed'],to:'released',evidence:{reason:'booking_expired'}});
             await c.execute("UPDATE booking_orders SET status='cancelled',pay_status='expired',updated_at=? WHERE id=?", [sqlDate(),order.id]);
             await release(c,order);
-            return 1;
+            return { n: 1, order };
           }
           const [registered] = await c.execute("SELECT biz_order_no FROM payment_order_guards WHERE biz_type='booking' AND biz_order_no=?", [row.order_no]);
           if (!registered.length && initial.pay_status === 'unpaid') {
@@ -287,16 +287,18 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
               && untouched.payment_expires_at && expired(untouched.payment_expires_at)) {
               await c.execute("UPDATE booking_orders SET status='cancelled',pay_status='expired',updated_at=? WHERE id=?", [sqlDate(), untouched.id]);
               await release(c, untouched);
-              return 1;
+              return { n: 1, order: untouched };
             }
           }
           const guard = await prepare(c, initial);
           const order = await load(c, row.order_no, true);
-          if (guard.paid_payment_id || order.status !== 'pending') return 0;
+          if (guard.paid_payment_id || order.status !== 'pending') return { n: 0 };
           await core.requestClose({ bizType: 'booking', orderId: order.order_no, reason: 'booking_expired', reopen: false }, c);
           await c.execute("UPDATE booking_orders SET pay_status='closing',updated_at=? WHERE id=?", [sqlDate(), order.id]);
-          return 1;
+          return { n: 1 };
         });
+        requested += outcome.n;
+        if (outcome.order) emitCancelled(outcome.order, 'expired', 'expired');
       } catch (error) { errors.push({ orderNo: row.order_no, code: error.code || 'booking_expiry_error' }); }
     }
     return { scanned: rows.length, requested, errors };
@@ -344,8 +346,9 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
       if (order.coupon_application_id) await require('../../commerce/coupon-application.cjs').transition(conn, {
         bizType:'booking',orderNo:order.order_no,from:['reserved','committed'],to:'released',evidence:{payment_event:'order.closed'} });
       await release(conn, order);
-      // 未支付关单要等网关关闭后订单才变为已取消，回调打在这一下，与已支付单“变为已取消即推”同一口径。
-      if (reason === 'booking_cancel') publishCancelled(order, payStatus, hooks);
+      // 未支付关单要等网关关闭后订单才变为已取消。客户取消与超时都在这一下推，已支付单则在变为已取消时推。
+      if (reason === 'booking_cancel') publishCancelled(order, payStatus, hooks, 'customer');
+      else if (/expir/.test(reason)) publishCancelled(order, payStatus, hooks, 'expired');
     }
     if (event.event_type === 'refund.succeeded' && Number(guard.paid_payment_id) === Number(payload.paymentId)) {
       await require('../settlement/business.cjs').onRefundSucceeded(conn, { biz_type: 'booking', order, payload });
