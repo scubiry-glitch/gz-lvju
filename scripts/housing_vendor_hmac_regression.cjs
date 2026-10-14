@@ -794,6 +794,23 @@ async function catalogEventually(base, projectId, citySlug, want) {
       && photoCfg.ipIsBlocked('169.254.169.254') && photoCfg.ipIsBlocked('192.168.1.1')
       && photoCfg.ipIsBlocked('::1') && photoCfg.ipIsBlocked('fd00::1')
       && !photoCfg.ipIsBlocked('8.8.8.8') && !photoCfg.ipIsBlocked('2400:3200::1'));
+
+    // 11-9g 尺寸解析零依赖（sharp 缺失也必须能判；2026-10-14 线上「未安装 sharp」→ 抽检失效）
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(8), Buffer.from([0, 0, 0x04, 0x00, 0, 0, 0x03, 0x00])]);   // IHDR 1024×768
+    const jpg = Buffer.concat([Buffer.from([0xff, 0xd8]), Buffer.alloc(6, 0xff),
+      Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x00, 0x04, 0x00, 0x03])]);  // SOF0 1024×768
+    const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBP'),
+      Buffer.from('VP8X'), Buffer.alloc(8), Buffer.from([0xff, 0x03, 0x00, 0xff, 0x02, 0x00])]); // 1024×768
+    const dim = (b) => photoCfg.readImageSize(b) || {};
+    check('11-9g 零依赖读尺寸：png/jpeg/webp 均取到 1024×768，HTML 非图 → null',
+      dim(png).width === 1024 && dim(png).height === 768
+      && dim(jpg).width === 1024 && dim(jpg).height === 768
+      && dim(webp).width === 1024 && dim(webp).height === 768
+      && photoCfg.readImageSize(Buffer.from('<html><body>404</body></html>')) === null,
+      JSON.stringify({ png: dim(png), jpg: dim(jpg), webp: dim(webp) }));
+    check('11-9h 非图（200 HTML）→ rejected 阻断，不再因缺 sharp 退化成 unreachable 放行',
+      photoCfg.judgeProbe({ bytes: 27, width: null, height: null, parseFailed: true }).status === 'rejected');
   }
 
   // ── 5.12) 房间档案 room_profile（Excel 房源字段，2026-09 开放给商家接口）──
