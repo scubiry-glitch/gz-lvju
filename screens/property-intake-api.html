@@ -774,7 +774,7 @@
       <tr><th>event</th><th>触发时机</th><th>商家应做什么</th></tr>
       <tr><td><code>booking.created</code></td><td>客户提交预订单</td><td>备房；预付单等待支付到账</td></tr>
       <tr><td><code>booking.paid</code></td><td>预付单支付完成（民宿民宿）</td><td>此时方可确认订单</td></tr>
-      <tr><td><code>booking.cancelled</code></td><td>客户取消。线上、线下都在订单变为已取消时推送；已支付单此时为退款处理中，不等退款到账。商家自己拒单不推送</td><td>释放已备房源</td></tr>
+      <tr><td><code>booking.cancelled</code></td><td>客户取消，或超过支付时限自动取消。都在订单变为已取消时推送；已支付的客户取消此时为退款处理中，不等退款到账。超时单 <code>cancel_by</code> 为 <code>expired</code>、<code>pay_status</code> 为 <code>expired</code>。商家自己拒单不推送</td><td>释放已备房源</td></tr>
     </table>
     <p>推送为 <code>POST</code> JSON，body 即开放接口同款结构：<code>event</code> + <code>vendor_id</code> + <code>order</code>（订单对象，手机号不外传）+ <code>timestamp</code> + <code>sign</code>。<strong>验签与开放接口同一算法</strong>（对去掉 <code>sign</code>/<code>timestamp</code> 的参数扁平排序后 HMAC-SHA256），收到后先验签再处理：</p>
 <pre><code><span class="tok-com">// Node 验签示例（与平台 hmac_auth.cjs 同算法）</span>

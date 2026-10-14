@@ -326,7 +326,15 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     const row = (await db('SELECT status,pay_status FROM booking_orders WHERE order_no=?', [orderNo]))[0];
     assert.equal(row.status, 'cancelled'); assert.equal(row.pay_status, 'expired');
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total), before - 1);
+    const notice = cancelNotices.at(-1);
+    assert.equal(notice.event, 'booking.cancelled');
+    assert.equal(notice.order.order_no, orderNo);
+    assert.equal(notice.order.cancel_by, 'expired');
+    assert.equal(notice.order.pay_status, 'expired');
+    assert.equal(notice.order.contact_phone, undefined);
+    const sent = cancelNotices.length;
     await adapter.expire(); await consume();
+    assert.equal(cancelNotices.length, sent);
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total), before - 1);
   });
 
@@ -346,6 +354,32 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     assert.equal((await db('SELECT status FROM commerce_coupons WHERE id=?',[couponId]))[0].status,'available');
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total),before-1);
     assert.equal(Number((await db("SELECT COUNT(*) n FROM payment_order_guards WHERE biz_type='booking' AND biz_order_no=?",[orderNo]))[0].n),0);
+    const notice = cancelNotices.at(-1);
+    assert.equal(notice.event, 'booking.cancelled');
+    assert.equal(notice.order.order_no, orderNo);
+    assert.equal(notice.order.cancel_by, 'expired');
+    assert.equal(notice.order.pay_status, 'expired');
+  });
+
+  await t.test('unpaid order with a cashier notifies once when the payment window expires', async () => {
+    const orderNo = await booking();
+    await intent(orderNo, 'booking-expire-request'); await work();
+    await db("UPDATE booking_orders SET payment_expires_at='2020-01-01 00:00:00' WHERE order_no=?", [orderNo]);
+    const beforeNotices = cancelNotices.length;
+    const result = await adapter.expire();
+    assert.equal(result.errors.length, 0);
+    assert.equal(result.requested, 1);
+    assert.equal(cancelNotices.length, beforeNotices);
+    await work(); await work(); await consume();
+    const row = (await db('SELECT status,pay_status FROM booking_orders WHERE order_no=?', [orderNo]))[0];
+    assert.equal(row.status, 'cancelled');
+    assert.equal(row.pay_status, 'expired');
+    assert.equal(cancelNotices.length, beforeNotices + 1);
+    assert.equal(cancelNotices.at(-1).order.cancel_by, 'expired');
+    assert.equal(cancelNotices.at(-1).order.pay_status, 'expired');
+    assert.equal(cancelNotices.at(-1).order.contact_phone, undefined);
+    await adapter.expire(); await consume();
+    assert.equal(cancelNotices.length, beforeNotices + 1);
   });
 
   await t.test('legacy paid and pending refund import retain original merchant and only query the refund', async () => {
