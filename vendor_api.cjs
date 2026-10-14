@@ -30,6 +30,30 @@ async function normCoverRef(ref, opts) {
   return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
 }
 
+/** 该引用是否已是平台对象存储（本域 S3）里的受管引用 */
+function isManagedS3Ref(p) {
+  return !!(imgStorage && typeof imgStorage.parse === 'function' && imgStorage.parse(p).kind === 's3');
+}
+
+/** 源地址归一：http(s) 一律剥掉查询串（商家签名 URL 的 X-Amz-Date/Signature 每次推送都在变） */
+function sourceKeyOf(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!/^https?:\/\//i.test(s)) return s;
+  try { const x = new URL(s); return x.origin + x.pathname; } catch (_) { return s; }
+}
+
+/** 是否同一张图（按去签名的源地址比对）：判断能否复用已镜像的存量引用 */
+function sameImageSource(a, b) {
+  const ka = sourceKeyOf(a);
+  return !!ka && ka === sourceKeyOf(b);
+}
+
+/** 是否「带签名/时效」的临时地址（S3 预签名、OSS、CDN 防盗链 alike）——这类地址会过期，未镜像就是定时炸弹 */
+function looksSignedUrl(u) {
+  return /[?&](x-amz-signature|x-amz-expires|x-amz-credential|signature|ossaccesskeyid|expires|auth_key)=/i
+    .test(String(u == null ? '' : u));
+}
+
 function reply(status, data) {
   return { status, data };
 }
@@ -1276,8 +1300,6 @@ async function housingPhotosSync(conn, body, vendorId) {
   try { norm = photoCfg.normalizeGalleryInput(b.photos); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const items = photoCfg.assignSortOrders(norm.items);
-  const coverIdx = photoCfg.pickCoverIndex(items);
-  const cover = coverIdx >= 0 ? items[coverIdx].file_path : (items[0] ? items[0].file_path : null);
 
   const [existing] = await conn.execute(
     'SELECT * FROM photos WHERE entity_type=? AND entity_id=? ORDER BY sort_order, id', [entityType, entityId]);
@@ -1297,6 +1319,43 @@ async function housingPhotosSync(conn, body, vendorId) {
   const delRows = existing.filter((r) => !keptIds.has(r.id));
   const deleteObjects = String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1';
 
+  // ── 图片引用收口（规则 21/300：所有 file_path 写入必须经 img_storage.ingestRef）──
+  // 2026-10-14 修复：原先直接把入参 URL 写库，导致外链既不镜像进平台对象存储、也不记 source_path。
+  // 后果：商家推的是自家对象存储的**临时签名 URL**（X-Amz-Expires=432000 → 5 天后失效，长度已达 489，
+  // 距 photos.file_path 的 VARCHAR(500) 仅剩 11 字符余量），签名过期后 C 端整页 404；且 source_path
+  // 为空会让 photos/add 的幂等前置与 deleteObjectByRef 的「只删本域引用」双双失去依据。
+  // 镜像在事务**之前**做完（网络 I/O 不占锁），失败按 photos/add 同口径 400 显式暴露。
+  const warnings = norm.warnings.slice();
+  const resolved = [];
+  let externalKept = 0;
+  let externalWarn = '';
+  for (let i = 0; i < plan.length; i++) {
+    const { it, hit } = plan[i];
+    // 已镜像过的同一张图：按**剥掉查询串**的源地址比对（签名每次推送都在变）→ 复用存量引用，
+    // 免得每次全量覆盖都白传一份对象 + 两档缩略图，也让 C 端引用保持稳定。
+    if (hit && isManagedS3Ref(hit.file_path) && sameImageSource(hit.source_path, it.file_path)) {
+      resolved.push({ it, hit, ref: hit.file_path, source: hit.source_path || it.file_path });
+      continue;
+    }
+    const r = await normImgRef(it.file_path, { mirror: true, prefix: 'housing', entityType, entityId });
+    if (!r.ok) return reply(400, { code: 400, message: `photos[${i}].url 处理失败: ${r.error}` });
+    if (String(r.ref).length > 500) return reply(400, { code: 400, message: `photos[${i}].url 归一化后长度超过 500` });
+    if (r.ref === it.file_path) {                 // 未镜像（IMG_INGEST != mirror / 镜像回落本地）
+      if (looksSignedUrl(it.file_path)) {         // 只对「会过期的临时地址」告警，普通 CDN 直链不刷屏
+        externalKept += 1;
+        if (r.warn) externalWarn = r.warn;
+      }
+    } else if (r.warn) warnings.push(`photos[${i}] ${r.warn}`);
+    resolved.push({ it, hit, ref: r.ref, source: it.file_path });
+  }
+  if (externalKept) {
+    warnings.push(`有 ${externalKept} 张是带签名的临时地址且未镜像进平台对象存储（${externalWarn || '未镜像'}）：`
+      + '签名过期后 C 端会 404，建议服务端开 IMG_INGEST=mirror');
+  }
+  const coverIdx = photoCfg.pickCoverIndex(items);
+  const coverItem = coverIdx >= 0 ? coverIdx : 0;
+  const cover = resolved.length ? resolved[coverItem].ref : null;
+
   await conn.beginTransaction();
   try {
     let removed = 0;
@@ -1307,18 +1366,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     }
     let added = 0;
     let updated = 0;
-    for (const { it, hit } of plan) {
-      const isCover = it.file_path === cover ? 1 : 0;
+    for (let i = 0; i < resolved.length; i++) {
+      const { it, hit, ref, source } = resolved[i];
+      const isCover = i === coverItem ? 1 : 0;
       if (hit) {
         await conn.execute(
-          'UPDATE photos SET file_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
-          [it.file_path, it.category, it.sort_order, isCover, it.external_id, hit.id]);
+          'UPDATE photos SET file_path=?, source_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
+          [ref, source, it.category, it.sort_order, isCover, it.external_id, hit.id]);
         updated++;
       } else {
         await conn.execute(
-          `INSERT INTO photos(entity_type, entity_id, file_path, category, sort_order, is_cover, external_id)
-           VALUES (?,?,?,?,?,?,?)`,
-          [entityType, entityId, it.file_path, it.category, it.sort_order, isCover, it.external_id]);
+          `INSERT INTO photos(entity_type, entity_id, file_path, source_path, category, sort_order, is_cover, external_id)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [entityType, entityId, ref, source, it.category, it.sort_order, isCover, it.external_id]);
         added++;
       }
     }
@@ -1340,7 +1400,6 @@ async function housingPhotosSync(conn, body, vendorId) {
       }
     }
 
-    const warnings = norm.warnings.slice();
     const total = await galleryCountOf(conn, projectId);
     if (total < photoCfg.PHOTO_MIN_PUBLISH) {
       warnings.push(`该房源图集合计 ${total} 张，低于上架所需的 ${photoCfg.PHOTO_MIN_PUBLISH} 张（房源 + 户型合计）`);

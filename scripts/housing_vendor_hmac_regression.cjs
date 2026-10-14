@@ -718,6 +718,26 @@ async function catalogEventually(base, projectId, citySlug, want) {
       && r.j.cover === U(4) && r.j.photos.filter((x) => x.is_cover).length === 1,
       JSON.stringify((r.j.photos || []).map((x) => [x.file_path.slice(-6), x.sort_order, x.category])));
 
+    // 11-1c 图片引用收口（2026-10-14 修复）：sync 写库必须记 source_path 存档。
+    //  原先直接把入参 URL 原样入库、不记 source_path —— 商家推的是自家对象存储的**临时签名 URL**
+    //  （5 天失效），过期后 C 端整页 404；source_path 为空还会让 photos/add 的幂等前置
+    //  与 deleteObjectByRef「只删本域引用」失去依据。
+    check('11-1c sync 记 source_path 存档（原地址可追溯、幂等前置可匹配）',
+      r.status === 200 && r.j.photos.every((x) => !!x.source_path),
+      JSON.stringify((r.j.photos || []).map((x) => x.source_path && x.source_path.slice(-10))));
+    // 11-1d 未镜像（回归默认 IMG_INGEST=keep）时不得静默：**带签名的临时地址**必须给可诊断告警
+    //  （普通 CDN 直链不告警，避免每次推送刷屏）
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, {
+      project_id: pid4, unit_id: u4,
+      photos: [{ url: U(1) + '?X-Amz-Expires=432000&X-Amz-Signature=deadbeef', external_id: 'SIGNED-1', category: 'living' }],
+    }));
+    check('11-1d 带签名临时地址未镜像 → 响应带 warnings（原先静默原样入库）',
+      r.status === 200 && r.j.added === 1
+      && (r.j.warnings || []).some((w) => /带签名的临时地址/.test(w)),
+      JSON.stringify(r.j.warnings));
+    // 复原 g1 图集，供后续 11-2 起的用例继续做覆盖计数
+    r = await call('/api/juzhu/housing/vendor/photos/sync', signed(vendor, { project_id: pid4, unit_id: u4, photos: g1 }));
+
     // 11-2 再推一次：去掉 2 张、新增 1 张、改顺序与分类 → 图集应精确等于传入
     const g2 = gallery(6).concat([mk(99, { category: 'living' })]);
     g2.forEach((x, i) => { x.sort = i; });

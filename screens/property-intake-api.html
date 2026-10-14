@@ -676,13 +676,14 @@
       ① <strong>按实体覆盖</strong>——房源级只动房源级、户型级只动该户型，不会误删另一层（上架闸按两层合计算）；
       ② <strong>整体事务</strong>——任一校验不过整批不动，不留半拉图集；
       ③ <strong>上限 100 张</strong>——超出按 <code>sort</code>/数组顺序<strong>截取前 100 张</strong>，响应回 <code>truncated: true</code> + <code>warnings</code>（不静默丢图）；
-      ④ 覆盖后若该房源图集合计不足 7 张，响应会带一条 <code>warnings</code> 提示（<strong>不阻断</strong>——「≥8 张」是上架闸，不是每次覆盖的闸）。
+      ④ 覆盖后若该房源图集合计不足 7 张，响应会带一条 <code>warnings</code> 提示（<strong>不阻断</strong>——「≥8 张」是上架闸，不是每次覆盖的闸）；
+      ⑤ <strong>图片转存（平台侧开关，2026-10-14 起写库统一过收口）</strong>：<code>IMG_INGEST=mirror</code> 时平台把图片<strong>镜像进自己的对象存储</strong>（C 端走平台域名 + WebP 缩略图），缺省 <code>keep</code> 则原样保留你们给的地址。<strong>建议用 mirror</strong>：你们给的多是带签名的临时地址（<code>X-Amz-Expires</code> 到期即失效，且长度已逼近 <code>url</code> 的 500 字符上限），原样入库会让 C 端在签名过期后成片 404；<strong>未镜像时响应会带 <code>warnings</code> 明示</strong>。无论是否镜像，平台都会把<strong>原始地址存档进 <code>source_path</code></strong>（出参可见）便于追溯。
     </div>
     <div class="callout warn">
       <strong>上架抽检（2026-09）：</strong><code>projects/status online</code> 时会真拉取<strong>封面 + 排序靠前的图（默认 2 张）</strong>核对大小与分辨率。
       <strong>确定性不合格</strong>（超 10MB / 小于 800×600 / 非图 / 地址非法）→ 400 拒绝上架；
       <strong>仅网络不可达</strong>（超时、DNS、非 200）→ <strong>放行</strong>并在响应里回 <code>warnings</code>（CDN 抖动不卡上架）。
-      抽检会读到你们的图片，平台只读必要字节、不落盘、不转存。
+      抽检会读到你们的图片，平台只读必要字节、不落盘、不转存（转存只发生在写入时的「图片转存」开关，见 4.11 ⑤）。
     </div>
 
     <h4 style="font-size:14px;margin:18px 0 6px;">4.11.2 单张追加 / 更新</h4>
