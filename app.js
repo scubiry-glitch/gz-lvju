@@ -175,6 +175,29 @@ async function getSettlementRuntime() {
   return settlementRuntimePromise;
 }
 function getBookingPaymentAdapter() { return getPaymentService().bookingAdapter; }
+let commerceHandlerPromise;
+async function getCommerceHandler() {
+  if (!commerceHandlerPromise) commerceHandlerPromise = (async () => {
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: 'Z', supportBigNumbers: true, bigNumberStrings: false, connectionLimit: 8, waitForConnections: true, queueLimit: 50 });
+    try {
+      const { migrate } = require('./commerce/migrate.cjs');
+      await migrate(pool);
+      const { createServer } = require('./commerce/app.cjs');
+      const srv = createServer({ pool, auth: authCenter, publicOrigin: process.env.COMMERCE_PUBLIC_ORIGIN || '' });
+      // 开启后台任务（支付回收 + 优惠券到期）
+      let consuming = false;
+      const paymentTask = setInterval(async () => {
+        if (consuming) return; consuming = true;
+        try { await srv.service.payments.consume(); await srv.service.payments.queueExpiryRefunds(); } catch (_) {} finally { consuming = false; }
+      }, 1500);
+      paymentTask.unref();
+      const expiryTask = setInterval(() => srv.service.expire().catch(() => {}), 30000);
+      expiryTask.unref();
+      return srv.listeners('request')[0];
+    } catch (e) { await pool.end(); throw e; }
+  })().catch(e => { commerceHandlerPromise = null; throw e; });
+  return commerceHandlerPromise;
+}
 let jiazhengPaymentAdapter;
 function getJiazhengAdapter() {
   if (!jiazhengPaymentAdapter) jiazhengPaymentAdapter = require('./server/payment/jiazheng-adapter.cjs').createJiazhengAdapter({
@@ -2350,6 +2373,13 @@ const server = http.createServer((req, res) => {
     });
     return;
   }
+  if (rawPath.startsWith('/api/commerce/v1')) {
+    getCommerceHandler().then(handler => handler(req, res)).catch(() => {
+      if (!res.headersSent) res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: '权益服务暂时不可用，请稍后重试' }));
+    });
+    return;
+  }
   reqLogBegin(req, rawPath, qs);
   if (apiReq) resLogWrap(req, res);
 
@@ -2476,6 +2506,8 @@ if (require.main === module) {
     }
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
+    // 预热 commerce 服务（migrate + createServer），避免首请求 504
+    getCommerceHandler().then(() => console.log('commerce handler ready')).catch(e => console.warn('commerce init warn:', e.code || e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
     imgThumbs.initBackground();
   });
