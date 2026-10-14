@@ -674,6 +674,13 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
     try { if (stayCfg.normalizeDefaultClosedInput(u.default_closed)) ext.default_closed = true; }
     catch (e) { throw new Error('units[].' + e.message); }
   }
+  // 免费取消政策（房型维度，2026-09-09）：口径与 units/update 完全一致（单一数据源 stay_config.cjs）。
+  // 漏掉这段会让「创建时就带 cancel_policy」静默丢字段——落库无 ext.cancel_policy，出参回落
+  // disabledCancelPolicy()（enabled:false / 18:00），商家看到 200 却以为政策已生效（2026-10-14 修复）。
+  if (u.cancel_policy != null && u.cancel_policy !== '') {
+    try { ext.cancel_policy = stayCfg.normalizeCancelPolicyInput(u.cancel_policy); }
+    catch (e) { throw new Error('units[].' + e.message); }
+  }
   // 房间档案（Excel 房源字段）：字段清单 / 长度 / 枚举校验在 room_profile.cjs（单一数据源）
   if (u.room_profile != null && u.room_profile !== '') {
     try { roomProfileCfg.mergeRoomProfileIntoExt(ext, u.room_profile); }

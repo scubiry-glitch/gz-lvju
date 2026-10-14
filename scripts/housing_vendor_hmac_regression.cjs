@@ -205,6 +205,27 @@ async function catalogEventually(base, projectId, citySlug, want) {
     project_id: pid, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200,
   }));
   check('units/create → 200', r.status === 200 && r.j.unit && r.j.unit.id, JSON.stringify(r.j));
+
+  // 3-1 取消政策必须能**创建即落库**（2026-10-14 修复：createUnit 漏处理 cancel_policy，
+  //     字段被静默丢弃 → 出参回落 disabledCancelPolicy()（enabled:false / 18:00），商家看到 200 以为已生效）
+  {
+    r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, {
+      project_id: pid, name: '取消政策户型-临时',
+      cancel_policy: { enabled: true, days_before: 1, cutoff_time: '12:00' },
+    }));
+    const cpn = r.j && r.j.unit && r.j.unit.cancel_policy;
+    check('3-1 units/create 带 cancel_policy → 落库并回显 enabled=true / 12:00',
+      r.status === 200 && cpn && cpn.enabled === true && cpn.days_before === 1 && cpn.cutoff_time === '12:00'
+      && /12:00/.test(r.j.unit.cancel_policy_text || ''),
+      JSON.stringify(cpn || r.j).slice(0, 200));
+    const cpUnit = r.j && r.j.unit && r.j.unit.id;
+    r = await call('/api/juzhu/housing/vendor/units/create', signed(vendor, {
+      project_id: pid, name: '取消政策户型-非法', cancel_policy: { enabled: true, cutoff_time: '25:00' },
+    }));
+    check('3-1b units/create 非法 cutoff_time → 400（与 update 同口径）',
+      r.status === 400 && /cutoff_time/.test(r.j.message || ''), JSON.stringify(r.j).slice(0, 200));
+    if (cpUnit) await call('/api/juzhu/housing/vendor/units/delete', signed(vendor, { id: cpUnit }));
+  }
   r = await call('/api/juzhu/housing/vendor/projects/status', signed(vendor, { id: pid, status: 'online' }));
   check('上架 online → 200', r.status === 200 && r.j.status === 'online', JSON.stringify(r.j));
   check('C 端 catalog 可见（online，等待 15s 缓存过期）', await catalogEventually(BASE, pid, city.slug, true));

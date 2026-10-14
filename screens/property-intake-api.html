@@ -606,8 +606,9 @@
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/create</span><span class="desc">向已有房源追加户型</span></div>
 <pre><code>{ <span class="tok-key">"project_id"</span>: <span class="tok-num">1611</span>, <span class="tok-key">"name"</span>: <span class="tok-str">"两居 68㎡"</span>, <span class="tok-key">"layout_label"</span>: <span class="tok-str">"2室1厅"</span>,
   <span class="tok-key">"area_sqm"</span>: <span class="tok-num">68</span>, <span class="tok-key">"rent_monthly"</span>: <span class="tok-num">3200</span>, <span class="tok-key">"total_qty"</span>: <span class="tok-num">3</span>,
-  <span class="tok-key">"room_profile"</span>: { <span class="tok-key">"max_guests"</span>: <span class="tok-num">4</span>, <span class="tok-key">"beds"</span>: <span class="tok-str">"卧室1：1.8×2.0m 大床"</span> } }   <span class="tok-com">// 房间档案（见 3.7）</span>
-→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-com">/*…含 room_profile 已解析对象…*/</span> } }</code></pre>
+  <span class="tok-key">"room_profile"</span>: { <span class="tok-key">"max_guests"</span>: <span class="tok-num">4</span>, <span class="tok-key">"beds"</span>: <span class="tok-str">"卧室1：1.8×2.0m 大床"</span> },   <span class="tok-com">// 房间档案（见 3.7）</span>
+  <span class="tok-key">"cancel_policy"</span>: { <span class="tok-key">"enabled"</span>: <span class="tok-key">true</span>, <span class="tok-key">"days_before"</span>: <span class="tok-num">1</span>, <span class="tok-key">"cutoff_time"</span>: <span class="tok-str">"12:00"</span> } }   <span class="tok-com">// 免费取消政策（见 4.8），创建即生效，口径与 update 相同</span>
+→ 200 { <span class="tok-key">"code"</span>: <span class="tok-num">0</span>, <span class="tok-key">"unit"</span>: { <span class="tok-key">"id"</span>: <span class="tok-num">3101</span>, <span class="tok-com">/*…含 room_profile 已解析对象 + cancel_policy / cancel_policy_text…*/</span> } }</code></pre>
 
     <h3>4.8 更新户型（调价 / 间数 / 取消政策等）</h3>
     <div class="ep"><span class="method POST">POST</span><span class="path">/api/juzhu/housing/vendor/units/update</span><span class="desc">按户型 id 增量更新</span></div>
@@ -1033,7 +1034,7 @@ node scripts/vendor_hmac_regression.cjs                       <span class="tok-c
       { url: 'https://cdn.example.com/p2.jpg', category: 'living', sort: 1, external_id: 'IMG-1002' },
     ] },
     '/api/juzhu/housing/vendor/photos/add': { project_id: 0, unit_id: 0, file_path: 'https://cdn.example.com/p1.jpg', is_cover: true, category: 'bedroom', sort_order: 0 },
-    '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3 },
+    '/api/juzhu/housing/vendor/units/create': { project_id: 0, name: '两居 68㎡', layout_label: '2室1厅', area_sqm: 68, rent_monthly: 3200, total_qty: 3, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '12:00' } },
     '/api/juzhu/housing/vendor/units/update': { id: 0, rent_monthly: 3380, price_night: 128, total_qty: 5, min_stay_nights: 3, default_closed: false, room_profile: { window_type: 'exterior', window_count: 2, window_openable: true, max_guests: 4, smoking: 'no', beds: '卧室1：1.8×2.0m 大床', feature_image: 'https://cdn.example.com/room.jpg' }, cancel_policy: { enabled: true, days_before: 1, cutoff_time: '18:00' } },
     '/api/juzhu/housing/vendor/stay-calendar/set': { project_id: 0, unit_id: 0, dates: ['2026-12-10'], status: 'open', price_night: null, qty: null, available_qty: 2 },
     '/api/juzhu/housing/vendor/stay-calendar/query': { project_id: 0, unit_id: 0, month: '2026-12' },
