@@ -75,7 +75,7 @@ async function seedProject(conn) {
      VALUES (?,?,?,?,?,?,?,?,?,?, 'passed', 'online', 153, ?)`,
     [city.id, district.id, 'rental', RUN + '·多间回归房', 'qty-reg-' + process.pid, '回归测试地址',
       JSON.stringify(['演示']), 99, 2, 3000,
-      JSON.stringify({ online_booking: true, online_payment: false, min_stay_nights: 1, insurance: ['property'] })]);
+      JSON.stringify({ online_booking: true, online_payment: false, insurance: ['property'] })]);
   const pid = ins.insertId;
   const mkUnit = async (name, slug, qty) => {
     const [u] = await conn.execute(
@@ -106,7 +106,7 @@ async function cleanup(conn) {
   const pid = seed.pid;
   console.log(`seed: project #${pid} · unit A(3间) #${seed.ua} · unit B(1间) #${seed.ub}\n`);
 
-  const ci1 = iso(dayN(10)), ci2 = iso(dayN(12));           // 窗口1：+10 → +12（2 晚）
+  const ci1 = iso(dayN(10)), ci2 = iso(dayN(25));           // 窗口1：+10 → +25（15 晚，频道兜底）
   const mk1 = ci1.slice(0, 7);
   const calA = () => calendar(mk1, seed.ua);
 
@@ -143,10 +143,10 @@ async function cleanup(conn) {
   await conn.execute(
     "INSERT INTO stay_calendar(project_id, unit_id, stay_date, status, qty, price_night, source, updated_at) VALUES (?,?,?,'open',1,777,'vendor',?)",
     [pid, seed.ua, ci1, NOW]);
-  r = await book({ project_id: pid, unit_id: seed.ua, rooms: 2, checkin: ci1, checkout: iso(dayN(11)), contact_name: '多间回归', contact_phone: PHONE });
+  r = await book({ project_id: pid, unit_id: seed.ua, rooms: 2, checkin: ci1, checkout: ci2, contact_name: '多间回归', contact_phone: PHONE });
   check('qty=1 时订 2 间 → 400（超出剩余）', r.status === 400, JSON.stringify(r.j));
-  r = await book({ project_id: pid, unit_id: seed.ua, rooms: 1, checkin: ci1, checkout: iso(dayN(11)), contact_name: '多间回归', contact_phone: PHONE });
-  check('qty=1 时订 1 间 → 200 且按覆盖价 777 计价', r.status === 200 && r.j.price_total === 777, JSON.stringify(r.j));
+  r = await book({ project_id: pid, unit_id: seed.ua, rooms: 1, checkin: ci1, checkout: ci2, contact_name: '多间回归', contact_phone: PHONE });
+  check('qty=1 时订 1 间 → 200 且首晚按覆盖价 777、其余按月租折算 100', r.status === 200 && r.j.price_total === 2177, JSON.stringify(r.j));
   const ord3 = r.j.order_no;
   await cancel(ord3);
   const [keep] = await conn.execute('SELECT qty, price_night, status, booked_qty FROM stay_calendar WHERE project_id=? AND unit_id=? AND stay_date=?', [pid, seed.ua, ci1]);
@@ -154,7 +154,7 @@ async function cleanup(conn) {
     JSON.stringify(keep));
 
   // ── 4) 整栋 ↔ 房型互斥 ──
-  const wi1 = iso(dayN(20)), wi2 = iso(dayN(21));
+  const wi1 = iso(dayN(40)), wi2 = iso(dayN(55));
   r = await book({ project_id: pid, unit_id: seed.ua, rooms: 1, checkin: wi1, checkout: wi2, contact_name: '多间回归', contact_phone: PHONE });
   check('窗口2 房型单订 1 间 → 200', r.status === 200, JSON.stringify(r.j));
   const ordW = r.j.order_no;

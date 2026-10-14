@@ -10,10 +10,10 @@ const INSURANCE_TYPES = [
 ];
 const INSURANCE_KEYS = INSURANCE_TYPES.map((t) => t.key);
 
-// 最短连住晚数（详情日历与下单共同校验）：rental 旅居/长租、minsu 惠民民宿均默认 15 晚起住；
-// 商家可在 projects.ext.min_stay_nights 覆盖（rental 1–365；minsu 15–365）
+// 最短连住晚数（详情日历与下单共同校验）：rental / minsu 频道兜底都是 15 晚。
+// 房源、户型可以写更短的数，但下单只在「比下一级更长」时才采用，不能把兜底放宽。
 const STAY_MIN_NIGHTS_DEFAULT = { rental: 15, minsu: 15 };
-// 民宿不允许用房源级覆盖降到 15 晚以下；rental 保留既有 1–365 晚覆盖能力。
+// 写入校验下限（rental 1–365、minsu 15–365）。生效值另见 resolveMinStay，短于下一级的配置不参与下单。
 const STAY_MIN_NIGHTS_MIN = { rental: 1, minsu: 15 };
 
 // 房源交易能力（口径 2026-09-16）：online_booking=在线预订、商家确认后线下收款；
@@ -48,32 +48,44 @@ function insuranceOf(proj) {
   return seen;
 }
 
-/**
- * 最短连住生效值（2026-09 下放户型）：户型 ext > 房源 ext > 频道默认，
- * 再按频道下限 clamp（rental 1 晚、minsu 15 晚）。unit 省略 = 房源级口径（列表摘要用）。
- * 整栋单（不指定户型）由调用方传入「排序最前的户型」，与取消政策同一套回退。
- */
-function minStayNightsOf(proj, unit) {
-  const channel = proj && proj.channel;
-  const floor = STAY_MIN_NIGHTS_MIN[channel] || 1;
-  const pick = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
-  const fromUnit = unit ? pick(parseExtObj(unit.ext).min_stay_nights) : null;
-  const fromProj = pick(parseExtObj(proj && proj.ext).min_stay_nights);
-  let v = fromUnit != null ? fromUnit : (fromProj != null ? fromProj : (STAY_MIN_NIGHTS_DEFAULT[channel] || 1));
-  if (!(v >= floor)) v = floor;
-  return Math.min(v, 365);
+function readStayNights(ext) {
+  const n = parseInt(parseExtObj(ext).min_stay_nights, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function channelMinStayOf(proj) {
+  return STAY_MIN_NIGHTS_DEFAULT[proj && proj.channel] || 1;
 }
 
 /**
- * 最短连住的取值来源：'unit'（户型级显式配置）/ 'project'（房源级）/ 'default'（频道默认）。
- * 供后台表单区分「显式配置」与「继承来的生效值」——回显时只有 unit 档才预填输入框，
- * 否则保存会把继承值静默固化成户型级配置。
+ * 下单连住下限。只往更严收：
+ * 房源 ext 大于频道默认才取房源，否则兜底频道默认；
+ * 户型 ext 大于这个房源生效值才取户型，否则继续用房源生效值。
+ * unit 省略 = 只看到房源这一层（列表摘要）。整栋单由调用方传入排序最前的户型。
+ */
+function resolveMinStay(proj, unit) {
+  const floor = STAY_MIN_NIGHTS_MIN[proj && proj.channel] || 1;
+  const cap = (n) => Math.min(Math.max(n, floor), 365);
+  const channelDefault = cap(channelMinStayOf(proj));
+  const fromProj = readStayNights(proj && proj.ext);
+  const fromUnit = unit ? readStayNights(unit.ext) : null;
+  const projectNights = fromProj != null && fromProj > channelDefault ? cap(fromProj) : channelDefault;
+  if (fromUnit != null && fromUnit > projectNights) return { nights: cap(fromUnit), source: 'unit' };
+  return { nights: projectNights, source: fromProj != null && fromProj > channelDefault ? 'project' : 'default' };
+}
+
+/** 最短连住生效值。unit 省略 = 房源级口径（列表摘要用）。 */
+function minStayNightsOf(proj, unit) {
+  return resolveMinStay(proj, unit).nights;
+}
+
+/**
+ * 最短连住的取值来源：'unit' / 'project' / 'default'。
+ * 只有真正把下限抬高的那一层才算来源。后台回显据此决定要不要预填输入框，
+ * 避免把没生效的更短配置或继承值再固化进去。
  */
 function minStayNightsSourceOf(proj, unit) {
-  const pick = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
-  if (unit && pick(parseExtObj(unit.ext).min_stay_nights) != null) return 'unit';
-  if (pick(parseExtObj(proj && proj.ext).min_stay_nights) != null) return 'project';
-  return 'default';
+  return resolveMinStay(proj, unit).source;
 }
 
 /** 写入口校验：default_closed 只接受布尔；非法抛 Error（写入口据此 400） */

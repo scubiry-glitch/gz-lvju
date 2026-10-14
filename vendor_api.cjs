@@ -30,6 +30,30 @@ async function normCoverRef(ref, opts) {
   return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
 }
 
+/** 该引用是否已是平台对象存储（本域 S3）里的受管引用 */
+function isManagedS3Ref(p) {
+  return !!(imgStorage && typeof imgStorage.parse === 'function' && imgStorage.parse(p).kind === 's3');
+}
+
+/** 源地址归一：http(s) 一律剥掉查询串（商家签名 URL 的 X-Amz-Date/Signature 每次推送都在变） */
+function sourceKeyOf(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!/^https?:\/\//i.test(s)) return s;
+  try { const x = new URL(s); return x.origin + x.pathname; } catch (_) { return s; }
+}
+
+/** 是否同一张图（按去签名的源地址比对）：判断能否复用已镜像的存量引用 */
+function sameImageSource(a, b) {
+  const ka = sourceKeyOf(a);
+  return !!ka && ka === sourceKeyOf(b);
+}
+
+/** 是否「带签名/时效」的临时地址（S3 预签名、OSS、CDN 防盗链 alike）——这类地址会过期，未镜像就是定时炸弹 */
+function looksSignedUrl(u) {
+  return /[?&](x-amz-signature|x-amz-expires|x-amz-credential|signature|ossaccesskeyid|expires|auth_key)=/i
+    .test(String(u == null ? '' : u));
+}
+
 function reply(status, data) {
   return { status, data };
 }
@@ -591,34 +615,58 @@ async function housingProjectsDetail(conn, body, vendorId) {
   });
 }
 
-/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错 */
+/** body.ext 入参源（2026-10-13 商家侧嵌套写法兼容）：ext 对象展开为伪顶层，null/'' 视为未传。
+ *  值可为对象或 JSON 字符串；其余类型/解析失败直接报错，不做静默丢弃。 */
+function extSrcFromBody(body) {
+  const raw = body == null ? null : body.ext;
+  if (raw == null || raw === '') return {};
+  if (typeof raw === 'string') {
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object' && !Array.isArray(o)) return o;
+    } catch (_) { /* 落到下方统一报错 */ }
+    throw new Error('ext 须为对象');
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('ext 须为对象');
+  return raw;
+}
+
+/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错。
+ *  字段来源兼容两处：body 顶层（优先）与 body.ext 对象（2026-10-13 兼容商家嵌套写法）。 */
 function extFromBody(body, baseExt, channel) {
+  const src = extSrcFromBody(body);
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k) || Object.prototype.hasOwnProperty.call(src, k);
+  const from = (k) => (Object.prototype.hasOwnProperty.call(body, k) ? body[k] : src[k]);
   let ext = Object.assign({}, stayCfg.parseExtObj(baseExt));
-  if (Object.prototype.hasOwnProperty.call(body, 'insurance')) {
-    if (body.insurance === null || body.insurance === '') ext.insurance = [];
-    else if (Array.isArray(body.insurance)) {
-      const unknown = body.insurance.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
+  if (has('insurance')) {
+    const v = from('insurance');
+    if (v === null || v === '') ext.insurance = [];
+    else if (Array.isArray(v)) {
+      const unknown = v.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
       if (unknown.length) throw new Error('insurance 含未知标识: ' + unknown.join(',') + '（可用: ' + stayCfg.INSURANCE_KEYS.join('/') + '）');
-      ext.insurance = body.insurance.map(String);
+      ext.insurance = v.map(String);
     } else throw new Error('insurance 须为标识数组: ' + stayCfg.INSURANCE_KEYS.join('/'));
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'min_stay_nights')) {
-    if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
+  if (has('min_stay_nights')) {
+    const v = from('min_stay_nights');
+    if (v === null || v === '') delete ext.min_stay_nights;
     else {
-      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, channel);
+      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(v, channel);
     }
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'default_closed')) {
-    if (body.default_closed === null || body.default_closed === '') delete ext.default_closed;
-    else if (stayCfg.normalizeDefaultClosedInput(body.default_closed)) ext.default_closed = true; else delete ext.default_closed;
+  if (has('default_closed')) {
+    const v = from('default_closed');
+    if (v === null || v === '') delete ext.default_closed;
+    else if (stayCfg.normalizeDefaultClosedInput(v)) ext.default_closed = true; else delete ext.default_closed;
   }
   // 审核通过后自动上架（2026-09-22 商家诉求 3.1）：true = 评级复核通过即由平台自动推 online
   //（仍走同一套上架闸与图片抽检；闸不过保持 draft，原因随 rating.reviewed webhook 带回）
-  if (Object.prototype.hasOwnProperty.call(body, 'auto_publish')) {
-    if (body.auto_publish === true || body.auto_publish === 'true') ext.auto_publish = true;
+  if (has('auto_publish')) {
+    const v = from('auto_publish');
+    if (v === true || v === 'true') ext.auto_publish = true;
     else delete ext.auto_publish;
   }
-  ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
+  ext = stayCfg.applyTransactionCapabilities(ext, Object.assign({}, src, body), channel);
   return ext;
 }
 
@@ -648,6 +696,13 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
   // 默认关房（2026-09 方案 B 配套）：未推送放出的日期默认不可订，多渠道商家防超售
   if (u.default_closed != null && u.default_closed !== '') {
     try { if (stayCfg.normalizeDefaultClosedInput(u.default_closed)) ext.default_closed = true; }
+    catch (e) { throw new Error('units[].' + e.message); }
+  }
+  // 免费取消政策（房型维度，2026-09-09）：口径与 units/update 完全一致（单一数据源 stay_config.cjs）。
+  // 漏掉这段会让「创建时就带 cancel_policy」静默丢字段——落库无 ext.cancel_policy，出参回落
+  // disabledCancelPolicy()（enabled:false / 18:00），商家看到 200 却以为政策已生效（2026-10-14 修复）。
+  if (u.cancel_policy != null && u.cancel_policy !== '') {
+    try { ext.cancel_policy = stayCfg.normalizeCancelPolicyInput(u.cancel_policy); }
     catch (e) { throw new Error('units[].' + e.message); }
   }
   // 房间档案（Excel 房源字段）：字段清单 / 长度 / 枚举校验在 room_profile.cjs（单一数据源）
@@ -777,7 +832,8 @@ async function housingProjectsUpdate(conn, body, vendorId) {
   }
   if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
     || Object.prototype.hasOwnProperty.call(b, 'online_booking') || Object.prototype.hasOwnProperty.call(b, 'online_payment')
-    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')) {
+    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')
+    || b.ext != null && b.ext !== '') {
     let ext;
     try { ext = extFromBody(b, row.ext, row.channel); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
@@ -1244,8 +1300,6 @@ async function housingPhotosSync(conn, body, vendorId) {
   try { norm = photoCfg.normalizeGalleryInput(b.photos); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const items = photoCfg.assignSortOrders(norm.items);
-  const coverIdx = photoCfg.pickCoverIndex(items);
-  const cover = coverIdx >= 0 ? items[coverIdx].file_path : (items[0] ? items[0].file_path : null);
 
   const [existing] = await conn.execute(
     'SELECT * FROM photos WHERE entity_type=? AND entity_id=? ORDER BY sort_order, id', [entityType, entityId]);
@@ -1265,6 +1319,43 @@ async function housingPhotosSync(conn, body, vendorId) {
   const delRows = existing.filter((r) => !keptIds.has(r.id));
   const deleteObjects = String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1';
 
+  // ── 图片引用收口（规则 21/300：所有 file_path 写入必须经 img_storage.ingestRef）──
+  // 2026-10-14 修复：原先直接把入参 URL 写库，导致外链既不镜像进平台对象存储、也不记 source_path。
+  // 后果：商家推的是自家对象存储的**临时签名 URL**（X-Amz-Expires=432000 → 5 天后失效，长度已达 489，
+  // 距 photos.file_path 的 VARCHAR(500) 仅剩 11 字符余量），签名过期后 C 端整页 404；且 source_path
+  // 为空会让 photos/add 的幂等前置与 deleteObjectByRef 的「只删本域引用」双双失去依据。
+  // 镜像在事务**之前**做完（网络 I/O 不占锁），失败按 photos/add 同口径 400 显式暴露。
+  const warnings = norm.warnings.slice();
+  const resolved = [];
+  let externalKept = 0;
+  let externalWarn = '';
+  for (let i = 0; i < plan.length; i++) {
+    const { it, hit } = plan[i];
+    // 已镜像过的同一张图：按**剥掉查询串**的源地址比对（签名每次推送都在变）→ 复用存量引用，
+    // 免得每次全量覆盖都白传一份对象 + 两档缩略图，也让 C 端引用保持稳定。
+    if (hit && isManagedS3Ref(hit.file_path) && sameImageSource(hit.source_path, it.file_path)) {
+      resolved.push({ it, hit, ref: hit.file_path, source: hit.source_path || it.file_path });
+      continue;
+    }
+    const r = await normImgRef(it.file_path, { mirror: true, prefix: 'housing', entityType, entityId });
+    if (!r.ok) return reply(400, { code: 400, message: `photos[${i}].url 处理失败: ${r.error}` });
+    if (String(r.ref).length > 500) return reply(400, { code: 400, message: `photos[${i}].url 归一化后长度超过 500` });
+    if (r.ref === it.file_path) {                 // 未镜像（IMG_INGEST != mirror / 镜像回落本地）
+      if (looksSignedUrl(it.file_path)) {         // 只对「会过期的临时地址」告警，普通 CDN 直链不刷屏
+        externalKept += 1;
+        if (r.warn) externalWarn = r.warn;
+      }
+    } else if (r.warn) warnings.push(`photos[${i}] ${r.warn}`);
+    resolved.push({ it, hit, ref: r.ref, source: it.file_path });
+  }
+  if (externalKept) {
+    warnings.push(`有 ${externalKept} 张是带签名的临时地址且未镜像进平台对象存储（${externalWarn || '未镜像'}）：`
+      + '签名过期后 C 端会 404，建议服务端开 IMG_INGEST=mirror');
+  }
+  const coverIdx = photoCfg.pickCoverIndex(items);
+  const coverItem = coverIdx >= 0 ? coverIdx : 0;
+  const cover = resolved.length ? resolved[coverItem].ref : null;
+
   await conn.beginTransaction();
   try {
     let removed = 0;
@@ -1275,18 +1366,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     }
     let added = 0;
     let updated = 0;
-    for (const { it, hit } of plan) {
-      const isCover = it.file_path === cover ? 1 : 0;
+    for (let i = 0; i < resolved.length; i++) {
+      const { it, hit, ref, source } = resolved[i];
+      const isCover = i === coverItem ? 1 : 0;
       if (hit) {
         await conn.execute(
-          'UPDATE photos SET file_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
-          [it.file_path, it.category, it.sort_order, isCover, it.external_id, hit.id]);
+          'UPDATE photos SET file_path=?, source_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
+          [ref, source, it.category, it.sort_order, isCover, it.external_id, hit.id]);
         updated++;
       } else {
         await conn.execute(
-          `INSERT INTO photos(entity_type, entity_id, file_path, category, sort_order, is_cover, external_id)
-           VALUES (?,?,?,?,?,?,?)`,
-          [entityType, entityId, it.file_path, it.category, it.sort_order, isCover, it.external_id]);
+          `INSERT INTO photos(entity_type, entity_id, file_path, source_path, category, sort_order, is_cover, external_id)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [entityType, entityId, ref, source, it.category, it.sort_order, isCover, it.external_id]);
         added++;
       }
     }
@@ -1308,7 +1400,6 @@ async function housingPhotosSync(conn, body, vendorId) {
       }
     }
 
-    const warnings = norm.warnings.slice();
     const total = await galleryCountOf(conn, projectId);
     if (total < photoCfg.PHOTO_MIN_PUBLISH) {
       warnings.push(`该房源图集合计 ${total} 张，低于上架所需的 ${photoCfg.PHOTO_MIN_PUBLISH} 张（房源 + 户型合计）`);

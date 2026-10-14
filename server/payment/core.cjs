@@ -306,8 +306,10 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     let processed = 0;
     for (let i = 0; i < Math.min(limit, 100); i++) {
       let selected;
+      let afterCommit = [];
       try {
         const found = await tx(async c => {
+          afterCommit = [];
           const [e] = await rows(c, `SELECT e.* FROM payment_events e WHERE e.biz_type=? AND e.status<>'processed' AND e.next_run_at<=?
             ${orderNo == null ? '' : 'AND e.biz_order_no=?'}
             AND NOT EXISTS(SELECT 1 FROM payment_events p WHERE p.biz_type=e.biz_type AND p.biz_order_no=e.biz_order_no AND p.id<e.id AND p.status<>'processed') ORDER BY e.id LIMIT 1`, [bizType, clock(), ...(orderNo == null ? [] : [orderNo])]);
@@ -317,12 +319,17 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
           const [current] = await rows(c, "SELECT * FROM payment_events WHERE id=? FOR UPDATE", [e.id]);
           if (current.status === 'processed' || sqlDate(current.next_run_at) > clock()) return true;
           current.payload = parse(current.payload);
-          await handler(c, current, g);
+          await handler(c, current, g, { afterCommit(fn) { afterCommit.push(fn); } });
           await c.execute("UPDATE payment_events SET status='processed',processed_at=?,last_error=NULL WHERE id=?", [clock(), e.id]);
           processed++; return true;
         });
         if (!found) break;
+        for (const fn of afterCommit) {
+          try { fn(); } catch (error) { logger.warn('payment event side effect:', error && error.message); }
+        }
+        afterCommit = [];
       } catch (error) {
+        afterCommit = [];
         if (!selected) throw error;
         await tx(async c => { await c.execute("UPDATE payment_events SET status='failed',attempts=attempts+1,next_run_at=?,last_error=? WHERE id=? AND status<>'processed'", [due(Math.min(300, 2 ** Math.min(Number(selected.attempts) + 1, 8))), String(error.code || error.message).slice(0, 500), selected.id]); });
         logger.warn('payment event deferred:', selected.id, error.code || error.message);

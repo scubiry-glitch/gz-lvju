@@ -107,7 +107,7 @@ function morphApiEnv() {
   return 'production';
 }
 
-function ensureLjBridge() {
+export function ensureLjBridge() {
   if (typeof window === 'undefined') return Promise.resolve(null);
   if (window.$ljBridge) return Promise.resolve(window.$ljBridge);
   if (_ljBridgeP) return _ljBridgeP;
@@ -126,6 +126,37 @@ function ensureLjBridge() {
     (document.head || document.documentElement).appendChild(s);
   });
   return _ljBridgeP;
+}
+
+/** 浏览器 document.title + App 内 $ljBridge.setPageTitle */
+export function setAppTitle(title) {
+  const t = String(title || '').trim() || '贝壳旅居';
+  try {
+    document.title = t;
+  } catch {
+    /* ignore */
+  }
+  return ensureLjBridge().then((lj) => {
+    if (!lj || typeof lj.ready !== 'function') return false;
+    return new Promise((resolve) => {
+      try {
+        lj.ready((bridge) => {
+          try {
+            if (bridge && typeof bridge.setPageTitle === 'function') {
+              bridge.setPageTitle(t);
+              resolve(true);
+              return;
+            }
+          } catch {
+            /* ignore */
+          }
+          resolve(false);
+        });
+      } catch {
+        resolve(false);
+      }
+    });
+  });
 }
 
 /**

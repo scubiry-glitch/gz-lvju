@@ -57,7 +57,6 @@ export default function Topic() {
         const t = (tj.topics || []).find((x) => x.slug === slug);
         if (t) setMeta({ label: t.label || slug, desc: t.desc || FALLBACK[slug]?.desc || '' });
         else if (FALLBACK[slug]) setMeta(FALLBACK[slug]);
-        document.title = (t?.label || FALLBACK[slug]?.label || slug) + ' · 找房专题';
       })
       .catch((e) => {
         if (!alive) return;

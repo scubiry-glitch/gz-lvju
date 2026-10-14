@@ -121,10 +121,11 @@ function BookingInner() {
         setLoading(false);
         return;
       }
+      // 两项都开时默认在线支付；链接显式带 transaction_mode 时仍以链接为准。
       let nextTx = sp.get('transaction_mode') || '';
       if (nextTx !== 'booking' && nextTx !== 'payment') {
-        if (proj.online_booking) nextTx = 'booking';
-        else if (proj.online_payment) nextTx = 'payment';
+        if (proj.online_payment) nextTx = 'payment';
+        else if (proj.online_booking) nextTx = 'booking';
       }
       if (nextTx === 'booking' && !proj.online_booking && proj.online_payment) nextTx = 'payment';
       if (nextTx === 'payment' && !proj.online_payment && proj.online_booking) nextTx = 'booking';
@@ -159,7 +160,7 @@ function BookingInner() {
             title: '待支付订单',
             sub:
               (o.project_name || '旅居预订') +
-              (o.checkin ? ' · ' + o.checkin + ' → ' + (o.checkout || '') : '') +
+              (o.checkin ? ' · ' + o.checkin + ' – ' + (o.checkout || '') : '') +
               (o.nights ? ' · ' + o.nights + ' 晚' : '') +
               (o.price_total != null ? ' · ¥' + formatPrice(o.price_total) : ''),
             contact_phone: o.contact_phone_raw || o.contact_phone || sp.get('phone') || '',
@@ -482,11 +483,11 @@ function BookingInner() {
           ok.pay_status === 'paying' ||
           ok.pay_status === 'create_unknown' ? (
             <button type="button" className="btn pay" onClick={onPay} disabled={paying}>
-              {paying ? '正在拉起收银台…' : '立即支付 →'}
+              {paying ? '正在拉起收银台…' : '立即支付'}
             </button>
           ) : null}
           <Link className="btn ghost" to="/orders">
-            去订单页查状态 →
+            去订单页查状态
           </Link>
         </div>
       </div>
@@ -602,11 +603,11 @@ function BookingInner() {
       <div className="bfield">
         <span className="l">交易方式</span>
         <select value={tx} onChange={(e) => { setTx(e.target.value); if (e.target.value === 'booking') setCouponId(''); }}>
-          {p?.online_booking ? (
-            <option value="booking">在线预订 · 商家确认后线下收款</option>
-          ) : null}
           {p?.online_payment ? (
             <option value="payment">在线支付 · 支付后商家确认</option>
+          ) : null}
+          {p?.online_booking ? (
+            <option value="booking">在线预订 · 商家确认后线下收款</option>
           ) : null}
         </select>
       </div>

@@ -294,6 +294,22 @@ t('sourceUrlAllowed：未配白名单不限制；配了按域（含子域）匹�
     process.env.S3_FAIL_ON_UNCONFIGURED = savedFlag || '0';
   });
 
+  // 签名 URL / 非标准 MIME 兜底（2026-10-12 商家 AWS 预签名 URL 场景）
+  await ta('格式推导：AWS 预签名 URL（application/jpg + 签名 query）→ 正确推导 jpg', () => {
+    assert.strictEqual(img.normalizeMime('application/jpg'), 'image/jpeg');
+    assert.strictEqual(img.normalizeMime('application/jpg; charset=utf-8'), 'image/jpeg');
+    assert.strictEqual(img.extFromUrl('https://x.s3.cn-northwest-1.amazonaws.com.cn/a/b/6acc8c44.jpg?X-Amz-Date=1&X-Amz-Signature=ab'), 'jpg');
+    assert.strictEqual(img.extFromUrl('https://x/a.png?response-content-type=application%2Fpng'), 'png');
+    assert.strictEqual(img.extFromUrl('https://x/a/noext?X-Amz-Signature=ab'), '');
+  });
+  await ta('格式推导：魔数嗅探（不依赖 URL/响应头）', () => {
+    assert.strictEqual(img.sniffImageExt(Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0, 0, 0, 0])), 'jpg');
+    assert.strictEqual(img.sniffImageExt(PNG_1PX), 'png');
+    assert.strictEqual(img.sniffImageExt(Buffer.from('RIFF____WEBPVP8 ', 'binary')), 'webp');
+    assert.strictEqual(img.sniffImageExt(Buffer.from('not-an-image-content')), '');
+    assert.strictEqual(img.sniffImageExt(Buffer.from([0xFF, 0xD8])), '');
+  });
+
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   process.exit(fail ? 1 : 0);
 })();

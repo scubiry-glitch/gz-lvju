@@ -208,7 +208,13 @@ export function AuthProvider({ children }) {
   /* /api/auth/me 完成前不渲染业务页，避免未登录态闪一下再跳登录 */
   return (
     <AuthUserContext.Provider value={value}>
-      {ready ? children : null}
+      {ready ? (
+        children
+      ) : (
+        <div className="auth-gate">
+          <p>加载中…</p>
+        </div>
+      )}
     </AuthUserContext.Provider>
   );
 }

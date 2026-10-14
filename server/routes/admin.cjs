@@ -117,6 +117,41 @@ queryRows,
       return removed;
     }
 
+    // ── 项目 ext 组装（2026-10-13 兼容顶层写法，与商家端同体验）──
+    // 痛点：管理端此前只认 body.ext，body 顶层直接传 online_payment=true 被静默丢弃 → 「传了不生效」。
+    // 现在：能力/住宿配置字段（online_booking / online_payment / stay_bookable / insurance /
+    // min_stay_nights / default_closed）可直接挂 body 顶层，与 body.ext 合并后统一走 normalizeProjectExtInput。
+    const PROJECT_EXT_TOP_KEYS = ['online_booking', 'online_payment', 'stay_bookable', 'insurance', 'min_stay_nights', 'default_closed'];
+    function projectExtMergedFromBody(body, baseExt) {
+      const hasTop = PROJECT_EXT_TOP_KEYS.some((k) => Object.prototype.hasOwnProperty.call(body, k));
+      const hasExt = Object.prototype.hasOwnProperty.call(body, 'ext');
+      if (!hasTop && !hasExt) return { touched: false, ext: null };
+      let merged = {};
+      if (baseExt && typeof baseExt === 'object') merged = Object.assign(merged, baseExt);
+      else if (typeof baseExt === 'string' && baseExt) {
+        try { merged = Object.assign(merged, JSON.parse(baseExt) || {}); } catch (_) { merged = {}; }
+      }
+      if (hasExt) {
+        if (body.ext == null) merged = {};   // ext: null 显式重置
+        else if (typeof body.ext === 'object' && !Array.isArray(body.ext)) merged = Object.assign(merged, body.ext);
+        else throw new Error('ext 须为对象');
+      }
+      for (const k of PROJECT_EXT_TOP_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(body, k)) merged[k] = body[k];
+      }
+      return { touched: true, ext: merged };
+    }
+
+    /** 项目出参：ext 解析为对象 + 透出交易能力位（管理台据此回显在线预订/在线支付开关） */
+    function attachTxCaps(proj) {
+      if (!proj) return proj;
+      parseJsonFields(proj, ['ext']);
+      const caps = transactionCapabilitiesOf(proj);
+      proj.online_booking = caps.online_booking;
+      proj.online_payment = caps.online_payment;
+      return proj;
+    }
+
     // --- from app.js L2677-4288 ---
     // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
     if (urlPath === '/api/juzhu/admin/vendor-onboarding' && req.method === 'GET') {
@@ -283,7 +318,7 @@ queryRows,
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
       sql += ' ORDER BY p.channel, p.sort_order, p.id';
       const rows = await queryRows(sql, params);
-      rows.forEach((r) => parseJsonFields(r, ['tags', 'rating']));
+      rows.forEach((r) => { parseJsonFields(r, ['tags', 'rating']); attachTxCaps(r); });
       return jsonReply(res, rows);
     }
 
@@ -298,6 +333,7 @@ queryRows,
         );
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(projs[0], ['tags', 'rating']);
+        attachTxCaps(projs[0]);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
         units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
         const photos = await queryRows(
@@ -1427,8 +1463,11 @@ queryRows,
         return jsonReply(res, { error: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' }, 400);
       }
       let projectExt = null;
-      try { projectExt = normalizeProjectExtInput(body.ext, channel); }
-      catch (e) { return jsonReply(res, { error: e.message }, 400); }
+      try {
+        // 顶层能力/住宿字段（online_payment 等）与 body.ext 合并后统一归一（此前顶层写法被静默丢弃）
+        const extM = projectExtMergedFromBody(body, null);
+        projectExt = normalizeProjectExtInput(extM.touched ? extM.ext : body.ext, channel);
+      } catch (e) { return jsonReply(res, { error: e.message }, 400); }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const resolved = await resolveBodyCityId(conn, body, '未配置城市');
@@ -1498,6 +1537,7 @@ queryRows,
           [pid]
         );
         parseJsonFields(projs[0], ['tags', 'rating']);
+        attachTxCaps(projs[0]);
         return jsonReply(res, {
           ok: true, project: projs[0],
           // 镜像自证：库内存的 cover_image 是否已转对象存储；未转时 warned 给出原因
@@ -1518,7 +1558,7 @@ queryRows,
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [existing] = await conn.execute('SELECT id, channel FROM projects WHERE id=?', [pid]);
+          const [existing] = await conn.execute('SELECT id, channel, ext FROM projects WHERE id=?', [pid]);
           if (!existing.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
@@ -1541,13 +1581,17 @@ queryRows,
             }
             put(col, body[col]);
           }
-          if ('ext' in body) {
-            try {
-              const ext = normalizeProjectExtInput(body.ext, existing[0].channel);
-              put('ext', ext != null ? JSON.stringify(ext) : null);
-            } catch (e) {
-              conn.end();
-              return jsonReply(res, { error: e.message }, 400);
+          {
+            // 兼容顶层写法：body 顶层 online_payment 等与 body.ext、库内现值合并后归一
+            const extM = projectExtMergedFromBody(body, existing[0].ext);
+            if (extM.touched) {
+              try {
+                const ext = normalizeProjectExtInput(extM.ext, existing[0].channel);
+                put('ext', ext != null ? JSON.stringify(ext) : null);
+              } catch (e) {
+                conn.end();
+                return jsonReply(res, { error: e.message }, 400);
+              }
             }
           }
           if ('owner_vendor_id' in body) {
@@ -1590,6 +1634,7 @@ queryRows,
             [pid]
           );
           parseJsonFields(projs[0], ['tags', 'rating']);
+          attachTxCaps(projs[0]);
           return jsonReply(res, {
             ok: true, project: projs[0],
             cover_image_storage: coverRefInfo ? coverRefInfo.storage : null,

@@ -1321,24 +1321,29 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
     if (d < TODAY || d > MAX) return;
     var inf = dayInfo(d);
     if (inf && (inf.status === 'booked' || inf.status === 'blocked')) return;
-    if (!ci || (ci && co) || d <= ci) { ci = d; co = null; }   // 重新起算
+    /* 再点一次已选入住日 → 清空 */
+    if (ci && !co && iso(d) === iso(ci)) { ci = null; co = null; tipMsg = ''; paintAll(); return; }
+    if (!ci || (ci && co) || d <= ci) { ci = d; co = null; tipMsg = ''; }   // 重新起算
     else {
       var n = Math.round((d - ci) / 864e5);
       if (n < minNights()) {
-        tip('须连续入住 ≥ ' + minNights() + ' 晚 · 最早 ' + md(new Date(ci.getTime() + minNights() * 864e5)) + ' 离店');
-        return;
+        /* 不能成合法离店 → 改作新入住，避免卡死 */
+        tipMsg = '连住不足 ' + minNights() + ' 晚 · 已改选 ' + md(d) + ' 为入住，请再选离店';
+        ci = d; co = null;
+        paintAll(); return;
       }
-      // 区间内含已订/关房夜（选中户型口径）→ 拒绝成段，指出第一晚（与服务端下单校验同口径，规则16）
+      // 区间内含已订/关房夜（选中户型口径）→ 改选该日为新入住（与服务端下单校验同口径，规则16）
       var firstBad = null;
       for (var t = new Date(ci); t < d; t.setDate(t.getDate() + 1)) {
         var tInf = dayInfo(t);
         if (tInf && (tInf.status === 'booked' || tInf.status === 'blocked')) { firstBad = new Date(t); break; }
       }
       if (firstBad) {
-        tip(md(firstBad) + (dayInfo(firstBad).status === 'booked' ? ' 已订' : ' 关房') + ' · 请调整日期或换房型');
-        return;
+        tipMsg = md(firstBad) + (dayInfo(firstBad).status === 'booked' ? ' 已订' : ' 关房') + ' · 已改选 ' + md(d) + ' 为入住，请再选离店';
+        ci = d; co = null;
+        paintAll(); return;
       }
-      co = d;
+      co = d; tipMsg = '';
     }
     paintAll();
   }

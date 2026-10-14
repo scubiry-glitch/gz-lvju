@@ -43,6 +43,44 @@ const MIME_EXT = {
 };
 const ALLOWED_EXT = new Set(['jpg', 'jpeg', 'png', 'webp']);
 
+/** 非标准图片 MIME 别名归一（AWS 预签名 response-content-type 等会产出 application/jpg 这类值） */
+const MIME_ALIAS = {
+  'application/jpg': 'image/jpeg',
+  'application/jpeg': 'image/jpeg',
+  'application/png': 'image/png',
+  'application/webp': 'image/webp',
+  'application/x-jpg': 'image/jpeg',
+  'image/pjpeg': 'image/jpeg',
+  'image/x-png': 'image/png',
+  'image/x-webp': 'image/webp',
+  'image/vnd.mozilla.jpeg': 'image/jpeg',
+};
+function normalizeMime(ct) {
+  const m = String(ct || '').toLowerCase().split(';')[0].trim();
+  return MIME_ALIAS[m] || m;
+}
+
+/** 图片魔数嗅探（jpg/png/webp/gif；内容层判定，不依赖 URL/响应头——签名 URL 场景的最终兜底） */
+function sniffImageExt(buf) {
+  if (!buf || buf.length < 12) return '';
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'jpg';
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'png';
+  if (buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+      && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) return 'webp';
+  return '';
+}
+
+/** URL pathname 取扩展名（剥掉签名 query，如 .jpg?X-Amz-...） */
+function extFromUrl(u) {
+  const s = String(u || '');
+  if (!s) return '';
+  let p = s;
+  try { p = new URL(s).pathname; } catch (_) { p = s.split('?')[0].split('#')[0]; }
+  const ext = String(p).split('/').pop().split('.').pop();
+  const e = (ext || '').toLowerCase();
+  return ALLOWED_EXT.has(e) ? (e === 'jpeg' ? 'jpg' : e) : '';
+}
+
 /** 存储模式：s3 = 已配置可用；local = 回落本地磁盘 */
 function storageMode() {
   return S3.isConfigured() ? 's3' : 'local';
@@ -430,7 +468,7 @@ function thumbCandidate(p, size) {
 
 // ── 图片处理 ──────────────────────────────────────────────────
 function extFrom(filename, contentType) {
-  const byMime = MIME_EXT[String(contentType || '').toLowerCase().split(';')[0].trim()];
+  const byMime = MIME_EXT[normalizeMime(contentType)];
   if (byMime) return byMime;
   const ext = path.extname(String(filename || '')).replace(/^\./, '').toLowerCase();
   if (ALLOWED_EXT.has(ext)) return ext === 'jpeg' ? 'jpg' : ext;
@@ -521,9 +559,16 @@ async function uploadImage(opts) {
   if (!buffer || !buffer.length) return fail('缺少图片内容（buffer 或 sourceUrl）');
   if (buffer.length > maxBytes()) return fail(`图片过大（${(buffer.length / 1048576).toFixed(1)}MB > ${(maxBytes() / 1048576).toFixed(0)}MB）`);
 
-  const ext = extFrom(o.filename, contentType);
+  // 扩展名三层推导（签名 URL / 非标准 MIME 兜底）：
+  //   ① filename / content-type（含别名归一）→ ② sourceUrl pathname（剥签名 query）→ ③ 图片魔数嗅探
+  const ext = extFrom(o.filename, contentType)
+    || extFromUrl(o.sourceUrl)
+    || sniffImageExt(buffer);
   if (!ext) return fail('不支持的图片格式（仅 jpg/jpeg/png/webp）');
-  if (!contentType) contentType = Object.keys(MIME_EXT).find((k) => MIME_EXT[k] === ext) || 'image/jpeg';
+  // content-type 归一：非标准/未知 MIME（如 AWS response-content-type=application/jpg）→ 用扩展名反推标准值
+  if (!MIME_EXT[normalizeMime(contentType)]) {
+    contentType = Object.keys(MIME_EXT).find((k) => MIME_EXT[k] === ext) || 'image/jpeg';
+  }
 
   const norm = normalizeRewriteEnabled()
     ? await normalize(buffer, o.maxWidth)
@@ -664,6 +709,10 @@ module.exports = {
   thumbCandidate,
   uploadImage,
   readImage,
+  // 格式推导工具（签名 URL/非标准 MIME 场景，2026-10-12）
+  sniffImageExt,
+  normalizeMime,
+  extFromUrl,
   migrateLocalToS3,
   normalize,
   makeThumbs,

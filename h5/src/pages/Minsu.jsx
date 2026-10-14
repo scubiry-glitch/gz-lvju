@@ -73,6 +73,7 @@ export default function Minsu() {
 
   return (
     <div className="chan-page">
+      {/* 暂隐藏：频道顶栏
       <div className="appbar ghost">
         <Link className="bk" to="/" onClick={(e) => {
           if (history.length > 1) {
@@ -86,6 +87,7 @@ export default function Minsu() {
           民宿<small>整栋 · 庭院 · 管家</small>
         </div>
       </div>
+      */}
 
       <div className="hero-sm minsu">
         <div className="bg" />

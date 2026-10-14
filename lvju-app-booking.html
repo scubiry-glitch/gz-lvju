@@ -231,7 +231,7 @@
       : '<span class="st on"><span class="n">1</span>预定下单</span><span class="sep">›</span><span class="st"><span class="n">2</span>商家确认</span><span class="sep">›</span><span class="st"><span class="n">3</span>线下收款</span>';
     var ag = document.getElementById('txAgreement');
     if (ag) ag.innerHTML = paid
-      ? '提交即同意《旅居预订与退改协议》。资金由 <b style="color:var(--brand-deep);">贝壳存管</b>，支付后待商家确认。'
+      ? '提交即同意《旅居预订与退改协议》。支付后待商家确认。'
       : '提交即同意《旅居预订与退改协议》。本单在线预订，商家确认后线下收款。';
   }
   txSel.addEventListener('change', function(){if(txSel.value!=='payment')selectedCouponId='';renderSteps();calc();});

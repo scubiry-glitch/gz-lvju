@@ -212,7 +212,9 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     PAY_NOTIFY_URL: 'https://example.test/notify', PAY_POLL_SECONDS: '1' };
   const core = createPaymentCore({ createConnection, config, payCenter: gateway, now: () => now,
     logger: { warn() {} }, jobHandlers: { booking_webhook: async () => {} } });
-  const adapter = createBookingPaymentAdapter({ core, createConnection, config });
+  const cancelNotices = [];
+  const adapter = createBookingPaymentAdapter({ core, createConnection, config,
+    notifyVendorBooking: (vendorId, event, order) => { cancelNotices.push({ vendorId, event, order }); } });
   const account = { id: 'account-1', idp_type: 'beike', idp_subject: 'ucid-one' };
   let seq = 0;
   async function booking(payStatus = 'unpaid') {
@@ -249,11 +251,17 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     const orderNo = await booking();
     await intent(orderNo, 'booking-close-request'); await work();
     const before = Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total);
+    const beforeNotices = cancelNotices.length;
     const cancelled = await adapter.cancel({ orderNo, account, source: 'user' });
     assert.equal(cancelled.pay_status, 'closing');
+    assert.equal(cancelNotices.length, beforeNotices);
     assert.equal(Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total), before);
     await work(); await work(); await consume();
     assert.equal((await db('SELECT status FROM booking_orders WHERE order_no=?', [orderNo]))[0].status, 'cancelled');
+    assert.equal(cancelNotices.length, beforeNotices + 1);
+    assert.equal(cancelNotices.at(-1).event, 'booking.cancelled');
+    assert.equal(cancelNotices.at(-1).order.pay_status, 'closed');
+    assert.equal(cancelNotices.at(-1).order.cancel_by, 'customer');
     const after = Number((await db('SELECT SUM(booked_qty) total FROM stay_calendar'))[0].total);
     assert.equal(after, before - 1);
     await adapter.cancel({ orderNo, account, source: 'user' }); await consume();
@@ -273,14 +281,39 @@ test('booking adapter preserves payment and inventory invariants', { skip: !sock
     await adapter.confirm({ orderNo, source: 'vendor', vendorId: 1 });
     await adapter.status({ orderNo, account }); await work(); await consume();
     assert.equal((await db('SELECT * FROM payment_refunds WHERE biz_order_no=?', [orderNo])).length, 0);
+    const beforeNotices = cancelNotices.length;
     const cancelled = await adapter.cancel({ orderNo, source: 'vendor', vendorId: 1 });
     assert.equal(cancelled.pay_status, 'refunding');
+    assert.equal(cancelNotices.length, beforeNotices);
     await adapter.cancel({ orderNo, source: 'vendor', vendorId: 1 });
     assert.equal((await db('SELECT * FROM payment_refunds WHERE biz_order_no=?', [orderNo])).length, 1);
     await work(); await work(); await consume();
     row = (await db('SELECT * FROM booking_orders WHERE order_no=?', [orderNo]))[0];
     assert.equal(row.pay_status, 'refunded');
     assert.ok(row.paid_payment_order_id);
+  });
+
+  await t.test('customer cancellation of a paid order notifies once when the order becomes cancelled', async () => {
+    const orderNo = await booking(); const out = await intent(orderNo, 'booking-customer-cancel'); await work();
+    paymentMap.get(out.app_order_id).orderStatus = '30'; await work(); await consume();
+    const beforeNotices = cancelNotices.length;
+    const cancelled = await adapter.cancel({ orderNo, account, source: 'user' });
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(cancelled.pay_status, 'refunding');
+    assert.equal(cancelNotices.length, beforeNotices + 1);
+    const notice = cancelNotices.at(-1);
+    assert.equal(notice.vendorId, 1);
+    assert.equal(notice.event, 'booking.cancelled');
+    assert.equal(notice.order.order_no, orderNo);
+    assert.equal(notice.order.status, 'cancelled');
+    assert.equal(notice.order.pay_status, 'refunding');
+    assert.equal(notice.order.cancel_by, 'customer');
+    assert.equal(notice.order.contact_phone, undefined);
+    await work(); await work(); await consume();
+    assert.equal((await db('SELECT pay_status FROM booking_orders WHERE order_no=?', [orderNo]))[0].pay_status, 'refunded');
+    assert.equal(cancelNotices.length, beforeNotices + 1);
+    await adapter.cancel({ orderNo, account, source: 'user' });
+    assert.equal(cancelNotices.length, beforeNotices + 1);
   });
 
   await t.test('legacy expired order without a payment still emits one inventory-release event', async () => {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import CalSheet from '../components/CalSheet.jsx';
+import { useAuthUser } from '../lib/auth-context.jsx';
 import { project, projectUnits, stayCalendar, virtualPhone } from '../lib/api.js';
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, priceParts, unitNight } from '../lib/price.js';
@@ -174,6 +175,7 @@ export default function Detail() {
   const { id } = useParams();
   const [sp, setSp] = useSearchParams();
   const nav = useNavigate();
+  const { loggedIn, goLogin } = useAuthUser();
   const scrRef = useRef(null);
 
   const [p, setP] = useState(null);
@@ -213,7 +215,6 @@ export default function Detail() {
         const first = qUnit && us.some((u) => u.id === qUnit) ? qUnit : us[0]?.id || 0;
         setSelUnit(first);
         setProfileUnit(first);
-        document.title = (proj.name || '房源详情') + ' · 贝壳找房旅居';
       })
       .catch((e) => {
         if (!alive) return;
@@ -252,7 +253,9 @@ export default function Detail() {
 
   const spots = Array.isArray(p?.spots) ? p.spots : [];
   const hasFacilities = units.some((u) => roomFacts(u).length || facilityData(u).length || profileOf(u).introduction);
-  const hasNearby = spots.length > 0;
+  /* 详情暂不展示周边玩法 / 入住保障 */
+  const hasNearby = false && spots.length > 0;
+  const showInsurance = false;
   const navItems = useMemo(() => {
     const items = [{ id: 'units', label: '房型', target: 'dUnitsBlock' }];
     if (hasFacilities) items.push({ id: 'facilities', label: '设施', target: 'dFacilitiesBlock' });
@@ -339,7 +342,13 @@ export default function Detail() {
     q.set('checkin', checkin);
     q.set('checkout', checkout);
     if (u) q.set('unit', String(u));
-    nav('/booking/' + id + '?' + q.toString());
+    const path = '/booking/' + id + '?' + q.toString();
+    /* 未登录先 Morph 登录，回跳直接进预订页，避免先进 /booking 被 RequireAuth 渲成白屏 */
+    if (!loggedIn) {
+      goLogin(path);
+      return;
+    }
+    nav(path);
   }
 
   function scrollTo(targetId, secId) {
@@ -766,7 +775,7 @@ export default function Detail() {
         </div>
       ) : null}
 
-      {Array.isArray(p.insurance_types) && p.insurance_types.length ? (
+      {showInsurance && Array.isArray(p.insurance_types) && p.insurance_types.length ? (
         <div className="pd-block">
           <div className="bt">
             入住保障 <span className="bs" style={{ fontWeight: 400 }}>商家已投保 · 扫码验真可查</span>
