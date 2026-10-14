@@ -26,7 +26,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@ke/morph', '@babel/runtime/helpers/interopRequireDefault'],
+    // 仅在真实包存在时才预构建（CJS 包需要）；shim 是纯 ESM，不需要预构建
+    include: fs.existsSync(MORPH_PKG)
+      ? ['@ke/morph', '@babel/runtime/helpers/interopRequireDefault']
+      : [],
   },
   build: {
     commonjsOptions: {
