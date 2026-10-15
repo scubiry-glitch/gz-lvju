@@ -30,14 +30,15 @@ export default function Home() {
   const [featured, setFeatured] = useState(null);
   const [dmap, setDmap] = useState({});
   const [featErr, setFeatErr] = useState('');
-  const [hiddenTabs, setHiddenTabs] = useState(() => new Set());
+  /** null = catalog 未回，频道区先不渲染，避免 hidden_home_tabs 闪一下全量再裁剪 */
+  const [hiddenTabs, setHiddenTabs] = useState(null);
 
   const load = useCallback((c) => {
     setPosts(null);
     setPostsHide(false);
     setFeatured(null);
     setFeatErr('');
-    setHiddenTabs(new Set());
+    setHiddenTabs(null);
 
     spots({ city: c })
       .then((data) => {
@@ -64,6 +65,8 @@ export default function Home() {
       .catch(() => {
         setFeatErr('无法连接新居住数据库');
         setFeatured([]);
+        /* 失败也落盘配置（仅 FORCE_HIDDEN），避免频道区一直空白 */
+        setHiddenTabs(hiddenHomeTabSet(null));
       });
   }, []);
 
@@ -132,18 +135,24 @@ export default function Home() {
           <span className="bar" />
           <h3>找房·全频道</h3>
         </div>
-        <div className="chan">
-          {HOME_CHANNELS.filter((ch) => channelShown(ch.id, hiddenTabs)).map((ch) => (
-            <Link key={ch.id} className="chan feat" to={channelHref(ch, city)}>
-              {ch.badge ? <span className="nb">{ch.badge}</span> : null}
-              <div className="ic">
-                {ch.icon ? <img src={ch.icon} alt="" /> : <span style={{ fontSize: 22, lineHeight: 1 }}>{ch.emoji}</span>}
-              </div>
-              <b>{ch.label}</b>
-              <small>{ch.hint}</small>
-            </Link>
-          ))}
-        </div>
+        {hiddenTabs == null ? (
+          <div className="home-empty" style={{ padding: '28px 0 8px' }}>
+            加载中…
+          </div>
+        ) : (
+          <div className="chan">
+            {HOME_CHANNELS.filter((ch) => channelShown(ch.id, hiddenTabs)).map((ch) => (
+              <Link key={ch.id} className="chan feat" to={channelHref(ch, city)}>
+                {ch.badge ? <span className="nb">{ch.badge}</span> : null}
+                <div className="ic">
+                  {ch.icon ? <img src={ch.icon} alt="" /> : <span style={{ fontSize: 22, lineHeight: 1 }}>{ch.emoji}</span>}
+                </div>
+                <b>{ch.label}</b>
+                <small>{ch.hint}</small>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* 暂隐藏：旅居周刊入口卡
         <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
