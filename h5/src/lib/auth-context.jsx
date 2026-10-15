@@ -87,14 +87,32 @@ export async function loadAuthUser() {
 }
 
 const LOGIN_NEXT_KEY = 'bzf_h5_login_next';
+/** 与 BrowserRouter basename / vite base 一致（已从 /h5 迁到 /gy） */
+const H5_BASE = '/gy';
+
+function withH5Base(path) {
+  if (path === H5_BASE || path.startsWith(H5_BASE + '/')) return path;
+  /* 兼容旧回跳 /h5/... → /gy/... */
+  if (path === '/h5' || path.startsWith('/h5/')) return H5_BASE + path.slice(3);
+  return H5_BASE + path;
+}
 
 function loginNextPath(next) {
   const raw = next == null || next === '' ? location.pathname + location.search : String(next);
-  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const u = new URL(raw);
+      if (u.origin === location.origin) {
+        u.pathname = withH5Base(u.pathname);
+        return u.toString();
+      }
+    } catch {
+      /* ignore */
+    }
+    return raw;
+  }
   const path = raw.startsWith('/') ? raw : '/' + raw;
-  /* 已是 /h5/... 时不要再拼一层 */
-  if (path === '/h5' || path.startsWith('/h5/')) return location.origin + path;
-  return location.origin + '/h5' + path;
+  return location.origin + withH5Base(path);
 }
 
 function saveLoginNext(path) {
@@ -120,7 +138,7 @@ function resumeLoginNext() {
   const next = takeLoginNext();
   if (!next) return;
   const path = next.startsWith('/') ? next : '/' + next;
-  const target = path === '/h5' || path.startsWith('/h5/') ? path : '/h5' + path;
+  const target = withH5Base(path);
   const cur = location.pathname + location.search;
   if (cur === target) return;
   authLog('resumeLoginNext', { from: cur, to: target });

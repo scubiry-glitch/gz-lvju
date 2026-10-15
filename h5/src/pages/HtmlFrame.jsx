@@ -1,4 +1,4 @@
-/** 同源旧 HTML 嵌进 H5 路由，地址栏保持 /h5/* */
+/** 同源旧 HTML 嵌进 H5 路由，地址栏保持 /gy/* */
 export default function HtmlFrame({ src, title = '页面' }) {
   if (!src) {
     return (
