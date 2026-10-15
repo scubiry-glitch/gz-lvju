@@ -271,10 +271,10 @@ function isPublicStatic(urlPath) {
   return true;
 }
 
-/** C 端 React SPA：/h5 → h5/dist，未知路径回落 index.html（不删 lvju-app-*.html） */
+/** C 端 React SPA：/gy → h5/dist，未知路径回落 index.html（不删 lvju-app-*.html） */
 function serveH5Spa(rawPath, res) {
   const dist = path.join(ROOT, 'h5', 'dist');
-  const relRaw = String(rawPath || '').replace(/^\/h5\/?/, '') || 'index.html';
+  const relRaw = String(rawPath || '').replace(/^\/gy\/?/, '') || 'index.html';
   const rel = path.posix.normalize('/' + relRaw).replace(/^\/+/, '') || 'index.html';
   if (rel.split('/').some((p) => p === '..')) {
     res.writeHead(403);
@@ -2405,13 +2405,13 @@ const server = http.createServer((req, res) => {
   }
 
   // React C 端 SPA（与 lvju-app-*.html 并存；源码在 h5/，成品 h5/dist）
-  if (rawPath === '/h5' || rawPath.startsWith('/h5/')) {
+  if (rawPath === '/gy' || rawPath.startsWith('/gy/')) {
     return serveH5Spa(rawPath, res);
   }
 
-  // 旧首页入口 → React /h5（保留 ?city= 等查询串）
+  // 旧首页入口 → React /gy（保留 ?city= 等查询串）
   if (rawPath === '/lvju-app-home-demo.html') {
-    res.writeHead(302, { Location: '/h5' + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
+    res.writeHead(302, { Location: '/gy' + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
     res.end();
     return;
   }

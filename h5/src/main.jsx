@@ -9,7 +9,7 @@ import './styles/app.css';
 function mount() {
   createRoot(document.getElementById('root')).render(
     <StrictMode>
-      <BrowserRouter basename="/h5">
+      <BrowserRouter basename="/gy">
         <App />
       </BrowserRouter>
     </StrictMode>,
