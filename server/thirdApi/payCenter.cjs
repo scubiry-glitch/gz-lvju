@@ -223,7 +223,8 @@ class PayCenter {
    *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/9297
    * @param {object} body 必填：appCode, projectCode, appOrderId, refundAmount, callbackUrl,
    *   ucid, userType, shareOrderInfos[{merchantNo, shareBizCode, amount}]，
-   *   且 orderId / businessOrderNo / cashierOrderNo 至少其一（定位原单）
+   *   且 orderId / businessOrderNo / cashierOrderNo 至少其一（定位原单）。
+   *   profitSharingType 未传（缺省 / null / 空串）时默认 2；业务显式传入则原样转发。
    * @returns {Promise<{errno:number,error:string,data:object}>}
    */
   async refundOrder(body = {}) {
@@ -232,6 +233,7 @@ class PayCenter {
     const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
     if (miss.length) throw new Error('[payCenter] refundOrder 缺少必填：' + miss.join(', '));
     const payload = Object.assign({ refundType: '01' }, body);
+    if (payload.profitSharingType == null || payload.profitSharingType === '') payload.profitSharingType = 2;
     return this._paymentJson('原路退款', this._path('/order/refundOrder'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
