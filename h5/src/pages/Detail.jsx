@@ -802,7 +802,7 @@ export default function Detail() {
           {spots[0] ? (
             <a
               className="nb-feat"
-              href={spots[0].link || `/h5/spot/${spots[0].id}`}
+              href={spots[0].link || `/gy/spot/${spots[0].id}`}
             >
               <div
                 className="bg"
@@ -826,7 +826,7 @@ export default function Detail() {
             <a
               key={s.id}
               className="nb-row"
-              href={s.link || `/h5/spot/${s.id}`}
+              href={s.link || `/gy/spot/${s.id}`}
             >
               <div
                 className="th"

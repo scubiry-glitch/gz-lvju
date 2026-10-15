@@ -4,7 +4,7 @@ import { useAuthUser } from '../lib/auth-context.jsx';
 
 /**
  * 受保护路由：未登录一律 jumpToLogin → clogin（App 原生）。
- * 不进 /h5/login，也不落页内密码卡。
+ * 不进 /gy/login，也不落页内密码卡。
  */
 export default function RequireAuth() {
   const { pathname, search } = useLocation();

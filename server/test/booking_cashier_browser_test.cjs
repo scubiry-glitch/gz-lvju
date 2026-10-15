@@ -31,14 +31,14 @@ test('real accommodation pages retain old and new cashier compatibility', { skip
       if (legacy && ['/lvju-app-booking.html', '/lvju-app-paid.html'].includes(pathname)) {
         body = execFileSync('git', ['show', LEGACY_REF + ':' + pathname.slice(1)], { cwd: root });
       } else {
-        let file = pathname.startsWith('/h5/')
-          ? path.join(root, 'h5/dist', pathname.startsWith('/h5/assets/') ? pathname.slice(4) : 'index.html')
+        let file = pathname.startsWith('/gy/')
+          ? path.join(root, 'h5/dist', pathname.startsWith('/gy/assets/') ? pathname.slice(4) : 'index.html')
           : path.join(root, pathname);
         if (!file.startsWith(root + path.sep)) throw new Error('path outside fixture root');
         body = await fs.readFile(file);
       }
       const ext = path.extname(pathname);
-      res.setHeader('Content-Type', ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png' })[ext] || (pathname.startsWith('/h5/') ? 'text/html' : 'application/octet-stream'));
+      res.setHeader('Content-Type', ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.svg': 'image/svg+xml', '.png': 'image/png' })[ext] || (pathname.startsWith('/gy/') ? 'text/html' : 'application/octet-stream'));
       res.end(body);
     } catch (_) { res.writeHead(404); res.end(); }
   });
@@ -97,8 +97,8 @@ test('real accommodation pages retain old and new cashier compatibility', { skip
     });
     return { page, state, close: async () => { assert.deepEqual(state.errors, []); await context.close(); } };
   }
-  const bookingUrl = (react = false) => origin + (react ? '/h5/booking' : '/lvju-app-booking.html') + '?order_no=' + orderNo + '&phone=13000000000';
-  const paidUrl = (react = false) => origin + (react ? '/h5/paid' : '/lvju-app-paid.html') + '?channel=booking&order_no=' + orderNo + '&phone=13000000000';
+  const bookingUrl = (react = false) => origin + (react ? '/gy/booking' : '/lvju-app-booking.html') + '?order_no=' + orderNo + '&phone=13000000000';
+  const paidUrl = (react = false) => origin + (react ? '/gy/paid' : '/lvju-app-paid.html') + '?channel=booking&order_no=' + orderNo + '&phone=13000000000';
   const paySelector = react => react ? 'button.btn.pay' : '#okPay';
   const titleSelector = react => react ? '.ok-t' : '#okTitle';
 

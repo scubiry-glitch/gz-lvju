@@ -350,7 +350,7 @@ function BookingInner() {
     setPaying(true);
     const contactPhone = ok.contact_phone || phone;
     const result =
-      '/h5/paid?channel=booking&order_no=' +
+      '/gy/paid?channel=booking&order_no=' +
       encodeURIComponent(ok.order_no) +
       '&phone=' +
       encodeURIComponent(contactPhone || '');

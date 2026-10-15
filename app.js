@@ -266,7 +266,7 @@ function isPublicStatic(urlPath) {
   if (parts.some(isSensitivePart)) return false;
   if (parts.length === 1 && ROOT_BLOCKED_FILES.has(parts[0].toLowerCase())) return false;
   if (parts[0] === 'node_modules' || parts[0] === 'scripts' || parts[0] === '.git' || parts[0] === 'commerce') return false;
-  // React C 端源码/依赖不走通用静态根；成品由 serveH5Spa 从 h5/dist 挂 /h5/*
+  // React C 端源码/依赖不走通用静态根；成品由 serveH5Spa 从 h5/dist 挂 /gy/*
   if (parts[0] === 'h5' && (parts[1] === 'src' || parts[1] === 'node_modules' || parts[1] === 'public')) return false;
   return true;
 }
@@ -2407,6 +2407,14 @@ const server = http.createServer((req, res) => {
   // React C 端 SPA（与 lvju-app-*.html 并存；源码在 h5/，成品 h5/dist）
   if (rawPath === '/gy' || rawPath.startsWith('/gy/')) {
     return serveH5Spa(rawPath, res);
+  }
+
+  // 旧 /h5/* 登录回跳与深链 → /gy/*
+  if (rawPath === '/h5' || rawPath.startsWith('/h5/')) {
+    const rest = rawPath === '/h5' ? '' : rawPath.slice(3);
+    res.writeHead(302, { Location: '/gy' + rest + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
+    res.end();
+    return;
   }
 
   // 旧首页入口 → React /gy（保留 ?city= 等查询串）
