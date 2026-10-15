@@ -62,6 +62,29 @@ async function verify(token, opts) {
     signature: cfg.signature,
     token: t,
   }).toString();
+  const envSig = (process.env.SESSION_SIGNATURE || '').trim();
+  console.log('[session_token.verify]', JSON.stringify({
+    url,
+    source: cfg.source,
+    prod: cfg.prod,
+    referer,
+    token_len: t.length,
+    token_head: t.slice(0, 8),
+    signature_head: cfg.signature.slice(0, 8),
+    env: {
+      JUZHU_ENV: (process.env.JUZHU_ENV || '').trim() || '(empty)',
+      NODE_ENV: (process.env.NODE_ENV || '').trim() || '(empty)',
+      SESSION_SOURCE: (process.env.SESSION_SOURCE || '').trim() || '(empty)',
+      SESSION_SIGNATURE: envSig ? envSig.slice(0, 8) + '…(len=' + envSig.length + ')' : '(empty)',
+      SESSION_VERIFY_URL: (process.env.SESSION_VERIFY_URL || '').trim() || '(empty)',
+      SESSION_REFERER: (process.env.SESSION_REFERER || '').trim() || '(empty)',
+    },
+    resolved: {
+      base: cfg.base,
+      source: cfg.source,
+      signature_head: cfg.signature.slice(0, 8) + '…(len=' + cfg.signature.length + ')',
+    },
+  }));
   let json;
   try {
     const res = await fetch(url, {
@@ -76,13 +99,16 @@ async function verify(token, opts) {
     });
     const text = await res.text();
     try { json = JSON.parse(text); } catch (_) {
+      console.log('[session_token.verify] parse_fail', { url, http_status: res.status, body_head: String(text).slice(0, 120) });
       return { ok: false, error: 'session 验票响应无法解析', status: 502 };
     }
   } catch (e) {
     const msg = e && e.name === 'TimeoutError' ? 'session 验票超时' : 'session 验票不可达';
+    console.log('[session_token.verify] fetch_fail', { url, error: msg, detail: e && e.message });
     return { ok: false, error: msg, status: 502 };
   }
   const code = json && json.error_code;
+  console.log('[session_token.verify] result', { url, error_code: code, error: (json && json.error) || '', ok: code === 0 });
   if (code === 0) {
     const u = pickUser(json.data);
     if (!u) return { ok: false, error: '验票成功但没有 ucid', status: 502 };
