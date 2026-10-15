@@ -183,17 +183,6 @@ export default function Changzu() {
           })
         )}
       </div>
-
-      <Link className="banner" to="/guide">
-        <span className="bi">
-          <img src="/assets/lvju/icons/changzu-guide-bi.png" alt="" />
-        </span>
-        <div className="bt">
-          <b>想长住，也想置业？</b>
-          <p>置业导购：看房团 · 贷款测算 · 1对1顾问</p>
-        </div>
-        <span className="go">去导购 ›</span>
-      </Link>
     </div>
   );
 }
