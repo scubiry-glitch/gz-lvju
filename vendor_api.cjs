@@ -559,6 +559,9 @@ function housingProjectOut(row, disp) {
   const out = stripContactPhone(Object.assign({}, row));
   Object.assign(out, stayCfg.stayConfigOf(row));
   Object.assign(out, disp || { price_from_display: null, price_unit: null, price_note: '' });
+  // auto_publish 生效值回显（2026-10-14）：平台到底有没有记下「复核通过自动上架」，
+  // 商家不该只能靠复核结果反推——create/update 出参里直接给布尔值（历史 bug 见 PROJECT_EXT_KEYS 注释）。
+  out.auto_publish = stayCfg.parseExtObj(row.ext).auto_publish === true;
   return out;
 }
 
@@ -672,6 +675,15 @@ function extFromBody(body, baseExt, channel) {
 
 const PROJECT_UPDATABLE_COLS = ['name', 'address', 'cover_image', 'sort_order', 'price_from',
   'is_featured', 'featured_rank', 'old_house_hint', 'unit_count', 'managed_unit_count'];
+
+/** `projects/update` 会重建 `ext` 的字段清单——**必须与 extFromBody() 认的键一一对应**。
+ *  历史 bug（2026-10-14，商家 9410 复核通过未自动上架）：重建条件是手写的 `insurance || min_stay_nights ||
+ *  online_booking || online_payment || stay_bookable`，**漏了 auto_publish / default_closed** →
+ *  `{id, auto_publish:true}` 这类「只想改一个 ext 开关」的请求整段跳过 ext 重建，字段被静默丢弃
+ *  （接口回 200、无任何提示），复核通过时读到的 ext.auto_publish 自然不是 true。
+ *  新增 ext 字段时改这里一处，别再各写一份条件。 */
+const PROJECT_EXT_KEYS = ['insurance', 'min_stay_nights', 'default_closed', 'auto_publish',
+  'online_booking', 'online_payment', 'stay_bookable'];
 
 async function createUnit(conn, projectId, channel, priceFrom, u) {
   const name = String((u && u.name) || '').trim();
@@ -830,10 +842,8 @@ async function housingProjectsUpdate(conn, body, vendorId) {
     try { sets.push('contact_phone=?'); params.push(phoneFromBody(b.contact_phone)); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
   }
-  if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
-    || Object.prototype.hasOwnProperty.call(b, 'online_booking') || Object.prototype.hasOwnProperty.call(b, 'online_payment')
-    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')
-    || b.ext != null && b.ext !== '') {
+  if (PROJECT_EXT_KEYS.some((k) => Object.prototype.hasOwnProperty.call(b, k))
+    || (b.ext != null && b.ext !== '')) {
     let ext;
     try { ext = extFromBody(b, row.ext, row.channel); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }

@@ -120,8 +120,10 @@ queryRows,
     // ── 项目 ext 组装（2026-10-13 兼容顶层写法，与商家端同体验）──
     // 痛点：管理端此前只认 body.ext，body 顶层直接传 online_payment=true 被静默丢弃 → 「传了不生效」。
     // 现在：能力/住宿配置字段（online_booking / online_payment / stay_bookable / insurance /
-    // min_stay_nights / default_closed）可直接挂 body 顶层，与 body.ext 合并后统一走 normalizeProjectExtInput。
-    const PROJECT_EXT_TOP_KEYS = ['online_booking', 'online_payment', 'stay_bookable', 'insurance', 'min_stay_nights', 'default_closed'];
+    // min_stay_nights / default_closed / auto_publish）可直接挂 body 顶层，与 body.ext 合并后统一走
+    // normalizeProjectExtInput。**新增 ext 开关字段必须补进这张表**（auto_publish 曾漏，2026-10-14）。
+    const PROJECT_EXT_TOP_KEYS = ['online_booking', 'online_payment', 'stay_bookable', 'insurance',
+      'min_stay_nights', 'default_closed', 'auto_publish'];
     function projectExtMergedFromBody(body, baseExt) {
       const hasTop = PROJECT_EXT_TOP_KEYS.some((k) => Object.prototype.hasOwnProperty.call(body, k));
       const hasExt = Object.prototype.hasOwnProperty.call(body, 'ext');

@@ -237,6 +237,21 @@ async function catalogEventually(base, projectId, citySlug, want) {
   check('update 保险+最短连住 → 200', r.status === 200
     && JSON.stringify(r.j.project.insurance) === JSON.stringify(['hotel_cancel', 'property'])
     && r.j.project.min_stay_nights === 20, JSON.stringify(r.j));
+
+  // 4-1 auto_publish 必须能经 projects/update 落库（2026-10-14 修复：ext 重建条件手写漏了 auto_publish，
+  //   单传时 400「无可更新字段」、与其它字段同传时被静默丢弃 → 复核通过不自动上架却毫无提示）
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, auto_publish: true }));
+  check('4-1 projects/update 单传 auto_publish → 落库 + 出参回显 true',
+    r.status === 200 && r.j.project && r.j.project.auto_publish === true,
+    JSON.stringify({ status: r.status, auto: r.j.project && r.j.project.auto_publish, msg: r.j.message }));
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, auto_publish: true, sort_order: 1 }));
+  check('4-1b 与列字段同传 → auto_publish 不丢（历史 bug 现场）',
+    r.status === 200 && r.j.project.auto_publish === true && r.j.project.sort_order === 1,
+    JSON.stringify({ auto: r.j.project && r.j.project.auto_publish, sort: r.j.project && r.j.project.sort_order }));
+  r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, auto_publish: false, sort_order: 999 }));
+  check('4-1c 传 false → 关闭并回显 false（sort_order 复原）',
+    r.status === 200 && r.j.project.auto_publish === false && r.j.project.sort_order === 999,
+    JSON.stringify({ auto: r.j.project && r.j.project.auto_publish, sort: r.j.project && r.j.project.sort_order }));
   r = await call('/api/juzhu/housing/vendor/projects/update', signed(vendor, { id: pid, insurance: ['not_exist'] }));
   check('未知保险标识被拒 400', r.status === 400, JSON.stringify(r.j));
 
