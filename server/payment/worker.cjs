@@ -17,6 +17,8 @@ function createWorker(I) {
     return data;
   };
   const remoteStatus = data => String(data.orderStatus ?? data.status ?? data.refundStatus ?? data.payStatus ?? '');
+  // 一期退款状态：40/104 为明确失败，60/101/102/103 转人工。其余非成功态继续视为处理中。
+  const localRefundStatus = code => ['40', '104'].includes(code) ? 'refund_failed' : ['60', '101', '102', '103'].includes(code) ? 'manual_review' : 'refunding';
   // This capability never leaves the worker. Public reconciliation and callbacks
   // cannot opt into the historical booking query response contract.
   const trustedQuery = Symbol('authenticated payment query');
@@ -198,9 +200,12 @@ function createWorker(I) {
         await emit(c, g, 'refund.succeeded', `refunded:${id}`, { paymentId: p.id, refundId: r.id, amountMinor: Number(r.amount_minor), reference: parse(r.reference_json), reason: r.refund_reason_type, requestKey: r.idempotency_key });
         return { terminal: true };
       }
-      // Failed/unknown refunds still reserve their amount until an operator has authoritative final evidence.
-      await c.execute('UPDATE payment_refunds SET refund_status=?,retry_count=retry_count+1,next_retry_at=?,updated_at=? WHERE id=?', [['40', '104', '60', '101', '102', '103'].includes(code) ? 'manual_review' : 'refunding', due(pendingDelay), clock(), id]);
-      return { terminal: false };
+      // 40/104 is a finished failure: stop this refund_query. Review and in-progress results stay scheduled.
+      // The reserved amount stays on the refund until a later authoritative query settles it.
+      const status = localRefundStatus(code);
+      const failed = status === 'refund_failed';
+      await c.execute('UPDATE payment_refunds SET refund_status=?,retry_count=retry_count+1,next_retry_at=?,updated_at=? WHERE id=?', [status, failed ? null : due(pendingDelay), clock(), id]);
+      return { terminal: failed };
     });
   }
   async function queryPayment(p) {

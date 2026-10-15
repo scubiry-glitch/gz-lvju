@@ -34,6 +34,33 @@ test('payment methods reject HTTP 200 business errors', async () => {
   );
 });
 
+test('refundOrder defaults profitSharingType to 2 when the caller omits it', async () => {
+  const sent = [];
+  const pay = new PayCenter({
+    client: {
+      json: async (_path, options) => {
+        sent.push(options.body);
+        return { errno: 0, data: { accepted: true } };
+      },
+    },
+  });
+  const base = {
+    appCode: 'lvju', projectCode: 'proj', appOrderId: 'RF-1', refundAmount: '1.00',
+    callbackUrl: 'https://example.test/notify', ucid: 'u1', userType: 1,
+    shareOrderInfos: [{ merchantNo: 'm1', shareBizCode: 'b1', amount: '1.00' }],
+    businessOrderNo: 'PAY-1',
+  };
+
+  await pay.refundOrder(base);
+  assert.equal(base.profitSharingType, 2);
+  await pay.refundOrder({ ...base, profitSharingType: null });
+  await pay.refundOrder({ ...base, profitSharingType: '' });
+  await pay.refundOrder({ ...base, profitSharingType: 0 });
+  await pay.refundOrder({ ...base, profitSharingType: 1 });
+
+  assert.deepEqual(sent.map((body) => body.profitSharingType), [2, 2, 2, 0, 1]);
+});
+
 test('payment methods reject malformed success responses without data', async () => {
   const pay = new PayCenter({
     client: { json: async () => ({ errno: 0, error: '操作成功', data: null }) },

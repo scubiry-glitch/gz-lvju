@@ -3,9 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createWorker } = require('../payment/worker.cjs');
+const { PayCenter } = require('../thirdApi/payCenter.cjs');
 
 // Protocol-only fixtures: no host configuration, database, gateway or network.
-function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '30' }, create = { status: '30' }, refundQuery = { status: '30' }, failQuery = null } = {}) {
+function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '30' }, create = { status: '30' }, refundQuery = { status: '30' }, failQuery = null, payCenter: payCenterOverride = null } = {}) {
   const p = { id: 1, biz_type: bizType, biz_order_no: 'fixture-order', app_order_id: 'XD_fixture', app_code: 'fixture-app',
     project_code: 'fixture-project', merchant_no: 'fixture-merchant', payer_ucid: 'fixture-payer', payer_user_type: '2',
     amount_minor: 10000, share_biz_code: 'fixture-share', cashier_type: '2', callback_url: 'https://invalid.example.test/notify',
@@ -27,7 +28,7 @@ function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '3
     if (sql.includes('FROM payment_orders') && sql.includes('app_order_id=?')) return [p];
     return [];
   };
-  const payCenter = {
+  const payCenter = payCenterOverride || {
     async queryOrder(input) { calls.push({ kind: 'query', input }); if (failQuery) throw failQuery; return { errno: 0, data: query }; },
     async createC2BOrder(input) { calls.push({ kind: 'create', input }); return { errno: 0, data: create }; },
     async queryRefundOrder(input) { calls.push({ kind: 'refund_query', input }); return { errno: 0, data: refundQuery }; },
@@ -113,6 +114,27 @@ test('refund identity distinguishes explicit refund ID and original payment ID',
     merchantNo: originalOnly.p.merchant_no, refundAmount: '25.00' } }), { code: 'gateway_evidence_incomplete' });
 });
 
+test('refund query writes 40 and 104 as refund_failed and keeps review codes in manual_review', async () => {
+  const refundWrite = writes => writes.find(w => w.sql.includes('UPDATE payment_refunds SET refund_status=?'));
+  const jobFinish = writes => writes.find(w => w.sql.includes("JSON_EXTRACT(payload,'$.rerun')"));
+  for (const code of ['40', '104']) {
+    const f = fixture({ kind: 'refund_query', refundQuery: { orderStatus: code, refundAppOrderId: 'RF_fixture', merchantNo: 'fixture-merchant', refundAmount: '25.00' } });
+    assert.equal((await f.worker.runJobs(1)).processed, 1);
+    assert.equal(f.events.length, 0);
+    assert.equal(refundWrite(f.writes).args[0], 'refund_failed');
+    assert.equal(refundWrite(f.writes).args[1], null);
+    assert.equal(jobFinish(f.writes).args[0], 'done');
+  }
+  for (const code of ['60', '101', '102', '103', '10']) {
+    const f = fixture({ kind: 'refund_query', refundQuery: { orderStatus: code } });
+    assert.equal((await f.worker.runJobs(1)).processed, 1);
+    assert.equal(refundWrite(f.writes).args[0], code === '10' ? 'refunding' : 'manual_review');
+    assert.equal(refundWrite(f.writes).args[1], '2026-01-01 00:00:10');
+    assert.equal(jobFinish(f.writes).args[0], 'pending');
+    assert.equal(f.events.length, 0);
+  }
+});
+
 test('refund query allows sparse booking only and retains mismatched amount protection', async () => {
   for (const bizType of ['booking', 'commerce', 'jiazheng']) {
     const f = fixture({ bizType, kind: 'refund_query' });
@@ -157,6 +179,18 @@ test('merchantId never substitutes for a collecting merchantNo', async () => {
     amount: '100.00', merchantId: f.p.merchant_no } }), { code: 'gateway_evidence_incomplete' });
   await f.worker.reconcilePayment(1, { data: { ...evidence, merchantId: 'different-institution-id' } });
   assert(f.events.some(e => e.type === 'payment.accepted'));
+});
+
+test('refund create log stores profitSharingType assigned on the request before it is written', async () => {
+  let sent;
+  const pay = new PayCenter({
+    client: { json: async (_path, options) => { sent = options.body; return { errno: 0, data: { accepted: true } }; } },
+  });
+  const f = fixture({ kind: 'refund_create', payCenter: pay });
+  assert.equal((await f.worker.runJobs(1)).processed, 1);
+  const logged = JSON.parse(gatewayLog(f.writes)[8]);
+  assert.equal(logged.profitSharingType, 2);
+  assert.equal(sent.profitSharingType, 2);
 });
 
 function gatewayLog(writes) {
