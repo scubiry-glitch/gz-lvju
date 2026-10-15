@@ -52,6 +52,7 @@ test('refundOrder defaults profitSharingType to 2 when the caller omits it', asy
   };
 
   await pay.refundOrder(base);
+  assert.equal(base.profitSharingType, 2);
   await pay.refundOrder({ ...base, profitSharingType: null });
   await pay.refundOrder({ ...base, profitSharingType: '' });
   await pay.refundOrder({ ...base, profitSharingType: 0 });
