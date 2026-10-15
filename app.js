@@ -2491,7 +2491,20 @@ if (require.main === module) {
   }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+    const rawJuzhuEnv = process.env.JUZHU_ENV;
+    const rawNodeEnv = process.env.NODE_ENV;
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
+    console.log('[env] JUZHU_ENV', rawJuzhuEnv === undefined ? '(unset)' : rawJuzhuEnv === '' ? '(empty string)' : JSON.stringify(rawJuzhuEnv),
+      '| NODE_ENV', rawNodeEnv === undefined ? '(unset)' : rawNodeEnv === '' ? '(empty string)' : JSON.stringify(rawNodeEnv),
+      '| resolved_mode=', envName);
+    console.log('[env] SESSION', JSON.stringify({
+      SESSION_SOURCE: (process.env.SESSION_SOURCE || '').trim() || '(empty)',
+      SESSION_SIGNATURE: (process.env.SESSION_SIGNATURE || '').trim()
+        ? String(process.env.SESSION_SIGNATURE).trim().slice(0, 8) + '…(len=' + String(process.env.SESSION_SIGNATURE).trim().length + ')'
+        : '(empty)',
+      SESSION_VERIFY_URL: (process.env.SESSION_VERIFY_URL || '').trim() || '(empty)',
+      SESSION_REFERER: (process.env.SESSION_REFERER || '').trim() || '(empty)',
+    }));
     console.log('auth: /api/juzhu/* default-deny API Key; C-end catalog/wechat-link/gr-orders public; vendor HMAC; admin session');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
     // 对象存储启动自检：未配置时醒目告警（发行包不含 assets/，回落本地 = 静默丢图）
