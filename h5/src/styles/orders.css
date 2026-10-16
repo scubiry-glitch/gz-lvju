@@ -210,6 +210,31 @@
   font-weight: 600;
 }
 
+.orders-page .ordcard .pay-tip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 14px 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #fff4e5;
+  color: #d9691f;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.orders-page .ordcard .pay-tip-ic {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.orders-page .ordcard .pay-tip-txt {
+  flex: none;
+  white-space: nowrap;
+}
+
 .orders-page .ordcard .of {
   display: flex;
   justify-content: flex-end;
