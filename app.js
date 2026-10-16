@@ -798,6 +798,8 @@ function isCEndPublicApi(urlPath, method) {
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
   if (m === 'POST' && process.env.PAY_NOTIFY_TOKEN
     && p === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}`) return true;
+  if (m === 'POST' && process.env.PAY_NOTIFY_SPLIT_TOKEN
+    && p === `/api/juzhu/payment/split/notify/${process.env.PAY_NOTIFY_SPLIT_TOKEN}`) return true;
   if (m === 'POST' && p === '/api/juzhu/payment/query') return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'GET' && p === '/api/juzhu/auth/beike-config') return true;
@@ -2511,7 +2513,7 @@ if (require.main === module) {
     const paymentRequired = [
       'OAUTH_GATEWAY_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET',
       'PAY_APP_CODE', 'PAY_PROJECT_CODE', 'PAY_SHARE_BIZ_CODE',
-      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN',
+      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN', 'PAY_NOTIFY_SPLIT_TOKEN',
     ];
     const missingPayment = paymentRequired.filter((key) => !String(process.env[key] || '').trim());
     if (missingPayment.length) {

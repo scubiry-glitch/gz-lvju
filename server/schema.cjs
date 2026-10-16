@@ -179,7 +179,8 @@ function createSchema(deps) {
         `CREATE TABLE IF NOT EXISTS payment_split_callback_log (
         id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '分账回调日志主键',
         order_no VARCHAR(64) NOT NULL COMMENT '中台分账订单号（回调 orderNo，幂等键，对应 payment_split.split_order_no）',
-        biz_order_no VARCHAR(32) NULL COMMENT '业务订单号（回调 bizOrderNo，对应 booking_orders.order_no / payment_split.biz_order_no）',
+        app_order_id VARCHAR(64) NULL COMMENT '分账业务单号（回调 bizOrderNo，对应 payment_split.app_order_id，即发起分账时填写的分账 bizOrderNo）',
+        biz_order_no VARCHAR(32) NULL COMMENT '旅居业务订单号（对应 payment_split.biz_order_no / booking_orders.order_no，由回调 bizOrderNo 经 payment_split 反查得到）',
         biz_code VARCHAR(64) NULL COMMENT '业务码（回调 bizCode，对应 payment_split.biz_code）',
         order_type VARCHAR(32) NULL COMMENT '订单类型（回调 orderType：DIRECT_SPLIT-分账 SPLIT_RETURN-分账追回）',
         amount DECIMAL(12,2) NULL COMMENT '分账金额（回调 amount，2位小数）',
@@ -196,6 +197,7 @@ function createSchema(deps) {
         received_at DATETIME NOT NULL COMMENT '接收时间',
         handled_at DATETIME NULL COMMENT '处理完成时间',
         UNIQUE KEY uk_pscl_order_no (order_no),
+        KEY idx_pscl_app_order (app_order_id),
         KEY idx_pscl_biz_order (biz_order_no),
         KEY idx_pscl_received (received_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分账异步回调日志表'`,
