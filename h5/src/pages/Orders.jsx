@@ -238,14 +238,37 @@ function OrdersBody() {
                     </div>
                   </div>
                 </div>
+                {showPayClock && !payTimedOut ? (
+                  <div className="pay-tip" role="status">
+                    <svg className="pay-tip-ic" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M8 4.5V8l2.2 1.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="pay-tip-txt">请在下单后30分钟内完成支付，超时订单将自动取消。</span>
+                  </div>
+                ) : null}
                 <div className="of">
                   {canCancelBooking(o) ? (
                     <button type="button" className="cancel" onClick={() => setCx(o)}>
                       取消订单
                     </button>
                   ) : null}
+                  {o.project_id && o.project_status === 'online' ? (
+                    <Link to={`/detail/${o.project_id}`}>房源详情</Link>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12, color: 'var(--muted)', padding: '7px 0' }}>
+                      {o.project_id ? '房源已下架' : '暂无房源'}
+                    </span>
+                  )}
+                  <Link
+                    className={o.status === 'pending' && UNPAID_PS[o.pay_status] && !payTimedOut ? undefined : 'primary'}
+                    to={`/order/${encodeURIComponent(o.order_no)}`}
+                  >
+                    订单详情
+                  </Link>
                   {o.status === 'pending' && UNPAID_PS[o.pay_status] && !payTimedOut ? (
                     <Link
+                      className="primary"
                       to={
                         '/booking?order_no=' +
                         encodeURIComponent(o.order_no) +
@@ -255,16 +278,6 @@ function OrdersBody() {
                       去支付
                     </Link>
                   ) : null}
-                  {o.project_id && o.project_status === 'online' ? (
-                    <Link to={`/detail/${o.project_id}`}>房源详情</Link>
-                  ) : (
-                    <span className="muted" style={{ fontSize: 12, color: 'var(--muted)', padding: '7px 0' }}>
-                      {o.project_id ? '房源已下架' : '暂无房源'}
-                    </span>
-                  )}
-                  <Link className="primary" to={`/order/${encodeURIComponent(o.order_no)}`}>
-                    订单详情
-                  </Link>
                 </div>
               </div>
             );
