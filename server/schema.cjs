@@ -293,6 +293,7 @@ function createSchema(deps) {
           commission_rate DECIMAL(5,2),
           commission_fee DECIMAL(10,2),
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
+          split_status VARCHAR(16) NOT NULL DEFAULT 'none' COMMENT '分账状态：none-未分账 split-分账中 done-已分账 fail-分账失败',
           pay_status VARCHAR(20),
           pay_method VARCHAR(50),
           pay_at VARCHAR(30),
@@ -769,6 +770,7 @@ function createSchema(deps) {
         ['jz_products', 'path VARCHAR(500)'],
         ['jz_products', 'query VARCHAR(500)'],
         ['vendor_onboarding', 'approved_vendor_id INT'],   // 受理台 ↔ 商家档案互通（2026-09-22）：approve 按 phone 单命中时记录关联商家
+        ['booking_orders', "split_status VARCHAR(16) NOT NULL DEFAULT 'none' COMMENT '分账状态：none-未分账 split-分账中 done-已分账 fail-分账失败'"],  // 分账状态（2026-10）：none-未分账 split-分账中 done-已分账 fail-分账失败
         ['channels', 'hidden_cities TEXT NULL'],  // 按城市隐藏 tab（JSON 数组，如 ["shenyang"]）
       ];
       for (const [table, ddl] of extraCols) {
