@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import CancelOrderSheet from '../components/CancelOrderSheet.jsx';
 import { myBookings } from '../lib/api.js';
@@ -36,6 +36,51 @@ function matchTab(o, tab) {
   return true;
 }
 
+/** payment_expires_at 与服务端同一口径：无时区的时间按 UTC。 */
+function payDeadlineMs(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)) {
+    const ms = Date.parse(s);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const ms = Date.parse(s.replace(' ', 'T') + 'Z');
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatRemain(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function PayCountdown({ expiresAt, onExpire }) {
+  const end = payDeadlineMs(expiresAt);
+  const [left, setLeft] = useState(() => (end == null ? null : end - Date.now()));
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (end == null) return undefined;
+    const tick = () => {
+      const n = end - Date.now();
+      setLeft(n);
+      if (n <= 0 && !fired.current) {
+        fired.current = true;
+        onExpire();
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [end, onExpire]);
+
+  if (end == null || left == null) return null;
+  if (left <= 0) return <span className="paycd over">已超时</span>;
+  return <span className="paycd">剩余 {formatRemain(left)}</span>;
+}
+
 function emptyHint(tab) {
   if (tab === 'unpaid') return '暂无待支付订单';
   if (tab === 'stay') return '暂无待入住订单';
@@ -51,6 +96,9 @@ function OrdersBody() {
   const [loadErr, setLoadErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [cx, setCx] = useState(null);
+  const [timedOut, setTimedOut] = useState(() => new Set());
+  const reloadTimer = useRef(null);
+  const reloadedNos = useRef(new Set());
 
   const loadMine = useCallback((opts = {}) => {
     const silent = !!opts.silent;
@@ -73,8 +121,19 @@ function OrdersBody() {
       });
   }, [clearSession, goLogin]);
 
+  const onPayExpire = useCallback(() => {
+    if (reloadTimer.current) return;
+    reloadTimer.current = setTimeout(() => {
+      reloadTimer.current = null;
+      loadMine({ silent: true });
+    }, 600);
+  }, [loadMine]);
+
   useEffect(() => {
     loadMine();
+    return () => {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    };
   }, [loadMine]);
 
   function setTab(id) {
@@ -125,6 +184,10 @@ function OrdersBody() {
         ) : (
           shown.map((o) => {
             const st = bookingStatusOf(o);
+            const deadline = payDeadlineMs(o.payment_expires_at);
+            const showPayClock =
+              o.status === 'pending' && o.pay_status === 'unpaid' && deadline != null;
+            const payTimedOut = showPayClock && (timedOut.has(o.order_no) || deadline <= Date.now());
             const cover = o.project_cover
               ? { backgroundImage: `url(${assetUrl(o.project_cover)})` }
               : { backgroundImage: 'url(/assets/lvju/xijiang-night.jpg)' };
@@ -132,7 +195,25 @@ function OrdersBody() {
               <div className="ordcard" key={o.id || o.order_no}>
                 <div className="oh">
                   <span className="shop">贝壳旅居 · {o.channel === 'minsu' ? '民宿' : '租赁住宿'}</span>
-                  <span className={'stt ' + st[1]}>{st[0]}</span>
+                  <span className={'stt ' + st[1]}>
+                    {st[0]}
+                    {showPayClock ? (
+                      <PayCountdown
+                        expiresAt={o.payment_expires_at}
+                        onExpire={() => {
+                          setTimedOut((prev) => {
+                            if (prev.has(o.order_no)) return prev;
+                            const next = new Set(prev);
+                            next.add(o.order_no);
+                            return next;
+                          });
+                          if (reloadedNos.current.has(o.order_no)) return;
+                          reloadedNos.current.add(o.order_no);
+                          onPayExpire();
+                        }}
+                      />
+                    ) : null}
+                  </span>
                 </div>
                 <div className="ob">
                   <div className="th" style={cover} />
@@ -163,7 +244,7 @@ function OrdersBody() {
                       取消订单
                     </button>
                   ) : null}
-                  {o.status === 'pending' && UNPAID_PS[o.pay_status] ? (
+                  {o.status === 'pending' && UNPAID_PS[o.pay_status] && !payTimedOut ? (
                     <Link
                       to={
                         '/booking?order_no=' +
