@@ -139,6 +139,18 @@
 .orders-page .ordcard .stt {
   font-size: 11px;
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.orders-page .ordcard .paycd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.orders-page .ordcard .paycd.over {
+  font-weight: 500;
 }
 
 .orders-page .ordcard .stt.wait {

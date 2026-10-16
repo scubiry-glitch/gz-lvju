@@ -38,7 +38,7 @@ function createBookingRouter(deps) {
         `SELECT b.id, b.order_no, b.project_id, b.unit_id, b.channel, p.name AS project_name,
                 p.status AS project_status, p.cover_image AS project_cover,
                 b.checkin, b.checkout, b.nights, b.rooms, b.price_total, b.coupon_minor, b.cash_due_minor, b.status, b.created_at,
-                b.pay_status, b.pay_method,
+                b.pay_status, b.pay_method, b.payment_expires_at,
                 b.contact_name, b.contact_phone, uu.ext AS unit_ext
          FROM booking_orders b LEFT JOIN projects p ON p.id=b.project_id
          LEFT JOIN units uu ON uu.id=b.unit_id
