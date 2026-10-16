@@ -2474,6 +2474,30 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// 启动时加载 server/job 目录下所有 .cjs 的定时任务（约定：模块导出 start() 即启动）
+function startJobDir(jobDir) {
+  let files = [];
+  try { files = fs.readdirSync(jobDir); } catch (_) { return []; }
+  const started = [];
+  for (const f of files.sort()) {
+    if (!f.endsWith('.cjs')) continue;
+    const abs = path.join(jobDir, f);
+    try {
+      const mod = require(abs);
+      if (mod && typeof mod.start === 'function') {
+        const timer = mod.start();
+        if (timer && typeof timer.unref === 'function') timer.unref();
+        started.push(f);
+        console.log(`[job] started: ${f}`);
+      }
+    } catch (e) {
+      console.warn(`[job] failed to start ${f}:`, e.message);
+    }
+  }
+  return started;
+}
+module.exports.startJobDir = startJobDir;
+
 if (require.main === module) {
   const paymentTimer = setInterval(() => runUnifiedPaymentMaintenance().catch((e) => console.warn('payment maintenance:', e.code || e.message)), 2000);
   paymentTimer.unref();
@@ -2531,5 +2555,8 @@ if (require.main === module) {
     getCommerceHandler().then(() => console.log('commerce handler ready')).catch(e => console.warn('commerce init warn:', e.code || e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
     imgThumbs.initBackground();
+    // 启动 server/job 目录下所有定时任务
+    const jobStarted = startJobDir(path.join(__dirname, 'server', 'job'));
+    console.log(`[job] loaded ${jobStarted.length} job(s): ${jobStarted.join(', ') || '(none)'}`);
   });
 }
