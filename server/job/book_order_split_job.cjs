@@ -49,9 +49,8 @@ const SQL_SELECT_PAID_PAYMENT = `
   LIMIT 1`;
 
 // 去重按 biz_order_no（一个旅居订单只应有一笔分账）；app_order_id 含随机后缀，不能用于跨次去重。
-// 注意：fail 记录不视为「已处理」，允许重试（重试前 triggerSplitForOrder 会清掉 fail 记录）。
 const SQL_EXISTS_SPLIT = `
-  SELECT id FROM payment_split WHERE biz_order_no = ? AND split_status != 'fail' LIMIT 1`;
+  SELECT id FROM payment_split WHERE biz_order_no = ?   LIMIT 1`;
 
 // 插入分账订单；split_status 由调用方传入（'split' 分账中 / 'fail' 申请失败）；
 // split_order_no / gateway_order_status 在 apply 成功时从响应 data 回写（失败响应为 null）
