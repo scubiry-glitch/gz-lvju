@@ -10,8 +10,9 @@
  * 置为 split（分账中，终态由异步回调置 done/fail）。
  *
  * - 约定：导出 start()，由 app.js 的 startJobDir 在启动时自动拉起。
- * - 幂等：payment_split 以 app_order_id = `SPLIT-{order_no}` 唯一；booking 仅在仍
- *   split_status='none' 时更新；分账中台侧 bizOrderNo 亦幂等，失败次日重试。
+ * - 幂等：分账业务单号 app_order_id 由 generateAppOrderId('FZ') 生成（格式 FZ_时间戳_随机，
+ *   与支付 XD / 退款 RF 同源）；payment_split 按 biz_order_no 去重，一个旅居订单仅一笔分账；
+ *   booking 仅在仍 split_status='none' 时更新；分账中台侧 bizOrderNo 亦幂等，失败可重试。
  * - 必填环境变量（缺失则本次跳过并在日志告警，不影响其余订单/下次执行）：
  *     contractInfo.contractNo 取关联支付单 payment_orders.biz_order_no（即 booking_orders.order_no）
  *     PAY_PLATFORM_MERCHANT_NO      平台商户号（merchantNo_P，平台抽成入账方，复用既有配置）
@@ -22,8 +23,13 @@
 'use strict';
 
 const path = require('path');
+const crypto = require('crypto');
 const { queryRows, getPool } = require(path.join(__dirname, '..', 'db.cjs'));
 const { payCenter } = require(path.join(__dirname, '..', 'thirdApi', 'payCenter.cjs'));
+const { generateAppOrderId } = require(path.join(__dirname, '..', 'payment', 'primitives.cjs'));
+
+// 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账下单入参/出参，便于联调；生产环境关闭
+const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
 
 // 待分账：已离店 + 未分账 + 离店日期 <= 今天-7天
 const SQL_SELECT_DUE = `
@@ -42,26 +48,54 @@ const SQL_SELECT_PAID_PAYMENT = `
   ORDER BY paid_at DESC
   LIMIT 1`;
 
-// 已有分账记录则跳过（防止重复提交/落库）
+// 去重按 biz_order_no（一个旅居订单只应有一笔分账）；app_order_id 含随机后缀，不能用于跨次去重。
+// 注意：fail 记录不视为「已处理」，允许重试（重试前 triggerSplitForOrder 会清掉 fail 记录）。
 const SQL_EXISTS_SPLIT = `
-  SELECT id FROM payment_split WHERE app_order_id = ? LIMIT 1`;
+  SELECT id FROM payment_split WHERE biz_order_no = ? AND split_status != 'fail' LIMIT 1`;
 
-// 插入分账订单（split_status='split' 分账中）
+// 插入分账订单；split_status 由调用方传入（'split' 分账中 / 'fail' 申请失败）
 const SQL_INSERT_SPLIT = `
   INSERT INTO payment_split
     (payment_order_id, biz_order_no, app_order_id, idempotency_key, biz_code,
      order_name, amount, contract_no, source_merchant_no, pay_infos, split_details,
      split_status, created_at, updated_at)
-  VALUES (?,?,?,?,?,?,?,?,?,?,?, 'split', NOW(), NOW())`;
+  VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, NOW(), NOW())`;
 
 // 更新旅居订单分账状态（只在仍为 none 时更新，防并发/重复）
 const SQL_UPDATE_BOOKING = `
   UPDATE booking_orders SET split_status = 'split', updated_at = ?
   WHERE order_no = ? AND split_status = 'none'`;
 
+// 出战中台调用日志（与支付/退款 worker 一致的写入口径；app_order_id 用分账业务单号 FZ_时间戳_随机，长度 < VARCHAR(28)）
+const SQL_INSERT_GATEWAY_LOG = `
+  INSERT INTO payment_gateway_logs
+    (payment_order_id, payment_refund_id, app_order_id, operation_type, request_no,
+     business_code, trace_id, success_flag, request_json, response_json, error_message, started_at, finished_at)
+  VALUES (?, NULL, ?, 'split_apply', ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
 // 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
 function nowStamp() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// 落库出战中台调用日志（payment_gateway_logs）。独立于分账主事务，写入失败仅告警，不影响分账主流程。
+async function logGateway(p) {
+  let conn;
+  try {
+    conn = await getPool().getConnection();
+    await conn.execute(SQL_INSERT_GATEWAY_LOG, [
+      p.paymentOrderId != null ? p.paymentOrderId : null, p.appOrderId, p.requestNo,
+      p.businessCode != null ? String(p.businessCode) : null,
+      p.traceId != null ? String(p.traceId) : null,
+      p.successFlag ? 1 : 0,
+      p.requestJson, p.responseJson || null, p.errorMessage || null,
+      p.startedAt, p.finishedAt,
+    ]);
+  } catch (e) {
+    console.warn('[book_order_split_job] 网关日志写入失败:', e.message);
+  } finally {
+    if (conn) conn.release();
+  }
 }
 
 /**
@@ -78,42 +112,47 @@ function nowStamp() {
  * @param {string}   p.sourceMerchantNo    源收款商户号（merchantNo_A），即下单时实际收款方，也是分账的资金出处，取自 payment_orders.merchant_no
  * @param {string}   p.contractNo          分账合同号，取自 payment_orders.biz_order_no（即 booking_orders.order_no）
  * @param {string}   p.bizCode             统一业务码，取自 payment_orders.share_biz_code
+ * @param {string}   p.notifyUrl           分账异步回调地址（完整 URL，取自 PAY_NOTIFY_SPLIT_URL），中台分账结果经此回调 /api/juzhu/payment/split/notify/:token
  * @returns {object}  splitApply 所需的请求体
- *   - bizOrderNo  : `SPLIT-{orderNo}`，分账业务单号/幂等键 → 对应 payment_split.app_order_id
+ *   - bizOrderNo  : 分账业务单号/幂等键（FZ_时间戳_随机，由 generateAppOrderId('FZ') 生成或外部传入）→ 对应 payment_split.app_order_id
  *   - bizCode     : 统一业务码
+ *   - splitModel  : 分账模式，固定 'SPLIT'
  *   - orderName   : 分账订单名称
  *   - amount      : 分账总金额（元，字符串）
  *   - contractInfo: { contractNo } 分账合同号
+ *   - callBackInfo: { callbackUrl } 分账异步回调地址（PAY_NOTIFY_SPLIT_URL）
  *   - payInfos    : 收款参与方列表 [{ merchantNo, amount }]，两方金额之和 = amount
  *   - details     : 分账明细列表 [{ bizDetailNo, splitLevel, payerMerchantNo(源商户), payAmount, payeeMerchantNo(目标商户), leafFlag, summary }]
  */
-function buildSplitBody({ orderNo, totalMinor, rate, platformMerchantNo, merchantMerchantNo, sourceMerchantNo, contractNo, bizCode }) {
+function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchantNo, merchantMerchantNo, sourceMerchantNo, contractNo, bizCode, notifyUrl }) {
   const totalStr = (totalMinor / 100).toFixed(2);
   const platformMinor = Math.floor((totalMinor * rate) / 100); // 分位向下取整
   const merchantMinor = totalMinor - platformMinor;
   const platformStr = (platformMinor / 100).toFixed(2);
   const merchantStr = (merchantMinor / 100).toFixed(2);
-  const appOrderId = `SPLIT-${orderNo}`;
+  const bizOrderNo = appOrderId || generateAppOrderId('FZ');
 
   const payInfos = [{ merchantNo: platformMerchantNo, amount: platformStr }];
   const details = [{
-    bizDetailNo: '1', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
-    payAmount: platformStr, payeeMerchantNo: platformMerchantNo, leafFlag: 1, summary: '平台服务费',
+    bizDetailNo: bizOrderNo+'_1', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
+    payAmount: platformStr, payeeMerchantNo: platformMerchantNo, leafFlag: "Y", summary: '平台服务费',
   }];
   if (merchantMinor > 0) {
     payInfos.push({ merchantNo: merchantMerchantNo, amount: merchantStr });
     details.push({
-      bizDetailNo: '2', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
-      payAmount: merchantStr, payeeMerchantNo: merchantMerchantNo, leafFlag: 1, summary: '商户货款',
+      bizDetailNo: bizOrderNo+'_2', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
+      payAmount: merchantStr, payeeMerchantNo: merchantMerchantNo, leafFlag: "N", summary: '商户货款',
     });
   }
 
   return {
-    bizOrderNo: appOrderId,
+    bizOrderNo,
     bizCode,
+    splitModel: 'SPLIT',
     orderName: `旅居分账 ${orderNo}`,
     amount: totalStr,
     contractInfo: { contractNo },
+    callBackInfo: { callbackUrl: notifyUrl },
     payInfos,
     details,
   };
@@ -122,10 +161,11 @@ function buildSplitBody({ orderNo, totalMinor, rate, platformMerchantNo, merchan
 // 处理单个订单：校验 → 调分账中台 → 同事务落库。返回 'processed' | 'skipped'
 async function processOne(b, platformMerchantNo) {
   const orderNo = b.order_no;
-  const appOrderId = `SPLIT-${orderNo}`;
+  // 分账业务单号：沿用支付/退款的 generateAppOrderId 规则（prefix_时间戳_随机），前缀 FZ，全局唯一
+  const appOrderId = generateAppOrderId('FZ');
 
-  // 已存在分账记录 → 跳过（保证幂等）
-  const [existing] = await queryRows(SQL_EXISTS_SPLIT, [appOrderId]);
+  // 已存在分账记录 → 跳过（按 biz_order_no 去重，保证一个旅居订单仅一笔分账）
+  const [existing] = await queryRows(SQL_EXISTS_SPLIT, [orderNo]);
   if (existing && existing.length) return 'skipped';
 
   // 取已支付支付单（收款商户号 + 统一业务码 + 分账合同号 biz_order_no）
@@ -155,30 +195,84 @@ async function processOne(b, platformMerchantNo) {
   }
 
   const body = buildSplitBody({
-    orderNo, totalMinor, rate,
+    orderNo, appOrderId, totalMinor, rate,
     platformMerchantNo,
     merchantMerchantNo: pay.merchant_no, // 收款商户（merchantNo_A），剩余金额归它
     sourceMerchantNo: pay.merchant_no,   // 源收款商户 = 下单收款方
     contractNo,
     bizCode: pay.share_biz_code,
+    notifyUrl: process.env.PAY_NOTIFY_SPLIT_URL, // 分账异步回调地址（完整 URL，含 token）
   });
 
-  // 调分账中台（bizOrderNo 幂等，失败抛出由上层计 failed，保留 none 次日重试）
+  // 调分账中台（bizOrderNo 幂等）。失败分两类：① 网络/SDK 抛异常；② 接口返回业务级错误
+  // （errno!=0 或 data 缺失）—— payCenter.splitApply 直接返回原始 JSON，错误时不抛异常，必须显式判失败。
+  // 两种失败都须把 payment_split.split_status 记为 fail（不能误判成功去落 split），并保持 booking='none' 以便次日重试。
+  const requestNo = crypto.randomUUID();
+  const startedAt = nowStamp();
+  let res = null;
+  let failed = false;
+  let failMsg = null;
   try {
-    await payCenter.splitApply(body);
+    res = await payCenter.splitApply(body);
   } catch (e) {
-    console.error(`[book_order_split_job] ${orderNo} 调分账接口失败:`, e.message);
-    throw e;
+    failed = true;
+    failMsg = e.message;
+    console.error(`[book_order_split_job] ${orderNo} 调分账接口异常:`, e.message);
+  }
+  // 接口返回业务级失败（如 errno!=0 / 缺 data）：按 assertPaySuccess 的成功约定 Number(errno)===0 && data!=null 判定
+  if (!failed && !(res && Number(res.errno) === 0 && res.data != null)) {
+    failed = true;
+    failMsg = (res && (res.error || res.msg || res.message)) || `分账接口返回非成功响应: ${JSON.stringify(res)}`;
+    console.error(`[book_order_split_job] ${orderNo} 分账接口返回失败:`, failMsg);
+  }
+  // 无论成功/失败都落网关调用日志（与支付/退款 worker 一致，便于排查与对账）
+  await logGateway({
+    paymentOrderId: pay.id,
+    appOrderId,
+    requestNo,
+    businessCode: res && res.errno != null ? String(res.errno) : (res && res.code != null ? String(res.code) : null),
+    traceId: res && (res.traceId || (res.data && res.data.traceId)) ? (res.traceId || res.data.traceId) : null,
+    successFlag: !failed,
+    requestJson: JSON.stringify(body),
+    responseJson: res != null ? JSON.stringify(res) : null,
+    errorMessage: failMsg,
+    startedAt,
+    finishedAt: nowStamp(),
+  });
+  // 非生产环境打印分账下单入参/出参，便于联调（生产环境不打，避免敏感信息外泄）
+  if (!IS_PROD) {
+    console.log('[split apply] 入参 >>>', JSON.stringify(body));
+    console.log('[split apply] 出参 <<<', res != null ? JSON.stringify(res) : null, failMsg ? `err: ${failMsg}` : '');
   }
 
-  // 落库：插入分账订单 + 更新旅居订单分账状态（同事务）
+  // 失败：落 payment_split='fail'（独立事务，便于重试与排查）；booking 保持原 split_status（none）以便次日重试
+  if (failed) {
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.execute(SQL_INSERT_SPLIT, [
+        pay.id, orderNo, appOrderId, appOrderId, pay.share_biz_code,
+        `旅居分账 ${orderNo}`, (totalMinor / 100).toFixed(2), contractNo, pay.merchant_no,
+        JSON.stringify(body.payInfos), JSON.stringify(body.details), 'fail',
+      ]);
+      await conn.commit();
+    } catch (e) {
+      try { await conn.rollback(); } catch (_) {}
+      console.error(`[book_order_split_job] ${orderNo} 失败分账落库失败:`, e.message);
+    } finally {
+      conn.release();
+    }
+    throw new Error(failMsg);
+  }
+
+  // 成功：插入分账订单（split）+ 更新旅居订单分账状态（split），同事务
   const conn = await getPool().getConnection();
   try {
     await conn.beginTransaction();
     await conn.execute(SQL_INSERT_SPLIT, [
       pay.id, orderNo, appOrderId, appOrderId, pay.share_biz_code,
       `旅居分账 ${orderNo}`, (totalMinor / 100).toFixed(2), contractNo, pay.merchant_no,
-      JSON.stringify(body.payInfos), JSON.stringify(body.details),
+      JSON.stringify(body.payInfos), JSON.stringify(body.details), 'split',
     ]);
     await conn.execute(SQL_UPDATE_BOOKING, [nowStamp(), orderNo]);
     await conn.commit();
@@ -195,8 +289,9 @@ async function processOne(b, platformMerchantNo) {
 // 执行一次分账（可单独调用 / 手动触发）
 async function runOnce() {
   const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
-  if (!platformMerchantNo) {
-    console.error('[book_order_split_job] 缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO，跳过本次执行');
+  const notifyUrl = process.env.PAY_NOTIFY_SPLIT_URL;
+  if (!platformMerchantNo || !notifyUrl) {
+    console.error('[book_order_split_job] 缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL，跳过本次执行');
     return { due: 0, processed: 0, skipped: 0, failed: 0, reason: 'missing_env' };
   }
 
@@ -264,8 +359,9 @@ function start() {
  */
 async function triggerSplitForOrder(orderNo, { allowRetryFail = true } = {}) {
   const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
-  if (!platformMerchantNo) {
-    return { ok: false, code: 'missing_env', message: '缺少 PAY_PLATFORM_MERCHANT_NO' };
+  const notifyUrl = process.env.PAY_NOTIFY_SPLIT_URL;
+  if (!platformMerchantNo || !notifyUrl) {
+    return { ok: false, code: 'missing_env', message: '缺少 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL' };
   }
   const rows = await queryRows(
     'SELECT id, order_no, price_total, cash_due_minor, commission_rate, commission_fee, status, split_status FROM booking_orders WHERE order_no = ?',
@@ -279,7 +375,7 @@ async function triggerSplitForOrder(orderNo, { allowRetryFail = true } = {}) {
   if (allowRetryFail && b.split_status === 'fail') {
     const conn = await getPool().getConnection();
     try {
-      await conn.execute('DELETE FROM payment_split WHERE app_order_id = ? AND split_status = ?', [`SPLIT-${orderNo}`, 'fail']);
+      await conn.execute('DELETE FROM payment_split WHERE biz_order_no = ? AND split_status = ?', [orderNo, 'fail']);
     } finally {
       conn.release();
     }

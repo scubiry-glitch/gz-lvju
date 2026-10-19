@@ -14,6 +14,10 @@
  *   if ((await handle(urlPath, qs, req, res)) !== false) return;
  * 命中路由时 handler 经 return jsonReply/... 返回 undefined；未命中返回 false。
  */
+
+// 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账回调入参/出参日志；生产环境关闭
+const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
+
 function createBookingRouter(deps) {
   return async function handleBookingRoutes(urlPath, qs, req, res) {
     const {
@@ -569,7 +573,9 @@ function createBookingRouter(deps) {
     if (process.env.PAY_NOTIFY_SPLIT_TOKEN
       && urlPath === `/api/juzhu/payment/split/notify/${process.env.PAY_NOTIFY_SPLIT_TOKEN}` && req.method === 'POST') {
       const body = await readBody(req);
+      if (!IS_PROD) console.log('[split notify] 入参 >>>', JSON.stringify(body));
       if (!body || typeof body.orderNo !== 'string' || !body.orderNo) {
+        if (!IS_PROD) console.log('[split notify] 出参 <<< INVALID');
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('INVALID');
       }
@@ -633,11 +639,13 @@ function createBookingRouter(deps) {
           [status === 'SUCCEED' ? '分账成功，订单已结单' : (status === 'FAILED' ? '分账失败' : '已记录待核'), orderNo],
         );
         await conn.commit();
+        if (!IS_PROD) console.log('[split notify] 出参 <<<', status, 'SUCCESS');
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('SUCCESS');
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         console.error('[split notify] failed:', e && e.message);
+        if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('FAILED');
       } finally {

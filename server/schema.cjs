@@ -43,7 +43,9 @@ function createSchema(deps) {
     const name = tableNameOf(ddl);
     let existed = false;
     if (name) {
-      try { const [r] = await conn.execute('SHOW TABLES LIKE ?', [name]); existed = r.length > 0; } catch (_) {}
+      // 用 conn.query（客户端转义，非服务端预处理）探测：SHOW 在 execute 预处理协议下部分 MySQL 版本会异常，
+      // 一旦探测失败 existed 恒为 false，会导致已存在的表每启动都误打印“新建表”。
+      try { const [r] = await conn.query('SHOW TABLES LIKE ?', [name]); existed = Array.isArray(r) && r.length > 0; } catch (_) {}
     }
     await conn.execute(ddl);
     if (name && !existed) console.log(`[ensureSchema] 新建表: ${name}`);
@@ -53,7 +55,7 @@ function createSchema(deps) {
     const col = colNameOf(ddl);
     let existed = false;
     if (col) {
-      try { const [r] = await conn.execute(`SHOW COLUMNS FROM \`${table}\` LIKE ?`, [col]); existed = r.length > 0; } catch (_) {}
+      try { const [r] = await conn.query(`SHOW COLUMNS FROM \`${table}\` LIKE ?`, [col]); existed = Array.isArray(r) && r.length > 0; } catch (_) {}
     }
     try {
       await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
