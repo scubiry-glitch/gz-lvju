@@ -148,7 +148,7 @@ async function processOne(b, platformMerchantNo) {
     return 'skipped';
   }
   // 分账总额以实际应收现金（已扣优惠券）cash_due_minor 为准；历史订单无该列时回退标价总额
-  const totalMinor = Number(b.cash_due_minor != null ? b.cash_due_minor :  b.price_total);
+  const totalMinor = Number(b.cash_due_minor != null ? b.cash_due_minor : Number( b.price_total)*100);
   if (!(totalMinor > 0)) {
     console.warn(`[book_order_split_job] ${orderNo} 金额异常，跳过`);
     return 'skipped';
@@ -304,5 +304,4 @@ if (require.main === module) {
     }
   })();
 }
-
-module.exports = { start, runOnce, scheduleDaily, buildSplitBody };
+module.exports = { start, runOnce, scheduleDaily, buildSplitBody, triggerSplitForOrder };
