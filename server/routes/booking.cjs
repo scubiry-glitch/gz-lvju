@@ -641,13 +641,13 @@ function createBookingRouter(deps) {
         await conn.commit();
         if (!IS_PROD) console.log('[split notify] 出参 <<<', status, 'SUCCESS');
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('SUCCESS');
+        return res.end({"code":200,"info":"回调成功"});
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         console.error('[split notify] failed:', e && e.message);
         if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('FAILED');
+        return res.end({"code":500,"info":e.message});
       } finally {
         try { await conn.end(); } catch (_) {}
       }
