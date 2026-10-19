@@ -40,9 +40,9 @@ const SQL_SELECT_DUE = `
     AND checkout <= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
   ORDER BY id`;
 
-// 取该订单已支付成功的支付单（拿收款商户号 + 统一业务码）
+// 取该订单已支付成功的支付单（拿收款商户号 + 统一业务码 + 业务单号）
 const SQL_SELECT_PAID_PAYMENT = `
-  SELECT id, merchant_no, share_biz_code, biz_order_no
+  SELECT id, merchant_no, share_biz_code, biz_order_no, app_order_id
   FROM payment_orders
   WHERE biz_order_no = ? AND pay_status = 'paid'
   ORDER BY paid_at DESC
@@ -99,6 +99,27 @@ async function logGateway(p) {
 }
 
 /**
+ * 从支付中台异步通知日志 payment_notify_log 解析支付单的 coreNo（支付流水号）。
+ * 取 notify_type='pay' 且 order_status='30'（支付成功）的第一条，解析 payload_json 中的 coreNo。
+ * @param {string} appOrderId 支付单业务单号（payment_orders.app_order_id，亦即 payment_notify_log.app_order_id）
+ * @returns {Promise<string|null>} coreNo，未找到返回 null
+ */
+async function lookupPaymentCoreNo(appOrderId) {
+  if (!appOrderId) return null;
+  const rows = await queryRows(`
+    SELECT payload_json FROM payment_notify_log
+    WHERE app_order_id = ? AND notify_type = 'pay' AND order_status = '30'
+    ORDER BY id ASC LIMIT 1`, [appOrderId]);
+  if (!rows || !rows.length) return null;
+  const payload = rows[0].payload_json;
+  if (!payload) return null;
+  let obj;
+  try { obj = JSON.parse(payload); } catch (_) { return null; }
+  if (!obj || typeof obj !== 'object') return null;
+  return obj.coreNo || (obj.data && obj.data.coreNo) || null;
+}
+
+/**
  * 组装 ACN 分账申请报文（payCenter.splitApply 入参）。
  * 分账模型：钱先由「源收款商户」收下，再按比例分给「平台」与「收款商户」两方。
  * 金额单位为元（字符串，2 位小数）；内部一律以「分」(minor) 整数运算，平台份额分位向下取整。
@@ -113,6 +134,7 @@ async function logGateway(p) {
  * @param {string}   p.contractNo          分账合同号，取自 payment_orders.biz_order_no（即 booking_orders.order_no）
  * @param {string}   p.bizCode             统一业务码，取自 payment_orders.share_biz_code
  * @param {string}   p.notifyUrl           分账异步回调地址（完整 URL，取自 PAY_NOTIFY_SPLIT_URL），中台分账结果经此回调 /api/juzhu/payment/split/notify/:token
+ * @param {string}   [p.payNo]             原支付单流水号 coreNo（取自 payment_notify_log，支付成功 order_status=30 的回调），写入 payInfos.payNo
  * @returns {object}  splitApply 所需的请求体
  *   - bizOrderNo  : 分账业务单号/幂等键（FZ_时间戳_随机，由 generateAppOrderId('FZ') 生成或外部传入）→ 对应 payment_split.app_order_id
  *   - bizCode     : 统一业务码
@@ -124,7 +146,7 @@ async function logGateway(p) {
  *   - payInfos    : 收款参与方列表 [{ merchantNo, amount }]，两方金额之和 = amount
  *   - details     : 分账明细列表 [{ bizDetailNo, splitLevel, payerMerchantNo(源商户), payAmount, payeeMerchantNo(目标商户), leafFlag, summary }]
  */
-function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchantNo, merchantMerchantNo, sourceMerchantNo, contractNo, bizCode, notifyUrl }) {
+function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchantNo, merchantMerchantNo, sourceMerchantNo, contractNo, bizCode, notifyUrl, payNo }) {
   const totalStr = (totalMinor / 100).toFixed(2);
   const platformMinor = Math.floor((totalMinor * rate) / 100); // 分位向下取整
   const merchantMinor = totalMinor - platformMinor;
@@ -132,16 +154,15 @@ function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchan
   const merchantStr = (merchantMinor / 100).toFixed(2);
   const bizOrderNo = appOrderId || generateAppOrderId('FZ');
 
-  const payInfos = [{ merchantNo: platformMerchantNo, amount: platformStr }];
+  const payInfos = [{ payNo: payNo || null, merchantNo: sourceMerchantNo, amount: totalStr }];
   const details = [{
     bizDetailNo: bizOrderNo+'_1', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
     payAmount: platformStr, payeeMerchantNo: platformMerchantNo, leafFlag: "Y", summary: '平台服务费',
   }];
   if (merchantMinor > 0) {
-    payInfos.push({ merchantNo: merchantMerchantNo, amount: merchantStr });
     details.push({
       bizDetailNo: bizOrderNo+'_2', splitLevel: 1, payerMerchantNo: sourceMerchantNo,
-      payAmount: merchantStr, payeeMerchantNo: merchantMerchantNo, leafFlag: "N", summary: '商户货款',
+      payAmount: merchantStr, payeeMerchantNo: merchantMerchantNo, leafFlag: "Y", summary: '商户货款',
     });
   }
 
@@ -176,6 +197,9 @@ async function processOne(b, platformMerchantNo) {
   }
   const pay = paid[0];
   const contractNo = pay.biz_order_no; // 分账合同号取支付单的业务订单号
+  // 原支付单流水号 coreNo（支付成功 order_status=30 的回调），写入分账报文 payInfos.payNo
+  const coreNo = await lookupPaymentCoreNo(pay.app_order_id);
+  if (!coreNo) console.warn(`[book_order_split_job] ${orderNo} 未取到支付流水号 coreNo（notify_type=pay & order_status=30），payInfos.payNo 可能为空`);
   if (!pay.share_biz_code) {
     console.warn(`[book_order_split_job] ${orderNo} 支付单缺 share_biz_code，跳过`);
     return 'skipped';
@@ -202,6 +226,7 @@ async function processOne(b, platformMerchantNo) {
     contractNo,
     bizCode: pay.share_biz_code,
     notifyUrl: process.env.PAY_NOTIFY_SPLIT_URL, // 分账异步回调地址（完整 URL，含 token）
+    payNo: coreNo, // 原支付单流水号 coreNo，写入 payInfos.payNo
   });
 
   // 调分账中台（bizOrderNo 幂等）。失败分两类：① 网络/SDK 抛异常；② 接口返回业务级错误
@@ -219,8 +244,8 @@ async function processOne(b, platformMerchantNo) {
     failMsg = e.message;
     console.error(`[book_order_split_job] ${orderNo} 调分账接口异常:`, e.message);
   }
-  // 接口返回业务级失败（如 errno!=0 / 缺 data）：按 assertPaySuccess 的成功约定 Number(errno)===0 && data!=null 判定
-  if (!failed && !(res && Number(res.errno) === 0 && res.data != null)) {
+  // 接口返回业务级失败（如 errno!=0 / 缺 data）：按 assertPaySuccess 的成功约定 Number(errno)===200 && data!=null 判定
+  if (!failed && !(res && Number(res.errno) === 200 && res.data != null)) {
     failed = true;
     failMsg = (res && (res.error || res.msg || res.message)) || `分账接口返回非成功响应: ${JSON.stringify(res)}`;
     console.error(`[book_order_split_job] ${orderNo} 分账接口返回失败:`, failMsg);
