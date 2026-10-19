@@ -143,7 +143,7 @@ async function lookupPaymentCoreNo(appOrderId) {
  *   - orderName   : 分账订单名称
  *   - amount      : 分账总金额（元，字符串）
  *   - contractInfo: { contractNo } 分账合同号
- *   - callBackInfo: { callbackUrl } 分账异步回调地址（PAY_NOTIFY_SPLIT_URL）
+ *   - orderCallbackUrl: 分账异步回调地址（PAY_NOTIFY_SPLIT_URL），中台分账结果经此回调 /api/juzhu/payment/split/notify/:token
  *   - payInfos    : 收款参与方列表 [{ merchantNo, amount }]，两方金额之和 = amount
  *   - details     : 分账明细列表 [{ bizDetailNo, splitLevel, payerMerchantNo(源商户), payAmount, payeeMerchantNo(目标商户), leafFlag, summary }]
  */
@@ -174,7 +174,7 @@ function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchan
     orderName: `旅居分账 ${orderNo}`,
     amount: totalStr,
     contractInfo: { contractNo },
-    callBackInfo: { callbackUrl: notifyUrl },
+    orderCallbackUrl: notifyUrl,
     payInfos,
     details,
   };
