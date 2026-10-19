@@ -565,7 +565,7 @@ function createBookingRouter(deps) {
         return res.end(result);
       } catch (_) {
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('FAILED');
+        return res.json({"code":500,"info":e.message});
       }
     }
 
