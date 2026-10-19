@@ -597,7 +597,7 @@ function createBookingRouter(deps) {
         await conn.execute(
           `INSERT INTO payment_split_callback_log(order_no,app_order_id,biz_order_no,biz_code,order_type,amount,order_status,trans_finish_time,error_code,error_message,estimated_settle_time,fee_info,external_fee,payload_json,handle_result,handle_message,received_at)
            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'processing',?,?)
-           ON DUPLICATE KEY UPDATE handle_result='processing', handle_message=VALUES(handle_message), payload_json=VALUES(payload_json), handled_at=NULL, updated_at=NOW()`,
+           ON DUPLICATE KEY UPDATE handle_result='processing', handle_message=VALUES(handle_message), payload_json=VALUES(payload_json), handled_at=NULL`,
           [
             orderNo, appOrderId, bookingOrderNo, String(body.bizCode || ''), String(body.orderType || ''),
             body.amount != null ? Number(body.amount) : null, status,
@@ -647,13 +647,13 @@ function createBookingRouter(deps) {
         await conn.commit();
         if (!IS_PROD) console.log('[split notify] 出参 <<<', status, 'SUCCESS');
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end({"code":200,"info":"回调成功"});
+        return res.json({"code":200,"info":"回调成功"});
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         console.error('[split notify] failed:', e && e.message);
         if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end({"code":500,"info":e.message});
+        return res.json({"code":500,"info":e.message});
       } finally {
         try { await conn.end(); } catch (_) {}
       }
