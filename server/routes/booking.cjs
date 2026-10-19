@@ -609,10 +609,10 @@ function createBookingRouter(deps) {
           ],
         );
         if (status === 'SUCCEED') {
-          // 分账订单表：按分账业务单号/中台分账单号定位，分账状态置 done
+          // 分账订单表：按分账业务单号/中台分账单号定位，分账状态置 done；回写中台分账单号与状态
           await conn.execute(
-            `UPDATE payment_split SET split_status='done', gateway_order_status=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
-            [status, JSON.stringify(body), appOrderId, orderNo],
+            `UPDATE payment_split SET split_status='done', gateway_order_status=?, split_order_no=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, JSON.stringify(body), appOrderId, orderNo],
           );
           // 旅居订单表：经分账记录关联的业务订单号，置分账状态 done、订单状态 finished（已结单）
           if (bookingOrderNo) {
@@ -624,8 +624,8 @@ function createBookingRouter(deps) {
         } else if (status === 'FAILED') {
           // 分账失败：回写分账订单表状态，并同步旅居订单表分账状态为 fail（不动订单主状态，便于重分账/人工处理）
           await conn.execute(
-            `UPDATE payment_split SET split_status='fail', gateway_order_status=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
-            [status, JSON.stringify(body), appOrderId, orderNo],
+            `UPDATE payment_split SET split_status='fail', gateway_order_status=?, split_order_no=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, JSON.stringify(body), appOrderId, orderNo],
           );
           if (bookingOrderNo) {
             await conn.execute(
@@ -633,6 +633,12 @@ function createBookingRouter(deps) {
               [bookingOrderNo],
             );
           }
+        } else if (status) {
+          // 中间态（ACCEPTED / PROCESSING 等）：仅回写中台分账单号与状态，不动 split_status / 订单主状态
+          await conn.execute(
+            `UPDATE payment_split SET gateway_order_status=?, split_order_no=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, appOrderId, orderNo],
+          );
         }
         await conn.execute(
           `UPDATE payment_split_callback_log SET handle_result='success', handle_message=?, handled_at=NOW() WHERE order_no=?`,

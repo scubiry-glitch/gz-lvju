@@ -53,13 +53,14 @@ const SQL_SELECT_PAID_PAYMENT = `
 const SQL_EXISTS_SPLIT = `
   SELECT id FROM payment_split WHERE biz_order_no = ? AND split_status != 'fail' LIMIT 1`;
 
-// 插入分账订单；split_status 由调用方传入（'split' 分账中 / 'fail' 申请失败）
+// 插入分账订单；split_status 由调用方传入（'split' 分账中 / 'fail' 申请失败）；
+// split_order_no / gateway_order_status 在 apply 成功时从响应 data 回写（失败响应为 null）
 const SQL_INSERT_SPLIT = `
   INSERT INTO payment_split
     (payment_order_id, biz_order_no, app_order_id, idempotency_key, biz_code,
      order_name, amount, contract_no, source_merchant_no, pay_infos, split_details,
-     split_status, created_at, updated_at)
-  VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, NOW(), NOW())`;
+     split_status, split_order_no, gateway_order_status, created_at, updated_at)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, ?, ?, NOW(), NOW())`;
 
 // 更新旅居订单分账状态（只在仍为 none 时更新，防并发/重复）
 const SQL_UPDATE_BOOKING = `
@@ -270,6 +271,13 @@ async function processOne(b, platformMerchantNo) {
     console.log('[split apply] 出参 <<<', res != null ? JSON.stringify(res) : null, failMsg ? `err: ${failMsg}` : '');
   }
 
+  // 从成功响应解析中台分账单号与状态，落库时回写 payment_split。
+  // 字段与回调一致：data.orderNo → split_order_no；data.orderStatus/data.status → gateway_order_status。
+  // 失败响应 data 为空，这里自然为 null。
+  const splitData = res && res.data && typeof res.data === 'object' ? res.data : null;
+  const splitOrderNo = splitData ? (splitData.orderNo || splitData.splitOrderNo || null) : null;
+  const gatewayStatus = splitData ? (splitData.orderStatus || splitData.status || null) : null;
+
   // 失败：落 payment_split='fail'（独立事务，便于重试与排查）；booking 保持原 split_status（none）以便次日重试
   if (failed) {
     const conn = await getPool().getConnection();
@@ -278,7 +286,7 @@ async function processOne(b, platformMerchantNo) {
       await conn.execute(SQL_INSERT_SPLIT, [
         pay.id, orderNo, appOrderId, appOrderId, pay.share_biz_code,
         `旅居分账 ${orderNo}`, (totalMinor / 100).toFixed(2), contractNo, pay.merchant_no,
-        JSON.stringify(body.payInfos), JSON.stringify(body.details), 'fail',
+        JSON.stringify(body.payInfos), JSON.stringify(body.details), 'fail', null, null,
       ]);
       await conn.commit();
     } catch (e) {
@@ -297,8 +305,8 @@ async function processOne(b, platformMerchantNo) {
     await conn.execute(SQL_INSERT_SPLIT, [
       pay.id, orderNo, appOrderId, appOrderId, pay.share_biz_code,
       `旅居分账 ${orderNo}`, (totalMinor / 100).toFixed(2), contractNo, pay.merchant_no,
-      JSON.stringify(body.payInfos), JSON.stringify(body.details), 'split',
-    ]);
+      JSON.stringify(body.payInfos), JSON.stringify(body.details), 'split', splitOrderNo, gatewayStatus,
+      ]);
     await conn.execute(SQL_UPDATE_BOOKING, [nowStamp(), orderNo]);
     await conn.commit();
     return 'processed';
