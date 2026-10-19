@@ -57,6 +57,7 @@ const { createJiazhengRouter } = require('./server/routes/jiazheng.cjs');
 const { createAdminRouter } = require('./server/routes/admin.cjs');
 const { createApiDirectRouter } = require('./server/routes/api_direct.cjs');
 const { createSchema } = require('./server/schema.cjs');
+const { createCmdRouter } = require('./server/job/cmd_split.cjs');
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
   exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
@@ -2109,6 +2110,7 @@ const handleApiDirect = createApiDirectRouter({
   withStayRules
 });
 
+const handleCmd = createCmdRouter({ cmdToken: process.env.CMD_API_TOKEN });
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -2399,6 +2401,11 @@ const server = http.createServer((req, res) => {
   // /api/juzhu/* 直接走 Node.js MySQL 实现
   if (apiReq) {
     return handleApiDirect(rawPath, qs, req, res);
+  }
+
+  // /cmd/* 测试/运维命令接口（server/job/cmd_split.cjs），需 CMD_API_TOKEN 鉴权
+  if (rawPath.startsWith('/cmd')) {
+    return handleCmd(rawPath, qs, req, res);
   }
 
   // /api/auth/* —— 账号中心登录/登出/身份（handleApiDirect 之外的独立轻路由）

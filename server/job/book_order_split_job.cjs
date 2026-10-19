@@ -27,7 +27,7 @@ const { payCenter } = require(path.join(__dirname, '..', 'thirdApi', 'payCenter.
 
 // 待分账：已离店 + 未分账 + 离店日期 <= 今天-7天
 const SQL_SELECT_DUE = `
-  SELECT id, order_no, price_total, commission_rate, commission_fee
+  SELECT id, order_no, price_total, cash_due_minor, commission_rate, commission_fee
   FROM booking_orders
   WHERE status = 'checkOut'
     AND split_status = 'none'
@@ -71,7 +71,7 @@ function nowStamp() {
  *
  * @param {object}   p
  * @param {string}   p.orderNo             旅居业务订单号（booking_orders.order_no），用于生成幂等 bizOrderNo 与 orderName
- * @param {number}   p.totalMinor          分账总金额（单位：分 = 元×100），取自 booking_orders.price_total
+ * @param {number}   p.totalMinor          分账总金额（单位：分 = 元×100），取自 booking_orders.cash_due_minor（实际应收现金，已扣优惠券；历史订单回退 price_total×100）
  * @param {number}   p.rate                下单锁定的分账费率（百分比，如 10 表示 10%），取自 booking_orders.commission_rate
  * @param {string}   p.platformMerchantNo  平台商户号（merchantNo_P），平台抽成入账方，取自 PAY_PLATFORM_MERCHANT_NO
  * @param {string}   p.merchantMerchantNo  收款商户号（merchantNo_A），剩余金额（货款）入账方，取自 payment_orders.merchant_no
@@ -147,7 +147,8 @@ async function processOne(b, platformMerchantNo) {
     console.warn(`[book_order_split_job] ${orderNo} 缺 commission_rate，跳过`);
     return 'skipped';
   }
-  const totalMinor = Math.round(Number(b.price_total) * 100);
+  // 分账总额以实际应收现金（已扣优惠券）cash_due_minor 为准；历史订单无该列时回退标价总额
+  const totalMinor = Number(b.cash_due_minor != null ? b.cash_due_minor :  b.price_total);
   if (!(totalMinor > 0)) {
     console.warn(`[book_order_split_job] ${orderNo} 金额异常，跳过`);
     return 'skipped';
@@ -252,6 +253,43 @@ function start() {
   const minute = parseInt(process.env.SPLIT_JOB_MINUTE || '0', 10) || 0;
   console.log(`[book_order_split_job] 每日 ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} 执行旅居订单自动分账`);
   return scheduleDaily(hour, minute, runOnce);
+}
+
+/**
+ * 按 order_no 单独触发某条 booking_orders 的分账（供 /cmd 测试/运维接口复用，绕过每日定时与 7 天延迟）。
+ * 仅按 order_no 取数，不强制 status='checkOut'；已 done/split 直接返回，fail 可重试。
+ * @param {string} orderNo
+ * @param {{allowRetryFail?: boolean}} [opts]
+ * @returns {Promise<{ok:boolean, code?:string, message?:string, result?:string, order_no?:string}>}
+ */
+async function triggerSplitForOrder(orderNo, { allowRetryFail = true } = {}) {
+  const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
+  if (!platformMerchantNo) {
+    return { ok: false, code: 'missing_env', message: '缺少 PAY_PLATFORM_MERCHANT_NO' };
+  }
+  const rows = await queryRows(
+    'SELECT id, order_no, price_total, cash_due_minor, commission_rate, commission_fee, status, split_status FROM booking_orders WHERE order_no = ?',
+    [orderNo],
+  );
+  if (!rows || !rows.length) return { ok: false, code: 'not_found', message: '订单不存在' };
+  const b = rows[0];
+  if (b.split_status === 'done') return { ok: false, code: 'already_done', message: '已分账(done)，无需重复触发' };
+  if (b.split_status === 'split') return { ok: false, code: 'in_progress', message: '分账中(split)，请等待回调终态' };
+  // 失败单重试：先清理旧的失败分账记录（gateway 侧 bizOrderNo 幂等，可重提）
+  if (allowRetryFail && b.split_status === 'fail') {
+    const conn = await getPool().getConnection();
+    try {
+      await conn.execute('DELETE FROM payment_split WHERE app_order_id = ? AND split_status = ?', [`SPLIT-${orderNo}`, 'fail']);
+    } finally {
+      conn.release();
+    }
+  }
+  try {
+    const r = await processOne(b, platformMerchantNo);
+    return { ok: true, result: r, order_no: orderNo };
+  } catch (e) {
+    return { ok: false, code: 'failed', message: e.message };
+  }
 }
 
 if (require.main === module) {
