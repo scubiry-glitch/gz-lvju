@@ -1,4 +1,5 @@
 'use strict';
+
 /**
  * C 端预订 + 支付确认/回调（从 app.js 拆出）。
  * 覆盖：
@@ -565,7 +566,7 @@ function createBookingRouter(deps) {
         return res.end(result);
       } catch (_) {
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.json({"code":500,"info":e.message});
+        return res.end(JSON.stringify({"code":500,"info":e.message}));
       }
     }
 
@@ -647,13 +648,13 @@ function createBookingRouter(deps) {
         await conn.commit();
         if (!IS_PROD) console.log('[split notify] 出参 <<<', status, 'SUCCESS');
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.json({"code":200,"info":"回调成功"});
+        return res.end(JSON.stringify({"code":200,"info":"回调成功"}));
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         console.error('[split notify] failed:', e && e.message);
         if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.json({"code":500,"info":e.message});
+        return res.end(JSON.stringify({"code":500,"info":e.message}));
       } finally {
         try { await conn.end(); } catch (_) {}
       }
