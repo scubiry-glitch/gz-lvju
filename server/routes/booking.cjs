@@ -19,6 +19,10 @@
 // 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账回调入参/出参日志；生产环境关闭
 const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
 
+// 复用全局连接池（server/db.cjs 的 8 连接池），避免每请求 mysql2.createConnection 新建连接
+// （新建连接每次都走 TCP 握手 + 可能的 MySQL 反向 DNS 解析，是分账回调持续慢的主因）
+const { getPool } = require('../db.cjs');
+
 function createBookingRouter(deps) {
   return async function handleBookingRoutes(urlPath, qs, req, res) {
     const {
@@ -585,7 +589,7 @@ function createBookingRouter(deps) {
       const orderNo = String(body.orderNo);
       const appOrderId = String(body.bizOrderNo || ''); // 回调 bizOrderNo = 发起分账时的分账业务单号 = payment_split.app_order_id
       const status = String(body.orderStatus || '');
-      const conn = await mysql2.createConnection(getDbConfig());
+      const conn = await getPool().getConnection();
       try {
         await conn.beginTransaction();
         // 通过分账业务单号（回调 bizOrderNo = payment_split.app_order_id）或中台分账单号定位分账记录，取关联的旅居订单号
@@ -656,7 +660,7 @@ function createBookingRouter(deps) {
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end(JSON.stringify({"code":500,"info":e.message}));
       } finally {
-        try { await conn.end(); } catch (_) {}
+        try { if (conn) await conn.release(); } catch (_) {}
       }
     }
 
