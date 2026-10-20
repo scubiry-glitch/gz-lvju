@@ -109,7 +109,10 @@
 <script src="screens/_beike-login.js?v=18"></script>
 <script>
 /* 我的订单：登录会话拉取 /api/juzhu/booking/my，按 ?tab= 客户端筛选。
-   tab: all | unpaid | stay | refund —— 与「我的」页入口对齐。 */
+   tab: all | unpaid | stay | refund —— 与「我的」页入口对齐。
+   订单 status：pending 待确认 / confirmed 已确认待入住 / cancelled 已取消 /
+               finished 已结单（分账成功回调置位，见 booking.cjs 分账回调），
+               终态，不再出现在「待入住」，仅在「全部」展示。 */
 (function(){
   var q = new URLSearchParams(location.search);
   var TAB_IDS = { all:1, unpaid:1, stay:1, refund:1 };
@@ -117,7 +120,7 @@
   var allItems = [];
   var REFUND_PS = { refunding:1, refunded:1, refund_failed:1, manual_review:1 };
   var UNPAID_PS = { unpaid:1, creating:1, paying:1, create_unknown:1 };
-  var STATUS = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'] };
+  var STATUS = { pending: ['待商家确认', 'wait'], confirmed: ['已确认 · 待入住', 'stay'], cancelled: ['已取消', 'done'], finished: ['已结单', 'done'] };
 
   function stOf(o){
     if (REFUND_PS[o.pay_status] || REFUND_PS[o.refund_status]) {
