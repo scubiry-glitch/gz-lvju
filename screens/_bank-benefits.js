@@ -8,19 +8,27 @@
       {key:'move',name:'搬家服务券',category:'moving',query:'居民搬家 · 同城',why:'完成换房方案后，客户确认实际搬家日期再领；避免只因浏览新房就发券。',unit:150,selected:true},
       {key:'water',name:'漏水排查 / 水管维修券',category:'repair',query:'水管维修 · 应急',why:'新旧房交接时提供一次故障排查；保单不能由维修券替代。',unit:90,selected:true},
       {key:'handover',name:'入住前深度保洁券',category:'cleaning',query:'深度清洁 · 4小时',why:'新房交接且确有入住日期时可选；需核验清洁面积与施工后的适用条件。',unit:120,selected:false},
+      {key:'bedding',name:'新居床品焕新权益',proposal:true,goods:true,why:'按实际入住需要选择床品品类、尺寸与配送日期；需核商家、规格、退换货和采购价。',unit:160,selected:false},
+      {key:'appliance',name:'新居小家电权益',proposal:true,goods:true,why:'可选电热水壶、空气净化等真实商品；领券与贷款申请分开，需核型号、库存和售后。',unit:180,selected:false},
       {key:'insurance',name:'漏水保险咨询入口',external:true,why:'保险产品、保障责任和承保资格需由保险机构独立核验；先放入口，不创建保险券。',unit:0,selected:false}
-    ],note:'当前北京目录为空。沈阳已有同类搬家、维修演示商品，仅能证明券平台有该品类流程；北京投放还须本地商家、报价、库存和服务规则。消费贷不与领券绑定。'},
+    ],note:'当前北京目录为空。沈阳已有同类搬家、维修和保洁演示商品，仅能证明券平台有该品类流程；床品、小家电是待核供货提案。若客户确有装修支出，可由银行自营渠道评估装修消费贷款与银行活动贴息，核验用途和交易凭证；不得把购房款或首付款包装成装修支出，生活券也不与借贷绑定。'},
     suzhou:{name:'苏州 · 高端省心租',city:'苏州',reference:'沈阳',persona:'suzhou',channel:'贝壳居住通路',need:'先核出租、托管和维修责任，再交付净租金方案；权益帮助业主处理真实的出租管理问题。',rights:[
       {key:'clean',name:'退租 / 入租深度保洁券',category:'cleaning',query:'深度清洁 · 4小时',why:'在房屋交接或托管签约后的实际清洁节点领取，不以购买理财为前提。',unit:120,selected:true},
       {key:'repair',name:'家电检修服务券',category:'repair',query:'家电维修 · 上门',why:'空置期或租客报修时使用；服务范围和超出基础工序的费用需先说明。',unit:90,selected:true},
+      {key:'linen',name:'出租房床品换新权益',proposal:true,goods:true,why:'仅对带家具、床品的出租方案适用；业主先确认配置标准、配送和退换货责任。',unit:140,selected:false},
+      {key:'appliance',name:'出租房小家电换新权益',proposal:true,goods:true,why:'按租约和托管责任选择实际需替换的设备；需核型号、供应商、质保和交付回执。',unit:180,selected:false},
       {key:'visit',name:'空置巡检服务权益',proposal:true,why:'建议新增可预约的上门巡检：照片回执、异常报修和业主确认，作为省心租场景的核心权益。',unit:80,selected:false}
-    ],note:'当前苏州目录为空。沈阳已有保洁与维修演示券；空置巡检是新提案，需运营商定义工序、频次、价格与核销证据。理财咨询留在银行自营流程。'},
+    ],note:'当前苏州目录为空。沈阳已有保洁与维修演示券；床品、小家电和空置巡检是新提案，需先确认租赁服务责任、商家供给、价格与核销证据。理财咨询留在银行自营流程。'},
     travel:{name:'上海房东 · 贵阳试住',city:'贵阳',reference:'贵阳',persona:'travel',channel:'贝壳居住通路',need:'上海原房出租、出售或先试住未定；先交付现金流和目的地住房核验清单，再给异地试住权益。',rights:[
       {key:'hotel',name:'酒店通兑券',category:'hotel_exchange',tier:'t120',why:'先住一晚验证目的地生活。现有演示券可在同档试点名单酒店中按券页规则选店、预约与核销。',unit:120,selected:true},
+      {key:'clean',name:'贵阳短住保洁券',category:'cleaning',query:'日常保洁 · 2小时',why:'适用于独立短租房或公寓交接；酒店住宿的常规客房清洁已包含在住宿服务中，不重复配券。',unit:100,selected:false},
+      {key:'photo',name:'目的地旅拍权益',proposal:true,why:'客户主动预约后由摄影服务商交付成片；需核拍摄时长、照片数量、授权使用和取消规则。',unit:180,selected:false},
+      {key:'linen',name:'短住床品租用 / 换新',proposal:true,goods:true,why:'仅对独立短租住所适用；明确配送、清洗、归还和损坏责任，酒店住宿不重复配置。',unit:90,selected:false},
+      {key:'appliance',name:'旅居小家电租用权益',proposal:true,goods:true,why:'按试住天数选择电热水壶等轻量设备，按租用而非购买设计归还和售后。',unit:80,selected:false},
       {key:'scenic',name:'城市漫游门票券',category:'scenic_ticket',query:'城市漫游',why:'客户明确有短期探索需求时可搭配，不强制打包。',unit:55,selected:false},
       {key:'dining',name:'本地餐饮代金券',category:'dining',query:'本地风味',why:'首日抵达的生活体验，可作为酒店券之外的小额权益。',unit:65,selected:false},
       {key:'area',name:'目的地居住条件核验服务',proposal:true,why:'建议新增实地看住处服务：核验交通、租住条件和无障碍需求，形成可追溯记录；需先定义服务商和工序。',unit:80,selected:false}
-    ],note:'贵阳目录已有酒店通兑、门票和餐饮演示券；上海是客户来源地，贵阳是本轮可演练目的地。此前昆明仅是旅程假设，当前公开演示目录未开放昆明券及酒店选择，不能承诺昆明可用。旅居预付与实际服务费用的多退少补另走订单结算，不改变固定一晚酒店券面值。'}
+    ],note:'贵阳目录已有酒店通兑、保洁、门票和餐饮演示券；旅拍、床品和小家电是待上架提案。上海是客户来源地，贵阳是本轮可演练目的地。此前昆明仅是旅程假设，当前公开演示目录未开放昆明券及酒店选择，不能承诺昆明可用。旅居服务费用的多退少补另走订单结算，不改变酒店券面值。'}
   };
   let active='beijing',catalog={};
   const selections={};for(const [k,s] of Object.entries(scenes))selections[k]=Object.fromEntries(s.rights.map(r=>[r.key,{checked:r.selected,unit:r.unit,tier:r.tier||''}]));
@@ -31,8 +39,8 @@
     const product=right.external||right.proposal?null:match(selectedRight,catalog[s.city]);
     const example=right.external||right.proposal?null:match(selectedRight,catalog[s.reference]);
     const usable=!!product&&product.is_demo&&product.in_stock&&product.demo_purchase_enabled;
-    const state=right.external?'外部机构':right.proposal?'待定义工序':usable?'可演练':'目标城市待上架';
-    const detail=right.external?'保险机构的咨询入口，不代表可领保险或已承保。':right.proposal?'新服务提案，尚无可核销商品。':product?'目标城市目录：'+product.name+'；展示价 '+money(product.price_minor/100)+'，演示购买零支付。':example?'已有'+s.reference+'同类演示商品：'+example.name+'；不能跨城当作本地券发放。':'目前目录没有对应商品。';
+    const state=right.external?'外部机构':right.proposal?(right.goods?'待核供货':'待定义服务'):usable?'可演练':'目标城市待上架';
+    const detail=right.external?'保险机构的咨询入口，不代表可领保险或已承保。':right.proposal?(right.goods?'商品权益提案，尚无可核销 SKU；需核商家、库存、价格、配送和售后。':'服务权益提案，尚无可核销 SKU；需核服务商、工序、预约和交付凭证。'):product?'目标城市目录：'+product.name+'；展示价 '+money(product.price_minor/100)+'，演示购买零支付。':example?'已有'+s.reference+'同类演示商品：'+example.name+'；不能跨城当作本地券发放。':'目前目录没有对应商品。';
     const linkProduct=usable?product:example;
     const link=linkProduct?'<a href="juzhu-voucher.html?kind=skus&amp;id='+Number(linkProduct.id)+'&amp;city='+encodeURIComponent(usable?s.city:s.reference)+'" target="_blank" rel="noopener">'+(usable?'打开当前券':'查看异地样例')+' ↗</a>':'';
     const tiers=right.category==='hotel_exchange'?'<label class="tier-row">酒店通兑档位<select data-tier="'+esc(right.key)+'">'+[80,100,120,160,180,200].map(n=>'<option value="t'+n+'" '+(chosen.tier==='t'+n?'selected':'')+'>'+n+' 元档</option>').join('')+'</select></label>':'';
