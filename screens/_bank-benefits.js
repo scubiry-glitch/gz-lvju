@@ -20,7 +20,7 @@
       {key:'scenic',name:'城市漫游门票券',category:'scenic_ticket',query:'城市漫游',why:'客户明确有短期探索需求时可搭配，不强制打包。',unit:55,selected:false},
       {key:'dining',name:'本地餐饮代金券',category:'dining',query:'本地风味',why:'首日抵达的生活体验，可作为酒店券之外的小额权益。',unit:65,selected:false},
       {key:'area',name:'目的地居住条件核验服务',proposal:true,why:'建议新增实地看住处服务：核验交通、租住条件和无障碍需求，形成可追溯记录；需先定义服务商和工序。',unit:80,selected:false}
-    ],note:'贵阳目录已有酒店通兑、门票和餐饮演示券；上海是客户来源地，贵阳是本轮可演练目的地。此前昆明仅是旅程假设，当前名单未核到昆明试点酒店，不能承诺昆明可用。旅居预付与实际服务费用的多退少补另走订单结算，不改变固定一晚酒店券面值。'}
+    ],note:'贵阳目录已有酒店通兑、门票和餐饮演示券；上海是客户来源地，贵阳是本轮可演练目的地。此前昆明仅是旅程假设，当前公开演示目录未开放昆明券及酒店选择，不能承诺昆明可用。旅居预付与实际服务费用的多退少补另走订单结算，不改变固定一晚酒店券面值。'}
   };
   let active='beijing',catalog={};
   const selections={};for(const [k,s] of Object.entries(scenes))selections[k]=Object.fromEntries(s.rights.map(r=>[r.key,{checked:r.selected,unit:r.unit,tier:r.tier||''}]));
