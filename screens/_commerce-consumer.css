@@ -547,3 +547,10 @@
 .member-records h2{font:600 16px/1.4 var(--serif);margin:0 0 4px;letter-spacing:.01em}
 .member-records{padding:16px 18px}
 .member-record b{font-weight:600}
+
+/* 银行零售场景权益方案入口。单独页面用于选品演示，不触发发券。 */
+.commerce-consumer .bank-scene-entry{margin:10px 16px 4px;padding:12px 14px;background:#eaf6f1;border:1px solid #bfddd0;border-radius:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#184e40;text-decoration:none}
+.commerce-consumer .bank-scene-entry b,.commerce-consumer .bank-scene-entry small{display:block}
+.commerce-consumer .bank-scene-entry b{font-size:13px}
+.commerce-consumer .bank-scene-entry small{margin-top:3px;font-size:10px;color:#54786b}
+.commerce-consumer .bank-scene-entry em{font-style:normal;font-size:11px;white-space:nowrap;font-weight:700}
