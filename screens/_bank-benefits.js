@@ -66,7 +66,7 @@
     $('product-grid').innerHTML=s.rights.map(r=>productCard(s,r)).join('');
     $('supply-note').textContent=s.note;
     $('supply-status').textContent=catalog[s.city]?'已核对 '+s.city+' 公开目录 · '+catalog[s.city].length+' 项商品':'目录暂不可核验，所有供给按待确认处理';
-    $('marketing-link').href='https://marketing.renos.life/marketing?persona='+encodeURIComponent(s.persona)+'&fresh=1';
+    $('marketing-link').href='https://marketing.meizu.life/marketing?persona='+encodeURIComponent(s.persona)+'&fresh=1';
     refreshBudget();
   }
   document.querySelectorAll('[data-scene]').forEach(b=>b.addEventListener('click',()=>{active=b.dataset.scene;render();}));
