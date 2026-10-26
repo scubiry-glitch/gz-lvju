@@ -330,13 +330,14 @@ class PayCenter {
   /**
    * 9. 分账结果与分账回退结果查询
    *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1479569
-   * @param {object} params 必填：bizCode, orderType；bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
+   * @param {object} params 必填：orderType，且 bizCode(分账标准业务码) / feeType(分账业务类型) 二选一必传；
+   *   bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
    *   orderType 取值：DIRECT_SPLIT-分账；SPLIT_RETURN-分账追回
    * @returns {Promise<{code:string,info:string,data:object}>}
    */
   async querySplitResult(params = {}) {
-    if (!params.bizCode || !params.orderType) {
-      throw new Error('[payCenter] querySplitResult 必填 bizCode / orderType');
+    if ((!params.bizCode && !params.feeType) || !params.orderType) {
+      throw new Error('[payCenter] querySplitResult 必填 orderType，且 bizCode / feeType 二选一必传');
     }
     assertOneOf('querySplitResult', params, ['bizOrderNo', 'orderNo']);
     return this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
