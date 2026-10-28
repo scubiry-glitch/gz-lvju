@@ -22,6 +22,7 @@ const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'pr
 // 复用全局连接池（server/db.cjs 的 8 连接池），避免每请求 mysql2.createConnection 新建连接
 // （新建连接每次都走 TCP 握手 + 可能的 MySQL 反向 DNS 解析，是分账回调持续慢的主因）
 const { getPool } = require('../db.cjs');
+const { sendMarkdown } = require('../utils/wecom-robot.cjs');
 
 function createBookingRouter(deps) {
   return async function handleBookingRoutes(urlPath, qs, req, res) {
@@ -656,6 +657,15 @@ function createBookingRouter(deps) {
       } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         console.error('[split notify] failed:', e && e.message);
+        // 企微告警（fire-and-forget，不阻塞回调响应）：分账回调处理失败
+        sendMarkdown([
+          '**分账回调处理失败**',
+          `> 订单号：${orderNo}`,
+          `> 业务单号：${appOrderId || '-'}`,
+          `> 回调状态：${status || '-'}`,
+          `> 错误：${(e && e.message) || e}`,
+          `> 时间：${nowSql}`,
+        ].join('\n')).catch(() => {});
         if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end(JSON.stringify({"code":500,"info":e.message}));

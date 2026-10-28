@@ -29,6 +29,7 @@ const crypto = require('crypto');
 const { queryRows, getPool } = require(path.join(__dirname, '..', 'db.cjs'));
 const { payCenter } = require(path.join(__dirname, '..', 'thirdApi', 'payCenter.cjs'));
 const { generateAppOrderId } = require(path.join(__dirname, '..', 'payment', 'primitives.cjs'));
+const { sendMarkdown } = require(path.join(__dirname, '..', 'utils', 'wecom-robot.cjs'));
 
 // 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账下单入参/出参，便于联调；生产环境关闭
 const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
@@ -320,18 +321,40 @@ async function processOne(b, platformMerchantNo) {
   }
 }
 
+// 企微通知（异常只告警，绝不影响分账主流程）
+async function notifySplit(content) {
+  try {
+    await sendMarkdown(content);
+  } catch (e) {
+    console.warn('[book_order_split_job] 企微通知发送失败:', e && e.message);
+  }
+}
+
 // 执行一次分账（可单独调用 / 手动触发）
 async function runOnce() {
   const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
   const notifyUrl = process.env.PAY_NOTIFY_SPLIT_URL;
   if (!platformMerchantNo || !notifyUrl) {
-    console.error('[book_order_split_job] 缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL，跳过本次执行');
+    const reason = '缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL，跳过本次执行';
+    console.error('[book_order_split_job] ' + reason);
+    await notifySplit(`**旅居分账定时任务跳过**\n> 原因：${reason}\n> 时间：${nowStamp()}`);
     return { due: 0, processed: 0, skipped: 0, failed: 0, reason: 'missing_env' };
   }
 
-  const due = await queryRows(SQL_SELECT_DUE);
+  let due;
+  try {
+    due = await queryRows(SQL_SELECT_DUE);
+  } catch (e) {
+    const msg = `查询待分账订单失败: ${(e && e.message) || e}`;
+    console.error('[book_order_split_job] ' + msg);
+    await notifySplit(`**旅居分账定时任务执行失败**\n> 错误：${msg}\n> 时间：${nowStamp()}`);
+    throw e;
+  }
   if (!due || !due.length) {
     console.log('[book_order_split_job] 无待分账订单（checkOut & split_status=none & checkout<=今天-7天）');
+    if (process.env.SPLIT_JOB_NOTIFY_ALWAYS === '1') {
+      await notifySplit(`**旅居分账定时任务**\n> 无待分账订单\n> 时间：${nowStamp()}`);
+    }
     return { due: 0, processed: 0, skipped: 0, failed: 0 };
   }
   console.log(`[book_order_split_job] 待分账 ${due.length} 单`);
@@ -339,6 +362,7 @@ async function runOnce() {
   let processed = 0;
   let skipped = 0;
   let failed = 0;
+  const failures = [];
   for (const b of due) {
     try {
       const r = await processOne(b, platformMerchantNo);
@@ -347,9 +371,26 @@ async function runOnce() {
     } catch (e) {
       failed++;
       // 单笔失败不影响其余订单；保留 split_status='none' 次日重试
+      failures.push({ orderNo: b.order_no, message: (e && e.message) || String(e) });
     }
   }
   console.log(`[book_order_split_job] 完成 processed=${processed} skipped=${skipped} failed=${failed}`);
+
+  // 企微通知：本次有待分账订单即汇总推送（含失败明细）；无待分账时可设 SPLIT_JOB_NOTIFY_ALWAYS=1 也推送
+  const lines = [
+    failed > 0 ? '**旅居分账定时任务（有失败）**' : '**旅居分账定时任务**',
+    `> 待分账：${due.length}`,
+    `> 成功：${processed}`,
+    `> 跳过：${skipped}`,
+    `> 失败：${failed}`,
+    `> 时间：${nowStamp()}`,
+  ];
+  if (failures.length) {
+    lines.push('', '**失败明细**');
+    failures.forEach((f) => lines.push(`- ${f.orderNo}：${f.message}`));
+  }
+  await notifySplit(lines.join('\n'));
+
   return { due: due.length, processed, skipped, failed };
 }
 
