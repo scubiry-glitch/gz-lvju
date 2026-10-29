@@ -152,11 +152,9 @@ const SQL_INSERT_GATEWAY_LOG = `
      business_code, trace_id, success_flag, request_json, response_json, error_message, started_at, finished_at)
   VALUES (?, NULL, ?, 'split_apply', ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-// 业务时钟：北京时间（UTC+8）'YYYY-MM-DD HH:mm:ss'。
-// 中国无夏令时，固定加 8 小时即可，不依赖进程/数据库时区；与 MySQL NOW() 的口径一致。
+// 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
 function nowStamp() {
-  const bj = new Date(Date.now() + 8 * 60 * 60 * 1000);
-  return bj.toISOString().slice(0, 19).replace('T', ' ');
+  return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // 落库出战中台调用日志（payment_gateway_logs）。独立于分账主事务，写入失败仅告警，不影响分账主流程。
