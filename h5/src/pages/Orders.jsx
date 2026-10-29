@@ -36,7 +36,7 @@ function matchTab(o, tab) {
   return true;
 }
 
-/** payment_expires_at 与服务端同一口径：无时区的时间按 UTC。 */
+/** payment_expires_at 与服务端同一口径：无时区的时间是北京时间，按 +08:00 解析。 */
 function payDeadlineMs(raw) {
   if (raw == null || raw === '') return null;
   const s = String(raw).trim();
@@ -45,7 +45,7 @@ function payDeadlineMs(raw) {
     const ms = Date.parse(s);
     return Number.isFinite(ms) ? ms : null;
   }
-  const ms = Date.parse(s.replace(' ', 'T') + 'Z');
+  const ms = Date.parse(s.replace(' ', 'T') + '+08:00');
   return Number.isFinite(ms) ? ms : null;
 }
 
