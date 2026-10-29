@@ -330,20 +330,31 @@ class PayCenter {
   /**
    * 9. 分账结果与分账回退结果查询
    *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1479569
-   * @param {object} params 必填：bizCode, orderType；bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
+   * @param {object} params 必填：orderType，且 bizCode(分账标准业务码)  必传；
+   *   bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
    *   orderType 取值：DIRECT_SPLIT-分账；SPLIT_RETURN-分账追回
    * @returns {Promise<{code:string,info:string,data:object}>}
    */
   async querySplitResult(params = {}) {
-    if (!params.bizCode || !params.orderType) {
-      throw new Error('[payCenter] querySplitResult 必填 bizCode / orderType');
+    if ((!params.bizCode) || !params.orderType) {
+      throw new Error('[payCenter] querySplitResult 必填 orderType，且 bizCode / feeType 二选一必传');
     }
     assertOneOf('querySplitResult', params, ['bizOrderNo', 'orderNo']);
-    return this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      query: clean(params),
-    });
+    console.log("querySplitResult params",params)
+    try {
+      const result = await this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        query: clean(params),
+      });
+      console.log('[payCenter] querySplitResult 出参 >>>', JSON.stringify(result));
+      return result;
+    } catch (e) {
+      // 失败也打印网关真实返回（responseText 含 X-Error-Code / 权限原因），便于排查 401/403
+      console.error('[payCenter] querySplitResult 失败:', e && e.message,
+        '| httpStatus:', e && e.httpStatus, '| traceId:', e && e.traceId, '| responseText:', e && e.responseText);
+      throw e;
+    }
   }
 }
 

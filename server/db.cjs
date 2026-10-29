@@ -5,7 +5,8 @@
  */
 
 let mysql2 = null;
-try { mysql2 = require('mysql2/promise'); } catch (_) {}
+try { mysql2 = require('mysql2/promise'); } catch (e) { throw new Error('缺少依赖 mysql2，请先在项目根目录执行 npm install'); }
+
 
 function getDbConfig() {
   const host = (process.env.MYSQL_HOST || process.env.JUZHU_DB_HOST || '').trim();

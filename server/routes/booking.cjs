@@ -1,4 +1,5 @@
 'use strict';
+
 /**
  * C 端预订 + 支付确认/回调（从 app.js 拆出）。
  * 覆盖：
@@ -14,6 +15,15 @@
  *   if ((await handle(urlPath, qs, req, res)) !== false) return;
  * 命中路由时 handler 经 return jsonReply/... 返回 undefined；未命中返回 false。
  */
+
+// 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账回调入参/出参日志；生产环境关闭
+const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
+
+// 复用全局连接池（server/db.cjs 的 8 连接池），避免每请求 mysql2.createConnection 新建连接
+// （新建连接每次都走 TCP 握手 + 可能的 MySQL 反向 DNS 解析，是分账回调持续慢的主因）
+const { getPool } = require('../db.cjs');
+const { sendMarkdown } = require('../utils/wecom-robot.cjs');
+
 function createBookingRouter(deps) {
   return async function handleBookingRoutes(urlPath, qs, req, res) {
     const {
@@ -561,10 +571,108 @@ function createBookingRouter(deps) {
         return res.end(result);
       } catch (_) {
         res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('FAILED');
+        return res.end(JSON.stringify({"code":500,"info":e.message}));
       }
     }
 
+    // POST /api/juzhu/payment/split/notify/:token —— 分账中台异步回调（参考支付回调接口）
+    if (process.env.PAY_NOTIFY_SPLIT_TOKEN
+      && urlPath === `/api/juzhu/payment/split/notify/${process.env.PAY_NOTIFY_SPLIT_TOKEN}` && req.method === 'POST') {
+      const body = await readBody(req);
+      if (!IS_PROD) console.log('[split notify] 入参 >>>', JSON.stringify(body));
+      if (!body || typeof body.orderNo !== 'string' || !body.orderNo) {
+        if (!IS_PROD) console.log('[split notify] 出参 <<< INVALID');
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('INVALID');
+      }
+      const nowSql = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const dt = (s) => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(s)) ? s.replace('T', ' ') : null;
+      const orderNo = String(body.orderNo);
+      const appOrderId = String(body.bizOrderNo || ''); // 回调 bizOrderNo = 发起分账时的分账业务单号 = payment_split.app_order_id
+      const status = String(body.orderStatus || '');
+      const conn = await getPool().getConnection();
+      try {
+        await conn.beginTransaction();
+        // 通过分账业务单号（回调 bizOrderNo = payment_split.app_order_id）或中台分账单号定位分账记录，取关联的旅居订单号
+        const [splitRows] = await conn.execute(
+          `SELECT biz_order_no FROM payment_split WHERE app_order_id=? OR split_order_no=? LIMIT 1`,
+          [appOrderId, orderNo],
+        );
+        const bookingOrderNo = splitRows[0] ? splitRows[0].biz_order_no : null;
+        // 幂等写入分账回调日志（按 order_no 唯一键，重复回调只更新）
+        await conn.execute(
+          `INSERT INTO payment_split_callback_log(order_no,app_order_id,biz_order_no,biz_code,order_type,amount,order_status,trans_finish_time,error_code,error_message,estimated_settle_time,fee_info,external_fee,payload_json,handle_result,handle_message,received_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'processing',?,?)
+           ON DUPLICATE KEY UPDATE handle_result='processing', handle_message=VALUES(handle_message), payload_json=VALUES(payload_json), handled_at=NULL`,
+          [
+            orderNo, appOrderId, bookingOrderNo, String(body.bizCode || ''), String(body.orderType || ''),
+            body.amount != null ? Number(body.amount) : null, status,
+            dt(body.transFinishTime), String(body.errorCode || '') || null, String(body.errorMessage || '') || null,
+            dt(body.estimatSettleTime),
+            body.feeInfo ? JSON.stringify(body.feeInfo) : null,
+            body.externalFee ? JSON.stringify(body.externalFee) : null,
+            JSON.stringify(body), 'received', nowSql,
+          ],
+        );
+        if (status === 'SUCCEED') {
+          // 分账订单表：按分账业务单号/中台分账单号定位，分账状态置 done；回写中台分账单号与状态
+          await conn.execute(
+            `UPDATE payment_split SET split_status='done', gateway_order_status=?, split_order_no=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, JSON.stringify(body), appOrderId, orderNo],
+          );
+          // 旅居订单表：经分账记录关联的业务订单号，置分账状态 done、订单状态 finished（已结单）
+          if (bookingOrderNo) {
+            await conn.execute(
+              `UPDATE booking_orders SET split_status='done', status='finished', updated_at=NOW() WHERE order_no=?`,
+              [bookingOrderNo],
+            );
+          }
+        } else if (status === 'FAILED') {
+          // 分账失败：回写分账订单表状态，并同步旅居订单表分账状态为 fail（不动订单主状态，便于重分账/人工处理）
+          await conn.execute(
+            `UPDATE payment_split SET split_status='fail', gateway_order_status=?, split_order_no=?, split_result_info=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, JSON.stringify(body), appOrderId, orderNo],
+          );
+          if (bookingOrderNo) {
+            await conn.execute(
+              `UPDATE booking_orders SET split_status='fail', updated_at=NOW() WHERE order_no=?`,
+              [bookingOrderNo],
+            );
+          }
+        } else if (status) {
+          // 中间态（ACCEPTED / PROCESSING 等）：仅回写中台分账单号与状态，不动 split_status / 订单主状态
+          await conn.execute(
+            `UPDATE payment_split SET gateway_order_status=?, split_order_no=?, updated_at=NOW() WHERE app_order_id=? OR split_order_no=?`,
+            [status, orderNo, appOrderId, orderNo],
+          );
+        }
+        await conn.execute(
+          `UPDATE payment_split_callback_log SET handle_result='success', handle_message=?, handled_at=NOW() WHERE order_no=?`,
+          [status === 'SUCCEED' ? '分账成功，订单已结单' : (status === 'FAILED' ? '分账失败' : '已记录待核'), orderNo],
+        );
+        await conn.commit();
+        if (!IS_PROD) console.log('[split notify] 出参 <<<', status, 'SUCCESS');
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(JSON.stringify({"code":200,"info":"回调成功"}));
+      } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        console.error('[split notify] failed:', e && e.message);
+        // 企微告警（fire-and-forget，不阻塞回调响应）：分账回调处理失败
+        sendMarkdown([
+          '**分账回调处理失败**',
+          `> 订单号：${orderNo}`,
+          `> 业务单号：${appOrderId || '-'}`,
+          `> 回调状态：${status || '-'}`,
+          `> 错误：${(e && e.message) || e}`,
+          `> 时间：${nowSql}`,
+        ].join('\n')).catch(() => {});
+        if (!IS_PROD) console.log('[split notify] 出参 <<< FAILED', e && e.message);
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(JSON.stringify({"code":500,"info":e.message}));
+      } finally {
+        try { if (conn) await conn.release(); } catch (_) {}
+      }
+    }
 
     return false;
   };

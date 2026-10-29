@@ -29,6 +29,57 @@ function createSchema(deps) {
     staffSeedAll,
   } = deps;
 
+  // ── ensureSchema 执行日志辅助：仅在实际「新建表 / 新增字段 / 结构变更」时打印，幂等重跑不产生噪音 ──
+  function tableNameOf(ddl) {
+    const m = ddl.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([A-Za-z0-9_]+)`?/i);
+    return m ? m[1] : null;
+  }
+  function colNameOf(ddl) {
+    const m = ddl.match(/^\s*`?([A-Za-z0-9_]+)`?/);
+    return m ? m[1] : null;
+  }
+  // 建表：先探测是否已存在，仅「真正新建」时打印日志
+  async function ensureTable(conn, ddl) {
+    const name = tableNameOf(ddl);
+    let existed = false;
+    if (name) {
+      // 用 conn.query（客户端转义，非服务端预处理）探测：SHOW 在 execute 预处理协议下部分 MySQL 版本会异常，
+      // 一旦探测失败 existed 恒为 false，会导致已存在的表每启动都误打印“新建表”。
+      try { const [r] = await conn.query('SHOW TABLES LIKE ?', [name]); existed = Array.isArray(r) && r.length > 0; } catch (_) {}
+    }
+    await conn.execute(ddl);
+    if (name && !existed) console.log(`[ensureSchema] 新建表: ${name}`);
+  }
+  // 加列：重复列会抛 Duplicate（静默跳过），成功即代表「实际新增」，仅此时打印；其它错误告警
+  async function ensureColumn(conn, table, ddl) {
+    const col = colNameOf(ddl);
+    let existed = false;
+    if (col) {
+      try { const [r] = await conn.query(`SHOW COLUMNS FROM \`${table}\` LIKE ?`, [col]); existed = Array.isArray(r) && r.length > 0; } catch (_) {}
+    }
+    try {
+      await conn.execute(`ALTER TABLE \`${table}\` ADD COLUMN ${ddl}`);
+      if (!existed) console.log(`[ensureSchema] 新增字段: ${table}.${col}`);
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if (/Duplicate column|1060/i.test(msg)) return;
+      console.warn(`[ensureSchema] 新增字段失败 ${table}.${col || ''}: ${msg}`);
+    }
+  }
+  // 通用迁移 DDL（ADD COLUMN / ADD KEY / MODIFY / CHANGE 等）：成功即「实际变更」才打印；重复键静默跳过；其余告警。
+  // 数据回填类（UPDATE / INSERT）不打印，避免每次启动刷屏。
+  async function runMigration(conn, sql) {
+    const isDDL = /\b(ADD\s+(?:COLUMN|KEY|UNIQUE|INDEX|PRIMARY)|MODIFY|CHANGE|ALTER\s+COLUMN|RENAME)\b/i.test(sql);
+    try {
+      await conn.execute(sql);
+      if (isDDL) console.log(`[ensureSchema] 结构变更: ${sql.replace(/\s+/g, ' ').slice(0, 140)}`);
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if (/Duplicate (column|key name)|1060|1061/i.test(msg)) return;
+      console.warn(`[ensureSchema] 迁移失败: ${msg} | ${sql.replace(/\s+/g, ' ').slice(0, 140)}`);
+    }
+  }
+
   async function ensureGrOrdersShape(conn) {
     let cols = [];
     try {
@@ -81,7 +132,7 @@ function createSchema(deps) {
     ];
     for (const [name, ddl] of extra) {
       if (!cols.includes(name)) {
-        try { await conn.execute(`ALTER TABLE gr_orders ADD COLUMN ${name} ${ddl}`); } catch (_) { /* ignore */ }
+        try { await conn.execute(`ALTER TABLE gr_orders ADD COLUMN ${name} ${ddl}`); console.log(`[ensureSchema] 新增字段: gr_orders.${name}`); } catch (e) { console.warn(`[ensureSchema] 新增字段失败 gr_orders.${name}:`, (e && e.message) || e); }
       }
     }
   }
@@ -127,6 +178,149 @@ function createSchema(deps) {
     const conn = await mysql2.createConnection(getDbConfig());
     try {
       const ddls = [
+        `CREATE TABLE IF NOT EXISTS payment_split_callback_log (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '分账回调日志主键',
+        order_no VARCHAR(64) NOT NULL COMMENT '中台分账订单号（回调 orderNo，幂等键，对应 payment_split.split_order_no）',
+        app_order_id VARCHAR(64) NULL COMMENT '分账业务单号（回调 bizOrderNo，对应 payment_split.app_order_id，即发起分账时填写的分账 bizOrderNo）',
+        biz_order_no VARCHAR(32) NULL COMMENT '旅居业务订单号（对应 payment_split.biz_order_no / booking_orders.order_no，由回调 bizOrderNo 经 payment_split 反查得到）',
+        biz_code VARCHAR(64) NULL COMMENT '业务码（回调 bizCode，对应 payment_split.biz_code）',
+        order_type VARCHAR(32) NULL COMMENT '订单类型（回调 orderType：DIRECT_SPLIT-分账 SPLIT_RETURN-分账追回）',
+        amount DECIMAL(12,2) NULL COMMENT '分账金额（回调 amount，2位小数）',
+        order_status VARCHAR(8) NULL COMMENT '分账状态（回调 orderStatus：SUCCEED-处理成功 FAILED-处理失败）',
+        trans_finish_time DATETIME NULL COMMENT '分账时间（回调 transFinishTime，状态成功时有值）',
+        error_code VARCHAR(64) NULL COMMENT '错误码（回调 errorCode，orderStatus=FAILED 时有值）',
+        error_message VARCHAR(500) NULL COMMENT '错误描述（回调 errorMessage）',
+        estimated_settle_time DATETIME NULL COMMENT '预估到账时间（回调 estimatSettleTime，未结算时有值）',
+        fee_info JSON NULL COMMENT '手续费信息（回调 feeInfo：feeAmount/feeType/finishTime/merchantNo/status/errorCode/errorMessage）',
+        external_fee JSON NULL COMMENT '外部手续费（回调 externalFee：bizScene/merchantNo/amount/tradeTime，24.11新增）',
+        payload_json LONGTEXT NOT NULL COMMENT '脱敏后的分账回调原文',
+        handle_result VARCHAR(16) NOT NULL COMMENT '处理结果：success/fail/ignored',
+        handle_message VARCHAR(500) NULL COMMENT '处理说明',
+        received_at DATETIME NOT NULL COMMENT '接收时间',
+        handled_at DATETIME NULL COMMENT '处理完成时间',
+        UNIQUE KEY uk_pscl_order_no (order_no),
+        KEY idx_pscl_app_order (app_order_id),
+        KEY idx_pscl_biz_order (biz_order_no),
+        KEY idx_pscl_received (received_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分账异步回调日志表'`,
+        `CREATE TABLE IF NOT EXISTS payment_orders (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地支付记录主键',
+        biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
+        app_order_id VARCHAR(28) NOT NULL COMMENT '支付中台业务支付单号及幂等键',
+        amount DECIMAL(12,2) NOT NULL COMMENT '本次支付应付金额',
+        payer_ucid VARCHAR(64) NOT NULL COMMENT '支付用户 UCID 快照',
+        payer_user_type VARCHAR(8) NOT NULL COMMENT '支付用户类型快照',
+        merchant_no VARCHAR(64) NOT NULL COMMENT '收款商户号快照',
+        share_biz_code VARCHAR(64) NOT NULL COMMENT '统一业务码快照',
+        cashier_type VARCHAR(8) NOT NULL COMMENT '收银台类型',
+        pay_method VARCHAR(50) NULL COMMENT '实际支付方式',
+        pay_status VARCHAR(24) NOT NULL COMMENT '本地支付状态',
+        gateway_order_status VARCHAR(20) NULL COMMENT '中台原始订单状态',
+        pay_no VARCHAR(64) NULL COMMENT '支付流水号',
+        cashier_url TEXT NULL COMMENT '收银台地址',
+        callback_url VARCHAR(500) NOT NULL COMMENT '异步通知地址',
+        cashier_expires_at DATETIME NULL COMMENT '收银台失效时间',
+        paid_at DATETIME NULL COMMENT '支付确认成功时间',
+        closed_at DATETIME NULL COMMENT '关单确认时间',
+        close_reason VARCHAR(32) NULL COMMENT '关单原因',
+        query_retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
+        next_query_at DATETIME NULL COMMENT '下次查询时间',
+        version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+        created_at DATETIME NOT NULL COMMENT '创建时间',
+        updated_at DATETIME NOT NULL COMMENT '更新时间',
+        UNIQUE KEY uk_po_app_order (app_order_id),
+        KEY idx_po_biz_order_id (biz_order_no, id),
+        KEY idx_po_biz_order_status (biz_order_no, pay_status),
+        KEY idx_po_status_retry (pay_status, next_query_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付表'`,
+        `CREATE TABLE IF NOT EXISTS payment_refunds (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地退款单主键',
+        payment_order_id BIGINT NOT NULL COMMENT '关联支付记录 ID',
+        biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
+        app_order_id VARCHAR(28) NOT NULL COMMENT '退款业务单号及幂等键',
+        idempotency_key VARCHAR(128) NOT NULL COMMENT '退款幂等键',
+        refund_reason_type VARCHAR(32) NOT NULL COMMENT '退款原因',
+        trigger_source VARCHAR(32) NOT NULL COMMENT '触发来源',
+        refund_amount DECIMAL(12,2) NOT NULL COMMENT '退款金额',
+        payer_ucid VARCHAR(64) NOT NULL COMMENT '原支付用户 UCID 快照',
+        merchant_no VARCHAR(64) NOT NULL COMMENT '原支付商户号快照',
+        refund_status VARCHAR(24) NOT NULL COMMENT '退款状态',
+        refunded_at DATETIME NULL COMMENT '退款成功时间',
+        retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
+        next_retry_at DATETIME NULL COMMENT '下次查询时间',
+        version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+        created_at DATETIME NOT NULL COMMENT '创建时间',
+        updated_at DATETIME NOT NULL COMMENT '更新时间',
+        UNIQUE KEY uk_pr_app_order (app_order_id),
+        UNIQUE KEY uk_pr_idempotency (idempotency_key),
+        KEY idx_pr_biz_order (biz_order_no),
+        KEY idx_pr_payment (payment_order_id),
+        KEY idx_pr_status_retry (refund_status, next_retry_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单退款表'`,
+        `CREATE TABLE IF NOT EXISTS payment_split (
+        id                 BIGINT AUTO_INCREMENT PRIMARY KEY          COMMENT '本地分账单主键',
+        payment_order_id   BIGINT       NOT NULL                      COMMENT '关联支付订单表支付记录 ID（payment_orders.id）',
+        biz_order_no       VARCHAR(32)  NOT NULL                      COMMENT '关联旅居业务订单号 booking_orders.order_no',
+        app_order_id       VARCHAR(64)  NOT NULL                      COMMENT '分账业务单号（分账接口 bizOrderNo），幂等键',
+        idempotency_key    VARCHAR(128) NOT NULL                      COMMENT '分账幂等键',
+        biz_code           VARCHAR(64)  NOT NULL                      COMMENT '分账业务码（接口 bizCode / 统一业务码）',
+        order_name         VARCHAR(255) NOT NULL                      COMMENT '分账订单名称（接口 orderName）',
+        amount             DECIMAL(12,2) NOT NULL                     COMMENT '分账总金额（接口 amount）',
+        contract_no        VARCHAR(64)  NOT NULL                      COMMENT '合同号（接口 contractInfo.contractNo）',
+        source_merchant_no VARCHAR(64)  NULL                          COMMENT '源收款商户号快照（details[0].payerMerchantNo）',
+        pay_infos          JSON         NULL                          COMMENT '收款参与方（接口 payInfos: [{merchantNo,amount}]）',
+        split_details      JSON         NULL                          COMMENT '分账明细（接口 details: [{bizDetailNo,splitLevel,payerMerchantNo,payAmount,payeeMerchantNo,leafFlag,summary}]）',
+        split_status       VARCHAR(16)  NOT NULL DEFAULT 'none'        COMMENT '分账状态：none-未分账 split-分账中 done-已分账 fail-分账失败',
+        gateway_order_status VARCHAR(20) NULL                          COMMENT '中台分账单状态（querySplitResult 回写），枚举: ACCEPTED-已受理,PROCESSING-处理中,SUCCEED-处理成功,FAILED-处理失败',
+        split_order_no     VARCHAR(64)  NULL                          COMMENT '中台返回的分账单号（orderNo）',
+        split_result_info  TEXT         NULL                          COMMENT '分账结果详情（querySplitResult 回写）',
+        retry_count        INT          NOT NULL DEFAULT 0             COMMENT '查询补偿次数',
+        next_retry_at      DATETIME     NULL                          COMMENT '下次查询时间',
+        version            INT          NOT NULL DEFAULT 0             COMMENT '乐观锁版本',
+        created_at         DATETIME     NOT NULL                      COMMENT '创建时间',
+        updated_at         DATETIME     NOT NULL                      COMMENT '更新时间',
+        UNIQUE KEY uk_ps_app_order   (app_order_id),
+        UNIQUE KEY uk_ps_idempotency  (idempotency_key),
+        KEY idx_ps_biz_order    (biz_order_no),
+        KEY idx_ps_payment      (payment_order_id),
+        KEY idx_ps_status_retry (split_status, next_retry_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分账订单表'`,
+        `CREATE TABLE IF NOT EXISTS payment_gateway_logs (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '网关调用日志主键',
+        payment_order_id BIGINT NULL COMMENT '关联支付记录 ID',
+        payment_refund_id BIGINT NULL COMMENT '关联退款记录 ID',
+        app_order_id VARCHAR(28) NOT NULL COMMENT '业务单号',
+        operation_type VARCHAR(24) NOT NULL COMMENT '调用类型',
+        request_no VARCHAR(64) NOT NULL COMMENT '调用请求号',
+        http_status INT NULL COMMENT 'HTTP 状态',
+        business_code VARCHAR(64) NULL COMMENT '中台业务码',
+        trace_id VARCHAR(128) NULL COMMENT '网关链路 ID',
+        success_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否成功',
+        request_json LONGTEXT NULL COMMENT '脱敏请求',
+        response_json LONGTEXT NULL COMMENT '脱敏响应',
+        error_message VARCHAR(500) NULL COMMENT '异常摘要',
+        started_at DATETIME NOT NULL COMMENT '开始时间',
+        finished_at DATETIME NULL COMMENT '结束时间',
+        UNIQUE KEY uk_pgl_request_no (request_no),
+        KEY idx_pgl_payment (payment_order_id, operation_type),
+        KEY idx_pgl_refund (payment_refund_id, operation_type),
+        KEY idx_pgl_app_order (app_order_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台出站调用日志'`,
+        `CREATE TABLE IF NOT EXISTS payment_notify_log (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '中台通知日志主键',
+        notify_key VARCHAR(191) NOT NULL COMMENT '通知幂等键',
+        notify_type VARCHAR(16) NOT NULL COMMENT 'pay 或 refund',
+        app_order_id VARCHAR(28) NULL COMMENT '业务单号',
+        order_status VARCHAR(8) NULL COMMENT '中台状态',
+        payload_json LONGTEXT NOT NULL COMMENT '脱敏通知原文',
+        handle_result VARCHAR(16) NOT NULL COMMENT '处理结果',
+        handle_message VARCHAR(500) NULL COMMENT '处理说明',
+        received_at DATETIME NOT NULL COMMENT '接收时间',
+        handled_at DATETIME NULL COMMENT '处理完成时间',
+        UNIQUE KEY uk_pnl_notify_key (notify_key),
+        KEY idx_pnl_app_order (app_order_id),
+        KEY idx_pnl_received (received_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台异步通知日志'`,
         `CREATE TABLE IF NOT EXISTS cities (
           id INT AUTO_INCREMENT PRIMARY KEY,
           name VARCHAR(100) NOT NULL,
@@ -293,6 +487,7 @@ function createSchema(deps) {
           commission_rate DECIMAL(5,2),
           commission_fee DECIMAL(10,2),
           status VARCHAR(16) NOT NULL DEFAULT 'pending',
+          split_status VARCHAR(16) NOT NULL DEFAULT 'none' COMMENT '分账状态：none-未分账 split-分账中 done-已分账 fail-分账失败',
           pay_status VARCHAR(20),
           pay_method VARCHAR(50),
           pay_at VARCHAR(30),
@@ -585,7 +780,7 @@ function createSchema(deps) {
         ) CHARSET=utf8mb4`,
       ];
       for (const ddl of ddls) {
-        await conn.execute(ddl);
+        await ensureTable(conn, ddl);
       }
       // 初始化 jz_categories 种子数据（到家 4 类 + 本地生活 7 频道，同 Tab 并列）
       const jzCatSeeds = [
@@ -769,15 +964,16 @@ function createSchema(deps) {
         ['jz_products', 'path VARCHAR(500)'],
         ['jz_products', 'query VARCHAR(500)'],
         ['vendor_onboarding', 'approved_vendor_id INT'],   // 受理台 ↔ 商家档案互通（2026-09-22）：approve 按 phone 单命中时记录关联商家
+        ['booking_orders', "split_status VARCHAR(16) NOT NULL DEFAULT 'none' COMMENT '分账状态：none-未分账 split-分账中 done-已分账 fail-分账失败'"],  // 分账状态（2026-10）：none-未分账 split-分账中 done-已分账 fail-分账失败
         ['channels', 'hidden_cities TEXT NULL'],  // 按城市隐藏 tab（JSON 数组，如 ["shenyang"]）
       ];
       for (const [table, ddl] of extraCols) {
-        try { await conn.execute(`ALTER TABLE ${table} ADD COLUMN ${ddl}`); } catch (_) { /* 列已存在 */ }
+        await ensureColumn(conn, table, ddl);
       }
       // 商家资质复审默认从严（2026-09-22）：旧库列已存在，ADD COLUMN 不换默认值，这里显式对齐——
       // 新建档不再「生而 approved」（252 青屿民宿教训：脚本直插商家自证通过、零审计留痕），进待审视野。
       // 只改列默认值，存量行原值不动；幂等可重跑。
-      try { await conn.execute("ALTER TABLE jz_vendors ALTER COLUMN review_status SET DEFAULT 'pending'"); } catch (_) { /* 表未就绪 */ }
+      try { await conn.execute("ALTER TABLE jz_vendors ALTER COLUMN review_status SET DEFAULT 'pending'"); console.log('[ensureSchema] 结构变更: ALTER jz_vendors.review_status 默认 pending'); } catch (_) { /* 表未就绪 */ }
       await ensureJzSkusIncludesColumn(conn);
       // 图集分类回填（2026-09 商家反馈点 4）：存量图无分类 → 'other'，幂等（只碰 NULL/空串行）
       try { await conn.execute("UPDATE photos SET category='other' WHERE category IS NULL OR category=''"); } catch (_) { /* 表未就绪 */ }
@@ -812,6 +1008,7 @@ function createSchema(deps) {
       await ensureGrOrdersShape(conn);
       try {
         await conn.execute('ALTER TABLE gr_orders CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci');
+        console.log('[ensureSchema] 结构变更: gr_orders CONVERT TO utf8mb4');
       } catch (_) { /* 5.7 无 0900 或已是该 collation */ }
       // 迁移：补充可能缺失的列（ALTER TABLE ... ADD COLUMN IF NOT EXISTS 在 MySQL 8.0 不支持，用 try/catch 忽略重复列错误）
       const migrations = [
@@ -855,106 +1052,16 @@ function createSchema(deps) {
            ) > 0 THEN 1 ELSE 0 END`,
       ];
       for (const sql of migrations) {
-        try { await conn.execute(sql); } catch (_) { /* 列已存在，忽略 */ }
+        await runMigration(conn, sql);
       }
       // 花名册归属列（scope 行级过滤；NULL=平台级）——存量表渐进补列
-      try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN org_id INT NULL'); } catch (_) {}
-      try { await conn.execute('ALTER TABLE operator_staff ADD COLUMN vendor_id INT NULL'); } catch (_) {}
+      await ensureColumn(conn, 'operator_staff', 'org_id INT NULL');
+      await ensureColumn(conn, 'operator_staff', 'vendor_id INT NULL');
       // 账号与权限中心：orgs/accounts/roles/account_roles/sessions/audit_log + 角色种子 + platform_admin 引导
       await authCenter.ensureAuthSchema(conn);
       // 审计留存（默认 180 天，AUDIT_RETENTION_DAYS 可调）
       await authCenter.cleanupAudit().catch((e) => console.warn('cleanupAudit warn:', e.message));
-      // 支付中台一期迁移：新表可 CREATE；存量表字段变更只在迁移末尾追加 ALTER。
-      await conn.execute(`CREATE TABLE IF NOT EXISTS payment_orders (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地支付记录主键',
-        biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
-        app_order_id VARCHAR(28) NOT NULL COMMENT '支付中台业务支付单号及幂等键',
-        amount DECIMAL(12,2) NOT NULL COMMENT '本次支付应付金额',
-        payer_ucid VARCHAR(64) NOT NULL COMMENT '支付用户 UCID 快照',
-        payer_user_type VARCHAR(8) NOT NULL COMMENT '支付用户类型快照',
-        merchant_no VARCHAR(64) NOT NULL COMMENT '收款商户号快照',
-        share_biz_code VARCHAR(64) NOT NULL COMMENT '统一业务码快照',
-        cashier_type VARCHAR(8) NOT NULL COMMENT '收银台类型',
-        pay_method VARCHAR(50) NULL COMMENT '实际支付方式',
-        pay_status VARCHAR(24) NOT NULL COMMENT '本地支付状态',
-        gateway_order_status VARCHAR(8) NULL COMMENT '中台原始订单状态',
-        pay_no VARCHAR(64) NULL COMMENT '支付流水号',
-        cashier_url TEXT NULL COMMENT '收银台地址',
-        callback_url VARCHAR(500) NOT NULL COMMENT '异步通知地址',
-        cashier_expires_at DATETIME NULL COMMENT '收银台失效时间',
-        paid_at DATETIME NULL COMMENT '支付确认成功时间',
-        closed_at DATETIME NULL COMMENT '关单确认时间',
-        close_reason VARCHAR(32) NULL COMMENT '关单原因',
-        query_retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
-        next_query_at DATETIME NULL COMMENT '下次查询时间',
-        version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
-        created_at DATETIME NOT NULL COMMENT '创建时间',
-        updated_at DATETIME NOT NULL COMMENT '更新时间',
-        UNIQUE KEY uk_po_app_order (app_order_id),
-        KEY idx_po_biz_order_id (biz_order_no, id),
-        KEY idx_po_biz_order_status (biz_order_no, pay_status),
-        KEY idx_po_status_retry (pay_status, next_query_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单支付表'`);
-      await conn.execute(`CREATE TABLE IF NOT EXISTS payment_refunds (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '本地退款单主键',
-        payment_order_id BIGINT NOT NULL COMMENT '关联支付记录 ID',
-        biz_order_no VARCHAR(32) NOT NULL COMMENT '关联 booking_orders.order_no',
-        app_order_id VARCHAR(28) NOT NULL COMMENT '退款业务单号及幂等键',
-        idempotency_key VARCHAR(128) NOT NULL COMMENT '退款幂等键',
-        refund_reason_type VARCHAR(32) NOT NULL COMMENT '退款原因',
-        trigger_source VARCHAR(32) NOT NULL COMMENT '触发来源',
-        refund_amount DECIMAL(12,2) NOT NULL COMMENT '退款金额',
-        payer_ucid VARCHAR(64) NOT NULL COMMENT '原支付用户 UCID 快照',
-        merchant_no VARCHAR(64) NOT NULL COMMENT '原支付商户号快照',
-        refund_status VARCHAR(24) NOT NULL COMMENT '退款状态',
-        refunded_at DATETIME NULL COMMENT '退款成功时间',
-        retry_count INT NOT NULL DEFAULT 0 COMMENT '查询补偿次数',
-        next_retry_at DATETIME NULL COMMENT '下次查询时间',
-        version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
-        created_at DATETIME NOT NULL COMMENT '创建时间',
-        updated_at DATETIME NOT NULL COMMENT '更新时间',
-        UNIQUE KEY uk_pr_app_order (app_order_id),
-        UNIQUE KEY uk_pr_idempotency (idempotency_key),
-        KEY idx_pr_biz_order (biz_order_no),
-        KEY idx_pr_payment (payment_order_id),
-        KEY idx_pr_status_retry (refund_status, next_retry_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单退款表'`);
-      await conn.execute(`CREATE TABLE IF NOT EXISTS payment_gateway_logs (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '网关调用日志主键',
-        payment_order_id BIGINT NULL COMMENT '关联支付记录 ID',
-        payment_refund_id BIGINT NULL COMMENT '关联退款记录 ID',
-        app_order_id VARCHAR(28) NOT NULL COMMENT '业务单号',
-        operation_type VARCHAR(24) NOT NULL COMMENT '调用类型',
-        request_no VARCHAR(64) NOT NULL COMMENT '调用请求号',
-        http_status INT NULL COMMENT 'HTTP 状态',
-        business_code VARCHAR(64) NULL COMMENT '中台业务码',
-        trace_id VARCHAR(128) NULL COMMENT '网关链路 ID',
-        success_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否成功',
-        request_json LONGTEXT NULL COMMENT '脱敏请求',
-        response_json LONGTEXT NULL COMMENT '脱敏响应',
-        error_message VARCHAR(500) NULL COMMENT '异常摘要',
-        started_at DATETIME NOT NULL COMMENT '开始时间',
-        finished_at DATETIME NULL COMMENT '结束时间',
-        UNIQUE KEY uk_pgl_request_no (request_no),
-        KEY idx_pgl_payment (payment_order_id, operation_type),
-        KEY idx_pgl_refund (payment_refund_id, operation_type),
-        KEY idx_pgl_app_order (app_order_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台出站调用日志'`);
-      await conn.execute(`CREATE TABLE IF NOT EXISTS payment_notify_log (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '中台通知日志主键',
-        notify_key VARCHAR(191) NOT NULL COMMENT '通知幂等键',
-        notify_type VARCHAR(16) NOT NULL COMMENT 'pay 或 refund',
-        app_order_id VARCHAR(28) NULL COMMENT '业务单号',
-        order_status VARCHAR(8) NULL COMMENT '中台状态',
-        payload_json LONGTEXT NOT NULL COMMENT '脱敏通知原文',
-        handle_result VARCHAR(16) NOT NULL COMMENT '处理结果',
-        handle_message VARCHAR(500) NULL COMMENT '处理说明',
-        received_at DATETIME NOT NULL COMMENT '接收时间',
-        handled_at DATETIME NULL COMMENT '处理完成时间',
-        UNIQUE KEY uk_pnl_notify_key (notify_key),
-        KEY idx_pnl_app_order (app_order_id),
-        KEY idx_pnl_received (received_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付中台异步通知日志'`);
+      // 支付中台相关新表（payment_* 五张）已统一挪到上方 ddls 数组开头，先于种子数据创建，避免被后续慢步骤拖后/跳过。
       try { await conn.execute('ALTER TABLE jz_vendors ADD COLUMN pay_merchant_no VARCHAR(64)'); } catch (_) {}
       try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN paid_payment_order_id BIGINT NULL'); } catch (_) {}
       try { await conn.execute('ALTER TABLE booking_orders ADD COLUMN latest_refund_id BIGINT NULL'); } catch (_) {}

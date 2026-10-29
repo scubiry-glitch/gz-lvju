@@ -28,4 +28,14 @@
     "delete" : false,
     "status" : "enabled"
   }
+}, {
+  "@upstash/mcp-context7-server" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
+}, {
+  "magic-mcp" : {
+    "delete" : false,
+    "status" : "enabled"
+  }
 } ]

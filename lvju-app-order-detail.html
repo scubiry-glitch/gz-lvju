@@ -93,7 +93,7 @@ document.querySelectorAll('a.qrlink').forEach(function(a){
   var orderNo = q.get('order_no') || '';
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function fmt(n){ return (n==null||isNaN(n)) ? '' : Number(n).toLocaleString('zh-CN'); }
-  var ST = { pending: ['待商家确认', '退改口径见下方提示'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'] };
+  var ST = { pending: ['待商家确认', '退改口径见下方提示'], confirmed: ['已确认 · 待入住', '商家已确认，按入住日期到店'], cancelled: ['已取消', '订单已取消'], finished: ['已结单', '订单已结单'] };
   var UNPAID_PS = { unpaid:1, creating:1, paying:1, create_unknown:1 };
   function stOf(o){
     if (o.status === 'pending' && o.pay_status === 'unpaid') return ['待支付', '请尽快完成支付，超时将自动取消并释放房态'];

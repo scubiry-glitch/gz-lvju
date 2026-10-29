@@ -65,6 +65,10 @@ export function bookingStatusOf(o) {
   }
 
   if (o.status === 'confirmed') return ['已确认 · 待入住', 'stay', '商家已确认，按入住日期到店'];
+
+  // 已结单：分账成功回调置位（booking.cjs 分账回调），终态，不再「待入住」
+  if (o.status === 'finished') return ['已结单', 'done', '订单已结单'];
+
   return [o.status || '—', 'stay', ''];
 }
 

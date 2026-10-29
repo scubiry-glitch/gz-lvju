@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 
 // This module never opens a connection. The caller supplies the isolated or
 // deployment connection; importing it cannot migrate a database.
-const VERSION = '20261002_unified_cashier_v1';
+const VERSION = '20261019_unified_cashier_v2';
 const TABLES = [
   `CREATE TABLE IF NOT EXISTS payment_orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -18,7 +18,7 @@ const TABLES = [
     cashier_type VARCHAR(8) NOT NULL,
     pay_method VARCHAR(50) NULL,
     pay_status VARCHAR(24) NOT NULL,
-    gateway_order_status VARCHAR(8) NULL,
+    gateway_order_status VARCHAR(20) NULL,
     pay_no VARCHAR(64) NULL,
     cashier_url TEXT NULL,
     callback_url VARCHAR(500) NOT NULL,

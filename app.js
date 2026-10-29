@@ -57,6 +57,7 @@ const { createJiazhengRouter } = require('./server/routes/jiazheng.cjs');
 const { createAdminRouter } = require('./server/routes/admin.cjs');
 const { createApiDirectRouter } = require('./server/routes/api_direct.cjs');
 const { createSchema } = require('./server/schema.cjs');
+const { createCmdRouter } = require('./server/job/cmd_split.cjs');
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
   exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
@@ -798,6 +799,8 @@ function isCEndPublicApi(urlPath, method) {
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
   if (m === 'POST' && process.env.PAY_NOTIFY_TOKEN
     && p === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}`) return true;
+  if (m === 'POST' && process.env.PAY_NOTIFY_SPLIT_TOKEN
+    && p === `/api/juzhu/payment/split/notify/${process.env.PAY_NOTIFY_SPLIT_TOKEN}`) return true;
   if (m === 'POST' && p === '/api/juzhu/payment/query') return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'GET' && p === '/api/juzhu/auth/beike-config') return true;
@@ -2107,6 +2110,7 @@ const handleApiDirect = createApiDirectRouter({
   withStayRules
 });
 
+const handleCmd = createCmdRouter({ cmdToken: process.env.CMD_API_TOKEN });
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -2399,6 +2403,11 @@ const server = http.createServer((req, res) => {
     return handleApiDirect(rawPath, qs, req, res);
   }
 
+  // /cmd/* 测试/运维命令接口（server/job/cmd_split.cjs），需 CMD_API_TOKEN 鉴权
+  if (rawPath.startsWith('/cmd')) {
+    return handleCmd(rawPath, qs, req, res);
+  }
+
   // /api/auth/* —— 账号中心登录/登出/身份（handleApiDirect 之外的独立轻路由）
   if (rawPath.startsWith('/api/auth')) {
     return handleAuthRoutes(rawPath, qs, req, res);
@@ -2474,6 +2483,30 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// 启动时加载 server/job 目录下所有 .cjs 的定时任务（约定：模块导出 start() 即启动）
+function startJobDir(jobDir) {
+  let files = [];
+  try { files = fs.readdirSync(jobDir); } catch (_) { return []; }
+  const started = [];
+  for (const f of files.sort()) {
+    if (!f.endsWith('.cjs')) continue;
+    const abs = path.join(jobDir, f);
+    try {
+      const mod = require(abs);
+      if (mod && typeof mod.start === 'function') {
+        const timer = mod.start();
+        if (timer && typeof timer.unref === 'function') timer.unref();
+        started.push(f);
+        console.log(`[job] started: ${f}`);
+      }
+    } catch (e) {
+      console.warn(`[job] failed to start ${f}:`, e.message);
+    }
+  }
+  return started;
+}
+module.exports.startJobDir = startJobDir;
+
 if (require.main === module) {
   const paymentTimer = setInterval(() => runUnifiedPaymentMaintenance().catch((e) => console.warn('payment maintenance:', e.code || e.message)), 2000);
   paymentTimer.unref();
@@ -2487,7 +2520,7 @@ if (require.main === module) {
     const paymentRequired = [
       'OAUTH_GATEWAY_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET',
       'PAY_APP_CODE', 'PAY_PROJECT_CODE', 'PAY_SHARE_BIZ_CODE',
-      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN',
+      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN', 'PAY_NOTIFY_SPLIT_TOKEN',
     ];
     const missingPayment = paymentRequired.filter((key) => !String(process.env[key] || '').trim());
     if (missingPayment.length) {
@@ -2531,5 +2564,8 @@ if (require.main === module) {
     getCommerceHandler().then(() => console.log('commerce handler ready')).catch(e => console.warn('commerce init warn:', e.code || e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
     imgThumbs.initBackground();
+    // 启动 server/job 目录下所有定时任务
+    const jobStarted = startJobDir(path.join(__dirname, 'server', 'job'));
+    console.log(`[job] loaded ${jobStarted.length} job(s): ${jobStarted.join(', ') || '(none)'}`);
   });
 }
