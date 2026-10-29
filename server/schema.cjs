@@ -4,6 +4,7 @@
  * 对外：ensureSchema()（幂等，只跑一次）.
  */
 'use strict';
+const { bjStamp } = require('./utils/bj-time.cjs');
 
 const { getMysql, getDbConfig } = require('./db.cjs');
 
@@ -847,7 +848,7 @@ function createSchema(deps) {
         [151,'moving','蓝犀牛搬家','🚚','全市覆盖',4.6,2400],
         [152,'nanny','阿姨来了','👶','全市覆盖',4.8,8800],
       ];
-      const nowLife = new Date().toISOString().slice(0, 19);
+      const nowLife = bjStamp();
       for (const [id, type, name, logo, address, rating, reviews] of lifeVendors) {
         await conn.execute(
           `INSERT IGNORE INTO jz_vendors(id,type,name,logo,address,rating,review_count,badges,live,start_price,unit,hours,status,review_status,sort_order,created_at,updated_at,city_ids)

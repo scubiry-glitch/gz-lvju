@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 
 const crypto = require('node:crypto');
 
@@ -32,14 +33,14 @@ async function migrate(conn) {
 async function record(pool, token, data, { ip = '', userAgent = '' } = {}) {
   const secret = process.env.JUZHU_API_KEY || process.env.JUZHU_ADMIN_PASSWORD;
   if (!secret) throw Error('Referral signing key unavailable');
-  const day = new Date().toISOString().slice(0, 10);
+  const day = bjStamp().slice(0, 10);
   // Only a keyed digest is retained. One visitor can count once per link per day.
   const visitorKey = crypto.createHmac('sha256', secret).update(JSON.stringify([token, day, ip, userAgent])).digest('hex');
   const aggregateId = 'referral:' + data.kind + ':' + data.id;
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [result] = await conn.execute('INSERT IGNORE INTO commerce_referral_visits(visitor_key,aggregate_id,expires_at) VALUES(?,?,DATE_ADD(UTC_TIMESTAMP(),INTERVAL 8 DAY))', [visitorKey, aggregateId]);
+    const [result] = await conn.execute('INSERT IGNORE INTO commerce_referral_visits(visitor_key,aggregate_id,expires_at) VALUES(?,?,DATE_ADD(NOW(),INTERVAL 8 DAY))', [visitorKey, aggregateId]);
     if (result.affectedRows) await conn.execute(`INSERT INTO commerce_referral_daily(day,promoter_account_id,product_kind,product_id,clicks)
       VALUES(?,?,?,?,1) ON DUPLICATE KEY UPDATE clicks=clicks+1`,[day,data.aid,data.kind,data.id]);
     await conn.commit();

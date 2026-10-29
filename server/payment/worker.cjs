@@ -74,7 +74,7 @@ function createWorker(I) {
     return p.app_order_id;
   }
   function createPayload(p) {
-    const amount = toAmount(p.amount_minor), seconds = Math.max(1, Math.floor((new Date(sqlDate(p.expires_at).replace(' ', 'T') + 'Z').getTime() - now()) / 1000));
+    const amount = toAmount(p.amount_minor), seconds = Math.max(1, Math.floor((new Date(sqlDate(p.expires_at).replace(' ', 'T') + '+08:00').getTime() - now()) / 1000));
     return {
       amount, appCode: p.app_code, projectCode: p.project_code, shareBizCode: p.share_biz_code,
       appOrderId: p.app_order_id, appOrderName: p.title,

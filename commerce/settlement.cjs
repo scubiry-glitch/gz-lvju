@@ -177,7 +177,7 @@ async function sandboxSimulate(c,requestNo,result){
  assert(['paid','failed','unknown','clear'].includes(result),'沙箱结果无效');
  const [rows]=await c.execute('SELECT * FROM commerce_provider_requests WHERE request_no=?',[requestNo]);assert(rows.length,'机构指令不存在',404);
  if(result==='clear')await c.execute('UPDATE commerce_provider_requests SET simulated=NULL,status=\'processing\',paid_at=NULL WHERE request_no=?',[requestNo]);
- else if(result==='paid')await c.execute('UPDATE commerce_provider_requests SET simulated=\'paid\',status=\'paid\',paid_at=UTC_TIMESTAMP() WHERE request_no=?',[requestNo]);
+ else if(result==='paid')await c.execute('UPDATE commerce_provider_requests SET simulated=\'paid\',status=\'paid\',paid_at=NOW() WHERE request_no=?',[requestNo]);
  else await c.execute('UPDATE commerce_provider_requests SET simulated=? WHERE request_no=?',[result,requestNo]);
  return sandboxQuery(c,requestNo);
 }
@@ -199,7 +199,7 @@ async function applyInstrument(c,type,rowId,status,note,controlled=false){
  if(['paid','cancelled'].includes(row.status)||(row.status==='failed'&&!controlled))return {id:rowId,status:row.status,unchanged:true};
  if(status==='paid'&&row.status==='failed'&&!controlled)assert(false,'已明确失败的指令不能经回执直接改为成功，请走受控重试',409,'receipt_conflict');
  if(status==='paid'){
-  await c.execute(`UPDATE ${table} SET status='paid',settled_at=UTC_TIMESTAMP(),fail_reason=NULL WHERE id=?`,[rowId]);
+  await c.execute(`UPDATE ${table} SET status='paid',settled_at=NOW(),fail_reason=NULL WHERE id=?`,[rowId]);
   if(type==='refund'){
    await c.execute("UPDATE commerce_cases SET status='closed',resolution=CONCAT_WS(' / ',NULLIF(resolution,''),'退款指令已完成原路退回（沙箱回执）') WHERE id=?",[row.case_id]);
    await c.execute("UPDATE commerce_coupons SET status='refunded' WHERE id=? AND status='frozen'",[row.coupon_id]);
@@ -211,8 +211,8 @@ async function applyInstrument(c,type,rowId,status,note,controlled=false){
   }
  }
  else if(status==='failed')await c.execute(`UPDATE ${table} SET status='failed',fail_reason=? WHERE id=?`,[note||'机构返回失败',rowId]);
- else if(status==='unknown')await c.execute(`UPDATE ${table} SET status='unknown',last_query_at=UTC_TIMESTAMP() WHERE id=?`,[rowId]);
- else if(status==='submitted')await c.execute(`UPDATE ${table} SET status='submitted',submitted_at=COALESCE(submitted_at,UTC_TIMESTAMP()) WHERE id=?`,[rowId]);
+ else if(status==='unknown')await c.execute(`UPDATE ${table} SET status='unknown',last_query_at=NOW() WHERE id=?`,[rowId]);
+ else if(status==='submitted')await c.execute(`UPDATE ${table} SET status='submitted',submitted_at=COALESCE(submitted_at,NOW()) WHERE id=?`,[rowId]);
  return {id:rowId,status:status==='paid'?'paid':status};
 }
 async function refreshBatch(c,batchId){
@@ -352,14 +352,14 @@ async function executeBatch(c,service,p,batch,input){
  const amount=payable-offset;
  if(amount<=0){
   // 应结被追偿全额抵扣：无款可付，批次直接完成（无指令、无机构请求）。
-  await c.execute("UPDATE commerce_settlement_batches SET status='completed',executed_at=UTC_TIMESTAMP(),offset_minor=?,closed_reason='应结被追偿全额抵扣，无付款指令' WHERE id=?",[offset,batch.id]);
+  await c.execute("UPDATE commerce_settlement_batches SET status='completed',executed_at=NOW(),offset_minor=?,closed_reason='应结被追偿全额抵扣，无付款指令' WHERE id=?",[offset,batch.id]);
   return {offset,amount:0,fully_offset:true};
  }
  const instructionNo=no('PI'),requestNo=no('PR');
  const submit=await sandboxSubmit(c,{requestNo,targetType:'payout',targetId:instructionNo,amount});
  await c.execute(`INSERT INTO commerce_payout_instructions(instruction_no,batch_id,request_no,target_kind,merchant_id,promoter_account_id,amount_minor,status) VALUES(?,?,?,?,?,?,?,?)`,
   [instructionNo,batch.id,requestNo,batch.kind,batch.merchant_id,batch.promoter_account_id,amount,submit.status==='timeout'?'unknown':'submitted']);
- await c.execute("UPDATE commerce_settlement_batches SET status='executing',executed_at=UTC_TIMESTAMP(),offset_minor=? WHERE id=?",[offset,batch.id]);
+ await c.execute("UPDATE commerce_settlement_batches SET status='executing',executed_at=NOW(),offset_minor=? WHERE id=?",[offset,batch.id]);
 }
 async function batchView(c,key){
  const [batches]=await c.execute('SELECT b.*,mb.name merchant_name FROM commerce_settlement_batches b LEFT JOIN commerce_merchants mb ON mb.id=b.merchant_id WHERE b.id=?',[key]);
@@ -389,7 +389,7 @@ async function ingestReceipt(service,p,input){
    type='refund';row=rows[0];
   }
   const applied=await applyInstrument(c,type,row.id,input.outcome,input.note);
-  await c.execute('INSERT INTO commerce_receipts(target_type,target_id,request_no,outcome,payload,digest,received_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP())',
+  await c.execute('INSERT INTO commerce_receipts(target_type,target_id,request_no,outcome,payload,digest,received_at) VALUES(?,?,?,?,?,?,NOW())',
    [type,row.id,input.request_no,input.outcome,JSON.stringify(input.payload||null),payloadDigest]);
   if(input.outcome!=='unknown')await sandboxSimulate(c,input.request_no,input.outcome==='paid'?'paid':'failed'); // institution mirror follows accepted receipts
   await service.audit(c,p,'settlement.receipt',input.request_no,{outcome:input.outcome,type,applied:applied.status,duplicated:false},{});
@@ -423,7 +423,7 @@ async function queryInstrument(service,p,type,key){
   if(remote.status==='paid'){
    const payloadDigest=digest({request_no:row.request_no,outcome:'paid',source:'provider-query'});
    const [dupe]=await c.execute('SELECT id FROM commerce_receipts WHERE request_no=? AND digest=?',[row.request_no,payloadDigest]);
-   if(!dupe.length)await c.execute('INSERT INTO commerce_receipts(target_type,target_id,request_no,outcome,payload,digest,received_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP())',[type,row.id,row.request_no,'paid',JSON.stringify({source:'provider-query',query_count:remote.query_count}),payloadDigest]);
+   if(!dupe.length)await c.execute('INSERT INTO commerce_receipts(target_type,target_id,request_no,outcome,payload,digest,received_at) VALUES(?,?,?,?,?,?,NOW())',[type,row.id,row.request_no,'paid',JSON.stringify({source:'provider-query',query_count:remote.query_count}),payloadDigest]);
   }
   await service.audit(c,p,'settlement.query',row.request_no,{remote:remote.status,type},{});
   return {request_no:row.request_no,remote_status:remote.status,instrument:applied,query_count:remote.query_count};
@@ -525,7 +525,7 @@ async function reviewReversal(service,p,key,input){
   assert(Number(reversal.requested_by)!==Number(p.account.id),'申请人不能复核自己的撤销申请',403,'review_separation');
   assert(typeof input.note==='string'&&input.note.trim().length>=2,'请填写复核意见');
   if(input.action!=='approve'){
-   await c.execute("UPDATE commerce_redemption_reversals SET status='rejected',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?",[p.account.id,input.note.trim(),key]);
+   await c.execute("UPDATE commerce_redemption_reversals SET status='rejected',reviewed_by=?,review_note=?,reviewed_at=NOW() WHERE id=?",[p.account.id,input.note.trim(),key]);
    await service.audit(c,p,'reversal.review',reversal.reversal_no,{action:'rejected'},{});
    return {id:key,status:'rejected'};
   }
@@ -543,9 +543,9 @@ async function applyReversal(c,service,p,reversal,note){
  const r=rows[0];
  assert(r.status==='confirmed','核销状态已变化，撤销失败',409,'redemption_state');
  await post(c,{sourceType:'reversal',sourceId:reversal.reversal_no,lines:reverseLines(r),memo:'reverse redemption '+reversal.redemption_id});
- await c.execute("UPDATE commerce_redemptions SET status='reversed',reversed_at=UTC_TIMESTAMP() WHERE id=?",[reversal.redemption_id]);
+ await c.execute("UPDATE commerce_redemptions SET status='reversed',reversed_at=NOW() WHERE id=?",[reversal.redemption_id]);
  await c.execute("UPDATE commerce_coupons SET status='available',token_hash=NULL,token_expires_at=NULL WHERE id=? AND status='redeemed'",[r.coupon_id]);
- await c.execute('UPDATE commerce_redemption_reversals SET status=\'approved\',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?',[p.account.id,note,reversal.id]);
+ await c.execute('UPDATE commerce_redemption_reversals SET status=\'approved\',reviewed_by=?,review_note=?,reviewed_at=NOW() WHERE id=?',[p.account.id,note,reversal.id]);
  // Settlement linkage: un-executed batches lose the line; already-committed money becomes a recovery receivable.
  const [items]=await c.execute('SELECT i.*,b.status batch_status FROM commerce_settlement_items i JOIN commerce_settlement_batches b ON b.id=i.batch_id WHERE i.redemption_id=? ORDER BY i.line_kind FOR UPDATE',[reversal.redemption_id]);
  for(const item of items){
@@ -675,7 +675,7 @@ async function diffAction(service,p,reconId,diffId,input,action){
    assert(typeof input.reason==='string'&&input.reason.trim().length>=5,'请填写关闭依据（至少5字）');
    assert(diff.status==='resolved','差异需先有处理记录才能关闭',409,'diff_state');
    assert(diff.owner_id&&Number(diff.owner_id)!==Number(p.account.id),'差异关闭需由非责任人的复核人执行',403,'review_separation');
-   await c.execute("UPDATE commerce_recon_diffs SET status='closed',closed_by=?,closed_reason=?,closed_at=UTC_TIMESTAMP() WHERE id=?",[p.account.id,input.reason.trim(),diffId]);
+   await c.execute("UPDATE commerce_recon_diffs SET status='closed',closed_by=?,closed_reason=?,closed_at=NOW() WHERE id=?",[p.account.id,input.reason.trim(),diffId]);
    await service.audit(c,p,'recon.close',diff.diff_no,{reason:input.reason.trim()},{});
    return {id:diffId,status:'closed'};
   }
@@ -888,7 +888,7 @@ async function reviewCompensation(service,p,key,input){
   assert(Number(comp.requested_by)!==Number(p.account.id),'申请人不能复核自己的赔付单',403,'review_separation');
   assert(typeof input.note==='string'&&input.note.trim().length>=2,'请填写复核意见');
   if(input.action!=='approve'){
-   await c.execute("UPDATE commerce_compensation_cases SET status='cancelled',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?",[p.account.id,input.note.trim(),key]);
+   await c.execute("UPDATE commerce_compensation_cases SET status='cancelled',reviewed_by=?,review_note=?,reviewed_at=NOW() WHERE id=?",[p.account.id,input.note.trim(),key]);
    await c.execute("UPDATE commerce_cases SET status='rejected',resolution=? WHERE id=? AND status='awaiting_provider'",['赔付复核未通过：'+input.note.trim(),comp.case_id]);
    await service.audit(c,p,'compensation.review',comp.compensation_no,{action:'rejected'},{city_id:comp.city_id,merchant_id:comp.merchant_id});
    return {id:key,status:'cancelled'};
@@ -899,7 +899,7 @@ async function reviewCompensation(service,p,key,input){
    {side:'debit',account:'compensation_expense',amount:Number(comp.amount_minor)},
    {side:'credit',account:'platform_own_compensation_cash',amount:Number(comp.amount_minor)}],memo:'compensation '+comp.compensation_no});
   const recovery=await openRecovery(c,'merchant',comp.merchant_id,0,comp.coupon_id,Number(comp.amount_minor),'服务失败先行赔付 '+comp.compensation_no+'，向商户追偿');
-  await c.execute(`UPDATE commerce_compensation_cases SET status='paid',reviewed_by=?,review_note=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?`,[p.account.id,input.note.trim(),key]);
+  await c.execute(`UPDATE commerce_compensation_cases SET status='paid',reviewed_by=?,review_note=?,reviewed_at=NOW() WHERE id=?`,[p.account.id,input.note.trim(),key]);
   await c.execute("UPDATE commerce_cases SET status='closed',resolution=CONCAT_WS(' / ',NULLIF(resolution,''),'平台已完成先行赔付（沙箱口径），并向商户追偿') WHERE id=?",[comp.case_id]);
   await service.audit(c,p,'compensation.review',comp.compensation_no,{action:'approved',amount:comp.amount_minor,recovery:recovery.recovery_no},{city_id:comp.city_id,merchant_id:comp.merchant_id});
   return {id:key,status:'paid',recovery_no:recovery.recovery_no};
@@ -915,7 +915,7 @@ async function listCompensations(service,p,query){
 async function operationalAlerts(service){
  const one=async(sql,args=[])=>(await service.get(service.pool,sql,args))[0];
  const n=v=>Number(v)||0;
- const now='UTC_TIMESTAMP()';
+ const now='NOW()';
  const grantBacklog=await one("SELECT COUNT(*) n FROM commerce_orders WHERE status='reserved' AND expires_at<="+now);
  const expiryStale=await one("SELECT COUNT(*) n FROM commerce_coupons WHERE status='available' AND expires_at<="+now);
  const refundStuck=await one("SELECT COUNT(*) n, SUM(status='unknown') unk FROM commerce_refund_orders WHERE status IN ('pending','submitted') AND created_at<="+now+" - INTERVAL 24 HOUR");

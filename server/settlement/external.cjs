@@ -60,7 +60,7 @@ function createExternal({ pool, authorize, now = () => Date.now(), config = {} }
   async function tx(fn) {
     if(transactions.getStore())return fn(transactions.getStore());
     const c = await pool.getConnection();
-    try { await c.query("SET time_zone='+00:00'"); await c.beginTransaction(); const out = await transactions.run(c,()=>fn(c)); await c.commit(); return out; }
+    try { await c.query("SET time_zone='+08:00'"); await c.beginTransaction(); const out = await transactions.run(c,()=>fn(c)); await c.commit(); return out; }
     catch (e) { await c.rollback(); throw e; } finally { c.release(); }
   }
   async function context(c, key, party) {

@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 /**
  * /api/juzhu/* 直连处理器（从 app.js handleApiDirect 整块拆出）。
  * 内部仍转发 booking / jiazheng / admin 子路由；本文件保留其余公开/商家/运营路由。
@@ -914,7 +915,7 @@ function createApiDirectRouter(deps) {
             if (curIdx === -1 || order.status === 'pending') { conn.end(); return jsonReply(res, { error: '当前状态不可推进' }, 400); }
             if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
             const nextStatus = STATUS_ORDER[curIdx + 1];
-            const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+            const now = bjStamp();
             let log = [];
             try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
             log.push({ at: now, action: 'advance', by: 'worker:' + wid, from: order.status, to: nextStatus });
@@ -974,7 +975,7 @@ function createApiDirectRouter(deps) {
         return jsonReply(res, {
           view: 'holding', readonly: true,
           scope: { level: scope.level, city_ids: scope.cityIds || null },
-          generated_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+          generated_at: bjStamp(),
           housing: { by_channel: byChannel },
           vendors: { by_type: vendorsByType },
           orders: scope.level === 'all' ? { by_status: ordersByStatus } : { by_status: [], note: 'city 口径暂不提供工单聚合（试点范围）' },
@@ -1016,7 +1017,7 @@ function createApiDirectRouter(deps) {
         if (url.length > 500) return jsonReply(res, { error: 'webhook_url 过长（≤500 字符）' }, 400);
         const before = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
         await queryRows('UPDATE jz_vendors SET webhook_url=?, updated_at=? WHERE id=?',
-          [url || null, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+          [url || null, bjStamp(), targetVid]);
         try {
           await authCenter.audit({
             accountId: (sess.account && sess.account.id) || null, principalType: 'user',
@@ -1061,7 +1062,7 @@ function createApiDirectRouter(deps) {
         const sets = [], vals = [];
         for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
         await queryRows(`UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
-          [...vals, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+          [...vals, bjStamp(), targetVid]);
         if (resetVendorConfigCache) resetVendorConfigCache();
         try {
           await authCenter.audit({
@@ -1087,7 +1088,7 @@ function createApiDirectRouter(deps) {
         if (!v || !v.webhook_url) return jsonReply(res, { error: '请先保存 webhook_url' }, 400);
         if (!v.hmac_key) return jsonReply(res, { error: '商家未配置 hmac_key，无法签名' }, 400);
         const ts = Date.now();
-        const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+        const data = { note: '连通性测试', at: bjStamp() };
         const payload = { event: 'webhook.test', vendor_id: targetVid, data };
         const signed = { event: payload.event, vendor_id: targetVid, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts) };
         const out = await guardedPostJson(v.webhook_url, signed, 5000);
@@ -1556,7 +1557,7 @@ function createApiDirectRouter(deps) {
               }
             }
             const marks = dates.map(() => '?').join(',');
-            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            const now = bjStamp();
             let affected = 0;
             if (status === 'blocked') {
               for (const d of dates) {
@@ -2012,7 +2013,7 @@ function createApiDirectRouter(deps) {
         const clientEmpNo = (body.emp_no || '').trim() || null;
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const now = new Date().toISOString().slice(0, 19);
+          const now = bjStamp();
           const ins = 'INSERT INTO operator_staff (emp_no,name,phone,level,`role`,station,month_orders,rating,contract_type,contract_end,status,can_extra,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
           let row = null;
           for (let attempt = 1; attempt <= 3; attempt++) {
@@ -2077,7 +2078,7 @@ function createApiDirectRouter(deps) {
               params.push(v.row[k]);
             }
             sets.push('updated_at=?');
-            params.push(new Date().toISOString().slice(0, 19));
+            params.push(bjStamp());
             params.push(id);
             try {
               await conn.execute('UPDATE operator_staff SET ' + sets.join(', ') + ' WHERE id=?', params);

@@ -17,7 +17,8 @@ function config() {
   const env = process.env;
   const value = { host: env.MYSQL_HOST || env.JUZHU_DB_HOST, port: Number(env.MYSQL_PORT || env.JUZHU_DB_PORT || 3306), database: env.COMMERCE_DB_NAME || env.MYSQL_DB || env.JUZHU_DB_NAME, user: env.MYSQL_USER || env.JUZHU_DB_USER, password: env.MYSQL_PASSWORD || env.JUZHU_DB_PASSWORD };
   if (!value.host || !value.database || !value.user || !value.password) throw new Error('Commerce database configuration missing in host credential mechanism');
-  return { ...value, charset: 'utf8mb4', connectTimeout: 10000, timezone: 'Z', supportBigNumbers: true, bigNumberStrings: false, multipleStatements: false };
+  // 全库时间统一北京时间（原为 'Z'）；会话时区依赖 MySQL 全局 +08:00
+  return { ...value, charset: 'utf8mb4', connectTimeout: 10000, timezone: '+08:00', supportBigNumbers: true, bigNumberStrings: false, multipleStatements: false };
 }
 function createPool() { return mysql.createPool({ ...config(), connectionLimit: 8, waitForConnections: true, queueLimit: 50 }); }
 function initAuth(pool) {

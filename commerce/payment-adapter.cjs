@@ -138,7 +138,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       if (refund.status === 'paid') return;
       const coupon = await service.coupon(c, refund.coupon_id);
       assert(coupon.status === 'frozen', '退款卡券状态冲突', 409);
-      await c.execute("UPDATE commerce_refund_orders SET status='paid',settled_at=UTC_TIMESTAMP(),fail_reason=NULL WHERE id=?", [refund.id]);
+      await c.execute("UPDATE commerce_refund_orders SET status='paid',settled_at=NOW(),fail_reason=NULL WHERE id=?", [refund.id]);
       await c.execute("UPDATE commerce_coupons SET status='refunded',token_hash=NULL,token_expires_at=NULL WHERE id=?", [coupon.id]);
       await c.execute("UPDATE commerce_cases SET status='closed',resolution=CONCAT_WS(' / ',NULLIF(resolution,''),'原路退款已由支付机构确认') WHERE id=?", [refund.case_id]);
       await main.resolveWork(c, refund.case_id, '原路退款已由支付机构确认');
@@ -153,7 +153,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       assert(total <= Number(order.amount_minor), '退款金额超过业务实收', 409);
       const full = total === Number(order.amount_minor);
       await c.execute('UPDATE commerce_orders SET refunded_minor=?,payment_status=?,status=?,fulfillment_status=? WHERE id=?', [total,full?'refunded':'partially_refunded',full?'refunded':order.status,full?'refunded':order.fulfillment_status,order.id]);
-      if (full) await c.execute('UPDATE commerce_memberships SET expires_at=LEAST(expires_at,UTC_TIMESTAMP()) WHERE order_id=?', [order.id]);
+      if (full) await c.execute('UPDATE commerce_memberships SET expires_at=LEAST(expires_at,NOW()) WHERE order_id=?', [order.id]);
       await main.linkOrder(c, {...order, status:full?'refunded':order.status, payment_status:full?'refunded':'partially_refunded'});
     }
   }
@@ -166,7 +166,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       assert(Number.isSafeInteger(paymentId) && paymentId > 0 && amount === Number(order.amount_minor), '到账事件与订单金额不一致', 409);
       if (!await postOnce(c, 'payment_received', paymentId, [{side:'debit',account:'provider_receivable',amount},{side:'credit',account:'payment_pending_liability',amount}])) return;
       if (payload.accepted === true && Number(guard.paid_payment_id) === paymentId) {
-        await c.execute("UPDATE commerce_orders SET payment_status='paid',paid_payment_order_id=?,paid_at=COALESCE(paid_at,UTC_TIMESTAMP()),status=IF(status='reserved','paid_pending_fulfillment',status),fulfillment_status=IF(fulfillment_status='unfulfilled','pending',fulfillment_status) WHERE id=?", [paymentId,order.id]);
+        await c.execute("UPDATE commerce_orders SET payment_status='paid',paid_payment_order_id=?,paid_at=COALESCE(paid_at,NOW()),status=IF(status='reserved','paid_pending_fulfillment',status),fulfillment_status=IF(fulfillment_status='unfulfilled','pending',fulfillment_status) WHERE id=?", [paymentId,order.id]);
         await main.linkOrder(c,{...order,status:order.status==='reserved'?'paid_pending_fulfillment':order.status,payment_status:'paid'});
       } else if (!order.paid_payment_order_id) {
         await c.execute("UPDATE commerce_orders SET payment_status='refund_pending' WHERE id=?", [order.id]);
@@ -179,7 +179,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       if (order.status === 'refunded' && Number(order.paid_payment_order_id) === paymentId) return;
       await require('../server/settlement/business.cjs').onPaymentAccepted(c,{biz_type:'commerce',order,guard});
       await service.fulfillPaidOrder(order.id, 'payment:' + paymentId, amount, { connection:c, verified:true, fundingRecorded:true });
-      await c.execute("UPDATE commerce_orders SET payment_status='paid',paid_payment_order_id=?,paid_at=COALESCE(paid_at,UTC_TIMESTAMP()),fulfillment_status='fulfilled',stock_status='granted' WHERE id=?", [paymentId,order.id]);
+      await c.execute("UPDATE commerce_orders SET payment_status='paid',paid_payment_order_id=?,paid_at=COALESCE(paid_at,NOW()),fulfillment_status='fulfilled',stock_status='granted' WHERE id=?", [paymentId,order.id]);
       await main.linkOrder(c, {...order,status:'fulfilled',payment_status:'paid'});
       return;
     }
@@ -232,7 +232,7 @@ function createPaymentAdapter({ service, core, config = process.env, sharedDatab
       assert(id, '退款请求未建立', 503);
       assert(!refund.payment_refund_id||Number(refund.payment_refund_id)===Number(id),'退款请求不得更换原支付机构单号',409,'refund_identity_conflict');
       const state = result.refund_status === 'refund_failed' ? 'failed' : /unknown|manual_review/.test(result.refund_status || '') ? 'unknown' : 'submitted';
-      await c.execute('UPDATE commerce_refund_orders SET payment_refund_id=?,status=?,submitted_at=COALESCE(submitted_at,UTC_TIMESTAMP()),fail_reason=NULL WHERE id=?', [id,state,refund.id]);
+      await c.execute('UPDATE commerce_refund_orders SET payment_refund_id=?,status=?,submitted_at=COALESCE(submitted_at,NOW()),fail_reason=NULL WHERE id=?', [id,state,refund.id]);
       refund.payment_refund_id=id;
       if(principal)await service.audit(c,principal,action==='execute'?'refund.execute':'settlement.'+action,refund.request_no,{type:'refund',payment_refund_id:id,status:state,retry:refund.retry_count||0},{city_id:refund.city_id,merchant_id:refund.merchant_id});
       return summary(state);

@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { bjStamp, dbTimeMs } = require('../utils/bj-time.cjs');
 
 class PaymentError extends Error {
   constructor(message, status = 409, code = 'payment_conflict') {
@@ -16,11 +17,11 @@ function stable(value) {
 }
 function digest(value) { return crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex'); }
 function sqlDate(value = new Date()) {
-  const date = value instanceof Date ? value : new Date(typeof value === 'string' && /^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:\.\d+)?$/.test(value) ? value.replace(' ', 'T') + 'Z' : value);
-  assert(Number.isFinite(date.getTime()), '支付时间格式无效', 422, 'invalid_date');
-  return date.toISOString().slice(0, 19).replace('T', ' ');
+  // 统一口径：数据库存北京时间 'YYYY-MM-DD HH:mm:ss'
+  try { return bjStamp(value); }
+  catch (_) { throw new PaymentError('支付时间格式无效', 422, 'invalid_date'); }
 }
-function expired(value, now = Date.now()) { return new Date(sqlDate(value).replace(' ', 'T') + 'Z').getTime() <= now; }
+function expired(value, now = Date.now()) { return dbTimeMs(sqlDate(value)) <= now; }
 function minor(value, allowZero = false) {
   const n = Number(value);
   assert(Number.isSafeInteger(n) && n >= (allowZero ? 0 : 1) && n <= 999999999999, '支付金额无效（单位分）', 422, 'invalid_amount');

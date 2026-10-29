@@ -1,8 +1,9 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 const crypto=require('node:crypto');
 const {assert}=require('./configuration.cjs');
 const {isDemo}=require('./guiyang-demo.cjs');
-const date=v=>new Date(v).toISOString().slice(0,19).replace('T',' ');
+const date=v=>bjStamp(v);
 // Does not invoke fulfillment/payment adapters. Every accounting amount stays zero.
 async function demoOrder(service,p,input,key){
  assert(['skus','packages','plans'].includes(input.kind),'商品类型无效');

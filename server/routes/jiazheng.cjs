@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 const crypto = require('node:crypto');
 const { fail, stripPaymentSecrets } = require('../payment/vendor-payment.cjs');
 const legacyCompat = require('../payment/jiazheng-compat.cjs');
@@ -474,7 +475,7 @@ function createJiazhengRouter(deps) {
       if (!body.house) return jsonReply(res, { error: 'house 必填' }, 400);
       if (!body.phone) return jsonReply(res, { error: 'phone 必填' }, 400);
       if (!body.expectTime) return jsonReply(res, { error: 'expectTime 必填' }, 400);
-      const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+      const now = bjStamp();
       const orderId = 'WO-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
       const source = String(body.source || '旅居客 App').slice(0, 100);
       if (!source.startsWith('旅居客 App')) return jsonReply(res, { error: 'source 须以「旅居客 App」开头' }, 400);
@@ -566,7 +567,7 @@ function createJiazhengRouter(deps) {
           if (!(['paid','not_required','coupon_funded'].includes(order.pay_status)) || order.status !== 'pending' || order.refund_status) {
             conn.end(); return jsonReply(res, { error: '订单须已支付且为待派单状态' }, 400);
           }
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           // 规则派单兜底：未显式指派（B 端快速派/裸派单）时按 信用分↓ 完单量↓ 择优分配，
           // 不再落 worker_json=NULL 的幽灵单（服务者端按 worker 过滤，幽灵单无人可见、闭环断）
           let worker = body.worker || null;
@@ -617,7 +618,7 @@ function createJiazhengRouter(deps) {
           if (order.status === 'pending') { conn.end(); return jsonReply(res, { error: '请先派单再推进状态' }, 400); }
           if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
           const nextStatus = STATUS_ORDER[curIdx + 1];
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           let log = [];
           try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
           log.push({ at: now, action: 'advance', from: order.status, to: nextStatus });
@@ -654,7 +655,7 @@ function createJiazhengRouter(deps) {
             const sess = await requestSession(req);
             if (!sess?.account || String(sess.account.id) !== String(order.account_id)) return jsonReply(res, { error: '订单不存在或无权评价' }, 404);
           }
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           const rating = { score, tags: body.tags || [], text: body.text || '' };
           let log = [];
           try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
@@ -688,7 +689,7 @@ function createJiazhengRouter(deps) {
         const prods = await queryRows(prodSql, prodParams);
         if (!prods.length) return jsonReply(res, { slots: [] });
         const productId = prods[0].id;
-        const today = new Date().toISOString().slice(0, 10);
+        const today = bjStamp().slice(0, 10);
         const slots = await queryRows(
           `SELECT s.*, w.name AS worker_name, w.level AS worker_level, w.avatar AS worker_avatar
            FROM jz_sku_slots s LEFT JOIN jz_workers w ON w.id=s.worker_id

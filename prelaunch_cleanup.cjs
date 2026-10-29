@@ -30,6 +30,7 @@
 // 数据库配置：与 app.js getDbConfig 对齐 —— 优先 MYSQL_*，回退 JUZHU_DB_*；
 // 读取根目录 .env 与 juzhu/.env（不覆盖已注入的环境变量）。
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 const fs = require('fs');
 const path = require('path');
@@ -177,7 +178,7 @@ async function preview(conn, args) {
 async function apply(conn, plan, args) {
   const { keepCity, keepVendor, dropVendor } = plan;
   const newKey = crypto.randomBytes(32).toString('hex');
-  const now = new Date().toISOString().slice(0, 19);
+  const now = bjStamp();
   // 第 4 步：缺省保留表中现值
   const urlLink = args.urlLink || keepVendor.url_link || null;
   const orderDetailUrl = args.orderDetailUrl || keepVendor.order_detail_url || null;

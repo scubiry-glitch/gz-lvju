@@ -1,3 +1,4 @@
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 const http = require('http');
 const dns = require('dns');
 const net = require('net');
@@ -151,7 +152,7 @@ let paymentService = null;
 function getPaymentService() {
   if (!paymentService) {
     paymentService = createPaymentService({
-      createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }),
+      createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: '+08:00' }),
       payCenter,
       notifyVendorBooking,
       jobHandlers: { booking_webhook: deliverPaymentWebhook },
@@ -165,7 +166,7 @@ let settlementRuntimePromise;
 async function getSettlementRuntime() {
   if (!settlementRuntimePromise) settlementRuntimePromise = (async () => {
     await ensureSchema();
-    const pool = mysql2.createPool({ ...getDbConfig(), timezone: 'Z', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, connectionLimit: 8 });
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: '+08:00', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, connectionLimit: 8 });
     try {
       const module = require('./server/settlement/index.cjs');
       await module.migrate(pool);
@@ -179,7 +180,7 @@ function getBookingPaymentAdapter() { return getPaymentService().bookingAdapter;
 let commerceHandlerPromise;
 async function getCommerceHandler() {
   if (!commerceHandlerPromise) commerceHandlerPromise = (async () => {
-    const pool = mysql2.createPool({ ...getDbConfig(), timezone: 'Z', supportBigNumbers: true, bigNumberStrings: false, connectionLimit: 8, waitForConnections: true, queueLimit: 50 });
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: '+08:00', supportBigNumbers: true, bigNumberStrings: false, connectionLimit: 8, waitForConnections: true, queueLimit: 50 });
     try {
       const { migrate } = require('./commerce/migrate.cjs');
       await migrate(pool);
@@ -202,7 +203,7 @@ async function getCommerceHandler() {
 let jiazhengPaymentAdapter;
 function getJiazhengAdapter() {
   if (!jiazhengPaymentAdapter) jiazhengPaymentAdapter = require('./server/payment/jiazheng-adapter.cjs').createJiazhengAdapter({
-    createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }), paymentCore: getPaymentCore(), config: process.env,
+    createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: '+08:00' }), paymentCore: getPaymentCore(), config: process.env,
   });
   return jiazhengPaymentAdapter;
 }
@@ -1054,8 +1055,9 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
 }
 
 function bookingPaymentExpired(row) {
+  // payment_expires_at 存的是北京时间，解析时必须显式带 +08:00，不能再用 Z
   return row && row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
-    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
+    && new Date(row.payment_expires_at.replace(' ', 'T') + '+08:00').getTime() <= Date.now();
 }
 
 // Historical caller compatibility: expiry requests durable closure and never releases stock here.
@@ -1228,7 +1230,7 @@ async function runVendorWebhookTest(vendorId) {
   if (!v || !v.webhook_url) return { ok: false, badRequest: true, error: '请先保存 webhook_url' };
   if (!v.hmac_key) return { ok: false, badRequest: true, error: '商家未配置 hmac_key，无法签名' };
   const ts = Date.now();
-  const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  const data = { note: '连通性测试', at: bjStamp() };
   const payload = { event: 'webhook.test', vendor_id: vendorId, data };
   const out = await guardedPostJson(v.webhook_url, {
     event: payload.event, vendor_id: vendorId, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts),

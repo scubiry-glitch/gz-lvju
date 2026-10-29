@@ -1,6 +1,7 @@
 // vendor_api.cjs — 商家 HMAC 开放接口（对齐 api_doc.md）
 // 家政：/api/juzhu/jiazheng/vendor/*；房源：/api/juzhu/housing/vendor/*（同一套 HMAC 鉴权）
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
@@ -911,7 +912,7 @@ async function housingRatingSubmit(conn, body, vendorId) {
   try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
   rating.dims = dims;
   rating.code = `${ratingCfg.RATING_CODE_PREFIX[row.channel] || 'SY'}-${row.id}`;
-  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const now = bjStamp();
   await conn.execute(
     "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
     [JSON.stringify(rating), now, row.id]);
@@ -1497,7 +1498,7 @@ async function housingStayCalendarSet(conn, body, vendorId) {
   if (over.length) {
     return reply(400, { code: 400, message: '以下日期已订间数超过放出间数，须先取消订单或调高 qty：' + [...new Set(over.map((e) => e.date))].join('、') });
   }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   let affected = 0;
   for (const e of entries) {
     if (e.status === 'blocked') {
@@ -1641,8 +1642,8 @@ async function housingBookingsConfirm(conn, body, vendorId, options = {}) {
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
   if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
-    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    && new Date(row.payment_expires_at.replace(' ', 'T') + '+08:00').getTime() <= Date.now()) {
+    const now = bjStamp();
     await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending'", [now, row.id]);
     await stayCfg.releaseStayQty(connRows(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
     await conn.commit();
@@ -1654,7 +1655,7 @@ async function housingBookingsConfirm(conn, body, vendorId, options = {}) {
     await conn.rollback();
     return reply(400, { code: 400, message: '租客尚未支付（收银台待付），支付完成后可确认生效' });
   }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   await conn.execute("UPDATE booking_orders SET status='confirmed', updated_at=? WHERE id=?", [now, row.id]);
   await conn.commit();
   return reply(200, { code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'confirmed' });
@@ -1678,7 +1679,7 @@ async function housingBookingsCancel(conn, body, vendorId, options = {}) {
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
   if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再变更' }); }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   const newPay = null; // Offline-only compatibility; online refunds use the payment adapter above.
   await conn.execute('UPDATE booking_orders SET status=?, pay_status=?, updated_at=? WHERE id=?', ['cancelled', newPay, now, row.id]);
   // 拒单/取消 → 释放库存（多间口径 2026-09-10：递减 booked_qty，商家差异行保留；与 B 端工作台同口径）
