@@ -1,8 +1,9 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 const {rows,parse,id,hash,transaction,sqlDate}=require('./primitives.cjs');
 const {registerContext}=require('./business.cjs');
 const bookingPolicy=require('./booking-policy.cjs');
-function dateOnly(value){return value instanceof Date?value.toISOString().slice(0,10):String(value||'').slice(0,10);}
+function dateOnly(value){return value instanceof Date?bjStamp(value).slice(0,10):String(value||'').slice(0,10);}
 function yuan(value){if(value==null)return null;const m=String(value).match(/^(\d+)(?:\.(\d{1,2}))?$/);return m?(BigInt(m[1])*100n+BigInt((m[2]||'').padEnd(2,'0'))).toString():null;}
 async function sync(pool,{limit=500,after_id=0,now=Date.now}={}){
  const exists=await rows(pool,"SELECT 1 FROM information_schema.tables WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='booking_orders'");if(!exists.length)return {count:0,has_more:false};

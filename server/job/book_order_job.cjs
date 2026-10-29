@@ -12,6 +12,7 @@
  * ---------------------------------------------------------------------------
  */
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 
 const path = require('path');
 const { queryRows } = require(path.join(__dirname, '..', 'db.cjs'));
@@ -31,7 +32,7 @@ const SQL_UPDATE_CHECKOUT = `
 
 // 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
 function nowStamp() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return bjStamp();
 }
 
 // 执行一次离店更新（可单独调用 / 手动触发）

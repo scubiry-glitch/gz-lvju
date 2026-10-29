@@ -1,6 +1,7 @@
 // stay_config.cjs — 房态 / 保险 / 最短连住（旅居短住口径）单一数据源
 // app.js（会话态接口）与 vendor_api.cjs（商家 HMAC 开放接口）共用，勿在两侧各写一份。
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 // 保险标识：商家在 projects.ext.insurance（key 数组）配置，catalog / 项目详情按此下发
 const INSURANCE_TYPES = [
@@ -645,7 +646,7 @@ async function releaseStayQty(execute, opts) {
   if (!o.project_id || !isValidDateString(o.checkin) || !isValidDateString(o.checkout)) return 0;
   const unitId = parseInt(o.unit_id, 10) || 0;
   const rooms = Math.min(999, Math.max(1, parseInt(o.rooms, 10) || 1));
-  const now = o.now || new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = o.now || bjStamp();
   await execute(
     `UPDATE stay_calendar SET
        booked_qty = IF(status='booked', GREATEST(booked_qty, 1) - ?, GREATEST(booked_qty - ?, 0)),

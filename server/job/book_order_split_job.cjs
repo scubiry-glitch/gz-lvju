@@ -30,6 +30,7 @@
  * 注意：发起分账以后，只要理房通受理成功了，一个小时就会自动重试一次，分账指令，发起以后，无法撤销
  */
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 
 const path = require('path');
 const fs = require('fs');
@@ -154,7 +155,7 @@ const SQL_INSERT_GATEWAY_LOG = `
 
 // 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
 function nowStamp() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  return bjStamp();
 }
 
 // 落库出战中台调用日志（payment_gateway_logs）。独立于分账主事务，写入失败仅告警，不影响分账主流程。

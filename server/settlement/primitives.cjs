@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const { bjStamp } = require('../utils/bj-time.cjs');
 function fault(message, status = 400, code = 'settlement_invalid') { return Object.assign(new Error(message), { status, statusCode: status, code }); }
 function assert(condition, message, status = 400, code) { if (!condition) throw fault(message, status, code); }
 const id = () => crypto.randomUUID();
@@ -20,16 +21,16 @@ function minor(value, { signed = false, nullable = false } = {}) {
   return n.toString();
 }
 function sqlDate(value = Date.now()) {
+  // 统一口径：数据库存北京时间 'YYYY-MM-DD HH:mm:ss'
   if (value == null || value === '') return null;
-  const normalized = typeof value === 'string' && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(value) ? value.replace(' ', 'T') + 'Z' : value;
-  const d = new Date(normalized); assert(Number.isFinite(d.getTime()), '时间无效');
-  return d.toISOString().slice(0,19).replace('T',' ');
+  try { return bjStamp(value); }
+  catch (_) { assert(false, '时间无效'); }
 }
 async function transaction(pool, fn, existing) {
   if (existing) return fn(existing);
   for (let attempt=0; ; attempt++) {
     const c = await pool.getConnection();
-    try { await c.query("SET time_zone='+00:00'");await c.beginTransaction(); const out = await fn(c); await c.commit(); return out; }
+    try { await c.query("SET time_zone='+08:00'");await c.beginTransaction(); const out = await fn(c); await c.commit(); return out; }
     catch (e) { await c.rollback().catch(() => {}); if(!['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT'].includes(e.code)||attempt>=3)throw e; }
     finally { c.release(); }
   }
@@ -39,7 +40,7 @@ function configurePool(pool){
  // mysql2 emits acquire before handing the raw connection to an execute/query
  // callback. Its protocol queue applies UTC before that caller's SQL, including
  // already-created pool connections. Client timezone alone is insufficient.
- pool.on('acquire',connection=>connection.query("SET time_zone='+00:00'",error=>{if(error)connection.destroy();}));
+ pool.on('acquire',connection=>connection.query("SET time_zone='+08:00'",error=>{if(error)connection.destroy();}));
 }
 const rows = async (c, sql, args = []) => (await c.execute(sql, args))[0];
 function calculate(input) {

@@ -1,8 +1,9 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 
 const crypto = require('node:crypto');
 const { fail, parseObject, paymentConfig } = require('./vendor-payment.cjs');
-const utc = (value = new Date()) => new Date(value).toISOString().slice(0, 19).replace('T', ' ');
+const utc = (value = new Date()) => bjStamp(value);
 const accountUser = id => 'commerce-account-' + String(id);
 function amountMinor(value) {
   const match = /^(\d{1,8})(?:\.(\d{1,2}))?$/.exec(String(value));
@@ -220,11 +221,11 @@ function createJiazhengAdapter({ createConnection, paymentCore, config = process
     try { [rows] = await conn.execute(`SELECT o.id,o.account_id FROM jz_orders o JOIN payment_order_guards g
       ON g.biz_type='jiazheng' AND g.biz_order_no=o.id
       WHERE o.payment_mode='pay_center' AND o.status='pending' AND o.pay_status='unpaid'
-      AND g.lifecycle='open' AND g.paid_payment_id IS NULL AND o.expires_at<=UTC_TIMESTAMP()
+      AND g.lifecycle='open' AND g.paid_payment_id IS NULL AND o.expires_at<=NOW()
       ORDER BY o.expires_at LIMIT ${bounded}`);
       [couponRows] = await conn.execute(`SELECT o.id FROM jz_orders o WHERE o.payment_mode='pay_center'
         AND o.status='pending' AND o.pay_status='coupon_funded' AND o.cash_due_minor=0
-        AND o.coupon_application_id IS NOT NULL AND o.expires_at<=UTC_TIMESTAMP()
+        AND o.coupon_application_id IS NOT NULL AND o.expires_at<=NOW()
         ORDER BY o.expires_at LIMIT ${bounded}`);
     }
     finally { await conn.end(); }
@@ -236,7 +237,7 @@ function createJiazhengAdapter({ createConnection, paymentCore, config = process
         await c.beginTransaction();
         const [[order]]=await c.execute('SELECT * FROM jz_orders WHERE id=? FOR UPDATE',[row.id]);
         if (order?.status==='pending' && order.pay_status==='coupon_funded' && Number(order.cash_due_minor)===0) {
-          const [[time]]=await c.execute('SELECT ?<=UTC_TIMESTAMP() AS due',[order.expires_at]);
+          const [[time]]=await c.execute('SELECT ?<=NOW() AS due',[order.expires_at]);
           if (Number(time.due)===1) {
             await releaseSlot(c,order);
             await require('../../commerce/coupon-application.cjs').transition(c,{bizType:'jiazheng',orderNo:order.id,

@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp, bjStampPlus } = require('../utils/bj-time.cjs');
 
 /**
  * C 端预订 + 支付确认/回调（从 app.js 拆出）。
@@ -114,7 +115,7 @@ function createBookingRouter(deps) {
       if (!name || !/^1\d{10}$/.test(phone)) return jsonReply(res, { error: '姓名与 11 位手机号为必填' }, 400);
       const cntRows = await queryRows('SELECT COUNT(*) AS n FROM booking_contacts WHERE user_id=?', [String(sess.account.id)]);
       if (cntRows[0].n >= 20) return jsonReply(res, { error: '联系人最多 20 个' }, 400);
-      const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const now = bjStamp();
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const [r] = await conn.execute(
@@ -346,8 +347,8 @@ function createBookingRouter(deps) {
           }
         }
         const commissionFee = vendorRate.commissionAmountOf(priceTotal, rate);
-        const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z').slice(0, 19).replace('T', ' ');
-        const paymentExpiresAt = transactionMode === 'payment' ? new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ') : null;
+        const now = bjStamp();
+        const paymentExpiresAt = transactionMode === 'payment' ? bjStampPlus(30 * 60) : null;
         const tempOrderNo = `TMP-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`.slice(0, 32);
         const [ins] = await conn.execute(
           `INSERT INTO booking_orders(order_no,project_id,unit_id,channel,city_id,owner_vendor_id,user_id,contact_name,contact_phone,checkin,checkout,nights,rooms,price_total,commission_rate,commission_fee,status,pay_status,idempotency_key,request_hash,payment_expires_at,created_at,updated_at)
@@ -497,7 +498,7 @@ function createBookingRouter(deps) {
             : '该订单未开通免费取消，预订成功后不可取消';
           return jsonReply(res, { error: reason, cancel_policy_text: cInfo.cancel_policy_text, cancel_deadline: cInfo.cancel_deadline }, 400);
         }
-        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const now = bjStamp();
         // This compatibility branch only handles offline bookings.
         await conn.execute("UPDATE booking_orders SET status='cancelled', updated_at=? WHERE id=?", [now, rows[0].id]);
         // 释放库存（多间口径 2026-09-10）：递减 booked_qty，纯占用行删行（商家夜价/qty 差异行保留）
@@ -585,7 +586,7 @@ function createBookingRouter(deps) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('INVALID');
       }
-      const nowSql = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const nowSql = bjStamp();
       const dt = (s) => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/.test(s)) ? s.replace('T', ' ') : null;
       const orderNo = String(body.orderNo);
       const appOrderId = String(body.bizOrderNo || ''); // 回调 bizOrderNo = 发起分账时的分账业务单号 = payment_split.app_order_id

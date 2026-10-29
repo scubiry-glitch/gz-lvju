@@ -261,7 +261,7 @@ function createBookingPaymentAdapter({ core, createConnection, config = process.
   async function expire(limit = 100) {
     const rows = await scan(`SELECT b.id,b.order_no FROM booking_orders b WHERE b.id>? AND b.status='pending'
       AND b.pay_status IS NOT NULL AND b.paid_payment_order_id IS NULL
-      AND b.payment_expires_at IS NOT NULL AND b.payment_expires_at<=UTC_TIMESTAMP()`, expiryCursor, limit);
+      AND b.payment_expires_at IS NOT NULL AND b.payment_expires_at<=NOW()`, expiryCursor, limit);
     expiryCursor = rows.length ? rows[rows.length - 1].id : 0;
     let requested = 0;
     const errors = [];

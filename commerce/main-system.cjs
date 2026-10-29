@@ -1,25 +1,26 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 // Existing gr_orders is the customer order centre; jz_orders is the service work pool.
 // Commerce tables retain only their domain snapshots/entitlements linked by the same ID.
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const accountUser=id=>'commerce-account-'+id;
 async function linkOrder(c,order){
- const p=parse(order.snapshot),now=new Date().toISOString(),[[city]]=await c.execute('SELECT name FROM cities WHERE id=?',[order.city_id]);
+ const p=parse(order.snapshot),now=bjStamp(),[[city]]=await c.execute('SELECT name FROM cities WHERE id=?',[order.city_id]);
  const state=['fulfilled','partially_refunded'].includes(order.status)?'completed':['expired','cancelled','refunded'].includes(order.status)?'cancelled':'pending';
  const [existing]=await c.execute('SELECT user_id FROM gr_orders WHERE order_ref=? FOR UPDATE',[order.id]);
  if(existing.length){if(existing[0].user_id!==accountUser(order.account_id))throw Error('Main order owner conflict');await c.execute('UPDATE gr_orders SET status=?,updated_at=?,completed_at=COALESCE(completed_at,?) WHERE order_ref=?',[state,now,state==='completed'?now:null,order.id]);}
- else await c.execute('INSERT INTO gr_orders(order_ref,user_id,sku,city,status,fee,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?)',[order.id,accountUser(order.account_id),'commerce:'+order.product_kind,city?.name||'',state,order.amount_minor,order.created_at?new Date(order.created_at).toISOString():now,now,state==='completed'?now:null]);
+ else await c.execute('INSERT INTO gr_orders(order_ref,user_id,sku,city,status,fee,created_at,updated_at,completed_at) VALUES(?,?,?,?,?,?,?,?,?)',[order.id,accountUser(order.account_id),'commerce:'+order.product_kind,city?.name||'',state,order.amount_minor,order.created_at?bjStamp(order.created_at):now,now,state==='completed'?now:null]);
  if(order.payment_mode==='pay_center'||p.payment_mode==='pay_center')await c.execute("UPDATE gr_orders SET biz_type='commerce',payment_mode='pay_center',account_id=?,pay_status=?,refund_status=?,order_snapshot=? WHERE order_ref=?",[String(order.account_id),order.payment_status||(['fulfilled','paid_pending_fulfillment'].includes(order.status)?'paid':'unpaid'),['refunded','partially_refunded','refund_pending'].includes(order.payment_status)?order.payment_status:null,JSON.stringify({product_name:p.name,kind:order.product_kind,amount_minor:order.amount_minor}),order.id]);
 }
 async function linkCase(c,entry,coupon){
- const p=parse(coupon.snapshot),now=new Date().toISOString(),category=p.sku?.category_id||'community';
+ const p=parse(coupon.snapshot),now=bjStamp(),category=p.sku?.category_id||'community';
  const [existing]=await c.execute('SELECT id FROM jz_orders WHERE id=?',[entry.id]);if(existing.length)return;
  const [[cat]]=await c.execute('SELECT id FROM jz_categories WHERE id=?',[category]);
  await c.execute('INSERT INTO jz_orders(id,sku_id,category_id,type,house,phone,expect_time,`desc`,fee,pay_status,status,source,created_at,updated_at,log_json) VALUES(?,NULL,?,?,?,?,?,?,0,?,?,?,?,?,?)',[entry.id,cat?.id||'community','权益售后',p.sku?.name||'生活权益','未提供','待客服确认',entry.reason,'not_required',entry.status==='closed'||entry.status==='rejected'?'done':'pending',p.is_demo?'新居住权益售后（演示）':'新居住权益售后',now,now,JSON.stringify([{at:now,action:'created',note:entry.reason,order_ref:coupon.order_id,coupon_id:coupon.id}])]);
 }
 async function resolveWork(c,caseId,resolution){
  const [[work]]=await c.execute('SELECT log_json FROM jz_orders WHERE id=?',[caseId]);if(!work)return;
- const now=new Date().toISOString(),log=parse(work.log_json||'[]');log.push({at:now,action:'resolved',note:resolution});
+ const now=bjStamp(),log=parse(work.log_json||'[]');log.push({at:now,action:'resolved',note:resolution});
  await c.execute("UPDATE jz_orders SET status='done',updated_at=?,log_json=? WHERE id=?",[now,JSON.stringify(log),caseId]);
 }
 async function workCompleted(c,work){

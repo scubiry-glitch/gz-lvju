@@ -1,10 +1,11 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 const crypto=require('node:crypto');
 const {definitions,kinds,Fault,assert,validate,EXCHANGE_TIERS}=require('./configuration.cjs');
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 const id=()=>crypto.randomUUID();
 const digest=v=>crypto.createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
-const date=v=>new Date(v).toISOString().slice(0,19).replace('T',' ');
+const date=v=>bjStamp(v);
 const row=v=>v&&({...v,...(v.payload?{payload:parse(v.payload)}:{}),...(v.snapshot?{snapshot:parse(v.snapshot)}:{})});
 function usageFields(sku={}){return {use_mode:sku.use_mode||null,use_domains:sku.use_domains||[],
  booking_project_ids:sku.booking_project_ids||[],booking_unit_ids:sku.booking_unit_ids||[],
@@ -268,7 +269,7 @@ class Service {
   return {tiers,hotels:list,total:list.length,is_demo:true,note:'试点报名名单演示；不提供真实入住与履约，不发生资金往来。'};
  }
  async inventory(p,perm,input,merchantOnly=false){assert(Number.isSafeInteger(input.total)&&input.total>=0&&input.total<=10000000,'库存或产能总量无效');return this.tx(async c=>{const capacity=input.kind==='capacity';const e=await this.entity(c,capacity?'stores':'skus',capacity?input.store_id:input.sku_id,true);await this.allowed(c,p,perm,e,merchantOnly);
-  if(capacity){assert(/^\d{4}-\d{2}-\d{2}$/.test(input.service_date)&&input.service_date>=new Date().toISOString().slice(0,10),'请选择今天或之后的日期');await c.execute('INSERT IGNORE INTO commerce_capacity(store_id,service_date,total) VALUES(?,?,?)',[e.id,input.service_date,input.total]);const rows=await this.get(c,'SELECT * FROM commerce_capacity WHERE store_id=? AND service_date=? FOR UPDATE',[e.id,input.service_date]);assert(rows[0].reserved<=input.total,'产能不能低于已预约量',409);await c.execute('UPDATE commerce_capacity SET total=? WHERE store_id=? AND service_date=?',[input.total,e.id,input.service_date]);}
+  if(capacity){assert(/^\d{4}-\d{2}-\d{2}$/.test(input.service_date)&&input.service_date>=bjStamp().slice(0, 10),'请选择今天或之后的日期');await c.execute('INSERT IGNORE INTO commerce_capacity(store_id,service_date,total) VALUES(?,?,?)',[e.id,input.service_date,input.total]);const rows=await this.get(c,'SELECT * FROM commerce_capacity WHERE store_id=? AND service_date=? FOR UPDATE',[e.id,input.service_date]);assert(rows[0].reserved<=input.total,'产能不能低于已预约量',409);await c.execute('UPDATE commerce_capacity SET total=? WHERE store_id=? AND service_date=?',[input.total,e.id,input.service_date]);}
   else {const [r]=await c.execute('UPDATE commerce_inventory SET total=? WHERE sku_id=? AND reserved+granted<=?',[input.total,e.id,input.total]);assert(r.affectedRows,'库存不能低于已预占与已发放数量',409);}
   await this.audit(c,p,capacity?'capacity.adjust':'inventory.adjust',e.id,{total:input.total,date:input.service_date||null},e);return {updated:true};
  });}
@@ -296,7 +297,7 @@ class Service {
   await c.execute("UPDATE commerce_orders SET status='fulfilled',provider_ref=? WHERE id=?",[providerRef,orderId]);await require('./main-system.cjs').linkOrder(c,{...order,status:'fulfilled'});await c.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',[orderId,'order.fulfilled',JSON.stringify({orderId,providerRef})]);return {id:orderId,status:'fulfilled'};
  };return options.connection?apply(options.connection):this.tx(apply);}
  async expire(){
-  const orders=await this.get(this.pool,"SELECT id,payment_mode FROM commerce_orders WHERE status='reserved' AND expires_at<=UTC_TIMESTAMP() LIMIT 100");
+  const orders=await this.get(this.pool,"SELECT id,payment_mode FROM commerce_orders WHERE status='reserved' AND expires_at<=NOW() LIMIT 100");
   for(const o of orders){
    if(o.payment_mode==='pay_center'){if(this.payments)await this.payments.expireOrder(o.id);continue;}
    await this.tx(async c=>{const [locked]=await this.get(c,'SELECT status FROM commerce_orders WHERE id=? FOR UPDATE',[o.id]);if(locked.status!=='reserved')return;const items=await this.get(c,'SELECT sku_id,quantity FROM commerce_order_items WHERE order_id=? ORDER BY sku_id',[o.id]);for(const i of items)await c.execute('UPDATE commerce_inventory SET reserved=reserved-? WHERE sku_id=?',[i.quantity,i.sku_id]);await c.execute("UPDATE commerce_orders SET status='expired' WHERE id=?",[o.id]);});
@@ -306,7 +307,7 @@ class Service {
 
  async expireCoupons(){
   await require('./distribution.cjs').expire(this);
-  const candidates=await this.get(this.pool,"SELECT id,account_id FROM commerce_coupons WHERE status='available' AND expires_at<=UTC_TIMESTAMP() LIMIT 100");
+  const candidates=await this.get(this.pool,"SELECT id,account_id FROM commerce_coupons WHERE status='available' AND expires_at<=NOW() LIMIT 100");
   for(const candidate of candidates)await this.tx(async c=>{
    const coupon=await this.coupon(c,candidate.id);if(coupon.status!=='available'||new Date(coupon.expires_at)>new Date())return;
    const [old]=await this.get(c,"SELECT id FROM commerce_cases WHERE coupon_id=? AND kind='refund' AND status IN ('open','processing','awaiting_provider') FOR UPDATE",[coupon.id]);
@@ -317,7 +318,7 @@ class Service {
    await require('./main-system.cjs').linkCase(c,{id:caseId,reason:'未使用权益到期处理'+(coupon.snapshot.is_demo?'（演示，无实际退款）':''),status:coupon.snapshot.is_demo?'closed':'awaiting_provider'},coupon);
    await c.execute('INSERT INTO commerce_events(aggregate_id,event_type,payload) VALUES(?,?,?)',[coupon.id,coupon.snapshot.is_demo?'demo.coupon.expired':'coupon.expired_refund_requested',JSON.stringify({coupon_id:coupon.id,case_id:caseId})]);
   });
-  await this.pool.execute('DELETE FROM commerce_referral_visits WHERE expires_at<UTC_TIMESTAMP() LIMIT 1000');
+  await this.pool.execute('DELETE FROM commerce_referral_visits WHERE expires_at<NOW() LIMIT 1000');
  }
  async verifyReferral(token,product){
   assert(typeof token==='string'&&token.length<1500,'推广链接无效',422);const [payload,signature,...rest]=token.split('.');assert(payload&&signature&&!rest.length,'推广链接无效',422);
@@ -380,23 +381,23 @@ class Service {
  }
  async myCoupons(p,query={}){
   const filters={
-   all:'1=1',available:"c.status='available' AND c.expires_at>UTC_TIMESTAMP()",
-   used:"c.status='redeemed'",expired:"c.status='expired' OR (c.status='available' AND c.expires_at<=UTC_TIMESTAMP())",
+   all:'1=1',available:"c.status='available' AND c.expires_at>NOW()",
+   used:"c.status='redeemed'",expired:"c.status='expired' OR (c.status='available' AND c.expires_at<=NOW())",
    reserved:"c.status='reserved'",frozen:"c.status='frozen'",refunded:"c.status='refunded'"
   };
   const status=String(query.status||'all'),page=Number(query.page||1),size=Number(query.size||30);
   assert(Object.hasOwn(filters,status),'卡券状态无效',422);
   assert(Number.isSafeInteger(page)&&page>=1&&page<=100000&&Number.isSafeInteger(size)&&size>=1&&size<=100,'分页参数无效',422);
   const [countsRow]=await this.get(this.pool,`SELECT COUNT(*) total,
-   COALESCE(SUM(status='available' AND expires_at>UTC_TIMESTAMP()),0) available,
+   COALESCE(SUM(status='available' AND expires_at>NOW()),0) available,
    COALESCE(SUM(status='redeemed'),0) used,
-   COALESCE(SUM(status='expired' OR (status='available' AND expires_at<=UTC_TIMESTAMP())),0) expired,
+   COALESCE(SUM(status='expired' OR (status='available' AND expires_at<=NOW())),0) expired,
    COALESCE(SUM(status='reserved'),0) reserved,COALESCE(SUM(status='frozen'),0) frozen,COALESCE(SUM(status='refunded'),0) refunded
    FROM commerce_coupons WHERE account_id=?`,[p.account.id]);
   const counts=Object.fromEntries(Object.entries(countsRow).map(([key,value])=>[key,Number(value)]));
   const rows=await this.get(this.pool,`SELECT c.* FROM commerce_coupons c LEFT JOIN commerce_orders o ON o.id=c.order_id
    WHERE c.account_id=? AND (${filters[status]})
-   ORDER BY CASE WHEN c.status='available' AND c.expires_at>UTC_TIMESTAMP() THEN 0 WHEN c.status='reserved' THEN 1 WHEN c.status='frozen' THEN 2 ELSE 3 END,
+   ORDER BY CASE WHEN c.status='available' AND c.expires_at>NOW() THEN 0 WHEN c.status='reserved' THEN 1 WHEN c.status='frozen' THEN 2 ELSE 3 END,
    o.created_at DESC,c.item_id DESC,c.unit_no,c.id DESC LIMIT ${size} OFFSET ${(page-1)*size}`,[p.account.id]);
   let appointments=[];
   if(rows.length){
@@ -429,13 +430,13 @@ class Service {
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   const from=String(query.from||today);
   const start=Date.parse(from+'T00:00:00Z');
-  assert(/^\d{4}-\d{2}-\d{2}$/.test(from)&&from>=today&&Number.isFinite(start)&&new Date(start).toISOString().slice(0,10)===from&&start<new Date(coupon.expires_at).getTime(),'查询日期无效',422);
-  const end=new Date(start+days*86400000).toISOString().slice(0,10);
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(from)&&from>=today&&Number.isFinite(start)&&bjStamp(start).slice(0, 10)===from&&start<new Date(coupon.expires_at).getTime(),'查询日期无效',422);
+  const end=bjStamp(start+days*86400000).slice(0, 10);
   const capacity=await this.get(this.pool,'SELECT service_date,total,reserved FROM commerce_capacity WHERE store_id=? AND service_date>=? AND service_date<?',[store.id,from,end]);
   const byDate=new Map(capacity.map(r=>[date(r.service_date).slice(0,10),r]));
   const now=Date.now(),expires=new Date(coupon.expires_at).getTime(),lead=Number(store.payload.lead_hours||0),defaultTotal=Number(store.payload.capacity||0);
   const dates=Array.from({length:days},(_,i)=>{
-   const day=new Date(start+i*86400000).toISOString().slice(0,10),row=byDate.get(day);
+   const day=bjStamp(start+i*86400000).slice(0, 10),row=byDate.get(day);
    const remaining=Math.max(0,Number(row?.total??defaultTotal)-Number(row?.reserved||0));
    const time=Date.parse(day+'T00:00:00+08:00');
    const reason=time<now+lead*3600000?'too_soon':time>=expires?'expired':remaining===0?'full':null;
@@ -546,7 +547,7 @@ class Service {
   const orders=await one("SELECT COUNT(*) total,SUM(status='fulfilled') fulfilled,SUM(JSON_EXTRACT(snapshot,'$.is_demo')=true) demo FROM commerce_orders"+cond(''),args());
   const appointments=await one("SELECT COUNT(*) total,SUM(status='booked') booked,SUM(status='booked' AND service_date=DATE(CONVERT_TZ(NOW(),'+00:00','+08:00'))) today FROM commerce_appointments"+cond(''),args());
   const redemptions=await one('SELECT COUNT(*) total,COALESCE(SUM(supplier_minor),0) supplier_minor,COALESCE(SUM(beike_minor),0) beike_minor,COALESCE(SUM(channel_minor),0) channel_minor FROM commerce_redemptions'+cond(''),args());
-  const codes=await one("SELECT COUNT(*) total,SUM(status<>'disabled' AND redeemed_by IS NULL AND expires_at>UTC_TIMESTAMP()) unused,SUM(status<>'disabled' AND redeemed_by IS NOT NULL) redeemed,SUM(status<>'disabled' AND redeemed_by IS NULL AND expires_at<=UTC_TIMESTAMP()) expired,SUM(status='disabled') disabled FROM commerce_exchange_codes"+cond(''),args());
+  const codes=await one("SELECT COUNT(*) total,SUM(status<>'disabled' AND redeemed_by IS NULL AND expires_at>NOW()) unused,SUM(status<>'disabled' AND redeemed_by IS NOT NULL) redeemed,SUM(status<>'disabled' AND redeemed_by IS NULL AND expires_at<=NOW()) expired,SUM(status='disabled') disabled FROM commerce_exchange_codes"+cond(''),args());
   const cases=await one("SELECT COUNT(*) total,SUM(kind='refund') refund,SUM(kind='help') help,SUM(kind='compensation') compensation,SUM(status='open') open,SUM(status='processing') processing,SUM(status='awaiting_provider') awaiting_provider,SUM(status='closed') closed,SUM(status='rejected') rejected FROM commerce_cases"+cond(''),args());
   const failures=await one("SELECT COUNT(*) total FROM commerce_audit WHERE action='operation.failed'");
   const recent=(await this.get(this.pool,"SELECT b.id,b.actor_id,b.resource,b.detail,b.created_at,acc.display_name actor_name FROM commerce_audit b LEFT JOIN accounts acc ON acc.id=b.actor_id WHERE b.action='operation.failed' ORDER BY b.id DESC LIMIT 20")).map(r=>({...r,detail:parse(r.detail)}));

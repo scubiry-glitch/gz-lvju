@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 // M0 only: isolated, synchronous in-memory domain. No database or network dependencies.
 const { randomUUID, createHmac, timingSafeEqual } = require('node:crypto');
 const id = (p) => `${p}_${randomUUID()}`;
@@ -143,7 +144,7 @@ class Commerce {
   used(store, date, exclude) { return this.appointments.filter((a) => a.id !== exclude && a.store === store && a.date === date && ['RESERVED', 'FULFILLED'].includes(a.status)).length; }
   availability(c) {
     return Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(this.now() + (i + 2) * DAY).toISOString().slice(0, 10);
+      const date = bjStamp(this.now() + (i + 2) * DAY).slice(0, 10);
       const total = this.capacity.get(`${c.store}:${date}`) ?? 10;
       return { date, total, remaining: Math.max(0, total - this.used(c.store, date)), usable: Date.parse(`${date}T23:59:59+08:00`) < c.valid_to && !this.stopped.has(c.merchant) };
     });

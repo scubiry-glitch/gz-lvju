@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 const vendorPayment = require('../payment/vendor-payment.cjs');
 /**
  * /api/juzhu/admin/* 管理域（从 app.js 拆出）。
@@ -425,7 +426,7 @@ queryRows,
             'SELECT id, name, review_status, status FROM jz_vendors WHERE id=?', [vid]);
           if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
           const cur = curRows[0];
-          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          const now = bjStamp();
           const nextStatus = reviewStatus === 'approved' ? 'active' : (reviewStatus === 'rejected' ? 'suspended' : 'active');
           await conn.execute(
             'UPDATE jz_vendors SET review_status=?, review_note=?, reviewed_at=?, status=?, updated_at=? WHERE id=?',
@@ -561,7 +562,7 @@ queryRows,
           for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
           await conn.execute(
             `UPDATE jz_vendors SET ${sets.join(', ')},payment_config_version=COALESCE(payment_config_version,0)+1, updated_at=? WHERE id=?`,
-            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [...vals, bjStamp(), vid]
           );
           await conn.commit();
           if (resetVendorConfigCache) resetVendorConfigCache();
@@ -598,7 +599,7 @@ queryRows,
           const newKey = crypto.randomBytes(32).toString('hex');
           await conn.execute(
             'UPDATE jz_vendors SET hmac_key=?, updated_at=? WHERE id=?',
-            [newKey, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [newKey, bjStamp(), vid]
           );
           if (resetVendorConfigCache) resetVendorConfigCache();
           const maskKey = (k) => (k ? { head: k.slice(0, 8), len: k.length } : null);
@@ -672,7 +673,7 @@ queryRows,
         try {
           const [r] = await conn.execute(
             'UPDATE jz_vendors SET consult_mode=?, updated_at=? WHERE id=?',
-            [mode, new Date().toISOString().slice(0, 19).replace('T', ' '), parseInt(m[1], 10)]
+            [mode, bjStamp(), parseInt(m[1], 10)]
           );
           if (!r.affectedRows) return jsonReply(res, { error: 'not found' }, 404);
           return jsonReply(res, { ok: true, id: parseInt(m[1], 10), consult_mode: mode });
@@ -788,7 +789,7 @@ queryRows,
           if (nextJiazheng !== undefined) { sets.push('commission_jiazheng=?'); vals.push(nextJiazheng); }
           await conn.execute(
             `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
-            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [...vals, bjStamp(), vid]
           );
           // 敏感商业条款变更：处理器内记 before/after（role.update 金标准），不只依赖 ROUTES 自动审计
           const p = req.principal || {};
@@ -2341,7 +2342,7 @@ queryRows,
             conn.end();
             return jsonReply(res, { error: `请先保存 ${dimsReq.length} 维自评分（${proj.channel} 口径）` }, 400);
           }
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           rating.code = `${RATING_CODE_PREFIX[proj.channel] || 'SY'}-${pid}`;
           await conn.execute(
             "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
@@ -2608,7 +2609,7 @@ queryRows,
           const [rows] = await conn.execute('SELECT * FROM projects WHERE id=? AND rating_status=?', [pid, 'pending']);
           if (!rows.length) return jsonReply(res, { error: 'not found or not pending' }, 404);
           const action = body.action === 'pass' ? 'passed' : 'rejected';
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           let rating = {};
           try { rating = JSON.parse(rows[0].rating || '{}'); } catch (_) {}
           if (body.dims) rating.dims = body.dims;

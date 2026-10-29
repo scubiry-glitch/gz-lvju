@@ -17,9 +17,9 @@ function createPaymentCore({ createConnection, config = process.env, payCenter, 
     else await c.end();
   }
   async function tx(fn, existing) {
-    if (existing) { if(typeof existing.query==='function')await existing.query("SET time_zone='+00:00'");return fn(existing); }
+    if (existing) { if(typeof existing.query==='function')await existing.query("SET time_zone='+08:00'");return fn(existing); }
     const c = await createConnection();
-    try { if(typeof c.query==='function')await c.query("SET time_zone='+00:00'");await c.beginTransaction(); const result = await fn(c); await c.commit(); return result; }
+    try { if(typeof c.query==='function')await c.query("SET time_zone='+08:00'");await c.beginTransaction(); const result = await fn(c); await c.commit(); return result; }
     catch (e) { await c.rollback().catch(() => {}); throw e; }
     finally { await close(c); }
   }
