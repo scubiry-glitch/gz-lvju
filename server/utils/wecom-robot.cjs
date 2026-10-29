@@ -37,6 +37,7 @@
  */
 
 // 企微群机器人 webhook（可用 WECOM_ROBOT_WEBHOOK 覆盖）
+// const DEFAULT_WEBHOOK = '1';
 const DEFAULT_WEBHOOK = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=3cf33190-bc91-4f41-b438-761d148f42bb';
 
 // 企微官方上限（字节，UTF-8）

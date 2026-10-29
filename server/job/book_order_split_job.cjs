@@ -16,8 +16,15 @@
  * - 必填环境变量（缺失则本次跳过并在日志告警，不影响其余订单/下次执行）：
  *     contractInfo.contractNo 取关联支付单 payment_orders.biz_order_no（即 booking_orders.order_no）
  *     PAY_PLATFORM_MERCHANT_NO      平台商户号（merchantNo_P，平台抽成入账方，复用既有配置）
+ *     PAY_NOTIFY_SPLIT_URL          分账异步回调地址
  *   可配置：SPLIT_JOB_HOUR（默认 8）、SPLIT_JOB_MINUTE（默认 0）
- * - 手动触发：node server/job/book_order_split_job.cjs   （立即跑一次并退出）
+ * - 手动触发（立即跑一次并退出），按参数自动加载根目录 env 文件，缺省 test：
+ *     node server/job/book_order_split_job.cjs test            → .env.test → .env → runtime.env
+ *     node server/job/book_order_split_job.cjs prod            → .env.prod → .env → runtime.env
+ *     node server/job/book_order_split_job.cjs --env=prod      → 同上
+ *     JUZHU_ENV=prod node server/job/book_order_split_job.cjs  → 同上
+ *   选择优先级：命令行参数 > JUZHU_ENV > 默认 test（不读 NODE_ENV，避免 IDE 注入 production 时误连生产）；
+ *   与 app.js 同约定：不覆盖已存在的非空环境变量，命令行显式注入仍优先。
  * ---------------------------------------------------------------------------
  *
  * 注意：发起分账以后，只要理房通受理成功了，一个小时就会自动重试一次，分账指令，发起以后，无法撤销
@@ -25,14 +32,83 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
+
+// ── 运行时 env 加载 ─────────────────────────────────────────────────────────
+// 直接执行本文件时，按参数/JUZHU_ENV 读取根目录 .env.<env>，再回退 .env、runtime.env；
+// 被 app.js 通过 startJobDir require 时环境已注入，不再重复加载。
+// 注意：payCenter.cjs 在 require 期即读取 OAUTH_*，env 必须先于下面的 require 加载。
+//   node server/job/book_order_split_job.cjs test            → .env.test
+//   node server/job/book_order_split_job.cjs prod            → .env.prod
+//   node server/job/book_order_split_job.cjs --env=prod      → .env.prod
+//   JUZHU_ENV=prod node server/job/book_order_split_job.cjs  → .env.prod
+// 与 app.js 同约定：不覆盖已存在的非空环境变量（命令行显式注入仍优先）。
+const ROOT_DIR = path.resolve(__dirname, '..', '..');
+
+/** 解析 KEY=VALUE（支持 # 注释 / export 前缀 / 成对引号），不覆盖已存在的非空环境变量 */
+function loadDotEnv(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  let text = '';
+  try { text = fs.readFileSync(filePath, 'utf8'); } catch (_) { return false; }
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('export ')) line = line.slice(7).trim();
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!key) continue;
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (Object.prototype.hasOwnProperty.call(process.env, key) && process.env[key] !== '') continue;
+    process.env[key] = val;
+  }
+  return true;
+}
+
+/** 从命令行解析环境：test | prod | dev，或 --env=prod / --env prod / -e prod */
+function resolveEnvArg(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--env' || a === '-e') return argv[i + 1] || '';
+    if (a.startsWith('--env=')) return a.slice('--env='.length);
+    if (/^(test|prod|production|dev|development)$/i.test(a)) return a;
+  }
+  return '';
+}
+
+const ENV_ALIASES = { production: 'prod', development: 'dev' };
+let LOADED_ENV = '';
+if (require.main === module) {
+  // 优先级：命令行参数 > JUZHU_ENV > 默认 test。
+  // 刻意不读 NODE_ENV：IDE/工具链常注入 NODE_ENV=production，若据此选库会误连生产。
+  const argEnv = resolveEnvArg(process.argv.slice(2));
+  const chosen = argEnv || process.env.JUZHU_ENV || 'test';
+  const envName = ENV_ALIASES[String(chosen).toLowerCase()] || String(chosen).toLowerCase();
+  const envSource = argEnv ? '命令行参数' : (process.env.JUZHU_ENV ? 'JUZHU_ENV' : '默认');
+  // 显式参数优先：先落 JUZHU_ENV，防止被 env 文件里的旧值反超（loadDotEnv 不覆盖已有值）
+  process.env.JUZHU_ENV = envName;
+  const envFile = path.join(ROOT_DIR, `.env.${envName}`);
+  const loaded = [];
+  if (loadDotEnv(envFile)) loaded.push(path.basename(envFile));
+  else console.warn(`[book_order_split_job] 未找到 ${envFile}`);
+  if (loadDotEnv(path.join(ROOT_DIR, '.env'))) loaded.push('.env');
+  if (loadDotEnv(path.join(ROOT_DIR, 'runtime.env'))) loaded.push('runtime.env');
+  LOADED_ENV = envName;
+  console.log(`[book_order_split_job] env=${envName}（来源：${envSource}；加载：${loaded.length ? loaded.join(' → ') : '无 env 文件，仅用当前进程环境'}）`);
+}
+
 const crypto = require('crypto');
 const { queryRows, getPool } = require(path.join(__dirname, '..', 'db.cjs'));
 const { payCenter } = require(path.join(__dirname, '..', 'thirdApi', 'payCenter.cjs'));
 const { generateAppOrderId } = require(path.join(__dirname, '..', 'payment', 'primitives.cjs'));
 const { sendMarkdown } = require(path.join(__dirname, '..', 'utils', 'wecom-robot.cjs'));
 
-// 非生产环境（JUZHU_ENV/NODE_ENV 非 prod）打印分账下单入参/出参，便于联调；生产环境关闭
-const IS_PROD = process.env.JUZHU_ENV === 'prod' || process.env.NODE_ENV === 'production';
+// 非生产环境打印分账下单入参/出参，便于联调；生产环境关闭。
+// 以 JUZHU_ENV 为准（上面已按参数落定），不掺入 IDE 常注入的 NODE_ENV。
+const IS_PROD = /^(prod|production)$/i.test(process.env.JUZHU_ENV || '');
 
 // 待分账：已离店 + 未分账 + 离店日期 <= 今天-7天
 const SQL_SELECT_DUE = `
@@ -76,9 +152,11 @@ const SQL_INSERT_GATEWAY_LOG = `
      business_code, trace_id, success_flag, request_json, response_json, error_message, started_at, finished_at)
   VALUES (?, NULL, ?, 'split_apply', ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-// 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
+// 业务时钟：北京时间（UTC+8）'YYYY-MM-DD HH:mm:ss'。
+// 中国无夏令时，固定加 8 小时即可，不依赖进程/数据库时区；与 MySQL NOW() 的口径一致。
 function nowStamp() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const bj = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return bj.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // 落库出战中台调用日志（payment_gateway_logs）。独立于分账主事务，写入失败仅告警，不影响分账主流程。
@@ -182,7 +260,19 @@ function buildSplitBody({ orderNo, appOrderId, totalMinor, rate, platformMerchan
   };
 }
 
-// 处理单个订单：校验 → 调分账中台 → 同事务落库。返回 'processed' | 'skipped'
+// 跳过原因 → 企微通知展示文案（键顺序即通知中的展示顺序）
+const SKIP_LABELS = {
+  'skipped:existing_split': '已有分账记录',
+  'skipped:no_paid_payment': '无已支付支付单',
+  'skipped:no_share_biz_code': '支付单缺 share_biz_code',
+  'skipped:no_commission_rate': '缺 commission_rate',
+  'skipped:invalid_amount': '分账金额异常',
+};
+const SKIP_CODES = Object.keys(SKIP_LABELS);
+
+// 处理单个订单：校验 → 调分账中台 → 同事务落库。
+// 返回 'processed' | 'skipped:<reason>'（reason 见 SKIP_LABELS），
+// 带原因后缀便于 runOnce 按类型统计、企微通知分别展示各类跳过次数。
 async function processOne(b, platformMerchantNo) {
   const orderNo = b.order_no;
   // 分账业务单号：沿用支付/退款的 generateAppOrderId 规则（prefix_时间戳_随机），前缀 FZ，全局唯一
@@ -190,13 +280,13 @@ async function processOne(b, platformMerchantNo) {
 
   // 已存在分账记录 → 跳过（按 biz_order_no 去重，保证一个旅居订单仅一笔分账）
   const [existing] = await queryRows(SQL_EXISTS_SPLIT, [orderNo]);
-  if (existing && existing.length) return 'skipped';
+  if (existing && existing.length) return 'skipped:existing_split';
 
   // 取已支付支付单（收款商户号 + 统一业务码 + 分账合同号 biz_order_no）
   const paid = await queryRows(SQL_SELECT_PAID_PAYMENT, [orderNo]);
   if (!paid || !paid.length) {
     console.warn(`[book_order_split_job] ${orderNo} 无已支付支付单，跳过`);
-    return 'skipped';
+    return 'skipped:no_paid_payment';
   }
   const pay = paid[0];
   const contractNo = pay.biz_order_no; // 分账合同号取支付单的业务订单号
@@ -205,20 +295,20 @@ async function processOne(b, platformMerchantNo) {
   if (!coreNo) console.warn(`[book_order_split_job] ${orderNo} 未取到支付流水号 coreNo（notify_type=pay & order_status=30），payInfos.payNo 可能为空`);
   if (!pay.share_biz_code) {
     console.warn(`[book_order_split_job] ${orderNo} 支付单缺 share_biz_code，跳过`);
-    return 'skipped';
+    return 'skipped:no_share_biz_code';
   }
 
   // 下单锁定的分账费率（百分比），缺失则跳过
   const rate = b.commission_rate == null ? null : Number(b.commission_rate);
   if (rate == null || Number.isNaN(rate)) {
     console.warn(`[book_order_split_job] ${orderNo} 缺 commission_rate，跳过`);
-    return 'skipped';
+    return 'skipped:no_commission_rate';
   }
   // 分账总额以实际应收现金（已扣优惠券）cash_due_minor 为准；历史订单无该列时回退标价总额
   const totalMinor = Number(b.cash_due_minor != null ? b.cash_due_minor : Number( b.price_total)*100);
   if (!(totalMinor > 0)) {
     console.warn(`[book_order_split_job] ${orderNo} 金额异常，跳过`);
-    return 'skipped';
+    return 'skipped:invalid_amount';
   }
 
   const body = buildSplitBody({
@@ -335,10 +425,12 @@ async function runOnce() {
   const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
   const notifyUrl = process.env.PAY_NOTIFY_SPLIT_URL;
   if (!platformMerchantNo || !notifyUrl) {
-    const reason = '缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL，跳过本次执行';
+    const envHint = LOADED_ENV || process.env.JUZHU_ENV || 'unknown';
+    const reason = `缺少必填环境变量 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL（当前 env=${envHint}），跳过本次执行；`
+      + `请检查根目录 .env.${envHint}，或用 node server/job/book_order_split_job.cjs test|prod 指定环境`;
     console.error('[book_order_split_job] ' + reason);
     await notifySplit(`**旅居分账定时任务跳过**\n> 原因：${reason}\n> 时间：${nowStamp()}`);
-    return { due: 0, processed: 0, skipped: 0, failed: 0, reason: 'missing_env' };
+    return { due: 0, processed: 0, skipped: 0, failed: 0, skip_reasons: {}, reason: 'missing_env' };
   }
 
   let due;
@@ -355,7 +447,7 @@ async function runOnce() {
     if (process.env.SPLIT_JOB_NOTIFY_ALWAYS === '1') {
       await notifySplit(`**旅居分账定时任务**\n> 无待分账订单\n> 时间：${nowStamp()}`);
     }
-    return { due: 0, processed: 0, skipped: 0, failed: 0 };
+    return { due: 0, processed: 0, skipped: 0, failed: 0, skip_reasons: {} };
   }
   console.log(`[book_order_split_job] 待分账 ${due.length} 单`);
 
@@ -363,35 +455,43 @@ async function runOnce() {
   let skipped = 0;
   let failed = 0;
   const failures = [];
+  const skipCounts = {}; // skipped:<reason> -> 次数，用于企微通知按类型展示
   for (const b of due) {
     try {
       const r = await processOne(b, platformMerchantNo);
       if (r === 'processed') processed++;
-      else if (r === 'skipped') skipped++;
+      else if (typeof r === 'string' && r.startsWith('skipped:')) {
+        skipped++;
+        skipCounts[r] = (skipCounts[r] || 0) + 1;
+      }
     } catch (e) {
       failed++;
       // 单笔失败不影响其余订单；保留 split_status='none' 次日重试
       failures.push({ orderNo: b.order_no, message: (e && e.message) || String(e) });
     }
   }
-  console.log(`[book_order_split_job] 完成 processed=${processed} skipped=${skipped} failed=${failed}`);
+  console.log(`[book_order_split_job] 完成 processed=${processed} skipped=${skipped} failed=${failed} skipCounts=${JSON.stringify(skipCounts)}`);
 
-  // 企微通知：本次有待分账订单即汇总推送（含失败明细）；无待分账时可设 SPLIT_JOB_NOTIFY_ALWAYS=1 也推送
+  // 企微通知：本次有待分账订单即汇总推送（含跳过分类与失败明细）；无待分账时可设 SPLIT_JOB_NOTIFY_ALWAYS=1 也推送
   const lines = [
     failed > 0 ? '**旅居分账定时任务（有失败）**' : '**旅居分账定时任务**',
     `> 待分账：${due.length}`,
     `> 成功：${processed}`,
     `> 跳过：${skipped}`,
-    `> 失败：${failed}`,
-    `> 时间：${nowStamp()}`,
   ];
+  // 跳过按原因分类展示，只列本次实际出现的类型；顺序固定，便于横向对比
+  SKIP_CODES.forEach((code) => {
+    const n = skipCounts[code];
+    if (n) lines.push(`>   - ${SKIP_LABELS[code]}：${n}`);
+  });
+  lines.push(`> 失败：${failed}`, `> 时间：${nowStamp()}`);
   if (failures.length) {
     lines.push('', '**失败明细**');
     failures.forEach((f) => lines.push(`- ${f.orderNo}：${f.message}`));
   }
   await notifySplit(lines.join('\n'));
 
-  return { due: due.length, processed, skipped, failed };
+  return { due: due.length, processed, skipped, failed, skip_reasons: skipCounts };
 }
 
 // 每天在指定时分触发一次 fn（容错：单次失败仅告警，不影响下次）
@@ -431,12 +531,14 @@ function start() {
  * @param {string} orderNo
  * @param {{allowRetryFail?: boolean}} [opts]
  * @returns {Promise<{ok:boolean, code?:string, message?:string, result?:string, order_no?:string}>}
+ *   result 取值：'processed' | 'skipped:<reason>'（reason 见 SKIP_LABELS）
  */
 async function triggerSplitForOrder(orderNo, { allowRetryFail = true } = {}) {
   const platformMerchantNo = process.env.PAY_PLATFORM_MERCHANT_NO;
   const notifyUrl = process.env.PAY_NOTIFY_SPLIT_URL;
   if (!platformMerchantNo || !notifyUrl) {
-    return { ok: false, code: 'missing_env', message: '缺少 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL' };
+    const envHint = LOADED_ENV || process.env.JUZHU_ENV || 'unknown';
+    return { ok: false, code: 'missing_env', message: `缺少 PAY_PLATFORM_MERCHANT_NO / PAY_NOTIFY_SPLIT_URL（当前 env=${envHint}）` };
   }
   const rows = await queryRows(
     'SELECT id, order_no, price_total, cash_due_minor, commission_rate, commission_fee, status, split_status FROM booking_orders WHERE order_no = ?',
@@ -475,4 +577,4 @@ if (require.main === module) {
     }
   })();
 }
-module.exports = { start, runOnce, scheduleDaily, buildSplitBody, triggerSplitForOrder };
+module.exports = { start, runOnce, scheduleDaily, buildSplitBody, triggerSplitForOrder, SKIP_LABELS, SKIP_CODES };

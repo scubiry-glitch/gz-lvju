@@ -23,15 +23,17 @@ const SQL_SELECT_DUE = `
   WHERE status = 'confirmed' AND checkout <= CURDATE()
   ORDER BY id`;
 
-// 批量置为已离店（updated_at 同 app.js 既有时钟格式：UTC 'YYYY-MM-DD HH:mm:ss'）
+// 批量置为已离店（updated_at 写入北京时间 'YYYY-MM-DD HH:mm:ss'）
 const SQL_UPDATE_CHECKOUT = `
   UPDATE booking_orders
   SET status = 'checkOut', updated_at = ?
   WHERE status = 'confirmed' AND checkout <= CURDATE()`;
 
-// 业务时钟（与 app.js 一致）：UTC 'YYYY-MM-DD HH:mm:ss'
+// 业务时钟：北京时间（UTC+8）'YYYY-MM-DD HH:mm:ss'。
+// 中国无夏令时，固定加 8 小时即可，不依赖进程/数据库时区；与 MySQL NOW() 的口径一致。
 function nowStamp() {
-  return new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const bj = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return bj.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 // 执行一次离店更新（可单独调用 / 手动触发）
