@@ -38,6 +38,7 @@ const PERMS = [
   { code: 'admin.write',   name: '管理域写（旧）', domain: 'platform', action: 'write',  desc: '旧一刀切写权限点；已不作为路由闸，仅过渡期别名', roles: ['platform_op'] },
   { code: 'settings.write', name: '平台参数配置',  domain: 'platform', action: 'write',  desc: '全局设置/频道品牌名/预订电话', roles: [] },
   { code: 'dict.write',    name: '基础字典维护',   domain: 'platform', action: 'write',  desc: '城市/行政区/频道', roles: [] },
+  { code: 'spu.write',     name: '服务标准品维护', domain: 'platform', action: 'write',  desc: '家政/搬家 jz_skus 标准品新增与更新（P 端 SPU 页）', roles: [] },
   // ── 房源与评级 ──
   { code: 'house.write',   name: '房源与评级录入', domain: 'housing',  action: 'write',  desc: '项目/户型/图片/上下架/评级提交', roles: ['operator_admin'] },
   { code: 'rating.review', name: '评级复核',       domain: 'rating',   action: 'review', desc: '好房子/旅居评级审定 pass/reject', roles: ['platform_op'] },
@@ -215,6 +216,10 @@ const ROUTES = [
   { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
   { method: 'POST',   re: '^/api/juzhu/admin/photos/migrate-images$', perm: 'house.write', act: 'photo.migrate', res: 'photos' },
   { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },
+  // P 端标准品写入口不在 /admin 前缀下，admin 入口闸扫不到；api_direct 按本表 perm 校验。
+  // roles 留空：platform_admin 的 * 可写；perm_strict 未打开时 requirePerm 仍接受 admin.write。
+  { method: 'POST',   re: '^/api/juzhu/jz/spu$', perm: 'spu.write', act: 'spu.create', res: 'jz_skus' },
+  { method: 'PUT',    re: '^/api/juzhu/jz/spu/(\\d+)$', perm: 'spu.write', act: 'spu.update', res: 'jz_skus', idGroup: 1 },
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
   // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）
