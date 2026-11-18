@@ -18,7 +18,7 @@ export const SEARCH_SEGS = [
 ];
 
 /** 临时全站隐藏（不依赖城市 hidden_home_tabs）；恢复时清空即可 */
-const FORCE_HIDDEN_TABS = new Set(['newhouse', 'resale']);
+const FORCE_HIDDEN_TABS = new Set();
 
 export function hiddenHomeTabSet(cat) {
   const raw = cat?.city?.hidden_home_tabs;
