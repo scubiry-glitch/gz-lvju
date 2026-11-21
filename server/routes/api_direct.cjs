@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 /**
  * /api/juzhu/* 直连处理器（从 app.js handleApiDirect 整块拆出）。
  * 内部仍转发 booking / jiazheng / admin 子路由；本文件保留其余公开/商家/运营路由。
@@ -6,6 +7,98 @@
  *   const handle = createApiDirectRouter(deps);
  *   await handle(urlPath, qs, req, res);
  */
+const SPU_JSON_KEYS = ['tags', 'badges', 'gallery', 'includes', 'service_flow', 'service_notice'];
+const SPU_WRITABLE = [
+  'category_id', 'name', 'slug', 'spec', 'price_from', 'price_unit', 'duration_min',
+  'tags', 'badges', 'sales_text', 'rating_score', 'worker_min_level',
+  'cover_image', 'gallery', 'includes', 'service_flow', 'service_notice',
+  'sort_order', 'enabled',
+];
+const SPU_TEXT_LIMIT = { spec: 2000, price_unit: 50, sales_text: 200, name: 200, slug: 200 };
+
+function spuJsonValue(v) {
+  if (v == null) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v !== 'string') return [];
+  const s = v.trim();
+  if (!s) return [];
+  if (s[0] === '[' || s[0] === '{') {
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) { /* 页面按逗号分隔提交，解析失败再按分隔符拆 */ }
+  }
+  return s.replace(/\n/g, ',').split(',').map((part) => part.trim()).filter(Boolean);
+}
+
+function spuEnabled(v) {
+  return ['0', 'false', 'False', ''].includes(String(v)) ? 0 : 1;
+}
+
+/** 对齐已退役 Python jiazheng_db.create_sku / update_sku：JSON 列收数组或逗号串。 */
+function normalizeSpuWrite(body, partial) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: '请求体须为 JSON 对象' };
+  const defaults = {
+    category_id: 'cleaning', name: '', slug: '', spec: '', price_from: 0, price_unit: '起',
+    duration_min: 0, tags: [], badges: [], sales_text: '', rating_score: 0, worker_min_level: 'L3',
+    cover_image: null, gallery: [], includes: [], service_flow: [], service_notice: [],
+    sort_order: 99, enabled: 1,
+  };
+  const src = partial ? body : Object.assign({}, defaults, body);
+  const keys = partial ? SPU_WRITABLE.filter((k) => Object.prototype.hasOwnProperty.call(body, k)) : SPU_WRITABLE;
+  if (!keys.length) return { error: '没有可更新字段' };
+  const row = {};
+  for (const k of keys) {
+    const raw = src[k];
+    if (SPU_JSON_KEYS.includes(k)) {
+      const text = JSON.stringify(spuJsonValue(raw));
+      if (text.length > 20000) return { error: k + ' 过长' };
+      row[k] = text;
+      continue;
+    }
+    if (k === 'enabled') { row[k] = spuEnabled(raw); continue; }
+    if (k === 'price_from' || k === 'duration_min' || k === 'sort_order') {
+      if (raw == null || raw === '') return { error: k + ' 不能为空' };
+      const n = parseInt(raw, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 10000000) return { error: k + ' 须为非负整数' };
+      row[k] = n;
+      continue;
+    }
+    if (k === 'rating_score') {
+      if (raw == null || raw === '') return { error: 'rating_score 不能为空' };
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0 || n > 9.99) return { error: 'rating_score 须在 0–9.99' };
+      row[k] = Math.round(n * 100) / 100;
+      continue;
+    }
+    if (k === 'cover_image') {
+      if (raw == null || String(raw).trim() === '') { row[k] = null; continue; }
+      const s = String(raw).trim();
+      if (s.length > 500 || s.includes('..') || /^javascript:/i.test(s)) return { error: 'cover_image 不合法' };
+      row[k] = s;
+      continue;
+    }
+    if (k === 'category_id') {
+      const s = String(raw == null ? '' : raw).trim();
+      if (!/^[a-z0-9][a-z0-9-]{0,48}$/.test(s)) return { error: 'category_id 不合法' };
+      row[k] = s;
+      continue;
+    }
+    if (k === 'worker_min_level') {
+      const s = String(raw == null ? '' : raw).trim();
+      if (!/^L[0-7]$/.test(s)) return { error: 'worker_min_level 须为 L0–L7' };
+      row[k] = s;
+      continue;
+    }
+    const s = String(raw == null ? '' : raw).trim();
+    if (s.length > (SPU_TEXT_LIMIT[k] || 200)) return { error: k + ' 过长' };
+    if ((k === 'name' || k === 'slug') && !s) return { error: k === 'name' ? '请输入 SPU 名称' : '请输入 slug' };
+    if (k === 'slug' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s)) return { error: 'slug 只允许小写字母、数字和连字符' };
+    row[k] = k === 'price_unit' && !s ? '起' : s;
+  }
+  return { row };
+}
+
 function createApiDirectRouter(deps) {
   // 周边玩法类型枚举（与 admin 路由同口径；C 端公开读也用）
   const SPOT_TYPES = ['scenic', 'biz', 'food', 'cafe'];
@@ -914,7 +1007,7 @@ function createApiDirectRouter(deps) {
             if (curIdx === -1 || order.status === 'pending') { conn.end(); return jsonReply(res, { error: '当前状态不可推进' }, 400); }
             if (curIdx >= STATUS_ORDER.length - 1) { conn.end(); return jsonReply(res, { error: '已是最终状态' }, 400); }
             const nextStatus = STATUS_ORDER[curIdx + 1];
-            const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+            const now = bjStamp();
             let log = [];
             try { log = JSON.parse(order.log_json || '[]'); } catch (_) {}
             log.push({ at: now, action: 'advance', by: 'worker:' + wid, from: order.status, to: nextStatus });
@@ -974,7 +1067,7 @@ function createApiDirectRouter(deps) {
         return jsonReply(res, {
           view: 'holding', readonly: true,
           scope: { level: scope.level, city_ids: scope.cityIds || null },
-          generated_at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+          generated_at: bjStamp(),
           housing: { by_channel: byChannel },
           vendors: { by_type: vendorsByType },
           orders: scope.level === 'all' ? { by_status: ordersByStatus } : { by_status: [], note: 'city 口径暂不提供工单聚合（试点范围）' },
@@ -1016,7 +1109,7 @@ function createApiDirectRouter(deps) {
         if (url.length > 500) return jsonReply(res, { error: 'webhook_url 过长（≤500 字符）' }, 400);
         const before = await queryRows('SELECT webhook_url FROM jz_vendors WHERE id=? LIMIT 1', [targetVid]);
         await queryRows('UPDATE jz_vendors SET webhook_url=?, updated_at=? WHERE id=?',
-          [url || null, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+          [url || null, bjStamp(), targetVid]);
         try {
           await authCenter.audit({
             accountId: (sess.account && sess.account.id) || null, principalType: 'user',
@@ -1061,7 +1154,7 @@ function createApiDirectRouter(deps) {
         const sets = [], vals = [];
         for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
         await queryRows(`UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
-          [...vals, new Date().toISOString().replace(/\.\d+Z$/, 'Z'), targetVid]);
+          [...vals, bjStamp(), targetVid]);
         if (resetVendorConfigCache) resetVendorConfigCache();
         try {
           await authCenter.audit({
@@ -1087,7 +1180,7 @@ function createApiDirectRouter(deps) {
         if (!v || !v.webhook_url) return jsonReply(res, { error: '请先保存 webhook_url' }, 400);
         if (!v.hmac_key) return jsonReply(res, { error: '商家未配置 hmac_key，无法签名' }, 400);
         const ts = Date.now();
-        const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+        const data = { note: '连通性测试', at: bjStamp() };
         const payload = { event: 'webhook.test', vendor_id: targetVid, data };
         const signed = { event: payload.event, vendor_id: targetVid, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts) };
         const out = await guardedPostJson(v.webhook_url, signed, 5000);
@@ -1556,7 +1649,7 @@ function createApiDirectRouter(deps) {
               }
             }
             const marks = dates.map(() => '?').join(',');
-            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            const now = bjStamp();
             let affected = 0;
             if (status === 'blocked') {
               for (const d of dates) {
@@ -1766,6 +1859,57 @@ function createApiDirectRouter(deps) {
         );
         rows.forEach(r => parseSkuJsonFields(r));
         return jsonReply(res, { list: rows });
+      }
+
+      // POST /api/juzhu/jz/spu 、 PUT /api/juzhu/jz/spu/:id
+      // 权限在 perm_registry（spu.write）。本路径不在 /admin 前缀下，入口闸不会代为校验。
+      if ((urlPath === '/api/juzhu/jz/spu' && req.method === 'POST')
+        || (/^\/api\/juzhu\/jz\/spu\/\d+$/.test(urlPath) && req.method === 'PUT')) {
+        const rule = permRegistry.match(urlPath, req.method);
+        if (!rule) return jsonReply(res, { ok: false, error: '接口未登记权限' }, 500);
+        if (!(await requirePerm(req, res, rule.perm, permRegistry.labelOf(rule.perm)))) return;
+        const idMatch = urlPath.match(/^\/api\/juzhu\/jz\/spu\/(\d+)$/);
+        const spuId = idMatch ? parseInt(idMatch[1], 10) : null;
+        const body = await readBody(req);
+        const parsed = normalizeSpuWrite(body, req.method === 'PUT');
+        if (parsed.error) return jsonReply(res, { ok: false, error: parsed.error }, 400);
+        const row = parsed.row;
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          if (row.category_id) {
+            const [cats] = await conn.execute('SELECT id FROM jz_categories WHERE id=? LIMIT 1', [row.category_id]);
+            if (!cats.length) return jsonReply(res, { ok: false, error: '类目不存在' }, 400);
+          }
+          const cols = Object.keys(row);
+          if (req.method === 'POST') {
+            try {
+              const [ret] = await conn.execute(
+                `INSERT INTO jz_skus (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+                cols.map((k) => row[k])
+              );
+              await auditIfAccount(req, rule.act, rule.res, String(ret.insertId), row);
+              return jsonReply(res, { ok: true, id: ret.insertId });
+            } catch (e) {
+              if (e && e.code === 'ER_DUP_ENTRY') return jsonReply(res, { ok: false, error: 'slug 已存在' }, 400);
+              throw e;
+            }
+          }
+          const [found] = await conn.execute('SELECT id FROM jz_skus WHERE id=? LIMIT 1', [spuId]);
+          if (!found.length) return jsonReply(res, { ok: false, error: 'not found' }, 404);
+          try {
+            await conn.execute(
+              `UPDATE jz_skus SET ${cols.map((k) => k + '=?').join(', ')} WHERE id=?`,
+              [...cols.map((k) => row[k]), spuId]
+            );
+          } catch (e) {
+            if (e && e.code === 'ER_DUP_ENTRY') return jsonReply(res, { ok: false, error: 'slug 已存在' }, 400);
+            throw e;
+          }
+          await auditIfAccount(req, rule.act, rule.res, String(spuId), row);
+          return jsonReply(res, { ok: true });
+        } finally {
+          await conn.end();
+        }
       }
 
       // GET /api/juzhu/jz/vendors
@@ -2012,7 +2156,7 @@ function createApiDirectRouter(deps) {
         const clientEmpNo = (body.emp_no || '').trim() || null;
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const now = new Date().toISOString().slice(0, 19);
+          const now = bjStamp();
           const ins = 'INSERT INTO operator_staff (emp_no,name,phone,level,`role`,station,month_orders,rating,contract_type,contract_end,status,can_extra,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
           let row = null;
           for (let attempt = 1; attempt <= 3; attempt++) {
@@ -2077,7 +2221,7 @@ function createApiDirectRouter(deps) {
               params.push(v.row[k]);
             }
             sets.push('updated_at=?');
-            params.push(new Date().toISOString().slice(0, 19));
+            params.push(bjStamp());
             params.push(id);
             try {
               await conn.execute('UPDATE operator_staff SET ' + sets.join(', ') + ' WHERE id=?', params);

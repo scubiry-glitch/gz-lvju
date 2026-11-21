@@ -2,6 +2,7 @@
 // 幂等策略：INSERT IGNORE + uk_staff_emp_no（多 app.js 实例共用一库，重启都会跑 ensureSchema，
 // 不能用"表空才写"，否则并发双跑会重复插入）。
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 // [emp_no, name, phone, level, role, station, month_orders, rating, contract_type, contract_end|'@CUR'|'@NEXT'|null, status, can_extra, note]
 const STAFF_ROWS = [
@@ -46,7 +47,7 @@ function resolveContractEnd(v) {
 }
 
 async function seedAll(conn) {
-  const now = new Date().toISOString().slice(0, 19);
+  const now = bjStamp();
   let inserted = 0;
   for (const r of STAFF_ROWS) {
     const [empNo, name, phone, level, role, station, orders, rating, cType, cEnd, status, canExtra, note] = r;

@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../server/utils/bj-time.cjs');
 
 const crypto = require('node:crypto');
 const {assert} = require('./configuration.cjs');
@@ -28,10 +29,10 @@ const DDL = [
 ];
 const checksum = crypto.createHash('sha256').update(DDL.join('\n')).digest('hex');
 const rows = async (conn, sql, args = []) => (await conn.execute(sql, args))[0];
-const utc = value => new Date(value).toISOString().slice(0,19).replace('T',' ');
+const utc = value => bjStamp(value);
 const toMs = value => {
   // mysql2's default Date conversion uses the process timezone. Interpret the
-  // database's DATETIME wall-clock fields as UTC, matching UTC_TIMESTAMP().
+  // database's DATETIME wall-clock fields as UTC, matching NOW().
   if(value instanceof Date)value=[value.getFullYear(),String(value.getMonth()+1).padStart(2,'0'),String(value.getDate()).padStart(2,'0')].join('-')+
     ' '+[value.getHours(),value.getMinutes(),value.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
   const text=String(value).replace(' ','T');
@@ -160,7 +161,7 @@ async function claim(service,principal,token,key) {
     assert(Number(prior.n)<Number(campaign.per_user_limit),'已达到每人领取上限',409);
     const [item]=await rows(conn,"SELECT di.id,di.coupon_id,c.status,c.account_id,c.expires_at FROM commerce_distribution_items di JOIN commerce_coupons c ON c.id=di.coupon_id WHERE di.campaign_id=? AND di.state='available' ORDER BY di.id LIMIT 1 FOR UPDATE",[id]);
     assert(item&&item.status==='reserved'&&String(item.account_id)===String(campaign.sponsor_account_id)&&toMs(item.expires_at)>Date.now(),'活动券已领完或已失效',409);
-    await conn.execute("UPDATE commerce_distribution_items SET state='claimed',claimed_by=?,claimed_at=UTC_TIMESTAMP() WHERE id=?",[principal.account.id,item.id]);
+    await conn.execute("UPDATE commerce_distribution_items SET state='claimed',claimed_by=?,claimed_at=NOW() WHERE id=?",[principal.account.id,item.id]);
     const [updated]=await conn.execute("UPDATE commerce_coupons SET account_id=?,status='available',snapshot=JSON_SET(snapshot,'$.distribution',JSON_OBJECT('campaign_id',?,'sponsor_account_id',?)) WHERE id=? AND account_id=? AND status='reserved'",
       [principal.account.id,id,campaign.sponsor_account_id,item.coupon_id,campaign.sponsor_account_id]);
     assert(updated.affectedRows===1,'卡券领取状态已变化',409);
@@ -182,11 +183,11 @@ async function list(service,principal) {
 async function release(conn,campaign) {
   const items=await rows(conn,"SELECT coupon_id FROM commerce_distribution_items WHERE campaign_id=? AND state='available' ORDER BY coupon_id FOR UPDATE",[campaign.id]);
   for(const item of items)await conn.execute("UPDATE commerce_coupons SET status='available' WHERE id=? AND account_id=? AND status='reserved'",[item.coupon_id,campaign.sponsor_account_id]);
-  await conn.execute("UPDATE commerce_distribution_items SET state='released',released_at=UTC_TIMESTAMP() WHERE campaign_id=? AND state='available'",[campaign.id]);
+  await conn.execute("UPDATE commerce_distribution_items SET state='released',released_at=NOW() WHERE campaign_id=? AND state='available'",[campaign.id]);
 }
 
 async function expire(service) {
-  const candidates=await rows(service.pool,"SELECT id FROM commerce_distribution_campaigns WHERE status IN ('draft','submitted','approved','active') AND expires_at<=UTC_TIMESTAMP() ORDER BY expires_at LIMIT 100");
+  const candidates=await rows(service.pool,"SELECT id FROM commerce_distribution_campaigns WHERE status IN ('draft','submitted','approved','active') AND expires_at<=NOW() ORDER BY expires_at LIMIT 100");
   for(const {id} of candidates)await service.tx(async conn=>{
     const [campaign]=await rows(conn,'SELECT * FROM commerce_distribution_campaigns WHERE id=? FOR UPDATE',[id]);
     if(!campaign||!['draft','submitted','approved','active'].includes(campaign.status)||toMs(campaign.expires_at)>Date.now())return;

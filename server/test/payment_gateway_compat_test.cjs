@@ -3,9 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createWorker } = require('../payment/worker.cjs');
+const { PayCenter } = require('../thirdApi/payCenter.cjs');
 
 // Protocol-only fixtures: no host configuration, database, gateway or network.
-function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '30' }, create = { status: '30' }, refundQuery = { status: '30' } } = {}) {
+function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '30' }, create = { status: '30' }, refundQuery = { status: '30' }, failQuery = null, payCenter: payCenterOverride = null } = {}) {
   const p = { id: 1, biz_type: bizType, biz_order_no: 'fixture-order', app_order_id: 'XD_fixture', app_code: 'fixture-app',
     project_code: 'fixture-project', merchant_no: 'fixture-merchant', payer_ucid: 'fixture-payer', payer_user_type: '2',
     amount_minor: 10000, share_biz_code: 'fixture-share', cashier_type: '2', callback_url: 'https://invalid.example.test/notify',
@@ -27,8 +28,8 @@ function fixture({ bizType = 'booking', kind = 'pay_query', query = { status: '3
     if (sql.includes('FROM payment_orders') && sql.includes('app_order_id=?')) return [p];
     return [];
   };
-  const payCenter = {
-    async queryOrder(input) { calls.push({ kind: 'query', input }); return { errno: 0, data: query }; },
+  const payCenter = payCenterOverride || {
+    async queryOrder(input) { calls.push({ kind: 'query', input }); if (failQuery) throw failQuery; return { errno: 0, data: query }; },
     async createC2BOrder(input) { calls.push({ kind: 'create', input }); return { errno: 0, data: create }; },
     async queryRefundOrder(input) { calls.push({ kind: 'refund_query', input }); return { errno: 0, data: refundQuery }; },
   };
@@ -113,6 +114,27 @@ test('refund identity distinguishes explicit refund ID and original payment ID',
     merchantNo: originalOnly.p.merchant_no, refundAmount: '25.00' } }), { code: 'gateway_evidence_incomplete' });
 });
 
+test('refund query writes 40 and 104 as refund_failed and keeps review codes in manual_review', async () => {
+  const refundWrite = writes => writes.find(w => w.sql.includes('UPDATE payment_refunds SET refund_status=?'));
+  const jobFinish = writes => writes.find(w => w.sql.includes("JSON_EXTRACT(payload,'$.rerun')"));
+  for (const code of ['40', '104']) {
+    const f = fixture({ kind: 'refund_query', refundQuery: { orderStatus: code, refundAppOrderId: 'RF_fixture', merchantNo: 'fixture-merchant', refundAmount: '25.00' } });
+    assert.equal((await f.worker.runJobs(1)).processed, 1);
+    assert.equal(f.events.length, 0);
+    assert.equal(refundWrite(f.writes).args[0], 'refund_failed');
+    assert.equal(refundWrite(f.writes).args[1], null);
+    assert.equal(jobFinish(f.writes).args[0], 'done');
+  }
+  for (const code of ['60', '101', '102', '103', '10']) {
+    const f = fixture({ kind: 'refund_query', refundQuery: { orderStatus: code } });
+    assert.equal((await f.worker.runJobs(1)).processed, 1);
+    assert.equal(refundWrite(f.writes).args[0], code === '10' ? 'refunding' : 'manual_review');
+    assert.equal(refundWrite(f.writes).args[1], '2026-01-01 00:00:10');
+    assert.equal(jobFinish(f.writes).args[0], 'pending');
+    assert.equal(f.events.length, 0);
+  }
+});
+
 test('refund query allows sparse booking only and retains mismatched amount protection', async () => {
   for (const bizType of ['booking', 'commerce', 'jiazheng']) {
     const f = fixture({ bizType, kind: 'refund_query' });
@@ -124,12 +146,115 @@ test('refund query allows sparse booking only and retains mismatched amount prot
   assert.equal((await bad.worker.runJobs(1)).deferred, 1); assert.equal(bad.events.length, 0);
 });
 
+test('blank gateway strings are absent and do not count as identity evidence', async () => {
+  const blank = { merchantNo: '', ucid: '', appCode: '', projectCode: '', currency: '', businessOrderNo: '', appOrderId: '' };
+  const bookingPay = fixture({ query: { status: '30', ...blank, pay_method: 'wx' } });
+  assert.equal((await bookingPay.worker.runJobs(1)).processed, 1);
+  assert(bookingPay.events.some(e => e.type === 'payment.accepted'));
+
+  const commercePay = fixture({ bizType: 'commerce' });
+  await assert.rejects(commercePay.worker.reconcilePayment(1, { data: { status: '30', appOrderId: '', merchantNo: '', amount: '100.00' } }), { code: 'gateway_evidence_incomplete' });
+
+  const bookingRefund = fixture({ kind: 'refund_query', refundQuery: {
+    status: '30', payStatus: 'SUCCESS', appOrderId: 'RF_fixture', merchantNo: '', ucid: '', refundAmount: '', amount: '25.00',
+  } });
+  assert.equal((await bookingRefund.worker.runJobs(1)).processed, 1);
+  assert(bookingRefund.events.some(e => e.type === 'refund.succeeded'));
+
+  const blankAmount = fixture({ kind: 'refund_query', refundQuery: {
+    status: '30', appOrderId: 'RF_fixture', merchantNo: '', refundAmount: '', amount: '99.00',
+  } });
+  assert.equal((await blankAmount.worker.runJobs(1)).deferred, 1);
+  assert.equal(blankAmount.events.length, 0);
+
+  const commerceRefund = fixture({ bizType: 'commerce' });
+  await assert.rejects(commerceRefund.worker.reconcileRefund(2, { data: {
+    status: '30', appOrderId: 'RF_fixture', merchantNo: '', refundAmount: '', amount: '25.00',
+  } }), { code: 'gateway_evidence_incomplete' });
+});
+
 test('merchantId never substitutes for a collecting merchantNo', async () => {
   const f = fixture({ bizType: 'commerce' });
   await assert.rejects(f.worker.reconcilePayment(1, { data: { status: '30', appOrderId: f.p.app_order_id,
     amount: '100.00', merchantId: f.p.merchant_no } }), { code: 'gateway_evidence_incomplete' });
   await f.worker.reconcilePayment(1, { data: { ...evidence, merchantId: 'different-institution-id' } });
   assert(f.events.some(e => e.type === 'payment.accepted'));
+});
+
+test('refund create log stores profitSharingType assigned on the request before it is written', async () => {
+  let sent;
+  const pay = new PayCenter({
+    client: { json: async (_path, options) => { sent = options.body; return { errno: 0, data: { accepted: true } }; } },
+  });
+  const f = fixture({ kind: 'refund_create', payCenter: pay });
+  assert.equal((await f.worker.runJobs(1)).processed, 1);
+  const logged = JSON.parse(gatewayLog(f.writes)[8]);
+  assert.equal(logged.profitSharingType, 2);
+  assert.equal(sent.profitSharingType, 2);
+});
+
+function gatewayLog(writes) {
+  const log = writes.find(w => w.sql.includes('INSERT INTO payment_gateway_logs'));
+  assert.ok(log, 'gateway log was not written');
+  return log.args;
+}
+
+test('business failures persist the gateway body carried on the thrown error', async () => {
+  const payResult = { errno: 1011, error: '原订单不存在', data: null, traceId: 'trace-1011', userInfo: { ucid: '200000001' } };
+  const error = new Error('[payCenter] 支付订单查询业务失败: 原订单不存在');
+  error.name = 'PayCenterBusinessError';
+  error.code = 'PAY_CENTER_BUSINESS_ERROR';
+  error.errno = 1011;
+  error.traceId = 'trace-1011';
+  error.payResult = payResult;
+  const f = fixture({ failQuery: error });
+  assert.equal((await f.worker.runJobs(1)).deferred, 1);
+  const args = gatewayLog(f.writes);
+  assert.equal(args[5], '1011');
+  assert.equal(args[6], 'trace-1011');
+  assert.equal(args[7], 0);
+  assert.equal(args[10], 'PAY_CENTER_BUSINESS_ERROR: 原订单不存在');
+  const saved = JSON.parse(args[9]);
+  assert.equal(saved.errno, 1011);
+  assert.equal(saved.error, '原订单不存在');
+  assert.equal(saved.data, null);
+  assert.equal(saved.userInfo.ucid, '[redacted]');
+});
+
+test('http gateway failures persist a response body that never became a return value', async () => {
+  const jsonError = new Error('[gateway-client] 网关请求失败 (502)');
+  jsonError.name = 'GatewayHttpError';
+  jsonError.code = 'GATEWAY_HTTP_ERROR';
+  jsonError.httpStatus = 502;
+  jsonError.responseText = JSON.stringify({ errno: -1, error: '系统繁忙', traceId: 'trace-http' });
+  const parsed = fixture({ failQuery: jsonError });
+  assert.equal((await parsed.worker.runJobs(1)).deferred, 1);
+  const parsedArgs = gatewayLog(parsed.writes);
+  assert.equal(parsedArgs[5], '-1');
+  assert.equal(parsedArgs[6], 'trace-http');
+  assert.deepEqual(JSON.parse(parsedArgs[9]), { errno: -1, error: '系统繁忙', traceId: 'trace-http' });
+  assert.equal(parsedArgs[10], 'GATEWAY_HTTP_ERROR: 系统繁忙');
+
+  const textError = new Error('[gateway-client] 网关请求失败 (502)');
+  textError.name = 'GatewayHttpError';
+  textError.code = 'GATEWAY_HTTP_ERROR';
+  textError.httpStatus = 502;
+  textError.traceId = 'trace-text';
+  textError.responseText = '<html>bad gateway</html>';
+  const raw = fixture({ failQuery: textError });
+  assert.equal((await raw.worker.runJobs(1)).deferred, 1);
+  const rawArgs = gatewayLog(raw.writes);
+  assert.equal(rawArgs[6], 'trace-text');
+  assert.deepEqual(JSON.parse(rawArgs[9]), { httpStatus: 502, body: '<html>bad gateway</html>' });
+});
+
+test('successful queries still store the returned body', async () => {
+  const f = fixture({ query: { status: '10' } });
+  assert.equal((await f.worker.runJobs(1)).processed, 1);
+  const args = gatewayLog(f.writes);
+  assert.equal(args[7], 1);
+  assert.equal(args[10], null);
+  assert.deepEqual(JSON.parse(args[9]), { errno: 0, data: { status: '10' } });
 });
 
 test('provider references preserve string IDs and never store rounded numeric order IDs', async () => {

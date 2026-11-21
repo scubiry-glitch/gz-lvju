@@ -1,6 +1,7 @@
 // jz_seed.cjs — 家政频道全量种子数据（MySQL 版）
 // 仅在对应表为空时写入，幂等安全。
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 const JZ_SUBCATS = [
   ['cleaning','日常保洁','🧹',1],['cleaning','深度清洁','✨',2],
@@ -142,7 +143,7 @@ const JZ_PRODUCTS = [
 
 async function seedAll(conn) {
   const jd = (v) => JSON.stringify(v);
-  const now = new Date().toISOString().slice(0, 19);
+  const now = bjStamp();
 
   // 本地生活 7 频道：存量库也可增量 INSERT IGNORE
   const lifeCats = [

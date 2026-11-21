@@ -627,16 +627,24 @@ function uploadImage(file, fields) {
   return uploadForm('/upload', fd);
 }
 
-function uploadUnitPhotos(unitId, files) {
-  var chain = Promise.resolve();
-  files.forEach(function(file) {
-    chain = chain.then(function() {
-      var fd = new FormData();
-      fd.append('file', file);
-      return uploadForm('/units/'+unitId+'/photos', fd);
-    });
-  });
-  return chain;
+/* 批量上传房源图片：并发上限 3（原实现串行，20 张易触发网关超时）；
+   单张失败不阻断整批，返回失败清单由调用方提示。 */
+function uploadUnitPhotos(unitId, files, concurrency) {
+  var queue = files.slice();
+  var failed = [];
+  var limit = Math.max(1, Math.min(concurrency || 3, queue.length || 1));
+  function worker() {
+    if (!queue.length) return Promise.resolve();
+    var file = queue.shift();
+    var fd = new FormData();
+    fd.append('file', file);
+    return uploadForm('/units/'+unitId+'/photos', fd)
+      .catch(function(e){ failed.push((file.name || '文件') + '：' + e.message); })
+      .then(worker);
+  }
+  var workers = [];
+  for (var i = 0; i < limit; i++) workers.push(worker());
+  return Promise.all(workers).then(function(){ return { ok: !failed.length, failed: failed }; });
 }
 
 function bindCoverUpload(inputId, previewId, getMeta) {
@@ -653,8 +661,7 @@ function bindCoverUpload(inputId, previewId, getMeta) {
     uploadImage(file, getMeta()).then(function(res) {
       input.value = res.file_path;
       if (previewId) {
-        document.getElementById(previewId).style.backgroundImage =
-          "url('/"+res.file_path.replace(/^\//,'')+"')";
+        document.getElementById(previewId).style.backgroundImage = cssUrl(res.file_path);
       }
       toast('上传成功');
       fileInput.value = '';
@@ -1730,8 +1737,22 @@ function photosOf(unitId) {
     .sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0) || a.id - b.id; });
 }
 
+/* 图片引用 → 可用于 <img src> / CSS url() 的值：
+   绝对 URL（含协议相对 //）与 data:/blob: 原样；本地/相对路径补前导 /。
+   兼容对象存储改造：库内可能存 https://file-domain/... 绝对地址（不能拼成 /https://...）。 */
+function imgUrl(path) {
+  var s = (path == null ? '' : String(path)).trim();
+  if (!s) return '';
+  if (/^(https?:)?\/\//i.test(s) || /^(data|blob):/i.test(s)) return s;
+  return '/' + s.replace(/^\/+/, '');
+}
+function cssUrl(path) {
+  var u = imgUrl(path);
+  return u ? "url('" + u + "')" : '';
+}
 function imgStyle(path) {
-  return path ? "background-image:url('/"+path.replace(/^\//,'')+"')" : '';
+  var u = imgUrl(path);
+  return u ? 'background-image:url(\'' + u + '\')' : '';
 }
 
 function renderNewProjectForm() {
@@ -1900,7 +1921,7 @@ function renderEditor() {
   if (!p) return;
   var isTrade = p.channel === 'trade';
   var chLabel = channelLabel(p.channel);
-  var cover = p.cover_image ? "background-image:url('/"+p.cover_image.replace(/^\//,'')+"')" : '';
+  var cover = imgStyle(p.cover_image);
   var rs = p.rating_status || 'draft';
   var rating = parseRating(p);
   var ratingCard = '';
@@ -2006,8 +2027,7 @@ function renderEditor() {
     '</div>';
 
   document.getElementById('p_cover').oninput = function() {
-    document.getElementById('p_cover_prev').style.backgroundImage =
-      this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    document.getElementById('p_cover_prev').style.backgroundImage = cssUrl(this.value) || 'none';
   };
   bindCoverUpload('p_cover', 'p_cover_prev', function() {
     return { scope: 'project_cover', project_id: state.current.id };
@@ -2089,7 +2109,7 @@ function renderUnitDetailPanel(u) {
       '<input class="fee_val" value="'+esc(f.value||'')+'" placeholder="金额/单位"/>'+
       '<button type="button" class="btn danger fee_del">删</button></div>';
   }).join('');
-  var avBg = k.avatar ? "background-image:url('/"+k.avatar.replace(/^\//,'')+"')" : '';
+  var avBg = imgStyle(k.avatar);
   return '<div class="unit-detail-panel" data-unit-detail="'+u.id+'">'+
     '<div class="sec"><div class="sec-h">房源信息标签</div>'+
       '<div class="detail-grid">'+
@@ -2137,7 +2157,7 @@ function bindUnitDetailPanel(unitId) {
   var avIn = panel.querySelector('.ud_k_avatar');
   var avPrev = panel.querySelector('.ud_k_prev');
   avIn.oninput = function() {
-    avPrev.style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+    avPrev.style.backgroundImage = cssUrl(this.value) || 'none';
   };
   var up = panel.querySelector('.ud_k_upload');
   if (up) {
@@ -2150,7 +2170,7 @@ function bindUnitDetailPanel(unitId) {
       fd.append('unit_id', unitId);
       uploadForm('/upload', fd).then(function(res) {
         avIn.value = res.file_path;
-        avPrev.style.backgroundImage = "url('/"+res.file_path.replace(/^\//,'')+"')";
+        avPrev.style.backgroundImage = cssUrl(res.file_path);
         toast('头像已上传');
       }).catch(function(e){ toast('上传失败：'+e.message); });
       up.value = '';
@@ -2261,7 +2281,7 @@ function bindPhotoPanel(unitId) {
   panel.querySelectorAll('.photo-card').forEach(function(card){
     var pid = +card.dataset.photo;
     card.querySelector('.ph_path').oninput = function(){
-      card.querySelector('.pv').style.backgroundImage = this.value ? "url('/"+this.value.replace(/^\//,'')+"')" : 'none';
+      card.querySelector('.pv').style.backgroundImage = cssUrl(this.value) || 'none';
     };
     card.querySelector('.ph_save').onclick = function(){
       api('/photos/'+pid, { method:'PUT', body: {
@@ -2305,8 +2325,8 @@ function bindPhotoPanel(unitId) {
       var files = Array.prototype.slice.call(bulkInput.files || []);
       if (!files.length) return;
       toast('上传 '+files.length+' 张…');
-      uploadUnitPhotos(unitId, files).then(function() {
-        toast('上传完成');
+      uploadUnitPhotos(unitId, files).then(function(res) {
+        toast(res.ok ? '上传完成' : ('部分失败 '+res.failed.length+' 张：'+res.failed[0]));
         openProject(state.current.id, unitId);
       }).catch(function(e){ toast('上传失败：'+e.message); });
       bulkInput.value = '';
@@ -2325,7 +2345,7 @@ function renderUnits(isTrade) {
   var tbody = document.getElementById('unitRows');
   var html = '';
   state.units.forEach(function(u) {
-    var th = u.cover_image ? "background-image:url('/"+u.cover_image.replace(/^\//,'')+"')" : '';
+    var th = imgStyle(u.cover_image);
     var priceVal = isTrade ? (u.price_total||'') : (u.rent_monthly||'');
     var pc = photosOf(u.id).length;
     html += '<tr class="unit-main" data-id="'+u.id+'">'+

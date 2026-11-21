@@ -184,6 +184,7 @@ export default function Lvju() {
 
   return (
     <div className="chan-page">
+      {/* 暂隐藏：频道顶栏
       <div className="appbar ghost">
         <Link
           className="bk"
@@ -201,6 +202,7 @@ export default function Lvju() {
           旅居<small>短住 · 候鸟 · 康养</small>
         </div>
       </div>
+      */}
 
       <div className="hero-sm lvju">
         <div className="bg" />
@@ -427,14 +429,14 @@ export default function Lvju() {
       </div>
 
       {CAIBEI ? (
-        <a className="banner" href="/lvju-rating-standard.html">
+        <Link className="banner" to="/rating-standard">
           <span className="bi">★</span>
           <div className="bt">
             <b>什么是旅居星级旅居？</b>
             <p>5 维评定 + 公安/住建/保险验真，扫码可查</p>
           </div>
           <span className="go">看标准 ›</span>
-        </a>
+        </Link>
       ) : null}
     </div>
   );

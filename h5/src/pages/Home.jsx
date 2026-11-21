@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { catalog, pickFeaturedProjects, spots } from '../lib/api.js';
+import { HOME_CHANNELS, channelHref, channelShown, hiddenHomeTabSet } from '../lib/homeChannels.js';
 import { assetUrl } from '../lib/asset.js';
 import { resolveHomeCity, syncCityToUrl, writeStoredCity } from '../lib/city.js';
 import { priceLabel } from '../lib/price.js';
@@ -29,12 +30,15 @@ export default function Home() {
   const [featured, setFeatured] = useState(null);
   const [dmap, setDmap] = useState({});
   const [featErr, setFeatErr] = useState('');
+  /** null = catalog 未回，频道区先不渲染，避免 hidden_home_tabs 闪一下全量再裁剪 */
+  const [hiddenTabs, setHiddenTabs] = useState(null);
 
   const load = useCallback((c) => {
     setPosts(null);
     setPostsHide(false);
     setFeatured(null);
     setFeatErr('');
+    setHiddenTabs(null);
 
     spots({ city: c })
       .then((data) => {
@@ -54,12 +58,15 @@ export default function Home() {
     catalog({ city: c })
       .then((cat) => {
         const { projects, dmap: dm } = pickFeaturedProjects(cat || {});
+        setHiddenTabs(hiddenHomeTabSet(cat));
         setDmap(dm);
         setFeatured(projects);
       })
       .catch(() => {
         setFeatErr('无法连接新居住数据库');
         setFeatured([]);
+        /* 失败也落盘配置（仅 FORCE_HIDDEN），避免频道区一直空白 */
+        setHiddenTabs(hiddenHomeTabSet(null));
       });
   }, []);
 
@@ -128,38 +135,24 @@ export default function Home() {
           <span className="bar" />
           <h3>找房·全频道</h3>
         </div>
-        <div className="chan">
-          <Link className="chan feat" to={`/lvju?city=${encodeURIComponent(city)}`}>
-            <span className="nb">新</span>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-lvju.png?v=14" alt="" />
-            </div>
-            <b>旅居</b>
-            <small>短住·候鸟·康养</small>
-          </Link>
-          <Link className="chan feat" to={`/minsu?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-minsu.png?v=15" alt="" />
-            </div>
-            <b>民宿</b>
-            <small>整栋·庭院·管家</small>
-          </Link>
-          <Link className="chan feat" to={`/changzu?city=${encodeURIComponent(city)}`}>
-            <span className="nb">新</span>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-changzu.png?v=14" alt="" />
-            </div>
-            <b>长租</b>
-            <small>整租·合租·月付</small>
-          </Link>
-          <Link className="chan" to={`/guide?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/chan-guide.png?v=14" alt="" />
-            </div>
-            <b>置业导购</b>
-            <small>看房·测算</small>
-          </Link>
-        </div>
+        {hiddenTabs == null ? (
+          <div className="home-empty" style={{ padding: '28px 0 8px' }}>
+            加载中…
+          </div>
+        ) : (
+          <div className="chan">
+            {HOME_CHANNELS.filter((ch) => channelShown(ch.id, hiddenTabs)).map((ch) => (
+              <Link key={ch.id} className="chan feat" to={channelHref(ch, city)}>
+                {ch.badge ? <span className="nb">{ch.badge}</span> : null}
+                <div className="ic">
+                  {ch.icon ? <img src={ch.icon} alt="" /> : <span style={{ fontSize: 22, lineHeight: 1 }}>{ch.emoji}</span>}
+                </div>
+                <b>{ch.label}</b>
+                <small>{ch.hint}</small>
+              </Link>
+            ))}
+          </div>
+        )}
 
         <Link className="feature" to={`/routes?city=${encodeURIComponent(city)}`}>
           <div className="fbg" />
@@ -173,41 +166,6 @@ export default function Home() {
             <p>编辑实地探访 12 处特色旅居 · 含双早 + 苗寨向导</p>
           </div>
         </Link>
-
-        <div className="seg-h" style={{ marginTop: 24 }}>
-          <span className="bar" />
-          <h3>内容服务 · 玩在贵州</h3>
-        </div>
-        <div className="content4">
-          <Link to="/spots">
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-spots.png?v=9" alt="" />
-            </div>
-            <b>旅游景点</b>
-            <small>必打卡</small>
-          </Link>
-          <Link to={`/routes?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-routes.png?v=9" alt="" />
-            </div>
-            <b>旅游路线</b>
-            <small>精选行程</small>
-          </Link>
-          <Link to={`/food?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-food.png?v=9" alt="" />
-            </div>
-            <b>旅游美食</b>
-            <small>本地味道</small>
-          </Link>
-          <Link to={`/convenience?city=${encodeURIComponent(city)}`}>
-            <div className="ic">
-              <img src="/assets/lvju/icons/svc-convenience.png?v=9" alt="" />
-            </div>
-            <b>旅游便民</b>
-            <small>出行·向导</small>
-          </Link>
-        </div>
 
         {!postsHide ? (
           <div>

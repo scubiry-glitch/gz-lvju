@@ -75,8 +75,14 @@ export default function PrivacyGate() {
         <h3 id="privTitle">用户隐私保护提示</h3>
         <div className="body">
           欢迎使用贝壳旅居频道。为向您提供找房、预订与客服等服务，我们需要收集、使用必要的账号与设备信息。详情请阅读
-          <a href="/lvju-app-privacy.html">《隐私政策》</a>与
-          <a href="/lvju-app-terms.html">《用户服务协议》</a>。
+          <a href="/gy/privacy" target="_blank" rel="noopener noreferrer">
+            《隐私政策》
+          </a>
+          与
+          <a href="/gy/terms" target="_blank" rel="noopener noreferrer">
+            《用户服务协议》
+          </a>
+          。
           点击「同意」即表示您已阅读并同意相关条款；若不同意，将退出本频道。
         </div>
         <div className="priv-acts">

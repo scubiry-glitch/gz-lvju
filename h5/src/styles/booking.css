@@ -342,7 +342,95 @@
   font-size: 11px;
   color: var(--muted);
   padding: 14px 18px 18px;
+  line-height: 1.65;
+}
+.agree p {
+  margin: 0 0 6px;
+}
+.agree p:last-child {
+  margin-bottom: 0;
+}
+.agree a {
+  color: var(--brand-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+.agree .lic-btn {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border: 1px solid #f0b429;
+  border-radius: 3px;
+  background: #fffbeb;
+  color: #b45309;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
   line-height: 1.6;
+  vertical-align: 1px;
+  cursor: pointer;
+}
+
+.booking-page .lic-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(8, 18, 16, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.booking-page .lic-panel {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  max-height: 88dvh;
+  background: #111;
+  border-radius: 12px;
+  overflow: auto;
+}
+.booking-page .lic-panel img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.booking-page .lic-x {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 18px;
+  line-height: 32px;
+  cursor: pointer;
+}
+.booking-page .lic-empty {
+  padding: 48px 22px 28px;
+  color: #e5e7eb;
+  text-align: center;
+}
+.booking-page .lic-empty b {
+  display: block;
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.booking-page .lic-empty p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #9ca3af;
+}
+.booking-page .lic-empty .lic-meta {
+  margin-top: 12px;
+  color: #d1d5db;
 }
 
 .bk-cta {

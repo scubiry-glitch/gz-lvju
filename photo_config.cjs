@@ -8,6 +8,8 @@
  *  1) 纯函数：分类归一化、全量覆盖入参归一化（分类 + 排序 + 封面 + 去重）、声明值校验；
  *  2) probeImage()：带防护的远程图片探测（仅商家开放接口的上架抽检用）——禁内网/环回/云元数据
  *     地址、限时、限字节、不跟随跨站跳转，任一环节异常都不抛异常、只回状态。
+ *     尺寸判定用零依赖 readImageSize()（jpg/png/gif/webp/bmp），**不得依赖 sharp**——
+ *     sharp 缺失属服务端缺件，若混入「网络不可达」会让抽检闸静默失效（2026-10-14 线上问题）。
  */
 'use strict';
 
@@ -230,6 +232,88 @@ function judgeProbe(f) {
   return { status: 'ok', width: x.width, height: x.height, bytes: x.bytes };
 }
 
+// ===== 尺寸解析（纯 JS，零依赖；见 readImageSize 注释为何不依赖 sharp）=====
+
+/** JPEG：从 SOFn 段取尺寸（跳过 APPn/COM 等带载荷段） */
+function readJpegSize(buf) {
+  const n = buf.length;
+  let i = 2;
+  while (i + 9 < n) {
+    if (buf[i] !== 0xff) { i += 1; continue; }
+    const marker = buf[i + 1];
+    if (marker === 0xff) { i += 1; continue; }                              // 段间填充
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) { i += 2; continue; }  // 无载荷
+    if (marker === 0xda) return null;                                       // 进压缩数据 = 没找到 SOF
+    const len = buf.readUInt16BE(i + 2);
+    if (len < 2) return null;
+    // SOF0..SOF15（排除 DHT=C4 / JPG=C8 / DAC=CC）携带宽高
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5), format: 'jpeg' };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+
+/** WebP：VP8X（扩展）/ VP8L（无损）/ VP8（有损）三种载荷头 */
+function readWebpSize(buf) {
+  const fourcc = buf.slice(12, 16).toString('latin1');
+  if (fourcc === 'VP8X' && buf.length >= 30) {
+    return { width: 1 + buf.readUIntLE(24, 3), height: 1 + buf.readUIntLE(27, 3), format: 'webp' };
+  }
+  if (fourcc === 'VP8L' && buf.length >= 25 && buf[20] === 0x2f) {
+    const b = buf.readUInt32LE(21);
+    return { width: (b & 0x3fff) + 1, height: ((b >> 14) & 0x3fff) + 1, format: 'webp' };
+  }
+  if (fourcc === 'VP8 ' && buf.length >= 30
+    && buf[23] === 0x9d && buf[24] === 0x01 && buf[25] === 0x2a) {
+    return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff, format: 'webp' };
+  }
+  return null;
+}
+
+/**
+ * 读取图片尺寸（纯 JS，按文件头判定，不解码像素）：
+ * JPEG / PNG / GIF / WebP / BMP 覆盖商家图集实际会出现的全部格式。
+ * 返回 { width, height, format }；识别不出（非图 / 损坏 / 非白名单格式）→ null。
+ *
+ * 为什么不走 sharp：sharp 是**原生依赖**，发行包在 mac 上打包、跑到 Linux 上时平台二进制不匹配
+ * （或 `npm ci --omit=dev` 未装 devDependencies）→ require('sharp') 直接抛错。
+ * 原实现把这种「服务端自身缺件」混进 unreachable 只记 warning，等于上架抽检闸被静默关闭
+ * （2026-10-14 线上告警即此）。此处改为零依赖解析，sharp 仅作为未知格式的兜底。
+ */
+function readImageSize(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 16) return null;
+  if (buf.readUInt32BE(0) === 0x89504e47 && buf.readUInt32BE(4) === 0x0d0a1a0a) {   // PNG + IHDR
+    return buf.length >= 24 ? { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), format: 'png' } : null;
+  }
+  if (buf.slice(0, 3).toString('latin1') === 'GIF') {
+    return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8), format: 'gif' };
+  }
+  if (buf.slice(0, 2).toString('latin1') === 'BM' && buf.length >= 26) {            // BMP（高可为负=倒序行）
+    return { width: Math.abs(buf.readInt32LE(18)), height: Math.abs(buf.readInt32LE(22)), format: 'bmp' };
+  }
+  if (buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') {
+    return readWebpSize(buf);
+  }
+  if (buf[0] === 0xff && buf[1] === 0xd8) return readJpegSize(buf);                // JPEG SOI
+  return null;
+}
+
+/**
+ * 抽检取尺寸：优先零依赖解析；解析不出（少见格式）再用 sharp 兜底；都没有 → 视为解析失败。
+ */
+function probeDimensions(buf) {
+  const size = readImageSize(buf);
+  if (size) return Promise.resolve(size);
+  let sharp = null;
+  try { sharp = require('sharp'); } catch (_) {}
+  if (!sharp) return Promise.resolve(null);
+  return sharp(buf, { failOn: 'none' }).metadata()
+    .then((m) => (m && m.width && m.height ? { width: m.width, height: m.height, format: m.format } : null))
+    .catch(() => null);
+}
+
 /**
  * 探测一张远程图：返回 { status, width, height, bytes, reason }
  *   status = 'ok'（读到了且能解析）/ 'rejected'（确定性不合格：超限、非图、地址不合法）
@@ -306,12 +390,12 @@ function probeOnce(url, o, timeoutMs, maxBytes, depth) {
       });
       res.on('end', () => {
         const buf = Buffer.concat(chunks);
-        let sharp = null;
-        try { sharp = require('sharp'); } catch (_) {}
-        if (!sharp) return done({ status: 'unreachable', reason: '服务端未安装图片解析库（sharp）' });
-        sharp(buf).metadata()
-          .then((m) => done(judgeProbe({ bytes: buf.length, width: m && m.width, height: m && m.height })))
-          .catch(() => done(judgeProbe({ bytes: buf.length, parseFailed: true })));
+        probeDimensions(buf).then((size) => done(judgeProbe({
+          bytes: buf.length,
+          width: size && size.width,
+          height: size && size.height,
+          parseFailed: !size,
+        })));
       });
       res.on('error', () => done({ status: 'unreachable', reason: '图片下载中断' }));
     });
@@ -366,6 +450,8 @@ module.exports = {
   pickCoverIndex,
   ipIsBlocked,
   judgeProbe,
+  readImageSize,
+  probeDimensions,
   probeImage,
   spotCheck,
   clearProbeCache,

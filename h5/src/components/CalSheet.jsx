@@ -123,10 +123,24 @@ export default function CalSheet({
     return () => io.disconnect();
   }, [open, loadMonth, monthList]);
 
+  /** 第二下若不能成合法离店（连住不足 / 中间满房），改作新入住日起算，避免卡死在旧入住 */
+  function restartAsCheckin(d, reason) {
+    setCi(d);
+    setCo(null);
+    setTip(reason || '');
+  }
+
   function pick(d) {
     if (d < today || d > maxDay) return;
     const inf = dayInfo(d);
     if (dayBlocked(inf)) return;
+    /* 再点一次已选入住日 → 清空，便于重选 */
+    if (ci && !co && iso(d) === iso(ci)) {
+      setCi(null);
+      setCo(null);
+      setTip('');
+      return;
+    }
     if (!ci || (ci && co) || d <= ci) {
       setCi(d);
       setCo(null);
@@ -135,7 +149,10 @@ export default function CalSheet({
     }
     const n = Math.round((d - ci) / 864e5);
     if (n < minNights) {
-      setTip('须连续入住 ≥ ' + minNights + ' 晚 · 最早 ' + md(addDays(ci, minNights)) + ' 离店');
+      restartAsCheckin(
+        d,
+        '连住不足 ' + minNights + ' 晚 · 已改选 ' + md(d) + ' 为入住，请再选离店',
+      );
       return;
     }
     let firstBad = null;
@@ -147,7 +164,11 @@ export default function CalSheet({
       }
     }
     if (firstBad) {
-      setTip(md(firstBad) + (dayInfo(firstBad)?.status === 'booked' ? ' 已订' : ' 关房') + ' · 请调整日期或换房型');
+      const badLabel = dayInfo(firstBad)?.status === 'booked' ? '已订' : '关房';
+      restartAsCheckin(
+        d,
+        md(firstBad) + ' ' + badLabel + ' · 已改选 ' + md(d) + ' 为入住，请再选离店',
+      );
       return;
     }
     setCo(d);
@@ -155,6 +176,8 @@ export default function CalSheet({
   }
 
   const n = ci && co ? Math.round((co - ci) / 864e5) : 0;
+  /* 已选入住、未选离店：最早合法离店日 = 入住 + minNights */
+  const earliestCo = ci && !co ? addDays(ci, minNights) : null;
   const nights = ci && co ? nightsBetween(ci, co) : [];
   const dayMap = useMemo(() => {
     const map = {};
@@ -195,11 +218,20 @@ export default function CalSheet({
             <div className="cnn">{n ? n + '晚' : '—'}</div>
             <div className="csd">
               <small>离店</small>
-              <b className={co ? '' : 'ph'}>{co ? md(co) : '请选择'}</b>
+              <b className={co ? '' : 'ph'}>
+                {co ? md(co) : earliestCo ? '最早 ' + md(earliestCo) : '请选择'}
+              </b>
             </div>
           </div>
           <div className={'cs-tip' + (tip ? ' warn' : '')}>
-            {tip || '连住 ' + minNights + ' 晚起 · 点选入住与离店日期，再点「确定」'}
+            {tip ||
+              (ci && earliestCo
+                ? '连住 ' +
+                  minNights +
+                  ' 晚起 · 请选 ' +
+                  md(earliestCo) +
+                  ' 及之后离店（日历虚线圈＝最早）'
+                : '连住 ' + minNights + ' 晚起 · 点选入住与离店日期，再点「确定」')}
           </div>
         </div>
         <div className="cs-months" ref={monthsRef}>
@@ -228,7 +260,11 @@ export default function CalSheet({
                     const low = inf && inf.remaining != null && inf.remaining > 0 && inf.remaining <= 2;
                     const isCi = ci && iso(d) === iso(ci);
                     const isCo = co && iso(d) === iso(co);
+                    const isMinCo = earliestCo && iso(d) === iso(earliestCo);
                     const inRange = ci && co && d > ci && d < co;
+                    /* 入住后、最早离店前：连住不足，视觉弱化但仍可点（改选入住） */
+                    const tooShort =
+                      earliestCo && !noslot && !past && !beyond && d > ci && d < earliestCo;
                     const wknd = d.getDay() === 0 || d.getDay() === 6;
                     const tdy = iso(d) === iso(today);
                     const price = inf && inf.price != null ? Number(inf.price) : basePrice;
@@ -238,8 +274,15 @@ export default function CalSheet({
                     if (tdy) cls += ' tdy';
                     if (wknd) cls += ' wknd';
                     if (low && !noslot) cls += ' low';
+                    if (tooShort) cls += ' short';
+                    if (isMinCo && !noslot) cls += ' minco';
                     if (inRange) cls += ' range';
                     if (isCi || isCo) cls += ' end';
+                    let dpText = '·';
+                    if (noslot) dpText = '满';
+                    else if (isMinCo) dpText = '最早';
+                    else if (tooShort) dpText = '不足';
+                    else if (price) dpText = '¥' + price;
                     return (
                       <div
                         key={iso(d)}
@@ -247,11 +290,7 @@ export default function CalSheet({
                         onClick={() => !(past || beyond || noslot) && pick(d)}
                       >
                         <span className="dn">{d.getDate()}</span>
-                        {!past && !beyond ? (
-                          <span className="dp">
-                            {noslot ? '满' : price ? '¥' + price : '·'}
-                          </span>
-                        ) : null}
+                        {!past && !beyond ? <span className="dp">{dpText}</span> : null}
                       </div>
                     );
                   })}
@@ -263,6 +302,10 @@ export default function CalSheet({
             <span>
               <i style={{ background: 'var(--brand)' }} />
               选中
+            </span>
+            <span>
+              <i className="lg-minco" />
+              最早离店
             </span>
             <span>
               <i style={{ background: 'var(--brand-soft)' }} />
@@ -283,6 +326,12 @@ export default function CalSheet({
               </>
             ) : n && range.blocked ? (
               <span style={{ color: '#b91c1c', fontWeight: 600 }}>选中户型该时段含已订 · 请换日期或房型</span>
+            ) : earliestCo ? (
+              <>
+                最早离店 <b style={{ fontSize: 15 }}>{md(earliestCo)}</b>
+                <br />
+                连住 {minNights} 晚 · 可选该日及之后
+              </>
             ) : basePrice ? (
               <>
                 <b>¥{formatPrice(basePrice)}</b>/晚起 · 连住 {minNights} 晚起

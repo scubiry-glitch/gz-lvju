@@ -5,7 +5,8 @@
  */
 
 let mysql2 = null;
-try { mysql2 = require('mysql2/promise'); } catch (_) {}
+try { mysql2 = require('mysql2/promise'); } catch (e) { throw new Error('缺少依赖 mysql2，请先在项目根目录执行 npm install'); }
+
 
 function getDbConfig() {
   const host = (process.env.MYSQL_HOST || process.env.JUZHU_DB_HOST || '').trim();
@@ -27,6 +28,10 @@ function getDbConfig() {
     charset: 'utf8mb4',
     connectTimeout: 8000,
     decimalNumbers: true,
+    // 全库时间统一北京时间：客户端按 +08:00 序列化/解析，
+    // 服务端会话时区由 MySQL 全局 +08:00 保证（已核实），
+    // 因此 NOW() / DEFAULT CURRENT_TIMESTAMP 生成的也是北京时间。
+    timezone: '+08:00',
   };
 }
 

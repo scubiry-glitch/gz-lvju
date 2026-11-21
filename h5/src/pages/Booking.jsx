@@ -23,6 +23,9 @@ import '../styles/booking.css';
 const COVER_FALLBACK = '/assets/lvju/xijiang-night.jpg';
 const TIMER_IC = '/assets/lvju/icons/booking-timer.png';
 const CAIBEI = featureEnabled('caibei');
+/** 预订主体（文案占位；执照图暂用贝壳智造样例，正式主体到位后替换） */
+const PLATFORM_CO = '新居住（贵阳）xx有限公司';
+const PLATFORM_LIC = '/assets/lvju/biz-license-beike-zhizao.jpg';
 
 function asArr(v) {
   if (Array.isArray(v)) return v;
@@ -73,6 +76,7 @@ function BookingInner() {
   const [couponStatus, setCouponStatus] = useState('idle');
   const [couponError, setCouponError] = useState('');
   const [couponRefresh, setCouponRefresh] = useState(0);
+  const [lic, setLic] = useState(null); // 'platform' | 'merchant' | null
   const couponContext = [me?.id || '',id,unitId,checkin,checkout,unitId ? rooms : 1].join('|');
   const visibleQuotes = quotedFor === couponContext ? couponQuotes : [];
   const selectedCoupon = visibleQuotes.find((q) => q.coupon_id === couponId);
@@ -117,10 +121,11 @@ function BookingInner() {
         setLoading(false);
         return;
       }
+      // 两项都开时默认在线支付；链接显式带 transaction_mode 时仍以链接为准。
       let nextTx = sp.get('transaction_mode') || '';
       if (nextTx !== 'booking' && nextTx !== 'payment') {
-        if (proj.online_booking) nextTx = 'booking';
-        else if (proj.online_payment) nextTx = 'payment';
+        if (proj.online_payment) nextTx = 'payment';
+        else if (proj.online_booking) nextTx = 'booking';
       }
       if (nextTx === 'booking' && !proj.online_booking && proj.online_payment) nextTx = 'payment';
       if (nextTx === 'payment' && !proj.online_payment && proj.online_booking) nextTx = 'booking';
@@ -155,7 +160,7 @@ function BookingInner() {
             title: '待支付订单',
             sub:
               (o.project_name || '旅居预订') +
-              (o.checkin ? ' · ' + o.checkin + ' → ' + (o.checkout || '') : '') +
+              (o.checkin ? ' · ' + o.checkin + ' – ' + (o.checkout || '') : '') +
               (o.nights ? ' · ' + o.nights + ' 晚' : '') +
               (o.price_total != null ? ' · ¥' + formatPrice(o.price_total) : ''),
             contact_phone: o.contact_phone_raw || o.contact_phone || sp.get('phone') || '',
@@ -345,7 +350,7 @@ function BookingInner() {
     setPaying(true);
     const contactPhone = ok.contact_phone || phone;
     const result =
-      '/h5/paid?channel=booking&order_no=' +
+      '/gy/paid?channel=booking&order_no=' +
       encodeURIComponent(ok.order_no) +
       '&phone=' +
       encodeURIComponent(contactPhone || '');
@@ -478,11 +483,11 @@ function BookingInner() {
           ok.pay_status === 'paying' ||
           ok.pay_status === 'create_unknown' ? (
             <button type="button" className="btn pay" onClick={onPay} disabled={paying}>
-              {paying ? '正在拉起收银台…' : '立即支付 →'}
+              {paying ? '正在拉起收银台…' : '立即支付'}
             </button>
           ) : null}
           <Link className="btn ghost" to="/orders">
-            去订单页查状态 →
+            去订单页查状态
           </Link>
         </div>
       </div>
@@ -598,11 +603,11 @@ function BookingInner() {
       <div className="bfield">
         <span className="l">交易方式</span>
         <select value={tx} onChange={(e) => { setTx(e.target.value); if (e.target.value === 'booking') setCouponId(''); }}>
-          {p?.online_booking ? (
-            <option value="booking">在线预订 · 商家确认后线下收款</option>
-          ) : null}
           {p?.online_payment ? (
             <option value="payment">在线支付 · 支付后商家确认</option>
+          ) : null}
+          {p?.online_booking ? (
+            <option value="booking">在线预订 · 商家确认后线下收款</option>
           ) : null}
         </select>
       </div>
@@ -613,7 +618,7 @@ function BookingInner() {
         <select value={cSel} onChange={(e) => applyContact(e.target.value)}>
           {me ? (
             <option value="acct">
-              我的资料（{me.display_name || ''} · {(me.phone || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}）
+              （{me.display_name || ''} · {(me.phone || '').replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}）
             </option>
           ) : null}
           {contacts.map((c) => (
@@ -712,10 +717,45 @@ function BookingInner() {
       {err ? <div className="berr">{err}</div> : null}
 
       <div className="agree">
-        {paidMode
-          ? '提交即同意《旅居预订与退改协议》。资金由贝壳存管，支付后待商家确认。'
-          : '提交即同意《旅居预订与退改协议》。本单在线预订，商家确认后线下收款。'}
+        <p>
+          请您在提交前仔细阅读
+          <Link to="/terms">《网络预订服务协议》</Link>
+          <Link to="/privacy">《隐私声明》</Link>
+        </p>
+        <p>
+          预订服务由【{PLATFORM_CO}】提供
+          <button type="button" className="lic-btn" onClick={() => setLic('platform')}>
+            营业执照
+          </button>
+          ；
+        </p>
+        <p>
+          住宿服务由民宿经营者提供
+          <button type="button" className="lic-btn" onClick={() => setLic('merchant')}>
+            营业执照
+          </button>
+          。
+        </p>
       </div>
+
+      {lic ? (
+        <div className="lic-mask" onClick={(e) => e.target === e.currentTarget && setLic(null)} role="presentation">
+          <div className="lic-panel" role="dialog" aria-modal="true" aria-label="营业执照">
+            <button type="button" className="lic-x" onClick={() => setLic(null)} aria-label="关闭">
+              ✕
+            </button>
+            {lic === 'platform' ? (
+              <img src={PLATFORM_LIC} alt={PLATFORM_CO + '营业执照'} />
+            ) : (
+              <div className="lic-empty">
+                <b>民宿经营者营业执照</b>
+                <p>由住宿服务提供方持有并公示。如需核验，请通过房源详情咨询管家或商家。</p>
+                {p?.name ? <p className="lic-meta">本单房源：{p.name}</p> : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <div className="bk-cta">
         <div className="p">

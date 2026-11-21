@@ -73,6 +73,7 @@ export default function Minsu() {
 
   return (
     <div className="chan-page">
+      {/* 暂隐藏：频道顶栏
       <div className="appbar ghost">
         <Link className="bk" to="/" onClick={(e) => {
           if (history.length > 1) {
@@ -86,6 +87,7 @@ export default function Minsu() {
           民宿<small>整栋 · 庭院 · 管家</small>
         </div>
       </div>
+      */}
 
       <div className="hero-sm minsu">
         <div className="bg" />
@@ -221,9 +223,9 @@ export default function Minsu() {
             <b>每间民宿一张验真卡</b>
             <p>公安实名 · 住建备案 · 安心险，扫码核验</p>
           </div>
-          <a className="go" href="/lvju-rating-standard.html">
+          <Link className="go" to="/rating-standard">
             了解 ›
-          </a>
+          </Link>
         </div>
       ) : null}
     </div>

@@ -223,7 +223,8 @@ class PayCenter {
    *   落兵台接口文档：https://weapons.ke.com/project/15453/interface/api/9297
    * @param {object} body 必填：appCode, projectCode, appOrderId, refundAmount, callbackUrl,
    *   ucid, userType, shareOrderInfos[{merchantNo, shareBizCode, amount}]，
-   *   且 orderId / businessOrderNo / cashierOrderNo 至少其一（定位原单）
+   *   且 orderId / businessOrderNo / cashierOrderNo 至少其一（定位原单）。
+   *   profitSharingType 未传（缺省 / null / 空串）时先写回入参再默认 2，网关日志记下的就是这份请求；业务显式传入则原样转发。
    * @returns {Promise<{errno:number,error:string,data:object}>}
    */
   async refundOrder(body = {}) {
@@ -231,6 +232,7 @@ class PayCenter {
     const need = ['appCode', 'projectCode', 'appOrderId', 'refundAmount', 'callbackUrl', 'ucid', 'userType', 'shareOrderInfos'];
     const miss = need.filter((k) => body[k] === undefined || body[k] === null || body[k] === '');
     if (miss.length) throw new Error('[payCenter] refundOrder 缺少必填：' + miss.join(', '));
+    if (body.profitSharingType == null || body.profitSharingType === '') body.profitSharingType = 2;
     const payload = Object.assign({ refundType: '01' }, body);
     return this._paymentJson('原路退款', this._path('/order/refundOrder'), {
       method: 'POST',
@@ -328,20 +330,31 @@ class PayCenter {
   /**
    * 9. 分账结果与分账回退结果查询
    *   落兵台接口文档：https://weapons.ke.com/project/15873/interface/api/1479569
-   * @param {object} params 必填：bizCode, orderType；bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
+   * @param {object} params 必填：orderType，且 bizCode(分账标准业务码)  必传；
+   *   bizOrderNo / orderNo 至少其一（与 bizCode 幂等）
    *   orderType 取值：DIRECT_SPLIT-分账；SPLIT_RETURN-分账追回
    * @returns {Promise<{code:string,info:string,data:object}>}
    */
   async querySplitResult(params = {}) {
-    if (!params.bizCode || !params.orderType) {
-      throw new Error('[payCenter] querySplitResult 必填 bizCode / orderType');
+    if ((!params.bizCode) || !params.orderType) {
+      throw new Error('[payCenter] querySplitResult 必填 orderType，且 bizCode / feeType 二选一必传');
     }
     assertOneOf('querySplitResult', params, ['bizOrderNo', 'orderNo']);
-    return this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      query: clean(params),
-    });
+    console.log("querySplitResult params",params)
+    try {
+      const result = await this.client.json(this._profitPath('/share-profits/api/standard/direct/split/query'), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        query: clean(params),
+      });
+      console.log('[payCenter] querySplitResult 出参 >>>', JSON.stringify(result));
+      return result;
+    } catch (e) {
+      // 失败也打印网关真实返回（responseText 含 X-Error-Code / 权限原因），便于排查 401/403
+      console.error('[payCenter] querySplitResult 失败:', e && e.message,
+        '| httpStatus:', e && e.httpStatus, '| traceId:', e && e.traceId, '| responseText:', e && e.responseText);
+      throw e;
+    }
   }
 }
 

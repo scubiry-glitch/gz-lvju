@@ -25,12 +25,12 @@ function createExecution(options) {
  async function tx(fn) {
   for(let attempt=0;;attempt++) {
    const c=await pool.getConnection();
-   try { if(typeof c.query==='function')await c.query("SET time_zone='+00:00'");await c.beginTransaction(); const result=await fn(c); await c.commit(); return result; }
+   try { if(typeof c.query==='function')await c.query("SET time_zone='+08:00'");await c.beginTransaction(); const result=await fn(c); await c.commit(); return result; }
    catch(e) { await c.rollback().catch(()=>{}); if(attempt<2 && ['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT','ER_DUP_ENTRY'].includes(e.code)) continue; throw e; }
    finally { c.release(); }
   }
  }
- async function read(fn) {const c=await pool.getConnection();try{if(typeof c.query==='function')await c.query("SET time_zone='+00:00'");return await fn(c);}finally{c.release();}}
+ async function read(fn) {const c=await pool.getConnection();try{if(typeof c.query==='function')await c.query("SET time_zone='+08:00'");return await fn(c);}finally{c.release();}}
  async function loadContext(c,id) {
   const context=(await rows(c,'SELECT * FROM commerce_settlement_business_contexts WHERE id=?',[id]))[0];
   ensure(context && upper(context.execution_scope)==='INTERNAL_FUNDED','外部账单或缺少资金准入的订单不可执行','SETTLEMENT_SCOPE_DENIED');

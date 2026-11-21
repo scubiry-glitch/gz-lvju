@@ -104,7 +104,7 @@ async function fundedOwnerOrRecipient(conn,coupon,order,accountId) {
 async function quote(conn, { couponId, accountId, bizType, cityId, vendorId, itemId, unitId = null, grossMinor, unitCount = 1, lock = false }) {
   assert(['booking','jiazheng'].includes(bizType), '用券业务域无效', 400);
   assert(/^[0-9a-f-]{36,40}$/i.test(String(couponId)), '券编号无效', 400);
-  const [coupons] = await conn.execute(`SELECT *,expires_at>UTC_TIMESTAMP() AS still_valid FROM commerce_coupons WHERE id=?${lock ? ' FOR UPDATE' : ''}`, [couponId]);
+  const [coupons] = await conn.execute(`SELECT *,expires_at>NOW() AS still_valid FROM commerce_coupons WHERE id=?${lock ? ' FOR UPDATE' : ''}`, [couponId]);
   const coupon = coupons[0];
   assert(coupon && String(coupon.account_id) === String(accountId), '券不存在或不属于当前账号', 404);
   assert(coupon.status === 'available' && Number(coupon.still_valid) === 1, '券已失效或被占用', 409);
@@ -135,7 +135,7 @@ async function listQuotes(conn, input) {
     const scopeColumn=input.bizType==='booking'?'booking_project_ids':'life_product_ids';
     const [coupons]=await conn.execute(`SELECT c.id,c.expires_at FROM commerce_coupons c
       JOIN commerce_orders o ON o.id=c.order_id
-      WHERE c.account_id=? AND c.city_id=? AND c.status='available' AND c.expires_at>UTC_TIMESTAMP()
+      WHERE c.account_id=? AND c.city_id=? AND c.status='available' AND c.expires_at>NOW()
         AND (o.account_id=? OR EXISTS(SELECT 1 FROM commerce_distribution_items di JOIN commerce_distribution_campaigns dc ON dc.id=di.campaign_id WHERE di.coupon_id=c.id AND di.state='claimed' AND di.claimed_by=c.account_id AND dc.order_id=o.id AND dc.sponsor_account_id=o.account_id))
         AND o.city_id=? AND o.payment_status IN ('paid','partially_refunded') AND o.paid_payment_order_id IS NOT NULL
         AND NOT (JSON_EXTRACT(c.snapshot,'$.is_demo') <=> TRUE)
@@ -200,11 +200,11 @@ async function transition(conn, { bizType, orderNo, from, to, evidence = {} }) {
   if (app.status === to) return app;
   assert(from.includes(app.status), '用券状态不允许此操作', 409);
   if (to === 'released') {
-    const [coupon] = await conn.execute('SELECT status,expires_at>UTC_TIMESTAMP() AS still_valid FROM commerce_coupons WHERE id=? FOR UPDATE', [app.coupon_id]);
+    const [coupon] = await conn.execute('SELECT status,expires_at>NOW() AS still_valid FROM commerce_coupons WHERE id=? FOR UPDATE', [app.coupon_id]);
     assert(coupon[0]?.status === 'reserved', '券当前状态不允许释放', 409);
     // Free cancellation does not erase an entitlement while it was held by this order.
     if (Number(coupon[0].still_valid) === 1) await conn.execute("UPDATE commerce_coupons SET status='available' WHERE id=?", [app.coupon_id]);
-    else await conn.execute("UPDATE commerce_coupons SET status='available',expires_at=DATE_ADD(UTC_TIMESTAMP(),INTERVAL 24 HOUR) WHERE id=?", [app.coupon_id]);
+    else await conn.execute("UPDATE commerce_coupons SET status='available',expires_at=DATE_ADD(NOW(),INTERVAL 24 HOUR) WHERE id=?", [app.coupon_id]);
   } else if (to === 'consumed') {
     const [coupon] = await conn.execute('SELECT status FROM commerce_coupons WHERE id=? FOR UPDATE', [app.coupon_id]);
     assert(coupon[0]?.status === 'reserved', '券当前状态不允许履约', 409);

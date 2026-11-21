@@ -34,7 +34,7 @@ async function config(pool,principal){
  const c=await pool.getConnection();try{
   await assertAdmin(c,principal);const {product,sku}=await fixture(c);
   const [coupons]=await c.execute(`SELECT id,status,expires_at FROM commerce_coupons
-   WHERE account_id=? AND status='available' AND expires_at>UTC_TIMESTAMP()
+   WHERE account_id=? AND status='available' AND expires_at>NOW()
     AND JSON_UNQUOTE(JSON_EXTRACT(snapshot,'$.sku.initialization.seed_key'))=? ORDER BY expires_at,id LIMIT 30`,[principal.account.id,SEED]);
   const [orders]=await c.execute('SELECT id,product_id,coupon_id,listed_minor,coupon_minor,simulated_cash_minor,status,created_at FROM commerce_demo_life_orders WHERE account_id=? ORDER BY created_at DESC LIMIT 20',[principal.account.id]);
   const payload=parse(sku.payload);
@@ -44,7 +44,7 @@ async function config(pool,principal){
 async function quoteOn(conn,principal,couponId,lock=false){
  assert(/^[0-9a-f-]{36}$/i.test(String(couponId||'')),'券编号无效',400);
  const {product}=await fixture(conn);
- const [rows]=await conn.execute(`SELECT *,expires_at>UTC_TIMESTAMP() AS still_valid FROM commerce_coupons WHERE id=?${lock?' FOR UPDATE':''}`,[couponId]);
+ const [rows]=await conn.execute(`SELECT *,expires_at>NOW() AS still_valid FROM commerce_coupons WHERE id=?${lock?' FOR UPDATE':''}`,[couponId]);
  const coupon=rows[0];assert(coupon&&String(coupon.account_id)===String(principal.account.id),'券不存在或不属于当前账号',404);
  assert(coupon.status==='available'&&Number(coupon.still_valid)===1,'券已使用或过期',409);
  const snapshot=parse(coupon.snapshot),sku=snapshot.sku||{};

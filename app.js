@@ -1,3 +1,4 @@
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 const http = require('http');
 const dns = require('dns');
 const net = require('net');
@@ -57,6 +58,7 @@ const { createJiazhengRouter } = require('./server/routes/jiazheng.cjs');
 const { createAdminRouter } = require('./server/routes/admin.cjs');
 const { createApiDirectRouter } = require('./server/routes/api_direct.cjs');
 const { createSchema } = require('./server/schema.cjs');
+const { createCmdRouter } = require('./server/job/cmd_split.cjs');
 authCenter.init({
   query: (sql, params) => queryRows(sql, params),
   exec: (sql, params) => withDbRetry(async () => { const [r] = await getPool().execute(sql, params || []); return r; }),
@@ -131,6 +133,10 @@ module.exports.ensureSchema = ensureSchema;
 
 let vendorApi = null;
 try { vendorApi = require('./vendor_api.cjs'); } catch (_) {}
+let s3Client = null;
+try { s3Client = require('./s3_client.cjs'); } catch (_) {}
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
 // 商家 HMAC-SHA256 签名（平台 → 商家方向的 urllink / order_detail 用）
 let hmacAuth = null;
 try { hmacAuth = require('./hmac_auth.cjs'); } catch (_) {}
@@ -146,8 +152,9 @@ let paymentService = null;
 function getPaymentService() {
   if (!paymentService) {
     paymentService = createPaymentService({
-      createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }),
+      createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: '+08:00' }),
       payCenter,
+      notifyVendorBooking,
       jobHandlers: { booking_webhook: deliverPaymentWebhook },
     });
   }
@@ -159,7 +166,7 @@ let settlementRuntimePromise;
 async function getSettlementRuntime() {
   if (!settlementRuntimePromise) settlementRuntimePromise = (async () => {
     await ensureSchema();
-    const pool = mysql2.createPool({ ...getDbConfig(), timezone: 'Z', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, connectionLimit: 8 });
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: '+08:00', dateStrings: true, supportBigNumbers: true, bigNumberStrings: true, connectionLimit: 8 });
     try {
       const module = require('./server/settlement/index.cjs');
       await module.migrate(pool);
@@ -170,10 +177,33 @@ async function getSettlementRuntime() {
   return settlementRuntimePromise;
 }
 function getBookingPaymentAdapter() { return getPaymentService().bookingAdapter; }
+let commerceHandlerPromise;
+async function getCommerceHandler() {
+  if (!commerceHandlerPromise) commerceHandlerPromise = (async () => {
+    const pool = mysql2.createPool({ ...getDbConfig(), timezone: '+08:00', supportBigNumbers: true, bigNumberStrings: false, connectionLimit: 8, waitForConnections: true, queueLimit: 50 });
+    try {
+      const { migrate } = require('./commerce/migrate.cjs');
+      await migrate(pool);
+      const { createServer } = require('./commerce/app.cjs');
+      const srv = createServer({ pool, auth: authCenter, publicOrigin: process.env.COMMERCE_PUBLIC_ORIGIN || '' });
+      // 开启后台任务（支付回收 + 优惠券到期）
+      let consuming = false;
+      const paymentTask = setInterval(async () => {
+        if (consuming) return; consuming = true;
+        try { await srv.service.payments.consume(); await srv.service.payments.queueExpiryRefunds(); } catch (_) {} finally { consuming = false; }
+      }, 1500);
+      paymentTask.unref();
+      const expiryTask = setInterval(() => srv.service.expire().catch(() => {}), 30000);
+      expiryTask.unref();
+      return srv.listeners('request')[0];
+    } catch (e) { await pool.end(); throw e; }
+  })().catch(e => { commerceHandlerPromise = null; throw e; });
+  return commerceHandlerPromise;
+}
 let jiazhengPaymentAdapter;
 function getJiazhengAdapter() {
   if (!jiazhengPaymentAdapter) jiazhengPaymentAdapter = require('./server/payment/jiazheng-adapter.cjs').createJiazhengAdapter({
-    createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: 'Z' }), paymentCore: getPaymentCore(), config: process.env,
+    createConnection: () => mysql2.createConnection({ ...getDbConfig(), timezone: '+08:00' }), paymentCore: getPaymentCore(), config: process.env,
   });
   return jiazhengPaymentAdapter;
 }
@@ -238,15 +268,15 @@ function isPublicStatic(urlPath) {
   if (parts.some(isSensitivePart)) return false;
   if (parts.length === 1 && ROOT_BLOCKED_FILES.has(parts[0].toLowerCase())) return false;
   if (parts[0] === 'node_modules' || parts[0] === 'scripts' || parts[0] === '.git' || parts[0] === 'commerce') return false;
-  // React C 端源码/依赖不走通用静态根；成品由 serveH5Spa 从 h5/dist 挂 /h5/*
+  // React C 端源码/依赖不走通用静态根；成品由 serveH5Spa 从 h5/dist 挂 /gy/*
   if (parts[0] === 'h5' && (parts[1] === 'src' || parts[1] === 'node_modules' || parts[1] === 'public')) return false;
   return true;
 }
 
-/** C 端 React SPA：/h5 → h5/dist，未知路径回落 index.html（不删 lvju-app-*.html） */
+/** C 端 React SPA：/gy → h5/dist，未知路径回落 index.html（不删 lvju-app-*.html） */
 function serveH5Spa(rawPath, res) {
   const dist = path.join(ROOT, 'h5', 'dist');
-  const relRaw = String(rawPath || '').replace(/^\/h5\/?/, '') || 'index.html';
+  const relRaw = String(rawPath || '').replace(/^\/gy\/?/, '') || 'index.html';
   const rel = path.posix.normalize('/' + relRaw).replace(/^\/+/, '') || 'index.html';
   if (rel.split('/').some((p) => p === '..')) {
     res.writeHead(403);
@@ -709,6 +739,57 @@ function isVendorHmacPath(urlPath, method) {
   return m === 'POST' && (p === '/api/juzhu/callback' || p.startsWith('/api/juzhu/jiazheng/vendor/') || p.startsWith('/api/juzhu/housing/vendor/'));
 }
 
+const OPEN_API_HOST_PREFIX = 'test-xjz-open';
+// 暂时放开 test-xjz-open 的路径限制。判定与白名单留在下面，恢复时改回 true。
+const OPEN_API_HOST_GATE = false;
+
+function requestHostnames(req) {
+  const headers = (req && req.headers) || {};
+  const names = [];
+  for (const value of [headers['x-forwarded-host'], headers.host]) {
+    for (const part of String(value || '').split(',')) {
+      const host = part.trim().toLowerCase().replace(/:\d+$/, '');
+      if (host) names.push(host);
+    }
+  }
+  return names;
+}
+
+function isOpenApiHost(req) {
+  return requestHostnames(req).some((host) => host.startsWith(OPEN_API_HOST_PREFIX));
+}
+
+const OPEN_API_PAGES = new Set([
+  '/screens/open-platform.html',
+  '/screens/property-intake-api.html',
+  '/screens/vendor-onboarding.html',
+  '/screens/_region.js',
+  '/screens/_nav.js',
+]);
+
+function isOpenApiAllowedPath(urlPath, method) {
+  if (isVendorHmacPath(urlPath, method)) return true;
+  const p = String(urlPath || '').split('?')[0].replace(/\/+$/, '') || '/';
+  const m = String(method || 'GET').toUpperCase();
+  if ((m === 'GET' || m === 'HEAD') && OPEN_API_PAGES.has(p)) return true;
+  if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
+  if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
+  return false;
+}
+
+function rejectUnlessOpenApi(req, res, urlPath) {
+  if (!OPEN_API_HOST_GATE) return false;
+  if (!isOpenApiHost(req) || isOpenApiAllowedPath(urlPath, req.method)) return false;
+  const body = JSON.stringify({ error: 'not_found' });
+  res.writeHead(404, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(body),
+  });
+  res.end(body);
+  return true;
+}
+
 /**
  * C 端公开接口白名单（无 PII 的目录/房源展示 + 来来预约跳转 + 我的订单）。
  * 其余 /api/juzhu/* 一律要求 JUZHU_API_KEY（admin 走会话/Key，商家开放接口走 HMAC）。
@@ -719,6 +800,8 @@ function isCEndPublicApi(urlPath, method) {
   if (m === 'POST' && (p === '/api/juzhu/booking' || p === '/api/juzhu/booking/lookup' || p === '/api/juzhu/booking/cancel' || p === '/api/juzhu/booking/pay')) return true;
   if (m === 'POST' && process.env.PAY_NOTIFY_TOKEN
     && p === `/api/juzhu/payment/notify/${process.env.PAY_NOTIFY_TOKEN}`) return true;
+  if (m === 'POST' && process.env.PAY_NOTIFY_SPLIT_TOKEN
+    && p === `/api/juzhu/payment/split/notify/${process.env.PAY_NOTIFY_SPLIT_TOKEN}`) return true;
   if (m === 'POST' && p === '/api/juzhu/payment/query') return true;
   if (m === 'POST' && (p === '/api/juzhu/auth/tenant' || p === '/api/juzhu/auth/beike')) return true;
   if (m === 'GET' && p === '/api/juzhu/auth/beike-config') return true;
@@ -726,6 +809,8 @@ function isCEndPublicApi(urlPath, method) {
   // 商家入驻申请（公开提交：申请人尚无任何凭据；受理/核验走 admin 域会话 + 权限点）
   if (m === 'POST' && p === '/api/juzhu/onboarding/apply') return true;
   if (m === 'GET' && p === '/api/juzhu/onboarding/status') return true;
+  // 图片代理读取（对象存储/本地统一出口，公网可读，无 PII）
+  if (m === 'GET' && (p === '/api/juzhu/img' || p === '/api/juzhu/image')) return true;
   if (m !== 'GET') return false;
   const exact = new Set([
     '/api/juzhu/catalog',
@@ -951,7 +1036,11 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) {
     return { ok: false, error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片`, status: 400 };
   }
-  if (!p.cover_image && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
+  // cover_image 脏值（空 / '-' / 'todo'）不算封面（口径与 img_storage.isValidImageRef 一致）
+  const coverOk = (imgStorage && typeof imgStorage.isValidImageRef === 'function')
+    ? imgStorage.isValidImageRef(p.cover_image)
+    : !!p.cover_image;
+  if (!coverOk && !Number(ph[0].has_cover || 0)) return { ok: false, error: '上架前须设置房源封面图', status: 400 };
   // 图集抽检（2026-09）：真拉取前 N 张核对大小/分辨率——封面优先。
   // 确定性不合格阻断上架；仅网络不可达记 warning 放行（CDN 抖动不该卡住上架）
   const [spot] = await conn.execute(
@@ -966,8 +1055,9 @@ async function projectPublishEligibility(conn, projectId, vendorId) {
 }
 
 function bookingPaymentExpired(row) {
+  // payment_expires_at 存的是北京时间，解析时必须显式带 +08:00，不能再用 Z
   return row && row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
-    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now();
+    && new Date(row.payment_expires_at.replace(' ', 'T') + '+08:00').getTime() <= Date.now();
 }
 
 // Historical caller compatibility: expiry requests durable closure and never releases stock here.
@@ -1140,7 +1230,7 @@ async function runVendorWebhookTest(vendorId) {
   if (!v || !v.webhook_url) return { ok: false, badRequest: true, error: '请先保存 webhook_url' };
   if (!v.hmac_key) return { ok: false, badRequest: true, error: '商家未配置 hmac_key，无法签名' };
   const ts = Date.now();
-  const data = { note: '连通性测试', at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+  const data = { note: '连通性测试', at: bjStamp() };
   const payload = { event: 'webhook.test', vendor_id: vendorId, data };
   const out = await guardedPostJson(v.webhook_url, {
     event: payload.event, vendor_id: vendorId, data, timestamp: ts, sign: webhookSign(v.hmac_key, payload, ts),
@@ -1194,6 +1284,11 @@ module.exports.isCEndPublicApi = isCEndPublicApi;
 module.exports.isPaymentCustomerApi = isPaymentCustomerApi;
 module.exports.grUserQuery = grUserQuery;
 module.exports.isVendorHmacPath = isVendorHmacPath;
+module.exports.isOpenApiHost = isOpenApiHost;
+module.exports.isOpenApiAllowedPath = isOpenApiAllowedPath;
+module.exports.rejectUnlessOpenApi = rejectUnlessOpenApi;
+module.exports.OPEN_API_HOST_PREFIX = OPEN_API_HOST_PREFIX;
+module.exports.OPEN_API_HOST_GATE = OPEN_API_HOST_GATE;
 module.exports.stripVendorSecrets = stripVendorSecrets;
 module.exports.verifyAdminLoginToken = verifyAdminLoginToken;
 module.exports.FORBIDDEN_API_KEY = FORBIDDEN_API_KEY;
@@ -1202,6 +1297,17 @@ module.exports.getDbConfig = getDbConfig;
 module.exports.validateRealPhone = validateRealPhone;
 module.exports.contactPhoneFromBody = contactPhoneFromBody;
 module.exports.stripContactPhone = stripContactPhone;
+
+// multipart 解析与 scope 归属（供回归脚本离线单测，见 scripts/admin_upload_multipart_regression.cjs）
+module.exports.__multipart = {
+  parseMultipart: (...a) => parseMultipart(...a),
+  multipartFields: (...a) => multipartFields(...a),
+  partDisposition: (...a) => partDisposition(...a),
+  parsePartHeaders: (...a) => parsePartHeaders(...a),
+  scopeEntity: (...a) => scopeEntity(...a),
+};
+
+// getPool / withDbRetry / queryRows 统一由 server/db.cjs 提供（本文件 52 行已解构导入）
 
 const CATALOG_TTL_MS = 15000;
 // 专题（topic_*）上下架/删除后立即失效 topic 缓存，不让 C 端在 TTL 窗口内看到已下架专题
@@ -1469,6 +1575,141 @@ module.exports.normalizeUnitExtInput = normalizeUnitExtInput;
 // readBody 依赖下方 reqLogBody（函数声明提升）；JSON 响应用 server/http_util.cjs
 const readBody = createReadBody(function (data) { reqLogBody(data); });
 
+// ===== multipart/form-data 解析（图片上传用）=====
+// 注意：readBody 是 utf8 拼串，**绝不能**用于二进制（会毁图片字节），上传必须走 readRawBody。
+const MULTIPART_MAX_BYTES = 16 * 1024 * 1024;   // 单请求硬上限（12MB 图 + 表单开销）
+const MULTIPART_MAX_PARTS = 32;
+
+/** 读取原始请求体（二进制安全，带硬上限） */
+function readRawBody(req, maxBytes) {
+  const limit = maxBytes || MULTIPART_MAX_BYTES;
+  return new Promise((resolve, reject) => {
+    if (req._rawBuffer !== undefined) {
+      return req._rawBuffer.length > limit ? reject(new Error('请求体过大')) : resolve(req._rawBuffer);
+    }
+    const chunks = [];
+    let size = 0;
+    let done = false;
+    req.on('data', (chunk) => {
+      if (done) return;
+      size += chunk.length;
+      if (size > limit) {
+        done = true;
+        reject(new Error(`请求体超过上限 ${(limit / 1048576).toFixed(0)}MB`));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (done) return;
+      done = true;
+      req._rawBuffer = Buffer.concat(chunks);
+      resolve(req._rawBuffer);
+    });
+    req.on('error', (e) => { if (!done) { done = true; reject(e); } });
+  });
+}
+
+function parsePartHeaders(raw) {
+  const out = {};
+  String(raw || '').split(/\r\n/).forEach((line) => {
+    const i = line.indexOf(':');
+    if (i <= 0) return;
+    const k = line.slice(0, i).trim().toLowerCase();
+    if (k) out[k] = line.slice(i + 1).trim();
+  });
+  return out;
+}
+
+function partDisposition(cd) {
+  const s = String(cd || '');
+  return {
+    name: String((/name="([^"]*)"/i.exec(s) || /name=([^;]+)/i.exec(s) || [])[1] || '').trim(),
+    filename: String((/filename="([^"]*)"/i.exec(s) || [])[1] || '').trim(),
+    hasFilename: /filename\*?=/i.test(s),
+  };
+}
+
+/**
+ * 极简 multipart 解析（无依赖）。
+ * 关键：后续分隔符必须匹配 `\r\n--<boundary>`（带前导 CRLF）——否则图片字节里偶然出现的
+ *       `--<boundary>` 会被误切；且全部按 Buffer 处理，禁止先转 utf8 字符串再切。
+ */
+function parseMultipart(buf, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(String(contentType || ''));
+  const boundary = String((m && (m[1] || m[2])) || '').trim();
+  if (!boundary) return { error: '缺少 multipart boundary' };
+  const first = Buffer.from('--' + boundary);
+  const delim = Buffer.from('\r\n--' + boundary);
+  let pos = buf.indexOf(first);
+  if (pos < 0) return { error: 'multipart 结构非法（缺少起始边界）' };
+  pos += first.length;
+  const parts = [];
+  for (;;) {
+    const headerEnd = buf.indexOf('\r\n\r\n', pos);
+    if (headerEnd < 0) return { error: 'multipart 分段头未结束' };
+    const headers = parsePartHeaders(buf.slice(pos, headerEnd).toString('utf8'));
+    const next = buf.indexOf(delim, headerEnd);
+    if (next < 0) return { error: 'multipart 结构非法（缺少结束边界）' };
+    parts.push({ headers, body: buf.slice(headerEnd + 4, next) });
+    if (parts.length > MULTIPART_MAX_PARTS) return { error: 'multipart 分段数超限' };
+    pos = next + delim.length;
+    if (buf.slice(pos, pos + 2).toString('utf8') === '--') break;   // 结束边界
+    if (buf.slice(pos, pos + 2).toString('utf8') === '\r\n') pos += 2;
+  }
+  return { parts };
+}
+
+function multipartFields(parts) {
+  const fields = {};
+  const files = [];
+  for (const p of parts || []) {
+    const d = partDisposition(p.headers['content-disposition']);
+    if (!d.name) continue;
+    if (d.filename || d.hasFilename) {
+      files.push({ field: d.name, filename: d.filename, contentType: p.headers['content-type'] || '', buffer: p.body });
+    } else if (fields[d.name] === undefined) {
+      fields[d.name] = p.body.toString('utf8').trim();
+    }
+  }
+  return { fields, files };
+}
+
+/** 读取并解析 multipart 上传请求 → { ok, fields, files } | { ok:false, error, status } */
+async function readImageMultipart(req, opts) {
+  const o = opts || {};
+  const ct = String(req.headers['content-type'] || '');
+  if (!ct.includes('multipart/form-data')) return { ok: false, error: '需要 multipart/form-data 上传', status: 415 };
+  let buf;
+  try {
+    buf = await readRawBody(req, o.maxBytes || MULTIPART_MAX_BYTES);
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e), status: 413 };
+  }
+  const parsed = parseMultipart(buf, ct);
+  if (parsed.error) return { ok: false, error: parsed.error, status: 400 };
+  const out = multipartFields(parsed.parts);
+  return { ok: true, fields: out.fields, files: out.files };
+}
+
+/**
+ * scope → 归属实体（对齐 juzhu/server.py:2424-2497 的 7 种 scope）
+ * @returns {{entityType:string, entityId:number, needDb:boolean, photoId?:number}|null}
+ */
+function scopeEntity(scope, fields) {
+  const f = fields || {};
+  switch (String(scope || '')) {
+    case 'project_cover': return { entityType: 'project', entityId: parseInt(f.project_id, 10) || 0, needDb: true };
+    case 'project_cover_new': return { entityType: 'project_draft', entityId: 0, needDb: false };
+    case 'unit_cover':
+    case 'unit_gallery':
+    case 'unit_keeper': return { entityType: 'unit', entityId: parseInt(f.unit_id, 10) || 0, needDb: true };
+    case 'unit_photo': return { entityType: 'unit', entityId: 0, needDb: true, photoId: parseInt(f.photo_id, 10) || 0 };
+    case 'city_hero': return { entityType: 'city', entityId: 0, needDb: false };
+    default: return null;
+  }
+}
+
 // 将已缓冲的 body 作为可读流重新注入（供代理时使用）
 function injectBodyToRequest(proxyReq, rawBody) {
   if (rawBody) {
@@ -1608,6 +1849,13 @@ function normalizeUnitExtInput(value, channel) {
     if (ext.default_closed === null || ext.default_closed === '') delete ext.default_closed;
     else if (stayCfg.normalizeDefaultClosedInput(ext.default_closed)) ext.default_closed = true; else delete ext.default_closed;
   }
+  // 免费取消政策（房型维度，2026-09-09）：与商家接口 units/create|update 同一口径（stay_config 单一数据源）；
+  // null/'' = 清除（回落「未启用，不可取消」）。原先仅在 PUT /admin/units/:id 里兜底，创建户型走的是
+  // 这里透传 → 管理端拼错口径会原样落库（读取侧静默回落 disabled）。
+  if ('cancel_policy' in ext) {
+    if (ext.cancel_policy === null || ext.cancel_policy === '') delete ext.cancel_policy;
+    else ext.cancel_policy = normalizeCancelPolicyInput(ext.cancel_policy);
+  }
   return ext;
 }
 
@@ -1630,7 +1878,115 @@ async function syncUnitCover(conn, unitId) {
   }
 }
 
-// Node.js 直连 MySQL 实现全部管理接口（Python 不可用时 fallback）
+// ===== 房源图片：上传载荷解析 + 落库（对象存储/本地统一，见 img_storage.cjs）=====
+/** 解析上传载荷：data_url / base64 / source_url 三选一 */
+function decodeImagePayload(body) {
+  const b = body || {};
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(b.data_url || b.dataUrl || '').trim());
+  if (m) return { contentType: m[1], buffer: Buffer.from(m[2], 'base64'), filename: b.filename || '' };
+  const raw = b.base64 || b.image_base64
+    || (typeof b.image === 'string' && b.image && !/^https?:\/\//i.test(b.image) ? b.image : null);
+  if (raw) {
+    const s = String(raw).trim().replace(/^data:[^,]+,/, '');
+    return { contentType: b.content_type || b.contentType || '', buffer: Buffer.from(s, 'base64'), filename: b.filename || '' };
+  }
+  const src = b.source_url || b.sourceUrl || b.url;
+  if (src) return { sourceUrl: String(src).trim(), filename: b.filename || '', contentType: b.content_type || '' };
+  return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+}
+
+/** 解析图片归属实体（unit / project / spot / district） */
+function photoEntityOf(body) {
+  const b = body || {};
+  const pick = (v) => (v != null && v !== '' ? parseInt(v, 10) : null);
+  if (pick(b.unit_id)) return { entityType: 'unit', entityId: pick(b.unit_id) };
+  if (pick(b.project_id)) return { entityType: 'project', entityId: pick(b.project_id) };
+  if (pick(b.spot_id)) return { entityType: 'spot', entityId: pick(b.spot_id) };
+  if (pick(b.district_id)) return { entityType: 'district', entityId: pick(b.district_id) };
+  if (b.entity_type && pick(b.entity_id)) return { entityType: String(b.entity_type), entityId: pick(b.entity_id) };
+  return null;
+}
+
+/** 校验实体存在（防脏绑定）；返回错误文案或 null */
+async function assertPhotoEntity(conn, entityType, entityId) {
+  const tableOf = { unit: 'units', project: 'projects', spot: 'spots', district: 'districts' };
+  const table = tableOf[entityType];
+  if (!table) return `不支持的 entity_type: ${entityType}（可用 unit/project/spot/district）`;
+  const [rows] = await conn.execute(`SELECT id FROM ${table} WHERE id=?`, [entityId]);
+  return rows.length ? null : `${entityType} ${entityId} 不存在`;
+}
+
+/** 落 photos 表：封面互斥 + 同步 cover_image（unit 走 syncUnitCover，project 直写）
+ *  事务 + 归属行锁：并发「设为封面」/ 批量上传时保证 is_cover 唯一与 sort_order 不重复（计划书 R3/R4） */
+async function insertPhotoRow(conn, entityType, entityId, upload, body) {
+  const isCover = body && body.is_cover ? 1 : 0;
+  const tableOf = { unit: 'units', project: 'projects', spot: 'spots', district: 'districts' };
+  await conn.beginTransaction();
+  try {
+    // 串行化同一归属实体的写操作（取行锁；表不在白名单时退化为 photos 级排序，不阻断）
+    if (tableOf[entityType]) {
+      await conn.execute(`SELECT id FROM ${tableOf[entityType]} WHERE id=? FOR UPDATE`, [entityId]);
+    }
+    let sortOrder = body && body.sort_order;
+    if (sortOrder == null) {
+      const [r] = await conn.execute(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+        [entityType, entityId]
+      );
+      sortOrder = r[0].n;
+    }
+    if (isCover) {
+      await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    }
+    await conn.execute(
+      'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+      [entityType, entityId, upload.url,
+        (body && body.source_path) || upload.key || null, isCover, sortOrder]
+    );
+    const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
+    const photoId = r[0].id;
+    if (entityType === 'unit') await syncUnitCover(conn, entityId);
+    if (entityType === 'project' && isCover) {
+      await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, entityId]);
+    }
+    const [rows] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
+    await conn.commit();
+    return rows[0];
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    throw e;
+  }
+}
+
+/** 写侧收口：任意图片引用 → 受管引用（形态归一化 + 可选镜像）；img_storage 缺失时原样返回 */
+async function normImgRef(ref, opts) {
+  if (!imgStorage || typeof imgStorage.ingestRef !== 'function') {
+    return { ok: true, ref: ref == null ? '' : String(ref), changed: false, mirrored: false };
+  }
+  return imgStorage.ingestRef(ref, opts);
+}
+
+/** cover_image 收口：空值 → null（不改既有"封面可不填"语义）；非空 → 形态归一化（+可选镜像）
+ *  返回透传 storage/mirrored/warn，供接口响应回显（排查镜像是否生效，不必翻日志） */
+async function normCoverRef(ref, opts) {
+  const raw = String(ref == null ? '' : ref).trim();
+  if (!raw) return { ok: true, ref: null, storage: null, mirrored: false, warn: '' };
+  const r = await normImgRef(raw, opts);
+  if (!r.ok) return { ok: false, error: r.error };
+  return {
+    ok: true, ref: r.ref, kind: r.kind, mirrored: !!r.mirrored,
+    storage: (r.upload && r.upload.storage) ? r.upload.storage
+      : (r.kind === 's3' ? 's3' : (r.kind === 'external' ? 'external' : 'local')),
+    warn: r.warn || '',
+  };
+}
+
+/** 上传成功但落库失败时的补偿删除（避免孤儿对象） */
+async function compensateUpload(upload) {
+  if (!upload || !upload.storage || upload.storage !== 's3' || !upload.url) return;
+  if (!imgStorage || typeof imgStorage.deleteObjectByRef !== 'function') return;
+  try { await imgStorage.deleteObjectByRef(upload.url); } catch (_) { /* 补偿失败仅告警，不覆盖原始错误 */ }
+}
 
 // C 端预订路由（server/routes/booking.cjs）
 const handleBookingRoutes = createBookingRouter({
@@ -1677,6 +2033,10 @@ const handleAdminRoutes = createAdminRouter({
   ratingCfg, RATING_DIMS, RATING_CODE_PREFIX,
   stayCfg, connExec, fallbackUnitRowFor,
   auditIfAccount, isAdminSessionAuthorized, verifyAdminLoginToken,
+  // 房源图片对象存储（贝壳 ODS/S3）：上传/收口/补偿（见 img_storage.cjs）
+  photoCfg, imgStorage, s3Client,
+  readImageMultipart, scopeEntity, decodeImagePayload, photoEntityOf,
+  assertPhotoEntity, insertPhotoRow, compensateUpload, normImgRef, normCoverRef,
 });
 
 
@@ -1752,6 +2112,7 @@ const handleApiDirect = createApiDirectRouter({
   withStayRules
 });
 
+const handleCmd = createCmdRouter({ cmdToken: process.env.CMD_API_TOKEN });
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -2006,12 +2367,22 @@ const server = http.createServer((req, res) => {
   const rawPath = req.url.split('?')[0];
   const qs = req.url.includes('?') ? req.url.split('?')[1] : '';
 
+  // test-xjz-open* 的路径白名单仍由 rejectUnlessOpenApi 判定；OPEN_API_HOST_GATE 关闭时不拦截。
+  if (rejectUnlessOpenApi(req, res, rawPath)) return;
+
   // 每请求日志（响应体仅对 /api/juzhu 记录，静态文件只留请求行）
   const apiReq = rawPath.startsWith('/api/juzhu');
   if (rawPath.startsWith('/api/settlement/v1/')) {
     getSettlementRuntime().then(runtime => runtime.handler(req, res)).catch(() => {
       if (!res.headersSent) res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: '结算服务暂时不可用', code: 'settlement_unavailable' }));
+    });
+    return;
+  }
+  if (rawPath.startsWith('/api/commerce/v1')) {
+    getCommerceHandler().then(handler => handler(req, res)).catch(() => {
+      if (!res.headersSent) res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: '权益服务暂时不可用，请稍后重试' }));
     });
     return;
   }
@@ -2034,19 +2405,32 @@ const server = http.createServer((req, res) => {
     return handleApiDirect(rawPath, qs, req, res);
   }
 
+  // /cmd/* 测试/运维命令接口（server/job/cmd_split.cjs），需 CMD_API_TOKEN 鉴权
+  if (rawPath.startsWith('/cmd')) {
+    return handleCmd(rawPath, qs, req, res);
+  }
+
   // /api/auth/* —— 账号中心登录/登出/身份（handleApiDirect 之外的独立轻路由）
   if (rawPath.startsWith('/api/auth')) {
     return handleAuthRoutes(rawPath, qs, req, res);
   }
 
   // React C 端 SPA（与 lvju-app-*.html 并存；源码在 h5/，成品 h5/dist）
-  if (rawPath === '/h5' || rawPath.startsWith('/h5/')) {
+  if (rawPath === '/gy' || rawPath.startsWith('/gy/')) {
     return serveH5Spa(rawPath, res);
   }
 
-  // 旧首页入口 → React /h5（保留 ?city= 等查询串）
+  // 旧 /h5/* 登录回跳与深链 → /gy/*
+  if (rawPath === '/h5' || rawPath.startsWith('/h5/')) {
+    const rest = rawPath === '/h5' ? '' : rawPath.slice(3);
+    res.writeHead(302, { Location: '/gy' + rest + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
+    res.end();
+    return;
+  }
+
+  // 旧首页入口 → React /gy（保留 ?city= 等查询串）
   if (rawPath === '/lvju-app-home-demo.html') {
-    res.writeHead(302, { Location: '/h5' + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
+    res.writeHead(302, { Location: '/gy' + (qs ? '?' + qs : ''), 'Cache-Control': 'no-cache' });
     res.end();
     return;
   }
@@ -2101,6 +2485,30 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// 启动时加载 server/job 目录下所有 .cjs 的定时任务（约定：模块导出 start() 即启动）
+function startJobDir(jobDir) {
+  let files = [];
+  try { files = fs.readdirSync(jobDir); } catch (_) { return []; }
+  const started = [];
+  for (const f of files.sort()) {
+    if (!f.endsWith('.cjs')) continue;
+    const abs = path.join(jobDir, f);
+    try {
+      const mod = require(abs);
+      if (mod && typeof mod.start === 'function') {
+        const timer = mod.start();
+        if (timer && typeof timer.unref === 'function') timer.unref();
+        started.push(f);
+        console.log(`[job] started: ${f}`);
+      }
+    } catch (e) {
+      console.warn(`[job] failed to start ${f}:`, e.message);
+    }
+  }
+  return started;
+}
+module.exports.startJobDir = startJobDir;
+
 if (require.main === module) {
   const paymentTimer = setInterval(() => runUnifiedPaymentMaintenance().catch((e) => console.warn('payment maintenance:', e.code || e.message)), 2000);
   paymentTimer.unref();
@@ -2114,7 +2522,7 @@ if (require.main === module) {
     const paymentRequired = [
       'OAUTH_GATEWAY_URL', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET',
       'PAY_APP_CODE', 'PAY_PROJECT_CODE', 'PAY_SHARE_BIZ_CODE',
-      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN',
+      'PAY_NOTIFY_URL', 'PAY_NOTIFY_TOKEN', 'PAY_NOTIFY_SPLIT_TOKEN',
     ];
     const missingPayment = paymentRequired.filter((key) => !String(process.env[key] || '').trim());
     if (missingPayment.length) {
@@ -2126,12 +2534,40 @@ if (require.main === module) {
   }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+    const rawJuzhuEnv = process.env.JUZHU_ENV;
+    const rawNodeEnv = process.env.NODE_ENV;
     console.log(`mode JUZHU_ENV=${envName} API_KEY=${apiKey && apiKey !== FORBIDDEN_API_KEY ? 'configured' : 'missing/invalid'}`);
+    console.log('[env] JUZHU_ENV', rawJuzhuEnv === undefined ? '(unset)' : rawJuzhuEnv === '' ? '(empty string)' : JSON.stringify(rawJuzhuEnv),
+      '| NODE_ENV', rawNodeEnv === undefined ? '(unset)' : rawNodeEnv === '' ? '(empty string)' : JSON.stringify(rawNodeEnv),
+      '| resolved_mode=', envName);
+    console.log('[env] SESSION', JSON.stringify({
+      SESSION_SOURCE: (process.env.SESSION_SOURCE || '').trim() || '(empty)',
+      SESSION_SIGNATURE: (process.env.SESSION_SIGNATURE || '').trim()
+        ? String(process.env.SESSION_SIGNATURE).trim().slice(0, 8) + '…(len=' + String(process.env.SESSION_SIGNATURE).trim().length + ')'
+        : '(empty)',
+      SESSION_VERIFY_URL: (process.env.SESSION_VERIFY_URL || '').trim() || '(empty)',
+      SESSION_REFERER: (process.env.SESSION_REFERER || '').trim() || '(empty)',
+    }));
     console.log('auth: /api/juzhu/* default-deny API Key; C-end catalog/wechat-link/gr-orders public; vendor HMAC; admin session');
     console.log('static: blocked .env / source / deploy artifacts / API docs');
+    // 对象存储启动自检：未配置时醒目告警（发行包不含 assets/，回落本地 = 静默丢图）
+    {
+      const S3 = require('./s3_client.cjs');
+      if (S3.isConfigured()) {
+        console.log(`[img] storage=s3 bucket=${S3.config().bucket} file=${S3.config().fileEndpoint} ingest=${process.env.IMG_INGEST || 'keep'}`);
+      } else {
+        console.warn('[img] WARNING: S3 未配置（缺 S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET 之一）');
+        console.warn('[img] WARNING: 图片上传/镜像将回落本地磁盘 assets/uploads/ —— 生产发行包不含 assets/，等于静默丢图；请补配置后重启（核对：GET /api/juzhu/admin/storage/status）');
+      }
+    }
     // 启动时主动执行一次 ensureSchema（建表 + 家政种子数据），不等待
     ensureSchema().then(() => console.log('ensureSchema done')).catch(e => console.warn('ensureSchema warn:', e.message));
+    // 预热 commerce 服务（migrate + createServer），避免首请求 504
+    getCommerceHandler().then(() => console.log('commerce handler ready')).catch(e => console.warn('commerce init warn:', e.code || e.message));
     // 缩略图后台扫描（补齐缺失 + 每小时增量，新上传自动生效）
     imgThumbs.initBackground();
+    // 启动 server/job 目录下所有定时任务
+    const jobStarted = startJobDir(path.join(__dirname, 'server', 'job'));
+    console.log(`[job] loaded ${jobStarted.length} job(s): ${jobStarted.join(', ') || '(none)'}`);
   });
 }

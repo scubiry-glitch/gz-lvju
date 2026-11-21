@@ -38,6 +38,7 @@ const PERMS = [
   { code: 'admin.write',   name: '管理域写（旧）', domain: 'platform', action: 'write',  desc: '旧一刀切写权限点；已不作为路由闸，仅过渡期别名', roles: ['platform_op'] },
   { code: 'settings.write', name: '平台参数配置',  domain: 'platform', action: 'write',  desc: '全局设置/频道品牌名/预订电话', roles: [] },
   { code: 'dict.write',    name: '基础字典维护',   domain: 'platform', action: 'write',  desc: '城市/行政区/频道', roles: [] },
+  { code: 'spu.write',     name: '服务标准品维护', domain: 'platform', action: 'write',  desc: '家政/搬家 jz_skus 标准品新增与更新（P 端 SPU 页）', roles: [] },
   // ── 房源与评级 ──
   { code: 'house.write',   name: '房源与评级录入', domain: 'housing',  action: 'write',  desc: '项目/户型/图片/上下架/评级提交', roles: ['operator_admin'] },
   { code: 'rating.review', name: '评级复核',       domain: 'rating',   action: 'review', desc: '好房子/旅居评级审定 pass/reject', roles: ['platform_op'] },
@@ -210,6 +211,15 @@ const ROUTES = [
   { method: 'PUT',    re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.update', res: 'photos', idGroup: 1 },
   { method: 'DELETE', re: '^/api/juzhu/admin/photos/(\\d+)$', perm: 'house.write', act: 'photo.delete', res: 'photos', idGroup: 1 },
   { method: 'POST',   re: '^/api/juzhu/admin/upload$', perm: 'house.write', act: 'upload', res: 'photos' },
+  // 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传（与 admin/upload 同权限面 house.write）
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/upload$', perm: 'house.write', act: 'photo.upload', res: 'photos' },
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/presign$', perm: 'house.write', act: 'photo.presign', res: 'photos' },
+  { method: 'POST',   re: '^/api/juzhu/admin/photos/migrate-images$', perm: 'house.write', act: 'photo.migrate', res: 'photos' },
+  { method: 'GET',    re: '^/api/juzhu/admin/storage/status$', perm: 'admin.read', act: null, res: null },
+  // P 端标准品写入口不在 /admin 前缀下，admin 入口闸扫不到；api_direct 按本表 perm 校验。
+  // roles 留空：platform_admin 的 * 可写；perm_strict 未打开时 requirePerm 仍接受 admin.write。
+  { method: 'POST',   re: '^/api/juzhu/jz/spu$', perm: 'spu.write', act: 'spu.create', res: 'jz_skus' },
+  { method: 'PUT',    re: '^/api/juzhu/jz/spu/(\\d+)$', perm: 'spu.write', act: 'spu.update', res: 'jz_skus', idGroup: 1 },
   // 导出
   { method: 'POST',   re: '^/api/juzhu/admin/export$', perm: 'report.export', act: 'export.run', res: 'export' },
   // 商家咨询方式（商家维度，C 端详情页左下咨询入口优先级）
@@ -270,6 +280,14 @@ const ROUTES = [
 ];
 
 const _compiled = ROUTES.map((r) => Object.assign({}, r, { _re: new RegExp(r.re) }));
+// 防御：ROUTES 字面量里多写一个逗号会产生「数组空洞」，.map 会跳过它但 for...of 会取到 undefined，
+// 导致 permRegistry.match() 抛错 → 所有「凭据通过的 admin 请求」全部 500（2026-09-21 实际踩过）。
+// 这里在**模块加载期**直接失败，宁可起不来，也不要静默 500。
+for (let i = 0; i < _compiled.length; i += 1) {
+  if (!(i in _compiled) || !_compiled[i]) {
+    throw new Error(`perm_registry: ROUTES 第 ${i} 项为空（数组空洞/多余逗号），请检查 ROUTES 字面量`);
+  }
+}
 const _permByCode = new Map(PERMS.map((p) => [p.code, p]));
 
 /** 命中路由规则；未命中返回 null（调用方回退旧行为） */

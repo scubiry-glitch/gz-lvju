@@ -1,4 +1,5 @@
 'use strict';
+const { bjStamp } = require('../utils/bj-time.cjs');
 const vendorPayment = require('../payment/vendor-payment.cjs');
 /**
  * /api/juzhu/admin/* 管理域（从 app.js 拆出）。
@@ -77,8 +78,82 @@ queryRows,
       fallbackUnitRowFor,
       auditIfAccount,
       isAdminSessionAuthorized,
-      verifyAdminLoginToken
+      verifyAdminLoginToken,
+      // 房源图片对象存储（贝壳 ODS/S3，见 img_storage.cjs / docs/s3-image-storage.md）
+      imgStorage,
+      s3Client,
+      photoCfg,
+      readImageMultipart,
+      scopeEntity,
+      decodeImagePayload,
+      photoEntityOf,
+      assertPhotoEntity,
+      insertPhotoRow,
+      compensateUpload,
+      normImgRef,
+      normCoverRef
     } = deps;
+
+    // ── 照片删除联动对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时，与商家 photos/sync 同口径）──
+    // 必须在「行删除已提交」后调用；删除前做全库引用计数，防跨实体共享对象被误删；
+    // 本地引用/外部 URL 由 deleteObjectByRef 内部跳过（不确定就不动）。
+    async function reclaimPhotoObjects(conn, refs) {
+      if (String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') !== '1') return 0;
+      if (!imgStorage || typeof imgStorage.deleteObjectByRef !== 'function') return 0;
+      let removed = 0;
+      const seen = new Set();
+      for (const raw of (refs || [])) {
+        const ref = String(raw == null ? '' : raw).trim();
+        if (!ref || seen.has(ref)) continue;
+        seen.add(ref);
+        try {
+          const [a] = await conn.execute('SELECT COUNT(*) n FROM photos WHERE file_path=?', [ref]);
+          const [b] = await conn.execute('SELECT COUNT(*) n FROM projects WHERE cover_image=?', [ref]);
+          const [c] = await conn.execute('SELECT COUNT(*) n FROM units WHERE cover_image=?', [ref]);
+          if ((a[0] && a[0].n) + (b[0] && b[0].n) + (c[0] && c[0].n) > 0) continue;
+          const d = await imgStorage.deleteObjectByRef(ref);
+          if (d && d.ok) removed += 1;
+        } catch (_) { /* best-effort：单张失败不阻断，残留由对账脚本兜底 */ }
+      }
+      return removed;
+    }
+
+    // ── 项目 ext 组装（2026-10-13 兼容顶层写法，与商家端同体验）──
+    // 痛点：管理端此前只认 body.ext，body 顶层直接传 online_payment=true 被静默丢弃 → 「传了不生效」。
+    // 现在：能力/住宿配置字段（online_booking / online_payment / stay_bookable / insurance /
+    // min_stay_nights / default_closed / auto_publish）可直接挂 body 顶层，与 body.ext 合并后统一走
+    // normalizeProjectExtInput。**新增 ext 开关字段必须补进这张表**（auto_publish 曾漏，2026-10-14）。
+    const PROJECT_EXT_TOP_KEYS = ['online_booking', 'online_payment', 'stay_bookable', 'insurance',
+      'min_stay_nights', 'default_closed', 'auto_publish'];
+    function projectExtMergedFromBody(body, baseExt) {
+      const hasTop = PROJECT_EXT_TOP_KEYS.some((k) => Object.prototype.hasOwnProperty.call(body, k));
+      const hasExt = Object.prototype.hasOwnProperty.call(body, 'ext');
+      if (!hasTop && !hasExt) return { touched: false, ext: null };
+      let merged = {};
+      if (baseExt && typeof baseExt === 'object') merged = Object.assign(merged, baseExt);
+      else if (typeof baseExt === 'string' && baseExt) {
+        try { merged = Object.assign(merged, JSON.parse(baseExt) || {}); } catch (_) { merged = {}; }
+      }
+      if (hasExt) {
+        if (body.ext == null) merged = {};   // ext: null 显式重置
+        else if (typeof body.ext === 'object' && !Array.isArray(body.ext)) merged = Object.assign(merged, body.ext);
+        else throw new Error('ext 须为对象');
+      }
+      for (const k of PROJECT_EXT_TOP_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(body, k)) merged[k] = body[k];
+      }
+      return { touched: true, ext: merged };
+    }
+
+    /** 项目出参：ext 解析为对象 + 透出交易能力位（管理台据此回显在线预订/在线支付开关） */
+    function attachTxCaps(proj) {
+      if (!proj) return proj;
+      parseJsonFields(proj, ['ext']);
+      const caps = transactionCapabilitiesOf(proj);
+      proj.online_booking = caps.online_booking;
+      proj.online_payment = caps.online_payment;
+      return proj;
+    }
 
     // --- from app.js L2677-4288 ---
     // GET /api/juzhu/admin/vendor-onboarding?status= —— 受理列表（服务认证中台；权限点 vendor.onboarding.review）
@@ -246,7 +321,7 @@ queryRows,
       if (qp.get('q')) { sql += ' AND p.name LIKE ?'; params.push('%' + qp.get('q') + '%'); }
       sql += ' ORDER BY p.channel, p.sort_order, p.id';
       const rows = await queryRows(sql, params);
-      rows.forEach((r) => parseJsonFields(r, ['tags', 'rating']));
+      rows.forEach((r) => { parseJsonFields(r, ['tags', 'rating']); attachTxCaps(r); });
       return jsonReply(res, rows);
     }
 
@@ -261,6 +336,7 @@ queryRows,
         );
         if (!projs.length) return jsonReply(res, { error: 'not found' }, 404);
         parseJsonFields(projs[0], ['tags', 'rating']);
+        attachTxCaps(projs[0]);
         const units = await queryRows('SELECT * FROM units WHERE project_id=? ORDER BY sort_order', [pid]);
         units.forEach((u) => parseJsonFields(u, ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']));
         const photos = await queryRows(
@@ -350,7 +426,7 @@ queryRows,
             'SELECT id, name, review_status, status FROM jz_vendors WHERE id=?', [vid]);
           if (!curRows.length) return jsonReply(res, { error: '商家不存在' }, 404);
           const cur = curRows[0];
-          const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+          const now = bjStamp();
           const nextStatus = reviewStatus === 'approved' ? 'active' : (reviewStatus === 'rejected' ? 'suspended' : 'active');
           await conn.execute(
             'UPDATE jz_vendors SET review_status=?, review_note=?, reviewed_at=?, status=?, updated_at=? WHERE id=?',
@@ -486,7 +562,7 @@ queryRows,
           for (const f of Object.keys(next)) { sets.push(f + '=?'); vals.push(next[f]); }
           await conn.execute(
             `UPDATE jz_vendors SET ${sets.join(', ')},payment_config_version=COALESCE(payment_config_version,0)+1, updated_at=? WHERE id=?`,
-            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [...vals, bjStamp(), vid]
           );
           await conn.commit();
           if (resetVendorConfigCache) resetVendorConfigCache();
@@ -523,7 +599,7 @@ queryRows,
           const newKey = crypto.randomBytes(32).toString('hex');
           await conn.execute(
             'UPDATE jz_vendors SET hmac_key=?, updated_at=? WHERE id=?',
-            [newKey, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [newKey, bjStamp(), vid]
           );
           if (resetVendorConfigCache) resetVendorConfigCache();
           const maskKey = (k) => (k ? { head: k.slice(0, 8), len: k.length } : null);
@@ -597,7 +673,7 @@ queryRows,
         try {
           const [r] = await conn.execute(
             'UPDATE jz_vendors SET consult_mode=?, updated_at=? WHERE id=?',
-            [mode, new Date().toISOString().slice(0, 19).replace('T', ' '), parseInt(m[1], 10)]
+            [mode, bjStamp(), parseInt(m[1], 10)]
           );
           if (!r.affectedRows) return jsonReply(res, { error: 'not found' }, 404);
           return jsonReply(res, { ok: true, id: parseInt(m[1], 10), consult_mode: mode });
@@ -713,7 +789,7 @@ queryRows,
           if (nextJiazheng !== undefined) { sets.push('commission_jiazheng=?'); vals.push(nextJiazheng); }
           await conn.execute(
             `UPDATE jz_vendors SET ${sets.join(', ')}, updated_at=? WHERE id=?`,
-            [...vals, new Date().toISOString().slice(0, 19).replace('T', ' '), vid]
+            [...vals, bjStamp(), vid]
           );
           // 敏感商业条款变更：处理器内记 before/after（role.update 金标准），不只依赖 ROUTES 自动审计
           const p = req.principal || {};
@@ -1390,8 +1466,11 @@ queryRows,
         return jsonReply(res, { error: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' }, 400);
       }
       let projectExt = null;
-      try { projectExt = normalizeProjectExtInput(body.ext, channel); }
-      catch (e) { return jsonReply(res, { error: e.message }, 400); }
+      try {
+        // 顶层能力/住宿字段（online_payment 等）与 body.ext 合并后统一归一（此前顶层写法被静默丢弃）
+        const extM = projectExtMergedFromBody(body, null);
+        projectExt = normalizeProjectExtInput(extM.touched ? extM.ext : body.ext, channel);
+      } catch (e) { return jsonReply(res, { error: e.message }, 400); }
       const conn = await mysql2.createConnection(getDbConfig());
       try {
         const resolved = await resolveBodyCityId(conn, body, '未配置城市');
@@ -1430,11 +1509,14 @@ queryRows,
           if (!v.length) { conn.end(); return jsonReply(res, { error: '商家不存在' }, 400); }
           ownerVendorId = parseInt(body.owner_vendor_id, 10);
         }
+        // 封面收口：脏值 400 拒绝；本地/对象存储引用归一化；第三方 URL 按 IMG_INGEST 决定是否镜像
+        const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: 0 });
+        if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
         await conn.execute(
           `INSERT INTO projects(city_id,district_id,channel,name,slug,cover_image,address,tags,
             sort_order,unit_count,price_from,is_featured,featured_rank,old_house_hint,contact_phone)
            VALUES (?,?,?,?,?,?,?,?,?,0,?,COALESCE(?,0),?,?,?)`,
-          [cityId, districtId, channel, name, slug, body.cover_image || null, address,
+          [cityId, districtId, channel, name, slug, coverRef.ref, address,
            encodeTags(body.tags),
            body.sort_order || 999, body.price_from || null,
            body.is_featured ? 1 : 0, body.featured_rank || null, body.old_house_hint || null,
@@ -1458,7 +1540,14 @@ queryRows,
           [pid]
         );
         parseJsonFields(projs[0], ['tags', 'rating']);
-        return jsonReply(res, { ok: true, project: projs[0] }, 201);
+        attachTxCaps(projs[0]);
+        return jsonReply(res, {
+          ok: true, project: projs[0],
+          // 镜像自证：库内存的 cover_image 是否已转对象存储；未转时 warned 给出原因
+          cover_image_storage: coverRef ? coverRef.storage : null,
+          cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+          cover_warned: (coverRef && coverRef.warn) || undefined,
+        }, 201);
       } finally {
         await conn.end();
       }
@@ -1472,10 +1561,11 @@ queryRows,
         const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [existing] = await conn.execute('SELECT id, channel FROM projects WHERE id=?', [pid]);
+          const [existing] = await conn.execute('SELECT id, channel, ext FROM projects WHERE id=?', [pid]);
           if (!existing.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let coverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', body.slug || slugify(body.name));
@@ -1484,15 +1574,27 @@ queryRows,
           }
           for (const col of ['address', 'cover_image', 'sort_order', 'price_from',
               'is_featured', 'featured_rank', 'old_house_hint', 'status']) {
-            if (col in body) put(col, body[col]);
+            if (!(col in body)) continue;
+            if (col === 'cover_image') {
+              const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: pid });
+              if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              coverRefInfo = coverRef;
+              put(col, coverRef.ref);
+              continue;
+            }
+            put(col, body[col]);
           }
-          if ('ext' in body) {
-            try {
-              const ext = normalizeProjectExtInput(body.ext, existing[0].channel);
-              put('ext', ext != null ? JSON.stringify(ext) : null);
-            } catch (e) {
-              conn.end();
-              return jsonReply(res, { error: e.message }, 400);
+          {
+            // 兼容顶层写法：body 顶层 online_payment 等与 body.ext、库内现值合并后归一
+            const extM = projectExtMergedFromBody(body, existing[0].ext);
+            if (extM.touched) {
+              try {
+                const ext = normalizeProjectExtInput(extM.ext, existing[0].channel);
+                put('ext', ext != null ? JSON.stringify(ext) : null);
+              } catch (e) {
+                conn.end();
+                return jsonReply(res, { error: e.message }, 400);
+              }
             }
           }
           if ('owner_vendor_id' in body) {
@@ -1535,7 +1637,13 @@ queryRows,
             [pid]
           );
           parseJsonFields(projs[0], ['tags', 'rating']);
-          return jsonReply(res, { ok: true, project: projs[0] });
+          attachTxCaps(projs[0]);
+          return jsonReply(res, {
+            ok: true, project: projs[0],
+            cover_image_storage: coverRefInfo ? coverRefInfo.storage : null,
+            cover_mirrored: coverRefInfo ? !!coverRefInfo.mirrored : false,
+            cover_warned: (coverRefInfo && coverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }
@@ -1549,19 +1657,28 @@ queryRows,
         const pid = parseInt(m[1]);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
-          const [rows] = await conn.execute('SELECT district_id FROM projects WHERE id=?', [pid]);
+          const [rows] = await conn.execute('SELECT district_id, cover_image FROM projects WHERE id=?', [pid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const did = rows[0].district_id;
-          // 删除关联 photos、units
+          const projectCover = rows[0].cover_image;
+          // 删除关联 photos、units（含项目级 photos 行——旧实现遗漏，删除项目后残留脏行）
           const [units] = await conn.execute('SELECT id FROM units WHERE project_id=?', [pid]);
+          const [unitPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?)", [pid]);
+          const [projPhotos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           for (const u of units) {
             await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [u.id]);
           }
+          await conn.execute("DELETE FROM photos WHERE entity_type='project' AND entity_id=?", [pid]);
           await conn.execute('DELETE FROM units WHERE project_id=?', [pid]);
           await conn.execute('DELETE FROM projects WHERE id=?', [pid]);
           if (did) await syncDistrictStats(conn, did);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, [
+            ...unitPhotos.map((x) => x.file_path), ...projPhotos.map((x) => x.file_path), projectCover,
+          ]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1583,6 +1700,8 @@ queryRows,
           let unitExt = null;
           try { unitExt = normalizeUnitExtInput(body.ext, projs[0].channel); }
           catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
+          const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: 0 });
+          if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
           await conn.execute(
             `INSERT INTO units(project_id,name,slug,area_sqm,layout_label,rent_monthly,price_total,
               tags,unit_spec,promo_price,amenities,keeper,rent_detail,sort_order,cover_image,ext)
@@ -1594,7 +1713,7 @@ queryRows,
              body.amenities ? JSON.stringify(body.amenities) : null,
              body.keeper ? JSON.stringify(body.keeper) : null,
              body.rent_detail ? JSON.stringify(body.rent_detail) : null,
-             body.sort_order || 999, body.cover_image || null,
+             body.sort_order || 999, coverRef.ref,
              unitExt != null ? JSON.stringify(unitExt) : null]
           );
           const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
@@ -1603,7 +1722,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] }, 201);
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: coverRef ? coverRef.storage : null,
+            cover_mirrored: coverRef ? !!coverRef.mirrored : false,
+            cover_warned: (coverRef && coverRef.warn) || undefined,
+          }, 201);
         } finally {
           await conn.end();
         }
@@ -1639,6 +1763,7 @@ queryRows,
           const pid = rows[0].project_id;
           const sets = [], vals = [];
           const put = (col, val) => { sets.push(`${col}=?`); vals.push(val); };
+          let unitCoverRefInfo = null;
           if ('name' in body) {
             put('name', body.name);
             put('slug', await uniqueUnitSlug(conn, pid, body.name, body.slug, uid));
@@ -1647,7 +1772,15 @@ queryRows,
           }
           for (const col of ['area_sqm','layout_label','rent_monthly','price_total',
               'unit_spec','promo_price','sort_order','cover_image']) {
-            if (col in body) put(col, body[col]);
+            if (!(col in body)) continue;
+            if (col === 'cover_image') {
+              const coverRef = await normCoverRef(body.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
+              if (!coverRef.ok) { conn.end(); return jsonReply(res, { error: 'cover_image 非法: ' + coverRef.error }, 400); }
+              unitCoverRefInfo = coverRef;
+              put(col, coverRef.ref);
+              continue;
+            }
+            put(col, body[col]);
           }
           if ('total_qty' in body) {
             // 总间数（多间库存 2026-09-10）：1-999；不得低于未来晚已订间数（否则隐性超售）
@@ -1685,7 +1818,12 @@ queryRows,
           await conn.commit();
           const [units] = await conn.execute('SELECT * FROM units WHERE id=?', [uid]);
           parseJsonFields(units[0], ['tags', 'amenities', 'keeper', 'rent_detail', 'ext']);
-          return jsonReply(res, { ok: true, unit: units[0] });
+          return jsonReply(res, {
+            ok: true, unit: units[0],
+            cover_image_storage: unitCoverRefInfo ? unitCoverRefInfo.storage : null,
+            cover_mirrored: unitCoverRefInfo ? !!unitCoverRefInfo.mirrored : false,
+            cover_warned: (unitCoverRefInfo && unitCoverRefInfo.warn) || undefined,
+          });
         } finally {
           await conn.end();
         }
@@ -1702,11 +1840,14 @@ queryRows,
           const [rows] = await conn.execute('SELECT project_id FROM units WHERE id=?', [uid]);
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const pid = rows[0].project_id;
+          const [photos] = await conn.execute(
+            "SELECT file_path FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute("DELETE FROM photos WHERE entity_type='unit' AND entity_id=?", [uid]);
           await conn.execute('DELETE FROM units WHERE id=?', [uid]);
           await syncProjectUnitCount(conn, pid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          const objectsRemoved = await reclaimPhotoObjects(conn, photos.map((x) => x.file_path));
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1728,44 +1869,90 @@ queryRows,
       }
     }
 
-    // POST /admin/units/:id/photos  （仅支持 JSON body，不支持文件上传）
+    // POST /admin/units/:id/photos —— 新增房源图片
+    // 三条入参通道：① multipart 直传（file / files）② file_path 引用（形态归一 + 可选镜像）③ base64/data_url/source_url
     {
       const m = urlPath.match(/^\/api\/juzhu\/admin\/units\/(\d+)\/photos$/);
       if (m && req.method === 'POST') {
-        const uid = parseInt(m[1]);
-        const ct = req.headers['content-type'] || '';
+        const uid = parseInt(m[1], 10);
+        if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+        const ct = String(req.headers['content-type'] || '');
+        let body = {};
+        let upload = null;
         if (ct.includes('multipart/form-data')) {
-          return jsonReply(res, { error: '文件上传请使用 /api/juzhu/admin/upload 接口，Serverless 环境不支持直接上传图片到本机文件系统' }, 503);
+          const mp = await readImageMultipart(req);
+          if (!mp.ok) return jsonReply(res, { error: mp.error }, mp.status);
+          if (!mp.files.length) return jsonReply(res, { error: '缺少 file 字段' }, 400);
+          body = mp.fields;
+          const f0 = mp.files[0];
+          upload = await imgStorage.uploadImage({
+            buffer: f0.buffer,
+            filename: f0.filename,
+            contentType: f0.contentType,
+            prefix: 'housing',
+            entityType: 'unit',
+            entityId: uid,
+            makeThumbs: mp.fields.make_thumbs !== 'false',
+          });
+          if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+        } else {
+          body = await readBody(req);
+          const filePath = String(body.file_path || '').trim();
+          if (filePath) {
+            const r = await normImgRef(filePath, {
+              mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid, makeThumbs: body.make_thumbs !== false,
+            });
+            if (!r.ok) return jsonReply(res, { error: r.error }, 400);
+            upload = {
+              ok: true,
+              storage: r.kind === 's3' ? 's3' : (r.kind === 'local' ? 'local' : 'external'),
+              url: r.ref,
+              key: r.mirrored && r.upload ? r.upload.key : null,
+              thumb_240: (r.upload && r.upload.thumb_240) || '',
+              thumb_640: (r.upload && r.upload.thumb_640) || '',
+              mirrored: !!r.mirrored,
+              warned: r.warn || undefined,
+            };
+            if (r.kind === 'external' && !body.source_path) body.source_path = r.ref;
+          } else if (body.base64 || body.data_url || body.source_url || body.url) {
+            const payload = decodeImagePayload(body);
+            if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+            upload = await imgStorage.uploadImage({
+              buffer: payload.buffer,
+              sourceUrl: payload.sourceUrl,
+              filename: payload.filename,
+              contentType: payload.contentType,
+              prefix: 'housing',
+              entityType: 'unit',
+              entityId: uid,
+              makeThumbs: body.make_thumbs !== false,
+            });
+            if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+          } else {
+            return jsonReply(res, { error: 'file_path 不能为空（也可提供 base64 / data_url / source_url，或改用 multipart 直传）' }, 400);
+          }
         }
-        const body = await readBody(req);
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [units] = await conn.execute('SELECT id FROM units WHERE id=?', [uid]);
-          if (!units.length) { conn.end(); return jsonReply(res, { error: 'unit not found' }, 404); }
-          const filePath = (body.file_path || '').trim();
-          if (!filePath) { conn.end(); return jsonReply(res, { error: 'file_path 不能为空' }, 400); }
-          const isCover = body.is_cover ? 1 : 0;
-          let sortOrder = body.sort_order;
-          if (sortOrder == null) {
-            const [r] = await conn.execute(
-              "SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type='unit' AND entity_id=?",
-              [uid]
-            );
-            sortOrder = r[0].n;
+          if (!units.length) {
+            await compensateUpload(upload);
+            return jsonReply(res, { error: 'unit not found' }, 404);
           }
-          if (isCover) {
-            await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
-          }
-          await conn.execute(
-            "INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES ('unit', ?, ?, ?, ?, ?)",
-            [uid, filePath, body.source_path || null, isCover, sortOrder]
-          );
-          const [r] = await conn.execute('SELECT LAST_INSERT_ID() AS id');
-          const photoId = r[0].id;
-          await syncUnitCover(conn, uid);
-          await conn.commit();
-          const [photos] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
-          return jsonReply(res, { ok: true, photo: photos[0] }, 201);
+          const photo = await insertPhotoRow(conn, 'unit', uid, upload, body);
+          return jsonReply(res, {
+            ok: true,
+            storage: upload.storage,
+            file_path: upload.url,
+            thumb_240: upload.thumb_240 || null,
+            thumb_640: upload.thumb_640 || null,
+            warned: upload.warned || undefined,
+            upload,
+            photo,
+          }, 201);
+        } catch (e) {
+          await compensateUpload(upload);
+          return jsonReply(res, { error: '落库失败: ' + String((e && e.message) || e) }, 500);
         } finally {
           await conn.end();
         }
@@ -1785,29 +1972,44 @@ queryRows,
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const uid = rows[0].entity_id;
-          if (body.is_cover) {
-            await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
+          // file_path 收口：形态归一化（+可选镜像）；非法引用直接 400，避免脏值/危险协议入库
+          let fileRef = null;
+          if (body.file_path != null && String(body.file_path).trim()) {
+            const fr = await normImgRef(String(body.file_path).trim(), { mirror: true, prefix: 'housing', entityType: 'unit', entityId: uid });
+            if (!fr.ok) { conn.end(); return jsonReply(res, { error: 'file_path 非法: ' + fr.error }, 400); }
+            fileRef = fr.ref;
           }
-          let isCoverVal = null;
-          if ('is_cover' in body) isCoverVal = body.is_cover ? 1 : 0;
           let categoryVal = null;
           if ('category' in body) {
             try { categoryVal = photoCfg.normalizeCategoryInput(body.category); }
             catch (e) { conn.end(); return jsonReply(res, { error: e.message }, 400); }
           }
-          await conn.execute(
-            `UPDATE photos SET
-               file_path=COALESCE(?, file_path),
-               sort_order=COALESCE(?, sort_order),
-               is_cover=COALESCE(?, is_cover),
-               category=COALESCE(?, category)
-             WHERE id=?`,
-            [body.file_path ? body.file_path.trim() : null,
-             body.sort_order != null ? body.sort_order : null,
-             isCoverVal, categoryVal, photoId]
-          );
-          await syncUnitCover(conn, uid);
-          await conn.commit();
+          let isCoverVal = null;
+          if ('is_cover' in body) isCoverVal = body.is_cover ? 1 : 0;
+          await conn.beginTransaction();
+          try {
+            // 归属行锁：并发「设为封面」时保证 is_cover 唯一
+            await conn.execute('SELECT id FROM units WHERE id=? FOR UPDATE', [uid]);
+            if (body.is_cover) {
+              await conn.execute("UPDATE photos SET is_cover=0 WHERE entity_type='unit' AND entity_id=?", [uid]);
+            }
+            await conn.execute(
+              `UPDATE photos SET
+                 file_path=COALESCE(?, file_path),
+                 sort_order=COALESCE(?, sort_order),
+                 is_cover=COALESCE(?, is_cover),
+                 category=COALESCE(?, category)
+               WHERE id=?`,
+              [fileRef,
+               body.sort_order != null ? body.sort_order : null,
+               isCoverVal, categoryVal, photoId]
+            );
+            await syncUnitCover(conn, uid);
+            await conn.commit();
+          } catch (e) {
+            await conn.rollback().catch(() => {});
+            throw e;
+          }
           const [photos] = await conn.execute('SELECT * FROM photos WHERE id=?', [photoId]);
           return jsonReply(res, { ok: true, photo: photoCfg.photoOut(photos[0]) });
         } finally {
@@ -1824,14 +2026,16 @@ queryRows,
         const conn = await mysql2.createConnection(getDbConfig());
         try {
           const [rows] = await conn.execute(
-            "SELECT entity_id FROM photos WHERE id=? AND entity_type='unit'", [photoId]
+            "SELECT entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [photoId]
           );
           if (!rows.length) { conn.end(); return jsonReply(res, { error: 'not found' }, 404); }
           const uid = rows[0].entity_id;
           await conn.execute('DELETE FROM photos WHERE id=?', [photoId]);
           await syncUnitCover(conn, uid);
           await conn.commit();
-          return jsonReply(res, { ok: true });
+          // 行删除已提交 → 按开关回收对象（无其它引用才删）
+          const objectsRemoved = await reclaimPhotoObjects(conn, [rows[0].file_path]);
+          return jsonReply(res, { ok: true, objects_removed: objectsRemoved });
         } finally {
           await conn.end();
         }
@@ -1843,9 +2047,273 @@ queryRows,
       return jsonReply(res, { ok: true, stats: { note: 'Serverless 环境跳过 JSON 导出' } });
     }
 
-    // POST /admin/upload（图片上传需要对象存储，此处返回提示）
-    if (urlPath === '/api/juzhu/admin/upload' && req.method === 'POST') {
-      return jsonReply(res, { error: 'Serverless 环境不支持本地文件上传，请先在外部上传图片并使用图片 URL' }, 503);
+    // ===== 房源图片对象存储（贝壳 ODS/S3）：上传 / 预签名直传 / 自检 =====
+    // 统一入口：已配置 S3_* 走对象存储，否则自动回落 assets/uploads（口径见 img_storage.cjs）
+    if ((urlPath === '/api/juzhu/admin/photos/upload' || urlPath === '/api/juzhu/admin/upload') && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const ct = String(req.headers['content-type'] || '');
+      if (ct.includes('multipart/form-data')) {
+        // 前端历史调用方式：multipart/form-data + file + scope（7 种，语义对齐 juzhu/server.py:2424-2497）
+        const mp = await readImageMultipart(req);
+        if (!mp.ok) return jsonReply(res, { error: mp.error }, mp.status);
+        const file = mp.files.find((f) => f.field === 'file') || mp.files[0];
+        if (!file) return jsonReply(res, { error: '缺少 file 字段' }, 400);
+        const scope = String(mp.fields.scope || '').trim();
+        const ent = scopeEntity(mp.fields.scope, mp.fields);
+        if (scope && !ent) return jsonReply(res, { error: '未知 scope: ' + scope }, 400);
+        const t0 = Date.now();
+        let up = null;
+        const conn = await mysql2.createConnection(getDbConfig());
+        try {
+          let reuseKey = '';
+          let photoRow = null;
+          if (scope === 'unit_photo') {
+            if (!ent.photoId) return jsonReply(res, { error: '缺少 photo_id' }, 400);
+            const [rows] = await conn.execute("SELECT id, entity_id, file_path FROM photos WHERE id=? AND entity_type='unit'", [ent.photoId]);
+            if (!rows.length) return jsonReply(res, { error: '图片记录不存在' }, 404);
+            photoRow = rows[0];
+            // entityId 语义修正：scopeEntity('unit_photo') 只带 photo_id，此处回填真实 unit id（新 key 不再出现 unit/0/...）
+            ent.entityId = photoRow.entity_id;
+            const pr = imgStorage.parse(photoRow.file_path);
+            // 既有引用已在对象存储 → 复用同一 key 覆盖：零孤儿对象、零改库
+            const extWant = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[String(file.contentType || '').toLowerCase().split(';')[0].trim()] || '';
+            const curExt = (String(pr.key || '').match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+            if (pr.kind === 's3' && pr.key && (!extWant || curExt.toLowerCase() === extWant)) reuseKey = pr.key;
+          } else if (scope === 'project_cover') {
+            const [p] = await conn.execute('SELECT id FROM projects WHERE id=?', [ent.entityId]);
+            if (!p.length) return jsonReply(res, { error: 'project not found' }, 404);
+          } else if (scope === 'unit_cover' || scope === 'unit_gallery' || scope === 'unit_keeper') {
+            const [u] = await conn.execute('SELECT id FROM units WHERE id=?', [ent.entityId]);
+            if (!u.length) return jsonReply(res, { error: 'unit not found' }, 404);
+          }
+          up = await imgStorage.uploadImage({
+            buffer: file.buffer,
+            filename: file.filename,
+            contentType: file.contentType,
+            prefix: 'housing',
+            entityType: ent ? ent.entityType : 'misc',
+            entityId: ent ? ent.entityId : 0,
+            key: reuseKey || undefined,
+            makeThumbs: mp.fields.make_thumbs !== 'false',
+          });
+          if (!up.ok) return jsonReply(res, { error: up.error }, 400);
+          if (scope === 'unit_photo' && !reuseKey) {
+            await conn.execute('UPDATE photos SET file_path=?, source_path=COALESCE(source_path,?) WHERE id=?', [up.url, up.key || null, ent.photoId]);
+            await syncUnitCover(conn, photoRow.entity_id);
+            await conn.commit();
+          } else if (scope === 'city_hero') {
+            await conn.execute('UPDATE cities SET hero_bg_image=? WHERE id=(SELECT id FROM cities ORDER BY id LIMIT 1)', [up.url]);
+            await conn.commit();
+          }
+          console.log(`[img] upload(multipart) scope=${scope || '-'} storage=${up.storage} key=${up.key} ${up.bytes}B ${Date.now() - t0}ms`);
+          return jsonReply(res, {
+            ok: true,
+            file_path: up.url,
+            scope: scope || null,
+            entity_type: ent ? ent.entityType : null,
+            entity_id: ent ? ent.entityId : null,
+            storage: up.storage,
+            thumb_240: up.thumb_240 || null,
+            thumb_640: up.thumb_640 || null,
+            warned: up.warned || undefined,
+            upload: up,
+            saved: !!ent,
+            elapsed_ms: Date.now() - t0,
+          }, 201);
+        } catch (e) {
+          await compensateUpload(up);
+          return jsonReply(res, { error: '上传落库失败: ' + String((e && e.message) || e) }, 500);
+        } finally {
+          await conn.end();
+        }
+      }
+      const body = await readBody(req);
+      const payload = decodeImagePayload(body);
+      if (payload.error) return jsonReply(res, { error: payload.error }, 400);
+      const entity = photoEntityOf(body);
+      const t0 = Date.now();
+      const upload = await imgStorage.uploadImage({
+        buffer: payload.buffer,
+        sourceUrl: payload.sourceUrl,
+        filename: payload.filename,
+        contentType: payload.contentType,
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        makeThumbs: body.make_thumbs !== false,
+      });
+      if (!upload.ok) return jsonReply(res, { error: upload.error }, 400);
+      if (body.save === false || !entity) {
+        return jsonReply(res, { ok: true, upload, saved: false, elapsed_ms: Date.now() - t0 }, 201);
+      }
+      const conn = await mysql2.createConnection(getDbConfig());
+      try {
+        const bad = await assertPhotoEntity(conn, entity.entityType, entity.entityId);
+        if (bad) { await compensateUpload(upload); return jsonReply(res, { error: bad, upload }, 400); }
+        const photo = await insertPhotoRow(conn, entity.entityType, entity.entityId, upload, body);
+        console.log(`[img] upload ok storage=${upload.storage} key=${upload.key} → ${entity.entityType}#${entity.entityId} ${upload.bytes}B ${Date.now() - t0}ms`);
+        return jsonReply(res, { ok: true, upload, photo, saved: true, elapsed_ms: Date.now() - t0 }, 201);
+      } catch (e) {
+        await compensateUpload(upload);
+        return jsonReply(res, { error: '落库失败: ' + String(e && e.message || e), upload }, 500);
+      } finally {
+        await conn.end();
+      }
+    }
+
+    // POST /api/juzhu/admin/photos/migrate-images —— 存量图片引用迁移（本地路径/外链 → S3 绝对 URL）
+    // 口径（勿回退约束）：key 必须走 legacyKeyOf() 确定性前缀（与读侧改写 IMG_URL_MODE=s3 同 key，切读不 404）；
+    //   逐行 UPDATE（photos.file_path / projects.cover_image / units.cover_image），幂等可重跑；
+    //   单张失败不中断批次；limit 分批（每张含 sharp 重编码 + 2 缩略图上传，建议 10/批）。
+    // 用法：① 先 dry_run=true 预览规模 → ② 分批调用，直到 remaining=0；若 migrated=0 且 remaining>0，
+    //   说明剩余项无法自动迁移（failed 明细给出原因，多为本地文件缺失/外链不可达），需人工处置。
+    if (urlPath === '/api/juzhu/admin/photos/migrate-images' && req.method === 'POST') {
+      if (!imgStorage) return jsonReply(res, { error: 'img_storage module missing' }, 500);
+      const body = await readBody(req);
+      const dryRun = body.dry_run === true;
+      const only = String(body.only || 'local').toLowerCase() === 'all' ? 'all' : 'local';
+      const includeCover = body.include_cover !== false;
+      const limit = Math.min(Math.max(parseInt(body.limit, 10) || 10, 1), 50);
+      const t0 = Date.now();
+
+      // 1) 扫描三处引用（SQL 粗筛 + JS 精筛；S3 引用不入选）
+      const items = [];
+      const grab = (rows, kind, col) => {
+        for (const r of rows) {
+          const ref = String(r[col] || '').trim();
+          if (!ref || imgStorage.isS3Url(ref)) continue;
+          if (imgStorage.isLocalPath(ref)) items.push({ kind, id: r.id, ref });
+          else if (only === 'all' && imgStorage.isExternalUrl(ref)) items.push({ kind, id: r.id, ref, external: true });
+        }
+      };
+      const phRows = await queryRows("SELECT id, file_path FROM photos WHERE file_path LIKE '%assets/%' OR file_path LIKE 'http%' ORDER BY id");
+      grab(phRows, 'photo', 'file_path');
+      if (includeCover) {
+        const pjRows = await queryRows("SELECT id, cover_image FROM projects WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(pjRows, 'project_cover', 'cover_image');
+        const unRows = await queryRows("SELECT id, cover_image FROM units WHERE cover_image LIKE '%assets/%' OR cover_image LIKE 'http%' ORDER BY id");
+        grab(unRows, 'unit_cover', 'cover_image');
+      }
+      const totalLocal = items.filter((x) => !x.external).length;
+      const totalExternal = items.length - totalLocal;
+
+      if (dryRun) {
+        return jsonReply(res, {
+          ok: true, dry_run: true, only, total: items.length, total_local: totalLocal, total_external: totalExternal,
+          samples: items.slice(0, 8).map((x) => ({ target: x.kind + '#' + x.id, from: x.ref, to: imgStorage.isLocalPath(x.ref) ? 'legacyKey: ' + imgStorage.legacyKeyOf(x.ref) : '(镜像 S3)' })),
+          guide: '预览模式未上传/未写库。确认后去掉 dry_run 分批执行，limit 建议 10，直到 remaining=0',
+          elapsed_ms: Date.now() - t0,
+        });
+      }
+
+      // 2) 逐条迁移（串行；成功/失败都算"已处理"，避免失败项卡死批次）
+      const batch = items.slice(0, limit);
+      const failed = [];
+      const samples = [];
+      let migrated = 0;
+      for (const it of batch) {
+        const target = it.kind + '#' + it.id;
+        try {
+          let newRef = '';
+          if (imgStorage.isLocalPath(it.ref)) {
+            const read = await imgStorage.readImage(it.ref);
+            if (!read.ok) { failed.push({ target, from: it.ref, error: '本地文件不存在（发行包不含 assets/，无法自动迁移）' }); continue; }
+            const key = imgStorage.legacyKeyOf(it.ref);
+            // eslint-disable-next-line no-await-in-loop
+            const up = await imgStorage.uploadImage({
+              buffer: read.buffer, key,
+              filename: String(it.ref).split('/').pop(),
+              makeThumbs: true,
+            });
+            if (!up.ok || up.storage !== 's3') { failed.push({ target, from: it.ref, error: (up && (up.error || up.warned)) || '上传未落到 S3' }); continue; }
+            newRef = up.url;
+          } else {
+            // eslint-disable-next-line no-await-in-loop
+            const r = await imgStorage.ingestRef(it.ref, { mirror: true, prefix: 'housing' });
+            if (!r.ok || r.kind !== 's3') { failed.push({ target, from: it.ref, error: r.error || r.warn || '镜像未落到 S3' }); continue; }
+            newRef = r.ref;
+          }
+          if (it.kind === 'photo') await queryRows('UPDATE photos SET file_path=? WHERE id=?', [newRef, it.id]);
+          else if (it.kind === 'project_cover') await queryRows('UPDATE projects SET cover_image=? WHERE id=?', [newRef, it.id]);
+          else await queryRows('UPDATE units SET cover_image=? WHERE id=?', [newRef, it.id]);
+          migrated += 1;
+          if (samples.length < 5) samples.push({ target, from: it.ref, to: newRef });
+        } catch (e) {
+          failed.push({ target, from: it.ref, error: String((e && e.message) || e) });
+        }
+      }
+
+      const remaining = Math.max(items.length - batch.length, 0);
+      console.log(`[img] migrate-images processed=${batch.length} migrated=${migrated} failed=${failed.length} remaining=${remaining} ${Date.now() - t0}ms`);
+      return jsonReply(res, {
+        ok: true, dry_run: false, only,
+        total: items.length, total_local: totalLocal, total_external: totalExternal,
+        processed: batch.length, migrated, failed_count: failed.length,
+        remaining, next_round: remaining > 0,
+        failed: failed.slice(0, 20),
+        samples,
+        guide: migrated === 0 && remaining > 0
+          ? '本轮无进展：剩余项需人工处置（见 failed 明细），勿继续空转'
+          : '重复调用直到 remaining=0（已迁移项自动从扫描结果消失，幂等可重跑）',
+        elapsed_ms: Date.now() - t0,
+      });
+    }
+
+    // POST /api/juzhu/admin/photos/presign —— 预签名直传（大图/批量前端直传对象存储，不经服务端中转）
+    if (urlPath === '/api/juzhu/admin/photos/presign' && req.method === 'POST') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      if (!s3Client.isConfigured()) {
+        return jsonReply(res, { error: 'S3 未配置（S3_ACCESS_KEY/S3_SECRET_KEY/S3_ENDPOINT/S3_BUCKET）', mode: 'local' }, 503);
+      }
+      const body = await readBody(req);
+      const entity = photoEntityOf(body);
+      const ext = String(body.ext || 'jpg').replace(/^\./, '').toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'webp'].indexOf(ext) < 0) return jsonReply(res, { error: 'ext 仅支持 jpg/jpeg/png/webp' }, 400);
+      const key = imgStorage.keyFor({
+        prefix: body.prefix,
+        entityType: entity ? entity.entityType : 'misc',
+        entityId: entity ? entity.entityId : 0,
+        ext,
+      });
+      const contentType = body.content_type || ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+      const p = s3Client.presign(key, { method: 'PUT', expires: body.expires, contentType });
+      return jsonReply(res, Object.assign({ ok: true, key, public_url: s3Client.publicUrl(key), content_type: contentType,
+        note: '前端直接 PUT 该 url（需带 Content-Type 头），完成后把 public_url 交给 /photos/add 或 /photos/upload?save=false 落库' }, p));
+    }
+
+    // GET /api/juzhu/admin/storage/status?probe=1 —— 对象存储自检（运维/联调用）
+    if (urlPath === '/api/juzhu/admin/storage/status' && req.method === 'GET') {
+      if (!imgStorage || !s3Client) return jsonReply(res, { error: 'img_storage/s3_client module missing' }, 500);
+      const c = s3Client.config();
+      const out = {
+        mode: imgStorage.storageMode(),
+        configured: s3Client.isConfigured(),
+        bucket: c.bucket,
+        endpoint: c.endpoint,
+        file_endpoint: c.fileEndpoint,
+        sign_version: c.signVersion,
+        region: c.region,
+        addressing: c.addressing,
+        file_style: c.fileStyle,
+        key_prefix: c.keyPrefix,
+        max_bytes: imgStorage.maxBytes(),
+        thumb_rewrite: String(process.env.S3_THUMB_REWRITE == null ? '1' : process.env.S3_THUMB_REWRITE) !== '0',
+        sample_public_url: c.bucket ? s3Client.publicUrl('housing/sample.jpg') : '',
+        // 新增开关回显（运维核对；口径见 docs/s3-intake-api-plan.md §5）
+        img_url_mode: typeof imgStorage.urlMode === 'function' ? imgStorage.urlMode() : null,
+        write_mode: typeof imgStorage.writeMode === 'function' ? imgStorage.writeMode() : null,
+        img_ingest: typeof imgStorage.ingestMode === 'function' ? imgStorage.ingestMode() : null,
+        img_normalize: typeof imgStorage.normalizeRewriteEnabled === 'function' ? imgStorage.normalizeRewriteEnabled() : null,
+        fail_on_unconfigured: typeof imgStorage.failOnUnconfigured === 'function' ? imgStorage.failOnUnconfigured() : null,
+        migrate_prefix: typeof imgStorage.migratePrefix === 'function' ? imgStorage.migratePrefix() : null,
+        source_url_allowlist: String(process.env.S3_SOURCE_URL_ALLOWLIST || '').trim() || null,
+        sharp: (() => { try { require('sharp'); return true; } catch (_) { return false; } })(),
+      };
+      if (new URLSearchParams(qs).get('probe') === '1' && s3Client.isConfigured()) {
+        const key = new URLSearchParams(qs).get('key') || '';
+        out.probe = await s3Client.detectSignVersion(key);
+      }
+      return jsonReply(res, out);
     }
 
     // POST /admin/projects/:id/rating/submit
@@ -1874,7 +2342,7 @@ queryRows,
             conn.end();
             return jsonReply(res, { error: `请先保存 ${dimsReq.length} 维自评分（${proj.channel} 口径）` }, 400);
           }
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           rating.code = `${RATING_CODE_PREFIX[proj.channel] || 'SY'}-${pid}`;
           await conn.execute(
             "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
@@ -2141,7 +2609,7 @@ queryRows,
           const [rows] = await conn.execute('SELECT * FROM projects WHERE id=? AND rating_status=?', [pid, 'pending']);
           if (!rows.length) return jsonReply(res, { error: 'not found or not pending' }, 404);
           const action = body.action === 'pass' ? 'passed' : 'rejected';
-          const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+          const now = bjStamp();
           let rating = {};
           try { rating = JSON.parse(rows[0].rating || '{}'); } catch (_) {}
           if (body.dims) rating.dims = body.dims;

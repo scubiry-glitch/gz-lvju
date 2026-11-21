@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { cancelBooking, myBookings } from '../lib/api.js';
+import CancelOrderSheet from '../components/CancelOrderSheet.jsx';
+import { myBookings } from '../lib/api.js';
 import { useAuthUser } from '../lib/auth-context.jsx';
 import { assetUrl } from '../lib/asset.js';
 import { formatPrice, formatMoney } from '../lib/price.js';
+import {
+  REFUND_PS,
+  UNPAID_PS,
+  applyCancelResult,
+  bookingStatusOf,
+  canCancelBooking,
+} from '../lib/booking-status.js';
 import '../styles/orders.css';
 
 const TABS = [
@@ -12,33 +20,6 @@ const TABS = [
   { id: 'stay', label: '待入住' },
   { id: 'refund', label: '退款售后' },
 ];
-const REFUND_PS = { refunding: 1, refunded: 1, refund_failed: 1, manual_review: 1 };
-const UNPAID_PS = { unpaid: 1, creating: 1, paying: 1, create_unknown: 1 };
-
-function stOf(o) {
-  if (REFUND_PS[o.pay_status] || REFUND_PS[o.refund_status]) {
-    if (o.pay_status === 'refunding' || o.refund_status === 'refunding') return ['退款处理中', 'wait'];
-    if (
-      o.pay_status === 'refund_failed' ||
-      o.pay_status === 'manual_review' ||
-      o.refund_status === 'refund_failed' ||
-      o.refund_status === 'manual_review'
-    )
-      return ['退款异常', 'wait'];
-    if (o.status === 'cancelled') return ['已取消 · 已退款', 'done'];
-    return ['已退款', 'done'];
-  }
-  if (o.status === 'pending') {
-    if (o.pay_status === 'unpaid') return ['待支付', 'wait'];
-    if (UNPAID_PS[o.pay_status]) return ['支付确认中', 'wait'];
-    if (o.pay_status === 'paid') return ['已支付 · 待商家确认', 'stay'];
-    if (o.pay_status === 'coupon_funded') return ['已用券 · 待商家确认', 'stay'];
-    return ['待商家确认', 'wait'];
-  }
-  if (o.status === 'confirmed') return ['已确认 · 待入住', 'stay'];
-  if (o.status === 'cancelled') return ['已取消', 'done'];
-  return [o.status || '—', 'stay'];
-}
 
 function matchTab(o, tab) {
   const ps = o.pay_status || '';
@@ -46,13 +27,58 @@ function matchTab(o, tab) {
   const isRefund = !!(REFUND_PS[ps] || REFUND_PS[rs]);
   if (tab === 'unpaid') return !!UNPAID_PS[ps] && o.status !== 'cancelled';
   if (tab === 'stay') {
-    if (isRefund || o.status === 'cancelled') return false;
+    if (isRefund || o.status === 'cancelled' || ps === 'closing') return false;
     if (o.status === 'confirmed') return true;
     if (o.status === 'pending' && (ps === 'paid' || ps === 'coupon_funded')) return true;
     return false;
   }
   if (tab === 'refund') return isRefund;
   return true;
+}
+
+/** payment_expires_at 与服务端同一口径：无时区的时间是北京时间，按 +08:00 解析。 */
+function payDeadlineMs(raw) {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)) {
+    const ms = Date.parse(s);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const ms = Date.parse(s.replace(' ', 'T') + '+08:00');
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatRemain(ms) {
+  const sec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function PayCountdown({ expiresAt, onExpire }) {
+  const end = payDeadlineMs(expiresAt);
+  const [left, setLeft] = useState(() => (end == null ? null : end - Date.now()));
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (end == null) return undefined;
+    const tick = () => {
+      const n = end - Date.now();
+      setLeft(n);
+      if (n <= 0 && !fired.current) {
+        fired.current = true;
+        onExpire();
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [end, onExpire]);
+
+  if (end == null || left == null) return null;
+  if (left <= 0) return <span className="paycd over">已超时</span>;
+  return <span className="paycd">剩余 {formatRemain(left)}</span>;
 }
 
 function emptyHint(tab) {
@@ -70,12 +96,17 @@ function OrdersBody() {
   const [loadErr, setLoadErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [cx, setCx] = useState(null);
-  const [cxBusy, setCxBusy] = useState(false);
+  const [timedOut, setTimedOut] = useState(() => new Set());
+  const reloadTimer = useRef(null);
+  const reloadedNos = useRef(new Set());
 
-  const loadMine = useCallback(() => {
-    setLoading(true);
-    setLoadErr('');
-    myBookings()
+  const loadMine = useCallback((opts = {}) => {
+    const silent = !!opts.silent;
+    if (!silent) {
+      setLoading(true);
+      setLoadErr('');
+    }
+    return myBookings()
       .then((j) => setItems(j.items || []))
       .catch((e) => {
         if (e.status === 401) {
@@ -83,13 +114,26 @@ function OrdersBody() {
           goLogin('/orders');
           return;
         }
-        setLoadErr('加载失败');
+        if (!silent) setLoadErr('加载失败');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!silent) setLoading(false);
+      });
   }, [clearSession, goLogin]);
+
+  const onPayExpire = useCallback(() => {
+    if (reloadTimer.current) return;
+    reloadTimer.current = setTimeout(() => {
+      reloadTimer.current = null;
+      loadMine({ silent: true });
+    }, 600);
+  }, [loadMine]);
 
   useEffect(() => {
     loadMine();
+    return () => {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    };
   }, [loadMine]);
 
   function setTab(id) {
@@ -97,20 +141,6 @@ function OrdersBody() {
     if (id === 'all') p.delete('tab');
     else p.set('tab', id);
     setParams(p, { replace: true });
-  }
-
-  async function confirmCancel() {
-    if (!cx || cxBusy) return;
-    setCxBusy(true);
-    try {
-      await cancelBooking({ order_no: cx.order_no, contact_phone: cx.contact_phone_raw || '' });
-      setCx(null);
-      loadMine();
-    } catch (e) {
-      alert(e.message || '取消失败');
-    } finally {
-      setCxBusy(false);
-    }
   }
 
   const shown = items.filter((o) => matchTab(o, tab));
@@ -153,7 +183,11 @@ function OrdersBody() {
           </div>
         ) : (
           shown.map((o) => {
-            const st = stOf(o);
+            const st = bookingStatusOf(o);
+            const deadline = payDeadlineMs(o.payment_expires_at);
+            const showPayClock =
+              o.status === 'pending' && o.pay_status === 'unpaid' && deadline != null;
+            const payTimedOut = showPayClock && (timedOut.has(o.order_no) || deadline <= Date.now());
             const cover = o.project_cover
               ? { backgroundImage: `url(${assetUrl(o.project_cover)})` }
               : { backgroundImage: 'url(/assets/lvju/xijiang-night.jpg)' };
@@ -161,7 +195,25 @@ function OrdersBody() {
               <div className="ordcard" key={o.id || o.order_no}>
                 <div className="oh">
                   <span className="shop">贝壳旅居 · {o.channel === 'minsu' ? '民宿' : '租赁住宿'}</span>
-                  <span className={'stt ' + st[1]}>{st[0]}</span>
+                  <span className={'stt ' + st[1]}>
+                    {st[0]}
+                    {showPayClock ? (
+                      <PayCountdown
+                        expiresAt={o.payment_expires_at}
+                        onExpire={() => {
+                          setTimedOut((prev) => {
+                            if (prev.has(o.order_no)) return prev;
+                            const next = new Set(prev);
+                            next.add(o.order_no);
+                            return next;
+                          });
+                          if (reloadedNos.current.has(o.order_no)) return;
+                          reloadedNos.current.add(o.order_no);
+                          onPayExpire();
+                        }}
+                      />
+                    ) : null}
+                  </span>
                 </div>
                 <div className="ob">
                   <div className="th" style={cover} />
@@ -172,23 +224,60 @@ function OrdersBody() {
                     </div>
                     {o.cancel_policy_text ? <div className="meta">{o.cancel_policy_text}</div> : null}
                     <div className="amt">
-                      {Number(o.coupon_minor) > 0 ? <>结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付 <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b></> : <>合计 <b>¥{formatPrice(o.price_total)}</b></>} · 订单号 …{(o.order_no || '').slice(-4)}
+                      {Number(o.coupon_minor) > 0 ? (
+                        <>
+                          结算 ¥{formatMoney(o.price_total)} · 券抵 ¥{formatMoney(Number(o.coupon_minor) / 100)} · 现金应付{' '}
+                          <b>¥{formatMoney(Number(o.cash_due_minor) / 100)}</b>
+                        </>
+                      ) : (
+                        <>
+                          合计 <b>¥{formatPrice(o.price_total)}</b>
+                        </>
+                      )}{' '}
+                      · 订单号 {o.order_no || '—'}
                     </div>
                   </div>
                 </div>
+                {showPayClock && !payTimedOut ? (
+                  <div className="pay-tip" role="status">
+                    <svg className="pay-tip-ic" viewBox="0 0 16 16" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                      <path d="M8 4.5V8l2.2 1.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="pay-tip-txt">请在下单后30分钟内完成支付，超时订单将自动取消。</span>
+                  </div>
+                ) : null}
                 <div className="of">
-                  {o.status === 'pending' && o.can_cancel !== false ? (
+                  {canCancelBooking(o) ? (
                     <button type="button" className="cancel" onClick={() => setCx(o)}>
                       取消订单
                     </button>
                   ) : null}
-                  {o.status === 'pending' && UNPAID_PS[o.pay_status] ? (
-                    <a href={`/lvju-app-booking.html?order_no=${encodeURIComponent(o.order_no)}`}>去支付</a>
-                  ) : null}
-                  <Link to={`/detail/${o.project_id}`}>房源详情</Link>
-                  <a className="primary" href={`/lvju-app-order-detail.html?order_no=${encodeURIComponent(o.order_no)}`}>
+                  {o.project_id && o.project_status === 'online' ? (
+                    <Link to={`/detail/${o.project_id}`}>房源详情</Link>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12, color: 'var(--muted)', padding: '7px 0' }}>
+                      {o.project_id ? '房源已下架' : '暂无房源'}
+                    </span>
+                  )}
+                  <Link
+                    className={o.status === 'pending' && UNPAID_PS[o.pay_status] && !payTimedOut ? undefined : 'primary'}
+                    to={`/order/${encodeURIComponent(o.order_no)}`}
+                  >
                     订单详情
-                  </a>
+                  </Link>
+                  {o.status === 'pending' && UNPAID_PS[o.pay_status] && !payTimedOut ? (
+                    <Link
+                      className="primary"
+                      to={
+                        '/booking?order_no=' +
+                        encodeURIComponent(o.order_no) +
+                        (o.contact_phone_raw ? '&phone=' + encodeURIComponent(o.contact_phone_raw) : '')
+                      }
+                    >
+                      去支付
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             );
@@ -196,40 +285,18 @@ function OrdersBody() {
         )}
       </div>
 
-      {cx ? (
-        <div
-          className="cx-mask"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setCx(null);
-          }}
-          role="presentation"
-        >
-          <div className="cx-card" role="dialog" aria-modal="true">
-            <div className="cx-handle" aria-hidden />
-            <h3>确认取消订单？</h3>
-            <p className="cx-sub">取消后不可恢复，房态将立刻释放</p>
-            <div className="cx-info">
-              <div className="nm">{cx.project_name || `项目#${cx.project_id}`}</div>
-              <div className="meta">
-                {cx.checkin} → {cx.checkout} · {cx.nights || '—'} 晚
-                {cx.order_no ? ` · ${cx.order_no}` : ''}
-              </div>
-              <div className="amt">
-                合计 <b>¥{formatPrice(cx.price_total)}</b>
-              </div>
-            </div>
-            {cx.cancel_policy_text ? <div className="cx-tip">{cx.cancel_policy_text}</div> : null}
-            <div className="cx-acts">
-              <button type="button" className="no" onClick={() => setCx(null)} disabled={cxBusy}>
-                再想想
-              </button>
-              <button type="button" className="yes" onClick={confirmCancel} disabled={cxBusy}>
-                {cxBusy ? '取消中…' : '确认取消'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <CancelOrderSheet
+        order={cx}
+        onClose={() => setCx(null)}
+        onSuccess={async (o, res) => {
+          const no = o && o.order_no;
+          if (no) {
+            setItems((prev) => prev.map((it) => (it.order_no === no ? applyCancelResult(it, res) : it)));
+          }
+          setCx(null);
+          await loadMine({ silent: true });
+        }}
+      />
     </div>
   );
 }

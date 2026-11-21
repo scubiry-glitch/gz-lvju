@@ -1,0 +1,20 @@
+167b78d5761116862064fe7753bf784a09542f16
+作者: taoyesi001
+时间: Mon Sep 21 15:00:24 2026 +0800
+标题: 新增S3相关功能改动
+
+ .idea/.gitignore            |   6 +-
+ CLAUDE.md                   |  13 ++
+ README.md                   |   1 +
+ app.js                      | 181 ++++++++++++++++
+ docs/s3-image-storage.md    | 188 +++++++++++++++++
+ img_storage.cjs             | 372 +++++++++++++++++++++++++++++++++
+ img_thumbs.cjs              |  32 ++-
+ juzhu/.env.example          |  30 +++
+ package.json                |   4 +-
+ perm_registry.cjs           |   4 +
+ s3_client.cjs               | 487 ++++++++++++++++++++++++++++++++++++++++++++
+ scripts/s3_region_probe.cjs | 115 +++++++++++
+ scripts/s3_smoke.cjs        | 247 ++++++++++++++++++++++
+ vendor_api.cjs              |  88 ++++++++
+ 14 files changed, 1760 insertions(+), 8 deletions(-)

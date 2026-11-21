@@ -16,9 +16,9 @@ if (morphAlias !== MORPH_PKG) {
   console.warn('[h5] @ke/morph 未安装（内网私有包），本次构建使用 morph-shim 兜底；登录跳转为等价实现、非官方 SDK');
 }
 
-// 生产挂载在站点 /h5/*；开发时 vite 自带 /h5 base，代理 API 到本地 app.js
+// 生产挂载在站点 /gy/*；开发时 vite 自带 /gy base，代理 API 到本地 app.js
 export default defineConfig({
-  base: '/h5/',
+  base: '/gy/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -26,7 +26,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@ke/morph', '@babel/runtime/helpers/interopRequireDefault'],
+    // 仅在真实包存在时才预构建（CJS 包需要）；shim 是纯 ESM，不需要预构建
+    include: fs.existsSync(MORPH_PKG)
+      ? ['@ke/morph', '@babel/runtime/helpers/interopRequireDefault']
+      : [],
   },
   build: {
     commonjsOptions: {

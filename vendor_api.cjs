@@ -1,6 +1,7 @@
 // vendor_api.cjs — 商家 HMAC 开放接口（对齐 api_doc.md）
 // 家政：/api/juzhu/jiazheng/vendor/*；房源：/api/juzhu/housing/vendor/*（同一套 HMAC 鉴权）
 'use strict';
+const { bjStamp } = require('./server/utils/bj-time.cjs');
 
 const hmacAuth = require('./hmac_auth.cjs');
 const grOrders = require('./gr_orders.cjs');
@@ -9,6 +10,50 @@ const ratingCfg = require('./rating_config.cjs');
 const photoCfg = require('./photo_config.cjs');
 const roomProfileCfg = require('./room_profile.cjs');
 const MIN_PUBLISH_PHOTOS = photoCfg.PHOTO_MIN_PUBLISH;   // 单一数据源 photo_config.cjs（改阈值只改那一处）
+
+// 图片存储（贝壳 ODS/S3，S3 优先 + 本地兜底）：商家直传通道用；模块缺失时该路由返回 500
+let imgStorage = null;
+try { imgStorage = require('./img_storage.cjs'); } catch (_) {}
+
+// ── 图片引用收口（规则 21：图片只走 img_storage；模块缺失时原样透传，不阻断业务）──
+// 外部 URL 是否镜像由环境变量 IMG_INGEST 决定（缺省 keep = 原样保留，零行为变化）
+async function normImgRef(ref, opts) {
+  if (!imgStorage || typeof imgStorage.ingestRef !== 'function') {
+    return { ok: true, ref: ref == null ? '' : String(ref) };
+  }
+  return imgStorage.ingestRef(ref, opts);
+}
+
+async function normCoverRef(ref, opts) {
+  const raw = String(ref == null ? '' : ref).trim();
+  if (!raw) return { ok: true, ref: null };
+  const r = await normImgRef(raw, opts);
+  return r.ok ? { ok: true, ref: r.ref } : { ok: false, error: r.error };
+}
+
+/** 该引用是否已是平台对象存储（本域 S3）里的受管引用 */
+function isManagedS3Ref(p) {
+  return !!(imgStorage && typeof imgStorage.parse === 'function' && imgStorage.parse(p).kind === 's3');
+}
+
+/** 源地址归一：http(s) 一律剥掉查询串（商家签名 URL 的 X-Amz-Date/Signature 每次推送都在变） */
+function sourceKeyOf(u) {
+  const s = String(u == null ? '' : u).trim();
+  if (!/^https?:\/\//i.test(s)) return s;
+  try { const x = new URL(s); return x.origin + x.pathname; } catch (_) { return s; }
+}
+
+/** 是否同一张图（按去签名的源地址比对）：判断能否复用已镜像的存量引用 */
+function sameImageSource(a, b) {
+  const ka = sourceKeyOf(a);
+  return !!ka && ka === sourceKeyOf(b);
+}
+
+/** 是否「带签名/时效」的临时地址（S3 预签名、OSS、CDN 防盗链 alike）——这类地址会过期，未镜像就是定时炸弹 */
+function looksSignedUrl(u) {
+  return /[?&](x-amz-signature|x-amz-expires|x-amz-credential|signature|ossaccesskeyid|expires|auth_key)=/i
+    .test(String(u == null ? '' : u));
+}
 
 function reply(status, data) {
   return { status, data };
@@ -458,7 +503,11 @@ async function publishEligibility(conn, row) {
   const [ph] = await conn.execute(`SELECT COUNT(*) AS c, MAX(is_cover) AS has_cover FROM photos
     WHERE (entity_type='project' AND entity_id=?) OR (entity_type='unit' AND entity_id IN (SELECT id FROM units WHERE project_id=?))`, [row.id, row.id]);
   if (!ph[0] || Number(ph[0].c) < MIN_PUBLISH_PHOTOS) return { error: `上架前须至少上传 ${MIN_PUBLISH_PHOTOS} 张房源照片` };
-  if (!row.cover_image && !Number(ph[0].has_cover || 0)) return { error: '上架前须设置房源封面图' };
+  // cover_image 脏值（空 / '-' / 'todo'）不算封面（口径与 img_storage.isValidImageRef 一致）
+  const coverOk = (imgStorage && typeof imgStorage.isValidImageRef === 'function')
+    ? imgStorage.isValidImageRef(row.cover_image)
+    : !!row.cover_image;
+  if (!coverOk && !Number(ph[0].has_cover || 0)) return { error: '上架前须设置房源封面图' };
   // 图集抽检（2026-09）：真拉取前 N 张核对大小/分辨率——封面优先
   const check = await spotCheckPhotos(conn, row.id);
   if (check.error) return { error: check.error };
@@ -511,6 +560,9 @@ function housingProjectOut(row, disp) {
   const out = stripContactPhone(Object.assign({}, row));
   Object.assign(out, stayCfg.stayConfigOf(row));
   Object.assign(out, disp || { price_from_display: null, price_unit: null, price_note: '' });
+  // auto_publish 生效值回显（2026-10-14）：平台到底有没有记下「复核通过自动上架」，
+  // 商家不该只能靠复核结果反推——create/update 出参里直接给布尔值（历史 bug 见 PROJECT_EXT_KEYS 注释）。
+  out.auto_publish = stayCfg.parseExtObj(row.ext).auto_publish === true;
   return out;
 }
 
@@ -567,39 +619,72 @@ async function housingProjectsDetail(conn, body, vendorId) {
   });
 }
 
-/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错 */
+/** body.ext 入参源（2026-10-13 商家侧嵌套写法兼容）：ext 对象展开为伪顶层，null/'' 视为未传。
+ *  值可为对象或 JSON 字符串；其余类型/解析失败直接报错，不做静默丢弃。 */
+function extSrcFromBody(body) {
+  const raw = body == null ? null : body.ext;
+  if (raw == null || raw === '') return {};
+  if (typeof raw === 'string') {
+    try {
+      const o = JSON.parse(raw);
+      if (o && typeof o === 'object' && !Array.isArray(o)) return o;
+    } catch (_) { /* 落到下方统一报错 */ }
+    throw new Error('ext 须为对象');
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('ext 须为对象');
+  return raw;
+}
+
+/** ext 组装：保险标识 + 最短连住（stay_config 校验），未知 key 直接报错。
+ *  字段来源兼容两处：body 顶层（优先）与 body.ext 对象（2026-10-13 兼容商家嵌套写法）。 */
 function extFromBody(body, baseExt, channel) {
+  const src = extSrcFromBody(body);
+  const has = (k) => Object.prototype.hasOwnProperty.call(body, k) || Object.prototype.hasOwnProperty.call(src, k);
+  const from = (k) => (Object.prototype.hasOwnProperty.call(body, k) ? body[k] : src[k]);
   let ext = Object.assign({}, stayCfg.parseExtObj(baseExt));
-  if (Object.prototype.hasOwnProperty.call(body, 'insurance')) {
-    if (body.insurance === null || body.insurance === '') ext.insurance = [];
-    else if (Array.isArray(body.insurance)) {
-      const unknown = body.insurance.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
+  if (has('insurance')) {
+    const v = from('insurance');
+    if (v === null || v === '') ext.insurance = [];
+    else if (Array.isArray(v)) {
+      const unknown = v.map(String).filter((k) => !stayCfg.INSURANCE_KEYS.includes(k));
       if (unknown.length) throw new Error('insurance 含未知标识: ' + unknown.join(',') + '（可用: ' + stayCfg.INSURANCE_KEYS.join('/') + '）');
-      ext.insurance = body.insurance.map(String);
+      ext.insurance = v.map(String);
     } else throw new Error('insurance 须为标识数组: ' + stayCfg.INSURANCE_KEYS.join('/'));
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'min_stay_nights')) {
-    if (body.min_stay_nights === null || body.min_stay_nights === '') delete ext.min_stay_nights;
+  if (has('min_stay_nights')) {
+    const v = from('min_stay_nights');
+    if (v === null || v === '') delete ext.min_stay_nights;
     else {
-      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(body.min_stay_nights, channel);
+      ext.min_stay_nights = stayCfg.normalizeMinStayNightsInput(v, channel);
     }
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'default_closed')) {
-    if (body.default_closed === null || body.default_closed === '') delete ext.default_closed;
-    else if (stayCfg.normalizeDefaultClosedInput(body.default_closed)) ext.default_closed = true; else delete ext.default_closed;
+  if (has('default_closed')) {
+    const v = from('default_closed');
+    if (v === null || v === '') delete ext.default_closed;
+    else if (stayCfg.normalizeDefaultClosedInput(v)) ext.default_closed = true; else delete ext.default_closed;
   }
   // 审核通过后自动上架（2026-09-22 商家诉求 3.1）：true = 评级复核通过即由平台自动推 online
   //（仍走同一套上架闸与图片抽检；闸不过保持 draft，原因随 rating.reviewed webhook 带回）
-  if (Object.prototype.hasOwnProperty.call(body, 'auto_publish')) {
-    if (body.auto_publish === true || body.auto_publish === 'true') ext.auto_publish = true;
+  if (has('auto_publish')) {
+    const v = from('auto_publish');
+    if (v === true || v === 'true') ext.auto_publish = true;
     else delete ext.auto_publish;
   }
-  ext = stayCfg.applyTransactionCapabilities(ext, body, channel);
+  ext = stayCfg.applyTransactionCapabilities(ext, Object.assign({}, src, body), channel);
   return ext;
 }
 
 const PROJECT_UPDATABLE_COLS = ['name', 'address', 'cover_image', 'sort_order', 'price_from',
   'is_featured', 'featured_rank', 'old_house_hint', 'unit_count', 'managed_unit_count'];
+
+/** `projects/update` 会重建 `ext` 的字段清单——**必须与 extFromBody() 认的键一一对应**。
+ *  历史 bug（2026-10-14，商家 9410 复核通过未自动上架）：重建条件是手写的 `insurance || min_stay_nights ||
+ *  online_booking || online_payment || stay_bookable`，**漏了 auto_publish / default_closed** →
+ *  `{id, auto_publish:true}` 这类「只想改一个 ext 开关」的请求整段跳过 ext 重建，字段被静默丢弃
+ *  （接口回 200、无任何提示），复核通过时读到的 ext.auto_publish 自然不是 true。
+ *  新增 ext 字段时改这里一处，别再各写一份条件。 */
+const PROJECT_EXT_KEYS = ['insurance', 'min_stay_nights', 'default_closed', 'auto_publish',
+  'online_booking', 'online_payment', 'stay_bookable'];
 
 async function createUnit(conn, projectId, channel, priceFrom, u) {
   const name = String((u && u.name) || '').trim();
@@ -626,11 +711,20 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
     try { if (stayCfg.normalizeDefaultClosedInput(u.default_closed)) ext.default_closed = true; }
     catch (e) { throw new Error('units[].' + e.message); }
   }
+  // 免费取消政策（房型维度，2026-09-09）：口径与 units/update 完全一致（单一数据源 stay_config.cjs）。
+  // 漏掉这段会让「创建时就带 cancel_policy」静默丢字段——落库无 ext.cancel_policy，出参回落
+  // disabledCancelPolicy()（enabled:false / 18:00），商家看到 200 却以为政策已生效（2026-10-14 修复）。
+  if (u.cancel_policy != null && u.cancel_policy !== '') {
+    try { ext.cancel_policy = stayCfg.normalizeCancelPolicyInput(u.cancel_policy); }
+    catch (e) { throw new Error('units[].' + e.message); }
+  }
   // 房间档案（Excel 房源字段）：字段清单 / 长度 / 枚举校验在 room_profile.cjs（单一数据源）
   if (u.room_profile != null && u.room_profile !== '') {
     try { roomProfileCfg.mergeRoomProfileIntoExt(ext, u.room_profile); }
     catch (e) { throw new Error('units[].' + e.message); }
   }
+  const coverRef = await normCoverRef(u.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: projectId });
+  if (!coverRef.ok) throw new Error('units[].cover_image 非法: ' + coverRef.error);
   const [r] = await conn.execute(
     `INSERT INTO units(project_id, name, slug, area_sqm, layout_label, rent_monthly, price_total,
        tags, unit_spec, promo_price, total_qty, amenities, sort_order, cover_image, ext)
@@ -646,7 +740,7 @@ async function createUnit(conn, projectId, channel, priceFrom, u) {
       totalQty,
       tagsToDb(u.amenities),
       u.sort_order == null || u.sort_order === '' ? 99 : parseInt(u.sort_order, 10),
-      u.cover_image || null,
+      coverRef.ref,
       Object.keys(ext).length ? JSON.stringify(ext) : null,
     ]
   );
@@ -687,13 +781,15 @@ async function housingProjectsCreate(conn, body, vendorId) {
   if (status === 'online') return reply(400, { code: 400, message: '新建房源必须先保存为 draft，完成商家/房源审核后再上架' });
   const slug = await uniqueProjectSlug(conn, channel, name, b.slug);
   const address = String(b.address || '').trim() || (city[0].name + ' · ' + name);
+  const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: 0 });
+  if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
   const [r] = await conn.execute(
     `INSERT INTO projects(city_id, district_id, channel, name, slug, cover_image, address, tags,
        sort_order, unit_count, price_from, is_featured, old_house_hint, contact_phone,
        owner_vendor_id, status, ext)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      cityId, districtId, channel, name, slug, b.cover_image || null, address, tagsToDb(b.tags),
+      cityId, districtId, channel, name, slug, coverRef.ref, address, tagsToDb(b.tags),
       b.sort_order == null || b.sort_order === '' ? 999 : parseInt(b.sort_order, 10),
       Array.isArray(b.units) ? b.units.length : 0,
       b.price_from == null || b.price_from === '' ? null : parseInt(b.price_from, 10),
@@ -724,6 +820,12 @@ async function housingProjectsUpdate(conn, body, vendorId) {
   }
   for (const col of PROJECT_UPDATABLE_COLS) {
     if (col === 'name') continue;
+    if (col === 'cover_image' && Object.prototype.hasOwnProperty.call(b, col)) {
+      const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'project', entityId: row.id });
+      if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
+      sets.push('`' + col + '`=?'); params.push(coverRef.ref);
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(b, col)) {
       let v = b[col];
       if (['sort_order', 'price_from', 'unit_count', 'managed_unit_count', 'featured_rank'].includes(col)) {
@@ -741,9 +843,8 @@ async function housingProjectsUpdate(conn, body, vendorId) {
     try { sets.push('contact_phone=?'); params.push(phoneFromBody(b.contact_phone)); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
   }
-  if (Object.prototype.hasOwnProperty.call(b, 'insurance') || Object.prototype.hasOwnProperty.call(b, 'min_stay_nights')
-    || Object.prototype.hasOwnProperty.call(b, 'online_booking') || Object.prototype.hasOwnProperty.call(b, 'online_payment')
-    || Object.prototype.hasOwnProperty.call(b, 'stay_bookable')) {
+  if (PROJECT_EXT_KEYS.some((k) => Object.prototype.hasOwnProperty.call(b, k))
+    || (b.ext != null && b.ext !== '')) {
     let ext;
     try { ext = extFromBody(b, row.ext, row.channel); }
     catch (e) { return reply(400, { code: 400, message: e.message }); }
@@ -811,7 +912,7 @@ async function housingRatingSubmit(conn, body, vendorId) {
   try { rating = JSON.parse(row.rating || '{}') || {}; } catch (_) { rating = {}; }
   rating.dims = dims;
   rating.code = `${ratingCfg.RATING_CODE_PREFIX[row.channel] || 'SY'}-${row.id}`;
-  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const now = bjStamp();
   await conn.execute(
     "UPDATE projects SET rating=?, rating_status='pending', rating_submitted_at=?, rating_note=NULL WHERE id=?",
     [JSON.stringify(rating), now, row.id]);
@@ -869,6 +970,12 @@ async function housingUnitsUpdate(conn, body, vendorId) {
   }
   const sets = [], params = [];
   for (const col of ['name', 'layout_label', 'unit_spec', 'cover_image']) {
+    if (col === 'cover_image' && Object.prototype.hasOwnProperty.call(b, col)) {
+      const coverRef = await normCoverRef(b.cover_image, { mirror: true, prefix: 'housing', entityType: 'unit', entityId: rows[0].id });
+      if (!coverRef.ok) return reply(400, { code: 400, message: 'cover_image 非法: ' + coverRef.error });
+      sets.push('`' + col + '`=?'); params.push(coverRef.ref);
+      continue;
+    }
     if (Object.prototype.hasOwnProperty.call(b, col)) { sets.push('`' + col + '`=?'); params.push(b[col]); }
   }
   for (const col of ['area_sqm']) {
@@ -972,46 +1079,183 @@ async function housingPhotosAdd(conn, body, vendorId) {
   try { category = photoCfg.normalizeCategoryInput(b.category); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const externalId = b.external_id == null || b.external_id === '' ? null : String(b.external_id).trim().slice(0, 120);
-  const isCover = b.is_cover ? 1 : 0;
-  // 幂等（2026-09）：同实体同 URL / 同 external_id 已存在 → 原地更新，不再插重复行
-  // （商家反馈：反复推同一张图会堆重复、C 端重复展示）
-  const [dup] = await conn.execute(
-    `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
-       AND (file_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
-    externalId ? [entityType, entityId, filePath, externalId] : [entityType, entityId, filePath]);
-  if (dup.length) {
-    const sets = ['file_path=?', 'category=?'];
-    const vals = [filePath, category];
-    if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
-    if (b.source_path != null) { sets.push('source_path=?'); vals.push(b.source_path || null); }
-    // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
-    if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
-    if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
-    vals.push(dup[0].id);
-    await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
-    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-    const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
-    return reply(200, { code: 0, message: 'success', updated: true, photo: photoOut(upd[0]) });
-  }
-  if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
-  let nextSort;
-  if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
-    nextSort = parseInt(b.sort_order, 10);
+  // 源文件地址存档（2026-10-09）：无论镜像成功与否、无论入参形态（外链/对象引用/本地路径），
+  // 都把上游原始地址记入 source_path 便于追溯；商家显式传 source_path 时优先。
+  const rawSource = (typeof b.source_path === 'string' && b.source_path.trim()) ? b.source_path.trim() : filePath;
+  if (rawSource.length > 500) return reply(400, { code: 400, message: 'source_path 长度须 ≤500' });
+  const sourcePath = rawSource;
+  // 幂等前置（2026-10-09）：**同一原始地址**（file_path / source_path 存档）已登记且现存引用已在对象存储
+  // → 跳过重复镜像上传（mirror 每次会生成新 uuid key，反复推同一张图不再白传对象/缩略图）。
+  // 注意：仅按地址匹配——external_id 命中不适用（商家换图时 external_id 不变但地址变，须正常镜像新图）。
+  const [pre] = await conn.execute(
+    `SELECT id, file_path FROM photos WHERE entity_type=? AND entity_id=?
+       AND (file_path=? OR source_path=?) LIMIT 1`,
+    [entityType, entityId, filePath, filePath]);
+  let ref = null;
+  if (pre.length && imgStorage.parse(pre[0].file_path).kind === 's3') {
+    ref = { ok: true, ref: pre[0].file_path, kind: 's3', mirrored: true, warn: '' };  // 首次登记时已过校验/镜像，直接复用
   } else {
-    const [mx] = await conn.execute(
-      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
-      [entityType, entityId]);
-    nextSort = mx[0].n;
+    // 图片引用收口：本地/对象存储引用归一化；第三方 URL 是否镜像由 IMG_INGEST 决定（缺省 keep）
+    ref = await normImgRef(filePath, { mirror: true, prefix: 'housing', entityType, entityId });
+    if (!ref.ok) return reply(400, { code: 400, message: 'file_path 非法: ' + ref.error });
   }
-  const [r] = await conn.execute(
-    `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
-     VALUES (?,?,?,?,?,?,?,?)`,
-    [entityType, entityId, filePath, b.source_path || null, isCover, nextSort, category, externalId]);
-  if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [filePath, projectId]);
-  if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [filePath, unitId]);
-  const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
-  return reply(200, { code: 0, message: 'success', photo: photoOut(photo[0]) });
+  if (String(ref.ref).length > 500) return reply(400, { code: 400, message: 'file_path 归一化后长度超过 500' });
+  const isCover = b.is_cover ? 1 : 0;
+  // 幂等（2026-09/10）：同实体同原始地址（file_path 或 source_path 存档） / 同 external_id → 原地更新，不插重复行
+  await conn.beginTransaction();
+  try {
+    // 归属行锁：并发「设为封面」/批量登记时保证 is_cover 唯一与 sort_order 不重复
+    await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    const [dup] = await conn.execute(
+      `SELECT id FROM photos WHERE entity_type=? AND entity_id=?
+         AND (file_path=? OR source_path=?${externalId ? ' OR external_id=?' : ''}) LIMIT 1`,
+      externalId ? [entityType, entityId, filePath, filePath, externalId] : [entityType, entityId, filePath, filePath]);
+    if (dup.length) {
+      const sets = ['file_path=?', 'category=?', 'source_path=?'];
+      const vals = [ref.ref, category, sourcePath];
+      if (externalId) { sets.push('external_id=?'); vals.push(externalId); }
+      // sort_order 显式传入才改（旧行为是忽略入参、永远追加到末尾——2026-09 一并修掉）
+      if (b.sort_order != null && b.sort_order !== '') { sets.push('sort_order=?'); vals.push(parseInt(b.sort_order, 10) || 0); }
+      if (isCover) { sets.push('is_cover=1'); await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]); }
+      vals.push(dup[0].id);
+      await conn.execute(`UPDATE photos SET ${sets.join(', ')} WHERE id=?`, vals);
+      if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+      if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
+      const [upd] = await conn.execute('SELECT * FROM photos WHERE id=?', [dup[0].id]);
+      await conn.commit();
+      return reply(200, {
+        code: 0, message: 'success', updated: true,
+        storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
+        file_path: ref.ref,
+        warned: ref.warn || undefined,
+        photo: photoOut(upd[0]),
+      });
+    }
+    if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    let nextSort;
+    if (b.sort_order != null && b.sort_order !== '' && Number.isFinite(parseInt(b.sort_order, 10))) {
+      nextSort = parseInt(b.sort_order, 10);
+    } else {
+      const [mx] = await conn.execute(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?',
+        [entityType, entityId]);
+      nextSort = mx[0].n;
+    }
+    const [r] = await conn.execute(
+      `INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order, category, external_id)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [entityType, entityId, ref.ref, sourcePath, isCover, nextSort, category, externalId]);
+    if (isCover && entityType === 'project') await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [ref.ref, projectId]);
+    if (isCover && entityType === 'unit') await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [ref.ref, unitId]);
+    const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [r.insertId]);
+    await conn.commit();
+    return reply(200, {
+      code: 0, message: 'success',
+      storage: ref.kind === 's3' ? 's3' : (ref.kind === 'local' ? 'local' : 'external'),
+      file_path: ref.ref,
+      warned: ref.warn || undefined,
+      photo: photoOut(photo[0]),
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    return reply(500, { code: 500, message: '登记房源图片失败: ' + String(e.message || e) });
+  }
+}
+
+/** 解析上传载荷：data_url / base64 / source_url 三选一（与 app.js 同口径，此处独立实现避免循环依赖） */
+function decodeImagePayload(body) {
+  const b = body || {};
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,([\s\S]+)$/i.exec(String(b.data_url || '').trim());
+  if (m) return { contentType: m[1], buffer: Buffer.from(m[2], 'base64'), filename: b.filename || '' };
+  const raw = b.base64;
+  if (raw) return { contentType: b.content_type || '', buffer: Buffer.from(String(raw).replace(/^data:[^,]+,/, ''), 'base64'), filename: b.filename || '' };
+  const src = b.source_url || b.url;
+  if (src) return { sourceUrl: String(src).trim(), filename: b.filename || '', contentType: b.content_type || '' };
+  return { error: '缺少图片内容：请提供 base64 / data_url / source_url 之一' };
+}
+
+/**
+ * 图片上传（对象存储）：商家直传通道
+ * 走与 admin 同一 img_storage（S3 优先、本地兜底），owner 校验后落 photos 表；
+ * source_url 支持把商家自有 CDN 上的图片镜像到平台对象存储。
+ */
+async function housingPhotosUpload(conn, body, vendorId) {
+  if (!imgStorage) return reply(500, { code: 500, message: 'img_storage module missing' });
+  const b = body || {};
+  const projectId = parseInt(b.project_id, 10);
+  if (!projectId) return reply(400, { code: 400, message: '缺少 project_id 参数' });
+  const row = await ownProject(conn, vendorId, projectId);
+  if (!row) return reply(404, { code: 404, message: '房源不存在或不属于该商家' });
+
+  let entityType = 'project';
+  let entityId = projectId;
+  if (b.unit_id != null && b.unit_id !== '') {
+    const unitId = parseInt(b.unit_id, 10);
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [unitId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+    entityType = 'unit'; entityId = unitId;
+  }
+  if (b.is_cover && entityType === 'unit') {
+    const [units] = await conn.execute('SELECT id FROM units WHERE id=? AND project_id=?', [entityId, projectId]);
+    if (!units.length) return reply(400, { code: 400, message: '户型不存在或不属于该房源' });
+  }
+
+  const payload = decodeImagePayload(b);
+  if (payload.error) return reply(400, { code: 400, message: payload.error });
+
+  const upload = await imgStorage.uploadImage({
+    buffer: payload.buffer,
+    sourceUrl: payload.sourceUrl,
+    filename: payload.filename,
+    contentType: payload.contentType,
+    prefix: 'housing',
+    entityType,
+    entityId,
+    makeThumbs: b.make_thumbs !== false,
+  });
+  if (!upload.ok) return reply(400, { code: 400, message: upload.error });
+
+  const isCover = b.is_cover ? 1 : 0;
+  // 落库段：S3 已上传成功 → 失败必须补偿删对象（避免孤儿对象）；事务 + 归属行锁保 is_cover 唯一
+  await conn.beginTransaction();
+  try {
+    await conn.execute(`SELECT id FROM ${entityType === 'unit' ? 'units' : 'projects'} WHERE id=? FOR UPDATE`, [entityId]);
+    let sortOrder = b.sort_order == null || b.sort_order === '' ? null : parseInt(b.sort_order, 10);
+    if (sortOrder == null) {
+      const [next] = await conn.execute(
+        `SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM photos WHERE entity_type=? AND entity_id=?`,
+        [entityType, entityId]
+      );
+      sortOrder = next[0].n;
+    }
+    if (isCover) await conn.execute('UPDATE photos SET is_cover=0 WHERE entity_type=? AND entity_id=?', [entityType, entityId]);
+    const [ins] = await conn.execute(
+      'INSERT INTO photos(entity_type, entity_id, file_path, source_path, is_cover, sort_order) VALUES (?,?,?,?,?,?)',
+      [entityType, entityId, upload.url, b.source_path || upload.key || null, isCover, sortOrder]
+    );
+    if (entityType === 'project' && isCover) {
+      await conn.execute('UPDATE projects SET cover_image=? WHERE id=?', [upload.url, projectId]);
+    }
+    const [photo] = await conn.execute('SELECT * FROM photos WHERE id=?', [ins.insertId]);
+    await conn.commit();
+    return reply(200, {
+      code: 0, message: 'success',
+      storage: upload.storage,
+      file_path: upload.url,
+      thumb_240: upload.thumb_240 || null,
+      thumb_640: upload.thumb_640 || null,
+      bytes: upload.bytes,
+      warned: upload.warned || undefined,
+      photo: photo[0],
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    // 补偿删除已上传的对象（原图 + 两档缩略图）；失败仅告警，不覆盖原始错误
+    if (imgStorage && typeof imgStorage.deleteObjectByRef === 'function' && upload.storage === 's3' && upload.url) {
+      try { await imgStorage.deleteObjectByRef(upload.url); } catch (_) {}
+    }
+    return reply(500, { code: 500, message: '上传落库失败（对象已回收）: ' + String(e.message || e) });
+  }
 }
 
 /** 图集出参：分类中文名映射在 photo_config（单一数据源） */
@@ -1067,8 +1311,6 @@ async function housingPhotosSync(conn, body, vendorId) {
   try { norm = photoCfg.normalizeGalleryInput(b.photos); }
   catch (e) { return reply(400, { code: 400, message: e.message }); }
   const items = photoCfg.assignSortOrders(norm.items);
-  const coverIdx = photoCfg.pickCoverIndex(items);
-  const cover = coverIdx >= 0 ? items[coverIdx].file_path : (items[0] ? items[0].file_path : null);
 
   const [existing] = await conn.execute(
     'SELECT * FROM photos WHERE entity_type=? AND entity_id=? ORDER BY sort_order, id', [entityType, entityId]);
@@ -1084,6 +1326,46 @@ async function housingPhotosSync(conn, body, vendorId) {
   }));
   const keptIds = new Set(plan.filter((x) => x.hit).map((x) => x.hit.id));
   const delIds = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+  // 被覆盖删除的行（事务提交后按开关回收对象，默认不删防误删不可恢复）
+  const delRows = existing.filter((r) => !keptIds.has(r.id));
+  const deleteObjects = String(process.env.S3_DELETE_ON_PHOTO_DELETE || '0') === '1';
+
+  // ── 图片引用收口（规则 21/300：所有 file_path 写入必须经 img_storage.ingestRef）──
+  // 2026-10-14 修复：原先直接把入参 URL 写库，导致外链既不镜像进平台对象存储、也不记 source_path。
+  // 后果：商家推的是自家对象存储的**临时签名 URL**（X-Amz-Expires=432000 → 5 天后失效，长度已达 489，
+  // 距 photos.file_path 的 VARCHAR(500) 仅剩 11 字符余量），签名过期后 C 端整页 404；且 source_path
+  // 为空会让 photos/add 的幂等前置与 deleteObjectByRef 的「只删本域引用」双双失去依据。
+  // 镜像在事务**之前**做完（网络 I/O 不占锁），失败按 photos/add 同口径 400 显式暴露。
+  const warnings = norm.warnings.slice();
+  const resolved = [];
+  let externalKept = 0;
+  let externalWarn = '';
+  for (let i = 0; i < plan.length; i++) {
+    const { it, hit } = plan[i];
+    // 已镜像过的同一张图：按**剥掉查询串**的源地址比对（签名每次推送都在变）→ 复用存量引用，
+    // 免得每次全量覆盖都白传一份对象 + 两档缩略图，也让 C 端引用保持稳定。
+    if (hit && isManagedS3Ref(hit.file_path) && sameImageSource(hit.source_path, it.file_path)) {
+      resolved.push({ it, hit, ref: hit.file_path, source: hit.source_path || it.file_path });
+      continue;
+    }
+    const r = await normImgRef(it.file_path, { mirror: true, prefix: 'housing', entityType, entityId });
+    if (!r.ok) return reply(400, { code: 400, message: `photos[${i}].url 处理失败: ${r.error}` });
+    if (String(r.ref).length > 500) return reply(400, { code: 400, message: `photos[${i}].url 归一化后长度超过 500` });
+    if (r.ref === it.file_path) {                 // 未镜像（IMG_INGEST != mirror / 镜像回落本地）
+      if (looksSignedUrl(it.file_path)) {         // 只对「会过期的临时地址」告警，普通 CDN 直链不刷屏
+        externalKept += 1;
+        if (r.warn) externalWarn = r.warn;
+      }
+    } else if (r.warn) warnings.push(`photos[${i}] ${r.warn}`);
+    resolved.push({ it, hit, ref: r.ref, source: it.file_path });
+  }
+  if (externalKept) {
+    warnings.push(`有 ${externalKept} 张是带签名的临时地址且未镜像进平台对象存储（${externalWarn || '未镜像'}）：`
+      + '签名过期后 C 端会 404，建议服务端开 IMG_INGEST=mirror');
+  }
+  const coverIdx = photoCfg.pickCoverIndex(items);
+  const coverItem = coverIdx >= 0 ? coverIdx : 0;
+  const cover = resolved.length ? resolved[coverItem].ref : null;
 
   await conn.beginTransaction();
   try {
@@ -1095,18 +1377,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     }
     let added = 0;
     let updated = 0;
-    for (const { it, hit } of plan) {
-      const isCover = it.file_path === cover ? 1 : 0;
+    for (let i = 0; i < resolved.length; i++) {
+      const { it, hit, ref, source } = resolved[i];
+      const isCover = i === coverItem ? 1 : 0;
       if (hit) {
         await conn.execute(
-          'UPDATE photos SET file_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
-          [it.file_path, it.category, it.sort_order, isCover, it.external_id, hit.id]);
+          'UPDATE photos SET file_path=?, source_path=?, category=?, sort_order=?, is_cover=?, external_id=? WHERE id=?',
+          [ref, source, it.category, it.sort_order, isCover, it.external_id, hit.id]);
         updated++;
       } else {
         await conn.execute(
-          `INSERT INTO photos(entity_type, entity_id, file_path, category, sort_order, is_cover, external_id)
-           VALUES (?,?,?,?,?,?,?)`,
-          [entityType, entityId, it.file_path, it.category, it.sort_order, isCover, it.external_id]);
+          `INSERT INTO photos(entity_type, entity_id, file_path, source_path, category, sort_order, is_cover, external_id)
+           VALUES (?,?,?,?,?,?,?,?)`,
+          [entityType, entityId, ref, source, it.category, it.sort_order, isCover, it.external_id]);
         added++;
       }
     }
@@ -1115,7 +1398,19 @@ async function housingPhotosSync(conn, body, vendorId) {
     else await conn.execute('UPDATE units SET cover_image=? WHERE id=?', [cover, unitId]);
     await conn.commit();
 
-    const warnings = norm.warnings.slice();
+    // 对象回收（S3_DELETE_ON_PHOTO_DELETE=1 时）：行删除已提交，再删对象；
+    // 本域 S3 引用才删（外部第三方 URL / 本地引用自动跳过，见 deleteObjectByRef）
+    let objectsRemoved = 0;
+    if (deleteObjects && delRows.length && imgStorage && typeof imgStorage.deleteObjectByRef === 'function') {
+      for (const r of delRows) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const del = await imgStorage.deleteObjectByRef(r.file_path);
+          if (del && del.ok) objectsRemoved += 1;
+        } catch (_) { /* 单张失败不阻断；残留对象由对账脚本兜底 */ }
+      }
+    }
+
     const total = await galleryCountOf(conn, projectId);
     if (total < photoCfg.PHOTO_MIN_PUBLISH) {
       warnings.push(`该房源图集合计 ${total} 张，低于上架所需的 ${photoCfg.PHOTO_MIN_PUBLISH} 张（房源 + 户型合计）`);
@@ -1125,7 +1420,7 @@ async function housingPhotosSync(conn, body, vendorId) {
     return reply(200, {
       code: 0, message: 'success',
       entity_type: entityType, entity_id: entityId,
-      applied: items.length, added, updated, removed,
+      applied: items.length, added, updated, removed, objects_removed: objectsRemoved,
       cover, truncated: norm.truncated, warnings,
       gallery_total: total,
       photos: after.map(photoOut),
@@ -1203,7 +1498,7 @@ async function housingStayCalendarSet(conn, body, vendorId) {
   if (over.length) {
     return reply(400, { code: 400, message: '以下日期已订间数超过放出间数，须先取消订单或调高 qty：' + [...new Set(over.map((e) => e.date))].join('、') });
   }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   let affected = 0;
   for (const e of entries) {
     if (e.status === 'blocked') {
@@ -1347,8 +1642,8 @@ async function housingBookingsConfirm(conn, body, vendorId, options = {}) {
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
   if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'pending' && row.pay_status === 'unpaid' && row.payment_expires_at
-    && new Date(row.payment_expires_at.replace(' ', 'T') + 'Z').getTime() <= Date.now()) {
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    && new Date(row.payment_expires_at.replace(' ', 'T') + '+08:00').getTime() <= Date.now()) {
+    const now = bjStamp();
     await conn.execute("UPDATE booking_orders SET status='cancelled', pay_status='expired', updated_at=? WHERE id=? AND status='pending'", [now, row.id]);
     await stayCfg.releaseStayQty(connRows(conn), { project_id: row.project_id, unit_id: row.unit_id, rooms: row.rooms, checkin: row.checkin, checkout: row.checkout, now });
     await conn.commit();
@@ -1360,7 +1655,7 @@ async function housingBookingsConfirm(conn, body, vendorId, options = {}) {
     await conn.rollback();
     return reply(400, { code: 400, message: '租客尚未支付（收银台待付），支付完成后可确认生效' });
   }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   await conn.execute("UPDATE booking_orders SET status='confirmed', updated_at=? WHERE id=?", [now, row.id]);
   await conn.commit();
   return reply(200, { code: 0, message: 'success', id: row.id, order_no: row.order_no, status: 'confirmed' });
@@ -1384,7 +1679,7 @@ async function housingBookingsCancel(conn, body, vendorId, options = {}) {
   if (!row || row.owner_vendor_id !== vendorId) { await conn.rollback(); return reply(404, { code: 404, message: '订单不存在或不属于该商家' }); }
   if (row.pay_status != null) { await conn.rollback(); return reply(409, { code: 409, message: '订单支付状态变化，请重试统一支付处理' }); }
   if (row.status === 'cancelled') { await conn.rollback(); return reply(400, { code: 400, message: '订单已取消，不可再变更' }); }
-  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const now = bjStamp();
   const newPay = null; // Offline-only compatibility; online refunds use the payment adapter above.
   await conn.execute('UPDATE booking_orders SET status=?, pay_status=?, updated_at=? WHERE id=?', ['cancelled', newPay, now, row.id]);
   // 拒单/取消 → 释放库存（多间口径 2026-09-10：递减 booked_qty，商家差异行保留；与 B 端工作台同口径）
@@ -1454,6 +1749,7 @@ const HOUSING_ROUTES = {
   '/api/juzhu/housing/vendor/units/create': housingUnitsCreate,
   '/api/juzhu/housing/vendor/photos/add': housingPhotosAdd,
   '/api/juzhu/housing/vendor/photos/sync': housingPhotosSync,
+  '/api/juzhu/housing/vendor/photos/upload': housingPhotosUpload,
   '/api/juzhu/housing/vendor/units/update': housingUnitsUpdate,
   '/api/juzhu/housing/vendor/stay-calendar/set': housingStayCalendarSet,
   '/api/juzhu/housing/vendor/stay-calendar/query': housingStayCalendarQuery,

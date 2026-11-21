@@ -132,6 +132,32 @@ async function run() {
   assert.strictEqual(app.isVendorHmacPath('/api/juzhu/jiazheng/vendor/products/list', 'POST'), true);
   assert.strictEqual(app.isVendorHmacPath('/api/juzhu/jiazheng/orders', 'POST'), false);
 
+  assert.strictEqual(app.OPEN_API_HOST_PREFIX, 'test-xjz-open');
+  assert.strictEqual(app.OPEN_API_HOST_GATE, false);
+  assert.strictEqual(app.isOpenApiHost({ headers: { host: 'test-xjz-open.ke.com' } }), true);
+  assert.strictEqual(app.isOpenApiHost({ headers: { host: 'test-xjz-open.ke.com:8080' } }), true);
+  assert.strictEqual(app.isOpenApiHost({ headers: { 'x-forwarded-host': 'test-xjz-open.example.com, proxy.internal' } }), true);
+  assert.strictEqual(app.isOpenApiHost({ headers: { host: 'localhost:8080' } }), false);
+  assert.strictEqual(app.isOpenApiHost({ headers: { host: 'sytest.meizu.life', 'x-forwarded-host': 'test-xjz-open.ke.com' } }), true);
+  const openHost = { headers: { host: 'test-xjz-open.ke.com' } };
+  assert.strictEqual(app.isOpenApiAllowedPath('/', 'GET'), false);
+  assert.strictEqual(app.isOpenApiAllowedPath('/api/juzhu/catalog', 'GET'), false);
+  assert.strictEqual(app.isOpenApiAllowedPath('/screens/p-vendor-onboarding.html', 'GET'), false);
+  assert.strictEqual(app.isOpenApiAllowedPath('/api/juzhu/housing/vendor/projects/list', 'POST'), true);
+  for (const page of ['/screens/open-platform.html', '/screens/property-intake-api.html', '/screens/vendor-onboarding.html', '/screens/_region.js', '/screens/_nav.js']) {
+    assert.strictEqual(app.isOpenApiAllowedPath(page, 'GET'), true, page);
+  }
+  assert.strictEqual(app.isOpenApiAllowedPath('/api/juzhu/onboarding/apply', 'POST'), true);
+  assert.strictEqual(app.isOpenApiAllowedPath('/api/juzhu/onboarding/status', 'GET'), true);
+  const blocked = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'GET' }, blocked, '/'), false);
+  assert.strictEqual(blocked.statusCode, null);
+  const catalog = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ ...openHost, method: 'GET' }, catalog, '/api/juzhu/catalog'), false);
+  assert.strictEqual(catalog.statusCode, null);
+  const otherHost = mockRes();
+  assert.strictEqual(app.rejectUnlessOpenApi({ method: 'GET', headers: { host: 'localhost:8080' } }, otherHost, '/'), false);
+
   if (prevKey === undefined) delete process.env.JUZHU_API_KEY;
   else process.env.JUZHU_API_KEY = prevKey;
 
